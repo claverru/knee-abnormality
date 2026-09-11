@@ -1,0 +1,155 @@
+{
+  "review_date": "2026-09-10",
+  "scope": "Selected source inspections only; no external code execution, artifact audit, score reproduction, or dataset download. Paper and discussion bibliographies are in the topic documents.",
+  "cell_numbering": "Zero-based source-cell indices, including Markdown cells.",
+  "hash_definition": "SHA-256 of downloaded file bytes, not normalized source.",
+  "sources": [
+    {
+      "repository": "https://github.com/Theoviel/kaggle_rsna_lumbar_spine",
+      "path": "README.md",
+      "kind": "solution prose",
+      "commit": "0e4dbea8ce16249792ec64cefa4cd5510eda7cdb",
+      "commit_date": "2024-10-28T16:42:50Z",
+      "url": "https://github.com/Theoviel/kaggle_rsna_lumbar_spine/blob/0e4dbea8ce16249792ec64cefa4cd5510eda7cdb/README.md",
+      "download_url": "https://raw.githubusercontent.com/Theoviel/kaggle_rsna_lumbar_spine/0e4dbea8ce16249792ec64cefa4cd5510eda7cdb/README.md",
+      "sha256": "68cd623afe9d95bb178956ad16753b7421a06933ed17ba6ff15331ac69ab53d2",
+      "bytes": 9023
+    },
+    {
+      "repository": "https://github.com/Theoviel/kaggle_rsna_lumbar_spine",
+      "path": "notebooks/CoordsInf.ipynb",
+      "kind": "notebook",
+      "commit": "0e4dbea8ce16249792ec64cefa4cd5510eda7cdb",
+      "commit_date": "2024-10-28T16:42:50Z",
+      "url": "https://github.com/Theoviel/kaggle_rsna_lumbar_spine/blob/0e4dbea8ce16249792ec64cefa4cd5510eda7cdb/notebooks/CoordsInf.ipynb",
+      "download_url": "https://raw.githubusercontent.com/Theoviel/kaggle_rsna_lumbar_spine/0e4dbea8ce16249792ec64cefa4cd5510eda7cdb/notebooks/CoordsInf.ipynb",
+      "sha256": "baac59769ce081d4472c181dbc0782c2b2d01f0af38eea32f0986a866382d938",
+      "bytes": 13147,
+      "reviewed_source_cells": [
+        7,
+        13,
+        14,
+        15,
+        16,
+        17
+      ],
+      "cell_count": 19
+    },
+    {
+      "repository": "https://github.com/Theoviel/kaggle_rsna_lumbar_spine",
+      "path": "notebooks/Training_Lvl2.ipynb",
+      "kind": "notebook",
+      "commit": "0e4dbea8ce16249792ec64cefa4cd5510eda7cdb",
+      "commit_date": "2024-10-28T16:42:50Z",
+      "url": "https://github.com/Theoviel/kaggle_rsna_lumbar_spine/blob/0e4dbea8ce16249792ec64cefa4cd5510eda7cdb/notebooks/Training_Lvl2.ipynb",
+      "download_url": "https://raw.githubusercontent.com/Theoviel/kaggle_rsna_lumbar_spine/0e4dbea8ce16249792ec64cefa4cd5510eda7cdb/notebooks/Training_Lvl2.ipynb",
+      "sha256": "863874f5a3e44f40b89a0fca8206a4751d11aab0946a4e821efa4f2615e7e25f",
+      "bytes": 9949,
+      "reviewed_source_cells": [
+        8,
+        9,
+        11,
+        15,
+        19,
+        20,
+        21,
+        22
+      ],
+      "cell_count": 25
+    },
+    {
+      "repository": "https://github.com/uchiyama33/rsna2025_1st_place",
+      "path": "solution_v2_1.md",
+      "kind": "solution prose",
+      "commit": "e1dcdf0058e1e0d0044d8053e92243b4b4794555",
+      "commit_date": "2025-10-21T11:51:48Z",
+      "url": "https://github.com/uchiyama33/rsna2025_1st_place/blob/e1dcdf0058e1e0d0044d8053e92243b4b4794555/solution_v2_1.md",
+      "download_url": "https://raw.githubusercontent.com/uchiyama33/rsna2025_1st_place/e1dcdf0058e1e0d0044d8053e92243b4b4794555/solution_v2_1.md",
+      "sha256": "9c5492b53d30ecbe639fc2716c2c690abc13005e5f7db3a5c67a287b366113b6",
+      "bytes": 15534
+    },
+    {
+      "repository": "https://github.com/uchiyama33/rsna2025_1st_place",
+      "path": "rsna2025-submission-1st-place.ipynb",
+      "kind": "notebook",
+      "commit": "e1dcdf0058e1e0d0044d8053e92243b4b4794555",
+      "commit_date": "2025-10-21T11:51:48Z",
+      "url": "https://github.com/uchiyama33/rsna2025_1st_place/blob/e1dcdf0058e1e0d0044d8053e92243b4b4794555/rsna2025-submission-1st-place.ipynb",
+      "download_url": "https://raw.githubusercontent.com/uchiyama33/rsna2025_1st_place/e1dcdf0058e1e0d0044d8053e92243b4b4794555/rsna2025-submission-1st-place.ipynb",
+      "sha256": "15c078e0b0850cf78f3e2982de3f149606139032b0d8c5675ca02bee3248f8a2",
+      "bytes": 8211,
+      "reviewed_source_cells": [
+        1,
+        2,
+        3,
+        4,
+        7,
+        8
+      ],
+      "cell_count": 9
+    },
+    {
+      "repository": "https://github.com/uchiyama33/rsna2025_1st_place",
+      "path": "src/models/components/region_mask_pooling.py",
+      "kind": "Python source",
+      "commit": "e1dcdf0058e1e0d0044d8053e92243b4b4794555",
+      "commit_date": "2025-10-21T11:51:48Z",
+      "url": "https://github.com/uchiyama33/rsna2025_1st_place/blob/e1dcdf0058e1e0d0044d8053e92243b4b4794555/src/models/components/region_mask_pooling.py",
+      "download_url": "https://raw.githubusercontent.com/uchiyama33/rsna2025_1st_place/e1dcdf0058e1e0d0044d8053e92243b4b4794555/src/models/components/region_mask_pooling.py",
+      "sha256": "0c4d33d6a4bb3f146c469aefee8b16b70c1c916cb027dd938396555c0da65c57",
+      "bytes": 15571
+    },
+    {
+      "repository": "https://github.com/FirasBaba/brain-tumor-radiogen",
+      "path": "working/dataset.py",
+      "kind": "Python source",
+      "commit": "db805687a453d3f4174301bc3385d9c3e288482e",
+      "commit_date": "2024-01-15T16:55:28Z",
+      "url": "https://github.com/FirasBaba/brain-tumor-radiogen/blob/db805687a453d3f4174301bc3385d9c3e288482e/working/dataset.py",
+      "download_url": "https://raw.githubusercontent.com/FirasBaba/brain-tumor-radiogen/db805687a453d3f4174301bc3385d9c3e288482e/working/dataset.py",
+      "sha256": "11d90a02c4c25539b854f92265f9c770b85ffddbee207ed94b360cbe9008e645",
+      "bytes": 3520
+    },
+    {
+      "repository": "https://github.com/FirasBaba/brain-tumor-radiogen",
+      "path": "working/config.py",
+      "kind": "Python source",
+      "commit": "db805687a453d3f4174301bc3385d9c3e288482e",
+      "commit_date": "2024-01-15T16:55:28Z",
+      "url": "https://github.com/FirasBaba/brain-tumor-radiogen/blob/db805687a453d3f4174301bc3385d9c3e288482e/working/config.py",
+      "download_url": "https://raw.githubusercontent.com/FirasBaba/brain-tumor-radiogen/db805687a453d3f4174301bc3385d9c3e288482e/working/config.py",
+      "sha256": "742cde6714fc334326c6ea7e83e0dcf965767fcff877b3ddbaa71b4a2af55db0",
+      "bytes": 123
+    },
+    {
+      "repository": "https://github.com/microsoft/fastmri-plus",
+      "path": "ExampleScripts/example.ipynb",
+      "kind": "notebook",
+      "commit": "67ed9a68ee33d3197f93893e8125688470c4a577",
+      "commit_date": "2021-09-07T21:01:53Z",
+      "url": "https://github.com/microsoft/fastmri-plus/blob/67ed9a68ee33d3197f93893e8125688470c4a577/ExampleScripts/example.ipynb",
+      "download_url": "https://raw.githubusercontent.com/microsoft/fastmri-plus/67ed9a68ee33d3197f93893e8125688470c4a577/ExampleScripts/example.ipynb",
+      "sha256": "f1d57d4e7d276b0d9f645c9d6b63938bbfe17b7501860916ee9e87906570143f",
+      "bytes": 210841,
+      "reviewed_source_cells": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "cell_count": 6
+    },
+    {
+      "repository": "https://github.com/TheoViel/kaggle_rsna_abdominal_trauma",
+      "path": "src/inference/extract_features.py",
+      "kind": "Python source",
+      "commit": "6e9d193cb60b11c2a3c1597d430d53615173b441",
+      "commit_date": "2024-02-16T14:59:38Z",
+      "url": "https://github.com/TheoViel/kaggle_rsna_abdominal_trauma/blob/6e9d193cb60b11c2a3c1597d430d53615173b441/src/inference/extract_features.py",
+      "download_url": "https://raw.githubusercontent.com/TheoViel/kaggle_rsna_abdominal_trauma/6e9d193cb60b11c2a3c1597d430d53615173b441/src/inference/extract_features.py",
+      "sha256": "e3b6518a77030549709e363adda18b4323851ca7cc1fd8898e127f08e7d3e699",
+      "bytes": 8052
+    }
+  ]
+}

@@ -1,0 +1,91 @@
+version: 1
+scripts:
+  - id: train-baseline
+    path: scripts/pipeline/train.py
+    summary: Train one or more fixed-fold baseline models with on-the-fly MRI preparation and save validation predictions.
+    tags: [train, baseline, lightning, fold, checkpoint, auc, mri]
+    commands:
+      - rtk proxy uv run --locked just train baseline5
+      - rtk proxy uv run --locked just resume baseline5-resumed outputs/baseline5/fold_0/last.ckpt outputs/baseline5/effective_config.json
+      - rtk proxy uv run --locked python -m scripts.pipeline.train configs/baseline.yaml
+      - rtk proxy uv run --locked python -m scripts.pipeline.train configs/baseline.yaml --folds 0,1,2,3,4
+    inputs: [Experiment YAML, Raw training DICOMs and metadata, Pinned public labels, Saved fold protocol]
+    outputs: [Run directory with effective config, provenance, checkpoints, logs, epoch metrics, and validation predictions]
+    notes:
+      - just train defaults to fold 0 for iterative development; resume requires a new run ID and the saved configuration.
+      - Creates a fresh timestamped run unless --run-id is supplied; existing run directories are never overwritten.
+      - --limit-train is for small development executions and does not change complete validation.
+      - The current all-study split validates the entire held-out fold and monitors macro AUC against frozen targets thresholded at 0.5, with separate gold diagnostics; training BCE keeps soft targets.
+      - Defaults CUDA allocation to expandable segments unless PYTORCH_ALLOC_CONF or PYTORCH_CUDA_ALLOC_CONF is supplied; records the setting in provenance.
+      - Saves the best checkpoint separately from last.ckpt, which is refreshed every epoch independently of validation improvement.
+      - Honors model.pretrained for fresh runs; resume requires matching training settings and recorded input identities. Legacy checkpoints without identities support prediction only.
+      - The baseline packs three consecutive non-overlapping slices into each input and uses ImageNet mean/std; data.input_mode is saved and checked with the run.
+      - max_images counts raw slices and must be divisible by three in adjacent_triplets mode; incomplete triplets are omitted and batch padding is masked before the CNN and transformer.
+      - The baseline uses a ten-epoch budget with one warmup epoch and patience ten; training adds series-consistent gamma/contrast augmentation, disabled during validation and prediction.
+    docs: [docs/modeling.md, docs/architecture.md#experiment-artifacts-and-reproducibility, docs/modeling.md#batch-4-memory-fix, docs/baseline-review.md#implemented-corrections]
+
+  - id: predict-baseline
+    path: scripts/pipeline/predict.py
+    summary: Reload a baseline checkpoint for deterministic validation or offline test prediction.
+    tags: [predict, inference, submission, validation, checkpoint, offline]
+    commands:
+      - rtk proxy uv run --locked just infer outputs/exports/run-fold0
+      - rtk proxy uv run --locked just validate outputs/run/effective_config.json outputs/run/fold_0/best.ckpt outputs/run/reproduced.csv
+      - rtk proxy uv run --locked python -m scripts.pipeline.predict configs/baseline.yaml --checkpoint outputs/run/fold_0/best.ckpt --output outputs/run/submission.csv
+      - rtk proxy uv run --locked env PYTHONPATH=outputs/exports/run-fold0/code python -m scripts.pipeline.predict outputs/exports/run-fold0/config.json --bundle outputs/exports/run-fold0 --data-root data --output outputs/submission.csv --device auto --precision auto --num-workers 2
+      - rtk proxy uv run --locked env PYTHONPATH=outputs/exports/run-fold0/code python -m scripts.pipeline.predict outputs/exports/run-fold0/config.json --bundle outputs/exports/run-fold0 --data-root data --label-manifest docs/public-label-sources.json --output outputs/reproduced.csv --split validation --fold 0 --device cpu --precision fp32
+      - rtk proxy uv run --locked python -m scripts.pipeline.predict configs/baseline.yaml --checkpoint outputs/run/fold_0/best.ckpt --output outputs/run/fold_0/reproduced.csv --split validation --fold 0
+      - rtk proxy uv run --locked python -m scripts.pipeline.predict outputs/baseline1/effective_config.json --checkpoint outputs/baseline1/fold_0/best-epoch=04-val_macro_auc=0.84400.ckpt --output outputs/baseline1-reproduced.csv --split validation --fold 0
+    inputs: [Experiment YAML or saved effective_config.json, Lightning checkpoint with saved configuration and target order, Raw validation or test DICOMs and metadata]
+    outputs: [Study-level validation predictions or submission CSV]
+    notes:
+      - Constructs the backbone without downloading pretrained weights, then loads all model parameters from the checkpoint.
+      - Test output is aligned to sample_submission.csv and preserves one row per requested study.
+      - Validates input and model semantics, target order, and producing fold for validation; storage locations and inference runtime settings can differ.
+      - The current baseline uses physical millimeter positions. Use baseline1's saved effective_config.json to reproduce its legacy index positions.
+      - Loads the saved channel count and normalization recipe; baseline1's saved config retains its one-channel input and scalar normalization.
+      - Missing data.input_mode defaults to legacy single_slice; adjacent_triplets checkpoints require the matching triplet input recipe.
+      - Accepts direct competition mounts or the repository data_root/raw layout and discovers test membership from the mounted submission template and series metadata.
+      - Runtime overrides support batch size, workers, device and autocast precision. Auto uses native CUDA BF16 and otherwise FP32; explicit FP16 requires CUDA. Bundle batch size defaults to its exported value.
+      - Bundle mode verifies the manifest and all packaged file hashes before loading the frozen config and checkpoint.
+      - Test inference defaults to 2x image limits; validation uses its saved validation multiplier. --image-multiplier changes repository inference, while bundles freeze this choice at export.
+      - Packaged validation reproduction also requires the original data root and an explicit label manifest because training labels and folds are not bundled.
+    docs: [docs/modeling.md, docs/inference-efficiency.md, docs/baseline-review.md#implemented-corrections]
+
+  - id: export-inference-bundle
+    path: scripts/pipeline/export.py
+    summary: Export an explicitly selected training checkpoint as an atomic, portable inference bundle and notebook.
+    tags: [export, inference, bundle, checkpoint, notebook, offline, wheels, manifest]
+    commands:
+      - rtk proxy uv run --locked just export outputs/run/fold_0/best.ckpt outputs/exports/run-fold0-3x 3
+      - rtk proxy uv run --locked python -m scripts.pipeline.export --checkpoint outputs/run/fold_0/best.ckpt --output outputs/exports/run-fold0-2x --wheel-dir outputs/dependencies/kaggle-v170 --target-python 3.12 --target-platform manylinux_x86_64 --image-multiplier 2 --inference-batch-size 2
+      - rtk proxy uv run --locked python -m scripts.pipeline.export --checkpoint outputs/run/fold_0/best.ckpt --output outputs/exports/run-fold0 --wheel-dir outputs/dependencies/kaggle --target-python 3.12 --target-platform manylinux_x86_64 --verification-record outputs/verification/run-fold0.json
+    inputs: [Explicit scored Lightning checkpoint, Current frozen prediction source, Optional prepared wheel directory, Target Python and platform identity, Optional artifact verification record]
+    outputs: [Versioned inference bundle with checkpoint, portable config, manifest, source, requirements, wheels, licenses, and notebook]
+    notes:
+      - just export accepts checkpoint, output, optional image multiplier and batch size, then wheel directory and target runtime; defaults use 2x images, batch size 2, Kaggle v170 codec wheels and Python 3.12.
+      - Requires an explicit checkpoint path, rejects existing destinations, builds in a temporary sibling directory, and publishes only after reconstructing the model strictly and hashing every artifact.
+      - Retains model state and required semantic metadata while removing optimizer, scheduler, callback and loop state.
+      - Routine export runs no local inference; readiness requires target-runtime information, DICOM codec wheels and strict checkpoint reconstruction. Records optional verification and source correspondence separately.
+      - Verification evidence is bound to checkpoint and bundled-source hashes and records validation reproduction, example output validity and compressed-DICOM decoding.
+      - Only explicit --quick-verify runs about 16 held-out studies plus example inference and memory profiling in frozen source; it requires --codec-reference-bundle with hash-identical verified codec wheels. This is not part of routine submission preparation.
+      - --image-multiplier freezes inference density without rewriting checkpoint training settings; notebook batch size defaults to 2 and can be set at export.
+      - Performs no training, upload, notebook execution or submission.
+    docs: [docs/inference-efficiency.md#fast-submission-preparation, docs/inference-efficiency.md#model-bundle-and-offline-environment]
+
+  - id: submit-inference-bundle
+    path: scripts/pipeline/submit.py
+    summary: Version a private bundle dataset, run an offline Kaggle notebook, verify its output and submit the exact successful notebook version.
+    tags: [submit, kaggle, dataset, notebook, offline, competition, score, provenance]
+    commands:
+      - rtk proxy uv run --locked just submit outputs/exports/run-fold0 OWNER/knee-fold0-bundle OWNER/knee-inference outputs/submissions/run-fold0.json
+      - rtk proxy uv run --locked python -m scripts.pipeline.submit --bundle outputs/exports/run-fold0 --dataset OWNER/knee-fold0-bundle --notebook OWNER/knee-inference --record outputs/submissions/run-fold0.json --message "Fold 0"
+    inputs: [Ready bundle with valid file hashes, Explicit Kaggle dataset ID, Explicit Kaggle notebook ID, Kaggle credentials and competition access]
+    outputs: [Private dataset version, Offline notebook version, Verified notebook output, Competition submission, Incremental JSON workflow record]
+    notes:
+      - just submit launches the maintained workflow in a detached user service; just submit-foreground is the explicit blocking variant. Monitor with just submit-status, submit-logs or submissions.
+      - Refuses unready bundles, existing record paths and overlapping notebook runs.
+      - Records each remote response before advancing; notebook failure or invalid submission.csv prevents competition submission.
+      - Records timestamped stage transitions in history and prints them for detached runner logs; queue and scoring intervals include polling delay.
+      - Downloads and validates the saved notebook output before submitting that exact notebook version, then records available status and scores.
+    docs: [docs/inference-efficiency.md#control-the-workflow-from-the-local-cli]
