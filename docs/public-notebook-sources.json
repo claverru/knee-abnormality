@@ -1,0 +1,48 @@
+{
+  "checked_on": "2026-09-09",
+  "method": "Kaggle CLI 2.0.2 kernels pull with metadata; source read without executing. Kernel IDs are not source-version IDs. Attached data, weights and their provenance were not audited. Hashes identify downloaded source bytes; later pulls may differ.",
+  "sources": [
+    {
+      "url": "https://www.kaggle.com/code/dreaddevelopment/knee-mri-training-the-twelve-finding-model",
+      "kernel_id": 131724100,
+      "source_version_id": null,
+      "source_filename": "knee-mri-training-the-twelve-finding-model.py",
+      "sha256": "6ea209b03c33bf21d50d89e9e9696e2aecf90c4bcccdd1037c0b3711ab3d3699"
+    },
+    {
+      "url": "https://www.kaggle.com/code/mattiaangeli/bend-the-knee-to-dinov3-ensembled",
+      "kernel_id": 130531648,
+      "source_version_id": null,
+      "source_filename": "bend-the-knee-to-dinov3-ensembled.ipynb",
+      "sha256": "d0fba9215910fa1b169c168baf3dd6ffcb4dae136192049343a3aa688eaf2364"
+    },
+    {
+      "url": "https://www.kaggle.com/code/pilkwang/rsna-knee-baseline-v1",
+      "kernel_id": 129842990,
+      "source_version_id": null,
+      "source_filename": "rsna-knee-baseline-v1.ipynb",
+      "sha256": "b32a9155fcc73c519e75e78c08e07d30393efc591c2798a3e40ca92f39832bb8"
+    },
+    {
+      "url": "https://www.kaggle.com/code/prvsiyan/head-and-shoulders-knees-and-toes",
+      "kernel_id": 130532439,
+      "source_version_id": null,
+      "source_filename": "head-and-shoulders-knees-and-toes.ipynb",
+      "sha256": "e0c8e3e31fca89835c8973b0ba9dd63dbe28233c31af7a0daa2b112e437b887f"
+    },
+    {
+      "url": "https://www.kaggle.com/code/romantamrazov/rsna-knee-dinosaur-v4-train",
+      "kernel_id": 131474296,
+      "source_version_id": null,
+      "source_filename": "rsna-knee-dinosaur-v4-train.ipynb",
+      "sha256": "3385ea6750063a76c264a5385e7ba1e936895e1b401c5a666d6f27f554417080"
+    },
+    {
+      "url": "https://www.kaggle.com/code/wguesdon/rsna-knee-dinov2-at-meniscus-resolution",
+      "kernel_id": 129833533,
+      "source_version_id": null,
+      "source_filename": "rsna-knee-dinov2-at-meniscus-resolution.ipynb",
+      "sha256": "387c8bedb0c87d8ca40f3d7b2bbe57ff1492681c37124f4aa05a5a8016f4c56b"
+    }
+  ]
+}

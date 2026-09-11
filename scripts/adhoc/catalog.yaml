@@ -1,0 +1,86 @@
+version: 1
+scripts:
+  - id: profile-threaded-loading
+    path: scripts/adhoc/profile_threaded_loading.py
+    summary: Compare worker-local slice threads against process-only loading on fixed real studies.
+    tags: [profile, threading, parallel, dataloader, throughput, gpu, preprocessing]
+    commands:
+      - rtk proxy uv run --locked python -m scripts.adhoc.profile_threaded_loading configs/baseline.yaml --mode audit --samples 8 --output-dir outputs/profiling/threading-audit-new
+      - rtk proxy uv run --locked python -m scripts.adhoc.profile_threaded_loading configs/baseline.yaml --mode gpu --workers 8 --decode-threads 1 --samples 256 --output-dir outputs/profiling/threading-gpu-new
+      - rtk proxy env OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 uv run --locked python -m scripts.adhoc.profile_threaded_loading configs/baseline.yaml --mode loader --workers 4 --decode-threads 2 --samples 512 --warmup-batches 16 --output-dir outputs/profiling/threading-loader-new
+    inputs: [Baseline config, Training DICOMs, Frozen fold and label sources]
+    outputs: [Per-batch timings and losses, Prepared-input audit hashes, Configuration and source snapshots]
+    notes:
+      - Experimental subclass leaves production loading unchanged; one thread calls the production preparation function.
+      - Reuses bounded pools created lazily after worker startup; preserves serial indexing and sampling and ordered joint clipping.
+      - Selects four maximum-load training studies plus a seeded random sample; two passes repeat epoch-zero slice choices with persistent workers.
+      - GPU mode uses bounded optimization steps with seeded random weights, current augmentation and constant learning rates; saves no checkpoint or validation metric.
+      - Warmup batches are excluded from throughput; OS page cache is uncontrolled, so first passes are not cold-disk measurements.
+      - Default loader mode consumes CPU batches immediately without pinning or GPU work and records wall-clock studies/s and selected slices/s.
+      - Honors adjacent_triplets sampling and complete-group failure handling; records CNN-input and raw-slice counts separately. Historical single-slice measurements use their source/config snapshots.
+      - Uses production pooled acquisition allocation, center-weighted sampling and position references when configured; decode threading only changes pixel loading.
+      - Audit mode compares all collated fields with production on real studies without using CUDA.
+    docs: [docs/data-preparation.md#threading-inside-dataset-loading]
+  - id: profile-training
+    path: scripts/adhoc/profile_training.py
+    summary: Profile a bounded real-data sample to locate preprocessing costs and size baseline training batches.
+    tags: [profile, preprocessing, throughput, batch, memory, gpu]
+    commands:
+      - rtk proxy uv run --locked python -m scripts.adhoc.profile_training configs/baseline.yaml --output-dir outputs/profiling/preprocessing --mode preprocessing
+      - rtk proxy uv run --locked python -m scripts.adhoc.profile_training configs/baseline.yaml --output-dir outputs/profiling/gpu-new --mode gpu --batch-sizes 4 --samples 4 --warmup 1 --steps 2
+      - rtk proxy uv run --locked python -m scripts.adhoc.profile_training configs/baseline.yaml --output-dir outputs/profiling/loader-new --mode loader --batch-sizes 4 --workers 2,4,8 --samples 48 --warmup 2 --steps 6 --threads 16
+      - rtk proxy uv run --locked python -m scripts.adhoc.profile_training configs/baseline.yaml --output-dir outputs/profiling/lightning-new --mode lightning --samples 64 --warmup 1 --steps 2 --threads 16
+    inputs: [Baseline config, Training DICOMs, Frozen fold and label sources]
+    outputs: [JSON timings and input identities, Source snapshot, CPU profiles, GPU memory and loader wait measurements, Backbone BatchNorm update counts]
+    notes:
+      - Samples fold-0 training studies only, retaining full configured slice limits.
+      - Reports raw slices separately from CNN inputs when adjacent_triplets mode packs three slices per input.
+      - Counts and hashes each selected acquisition separately while retaining the configured total budget per plane/contrast.
+      - Uses a few development steps without running an epoch or reporting validation AUC.
+      - GPU modes use seeded random weights and require CUDA; capacity profiling disables series dropout.
+      - Capacity mode records BatchNorm counters to audit recomputation during activation checkpointing.
+      - Uses the training CUDA allocator default and records explicit environment overrides in the manifest.
+      - GPU sweeps stop on OOM or excessive allocator reservation; Lightning mode refuses to exhaust its subset.
+      - Metadata indexes are reused on the second preprocessing pass; loader profiling starts with empty header caches.
+    docs: [docs/data-preparation.md#preprocessing-profile-and-optimization, docs/modeling.md#batch-4-memory-fix, docs/modeling.md#profiled-training-runtime]
+
+  - id: audit-metadata
+    path: scripts/adhoc/audit_metadata.py
+    summary: Audit official CSV schemas, study and series coverage, report duplicates, and gold labels.
+    tags: [metadata, data, csv, audit, series, reports, labels, gold]
+    commands:
+      - rtk proxy uv run --locked python -m scripts.adhoc.audit_metadata --help
+      - rtk proxy uv run --locked python -m scripts.adhoc.audit_metadata
+    inputs: [Five official competition CSVs under data/raw/]
+    outputs: [data/metadata/audit.json, data/metadata/label_counts.csv]
+    notes:
+      - Writes aggregate outputs and file hashes; report text is not emitted.
+      - Existing output files are overwritten; --output-dir selects another destination.
+    docs: [docs/metadata.md]
+
+  - id: audit-public-labels
+    path: scripts/adhoc/audit_public_labels.py
+    summary: Compare pinned Steven, Pilkwang, and lixin labels for coverage, uncertainty, and gold agreement.
+    tags: [labels, silver, gold, audit, steven, pilkwang, lixin, uncertainty, provenance]
+    commands:
+      - rtk proxy uv run --locked python -m scripts.adhoc.audit_public_labels --help
+      - rtk proxy uv run --locked python -m scripts.adhoc.audit_public_labels
+    inputs: [docs/public-label-sources.json, Pinned public label CSVs, Official gold labels and saved folds]
+    outputs: [data/labels/audit/public-v1/]
+    notes:
+      - Verifies source hashes and specific label transformations; source names are fixed in this investigation.
+      - Existing aggregate outputs are overwritten; --output-dir selects another destination.
+    docs: [docs/public-label-audit.md#acquisition-and-reproduction]
+
+  - id: check-environment
+    path: scripts/adhoc/check_environment.py
+    summary: Historical synthetic checks of the local data libraries and CUDA training stack.
+    tags: [environment, setup, cuda, gpu, torch, dicom, dependencies]
+    status: historical
+    commands: []
+    inputs: [Installed Python dependencies, NVIDIA GPU]
+    outputs: [Console diagnostics]
+    notes:
+      - Contains synthetic checks; do not execute under the current repository rule against running tests.
+      - Retained to explain the historical environment verification, not as evidence of MRI pipeline correctness.
+    docs: [docs/environment.md#local-verification]

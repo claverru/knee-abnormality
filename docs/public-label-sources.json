@@ -1,0 +1,124 @@
+{
+  "downloaded_at": "2026-09-10T08:15:06.775069+00:00",
+  "competition": "rsna-knee-abnormality-detection",
+  "method": "Kaggle CLI 2.0.2 version-specific dataset downloads; public dataset-view API metadata saved separately. Dataset versions differ from label recipe names. Downloaded Python source inspected, never executed.",
+  "inputs": [
+    {
+      "path": "data/raw/train.csv",
+      "bytes": 5690007,
+      "sha256": "8ca2203c0e9d61c080c7a314c7cdb51c1b03a1d9eb4770819f7f34af53ef4e33"
+    },
+    {
+      "path": "data/raw/sample_submission.csv",
+      "bytes": 470,
+      "sha256": "bf96706cfea74f089b0450290206e659bf5ee2a17a8d732774e1f2a5bcac53e4"
+    },
+    {
+      "path": "data/folds/gold_5fold_v1/studies.csv",
+      "bytes": 612496,
+      "sha256": "f32934f4e13d55fa53aa4245cc7ad26b6747ababe35b7c54e52ef20f07eef176"
+    },
+    {
+      "path": "data/folds/gold_5fold_v1/protocol.json",
+      "bytes": 1764,
+      "sha256": "1810bcbbebe2bac716076dc4fa2453232fbaae32ad4100cba79e94bfab5c84c1"
+    }
+  ],
+  "sources": [
+    {
+      "dataset": "stevenleehans/rsna-knee-llm-report-labels",
+      "dataset_id": 11549447,
+      "dataset_version": 6,
+      "url": "https://www.kaggle.com/datasets/stevenleehans/rsna-knee-llm-report-labels/versions/6",
+      "license": "CC0: Public Domain",
+      "api_metadata_url": "https://www.kaggle.com/api/v1/datasets/view/stevenleehans/rsna-knee-llm-report-labels",
+      "download_command": "rtk proxy uv run --locked kaggle datasets download stevenleehans/rsna-knee-llm-report-labels/6 -p data/labels/public/stevenleehans/version-6 --unzip -q",
+      "files": [
+        {
+          "path": "data/labels/public/stevenleehans/version-6/dataset-metadata.json",
+          "bytes": 5720,
+          "sha256": "4fc5a8bb3fb2e837ac9f47af3365c48660d8b70722e82bdaa37bfc1911f50fa8"
+        },
+        {
+          "path": "data/labels/public/stevenleehans/version-6/dataset-view.json",
+          "bytes": 18034,
+          "sha256": "d590d331f855d8f3d8803cc55cc1fb276b98b5cb2af34fbc0ef2e756b514c240"
+        },
+        {
+          "path": "data/labels/public/stevenleehans/version-6/llm_labels_full.csv",
+          "bytes": 534442,
+          "sha256": "96444cd3c7d396bae4a71454317d9cbe0689759b5278b30939781e04d0774537",
+          "label_table": "steven_v1"
+        },
+        {
+          "path": "data/labels/public/stevenleehans/version-6/llm_labels_v2.csv",
+          "bytes": 548231,
+          "sha256": "3c082a987939528a55202028f655bd6f9dc5c9e28eff5058bbae7ef088a9f144",
+          "label_table": "steven_v2"
+        },
+        {
+          "path": "data/labels/public/stevenleehans/version-6/llm_labels_v4_blend.csv",
+          "bytes": 630153,
+          "sha256": "eb4c2b29e7e84adbb4b5ccee825ca20ade6a43dbe295f13be442d549e4f5dca4",
+          "label_table": "steven_v4"
+        }
+      ]
+    },
+    {
+      "dataset": "pilkwang/rsna-knee-llm-labels",
+      "dataset_id": 11529209,
+      "dataset_version": 1,
+      "url": "https://www.kaggle.com/datasets/pilkwang/rsna-knee-llm-labels/versions/1",
+      "license": "CC0: Public Domain",
+      "api_metadata_url": "https://www.kaggle.com/api/v1/datasets/view/pilkwang/rsna-knee-llm-labels",
+      "download_command": "rtk proxy uv run --locked kaggle datasets download pilkwang/rsna-knee-llm-labels/1 -p data/labels/public/pilkwang/version-1 --unzip -q",
+      "files": [
+        {
+          "path": "data/labels/public/pilkwang/version-1/api_labeler.py",
+          "bytes": 12976,
+          "sha256": "045f0f858b20ee477869c999c4bc9b484154cb5ddfd507b79e7c732632abc52e"
+        },
+        {
+          "path": "data/labels/public/pilkwang/version-1/dataset-view.json",
+          "bytes": 4729,
+          "sha256": "9f04f1485da554d38ea7eeeb7215aa5a746ec5dad4ebef223f5768af7e468ad6"
+        },
+        {
+          "path": "data/labels/public/pilkwang/version-1/report_labels_v2.csv",
+          "bytes": 1004839,
+          "sha256": "6f704a7bdb2f894cc49445b19ba7c4378c3f548d3449e00361e10044bee40920",
+          "label_table": "pilkwang_v2"
+        }
+      ]
+    },
+    {
+      "dataset": "lixin73/rsna-knee-llm-report-labels-sol56",
+      "dataset_id": 11551808,
+      "dataset_version": 1,
+      "url": "https://www.kaggle.com/datasets/lixin73/rsna-knee-llm-report-labels-sol56/versions/1",
+      "license": "CC0: Public Domain",
+      "api_metadata_url": "https://www.kaggle.com/api/v1/datasets/view/lixin73/rsna-knee-llm-report-labels-sol56",
+      "download_command": "rtk proxy uv run --locked kaggle datasets download lixin73/rsna-knee-llm-report-labels-sol56/1 -p data/labels/public/lixin73/version-1 --unzip -q",
+      "files": [
+        {
+          "path": "data/labels/public/lixin73/version-1/dataset-view.json",
+          "bytes": 2243,
+          "sha256": "e0e1def2d72e35faee74beb705e2f8ea9654b7aebc48b7534c9e5674e901c8ce"
+        },
+        {
+          "path": "data/labels/public/lixin73/version-1/labels_llm_gpt56sol.csv",
+          "bytes": 503354,
+          "sha256": "a79b05e609336811d51c97f9a48f00ea8004244a1a80fe886504a62bb39867ae",
+          "label_table": "lixin_targets"
+        },
+        {
+          "path": "data/labels/public/lixin73/version-1/report_labels_gpt56sol.csv",
+          "bytes": 740621,
+          "sha256": "91678f249ec576d63e16c566b6d7a5c968dfd1af8d1d0721dfde4d0384832add",
+          "label_table": "lixin_with_conf"
+        }
+      ]
+    }
+  ],
+  "scope": "Steven and Pilkwang label sources, plus lixin73 to trace the upstream component of Steven v4. No labels modified; no extractors or image models trained."
+}

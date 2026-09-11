@@ -1,0 +1,102 @@
+version: 1
+scripts:
+  - id: submission-job
+    path: scripts/tools/submission_job.py
+    summary: Launch a detached submission service or inspect its saved status, stage durations and runner logs.
+    tags: [submit, background, systemd, progress, logs, timing, kaggle]
+    commands:
+      - rtk proxy uv run --locked just submit outputs/exports/run-fold0 OWNER/knee-fold0-bundle OWNER/knee-inference outputs/submissions/run-fold0.json
+      - rtk proxy uv run --locked just submit-status outputs/submissions/run-fold0.json
+      - rtk proxy uv run --locked just submit-logs outputs/submissions/run-fold0.json
+      - rtk proxy uv run --locked python -m scripts.tools.submission_job --help
+    inputs: [Ready bundle for start, Kaggle dataset and notebook IDs for start, Unique workflow record path, Existing workflow record or runner log for inspection]
+    outputs: [Detached user systemd service for start, JSON status and stage durations, Runner log excerpt or explicit live follow]
+    notes:
+      - Start verifies bundle hashes and readiness without local inference, then returns after systemd accepts the service; execution and submission remain in scripts.pipeline.submit.
+      - Requires Linux user systemd for start and the current project environment; quotes arguments through subprocess arrays and rejects existing records or logs.
+      - Status and logs also read older manually launched runners using the matching record-stem-runner.log convention.
+      - Logs return the last 60 lines by default; only explicit --follow waits for more output. Stage durations include polling delay and are not official hidden-test execution time.
+    docs: [docs/inference-efficiency.md#justfile-recipes]
+
+  - id: verify-inference
+    path: scripts/tools/verify_inference.py
+    summary: Optionally check a bounded real-study parity sample and FP32 inference memory when explicitly requested during export.
+    tags: [inference, verify, parity, sample, vram, export, submission]
+    commands:
+      - rtk proxy uv run --locked python -m scripts.tools.verify_inference --help
+    inputs: [Export staging bundle, Exporter-generated request JSON, Saved epoch predictions, Local validation and example DICOMs]
+    outputs: [Sample parity and example predictions, Verification record with FP32 peak memory and codec evidence]
+    notes:
+      - Invoked only by explicit export --quick-verify from the frozen copy of this script inside the staging bundle; routine exports and submissions do not run it.
+      - Preserves complete original validation batches selected across low and high input counts; defaults to about 16 studies.
+      - Compares saved predictions at their original density, then checks the requested inference density separately without reporting sample AUC.
+      - Uses the existing checkpoint without training; source, checkpoint, multiplier and verified codec identities are recorded.
+    docs: [docs/inference-efficiency.md#fast-submission-preparation]
+
+  - id: script-catalog
+    path: scripts/tools/catalog.py
+    summary: Find existing scripts by purpose and check catalog coverage and references.
+    tags: [scripts, discovery, search, index, maintenance]
+    commands:
+      - rtk proxy uv run --locked python -m scripts.tools.catalog search --query labels
+      - rtk proxy uv run --locked python -m scripts.tools.catalog show --id validation
+      - rtk proxy uv run --locked python -m scripts.tools.catalog check
+    inputs: [scripts/**/catalog.yaml, Script and documentation paths]
+    outputs: [JSON results on stdout]
+    notes:
+      - Reads metadata and checks filesystem paths without importing or executing indexed scripts.
+    docs: [scripts/INDEX.md]
+
+  - id: download-data
+    path: scripts/tools/download_data.py
+    summary: Download and extract the Kaggle MRI archive with bounded disk use and resumable chunks.
+    tags: [data, kaggle, mri, download, acquisition, resume, zip]
+    commands:
+      - rtk proxy uv run --locked python -m scripts.tools.download_data --help
+      - rtk proxy uv run --locked python -m scripts.tools.download_data
+    inputs: [Kaggle credentials and accepted competition rules, Remote competition ZIP archive]
+    outputs: [data/raw/, data/raw/.download/]
+    notes:
+      - Uses network access and substantial disk space; defaults to a 50 GiB free-space reserve.
+      - Override storage with --data-dir; resume state belongs to that destination.
+    docs: [docs/data-preparation.md#downloading-and-extracting-the-images]
+
+  - id: validation
+    path: scripts/tools/validation.py
+    summary: Create all-study stratified report-group folds and score complete OOF predictions with separate gold diagnostics.
+    tags: [validation, folds, split, gold, silver, reference, oof, auc, score, leakage]
+    commands:
+      - rtk proxy uv run --locked python -m scripts.tools.validation --help
+      - rtk proxy uv run --locked python -m scripts.tools.validation prepare
+      - rtk proxy uv run --locked python -m scripts.tools.validation score --predictions outputs/oof.csv
+      - rtk proxy uv run --locked python -m scripts.tools.validation score --split-dir data/folds/gold_5fold_v1 --predictions outputs/legacy-oof.csv
+    inputs: [Experiment config, Official training and submission CSVs, Pinned public labels for preparation, Saved split and OOF CSV for scoring]
+    outputs: [data/folds/all_5fold_v1/ with studies.csv and frozen targets.csv for prepare, JSON metrics on stdout for score]
+    notes:
+      - Preparation refuses conflicting existing artifacts; use a new --split-dir for a revised protocol.
+      - Preparation stratifies all studies using effective target probabilities thresholded at 0.5; gold status does not affect assignment. Duplicate reports remain in one fold.
+      - Training retains soft labels; AUC binarizes frozen evaluation targets at 0.5 and reports gold and report-derived diagnostics separately. A gold macro AUC is null if any target lacks both classes.
+      - Scoring requires every assigned study exactly once with saved fold IDs and twelve prediction columns; legacy protocol version 1 still scores only its 58 reference studies.
+    docs: [docs/validation.md#reproduce-and-score]
+
+  - id: preview-augmentations
+    path: scripts/tools/preview_augmentations.py
+    summary: Browse original and augmented example-test inputs, including triplet channels, by plane and contrast.
+    tags: [preview, augmentation, kornia, affine, noise, gamma, contrast, image, visualization, plane, mri, triplet, channel]
+    commands:
+      - rtk proxy uv run --locked python -m scripts.tools.preview_augmentations configs/baseline.yaml --output-dir outputs/previews/triplet-augmentations-new
+      - rtk proxy uv run --locked python -m scripts.tools.preview_augmentations configs/baseline.yaml --seed 100 --variants 6 --output-dir outputs/previews/augmentations-seed100
+      - rtk proxy uv run --locked python -m scripts.tools.preview_augmentations configs/baseline.yaml --sampling training --epoch 2 --output-dir outputs/previews/training-augmentations-epoch2
+    inputs: [Experiment config, Example-test DICOMs and metadata]
+    outputs: [Offline preview.html, overview.png, effective_config.json, manifest.json, Source snapshot]
+    notes:
+      - Uses shared preparation and augmentation code on CPU; requires no checkpoint, GPU, network or training labels.
+      - Defaults to all example-test studies so their combined series cover all six configured types; --study-uid restricts the preview to one example.
+      - Defaults to deterministic validation sampling; --sampling training and --epoch preview the actual seeded training sampler on example-test studies. Series dropout is not previewed.
+      - Keeps all selected acquisitions separately selectable within each plane/contrast, with centered physical positions and the shared type budget when configured.
+      - HTML defaults to forcing enabled transforms for comparison and can respect their independent training probabilities; the PNG overview forces enabled transforms in the first draw.
+      - Displays a fixed-scale triplet RGB composite or an individual grayscale channel before backbone normalization; single-slice configs retain grayscale previews.
+      - Records per-acquisition transform parameters, pixel-noise seeds and Kornia versions; geometry and noise strength are shared across triplets while pixel noise is independent.
+      - Records raw-slice and CNN-input counts separately; triplet positions identify middle slices. CPU random draws need not match CUDA draws with the same seed.
+      - Refuses existing output directories; choose a new --output-dir for each regenerated preview.
+    docs: [docs/data-preparation.md#preview-augmentations]
