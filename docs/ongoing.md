@@ -18,9 +18,10 @@ Current strategy, selected on 2026-09-11: iterate on **fold 0** until near the
 end of the competition. Additional-fold training and ensembling are deferred.
 Keep fold membership, validation targets and the comparison recipe fixed.
 
-- [ ] **Gaussian sampling and shared 0.72 mm spacing.** Follow the two separate
-  fold-0 comparisons in [next.md](../next.md). Planning is recorded; code and
-  configuration remain unchanged.
+- [ ] **Integrate the measured DICOM reader.** The native descriptor experiment
+  is complete with exact outputs and a 1.357× median loader ratio. Follow the
+  narrow production-integration scope in [optimization.md](../optimization.md)
+  and retain the [experiment evidence](data-preparation.md#dicom-descriptor-experiment).
 
 The unverified settings and results remain hypotheses to reproduce and improve,
 not established requirements. When a task is completed, move durable

@@ -1,10 +1,11 @@
 # Validation and experiments
 
-On **2026-09-10**, the user selected option A: five stratified folds across
-**all 4,407 studies**, with roughly 20% held out for validation in each fold.
-Gold status does not control assignment or force studies into validation.
-The default split is **`all_5fold_v1`**, protocol version 2. The old
-reference-only split remains available for reproducing baseline1.
+The default split is **`all_5fold_v3`**, protocol version 2: five stratified folds
+across **all 4,407 studies**, with roughly 20% held out for validation in each
+fold. Prepared on **2026-09-12**, it stratifies gold positive/negative targets
+alongside effective labels and `is_gold`, and requires both gold classes for
+every target in every fold. No study is forced into every fold's validation set.
+Earlier split artifacts remain available for reproducing historical runs.
 
 Use full held-out-fold macro AUC as the development selection metric, with
 gold-only and report-derived diagnostics kept separate. This mixed-label
@@ -12,10 +13,11 @@ endpoint is not a public leaderboard score or an independently annotated
 4,407-study reference endpoint. Repeated tuning remains development selection.
 
 The strategy selected on **2026-09-11** is to iterate on **fold 0** until near
-the end of the competition. Use its complete 903-study validation predictions
+the end of the competition. Use its complete 904-study validation predictions
 for routine comparisons. Additional-fold training, full OOF scoring and
 ensembling are deferred to that later phase; they are not prerequisites for
-each experiment. Keep the existing five-fold membership unchanged.
+each experiment. Keep the revised five-fold membership fixed within comparisons;
+rerun the baseline on this split before comparing new experiments.
 
 ## Project validation protocol
 
@@ -30,24 +32,36 @@ original soft probabilities for BCE.
 Studies are grouped by SHA-256 of report text after collapsing whitespace and
 case-folding. Each group receives positive and negative presence indicators
 for each target; a group with discordant member labels can have both indicators.
-The splitter sees those target indicators, not `is_gold`. Sorting groups before
-splitting makes assignments independent of input row order. No seed search or
-model score was used to select the split. Keeping groups intact and balancing
-multiple targets produces approximate, rather than exact, equal study counts.
+Each target also contributes separate gold-positive and gold-negative presence
+indicators, computed only from gold members of the group. The splitter retains
+one binary `is_gold` indicator, true when any member has gold labels. These
+indicators are used only for stratification; training and evaluation retain
+the same twelve targets. Gold and report-derived members of one report group
+always share a fold.
+Sorting groups before splitting makes assignments independent of input row
+order. No seed search or model score was used to select the split. Keeping
+groups intact and balancing multiple targets produces approximate, rather
+than exact, equal study counts.
 
 | Fold | Training studies | Validation studies | Validation share | Gold in validation | Report-derived in validation |
 |---:|---:|---:|---:|---:|---:|
-| 0 | 3,504 | 903 | 20.490% | 15 | 888 |
-| 1 | 3,535 | 872 | 19.787% | 10 | 862 |
-| 2 | 3,524 | 883 | 20.036% | 10 | 873 |
-| 3 | 3,538 | 869 | 19.719% | 7 | 862 |
-| 4 | 3,527 | 880 | 19.968% | 16 | 864 |
+| 0 | 3,503 | 904 | 20.513% | 11 | 893 |
+| 1 | 3,534 | 873 | 19.809% | 10 | 863 |
+| 2 | 3,537 | 870 | 19.741% | 14 | 856 |
+| 3 | 3,521 | 886 | 20.104% | 12 | 874 |
+| 4 | 3,533 | 874 | 19.832% | 11 | 863 |
 
-All twelve targets have both classes in each full validation fold. Gold status
-is not separately balanced: fold 3's seven gold studies have no MCL positives,
-so its gold MCL AUC and complete twelve-target gold macro AUC are undefined.
-The full-fold metric remains defined. Preserve this uncertainty rather than
-searching for a seed with a more convenient gold distribution.
+Preparation rejects indicators with fewer supporting report groups than folds.
+After assignment, it requires both classes for every target in each full and
+gold validation fold before saving any artifacts. Stratification encourages
+balance; these final checks enforce coverage and reject unsuitable assignments.
+
+The saved [membership audit](../outputs/maintenance/all-study-folds-v3/membership-audit.json)
+confirms all 4,407 study IDs occur exactly once, every fold has zero study or
+report-group overlap between training and validation, and all twelve targets
+have both classes in the full, gold and report-derived validation subsets.
+Every fold has three gold Medial OA positives; fold 0 also has eight negatives.
+Its gold diagnostics remain based on only eleven studies.
 
 Report grouping prevents identical normalized reports crossing a fold boundary;
 it does not establish patient or scanner independence. Revisit grouping if
@@ -55,7 +69,7 @@ image metadata or duplicate-image evidence supplies stronger identities.
 
 ### Membership and leakage controls
 
-`data/folds/all_5fold_v1/studies.csv` contains every training study with
+`data/folds/all_5fold_v3/studies.csv` contains every training study with
 `StudyInstanceUID`, `report_group`, `is_gold`, and `fold`:
 
 - For model `k`, training membership is `fold != k`; validation membership is
@@ -112,7 +126,9 @@ rtk proxy uv run --locked python -m scripts.tools.validation score --predictions
 
 [`scripts/tools/validation.py`](../scripts/tools/validation.py) saves `studies.csv`,
 `label_counts.csv`, `targets.csv`, and `protocol.json` under the configured
-split directory, currently `data/folds/all_5fold_v1/`. The explicit
+split directory, currently `data/folds/all_5fold_v3/`. `label_counts.csv` records
+full-fold `positive`/`negative` and `gold_positive`/`gold_negative` counts for
+every target and fold. The explicit
 `pydantic-settings` CLI accepts `--config`, `--data-dir`, `--split-dir`,
 `--n-splits` and `--seed`; without a seed override it uses the config seed.
 The protocol records official input hashes, label source/version/hash,
@@ -122,7 +138,7 @@ require a new `--split-dir`. Never change folds midway through a comparison.
 The current study-manifest SHA-256 is:
 
 ```text
-59232770bad9d5d3b7f141180aea75fc830eca67b27aaa006445169af7130a62
+c709cd27ff54dd10d833abfa966622f9a5ecadef5d37670da658d81c26f7b3ed
 ```
 
 The OOF CSV must contain exactly all 4,407 study IDs, their producing
@@ -144,11 +160,36 @@ probabilities with consistent output semantics. Avoid treating tiny changes
 as reliable gains or a fold-score spread as a confidence interval. Preserve
 the pooled 58-study gold diagnostic alongside the primary mixed-label score.
 
-The membership audit in
+### Previous all-study split
+
+The **`all_5fold_v2`** split, prepared on 2026-09-12 with protocol version 2,
+added `is_gold` to the effective-label indicators but did not stratify diagnoses
+within the gold subset. Its validation study counts were **874, 921, 864, 865,
+883**, with gold counts **12, 12, 11, 11, 12**. Fold 0 had zero gold Medial OA
+positives and twelve negatives, leaving gold macro AUC undefined throughout
+`baseline-gold-balanced`. Its study-manifest SHA-256 remains:
+
+```text
+c71a71243c690e0ee076845c427f942dee0085249013ee3584b0d0bd48ee2853
+```
+
+The **`all_5fold_v1`** split, prepared on 2026-09-10 with protocol version 2,
+used the same target indicators, report grouping and seed without `is_gold`.
+Its validation study counts were **903, 872, 883, 869, 880**, with gold counts
+**15, 10, 10, 7, 16**. Fold 3 had no gold MCL positives, leaving its gold MCL
+and complete gold macro AUC undefined. Its study-manifest SHA-256 remains:
+
+```text
+59232770bad9d5d3b7f141180aea75fc830eca67b27aaa006445169af7130a62
+```
+
+The historical membership audit in
 `outputs/maintenance/all-study-folds-20260910T183229Z/membership-audit.json`
-confirms that every fold's train/validation union covers all 4,407 studies,
+confirmed that every fold's train/validation union covered all 4,407 studies,
 with zero study or normalized-report overlap. The original split hash is
-unchanged.
+unchanged. The revised split retains the same frozen target table, but changes
+fold membership. Scores from different splits are separate development results;
+start a fresh run on v3 rather than resuming a checkpoint trained on v1 or v2.
 
 ## Why baseline1 had twelve validation studies
 
@@ -260,6 +301,158 @@ also record an observation that improved labels could make
 models more correlated and reduce their ensemble contribution.
 
 ## Experiment workflow
+
+### Overnight hyperparameter queue
+
+Run the seven planned experiments sequentially with:
+
+```bash
+rtk proxy uv run --locked python -m scripts.adhoc.train_overnight
+```
+
+To keep the queue running after closing the terminal, launch from the repository
+root with:
+
+```bash
+rtk proxy mkdir -p outputs
+rtk proxy bash -c 'nohup uv run --locked python -u -m scripts.adhoc.train_overnight > outputs/overnight-launch.log 2>&1 < /dev/null &'
+```
+
+Use `--prepare-only` to write the seven configurations without starting
+training, or `--config PATH` to select the baseline YAML. Every invocation
+creates a new queue; preparation does not reserve a queue for a later command.
+
+The script trains and plots results without invoking Codex or submitting to
+Kaggle. Before training, it raises the process soft open-file limit to the
+inherited hard limit and saves the before/after limits in `runtime.json`.
+`--prepare-only` leaves process limits unchanged.
+
+The first background attempt on 2026-09-12 stopped at batch 44 of epoch 0 in
+all seven runs and produced no validation results or checkpoints. Three logs
+reported file-descriptor exhaustion; the service had a soft limit of 1,024,
+compared with 1,048,576 in the shell. This is the likely shared cause. The
+corrected queue below completed all seven runs with the raised limit. The
+subsequent Codex resume was interrupted. Failed outputs were deleted at the
+user's request, and the resume hook was removed in favor of manual launching.
+
+The launcher snapshots the current baseline into seven validated YAML files
+under a unique `outputs/overnight-<UTC timestamp>-<suffix>/configs/` directory.
+It fixes `all_5fold_v3`, fold 0, seed 42, batch size eight with no accumulation,
+series dropout 0.2 and validation density 2×. Other model and data settings
+come from the baseline at launch. Each run starts fresh, with one change from
+the control:
+
+| Run | Backbone LR | Head LR | Weight decay | Epochs / patience |
+|---|---:|---:|---:|---:|
+| `01-control` | 0.0001 | 0.0003 | 0.01 | 10 / 10 |
+| `02-longer` | 0.0001 | 0.0003 | 0.01 | 20 / 20 |
+| `03-lower-lr` | 0.00005 | 0.00015 | 0.01 | 10 / 10 |
+| `04-higher-lr` | 0.0002 | 0.0006 | 0.01 | 10 / 10 |
+| `05-faster-head` | 0.0001 | 0.001 | 0.01 | 10 / 10 |
+| `06-lower-decay` | 0.0001 | 0.0003 | 0.003 | 10 / 10 |
+| `07-higher-decay` | 0.0001 | 0.0003 | 0.03 | 10 / 10 |
+
+Each queue has `runs/<name>/` for normal training artifacts, `logs/<name>.log`
+for training output and `status.tsv` for completed run exit codes. The launcher
+prints each experiment's start, log path and completion status. A failed
+experiment is recorded and the queue continues; its final exit code is nonzero
+if any training or plotting command failed. SIGINT or SIGTERM
+stops the queue and terminates its active subprocess group. Successful runs
+are plotted together in `validation_metrics.png` at the
+end. Every invocation creates fresh directories and never resumes an earlier
+queue. The completed queue below took approximately five hours.
+
+### 2026-09-12 overnight results
+
+**`04-higher-lr` is the preferred recipe for subsequent controlled comparisons.**
+Its learning rates were adopted in `configs/baseline.yaml` on 2026-09-12.
+It scored **0.918** publicly, versus **0.913** for `02-longer` and **0.903**
+for `05-faster-head`. All three competition submissions completed successfully;
+the Kaggle API scores and saved submission records were checked on 2026-09-12.
+This is development-selection evidence from three submissions, not a private
+leaderboard result or a statistically established ranking.
+
+The queue is
+[`outputs/overnight-20260911T234416Z-8du9a4nh`](../outputs/overnight-20260911T234416Z-8du9a4nh).
+All seven runs used ReXNet-200 with attention MIL, adjacent triplets, 224-pixel
+inputs at 0.67 mm, center-weighted sampling, series dropout 0.2, Steven v4
+labels, seed 42 and the fixed `all_5fold_v3` fold 0: 3,503 training and 904
+validation studies, including eleven gold and 893 report-derived validation
+studies. Training batch size was eight; validation density was 2×.
+The [control configuration](../outputs/overnight-20260911T234416Z-8du9a4nh/runs/01-control/effective_config.json)
+and the hyperparameter table above define the comparison.
+
+Run provenance records commit `14940b06344345e333386a3b2aad3645d0d5d5f9`
+with a dirty working tree; each run's `source_snapshot.zip`,
+`effective_config.json`, `provenance.json` and `fold_0/input_identity.json`
+preserve the actual source/configuration and input identities. Input identities
+match across all seven runs, including membership hash
+`c709cd27ff54dd10d833abfa966622f9a5ecadef5d37670da658d81c26f7b3ed`.
+Every saved prediction table contains the expected 904 unique fold-0 IDs,
+matches its selected epoch's probabilities exactly, and reproduces the saved
+full-fold AUC. This comparison used saved predictions, without fresh inference.
+
+Metrics below are evaluated at the checkpoint selected by full-fold AUC.
+Epochs are numbered from one; checkpoint filenames and the
+[plot](../outputs/overnight-20260911T234416Z-8du9a4nh/validation_metrics.png)
+number epochs from zero. Public scores are reported to the API's three decimals.
+
+| Run | Selected epoch / budget | Full-fold AUC | Gold AUC | Soft-target BCE | Training minutes | Public AUC |
+|---|---:|---:|---:|---:|---:|---:|
+| `01-control` | 10 / 10 | 0.87848 | 0.91961 | 0.45870 | 35.8 | Not submitted |
+| `02-longer` | 12 / 20 | 0.88354 | 0.94183 | 0.46144 | 79.2 | 0.913 |
+| `03-lower-lr` | 10 / 10 | 0.86097 | 0.91634 | 0.47215 | 35.0 | Not submitted |
+| `04-higher-lr` | 10 / 10 | 0.88294 | 0.91756 | 0.45404 | 37.4 | 0.918 |
+| `05-faster-head` | 10 / 10 | 0.87724 | 0.93995 | 0.46091 | 36.0 | 0.903 |
+| `06-lower-decay` | 10 / 10 | 0.87866 | 0.92814 | 0.45850 | 35.7 | Not submitted |
+| `07-higher-decay` | 8 / 10 | 0.87944 | 0.92794 | 0.45947 | 34.7 | Not submitted |
+
+All submissions used 2× images and inference batch size two. Exact checkpoint,
+bundle, notebook and submission identities are linked in the
+[submission artifact record](inference-efficiency.md#overnight-fold-0-submissions).
+
+- Doubling both learning rates to backbone `2e-4` and head `6e-4` improved
+  local full-fold AUC by 0.00446 over control and improved nine targets. Largest
+  gains were Lateral Meniscus +0.02486, PF OA +0.01328 and Synovitis +0.01066.
+  It also had the lowest BCE and the highest public score among submitted runs.
+  Prefer its ten-epoch recipe with weight decay 0.01 for the next comparisons.
+- `02-longer`'s local advantage over higher LR was only 0.00060 and reversed
+  publicly by 0.005. It peaked at epoch 12, ending at 0.87990 local AUC with
+  worsening late BCE despite falling training loss, consistent with overfitting.
+  The twenty-epoch budget also stretches the cosine schedule; a fresh
+  twelve-epoch schedule would be a different experiment. Longer training did
+  not deliver the best public checkpoint here, but this does not establish
+  that every longer schedule is worse.
+- The eleven-study gold diagnostic ranked longer and faster-head above
+  higher-LR, whereas higher-LR won publicly. Faster-head's gold AUC of 0.93995
+  did not transfer to a strong public result. Keep gold AUC diagnostic rather
+  than using it to override the full-fold endpoint. BCE is useful supporting
+  evidence; three selected submissions do not justify replacing AUC with BCE.
+- Lower LR underperformed at this epoch budget. Weight-decay changes produced
+  small local gains without public evidence; they do not establish a reason
+  to change weight decay from 0.01.
+
+The previous best public submission, baseline4 at 2×, scored 0.913, so
+higher-LR improved the reported best by 0.005. That historical comparison also
+changes the split from `all_5fold_v1` to `all_5fold_v3` and series dropout from
+0.1 to 0.2. The overnight control was not submitted, so the public gain over
+baseline4 cannot be attributed solely to learning rate. Tiny local differences,
+an eleven-study gold subset and repeated public selection should not be treated
+as precise estimates of hidden-data generalization.
+
+### Plot validation metrics
+
+Plot epoch metrics from completed run folders with:
+
+```bash
+rtk proxy uv run --locked python -m scripts.tools.plot_validation_metrics baseline0 baseline1 baseline4
+```
+
+The command writes `outputs/validation_metrics.png` by default and shows the
+full-validation, gold and report-derived macro AUCs plus soft-target BCE. Use
+`--output` to select another PNG path. Undefined gold or report-derived macro
+AUCs (`null` in epoch JSON) appear as gaps; a subgroup with no defined epochs
+has no visible curve. Full-validation AUC and BCE must remain numeric.
 
 A dashboard workflow linked ideas, experiments, local metrics, and Kaggle
 submissions. Models described as `tabfpn3` and simpler

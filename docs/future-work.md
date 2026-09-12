@@ -23,8 +23,6 @@ The optional export parity utility is not required for each run or submission.
 
 ### Deferred report-label supervision
 
-Gaussian sampling and shared 0.72 mm spacing are now planned in
-[root next.md](../next.md) and tracked in [ongoing work](ongoing.md).
 Pooling and augmentation ablations were dropped from the proposed experiments.
 
 Keep **soft versus hard report-derived training targets** as a future experiment.
@@ -34,6 +32,140 @@ calibrated confidence. This would require a small loss or label-preparation
 change with similar model compute and memory. No gain is established and no
 implementation is scheduled. See the [public label audit](public-label-audit.md)
 and [supervision evidence](public-research.md#report-derived-supervision).
+
+## Sampling, physical coverage and resolution
+
+Proposed in the 2026-09-11 discussion and deferred for future work. This section
+records the proposed implementation and comparisons; none of these changes has
+been implemented.
+Continue iterating on fold 0. CoAtNet and label-supervision experiments are
+listed separately in this document; pooling and augmentation changes are excluded.
+
+### 1. Replace triangular sampling weights with Gaussian weights
+
+Use a Gaussian over the physical positions of triplet centers. Preserve the
+current nominal **3:1 center-to-edge weight ratio** for the first comparison,
+so the experiment changes the curve shape rather than its endpoint ratio.
+
+For normalized position `u` spanning `[-1, 1]` from the first to last slice:
+
+```text
+u = (triplet_center_position - series_midpoint) / series_half_span
+weight(u) = exp(log(3) * (1 - u²))
+```
+
+This is proportional to a Gaussian with standard deviation about 0.675 of the
+half-span, or 0.337 of the full series extent. Weights remain positive at the
+edges. These are selection weights, not exact inclusion probabilities after
+the non-overlap constraints.
+
+Keep complete, non-overlapping triplets; training selection remains random and
+seeded, while validation/submission selection remains deterministic. Keep slice
+budgets and pooled acquisition allocation fixed. Replace the triangular code
+and update affected callers; do not add a triangle/Gaussian selector or a legacy
+compatibility path.
+
+#### How often the budget requires subsampling
+
+Read-only counts across all 24,371 training series, covering all folds, from
+`data/metadata/train_series_image_counts.parquet`, with the two known bad files
+subtracted. Each percentage is the share of individual series whose available
+file count exceeds that plane–contrast type's nominal budget.
+
+| Plane | Fluid-sensitive / fat suppression | 1× raw-slice budget | Above 1× | Above 2× | Above 3× |
+|---|---|---:|---:|---:|---:|
+| Axial | 0 / 0 | 18 | 99.6% | 36.6% | 7.6% |
+| Axial | 1 / 1 | 18 | 96.5% | 26.5% | 6.7% |
+| Coronal | 0 / 0 | 15 | 97.4% | 29.1% | 0.1% |
+| Coronal | 1 / 1 | 15 | 99.7% | 33.9% | 0.2% |
+| Sagittal | 0 / 0 | 15 | 98.2% | 40.4% | 7.1% |
+| Sagittal | 1 / 1 | 15 | 99.8% | 34.6% | 5.3% |
+| Overall | | | 98.4% | 33.3% | 4.3% |
+
+The actual budget is shared across acquisitions within a study/plane/contrast.
+An individual series below the nominal cap can therefore still be subsampled.
+For example, at 2×, 36.6% of individual axial 0/0 series exceed 36 slices, while
+61.7% of corresponding study/type groups exceed 36 complete-triplet slices in
+total. The table is not an exact count of series affected after allocation or
+of predictions changed by the new weighting. File counts do not replace a
+complete usable-pixel audit. See [metadata provenance](metadata.md#images-per-series).
+
+### 2. Increase shared in-plane spacing from 0.67 to 0.72 mm
+
+Keep 224 × 224 inputs and use **0.72 mm in every plane**, giving a centered
+field of view of **161.28 × 161.28 mm**, compared with 150.08 × 150.08 mm at
+0.67 mm. This changes physical coverage while keeping the CNN input dimensions
+and slice budget fixed. The tradeoff is slightly less spatial detail per mm.
+
+Do not introduce separate spacing values or switches for individual planes.
+A read-only sample of 768 series, 128 per plane–contrast combination, found a
+median acquired field of view of approximately 160 × 160 mm in all six groups.
+That larger sample did not support the earlier 48-header sample's suggestion
+that sagittal acquisitions generally need a larger field of view.
+
+Sampling method: sort the count inventory by study and series UID, sample 128
+series within each type using Polars seed 42, and read the lexicographically
+first DICOM header per selected series. All 768 headers supplied valid geometry.
+Extent is rows × row spacing and columns × column spacing. Native image extent
+does not establish useful anatomy coverage; inspect crop boundaries before
+interpreting an AUC change as evidence that anatomy was previously excluded.
+
+### 3. Compare 336-pixel training with 224 pixels
+
+Train ReXNet-200 with **336 × 336 inputs**, holding the selected physical field
+of view fixed. Set shared spacing to `field_of_view_mm / 336`: approximately
+0.446667 mm for the original 150.08-mm field of view, or 0.48 mm if the
+161.28-mm field of view is selected after comparison 2. Use the same image size
+and spacing for validation and test prediction.
+
+This isolates finer spatial sampling from physical crop size. Increasing
+`image_size` while leaving `spacing_mm` unchanged would also widen the crop.
+Hold the backbone, labels, slice allocation, sampling and effective training
+batch size fixed; record any physical-batch or accumulation adjustment needed
+to fit memory. A 336-pixel input has 2.25 times the pixel area of a 224-pixel
+input, but measure actual runtime and peak VRAM rather than assuming they scale
+by that factor.
+
+### 4. Compare a 140-mm physical field of view
+
+Separately compare a centered **140 × 140 mm crop** against the physical field
+of view selected above, holding the chosen output resolution fixed. At 336
+pixels, shared spacing is `140 / 336`, approximately **0.416667 mm**; at 224
+pixels it is **0.625 mm**. Apply the same geometry in every plane and during
+training, validation and test prediction.
+
+This tests a tighter crop independently of the 224-to-336 resolution change.
+It increases pixels per mm while removing peripheral context; inspect crop
+boundaries and per-target results before accepting it. It is a separate
+comparison from the wider 161.28-mm field of view in comparison 2.
+
+The public [single-model Raptor notebook](https://www.kaggle.com/code/dreaddevelopment/knee-mri-twelve-findings-from-a-single-model)
+provides the lead for comparisons 3 and 4: its inspected source uses a 140-mm
+crop, 336-pixel preparation and a 384-pixel CoAtNet encoder. Kaggle metadata
+checked on 2026-09-11 records a best public score of 0.924. Its different
+backbone, labels, training membership and sampling prevent attributing that
+score to either resolution or crop size; no project gain is established.
+
+### Comparison sequence
+
+1. Compare Gaussian sampling at the existing 0.67 mm spacing against the
+   recorded triangular baseline.
+2. Compare 0.67 versus 0.72 mm while holding the selected sampling recipe fixed.
+3. Compare 224 versus 336 pixels while preserving the selected physical field
+   of view through the corresponding spacing adjustment.
+4. Compare the selected field of view with 140 mm at the chosen resolution.
+
+Keep fold-0 membership, seed 42, ReXNet-200, training budget, labels, slice
+limits and validation image multiplier fixed except for the factor under
+comparison. Rerun the baseline on `all_5fold_v3` before these comparisons.
+Retain full 904-study validation predictions, macro/per-target AUC,
+gold diagnostics, runtime and peak VRAM. Keep validation and test inference at
+2× image limits, with inference batch size 2, following the
+[completed density comparison](inference-efficiency.md#inference-image-count-and-memory).
+Do not mix a change in inference image multiplier into these comparisons.
+Gains from sampling, physical coverage and resolution remain unverified until
+measured;
+no additional folds, ensemble, or routine submission parity pass is required.
 
 ## Deferred preparation experiments
 
@@ -53,8 +185,8 @@ and [supervision evidence](public-research.md#report-derived-supervision).
 
 Recorded on 2026-09-09 after the
 [discussion/notebook investigation](public-research.md). These remain candidates
-after the two changes in [next.md](../next.md); none is a demonstrated project
-improvement.
+after the [sampling, physical coverage and resolution comparisons](#sampling-physical-coverage-and-resolution);
+none is a demonstrated project improvement.
 
 - **Label handling:** using the [audited public sources](public-label-audit.md),
   compare hard versus soft targets and explicit uncertainty weights. Isolate
@@ -62,14 +194,32 @@ improvement.
   from all-target imputation. Preserve an evaluation endpoint not used in
   label generation or repair.
   [Evidence](public-research.md#report-derived-supervision).
-- **Geometry and slice coverage:** vary physical crop, output resolution and
-  sampled-window coverage one at a time, with fixed split and labels. Check
-  whether more sampled windows add information or only runtime. Evaluate the
-  current triplet placement through the planned Gaussian comparison.
+- **Slice coverage:** compare sampled-window coverage with fixed split and
+  labels. Compare smaller inference budgets and greater sagittal allocation
+  separately. The [0.924 Raptor notebook](https://www.kaggle.com/code/dreaddevelopment/knee-mri-twelve-findings-from-a-single-model)
+  uses a 64-slice inference stack and 42 overlapping triplets; our 2× inference
+  allows 192 raw slices and 64 non-overlapping triplets. Its result does not
+  establish a need for more slices. Record AUC and runtime. Gaussian placement,
+  physical crop and output resolution have separate planned comparisons in
+  [sampling, physical coverage and resolution](#sampling-physical-coverage-and-resolution).
   [Evidence](public-research.md#geometry-sampling-encoders-and-losses).
   [Cross-competition comparison design](research/experiment-priorities.md#pooling-and-coverage).
-- **Complementary model families:** compare an understandable DINO baseline
-  with CoAtNet or a medical-pretrained branch and target-specific pooling.
+- **CoAtNet backbone:** compare `coatnet_rmlp_2_rw_384.sw_in12k_ft_in1k`
+  against ReXNet-200 after the planned geometry comparisons. Retain fold 0,
+  Steven v4 labels, triplet sampling, target-specific attention pooling and
+  the training budget. Use a supported common input resolution for the two
+  backbones; isolate any required resolution change from the encoder comparison.
+  Record full-fold and per-target AUC, runtime and peak VRAM. The public
+  [single-model Raptor inference notebook](https://www.kaggle.com/code/dreaddevelopment/knee-mri-twelve-findings-from-a-single-model)
+  has a best public score of **0.924**, verified through Kaggle metadata on
+  2026-09-11, but its different training membership, unpublished label table
+  and image pipeline confound attribution to CoAtNet. Its
+  [training source](https://www.kaggle.com/code/dreaddevelopment/knee-mri-training-the-twelve-finding-model)
+  is an implementation reference, not a reproduced project result. Keep this
+  as a single-model experiment; additional folds and ensembling remain deferred.
+- **Other complementary model families:** compare an understandable DINO baseline
+  or a medical-pretrained branch with the selected baseline and target-specific
+  pooling.
   Measure independent validation gains and incremental ensemble cost before
   scaling the encoder or importing a large public ensemble.
   [Source implementations](public-research.md#public-code-worth-inspecting).

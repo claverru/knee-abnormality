@@ -1,13 +1,14 @@
 import math
 from collections.abc import Callable
 from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
 import numpy as np
 import pydicom
 import torch
-from torch.nn import functional as F
+from scipy.sparse import csr_matrix
 
 KNOWN_BAD_INSTANCES = {
     "1.2.826.0.1.3680043.8.498.66460523372602171398246641420761543626",
@@ -42,6 +43,12 @@ class PreparedSeries:
     @property
     def slice_count(self) -> int:
         return len(self.images) * (self.images.shape[1] if self.images.ndim == 4 else 1)
+
+
+@dataclass(frozen=True)
+class _ArraySlice:
+    image: np.ndarray
+    rect: tuple[int, int, int, int]
 
 
 def _physical_position(dataset: pydicom.Dataset) -> float | None:
@@ -263,16 +270,57 @@ def select_slices(
     return tuple(records[index] for index in selected)
 
 
-def _resample_crop(
-    path: Path, spacing_mm: float, image_size: int
-) -> tuple[torch.Tensor, torch.Tensor]:
+def _crop_geometry(
+    target_height: int, target_width: int, image_size: int
+) -> tuple[int, int, int, int, int, int]:
+    source_top = max(0, (target_height - image_size) // 2)
+    source_left = max(0, (target_width - image_size) // 2)
+    output_top = max(0, (image_size - target_height) // 2)
+    output_left = max(0, (image_size - target_width) // 2)
+    rows = min(target_height, image_size)
+    columns = min(target_width, image_size)
+    return source_top, source_left, output_top, output_left, rows, columns
+
+
+@lru_cache(maxsize=128)
+def _axis_filter(source: int, target: int, first: int, count: int) -> csr_matrix:
+    scale = source / target
+    support = max(1.0, scale)
+    rows = []
+    columns = []
+    values = []
+    for output_index in range(first, first + count):
+        center = (output_index + 0.5) * scale - 0.5
+        start = math.floor(center - support)
+        end = math.ceil(center + support)
+        weights = {}
+        for index in range(start, end + 1):
+            weight = max(0.0, 1.0 - abs(center - index) / support)
+            if weight == 0 or index < 0 or index >= source:
+                continue
+            weights[index] = weight
+        total = sum(weights.values())
+        for index, weight in weights.items():
+            rows.append(output_index - first)
+            columns.append(index)
+            values.append(weight / total)
+    return csr_matrix(
+        (
+            np.asarray(values, dtype=np.float32),
+            (rows, columns),
+        ),
+        shape=(count, source),
+        dtype=np.float32,
+    )
+
+
+def _resample_crop(path: Path, spacing_mm: float, image_size: int) -> _ArraySlice:
     dataset = pydicom.dcmread(path)
     pixels = np.asarray(dataset.pixel_array, dtype=np.float32)
     if pixels.ndim != 2:
         raise ValueError(f"Expected one two-dimensional frame, got {pixels.shape}")
     slope = float(getattr(dataset, "RescaleSlope", 1.0))
     intercept = float(getattr(dataset, "RescaleIntercept", 0.0))
-    pixels = pixels * np.float32(slope) + np.float32(intercept)
     source_spacing = getattr(dataset, "PixelSpacing", None)
     if source_spacing is None or len(source_spacing) != 2:
         raise ValueError("Missing two-dimensional PixelSpacing")
@@ -282,41 +330,67 @@ def _resample_crop(
     target_width = max(
         1, round(pixels.shape[1] * float(source_spacing[1]) / spacing_mm)
     )
-    image = torch.from_numpy(pixels).unsqueeze(0).unsqueeze(0)
-    image = F.interpolate(
-        image,
-        size=(target_height, target_width),
-        mode="bilinear",
-        align_corners=False,
-        antialias=True,
-    )[0, 0]
-    valid = torch.ones_like(image, dtype=torch.bool)
-    pad_height = max(0, image_size - target_height)
-    pad_width = max(0, image_size - target_width)
-    if pad_height or pad_width:
-        top = pad_height // 2
-        bottom = pad_height - top
-        left = pad_width // 2
-        right = pad_width - left
-        image = F.pad(image, (left, right, top, bottom))
-        valid = F.pad(valid, (left, right, top, bottom))
-    top = max(0, (image.shape[0] - image_size) // 2)
-    left = max(0, (image.shape[1] - image_size) // 2)
-    return image[top : top + image_size, left : left + image_size], valid[
-        top : top + image_size, left : left + image_size
-    ]
+    source_top, source_left, output_top, output_left, rows, columns = _crop_geometry(
+        target_height, target_width, image_size
+    )
+    vertical = _axis_filter(pixels.shape[0], target_height, source_top, rows)
+    horizontal = _axis_filter(pixels.shape[1], target_width, source_left, columns)
+    middle = vertical.dot(pixels)
+    region = horizontal.dot(middle.T).T
+    if slope != 1.0 or intercept != 0.0:
+        region *= np.float32(slope)
+        region += np.float32(intercept)
+    image = np.zeros((image_size, image_size), dtype=np.float32)
+    image[
+        output_top : output_top + rows,
+        output_left : output_left + columns,
+    ] = region
+    return _ArraySlice(image, (output_top, output_left, rows, columns))
 
 
-def linear_quantiles(values: torch.Tensor, quantiles: torch.Tensor) -> torch.Tensor:
-    ranks = quantiles * (values.numel() - 1)
-    lower = ranks.floor().to(torch.int64)
-    upper = ranks.ceil().to(torch.int64)
-    partitioned = values.numpy()
-    partitioned.partition(torch.cat((lower, upper)).unique().numpy())
-    return torch.lerp(values[lower], values[upper], ranks - lower)
+def _linear_quantiles(
+    values: np.ndarray, lower_quantile: float, upper_quantile: float
+) -> tuple[float, float]:
+    quantiles = np.asarray([lower_quantile, upper_quantile], dtype=np.float32)
+    ranks = quantiles * np.float32(values.size - 1)
+    lower = np.floor(ranks).astype(np.int64)
+    upper = np.ceil(ranks).astype(np.int64)
+    values.partition(np.unique(np.concatenate((lower, upper))))
+    lower_values = values[lower]
+    upper_values = values[upper]
+    bounds = lower_values + (upper_values - lower_values) * (
+        ranks - lower
+    ).astype(np.float32)
+    return float(bounds[0]), float(bounds[1])
 
 
-DecodedSlice = tuple[torch.Tensor, torch.Tensor] | str
+def _normalize_pixels(
+    pixels: np.ndarray, rects: np.ndarray, low: float, high: float
+) -> np.ndarray:
+    low_value = np.float32(low)
+    high_value = np.float32(high)
+    if (
+        not np.isfinite(low_value)
+        or not np.isfinite(high_value)
+        or high_value <= low_value
+    ):
+        return np.zeros(pixels.shape, dtype=np.uint8)
+    gain = (np.float32(1.0) / (high_value - low_value)) * np.float32(255.0)
+    np.clip(pixels, low_value, high_value, out=pixels)
+    np.subtract(pixels, low_value, out=pixels)
+    np.multiply(pixels, gain, out=pixels)
+    np.rint(pixels, out=pixels)
+    np.clip(pixels, np.float32(0.0), np.float32(255.0), out=pixels)
+    output = pixels.astype(np.uint8)
+    for index, (top, left, rows, columns) in enumerate(rects):
+        output[index, :top] = 0
+        output[index, top + rows :] = 0
+        output[index, top : top + rows, :left] = 0
+        output[index, top : top + rows, left + columns :] = 0
+    return output
+
+
+DecodedSlice = _ArraySlice | str
 SeriesDecoder = Callable[
     [tuple[SliceRecord, ...], float, int], tuple[DecodedSlice, ...]
 ]
@@ -324,12 +398,14 @@ SeriesDecoder = Callable[
 
 def decode_slice(path: Path, spacing_mm: float, image_size: int) -> DecodedSlice:
     try:
-        image, valid = _resample_crop(path, spacing_mm, image_size)
+        value = _resample_crop(path, spacing_mm, image_size)
     except PREPARATION_ERRORS as error:
         return f"{path}: {type(error).__name__}: {error}"
-    if not torch.isfinite(image).all():
+    top, left, rows, columns = value.rect
+    region = value.image[top : top + rows, left : left + columns]
+    if not np.isfinite(region).all():
         return f"{path}: non-finite pixels"
-    return image, valid
+    return value
 
 
 def decode_series(
@@ -374,7 +450,7 @@ def prepare_series(
     if len(decoded) != len(records):
         raise ValueError("Series decoder must return one result per selected slice")
     images = []
-    valid_masks = []
+    rectangles = []
     positions = []
     failures = []
     for start in range(0, len(records), group_size):
@@ -386,13 +462,12 @@ def prepare_series(
             if isinstance(result, str):
                 failures.append(result)
                 continue
-            image, valid = result
-            group_images.append(image)
-            group_masks.append(valid)
+            group_images.append(result.image)
+            group_masks.append(result.rect)
         if len(group_images) != group_size:
             continue
         images.extend(group_images)
-        valid_masks.extend(group_masks)
+        rectangles.extend(group_masks)
         center = group_records[group_size // 2]
         positions.append(
             center.relative_position_mm
@@ -403,25 +478,25 @@ def prepare_series(
         if group_size == 3:
             raise ValueError("No complete selected triplet could be decoded")
         raise ValueError("No selected image could be decoded")
-    stacked = torch.stack(images).to(torch.float32)
-    valid = torch.stack(valid_masks)
-    values = stacked[valid]
-    bounds = linear_quantiles(values, torch.tensor([lower_quantile, upper_quantile]))
-    low, high = bounds.unbind()
-    constant = (
-        not math.isfinite(float(low))
-        or not math.isfinite(float(high))
-        or bool(high <= low)
+    pixels = np.empty((len(images), image_size, image_size), dtype=np.float32)
+    rects = np.asarray(rectangles, dtype=np.int32)
+    scratch = np.empty(
+        sum(rows * columns for _, _, rows, columns in rectangles),
+        dtype=np.float32,
     )
-    if constant:
-        output = torch.zeros_like(stacked, dtype=torch.uint8)
-    else:
-        output = (
-            ((stacked.clamp(low, high) - low) * (255.0 / (high - low)))
-            .round()
-            .to(torch.uint8)
-        )
-        output.masked_fill_(~valid, 0)
+    offset = 0
+    for index, (image, (top, left, rows, columns)) in enumerate(
+        zip(images, rectangles, strict=True)
+    ):
+        pixels[index] = image
+        size = rows * columns
+        scratch[offset : offset + size] = image[
+            top : top + rows, left : left + columns
+        ].reshape(-1)
+        offset += size
+    low, high = _linear_quantiles(scratch, lower_quantile, upper_quantile)
+    constant = not math.isfinite(low) or not math.isfinite(high) or high <= low
+    output = torch.from_numpy(_normalize_pixels(pixels, rects, low, high))
     if group_size == 3:
         output = output.reshape(-1, 3, image_size, image_size)
     return PreparedSeries(

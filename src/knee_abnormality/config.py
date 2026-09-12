@@ -166,7 +166,6 @@ class DataConfig(ConfigModel):
 class ModelConfig(ConfigModel):
     backbone: Identifier
     pretrained: bool
-    feature_width: Annotated[StrictInt, Field(gt=0)]
     projection_width: Annotated[StrictInt, Field(gt=0)]
     channels_last: bool = False
     checkpoint_backbone: bool = False
