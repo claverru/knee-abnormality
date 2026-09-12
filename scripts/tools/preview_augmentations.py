@@ -383,14 +383,25 @@ def create_preview(args: PreviewCLI) -> dict:
                 "augmentation.py",
                 "config.py",
                 "dataset.py",
-                "preprocessing.py",
                 "inference.py",
             )
         ],
+        Path("src/knee_abnormality/preprocessing"),
     ]
-    (output / "source").mkdir()
+    project_root = Path.cwd().resolve()
+    source_files = []
     for source in sources:
-        shutil.copy2(source, output / "source" / source.name)
+        source = source.resolve()
+        source_files.extend(
+            path for path in (source.rglob("*.py") if source.is_dir() else [source])
+            if path.is_file()
+        )
+    (output / "source").mkdir()
+    for source in source_files:
+        relative = source.relative_to(project_root)
+        destination = output / "source" / relative
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, destination)
     manifest = {
         "html": str(output / "preview.html"),
         "overview": str(output / "overview.png"),
@@ -405,7 +416,10 @@ def create_preview(args: PreviewCLI) -> dict:
             name: version(name)
             for name in ("torch", "kornia", "kornia-rs", "pillow", "pydicom", "polars")
         },
-        "source_sha256": {str(path): sha256_file(path) for path in sources},
+        "source_sha256": {
+            str(path.relative_to(project_root)): sha256_file(path)
+            for path in source_files
+        },
         "input_sha256": {
             name: sha256_file(config.raw_dir / name)
             for name in ("test.csv", "test_series.csv")

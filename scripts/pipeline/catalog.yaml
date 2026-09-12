@@ -32,7 +32,7 @@ scripts:
       - rtk proxy uv run --locked just infer outputs/exports/run-fold0
       - rtk proxy uv run --locked just validate outputs/run/effective_config.json outputs/run/fold_0/best.ckpt outputs/run/reproduced.csv
       - rtk proxy uv run --locked python -m scripts.pipeline.predict configs/baseline.yaml --checkpoint outputs/run/fold_0/best.ckpt --output outputs/run/submission.csv
-      - rtk proxy uv run --locked env PYTHONPATH=outputs/exports/run-fold0/code python -m scripts.pipeline.predict outputs/exports/run-fold0/config.json --bundle outputs/exports/run-fold0 --data-root data --output outputs/submission.csv --device auto --precision auto --num-workers 2
+      - rtk proxy uv run --locked env PYTHONPATH=outputs/exports/run-fold0/code python -m scripts.pipeline.predict outputs/exports/run-fold0/config.json --bundle outputs/exports/run-fold0 --data-root data --output outputs/submission.csv --device auto --precision auto --num-workers 8
       - rtk proxy uv run --locked env PYTHONPATH=outputs/exports/run-fold0/code python -m scripts.pipeline.predict outputs/exports/run-fold0/config.json --bundle outputs/exports/run-fold0 --data-root data --label-manifest docs/public-label-sources.json --output outputs/reproduced.csv --split validation --fold 0 --device cpu --precision fp32
       - rtk proxy uv run --locked python -m scripts.pipeline.predict configs/baseline.yaml --checkpoint outputs/run/fold_0/best.ckpt --output outputs/run/fold_0/reproduced.csv --split validation --fold 0
       - rtk proxy uv run --locked python -m scripts.pipeline.predict outputs/baseline1/effective_config.json --checkpoint outputs/baseline1/fold_0/best-epoch=04-val_macro_auc=0.84400.ckpt --output outputs/baseline1-reproduced.csv --split validation --fold 0

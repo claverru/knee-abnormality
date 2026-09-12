@@ -75,8 +75,22 @@ def setup_profile(
     torch.backends.cudnn.benchmark = False
     snapshot = output_dir / "source"
     snapshot.mkdir()
-    for path in [*Path("src/knee_abnormality").glob("*.py"), *source_paths]:
-        shutil.copy2(path, snapshot / path.name)
+    project_root = Path.cwd().resolve()
+    paths = [Path("src/knee_abnormality"), *source_paths]
+    files = []
+    for path in paths:
+        path = path.resolve()
+        files.extend(path.rglob("*.py") if path.is_dir() else [path])
+    for path in files:
+        if not path.is_file():
+            continue
+        if path.is_relative_to(project_root):
+            relative = path.relative_to(project_root)
+        else:
+            relative = Path("external") / path.relative_to(path.anchor)
+        destination = snapshot / relative
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(path, destination)
     return allocator, snapshot
 
 
@@ -104,7 +118,11 @@ def profile_manifest(
                 "timm",
             )
         },
-        "source_sha256": {path.name: sha256_file(path) for path in snapshot.iterdir()},
+        "source_sha256": {
+            str(path.relative_to(snapshot)): sha256_file(path)
+            for path in snapshot.rglob("*")
+            if path.is_file()
+        },
         "label_provenance": labels.provenance,
         "setup_seconds": setup_seconds,
         **(extra or {}),

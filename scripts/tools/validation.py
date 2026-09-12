@@ -85,16 +85,30 @@ def make_folds(
             [
                 (pl.col(target) >= TARGET_THRESHOLD).max().alias(f"positive_{target}"),
                 (pl.col(target) < TARGET_THRESHOLD).max().alias(f"negative_{target}"),
+                (pl.col("is_gold") & (pl.col(target) >= TARGET_THRESHOLD))
+                .max()
+                .alias(f"gold_positive_{target}"),
+                (pl.col("is_gold") & (pl.col(target) < TARGET_THRESHOLD))
+                .max()
+                .alias(f"gold_negative_{target}"),
             ]
         )
-    groups = studies.group_by("report_group").agg(indicators).sort("report_group")
+    groups = (
+        studies.group_by("report_group")
+        .agg(*indicators, pl.col("is_gold").any())
+        .sort("report_group")
+    )
     if groups.height < n_splits:
         raise ValueError("Too few independent report groups")
-    group_classes = groups.drop("report_group").to_numpy().astype(int)
-    if (group_classes.sum(axis=0) < n_splits).any():
-        raise ValueError(
-            "Too few positive/negative reference groups for the requested fold count"
-        )
+    group_indicators = groups.drop("report_group")
+    group_classes = group_indicators.to_numpy().astype(int)
+    for indicator, count in zip(
+        group_indicators.columns, group_classes.sum(axis=0), strict=True
+    ):
+        if count < n_splits:
+            raise ValueError(
+                f"{indicator}: {count} report groups cannot cover {n_splits} folds"
+            )
     splitter = MultilabelStratifiedKFold(
         n_splits=n_splits, shuffle=True, random_state=seed
     )
@@ -116,12 +130,19 @@ def make_folds(
         valid = studies.join(manifest.select(STUDY, "fold"), on=STUDY).filter(
             pl.col("fold") == fold
         )
+        gold = valid.filter(pl.col("is_gold"))
         for target in targets:
             positive = int((valid[target] >= TARGET_THRESHOLD).sum())
             negative = valid.height - positive
+            gold_positive = int((gold[target] >= TARGET_THRESHOLD).sum())
+            gold_negative = gold.height - gold_positive
             if min(positive, negative) == 0:
                 raise ValueError(
                     f"Fold {fold}, {target}: both classes are required; revise the split design"
+                )
+            if min(gold_positive, gold_negative) == 0:
+                raise ValueError(
+                    f"Fold {fold}, gold {target}: both classes are required; revise the split design"
                 )
             counts.append(
                 {
@@ -129,6 +150,8 @@ def make_folds(
                     "target": target,
                     "positive": positive,
                     "negative": negative,
+                    "gold_positive": gold_positive,
+                    "gold_negative": gold_negative,
                 }
             )
     return manifest, pl.DataFrame(counts), studies.select(STUDY, *targets).sort(STUDY)
@@ -160,7 +183,7 @@ def prepare(
         "n_splits": n_splits,
         "seed": seed,
         "targets": targets,
-        "stratification": "iterative multilabel over all report groups; positive and negative effective-label indicators; gold status is not an indicator",
+        "stratification": "iterative multilabel over all report groups; positive and negative effective-label and gold-only target indicators plus is_gold; both classes required per target in every full and gold validation fold",
         "grouping": "SHA-256 of whitespace-collapsed, casefolded Report",
         "validation_scope": "all_studies",
         "validation_target_threshold": TARGET_THRESHOLD,

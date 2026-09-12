@@ -1,5 +1,59 @@
 version: 1
 scripts:
+  - id: normalize-reports
+    path: scripts/adhoc/normalize_reports.py
+    summary: Count distinct training reports after progressively aggressive multilingual lexical normalization.
+    tags: [reports, text, normalization, duplicates, unique, metadata]
+    commands:
+      - rtk proxy uv run --locked python -m scripts.adhoc.normalize_reports
+    inputs: [data/raw/train.csv]
+    outputs: [data/metadata/report_normalization/summary.json, data/metadata/report_normalization/normalized_reports.parquet, data/metadata/report_normalization/duplicate_groups.csv]
+    notes:
+      - Uses deterministic rules without translation or fuzzy matching; numeric values and laterality are discarded at heavy stages.
+      - Saves raw and normalized report text only under the Git-ignored data directory by default.
+      - Token-set equality loses word order and negation scope and does not establish clinical equivalence.
+      - Existing output artifacts are overwritten; --input and --output-dir select paths.
+    docs: [docs/metadata.md#heavy-report-normalization]
+  - id: train-overnight
+    path: scripts/adhoc/train_overnight.py
+    summary: Run the seven planned learning-rate, weight-decay and duration experiments sequentially on fold 0.
+    tags: [train, overnight, queue, hyperparameters, learning-rate, weight-decay, experiments]
+    commands:
+      - rtk proxy uv run --locked python -m scripts.adhoc.train_overnight
+      - rtk proxy uv run --locked python -m scripts.adhoc.train_overnight --prepare-only
+    inputs: [Current baseline YAML, Prepared all_5fold_v3 split, Training DICOMs, Pinned labels and pretrained backbone]
+    outputs: [Unique outputs/overnight-* directory with seven YAML configs, Per-run artifacts and logs, status.tsv exit codes, runtime.json open-file limits, Validation comparison PNG for successful runs]
+    notes:
+      - Snapshots all seven configs before training and fixes split v3, fold 0, seed 42, batch eight, series dropout 0.2 and validation density 2x.
+      - Starts fresh runs in order; the duration experiment has twenty epochs and the others have ten.
+      - Continues after individual training failures and returns nonzero if training or plotting fails. SIGINT or SIGTERM stops the queue and terminates its active process group.
+      - Uses pydantic-settings for --config and --prepare-only; preparation never starts training.
+      - Raises the process soft open-file limit to its inherited hard limit before training and records both limits in runtime.json.
+      - Runs training and comparison plotting without invoking Codex or submitting to Kaggle.
+      - Run in a persistent terminal or with nohup to survive closing the terminal; every invocation creates a new queue.
+    docs: [docs/validation.md#overnight-hyperparameter-queue]
+  - id: benchmark-dataloader-optimizations
+    path: scripts/adhoc/benchmark_dataloader_optimizations.py
+    summary: Compare first-pass validation and inference data-loading optimizations against interleaved baselines.
+    tags: [benchmark, dataloader, validation, inference, dicom, preprocessing, throughput]
+    commands:
+      - rtk proxy env OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 uv run --locked python -m scripts.adhoc.benchmark_dataloader_optimizations configs/baseline.yaml --output-dir outputs/profiling/dataloader-optimizations --samples 128
+      - rtk proxy env OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 uv run --locked python -m scripts.adhoc.benchmark_dataloader_optimizations configs/baseline.yaml --output-dir outputs/profiling/production-run.json --mode run --candidate production --samples 128
+      - rtk proxy env OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 uv run --locked python -m scripts.adhoc.benchmark_dataloader_optimizations outputs/profiling/dicom-reader-20260912/workload.yaml --cohort outputs/profiling/dicom-reader-20260912/comparison-v1/timing_cohort.json --output-dir outputs/profiling/dicom-integration-new --mode dicom-suite --samples 128 --repeats 3 --audit-samples 8
+    inputs: [Baseline config, Training DICOMs, Frozen validation fold and label sources]
+    outputs: [Per-candidate JSON timings, DataLoader output audits, Progressive suite results]
+    notes:
+      - Retains C, NumPy and descriptor prototypes as historical candidates; production uses the actual dataset and collation, and production-reference uses independent frozen preprocessing and dataset sources in scripts/adhoc/dataloader_reference/.
+      - Single runs and dicom-suite use the resolved batch size and exactly eight workers; the historical preprocessing suite requires batch size eight and eight configured workers.
+      - dicom-suite compares production-reference with production, using the saved workload and 128-study cohort, the exact saved eight-study audit subset, corrected edge fixtures, training selections and persistent-worker ownership checks before three alternating timing pairs. A failed performance gate stops promotion.
+      - The native reader is limited to validated Explicit VR Little Endian single-frame 16-bit MONOCHROME2 files ending at PixelData; unsupported layouts use pydicom.
+      - dicom-audit checks exact eight-worker outputs and corrected format/failure fixtures plus freshness and invalid-metadata cases. reference-audit checks package/reference equivalence without native-specific edge cases. No separate test suite is created.
+      - Uses deterministic validation studies and the configured validation image multiplier.
+      - Runs every timing candidate in a separate process and interleaves candidate runs with baselines.
+      - Audits returned tensors with assert_allclose and checks labels, selected paths, positions, grouping, failures and valid regions separately from timing.
+      - OS page cache is uncontrolled; results represent first use by the application process, not guaranteed cold storage.
+      - The suite measures input discovery, worker startup, preprocessing, collation, optional pinning and optional host-to-device delivery without model execution.
+    docs: [docs/data-preparation.md#production-dicom-integration, docs/inference-efficiency.md]
   - id: profile-threaded-loading
     path: scripts/adhoc/profile_threaded_loading.py
     summary: Compare worker-local slice threads against process-only loading on fixed real studies.
@@ -9,7 +63,7 @@ scripts:
       - rtk proxy uv run --locked python -m scripts.adhoc.profile_threaded_loading configs/baseline.yaml --mode gpu --workers 8 --decode-threads 1 --samples 256 --output-dir outputs/profiling/threading-gpu-new
       - rtk proxy env OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 uv run --locked python -m scripts.adhoc.profile_threaded_loading configs/baseline.yaml --mode loader --workers 4 --decode-threads 2 --samples 512 --warmup-batches 16 --output-dir outputs/profiling/threading-loader-new
     inputs: [Baseline config, Training DICOMs, Frozen fold and label sources]
-    outputs: [Per-batch timings and losses, Prepared-input audit hashes, Configuration and source snapshots]
+    outputs: [Per-batch timings and losses, Prepared-input audit hashes, Configuration and recursive project-relative source snapshots]
     notes:
       - Experimental subclass leaves production loading unchanged; one thread calls the production preparation function.
       - Reuses bounded pools created lazily after worker startup; preserves serial indexing and sampling and ordered joint clipping.
@@ -31,7 +85,7 @@ scripts:
       - rtk proxy uv run --locked python -m scripts.adhoc.profile_training configs/baseline.yaml --output-dir outputs/profiling/loader-new --mode loader --batch-sizes 4 --workers 2,4,8 --samples 48 --warmup 2 --steps 6 --threads 16
       - rtk proxy uv run --locked python -m scripts.adhoc.profile_training configs/baseline.yaml --output-dir outputs/profiling/lightning-new --mode lightning --samples 64 --warmup 1 --steps 2 --threads 16
     inputs: [Baseline config, Training DICOMs, Frozen fold and label sources]
-    outputs: [JSON timings and input identities, Source snapshot, CPU profiles, GPU memory and loader wait measurements, Backbone BatchNorm update counts]
+    outputs: [JSON timings and input identities, Recursive project-relative source snapshot, CPU profiles, GPU memory and loader wait measurements, Backbone BatchNorm update counts]
     notes:
       - Samples fold-0 training studies only, retaining full configured slice limits.
       - Reports raw slices separately from CNN inputs when adjacent_triplets mode packs three slices per input.
