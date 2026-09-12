@@ -7,12 +7,12 @@ Working knowledge for the [RSNA Knee Abnormality Detection competition](https://
 | Deciding where code belongs or how to keep competition experiments fast and reproducible | [Project architecture](architecture.md) |
 | Finding a reusable script, locating an investigation, or adding and indexing a command | [Script index](../scripts/INDEX.md) |
 | Checking active work or tasks planned for the short term | [Ongoing work](ongoing.md) |
-| Reviewing remaining DICOM, percentile and conditional GPU optimization work | [Remaining preprocessing optimization work](../optimization.md) |
+| Checking the native DICOM reader's layout limits, preprocessing package, equivalence evidence and performance gates | [Production DICOM integration](data-preparation.md#production-dicom-integration) |
 | Recording or reviewing ideas to explore, including baseline, Gaussian sampling, physical-coverage and resolution experiments | [Future work](future-work.md) |
 | Comparing public notebook implementations and reported successes, failures, and uncertainties | [Public discussion and notebook findings](public-research.md) |
 | Applying lessons from past RSNA and other MRI competitions, papers, and public code | [Research across competitions](research/README.md) |
 | Setting up Python or matching dependencies to Kaggle's GPU image | [Environment and dependency versions](environment.md) |
-| Downloading small competition files or checking schemas, series profiles, image counts and median slice limits | [Competition metadata](metadata.md) |
+| Downloading small competition files or checking schemas, report normalization, series profiles, image counts and median slice limits | [Competition metadata](metadata.md) |
 | Downloading/preparing MRI images, previewing augmentations, or evaluating loader threading | [Data preparation](data-preparation.md) |
 | Checking reference-label coverage, choosing inferred labels, or refining supervision | [Supervision](supervision.md) |
 | Choosing public label files or checking their coverage, uncertainty semantics, provenance, and measured reference agreement | [Public label audit](public-label-audit.md) |

@@ -61,7 +61,11 @@ responsibility when that makes editing easier.
 | `scripts/adhoc/` | Metadata/label investigations, environment probes and future exploration | Implemented; see the [catalog](../scripts/adhoc/catalog.yaml) |
 | `src/knee_abnormality/labels.py` | Polars joins, source fingerprints, gold/silver provenance and fold membership | Implemented |
 | `src/knee_abnormality/checkpoints.py` | Validate saved input/model/target semantics and fingerprint actual training inputs for resumption | Implemented; legacy checkpoints support prediction with their saved config |
-| `src/knee_abnormality/preprocessing.py` | DICOM decoding, physical ordering, spatial preparation and fixed intensity processing, with injectable decoding for profiling | Implemented |
+| `src/knee_abnormality/preprocessing/dicom.py` | Parse headers into plain values, validate native descriptors, read selected frames and retain pydicom fallback and recoverable exceptions | Implemented |
+| `src/knee_abnormality/preprocessing/series.py` | Index metadata-only slice records, exclude known bad instances, order/center physical positions and sample slices or triplets | Implemented |
+| `src/knee_abnormality/preprocessing/spatial.py` | Crop/pad geometry, bounded sparse-filter cache, float32 resampling and delayed affine application | Implemented |
+| `src/knee_abnormality/preprocessing/intensity.py` | Exact float32 quantile selection and in-place NumPy normalization | Implemented |
+| `src/knee_abnormality/preprocessing/preparation.py` | Decode selected records, accept complete groups, collect acquisition-wide quantiles and construct tensors; retain decoder injection for profiling | Implemented |
 | `src/knee_abnormality/augmentation.py` | Sample and apply shared affine, gamma/contrast and noise transforms for training and previews | Implemented |
 | `src/knee_abnormality/dataset.py` | Set up the series index; select series and slices, prepare and collate inputs, and construct configured data loaders | Implemented |
 | `src/knee_abnormality/model.py` | PyTorch encoder, guarded series dropout and study-level aggregation producing twelve logits | Implemented |
@@ -75,6 +79,15 @@ responsibility when that makes editing easier.
 | `data/`, `outputs/` | Downloaded inputs, prepared metadata/labels and generated experiment artifacts | Local and Git-ignored |
 
 This table defines responsibilities; planned files are not empty scaffolds.
+The preprocessing package has an empty `__init__.py`; callers import each owner
+directly. `dataset.py` owns worker-local index lifetime and study/acquisition
+selection. DICOM byte interpretation stays in `dicom.py`; spatial and intensity
+modules perform no file I/O. Descriptors retain scalar metadata only, while
+selected pixels are decoded afresh on every load. Reader dispatch is fixed,
+with no configuration flag or persistent pixel/header cache. See the
+[integration evidence](data-preparation.md#production-dicom-integration) for
+layout limits, equivalence checks, performance and per-worker memory bounds.
+
 Keep experiment logic explicit. A new backbone or pooling alternative can be
 a small constructor/function in `src/knee_abnormality/model.py`; it does not
 need a plugin registry or a parallel copy of the training loop. Put runnable
@@ -253,6 +266,11 @@ Use one fresh directory per run under `outputs/<run_id>/`. Store the copied
 input config, effective settings, source/split/preprocessing identifiers, code revision
 and dirty-source snapshot, seed and dependency information. A name or Git SHA
 alone does not identify an experiment made with uncommitted changes.
+
+Profiling snapshots preserve repository-relative paths under `source/`.
+External inputs, including configs, retain their resolved absolute path without
+the filesystem root under `source/external/`; `/tmp/profile.yaml` becomes
+`source/external/tmp/profile.yaml`. The manifest hashes these files too.
 
 Keep per-fold checkpoints, logs and study predictions under `fold_<k>/`, with
 `last.ckpt` for explicit resumption and the recorded selected checkpoint for

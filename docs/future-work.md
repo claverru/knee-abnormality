@@ -36,8 +36,9 @@ and [supervision evidence](public-research.md#report-derived-supervision).
 ## Sampling, physical coverage and resolution
 
 Proposed in the 2026-09-11 discussion and deferred for future work. This section
-records the proposed implementation and comparisons; none of these changes has
-been implemented.
+records the remaining proposed implementation and comparisons. The 224-pixel,
+140-mm crop comparison is complete; see its
+[local and public results](validation.md#2026-09-12-140-mm-crop-result).
 Continue iterating on fold 0. CoAtNet and label-supervision experiments are
 listed separately in this document; pooling and augmentation changes are excluded.
 
@@ -114,8 +115,7 @@ interpreting an AUC change as evidence that anatomy was previously excluded.
 
 Train ReXNet-200 with **336 × 336 inputs**, holding the selected physical field
 of view fixed. Set shared spacing to `field_of_view_mm / 336`: approximately
-0.446667 mm for the original 150.08-mm field of view, or 0.48 mm if the
-161.28-mm field of view is selected after comparison 2. Use the same image size
+0.416667 mm for the preferred 140-mm field of view. Use the same image size
 and spacing for validation and test prediction.
 
 This isolates finer spatial sampling from physical crop size. Increasing
@@ -126,34 +126,25 @@ to fit memory. A 336-pixel input has 2.25 times the pixel area of a 224-pixel
 input, but measure actual runtime and peak VRAM rather than assuming they scale
 by that factor.
 
-### 4. Compare a 140-mm physical field of view
-
-Separately compare a centered **140 × 140 mm crop** against the physical field
-of view selected above, holding the chosen output resolution fixed. At 336
-pixels, shared spacing is `140 / 336`, approximately **0.416667 mm**; at 224
-pixels it is **0.625 mm**. Apply the same geometry in every plane and during
-training, validation and test prediction.
-
-This tests a tighter crop independently of the 224-to-336 resolution change.
-It increases pixels per mm while removing peripheral context; inspect crop
-boundaries and per-target results before accepting it. It is a separate
-comparison from the wider 161.28-mm field of view in comparison 2.
-
 The public [single-model Raptor notebook](https://www.kaggle.com/code/dreaddevelopment/knee-mri-twelve-findings-from-a-single-model)
-provides the lead for comparisons 3 and 4: its inspected source uses a 140-mm
+provided the lead for comparison 3 and the completed 140-mm crop comparison: its inspected source uses a 140-mm
 crop, 336-pixel preparation and a 384-pixel CoAtNet encoder. Kaggle metadata
 checked on 2026-09-11 records a best public score of 0.924. Its different
 backbone, labels, training membership and sampling prevent attributing that
-score to either resolution or crop size; no project gain is established.
+score to either resolution or crop size. The separate project crop comparison
+now has measured results; the resolution comparison remains unvalidated.
 
-### Comparison sequence
+### Original proposed comparison sequence
 
 1. Compare Gaussian sampling at the existing 0.67 mm spacing against the
    recorded triangular baseline.
 2. Compare 0.67 versus 0.72 mm while holding the selected sampling recipe fixed.
 3. Compare 224 versus 336 pixels while preserving the selected physical field
    of view through the corresponding spacing adjustment.
-4. Compare the selected field of view with 140 mm at the chosen resolution.
+
+The 224-pixel, 140-mm comparison completed ahead of this proposed sequence;
+use its [recorded result](validation.md#2026-09-12-140-mm-crop-result) when
+choosing the reference geometry for subsequent experiments.
 
 Keep fold-0 membership, seed 42, ReXNet-200, training budget, labels, slice
 limits and validation image multiplier fixed except for the factor under
@@ -163,12 +154,33 @@ gold diagnostics, runtime and peak VRAM. Keep validation and test inference at
 2× image limits, with inference batch size 2, following the
 [completed density comparison](inference-efficiency.md#inference-image-count-and-memory).
 Do not mix a change in inference image multiplier into these comparisons.
-Gains from sampling, physical coverage and resolution remain unverified until
-measured;
+Gains from the remaining sampling, wider-coverage and resolution proposals
+remain unverified until measured;
 no additional folds, ensemble, or routine submission parity pass is required.
 
 ## Deferred preparation experiments
 
+- **Exact percentile selection:** reconsider using the completed
+  [DICOM integration](data-preparation.md#production-dicom-integration) as the baseline. The earlier combined
+  profile spent 2.617 aggregate worker-seconds here; current production already
+  gathers valid resampled float32 values into contiguous scratch and partitions
+  all unique floor/ceil ranks together. Compare a native multi-selection loop
+  with NumPy partition including scratch construction and rank interpolation.
+  If still material, investigate exact coarse-histogram assistance: locate the
+  bins containing the requested ranks, then select exactly within those bins
+  using cumulative offsets. Keep the population acquisition-wide over all
+  successfully decoded complete groups. Do not repeat single-rank partition,
+  full sorting or per-slice bounds; approximate quantiles are outside the
+  equivalent-input contract.
+  [NumPy partition reference](https://numpy.org/doc/2.0/reference/generated/numpy.ndarray.partition.html).
+- **GPU preprocessing boundary:** consider only after remeasuring DICOM and
+  percentile work. Compare transfer of compact stored-pixel regions or float
+  crops with current uint8 output at the same logical model batch. Include IPC,
+  pinning, host-to-device bytes, percentile/CUDA synchronization, model
+  contention and peak VRAM. A resize-kernel timing is insufficient; stop if the
+  complete fixed-workload pipeline does not improve. Keep experimental
+  candidates in the existing
+  [preprocessing benchmark](../scripts/adhoc/benchmark_dataloader_optimizations.py).
 - **Learned per-series intensity bounds:** revisit after the fixed-clipping
   baseline. A shared predictor could estimate bounds for each acquisition,
   including unseen series. This needs unclipped floating-point input before

@@ -215,8 +215,8 @@ The following findings describe the original baseline1 run.
   consistent with one update per training batch, rather than two.
 - Positional encoding uses **ordinal indices in physical slice order**, not
   millimeter coordinates: `prepare_series` appends `record.original_index`
-  and returns int64 positions at lines 178–201 of
-  [`preprocessing.py`](../src/knee_abnormality/preprocessing.py). Physical
+  and returns int64 positions at lines 178–201 of the historical
+  `preprocessing.py`. Physical
   distances are discarded after sorting. This is a documentation/design
   mismatch, not shuffled slices. Physical float positions are now implemented
   as a separately recorded mode; no full-training score comparison establishes
