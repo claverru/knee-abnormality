@@ -41,7 +41,7 @@ data:
     - {plane: Coronal, fluid_sensitive: 1, fat_suppression: 1, max_images: 15}
     - {plane: Sagittal, fluid_sensitive: 0, fat_suppression: 0, max_images: 15}
     - {plane: Sagittal, fluid_sensitive: 1, fat_suppression: 1, max_images: 15}
-  spacing_mm: 0.67
+  spacing_mm: 0.625
   image_size: 224
   lower_quantile: 0.005
   upper_quantile: 0.995

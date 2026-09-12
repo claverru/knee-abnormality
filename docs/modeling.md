@@ -58,7 +58,8 @@ CNN input contains three consecutive slices from the physically sorted series.
 Channels retain their slice order and use the selected ReXNet and historical
 RA2 checkpoints' ImageNet normalization: mean `[0.485, 0.456, 0.406]` and standard deviation
 `[0.229, 0.224, 0.225]`, after dividing uint8 pixels by 255. The 224 px crop at
-0.67 mm covers **150.08 × 150.08 mm**.
+0.625 mm covers **140 × 140 mm**, following the
+[completed crop comparison](validation.md#2026-09-12-140-mm-crop-result).
 
 The dataset supplies uint8 `[inputs, 3, height, width]` tensors per series.
 Collation pads only to the largest input count present in the batch. Each
