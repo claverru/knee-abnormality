@@ -7,8 +7,8 @@ Working knowledge for the [RSNA Knee Abnormality Detection competition](https://
 | Deciding where code belongs or how to keep competition experiments fast and reproducible | [Project architecture](architecture.md) |
 | Finding a reusable script, locating an investigation, or adding and indexing a command | [Script index](../scripts/INDEX.md) |
 | Checking active work or tasks planned for the short term | [Ongoing work](ongoing.md) |
-| Reviewing the next Gaussian sampling and shared physical-spacing changes | [Next changes](../next.md) |
-| Recording or reviewing ideas to explore, including inexpensive baseline experiments | [Future work](future-work.md) |
+| Reviewing remaining DICOM, percentile and conditional GPU optimization work | [Remaining preprocessing optimization work](../optimization.md) |
+| Recording or reviewing ideas to explore, including baseline, Gaussian sampling, physical-coverage and resolution experiments | [Future work](future-work.md) |
 | Comparing public notebook implementations and reported successes, failures, and uncertainties | [Public discussion and notebook findings](public-research.md) |
 | Applying lessons from past RSNA and other MRI competitions, papers, and public code | [Research across competitions](research/README.md) |
 | Setting up Python or matching dependencies to Kaggle's GPU image | [Environment and dependency versions](environment.md) |

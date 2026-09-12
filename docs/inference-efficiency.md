@@ -1,7 +1,7 @@
 # Inference and efficiency
 
 Evidence: official submission research and repository inspection through
-2026-09-11, plus unverified working notes;
+2026-09-11, completed local submissions checked on 2026-09-12, plus unverified working notes;
 see [provenance](INDEX.md#provenance).
 
 Each current submission uses one trained fold. The implemented exporter
@@ -11,6 +11,35 @@ Baseline3 submission `56164711` scored **0.878** publicly, and baseline4
 submission `56167669` scored **0.910** publicly at 1× image limits. Baseline4
 at 2× scored **0.913** (`56169438`), ahead of 3× at **0.912** (`56169445`).
 Use **2× images and batch size 2** for current submissions.
+The best recorded public result is now **0.918**, from overnight
+`04-higher-lr` submission `56181821` on 2026-09-12. See the
+[overnight conclusions](validation.md#2026-09-12-overnight-results) and
+[submission artifacts](#overnight-fold-0-submissions).
+
+## Overnight fold-0 submissions
+
+All three submissions from `outputs/overnight-20260911T234416Z-8du9a4nh`
+completed successfully, confirmed through the Kaggle API on 2026-09-12.
+They use notebook version 1, 2× images and batch size two. Epochs below are
+numbered from one. Each record pins the uploaded bundle manifest and dataset
+version, notebook version, submission ID, API score and workflow history.
+
+| Run | Selected epoch | Submission ID | Workflow record |
+|---|---:|---:|---|
+| `02-longer` | 12 | 56181804 | [Record](../outputs/submissions/knee-overnight-02-longer-20260912.json) |
+| `04-higher-lr` | 10 | 56181821 | [Record](../outputs/submissions/knee-overnight-04-higher-lr-20260912.json) |
+| `05-faster-head` | 10 | 56181919 | [Record](../outputs/submissions/knee-overnight-05-faster-head-20260912-v2.json) |
+
+The preferred checkpoint is
+[`04-higher-lr/fold_0/best-epoch=09-val_macro_auc=0.88294.ckpt`](../outputs/overnight-20260911T234416Z-8du9a4nh/runs/04-higher-lr/fold_0/best-epoch=09-val_macro_auc=0.88294.ckpt),
+SHA-256 `900add74a5473bf6c220b6287f90c96e46881a37776abbc53ec1d7d20a24e670`.
+Its immutable bundle is
+[`outputs/exports/knee-overnight-04-higher-lr-20260912`](../outputs/exports/knee-overnight-04-higher-lr-20260912).
+The other bundles use the corresponding run names under `outputs/exports/`.
+All exports passed metadata, strict model-loading and bundle integrity checks;
+optional local inference was not requested. Successful scored submissions
+establish hidden-data execution for these artifacts, but the API does not
+provide official hidden-run runtime and no efficiency ranking is inferred.
 
 ## Verified submission requirements
 
@@ -286,7 +315,15 @@ partial-fold AUC or require a full training run.
 Launch `scripts.pipeline.submit` in a detached user systemd service so uploads,
 Kaggle execution and automatic submission continue after the interactive session
 returns. Give concurrent experiments distinct bundle, dataset, notebook and
-record paths. Do not repeatedly wait for remote completion in the interactive
+record paths. This account rejected a third concurrent notebook on 2026-09-12
+with `Maximum batch GPU session count of 2 reached.` Keep at most two batch
+GPU notebook runs active, and start additional jobs after a notebook completes.
+The current runner records this rejection as failed; it does not queue a retry.
+Reuse the same immutable bundle, dataset and notebook with a fresh record path
+after capacity becomes available. The rejection occurred before competition
+submission and consumed no submission slot; evidence is
+`outputs/submissions/knee-overnight-05-faster-head-20260912.json`.
+Do not repeatedly wait for remote completion in the interactive
 session; monitor the record or runner log as needed.
 
 ### Justfile recipes

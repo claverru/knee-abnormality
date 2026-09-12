@@ -218,7 +218,7 @@ rtk proxy uv run --locked python -m knee_abnormality.config configs/baseline.yam
 These print resolved settings as JSON, retaining the YAML's nested sections
 and adding `config_file` and `split_dir`. They do not create run artifacts,
 train or check dataset availability.
-The current config selects `steven_v4`, split `all_5fold_v1`, seed 42 and
+The current config selects `steven_v4`, split `all_5fold_v3`, seed 42 and
 **fold 0 for quick development**. Selecting one fold does not change the
 saved five-fold assignments. Preparation/training must check requested fold
 IDs against `protocol.json` and verify the selected label-source fingerprint.

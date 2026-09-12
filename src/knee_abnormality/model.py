@@ -58,13 +58,27 @@ class KneeAbnormalityModel(nn.Module):
             in_chans=data.input_channels,
             num_classes=0,
         )
-        if self.backbone.num_features != model.feature_width:
+        backbone_training = self.backbone.training
+        self.backbone.eval()
+        try:
+            with torch.inference_mode():
+                backbone_output = self.backbone(
+                    torch.zeros(
+                        1,
+                        data.input_channels,
+                        data.image_size,
+                        data.image_size,
+                    )
+                )
+        finally:
+            self.backbone.train(backbone_training)
+        if not isinstance(backbone_output, torch.Tensor) or backbone_output.ndim != 2:
             raise ValueError(
-                f"Backbone produces {self.backbone.num_features} features, expected {model.feature_width}"
+                "Backbone must return a two-dimensional pooled feature tensor"
             )
         if self.checkpoint_backbone:
             self.backbone.set_grad_checkpointing(True)
-        self.projection = nn.Linear(model.feature_width, model.projection_width)
+        self.projection = nn.Linear(backbone_output.shape[1], model.projection_width)
         if self.channels_last:
             self.backbone.to(memory_format=torch.channels_last)
         if model.pooling == "transformer":

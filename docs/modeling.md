@@ -160,7 +160,8 @@ Training uses
 epochs toward 1% of the peak learning rates. `patience: 10` prevents ordinary
 validation fluctuations from stopping this ten-epoch budget early. Best and
 latest checkpoints remain separate. The peak backbone/head learning rates are
-`1e-4` and `3e-4`.
+`2e-4` and `6e-4`, adopted in `configs/baseline.yaml` on 2026-09-12 from
+the [overnight comparison](validation.md#2026-09-12-overnight-results).
 
 Each acquisition independently samples affine augmentation with probability
 0.7, gamma/contrast with probability 0.5 and Gaussian noise with probability
