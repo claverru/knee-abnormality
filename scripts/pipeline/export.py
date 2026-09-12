@@ -210,7 +210,7 @@ def _matches_training_snapshot(training_source: dict | None) -> bool:
     if training_source is None or training_source.get("source_snapshot") is None:
         return False
     snapshot = Path(training_source["source_snapshot"]["path"])
-    source_paths = sorted((PROJECT_ROOT / "src" / "knee_abnormality").glob("*.py"))
+    source_paths = sorted((PROJECT_ROOT / "src" / "knee_abnormality").rglob("*.py"))
     source_paths.extend(
         [
             PROJECT_ROOT / "scripts" / "__init__.py",
@@ -462,7 +462,7 @@ command = [
     "--batch-size",
     os.environ.get("KNEE_BATCH_SIZE", str(manifest["runtime"].get("batch_size", 2))),
     "--num-workers",
-    os.environ.get("KNEE_NUM_WORKERS", "2"),
+    os.environ.get("KNEE_NUM_WORKERS", "8"),
 ]
 if data_root:
     command.extend(["--data-root", data_root])

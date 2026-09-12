@@ -8,12 +8,14 @@ import torch
 from torch.utils.data import DataLoader, Dataset
 
 from knee_abnormality.config import DataConfig, TrainerConfig
-from knee_abnormality.preprocessing import (
-    PREPARATION_ERRORS,
+from knee_abnormality.preprocessing.dicom import PREPARATION_ERRORS
+from knee_abnormality.preprocessing.preparation import (
     PreparedSeries,
+    prepare_series,
+)
+from knee_abnormality.preprocessing.series import (
     SliceRecord,
     index_series,
-    prepare_series,
     select_slices,
 )
 

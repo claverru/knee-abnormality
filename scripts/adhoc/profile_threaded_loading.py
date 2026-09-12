@@ -24,7 +24,8 @@ from knee_abnormality.dataset import (
     collate_studies,
 )
 from knee_abnormality.model import KneeAbnormalityModel
-from knee_abnormality.preprocessing import decode_slice, prepare_series, select_slices
+from knee_abnormality.preprocessing.preparation import decode_slice, prepare_series
+from knee_abnormality.preprocessing.series import select_slices
 from knee_abnormality.profiling import (
     finish_profile,
     profile_manifest,
@@ -79,7 +80,7 @@ class ThreadedStudyDataset(KneeStudyDataset):
         return tuple(
             self._pool.map(
                 decode_slice,
-                (record.path for record in records),
+                records,
                 repeat_value(spacing_mm),
                 repeat_value(image_size),
             )
