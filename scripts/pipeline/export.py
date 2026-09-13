@@ -38,6 +38,7 @@ INFERENCE_DISTRIBUTIONS = (
     "kornia",
     "pytorch-lightning",
     "numpy",
+    "scipy",
     "polars",
     "pydantic",
     "pydantic-settings",

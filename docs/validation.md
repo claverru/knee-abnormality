@@ -19,6 +19,57 @@ ensembling are deferred to that later phase; they are not prerequisites for
 each experiment. Keep the revised five-fold membership fixed within comparisons;
 rerun the baseline on this split before comparing new experiments.
 
+## 2026-09-13 3dsampling validation comparison
+
+The selected `3dsampling` checkpoint (epoch 9, index 8) scores **0.889964**
+versus **0.889506** for the selected epoch-10 five-embedding spatial-token
+previous champion: **+0.000458 macro AUC**. Kaggle submission **56210103**
+completed with **0.930 public AUC**, confirmed through the API on 2026-09-13,
+versus **0.929** for that previous champion. The **+0.001** public improvement
+makes 3dsampling the best recorded public result.
+
+Both runs use seed 42, Steven v4, fold 0 of `all_5fold_v3`, and 2× validation
+images. Their saved training/validation row hashes, split protocol, membership,
+label source and series metadata/count hashes match. Saved prediction study IDs
+also match across all 904 rows. Model, optimizer and trainer settings match;
+3dsampling replaces the triangular sampler with physical Gaussian overlap
+sampling at sigma 80 mm. Selected epochs differ. This compares saved training
+outputs; no fresh inference or training was run.
+
+| Metric | Previous champion | 3dsampling | Delta |
+|---|---:|---:|---:|
+| Full validation AUC (904) | 0.889506 | 0.889964 | +0.000458 |
+| Report-derived AUC (893) | 0.888626 | 0.889051 | +0.000425 |
+| Gold AUC (11) | 0.931118 | 0.936673 | +0.005556 |
+| Soft-target BCE, lower is better | 0.450625 | 0.452571 | +0.001946 |
+| Public AUC | 0.929 | 0.930 | +0.001 |
+
+| Target | Previous champion | 3dsampling | Delta |
+|---|---:|---:|---:|
+| ACL | 0.903170 | 0.918893 | +0.015723 |
+| MCL | 0.844146 | 0.838486 | -0.005660 |
+| Medial Meniscus | 0.923086 | 0.919616 | -0.003470 |
+| Lateral Meniscus | 0.885326 | 0.896857 | +0.011532 |
+| Medial OA | 0.897793 | 0.898729 | +0.000936 |
+| Lateral OA | 0.867189 | 0.869179 | +0.001990 |
+| PF OA | 0.875082 | 0.867193 | -0.007889 |
+| Effusion | 0.865013 | 0.864345 | -0.000668 |
+| Synovitis | 0.894440 | 0.890164 | -0.004276 |
+| Baker's | 0.908289 | 0.911122 | +0.002833 |
+| Contusion | 0.891787 | 0.887201 | -0.004586 |
+| Fracture | 0.918748 | 0.917785 | -0.000963 |
+
+Five targets improve and seven decline. ACL and lateral meniscus account for
+the largest gains; PF OA and MCL show the largest losses. Overall AUC is nearly
+unchanged and BCE worsens. One fold and one training seed do not establish a
+repeatable improvement, and the gold subset contains only eleven studies.
+
+The [comparison artifact](../outputs/analysis/3dsampling-vs-spatial-tokens-20260913/comparison.json)
+records full metrics, deltas, source paths and metric/prediction hashes. Original
+configs, input identities and source snapshots remain in each run directory.
+The [submission record](../outputs/submissions/knee-3dsampling-20260913.json)
+records the completed public evaluation; see [submission details](inference-efficiency.md#3dsampling-submission).
+
 ## Project validation protocol
 
 The split uses `MultilabelStratifiedKFold` from
@@ -797,7 +848,8 @@ at the final epoch. This is a promising improvement on the development fold;
 the paired uncertainty interval does not establish a repeatable advantage.
 
 Kaggle submission **56206027** completed with **0.929 public AUC**, improving
-on `crop140mm` at 0.925 by 0.004 and establishing the best recorded public result.
+on `crop140mm` at 0.925 by 0.004. It was later surpassed by
+[3dsampling](#2026-09-13-3dsampling-validation-comparison) at 0.930.
 The public improvement agrees with the local direction; it does not isolate
 individual architectural contributions. Exact artifact and API identities live
 in the [submission record](inference-efficiency.md#spatial-token-submission).
@@ -847,9 +899,55 @@ are also available as an
 This analysis reads saved CSVs and metrics on CPU; no model execution, tests,
 new training, encoding diagnostic or blend submission was performed.
 
+### 2026-09-13 Tonylin label comparison
+
+**Result: retain Steven v4.** The completed `tonylin-soft-v3` experiment scored
+**0.921 publicly**, below the otherwise matching Steven-v4 spatial-token run's
+**0.929**. Baseline configuration is restored to `steven_v4` and its original
+source manifest. The prepared Tonylin inputs and trained artifacts remain for
+reproduction; no further Tonylin run is scheduled.
+
+| Selected model | Epoch | Full-fold AUC, 904 | Gold AUC, 11 | Soft-target BCE | Public AUC |
+|---|---:|---:|---:|---:|---:|
+| Steven v4, spatial tokens | 10 | 0.889506 | 0.931118 | 0.450625 | **0.929** |
+| Tonylin soft v3 | 9 | **0.892306** | 0.920503 | 0.513874 | 0.921 |
+
+Tonylin improves full-fold AUC by **0.002800**, but loses **0.010615** on the
+small gold diagnostic and **0.008** on the public leaderboard. Its higher
+report-label reference AUC (0.902700 versus Steven's 0.892707) did not transfer
+to a better submitted image model in this experiment. The local full-fold
+metric, dominated by 893 frozen report-derived validation targets, moved in
+the opposite direction from public performance. Neither the twelve-target
+58-study label score nor this full-fold AUC increase justified adopting it.
+The result does not identify whether label calibration, particular target
+changes, prior gold tuning or training variability caused the regression.
+
+Saved effective configurations differ only in `labels.source` and
+`paths.label_manifest`. Both use seed 42, `all_5fold_v3` fold 0, identical
+model/optimizer/sampling settings, a ten-epoch budget, and 2× images with
+batch size two for submission. Preprocessing, split protocol, membership,
+series metadata and series-count identities match. Loading both saved configs
+confirms identical training study IDs, official gold training targets, and all
+904 validation IDs and effective target values. Full validation-row hashes
+differ because those frames also contain source columns and optional Steven
+diagnostics; that difference is not a changed validation target table.
+
+Tonylin checkpoint index 8 has SHA-256
+`55a9bf41d281a3abb71f3c96a667942d626538e5460c601fae9dfec0b6126dcd`.
+Submission **56208424** completed at 14:10:54 UTC according to the
+[workflow record](../outputs/submissions/knee-tonylin-soft-v3-20260913.json).
+The [comparison artifact](../outputs/analysis/tonylin-vs-steven-20260913/comparison.json)
+pins configs, saved metrics/predictions, input identities and submission records,
+including all per-target scores and the membership/gold/validation comparison.
+See the [submission artifact](inference-efficiency.md#tonylin-submission) and
+[label audit](public-label-audit.md#2026-09-13-new-public-label-comparison).
+This is one fold and seed with independently selected best epochs; it does
+not establish a universal ranking of the label sources. The analysis read
+saved artifacts and tabular labels only; no training, inference or tests ran.
+
 ### 2026-09-13 local and public agreement after the split change
 
-Local full-fold AUC tracks the public leaderboard strongly across the six
+Before the Tonylin experiment, local full-fold AUC tracked the public leaderboard strongly across the six
 distinct submitted checkpoints trained on `all_5fold_v3`. All use fold 0, seed 42,
 the same 904 validation studies, matching label/split/membership/input identities,
 and 2× image limits for both validation and submission. Earlier baseline3 and
@@ -880,6 +978,12 @@ cannot establish that balancing gold labels caused the correlation. Scores are
 rounded to three decimals, model submissions were selected during development,
 and all runs use one fold and seed. No local-to-public score conversion or
 private-leaderboard guarantee is inferred.
+
+The later [Tonylin label comparison](#2026-09-13-tonylin-label-comparison) is
+outside this six-run, fixed-label analysis: local AUC rises to 0.892306 while
+public AUC falls to 0.921. Preserve the correlation above as the measured
+Steven-v4 cohort result; it does not establish reliable ranking across changes
+in training-label source.
 
 The [comparison artifact](../outputs/analysis/local-public-all-5fold-v3-20260913/comparison.json)
 records every checkpoint, bundle and submission identity, saved local metrics,

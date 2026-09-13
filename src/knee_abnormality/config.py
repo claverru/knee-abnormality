@@ -88,14 +88,12 @@ class NoiseAugmentationConfig(ConfigModel):
 
 class DataConfig(ConfigModel):
     series_types: Annotated[tuple[SeriesTypeConfig, ...], Field(min_length=1)]
-    position_encoding: Literal["index", "physical_mm"] = "index"
-    position_reference: Literal["origin", "center"] = "origin"
-    acquisition_sampling: Literal["shortest", "pooled"] = "shortest"
-    slice_sampling: Literal["uniform", "center_weighted"] = "uniform"
-    center_sampling_weight: Annotated[float, Field(ge=1, allow_inf_nan=False)] = 3.0
+    position_encoding: Literal["physical_mm"] = "physical_mm"
+    position_reference: Literal["center"] = "center"
+    sampling_sigma_mm: PositiveFiniteFloat = 80.0
     validation_image_multiplier: Annotated[StrictInt, Field(gt=0)] = 1
-    input_channels: Literal[1, 3] = 1
-    input_mode: Literal["single_slice", "adjacent_triplets"] = "single_slice"
+    input_channels: Literal[3] = 3
+    input_mode: Literal["adjacent_triplets"] = "adjacent_triplets"
     intensity_augmentation: IntensityAugmentationConfig = Field(
         default_factory=IntensityAugmentationConfig
     )
@@ -114,22 +112,14 @@ class DataConfig(ConfigModel):
 
     @property
     def slices_per_input(self) -> int:
-        return 3 if self.input_mode == "adjacent_triplets" else 1
+        return 3
 
     @model_validator(mode="after")
     def triplet_inputs(self) -> "DataConfig":
-        if (
-            self.position_reference == "center"
-            and self.position_encoding != "physical_mm"
-        ):
-            raise ValueError("Centered positions require physical_mm encoding")
-        if self.input_mode == "adjacent_triplets":
-            if self.input_channels != 3:
-                raise ValueError("Adjacent triplets require three input channels")
-            if any(kind.max_images % 3 for kind in self.series_types):
-                raise ValueError(
-                    "Triplet max_images limits count raw slices and must be multiples of three"
-                )
+        if any(kind.max_images % 3 for kind in self.series_types):
+            raise ValueError(
+                "Triplet max_images limits count channel appearances and must be multiples of three"
+            )
         return self
 
     @field_validator("mean", "std")

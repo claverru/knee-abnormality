@@ -43,8 +43,8 @@ def _sample_batches(dataset, count: int, batch_size: int) -> list[int]:
                 dataset.series_index[uid].slots, dataset.data.series_types, strict=True
             ):
                 inputs += min(
-                    sum(candidate.image_count for candidate in slot),
-                    kind.max_images * dataset.image_limit_multiplier,
+                    sum(max(candidate.image_count - 2, 0) for candidate in slot),
+                    kind.max_images * dataset.image_limit_multiplier // 3,
                 )
                 acquisitions += len(slot)
         return inputs, acquisitions
@@ -114,8 +114,8 @@ def verify_inference(bundle: Path, request: dict) -> None:
     capacities = {
         uid: sum(
             min(
-                sum(candidate.image_count for candidate in slot),
-                kind.max_images * dataset.image_limit_multiplier,
+                sum(max(candidate.image_count - 2, 0) for candidate in slot),
+                kind.max_images * dataset.image_limit_multiplier // 3,
             )
             for slot, kind in zip(
                 dataset.series_index[uid].slots, dataset.data.series_types, strict=True

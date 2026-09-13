@@ -11,16 +11,63 @@ Baseline3 submission `56164711` scored **0.878** publicly, and baseline4
 submission `56167669` scored **0.910** publicly at 1× image limits. Baseline4
 at 2× scored **0.913** (`56169438`), ahead of 3× at **0.912** (`56169445`).
 Use **2× images and batch size 2** for current submissions.
-The best recorded public result is now **0.929**, from
-`spatial-tokens-five-embeddings` submission `56206027` on 2026-09-13. See the
-[validation comparison](validation.md#2026-09-13-spatial-token-validation-comparison)
-and [submission artifact](#spatial-token-submission).
+The best recorded public result is now **0.930**, from `3dsampling`
+submission `56210103` on 2026-09-13. See the
+[validation comparison](validation.md#2026-09-13-3dsampling-validation-comparison)
+and [submission artifact](#3dsampling-submission).
+
+## Physical-sampling runtime identity
+
+New runs use `physical_gaussian_overlap_spatial_tokens_v1`, including fixed gap,
+complete-link grouping, local-fallback, seed, retry and unique-slice intensity
+rules in the preprocessing identity. Recursive source hashing includes
+`preprocessing/sampling.py`; export copies the package and records SciPy in its
+runtime dependency manifest. SciPy is already installed in the pinned Kaggle
+runtime and is a locked project dependency. No new package is introduced.
+
+Checkpoint compatibility checks require the configured seed to match the saved
+seed because it affects evaluation supplier selection for overlapping
+acquisitions. A mismatch reports `seed`; use the run's `effective_config.json`
+to preserve its original validation and test inputs.
+
+Old checkpoints and bundles retain their original config and source; strict
+identity validation rejects using them with this sampler. Keep the 2× inference
+multiplier and existing tensor shapes. Loader capacity ranking now estimates
+possible overlapping triplets (`max(n_images - 2, 0)`) rather than dividing unique
+files into non-overlapping inputs; geometry and run constraints can lower this
+estimate. Actual input counts come from preparation.
+
+On the pinned accepted-center cohort, validation realizes 6,248 triplets versus
+5,659 historically, **10.4% more CNN inputs** at the same nominal limits. This is
+metadata/preparation evidence, not an inference runtime, memory or accuracy
+measurement. Training and model execution were excluded from implementation.
+See [verification](physical-sampling.md#implementation-verification).
+
+## 3dsampling submission
+
+The selected `3dsampling` fold-0 checkpoint (epoch 9, index 8) was exported on
+2026-09-13 to `outputs/exports/knee-3dsampling-20260913` at 2× images and batch 2.
+Checkpoint SHA-256 is
+`3a63b49d59d33be6b3f254639572aa3c34606a397107e5bcaa9ac1cdb42d6819`.
+Export readiness and bundle integrity checks passed, with preparation taking
+0.55 seconds and `local_inference: not_requested`.
+
+The detached automatic submission job uses private dataset
+`claverru/knee-3dsampling-20260913` and notebook
+`claverru/knee-3dsampling-20260913-inference`. Dataset version 1 supplied
+notebook version 1, Kaggle script version `349556156`. Its output was verified
+and submission **56210103** completed with **0.930 public AUC**, confirmed
+through the Kaggle API at 15:46:48 UTC on 2026-09-13. This is **+0.001** over
+the previous spatial-token champion. Exact identities and transitions are in
+the [workflow record](../outputs/submissions/knee-3dsampling-20260913.json).
+The [saved validation comparison](validation.md#2026-09-13-3dsampling-validation-comparison)
+shows +0.000458 macro AUC versus the previous champion, with slightly worse BCE.
 
 ## Spatial-token submission
 
 Submission **56206027** completed on 2026-09-13 with public score **0.929**,
 confirmed through the Kaggle API. This improves on `crop140mm` at 0.925 by 0.004
-and is the best recorded public result.
+and was subsequently surpassed by [3dsampling](#3dsampling-submission) at 0.930.
 It uses the completed `spatial-tokens-five-embeddings` fold-0 run's selected
 epoch-10 checkpoint, local macro AUC 0.88950565, with 2× image limits and
 inference batch size two. See the
@@ -48,6 +95,29 @@ upload; the successful retry reused the same private dataset version. The
 failed attempt created no competition submission. Exact export, both workflow
 launches and monitoring commands are retained in the
 [command log](../outputs/analysis/spatial-tokens-vs-crop140mm-20260913/submission-commands.md).
+
+## Tonylin submission
+
+Submission **56208424** completed on 2026-09-13 with public score **0.921**,
+confirmed through the Kaggle API. It is **0.008 below** the Steven-v4
+spatial-token submission at 0.929, so Steven remains the selected baseline.
+The [completed label comparison](validation.md#2026-09-13-tonylin-label-comparison)
+records the local/gold metrics and matched training setup.
+
+The run `tonylin-soft-v3` selected epoch 9, checkpoint index 8, local AUC
+0.89230583. Checkpoint SHA-256 is
+`55a9bf41d281a3abb71f3c96a667942d626538e5460c601fae9dfec0b6126dcd`.
+The [bundle](../outputs/exports/knee-tonylin-soft-v3-20260913) passed export
+readiness and integrity checks with 2× images and inference batch size two;
+optional local inference was not requested.
+
+Private dataset `claverru/knee-tonylin-soft-v3-20260913` version 1 supplied
+private offline notebook `claverru/knee-tonylin-v3-20260913-inference` version 1,
+Kaggle script version `349533769`. Its three example output rows were verified
+before that exact notebook version was submitted. The
+[workflow record](../outputs/submissions/knee-tonylin-soft-v3-20260913.json)
+pins the bundle/dataset/notebook identities and completed score, recorded at
+14:10:54 UTC. No official hidden-test runtime is available from the API.
 
 ## Spatial-fusion runtime gate
 

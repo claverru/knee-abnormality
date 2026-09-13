@@ -28,7 +28,9 @@ def sample_dataset(
         labels.training["StudyInstanceUID"].to_list(),
         key=lambda uid: (
             -sum(
-                min(values[0].image_count, kind.max_images) if values else 0
+                min(
+                    sum(max(c.image_count - 2, 0) for c in values), kind.max_images // 3
+                )
                 for values, kind in zip(
                     index[uid].slots, config.data.series_types, strict=True
                 )

@@ -64,7 +64,10 @@ def preprocessing_profile(dataset: KneeStudyDataset, args: ProfileCLI) -> dict:
                 {
                     "study_uid": item["study_uid"],
                     "seconds": seconds,
-                    "slices": sum(value.slice_count for value in prepared),
+                    "channel_appearances": sum(value.slice_count for value in prepared),
+                    "unique_source_slices": sum(
+                        value.unique_slice_count for value in prepared
+                    ),
                     "inputs": sum(len(value.images) for value in prepared),
                     "series": len(prepared),
                     "sha256": [

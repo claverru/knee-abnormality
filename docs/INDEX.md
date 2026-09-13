@@ -7,6 +7,7 @@ Working knowledge for the [RSNA Knee Abnormality Detection competition](https://
 | Deciding where code belongs or how to keep competition experiments fast and reproducible | [Project architecture](architecture.md) |
 | Finding a reusable script, locating an investigation, or adding and indexing a command | [Script index](../scripts/INDEX.md) |
 | Checking active work or tasks planned for the short term | [Ongoing work](ongoing.md) |
+| Reviewing 3dsampling's 0.930 public result and validation comparison with the previous champion | [3dsampling validation comparison](validation.md#2026-09-13-3dsampling-validation-comparison) |
 | Reviewing the completed center experiment, its rejected sampler and the frozen control for fusion | [Accurate-centers result](validation.md#2026-09-12-accurate-centers-result) |
 | Training the spatial-token model with five embeddings and study-level 3D dropout | [Active spatial token model](modeling.md#active-spatial-token-model) |
 | Reviewing the completed spatial-token run, its target gains and paired validation uncertainty | [Spatial-token validation comparison](validation.md#2026-09-13-spatial-token-validation-comparison) |
@@ -19,14 +20,18 @@ Working knowledge for the [RSNA Knee Abnormality Detection competition](https://
 | Finding removed regional investigation sources and original reproduction bundles | [Historical regional sources](history/regional-sources/README.md) |
 | Reviewing the earlier spatial-fusion implementation and failed deployment runtime gate | [Spatial-fusion engineering result](validation.md#2026-09-12-spatial-fusion-engineering-result) |
 | Checking the native DICOM reader's layout limits, preprocessing package, equivalence evidence and performance gates | [Production DICOM integration](data-preparation.md#production-dicom-integration) |
-| Recording or reviewing ideas to explore, including baseline, Gaussian sampling, physical-coverage and resolution experiments | [Future work](future-work.md) |
+| Understanding the implemented physical sampler, overlap, fallback and its metadata evidence | [Physical sampling analysis](physical-sampling.md) |
+| Recording or reviewing ideas to explore, including baseline, physical-coverage and resolution experiments | [Future work](future-work.md) |
 | Comparing public notebook implementations and reported successes, failures, and uncertainties | [Public discussion and notebook findings](public-research.md) |
 | Applying lessons from past RSNA and other MRI competitions, papers, and public code | [Research across competitions](research/README.md) |
 | Setting up Python or matching dependencies to Kaggle's GPU image | [Environment and dependency versions](environment.md) |
 | Downloading small competition files or checking schemas, report normalization, series profiles, image counts and median slice limits | [Competition metadata](metadata.md) |
 | Downloading/preparing MRI images, previewing augmentations, or evaluating loader threading | [Data preparation](data-preparation.md) |
 | Checking reference-label coverage, choosing inferred labels, or refining supervision | [Supervision](supervision.md) |
+| Reproducing the completed Tonylin experiment with our split and frozen validation targets | [Training with Tonylin](supervision.md#training-with-tonylin-soft-labels) |
+| Reviewing why Steven v4 was retained after the Tonylin public-score regression | [Tonylin label result](validation.md#2026-09-13-tonylin-label-comparison) |
 | Choosing public label files or checking their coverage, uncertainty semantics, provenance, and measured reference agreement | [Public label audit](public-label-audit.md) |
+| Comparing newer public labels with Steven v4 and checking published gold-score claims | [September 13 label comparison](public-label-audit.md#2026-09-13-new-public-label-comparison) |
 | Choosing a backbone, sampling windows, augmentation/losses, or diagnosing batch memory and profiled runtime settings | [Modeling](modeling.md) |
 | Using fixed folds, scoring OOF predictions, or interpreting local results | [Validation and experiments](validation.md) |
 | Reviewing baseline1's measured results, confirmed code defects, or historical limitations | [Baseline1 review](baseline-review.md) |
@@ -56,6 +61,16 @@ source transformations, uncertainty and reference agreement, separately from
 the earlier public experiment reports. It does not reproduce label generation
 or establish downstream training results. Dataset versions and file hashes
 are pinned in [the label-source manifest](public-label-sources.json).
+
+The [September 13 label comparison](public-label-audit.md#2026-09-13-new-public-label-comparison)
+adds six candidate publishers, reproduces available reference-score claims and
+distinguishes copied gold targets from scoreable predictions. Its separate
+[comparison manifest](public-label-comparison-sources.json) pins the inspected
+releases. Its initial Tonylin recommendation was followed by a separate
+[training comparison](validation.md#2026-09-13-tonylin-label-comparison):
+public AUC fell from 0.929 to 0.921 despite higher local AUC, and the baseline
+returned to Steven v4. Label-table agreement and image-model results remain
+separate evidence.
 
 The [broader competition research](research/README.md), reviewed on 2026-09-10,
 has separate primary-source evidence from past RSNA and MRI competitions,
