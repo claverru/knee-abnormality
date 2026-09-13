@@ -9,6 +9,8 @@ import numpy as np
 import pydicom
 from pydicom.filereader import read_partial
 
+from knee_abnormality.preprocessing.geometry import NativePose, PoseLayout
+
 PREPARATION_ERRORS = (
     AttributeError,
     EOFError,
@@ -24,6 +26,8 @@ class DicomHeader:
     physical_position: float | None
     instance_number: float | None
     descriptor: NativePixelDescriptor | None
+    position_source: str
+    pose: NativePose | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -35,7 +39,7 @@ class DecodedFrame:
     intercept: float
 
 
-def _physical_position(dataset: pydicom.Dataset) -> float | None:
+def _physical_position(dataset: pydicom.Dataset) -> tuple[float | None, str]:
     orientation = getattr(dataset, "ImageOrientationPatient", None)
     location = getattr(dataset, "ImagePositionPatient", None)
     if (
@@ -49,12 +53,35 @@ def _physical_position(dataset: pydicom.Dataset) -> float | None:
         normal = np.cross(row, column)
         position = float(np.dot(np.asarray(location, dtype=np.float64), normal))
         if math.isfinite(position) and np.linalg.norm(normal) > 0:
-            return position
+            return position, "patient"
     if hasattr(dataset, "SliceLocation"):
         position = float(dataset.SliceLocation)
         if math.isfinite(position):
-            return position
-    return None
+            return position, "slice_location"
+    return None, "filename"
+
+
+def _native_pose(dataset: pydicom.Dataset) -> NativePose | None:
+    try:
+        position = tuple(float(value) for value in dataset.ImagePositionPatient)
+        orientation = tuple(float(value) for value in dataset.ImageOrientationPatient)
+        spacing = tuple(float(value) for value in dataset.PixelSpacing)
+        if len(position) != 3 or len(orientation) != 6 or len(spacing) != 2:
+            return None
+        return NativePose(
+            position,
+            PoseLayout(
+                orientation,
+                spacing,
+                int(dataset.Rows),
+                int(dataset.Columns),
+                str(dataset.FrameOfReferenceUID)
+                if hasattr(dataset, "FrameOfReferenceUID")
+                else None,
+            ),
+        )
+    except PREPARATION_ERRORS:
+        return None
 
 
 @dataclass(frozen=True, slots=True)
@@ -135,14 +162,18 @@ def read_header(path: Path) -> DicomHeader:
 
         dataset = read_partial(stream, stop_when=stop_at_pixels)
         info = os.fstat(stream.fileno())
-    physical = _physical_position(dataset)
+    physical, source = _physical_position(dataset)
     instance = (
         float(dataset.InstanceNumber)
         if physical is None and hasattr(dataset, "InstanceNumber")
         else None
     )
     return DicomHeader(
-        physical, instance, _native_descriptor(dataset, pixel_element, info)
+        physical,
+        instance,
+        _native_descriptor(dataset, pixel_element, info),
+        "instance_number" if instance is not None else source,
+        _native_pose(dataset),
     )
 
 

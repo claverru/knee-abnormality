@@ -31,6 +31,7 @@ from knee_abnormality.checkpoints import validate_checkpoint
 from knee_abnormality.cli import NonExitingCLISettings
 from knee_abnormality.config import ExperimentConfig, load_config
 from knee_abnormality.inference import load_checkpoint_model
+from knee_abnormality.preprocessing_identity import validate_preprocessing_identity
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 INFERENCE_DISTRIBUTIONS = (
@@ -563,6 +564,9 @@ def export_bundle(args: ExportCLI) -> dict:
         (temporary / "code").mkdir()
         (temporary / "wheels").mkdir()
         _copy_code(temporary / "code")
+        bundled_preprocessing = validate_preprocessing_identity(
+            saved.get("preprocessing_identity"), temporary / "code" / "knee_abnormality"
+        )
         source_hash = _source_hash(temporary / "code")
         verification = _verification(
             args.verification_record, checkpoint_hash, source_hash, image_multiplier
@@ -653,6 +657,7 @@ def export_bundle(args: ExportCLI) -> dict:
                 f"Offline codec wheels were not supplied: {', '.join(missing_codecs)}"
             )
         manifest = {
+            "preprocessing_identity": bundled_preprocessing,
             "schema_version": BUNDLE_SCHEMA_VERSION,
             "created_at": datetime.now(UTC).isoformat(),
             "checkpoint": {

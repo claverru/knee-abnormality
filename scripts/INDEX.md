@@ -89,3 +89,12 @@ The repository skill lives under `.agents/skills/`, following the
 [official local skill discovery layout](https://learn.chatgpt.com/docs/build-skills#where-codex-loads-local-skills).
 The root `AGENTS.md` also links it directly so the maintenance instructions can
 be read even when a session has not refreshed its skill list.
+
+## Spatial-token diagnosis and retired regional work
+
+Use `diagnose-encoding-usage` for the manually invoked post-training spatial-token
+interventions; see [the procedure](../docs/validation.md#manual-encoding-usage-diagnosis).
+Removed regional coverage, usage and profiling commands are preserved as
+[historical source snapshots](../docs/history/regional-sources/README.md), outside
+the executable catalog. Reproduce them only with their original analysis/run
+source bundles and configurations.

@@ -21,3 +21,9 @@ Keep fold membership, validation targets and the comparison recipe fixed.
 The unverified settings and results remain hypotheses to reproduce and improve,
 not established requirements. When a task is completed, move durable
 findings to its linked canonical document and remove the completed task here.
+
+The user launches training and the [encoding diagnostic](validation.md#manual-encoding-usage-diagnosis)
+manually. No training, optimizer-step checks, automatic diagnostics, extra seeds,
+or baseline reruns are scheduled. Use fresh artifact directories and
+retain source/config/checkpoint/input identities. These single-fold comparisons
+cannot resolve training-seed variability or establish small repeatable gains.

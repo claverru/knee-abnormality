@@ -1,0 +1,338 @@
+import json
+import os
+import shutil
+import time
+from datetime import UTC, datetime
+from importlib.metadata import version
+from pathlib import Path
+from typing import Literal
+
+import matplotlib
+import numpy as np
+import polars as pl
+import torch
+from pydantic import Field
+from pydantic_settings import CliPositionalArg
+
+import knee_abnormality
+from knee_abnormality.cli import CLISettings
+from knee_abnormality.config import load_config
+from knee_abnormality.inference import (
+    load_checkpoint_model,
+    make_prediction_frame,
+    prediction_data,
+    prediction_loader,
+    resolve_device,
+    resolve_precision,
+)
+from knee_abnormality.labels import load_fold_labels
+from knee_abnormality.metrics import validation_metrics
+from knee_abnormality.preprocessing_identity import preprocessing_identity
+from knee_abnormality.provenance import sha256_file
+from knee_abnormality.runtime import configure_cuda_allocator, move_batch
+
+matplotlib.use("Agg")
+
+from matplotlib import pyplot as plt
+
+
+class DiagnoseCLI(CLISettings):
+    run_dir: CliPositionalArg[Path]
+    output_dir: Path
+    fold: int = Field(default=0, ge=0)
+    batch_size: int | None = Field(default=None, ge=1)
+    workers: int = Field(default=8, ge=0)
+    device: Literal["auto", "cpu", "cuda"] = "auto"
+    precision: Literal["auto", "fp32", "bf16"] = "auto"
+
+
+def distribution(values: np.ndarray) -> dict:
+    return {
+        "mean": float(values.mean()),
+        **{
+            f"p{int(q * 100):02d}": float(np.quantile(values, q))
+            for q in (0, 0.1, 0.5, 0.9, 1)
+        },
+    }
+
+
+def main() -> None:
+    args = DiagnoseCLI()
+    started = time.perf_counter()
+    config_path = args.run_dir / "effective_config.json"
+    config = load_config(config_path)
+    allocator = configure_cuda_allocator()
+    os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
+    torch.set_num_threads(1)
+    torch.set_float32_matmul_precision("high")
+    torch.manual_seed(config.seed)
+    torch.use_deterministic_algorithms(config.trainer.deterministic)
+    torch.backends.cudnn.benchmark = False
+    device = resolve_device(args.device)
+    precision, dtype = resolve_precision(args.precision, device)
+    fold_dir = args.run_dir / f"fold_{args.fold}"
+    selected = json.loads((fold_dir / "selected_checkpoint.json").read_text())
+    checkpoint = fold_dir / Path(selected["path"]).name
+    saved_path = fold_dir / "validation_predictions.csv"
+    saved = pl.read_csv(saved_path).sort("StudyInstanceUID")
+    dataset, targets, studies = prediction_data(config, "validation", args.fold)
+    if saved["StudyInstanceUID"].to_list() != studies["StudyInstanceUID"].to_list():
+        raise ValueError("Saved predictions must match the complete validation fold")
+    if saved["fold"].to_list() != [args.fold] * len(studies):
+        raise ValueError("Saved predictions have an unexpected producing fold")
+    model = load_checkpoint_model(
+        config, targets, checkpoint, device, expected_fold=args.fold
+    )
+    if model.training:
+        raise ValueError("Fusion diagnosis requires evaluation mode")
+    args.output_dir.mkdir(parents=True, exist_ok=False)
+    snapshot = args.output_dir / "source"
+    shutil.copytree(
+        Path(knee_abnormality.__file__).parent,
+        snapshot / "src/knee_abnormality",
+        ignore=shutil.ignore_patterns("__pycache__"),
+    )
+    script_snapshot = snapshot / "scripts/adhoc" / Path(__file__).name
+    script_snapshot.parent.mkdir(parents=True)
+    shutil.copy2(__file__, script_snapshot)
+    shutil.copy2(config_path, args.output_dir / "effective_config.json")
+    loader = prediction_loader(
+        config, dataset, batch_size=args.batch_size, num_workers=args.workers
+    )
+    original_pool = model._attention_pool
+    query_count = len(model.spatial_pool.offsets)
+    captured = {}
+
+    def inspect_pool(tokens, token_study, token_valid, batch_size):
+        logits = original_pool(tokens, token_study, token_valid, batch_size)
+        global_count = len(tokens) - batch_size * query_count
+        global_mask = torch.arange(len(tokens), device=tokens.device) < global_count
+        global_logits = original_pool(
+            tokens, token_study, token_valid & global_mask, batch_size
+        )
+        scores = model.attention(tokens).transpose(0, 1)
+        membership = (
+            torch.arange(batch_size, device=tokens.device)[:, None] == token_study
+        ) & token_valid[None]
+        with torch.autocast(device_type=device.type, enabled=False):
+            attention = scores.float()[None].expand(batch_size, -1, -1)
+            attention = attention.masked_fill(~membership[:, None], -torch.inf).softmax(
+                -1
+            )
+        regional = attention[..., global_count:]
+        captured.update(
+            global_only=torch.sigmoid(global_logits.float()).cpu(),
+            regional_mass=regional.sum(-1).cpu(),
+            query_mass=regional.reshape(
+                batch_size, len(targets), batch_size, query_count
+            )
+            .sum(2)
+            .cpu(),
+            query_valid=token_valid[global_count:]
+            .reshape(batch_size, query_count)
+            .cpu(),
+            global_count=torch.bincount(
+                token_study[:global_count], minlength=batch_size
+            ).cpu(),
+        )
+        return logits
+
+    model._attention_pool = inspect_pool
+    ids = []
+    full_predictions = []
+    global_predictions = []
+    masses = []
+    queries = []
+    validity = []
+    global_counts = []
+    accepted_centers = []
+    preparation_conditions = 0
+    if device.type == "cuda":
+        torch.cuda.reset_peak_memory_stats()
+    try:
+        with torch.inference_mode():
+            for batch in loader:
+                ids.extend(batch["study_uid"])
+                accepted_centers.extend(batch["center_valid"].tolist())
+                preparation_conditions += sum(
+                    len(values) for values in batch["failures"]
+                )
+                with torch.autocast(
+                    device_type=device.type, dtype=dtype, enabled=dtype is not None
+                ):
+                    logits = model(move_batch(batch, device))
+                full_predictions.append(torch.sigmoid(logits.float()).cpu())
+                global_predictions.append(captured["global_only"])
+                masses.append(captured["regional_mass"])
+                queries.append(captured["query_mass"])
+                validity.append(captured["query_valid"])
+                global_counts.append(captured["global_count"])
+                if len(ids) % 128 == 0 or len(ids) == len(dataset):
+                    print(
+                        f"Processed {len(ids)}/{len(dataset)} validation studies",
+                        flush=True,
+                    )
+    finally:
+        model._attention_pool = original_pool
+    if ids != studies["StudyInstanceUID"].to_list():
+        raise ValueError("Inference order differs from frozen validation membership")
+    full = torch.cat(full_predictions).numpy()
+    global_only = torch.cat(global_predictions).numpy()
+    regional_mass = torch.cat(masses).numpy()
+    query_mass = torch.cat(queries).numpy()
+    query_valid = torch.cat(validity).numpy()
+    global_count = torch.cat(global_counts).numpy()
+    valid_count = query_valid.sum(-1)
+    y = studies.select([f"target_{target}" for target in targets]).to_numpy()
+    gold = studies["is_gold"].to_numpy()
+    saved_values = saved.select(targets).to_numpy()
+    predictions = {
+        "intact": full,
+        "regional_omitted": global_only,
+        "saved": saved_values,
+    }
+    metrics = {
+        name: validation_metrics(y, values, targets, gold)
+        for name, values in predictions.items()
+    }
+    for name, values in predictions.items():
+        make_prediction_frame(ids, values, targets, args.fold).write_csv(
+            args.output_dir / f"{name}.csv"
+        )
+    per_target = pl.DataFrame(
+        {
+            "target": targets,
+            "regional_attention_mean": regional_mass.mean(0),
+            "regional_attention_median": np.median(regional_mass, axis=0),
+            "intact_auc": [
+                metrics["intact"]["per_target_auc"][target] for target in targets
+            ],
+            "regional_omitted_auc": [
+                metrics["regional_omitted"]["per_target_auc"][target]
+                for target in targets
+            ],
+            "probability_change_mean_abs": np.abs(full - global_only).mean(0),
+        }
+    ).with_columns(
+        (pl.col("intact_auc") - pl.col("regional_omitted_auc")).alias(
+            "fusion_auc_delta"
+        )
+    )
+    per_target.write_csv(args.output_dir / "per_target.csv")
+    pl.DataFrame(
+        {
+            "StudyInstanceUID": ids,
+            "center_accepted": accepted_centers,
+            "global_tokens": global_count,
+            "valid_regional_tokens": valid_count,
+            "regional_attention_mean": regional_mass.mean(-1),
+            "regional_attention_by_target": regional_mass.tolist(),
+            "probability_change_mean_abs": np.abs(full - global_only).mean(-1),
+        }
+    ).write_parquet(args.output_dir / "per_study.parquet")
+    np.savez_compressed(
+        args.output_dir / "query_attention.npz",
+        study_ids=np.array(ids),
+        targets=np.array(targets),
+        query_offsets_mm=model.spatial_pool.offsets.cpu().numpy(),
+        query_valid=query_valid,
+        attention=query_mass,
+    )
+    fig, axes = plt.subplots(1, 2, figsize=(12, 6), sharey=True, layout="constrained")
+    positions = np.arange(len(targets))
+    axes[0].barh(positions, regional_mass.mean(0) * 100, color="#168aad")
+    axes[0].set_yticks(positions, targets)
+    axes[0].invert_yaxis()
+    axes[0].set_xlabel("Mean final attention assigned to regional tokens (%)")
+    deltas = per_target["fusion_auc_delta"].to_numpy()
+    axes[1].barh(positions, deltas, color=np.where(deltas >= 0, "#2a9d8f", "#e76f51"))
+    axes[1].axvline(0, color="#333333", linewidth=0.8)
+    axes[1].set_xlabel("AUC with fusion minus AUC with regional tokens omitted")
+    fig.suptitle(f"{args.run_dir.name}: fusion usage on {len(ids)} validation studies")
+    fig.savefig(args.output_dir / "fusion_usage.png", dpi=180)
+    plt.close(fig)
+    result = {
+        "created_at": datetime.now(UTC).isoformat(),
+        "options": args.model_dump(mode="json"),
+        "checkpoint": str(checkpoint.resolve()),
+        "checkpoint_sha256": sha256_file(checkpoint),
+        "config_sha256": sha256_file(config_path),
+        "saved_predictions_sha256": sha256_file(saved_path),
+        "preprocessing_identity": preprocessing_identity(),
+        "label_split_provenance": load_fold_labels(config, args.fold).provenance,
+        "source_sha256": {
+            str(path.relative_to(snapshot)): sha256_file(path)
+            for path in sorted(snapshot.rglob("*.py"))
+        },
+        "versions": {
+            name: version(name)
+            for name in ("torch", "timm", "polars", "numpy", "scikit-learn")
+        },
+        "runtime": {
+            "device": str(device),
+            "precision": precision,
+            "batch_size": loader.batch_size,
+            "workers": args.workers,
+            "seed": config.seed,
+            "strict_determinism": config.trainer.deterministic,
+            "float32_matmul_precision": torch.get_float32_matmul_precision(),
+            "cuda_allocator": allocator,
+            "peak_cuda_allocated_bytes": torch.cuda.max_memory_allocated()
+            if device.type == "cuda"
+            else None,
+            "total_seconds": time.perf_counter() - started,
+        },
+        "intervention": "Omit regional tokens from final MIL and renormalize over the same global tokens; unchanged shared CNN pass and checkpoint; no retraining",
+        "metrics": metrics,
+        "reproduction_probability_difference": {
+            "mean_abs": float(np.abs(full - saved_values).mean()),
+            "max_abs": float(np.abs(full - saved_values).max()),
+        },
+        "regional_attention": distribution(regional_mass),
+        "regional_attention_when_eligible": distribution(regional_mass[valid_count > 0])
+        if (valid_count > 0).any()
+        else None,
+        "uniform_attention_regional_share": distribution(
+            valid_count / (valid_count + global_count)
+        ),
+        "valid_regional_queries": distribution(valid_count),
+        "studies_without_regional_queries": int((valid_count == 0).sum()),
+        "accepted_centers": sum(accepted_centers),
+        "probability_change_when_omitted": distribution(np.abs(full - global_only)),
+        "preparation_conditions": preparation_conditions,
+        "per_target": per_target.to_dicts(),
+    }
+    result["artifact_sha256"] = {
+        path.name: sha256_file(path)
+        for path in sorted(args.output_dir.iterdir())
+        if path.is_file()
+    }
+    (args.output_dir / "results.json").write_text(json.dumps(result, indent=2) + "\n")
+    print(
+        json.dumps(
+            {
+                key: result[key]
+                for key in (
+                    "reproduction_probability_difference",
+                    "regional_attention",
+                    "studies_without_regional_queries",
+                    "probability_change_when_omitted",
+                )
+            },
+            indent=2,
+        )
+    )
+    print(per_target)
+    print(
+        json.dumps(
+            {
+                name: {key: value[key] for key in ("macro_auc", "soft_target_bce")}
+                for name, value in metrics.items()
+            },
+            indent=2,
+        )
+    )
+
+
+if __name__ == "__main__":
+    main()

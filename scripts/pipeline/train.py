@@ -31,6 +31,7 @@ from knee_abnormality.inference import (
     make_prediction_frame,
     predict_loader,
 )
+from knee_abnormality.preprocessing_identity import preprocessing_identity
 from knee_abnormality.provenance import sha256_file
 from knee_abnormality.runtime import configure_cuda_allocator
 from knee_abnormality.training import BaselineModule, KneeDataModule
@@ -58,6 +59,7 @@ def _snapshot(run_dir: Path, config_path: Path, config: ExperimentConfig) -> Non
         json.dumps(config.model_dump(mode="json"), indent=2) + "\n"
     )
     provenance = {
+        "preprocessing_identity": preprocessing_identity(),
         "created_at": datetime.now(UTC).isoformat(),
         "git_commit": _command(["git", "rev-parse", "HEAD"]),
         "git_status": _command(["git", "status", "--short"]),

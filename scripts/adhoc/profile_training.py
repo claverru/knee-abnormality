@@ -195,6 +195,8 @@ def loader_candidate(
     args: ProfileCLI,
 ) -> dict:
     dataset._slice_index.clear()
+    dataset._study_references.clear()
+    dataset._center_projections.clear()
     dataset.training = True
     count = (args.warmup + args.steps) * size
     if count > len(dataset):

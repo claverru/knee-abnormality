@@ -19,7 +19,7 @@ slot, favor central triplets, and apply target-specific attention MIL across
 all retained inputs. Validation doubles the configured per-series raw-slice
 limits without changing training or test limits. The
 [modeling notes](modeling.md#implemented-baseline) record the chosen
-backbone, raw-slice limits, 224-pixel crops at 0.67 mm, clipping quantiles
+backbone, raw-slice limits, 224-pixel crops at 0.625 mm, clipping quantiles
 `[0.005, 0.995]`, checkpoint-specific normalization and training defaults.
 
 Prefer Lightning's built-in training, precision, optimization and callback
@@ -60,15 +60,18 @@ responsibility when that makes editing easier.
 | `scripts/tools/` | Reusable acquisition, validation and repository utilities | Implemented; see the [catalog](../scripts/tools/catalog.yaml) |
 | `scripts/adhoc/` | Metadata/label investigations, environment probes and future exploration | Implemented; see the [catalog](../scripts/adhoc/catalog.yaml) |
 | `src/knee_abnormality/labels.py` | Polars joins, source fingerprints, gold/silver provenance and fold membership | Implemented |
-| `src/knee_abnormality/checkpoints.py` | Validate saved input/model/target semantics and fingerprint actual training inputs for resumption | Implemented; legacy checkpoints support prediction with their saved config |
+| `src/knee_abnormality/checkpoints.py` | Validate saved preprocessing/input/model/target semantics and fingerprint actual training inputs for resumption | Implemented; historical checkpoints require archived code or bundles |
+| `src/knee_abnormality/preprocessing_identity.py` | Fingerprint dataset, preprocessing, augmentation and model sources with fixed sampling and spatial-token semantics | Implemented; required at prediction, validation, resume and export |
 | `src/knee_abnormality/preprocessing/dicom.py` | Parse headers into plain values, validate native descriptors, read selected frames and retain pydicom fallback and recoverable exceptions | Implemented |
 | `src/knee_abnormality/preprocessing/series.py` | Index metadata-only slice records, exclude known bad instances, order/center physical positions and sample slices or triplets | Implemented |
+| `src/knee_abnormality/preprocessing/geometry.py` | Retain compact native pose layouts, validate series center lines, solve the plane-balanced study reference and diagnose per-series projections | Implemented; pure geometry with no I/O or labels |
 | `src/knee_abnormality/preprocessing/spatial.py` | Crop/pad geometry, bounded sparse-filter cache, float32 resampling and delayed affine application | Implemented |
 | `src/knee_abnormality/preprocessing/intensity.py` | Exact float32 quantile selection and in-place NumPy normalization | Implemented |
 | `src/knee_abnormality/preprocessing/preparation.py` | Decode selected records, accept complete groups, collect acquisition-wide quantiles and construct tensors; retain decoder injection for profiling | Implemented |
 | `src/knee_abnormality/augmentation.py` | Sample and apply shared affine, gamma/contrast and noise transforms for training and previews | Implemented |
 | `src/knee_abnormality/dataset.py` | Set up the series index; select series and slices, prepare and collate inputs, and construct configured data loaders | Implemented |
-| `src/knee_abnormality/model.py` | PyTorch encoder, guarded series dropout and study-level aggregation producing twelve logits | Implemented |
+| `src/knee_abnormality/model.py` | One-pass spatial ReXNet features, guarded series dropout and target-specific study MIL | Implemented; spatial-token MIL is the active model |
+| `src/knee_abnormality/spatial_tokens.py` | Verified backbone anchors, independent visual/3D masks, coordinate and metadata embeddings, study-level 3D dropout | Implemented; fixed spatial-token path |
 | `scripts/pipeline/train.py` | Lightning module/data loading, optimizer, checkpoints, validation outputs and training entry point | Implemented; baseline3 fold 0 completed, with earlier checkpoint corrections recorded in the [baseline review](baseline-review.md#implemented-corrections) |
 | `scripts/pipeline/predict.py` | Load saved model/config, predict studies, write validation/submission tables | Implemented |
 | `scripts/pipeline/export.py` | Build an atomic, hash-inventoried checkpoint/code/wheel bundle and generated inference notebook | Implemented; artifact checks remain checkpoint-specific |
@@ -81,7 +84,11 @@ responsibility when that makes editing easier.
 This table defines responsibilities; planned files are not empty scaffolds.
 The preprocessing package has an empty `__init__.py`; callers import each owner
 directly. `dataset.py` owns worker-local index lifetime and study/acquisition
-selection. DICOM byte interpretation stays in `dicom.py`; spatial and intensity
+selection, study-reference and center-projection diagnostic caches. Slice records retain
+native XYZ tuples and share repeated orientation/spacing/layout descriptors.
+Native-pose validity, study-reference acceptance and sampling projection remain
+separate decisions; 3D requires accepted series geometry and study reference.
+DICOM byte interpretation stays in `dicom.py`; spatial and intensity
 modules perform no file I/O. Descriptors retain scalar metadata only, while
 selected pixels are decoded afresh on every load. Reader dispatch is fixed,
 with no configuration flag or persistent pixel/header cache. See the
@@ -92,6 +99,47 @@ Keep experiment logic explicit. A new backbone or pooling alternative can be
 a small constructor/function in `src/knee_abnormality/model.py`; it does not
 need a plugin registry or a parallel copy of the training loop. Put runnable
 behavior behind a main guard so scripts can also expose useful functions.
+
+### Shared geometry contract
+
+`SliceRecord` retains each native XYZ position and provenance (`patient`,
+`slice_location`, `instance_number` or `filename`). `NativePose` shares repeated
+`PoseLayout` values containing the two original orientation axes, pixel spacing,
+dimensions and frame ID. Native values are not rounded to a representative pose.
+`IndexedSeries` adds bounds, pose validity, orientation/center-line consistency
+and rejection reasons. `StudyReference` records an accepted point or explicit
+unavailability, contributors, conditioning, plane-balanced residuals and frame IDs.
+`CenterProjection` records each series' diagnostic projection or rejection reason.
+The worker index caches compact CPU values without pixels or dense grids.
+Prepared triplets carry per-channel crop-to-patient maps, series/native reliability and
+valid rectangles. Collation aligns geometry tensors with image masks and study
+slots; the model composes the executed augmentation transform on each forward.
+
+The [sampling experiment](validation.md#2026-09-12-accurate-centers-result)
+selected midpoint sampling. Projections are diagnostics only and do not change
+triplet selection, physical position encoding or the centered image crop.
+Native pose validity, reference acceptance and an in-range projection remain
+distinct: a projection outside a stack does not invalidate its native poses.
+Different cross-series frame IDs are recorded, not automatically rejected.
+The fixed [screening thresholds](data-preparation.md#accurate-sampling-centers)
+are not bounds on local registration error. Spatial tokens retain visually valid observations with unknown 3D; position-aware
+selection does not establish registration or local anatomical correspondence.
+
+### Geometry and fusion comparison sequence
+
+The shared geometry foundation and accurate-centers comparison are complete.
+The frozen fusion control is the submitted `crop140mm` checkpoint/bundle and
+midpoint recipe identified in [validation](validation.md#2026-09-12-accurate-centers-result).
+Use its saved config, seed, input/label/split identities and predictions; the
+mutable baseline YAML is not its recipe. Historical checkpoints run through
+their archived source/bundles and never receive invented preprocessing identities.
+The spatial-fusion stage was implemented, profiled and
+[rejected at the deployment runtime gate](validation.md#2026-09-12-spatial-fusion-engineering-result).
+The user subsequently selected the original 27-query, width-64 architecture
+with eager execution, later replaced by the [spatial-token model](modeling.md#active-spatial-token-model).
+The reduced compiled variant remains archived. The selected sampler and
+submitted model remain the frozen comparison control; their historical
+measurements do not establish an accuracy result for the restored implementation.
 
 ### Maintained workflow versus ad-hoc work
 
@@ -143,7 +191,7 @@ slices, triplet validity masks and the agreed metadata. Raw-slice limits are
 divisible by three; positional encoding uses each triplet's middle slice. The
 model applies acquisition-consistent augmentation and checkpoint-specific
 normalization before the CNN; see [input semantics](modeling.md#three-channel-inputs).
-Projected image features receive type and physical-position encodings before
+Projected spatial image features receive 1D, 2D, 3D, plane and contrast encodings before
 target-specific attention produces twelve study logits. Supervision supplies
 twelve targets and observation masks. Keep image padding and absent series
 separate from missing target labels.
@@ -285,8 +333,12 @@ and input fingerprints, with the latter also written to `input_identity.json`.
 Prediction rejects incompatible input/model settings or target order, and
 validation checks the producing fold. Resume also checks numerical training
 settings and the original input identities. Legacy checkpoints without those
-identities support prediction using their saved config but cannot safely pass
-the resume guard. See [implemented corrections](baseline-review.md#implemented-corrections)
+identities require their archived source/bundle, even for prediction with the
+same config. Every new checkpoint and input identity records the preprocessing
+algorithm, fixed reliability values and a stable digest of package-relative
+`dataset.py`, `model.py`, `augmentation.py`, `spatial_tokens.py` and all preprocessing Python sources. Export validates the actual
+copied sources; bundled prediction recomputes the identity without training data.
+See [implemented corrections](baseline-review.md#implemented-corrections)
 for allowed runtime/storage changes and baseline1 compatibility.
 
 Keep reusable metadata and label tables under `data/`, outside run directories.

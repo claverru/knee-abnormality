@@ -7,6 +7,17 @@ Working knowledge for the [RSNA Knee Abnormality Detection competition](https://
 | Deciding where code belongs or how to keep competition experiments fast and reproducible | [Project architecture](architecture.md) |
 | Finding a reusable script, locating an investigation, or adding and indexing a command | [Script index](../scripts/INDEX.md) |
 | Checking active work or tasks planned for the short term | [Ongoing work](ongoing.md) |
+| Reviewing the completed center experiment, its rejected sampler and the frozen control for fusion | [Accurate-centers result](validation.md#2026-09-12-accurate-centers-result) |
+| Training the spatial-token model with five embeddings and study-level 3D dropout | [Active spatial token model](modeling.md#active-spatial-token-model) |
+| Reviewing the completed spatial-token run, its target gains and paired validation uncertainty | [Spatial-token validation comparison](validation.md#2026-09-13-spatial-token-validation-comparison) |
+| Checking how local validation tracks public scores since the gold-balanced split | [Local and public agreement](validation.md#2026-09-13-local-and-public-agreement-after-the-split-change) |
+| Reproducing the training-image geometry measurement behind the fixed 18-mm coverage radius | [Per-plane coverage radius](modeling.md#per-plane-coverage-radius) |
+| Understanding why per-plane fusion resembles crop140mm and measuring its regional attention and omission effect | [Per-plane fusion usage diagnosis](validation.md#2026-09-13-per-plane-fusion-usage-diagnosis) |
+| Comparing the completed max-pooling run with average pooling and interpreting its timing difference | [Max-pooling result](validation.md#2026-09-13-max-pooling-validation-comparison) |
+| Following tensor shapes from triplet images through spatial tokens and final attention pooling | [Model shape diagram](../schema.md) |
+| Measuring a trained spatial-token checkpoint's reliance on its encodings | [Manual encoding diagnosis](validation.md#manual-encoding-usage-diagnosis) |
+| Finding removed regional investigation sources and original reproduction bundles | [Historical regional sources](history/regional-sources/README.md) |
+| Reviewing the earlier spatial-fusion implementation and failed deployment runtime gate | [Spatial-fusion engineering result](validation.md#2026-09-12-spatial-fusion-engineering-result) |
 | Checking the native DICOM reader's layout limits, preprocessing package, equivalence evidence and performance gates | [Production DICOM integration](data-preparation.md#production-dicom-integration) |
 | Recording or reviewing ideas to explore, including baseline, Gaussian sampling, physical-coverage and resolution experiments | [Future work](future-work.md) |
 | Comparing public notebook implementations and reported successes, failures, and uncertainties | [Public discussion and notebook findings](public-research.md) |

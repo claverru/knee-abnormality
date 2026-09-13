@@ -11,6 +11,11 @@ from knee_abnormality.preprocessing.dicom import (
     NativePixelDescriptor,
     read_header,
 )
+from knee_abnormality.preprocessing.geometry import (
+    NativePose,
+    SeriesGeometry,
+    summarize_series,
+)
 
 KNOWN_BAD_INSTANCES = {
     "1.2.826.0.1.3680043.8.498.66460523372602171398246641420761543626",
@@ -18,20 +23,29 @@ KNOWN_BAD_INSTANCES = {
 }
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class SliceRecord:
     path: Path
     physical_position: float
     original_index: int
     relative_position_mm: float | None = None
     descriptor: NativePixelDescriptor | None = None
+    position_source: str = "filename"
+    pose: NativePose | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class IndexedSeries:
+    records: tuple[SliceRecord, ...]
+    geometry: SeriesGeometry
 
 
 def index_series(
     series_dir: Path, position_reference: Literal["origin", "center"] = "origin"
-) -> tuple[SliceRecord, ...]:
+) -> IndexedSeries:
     candidates = sorted(series_dir.glob("*.dcm"))
     records = []
+    layouts = {}
     for fallback, path in enumerate(candidates):
         if path.stem in KNOWN_BAD_INSTANCES:
             continue
@@ -46,33 +60,50 @@ def index_series(
                 else float(fallback)
             )
             if math.isfinite(position):
-                records.append((path, position, physical, header.descriptor))
+                pose = header.pose
+                if pose is not None:
+                    pose = NativePose(
+                        pose.position, layouts.setdefault(pose.layout, pose.layout)
+                    )
+                records.append(
+                    (
+                        path,
+                        position,
+                        physical,
+                        header.descriptor,
+                        header.position_source,
+                        pose,
+                    )
+                )
         except PREPARATION_ERRORS:
             continue
     records.sort(key=lambda item: (item[1], item[0].name))
-    origin = next(
-        (physical for _, _, physical, _ in records if physical is not None), 0
-    )
+    origin = next((item[2] for item in records if item[2] is not None), 0)
     if position_reference == "center":
-        physical_positions = [
-            physical for _, _, physical, _ in records if physical is not None
-        ]
+        physical_positions = [item[2] for item in records if item[2] is not None]
         if physical_positions:
             origin = (min(physical_positions) + max(physical_positions)) / 2
-    return tuple(
+    slices = tuple(
         SliceRecord(
             path,
             position,
             index,
             physical - origin if physical is not None else None,
             descriptor,
+            source,
+            pose,
         )
-        for index, (path, position, physical, descriptor) in enumerate(records)
+        for index, (path, position, physical, descriptor, source, pose) in enumerate(
+            records
+        )
     )
+    return IndexedSeries(slices, summarize_series(slices))
 
 
 def _center_weights(
-    records: tuple[SliceRecord, ...], group_size: int, center_weight: float
+    records: tuple[SliceRecord, ...],
+    group_size: int,
+    center_weight: float,
 ) -> np.ndarray:
     if all(record.relative_position_mm is not None for record in records):
         positions = np.asarray(
