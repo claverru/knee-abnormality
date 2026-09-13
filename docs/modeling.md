@@ -99,7 +99,8 @@ rtk proxy uv run --locked just train spatial-tokens-five-embeddings
 
 The completed run is saved in `outputs/spatial-tokens-five-embeddings/`; another
 launch requires a fresh run directory. It selected epoch 10 at 0.889506 fold-0
-macro AUC and **0.929 public AUC**, the best recorded public result; see the
+macro AUC and **0.929 public AUC**, later surpassed by
+[3dsampling at 0.930](validation.md#2026-09-13-3dsampling-validation-comparison); see the
 [validation comparison](validation.md#2026-09-13-spatial-token-validation-comparison)
 for target changes, uncertainty, learning curves, timing and memory, and the
 [submission record](inference-efficiency.md#spatial-token-submission). The manual
@@ -179,19 +180,20 @@ one-channel tensors are either broadcast to RGB or kept single-channel according
 to the saved configuration. Checkpoint loading compares input mode, channel
 count, normalization and slice limits, so an older artifact cannot silently
 adopt current input semantics. Triplet mode requires three input channels and
-raw-slice limits divisible by three. Baseline1 compatibility and exact
+channel-appearance limits divisible by three. Baseline1 compatibility and exact
 prediction reproduction are recorded in the
 [baseline review](baseline-review.md#implemented-corrections).
 
 ### Adjacent triplet sampling
 
-Implemented on 2026-09-11. `max_images` continues to count **raw slices**.
+Updated on 2026-09-13. `max_images` counts **channel appearances**, including
+slices reused by overlapping triplets.
 Training limits round the previous half-median budgets up to multiples of
 three. `validation_image_multiplier: 2` doubles validation limits. Test
 prediction independently defaults to 2×. Export can freeze a different inference
 multiplier without changing the checkpoint's training settings:
 
-| Plane | Fluid-sensitive / fat suppression | Training raw slices | Training CNN inputs | Validation raw slices | Validation CNN inputs |
+| Plane | Fluid-sensitive / fat suppression | Training channel appearances | Training CNN inputs | Validation channel appearances | Validation CNN inputs |
 |---|---|---:|---:|---:|---:|
 | Axial | 0 / 0 | 18 | 6 | 36 | 12 |
 | Axial | 1 / 1 | 18 | 6 | 36 | 12 |
@@ -200,13 +202,12 @@ multiplier without changing the checkpoint's training settings:
 | Sagittal | 0 / 0 | 15 | 5 | 30 | 10 |
 | Sagittal | 1 / 1 | 15 | 5 | 30 | 10 |
 
-A study with all six types uses at most 96 raw slices and 32 CNN inputs during
-training, or 192 raw slices and 64 CNN inputs during validation. The multiplier
+A study with all six types uses at most 96 channel appearances and 32 CNN inputs during
+training, or 192 channel appearances and 64 CNN inputs during validation. The multiplier
 does not change model parameters or checkpoint tensor shapes. Current test
-inference defaults to the same 2× limits; 3× allows 288 raw slices and 96 CNN
+inference defaults to the same 2× limits; 3× allows 288 channel appearances and 96 CNN
 inputs per study, capped by available acquisitions. Earlier submitted bundles
-used 1× and retain their frozen code. Saved configs without the validation field
-use validation multiplier one. See [inference memory measurements](inference-efficiency.md#inference-image-count-and-memory).
+used 1× and retain their frozen code. Historical checkpoints require their archived runtime. See [inference memory measurements](inference-efficiency.md#inference-image-count-and-memory).
 
 ### ReXNet-100 runtime
 
@@ -234,31 +235,23 @@ does not recognize `bf16-mixed`; this affects only the displayed model-size
 estimate. Float32 matrix multiplication uses the `high` policy so supported
 operations can use the RTX 3090 Tensor Cores.
 
-`data.acquisition_sampling: pooled` keeps every usable acquisition in a
-plane–contrast slot and distributes that slot's input budget across them.
-Training samples from their combined capacities; validation first applies its
-limit multiplier, then allocates counts proportionally with deterministic
-remainder handling. A failed acquisition is
-removed and the budget is reallocated among those remaining.
+The shared [physical sampler](physical-sampling.md#implemented-sampler) selects
+Gaussian target depths about the accepted study center, then chooses suppliers
+independently of slice count. `data.sampling_sigma_mm: 80.0` is the only variable
+sampling parameter. Deterministic validation uses midpoint quantiles; training
+uses stratified random quantiles. Both permit overlapping consecutive triplets
+and assign each distinct middle-plane geometry at most once per type.
+Study geometry, acquisition-midpoint 1D positions, crops, augmentations and model
+shape remain unchanged. The prior allocator, triangular selector and their
+configuration fields have been removed.
 
-Within each acquisition, `slice_sampling: center_weighted` assigns possible
-triplet starts weight 3 at the acquisition midpoint and weight 1 at its edges.
-The [cross-view center experiment](validation.md#2026-09-12-accurate-centers-result)
-did not improve the control and was not adopted. Shared geometry supplies spatial-token coordinates without changing sampling,
-1D position encoding or crop size.
-Training samples a reproducible non-overlapping packing from those weights.
-Evaluation deterministically chooses non-overlapping starts near the weighted
-quantiles. This favors central anatomy without restricting inputs to a fixed
-central band. Uniform triplet placement remains supported for saved configs and
-separate experiments. Historical midpoint checkpoints require their archived
-source; configuration equality alone does not establish sampling compatibility.
-
-Preparation retains joint `[0.005, 0.995]` clipping bounds over valid pixels in
-the selected complete triplets of each acquisition. A decode or non-finite
-pixel failure drops its complete triplet. An acquisition with no surviving
-input is removed; an absent slot is masked, and a study with no usable slot
-fails explicitly. Adjacency follows the physically indexed usable records
-after known malformed files and unreadable headers are excluded.
+Preparation clips each unique retained source slice once per acquisition, then
+gathers its channel appearances. Path failures split original runs and trigger
+fresh type selection using fixed seeds and the original study center. Local
+percentile fallback retains trustworthy millimetre positions and unknown XYZ
+when a type has no physical candidates. Unusable types remain masked and a
+study without a complete usable input fails explicitly. See
+[overlapping preparation](data-preparation.md#overlapping-triplet-preparation).
 
 The [augmentation viewer](data-preparation.md#preview-augmentations) displays
 both the three-channel composite and each individual grayscale channel.

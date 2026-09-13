@@ -107,7 +107,7 @@ function render() {
     choice.addEventListener('change', () => { acquisitions.set(acquisitionKey, choice.value); render(); });
     choiceLabel.append(choice); card.append(choiceLabel);
     const content = document.createElement('div');
-    content.innerHTML = '<div class="status"></div><div class="pair"><figure><img class="original" alt="Prepared original MRI input"><figcaption>Prepared original</figcaption></figure><figure><img class="augmented" alt="Augmentation preview of the same MRI input"><figcaption class="caption"></figcaption></figure></div><label>Input<input type="range" min="0" step="1"></label><div class="position"></div><details><summary>Example study and preparation</summary><div class="identity"></div></details>';
+    content.innerHTML = '<div class="status"></div><div class="pair"><figure><img class="original" alt="Prepared original MRI input"><figcaption>Prepared original</figcaption></figure><figure><img class="augmented" alt="Augmentation preview of the same MRI input"><figcaption class="caption"></figcaption></figure></div><label>Input<input type="range" min="0" step="1"></label><div class="position"></div><details><summary>Example study and preparation</summary><div class="identity"></div><pre class="paths" style="white-space:pre-wrap;overflow-wrap:anywhere"></pre></details>';
     const slider = content.querySelector('input');
     const key = `${entry.study_uid}/${entry.series_uid}`;
     slider.max = entry.original.length-1;
@@ -120,7 +120,7 @@ function render() {
     if (active('noise')) effects.push(`Noise σ ${sample.noise.std.toFixed(4)}`);
     content.querySelector('.status').textContent = effects.length ? effects.join(' · ') : 'All transforms skipped for this acquisition';
     content.querySelector('.caption').textContent = force.checked ? 'Forced enabled transforms' : 'Sampled training transforms';
-    content.querySelector('.identity').textContent = `Study: ${entry.study_uid}. Acquisition: ${entry.series_uid}. ${data.acquisition_sampling} acquisition selection, ${data.slice_sampling} slice sampling; epoch ${data.epoch}. Center sampling weight ${data.center_sampling_weight}. This acquisition supplies ${entry.inputs} inputs from ${entry.slices} distinct slices; the type budget is ${type.max_images/data.slices_per_input} inputs across acquisitions. ${entry.failures.length} preparation conditions.`;
+    content.querySelector('.identity').textContent = `Study: ${entry.study_uid}. Acquisition: ${entry.series_uid}. Gaussian σ ${data.sampling_sigma_mm} mm; epoch ${data.epoch}. ${entry.sampling_path} sampling. This acquisition supplies ${entry.inputs} triplets, ${entry.slices} channel appearances, ${entry.unique_slices} unique source slices; the type budget is ${type.max_images/data.slices_per_input} inputs across acquisitions. ${entry.failures.length} preparation conditions.`;
     function update() {
       const index = Number(slider.value);
       positions.set(key,index);
@@ -131,6 +131,7 @@ function render() {
         : (force.checked ? sample.channels[channel][index] : sample.sampled_channels[channel][index]);
       content.querySelector('.original').src = original;
       content.querySelector('.augmented').src = augmented;
+      content.querySelector('.paths').textContent = entry.selected_paths[index].map((path, channel) => `Channel ${channel+1}: ${path}`).join(String.fromCharCode(10));
       const unit = data.position_encoding === 'physical_mm' ? `mm from acquisition ${data.position_reference}` : 'ordered slice index';
       content.querySelector('.position').textContent = `${triplets ? 'Triplet' : 'Slice'} ${index+1} / ${entry.original.length} · ${triplets ? 'middle slice: ' : ''}${entry.positions[index].toFixed(2)} ${unit}`;
     }
@@ -269,6 +270,10 @@ def create_preview(args: PreviewCLI) -> dict:
                         "slot": slot,
                         "inputs": len(series.images),
                         "slices": series.slice_count,
+                        "unique_slices": series.unique_slice_count,
+                        "sampling_path": series.sampling_path,
+                        "selected_paths": series.selected_paths,
+                        "sampling_metadata": item["sampling"][slot],
                         "positions": series.positions.tolist(),
                         "prepared_sha256": hashlib.sha256(
                             series.images.numpy().tobytes()
@@ -349,9 +354,7 @@ def create_preview(args: PreviewCLI) -> dict:
         "position_encoding": config.data.position_encoding,
         "position_reference": config.data.position_reference,
         "spacing_mm": config.data.spacing_mm,
-        "acquisition_sampling": config.data.acquisition_sampling,
-        "slice_sampling": config.data.slice_sampling,
-        "center_sampling_weight": config.data.center_sampling_weight,
+        "sampling_sigma_mm": config.data.sampling_sigma_mm,
         "sampling": args.sampling,
         "epoch": args.epoch,
         "settings": {
@@ -393,7 +396,8 @@ def create_preview(args: PreviewCLI) -> dict:
     for source in sources:
         source = source.resolve()
         source_files.extend(
-            path for path in (source.rglob("*.py") if source.is_dir() else [source])
+            path
+            for path in (source.rglob("*.py") if source.is_dir() else [source])
             if path.is_file()
         )
     (output / "source").mkdir()

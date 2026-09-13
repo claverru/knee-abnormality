@@ -28,6 +28,68 @@ All cover the 4,349 report-only studies. Pilkwang omits one reference study,
 so its extraction score uses 57 rather than 58 studies. Their uncertainty
 encodings differ; consult the audit before constructing training targets.
 
+## Training with Tonylin soft labels
+
+**Historical reproduction:** prepared on 2026-09-13 for the
+[completed fold-0 comparison](validation.md#2026-09-13-tonylin-label-comparison),
+which scored 0.921 publicly versus Steven v4's 0.929. The active baseline has
+returned to Steven v4; the procedure below preserves the Tonylin experiment.
+The [label audit](public-label-audit.md#2026-09-13-new-public-label-comparison)
+owns the source-quality evidence and its limitations.
+
+`data/labels/prepared/tonylin-soft-v3/labels.csv` contains all 4,407 study IDs
+and the twelve competition target columns. Preparation selects the audited
+release-3 `*_soft` values, renames the columns and sorts by study ID. Values
+are preserved; the publisher's hard labels and fold assignments are not used.
+The [training manifest](tonylin-label-sources.json) pins the prepared file,
+original CSV, metadata, column mapping and preparation script. The prepared
+CSV SHA-256 is
+`aa852eebb32e6ef95bbf1736e4f73b40699bb3dd247049606e8f1696bca4e216`.
+
+In `configs/baseline.yaml`, change these two values, retaining the other path
+settings:
+
+```yaml
+paths:
+  label_manifest: ../docs/tonylin-label-sources.json
+
+labels:
+  source: tonylin_soft
+```
+
+Keep `validation.split: all_5fold_v3` and `validation.folds: [0]`. Training
+loads our existing `studies.csv` membership and frozen `targets.csv`;
+official labels still override source values on eligible gold training rows.
+Preparation successfully loaded **3,503 training studies (47 gold)** and
+**904 validation studies (11 gold)** through `load_fold_labels`. The local
+`data/labels/prepared/tonylin-soft-v3/preparation.json` records their source,
+membership, protocol and evaluation-target hashes.
+
+After editing the YAML, launch a fresh run with:
+
+```bash
+rtk proxy uv run --locked just train tonylin-soft-v3 configs/baseline.yaml 0
+```
+
+`just train` does not generate folds. Do not run `just prepare-folds` for this
+label-source comparison: stratification and frozen evaluation targets depend
+on the selected labels, so rebuilding them with Tonylin would propose a
+different protocol. The preparation command refuses to overwrite conflicting
+existing split artifacts, but a new split directory would also change the
+comparison endpoint. Reuse the saved split throughout the experiment.
+
+The [preparation utility](../scripts/tools/prepare_tonylin_labels.py) uses only
+tabular metadata and the existing fold-label loader. To reproduce into fresh
+locations, run from the repository root:
+
+```bash
+rtk proxy uv run --locked python -m scripts.tools.prepare_tonylin_labels --output-dir data/labels/prepared/tonylin-soft-v3-reproduction --output-manifest docs/tonylin-label-sources-reproduction.json
+```
+
+The utility leaves the input YAML and split files unchanged. Preparation ran
+no training, image decoding or tests. The subsequent user-trained model and its
+submission are covered by the completed result linked above.
+
 ## Official labeling context
 
 The [host's annotation overview](https://www.kaggle.com/competitions/rsna-knee-abnormality-detection/discussion/733343)

@@ -17,13 +17,14 @@ from knee_abnormality.preprocessing.geometry import (
 )
 from knee_abnormality.preprocessing.preparation import (
     PreparedSeries,
+    decode_series,
     prepare_series,
 )
+from knee_abnormality.preprocessing.sampling import build_pool, select_triplets
 from knee_abnormality.preprocessing.series import (
     IndexedSeries,
     SliceRecord,
     index_series,
-    select_slices,
 )
 
 STUDY = "StudyInstanceUID"
@@ -45,31 +46,6 @@ class SeriesCandidate:
 class StudySeries:
     uid: str
     slots: tuple[tuple[SeriesCandidate, ...], ...]
-
-
-def allocate_acquisition_inputs(
-    capacities: tuple[int, ...],
-    limit: int,
-    training: bool,
-    generator: torch.Generator,
-) -> tuple[int, ...]:
-    total = sum(capacities)
-    count = min(total, limit)
-    if count == total:
-        return capacities
-    if training:
-        cumulative = torch.tensor(capacities).cumsum(0)
-        selected = torch.randperm(total, generator=generator)[:count]
-        acquisitions = torch.bucketize(selected, cumulative, right=True)
-        return tuple(torch.bincount(acquisitions, minlength=len(capacities)).tolist())
-    allocated = [capacity * count // total for capacity in capacities]
-    remainders = [capacity * count % total for capacity in capacities]
-    order = sorted(
-        range(len(capacities)), key=lambda index: (-remainders[index], index)
-    )
-    for index in order[: count - sum(allocated)]:
-        allocated[index] += 1
-    return tuple(allocated)
 
 
 def build_series_index(
@@ -203,12 +179,6 @@ class KneeStudyDataset(Dataset):
     def __len__(self) -> int:
         return self.studies.height
 
-    def _generator(self, index: int) -> torch.Generator:
-        value = (self.seed + 1_000_003 * self.epoch.value + 97_409 * index) % (
-            2**63 - 1
-        )
-        return torch.Generator().manual_seed(value)
-
     def _records(self, candidate: SeriesCandidate) -> tuple[SliceRecord, ...]:
         records = self._slice_index.get(candidate.directory)
         if records is None:
@@ -218,8 +188,6 @@ class KneeStudyDataset(Dataset):
 
     def _index_study_geometry(self, study: StudySeries) -> None:
         if study.uid in self._study_references:
-            return
-        if self.data.acquisition_sampling != "pooled":
             return
         candidates = {}
         for slot, values in enumerate(study.slots):
@@ -247,38 +215,23 @@ class KneeStudyDataset(Dataset):
                 else CenterProjection(None, "no_complete_input_groups")
             )
 
-    def _prepare_candidate(
-        self, candidate: SeriesCandidate, limit: int, generator: torch.Generator
-    ) -> PreparedSeries:
-        records = self._records(candidate)
-        selected = select_slices(
-            records,
-            limit,
-            self.training,
-            generator,
-            self.data.slices_per_input,
-            self.data.slice_sampling,
-            self.data.center_sampling_weight,
-        )
+    def _decode_series(self, records, spacing_mm, image_size):
+        return decode_series(records, spacing_mm, image_size)
+
+    def _prepare_candidate(self, candidate, selected, cache) -> PreparedSeries:
         return prepare_series(
             selected,
             self.data.spacing_mm,
             self.data.image_size,
             self.data.lower_quantile,
             self.data.upper_quantile,
-            self.data.position_encoding,
-            self.data.slices_per_input,
+            decoder=self._decode_series,
+            cache=cache,
         )
 
-    def _try_prepare_candidate(
-        self,
-        candidate: SeriesCandidate,
-        limit: int,
-        generator: torch.Generator,
-        failures: list[str],
-    ) -> PreparedSeries | None:
+    def _try_prepare_candidate(self, candidate, selected, cache, failures, physical):
         try:
-            value = self._prepare_candidate(candidate, limit, generator)
+            value = self._prepare_candidate(candidate, selected, cache)
             failures.extend(value.failures)
             if value.constant:
                 failures.append(f"{candidate.uid}: constant prepared series")
@@ -289,87 +242,85 @@ class KneeStudyDataset(Dataset):
                 uid=candidate.uid,
                 geometry_valid=value.geometry_valid
                 & geometry.native_poses_valid
-                & (geometry.reason is None),
+                & (geometry.reason is None)
+                & physical,
+                sampling_path="physical" if physical else "local",
             )
         except PREPARATION_ERRORS as error:
             failures.append(f"{candidate.uid}: {type(error).__name__}: {error}")
             return None
 
-    def _prepare_slot(
-        self,
-        candidates: tuple[SeriesCandidate, ...],
-        limit: int,
-        generator: torch.Generator,
-        failures: list[str],
-    ) -> tuple[PreparedSeries, ...]:
-        if self.data.acquisition_sampling == "shortest":
-            for candidate in candidates:
-                value = self._try_prepare_candidate(
-                    candidate, limit, generator, failures
-                )
-                if value is not None:
-                    return (value,)
-            return ()
-        available = []
-        group_size = self.data.slices_per_input
-        for candidate in sorted(candidates, key=lambda candidate: candidate.uid):
+    def _prepare_slot(self, study, slot, failures):
+        candidates = {c.uid: c for c in study.slots[slot]}
+        sources = []
+        for uid, candidate in sorted(candidates.items()):
             try:
-                capacity = len(self._records(candidate)) // group_size
-                if capacity:
-                    available.append((candidate, capacity))
-                else:
-                    failures.append(f"{candidate.uid}: no complete input groups")
+                self._records(candidate)
+                sources.append((uid, self._slice_index[candidate.directory]))
             except PREPARATION_ERRORS as error:
-                failures.append(f"{candidate.uid}: {type(error).__name__}: {error}")
-        cache = {}
-        while available:
-            allocations = allocate_acquisition_inputs(
-                tuple(capacity for _, capacity in available),
-                limit // group_size,
-                self.training,
-                generator,
+                failures.append(f"{uid}: {type(error).__name__}: {error}")
+        kind = self.data.series_types[slot]
+        failed_paths, failed_sources, cache = set(), set(), {}
+        attempts = 0
+        while True:
+            pool = build_pool(
+                tuple(sources),
+                kind.plane,
+                self._study_references[study.uid],
+                failed_paths,
+                failed_sources,
             )
-            values = []
-            failed = set()
-            for (candidate, _), count in zip(available, allocations, strict=True):
-                if not count:
-                    continue
-                key = (candidate.uid, count)
-                if key not in cache:
-                    cache[key] = self._try_prepare_candidate(
-                        candidate, count * group_size, generator, failures
-                    )
-                value = cache[key]
+            selection = select_triplets(
+                pool,
+                kind.max_images * self.image_limit_multiplier // 3,
+                self.data.sampling_sigma_mm,
+                self.data.image_size * self.data.spacing_mm / 2,
+                self.seed,
+                study.uid,
+                (kind.plane, kind.fluid_sensitive, kind.fat_suppression),
+                self.training,
+                self.epoch.value,
+            )
+            values, new_paths, new_sources = [], set(), set()
+            for uid in sorted({t.uid for t in selection.triplets}):
+                selected = tuple(
+                    r for t in selection.triplets if t.uid == uid for r in t.records
+                )
+                value = self._try_prepare_candidate(
+                    candidates[uid], selected, cache, failures, pool.physical
+                )
                 if value is None:
-                    failed.add(candidate.uid)
+                    new_sources.add(uid)
+                elif value.failed_paths:
+                    new_paths.update(value.failed_paths)
                 else:
                     values.append(value)
-            if not failed:
-                return tuple(values)
-            available = [
-                (candidate, capacity)
-                for candidate, capacity in available
-                if candidate.uid not in failed
-            ]
-        return ()
+            attempts += 1
+            if not new_paths and not new_sources:
+                metadata = {
+                    **selection.metadata,
+                    "attempts": attempts,
+                    "failed_paths": sorted(map(str, failed_paths)),
+                    "failed_sources": sorted(failed_sources),
+                    "decoded_unique_paths": len(cache),
+                }
+                return tuple(values), metadata
+            if not ((new_paths - failed_paths) or (new_sources - failed_sources)):
+                raise RuntimeError("Preparation retry made no progress")
+            failed_paths.update(new_paths)
+            failed_sources.update(new_sources)
 
     def __getitem__(self, index: int) -> dict:
         row = self.studies.row(index, named=True)
         study = self.series_index[row[STUDY]]
         self._index_study_geometry(study)
-        generator = self._generator(index)
         prepared = []
         failures = []
-        for slot, candidates in enumerate(study.slots):
-            prepared.append(
-                self._prepare_slot(
-                    candidates,
-                    self.data.series_types[slot].max_images
-                    * self.image_limit_multiplier,
-                    generator,
-                    failures,
-                )
-            )
+        sampling = []
+        for slot in range(len(study.slots)):
+            values, metadata = self._prepare_slot(study, slot, failures)
+            prepared.append(values)
+            sampling.append(metadata)
         if not any(prepared):
             logging.getLogger(__name__).error(
                 "Study %s has no decodable supported series after %d conditions: %s",
@@ -405,6 +356,7 @@ class KneeStudyDataset(Dataset):
             "target": target,
             "target_observed": observed,
             "failures": tuple(failures),
+            "sampling": tuple(sampling),
         }
 
 
@@ -462,6 +414,7 @@ def collate_studies(items: list[dict]) -> dict:
         "study_centers": study_centers,
         "center_valid": center_valid,
         "selected_paths": [series.selected_paths for _, _, series in entries],
+        "sampling": [item["sampling"] for item in items],
         "slice_mask": slice_mask,
         "series_presence": presence,
         "series_study_index": study_indices,

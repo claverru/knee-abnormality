@@ -24,8 +24,7 @@ from knee_abnormality.dataset import (
     collate_studies,
 )
 from knee_abnormality.model import KneeAbnormalityModel
-from knee_abnormality.preprocessing.preparation import decode_slice, prepare_series
-from knee_abnormality.preprocessing.series import select_slices
+from knee_abnormality.preprocessing.preparation import decode_slice
 from knee_abnormality.profiling import (
     finish_profile,
     profile_manifest,
@@ -57,9 +56,11 @@ class ThreadedStudyDataset(KneeStudyDataset):
             source.series_index,
             source.data,
             source.targets,
-            True,
+            source.training,
             source.seed,
+            source.image_limit_multiplier,
         )
+        self.set_epoch(source.epoch.value)
         self.decode_threads = decode_threads
         self._pool = None
         self._finalizer = None
@@ -77,28 +78,8 @@ class ThreadedStudyDataset(KneeStudyDataset):
         self._pool = None
 
     def _decode_series(self, records, spacing_mm, image_size):
-        return tuple(
-            self._pool.map(
-                decode_slice,
-                records,
-                repeat_value(spacing_mm),
-                repeat_value(image_size),
-            )
-        )
-
-    def _prepare_candidate(self, candidate, limit, generator):
         if self.decode_threads == 1:
-            return super()._prepare_candidate(candidate, limit, generator)
-        records = self._records(candidate)
-        selected = select_slices(
-            records,
-            limit,
-            self.training,
-            generator,
-            self.data.slices_per_input,
-            self.data.slice_sampling,
-            self.data.center_sampling_weight,
-        )
+            return super()._decode_series(records, spacing_mm, image_size)
         if self._pool is None:
             self._pool = ThreadPoolExecutor(
                 max_workers=self.decode_threads,
@@ -108,15 +89,13 @@ class ThreadedStudyDataset(KneeStudyDataset):
             self._finalizer = Finalize(
                 self, self._pool.shutdown, args=(True,), exitpriority=10
             )
-        return prepare_series(
-            selected,
-            self.data.spacing_mm,
-            self.data.image_size,
-            self.data.lower_quantile,
-            self.data.upper_quantile,
-            self.data.position_encoding,
-            self.data.slices_per_input,
-            decoder=self._decode_series,
+        return tuple(
+            self._pool.map(
+                decode_slice,
+                records,
+                repeat_value(spacing_mm),
+                repeat_value(image_size),
+            )
         )
 
 

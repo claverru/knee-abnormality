@@ -186,8 +186,8 @@ once during setup, not inside `__getitem__`. V1 decodes and prepares pixels
 while loading batches; preprocessing behavior follows the saved image recipe.
 
 The dataset can retain multiple usable acquisitions per selected type and
-supplies three-channel uint8 inputs containing consecutive non-overlapping
-slices, triplet validity masks and the agreed metadata. Raw-slice limits are
+supplies three-channel uint8 inputs containing consecutive slices in overlapping
+triplets, validity masks and the agreed metadata. Channel-appearance limits are
 divisible by three; positional encoding uses each triplet's middle slice. The
 model applies acquisition-consistent augmentation and checkpoint-specific
 normalization before the CNN; see [input semantics](modeling.md#three-channel-inputs).
@@ -195,6 +195,14 @@ Projected spatial image features receive 1D, 2D, 3D, plane and contrast encoding
 target-specific attention produces twelve study logits. Supervision supplies
 twelve targets and observation masks. Keep image padding and absent series
 separate from missing target labels.
+
+`preprocessing/sampling.py` owns metadata-only run indexing, union target
+sampling, supplier choice and distinct-plane assignment. `geometry.py` owns
+the unchanged reference fit. Dataset retries rebuild support after failures;
+`preparation.py` decodes and normalizes unique retained slices before gathering
+channels. Threaded loading injects decoding only. Fixed sampling rules and source
+hashes are part of the strict preprocessing identity; historical runtimes remain
+isolated. See [physical sampling](physical-sampling.md#implemented-sampler).
 
 The model consumes the agreed series inputs and returns `[batch, 12]` logits.
 Loss is applied after study aggregation. Raw reports, reference labels, file

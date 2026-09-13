@@ -64,6 +64,7 @@ scripts:
     inputs: [Explicit scored Lightning checkpoint, Current frozen prediction source, Optional prepared wheel directory, Target Python and platform identity, Optional artifact verification record]
     outputs: [Versioned inference bundle with checkpoint, portable config, manifest, source, requirements, wheels, licenses, and notebook]
     notes:
+      - Records the physical sampling identity and existing SciPy runtime dependency; historical checkpoints require archived source.
       - just export accepts checkpoint, output, optional image multiplier and batch size, then wheel directory and target runtime; defaults use 2x images, batch size 2, Kaggle v170 codec wheels and Python 3.12.
       - Requires an explicit checkpoint path, rejects existing destinations, builds in a temporary sibling directory, and publishes only after reconstructing the model strictly and hashing every artifact.
       - Retains model state and required semantic metadata while removing optimizer, scheduler, callback and loop state.

@@ -1,4 +1,4 @@
-name: spatial-tokens-five-embeddings
+name: spatial-tokens-physical-sampling
 seed: 42
 
 paths:
@@ -14,11 +14,9 @@ validation:
   folds: [0]
 
 data:
+  sampling_sigma_mm: 80.0
   position_encoding: physical_mm
   position_reference: center
-  acquisition_sampling: pooled
-  slice_sampling: center_weighted
-  center_sampling_weight: 3.0
   validation_image_multiplier: 2
   input_channels: 3
   input_mode: adjacent_triplets

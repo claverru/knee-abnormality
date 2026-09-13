@@ -1,5 +1,22 @@
 version: 1
 scripts:
+  - id: prepare-tonylin-labels
+    path: scripts/tools/prepare_tonylin_labels.py
+    summary: Reproduce preparation of the audited Tonylin soft columns for the completed label-source experiment.
+    status: historical
+    tags: [labels, tonylin, soft, preparation, training, provenance, folds]
+    commands:
+      - rtk proxy uv run --locked python -m scripts.tools.prepare_tonylin_labels --help
+      - rtk proxy uv run --locked python -m scripts.tools.prepare_tonylin_labels
+    inputs: [docs/public-label-comparison-sources.json, Pinned Tonylin release-3 CSV and metadata, Official training metadata, Experiment config and existing split]
+    outputs: [data/labels/prepared/tonylin-soft-v3/labels.csv, data/labels/prepared/tonylin-soft-v3/preparation.json, docs/tonylin-label-sources.json]
+    notes:
+      - Selects and renames only the twelve *_soft columns; preserves values and ignores the publisher's folds and hard labels.
+      - Loads real fold-label tables through the training loader without pixels, model execution, training or tests.
+      - Preserves existing split files and the input YAML; requires fresh output directory and manifest paths.
+      - Tonylin scored 0.921 publicly versus Steven v4's 0.929; the baseline returned to Steven and this utility is retained for reproduction.
+    docs: [docs/supervision.md#training-with-tonylin-soft-labels]
+
   - id: plot-validation-metrics
     path: scripts/tools/plot_validation_metrics.py
     summary: Plot epoch validation metrics from one or more completed experiment run folders.
@@ -43,6 +60,7 @@ scripts:
     inputs: [Export staging bundle, Exporter-generated request JSON, Saved epoch predictions, Local validation and example DICOMs]
     outputs: [Sample parity and example predictions, Verification record with FP32 peak memory and codec evidence]
     notes:
+      - Complexity ranking estimates overlapping triplet capacity; actual geometry-constrained counts come from preparation.
       - Invoked only by explicit export --quick-verify from the frozen copy of this script inside the staging bundle; routine exports and submissions do not run it.
       - Preserves complete original validation batches selected across low and high input counts; defaults to about 16 studies.
       - Compares saved predictions at their original density, then checks the requested inference density separately without reporting sample AUC.
@@ -107,6 +125,7 @@ scripts:
     inputs: [Experiment config, Example-test DICOMs and metadata]
     outputs: [Offline preview.html, overview.png, effective_config.json, manifest.json, Recursive project-relative source snapshot]
     notes:
+      - Displays physical/local sampling, Gaussian width, selected source paths, actual triplets, channel appearances and unique slices.
       - Uses shared preparation and augmentation code on CPU; requires no checkpoint, GPU, network or training labels.
       - Defaults to all example-test studies so their combined series cover all six configured types; --study-uid restricts the preview to one example.
       - Defaults to deterministic validation sampling; --sampling training and --epoch preview the actual seeded training sampler on example-test studies. Series dropout is not previewed.

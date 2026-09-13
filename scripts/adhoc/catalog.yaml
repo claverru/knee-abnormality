@@ -1,5 +1,51 @@
 version: 1
 scripts:
+  - id: analyze-physical-sampling
+    path: scripts/adhoc/analyze_physical_sampling.py
+    summary: Measure production physical sampling and local fallback on the pinned saved geometry cohort.
+    tags: [sampling, geometry, gaussian, triplets, overlap, density, acquisitions, center, metadata]
+    commands:
+      - rtk proxy uv run --locked python -m scripts.adhoc.analyze_physical_sampling --output-dir outputs/analysis/physical-sampling-new/geometry
+    inputs: [Saved 128-study geometry headers parquet, Series image-count inventory, Baseline config, Frozen fold membership, Archived prototype summary]
+    outputs: [Source and input manifest, Per-draw and selected-triplet parquet tables, Source exposures and center diagnostics, Summary JSON]
+    notes:
+      - Reads saved metadata only; no pixels, models, training or tests.
+      - Calls the production sampler for both dataset modes, including rejected-center local fallback; retains the original comparison as an archived summary.
+      - Default seed 20260913 and 32 randomized epochs; validation uses the configured multiplier.
+      - Records target and realized coverage, intended and realized source shares, gap splits, plane disagreements, singletons and shortfalls.
+      - Existing output directories are refused. Historical prototype source remains in outputs/analysis/physical-sampling-20260913/geometry-v3/source/.
+    docs: [docs/physical-sampling.md]
+
+  - id: inspect-physical-preparation
+    path: scripts/adhoc/inspect_physical_preparation.py
+    summary: Inspect overlapping CPU preparation on real accepted and rejected-center studies without models or tests.
+    tags: [sampling, preparation, overlap, intensity, geometry, threading, cpu]
+    commands:
+      - rtk proxy uv run --locked python -m scripts.adhoc.inspect_physical_preparation --output-dir outputs/analysis/physical-sampling-new/preparation
+    inputs: [Pinned geometry headers and inventory, Baseline config, Original training DICOMs]
+    outputs: [Source and input manifest, Selected paths and batch digests, Unique intensity populations, Metadata alignment and serial-threaded report]
+    notes:
+      - Includes all rejected-center studies and four accepted studies by default, in both dataset modes.
+      - Compares serial and four-thread decoding and reversed row order; independently recomputes unique-slice clipping populations.
+      - No synthetic fixtures, models, training, optimizer steps or test harness. Failure coverage depends on the real sample.
+      - Refuses existing output directories and preserves source, configuration and input identities.
+    docs: [docs/data-preparation.md#overlapping-triplet-preparation, docs/physical-sampling.md#implementation-verification]
+
+  - id: audit-sampling-protocols
+    path: scripts/adhoc/audit_sampling_protocols.py
+    summary: Inspect sequence metadata in one DICOM header per sampled acquisition to characterize repeated plane-contrast groups.
+    tags: [sampling, dicom, metadata, acquisition, protocol, repeats, echo, sequence]
+    commands:
+      - rtk proxy uv run --locked python -m scripts.adhoc.audit_sampling_protocols --output-dir outputs/analysis/physical-sampling-new/protocols
+    inputs: [Saved geometry headers parquet with DICOM paths, Original sampled DICOM headers, Series image-count inventory]
+    outputs: [Protocol-field parquet snapshot, Field availability and repeat summary, Source snapshot and manifest]
+    notes:
+      - Reads the first sorted header of each sampled series with stop_before_pixels and specific tags; does not read or decode pixel data.
+      - Uses exact supported plane and paired fluid-sensitive/fat-suppression metadata from the official inventory.
+      - Exact sequence signatures are metadata descriptions, not clinical duplicate labels.
+      - Refuses existing output directories; hashes metadata snapshots and sources, not complete original DICOM files.
+    docs: [docs/physical-sampling.md]
+
   - id: diagnose-encoding-usage
     path: scripts/adhoc/diagnose_encoding_usage.py
     summary: Measure reliance on spatial-token embeddings using paired held-out checkpoint interventions without training.
@@ -48,6 +94,7 @@ scripts:
       - Run in a persistent terminal or with nohup to survive closing the terminal; every invocation creates a new queue.
     docs: [docs/validation.md#overnight-hyperparameter-queue]
   - id: benchmark-dataloader-optimizations
+    status: historical
     path: scripts/adhoc/benchmark_dataloader_optimizations.py
     summary: Compare first-pass validation and inference data-loading optimizations against interleaved baselines.
     tags: [benchmark, dataloader, validation, inference, dicom, preprocessing, throughput]
@@ -58,6 +105,7 @@ scripts:
     inputs: [Baseline config, Training DICOMs, Frozen validation fold and label sources]
     outputs: [Per-candidate JSON timings, DataLoader output audits, Progressive suite results]
     notes:
+      - Retired from the active runtime after physical sampling; execute only with its original archived source and configuration.
       - Retains C, NumPy and descriptor prototypes as historical candidates; production uses the actual dataset and collation, and production-reference uses independent frozen preprocessing and dataset sources in scripts/adhoc/dataloader_reference/.
       - Single runs and dicom-suite use the resolved batch size and exactly eight workers; the historical preprocessing suite requires batch size eight and eight configured workers.
       - dicom-suite compares production-reference with production, using the saved workload and 128-study cohort, the exact saved eight-study audit subset, corrected edge fixtures, training selections and persistent-worker ownership checks before three alternating timing pairs. A failed performance gate stops promotion.
@@ -86,8 +134,8 @@ scripts:
       - GPU mode uses bounded optimization steps with seeded random weights, current augmentation and constant learning rates; saves no checkpoint or validation metric.
       - Warmup batches are excluded from throughput; OS page cache is uncontrolled, so first passes are not cold-disk measurements.
       - Default loader mode consumes CPU batches immediately without pinning or GPU work and records wall-clock studies/s and selected slices/s.
-      - Honors adjacent_triplets sampling and complete-group failure handling; records CNN-input and raw-slice counts separately. Historical single-slice measurements use their source/config snapshots.
-      - Uses production pooled acquisition allocation, center-weighted sampling and position references when configured; decode threading only changes pixel loading.
+      - Honors adjacent_triplets sampling and complete-group failure handling; records triplets, channel appearances and unique source slices separately. Historical single-slice measurements use their source/config snapshots.
+      - Uses shared production physical/local selection and retry preparation; decode threading only changes unique-path pixel loading.
       - Audit mode compares all collated fields with production on real studies without using CUDA.
     docs: [docs/data-preparation.md#threading-inside-dataset-loading]
   - id: profile-training
@@ -103,7 +151,7 @@ scripts:
     outputs: [JSON timings and input identities, Recursive project-relative source snapshot, CPU profiles, GPU memory and loader wait measurements, Backbone BatchNorm update counts]
     notes:
       - Samples fold-0 training studies only, retaining full configured slice limits.
-      - Reports raw slices separately from CNN inputs when adjacent_triplets mode packs three slices per input.
+      - Reports triplets, channel appearances and unique source slices separately in preprocessing mode.
       - Counts and hashes each selected acquisition separately while retaining the configured total budget per plane/contrast.
       - Uses a few development steps without running an epoch or reporting validation AUC.
       - GPU modes use seeded random weights and require CUDA; capacity profiling disables series dropout.
@@ -140,6 +188,21 @@ scripts:
       - Verifies source hashes and specific label transformations; source names are fixed in this investigation.
       - Existing aggregate outputs are overwritten; --output-dir selects another destination.
     docs: [docs/public-label-audit.md#acquisition-and-reproduction]
+
+  - id: compare-public-labels
+    path: scripts/adhoc/compare_public_labels.py
+    summary: Compare the September 13 public label releases with Steven v4 and audit claimed gold scores.
+    tags: [labels, gold, steven, zhen, tonylin, laymond, tasmeem, rayan, yunus, bootstrap, audit]
+    commands:
+      - rtk proxy uv run --locked python -m scripts.adhoc.compare_public_labels --help
+      - rtk proxy uv run --locked python -m scripts.adhoc.compare_public_labels --output-dir data/labels/audit/new-public-20260913-reproduction
+    inputs: [docs/public-label-comparison-sources.json, Pinned public label tables and metadata, Official train.csv and sample_submission.csv]
+    outputs: [Audit JSON, Per-target gold AUC CSV, Pairwise difference CSV, Large silver disagreement CSV]
+    notes:
+      - Verifies downloaded file hashes and uses each source's explicit target-column mapping.
+      - Reports reference replacement, matched-endpoint AUC, paired study bootstrap intervals and silver-target differences without report text.
+      - Requires a fresh output directory; does not change production labels, train models or run tests.
+    docs: [docs/public-label-audit.md#2026-09-13-new-public-label-comparison]
 
   - id: check-environment
     path: scripts/adhoc/check_environment.py
