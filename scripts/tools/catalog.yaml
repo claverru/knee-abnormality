@@ -116,22 +116,24 @@ scripts:
 
   - id: preview-augmentations
     path: scripts/tools/preview_augmentations.py
-    summary: Browse original and augmented example-test inputs, including triplet channels, by plane and contrast.
-    tags: [preview, augmentation, kornia, affine, noise, gamma, contrast, image, visualization, plane, mri, triplet, channel]
+    summary: Browse study-coherent reflection and other augmentations with source geometry and optional bounded CUDA profiling.
+    tags: [preview, augmentation, reflection, geometry, profiling, cuda, kornia, affine, noise, gamma, contrast, image, visualization, plane, mri, triplet, channel]
     commands:
       - rtk proxy uv run --locked python -m scripts.tools.preview_augmentations configs/baseline.yaml --output-dir outputs/previews/triplet-augmentations-new
       - rtk proxy uv run --locked python -m scripts.tools.preview_augmentations configs/baseline.yaml --seed 100 --variants 6 --output-dir outputs/previews/augmentations-seed100
       - rtk proxy uv run --locked python -m scripts.tools.preview_augmentations configs/baseline.yaml --sampling training --epoch 2 --output-dir outputs/previews/training-augmentations-epoch2
-    inputs: [Experiment config, Example-test DICOMs and metadata]
+      - rtk proxy uv run --locked python -m scripts.tools.preview_augmentations configs/baseline.yaml --variants 1 --profile-cuda true --output-dir outputs/previews/reflection-profile-new
+    inputs: [Experiment config, Example-test or fold-0 validation DICOMs and metadata, Optional existing geometry header audit]
     outputs: [Offline preview.html, overview.png, effective_config.json, manifest.json, Recursive project-relative source snapshot]
     notes:
       - Displays physical/local sampling, Gaussian width, selected source paths, actual triplets, channel appearances and unique slices.
-      - Uses shared preparation and augmentation code on CPU; requires no checkpoint, GPU, network or training labels.
-      - Defaults to all example-test studies so their combined series cover all six configured types; --study-uid restricts the preview to one example.
+      - CPU previews require no checkpoint or GPU; --split validation requires the prepared fold labels. --profile-cuda true adds bounded GPU augmentation-only timing and memory measurements without a backbone or optimizer.
+      - Defaults to example-test studies; --split validation, --offset and --max-studies bound validation examples. --study-uid restricts either split. Unavailable coverage categories are recorded.
       - Defaults to deterministic validation sampling; --sampling training and --epoch preview the actual seeded training sampler on example-test studies. Series dropout is not previewed.
       - Keeps all selected acquisitions separately selectable within each plane/contrast, with centered physical positions and the shared type budget when configured.
-      - HTML defaults to forcing enabled transforms for comparison and can respect their independent training probabilities; the PNG overview forces enabled transforms in the first draw.
-      - Displays a fixed-scale triplet RGB composite or an individual grayscale channel before backbone normalization; single-slice configs retain grayscale previews.
+      - HTML and overview default to forced eligible pure study reflection; combined forced/sampled augmentation remains selectable. Reflection decisions synchronize across all acquisitions in a study.
+      - Each sampled variant uses one advancing seeded CPU generator for study reflection and acquisition augmentation draws; gates consume separate random values.
+      - Displays fixed-scale triplet RGB or grayscale channels before normalization, source-channel correspondence, signed positions, centered LPS anchors, eligibility and source laterality from the optional --geometry-headers audit.
       - Records per-acquisition transform parameters, pixel-noise seeds and Kornia versions; geometry and noise strength are shared across triplets while pixel noise is independent.
       - Records raw-slice and CNN-input counts separately; triplet positions identify middle slices. CPU random draws need not match CUDA draws with the same seed.
       - Refuses existing output directories; choose a new --output-dir for each regenerated preview.

@@ -7,8 +7,13 @@ from torch import nn
 from knee_abnormality.augmentation import (
     ImageAugmentation,
     affine_matrices,
+    apply_reflection,
     augmented_to_prepared,
+    reflection_channels,
+    reflection_inverse,
+    reflection_positions,
     sample_augmentation_parameters,
+    sample_reflection_parameters,
 )
 from knee_abnormality.config import DataConfig, ModelConfig
 from knee_abnormality.spatial_tokens import (
@@ -193,6 +198,12 @@ class KneeAbnormalityModel(nn.Module):
                 "Prepared image channels differ from the configured input mode"
             )
         presence = batch["series_presence"]
+        reflected_study = torch.zeros_like(batch["reflection_eligible"])
+        if self.training:
+            reflected_study = sample_reflection_parameters(
+                self.augmentation_settings.reflection_augmentation.probability,
+                batch["reflection_eligible"],
+            ).applied
         effective = self._effective_presence(presence)
         all_study = batch["series_study_index"]
         all_type = batch["series_type_index"]
@@ -208,15 +219,27 @@ class KneeAbnormalityModel(nn.Module):
         valid_images = (
             batch["images"].flatten(0, 1)[flat_indices].to(torch.float32).div_(255.0)
         )
+        acquisition_index = slice_mask.nonzero(as_tuple=True)[0]
+        token_study = study_index[acquisition_index]
+        token_type = type_index[acquisition_index]
+        reflected = reflected_study[token_study]
+        sagittal = self.spatial_tokens.plane_lookup[token_type] == 2
+        if (
+            self.training
+            and self.augmentation_settings.reflection_augmentation.probability > 0
+        ):
+            valid_images = apply_reflection(valid_images, reflected, sagittal)
+        positions = reflection_positions(positions, reflected, sagittal)
+        channels = reflection_channels(reflected, sagittal)
         valid_images, inverse_affine = self._augment_images(valid_images, slice_mask)
+        inverse_affine = reflection_inverse(
+            inverse_affine, reflected, sagittal, valid_images.shape[-1]
+        )
         valid_images = valid_images.sub(self.mean).div_(self.std)
         if self.channels_last:
             valid_images = valid_images.contiguous(memory_format=torch.channels_last)
         maps = self._encode_images(valid_images)
         features = self.projection(maps.flatten(2).transpose(1, 2))
-        acquisition_index = slice_mask.nonzero(as_tuple=True)[0]
-        token_study = study_index[acquisition_index]
-        token_type = type_index[acquisition_index]
         xy, xyz, visual_valid, available_3d = feature_geometry(
             batch["patient_maps"].flatten(0, 1)[flat_indices],
             batch["valid_rects"].flatten(0, 1)[flat_indices],
@@ -227,6 +250,8 @@ class KneeAbnormalityModel(nn.Module):
             self.feature_mapping,
             batch["study_centers"][token_study],
             batch["center_valid"][token_study],
+            reflected,
+            channels,
         )
         terms = self.spatial_tokens(
             xy,

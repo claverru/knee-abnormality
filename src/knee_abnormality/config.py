@@ -86,7 +86,14 @@ class NoiseAugmentationConfig(ConfigModel):
     std_range: PositiveFiniteRange = (0.005, 0.02)
 
 
+class ReflectionAugmentationConfig(ConfigModel):
+    probability: Annotated[float, Field(ge=0, le=1)] = 0.0
+
+
 class DataConfig(ConfigModel):
+    reflection_augmentation: ReflectionAugmentationConfig = Field(
+        default_factory=ReflectionAugmentationConfig
+    )
     series_types: Annotated[tuple[SeriesTypeConfig, ...], Field(min_length=1)]
     position_encoding: Literal["physical_mm"] = "physical_mm"
     position_reference: Literal["center"] = "center"

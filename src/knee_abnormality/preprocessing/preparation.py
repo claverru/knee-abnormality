@@ -32,6 +32,8 @@ class PreparedSeries:
     intensity_pixel_count: int = 0
     intensity_bounds: tuple[float, float] = (0.0, 0.0)
     sampling_path: str = "physical"
+    reflection_eligible: bool = False
+    reflection_reason: str = "unavailable"
 
     @property
     def slice_count(self) -> int:
@@ -135,6 +137,7 @@ def prepare_series(
             torch.empty(0, dtype=torch.bool),
             (),
             failed_paths=failed_paths,
+            reflection_reason="empty_prepared_series",
         )
     lookup = {r.path: i for i, r in enumerate(retained)}
     successful_records = [r for group in groups for r in group]

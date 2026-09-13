@@ -9,6 +9,7 @@ from io import BytesIO
 from pathlib import Path
 from typing import Literal
 
+import polars as pl
 import torch
 import yaml
 from PIL import Image, ImageDraw, ImageFont
@@ -18,12 +19,22 @@ from pydantic_settings import CliPositionalArg, SettingsError
 from knee_abnormality.augmentation import (
     AugmentationParameters,
     ImageAugmentation,
+    affine_matrices,
+    apply_reflection,
+    augmented_to_prepared,
+    reflection_channels,
+    reflection_inverse,
+    reflection_positions,
     sample_augmentation_parameters,
+    sample_reflection_parameters,
 )
 from knee_abnormality.cli import NonExitingCLISettings
 from knee_abnormality.config import load_config
+from knee_abnormality.dataset import collate_studies
 from knee_abnormality.inference import prediction_data
+from knee_abnormality.preprocessing_identity import preprocessing_identity
 from knee_abnormality.provenance import sha256_file
+from knee_abnormality.spatial_tokens import feature_geometry
 
 PAGE = """<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
@@ -55,6 +66,7 @@ details {font-size:12px;overflow-wrap:anywhere;margin-top:12px;color:#91a2b8}
 <label>Example study<select id="study"><option value="all">All six types across examples</option></select></label>
 <label>Augmentation draw<select id="variant"></select></label>
 <label>Display<select id="display"><option value="composite">Three-channel composite</option><option value="0">Channel 1 · first slice</option><option value="1">Channel 2 · middle slice</option><option value="2">Channel 3 · last slice</option></select></label>
+<label><input type="checkbox" id="reflection" checked>Reflection only</label>
 <label><input type="checkbox" id="force" checked>Force enabled transforms</label>
 </div>
 <p id="explanation"></p><div id="cards"></div>
@@ -63,6 +75,7 @@ const data = __DATA__;
 const study = document.getElementById('study');
 const variant = document.getElementById('variant');
 const force = document.getElementById('force');
+const reflection = document.getElementById('reflection');
 const display = document.getElementById('display');
 const triplets = data.slices_per_input === 3;
 display.disabled = !triplets;
@@ -70,6 +83,7 @@ if (!triplets) display.options[0].textContent = 'Grayscale slice';
 const positions = new Map();
 const acquisitions = new Map();
 data.studies.forEach((uid,i) => study.add(new Option(`Example ${i+1} · …${uid.slice(-8)}`,uid)));
+study.value = data.studies[0];
 data.seeds.forEach((seed,i) => variant.add(new Option(`Seed ${seed}`,i)));
 document.getElementById('intro').textContent = `${data.image_size} px · ${(data.image_size*data.spacing_mm).toFixed(1)} mm crop · ${data.sampling} slice sampling · ${triplets ? 'three consecutive slices per input' : 'one slice per input'} · Kornia · affine ${100*data.settings.affine.probability}% · gamma/contrast ${100*data.settings.intensity.probability}% · noise ${100*data.settings.noise.probability}%`;
 function render() {
@@ -79,6 +93,7 @@ function render() {
   document.getElementById('explanation').textContent = force.checked
     ? 'Enabled transforms are forced on for comparison. Uncheck the box to respect their independently sampled training probabilities. Images use a fixed display scale before backbone normalization.'
     : 'Training probabilities are active. Geometry, gamma, contrast and noise strength are shared within each acquisition; pixel noise varies between slices. Images use a fixed display scale before backbone normalization.';
+  if (reflection.checked) document.getElementById('explanation').textContent = 'Pure forced study reflection, respecting eligibility. Axial/coronal columns reverse; sagittal channels reverse. Targets retain their identities. Source laterality is unchanged metadata. Unavailable categories: ' + data.coverage.unavailable_categories.join(', ');
   if (triplets) document.getElementById('explanation').textContent += ' The composite maps consecutive MRI slices to red, green and blue; select a channel to inspect its grayscale slice.';
   data.types.forEach((type,slot) => {
     const candidates = data.series.filter(row => row.slot === slot && (study.value === 'all' || row.study_uid === study.value));
@@ -118,27 +133,29 @@ function render() {
     if (active('affine')) effects.push(`Rotation ${sample.affine.angle_degrees.toFixed(2)}° · Shift ${sample.affine.translation_fraction.map(x => (100*x).toFixed(2)+'%').join(', ')} · Scale ${sample.affine.scale.toFixed(3)}`);
     if (active('intensity')) effects.push(`Gamma ${sample.intensity.gamma.toFixed(4)} · Contrast ${sample.intensity.contrast.toFixed(4)}`);
     if (active('noise')) effects.push(`Noise σ ${sample.noise.std.toFixed(4)}`);
-    content.querySelector('.status').textContent = effects.length ? effects.join(' · ') : 'All transforms skipped for this acquisition';
-    content.querySelector('.caption').textContent = force.checked ? 'Forced enabled transforms' : 'Sampled training transforms';
+    content.querySelector('.status').textContent = reflection.checked ? `Study reflection ${entry.study_reflection_eligible ? 'eligible' : 'rejected: '+entry.study_reflection_reasons.join(', ')} · Source laterality ${entry.source_lateralities.join(', ') || 'unavailable'} · Obliquity ${entry.obliquity_degrees.toFixed(1)}°` : effects.join(' · ') + ` · Reflection ${force.checked ? entry.study_reflection_eligible : sample.reflection_applied}`;
+    content.querySelector('.caption').textContent = reflection.checked ? 'Forced eligible reflection' : (force.checked ? 'Forced enabled transforms' : 'Sampled training transforms');
     content.querySelector('.identity').textContent = `Study: ${entry.study_uid}. Acquisition: ${entry.series_uid}. Gaussian σ ${data.sampling_sigma_mm} mm; epoch ${data.epoch}. ${entry.sampling_path} sampling. This acquisition supplies ${entry.inputs} triplets, ${entry.slices} channel appearances, ${entry.unique_slices} unique source slices; the type budget is ${type.max_images/data.slices_per_input} inputs across acquisitions. ${entry.failures.length} preparation conditions.`;
     function update() {
       const index = Number(slider.value);
       positions.set(key,index);
       const channel = display.value === 'composite' ? null : Number(display.value);
       const original = channel === null ? entry.original[index] : entry.original_channels[channel][index];
-      const augmented = channel === null
+      const augmented = reflection.checked ? (channel === null ? entry.reflected[index] : entry.reflected_channels[channel][index]) : channel === null
         ? (force.checked ? sample.images[index] : sample.sampled_images[index])
         : (force.checked ? sample.channels[channel][index] : sample.sampled_channels[channel][index]);
       content.querySelector('.original').src = original;
       content.querySelector('.augmented').src = augmented;
-      content.querySelector('.paths').textContent = entry.selected_paths[index].map((path, channel) => `Channel ${channel+1}: ${path}`).join(String.fromCharCode(10));
+      const geometry = reflection.checked ? entry.reflected_anchors : (force.checked ? sample.anchors : sample.sampled_anchors);
+      const association = geometry.source_channels[index];
+      content.querySelector('.paths').textContent = association.map((source, channel) => `Output channel ${channel+1} ← source channel ${source+1}: ${entry.selected_paths[index][source]}`).join(String.fromCharCode(10)) + '\\nCentered LPS anchors in mm (3×3 final image grid, unavailable = null):\\nBefore: ' + JSON.stringify(entry.original_anchors.centered_xyz_mm[index]) + '\\nAfter: ' + JSON.stringify(geometry.centered_xyz_mm[index]) + '\\nVisual validity: ' + JSON.stringify(geometry.visual_valid[index]) + '\\n3D availability: ' + JSON.stringify(geometry.available_3d[index]);
       const unit = data.position_encoding === 'physical_mm' ? `mm from acquisition ${data.position_reference}` : 'ordered slice index';
-      content.querySelector('.position').textContent = `${triplets ? 'Triplet' : 'Slice'} ${index+1} / ${entry.original.length} · ${triplets ? 'middle slice: ' : ''}${entry.positions[index].toFixed(2)} ${unit}`;
+      content.querySelector('.position').textContent = `${triplets ? 'Triplet' : 'Slice'} ${index+1} / ${entry.original.length} · ${triplets ? 'middle slice: ' : ''}${entry.positions[index].toFixed(2)} → ${geometry.positions[index].toFixed(2)} ${unit}`;
     }
     slider.addEventListener('input',update); update(); card.append(content); cards.append(card);
   });
 }
-[study,variant,force,display].forEach(control => control.addEventListener('change',render));
+[study,variant,force,display,reflection].forEach(control => control.addEventListener('change',render));
 render();
 </script></body></html>
 """
@@ -152,6 +169,14 @@ class PreviewCLI(NonExitingCLISettings):
     variants: int = Field(default=4, ge=1, le=12)
     sampling: Literal["validation", "training"] = "validation"
     epoch: int = Field(default=0, ge=0)
+    split: Literal["test", "validation"] = "test"
+    max_studies: int = Field(default=8, ge=1, le=128)
+    offset: int = Field(default=0, ge=0)
+    profile_cuda: bool = False
+    profile_iterations: int = Field(default=30, ge=1, le=100)
+    geometry_headers: Path = Path(
+        "outputs/analysis/geometry-metadata-20260912/headers.parquet"
+    )
 
 
 def encode_image(pixels: torch.Tensor) -> str:
@@ -178,13 +203,13 @@ def overview(data: dict, output: Path) -> None:
     font = ImageFont.load_default(size=13)
     draw.text(
         (16, 12),
-        "Prepared original / forced augmentation",
+        "Prepared original / forced eligible reflection",
         fill="white",
         font=title_font,
     )
     draw.text(
         (16, 38),
-        f"Example test · {data['sampling']} sampling · seed {data['seeds'][0]}",
+        f"{data['split']} · {data['sampling']} sampling · seed {data['seeds'][0]}",
         fill="#b6c2d2",
         font=font,
     )
@@ -199,33 +224,17 @@ def overview(data: dict, output: Path) -> None:
             )
             continue
         index = len(entry["original"]) // 2
-        sample = entry["variants"][0]
         for column, encoded in enumerate(
-            (entry["original"][index], sample["images"][index])
+            (entry["original"][index], entry["reflected"][index])
         ):
             pixels = Image.open(BytesIO(base64.b64decode(encoded.split(",", 1)[1])))
             canvas.paste(pixels, (16 + column * (size + 16), top + 28))
         unit = "Triplet" if data["slices_per_input"] == 3 else "Slice"
-        intensity_detail = (
-            f"gamma {sample['intensity']['gamma']:.3f} · contrast {sample['intensity']['contrast']:.3f}"
-            if data["settings"]["intensity"]["probability"] > 0
-            else "intensity disabled"
-        )
-        detail = f"{unit} {index + 1}/{len(entry['original'])} · {intensity_detail}"
+        detail = f"{unit} {index + 1}/{len(entry['original'])} · eligible {entry['study_reflection_eligible']}"
         draw.text((16, top + size + 38), detail, fill="#8dc8ff", font=font)
-        affine_detail = (
-            f"Angle {sample['affine']['angle_degrees']:.1f}° · scale {sample['affine']['scale']:.3f}"
-            if data["settings"]["affine"]["probability"] > 0
-            else "affine disabled"
-        )
-        noise_detail = (
-            f"noise std {sample['noise']['std']:.4f}"
-            if data["settings"]["noise"]["probability"] > 0
-            else "noise disabled"
-        )
         draw.text(
             (16, top + size + 58),
-            f"{affine_detail} · {noise_detail}",
+            f"Position {entry['positions'][index]:.2f} → {entry['reflected_anchors']['positions'][index]:.2f} mm",
             fill="#8dc8ff",
             font=font,
         )
@@ -238,13 +247,134 @@ def overview(data: dict, output: Path) -> None:
     canvas.save(output)
 
 
+def anchor_record(series, center, eligible, sagittal, inverse=None):
+    count = len(series.images)
+    reflected = torch.full((count,), eligible, dtype=torch.bool)
+    planes = torch.full((count,), sagittal, dtype=torch.bool)
+    association = reflection_channels(reflected, planes)
+    size = series.images.shape[-1]
+    if inverse is None:
+        inverse = torch.eye(3)[None].expand(count, -1, -1)
+    inverse = reflection_inverse(inverse, reflected, planes, size)
+    center_valid = center is not None and center.point is not None
+    centers = torch.tensor(center.point if center_valid else (0, 0, 0)).expand(
+        count, -1
+    )
+    _, xyz, visual, available = feature_geometry(
+        series.patient_maps,
+        series.valid_rects,
+        series.geometry_valid,
+        inverse,
+        (3, 3),
+        (size, size),
+        (0, 0, (size - 1) / 2, (size - 1) / 2),
+        centers,
+        torch.full((count,), center_valid),
+        reflected,
+        association,
+    )
+    return {
+        "source_channels": association.tolist(),
+        "positions": reflection_positions(series.positions, reflected, planes).tolist(),
+        "centered_xyz_mm": [
+            [
+                point if valid else None
+                for point, valid in zip(points, flags, strict=True)
+            ]
+            for points, flags in zip(
+                (xyz * 100).tolist(), available.tolist(), strict=True
+            )
+        ],
+        "visual_valid": visual.tolist(),
+        "available_3d": available.tolist(),
+    }
+
+
+def profile_reflection(config, stacks, entries, iterations, seed):
+    if not torch.cuda.is_available():
+        raise RuntimeError("--profile-cuda requires CUDA")
+    device = torch.device("cuda")
+    pixels = torch.cat(stacks).to(device=device, dtype=torch.float32).div_(255)
+    series_index = torch.cat(
+        [torch.full((len(stack),), index) for index, stack in enumerate(stacks)]
+    ).to(device)
+    eligible = torch.tensor(
+        [entry["study_reflection_eligible"] for entry in entries], device=device
+    )[series_index]
+    sagittal = torch.tensor(
+        [
+            config.data.series_types[entry["slot"]].plane == "Sagittal"
+            for entry in entries
+        ],
+        device=device,
+    )[series_index]
+    generator = torch.Generator(device=device).manual_seed(seed)
+    parameters = sample_augmentation_parameters(
+        config.data, len(entries), device, generator
+    )
+    matrices = affine_matrices(parameters.affine, *pixels.shape[-2:])
+    inverse = augmented_to_prepared(matrices, *pixels.shape[-2:])[series_index]
+    augmenter = ImageAugmentation().to(device)
+    results = {}
+    for name, enabled in (("probability_zero", False), ("forced_eligible", True)):
+        reflected = eligible if enabled else torch.zeros_like(eligible)
+
+        def execute(enabled=enabled, reflected=reflected):
+            values = pixels.clone()
+            if enabled:
+                values = apply_reflection(values, reflected, sagittal)
+            values = augmenter(values, series_index, parameters, generator, matrices)
+            return (
+                values,
+                reflection_inverse(inverse, reflected, sagittal, pixels.shape[-1]),
+                reflection_channels(reflected, sagittal),
+            )
+
+        for _ in range(5):
+            execute()
+        torch.cuda.synchronize()
+        torch.cuda.empty_cache()
+        allocated = torch.cuda.memory_allocated()
+        reserved = torch.cuda.memory_reserved()
+        torch.cuda.reset_peak_memory_stats()
+        generator.manual_seed(seed + 1)
+        start, end = (
+            torch.cuda.Event(enable_timing=True),
+            torch.cuda.Event(enable_timing=True),
+        )
+        start.record()
+        for _ in range(iterations):
+            execute()
+        end.record()
+        torch.cuda.synchronize()
+        results[name] = {
+            "milliseconds_per_iteration": start.elapsed_time(end) / iterations,
+            "incremental_peak_allocated_bytes": torch.cuda.max_memory_allocated()
+            - allocated,
+            "incremental_peak_reserved_bytes": torch.cuda.max_memory_reserved()
+            - reserved,
+        }
+    return {
+        "hardware": torch.cuda.get_device_name(),
+        "shape": list(pixels.shape),
+        "eligible_inputs": int(eligible.sum()),
+        "iterations": iterations,
+        "warmup": 5,
+        "rng_device": str(device),
+        "parameter_seed": seed,
+        "noise_seed": seed + 1,
+        "scope": "augmentation only; fixed shared affine parameters; includes reversal temporaries; no backbone or optimizer",
+        "measurements": results,
+    }
+
+
 def create_preview(args: PreviewCLI) -> dict:
     config = load_config(args.config)
     output = args.output_dir.expanduser().resolve()
     if output.exists():
         raise FileExistsError(f"{output} already exists; choose a new --output-dir")
     torch.set_num_threads(1)
-    dataset, _, _ = prediction_data(config, "test", 0)
+    dataset, _, _ = prediction_data(config, args.split, 0)
     seed = config.seed if args.seed is None else args.seed
     dataset.training = args.sampling == "training"
     dataset.seed = seed
@@ -255,17 +385,83 @@ def create_preview(args: PreviewCLI) -> dict:
         if args.study_uid is None or uid == args.study_uid
     ]
     if not indices:
-        raise ValueError("Requested study is absent from the example-test table")
+        raise ValueError("Requested study is absent from the selected split")
+    indices = indices[args.offset : args.offset + args.max_studies]
+    if not indices:
+        raise ValueError("No studies in requested range")
+    headers = (
+        pl.read_parquet(args.geometry_headers)
+        if args.geometry_headers.exists()
+        else None
+    )
     entries = []
     stacks = []
+    prepared = []
+    centers = []
+    items = []
     for index in indices:
         item = dataset[index]
+        items.append(item)
+        batch = collate_studies([item])
+        study_eligible = bool(batch["reflection_eligible"][0])
         for slot, acquisitions in enumerate(item["series"]):
             for series in acquisitions:
                 stacks.append(series.images)
+                prepared.append(series)
+                centers.append(item["study_reference"])
+                reflected = torch.full(
+                    (len(series.images),), study_eligible, dtype=torch.bool
+                )
+                sagittal = torch.full_like(
+                    reflected, config.data.series_types[slot].plane == "Sagittal"
+                )
+                reflection = apply_reflection(series.images, reflected, sagittal)
+                source_lateralities = []
+                if headers is not None:
+                    source_lateralities = (
+                        headers.filter(pl.col("SeriesInstanceUID") == series.uid)[
+                            "Laterality"
+                        ]
+                        .drop_nulls()
+                        .unique()
+                        .to_list()
+                    )
+                source_lateralities = [
+                    value for value in source_lateralities if value in {"L", "R"}
+                ]
+                maps = series.patient_maps[:, 1, :, :2]
+                directions = maps / maps.norm(dim=1, keepdim=True).clamp_min(1e-12)
+                obliquity = float(
+                    torch.rad2deg(
+                        torch.acos(directions.abs().amax(dim=1).clamp(0, 1))
+                    ).amax()
+                )
                 entries.append(
                     {
                         "study_uid": item["study_uid"],
+                        "reflection_eligible": series.reflection_eligible,
+                        "reflection_reason": series.reflection_reason,
+                        "study_reflection_eligible": study_eligible,
+                        "study_reflection_reasons": batch["reflection_reasons"][0],
+                        "source_lateralities": source_lateralities,
+                        "obliquity_degrees": obliquity,
+                        "padded_crop": bool(
+                            (series.valid_rects[..., 2:] < config.data.image_size).any()
+                        ),
+                        "center_reason": item["study_reference"].reason
+                        if item["study_reference"]
+                        else "missing",
+                        "original_anchors": anchor_record(
+                            series, item["study_reference"], False, bool(sagittal[0])
+                        ),
+                        "reflected_anchors": anchor_record(
+                            series,
+                            item["study_reference"],
+                            study_eligible,
+                            bool(sagittal[0]),
+                        ),
+                        "reflected": [encode_image(image) for image in reflection],
+                        "reflected_channels": encode_channels(reflection),
                         "series_uid": series.uid,
                         "slot": slot,
                         "inputs": len(series.images),
@@ -291,12 +487,20 @@ def create_preview(args: PreviewCLI) -> dict:
     }
     augmenter = ImageAugmentation()
     seeds = [seed + variant for variant in range(args.variants)]
+    study_ids = [item["study_uid"] for item in items]
+    eligibility = collate_studies(items)["reflection_eligible"]
     for variant_seed in seeds:
+        generator = torch.Generator().manual_seed(variant_seed)
+        reflection_draw = sample_reflection_parameters(
+            config.data.reflection_augmentation.probability,
+            eligibility,
+            generator,
+        )
         sampled = sample_augmentation_parameters(
             config.data,
             len(entries),
             torch.device("cpu"),
-            torch.Generator().manual_seed(variant_seed),
+            generator,
         )
         forced = AugmentationParameters(
             **{
@@ -318,6 +522,9 @@ def create_preview(args: PreviewCLI) -> dict:
             series_index = torch.full((len(stack),), index, dtype=torch.int64)
             noise_seed = variant_seed * len(entries) + index
             record = {
+                "reflection_applied": bool(
+                    reflection_draw.applied[study_ids.index(entry["study_uid"])]
+                ),
                 "intensity": {
                     "applied": bool(sampled.intensity.applied[index]),
                     "gamma": float(sampled.intensity.gamma[index]),
@@ -338,8 +545,29 @@ def create_preview(args: PreviewCLI) -> dict:
                 },
             }
             for prefix, parameters in (("", forced), ("sampled_", sampled)):
+                reflected = torch.full(
+                    (len(stack),),
+                    entry["study_reflection_eligible"]
+                    if not prefix
+                    else record["reflection_applied"],
+                    dtype=torch.bool,
+                )
+                sagittal = torch.full_like(
+                    reflected,
+                    config.data.series_types[entry["slot"]].plane == "Sagittal",
+                )
+                record[f"{prefix}anchors"] = anchor_record(
+                    prepared[index],
+                    centers[index],
+                    bool(reflected[0]),
+                    bool(sagittal[0]),
+                    augmented_to_prepared(
+                        affine_matrices(parameters.affine, *pixels.shape[-2:]),
+                        *pixels.shape[-2:],
+                    )[series_index],
+                )
                 augmented = augmenter(
-                    pixels.clone(),
+                    apply_reflection(pixels.clone(), reflected, sagittal),
                     series_index,
                     parameters,
                     torch.Generator().manual_seed(noise_seed),
@@ -348,7 +576,48 @@ def create_preview(args: PreviewCLI) -> dict:
                 record[f"{prefix}images"] = [encode_image(image) for image in encoded]
                 record[f"{prefix}channels"] = encode_channels(encoded)
             entry["variants"].append(record)
+    coverage = {
+        "source_lateralities": sorted(
+            {value for entry in entries for value in entry["source_lateralities"]}
+        ),
+        "planes": sorted(
+            {config.data.series_types[entry["slot"]].plane for entry in entries}
+        ),
+        "oblique_over_10_degrees": sum(
+            entry["obliquity_degrees"] > 10 for entry in entries
+        ),
+        "padded_crops": sum(entry["padded_crop"] for entry in entries),
+        "rejected_centers": sum(
+            item["study_reference"] is None or item["study_reference"].point is None
+            for item in items
+        ),
+        "missing_acquisitions": sum(
+            any(not values for values in item["series"]) for item in items
+        ),
+        "ineligible_studies": int((~eligibility).sum()),
+        "eligible_studies": int(eligibility.sum()),
+        "unavailable_categories": [],
+    }
+    for category in (
+        "oblique_over_10_degrees",
+        "padded_crops",
+        "rejected_centers",
+        "missing_acquisitions",
+        "ineligible_studies",
+    ):
+        if not coverage[category]:
+            coverage["unavailable_categories"].append(category)
+    if not {"L", "R"} <= set(coverage["source_lateralities"]):
+        coverage["unavailable_categories"].append("both_source_lateralities")
+    profile = (
+        profile_reflection(config, stacks, entries, args.profile_iterations, seed)
+        if args.profile_cuda
+        else None
+    )
     data = {
+        "coverage": coverage,
+        "split": args.split,
+        "reflection_probability": config.data.reflection_augmentation.probability,
         "image_size": config.data.image_size,
         "slices_per_input": config.data.slices_per_input,
         "position_encoding": config.data.position_encoding,
@@ -387,6 +656,9 @@ def create_preview(args: PreviewCLI) -> dict:
                 "config.py",
                 "dataset.py",
                 "inference.py",
+                "spatial_tokens.py",
+                "preprocessing_identity.py",
+                "model.py",
             )
         ],
         Path("src/knee_abnormality/preprocessing"),
@@ -407,6 +679,13 @@ def create_preview(args: PreviewCLI) -> dict:
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source, destination)
     manifest = {
+        "preprocessing_identity": preprocessing_identity(),
+        "coverage": coverage,
+        "profile": profile,
+        "split": args.split,
+        "geometry_headers_sha256": sha256_file(args.geometry_headers)
+        if args.geometry_headers.exists()
+        else None,
         "html": str(output / "preview.html"),
         "overview": str(output / "overview.png"),
         "config": config.model_dump(mode="json"),
@@ -415,7 +694,7 @@ def create_preview(args: PreviewCLI) -> dict:
         "sampling_seed": seed,
         "sampling_epoch": args.epoch,
         "seeds": seeds,
-        "display": "Fixed [0,1] before backbone normalization; triplet RGB composite or individual grayscale channels; enabled transforms forced by default, independent sampled training gates selectable",
+        "display": "Fixed [0,1] before backbone normalization; pure eligible study reflection by default; combined forced or sampled transforms selectable; source laterality metadata only",
         "versions": {
             name: version(name)
             for name in ("torch", "kornia", "kornia-rs", "pillow", "pydicom", "polars")
@@ -426,14 +705,25 @@ def create_preview(args: PreviewCLI) -> dict:
         },
         "input_sha256": {
             name: sha256_file(config.raw_dir / name)
-            for name in ("test.csv", "test_series.csv")
+            for name in (
+                ("test.csv", "test_series.csv")
+                if args.split == "test"
+                else ("train.csv", "train_series.csv")
+            )
         },
         "series": [
             {
                 **{
                     key: value
                     for key, value in entry.items()
-                    if key not in {"original", "original_channels", "variants"}
+                    if key
+                    not in {
+                        "original",
+                        "original_channels",
+                        "reflected",
+                        "reflected_channels",
+                        "variants",
+                    }
                 },
                 "variants": [
                     {
@@ -455,6 +745,8 @@ def create_preview(args: PreviewCLI) -> dict:
     }
     (output / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
     return {
+        "coverage": coverage,
+        "profile": profile,
         "html": manifest["html"],
         "overview": manifest["overview"],
         "studies": len(indices),

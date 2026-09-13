@@ -11,10 +11,10 @@ Baseline3 submission `56164711` scored **0.878** publicly, and baseline4
 submission `56167669` scored **0.910** publicly at 1× image limits. Baseline4
 at 2× scored **0.913** (`56169438`), ahead of 3× at **0.912** (`56169445`).
 Use **2× images and batch size 2** for current submissions.
-The best recorded public result is now **0.930**, from `3dsampling`
-submission `56210103` on 2026-09-13. See the
-[validation comparison](validation.md#2026-09-13-3dsampling-validation-comparison)
-and [submission artifact](#3dsampling-submission).
+The best recorded public result is now **0.931**, from `spatial-tokens-reflection`
+submission `56211972` on 2026-09-13. See the
+[validation comparison](validation.md#2026-09-13-reflection-validation-comparison)
+and [submission artifact](#reflection-submission).
 
 ## Physical-sampling runtime identity
 
@@ -42,6 +42,28 @@ On the pinned accepted-center cohort, validation realizes 6,248 triplets versus
 metadata/preparation evidence, not an inference runtime, memory or accuracy
 measurement. Training and model execution were excluded from implementation.
 See [verification](physical-sampling.md#implementation-verification).
+
+## Reflection submission
+
+The selected `spatial-tokens-reflection` fold-0 checkpoint (epoch 9, index 8)
+was exported on 2026-09-13 to `outputs/exports/knee-reflection-20260913` at
+2× images and batch 2. Checkpoint SHA-256 is
+`bc55feaa24cd6e6880bbb4ce0f0f452a9ea3302b5894928b117d508852bb928b`.
+Metadata, strict CPU model loading and bundle integrity checks passed; bundled
+source matches the training snapshot. Export took 0.70 seconds, with optional
+local inference not requested.
+
+The detached submission service launched at 17:24:48 UTC using private dataset
+`claverru/knee-reflection-20260913`, version 1, and private offline notebook
+`claverru/knee-reflection-20260913-inference`, version 1, Kaggle script version
+`349584477`. Its output passed verification and submission **56211972** completed
+with **0.931 public AUC**, confirmed through the Kaggle API on 2026-09-13.
+The runner recorded completion at 17:41:06 UTC in the
+[workflow record](../outputs/submissions/knee-reflection-20260913.json).
+This is **+0.001** over 3dsampling and the best recorded public result. The
+[saved validation comparison](validation.md#2026-09-13-reflection-validation-comparison)
+shows +0.001012 macro AUC versus that previous champion, with lower BCE and lower
+eleven-study gold AUC. The API provides no official hidden-data inference runtime.
 
 ## 3dsampling submission
 
@@ -173,7 +195,7 @@ pins the bundle, dataset/notebook versions, verified output and scored result.
 This is 0.005 below `crop140mm` at 0.925, consistent with the lower standalone
 validation AUC. The saved-prediction blend described in
 [validation](validation.md#2026-09-12-spatial-fusion-validation-comparison)
-has not been submitted. The later [spatial-token submission](#spatial-token-submission)
+has not been submitted. The later [reflection submission](#reflection-submission)
 now holds the best recorded public score.
 
 ## 140-mm crop submission

@@ -7,6 +7,8 @@ Working knowledge for the [RSNA Knee Abnormality Detection competition](https://
 | Deciding where code belongs or how to keep competition experiments fast and reproducible | [Project architecture](architecture.md) |
 | Finding a reusable script, locating an investigation, or adding and indexing a command | [Script index](../scripts/INDEX.md) |
 | Checking active work or tasks planned for the short term | [Ongoing work](ongoing.md) |
+| Reviewing reflection's best public score of 0.931 and its validation comparison with 3dsampling | [Reflection validation comparison](validation.md#2026-09-13-reflection-validation-comparison), [submission](inference-efficiency.md#reflection-submission) |
+| Using study-level knee reflection, reviewing geometry eligibility, previews and augmentation-only CUDA costs | [Reflection modeling](modeling.md#study-level-knee-reflection), [geometry and evidence](data-preparation.md#reflection-geometry-and-eligibility) |
 | Reviewing 3dsampling's 0.930 public result and validation comparison with the previous champion | [3dsampling validation comparison](validation.md#2026-09-13-3dsampling-validation-comparison) |
 | Reviewing the completed center experiment, its rejected sampler and the frozen control for fusion | [Accurate-centers result](validation.md#2026-09-12-accurate-centers-result) |
 | Training the spatial-token model with five embeddings and study-level 3D dropout | [Active spatial token model](modeling.md#active-spatial-token-model) |

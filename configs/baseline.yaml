@@ -1,4 +1,4 @@
-name: spatial-tokens-physical-sampling
+name: spatial-tokens-reflection
 seed: 42
 
 paths:
@@ -14,6 +14,8 @@ validation:
   folds: [0]
 
 data:
+  reflection_augmentation:
+    probability: 0.5
   sampling_sigma_mm: 80.0
   position_encoding: physical_mm
   position_reference: center

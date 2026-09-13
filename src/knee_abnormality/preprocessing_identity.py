@@ -1,6 +1,7 @@
 import hashlib
 from pathlib import Path
 
+from knee_abnormality.augmentation import REFLECTION_IDENTITY
 from knee_abnormality.preprocessing.geometry import RELIABILITY
 from knee_abnormality.preprocessing.sampling import SAMPLING_IDENTITY
 from knee_abnormality.spatial_tokens import SPATIAL_TOKEN_IDENTITY
@@ -29,7 +30,8 @@ def preprocessing_identity(package_root: Path | None = None) -> dict:
         digest.update(len(payload).to_bytes(8, "big"))
         digest.update(payload)
     return {
-        "algorithm": "physical_gaussian_overlap_spatial_tokens_v1",
+        "algorithm": "physical_gaussian_overlap_spatial_tokens_reflection_v2",
+        "reflection": dict(REFLECTION_IDENTITY),
         "sampling": dict(SAMPLING_IDENTITY),
         "reliability": dict(RELIABILITY),
         "spatial_tokens": dict(SPATIAL_TOKEN_IDENTITY),
