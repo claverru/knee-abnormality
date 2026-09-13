@@ -68,7 +68,7 @@ responsibility when that makes editing easier.
 | `src/knee_abnormality/preprocessing/spatial.py` | Crop/pad geometry, bounded sparse-filter cache, float32 resampling and delayed affine application | Implemented |
 | `src/knee_abnormality/preprocessing/intensity.py` | Exact float32 quantile selection and in-place NumPy normalization | Implemented |
 | `src/knee_abnormality/preprocessing/preparation.py` | Decode selected records, accept complete groups, collect acquisition-wide quantiles and construct tensors; retain decoder injection for profiling | Implemented |
-| `src/knee_abnormality/augmentation.py` | Sample and apply shared affine, gamma/contrast and noise transforms for training and previews | Implemented |
+| `src/knee_abnormality/augmentation.py` | Sample and apply study reflection plus shared affine, gamma/contrast and noise transforms for training and previews | Implemented |
 | `src/knee_abnormality/dataset.py` | Set up the series index; select series and slices, prepare and collate inputs, and construct configured data loaders | Implemented |
 | `src/knee_abnormality/model.py` | One-pass spatial ReXNet features, guarded series dropout and target-specific study MIL | Implemented; spatial-token MIL is the active model |
 | `src/knee_abnormality/spatial_tokens.py` | Verified backbone anchors, independent visual/3D masks, coordinate and metadata embeddings, study-level 3D dropout | Implemented; fixed spatial-token path |
@@ -114,6 +114,11 @@ The worker index caches compact CPU values without pixels or dense grids.
 Prepared triplets carry per-channel crop-to-patient maps, series/native reliability and
 valid rectangles. Collation aligns geometry tensors with image masks and study
 slots; the model composes the executed augmentation transform on each forward.
+The [reflection contract](data-preparation.md#reflection-geometry-and-eligibility)
+adds acquisition eligibility and study reduction before dropout. Shared GPU
+helpers reverse pixels/channels, compose `F @ U` and negate sagittal positions;
+spatial tokens apply centered LPS reflection once, retaining immutable source maps.
+The preview tool uses these helpers and supports bounded augmentation-only profiling.
 
 The [sampling experiment](validation.md#2026-09-12-accurate-centers-result)
 selected midpoint sampling. Projections are diagnostics only and do not change

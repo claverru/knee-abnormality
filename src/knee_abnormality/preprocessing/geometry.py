@@ -37,6 +37,7 @@ class SeriesGeometry:
     orientation_change: float
     line_departure_mm: float
     native_poses_valid: bool
+    orientations: tuple[tuple[float, ...], ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -54,6 +55,36 @@ class StudyReference:
 class CenterProjection:
     position: float | None
     reason: str
+
+
+def reflection_eligibility(geometry: SeriesGeometry, plane: str) -> tuple[bool, str]:
+    if geometry.reason is not None:
+        return False, geometry.reason
+    if not geometry.native_poses_valid or not geometry.orientations:
+        return False, "invalid_native_pose"
+    expected = {
+        "Axial": (0, 1, 2),
+        "Coronal": (0, 2, 1),
+        "Sagittal": (1, 2, 0),
+    }.get(plane)
+    if expected is None:
+        return False, "unsupported_plane"
+    tolerance = RELIABILITY["orientation_tolerance"]
+    orientations = geometry.orientations
+    for orientation in orientations:
+        axes = np.asarray(orientation, dtype=np.float64).reshape(2, 3)
+        vectors = (*axes, np.cross(axes[0], axes[1]))
+        for vector, axis in zip(vectors, expected, strict=True):
+            if (
+                abs(vector[axis])
+                <= max(
+                    (abs(value) for index, value in enumerate(vector) if index != axis),
+                    default=0.0,
+                )
+                + tolerance
+            ):
+                return False, "ambiguous_orientation_axes"
+    return True, "eligible"
 
 
 def valid_pose(pose: NativePose) -> bool:
@@ -106,7 +137,15 @@ def summarize_series(records: tuple) -> SeriesGeometry:
         reason = "invalid_native_pose"
     if reason:
         return SeriesGeometry(
-            None, None, bounds, frames, reason, 0.0, 0.0, native_poses_valid
+            None,
+            None,
+            bounds,
+            frames,
+            reason,
+            0.0,
+            0.0,
+            native_poses_valid,
+            (),
         )
     representative = poses[0]
     orientation = np.asarray(representative.layout.orientation)
@@ -137,6 +176,7 @@ def summarize_series(records: tuple) -> SeriesGeometry:
         change,
         departure,
         native_poses_valid,
+        tuple(sorted({pose.layout.orientation for pose in poses})),
     )
 
 

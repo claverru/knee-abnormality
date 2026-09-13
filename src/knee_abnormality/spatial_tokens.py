@@ -20,7 +20,7 @@ SPATIAL_TOKEN_IDENTITY = {
         "rng": "torch_seeded_training_rng",
     },
     "visual_validity": "all_channel_inverse_augmented_anchors_inside_prepared_rectangles",
-    "availability_3d": "visual_valid_native_poses_accepted_series_accepted_center_finite_xyz",
+    "availability_3d": "native_poses_accepted_series_accepted_center_finite_xyz_independent_visual_validity",
     "preparation": "rounded_resampling_half_pixel_crop_v1",
     "augmentation": "kornia_normalized_affine_align_corners_false_v1",
     "aggregation": "layernorm_target_attention_256_128_12",
@@ -68,6 +68,8 @@ def feature_geometry(
     mapping: tuple[float, float, float, float],
     centers: torch.Tensor,
     center_valid: torch.Tensor,
+    reflected: torch.Tensor,
+    source_channels: torch.Tensor,
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
     with torch.autocast(device_type=patient_maps.device.type, enabled=False):
         height, width = grid_shape
@@ -97,6 +99,9 @@ def feature_geometry(
             -1,
         )
         prepared = torch.einsum("nij,kj->nki", inverse_affine.float(), anchors)
+        valid_rects = valid_rects.gather(
+            1, source_channels[..., None].expand(-1, -1, 4)
+        )
         top, left, rows, columns = valid_rects.float().unbind(-1)
         px = prepared[:, None, :, 0]
         py = prepared[:, None, :, 1]
@@ -109,9 +114,11 @@ def feature_geometry(
         middle = patient_maps.shape[1] // 2
         points = torch.einsum("nij,nkj->nki", patient_maps[:, middle].float(), prepared)
         xyz = (points - centers[:, None].float()) / 100.0
+        xyz = xyz * torch.where(
+            reflected[:, None, None], xyz.new_tensor([-1, 1, 1]), xyz.new_ones(3)
+        )
         available = (
-            visual_valid
-            & geometry_valid[:, None]
+            geometry_valid[:, None]
             & center_valid[:, None]
             & torch.isfinite(xyz).all(-1)
         )

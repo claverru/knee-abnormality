@@ -284,6 +284,56 @@ Use the [augmentation viewer](data-preparation.md#preview-augmentations) to
 inspect original/augmented example-test slices for each plane–contrast type,
 with per-series parameters and seeded draws from the shared implementation.
 
+### Study-level knee reflection
+
+Implemented on 2026-09-13. The candidate `spatial-tokens-reflection` adds
+`data.reflection_augmentation.probability: 0.5` to the physical-sampling recipe.
+A training forward draws one seeded device-RNG value per study, masks it by
+[acquisition eligibility](data-preparation.md#reflection-geometry-and-eligibility),
+and broadcasts it across retained acquisitions and triplets. Eligibility is
+computed before series dropout. Evaluation consumes no reflection draws and
+uses original inputs; reflection TTA is absent.
+
+Axial and coronal triplets reverse columns exactly. Sagittal triplets reverse
+channels without changing the pixels within a slice, and negate the signed
+acquisition-midpoint position. Triplet container order, sampling membership and
+the middle source slice remain unchanged. Reflection precedes affine interpolation,
+intensity/noise augmentation and channel-specific backbone normalization.
+Plane/contrast embeddings and all twelve targets and observation masks retain
+their identities, including medial/lateral meniscus and OA. A whole-knee reflection
+preserves medial/lateral anatomical identity; it does not exchange those structures.
+The original plan based this contract on the
+[competition labels](https://www.kaggle.com/competitions/rsna-knee-abnormality-detection/data)
+and [AAOS anatomy](https://www.orthoinfo.org/diseases--conditions/collateral-ligament-injuries/),
+consulted on 2026-09-13. The completed run selected epoch 9 at **0.890976**
+validation macro AUC and **0.931 public AUC**, the best recorded public result.
+See the [comparison with 3dsampling](validation.md#2026-09-13-reflection-validation-comparison)
+for the +0.001012 local and +0.001 public gains, target changes and limitations.
+
+Probability is the only training reflection parameter; zero is the control.
+The added draws change subsequent stochastic choices relative to historical
+runs, so equal seeds do not imply paired augmentation sequences. CPU preview
+and CUDA training generators also differ. The preprocessing semantic identity
+records the fixed algorithm and source hashes; saved configuration records the
+probability. Historical checkpoints require their archived sources and identities.
+
+The completed fold-0 run was launched manually with:
+
+```bash
+rtk proxy uv run --locked just train spatial-tokens-reflection configs/baseline.yaml 0
+```
+
+Keep seed 42, `all_5fold_v3`, Steven v4, ReXNet-200, 224-pixel/140-mm crops,
+physical sampling, 2× validation density, optimizer and ten-epoch budget fixed.
+Use the saved physical-sampling configuration and
+[3dsampling result](validation.md#2026-09-13-3dsampling-validation-comparison)
+as the reference. Full-fold and per-target AUC, the separate gold diagnostic,
+wall time, peak VRAM and checkpoint/config/source identities are recorded in the
+[completed comparison](validation.md#2026-09-13-reflection-validation-comparison).
+The run directory is complete; another launch requires a fresh run ID. No extra
+seeds, baseline reruns or automatic encoding diagnostics were launched.
+See the [preview and bounded profile evidence](data-preparation.md#reflection-preview-evidence).
+
 ### Baseline history and compatibility
 
 The completed `outputs/baseline1` fold-0 run selected epoch 4 at **0.843997

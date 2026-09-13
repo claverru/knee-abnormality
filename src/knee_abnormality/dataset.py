@@ -14,6 +14,7 @@ from knee_abnormality.preprocessing.geometry import (
     StudyReference,
     estimate_reference,
     project_reference,
+    reflection_eligibility,
 )
 from knee_abnormality.preprocessing.preparation import (
     PreparedSeries,
@@ -229,7 +230,9 @@ class KneeStudyDataset(Dataset):
             cache=cache,
         )
 
-    def _try_prepare_candidate(self, candidate, selected, cache, failures, physical):
+    def _try_prepare_candidate(
+        self, candidate, selected, cache, failures, physical, plane
+    ):
         try:
             value = self._prepare_candidate(candidate, selected, cache)
             failures.extend(value.failures)
@@ -237,6 +240,9 @@ class KneeStudyDataset(Dataset):
                 failures.append(f"{candidate.uid}: constant prepared series")
                 return None
             geometry = self._slice_index[candidate.directory].geometry
+            eligible, reason = reflection_eligibility(geometry, plane)
+            if not bool(value.geometry_valid.all()):
+                eligible, reason = False, "invalid_selected_pose"
             return replace(
                 value,
                 uid=candidate.uid,
@@ -245,6 +251,8 @@ class KneeStudyDataset(Dataset):
                 & (geometry.reason is None)
                 & physical,
                 sampling_path="physical" if physical else "local",
+                reflection_eligible=eligible,
+                reflection_reason=reason,
             )
         except PREPARATION_ERRORS as error:
             failures.append(f"{candidate.uid}: {type(error).__name__}: {error}")
@@ -287,7 +295,12 @@ class KneeStudyDataset(Dataset):
                     r for t in selection.triplets if t.uid == uid for r in t.records
                 )
                 value = self._try_prepare_candidate(
-                    candidates[uid], selected, cache, failures, pool.physical
+                    candidates[uid],
+                    selected,
+                    cache,
+                    failures,
+                    pool.physical,
+                    kind.plane,
                 )
                 if value is None:
                     new_sources.add(uid)
@@ -357,6 +370,16 @@ class KneeStudyDataset(Dataset):
             "target_observed": observed,
             "failures": tuple(failures),
             "sampling": tuple(sampling),
+            "reflection_reasons": tuple(
+                sorted(
+                    {
+                        series.reflection_reason
+                        for acquisitions in prepared
+                        for series in acquisitions
+                        if series.reflection_reason != "eligible"
+                    }
+                )
+            ),
         }
 
 
@@ -383,7 +406,14 @@ def collate_studies(items: list[dict]) -> dict:
     geometry_valid = torch.zeros((len(entries), max_slices), dtype=torch.bool)
     study_centers = torch.zeros((batch_size, 3))
     center_valid = torch.zeros(batch_size, dtype=torch.bool)
+    reflection_eligible = torch.ones(batch_size, dtype=torch.bool)
     for index, item in enumerate(items):
+        supplied = [
+            series for acquisitions in item["series"] for series in acquisitions
+        ]
+        reflection_eligible[index] = bool(supplied) and all(
+            series.reflection_eligible for series in supplied
+        )
         reference = item["study_reference"]
         if reference is not None and reference.point is not None:
             study_centers[index] = torch.tensor(reference.point)
@@ -413,6 +443,8 @@ def collate_studies(items: list[dict]) -> dict:
         "geometry_valid": geometry_valid,
         "study_centers": study_centers,
         "center_valid": center_valid,
+        "reflection_eligible": reflection_eligible,
+        "reflection_reasons": [item["reflection_reasons"] for item in items],
         "selected_paths": [series.selected_paths for _, _, series in entries],
         "sampling": [item["sampling"] for item in items],
         "slice_mask": slice_mask,

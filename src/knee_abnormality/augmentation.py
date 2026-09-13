@@ -8,6 +8,79 @@ from torch import nn
 
 from knee_abnormality.config import DataConfig, IntensityAugmentationConfig
 
+REFLECTION_IDENTITY = {
+    "algorithm": "study_LPS_X_reflection_v1",
+    "eligibility": "all_supplied_acquisitions_native_series_reliable_dominant_axes_margin_orientation_tolerance_either_sign_before_dropout",
+    "axes": {"Axial": [0, 1, 2], "Coronal": [0, 2, 1], "Sagittal": [1, 2, 0]},
+    "pixels": "exact_columns_axial_coronal_channels_sagittal_before_affine_and_normalization",
+    "center": "accepted_center_only_rejected_center_retains_unknown_3d",
+    "membership": "triplet_container_order_and_middle_slice_unchanged",
+    "embeddings": "plane_contrast_and_final_image_2d_anchor_unchanged_study_3d_dropout_retained",
+    "positions": "negate_sagittal_preserve_axial_coronal",
+    "source_channels": "sagittal_2_minus_k_middle_unchanged_source_metadata_immutable",
+    "geometry": "S@(M_middle@F@U@q-center)/100;S=diag(-1,1,1);U=existing_half_pixel_inverse_affine",
+    "validity": "F_times_U_original_rectangles_all_associated_channels",
+    "availability": "unchanged_native_series_center_policy_independent_visual_validity",
+    "targets": "unchanged_all_twelve_and_observation_masks",
+    "rng": "one_torch_device_draw_per_study_training_forward_mask_eligibility_eval_no_draw",
+    "parameters": "data.reflection_augmentation.probability",
+}
+
+
+@dataclass(frozen=True)
+class ReflectionParameters:
+    applied: torch.Tensor
+
+
+def sample_reflection_parameters(
+    probability: float, eligible: torch.Tensor, generator: torch.Generator | None = None
+) -> ReflectionParameters:
+    return ReflectionParameters(
+        (
+            torch.rand(eligible.shape, device=eligible.device, generator=generator)
+            < probability
+        )
+        & eligible
+    )
+
+
+def reflection_channels(
+    reflected: torch.Tensor, sagittal: torch.Tensor
+) -> torch.Tensor:
+    channels = torch.arange(3, device=reflected.device).expand(len(reflected), -1)
+    return torch.where((reflected & sagittal)[:, None], 2 - channels, channels)
+
+
+def apply_reflection(
+    images: torch.Tensor, reflected: torch.Tensor, sagittal: torch.Tensor
+) -> torch.Tensor:
+    images = torch.where(
+        (reflected & ~sagittal)[:, None, None, None], images.flip(-1), images
+    )
+    return torch.where(
+        (reflected & sagittal)[:, None, None, None], images.flip(1), images
+    )
+
+
+def reflection_inverse(
+    inverse: torch.Tensor, reflected: torch.Tensor, sagittal: torch.Tensor, width: int
+) -> torch.Tensor:
+    with torch.autocast(device_type=inverse.device.type, enabled=False):
+        identity = torch.eye(3, device=inverse.device, dtype=torch.float32)
+        reversal = identity.clone()
+        reversal[0, 0] = -1
+        reversal[0, 2] = width - 1
+        return (
+            torch.where((reflected & ~sagittal)[:, None, None], reversal, identity)
+            @ inverse.float()
+        )
+
+
+def reflection_positions(
+    positions: torch.Tensor, reflected: torch.Tensor, sagittal: torch.Tensor
+) -> torch.Tensor:
+    return torch.where(reflected & sagittal, -positions, positions)
+
 
 @dataclass(frozen=True)
 class IntensityParameters:
