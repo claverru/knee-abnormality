@@ -1,5 +1,20 @@
 version: 1
 scripts:
+  - id: diagnose-encoding-usage
+    path: scripts/adhoc/diagnose_encoding_usage.py
+    summary: Measure reliance on spatial-token embeddings using paired held-out checkpoint interventions without training.
+    tags: [encoding, spatial, tokens, ablation, diagnosis, validation, geometry, bootstrap]
+    status: active
+    commands:
+      - rtk proxy uv run --locked python -m scripts.adhoc.diagnose_encoding_usage outputs/spatial-tokens-five-embeddings --output-dir outputs/analysis/encoding-usage-01 --workers 8
+    inputs: [Trained run effective config, Selected or explicit checkpoint, Saved validation predictions and input identities, Full held-out fold DICOMs and labels]
+    outputs: [Per-variant study predictions, Geometry availability, Per-target metrics, Paired bootstrap intervals, Selected input identities, Source snapshot and hashed results]
+    notes:
+      - Manual evaluation only; no weights are modified and training does not launch this diagnostic.
+      - Reuses one projected backbone feature bank per batch for seven interventions before LayerNorm with unchanged visual membership.
+      - Output directory must be fresh; investigate intact saved-prediction disagreement before interpreting small effects.
+      - Defaults to 2000 paired study bootstrap replicates with seed 20260913; intervals do not measure training-seed variability.
+    docs: [docs/validation.md#manual-encoding-usage-diagnosis]
   - id: normalize-reports
     path: scripts/adhoc/normalize_reports.py
     summary: Count distinct training reports after progressively aggressive multilingual lexical normalization.

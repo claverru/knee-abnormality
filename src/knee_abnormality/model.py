@@ -6,9 +6,16 @@ from torch import nn
 
 from knee_abnormality.augmentation import (
     ImageAugmentation,
+    affine_matrices,
+    augmented_to_prepared,
     sample_augmentation_parameters,
 )
 from knee_abnormality.config import DataConfig, ModelConfig
+from knee_abnormality.spatial_tokens import (
+    SpatialTokens,
+    backbone_mapping,
+    feature_geometry,
+)
 
 
 def sinusoidal_positions(
@@ -36,6 +43,10 @@ class KneeAbnormalityModel(nn.Module):
         load_pretrained: bool | None = None,
     ) -> None:
         super().__init__()
+        if data.slices_per_input != 3 or data.position_encoding != "physical_mm":
+            raise ValueError(
+                "Spatial tokens require triplets with physical 1D positions"
+            )
         self.series_dropout = model.series_dropout
         self.augmentation_settings = data
         self.image_augmentation = ImageAugmentation()
@@ -47,7 +58,6 @@ class KneeAbnormalityModel(nn.Module):
             "std", torch.tensor(data.std).reshape(1, -1, 1, 1), persistent=False
         )
         self.projection_width = model.projection_width
-        self.pooling = model.pooling
         self.channels_last = model.channels_last
         self.checkpoint_backbone = model.checkpoint_backbone
         self.backbone_eval = model.backbone_eval
@@ -57,12 +67,14 @@ class KneeAbnormalityModel(nn.Module):
             pretrained=pretrained,
             in_chans=data.input_channels,
             num_classes=0,
+            global_pool="",
         )
+        self.feature_mapping = backbone_mapping(model.backbone, self.backbone)
         backbone_training = self.backbone.training
         self.backbone.eval()
         try:
             with torch.inference_mode():
-                backbone_output = self.backbone(
+                spatial_output = self.backbone.forward_features(
                     torch.zeros(
                         1,
                         data.input_channels,
@@ -72,47 +84,22 @@ class KneeAbnormalityModel(nn.Module):
                 )
         finally:
             self.backbone.train(backbone_training)
-        if not isinstance(backbone_output, torch.Tensor) or backbone_output.ndim != 2:
-            raise ValueError(
-                "Backbone must return a two-dimensional pooled feature tensor"
-            )
+        if not isinstance(spatial_output, torch.Tensor) or spatial_output.ndim != 4:
+            raise ValueError("Backbone must return NCHW spatial features")
         if self.checkpoint_backbone:
             self.backbone.set_grad_checkpointing(True)
-        self.projection = nn.Linear(backbone_output.shape[1], model.projection_width)
+        self.projection = nn.Linear(spatial_output.shape[1], model.projection_width)
         if self.channels_last:
             self.backbone.to(memory_format=torch.channels_last)
-        if model.pooling == "transformer":
-            layer = nn.TransformerEncoderLayer(
-                d_model=model.projection_width,
-                nhead=model.attention_heads,
-                dim_feedforward=model.feedforward_width,
-                dropout=model.dropout,
-                activation="gelu",
-                batch_first=True,
-                norm_first=True,
-            )
-            self.transformer = nn.TransformerEncoder(
-                layer,
-                num_layers=model.transformer_layers,
-                norm=nn.LayerNorm(model.projection_width),
-                enable_nested_tensor=False,
-            )
-            self.cls_token = nn.Parameter(torch.empty(1, 1, model.projection_width))
-        else:
-            self.mil_norm = nn.LayerNorm(model.projection_width)
-            self.attention = nn.Sequential(
-                nn.Linear(model.projection_width, model.mil_attention_width),
-                nn.Tanh(),
-                nn.Dropout(model.dropout),
-                nn.Linear(model.mil_attention_width, target_count),
-            )
-        self.type_embedding = nn.Embedding(
-            len(data.series_types), model.projection_width
+        self.mil_norm = nn.LayerNorm(model.projection_width)
+        self.attention = nn.Sequential(
+            nn.Linear(model.projection_width, model.mil_attention_width),
+            nn.Tanh(),
+            nn.Dropout(model.dropout),
+            nn.Linear(model.mil_attention_width, target_count),
         )
         self.head = nn.Linear(model.projection_width, target_count)
-        if model.pooling == "transformer":
-            nn.init.normal_(self.cls_token, std=0.02)
-        nn.init.normal_(self.type_embedding.weight, std=0.02)
+        self.spatial_tokens = SpatialTokens(model.projection_width, data.series_types)
         self.train(self.training)
 
     def train(self, mode: bool = True) -> "KneeAbnormalityModel":
@@ -129,7 +116,7 @@ class KneeAbnormalityModel(nn.Module):
                     "Activation checkpointing requires model.backbone_eval=true"
                 )
             self.backbone.set_grad_checkpointing(enabled)
-        return self.backbone(images)
+        return self.backbone.forward_features(images)
 
     def _effective_presence(self, presence: torch.Tensor) -> torch.Tensor:
         if not presence.any(dim=1).all():
@@ -151,7 +138,7 @@ class KneeAbnormalityModel(nn.Module):
 
     def _augment_images(
         self, images: torch.Tensor, slice_mask: torch.Tensor
-    ) -> torch.Tensor:
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         settings = self.augmentation_settings
         if not self.training or not any(
             augmentation.probability > 0
@@ -161,36 +148,33 @@ class KneeAbnormalityModel(nn.Module):
                 settings.noise_augmentation,
             )
         ):
-            return images
+            return images, torch.eye(3, device=images.device)[None].expand(
+                len(images), -1, -1
+            )
         parameters = sample_augmentation_parameters(
             settings, slice_mask.shape[0], images.device
         )
         series_index = slice_mask.nonzero(as_tuple=True)[0]
-        return self.image_augmentation(images, series_index, parameters)
+        matrices = affine_matrices(parameters.affine, *images.shape[-2:])
+        inverse = augmented_to_prepared(matrices, *images.shape[-2:])
+        return self.image_augmentation(
+            images, series_index, parameters, matrices=matrices
+        ), inverse[series_index]
 
     def _attention_pool(
         self,
-        features: torch.Tensor,
-        slice_mask: torch.Tensor,
-        positions: torch.Tensor,
-        study_index: torch.Tensor,
-        type_index: torch.Tensor,
+        tokens: torch.Tensor,
+        token_study: torch.Tensor,
+        token_valid: torch.Tensor,
         batch_size: int,
     ) -> torch.Tensor:
-        acquisition_index = slice_mask.nonzero(as_tuple=True)[0]
-        tokens = features + self.type_embedding(type_index[acquisition_index])
-        tokens = self.mil_norm(
-            tokens
-            + sinusoidal_positions(
-                positions[slice_mask], self.projection_width, tokens.dtype
-            )
-        )
         scores = self.attention(tokens).transpose(0, 1)
         membership = (
-            torch.arange(batch_size, device=features.device)[:, None]
-            == study_index[acquisition_index][None]
-        )
-        with torch.autocast(device_type=features.device.type, enabled=False):
+            torch.arange(batch_size, device=tokens.device)[:, None] == token_study[None]
+        ) & token_valid[None]
+        if not membership.any(-1).all():
+            raise ValueError("A study has no visually valid spatial tokens")
+        with torch.autocast(device_type=tokens.device.type, enabled=False):
             attention = scores.float().unsqueeze(0).expand(batch_size, -1, -1)
             attention = attention.masked_fill(~membership[:, None], -torch.inf).softmax(
                 -1
@@ -203,7 +187,7 @@ class KneeAbnormalityModel(nn.Module):
             raise RuntimeError("Study attention pooling produced non-finite logits")
         return logits
 
-    def forward(self, batch: dict) -> torch.Tensor:
+    def encode_batch(self, batch: dict) -> dict:
         if batch["images"].shape[2] != self.prepared_channels:
             raise ValueError(
                 "Prepared image channels differ from the configured input mode"
@@ -215,58 +199,71 @@ class KneeAbnormalityModel(nn.Module):
         keep_series = effective[all_study, all_type]
         study_index = all_study[keep_series]
         type_index = all_type[keep_series]
-        images = batch["images"][keep_series]
         slice_mask = batch["slice_mask"][keep_series]
-        positions = batch["slice_positions"][keep_series]
+        flat_indices = (
+            (keep_series[:, None] & batch["slice_mask"]).flatten().nonzero().flatten()
+        )
+        positions = batch["slice_positions"].flatten()[flat_indices]
 
-        valid_images = images[slice_mask].to(torch.float32).div_(255.0)
-        valid_images = self._augment_images(valid_images, slice_mask)
+        valid_images = (
+            batch["images"].flatten(0, 1)[flat_indices].to(torch.float32).div_(255.0)
+        )
+        valid_images, inverse_affine = self._augment_images(valid_images, slice_mask)
         valid_images = valid_images.sub(self.mean).div_(self.std)
         if self.channels_last:
             valid_images = valid_images.contiguous(memory_format=torch.channels_last)
-        features = self.projection(self._encode_images(valid_images))
-        if self.pooling == "attention_mil":
-            return self._attention_pool(
-                features,
-                slice_mask,
-                positions,
-                study_index,
-                type_index,
-                presence.shape[0],
-            )
-        series_count, slice_count = slice_mask.shape
-        tokens = features.new_zeros((series_count, slice_count, self.projection_width))
-        tokens[slice_mask] = features
-        type_tokens = self.type_embedding(type_index)
-        tokens = tokens + sinusoidal_positions(
-            positions, self.projection_width, tokens.dtype
+        maps = self._encode_images(valid_images)
+        features = self.projection(maps.flatten(2).transpose(1, 2))
+        acquisition_index = slice_mask.nonzero(as_tuple=True)[0]
+        token_study = study_index[acquisition_index]
+        token_type = type_index[acquisition_index]
+        xy, xyz, visual_valid, available_3d = feature_geometry(
+            batch["patient_maps"].flatten(0, 1)[flat_indices],
+            batch["valid_rects"].flatten(0, 1)[flat_indices],
+            batch["geometry_valid"].flatten(0, 1)[flat_indices],
+            inverse_affine,
+            maps.shape[-2:],
+            valid_images.shape[-2:],
+            self.feature_mapping,
+            batch["study_centers"][token_study],
+            batch["center_valid"][token_study],
         )
-        tokens = tokens + type_tokens.unsqueeze(1)
-        cls = self.cls_token.to(tokens.dtype).expand(
-            series_count, -1, -1
-        ) + type_tokens.unsqueeze(1)
-        sequence = torch.cat([cls, tokens], dim=1)
-        padding_mask = torch.cat(
-            [
-                torch.zeros(
-                    (series_count, 1), device=slice_mask.device, dtype=torch.bool
-                ),
-                ~slice_mask,
-            ],
-            dim=1,
+        terms = self.spatial_tokens(
+            xy,
+            xyz,
+            available_3d,
+            token_type,
+            token_study,
+            len(presence),
+            features.dtype,
         )
-        series_vectors = self.transformer(sequence, src_key_padding_mask=padding_mask)[
-            :, 0
-        ]
+        return {
+            "features": features,
+            "position_1d": sinusoidal_positions(
+                positions, self.projection_width, features.dtype
+            ),
+            **terms,
+            "study": token_study,
+            "visual_valid": visual_valid,
+            "available_3d": available_3d,
+            "batch_size": len(presence),
+        }
 
-        batch_size = presence.shape[0]
-        pooled = series_vectors.new_full(
-            (batch_size, self.projection_width), -torch.inf
+    def pool_encoded(self, encoded: dict) -> torch.Tensor:
+        tokens = self.mil_norm(
+            encoded["features"]
+            + encoded["position_1d"][:, None]
+            + encoded["position_2d"][None]
+            + encoded["position_3d"]
+            + encoded["plane"][:, None]
+            + encoded["contrast"][:, None]
         )
-        scatter_index = study_index.unsqueeze(1).expand_as(series_vectors)
-        pooled = pooled.scatter_reduce(
-            0, scatter_index, series_vectors, reduce="amax", include_self=True
+        return self._attention_pool(
+            tokens.flatten(0, 1),
+            encoded["study"][:, None].expand_as(encoded["visual_valid"]).flatten(),
+            encoded["visual_valid"].flatten(),
+            encoded["batch_size"],
         )
-        if not torch.isfinite(pooled).all():
-            raise RuntimeError("Study pooling produced a non-finite representation")
-        return self.head(pooled)
+
+    def forward(self, batch: dict) -> torch.Tensor:
+        return self.pool_encoded(self.encode_batch(batch))

@@ -47,9 +47,6 @@ from knee_abnormality.inference import load_checkpoint_model
 from knee_abnormality.labels import load_fold_labels
 from knee_abnormality.preprocessing.dicom import PREPARATION_ERRORS
 from knee_abnormality.preprocessing.preparation import (
-    PreparedSeries,
-)
-from knee_abnormality.preprocessing.preparation import (
     prepare_series as production_prepare_series,
 )
 from knee_abnormality.preprocessing.series import (
@@ -59,6 +56,7 @@ from knee_abnormality.preprocessing.series import (
 from knee_abnormality.runtime import move_batch
 from scripts.adhoc import dataloader_reference as REFERENCE_DATASET
 
+PreparedSeries = REFERENCE_DATASET.PreparedSeries
 REFERENCE_PREPROCESSING = REFERENCE_DATASET
 
 
@@ -1429,7 +1427,11 @@ class AuditDatasetMixin:
         value = super().__getitem__(index)
         value["audit"] = self.audit_details
         value["stage_seconds"] = {}
-        records = [record for group in self._slice_index.values() for record in group]
+        records = [
+            record
+            for group in self._slice_index.values()
+            for record in getattr(group, "records", group)
+        ]
         descriptor_bytes = []
         for record in records:
             descriptor = getattr(record, "descriptor", None)
@@ -2369,7 +2371,9 @@ def dicom_edge_audit(output_dir: Path, data: DataConfig):
         reference_records = REFERENCE_PREPROCESSING.index_series(
             path.parent, data.position_reference
         )
-        records = production_dataset.index_series(path.parent, data.position_reference)
+        records = production_dataset.index_series(
+            path.parent, data.position_reference
+        ).records
         ordering = lambda values: [
             (r.path, r.physical_position, r.original_index, r.relative_position_mm)
             for r in values

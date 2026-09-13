@@ -1,4 +1,4 @@
-name: baseline
+name: spatial-tokens-five-embeddings
 seed: 42
 
 paths:
@@ -55,7 +55,6 @@ model:
   channels_last: false
   checkpoint_backbone: false
   backbone_eval: false
-  pooling: attention_mil
   mil_attention_width: 128
   dropout: 0.0
   series_dropout: 0.2
@@ -83,4 +82,4 @@ trainer:
   prefetch_factor: 2
   patience: 10
   min_delta: 0.0001
-  deterministic: true
+  deterministic: false

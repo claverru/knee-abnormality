@@ -9,11 +9,18 @@ from torch.utils.data import DataLoader, Dataset
 
 from knee_abnormality.config import DataConfig, TrainerConfig
 from knee_abnormality.preprocessing.dicom import PREPARATION_ERRORS
+from knee_abnormality.preprocessing.geometry import (
+    CenterProjection,
+    StudyReference,
+    estimate_reference,
+    project_reference,
+)
 from knee_abnormality.preprocessing.preparation import (
     PreparedSeries,
     prepare_series,
 )
 from knee_abnormality.preprocessing.series import (
+    IndexedSeries,
     SliceRecord,
     index_series,
     select_slices,
@@ -181,7 +188,9 @@ class KneeStudyDataset(Dataset):
         self.seed = seed
         self.image_limit_multiplier = image_limit_multiplier
         self.epoch = Value("q", 0)
-        self._slice_index: dict[Path, tuple[SliceRecord, ...]] = {}
+        self._slice_index: dict[Path, IndexedSeries] = {}
+        self._study_references: dict[str, StudyReference] = {}
+        self._center_projections: dict[Path, CenterProjection] = {}
         missing = set(studies[STUDY].to_list()) - set(series_index)
         if missing:
             raise ValueError(
@@ -205,7 +214,38 @@ class KneeStudyDataset(Dataset):
         if records is None:
             records = index_series(candidate.directory, self.data.position_reference)
             self._slice_index[candidate.directory] = records
-        return records
+        return records.records
+
+    def _index_study_geometry(self, study: StudySeries) -> None:
+        if study.uid in self._study_references:
+            return
+        if self.data.acquisition_sampling != "pooled":
+            return
+        candidates = {}
+        for slot, values in enumerate(study.slots):
+            for candidate in values:
+                candidates.setdefault(
+                    candidate.uid, (candidate, self.data.series_types[slot].plane)
+                )
+        eligible = []
+        indexed = []
+        for uid, (candidate, plane) in sorted(candidates.items()):
+            try:
+                records = self._records(candidate)
+            except PREPARATION_ERRORS:
+                continue
+            geometry = self._slice_index[candidate.directory].geometry
+            indexed.append((candidate.directory, geometry, len(records)))
+            if len(records) >= self.data.slices_per_input:
+                eligible.append((uid, plane, geometry))
+        reference = estimate_reference(tuple(eligible))
+        self._study_references[study.uid] = reference
+        for directory, geometry, count in indexed:
+            self._center_projections[directory] = (
+                project_reference(reference, geometry)
+                if count >= self.data.slices_per_input
+                else CenterProjection(None, "no_complete_input_groups")
+            )
 
     def _prepare_candidate(
         self, candidate: SeriesCandidate, limit: int, generator: torch.Generator
@@ -243,7 +283,14 @@ class KneeStudyDataset(Dataset):
             if value.constant:
                 failures.append(f"{candidate.uid}: constant prepared series")
                 return None
-            return replace(value, uid=candidate.uid)
+            geometry = self._slice_index[candidate.directory].geometry
+            return replace(
+                value,
+                uid=candidate.uid,
+                geometry_valid=value.geometry_valid
+                & geometry.native_poses_valid
+                & (geometry.reason is None),
+            )
         except PREPARATION_ERRORS as error:
             failures.append(f"{candidate.uid}: {type(error).__name__}: {error}")
             return None
@@ -309,6 +356,7 @@ class KneeStudyDataset(Dataset):
     def __getitem__(self, index: int) -> dict:
         row = self.studies.row(index, named=True)
         study = self.series_index[row[STUDY]]
+        self._index_study_geometry(study)
         generator = self._generator(index)
         prepared = []
         failures = []
@@ -353,6 +401,7 @@ class KneeStudyDataset(Dataset):
             "study_uid": study.uid,
             "is_gold": bool(row.get("is_gold", False)),
             "series": tuple(prepared),
+            "study_reference": self._study_references.get(study.uid),
             "target": target,
             "target_observed": observed,
             "failures": tuple(failures),
@@ -377,6 +426,16 @@ def collate_studies(items: list[dict]) -> dict:
     )
     positions = torch.zeros((len(entries), max_slices), dtype=torch.float32)
     slice_mask = torch.zeros((len(entries), max_slices), dtype=torch.bool)
+    patient_maps = torch.zeros((len(entries), max_slices, channels, 3, 3))
+    valid_rects = torch.zeros((len(entries), max_slices, channels, 4))
+    geometry_valid = torch.zeros((len(entries), max_slices), dtype=torch.bool)
+    study_centers = torch.zeros((batch_size, 3))
+    center_valid = torch.zeros(batch_size, dtype=torch.bool)
+    for index, item in enumerate(items):
+        reference = item["study_reference"]
+        if reference is not None and reference.point is not None:
+            study_centers[index] = torch.tensor(reference.point)
+            center_valid[index] = True
     study_indices = torch.empty(len(entries), dtype=torch.int64)
     type_indices = torch.empty(len(entries), dtype=torch.int64)
     for series_index, (study_index, type_index, series) in enumerate(entries):
@@ -386,6 +445,9 @@ def collate_studies(items: list[dict]) -> dict:
             raise ValueError("A batch cannot mix single-slice and triplet inputs")
         images[series_index, :count] = values
         positions[series_index, :count] = series.positions
+        patient_maps[series_index, :count] = series.patient_maps
+        valid_rects[series_index, :count] = series.valid_rects
+        geometry_valid[series_index, :count] = series.geometry_valid
         slice_mask[series_index, :count] = True
         study_indices[series_index] = study_index
         type_indices[series_index] = type_index
@@ -394,6 +456,12 @@ def collate_studies(items: list[dict]) -> dict:
         "is_gold": torch.tensor([item["is_gold"] for item in items], dtype=torch.bool),
         "images": images,
         "slice_positions": positions,
+        "patient_maps": patient_maps,
+        "valid_rects": valid_rects,
+        "geometry_valid": geometry_valid,
+        "study_centers": study_centers,
+        "center_valid": center_valid,
+        "selected_paths": [series.selected_paths for _, _, series in entries],
         "slice_mask": slice_mask,
         "series_presence": presence,
         "series_study_index": study_indices,

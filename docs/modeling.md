@@ -20,11 +20,9 @@ The completed `outputs/baseline3` fold-0 run uses a pretrained
 `resnet50d.ra2_in1k` encoder and a learned 2,048-to-256 projection. The
 maintained [baseline config](../configs/baseline.yaml) now selects pretrained
 `rexnet_200.nav_in1k`, with its 2,560-to-256 projection, for the next fresh run.
-Both use target-specific attention MIL over every valid triplet from the
-retained plane–contrast slots. Type embeddings and centered physical slice
-positions are added before attention. Training drops each present slot with
-probability 0.1 and always restores one when every slot would otherwise be
-removed.
+Baseline3 used global triplet descriptors with joint type and centered physical
+position embeddings and 0.1 series dropout. The current spatial-token architecture
+and 0.2 series dropout are specified below.
 
 Baseline3 selected epoch 7 at **0.849819 macro AUC** over all 903 fold-0
 studies. Its separate 15-study gold diagnostic was **0.915586** and its
@@ -50,6 +48,113 @@ The backbone trains in ordinary training mode: `backbone_eval: false` and
 clipping, early stopping, logging and independent best/latest checkpoints.
 Saved checkpoint configuration governs prediction; later edits to the baseline
 YAML do not change an existing artifact.
+
+### Active spatial token model
+
+The active `spatial-tokens-five-embeddings` experiment keeps every visually valid
+backbone location and applies target-specific attention MIL directly. A shared
+linear projection maps `[N, C, H, W]` to `[N, H × W, 256]`; ReXNet-200 gives
+49 locations per 224-pixel triplet and up to 3,136 before masking at the existing
+64-triplet validation budget. No global pooling, regional queries, grid reduction
+or token-to-token self-attention remains. The scorer stays 256→128→12 with its
+configured dropout, followed by per-target weighted features and linear heads.
+
+Before LayerNorm, tokens receive five additive embeddings:
+
+| Embedding | Definition |
+|---|---|
+| 1D | Sinusoidal middle-slice distance in mm from the acquisition midpoint |
+| 2D | Augmented-input anchor normalized independently to each image axis; 2→64→256 GELU MLP |
+| 3D | Middle-slice patient LPS anchor minus accepted study center, divided by 100 mm on every axis; 3→64→256 GELU MLP |
+| Plane | Learned Axial, Coronal, Sagittal embeddings |
+| Contrast | Learned metadata pairs `(0,0)` and `(1,1)` for fluid sensitivity/fat suppression |
+
+Plane and contrast lookup buffers derive from configured metadata rather than
+slot order. The verified ReXNet adapter derives stride 32 and origin 0 from
+its convolutions; other backbone mappings fail explicitly. Geometry and the
+coordinate MLPs execute in float32 outside autocast; embeddings are cast to
+visual-feature dtype. Grid dimensions may vary independently, including rectangular
+grids; the shared geometry has no fixed grid size or stride.
+
+[Visual validity and 3D availability](data-preparation.md#spatial-token-geometry)
+are independent. Missing or unreliable 3D uses a shared learned `unknown_3d`
+vector while all other embeddings remain. Training replaces available 3D with
+that vector with fixed probability 0.10 per eligible study per forward, using
+the seeded PyTorch RNG and one decision for the whole study. This does not
+rescale embeddings or remove images. Evaluation uses all reliable 3D. Series
+dropout remains 0.20, restoring one present type when necessary.
+
+The fresh fold-0 recipe keeps seed 42, `all_5fold_v3`, 224 pixels, 140 mm,
+2× validation density, pretrained initialization, augmentation, labels, loss,
+optimizer and ten-epoch budget. Strict determinism remains disabled as in the
+incoming recipe; the historical average-pooling reference enabled it, so this
+execution difference must accompany later comparisons. The five embeddings
+and removal of the regional branch constitute one experiment.
+
+Launch manually from the repository root:
+
+```bash
+rtk proxy uv run --locked just train spatial-tokens-five-embeddings
+```
+
+The completed run is saved in `outputs/spatial-tokens-five-embeddings/`; another
+launch requires a fresh run directory. It selected epoch 10 at 0.889506 fold-0
+macro AUC and **0.929 public AUC**, the best recorded public result; see the
+[validation comparison](validation.md#2026-09-13-spatial-token-validation-comparison)
+for target changes, uncertainty, learning curves, timing and memory, and the
+[submission record](inference-efficiency.md#spatial-token-submission). The manual
+encoding diagnostic has not been run. Matched inference cost remains unmeasured.
+Historical checkpoints require their original
+source bundles; current source/config identities reject them without migration.
+
+### Historical regional fusion
+
+The replaced model combined global triplet descriptors with 27 width-64 spatial
+queries and per-plane attention. The `spatial-fusion-radius` checkpoint selected
+epoch 8 at 0.88635162 AUC. Its regional tokens received 4.94% mean final attention,
+and omitting them reduced AUC by 0.00069668 on 904 validation studies. Its
+independently trained advantage over `crop140mm` was only 0.00022998 AUC;
+these single-fold results do not establish repeatability. See the
+[recorded diagnosis](validation.md#2026-09-13-per-plane-fusion-usage-diagnosis),
+[earlier runtime rejection](validation.md#2026-09-12-spatial-fusion-engineering-result)
+and [archived sources](history/regional-sources/README.md).
+The max-pooling comparison selected 0.87907846 AUC versus 0.88416888 for its
+average-pooling reference; it did not justify promoting max pooling. Regional
+bandwidth, finer regional grids and adaptive queries are retired.
+
+#### Per-plane coverage radius
+
+Selected on 2026-09-13, before training: **18 mm**, independently of the fixed
+35-mm attention bandwidth. The selection rule takes the 95th percentile of the
+nearest valid anchor distance for accepted-center query/plane groups with at
+least one valid anchor, then rounds up to the next whole millimeter. Missing
+planes are excluded from that distance distribution and remain uncovered.
+
+The measurement used a uniform 128-study sample from the `all_5fold_v3` fold-0
+training partition, seed 42. Original dataset indices preserve epoch-zero
+training acquisition and triplet sampling with the configured 1× budgets.
+Actual prepared 224-pixel crops supply the 7×7 anchors and all-channel validity;
+augmentation and series dropout are disabled for radius selection. No held-out
+geometry or predictions enter the choice, and no model executes.
+
+Of 128 studies, 121 had accepted centers, supplying 9,801 measured query/plane
+groups. Nearest-anchor distances were 10.07 mm at the median, 14.48 mm at p90,
+17.29 mm at p95 and 25.37 mm at p99. The selected radius permits **93.78%** of
+all sampled regional queries; plane coverage is 89.90% axial, 88.95% coronal
+and 92.51% sagittal, counting rejected centers as uncovered. These describe
+this pre-augmentation sample, not training-wide coverage or model accuracy.
+
+The [measurement record](../outputs/analysis/fusion-coverage-20260913/results.json)
+preserves the effective config, split/label provenance, input and source hashes,
+and quantiles. Its sibling `inputs.json`, `nearest_anchors.parquet` and `source/`
+preserve selected paths, geometry hashes, per-query distances and executable
+sources. Training membership SHA-256 is
+`31422731caf633a55b8d7bf2406dfa1fe1f791e78a16482c14ca5fe2089af749`.
+Reproduction requires the original analysis source bundle and configuration.
+The [coverage source snapshot](history/regional-sources/measure_fusion_coverage.py.txt)
+is historical; its 18-mm radius has no role in the current spatial-token model.
+The [regional usage results](validation.md#2026-09-13-per-plane-fusion-usage-diagnosis)
+remain historical evidence, with repeatability and deployment cost unresolved.
 
 ### Three-channel inputs
 
@@ -137,12 +242,16 @@ remainder handling. A failed acquisition is
 removed and the budget is reallocated among those remaining.
 
 Within each acquisition, `slice_sampling: center_weighted` assigns possible
-triplet starts weight 3 at the physical center and weight 1 at the edges.
+triplet starts weight 3 at the acquisition midpoint and weight 1 at its edges.
+The [cross-view center experiment](validation.md#2026-09-12-accurate-centers-result)
+did not improve the control and was not adopted. Shared geometry supplies spatial-token coordinates without changing sampling,
+1D position encoding or crop size.
 Training samples a reproducible non-overlapping packing from those weights.
 Evaluation deterministically chooses non-overlapping starts near the weighted
 quantiles. This favors central anatomy without restricting inputs to a fixed
 central band. Uniform triplet placement remains supported for saved configs and
-the planned paired comparison.
+separate experiments. Historical midpoint checkpoints require their archived
+source; configuration equality alone does not establish sampling compatibility.
 
 Preparation retains joint `[0.005, 0.995]` clipping bounds over valid pixels in
 the selected complete triplets of each acquisition. A decode or non-finite

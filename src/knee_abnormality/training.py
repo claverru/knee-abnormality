@@ -21,6 +21,7 @@ from knee_abnormality.inference import make_prediction_frame
 from knee_abnormality.labels import FoldLabels, load_fold_labels
 from knee_abnormality.metrics import validation_metrics
 from knee_abnormality.model import KneeAbnormalityModel
+from knee_abnormality.preprocessing_identity import preprocessing_identity
 
 
 def build_optimizer(model: KneeAbnormalityModel, settings: OptimizerConfig) -> AdamW:
@@ -159,6 +160,7 @@ class BaselineModule(L.LightningModule):
                 "training_studies": training_studies,
                 "validation_studies": validation_studies,
                 "input_identity": input_identity,
+                "preprocessing_identity": preprocessing_identity(),
             }
         )
 

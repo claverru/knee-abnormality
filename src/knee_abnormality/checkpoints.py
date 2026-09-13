@@ -7,6 +7,10 @@ from pytorch_lightning.callbacks import Callback
 
 from knee_abnormality.config import ExperimentConfig
 from knee_abnormality.labels import FoldLabels
+from knee_abnormality.preprocessing_identity import (
+    preprocessing_identity,
+    validate_preprocessing_identity,
+)
 from knee_abnormality.provenance import sha256_file
 
 
@@ -68,6 +72,7 @@ def training_input_identity(
     )
     return {
         "version": 1,
+        "preprocessing_identity": preprocessing_identity(),
         "label_manifest_sha256": labels.provenance["manifest_sha256"],
         "split_protocol_sha256": labels.provenance["split_protocol_sha256"],
         "membership_sha256": labels.provenance["membership_sha256"],
@@ -98,6 +103,7 @@ def validate_checkpoint(
     saved = checkpoint.get("hyper_parameters")
     if not isinstance(saved, dict) or not isinstance(saved.get("config"), dict):
         raise TypeError("Checkpoint must include its saved configuration and targets")
+    validate_preprocessing_identity(saved.get("preprocessing_identity"))
     saved_config = ExperimentConfig.model_validate(saved["config"])
     if saved.get("targets") != list(targets):
         raise ValueError(
@@ -180,8 +186,7 @@ def validate_resume_checkpoint(
     recorded_identity = saved.get("input_identity")
     if not isinstance(recorded_identity, dict) or recorded_identity.get("version") != 1:
         raise ValueError(
-            "Resume requires a checkpoint with recorded input identities; "
-            "legacy checkpoints remain usable for prediction"
+            "Resume requires a checkpoint with recorded input identities; start a fresh run"
         )
     if recorded_identity != input_identity:
         raise ValueError(

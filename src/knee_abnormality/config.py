@@ -166,29 +166,13 @@ class DataConfig(ConfigModel):
 class ModelConfig(ConfigModel):
     backbone: Identifier
     pretrained: bool
-    projection_width: Annotated[StrictInt, Field(gt=0)]
+    projection_width: Literal[256]
     channels_last: bool = False
     checkpoint_backbone: bool = False
     backbone_eval: bool = False
-    pooling: Literal["transformer", "attention_mil"] = "transformer"
-    mil_attention_width: Annotated[StrictInt, Field(gt=0)] = 128
-    transformer_layers: Annotated[StrictInt, Field(gt=0)] = 1
-    attention_heads: Annotated[StrictInt, Field(gt=0)] = 8
-    feedforward_width: Annotated[StrictInt, Field(gt=0)] = 2048
+    mil_attention_width: Literal[128] = 128
     dropout: Annotated[float, Field(ge=0, lt=1)]
     series_dropout: Annotated[float, Field(ge=0, lt=1)]
-
-    @field_validator("attention_heads")
-    @classmethod
-    def divisible_heads(cls, value: int, info: ValidationInfo) -> int:
-        width = info.data.get("projection_width")
-        if (
-            info.data.get("pooling") == "transformer"
-            and width is not None
-            and width % value
-        ):
-            raise ValueError("projection width must be divisible by attention heads")
-        return value
 
 
 class OptimizerConfig(ConfigModel):

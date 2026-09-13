@@ -12,6 +12,7 @@ from knee_abnormality.preprocessing.dicom import DecodedFrame
 class ResampledSlice:
     image: np.ndarray
     rect: tuple[int, int, int, int]
+    output_to_native: np.ndarray
 
 
 def _crop_geometry(
@@ -85,4 +86,16 @@ def resample_crop(
         output_top : output_top + rows,
         output_left : output_left + columns,
     ] = region
-    return ResampledSlice(image, (output_top, output_left, rows, columns))
+    scale_x = pixels.shape[1] / target_width
+    scale_y = pixels.shape[0] / target_height
+    output_to_native = np.array(
+        [
+            [scale_x, 0, (source_left - output_left + 0.5) * scale_x - 0.5],
+            [0, scale_y, (source_top - output_top + 0.5) * scale_y - 0.5],
+            [0, 0, 1],
+        ],
+        dtype=np.float32,
+    )
+    return ResampledSlice(
+        image, (output_top, output_left, rows, columns), output_to_native
+    )

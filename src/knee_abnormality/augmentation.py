@@ -112,24 +112,51 @@ def sample_augmentation_parameters(
     )
 
 
+def affine_matrices(
+    parameters: AffineParameters, height: int, width: int
+) -> torch.Tensor:
+    values = parameters.translation_fraction.float()
+    with torch.autocast(device_type=values.device.type, enabled=False):
+        center = values.new_tensor([(width - 1) / 2, (height - 1) / 2])
+        matrices = get_affine_matrix2d(
+            values * values.new_tensor([width, height]),
+            center.expand(len(parameters.applied), -1),
+            parameters.scale.float()[:, None].expand(-1, 2),
+            parameters.angle_degrees.float(),
+        )
+        return torch.where(
+            parameters.applied[:, None, None],
+            matrices,
+            torch.eye(3, device=values.device, dtype=values.dtype)[None],
+        )
+
+
+def augmented_to_prepared(
+    matrices: torch.Tensor, height: int, width: int
+) -> torch.Tensor:
+    matrices = matrices.float()
+    with torch.autocast(device_type=matrices.device.type, enabled=False):
+        conversion = matrices.new_tensor(
+            [
+                [(width - 1) / width, 0, (width - 1) / (2 * width)],
+                [0, (height - 1) / height, (height - 1) / (2 * height)],
+                [0, 0, 1],
+            ]
+        )
+        return torch.linalg.inv(conversion) @ torch.linalg.inv(matrices) @ conversion
+
+
 def apply_affine_augmentation(
     images: torch.Tensor,
     series_index: torch.Tensor,
     parameters: AffineParameters,
+    matrices: torch.Tensor,
 ) -> torch.Tensor:
     selected = parameters.applied[series_index]
     if not selected.any():
         return images
     selected_series = series_index[selected]
     height, width = images.shape[-2:]
-    center = images.new_tensor([(width - 1) / 2, (height - 1) / 2])
-    translations = parameters.translation_fraction * images.new_tensor([width, height])
-    matrices = get_affine_matrix2d(
-        translations,
-        center.expand(len(parameters.applied), -1),
-        parameters.scale[:, None].expand(-1, 2),
-        parameters.angle_degrees,
-    )
     images[selected] = warp_affine(
         images[selected],
         matrices[selected_series, :2],
@@ -153,12 +180,17 @@ class ImageAugmentation(nn.Module):
         series_index: torch.Tensor,
         parameters: AugmentationParameters,
         generator: torch.Generator | None = None,
+        matrices: torch.Tensor | None = None,
     ) -> torch.Tensor:
         if not self.training:
             return images
         with torch.autocast(device_type=images.device.type, enabled=False):
             images = images.to(torch.float32)
-            images = apply_affine_augmentation(images, series_index, parameters.affine)
+            if matrices is None:
+                matrices = affine_matrices(parameters.affine, *images.shape[-2:])
+            images = apply_affine_augmentation(
+                images, series_index, parameters.affine, matrices
+            )
             background = images == 0
             images = apply_intensity_augmentation(
                 images, series_index, parameters.intensity
