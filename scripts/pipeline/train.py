@@ -59,7 +59,7 @@ def _snapshot(run_dir: Path, config_path: Path, config: ExperimentConfig) -> Non
         json.dumps(config.model_dump(mode="json"), indent=2) + "\n"
     )
     provenance = {
-        "preprocessing_identity": preprocessing_identity(),
+        "preprocessing_identity": preprocessing_identity(config.model.backbone),
         "created_at": datetime.now(UTC).isoformat(),
         "git_commit": _command(["git", "rev-parse", "HEAD"]),
         "git_status": _command(["git", "status", "--short"]),
@@ -179,6 +179,7 @@ def run_fold(
             {
                 "name": config.model.backbone,
                 "pretrained": config.model.pretrained,
+                "feature_mapping": module.model.feature_mapping_identity,
                 **initialized_identity,
             },
             indent=2,

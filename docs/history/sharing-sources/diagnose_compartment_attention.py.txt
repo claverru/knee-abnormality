@@ -1,0 +1,385 @@
+import json
+import shutil
+import time
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import Literal
+
+import numpy as np
+import polars as pl
+import torch
+from pydantic import Field
+from pydantic_settings import CliPositionalArg
+from sklearn.metrics import roc_auc_score
+
+import knee_abnormality
+from knee_abnormality.checkpoints import training_input_identity
+from knee_abnormality.cli import CLISettings
+from knee_abnormality.config import load_config
+from knee_abnormality.inference import (
+    load_checkpoint_model,
+    make_prediction_frame,
+    prediction_data,
+    prediction_loader,
+    resolve_device,
+    resolve_precision,
+)
+from knee_abnormality.labels import load_fold_labels
+from knee_abnormality.metrics import aucs, validation_metrics
+from knee_abnormality.provenance import sha256_file
+from knee_abnormality.runtime import configure_cuda_allocator, move_batch
+from scripts.adhoc.diagnose_encoding_usage import batch_identity
+
+
+class DiagnoseCLI(CLISettings):
+    run_dir: CliPositionalArg[Path]
+    architecture: Literal["1b", "1c"]
+    output_dir: Path
+    examples: Path
+    workers: int = Field(default=8, ge=0)
+    batch_size: int = Field(default=8, ge=1)
+    device: Literal["cpu", "cuda"] = "cuda"
+
+
+PAIRS = (("Medial Meniscus", "Lateral Meniscus"), ("Medial OA", "Lateral OA"))
+ALGORITHMS = {
+    "1b": "spatial_tokens_shared_meniscus_oa_classifiers_v1",
+    "1c": "spatial_tokens_disease_compartment_attention_v1",
+}
+SCALES = {
+    "compartment_zero": (0.0, 0.0),
+    "compartment_half": (0.5, 0.5),
+    "compartment_double": (2.0, 2.0),
+    "compartment_reversed": (-1.0, -1.0),
+    "meniscus_compartment_zero": (0.0, 1.0),
+    "oa_compartment_zero": (1.0, 0.0),
+}
+
+
+def metrics(y, prediction, logits, targets, gold, zero_families=()):
+    result = validation_metrics(y, prediction, targets, gold)
+    families = {}
+    for family, pair in zip(("meniscus", "oa"), PAIRS, strict=True):
+        indices = [targets.index(target) for target in pair]
+        hard = (y[:, indices] >= 0.5).astype(int)
+        selected = hard.sum(1) == 1
+        margin = logits[:, indices[0]] - logits[:, indices[1]]
+        raw_margin_range = float(np.ptp(margin[selected]))
+        if family in zero_families:
+            margin = np.full_like(margin, margin.mean())
+        families[family] = {
+            "full_mean_auc": float(
+                np.mean([result["per_target_auc"][target] for target in pair])
+            ),
+            "exclusive": {
+                "studies": int(selected.sum()),
+                "positive_counts": hard[selected].sum(0).tolist(),
+                **aucs(hard[selected], prediction[selected][:, indices], pair),
+                "margin_auc": float(roc_auc_score(hard[selected, 0], margin[selected])),
+                "margin_range": float(np.ptp(margin[selected])),
+                "raw_margin_range": raw_margin_range,
+                "analytically_constant_margin": family in zero_families,
+                "correct_by_compartment": [
+                    int((margin[selected & (hard[:, 0] == 1)] > 0).sum()),
+                    int((margin[selected & (hard[:, 1] == 1)] < 0).sum()),
+                ],
+            },
+        }
+    result["families"] = families
+    return result
+
+
+def pool(model, tokens, scores, membership):
+    with torch.autocast(device_type=tokens.device.type, enabled=False):
+        attention = scores.float().T[None].expand(len(membership), -1, -1)
+        attention = attention.masked_fill(~membership[:, None], -torch.inf).softmax(-1)
+        features = torch.einsum("btn,nf->btf", attention, tokens.float())
+        return model.head(features), attention
+
+
+def correlation(a, b):
+    a = a.double() - a.double().mean()
+    b = b.double() - b.double().mean()
+    denominator = a.norm() * b.norm()
+    return float((a @ b / denominator).item()) if denominator > 0 else None
+
+
+def main():
+    args = DiagnoseCLI()
+    configure_cuda_allocator()
+    torch.set_num_threads(1)
+    torch.set_float32_matmul_precision("high")
+    config = load_config(args.run_dir / "effective_config.json")
+    torch.manual_seed(config.seed)
+    fold = config.validation.folds[0]
+    fold_dir = args.run_dir / f"fold_{fold}"
+    selected = json.loads((fold_dir / "selected_checkpoint.json").read_text())
+    checkpoint = fold_dir / Path(selected["path"]).name
+    identity = json.loads((fold_dir / "input_identity.json").read_text())
+    if (
+        identity["preprocessing_identity"]["model"]["algorithm"]
+        != ALGORITHMS[args.architecture]
+    ):
+        raise ValueError("The diagnostic architecture differs from the saved run")
+    labels = load_fold_labels(config, fold)
+    if (
+        training_input_identity(config, labels, labels.training, labels.validation)
+        != identity
+    ):
+        raise ValueError("Current inputs or runtime differ from the saved run")
+    dataset, targets, studies = prediction_data(config, "validation", fold)
+    saved = pl.read_csv(fold_dir / "validation_predictions.csv").sort(
+        "StudyInstanceUID"
+    )
+    if not saved["StudyInstanceUID"].equals(studies["StudyInstanceUID"]):
+        raise ValueError("Saved predictions differ from validation membership")
+    device = resolve_device(args.device)
+    precision, dtype = resolve_precision("auto", device)
+    model = load_checkpoint_model(
+        config, targets, checkpoint, device, expected_fold=fold
+    )
+    pairs = [[targets.index(target) for target in pair] for pair in PAIRS]
+    scorer = model.attention[-1]
+    if args.architecture == "1b":
+        weights = scorer.weight.detach().float()
+        disease_weights = torch.stack([(weights[m] + weights[l]) / 2 for m, l in pairs])
+        contrast_weights = torch.stack(
+            [(weights[m] - weights[l]) / 2 for m, l in pairs]
+        )
+    else:
+        disease_weights = scorer.disease_weight.detach().float()
+        contrast_weights = scorer.compartment_weight.detach().float().expand(2, -1)
+    weight_summary = {
+        "disease_norms": disease_weights.norm(dim=1).tolist(),
+        "compartment_norms": contrast_weights.norm(dim=1).tolist(),
+        "compartment_cosine": float(
+            torch.nn.functional.cosine_similarity(
+                contrast_weights[0], contrast_weights[1], dim=0
+            )
+        ),
+        "classifier_biases": dict(
+            zip(targets, model.head.bias.detach().cpu().tolist(), strict=True)
+        ),
+    }
+    example_ids = json.loads(args.examples.read_text())
+    args.output_dir.mkdir(parents=True, exist_ok=False)
+    source = args.output_dir / "source"
+    shutil.copytree(
+        Path(knee_abnormality.__file__).parent,
+        source / "src/knee_abnormality",
+        ignore=shutil.ignore_patterns("__pycache__", "*.pyc"),
+    )
+    script_source = source / "scripts/adhoc"
+    script_source.mkdir(parents=True)
+    shutil.copy2(__file__, script_source / Path(__file__).name)
+    shutil.copy2(
+        Path(__file__).with_name("diagnose_encoding_usage.py"),
+        script_source / "diagnose_encoding_usage.py",
+    )
+    shutil.copy2(
+        args.run_dir / "effective_config.json",
+        args.output_dir / "effective_config.json",
+    )
+    loader = prediction_loader(
+        config, dataset, batch_size=args.batch_size, num_workers=args.workers
+    )
+    collected, ids, inputs, diagnostics = {}, [], [], []
+    started = time.perf_counter()
+    with torch.inference_mode():
+        for batch in loader:
+            inputs.append(batch_identity(batch))
+            ids.extend(batch["study_uid"])
+            gpu = move_batch(batch, device)
+            with torch.autocast(
+                device_type=device.type, dtype=dtype, enabled=dtype is not None
+            ):
+                encoded = model.encode_batch(gpu)
+                shaped = model.mil_norm(
+                    encoded["features"]
+                    + encoded["position_1d"][:, None]
+                    + encoded["position_2d"][None]
+                    + encoded["position_3d"]
+                    + encoded["plane"][:, None]
+                    + encoded["contrast"][:, None]
+                )
+                tokens = shaped.flatten(0, 1)
+                token_study = (
+                    encoded["study"][:, None]
+                    .expand_as(encoded["visual_valid"])
+                    .flatten()
+                )
+                membership = (
+                    torch.arange(len(batch["study_uid"]), device=device)[:, None]
+                    == token_study[None]
+                ) & encoded["visual_valid"].flatten()[None]
+                if not membership.any(-1).all():
+                    raise ValueError("A study has no valid tokens")
+                hidden = model.attention[:-1](tokens)
+                intact = scorer(hidden).float()
+                contrasts = torch.stack(
+                    [(intact[:, m] - intact[:, l]) / 2 for m, l in pairs], dim=-1
+                )
+                diseases = torch.stack(
+                    [(intact[:, m] + intact[:, l]) / 2 for m, l in pairs], dim=-1
+                )
+                variants = {"intact": intact}
+                if args.architecture == "1c":
+                    for name, scale in SCALES.items():
+                        scores = intact.clone()
+                        for j, (m, l) in enumerate(pairs):
+                            scores[:, m] = diseases[:, j] + scale[j] * contrasts[:, j]
+                            scores[:, l] = diseases[:, j] - scale[j] * contrasts[:, j]
+                        variants[name] = scores
+                else:
+                    for name, shared in [
+                        ("shared_mean_contrast", contrasts.mean(-1)),
+                        ("shared_meniscus_contrast", contrasts[:, 0]),
+                        ("shared_oa_contrast", contrasts[:, 1]),
+                    ]:
+                        scores = intact.clone()
+                        for j, (m, l) in enumerate(pairs):
+                            scores[:, m] = diseases[:, j] + shared
+                            scores[:, l] = diseases[:, j] - shared
+                        variants[name] = scores
+                for name, scores in variants.items():
+                    logits, attention = pool(model, tokens, scores, membership)
+                    if name == "intact":
+                        intact_attention = attention
+                    collected.setdefault(name, []).append(logits.cpu())
+            for k, uid in enumerate(batch["study_uid"]):
+                keep = membership[k]
+                c = contrasts[keep]
+                row = {
+                    "StudyInstanceUID": uid,
+                    "valid_tokens": int(keep.sum()),
+                    "contrast_correlation": correlation(c[:, 0], c[:, 1]),
+                }
+                for j, family in enumerate(("meniscus", "oa")):
+                    m, l = pairs[j]
+                    am, al = intact_attention[k, m, keep], intact_attention[k, l, keep]
+                    row.update(
+                        {
+                            f"{family}_contrast_std": float(c[:, j].std()),
+                            f"{family}_disease_std": float(diseases[keep, j].std()),
+                            f"{family}_attention_overlap": float(
+                                torch.minimum(am, al).sum()
+                            ),
+                            f"{family}_medial_entropy": float(
+                                -(am * am.clamp_min(1e-30).log()).sum()
+                                / np.log(len(am))
+                            ),
+                            f"{family}_lateral_entropy": float(
+                                -(al * al.clamp_min(1e-30).log()).sum()
+                                / np.log(len(al))
+                            ),
+                        }
+                    )
+                diagnostics.append(row)
+                if uid in example_ids:
+                    selection = encoded["study"] == k
+                    image_indices = gpu["slice_mask"].nonzero(as_tuple=True)
+                    image_series = image_indices[0]
+                    image_types = gpu["series_type_index"][image_series]
+                    raw = batch["images"][batch["slice_mask"]][:, 1]
+                    np.savez_compressed(
+                        args.output_dir / f"example-{example_ids[uid]}.npz",
+                        images=raw[selection.cpu()].numpy(),
+                        types=image_types[selection].cpu().numpy(),
+                        contrasts=contrasts.reshape(*shaped.shape[:2], 2)[selection]
+                        .cpu()
+                        .numpy(),
+                        attention=intact_attention[k]
+                        .reshape(12, *shaped.shape[:2])[:, selection]
+                        .cpu()
+                        .numpy(),
+                        valid=encoded["visual_valid"][selection].cpu().numpy(),
+                        uid=uid,
+                    )
+            if len(ids) % 128 == 0 or len(ids) == len(dataset):
+                print(f"Processed {len(ids)}/{len(dataset)}", flush=True)
+    if ids != studies["StudyInstanceUID"].to_list():
+        raise ValueError("Diagnostic prediction order differs from frozen membership")
+    logits = {name: torch.cat(values).numpy() for name, values in collected.items()}
+    probabilities = {
+        name: torch.sigmoid(torch.from_numpy(values)).numpy()
+        for name, values in logits.items()
+    }
+    saved_delta = float(
+        np.abs(probabilities["intact"] - saved.select(targets).to_numpy()).max()
+    )
+    for name in logits:
+        make_prediction_frame(ids, probabilities[name], targets, fold).write_csv(
+            args.output_dir / f"{name}.csv"
+        )
+    np.savez_compressed(args.output_dir / "logits.npz", **logits)
+    pl.DataFrame(diagnostics).write_parquet(
+        args.output_dir / "attention_diagnostics.parquet"
+    )
+    (args.output_dir / "inputs.json").write_text(json.dumps(inputs, default=str) + "\n")
+    if saved_delta > 1e-6:
+        raise ValueError(
+            f"Intact predictions disagree with saved outputs: {saved_delta}"
+        )
+    y = studies.select([f"target_{t}" for t in targets]).to_numpy()
+    gold = studies["is_gold"].to_numpy()
+    result = {
+        "created_at": datetime.now(UTC).isoformat(),
+        "options": args.model_dump(mode="json"),
+        "weights": weight_summary,
+        "saved_max_abs_probability_difference": saved_delta,
+        "identity": identity,
+        "checkpoint_sha256": sha256_file(checkpoint),
+        "config_sha256": sha256_file(args.run_dir / "effective_config.json"),
+        "saved_predictions_sha256": sha256_file(
+            fold_dir / "validation_predictions.csv"
+        ),
+        "inputs_sha256": sha256_file(args.output_dir / "inputs.json"),
+        "source_sha256": {
+            str(p.relative_to(source)): sha256_file(p)
+            for p in sorted(source.rglob("*.py"))
+        },
+        "runtime": {
+            "seconds": time.perf_counter() - started,
+            "precision": precision,
+            "seed": config.seed,
+        },
+        "metrics": {
+            name: metrics(
+                y,
+                values,
+                logits[name].astype(np.float64),
+                targets,
+                gold,
+                tuple(
+                    family
+                    for family, scale in zip(
+                        ("meniscus", "oa"), SCALES.get(name, (1.0, 1.0)), strict=True
+                    )
+                    if scale == 0
+                ),
+            )
+            for name, values in probabilities.items()
+        },
+        "per_target_mean_abs_probability_change": {
+            name: dict(
+                zip(
+                    targets,
+                    np.abs(values - probabilities["intact"]).mean(0).tolist(),
+                    strict=True,
+                )
+            )
+            for name, values in probabilities.items()
+        },
+        "limits": "Post-training interventions measure reliance and constraints, not the causal effect of retraining. Near-constant raw margins after factor removal must not be interpreted as anatomical discrimination.",
+    }
+    (args.output_dir / "results.json").write_text(json.dumps(result, indent=2) + "\n")
+    print(
+        json.dumps(
+            {name: value["macro_auc"] for name, value in result["metrics"].items()},
+            indent=2,
+        )
+    )
+
+
+if __name__ == "__main__":
+    main()

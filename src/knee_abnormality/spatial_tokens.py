@@ -1,9 +1,27 @@
 import torch
+from timm.layers import to_2tuple
+from timm.models.maxxvit import Downsample2d, MbConvBlock, TransformerBlock2d
 from torch import nn
+
+COATNET_BACKBONE = "coatnet_rmlp_2_rw_224.sw_in12k_ft_in1k"
+
+BACKBONE_MAPPINGS = {
+    "rexnet_200.nav_in1k": {
+        "layout": "NCHW",
+        "origin": [0.0, 0.0],
+        "stride": [32.0, 32.0],
+        "anchors": "convolution_centers",
+    },
+    COATNET_BACKBONE: {
+        "layout": "NCHW",
+        "origin": [12.0, 12.0],
+        "stride": [32.0, 32.0],
+        "anchors": "mbconv_main_branch_and_attention_pool_centers",
+    },
+}
 
 SPATIAL_TOKEN_IDENTITY = {
     "algorithm": "all_valid_spatial_tokens_five_embeddings_v1",
-    "feature_mapping": "rexnet_200.nav_in1k_stride32_origin0_NCHW",
     "projection": "shared_linear_C_to_256",
     "position_1d": "sinusoidal_middle_slice_acquisition_midpoint_mm",
     "position_2d": "augmented_input_anchor_align_corners_linear2_64_gelu_linear64_256",
@@ -27,13 +45,44 @@ SPATIAL_TOKEN_IDENTITY = {
 }
 
 
-def backbone_mapping(
-    name: str, backbone: nn.Module
-) -> tuple[float, float, float, float]:
-    if name != "rexnet_200.nav_in1k":
+def backbone_mapping_identity(name: str) -> dict:
+    if name not in BACKBONE_MAPPINGS:
         raise ValueError(f"Unsupported spatial feature mapping for backbone: {name}")
-    stride = [1, 1]
-    origin = [0.0, 0.0]
+    return {"backbone": name, **BACKBONE_MAPPINGS[name]}
+
+
+def _spatial_mapping(
+    layers: list[nn.Module],
+    mapping: tuple[float, float, float, float] = (0.0, 0.0, 1.0, 1.0),
+) -> tuple[float, float, float, float]:
+    origin = list(mapping[:2])
+    stride = list(mapping[2:])
+    for layer in layers:
+        if isinstance(layer, nn.Identity):
+            continue
+        if not isinstance(layer, (nn.Conv2d, nn.AvgPool2d)):
+            raise TypeError(
+                f"Unsupported spatial mapping layer: {type(layer).__name__}"
+            )
+        if isinstance(layer.padding, str) or (
+            isinstance(layer, nn.AvgPool2d) and layer.ceil_mode
+        ):
+            raise ValueError("Spatial anchors require fixed padding and floor pooling")
+        kernel = to_2tuple(layer.kernel_size)
+        padding = to_2tuple(layer.padding)
+        step = to_2tuple(
+            layer.stride if layer.stride is not None else layer.kernel_size
+        )
+        dilation = to_2tuple(layer.dilation) if isinstance(layer, nn.Conv2d) else (1, 1)
+        for axis in range(2):
+            origin[axis] += (
+                (kernel[axis] - 1) * dilation[axis] / 2 - padding[axis]
+            ) * stride[axis]
+            stride[axis] *= step[axis]
+    return origin[0], origin[1], stride[0], stride[1]
+
+
+def _rexnet_mapping(backbone: nn.Module) -> tuple[float, float, float, float]:
     convolutions = [backbone.stem.conv]
     for block in backbone.features:
         if hasattr(block, "conv_dw"):
@@ -44,18 +93,67 @@ def backbone_mapping(
             convolutions.append(block.conv)
         else:
             raise ValueError("Unsupported ReXNet spatial feature block")
-    for convolution in convolutions:
-        for axis in range(2):
-            origin[axis] += (
-                (convolution.kernel_size[axis] - 1) * convolution.dilation[axis] / 2
-                - convolution.padding[axis]
-            ) * stride[axis]
-            stride[axis] *= convolution.stride[axis]
-    if stride != [32, 32] or origin != [0.0, 0.0]:
+    return _spatial_mapping(convolutions)
+
+
+def _coatnet_mapping(backbone: nn.Module) -> tuple[float, float, float, float]:
+    mapping = _spatial_mapping([backbone.stem.conv1, backbone.stem.conv2])
+    for stage in backbone.stages:
+        for block in stage.blocks:
+            previous = mapping
+            if isinstance(block, MbConvBlock):
+                if not isinstance(block.down, nn.Identity):
+                    raise TypeError(
+                        "CoAtNet spatial anchors require depthwise downsampling"
+                    )
+                layers = [block.conv1_1x1, block.conv2_kxk, block.conv3_1x1]
+            elif isinstance(block, TransformerBlock2d):
+                layers = (
+                    [block.norm1.down.pool, block.norm1.down.expand]
+                    if isinstance(block.norm1, nn.Sequential)
+                    else []
+                )
+            else:
+                raise TypeError(
+                    f"Unsupported CoAtNet spatial block: {type(block).__name__}"
+                )
+            mapping = _spatial_mapping(layers, previous)
+            shortcut = block.shortcut
+            shortcut_layers = (
+                [shortcut.pool, shortcut.expand]
+                if isinstance(shortcut, Downsample2d)
+                else [shortcut]
+            )
+            shortcut_mapping = _spatial_mapping(shortcut_layers, previous)
+            expected_shortcut = mapping
+            if isinstance(block, MbConvBlock) and isinstance(shortcut, Downsample2d):
+                expected_shortcut = (
+                    mapping[0] + previous[2] / 2,
+                    mapping[1] + previous[3] / 2,
+                    mapping[2],
+                    mapping[3],
+                )
+            if shortcut_mapping != expected_shortcut:
+                raise ValueError(
+                    "CoAtNet residual geometry differs from verified anchors"
+                )
+    return mapping
+
+
+def backbone_mapping(
+    name: str, backbone: nn.Module
+) -> tuple[float, float, float, float]:
+    identity = backbone_mapping_identity(name)
+    mapping = (
+        _coatnet_mapping(backbone)
+        if name == COATNET_BACKBONE
+        else _rexnet_mapping(backbone)
+    )
+    if mapping != (*identity["origin"], *identity["stride"]):
         raise ValueError(
-            "ReXNet convolution geometry differs from verified stride32 origin0 anchors"
+            f"Backbone geometry differs from verified spatial anchors: {name} {mapping}"
         )
-    return origin[0], origin[1], stride[0], stride[1]
+    return mapping
 
 
 def feature_geometry(

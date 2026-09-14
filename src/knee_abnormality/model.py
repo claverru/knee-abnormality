@@ -17,8 +17,10 @@ from knee_abnormality.augmentation import (
 )
 from knee_abnormality.config import DataConfig, ModelConfig
 from knee_abnormality.spatial_tokens import (
+    COATNET_BACKBONE,
     SpatialTokens,
     backbone_mapping,
+    backbone_mapping_identity,
     feature_geometry,
 )
 
@@ -67,12 +69,21 @@ class KneeAbnormalityModel(nn.Module):
         self.checkpoint_backbone = model.checkpoint_backbone
         self.backbone_eval = model.backbone_eval
         pretrained = model.pretrained if load_pretrained is None else load_pretrained
+        self.feature_mapping_identity = backbone_mapping_identity(model.backbone)
+        backbone_kwargs = {}
+        if model.backbone == COATNET_BACKBONE:
+            if data.image_size % 32:
+                raise ValueError(
+                    "CoAtNet spatial tokens require image_size divisible by 32"
+                )
+            backbone_kwargs["img_size"] = data.image_size
         self.backbone = timm.create_model(
             model.backbone,
             pretrained=pretrained,
             in_chans=data.input_channels,
             num_classes=0,
             global_pool="",
+            **backbone_kwargs,
         )
         self.feature_mapping = backbone_mapping(model.backbone, self.backbone)
         backbone_training = self.backbone.training
@@ -91,6 +102,8 @@ class KneeAbnormalityModel(nn.Module):
             self.backbone.train(backbone_training)
         if not isinstance(spatial_output, torch.Tensor) or spatial_output.ndim != 4:
             raise ValueError("Backbone must return NCHW spatial features")
+        if spatial_output.shape[1] != self.backbone.num_features:
+            raise ValueError("Backbone feature channels differ from the NCHW contract")
         if self.checkpoint_backbone:
             self.backbone.set_grad_checkpointing(True)
         self.projection = nn.Linear(spatial_output.shape[1], model.projection_width)

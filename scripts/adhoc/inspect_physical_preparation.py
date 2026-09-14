@@ -79,7 +79,7 @@ def main():
         "settings": args.model_dump(mode="json"),
         "study_uids": uids,
         "rejected_center_uids": rejected,
-        "preprocessing_identity": preprocessing_identity(),
+        "preprocessing_identity": preprocessing_identity(config.model.backbone),
         "inputs": [
             {"path": str(p.resolve()), "sha256": sha256_file(p)}
             for p in [args.config, args.headers, args.inventory, *source_files]

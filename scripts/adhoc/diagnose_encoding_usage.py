@@ -405,7 +405,7 @@ def main() -> None:
         "current_input_identity": current_input_identity,
         "checkpoint_input_identity": checkpoint_metadata["input_identity"],
         "actual_inputs_sha256": sha256_file(args.output_dir / "inputs.json"),
-        "preprocessing_identity": preprocessing_identity(),
+        "preprocessing_identity": preprocessing_identity(config.model.backbone),
         "label_split_provenance": load_fold_labels(config, args.fold).provenance,
         "source_sha256": {
             str(path.relative_to(snapshot)): sha256_file(path)

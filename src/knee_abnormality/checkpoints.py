@@ -72,7 +72,7 @@ def training_input_identity(
     )
     return {
         "version": 1,
-        "preprocessing_identity": preprocessing_identity(),
+        "preprocessing_identity": preprocessing_identity(config.model.backbone),
         "label_manifest_sha256": labels.provenance["manifest_sha256"],
         "split_protocol_sha256": labels.provenance["split_protocol_sha256"],
         "membership_sha256": labels.provenance["membership_sha256"],
@@ -103,8 +103,10 @@ def validate_checkpoint(
     saved = checkpoint.get("hyper_parameters")
     if not isinstance(saved, dict) or not isinstance(saved.get("config"), dict):
         raise TypeError("Checkpoint must include its saved configuration and targets")
-    validate_preprocessing_identity(saved.get("preprocessing_identity"))
     saved_config = ExperimentConfig.model_validate(saved["config"])
+    validate_preprocessing_identity(
+        saved.get("preprocessing_identity"), saved_config.model.backbone
+    )
     if saved.get("targets") != list(targets):
         raise ValueError(
             "Checkpoint target names or order differ from prediction targets"

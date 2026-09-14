@@ -15,9 +15,11 @@ using the pinned file from Kaggle dataset version 6. Keep official reference
 labels separate and apply them only to eligible training rows under the fixed folds.
 
 The current [all-study protocol](validation.md#project-validation-protocol)
-assigns all 4,407 studies to five folds without using gold status as a
-stratification feature. Training uses gold where available and the selected
-report-derived probabilities otherwise. The split's frozen effective label
+assigns all 4,407 studies to five folds, stratifying effective labels, gold
+labels and gold status. Training uses gold where available and the selected
+report-derived probabilities otherwise. All nonmissing targets contribute to training;
+the [training evidence mask](#training-label-masking) was tried and rejected.
+The split's frozen effective label
 table supplies validation targets, with a fixed 0.5 cutoff for AUC and separate
 gold/report-derived diagnostics. Label-source experiments change training
 supervision while preserving the evaluation table.
@@ -28,12 +30,40 @@ All cover the 4,349 report-only studies. Pilkwang omits one reference study,
 so its extraction score uses 57 rather than 58 studies. Their uncertainty
 encodings differ; consult the audit before constructing training targets.
 
+## Training-label masking
+
+**Rejected on 2026-09-13:** the completed `masked-labels` run reduced full-fold
+AUC by 0.011455 against reflection. The baseline again trains on all nonmissing
+soft targets, with official gold overrides. See the canonical
+[masking result](sharing-experiments.md#2026-09-13-label-masking-result).
+
+The experiment excluded report-derived training targets whose original Steven v1
+value was 0.5, preserving gold labels and the stored Steven v4 probabilities.
+It used pinned v1/v2 evidence tables and averaged BCE over retained entries;
+batches with no observed targets skipped their training step. Fold membership
+and validation targets were unchanged.
+
+Of 3,503 training studies, including 47 gold, masking excluded **10,548** target
+entries and retained **31,488**, including all **564** gold targets. Forty-six
+studies had no supervised targets left. All 904 validation studies and 10,848
+validation entries were retained, with the same complete label-row hash as
+reflection. The [label-loading summary](../outputs/analysis/label-masking-20260913/label-summary.json)
+records source hashes, identities and per-target counts.
+
+The policy field, evidence requirement, training-mask application, empty-batch
+skip and additional checkpoint identity field have been removed. Reproducing the
+rejected implementation requires its archived
+[source](../outputs/masked-labels/source_snapshot.zip) and
+[configuration](../outputs/masked-labels/effective_config.json); its checkpoints
+and recorded identities remain unchanged.
+
 ## Training with Tonylin soft labels
 
 **Historical reproduction:** prepared on 2026-09-13 for the
 [completed fold-0 comparison](validation.md#2026-09-13-tonylin-label-comparison),
 which scored 0.921 publicly versus Steven v4's 0.929. The active baseline has
 returned to Steven v4; the procedure below preserves the Tonylin experiment.
+Reproduce the historical commands below with the archived Tonylin run source.
 The [label audit](public-label-audit.md#2026-09-13-new-public-label-comparison)
 owns the source-quality evidence and its limitations.
 

@@ -135,6 +135,7 @@ scripts:
       - Each sampled variant uses one advancing seeded CPU generator for study reflection and acquisition augmentation draws; gates consume separate random values.
       - Displays fixed-scale triplet RGB or grayscale channels before normalization, source-channel correspondence, signed positions, centered LPS anchors, eligibility and source laterality from the optional --geometry-headers audit.
       - Records per-acquisition transform parameters, pixel-noise seeds and Kornia versions; geometry and noise strength are shared across triplets while pixel noise is independent.
+      - The manifest records the configured backbone's spatial mapping identity without constructing the backbone.
       - Records raw-slice and CNN-input counts separately; triplet positions identify middle slices. CPU random draws need not match CUDA draws with the same seed.
       - Refuses existing output directories; choose a new --output-dir for each regenerated preview.
     docs: [docs/data-preparation.md#preview-augmentations]

@@ -16,6 +16,7 @@ canonical account of knee-specific public evidence.
 
 | Read when | Document |
 |---|---|
+| Choosing partial medial/lateral sharing after the local/public reversal, including independent readouts and experiments to distinguish bias from constraints | [Medial and lateral disease transfer](medial-lateral-transfer.md) |
 | Comparing the closest RSNA MRI tasks and their successful and unsuccessful approaches | [RSNA MRI competitions](rsna-mri.md) |
 | Borrowing sequence modeling, crop supervision, or feature aggregation from volumetric CT competitions | [Transfer from RSNA CT](rsna-ct.md) |
 | Understanding knee MRI classification, MRI domain shift, segmentation, and reconstruction challenges | [Other MRI benchmarks](mri-benchmarks.md) |

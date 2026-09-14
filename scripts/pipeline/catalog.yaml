@@ -3,18 +3,19 @@ scripts:
   - id: train-baseline
     path: scripts/pipeline/train.py
     summary: Train the spatial-token model with five embeddings and visual-validity masking and save fixed-fold validation predictions.
-    tags: [train, baseline, spatial, fusion, lightning, fold, checkpoint, auc, mri]
+    tags: [train, baseline, spatial, fusion, lightning, fold, checkpoint, auc, mri, coatnet, rexnet]
     commands:
-      - rtk proxy uv run --locked just train spatial-tokens-five-embeddings
+      - rtk proxy uv run --locked just train reflection-sigma40-next
       - rtk proxy uv run --locked just resume spatial-tokens-five-embeddings-resumed outputs/spatial-tokens-five-embeddings/fold_0/last.ckpt outputs/spatial-tokens-five-embeddings/effective_config.json
       - rtk proxy uv run --locked python -m scripts.pipeline.train configs/baseline.yaml
       - rtk proxy uv run --locked python -m scripts.pipeline.train configs/baseline.yaml --folds 0,1,2,3,4
     inputs: [Experiment YAML, Raw training DICOMs and metadata, Pinned public labels, Saved fold protocol]
     outputs: [Run directory with effective config, provenance, checkpoints, logs, epoch metrics, and validation predictions]
     notes:
-      - just train defaults to direct spatial-token MIL, five embeddings and fold 0; missing 3D retains visual tokens and training uses fixed 0.10 study-level 3D dropout. Resume requires a new run ID and the saved configuration.
+      - just train defaults to ReXNet-200, reflection, sigma 40, independent spatial-token MIL heads, five embeddings and fold 0; missing 3D retains visual tokens and training uses fixed 0.10 study-level 3D dropout. Resume requires a new run ID and the saved configuration.
       - Creates a fresh timestamped run unless --run-id is supplied; existing run directories are never overwritten.
-      - Records the preprocessing source identity in checkpoints and run/input provenance; prediction, validation, resume and export reject missing or mismatched identities. Historical checkpoints require archived code or bundles.
+      - Records the preprocessing source identity and selected backbone spatial mapping in checkpoints and run/input provenance; prediction, validation, resume and export reject missing or mismatched identities. Historical checkpoints require archived code or bundles.
+      - Supports ReXNet-200 and CoAtNet RMLP-2 RW 224 spatial adapters; see the CoAtNet modeling notes for pooling anchors, checkpoint normalization and image-size constraints.
       - --limit-train is for small development executions and does not change complete validation.
       - The current all-study split validates the entire held-out fold and monitors macro AUC against frozen targets thresholded at 0.5, with separate gold diagnostics; training BCE keeps soft targets.
       - Defaults CUDA allocation to expandable segments unless PYTORCH_ALLOC_CONF or PYTORCH_CUDA_ALLOC_CONF is supplied; records the setting in provenance.
@@ -23,7 +24,7 @@ scripts:
       - The baseline packs three consecutive non-overlapping slices into each input and uses ImageNet mean/std; data.input_mode is saved and checked with the run.
       - max_images counts raw slices and must be divisible by three in adjacent_triplets mode; incomplete triplets are omitted and batch padding is masked before the CNN and study attention.
       - The baseline uses a ten-epoch budget with one warmup epoch and patience ten; training adds series-consistent gamma/contrast augmentation, disabled during validation and prediction.
-    docs: [docs/modeling.md, docs/architecture.md#experiment-artifacts-and-reproducibility, docs/modeling.md#batch-4-memory-fix, docs/baseline-review.md#implemented-corrections]
+    docs: [docs/modeling.md, docs/modeling.md#coatnet-224-spatial-backbone, docs/architecture.md#experiment-artifacts-and-reproducibility, docs/modeling.md#batch-4-memory-fix, docs/baseline-review.md#implemented-corrections]
 
   - id: predict-baseline
     path: scripts/pipeline/predict.py
@@ -64,7 +65,7 @@ scripts:
     inputs: [Explicit scored Lightning checkpoint, Current frozen prediction source, Optional prepared wheel directory, Target Python and platform identity, Optional artifact verification record]
     outputs: [Versioned inference bundle with checkpoint, portable config, manifest, source, requirements, wheels, licenses, and notebook]
     notes:
-      - Records the physical sampling identity and existing SciPy runtime dependency; historical checkpoints require archived source.
+      - Records the physical sampling identity, selected backbone spatial mapping and existing SciPy runtime dependency; validates bundled sources against the saved backbone. Historical checkpoints require archived source.
       - just export accepts checkpoint, output, optional image multiplier and batch size, then wheel directory and target runtime; defaults use 2x images, batch size 2, Kaggle v170 codec wheels and Python 3.12.
       - Requires an explicit checkpoint path, rejects existing destinations, builds in a temporary sibling directory, and publishes only after reconstructing the model strictly and hashing every artifact.
       - Retains model state and required semantic metadata while removing optimizer, scheduler, callback and loop state.

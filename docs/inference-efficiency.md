@@ -1,7 +1,7 @@
 # Inference and efficiency
 
 Evidence: official submission research and repository inspection through
-2026-09-11, completed local submissions checked on 2026-09-13, plus unverified working notes;
+2026-09-11, completed local submissions checked on 2026-09-14, plus unverified working notes;
 see [provenance](INDEX.md#provenance).
 
 Each current submission uses one trained fold. The implemented exporter
@@ -10,11 +10,14 @@ shared inference path on mounted test data and writes `submission.csv`.
 Baseline3 submission `56164711` scored **0.878** publicly, and baseline4
 submission `56167669` scored **0.910** publicly at 1× image limits. Baseline4
 at 2× scored **0.913** (`56169438`), ahead of 3× at **0.912** (`56169445`).
-Use **2× images and batch size 2** for current submissions.
-The best recorded public result is now **0.931**, from `spatial-tokens-reflection`
-submission `56211972` on 2026-09-13. See the
-[validation comparison](validation.md#2026-09-13-reflection-validation-comparison)
-and [submission artifact](#reflection-submission).
+The latest submission uses **2× images, four studies per GPU and four total
+loader workers** through the isolated dual-GPU runtime documented below.
+The best recorded public result is **0.936**, from `reflection-sigma40`
+submission `56230573` on 2026-09-14. See the
+[validation comparison](validation.md#2026-09-14-reflection-sigma-40-result)
+and [submission artifact](#reflection-sigma-40-submission). The older commands
+in this branch still describe its original batch-2 exporter; reproduce the new
+submission with its recorded runtime or frozen bundle.
 
 ## Physical-sampling runtime identity
 
@@ -43,6 +46,258 @@ metadata/preparation evidence, not an inference runtime, memory or accuracy
 measurement. Training and model execution were excluded from implementation.
 See [verification](physical-sampling.md#implementation-verification).
 
+## Reflection sigma-40 submission
+
+The selected `reflection-sigma40` checkpoint (epoch 7, index 6;
+**0.892360168 validation AUC**) was exported on 2026-09-14 to
+`outputs/exports/knee-reflection-sigma40-20260914`. Its checkpoint SHA-256 is
+`9526b28955ff67e0401aa3038ad659fd73aa797475f2c50d7ea79ce9ed2b0c31`.
+The [validation comparison](validation.md#2026-09-14-reflection-sigma-40-result)
+records the architecture-by-sigma results.
+
+This submission retains the accepted **2× images, four studies per GPU batch
+and four total loader workers**, with one process per visible GPU on Kaggle's
+two-T4 allocation. Its isolated runtime is
+`outputs/runtimes/knee-reflection-sigma40-20260914`: it starts from this run's
+training archive and uses the existing prediction coordinator, corrected
+worker, process module and exporter from branch `1C` at `3b8c2cc`. The
+reflection model constructor is preserved in `inference.py`; all other archived
+package Python files match exactly. No source in the active checkout or
+existing notebook was changed. The runtime's `runtime-provenance.json` pins
+the archive and overlaid files. The coordinator, worker and process module
+match the successful 1A dual-GPU v2 bundle.
+
+Strict CPU checkpoint loading, metadata and bundle-integrity checks passed;
+the bundle is ready with no unmet prerequisites. Export preparation took
+0.723 seconds excluding interpreter startup. No local prediction, GPU work
+or tests were run.
+
+The user authorized submission, and the detached workflow launched on
+2026-09-14 at **12:14:15 UTC**. Its private dataset is
+`claverru/knee-reflection-sigma40-20260914`; its notebook is
+`claverru/knee-reflection-sigma40-20260914-inference`. The
+[workflow record](../outputs/submissions/knee-reflection-sigma40-20260914.json)
+and adjacent `-runner.log` record the complete transitions and scored result.
+Notebook version 1 started at **12:15:00 UTC**. Competition submission
+**56230573 completed at 12:34:41 UTC with public AUC 0.936**, a **+0.005**
+gain over reflection sigma 80 and 1C sigma 40, both 0.931.
+
+The downloaded `submission.runtime.json` confirms **two Tesla T4 GPUs in
+FP32**, each configured for batch 4 and two loader workers. The visible
+notebook contains three studies, partitioned 2+1; it does not measure sustained
+four-study batches or hidden-test throughput. The visible notebook wait was
+**1m 31s**, submission-to-observed-completion was **18m 08s**, and the full
+workflow took **20m 26s**. Those waits include queue, setup, scoring and polling
+delays; GPU profiling remains deferred.
+
+## 2026-09-14 inference timing investigation
+
+The [generalization and inference investigation](sharing-generalization.md#inference-distinguish-the-measured-clocks)
+compares reflection, 1A, 1B and original 1C using their actual GPU, worker and
+batch settings. Submission-to-completion waits of 13m36s–17m38s include queue
+and scoring delays; they do not establish hidden-data inference speed or the
+efficiency-prize runtime. The saved visible notebooks contain only three studies.
+
+Static inspection identifies duplicated full-test metadata indexing per GPU,
+shared CPU/I/O limits, process startup and uneven study costs as scaling
+hypotheses. All four Kaggle runs use FP32 on T4. The report proposes a controlled
+Kaggle profiling matrix and explains the official accuracy/runtime tradeoff.
+No local GPU work or new remote benchmark was run for this investigation.
+
+## Independent GPU inference processes
+
+This describes the runtime implemented on branch `1C` at `3b8c2cc` and overlaid
+onto the frozen [reflection/sigma-40 submission](#reflection-sigma-40-submission).
+The `main` prediction coordinator and exporter remain their original single-GPU
+implementation. Use the preserved runtime or bundle to reproduce dual-GPU
+submissions; the defaults below do not describe a new export from `main`.
+The inference notebook remains unchanged and profiling is deferred.
+
+The prediction coordinator partitions study IDs across all visible CUDA devices
+before dataset collation. Each child process sees one GPU through
+`CUDA_VISIBLE_DEVICES`, loads its own complete model and predicts its assigned
+studies. With two T4s, the default is **four studies per GPU batch**, with two
+DataLoader workers per process: eight studies can be in flight across the GPUs,
+with four loader workers total. `--batch-size` controls each device's batch;
+`--num-workers` is divided across processes. A single visible GPU receives the
+whole worker budget; CPU inference uses one process with CUDA hidden. Small
+datasets use at most one process per study, avoiding empty partitions.
+
+Study assignment is deterministic and disjoint. The coordinator checks exact
+study coverage, target order, finite probabilities in [0, 1] and validation
+folds, then restores input study order before publishing the merged CSV.
+Worker failures abort publication and trigger process cleanup; the parent
+includes the failed worker's log tail in its error. The adjacent
+`submission.runtime.json` records active devices, assigned GPU IDs, GPU names,
+study counts, precision, batch size, loader workers and timings per process.
+
+`src/knee_abnormality/inference_processes.py`
+owns serialized requests and subprocess lifecycle without importing PyTorch.
+`scripts/pipeline/predict_worker.py` owns execution
+through the existing PyTorch inference functions. This boundary lets future
+ONNX or TensorRT work replace worker model execution while retaining study
+assignment and output merging. Training continues to use Lightning.
+
+Export bundles include both entry points and the shared process module. Their
+manifest records `batch_size_scope: per_device`, `num_workers_scope: total`
+and `parallelism: one_process_per_visible_gpu`; generated notebooks read the
+recorded batch and worker defaults. The prepared original-1C bundle is
+`outputs/exports/knee-1c-dual-gpu-20260914`, using the same checkpoint hash
+recorded below. Strict CPU model loading and bundle integrity checks passed;
+local inference was not requested. Updated inference source differs from its
+training snapshot, which the manifest records explicitly; model and
+preprocessing identity checks still pass.
+
+The first 1A Kaggle execution subsequently exposed a worker request-loading
+error: JSON-mode validation rejected resolved `Path` objects returned by the
+experiment path validators. The corrected archived worker decodes JSON and applies Python-mode
+validation, matching the configuration loader. Export fresh bundles to include
+this fix; the initial prepared `knee-1c-dual-gpu-20260914` bundle predates it.
+
+The local GPU was occupied, so implementation used no local inference, training
+or tests. The subsequent [1A notebook](#1a-submission-with-two-gpu-processes)
+confirmed successful prediction on two T4s. Its three-study example does not
+measure sustained throughput or a full four-study batch. Each model and
+four-study batch must fit independently on its GPU; GPU memory is not pooled.
+
+## 1A submission with two GPU processes
+
+The selected `meniscus-classifier` checkpoint (epoch 9, index 8; 0.891192
+local macro AUC) was exported on 2026-09-14 to
+`outputs/exports/knee-1a-dual-gpu-20260914`. Checkpoint SHA-256 is
+`d124774eecc83cff0d54bd3f42c59e5adb4ab4a53da82eb5df5121888aa5323a`.
+Its model identity is `spatial_tokens_shared_meniscus_classifier_v1`: only
+the meniscus classifier weights are shared; target attention and biases remain
+independent, and OA classifiers remain independent.
+
+The isolated runtime in `outputs/runtimes/knee-1a-dual-gpu-20260914` starts
+from 1A's training archive and adds the branch-1C prediction coordinator, worker,
+process module, inference metadata partitioning and exporter. All other package
+Python files match the archive exactly. `runtime-provenance.json` records the
+archive hash and each overlaid file hash. The bundle reports changed inference
+source separately from its unchanged model/preprocessing identity.
+
+Requested settings are **2× images, four studies per GPU batch and four loader
+workers total**, using [independent GPU processes](#independent-gpu-inference-processes).
+Strict CPU model loading, metadata and bundle integrity checks passed; export
+preparation took 0.55 seconds. No local inference, GPU work or tests ran.
+
+The authorized submission service uses private dataset
+`claverru/knee-1a-dual-gpu-20260914` and private notebook
+`claverru/knee-1a-dual-gpu-20260914-inference`. Its
+[initial workflow record](../outputs/submissions/knee-1a-dual-gpu-20260914.json)
+and saved notebook log show two visible GPUs, followed by the request-loading
+failure described above. The notebook failed before inference and before
+competition submission.
+
+The corrected retry uses runtime and bundle paths ending in `-v2`, preserving
+the first attempt. Only `scripts/pipeline/predict_worker.py` changed in the
+bundled Python source; the checkpoint and inference settings remain the same.
+The same private dataset and notebook receive new versions. The
+[retry workflow record](../outputs/submissions/knee-1a-dual-gpu-20260914-v2.json)
+tracks notebook verification, automatic competition submission and scoring.
+Notebook version 2 completed successfully and validated its three example rows.
+Both **Tesla T4s** were used, with FP32 inference, batch limit 4 and two loader
+workers each. GPU 0 predicted two studies in 8.81 seconds; GPU 1 predicted one
+in 4.89 seconds. Worker wall time, including startup and model loading, was
+24.64 seconds; the complete prediction subprocess took 83.65 seconds and the
+notebook's measured setup/inference/validation total was 90.62 seconds.
+These example timings include startup overhead and do not establish hidden-data
+throughput or a speedup over single-GPU inference. The downloaded
+`submission.runtime.json` records both worker identities, counts and timings.
+Competition submission **56226273** was accepted at 08:25:06 UTC on
+2026-09-14 and completed with **0.930 public AUC**, 0.001 below reflection,
+0.005 above 1B and 0.002 above original 1C. The saved workflow observed completion
+967.03 seconds after submission, about **16m07s**. This includes queuing, scoring
+and polling; it is not an isolated inference measurement. See the
+[cross-experiment investigation](sharing-generalization.md) for the local/public
+comparison and runtime limits.
+
+## Original 1C comparison submission
+
+The original `disease-compartment-attention` selected checkpoint (epoch 10,
+index 9; 0.889430 local macro AUC) was exported on 2026-09-14 from its archived
+training runtime to `outputs/exports/knee-1c-20260914`. Checkpoint SHA-256 is
+`fc34d31860aee0958a8a676be104e0e6f0c6ebd6a2528a2583dbf42ee80506e4`.
+This is the original 1C experiment with sigma 80 mm. The separate sigma-40
+submission below uses an overnight hyperparameter candidate.
+
+The user requested **2× images, batch size 8 and four workers** for this
+comparison. The bundle manifest records those runtime settings, and the notebook
+reads its worker default from that manifest. The runtime adjustment and refreshed
+notebook hash are recorded before upload; model and prediction source still match
+the training snapshot. Metadata, strict CPU model loading and bundle integrity
+checks passed. No local inference or GPU work was performed.
+
+The automatic submission service launched with private dataset
+`claverru/knee-1c-20260914` and private notebook
+`claverru/knee-1c-20260914-inference`. Its
+[workflow record](../outputs/submissions/knee-1c-20260914.json) preserves submission
+**56224993**, script version `349714936`: its hidden rerun failed with an
+unhandled-error message and no score. The visible notebook processed only three
+studies, so it never exercised a full batch of eight. GPU memory pressure is a
+possible cause; Kaggle's returned error did not provide a traceback to confirm it.
+The response reports `status: COMPLETE` alongside `errorDescription`; the runner used on branch `1C`
+treats that combination as failure, and saved-status inspection correctly
+reports failure for the original record without rewriting its history.
+
+The user-requested batch-4 retry retained the checkpoint, frozen source, 2×
+images and four workers in `outputs/exports/knee-1c-batch4-20260914`. Submission
+**56225269**, script version `349717410`, completed with **0.928 public AUC**;
+the [retry record](../outputs/submissions/knee-1c-batch4-20260914.json) recorded
+completion at 07:54:50 UTC. It used the previous single-GPU inference path.
+Original 1C improves on 1B's 0.925 by 0.003 and trails reflection and sigma 40
+at 0.931 by 0.003. These are separate trained models; the result does not isolate
+the causal effect of the compartment embedding.
+
+## Sigma-40 overnight submission
+
+The selected `02-central-sampling` checkpoint from
+`outputs/overnight-20260913T214822Z-74udtekr` is epoch 10 (index 9), with
+0.892538 full-fold AUC, the 1C architecture, reflection probability 0.5 and
+sampling sigma 40 mm. On 2026-09-14 it was exported from its archived training
+source to `outputs/exports/knee-sigma40-20260914`, at 2× images and batch 2.
+Checkpoint SHA-256 is
+`4035f331070361a81c59f753e0210f0c75d5554755c4a60d78d643acb7e4fa7e`.
+Strict loading and bundle checks passed; bundled source matches the training
+snapshot. Export took 0.69 seconds without optional local inference.
+
+The user-authorized automatic submission service launched on 2026-09-14 with
+private dataset `claverru/knee-sigma40-20260914` and notebook
+`claverru/knee-sigma40-20260914-inference`. The
+[workflow record](../outputs/submissions/knee-sigma40-20260914.json) tracks
+notebook verification, competition submission and scoring. Notebook version 1
+completed and its three-row example output passed verification. Submission
+**56224822** was accepted at 07:15:03 UTC and completed with **0.931 public AUC**,
+tying reflection at the reported precision. The saved workflow record contains
+the completed API response and Kaggle script version `349713159`.
+
+## Meniscus and OA sharing submission
+
+The selected 1B `meniscus-oa-classifiers` checkpoint (epoch 7, index 6;
+0.892022 local macro AUC) was exported on 2026-09-13 to
+`outputs/exports/knee-meniscus-oa-20260913` using its archived training source,
+2× images and batch size 2. Checkpoint SHA-256 is
+`fc7ced812d323f6109887a941c5d3693f5f8c7dafcd49c9e3eb568d6f4744a4e`.
+Strict CPU loading and bundle checks passed; source matches the training snapshot
+and identifies two shared classifier pairs with independent attention. Export
+preparation took 0.62 seconds; optional local inference was not requested.
+
+The user-authorized automatic submission job launched at 21:21:19 UTC with
+private dataset `claverru/knee-meniscus-oa-20260913`, version 1, and private offline
+notebook `claverru/knee-meniscus-oa-20260913-inference`, version 1, script version
+`349627071`. Submission **56215113** completed with **0.925 public AUC**, versus
+reflection's **0.931**. The runner recorded completion at 21:38:08 UTC in the
+[workflow record](../outputs/submissions/knee-meniscus-oa-20260913.json).
+
+The subsequent [CPU-only audit](sharing-experiments.md#2026-09-13-1b-public-result-and-overnight-code-choice)
+found no bundle mismatch: manifest and file hashes, original checkpoint identity
+and every bundled Python file match the submitted record and training snapshot.
+Both exports have identical effective configuration, 2× density and batch 2;
+both visible notebook runs use FP32. The downloaded three-study example outputs
+have the correct target order and finite probabilities. Hidden scored predictions
+and per-target public AUCs are unavailable. No fresh inference was run.
+
 ## Reflection submission
 
 The selected `spatial-tokens-reflection` fold-0 checkpoint (epoch 9, index 8)
@@ -60,8 +315,9 @@ The detached submission service launched at 17:24:48 UTC using private dataset
 with **0.931 public AUC**, confirmed through the Kaggle API on 2026-09-13.
 The runner recorded completion at 17:41:06 UTC in the
 [workflow record](../outputs/submissions/knee-reflection-20260913.json).
-This is **+0.001** over 3dsampling and the best recorded public result. The
-[saved validation comparison](validation.md#2026-09-13-reflection-validation-comparison)
+This was **+0.001** over 3dsampling and the best public result at that time.
+The later [sigma-40 submission](#reflection-sigma-40-submission) reached 0.936.
+The [saved validation comparison](validation.md#2026-09-13-reflection-validation-comparison)
 shows +0.001012 macro AUC versus that previous champion, with lower BCE and lower
 eleven-study gold AUC. The API provides no official hidden-data inference runtime.
 
@@ -195,8 +451,9 @@ pins the bundle, dataset/notebook versions, verified output and scored result.
 This is 0.005 below `crop140mm` at 0.925, consistent with the lower standalone
 validation AUC. The saved-prediction blend described in
 [validation](validation.md#2026-09-12-spatial-fusion-validation-comparison)
-has not been submitted. The later [reflection submission](#reflection-submission)
-now holds the best recorded public score.
+has not been submitted. The later
+[reflection sigma-40 submission](#reflection-sigma-40-submission) holds the
+best recorded public score, 0.936.
 
 ## 140-mm crop submission
 

@@ -10,6 +10,7 @@ scripts:
     outputs: [Source and input manifest, Per-draw and selected-triplet parquet tables, Source exposures and center diagnostics, Summary JSON]
     notes:
       - Reads saved metadata only; no pixels, models, training or tests.
+      - The source manifest records the configured backbone's spatial mapping identity.
       - Calls the production sampler for both dataset modes, including rejected-center local fallback; retains the original comparison as an archived summary.
       - Default seed 20260913 and 32 randomized epochs; validation uses the configured multiplier.
       - Records target and realized coverage, intended and realized source shares, gap splits, plane disagreements, singletons and shortfalls.
@@ -29,6 +30,7 @@ scripts:
       - Compares serial and four-thread decoding and reversed row order; independently recomputes unique-slice clipping populations.
       - No synthetic fixtures, models, training, optimizer steps or test harness. Failure coverage depends on the real sample.
       - Refuses existing output directories and preserves source, configuration and input identities.
+      - The source manifest records the configured backbone's spatial mapping identity.
     docs: [docs/data-preparation.md#overlapping-triplet-preparation, docs/physical-sampling.md#implementation-verification]
 
   - id: audit-sampling-protocols
@@ -58,6 +60,7 @@ scripts:
     notes:
       - Manual evaluation only; no weights are modified and training does not launch this diagnostic.
       - Reuses one projected backbone feature bank per batch for seven interventions before LayerNorm with unchanged visual membership.
+      - Records the configured backbone's spatial mapping alongside the source and checkpoint identities.
       - Output directory must be fresh; investigate intact saved-prediction disagreement before interpreting small effects.
       - Defaults to 2000 paired study bootstrap replicates with seed 20260913; intervals do not measure training-seed variability.
     docs: [docs/validation.md#manual-encoding-usage-diagnosis]

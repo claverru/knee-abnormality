@@ -98,3 +98,9 @@ Removed regional coverage, usage and profiling commands are preserved as
 [historical source snapshots](../docs/history/regional-sources/README.md), outside
 the executable catalog. Reproduce them only with their original analysis/run
 source bundles and configurations.
+
+The [historical sharing sources](../docs/history/sharing-sources/README.md)
+preserve the 1C compartment diagnostic, CPU generalization/case-mixture audits,
+blinded disagreement audit and eleven-run overnight launcher. They are text
+records outside the executable catalog and require their original runtimes.
+The current seven-run launcher does not reproduce that historical queue.

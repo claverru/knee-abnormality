@@ -566,7 +566,9 @@ def export_bundle(args: ExportCLI) -> dict:
         (temporary / "wheels").mkdir()
         _copy_code(temporary / "code")
         bundled_preprocessing = validate_preprocessing_identity(
-            saved.get("preprocessing_identity"), temporary / "code" / "knee_abnormality"
+            saved.get("preprocessing_identity"),
+            saved_config.model.backbone,
+            temporary / "code" / "knee_abnormality",
         )
         source_hash = _source_hash(temporary / "code")
         verification = _verification(
