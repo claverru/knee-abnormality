@@ -160,7 +160,7 @@ class BaselineModule(L.LightningModule):
                 "training_studies": training_studies,
                 "validation_studies": validation_studies,
                 "input_identity": input_identity,
-                "preprocessing_identity": preprocessing_identity(),
+                "preprocessing_identity": preprocessing_identity(config.model.backbone),
             }
         )
 

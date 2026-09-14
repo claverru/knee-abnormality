@@ -19,6 +19,16 @@ probabilities do not retain that distinction. Keep the component tables.
 Extraction agreement on the reference set does not establish downstream
 image-model quality or independent validation.
 
+The [2026-09-14 blinded disagreement audit](sharing-disagreement-audit.md#source-lineage-and-prediction-effects)
+adds a separate severity concern: 19 reviewed report-derived OA positives
+describe explicitly low-grade findings under the host's high-grade endpoint.
+Steven v1/v2 and lixin agree positively on all 19; v4 values are 0.80–0.93.
+Confidence or source-agreement filtering would retain them. This is a selected
+report-text audit, not an estimate of population label errors or image
+adjudication. One additional conflict involves official gold, which is preserved.
+No labels changed; the existing Steven-v4 training decision remains in place
+pending a controlled OA-only supervision comparison.
+
 ## Acquisition and reproduction
 
 The [source manifest](public-label-sources.json) records dataset IDs, explicit
@@ -171,7 +181,9 @@ neither `v4 == 0.5` nor distance from `0.5` recovers original report coverage.
 The author's proposed `2 * abs(p - 0.5)` loss weight is a heuristic, not validated
 calibration. Applied to v4, it assigns weight 0.5 to the 10,085 cells above.
 Preserve v1's evidence indicator and the v2 repair indicator separately if
-using v4; choosing to mask those cells is a later training experiment.
+using v4. Excluding originally unaddressed non-gold training targets was
+[tried and rejected](sharing-experiments.md#2026-09-13-label-masking-result): full-fold AUC
+fell by 0.011455. The baseline again supervises all nonmissing soft targets.
 
 ### Pilkwang: graded scores with explicit verdicts
 

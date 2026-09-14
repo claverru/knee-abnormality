@@ -240,9 +240,25 @@ spacing preserves more context at a lower spatial resolution; images smaller
 than the target field are padded after resampling.
 
 Baseline3 later selected **0.67 × 0.67 mm**, covering
-**150.08 × 150.08 mm** at 224 pixels. This is the current default. The earlier
+**150.08 × 150.08 mm** at 224 pixels. The earlier
 0.80 mm previews remain useful evidence about the cost of an 85.12 mm crop,
 but they do not validate 0.67 mm as optimal.
+
+The completed [140-mm crop comparison](validation.md#2026-09-12-140-mm-crop-result)
+subsequently selected **0.625 × 0.625 mm** at 224 pixels, the current default.
+It improved local and public AUC over 150.08 mm. The earlier proposal to expand
+from 0.67 to 0.72 mm (161.28 mm at 224 pixels) is retired; 0.72 mm itself was
+not evaluated, and the crop result does not isolate coverage from pixel spacing.
+
+A larger header survey recorded on 2026-09-11 sampled 768 series, 128 per
+plane–contrast type, with Polars seed 42 after sorting the count inventory by
+study and series UID. It read the lexicographically first DICOM header for each
+selected series; all 768 supplied valid geometry. Extents used rows × row spacing
+and columns × column spacing. Median acquired fields were approximately
+160 × 160 mm in all six groups, which did not support giving sagittal images a
+larger crop than other planes. Native extent alone does not establish useful
+anatomy coverage. This survey was originally recorded in the future-work notes
+without a linked artifact identity; its summary does not establish an optimal crop.
 
 A local header sample used eight shortest-selected acquisitions per type,
 sampled with seed 42 after stable sorting. Across these 48 series, per-type

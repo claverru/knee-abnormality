@@ -61,9 +61,36 @@ study IDs do not overlap training; the submission template matches the test
 IDs and their order, with finite predictions in `[0, 1]`. These three example
 rows do not establish the hidden evaluation set's size or composition.
 
+The [official data description](https://www.kaggle.com/competitions/rsna-knee-abnormality-detection/data),
+rechecked on 2026-09-14, states approximately **1,300 test studies** and warns
+that abnormality prevalence need not match training, public and final evaluation
+sets. The [leaderboard](https://www.kaggle.com/competitions/rsna-knee-abnormality-detection/leaderboard)
+states approximately **30% public and 70% private**, implying roughly **390
+public and 910 private studies**. Those are approximate derived counts, not
+an inspected hidden manifest. Final standings use the private portion, not the
+full public/private union. The 4,407-study training corpus is larger than the
+stated test set; submission duration cannot establish hidden study counts.
+
+Our 904-study validation fold is larger than the public subset, but its 893
+report-derived and 11 gold labels measure a different endpoint from expert
+adjudication. Sample count alone does not determine which ranking better predicts
+private performance. See the [case-mixture investigation](sharing-generalization.md#public-subset-size-and-case-mixture-follow-up).
+
 The CSVs provide no patient identifier, pixel geometry, or transfer syntax.
 They cannot establish patient-level separation, slice ordering, codec needs,
 or actual image duplication.
+
+## Representative acquisition inventory
+
+The later [disagreement audit](sharing-disagreement-audit.md#acquisition-inventory-and-population-sensitivity)
+read one representative DICOM header for all 4,407 studies on 2026-09-14,
+without pixel decoding or GPU use. Its
+`outputs/analysis/sharing-disagreement-20260914/study_headers.parquet` records
+manufacturer/model, field strength, sex and representative acquisition settings.
+All reads succeeded; manufacturer/model are present throughout, with 238 missing
+field-strength and sex values each. One header per study does not establish
+within-study scanner consistency or identify hospital sites. The linked audit
+owns its label-association and validation-stratum results.
 
 ## Heavy report normalization
 

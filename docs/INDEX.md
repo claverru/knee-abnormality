@@ -4,20 +4,28 @@ Working knowledge for the [RSNA Knee Abnormality Detection competition](https://
 
 | Read when | Canonical document |
 |---|---|
+| Investigating why medial/lateral sharing reversed local/public rankings and choosing a controlled partial-sharing experiment | [Medial and lateral disease transfer research](research/medial-lateral-transfer.md) |
+| Reviewing the completed 1A–1C experiments, attention interventions, failed label mask and eleven-run hyperparameter search | [Sharing experiment record](sharing-experiments.md) |
+| Separating weak-label, case-mixture and optimization hypotheses using saved predictions and public-size resampling | [Sharing generalization investigation](sharing-generalization.md) |
+| Inspecting OA severity-label conflicts, scanner subgroup results and the blinded review's limits | [Sharing disagreement audit](sharing-disagreement-audit.md) |
+| Recovering the original 1C architecture, audit commands and overnight definitions without changing current training | [Historical sharing sources](history/sharing-sources/README.md) |
 | Deciding where code belongs or how to keep competition experiments fast and reproducible | [Project architecture](architecture.md) |
 | Finding a reusable script, locating an investigation, or adding and indexing a command | [Script index](../scripts/INDEX.md) |
 | Checking active work or tasks planned for the short term | [Ongoing work](ongoing.md) |
-| Reviewing reflection's best public score of 0.931 and its validation comparison with 3dsampling | [Reflection validation comparison](validation.md#2026-09-13-reflection-validation-comparison), [submission](inference-efficiency.md#reflection-submission) |
+| Reviewing reflection/sigma-40's best public score of 0.936 and the completed comparison with both 1C controls | [Reflection sigma-40 result](validation.md#2026-09-14-reflection-sigma-40-result) |
+| Reviewing the completed reflection/sigma-40 submission with two GPUs, four studies per GPU and four total workers | [Reflection sigma-40 submission](inference-efficiency.md#reflection-sigma-40-submission) |
+| Reviewing reflection/sigma-80's previous best public score of 0.931 and its validation comparison with 3dsampling | [Reflection validation comparison](validation.md#2026-09-13-reflection-validation-comparison), [submission](inference-efficiency.md#reflection-submission) |
 | Using study-level knee reflection, reviewing geometry eligibility, previews and augmentation-only CUDA costs | [Reflection modeling](modeling.md#study-level-knee-reflection), [geometry and evidence](data-preparation.md#reflection-geometry-and-eligibility) |
 | Reviewing 3dsampling's 0.930 public result and validation comparison with the previous champion | [3dsampling validation comparison](validation.md#2026-09-13-3dsampling-validation-comparison) |
 | Reviewing the completed center experiment, its rejected sampler and the frozen control for fusion | [Accurate-centers result](validation.md#2026-09-12-accurate-centers-result) |
 | Training the spatial-token model with five embeddings and study-level 3D dropout | [Active spatial token model](modeling.md#active-spatial-token-model) |
+| Using the 224-pixel CoAtNet backbone with reflection/sigma-40, its spatial anchors and pretrained normalization | [CoAtNet 224 spatial backbone](modeling.md#coatnet-224-spatial-backbone) |
 | Reviewing the completed spatial-token run, its target gains and paired validation uncertainty | [Spatial-token validation comparison](validation.md#2026-09-13-spatial-token-validation-comparison) |
 | Checking how local validation tracks public scores since the gold-balanced split | [Local and public agreement](validation.md#2026-09-13-local-and-public-agreement-after-the-split-change) |
 | Reproducing the training-image geometry measurement behind the fixed 18-mm coverage radius | [Per-plane coverage radius](modeling.md#per-plane-coverage-radius) |
 | Understanding why per-plane fusion resembles crop140mm and measuring its regional attention and omission effect | [Per-plane fusion usage diagnosis](validation.md#2026-09-13-per-plane-fusion-usage-diagnosis) |
 | Comparing the completed max-pooling run with average pooling and interpreting its timing difference | [Max-pooling result](validation.md#2026-09-13-max-pooling-validation-comparison) |
-| Following tensor shapes from triplet images through spatial tokens and final attention pooling | [Model shape diagram](../schema.md) |
+| Following tensor shapes from triplet images through spatial tokens and independent attention/classifier heads | [Model shape diagram](model-shapes.md) |
 | Measuring a trained spatial-token checkpoint's reliance on its encodings | [Manual encoding diagnosis](validation.md#manual-encoding-usage-diagnosis) |
 | Finding removed regional investigation sources and original reproduction bundles | [Historical regional sources](history/regional-sources/README.md) |
 | Reviewing the earlier spatial-fusion implementation and failed deployment runtime gate | [Spatial-fusion engineering result](validation.md#2026-09-12-spatial-fusion-engineering-result) |

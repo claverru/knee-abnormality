@@ -16,10 +16,19 @@ not implementations of the unverified model described below.
 
 ## Implemented baseline
 
+The maintained [baseline config](../configs/baseline.yaml) uses ReXNet-200,
+independent attention and classifiers, reflection probability 0.5 and sampling
+sigma **40 mm**. The completed `outputs/reflection-sigma40` run selected epoch 7
+at **0.892360168 validation macro AUC** and scored **0.936 publicly**. It is the
+development reference. See the [paired comparison](validation.md#2026-09-14-reflection-sigma-40-result)
+and [frozen submission runtime](inference-efficiency.md#reflection-sigma-40-submission).
+CoAtNet support does not select a different backbone unless the configuration
+explicitly requests it. The earlier baselines below retain their historical results.
+
 The completed `outputs/baseline3` fold-0 run uses a pretrained
 `resnet50d.ra2_in1k` encoder and a learned 2,048-to-256 projection. The
 maintained [baseline config](../configs/baseline.yaml) now selects pretrained
-`rexnet_200.nav_in1k`, with its 2,560-to-256 projection, for the next fresh run.
+`rexnet_200.nav_in1k`, with its 2,560-to-256 projection.
 Baseline3 used global triplet descriptors with joint type and centered physical
 position embeddings and 0.1 series dropout. The current spatial-token architecture
 and 0.2 series dropout are specified below.
@@ -51,12 +60,12 @@ YAML do not change an existing artifact.
 
 ### Active spatial token model
 
-The active `spatial-tokens-five-embeddings` experiment keeps every visually valid
+The active spatial-token model keeps every visually valid
 backbone location and applies target-specific attention MIL directly. A shared
 linear projection maps `[N, C, H, W]` to `[N, H × W, 256]`; ReXNet-200 gives
 49 locations per 224-pixel triplet and up to 3,136 before masking at the existing
-64-triplet validation budget. No global pooling, regional queries, grid reduction
-or token-to-token self-attention remains. The scorer stays 256→128→12 with its
+64-triplet validation budget. The MIL head uses no global pooling, regional queries,
+grid reduction or token-to-token self-attention. The scorer stays 256→128→12 with its
 configured dropout, followed by per-target weighted features and linear heads.
 
 Before LayerNorm, tokens receive five additive embeddings:
@@ -70,8 +79,10 @@ Before LayerNorm, tokens receive five additive embeddings:
 | Contrast | Learned metadata pairs `(0,0)` and `(1,1)` for fluid sensitivity/fat suppression |
 
 Plane and contrast lookup buffers derive from configured metadata rather than
-slot order. The verified ReXNet adapter derives stride 32 and origin 0 from
-its convolutions; other backbone mappings fail explicitly. Geometry and the
+slot order. The ReXNet adapter derives stride 32 and origin 0 from its
+convolutions. The [CoAtNet adapter](#coatnet-224-spatial-backbone) derives stride 32
+and origin 12 using its main convolution branch and attention pooling;
+other backbone mappings fail explicitly. Geometry and the
 coordinate MLPs execute in float32 outside autocast; embeddings are cast to
 visual-feature dtype. Grid dimensions may vary independently, including rectangular
 grids; the shared geometry has no fixed grid size or stride.
@@ -107,6 +118,84 @@ for target changes, uncertainty, learning curves, timing and memory, and the
 encoding diagnostic has not been run. Matched inference cost remains unmeasured.
 Historical checkpoints require their original
 source bundles; current source/config identities reject them without migration.
+
+### CoAtNet 224 spatial backbone
+
+The supported alternative is `coatnet_rmlp_2_rw_224.sw_in12k_ft_in1k` with
+224-pixel inputs and per-channel mean/std `[0.5, 0.5, 0.5]`, matching its
+pretrained normalization. Select it in a separate experiment configuration by
+changing `model.backbone`, `data.channel_mean` and `data.channel_std` from the
+ReXNet [baseline](../configs/baseline.yaml). Keep the saved effective configuration
+for reproduction; a run name does not select a backbone. There is no maintained
+CoAtNet-specific YAML or new launch scheduled by this documentation.
+
+The model passes `data.image_size` explicitly to CoAtNet so timm builds its
+relative-position geometry for the actual input size. The adapter requires a
+size divisible by 32. At 224, the backbone produces `[N, 1024, 7, 7]`, giving
+49 tokens with a learned 1024→256 projection and the existing MIL head.
+The supported checkpoint, normalization and feature shape were checked against
+the [model card](https://huggingface.co/timm/coatnet_rmlp_2_rw_224.sw_in12k_ft_in1k)
+and installed timm 1.0.26 source on 2026-09-14.
+
+Spatial anchors follow the MBConv main-branch convolution centers. The stem
+and two convolution stages retain origin 0 at strides 2, 4 and 8. The two
+attention stages use 2×2 average pooling, shifting the origin by 4 and then
+8 input pixels. The final anchor on either axis is therefore `12 + 32 * index`.
+The MBConv downsampling shortcuts use average-pool centers offset by half the
+incoming stride from the main branch. The adapter checks that offset, equal
+branch strides and aligned attention-stage shortcuts, while keeping the
+main-branch convention fixed. These are nominal token/query anchors; residual
+mixing and attention do not give each output a unique receptive-field center.
+
+Construction derives and checks the actual mapping and NCHW channel layout.
+Checkpoint, input and source identities record the selected backbone, origin,
+stride, layout and anchor convention; `backbone_identity.json` records the same
+mapping. Validation, resume and bundled export use the saved backbone when
+checking identities. Historical checkpoints retain their archived source or
+bundle and must not have their identities rewritten.
+
+Static review on 2026-09-14 found no change to ReXNet's model arguments,
+convolution trace, anchor formula or parameter initialization order. The CoAtNet
+image-size argument and divisibility guard are conditional on that backbone.
+All model methods outside construction, feature geometry, spatial embeddings,
+training steps, loss and optimizer are unchanged. ReXNet's additional NCHW channel
+check agrees with timm 1.0.26's `num_features` definition. The baseline keeps its
+ReXNet normalization, learning rates, batch size and augmentation settings.
+
+The source fingerprint and mapping metadata changed, so historical ReXNet
+checkpoints also require their archived runtime; this is distinct from changing
+fresh ReXNet training behavior. No model execution, tests or GPU access were used
+for this review. It establishes static noninterference, not measured numerical
+parity, throughput or a new CoAtNet validation result.
+
+### Historical disease sharing
+
+The current model has twelve independent classifier vectors and twelve
+independent attention scorers. The completed alternatives were:
+
+| Experiment | Final classifier weights | Final attention readout |
+|---|---|---|
+| 1A | One shared meniscus vector; all other targets independent | Twelve independent scorers |
+| 1B | Separate shared meniscus and medial/lateral OA vectors; other targets independent | Twelve independent scorers |
+| 1C | Same classifier grouping as 1B | Two disease vectors plus one signed compartment vector for the four paired targets; eight independent scorers |
+
+All twelve classifier biases remain independent. PF OA is outside the OA pair.
+Each target normalizes its own attention over valid study tokens. Reflection
+preserves medial/lateral target names. 1C uses 128-dimensional disease and
+compartment factors, initialized uniformly at ±1/sqrt(2×128); their projections
+use autocast and their sums use float32. Constant attention biases cancel in
+softmax and are omitted for those factors. Official target order is restored by
+name-derived indices.
+
+Their architecture identities are respectively
+`spatial_tokens_shared_meniscus_classifier_v1`,
+`spatial_tokens_shared_meniscus_oa_classifiers_v1` and
+`spatial_tokens_disease_compartment_attention_v1`.
+[Historical sources](history/sharing-sources/README.md),
+[validation and intervention results](sharing-experiments.md), and the
+[transfer investigation](research/medial-lateral-transfer.md) preserve the
+implementation rationale and findings. Reproduce each checkpoint with its own
+saved source/configuration; sharing is not an option in the current model.
 
 ### Historical regional fusion
 
@@ -306,7 +395,12 @@ The original plan based this contract on the
 [competition labels](https://www.kaggle.com/competitions/rsna-knee-abnormality-detection/data)
 and [AAOS anatomy](https://www.orthoinfo.org/diseases--conditions/collateral-ligament-injuries/),
 consulted on 2026-09-13. The completed run selected epoch 9 at **0.890976**
-validation macro AUC and **0.931 public AUC**, the best recorded public result.
+validation macro AUC and **0.931 public AUC**, the best public result at that
+time. The later [sigma-40 run](validation.md#2026-09-14-reflection-sigma-40-result)
+selected epoch 7 at **0.892360 validation AUC and 0.936 public AUC**, making
+it the best submitted model and the recommended next development baseline.
+Its recipe is now the maintained [baseline YAML](../configs/baseline.yaml).
+The run's saved effective configuration remains the historical source of truth.
 See the [comparison with 3dsampling](validation.md#2026-09-13-reflection-validation-comparison)
 for the +0.001012 local and +0.001 public gains, target changes and limitations.
 

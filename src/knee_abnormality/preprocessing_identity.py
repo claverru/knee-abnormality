@@ -4,10 +4,13 @@ from pathlib import Path
 from knee_abnormality.augmentation import REFLECTION_IDENTITY
 from knee_abnormality.preprocessing.geometry import RELIABILITY
 from knee_abnormality.preprocessing.sampling import SAMPLING_IDENTITY
-from knee_abnormality.spatial_tokens import SPATIAL_TOKEN_IDENTITY
+from knee_abnormality.spatial_tokens import (
+    SPATIAL_TOKEN_IDENTITY,
+    backbone_mapping_identity,
+)
 
 
-def preprocessing_identity(package_root: Path | None = None) -> dict:
+def preprocessing_identity(backbone: str, package_root: Path | None = None) -> dict:
     root = Path(__file__).resolve().parent if package_root is None else package_root
     paths = [
         *(
@@ -34,15 +37,18 @@ def preprocessing_identity(package_root: Path | None = None) -> dict:
         "reflection": dict(REFLECTION_IDENTITY),
         "sampling": dict(SAMPLING_IDENTITY),
         "reliability": dict(RELIABILITY),
-        "spatial_tokens": dict(SPATIAL_TOKEN_IDENTITY),
+        "spatial_tokens": {
+            **SPATIAL_TOKEN_IDENTITY,
+            "feature_mapping": backbone_mapping_identity(backbone),
+        },
         "sources_sha256": digest.hexdigest(),
     }
 
 
 def validate_preprocessing_identity(
-    recorded: object, package_root: Path | None = None
+    recorded: object, backbone: str, package_root: Path | None = None
 ) -> dict:
-    current = preprocessing_identity(package_root)
+    current = preprocessing_identity(backbone, package_root)
     if recorded != current:
         raise ValueError(
             "Checkpoint preprocessing_identity is missing or differs from the executing sources. "

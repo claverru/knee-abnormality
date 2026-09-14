@@ -70,7 +70,7 @@ responsibility when that makes editing easier.
 | `src/knee_abnormality/preprocessing/preparation.py` | Decode selected records, accept complete groups, collect acquisition-wide quantiles and construct tensors; retain decoder injection for profiling | Implemented |
 | `src/knee_abnormality/augmentation.py` | Sample and apply study reflection plus shared affine, gamma/contrast and noise transforms for training and previews | Implemented |
 | `src/knee_abnormality/dataset.py` | Set up the series index; select series and slices, prepare and collate inputs, and construct configured data loaders | Implemented |
-| `src/knee_abnormality/model.py` | One-pass spatial ReXNet features, guarded series dropout and target-specific study MIL | Implemented; spatial-token MIL is the active model |
+| `src/knee_abnormality/model.py` | One-pass spatial ReXNet or CoAtNet features, guarded series dropout and target-specific study MIL | Implemented; spatial-token MIL is the active model |
 | `src/knee_abnormality/spatial_tokens.py` | Verified backbone anchors, independent visual/3D masks, coordinate and metadata embeddings, study-level 3D dropout | Implemented; fixed spatial-token path |
 | `scripts/pipeline/train.py` | Lightning module/data loading, optimizer, checkpoints, validation outputs and training entry point | Implemented; baseline3 fold 0 completed, with earlier checkpoint corrections recorded in the [baseline review](baseline-review.md#implemented-corrections) |
 | `scripts/pipeline/predict.py` | Load saved model/config, predict studies, write validation/submission tables | Implemented |
@@ -80,6 +80,12 @@ responsibility when that makes editing easier.
 | `notebooks/` | Optional visual inspection and short investigations that call shared code | Create when needed; submission notebooks are generated inside bundles |
 | `docs/` | Decisions, procedures, evidence, and work tracking | Implemented |
 | `data/`, `outputs/` | Downloaded inputs, prepared metadata/labels and generated experiment artifacts | Local and Git-ignored |
+
+The completed 0.936 submission used an isolated runtime with the independent
+GPU coordinator and worker from branch `1C`; those entry points are not present
+in current `main`. Its [runtime provenance](inference-efficiency.md#reflection-sigma-40-submission)
+preserves the reflection model and frozen notebook. Historical sharing model
+and audit sources are [archived separately](history/sharing-sources/README.md).
 
 This table defines responsibilities; planned files are not empty scaffolds.
 The preprocessing package has an empty `__init__.py`; callers import each owner
@@ -348,7 +354,8 @@ validation checks the producing fold. Resume also checks numerical training
 settings and the original input identities. Legacy checkpoints without those
 identities require their archived source/bundle, even for prediction with the
 same config. Every new checkpoint and input identity records the preprocessing
-algorithm, fixed reliability values and a stable digest of package-relative
+algorithm, fixed reliability values, selected backbone spatial mapping and a
+stable digest of package-relative
 `dataset.py`, `model.py`, `augmentation.py`, `spatial_tokens.py` and all preprocessing Python sources. Export validates the actual
 copied sources; bundled prediction recomputes the identity without training data.
 See [implemented corrections](baseline-review.md#implemented-corrections)

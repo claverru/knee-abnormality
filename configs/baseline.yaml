@@ -1,4 +1,4 @@
-name: spatial-tokens-reflection
+name: reflection-sigma40
 seed: 42
 
 paths:
@@ -16,7 +16,7 @@ validation:
 data:
   reflection_augmentation:
     probability: 0.5
-  sampling_sigma_mm: 80.0
+  sampling_sigma_mm: 40.0
   position_encoding: physical_mm
   position_reference: center
   validation_image_multiplier: 2

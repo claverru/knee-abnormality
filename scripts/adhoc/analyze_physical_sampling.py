@@ -158,7 +158,7 @@ def main():
     manifest = {
         "created_at": datetime.now(UTC).isoformat(),
         "settings": settings.model_dump(mode="json"),
-        "preprocessing_identity": preprocessing_identity(),
+        "preprocessing_identity": preprocessing_identity(config.model.backbone),
         "inputs": [
             {"path": str(p.resolve()), "sha256": sha256_file(p)}
             for p in inputs + source_files
