@@ -9,13 +9,13 @@ from typing import Literal
 from pydantic import Field
 from pydantic_settings import CliImplicitFlag, CliPositionalArg, SettingsError
 
-from knee_abnormality.bundle import verify_bundle
-from knee_abnormality.cli import NonExitingCLISettings
+from knee_abnormality.cli import CLISettings
+from knee_abnormality.inference.bundle import verify_bundle
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 
-class SubmissionJobCLI(NonExitingCLISettings):
+class SubmissionJobCLI(CLISettings):
     command: CliPositionalArg[Literal["start", "status", "logs"]]
     record: Path
     bundle: Path | None = None

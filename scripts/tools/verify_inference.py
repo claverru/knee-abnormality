@@ -9,22 +9,24 @@ import polars as pl
 import torch
 from pydantic_settings import SettingsError
 
-from knee_abnormality.cli import NonExitingCLISettings
-from knee_abnormality.config import ExperimentConfig
-from knee_abnormality.inference import (
-    load_checkpoint_model,
-    make_prediction_frame,
+import knee_abnormality
+from knee_abnormality.cli import CLISettings
+from knee_abnormality.config import SLICES_PER_INPUT, ExperimentConfig
+from knee_abnormality.data.dataset import build_data_loader
+from knee_abnormality.data.labels import STUDY
+from knee_abnormality.evaluation.predictions import make_prediction_frame
+from knee_abnormality.inference.checkpoint import load_checkpoint_model
+from knee_abnormality.inference.engine import (
     predict_loader,
     prediction_data,
-    prediction_loader,
     resolve_device,
     resolve_precision,
 )
 from knee_abnormality.provenance import sha256_file
-from knee_abnormality.runtime import configure_cuda_allocator
+from knee_abnormality.training.cuda import configure_cuda_allocator
 
 
-class VerifyInferenceCLI(NonExitingCLISettings):
+class VerifyInferenceCLI(CLISettings):
     bundle: Path
     request_file: Path
 
@@ -38,13 +40,15 @@ def _sample_batches(dataset, count: int, batch_size: int) -> list[int]:
     def complexity(indices: list[int]) -> tuple[int, int]:
         inputs = acquisitions = 0
         for index in indices:
-            uid = dataset.studies["StudyInstanceUID"][index]
+            uid = dataset.studies[STUDY][index]
             for slot, kind in zip(
                 dataset.series_index[uid].slots, dataset.data.series_types, strict=True
             ):
                 inputs += min(
                     sum(max(candidate.image_count - 2, 0) for candidate in slot),
-                    kind.max_images * dataset.image_limit_multiplier // 3,
+                    kind.max_images
+                    * dataset.image_limit_multiplier
+                    // SLICES_PER_INPUT,
                 )
                 acquisitions += len(slot)
         return inputs, acquisitions
@@ -63,8 +67,12 @@ def _sample_batches(dataset, count: int, batch_size: int) -> list[int]:
 
 def verify_inference(bundle: Path, request: dict) -> None:
     started = time.perf_counter()
-    if Path(__file__).resolve().parent != bundle / "code" / "scripts" / "tools":
-        raise RuntimeError("Verification must execute the exported source")
+    if Path(knee_abnormality.__file__).resolve().parent != bundle / "code" / (
+        "knee_abnormality"
+    ):
+        raise RuntimeError(
+            "Verification must import the exported source; set PYTHONPATH to the bundle's code directory"
+        )
     configure_cuda_allocator()
     torch.set_num_threads(4)
     torch.set_float32_matmul_precision("high")
@@ -72,7 +80,7 @@ def verify_inference(bundle: Path, request: dict) -> None:
     fold = config.validation.folds[0]
     device = resolve_device("auto")
     precision, _ = resolve_precision("auto", device)
-    if config.trainer.precision == "bf16-mixed" and precision != "bf16":
+    if precision != "bf16":
         raise RuntimeError("Saved BF16 parity requires native BF16 CUDA support")
     dataset, targets, _ = prediction_data(config, "validation", fold)
     indices = _sample_batches(dataset, request["samples"], config.trainer.batch_size)
@@ -80,20 +88,18 @@ def verify_inference(bundle: Path, request: dict) -> None:
     model = load_checkpoint_model(
         config, targets, bundle / "model.ckpt", device, expected_fold=fold
     )
-    ids, values = predict_loader(
+    ids, values, _ = predict_loader(
         model,
-        prediction_loader(config, dataset, num_workers=4),
+        build_data_loader(
+            dataset, config.trainer, config.trainer.batch_size, num_workers=4
+        ),
         device,
         precision,
     )
-    frame = make_prediction_frame(ids, values, targets).sort("StudyInstanceUID")
+    frame = make_prediction_frame(ids, values, targets).sort(STUDY)
     reference_path = Path(request["reference_csv"])
-    reference = (
-        pl.read_csv(reference_path)
-        .filter(pl.col("StudyInstanceUID").is_in(ids))
-        .sort("StudyInstanceUID")
-    )
-    if reference["StudyInstanceUID"].to_list() != frame["StudyInstanceUID"].to_list():
+    reference = pl.read_csv(reference_path).filter(pl.col(STUDY).is_in(ids)).sort(STUDY)
+    if reference[STUDY].to_list() != frame[STUDY].to_list():
         raise ValueError(
             "Saved predictions do not cover the parity sample exactly once"
         )
@@ -115,7 +121,7 @@ def verify_inference(bundle: Path, request: dict) -> None:
         uid: sum(
             min(
                 sum(max(candidate.image_count - 2, 0) for candidate in slot),
-                kind.max_images * dataset.image_limit_multiplier // 3,
+                kind.max_images * dataset.image_limit_multiplier // SLICES_PER_INPUT,
             )
             for slot, kind in zip(
                 dataset.series_index[uid].slots, dataset.data.series_types, strict=True
@@ -124,14 +130,14 @@ def verify_inference(bundle: Path, request: dict) -> None:
         for uid in ids
     }
     heaviest = sorted(ids, key=capacities.get, reverse=True)[: request["batch_size"]]
-    dataset.studies = dataset.studies.filter(pl.col("StudyInstanceUID").is_in(heaviest))
+    dataset.studies = dataset.studies.filter(pl.col(STUDY).is_in(heaviest))
     gc.collect()
     torch.cuda.empty_cache()
     torch.cuda.reset_peak_memory_stats()
     predict_loader(
         model,
-        prediction_loader(
-            config, dataset, batch_size=request["batch_size"], num_workers=2
+        build_data_loader(
+            dataset, config.trainer, request["batch_size"], num_workers=2
         ),
         device,
         "fp32",
@@ -158,20 +164,20 @@ def verify_inference(bundle: Path, request: dict) -> None:
     )
     if example_targets != targets:
         raise ValueError("Example target order differs from the checkpoint")
-    example_ids, example_values = predict_loader(
+    example_ids, example_values, _ = predict_loader(
         model,
-        prediction_loader(
-            config, dataset, batch_size=request["batch_size"], num_workers=2
+        build_data_loader(
+            dataset, config.trainer, request["batch_size"], num_workers=2
         ),
         device,
         "fp32",
     )
     example = make_prediction_frame(example_ids, example_values, targets)
-    if set(example_ids) != set(template_studies["StudyInstanceUID"]):
+    if set(example_ids) != set(template_studies[STUDY]):
         raise ValueError("Example predictions differ from the mounted template studies")
-    example = template_studies.select("StudyInstanceUID").join(
+    example = template_studies.select(STUDY).join(
         example,
-        on="StudyInstanceUID",
+        on=STUDY,
         how="left",
         validate="1:1",
         maintain_order="left",

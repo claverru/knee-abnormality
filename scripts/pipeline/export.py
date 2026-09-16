@@ -1,8 +1,6 @@
 import hashlib
 import json
-import os
 import shutil
-import subprocess
 import sys
 import tempfile
 import time
@@ -12,28 +10,39 @@ from datetime import UTC, datetime
 from email.parser import Parser
 from importlib.metadata import PackageNotFoundError, metadata, version
 from pathlib import Path
-from typing import Literal
 
 import torch
 import yaml
 from packaging.utils import parse_wheel_filename
-from pydantic import BaseModel, ConfigDict, Field, FiniteFloat
-from pydantic_settings import CliImplicitFlag, SettingsError
+from pydantic import Field
+from pydantic_settings import SettingsError
 from pytorch_lightning.plugins.io import TorchCheckpointIO
 
-from knee_abnormality.bundle import (
-    BUNDLE_SCHEMA_VERSION,
-    bundle_hashes,
-    sha256_file,
-    verify_bundle,
+from knee_abnormality.cli import CLISettings
+from knee_abnormality.config import (
+    INFERENCE_BATCH_SIZE,
+    INFERENCE_NUM_WORKERS,
+    TEST_IMAGE_MULTIPLIER,
+    ExperimentConfig,
+    load_config,
 )
-from knee_abnormality.checkpoints import validate_checkpoint
-from knee_abnormality.cli import NonExitingCLISettings
-from knee_abnormality.config import ExperimentConfig, load_config
-from knee_abnormality.inference import load_checkpoint_model
-from knee_abnormality.preprocessing_identity import validate_preprocessing_identity
+from knee_abnormality.identity import validate_preprocessing_identity
+from knee_abnormality.inference.bundle import BUNDLE_SCHEMA_VERSION, bundle_hashes
+from knee_abnormality.inference.checkpoint import (
+    checkpoint_model,
+    read_checkpoint,
+    validate_checkpoint,
+)
+from knee_abnormality.provenance import git_revision, sha256_file
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+NOTEBOOK = Path(__file__).resolve().with_name("inference.ipynb")
+BUNDLED_SCRIPTS = (
+    "scripts/__init__.py",
+    "scripts/pipeline/__init__.py",
+    "scripts/pipeline/predict.py",
+    "scripts/pipeline/predict_worker.py",
+)
 INFERENCE_DISTRIBUTIONS = (
     "kornia",
     "pytorch-lightning",
@@ -55,42 +64,26 @@ CODEC_DISTRIBUTIONS = (
 )
 
 
-class ExportCLI(NonExitingCLISettings):
+class ExportCLI(CLISettings):
     checkpoint: Path
     output: Path
     wheel_dir: Path | None = None
     target_python: str | None = Field(default=None, pattern=r"^\d+\.\d+$")
     target_platform: str | None = None
-    verification_record: Path | None = None
-    image_multiplier: int = Field(default=2, gt=0)
-    inference_batch_size: int = Field(default=2, gt=0)
-    quick_verify: CliImplicitFlag[bool] = False
-    verification_samples: int = Field(default=16, ge=4)
-    codec_reference_bundle: Path | None = None
+    image_multiplier: int = Field(default=TEST_IMAGE_MULTIPLIER, gt=0)
+    inference_batch_size: int = Field(default=INFERENCE_BATCH_SIZE, gt=0)
+    inference_num_workers: int = Field(default=INFERENCE_NUM_WORKERS, ge=0)
 
 
-class VerificationRecord(BaseModel):
-    model_config = ConfigDict(extra="forbid", frozen=True)
-
-    checkpoint_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
-    bundled_source_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
-    validation_max_abs_difference: FiniteFloat = Field(ge=0)
-    validation_macro_auc: FiniteFloat | None = Field(default=None, ge=0, le=1)
-    validation_scope: Literal["full_fold", "sample"] = "full_fold"
-    validation_studies: int | None = Field(default=None, gt=0)
-    inference_image_multiplier: int | None = Field(default=None, gt=0)
-    details: dict = Field(default_factory=dict)
-    example_submission_rows: int = Field(gt=0)
-    example_submission_valid: bool
-    jpeg_lossless_decoded: bool
-    jpeg_2000_decoded: bool
-
-
-def _command(args: list[str]) -> str | None:
-    result = subprocess.run(
-        args, cwd=PROJECT_ROOT, text=True, capture_output=True, check=False
-    )
-    return result.stdout.strip() if result.returncode == 0 else None
+def _bundled_files() -> list[str]:
+    package = PROJECT_ROOT / "src" / "knee_abnormality"
+    return [
+        *(
+            path.relative_to(PROJECT_ROOT).as_posix()
+            for path in sorted(package.rglob("*.py"))
+        ),
+        *BUNDLED_SCRIPTS,
+    ]
 
 
 def _portable_config(config: ExperimentConfig, fold: int) -> dict:
@@ -164,11 +157,7 @@ def _training_source(checkpoint_path: Path) -> dict | None:
     for parent in checkpoint_path.parents:
         path = parent / "provenance.json"
         if path.is_file():
-            result = {
-                "path": str(path),
-                "sha256": sha256_file(path),
-                "record": json.loads(path.read_text(encoding="utf-8")),
-            }
+            result = _artifact_record(path)
             snapshot = parent / "source_snapshot.zip"
             result["source_snapshot"] = (
                 {"path": str(snapshot), "sha256": sha256_file(snapshot)}
@@ -182,50 +171,26 @@ def _training_source(checkpoint_path: Path) -> dict | None:
 
 
 def _copy_code(destination: Path) -> None:
-    package = destination / "knee_abnormality"
-    shutil.copytree(
-        PROJECT_ROOT / "src" / "knee_abnormality",
-        package,
-        ignore=shutil.ignore_patterns("__pycache__", "*.pyc"),
-    )
-    scripts = destination / "scripts"
-    pipeline = scripts / "pipeline"
-    pipeline.mkdir(parents=True)
-    shutil.copy2(PROJECT_ROOT / "scripts" / "__init__.py", scripts / "__init__.py")
-    shutil.copy2(
-        PROJECT_ROOT / "scripts" / "pipeline" / "__init__.py",
-        pipeline / "__init__.py",
-    )
-    shutil.copy2(
-        PROJECT_ROOT / "scripts" / "pipeline" / "predict.py",
-        pipeline / "predict.py",
-    )
-    utilities = scripts / "tools"
-    utilities.mkdir()
-    shutil.copy2(
-        PROJECT_ROOT / "scripts" / "tools" / "verify_inference.py",
-        utilities / "verify_inference.py",
-    )
+    for name in _bundled_files():
+        relative = Path(name)
+        target = destination / (
+            relative.relative_to("src") if relative.parts[0] == "src" else relative
+        )
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(PROJECT_ROOT / name, target)
 
 
 def _matches_training_snapshot(training_source: dict | None) -> bool:
     if training_source is None or training_source.get("source_snapshot") is None:
         return False
     snapshot = Path(training_source["source_snapshot"]["path"])
-    source_paths = sorted((PROJECT_ROOT / "src" / "knee_abnormality").rglob("*.py"))
-    source_paths.extend(
-        [
-            PROJECT_ROOT / "scripts" / "__init__.py",
-            PROJECT_ROOT / "scripts" / "pipeline" / "__init__.py",
-            PROJECT_ROOT / "scripts" / "pipeline" / "predict.py",
-            PROJECT_ROOT / "scripts" / "tools" / "verify_inference.py",
-        ]
-    )
     with zipfile.ZipFile(snapshot) as archive:
         names = set(archive.namelist())
-        for path in source_paths:
-            name = path.relative_to(PROJECT_ROOT).as_posix()
-            if name not in names or archive.read(name) != path.read_bytes():
+        for name in _bundled_files():
+            if (
+                name not in names
+                or archive.read(name) != (PROJECT_ROOT / name).read_bytes()
+            ):
                 return False
     return True
 
@@ -237,97 +202,16 @@ def _source_hash(code: Path) -> str:
     return hashlib.sha256(inventory).hexdigest()
 
 
-def _verification(
-    path: Path | None, checkpoint_hash: str, source_hash: str, image_multiplier: int
-) -> dict | None:
-    if path is None:
-        return None
-    path = path.expanduser().resolve()
-    value = VerificationRecord.model_validate_json(path.read_text(encoding="utf-8"))
-    if value.checkpoint_sha256 != checkpoint_hash:
-        raise ValueError("Verification record checkpoint hash does not match")
-    if value.bundled_source_sha256 != source_hash:
-        raise ValueError("Verification record bundled source hash does not match")
-    if value.inference_image_multiplier != image_multiplier:
-        raise ValueError(
-            "Verification record must identify this inference image multiplier"
-        )
-    if not all(
-        (
-            value.example_submission_valid,
-            value.jpeg_lossless_decoded,
-            value.jpeg_2000_decoded,
-        )
-    ):
-        raise ValueError("Verification record contains an unsuccessful required check")
+def _license_record(info) -> dict:
     return {
-        "source_path": str(path),
-        "source_sha256": sha256_file(path),
-        **value.model_dump(mode="json"),
+        "license": info.get("License-Expression")
+        or info.get("License")
+        or "not declared",
+        "license_classifiers": [
+            value for value in info.get_all("Classifier", []) if "License" in value
+        ],
+        "project_url": info.get("Home-page") or info.get("Project-URL"),
     }
-
-
-def _quick_verification(
-    bundle: Path,
-    args: ExportCLI,
-    config: ExperimentConfig,
-    epoch: int,
-    checkpoint_hash: str,
-    source_hash: str,
-    image_multiplier: int,
-) -> dict:
-    if args.codec_reference_bundle is None:
-        raise ValueError("Quick verification requires --codec-reference-bundle")
-    reference = args.codec_reference_bundle.expanduser().resolve()
-    previous = verify_bundle(reference)
-    evidence = previous.get("verification") or {}
-    if not previous.get("ready") or not all(
-        evidence.get(name) for name in ("jpeg_lossless_decoded", "jpeg_2000_decoded")
-    ):
-        raise ValueError("Codec reference bundle has no successful decoding evidence")
-    wheels = bundle_hashes(bundle / "wheels")
-    if not wheels or wheels != bundle_hashes(reference / "wheels"):
-        raise ValueError("Codec wheels differ from the verified reference bundle")
-    request = {
-        "config": config.model_dump(mode="json"),
-        "reference_csv": str(
-            args.checkpoint.expanduser().resolve().parent
-            / "epochs"
-            / f"validation_epoch_{epoch:03d}.csv"
-        ),
-        "samples": args.verification_samples,
-        "image_multiplier": image_multiplier,
-        "batch_size": args.inference_batch_size,
-        "checkpoint_sha256": checkpoint_hash,
-        "bundled_source_sha256": source_hash,
-        "codec_evidence": {
-            "bundle": str(reference),
-            "manifest_sha256": sha256_file(reference / "manifest.json"),
-            "wheel_hashes": wheels,
-        },
-    }
-    environment = os.environ.copy()
-    environment["PYTHONPATH"] = str(bundle / "code")
-    with tempfile.TemporaryDirectory(prefix="knee-verification-") as name:
-        request_file = Path(name) / "request.json"
-        request_file.write_text(json.dumps(request))
-        subprocess.run(
-            [
-                sys.executable,
-                "-m",
-                "scripts.tools.verify_inference",
-                "--bundle",
-                str(bundle),
-                "--request-file",
-                str(request_file),
-            ],
-            cwd=bundle,
-            env=environment,
-            check=True,
-        )
-    path = bundle / "verification.json"
-    value = VerificationRecord.model_validate_json(path.read_text())
-    return value.model_dump(mode="json")
 
 
 def _wheel_requirements(
@@ -371,15 +255,7 @@ def _wheel_requirements(
                 {
                     "name": normalized_name,
                     "version": normalized_version,
-                    "license": info.get("License-Expression")
-                    or info.get("License")
-                    or "not declared",
-                    "license_classifiers": [
-                        value
-                        for value in info.get_all("Classifier", [])
-                        if "License" in value
-                    ],
-                    "project_url": info.get("Home-page") or info.get("Project-URL"),
+                    **_license_record(info),
                     "wheel": source.name,
                 }
             )
@@ -388,153 +264,17 @@ def _wheel_requirements(
 
 def _dependency_record(name: str) -> dict:
     try:
-        info = metadata(name)
-        classifiers = [
-            value for value in info.get_all("Classifier", []) if "License" in value
-        ]
         return {
             "name": name,
             "version": version(name),
-            "license": info.get("License-Expression")
-            or info.get("License")
-            or "not declared",
-            "license_classifiers": classifiers,
-            "project_url": info.get("Home-page") or info.get("Project-URL"),
+            **_license_record(metadata(name)),
         }
     except PackageNotFoundError:
         return {"name": name, "version": None, "license": "not installed"}
 
 
-def _notebook() -> dict:
-    setup = """import json
-import os
-import shutil
-import subprocess
-import sys
-import time
-import zipfile
-from importlib.metadata import PackageNotFoundError, version
-from pathlib import Path
-
-started = time.perf_counter()
-configured = os.environ.get("KNEE_BUNDLE_DIR")
-if configured:
-    bundle = Path(configured).expanduser().resolve()
-else:
-    input_root = Path("/kaggle/input")
-    manifests = sorted({path for pattern in ("*/manifest.json", "*/*/manifest.json", "*/*/*/manifest.json") for path in input_root.glob(pattern)}) if input_root.is_dir() else []
-    archives = sorted({path for pattern in ("*/bundle.zip", "*/*/bundle.zip", "*/*/*/bundle.zip") for path in input_root.glob(pattern)}) if input_root.is_dir() else []
-    if len(manifests) == 1:
-        bundle = manifests[0].parent
-    elif len(archives) == 1:
-        bundle = Path("/kaggle/working/knee_bundle")
-        if bundle.exists():
-            shutil.rmtree(bundle)
-        bundle.mkdir(parents=True)
-        with zipfile.ZipFile(archives[0]) as archive:
-            archive.extractall(bundle)
-    else:
-        raise RuntimeError(f"Expected one mounted bundle, manifests={manifests}, archives={archives}")
-wheels = sorted((bundle / "wheels").glob("*.whl"))
-if wheels:
-    subprocess.run([sys.executable, "-m", "pip", "install", "--no-index", "--no-deps", *map(str, wheels)], check=True)
-manifest = json.loads((bundle / "manifest.json").read_text())
-versions = {}
-for item in manifest["dependencies"]:
-    try:
-        versions[item["name"]] = version(item["name"])
-    except PackageNotFoundError:
-        versions[item["name"]] = None
-print(json.dumps({"bundle": str(bundle), "dependency_versions": versions, "setup_seconds": time.perf_counter() - started}))"""
-    inference = """data_root = os.environ.get("KNEE_DATA_ROOT")
-output = Path(os.environ.get("KNEE_OUTPUT", "/kaggle/working/submission.csv" if Path("/kaggle/working").is_dir() else "submission.csv")).expanduser().resolve()
-command = [
-    sys.executable,
-    "-m",
-    "scripts.pipeline.predict",
-    str(bundle / "config.json"),
-    "--bundle",
-    str(bundle),
-    "--output",
-    str(output),
-    "--device",
-    os.environ.get("KNEE_DEVICE", "auto"),
-    "--precision",
-    os.environ.get("KNEE_PRECISION", "auto"),
-    "--batch-size",
-    os.environ.get("KNEE_BATCH_SIZE", str(manifest["runtime"].get("batch_size", 2))),
-    "--num-workers",
-    os.environ.get("KNEE_NUM_WORKERS", "8"),
-]
-if data_root:
-    command.extend(["--data-root", data_root])
-environment = os.environ.copy()
-environment["PYTHONPATH"] = str(bundle / "code")
-run_started = time.perf_counter()
-subprocess.run(command, check=True, env=environment)
-print(json.dumps({"inference_command_seconds": time.perf_counter() - run_started, "output": str(output)}))"""
-    validate = """sys.path.insert(0, str(bundle / "code"))
-import math
-import csv
-from knee_abnormality.bundle import discover_kaggle_data_root
-from knee_abnormality.dataset import resolve_raw_dir
-
-root = Path(data_root).expanduser().resolve() if data_root else discover_kaggle_data_root()
-template_path = resolve_raw_dir(root, "test") / "sample_submission.csv"
-with template_path.open(newline="") as stream:
-    template = list(csv.reader(stream))
-with output.open(newline="") as stream:
-    submission = list(csv.reader(stream))
-if not submission or submission[0] != template[0] or len(submission) != len(template):
-    raise RuntimeError("Submission schema or row count differs from the mounted template")
-if [row[0] for row in submission[1:]] != [row[0] for row in template[1:]]:
-    raise RuntimeError("Submission study order differs from the mounted template")
-for row in submission[1:]:
-    values = [float(value) for value in row[1:]]
-    if not all(math.isfinite(value) and 0 <= value <= 1 for value in values):
-        raise RuntimeError(f"Invalid probabilities for study {row[0]}")
-print(json.dumps({"validated_rows": len(submission) - 1, "columns": submission[0], "total_seconds": time.perf_counter() - started}))"""
-    return {
-        "cells": [
-            {
-                "cell_type": "code",
-                "execution_count": None,
-                "metadata": {},
-                "outputs": [],
-                "source": setup,
-            },
-            {
-                "cell_type": "code",
-                "execution_count": None,
-                "metadata": {},
-                "outputs": [],
-                "source": inference,
-            },
-            {
-                "cell_type": "code",
-                "execution_count": None,
-                "metadata": {},
-                "outputs": [],
-                "source": validate,
-            },
-        ],
-        "metadata": {
-            "kernelspec": {
-                "display_name": "Python 3",
-                "language": "python",
-                "name": "python3",
-            },
-            "language_info": {"name": "python", "version": "3"},
-        },
-        "nbformat": 4,
-        "nbformat_minor": 5,
-    }
-
-
 def export_bundle(args: ExportCLI) -> dict:
     started = time.perf_counter()
-    if args.quick_verify and args.verification_record is not None:
-        raise ValueError("Choose quick verification or an existing verification record")
     checkpoint_path = args.checkpoint.expanduser().resolve()
     output = args.output.expanduser().resolve()
     if not checkpoint_path.is_file():
@@ -543,7 +283,7 @@ def export_bundle(args: ExportCLI) -> dict:
         raise FileExistsError(f"Output already exists: {output}")
     output.parent.mkdir(parents=True, exist_ok=True)
     checkpoint_hash = sha256_file(checkpoint_path)
-    checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
+    checkpoint = read_checkpoint(checkpoint_path)
     saved = checkpoint.get("hyper_parameters")
     if not isinstance(saved, dict) or not isinstance(saved.get("config"), dict):
         raise TypeError("Checkpoint must include saved configuration metadata")
@@ -557,7 +297,6 @@ def export_bundle(args: ExportCLI) -> dict:
     ):
         raise ValueError("Checkpoint must include ordered targets and producing fold")
     saved_config = ExperimentConfig.model_validate(saved["config"])
-    image_multiplier = args.image_multiplier
     validate_checkpoint(checkpoint, saved_config, targets, fold)
     config = _portable_config(saved_config, fold)
     temporary = Path(tempfile.mkdtemp(prefix=f".{output.name}.", dir=output.parent))
@@ -571,13 +310,6 @@ def export_bundle(args: ExportCLI) -> dict:
             temporary / "code" / "knee_abnormality",
         )
         source_hash = _source_hash(temporary / "code")
-        verification = _verification(
-            args.verification_record, checkpoint_hash, source_hash, image_multiplier
-        )
-        if verification is not None:
-            (temporary / "verification.json").write_text(
-                json.dumps(verification, indent=2) + "\n", encoding="utf-8"
-            )
         requirements, wheels, wheel_dependencies = _wheel_requirements(
             args.wheel_dir, temporary / "wheels"
         )
@@ -590,31 +322,16 @@ def export_bundle(args: ExportCLI) -> dict:
             "experiment": config,
             "targets": list(targets),
             "fold": fold,
-            "inference": {"image_multiplier": image_multiplier},
+            "inference": {"image_multiplier": args.image_multiplier},
         }
         (temporary / "config.json").write_text(
             json.dumps(bundle_config, indent=2) + "\n", encoding="utf-8"
         )
-        TorchCheckpointIO().save_checkpoint(
-            _inference_checkpoint(checkpoint, config), temporary / "model.ckpt"
-        )
-        portable_model_config = load_config(temporary / "config.json")
-        load_checkpoint_model(
-            portable_model_config,
-            targets,
-            temporary / "model.ckpt",
-            torch.device("cpu"),
-        )
-        if args.quick_verify:
-            verification = _quick_verification(
-                temporary,
-                args,
-                saved_config,
-                int(checkpoint["epoch"]),
-                checkpoint_hash,
-                source_hash,
-                image_multiplier,
-            )
+        exported = _inference_checkpoint(checkpoint, config)
+        TorchCheckpointIO().save_checkpoint(exported, temporary / "model.ckpt")
+        portable_config = load_config(temporary / "config.json")
+        validate_checkpoint(exported, portable_config, targets)
+        checkpoint_model(exported, portable_config, targets, torch.device("cpu"))
         dependencies_by_name = {
             record["name"]: record
             for record in (
@@ -627,11 +344,8 @@ def export_bundle(args: ExportCLI) -> dict:
         (temporary / "THIRD_PARTY.json").write_text(
             json.dumps(third_party, indent=2) + "\n", encoding="utf-8"
         )
-        (temporary / "inference.ipynb").write_text(
-            json.dumps(_notebook(), indent=1) + "\n", encoding="utf-8"
-        )
-        included_commit = _command(["git", "rev-parse", "HEAD"])
-        included_status = _command(["git", "status", "--short"])
+        shutil.copy2(NOTEBOOK, temporary / "inference.ipynb")
+        included_commit, included_status = git_revision(PROJECT_ROOT)
         training_source = _training_source(checkpoint_path)
         training_commit = (
             training_source.get("record", {}).get("git_commit")
@@ -689,18 +403,20 @@ def export_bundle(args: ExportCLI) -> dict:
                 "wheel_files": wheels,
             },
             "dependencies": dependencies,
-            "verification": verification,
             "checks": {
                 "checkpoint_metadata": "passed",
                 "strict_model_load": "passed",
-                "local_inference": "passed" if verification else "not_requested",
             },
             "runtime": {
                 "device": "auto",
                 "precision": "auto",
-                "image_multiplier": image_multiplier,
+                "image_multiplier": args.image_multiplier,
                 "batch_size": args.inference_batch_size,
-                "automatic_precision_policy": "native CUDA BF16, otherwise FP32",
+                "batch_size_scope": "per_device",
+                "num_workers": args.inference_num_workers,
+                "num_workers_scope": "total",
+                "parallelism": "one_process_per_visible_gpu",
+                "automatic_precision_policy": "native CUDA BF16, other CUDA FP16 with fixed backbone chunks warmed at the input size, CPU FP32",
             },
             "unmet_prerequisites": unmet,
             "ready": not unmet,
@@ -728,7 +444,6 @@ def main() -> None:
                     "checkpoint_sha256": manifest["checkpoint"]["source_sha256"],
                     "fold": manifest["checkpoint"]["fold"],
                     "ready": manifest["ready"],
-                    "local_inference": manifest["checks"]["local_inference"],
                     "preparation_seconds": manifest["preparation_seconds"],
                     "unmet_prerequisites": manifest["unmet_prerequisites"],
                 }
@@ -738,7 +453,6 @@ def main() -> None:
         KeyError,
         OSError,
         RuntimeError,
-        subprocess.CalledProcessError,
         TypeError,
         ValueError,
         yaml.YAMLError,

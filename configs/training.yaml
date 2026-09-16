@@ -1,0 +1,76 @@
+name: training
+seed: 42
+
+paths:
+  data_root: ../data
+  output_root: ../outputs/training
+  label_manifest: labels/public-label-sources.json
+
+labels:
+  source: steven_v4
+
+validation:
+  split: all_5fold_v3
+  folds: [0]
+
+data:
+  reflection_augmentation:
+    probability: 0.5
+  sampling_sigma_mm: 40.0
+  validation_image_multiplier: 2
+  intensity_augmentation:
+    probability: 0.5
+    gamma_range: [0.85, 1.15]
+    contrast_range: [0.9, 1.1]
+  affine_augmentation:
+    probability: 0.7
+    rotation_degrees: 10.0
+    translation_fraction: 0.04
+    scale_range: [0.95, 1.05]
+  noise_augmentation:
+    probability: 0.15
+    std_range: [0.005, 0.02]
+  series_types:
+    - {plane: Axial, fluid_sensitive: 0, fat_suppression: 0, max_images: 18}
+    - {plane: Axial, fluid_sensitive: 1, fat_suppression: 1, max_images: 18}
+    - {plane: Coronal, fluid_sensitive: 0, fat_suppression: 0, max_images: 15}
+    - {plane: Coronal, fluid_sensitive: 1, fat_suppression: 1, max_images: 15}
+    - {plane: Sagittal, fluid_sensitive: 0, fat_suppression: 0, max_images: 15}
+    - {plane: Sagittal, fluid_sensitive: 1, fat_suppression: 1, max_images: 15}
+  spacing_mm: 0.625
+  image_size: 224
+  lower_quantile: 0.005
+  upper_quantile: 0.995
+  mean: [0.485, 0.456, 0.406]
+  std: [0.229, 0.224, 0.225]
+
+model:
+  backbone: rexnet_200.nav_in1k
+  pretrained: true
+  channels_last: false
+  checkpoint_backbone: false
+  backbone_eval: false
+  dropout: 0.0
+  series_dropout: 0.2
+
+optimizer:
+  backbone_lr: 0.0002
+  head_lr: 0.0006
+  weight_decay: 0.01
+  beta1: 0.9
+  beta2: 0.999
+  epsilon: 0.00000001
+  warmup_epochs: 1
+  minimum_lr_ratio: 0.01
+
+trainer:
+  max_epochs: 10
+  batch_size: 8
+  accumulate_grad_batches: 1
+  gradient_clip_val: 1.0
+  num_workers: 16
+  persistent_workers: true
+  prefetch_factor: 2
+  patience: 10
+  min_delta: 0.0001
+  deterministic: false

@@ -34,7 +34,7 @@ trainable-parameter count is not an inference-time estimate.
 The [aneurysm ablation](rsna-mri.md#intracranial-aneurysm-detection-2025) supports
 segmentation-task pretraining when suitable labels exist. It does not rank all
 medical pretraining above general visual pretraining. The knee review's
-[RAD-DINO preprocessing failure](../public-research.md#geometry-sampling-encoders-and-losses)
+[RAD-DINO preprocessing failure](public-research.md#geometry-sampling-encoders-and-losses)
 is an additional reason to pin the exact checkpoint and input normalization.
 
 ## External resources and label compatibility
@@ -49,14 +49,14 @@ is an additional reason to pin the exact checkpoint and input normalization.
 
 The first three are research leads with **current-competition eligibility
 unverified**. Check the actual image, annotation, and checkpoint terms separately
-before use. The [host guidance](../supervision.md#official-labeling-context)
+before use. The [host guidance](../modeling/supervision.md#official-labeling-context)
 already distinguishes routine registration from restrictive institutional
 access; this review does not require another approval step for ordinary research.
 
 ### MRNet
 
 MRNet's reference ACL label includes low-grade partial tears, whereas this
-competition's [rubric](../supervision.md#official-labeling-context) targets
+competition's [rubric](../modeling/supervision.md#official-labeling-context) targets
 high-grade tears. Its meniscal target merges menisci, and its abnormality target
 combines heterogeneous findings. The same disease name therefore does not imply
 the same binary label.
@@ -127,5 +127,5 @@ large acquisitions until a concrete missing capability justifies them.
 6. StanfordMIMI. *Stanford Knee MRI Multi-Task Evaluation Dataset*, `DATASET.md`, documented dataset version v1.0.0.
 
 Reviewed on 2026-09-10. [SKI10 closure](mri-benchmarks.md#ski10-historical-knee-localization-evidence)
-and the [KneeCoT ruling](../supervision.md#official-labeling-context) have separate
+and the [KneeCoT ruling](../modeling/supervision.md#official-labeling-context) have separate
 primary-source references.

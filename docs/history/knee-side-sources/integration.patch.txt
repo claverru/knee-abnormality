@@ -1,0 +1,640 @@
+diff --git a/configs/baseline.yaml b/configs/baseline.yaml
+index 9022913..c1e384a 100644
+--- a/configs/baseline.yaml
++++ b/configs/baseline.yaml
+@@ -1,4 +1,4 @@
+-name: reflection-sigma40
++name: knee-side-embedding
+ seed: 42
+ 
+ paths:
+@@ -58,6 +58,7 @@ model:
+   mil_attention_width: 128
+   dropout: 0.0
+   series_dropout: 0.2
++  side_dropout: 0.10
+ 
+ optimizer:
+   backbone_lr: 0.0002
+diff --git a/scripts/adhoc/analyze_physical_sampling.py b/scripts/adhoc/analyze_physical_sampling.py
+index eb0fe1e..78d91f8 100644
+--- a/scripts/adhoc/analyze_physical_sampling.py
++++ b/scripts/adhoc/analyze_physical_sampling.py
+@@ -18,6 +18,7 @@ from knee_abnormality.preprocessing.geometry import (
+     estimate_reference,
+     summarize_series,
+ )
++from knee_abnormality.preprocessing.laterality import series_side
+ from knee_abnormality.preprocessing.sampling import (
+     build_pool,
+     select_triplets,
+@@ -194,7 +195,15 @@ def main():
+             if kind not in kinds:
+                 continue
+             pool = build_pool(
+-                tuple((a.uid, IndexedSeries(a.records, a.geometry)) for a in items),
++                tuple(
++                    (
++                        a.uid,
++                        IndexedSeries(
++                            a.records, a.geometry, series_side(a.records, ())
++                        ),
++                    )
++                    for a in items
++                ),
+                 kind[0],
+                 reference,
+             )
+diff --git a/scripts/adhoc/diagnose_encoding_usage.py b/scripts/adhoc/diagnose_encoding_usage.py
+index 13a44b6..bc281a7 100644
+--- a/scripts/adhoc/diagnose_encoding_usage.py
++++ b/scripts/adhoc/diagnose_encoding_usage.py
+@@ -44,6 +44,15 @@ class DiagnoseCLI(CLISettings):
+     precision: Literal["auto", "fp32", "bf16"] = "auto"
+     bootstrap_resamples: int = Field(default=2000, ge=1)
+     bootstrap_seed: int = 20260913
++    side_manifest: Path | None = None
++    corruption_seed: int = 42
++    corruption_rates: tuple[float, ...] = (0.01, 0.05, 0.10)
++    problematic_manufacturers: tuple[str, ...] = (
++        "GEHC",
++        "Philips",
++        "Philips Healthcare",
++        "Philips Medical Systems",
++    )
+ 
+ 
+ VARIANTS = {
+@@ -59,6 +68,43 @@ VARIANTS = {
+ }
+ 
+ 
++def side_interventions(sides: pl.DataFrame, args: DiagnoseCLI) -> dict:
++    source = dict(zip(sides["StudyInstanceUID"], sides["knee_side"], strict=True))
++    known = sorted(uid for uid, value in source.items() if value)
++    problematic = {
++        row["StudyInstanceUID"]
++        for row in sides.iter_rows(named=True)
++        if set(json.loads(row["manufacturers"])) & set(args.problematic_manufacturers)
++    }
++    result = {
++        "without_knee_side": ({uid: 0 for uid in source}, []),
++        "swapped_knee_side": (
++            {uid: 3 - value if value else 0 for uid, value in source.items()},
++            known,
++        ),
++    }
++    for rate in args.corruption_rates:
++        count = round(rate * len(known))
++        for concentrated in (False, True):
++            rng = np.random.default_rng(
++                [args.corruption_seed, round(rate * 10_000), int(concentrated)]
++            )
++            order = [known[index] for index in rng.permutation(len(known))]
++            if concentrated:
++                order = [uid for uid in order if uid in problematic] + [
++                    uid for uid in order if uid not in problematic
++                ]
++            affected = sorted(order[:count])
++            values = dict(source)
++            values.update({uid: 3 - source[uid] for uid in affected})
++            name = (
++                f"corrupt_{'problematic_' if concentrated else ''}"
++                f"known_side_{round(rate * 100)}pct"
++            )
++            result[name] = (values, affected)
++    return result
++
++
+ def binary_cross_entropy(targets: np.ndarray, probabilities: np.ndarray) -> float:
+     values = np.clip(probabilities.astype(np.float64), 1e-7, 1 - 1e-7)
+     return float(-(targets * np.log(values) + (1 - targets) * np.log1p(-values)).mean())
+@@ -144,9 +190,18 @@ def paired_bootstrap(
+     return {name: interval(measurements) for name, measurements in values.items()}
+ 
+ 
+-def pooled_logits(model, encoded: dict, omitted: frozenset[str]) -> torch.Tensor:
++def pooled_logits(
++    model, encoded: dict, omitted: frozenset[str], sides: torch.Tensor | None = None
++) -> torch.Tensor:
+     features = encoded["features"]
+-    tokens = features
++    tokens = (
++        features
++        + model.knee_side_terms(
++            encoded["knee_side"] if sides is None else sides,
++            encoded["study"],
++            features.dtype,
++        )[:, None]
++    )
+     if "position_1d" not in omitted:
+         tokens = tokens + encoded["position_1d"][:, None]
+     if "position_2d" not in omitted:
+@@ -259,10 +314,20 @@ def main() -> None:
+     script_snapshot.parent.mkdir(parents=True)
+     shutil.copy2(__file__, script_snapshot)
+     shutil.copy2(config_path, args.output_dir / "effective_config.json")
++    side_manifest = args.side_manifest or max(
++        (fold_dir / "epochs").glob("knee_sides_validation_epoch_*.csv")
++    )
++    sides = pl.read_csv(side_manifest).sort("StudyInstanceUID")
++    if sides["StudyInstanceUID"].to_list() != studies["StudyInstanceUID"].to_list():
++        raise ValueError("Side manifest must match the complete validation fold")
++    shutil.copy2(side_manifest, args.output_dir / "knee_sides_validation.csv")
++    source_sides = dict(zip(sides["StudyInstanceUID"], sides["knee_side"], strict=True))
++    side_variants = side_interventions(sides, args)
++    names = [*VARIANTS, *side_variants]
+     loader = prediction_loader(
+         config, dataset, batch_size=args.batch_size, num_workers=args.workers
+     )
+-    collected = {name: [] for name in VARIANTS}
++    collected = {name: [] for name in names}
+     ids = []
+     geometry = []
+     inputs = []
+@@ -277,6 +342,10 @@ def main() -> None:
+             with torch.autocast(
+                 device_type=device.type, dtype=dtype, enabled=dtype is not None
+             ):
++                if batch["knee_side"].tolist() != [
++                    source_sides[uid] for uid in batch["study_uid"]
++                ]:
++                    raise ValueError("Loader knee sides differ from the side manifest")
+                 encoded = model.encode_batch(move_batch(batch, device))
+                 if encoded["batch_size"] != len(batch["study_uid"]):
+                     raise ValueError("Encoded batch size differs from study membership")
+@@ -286,6 +355,15 @@ def main() -> None:
+                             pooled_logits(model, encoded, omitted).float()
+                         ).cpu()
+                     )
++                for name, (values, _) in side_variants.items():
++                    override = torch.tensor(
++                        [values[uid] for uid in batch["study_uid"]], device=device
++                    )
++                    collected[name].append(
++                        torch.sigmoid(
++                            pooled_logits(model, encoded, frozenset(), override).float()
++                        ).cpu()
++                    )
+             visual = encoded["visual_valid"]
+             available = encoded["available_3d"]
+             token_study = encoded["study"]
+@@ -358,13 +436,13 @@ def main() -> None:
+                 f"{name}_auc": [
+                     metric_values[name]["per_target_auc"][target] for target in targets
+                 ]
+-                for name in VARIANTS
++                for name in names
+             },
+             **{
+                 f"{name}_mean_abs_probability_change": np.abs(
+                     predictions[name] - predictions["intact"]
+                 ).mean(0)
+-                for name in VARIANTS
++                for name in names
+                 if name != "intact"
+             },
+         }
+@@ -391,6 +469,25 @@ def main() -> None:
+             args.bootstrap_resamples,
+             args.bootstrap_seed,
+         )
++    vectors = model.knee_side_embedding.detach().float().cpu()
++    knee_side_embedding = {
++        "left_norm": float(vectors[0].norm()),
++        "right_norm": float(vectors[1].norm()),
++        "left_right_distance": float((vectors[0] - vectors[1]).norm()),
++        "left_right_cosine": float(
++            torch.nn.functional.cosine_similarity(vectors[0], vectors[1], dim=0)
++        ),
++    }
++    source_values = sides["knee_side"].to_numpy()
++    strata = {}
++    for column in ("side", "source"):
++        for value in sorted(sides[column].unique().to_list()):
++            mask = (sides[column] == value).to_numpy()
++            strata[f"{column}={value}"] = {
++                name: metrics(labels[mask], predictions[name][mask], targets)
++                for name in names
++            }
++    strata["known_side_studies"] = int((source_values > 0).sum())
+     result = {
+         "created_at": datetime.now(UTC).isoformat(),
+         "options": args.model_dump(mode="json"),
+@@ -429,7 +526,22 @@ def main() -> None:
+             else None,
+             "total_seconds": time.perf_counter() - started,
+         },
+-        "interventions": {name: sorted(omitted) for name, omitted in VARIANTS.items()},
++        "interventions": {
++            **{name: sorted(omitted) for name, omitted in VARIANTS.items()},
++            **{name: ["knee_side"] for name in side_variants},
++        },
++        "knee_side_interventions": {
++            "manifest": str(side_manifest),
++            "manifest_sha256": sha256_file(side_manifest),
++            "corruption_seed": args.corruption_seed,
++            "corruption": "flip known left/right; count is round(rate * known studies); problematic variants select problematic-manufacturer known studies first",
++            "problematic_manufacturers": list(args.problematic_manufacturers),
++            "affected_studies": {
++                name: affected for name, (_, affected) in side_variants.items()
++            },
++        },
++        "knee_side_embedding": knee_side_embedding,
++        "knee_side_strata": strata,
+         "metrics": metric_values,
+         "valid_3d_subset_metrics": subset,
+         "valid_3d_subset_without_3d_probability_change": subset_probability_change,
+diff --git a/src/knee_abnormality/augmentation.py b/src/knee_abnormality/augmentation.py
+index dfc6e13..f11ac9c 100644
+--- a/src/knee_abnormality/augmentation.py
++++ b/src/knee_abnormality/augmentation.py
+@@ -16,6 +16,7 @@ REFLECTION_IDENTITY = {
+     "center": "accepted_center_only_rejected_center_retains_unknown_3d",
+     "membership": "triplet_container_order_and_middle_slice_unchanged",
+     "embeddings": "plane_contrast_and_final_image_2d_anchor_unchanged_study_3d_dropout_retained",
++    "knee_side": "left_right_swapped_unknown_unchanged_before_side_dropout",
+     "positions": "negate_sagittal_preserve_axial_coronal",
+     "source_channels": "sagittal_2_minus_k_middle_unchanged_source_metadata_immutable",
+     "geometry": "S@(M_middle@F@U@q-center)/100;S=diag(-1,1,1);U=existing_half_pixel_inverse_affine",
+diff --git a/src/knee_abnormality/config.py b/src/knee_abnormality/config.py
+index 579b485..b5c23ca 100644
+--- a/src/knee_abnormality/config.py
++++ b/src/knee_abnormality/config.py
+@@ -170,6 +170,7 @@ class ModelConfig(ConfigModel):
+     mil_attention_width: Literal[128] = 128
+     dropout: Annotated[float, Field(ge=0, lt=1)]
+     series_dropout: Annotated[float, Field(ge=0, lt=1)]
++    side_dropout: Annotated[float, Field(ge=0, lt=1)]
+ 
+ 
+ class OptimizerConfig(ConfigModel):
+diff --git a/src/knee_abnormality/dataset.py b/src/knee_abnormality/dataset.py
+index d90b6aa..2c5f7ad 100644
+--- a/src/knee_abnormality/dataset.py
++++ b/src/knee_abnormality/dataset.py
+@@ -16,6 +16,11 @@ from knee_abnormality.preprocessing.geometry import (
+     project_reference,
+     reflection_eligibility,
+ )
++from knee_abnormality.preprocessing.laterality import (
++    KneeSide,
++    resolve_knee_side,
++    side_record,
++)
+ from knee_abnormality.preprocessing.preparation import (
+     PreparedSeries,
+     decode_series,
+@@ -167,6 +172,7 @@ class KneeStudyDataset(Dataset):
+         self.epoch = Value("q", 0)
+         self._slice_index: dict[Path, IndexedSeries] = {}
+         self._study_references: dict[str, StudyReference] = {}
++        self._study_sides: dict[str, KneeSide] = {}
+         self._center_projections: dict[Path, CenterProjection] = {}
+         missing = set(studies[STUDY].to_list()) - set(series_index)
+         if missing:
+@@ -198,6 +204,7 @@ class KneeStudyDataset(Dataset):
+                 )
+         eligible = []
+         indexed = []
++        sides = []
+         for uid, (candidate, plane) in sorted(candidates.items()):
+             try:
+                 records = self._records(candidate)
+@@ -205,9 +212,11 @@ class KneeStudyDataset(Dataset):
+                 continue
+             geometry = self._slice_index[candidate.directory].geometry
+             indexed.append((candidate.directory, geometry, len(records)))
++            sides.append((uid, self._slice_index[candidate.directory].side))
+             if len(records) >= self.data.slices_per_input:
+                 eligible.append((uid, plane, geometry))
+         reference = estimate_reference(tuple(eligible))
++        self._study_sides[study.uid] = resolve_knee_side(tuple(sides))
+         self._study_references[study.uid] = reference
+         for directory, geometry, count in indexed:
+             self._center_projections[directory] = (
+@@ -366,6 +375,7 @@ class KneeStudyDataset(Dataset):
+             "is_gold": bool(row.get("is_gold", False)),
+             "series": tuple(prepared),
+             "study_reference": self._study_references.get(study.uid),
++            "knee_side": self._study_sides[study.uid],
+             "target": target,
+             "target_observed": observed,
+             "failures": tuple(failures),
+@@ -444,6 +454,12 @@ def collate_studies(items: list[dict]) -> dict:
+         "study_centers": study_centers,
+         "center_valid": center_valid,
+         "reflection_eligible": reflection_eligible,
++        "knee_side": torch.tensor(
++            [item["knee_side"].value for item in items], dtype=torch.int64
++        ),
++        "knee_side_evidence": [
++            side_record(item["study_uid"], item["knee_side"]) for item in items
++        ],
+         "reflection_reasons": [item["reflection_reasons"] for item in items],
+         "selected_paths": [series.selected_paths for _, _, series in entries],
+         "sampling": [item["sampling"] for item in items],
+diff --git a/src/knee_abnormality/model.py b/src/knee_abnormality/model.py
+index a018f4d..4cadc01 100644
+--- a/src/knee_abnormality/model.py
++++ b/src/knee_abnormality/model.py
+@@ -55,6 +55,7 @@ class KneeAbnormalityModel(nn.Module):
+                 "Spatial tokens require triplets with physical 1D positions"
+             )
+         self.series_dropout = model.series_dropout
++        self.side_dropout = model.side_dropout
+         self.augmentation_settings = data
+         self.image_augmentation = ImageAugmentation()
+         self.prepared_channels = data.slices_per_input
+@@ -118,6 +119,7 @@ class KneeAbnormalityModel(nn.Module):
+         )
+         self.head = nn.Linear(model.projection_width, target_count)
+         self.spatial_tokens = SpatialTokens(model.projection_width, data.series_types)
++        self.knee_side_embedding = nn.Parameter(torch.zeros(2, model.projection_width))
+         self.train(self.training)
+ 
+     def train(self, mode: bool = True) -> "KneeAbnormalityModel":
+@@ -154,6 +156,30 @@ class KneeAbnormalityModel(nn.Module):
+             keep[rows, selected[rows]] = True
+         return keep
+ 
++    def _knee_sides(
++        self, sides: torch.Tensor, reflected_study: torch.Tensor
++    ) -> torch.Tensor:
++        effective = torch.where(reflected_study & (sides > 0), 3 - sides, sides)
++        if self.training and self.side_dropout > 0:
++            known = effective > 0
++            dropped = torch.zeros_like(known)
++            dropped[known] = (
++                torch.rand(int(known.sum()), device=sides.device) < self.side_dropout
++            )
++            effective = effective.masked_fill(dropped, 0)
++        return effective
++
++    def knee_side_terms(
++        self, sides: torch.Tensor, token_study: torch.Tensor, dtype: torch.dtype
++    ) -> torch.Tensor:
++        table = torch.cat(
++            (
++                self.knee_side_embedding.new_zeros(1, self.projection_width),
++                self.knee_side_embedding,
++            )
++        )
++        return table[sides[token_study]].to(dtype)
++
+     def _augment_images(
+         self, images: torch.Tensor, slice_mask: torch.Tensor
+     ) -> tuple[torch.Tensor, torch.Tensor]:
+@@ -275,12 +301,17 @@ class KneeAbnormalityModel(nn.Module):
+             len(presence),
+             features.dtype,
+         )
++        knee_side = self._knee_sides(batch["knee_side"], reflected_study)
+         return {
+             "features": features,
+             "position_1d": sinusoidal_positions(
+                 positions, self.projection_width, features.dtype
+             ),
+             **terms,
++            "knee_side": knee_side,
++            "knee_side_term": self.knee_side_terms(
++                knee_side, token_study, features.dtype
++            ),
+             "study": token_study,
+             "visual_valid": visual_valid,
+             "available_3d": available_3d,
+@@ -295,6 +326,7 @@ class KneeAbnormalityModel(nn.Module):
+             + encoded["position_3d"]
+             + encoded["plane"][:, None]
+             + encoded["contrast"][:, None]
++            + encoded["knee_side_term"][:, None]
+         )
+         return self._attention_pool(
+             tokens.flatten(0, 1),
+diff --git a/src/knee_abnormality/preprocessing/dicom.py b/src/knee_abnormality/preprocessing/dicom.py
+index cd8b696..a3d9904 100644
+--- a/src/knee_abnormality/preprocessing/dicom.py
++++ b/src/knee_abnormality/preprocessing/dicom.py
+@@ -10,6 +10,12 @@ import pydicom
+ from pydicom.filereader import read_partial
+ 
+ from knee_abnormality.preprocessing.geometry import NativePose, PoseLayout
++from knee_abnormality.preprocessing.laterality import (
++    EXPLICIT_FIELDS,
++    TEXT_FIELDS,
++    HeaderSide,
++    header_side,
++)
+ 
+ PREPARATION_ERRORS = (
+     AttributeError,
+@@ -28,6 +34,7 @@ class DicomHeader:
+     descriptor: NativePixelDescriptor | None
+     position_source: str
+     pose: NativePose | None
++    side: HeaderSide
+ 
+ 
+ @dataclass(frozen=True, slots=True)
+@@ -174,6 +181,17 @@ def read_header(path: Path) -> DicomHeader:
+         _native_descriptor(dataset, pixel_element, info),
+         "instance_number" if instance is not None else source,
+         _native_pose(dataset),
++        header_side(
++            {
++                field: dataset.get(field)
++                for field in (
++                    *EXPLICIT_FIELDS,
++                    *TEXT_FIELDS,
++                    "Manufacturer",
++                    "ManufacturerModelName",
++                )
++            }
++        ),
+     )
+ 
+ 
+diff --git a/src/knee_abnormality/preprocessing/series.py b/src/knee_abnormality/preprocessing/series.py
+index 62c6c8a..979a228 100644
+--- a/src/knee_abnormality/preprocessing/series.py
++++ b/src/knee_abnormality/preprocessing/series.py
+@@ -13,6 +13,7 @@ from knee_abnormality.preprocessing.geometry import (
+     SeriesGeometry,
+     summarize_series,
+ )
++from knee_abnormality.preprocessing.laterality import SeriesSide, series_side
+ 
+ KNOWN_BAD_INSTANCES = {
+     "1.2.826.0.1.3680043.8.498.66460523372602171398246641420761543626",
+@@ -35,6 +36,7 @@ class SliceRecord:
+ class IndexedSeries:
+     records: tuple[SliceRecord, ...]
+     geometry: SeriesGeometry
++    side: SeriesSide
+ 
+ 
+ def index_series(
+@@ -43,11 +45,13 @@ def index_series(
+     candidates = sorted(series_dir.glob("*.dcm"))
+     records = []
+     layouts = {}
++    sides = set()
+     for fallback, path in enumerate(candidates):
+         if path.stem in KNOWN_BAD_INSTANCES:
+             continue
+         try:
+             header = read_header(path)
++            sides.add(header.side)
+             physical = header.physical_position
+             position = (
+                 physical
+@@ -94,4 +98,6 @@ def index_series(
+             records
+         )
+     )
+-    return IndexedSeries(slices, summarize_series(slices))
++    return IndexedSeries(
++        slices, summarize_series(slices), series_side(slices, tuple(sides))
++    )
+diff --git a/src/knee_abnormality/preprocessing_identity.py b/src/knee_abnormality/preprocessing_identity.py
+index f52c97e..9362497 100644
+--- a/src/knee_abnormality/preprocessing_identity.py
++++ b/src/knee_abnormality/preprocessing_identity.py
+@@ -1,8 +1,10 @@
+ import hashlib
++import json
+ from pathlib import Path
+ 
+ from knee_abnormality.augmentation import REFLECTION_IDENTITY
+ from knee_abnormality.preprocessing.geometry import RELIABILITY
++from knee_abnormality.preprocessing.laterality import SIDE_POLICY
+ from knee_abnormality.preprocessing.sampling import SAMPLING_IDENTITY
+ from knee_abnormality.spatial_tokens import (
+     SPATIAL_TOKEN_IDENTITY,
+@@ -33,10 +35,11 @@ def preprocessing_identity(backbone: str, package_root: Path | None = None) -> d
+         digest.update(len(payload).to_bytes(8, "big"))
+         digest.update(payload)
+     return {
+-        "algorithm": "physical_gaussian_overlap_spatial_tokens_reflection_v2",
++        "algorithm": "physical_gaussian_overlap_spatial_tokens_reflection_knee_side_v3",
+         "reflection": dict(REFLECTION_IDENTITY),
+         "sampling": dict(SAMPLING_IDENTITY),
+         "reliability": dict(RELIABILITY),
++        "knee_side": json.loads(json.dumps(SIDE_POLICY)),
+         "spatial_tokens": {
+             **SPATIAL_TOKEN_IDENTITY,
+             "feature_mapping": backbone_mapping_identity(backbone),
+diff --git a/src/knee_abnormality/spatial_tokens.py b/src/knee_abnormality/spatial_tokens.py
+index 0ff6dcb..0081105 100644
+--- a/src/knee_abnormality/spatial_tokens.py
++++ b/src/knee_abnormality/spatial_tokens.py
+@@ -21,7 +21,7 @@ BACKBONE_MAPPINGS = {
+ }
+ 
+ SPATIAL_TOKEN_IDENTITY = {
+-    "algorithm": "all_valid_spatial_tokens_five_embeddings_v1",
++    "algorithm": "all_valid_spatial_tokens_six_embeddings_knee_side_v2",
+     "projection": "shared_linear_C_to_256",
+     "position_1d": "sinusoidal_middle_slice_acquisition_midpoint_mm",
+     "position_2d": "augmented_input_anchor_align_corners_linear2_64_gelu_linear64_256",
+@@ -37,6 +37,22 @@ SPATIAL_TOKEN_IDENTITY = {
+         "replacement": "unknown_3d_no_rescaling",
+         "rng": "torch_seeded_training_rng",
+     },
++    "knee_side": {
++        "policy": "preprocessing_laterality_side_policy",
++        "states": {"0": "unknown", "1": "left", "2": "right"},
++        "parameters": "two_learned_256_vectors_left_right",
++        "unknown": "fixed_zero_vector",
++        "initialization": "zeros_no_rng_after_existing_initialization",
++        "placement": "study_vector_broadcast_to_all_image_tokens_before_layernorm",
++        "reflection": "reflected_study_swaps_left_right_unknown_unchanged_source_immutable",
++        "dropout": {
++            "probability": "model.side_dropout",
++            "unit": "known_effective_side_study_per_training_forward_after_reflection",
++            "replacement": "unknown_zero_no_rescaling",
++            "rng": "torch_seeded_training_rng_after_3d_dropout",
++        },
++        "optimizer": "head_lr_weight_decay",
++    },
+     "visual_validity": "all_channel_inverse_augmented_anchors_inside_prepared_rectangles",
+     "availability_3d": "native_poses_accepted_series_accepted_center_finite_xyz_independent_visual_validity",
+     "preparation": "rounded_resampling_half_pixel_crop_v1",
+diff --git a/src/knee_abnormality/training.py b/src/knee_abnormality/training.py
+index 7174156..5ac2581 100644
+--- a/src/knee_abnormality/training.py
++++ b/src/knee_abnormality/training.py
+@@ -3,6 +3,7 @@ import math
+ from pathlib import Path
+ 
+ import numpy as np
++import polars as pl
+ import pytorch_lightning as L
+ import torch
+ from torch.nn import functional as F
+@@ -152,6 +153,8 @@ class BaselineModule(L.LightningModule):
+         self.validation_rows: list[
+             tuple[list[str], np.ndarray, np.ndarray, np.ndarray]
+         ] = []
++        self.training_sides: dict[str, dict] = {}
++        self.validation_sides: dict[str, dict] = {}
+         self.save_hyperparameters(
+             {
+                 "config": config.model_dump(mode="json"),
+@@ -172,11 +175,29 @@ class BaselineModule(L.LightningModule):
+ 
+     def on_train_epoch_start(self) -> None:
+         self.sampling_epoch = self.current_epoch
++        self.training_sides.clear()
+         dataset = getattr(self.trainer.train_dataloader, "dataset", None)
+         if hasattr(dataset, "set_epoch"):
+             dataset.set_epoch(self.current_epoch)
+ 
++    def _record_sides(self, batch: dict, records: dict[str, dict]) -> None:
++        for record in batch["knee_side_evidence"]:
++            records[record["StudyInstanceUID"]] = record
++
++    def _write_sides(self, records: dict[str, dict], name: str) -> None:
++        self.prediction_dir.mkdir(parents=True, exist_ok=True)
++        pl.from_dicts(
++            [records[uid] for uid in sorted(records)], infer_schema_length=None
++        ).write_csv(self.prediction_dir / name)
++
++    def on_train_epoch_end(self) -> None:
++        self._write_sides(
++            self.training_sides,
++            f"knee_sides_training_epoch_{self.current_epoch:03d}.csv",
++        )
++
+     def training_step(self, batch: dict, batch_index: int) -> torch.Tensor:
++        self._record_sides(batch, self.training_sides)
+         logits = self(batch).to(torch.float32)
+         loss = masked_binary_cross_entropy_with_logits(
+             logits, batch["target"], batch["target_observed"]
+@@ -193,9 +214,11 @@ class BaselineModule(L.LightningModule):
+ 
+     def on_validation_epoch_start(self) -> None:
+         self.validation_rows.clear()
++        self.validation_sides.clear()
+ 
+     def validation_step(self, batch: dict, batch_index: int) -> None:
+         prediction = torch.sigmoid(self(batch).to(torch.float32))
++        self._record_sides(batch, self.validation_sides)
+         self.validation_rows.append(
+             (
+                 batch["study_uid"],
+@@ -227,6 +250,14 @@ class BaselineModule(L.LightningModule):
+         make_prediction_frame(study_ids, predictions, self.targets).write_csv(
+             self.prediction_dir / f"validation_epoch_{self.current_epoch:03d}.csv"
+         )
++        if sorted(self.validation_sides) != sorted(study_ids):
++            raise RuntimeError(
++                "Validation knee sides differ from prediction membership"
++            )
++        self._write_sides(
++            self.validation_sides,
++            f"knee_sides_validation_epoch_{self.current_epoch:03d}.csv",
++        )
+         (
+             self.prediction_dir / f"metrics_epoch_{self.current_epoch:03d}.json"
+         ).write_text(json.dumps(result, indent=2) + "\n")

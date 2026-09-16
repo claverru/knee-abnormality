@@ -1,21 +1,54 @@
 version: 1
 scripts:
+  - id: audit-knee-side-geometry
+    path: scripts/adhoc/audit_knee_side_geometry.py
+    summary: Measure coordinate-based knee-side agreement and unresolved coverage using physical DICOM geometry only.
+    tags: [laterality, knee, side, geometry, coordinates, orientation, metadata, audit]
+    commands:
+      - rtk proxy env CUDA_VISIBLE_DEVICES= POLARS_MAX_THREADS=1 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 uv run --locked python -m scripts.adhoc.audit_knee_side_geometry --output-dir outputs/analysis/knee-side-geometry-new
+    inputs: [Reviewed knee-laterality header and study snapshots, Official series CSVs, Original DICOM metadata for dimensions and coil fields, Optional enriched geometry snapshot, Training reports for corroboration only]
+    outputs: [Physical centers and orientation parquet, Agreement and coverage CSVs, Categorical metadata summaries, Report-side corroboration, Summary and fingerprint manifest, Script snapshot under source/]
+    notes:
+      - Reads metadata with two CPU threads; no pixels, models, tests, training or GPU access.
+      - Measures agreement with explicit or text-derived side separately; neither is independent anatomical truth.
+      - Coordinate margins and cross-series agreement gates are exploratory; unresolved rows remain candidate assignments only.
+      - --enriched-headers reuses an existing geometry snapshot without new DICOM reads; requires a fresh output directory.
+      - Training reports are a separate weak reference, never an inference input; no image-based methods are used.
+      - Copies its source to source/<repo-relative path> and records the copied hashes in manifest.json.
+    docs: [docs/metadata/knee-side-coordinate-investigation.md]
+
+  - id: audit-knee-laterality
+    path: scripts/adhoc/audit_knee_laterality.py
+    summary: Audit explicit and textual knee-side evidence across local train and example-test DICOM series.
+    tags: [laterality, knee, side, left, right, metadata, dicom, headers, audit]
+    commands:
+      - rtk proxy env CUDA_VISIBLE_DEVICES= POLARS_MAX_THREADS=1 uv run --locked python -m scripts.adhoc.audit_knee_laterality --output-dir outputs/analysis/knee-laterality-new
+    inputs: [Official local train and test series CSVs, Original DICOM headers, Optional prior header snapshot]
+    outputs: [Headers and study assignments parquet, Field-level evidence parquet, Unique descriptions CSV, Summary and provenance manifest, Script snapshot under source/]
+    notes:
+      - Reads three lexicographically selected headers per series with stop_before_pixels; no pixel decoding, model execution or GPU access.
+      - Defaults to two CPU threads; hidden Kaggle test data is unavailable locally.
+      - Separates explicit tags, conservative text inference, conflicts and unknowns; inferred text is not independently verified anatomy.
+      - Can reanalyze an existing headers parquet with --headers; requires a fresh output directory.
+      - Copies its source to source/<repo-relative path> and records the copied hashes in manifest.json.
+    docs: [docs/metadata/2026-09-14-knee-side-metadata-audit.md, docs/research/knee-side-and-location.md#metadata-and-reflection-requirements]
+
   - id: analyze-physical-sampling
     path: scripts/adhoc/analyze_physical_sampling.py
     summary: Measure production physical sampling and local fallback on the pinned saved geometry cohort.
     tags: [sampling, geometry, gaussian, triplets, overlap, density, acquisitions, center, metadata]
     commands:
       - rtk proxy uv run --locked python -m scripts.adhoc.analyze_physical_sampling --output-dir outputs/analysis/physical-sampling-new/geometry
-    inputs: [Saved 128-study geometry headers parquet, Series image-count inventory, Baseline config, Frozen fold membership, Archived prototype summary]
+    inputs: [Saved 128-study geometry headers parquet, Series image-count inventory, configs/training.yaml, Frozen fold membership, Archived prototype summary]
     outputs: [Source and input manifest, Per-draw and selected-triplet parquet tables, Source exposures and center diagnostics, Summary JSON]
     notes:
       - Reads saved metadata only; no pixels, models, training or tests.
-      - The source manifest records the configured backbone's spatial mapping identity.
+      - The source manifest records the configured backbone's spatial mapping identity; the script and every package module are copied to source/<repo-relative path>.
       - Calls the production sampler for both dataset modes, including rejected-center local fallback; retains the original comparison as an archived summary.
       - Default seed 20260913 and 32 randomized epochs; validation uses the configured multiplier.
       - Records target and realized coverage, intended and realized source shares, gap splits, plane disagreements, singletons and shortfalls.
       - Existing output directories are refused. Historical prototype source remains in outputs/analysis/physical-sampling-20260913/geometry-v3/source/.
-    docs: [docs/physical-sampling.md]
+    docs: [docs/data-preparation/physical-sampling/INDEX.md]
 
   - id: inspect-physical-preparation
     path: scripts/adhoc/inspect_physical_preparation.py
@@ -23,15 +56,15 @@ scripts:
     tags: [sampling, preparation, overlap, intensity, geometry, threading, cpu]
     commands:
       - rtk proxy uv run --locked python -m scripts.adhoc.inspect_physical_preparation --output-dir outputs/analysis/physical-sampling-new/preparation
-    inputs: [Pinned geometry headers and inventory, Baseline config, Original training DICOMs]
+    inputs: [Pinned geometry headers and inventory, configs/training.yaml, Original training DICOMs]
     outputs: [Source and input manifest, Selected paths and batch digests, Unique intensity populations, Metadata alignment and serial-threaded report]
     notes:
       - Includes all rejected-center studies and four accepted studies by default, in both dataset modes.
       - Compares serial and four-thread decoding and reversed row order; independently recomputes unique-slice clipping populations.
       - No synthetic fixtures, models, training, optimizer steps or test harness. Failure coverage depends on the real sample.
-      - Refuses existing output directories and preserves source, configuration and input identities.
+      - Refuses existing output directories and preserves source, configuration and input identities; sources are copied to source/<repo-relative path>.
       - The source manifest records the configured backbone's spatial mapping identity.
-    docs: [docs/data-preparation.md#overlapping-triplet-preparation, docs/physical-sampling.md#implementation-verification]
+    docs: [docs/data-preparation/current-preparation.md#overlapping-triplet-preparation, docs/data-preparation/physical-sampling/implementation-verification.md]
 
   - id: audit-sampling-protocols
     path: scripts/adhoc/audit_sampling_protocols.py
@@ -40,30 +73,36 @@ scripts:
     commands:
       - rtk proxy uv run --locked python -m scripts.adhoc.audit_sampling_protocols --output-dir outputs/analysis/physical-sampling-new/protocols
     inputs: [Saved geometry headers parquet with DICOM paths, Original sampled DICOM headers, Series image-count inventory]
-    outputs: [Protocol-field parquet snapshot, Field availability and repeat summary, Source snapshot and manifest]
+    outputs: [Protocol-field parquet snapshot, Field availability and repeat summary, Script snapshot under source/, Manifest]
     notes:
       - Reads the first sorted header of each sampled series with stop_before_pixels and specific tags; does not read or decode pixel data.
       - Uses exact supported plane and paired fluid-sensitive/fat-suppression metadata from the official inventory.
       - Exact sequence signatures are metadata descriptions, not clinical duplicate labels.
       - Refuses existing output directories; hashes metadata snapshots and sources, not complete original DICOM files.
-    docs: [docs/physical-sampling.md]
+    docs: [docs/data-preparation/physical-sampling/INDEX.md]
 
   - id: diagnose-encoding-usage
     path: scripts/adhoc/diagnose_encoding_usage.py
-    summary: Measure reliance on spatial-token embeddings using paired held-out checkpoint interventions without training.
-    tags: [encoding, spatial, tokens, ablation, diagnosis, validation, geometry, bootstrap]
+    summary: Measure a spatial-token checkpoint's reliance on its embeddings and planes using paired held-out interventions without training.
+    tags: [encoding, spatial, tokens, ablation, diagnosis, validation, bootstrap, plane, compartment, margin, cross-talk]
     status: active
     commands:
-      - rtk proxy uv run --locked python -m scripts.adhoc.diagnose_encoding_usage outputs/spatial-tokens-five-embeddings --output-dir outputs/analysis/encoding-usage-01 --workers 8
+      - rtk proxy uv run --locked python -m scripts.adhoc.diagnose_encoding_usage outputs/run --output-dir outputs/analysis/encoding-usage-run --workers 8
     inputs: [Trained run effective config, Selected or explicit checkpoint, Saved validation predictions and input identities, Full held-out fold DICOMs and labels]
-    outputs: [Per-variant study predictions, Geometry availability, Per-target metrics, Paired bootstrap intervals, Selected input identities, Source snapshot and hashed results]
+    outputs: [Per-variant study predictions, Per-target and compartment metrics, Paired bootstrap intervals, Selected input identities, Source snapshot and hashed results]
     notes:
-      - Manual evaluation only; no weights are modified and training does not launch this diagnostic.
-      - Reuses one projected backbone feature bank per batch for seven interventions before LayerNorm with unchanged visual membership.
-      - Records the configured backbone's spatial mapping alongside the source and checkpoint identities.
+      - Manual evaluation only; no weights are modified and training does not launch this diagnostic. Requires a checkpoint whose preprocessing identity matches the current sources; earlier checkpoints, including token-graph, 00-baseline and crop-selection runs, need their archived sources.
+      - Reuses one backbone pass per batch for six full-fold variants (intact; without 1D, 2D, plane, contrast or all position, which drops the 1D and 2D embeddings) plus axial-, coronal- and sagittal-only pooling of the intact tokens.
+      - Token-graph edge variants and graph statistics were removed with the token graph; the archived token-graph source keeps them.
+      - Plane-only variants cover only studies with visually valid tokens of that plane; their prediction files, per-target AUCs, metrics and bootstrap intervals compare against intact on the same studies, with study counts.
+      - Every variant reports medial/lateral meniscus and OA exclusive-positive logit-margin AUCs and lateral cross-talk at the prevalence threshold, with counts and the medial-positive base rate.
+      - The champion plane-only baseline was skipped by user decision on 2026-09-14, so plane-only margins exist only for later checkpoints.
+      - Records the configured backbone's spatial mapping alongside the source and checkpoint identities; copies the package and this script to source/<repo-relative path>.
+      - Reads the checkpoint once, validates it against the run config, target order and fold, requires its recorded input identity to match the current frozen inputs, and loads fold labels once.
+      - --batch-size defaults to the run config's trainer batch size; --workers defaults to eight.
       - Output directory must be fresh; investigate intact saved-prediction disagreement before interpreting small effects.
       - Defaults to 2000 paired study bootstrap replicates with seed 20260913; intervals do not measure training-seed variability.
-    docs: [docs/validation.md#manual-encoding-usage-diagnosis]
+    docs: [docs/validation/manual-encoding-usage-diagnosis.md]
   - id: normalize-reports
     path: scripts/adhoc/normalize_reports.py
     summary: Count distinct training reports after progressively aggressive multilingual lexical normalization.
@@ -77,25 +116,25 @@ scripts:
       - Saves raw and normalized report text only under the Git-ignored data directory by default.
       - Token-set equality loses word order and negation scope and does not establish clinical equivalence.
       - Existing output artifacts are overwritten; --input and --output-dir select paths.
-    docs: [docs/metadata.md#heavy-report-normalization]
+    docs: [docs/metadata/report-normalization.md]
   - id: train-overnight
     path: scripts/adhoc/train_overnight.py
-    summary: Run the seven planned learning-rate, weight-decay and duration experiments sequentially on fold 0.
-    tags: [train, overnight, queue, hyperparameters, learning-rate, weight-decay, experiments]
+    summary: Run the sixteen planned hyperparameter experiments sequentially on fold 0.
+    tags: [train, overnight, queue, hyperparameters, learning-rate, weight-decay, sampling, augmentation, crop, clipping, epochs, experiments]
     commands:
       - rtk proxy uv run --locked python -m scripts.adhoc.train_overnight
       - rtk proxy uv run --locked python -m scripts.adhoc.train_overnight --prepare-only
-    inputs: [Current baseline YAML, Prepared all_5fold_v3 split, Training DICOMs, Pinned labels and pretrained backbone]
-    outputs: [Unique outputs/overnight-* directory with seven YAML configs, Per-run artifacts and logs, status.tsv exit codes, runtime.json open-file limits, Validation comparison PNG for successful runs]
+    inputs: [configs/training.yaml, Prepared all_5fold_v3 split, Training DICOMs, Pinned labels and pretrained backbone]
+    outputs: [Unique outputs/training/overnight-* directory with sixteen YAML configs, Per-run artifacts and logs, status.tsv exit codes, runtime.json open-file limits, Validation comparison PNG for successful runs]
     notes:
-      - Snapshots all seven configs before training and fixes split v3, fold 0, seed 42, batch eight, series dropout 0.2 and validation density 2x.
-      - Starts fresh runs in order; the duration experiment has twenty epochs and the others have ten.
+      - Snapshots all sixteen configs before training and fixes split v3, fold 0 and seed 42; other settings come from --config (default configs/training.yaml).
+      - Starts fresh runs in order from 00-baseline, each with at most one change; 09-epochs12 has twelve epochs and the others use the configured budget.
       - Continues after individual training failures and returns nonzero if training or plotting fails. SIGINT or SIGTERM stops the queue and terminates its active process group.
       - Uses pydantic-settings for --config and --prepare-only; preparation never starts training.
       - Raises the process soft open-file limit to its inherited hard limit before training and records both limits in runtime.json.
       - Runs training and comparison plotting without invoking Codex or submitting to Kaggle.
-      - Run in a persistent terminal or with nohup to survive closing the terminal; every invocation creates a new queue.
-    docs: [docs/validation.md#overnight-hyperparameter-queue]
+      - Every invocation creates a new queue.
+    docs: [docs/validation/overnight-hyperparameter-queue.md, docs/backlog/overnight.md]
   - id: benchmark-dataloader-optimizations
     status: historical
     path: scripts/adhoc/benchmark_dataloader_optimizations.py
@@ -105,10 +144,11 @@ scripts:
       - rtk proxy env OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 uv run --locked python -m scripts.adhoc.benchmark_dataloader_optimizations configs/baseline.yaml --output-dir outputs/profiling/dataloader-optimizations --samples 128
       - rtk proxy env OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 uv run --locked python -m scripts.adhoc.benchmark_dataloader_optimizations configs/baseline.yaml --output-dir outputs/profiling/production-run.json --mode run --candidate production --samples 128
       - rtk proxy env OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 uv run --locked python -m scripts.adhoc.benchmark_dataloader_optimizations outputs/profiling/dicom-reader-20260912/workload.yaml --cohort outputs/profiling/dicom-reader-20260912/comparison-v1/timing_cohort.json --output-dir outputs/profiling/dicom-integration-new --mode dicom-suite --samples 128 --repeats 3 --audit-samples 8
-    inputs: [Baseline config, Training DICOMs, Frozen validation fold and label sources]
+    inputs: [Archived baseline config, Training DICOMs, Frozen validation fold and label sources]
     outputs: [Per-candidate JSON timings, DataLoader output audits, Progressive suite results]
     notes:
-      - Retired from the active runtime after physical sampling; execute only with its original archived source and configuration.
+      - Fails on import with the current package, which no longer provides the flat knee_abnormality.dataset, inference and runtime modules it imports; it runs only from an archived source tree and configuration that still provide them. Recorded results keep their sources under outputs/profiling/*/source or final-source.
+      - Retired from the active runtime after physical sampling; the commands assume that archived checkout, including its configs/baseline.yaml.
       - Retains C, NumPy and descriptor prototypes as historical candidates; production uses the actual dataset and collation, and production-reference uses independent frozen preprocessing and dataset sources in scripts/adhoc/dataloader_reference/.
       - Single runs and dicom-suite use the resolved batch size and exactly eight workers; the historical preprocessing suite requires batch size eight and eight configured workers.
       - dicom-suite compares production-reference with production, using the saved workload and 128-study cohort, the exact saved eight-study audit subset, corrected edge fixtures, training selections and persistent-worker ownership checks before three alternating timing pairs. A failed performance gate stops promotion.
@@ -119,50 +159,72 @@ scripts:
       - Audits returned tensors with assert_allclose and checks labels, selected paths, positions, grouping, failures and valid regions separately from timing.
       - OS page cache is uncontrolled; results represent first use by the application process, not guaranteed cold storage.
       - The suite measures input discovery, worker startup, preprocessing, collation, optional pinning and optional host-to-device delivery without model execution.
-    docs: [docs/data-preparation.md#production-dicom-integration, docs/inference-efficiency.md]
+    docs: [docs/data-preparation/production-dicom-integration.md, docs/inference/INDEX.md]
   - id: profile-threaded-loading
     path: scripts/adhoc/profile_threaded_loading.py
     summary: Compare worker-local slice threads against process-only loading on fixed real studies.
     tags: [profile, threading, parallel, dataloader, throughput, gpu, preprocessing]
     commands:
-      - rtk proxy uv run --locked python -m scripts.adhoc.profile_threaded_loading configs/baseline.yaml --mode audit --samples 8 --output-dir outputs/profiling/threading-audit-new
-      - rtk proxy uv run --locked python -m scripts.adhoc.profile_threaded_loading configs/baseline.yaml --mode gpu --workers 8 --decode-threads 1 --samples 256 --output-dir outputs/profiling/threading-gpu-new
-      - rtk proxy env OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 uv run --locked python -m scripts.adhoc.profile_threaded_loading configs/baseline.yaml --mode loader --workers 4 --decode-threads 2 --samples 512 --warmup-batches 16 --output-dir outputs/profiling/threading-loader-new
-    inputs: [Baseline config, Training DICOMs, Frozen fold and label sources]
+      - rtk proxy uv run --locked python -m scripts.adhoc.profile_threaded_loading configs/training.yaml --mode audit --samples 8 --output-dir outputs/profiling/threading-audit-new
+      - rtk proxy uv run --locked python -m scripts.adhoc.profile_threaded_loading configs/training.yaml --mode gpu --workers 8 --decode-threads 1 --samples 256 --output-dir outputs/profiling/threading-gpu-new
+      - rtk proxy env OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 uv run --locked python -m scripts.adhoc.profile_threaded_loading configs/training.yaml --mode loader --workers 4 --decode-threads 2 --samples 512 --warmup-batches 16 --output-dir outputs/profiling/threading-loader-new
+    inputs: [Experiment config, Training DICOMs, Frozen fold and label sources]
     outputs: [Per-batch timings and losses, Prepared-input audit hashes, Configuration and recursive project-relative source snapshots]
     notes:
-      - Experimental subclass leaves production loading unchanged; one thread calls the production preparation function.
+      - Experimental subclass overrides the dataset's _decode_series injection point and leaves production loading unchanged; one thread calls the production preparation function.
       - Reuses bounded pools created lazily after worker startup; preserves serial indexing and sampling and ordered joint clipping.
       - Selects four maximum-load training studies plus a seeded random sample; two passes repeat epoch-zero slice choices with persistent workers.
       - GPU mode uses bounded optimization steps with seeded random weights, current augmentation and constant learning rates; saves no checkpoint or validation metric.
       - Warmup batches are excluded from throughput; OS page cache is uncontrolled, so first passes are not cold-disk measurements.
       - Default loader mode consumes CPU batches immediately without pinning or GPU work and records wall-clock studies/s and selected slices/s.
-      - Honors adjacent_triplets sampling and complete-group failure handling; records triplets, channel appearances and unique source slices separately. Historical single-slice measurements use their source/config snapshots.
+      - Uses triplet sampling and complete-group failure handling; records triplets, channel appearances and unique source slices separately. Historical single-slice measurements use their source/config snapshots.
       - Uses shared production physical/local selection and retry preparation; decode threading only changes unique-path pixel loading.
       - Audit mode compares all collated fields with production on real studies without using CUDA.
-    docs: [docs/data-preparation.md#threading-inside-dataset-loading]
+    docs: [docs/data-preparation/threading-inside-dataset-loading.md]
   - id: profile-training
     path: scripts/adhoc/profile_training.py
     summary: Profile a bounded real-data sample to locate preprocessing costs and size baseline training batches.
     tags: [profile, preprocessing, throughput, batch, memory, gpu]
     commands:
-      - rtk proxy uv run --locked python -m scripts.adhoc.profile_training configs/baseline.yaml --output-dir outputs/profiling/preprocessing --mode preprocessing
-      - rtk proxy uv run --locked python -m scripts.adhoc.profile_training configs/baseline.yaml --output-dir outputs/profiling/gpu-new --mode gpu --batch-sizes 4 --samples 4 --warmup 1 --steps 2
-      - rtk proxy uv run --locked python -m scripts.adhoc.profile_training configs/baseline.yaml --output-dir outputs/profiling/loader-new --mode loader --batch-sizes 4 --workers 2,4,8 --samples 48 --warmup 2 --steps 6 --threads 16
-      - rtk proxy uv run --locked python -m scripts.adhoc.profile_training configs/baseline.yaml --output-dir outputs/profiling/lightning-new --mode lightning --samples 64 --warmup 1 --steps 2 --threads 16
-    inputs: [Baseline config, Training DICOMs, Frozen fold and label sources]
+      - rtk proxy uv run --locked python -m scripts.adhoc.profile_training configs/training.yaml --output-dir outputs/profiling/preprocessing-new --mode preprocessing
+      - rtk proxy uv run --locked python -m scripts.adhoc.profile_training configs/training.yaml --output-dir outputs/profiling/gpu-new --mode gpu --batch-sizes 8 --samples 8 --warmup 1 --steps 2
+      - rtk proxy uv run --locked python -m scripts.adhoc.profile_training configs/training.yaml --output-dir outputs/profiling/loader-new --mode loader --batch-sizes 4 --workers 2,4,8 --samples 48 --warmup 2 --steps 6 --threads 16
+      - rtk proxy uv run --locked python -m scripts.adhoc.profile_training configs/training.yaml --output-dir outputs/profiling/lightning-new --mode lightning --samples 64 --warmup 1 --steps 2 --threads 16
+    inputs: [Experiment config, Training DICOMs, Frozen fold and label sources]
     outputs: [JSON timings and input identities, Recursive project-relative source snapshot, CPU profiles, GPU memory and loader wait measurements, Backbone BatchNorm update counts]
     notes:
       - Samples fold-0 training studies only, retaining full configured slice limits.
       - Reports triplets, channel appearances and unique source slices separately in preprocessing mode.
       - Counts and hashes each selected acquisition separately while retaining the configured total budget per plane/contrast.
-      - Uses a few development steps without running an epoch or reporting validation AUC.
-      - GPU modes use seeded random weights and require CUDA; capacity profiling disables series dropout.
+      - Uses a few development steps without running an epoch or reporting validation AUC; Lightning mode uses the training BF16 precision and the configured batch size.
+      - GPU modes use seeded random weights and require CUDA; capacity profiling disables series dropout and accepts batch sizes up to eight.
+      - The GPU training step disables the autocast weight cache, as Lightning does.
+      - The shared sample starts with up to eight maximum-load training studies, then seeded random studies.
       - Capacity mode records BatchNorm counters to audit recomputation during activation checkpointing.
       - Uses the training CUDA allocator default and records explicit environment overrides in the manifest.
       - GPU sweeps stop on OOM or excessive allocator reservation; Lightning mode refuses to exhaust its subset.
       - Metadata indexes are reused on the second preprocessing pass; loader profiling starts with empty header caches.
-    docs: [docs/data-preparation.md#preprocessing-profile-and-optimization, docs/modeling.md#batch-4-memory-fix, docs/modeling.md#profiled-training-runtime]
+    docs: [docs/data-preparation/preprocessing-implementation-and-profile.md, docs/modeling/training-runtime-and-memory.md#batch-4-memory-fix, docs/modeling/training-runtime-and-memory.md#profiled-training-runtime]
+
+  - id: profile-kaggle-inference
+    path: scripts/adhoc/profile_kaggle_inference.py
+    summary: Run a frozen inference bundle over fold-0 training studies in one Kaggle notebook per runtime condition, then score FP16/FP32 parity and break down startup, loader, transfer, forward and per-stage DICOM loading time.
+    tags: [profile, inference, kaggle, notebook, t4, fp16, precision, runtime, efficiency, loader, workers, nfs, dicom, headers, throughput, parity, auc]
+    commands:
+      - rtk proxy uv run --locked python -m scripts.adhoc.profile_kaggle_inference launch --bundle outputs/submission/exports/run-fold0 --dataset OWNER/knee-profile-run-fold0 --output-dir outputs/profiling/kaggle-inference-new --conditions '["fp16-b4-w8","fp16-b4-w16"]'
+      - rtk proxy uv run --locked python -m scripts.adhoc.profile_kaggle_inference launch --bundle outputs/submission/exports/run-fold0 --dataset OWNER/knee-profile-run-fold0 --output-dir outputs/profiling/kaggle-loading-new --conditions '["loading"]'
+      - rtk proxy env CUDA_VISIBLE_DEVICES= uv run --locked python -m scripts.adhoc.profile_kaggle_inference analyze --output-dir outputs/profiling/kaggle-inference-20260915
+    inputs: [Exported inference bundle with instrumented runtime, Frozen fold membership and targets, Local BF16 validation predictions of the bundled checkpoint, Kaggle credentials]
+    outputs: [Private Kaggle dataset and notebooks, status.json with push and run states, Per-condition notebook outputs and logs, summary.json with AUC parity, timing and loading-stage breakdown]
+    notes:
+      - Each condition runs on a fresh Kaggle machine, so every run reads DICOMs cold like the hidden test; conditions are paired on the same fold-0 studies.
+      - The notebook presents training studies through a symlinked test layout under /tmp and runs the bundle's unchanged predict entry point, so image counts are enumerated from disk as on the hidden test.
+      - Launches at most two notebooks at once (the account's batch GPU session limit) and retries pushes rejected for that limit; a reused dataset must hold the same bundle manifest.
+      - Prediction conditions vary precision, per-GPU batch size and total loader workers on both GPUs; add a condition only when a measured bottleneck justifies it.
+      - The loading condition runs on a CPU notebook, times wrapped bundle preprocessing stages over 100 seeded studies cold then warm, and measures threaded header and full-file read throughput on separate cold studies.
+      - Samples /proc/stat and nvidia-smi once per second; AUC uses the training evaluation threshold and gold/report-derived split.
+      - The loading and precision cells import the bundle's knee_abnormality.data, data.preprocessing and inference.engine/checkpoint modules, so they need a bundle exported from the current package layout; bundles exported before 2026-09-16 (such as knee-reflection-sigma40-fast-20260915) only support prediction conditions. Analysis still sums project_reference timings recorded by those older loading runs.
+    docs: [docs/inference/2026-09-15-kaggle-inference-profiling.md]
 
   - id: audit-metadata
     path: scripts/adhoc/audit_metadata.py
@@ -176,7 +238,7 @@ scripts:
     notes:
       - Writes aggregate outputs and file hashes; report text is not emitted.
       - Existing output files are overwritten; --output-dir selects another destination.
-    docs: [docs/metadata.md]
+    docs: [docs/metadata/INDEX.md]
 
   - id: audit-public-labels
     path: scripts/adhoc/audit_public_labels.py
@@ -185,12 +247,12 @@ scripts:
     commands:
       - rtk proxy uv run --locked python -m scripts.adhoc.audit_public_labels --help
       - rtk proxy uv run --locked python -m scripts.adhoc.audit_public_labels
-    inputs: [docs/public-label-sources.json, Pinned public label CSVs, Official gold labels and saved folds]
+    inputs: [configs/labels/public-label-sources.json, Pinned public label CSVs, Official gold labels and saved folds]
     outputs: [data/labels/audit/public-v1/]
     notes:
       - Verifies source hashes and specific label transformations; source names are fixed in this investigation.
       - Existing aggregate outputs are overwritten; --output-dir selects another destination.
-    docs: [docs/public-label-audit.md#acquisition-and-reproduction]
+    docs: [docs/public-labels/public-label-audit-overview.md#acquisition-and-reproduction]
 
   - id: compare-public-labels
     path: scripts/adhoc/compare_public_labels.py
@@ -199,13 +261,13 @@ scripts:
     commands:
       - rtk proxy uv run --locked python -m scripts.adhoc.compare_public_labels --help
       - rtk proxy uv run --locked python -m scripts.adhoc.compare_public_labels --output-dir data/labels/audit/new-public-20260913-reproduction
-    inputs: [docs/public-label-comparison-sources.json, Pinned public label tables and metadata, Official train.csv and sample_submission.csv]
+    inputs: [configs/labels/public-label-comparison-sources.json, Pinned public label tables and metadata, Official train.csv and sample_submission.csv]
     outputs: [Audit JSON, Per-target gold AUC CSV, Pairwise difference CSV, Large silver disagreement CSV]
     notes:
       - Verifies downloaded file hashes and uses each source's explicit target-column mapping.
       - Reports reference replacement, matched-endpoint AUC, paired study bootstrap intervals and silver-target differences without report text.
       - Requires a fresh output directory; does not change production labels, train models or run tests.
-    docs: [docs/public-label-audit.md#2026-09-13-new-public-label-comparison]
+    docs: [docs/public-labels/2026-09-13-new-public-label-comparison.md]
 
   - id: check-environment
     path: scripts/adhoc/check_environment.py
@@ -218,4 +280,4 @@ scripts:
     notes:
       - Contains synthetic checks; do not execute under the current repository rule against running tests.
       - Retained to explain the historical environment verification, not as evidence of MRI pipeline correctness.
-    docs: [docs/environment.md#local-verification]
+    docs: [docs/architecture/environment.md#local-verification]

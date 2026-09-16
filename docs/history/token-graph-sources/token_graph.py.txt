@@ -1,0 +1,244 @@
+import torch
+from torch import nn
+from torch.nn import functional as F
+
+GRID_OFFSETS = ((-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1))
+SAME_SERIES_SLOTS = 4
+OTHER_SERIES_SLOTS = 8
+SLOTS = len(GRID_OFFSETS) + SAME_SERIES_SLOTS + OTHER_SERIES_SLOTS
+RADIUS_MM = 30.0
+OFFSET_SCALE_MM = 50.0
+MESSAGE_WIDTH = 128
+EDGE_WIDTH = 32
+EDGE_TYPES = ("grid", "same_series", "other_series_same_plane", "cross_plane")
+EDGE_FEATURES = 11
+
+TOKEN_GRAPH_IDENTITY = {
+    "algorithm": "local_knn_token_graph_gatv2_edgeconv_v1",
+    "nodes": "every_image_feature_grid_token_flattened_images_H_W",
+    "membership": "study_prepared_series_plane_visual_validity",
+    "incoming_slots": {
+        "grid": len(GRID_OFFSETS),
+        "same_series": SAME_SERIES_SLOTS,
+        "other_series": OTHER_SERIES_SLOTS,
+    },
+    "grid": "same_image_8_neighbourhood_row_major_offsets_both_visually_valid_no_geometry_required",
+    "same_series": "nearest_geometry_and_visually_valid_tokens_other_triplets_same_prepared_series",
+    "other_series": "nearest_geometry_and_visually_valid_tokens_other_prepared_series_same_study_typed_same_plane_or_cross_plane",
+    "search": "per_study_float32_cdist_disallowed_pairs_infinite_topk_no_cross_study_distances",
+    "radius_mm": RADIUS_MM,
+    "radius_distance": "exact_neighbour_minus_receiver_norm",
+    "edge_types": list(EDGE_TYPES),
+    "edge_features": [
+        "neighbour_minus_receiver_LPS_xyz_div50_zero_unless_both_geometry_valid",
+        "distance_div50_zero_unless_both_geometry_valid",
+        "both_geometry_valid",
+        "edge_type_one_hot_4",
+        "grid_row_column_offsets_zero_for_non_grid",
+        "all_zero_for_masked_slots",
+    ],
+    "construction": "no_grad_float32_outside_autocast",
+    "block": "prenorm_layernorm_query_256_128_key_256_128_edge_11_32_message_concat_query_key_minus_query_edge_288_128_gelu_score_128_1_no_bias_float32_masked_softmax_weighted_sum_output_128_256_no_bias_residual",
+    "position": "model_graph_placement_before_or_after_mil_layernorm",
+    "initialization": "output_projection_default_linear_init_scaled_by_model_graph_output_gain",
+    "optimizer": "optimizer_graph_lr_and_graph_weight_decay_for_matrices_no_decay_for_vectors",
+    "isolated_nodes": "no_valid_slot_no_update",
+    "visual_validity": "invalid_tokens_neither_send_nor_receive",
+    "geometry_dropout": {
+        "unit": "study_per_training_forward",
+        "dropped": "same_series_and_other_series_edges",
+        "retained": "grid_edges",
+        "rng": "torch_seeded_training_rng",
+        "evaluation": "all_edges_no_draw",
+    },
+}
+
+
+def build_token_graph(
+    points: torch.Tensor,
+    geometry_valid: torch.Tensor,
+    visual_valid: torch.Tensor,
+    study: torch.Tensor,
+    series: torch.Tensor,
+    plane: torch.Tensor,
+    grid_shape: tuple[int, int],
+    batch_size: int,
+    geometry_dropout: float,
+) -> dict:
+    device = points.device
+    with torch.no_grad(), torch.autocast(device_type=device.type, enabled=False):
+        images, tokens = visual_valid.shape
+        height, width = grid_shape
+        if height * width != tokens:
+            raise ValueError("Token graph grid shape differs from token count")
+        nodes = images * tokens
+        image = torch.arange(images, device=device).repeat_interleave(tokens)
+        node_study = study[image]
+        node_series = series[image]
+        node_plane = plane[image]
+        visual = visual_valid.flatten()
+        geometry = geometry_valid.flatten()
+        flat_points = points.flatten(0, 1).float()
+        offsets = torch.tensor(GRID_OFFSETS, device=device)
+        rows = (
+            torch.arange(height, device=device).repeat_interleave(width)[:, None]
+            + offsets[:, 0]
+        )
+        columns = (
+            torch.arange(width, device=device).repeat(height)[:, None] + offsets[:, 1]
+        )
+        inside = (rows >= 0) & (rows < height) & (columns >= 0) & (columns < width)
+        local = rows.clamp(0, height - 1) * width + columns.clamp(0, width - 1)
+        grid = (
+            torch.arange(images, device=device)[:, None, None] * tokens + local
+        ).flatten(0, 1)
+        grid_found = (
+            inside.expand(images, -1, -1).flatten(0, 1) & visual[:, None] & visual[grid]
+        )
+        receivers = torch.arange(nodes, device=device)[:, None]
+        same = receivers.expand(-1, SAME_SERIES_SLOTS).clone()
+        other = receivers.expand(-1, OTHER_SERIES_SLOTS).clone()
+        same_found = torch.zeros_like(same, dtype=torch.bool)
+        other_found = torch.zeros_like(other, dtype=torch.bool)
+        candidates = (visual & geometry).nonzero().flatten()
+        candidates = candidates[node_study[candidates].argsort(stable=True)]
+        counts = (
+            (
+                node_study[candidates][:, None]
+                == torch.arange(batch_size, device=device)[None]
+            )
+            .sum(0)
+            .tolist()
+        )
+        for members in candidates.split(counts):
+            if not len(members):
+                continue
+            distance = torch.cdist(flat_points[members], flat_points[members])
+            member_series = node_series[members]
+            member_image = image[members]
+            same_series = member_series[:, None] == member_series[None]
+            other_distance = distance.masked_fill(same_series, torch.inf)
+            same_distance = distance.masked_fill_(
+                ~same_series | (member_image[:, None] == member_image[None]),
+                torch.inf,
+            )
+            for distances, neighbours, found in (
+                (same_distance, same, same_found),
+                (other_distance, other, other_found),
+            ):
+                values, index = distances.topk(
+                    min(neighbours.shape[1], len(members)), dim=1, largest=False
+                )
+                neighbours[members, : index.shape[1]] = members[index]
+                found[members, : index.shape[1]] = values.isfinite()
+        neighbors = torch.cat((grid, same, other), 1)
+        mask = torch.cat((grid_found, same_found, other_found), 1)
+        both = geometry[neighbors] & geometry[:, None]
+        delta = torch.where(
+            both[..., None], flat_points[neighbors] - flat_points[:, None], 0.0
+        )
+        distance = delta.norm(dim=-1)
+        geometric = torch.arange(SLOTS, device=device) >= len(GRID_OFFSETS)
+        dropped = torch.zeros(batch_size, dtype=torch.bool, device=device)
+        if geometry_dropout > 0:
+            dropped = torch.rand(batch_size, device=device) < geometry_dropout
+        mask &= ~geometric | ((distance <= RADIUS_MM) & ~dropped[node_study][:, None])
+        edge_types = torch.cat(
+            (
+                torch.zeros_like(grid),
+                torch.ones_like(same),
+                torch.where(node_plane[other] == node_plane[:, None], 2, 3),
+            ),
+            1,
+        )
+        grid_offsets = torch.zeros(SLOTS, 2, device=device)
+        grid_offsets[: len(GRID_OFFSETS)] = offsets.float()
+        features = (
+            torch.cat(
+                (
+                    delta / OFFSET_SCALE_MM,
+                    distance[..., None] / OFFSET_SCALE_MM,
+                    both[..., None].float(),
+                    F.one_hot(edge_types, len(EDGE_TYPES)).float(),
+                    grid_offsets.expand(nodes, -1, -1),
+                ),
+                -1,
+            )
+            * mask[..., None]
+        )
+    return {
+        "neighbors": neighbors,
+        "mask": mask,
+        "edge_types": edge_types,
+        "features": features,
+        "geometry_dropped": dropped,
+    }
+
+
+class TokenGraphLayer(nn.Module):
+    def __init__(self, width: int, output_gain: float) -> None:
+        super().__init__()
+        self.norm = nn.LayerNorm(width)
+        self.query = nn.Linear(width, MESSAGE_WIDTH)
+        self.key = nn.Linear(width, MESSAGE_WIDTH)
+        self.edge = nn.Linear(EDGE_FEATURES, EDGE_WIDTH)
+        self.message = nn.Linear(2 * MESSAGE_WIDTH + EDGE_WIDTH, MESSAGE_WIDTH)
+        self.score = nn.Linear(MESSAGE_WIDTH, 1, bias=False)
+        self.output = nn.Linear(MESSAGE_WIDTH, width, bias=False)
+        with torch.no_grad():
+            self.output.weight.mul_(output_gain)
+
+    def forward(
+        self,
+        tokens: torch.Tensor,
+        neighbors: torch.Tensor,
+        mask: torch.Tensor,
+        features: torch.Tensor,
+    ) -> torch.Tensor:
+        normalized = self.norm(tokens)
+        query = self.query(normalized)
+        key = self.key(normalized)
+        messages = F.gelu(
+            self.message(
+                torch.cat(
+                    (
+                        query[:, None].expand(-1, neighbors.shape[1], -1),
+                        key[neighbors] - query[:, None],
+                        self.edge(features),
+                    ),
+                    -1,
+                )
+            )
+        )
+        scores = self.score(messages).squeeze(-1)
+        with torch.autocast(device_type=tokens.device.type, enabled=False):
+            weights = (
+                scores.float()
+                .masked_fill(~mask, torch.finfo(torch.float32).min)
+                .softmax(-1)
+                .masked_fill(~mask, 0.0)
+            )
+        update = (weights.to(messages.dtype)[..., None] * messages).sum(1)
+        return tokens + self.output(update)
+
+
+class TokenGraph(nn.Module):
+    def __init__(
+        self, width: int, layers: int, geometry_dropout: float, output_gain: float
+    ) -> None:
+        super().__init__()
+        self.geometry_dropout = geometry_dropout
+        self.layers = nn.ModuleList(
+            TokenGraphLayer(width, output_gain) for _ in range(layers)
+        )
+
+    def forward(
+        self,
+        tokens: torch.Tensor,
+        neighbors: torch.Tensor,
+        mask: torch.Tensor,
+        features: torch.Tensor,
+    ) -> torch.Tensor:
+        for layer in self.layers:
+            tokens = layer(tokens, neighbors, mask, features)
+        return tokens

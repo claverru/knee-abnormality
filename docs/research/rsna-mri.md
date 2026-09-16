@@ -6,7 +6,7 @@ that receives a label. Aneurysm detection strengthens the case for anatomical
 guidance when localization supervision exists. Brain radiogenomics supplies a
 counterexample to treating leaderboard rank as proof of a reliable method.
 
-Evidence conventions and review scope are in the [research index](README.md).
+Evidence conventions and review scope are in the [research index](INDEX.md).
 All reported measurements below belong to their source task.
 
 ## Lumbar spine degenerative classification, 2024

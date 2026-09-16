@@ -10,6 +10,8 @@ class CLISettings(BaseSettings):
         cli_parse_args=True,
         cli_kebab_case=True,
         cli_enforce_required=True,
+        cli_exit_on_error=False,
+        cli_hide_none_type=True,
     )
 
     @classmethod
@@ -22,10 +24,3 @@ class CLISettings(BaseSettings):
         file_secret_settings: PydanticBaseSettingsSource,
     ) -> tuple[PydanticBaseSettingsSource, ...]:
         return (init_settings,)
-
-
-class NonExitingCLISettings(CLISettings):
-    model_config = SettingsConfigDict(
-        cli_exit_on_error=False,
-        cli_hide_none_type=True,
-    )

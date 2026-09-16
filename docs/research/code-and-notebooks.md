@@ -65,7 +65,7 @@ packages dependencies offline in cells 1–4. Cell 7 specifies segmentation/ROI
 settings, classifier folds 0–3, two-way TTA, failure thresholds, and fixed fallback
 probabilities. Cell 8 starts the competition-specific inference server and uses
 `submission.parquet` in local evaluation. The knee competition instead has its
-own [CSV submission contract](../inference-efficiency.md#verified-submission-requirements).
+own [CSV submission contract](../inference/submission-requirements-and-output-contract.md#verified-submission-requirements).
 
 Borrow configurable stages, shared regional features, and explicit failure
 handling. Re-estimate any fallback from permitted training data; do not import
@@ -103,7 +103,7 @@ precise image-content criterion was not inspected.
 
 This is useful evidence that a winning repository can contain asymmetric
 sampling assumptions. It is not a reason to copy filename ordering into the knee
-pipeline. Use [physical DICOM geometry](../data-preparation.md#intensity-and-geometry),
+pipeline. Use [physical DICOM geometry](../data-preparation/unverified-preprocessing-notes.md#intensity-and-geometry),
 and explicitly record any intentional train/evaluation sampling difference.
 
 ## Trauma fold-held-out feature extraction
@@ -126,6 +126,6 @@ this is not a full audit of the authors' repositories. No external code,
 training, inference, or tests were run.
 
 Immutable source links identify the inspected artifacts, while the
-[research index](README.md) and topic bibliographies identify their associated
+[research index](INDEX.md) and topic bibliographies identify their associated
 papers and author-reported results. A future Kaggle pull may differ from these
 GitHub releases.

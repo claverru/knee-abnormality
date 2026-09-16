@@ -1,14 +1,17 @@
 import json
-import shutil
+import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
 import polars as pl
 import pydicom
 from pydantic import Field
+from pydantic_settings import SettingsError
 
 from knee_abnormality.cli import CLISettings
-from knee_abnormality.provenance import sha256_file
+from knee_abnormality.data.labels import STUDY
+from knee_abnormality.data.sources import SERIES
+from knee_abnormality.provenance import copy_sources, sha256_file
 
 TAGS = [
     "SequenceName",
@@ -28,7 +31,7 @@ TAGS = [
     "Manufacturer",
 ]
 NUMERIC = {"RepetitionTime", "EchoTime", "EchoTrainLength", "FlipAngle"}
-KEYS = ["StudyInstanceUID", "Anatomical_Plane", "Fluid_Sensitive", "Fat_Suppression"]
+KEYS = [STUDY, "Anatomical_Plane", "Fluid_Sensitive", "Fat_Suppression"]
 REDUCED = [
     "ScanningSequence",
     "SequenceVariant",
@@ -49,25 +52,17 @@ class Settings(CLISettings):
 def read_headers(settings: Settings) -> pl.DataFrame:
     headers = (
         pl.read_parquet(settings.headers)
-        .select(
-            [
-                "StudyInstanceUID",
-                "SeriesInstanceUID",
-                "path",
-                "Anatomical_Plane",
-                "Fluid_Sensitive",
-            ]
-        )
-        .sort(["SeriesInstanceUID", "path"])
-        .unique("SeriesInstanceUID", keep="first", maintain_order=True)
+        .select([STUDY, SERIES, "path", "Anatomical_Plane", "Fluid_Sensitive"])
+        .sort([SERIES, "path"])
+        .unique(SERIES, keep="first", maintain_order=True)
     )
     inventory = (
         pl.read_parquet(settings.inventory)
-        .select(["SeriesInstanceUID", "Fat_Suppression"])
-        .unique("SeriesInstanceUID")
+        .select([SERIES, "Fat_Suppression"])
+        .unique(SERIES)
     )
     rows = []
-    for row in headers.join(inventory, on="SeriesInstanceUID").iter_rows(named=True):
+    for row in headers.join(inventory, on=SERIES).iter_rows(named=True):
         dataset = pydicom.dcmread(
             row["path"], stop_before_pixels=True, specific_tags=TAGS
         )
@@ -84,7 +79,7 @@ def read_headers(settings: Settings) -> pl.DataFrame:
             record[f"{tag}_num"] = (
                 None if value is None else float(getattr(value, "value", value))
             )
-        record.update({key: row[key] for key in KEYS + ["SeriesInstanceUID", "path"]})
+        record.update({key: row[key] for key in KEYS + [SERIES, "path"]})
         rows.append(record)
     return pl.from_dicts(rows, infer_schema_length=1000)
 
@@ -180,8 +175,7 @@ def audit(frame: pl.DataFrame) -> dict:
     }
 
 
-def main() -> None:
-    settings = Settings()
+def run(settings: Settings) -> dict:
     if settings.output_dir.exists():
         raise FileExistsError(f"Output directory already exists: {settings.output_dir}")
     settings.output_dir.mkdir(parents=True, exist_ok=True)
@@ -202,11 +196,12 @@ def main() -> None:
         json.dumps(summary, indent=2) + "\n"
     )
     source = Path(__file__).resolve()
-    source_snapshot = settings.output_dir / source.name
-    shutil.copy2(source, source_snapshot)
+    source_snapshot = copy_sources([source], settings.output_dir / "source")
     source_files = [
         source,
         Path("src/knee_abnormality/cli.py"),
+        Path("src/knee_abnormality/data/labels.py"),
+        Path("src/knee_abnormality/data/sources.py"),
         Path("src/knee_abnormality/provenance.py"),
         Path("uv.lock"),
     ]
@@ -221,8 +216,9 @@ def main() -> None:
                 "sha256": sha256_file(settings.output_dir / name),
                 "bytes": (settings.output_dir / name).stat().st_size,
             }
-            for name in ("protocol-headers.parquet", "summary.json", source.name)
+            for name in ("protocol-headers.parquet", "summary.json")
         },
+        "source_snapshot": source_snapshot,
         "config": summary["config"],
         "limitations": [
             "Original raw DICOM files are not hashed; the selected-header parquet and emitted protocol snapshot are hashed to preserve header-only scope."
@@ -231,6 +227,20 @@ def main() -> None:
     (settings.output_dir / "manifest.json").write_text(
         json.dumps(manifest, indent=2) + "\n"
     )
+    return summary
+
+
+def main() -> None:
+    try:
+        summary = run(Settings())
+    except (
+        OSError,
+        ValueError,
+        pydicom.errors.InvalidDicomError,
+        SettingsError,
+    ) as error:
+        print(f"Sampling protocol audit error: {error}", file=sys.stderr)
+        raise SystemExit(2) from None
     print(json.dumps(summary, indent=2))
 
 

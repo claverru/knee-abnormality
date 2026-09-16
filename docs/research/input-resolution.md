@@ -1,0 +1,123 @@
+# Input resolution, field of view and slice density
+
+Researched on 2026-09-15 from four sources: an acquisition-header audit of all train and
+example-test series, image measurements on 300 series, this repository's past results, and
+a literature and competition review. Artifacts and scripts are in
+`outputs/analysis/input-resolution-research-20260915/` (`acquisition/`, `images/`). The
+[crop-run evidence](#evidence-from-the-crop-runs) was added on 2026-09-16; none of it is a
+controlled resolution test.
+
+## Answer
+
+Today's 224 px / 0.625 mm / 140 mm input discards some real in-plane detail and clips
+posterior anatomy in a third of sagittal series. Finer than about 0.5 mm adds almost
+nothing, because the stored ~0.31 mm images are interpolated. Depth sampling, with triplets
+about 17 mm apart at 1×, is a larger gap than in-plane resolution.
+
+The crop runs of 2026-09-15/16 suggest that ReXNet-200 needs both of these:
+
+- most slices;
+- a spacing of 0.625 mm or finer.
+
+Resolution at a fixed field of view is still untested. The 0.5 mm, 280 px test is deferred to
+the [end of the competition](../backlog/endgame.md#bigger-images).
+
+## Acquisition (all 24,371 train series)
+
+- **Stored images:** pixel median 0.31 mm (p5–p95 0.17–0.56), matrix median 512, FOV
+  median 160 mm (p5 140, p95 182–190) in every plane.
+- **Acquired resolution** (FOV ÷ acquisition matrix, usable for 86% of series): finer axis
+  median 0.49 mm (p25–p75 0.42–0.56), coarser axis median 0.625 mm (0.55–0.70), median
+  interpolation 2×. The spectra confirm interpolation, with sharp k-space cutoffs matching
+  the header, in 95–100% of series.
+  - GE has the coarsest phase axis (median 0.71 mm).
+  - Philips is the most isotropic.
+  - Fat-suppressed fluid-sensitive series are coarser than non-fat-suppressed ones.
+- **Share of series whose full acquired band fits under each spacing's Nyquist:**
+  0.3125 mm 99%, 0.417 mm 85%, 0.5 mm 59%, 0.625 mm 23%, 0.7 mm 12%.
+- **Downsampling loss** (repo resampler, native → spacing → native, inside tissue):
+
+  | Spacing (mm) | 0.3125 | 0.417 | 0.5 | 0.625 | 0.7 |
+  |---|---|---|---|---|---|
+  | SSIM | 0.97–0.99 | 0.94–0.96 | 0.91–0.95 | 0.84–0.90 | 0.79–0.87 |
+
+  0.625 → 0.5 mm cuts the error by about 21%.
+- **Through-plane:** thickness median 3.0 mm, spacing median 3.5 mm (p95 5.0), 30 slices,
+  depth 106 mm. A triplet spans about 10 mm. About 3.6% of series are 3D (0.4–1 mm spacing).
+- **Test examples** fall inside the train distributions.
+
+## Field of view and joint position
+
+- **Tissue sticking out more than 10 mm past an image-centred crop:**
+
+  | Crop | 120 | 130 | 140 | 150 | 160 |
+  |---|---|---|---|---|---|
+  | Sagittal (almost all posterior) | 81% | 64% | 34% | 8% | 2% |
+  | Coronal | 49% | 25% | 9% | 1% | 0% |
+  | Axial | 59% | 29% | 16% | 10% | 6% |
+- **Joint line:** a median 12.7 mm (sagittal) and 16.8 mm (coronal) below the native image
+  centre, more than 25 mm off in 6% and 16%. The heuristic is cross-checked within 10 mm
+  between planes in 96–98% of studies.
+- **Past crop results agree:**
+  - 150 → 140 mm at 224 px (0.67 → 0.625 mm) gave +0.003 local and +0.007 public.
+  - 130 and 128 mm crops tied overall but lost on MCL, Baker's, effusion and medial meniscus.
+  - That 140-mm gain also raised resolution, so the two effects are confounded.
+- Resolution at a fixed field of view has never been tested here.
+
+## Evidence from the crop runs
+
+The [crop-selection investigation](../history/crop-selection-investigation.md#what-the-runs-established)
+changed resolution, field of view, slice coverage and architecture together. It is therefore
+circumstantial evidence, from fold 0 and a single seed.
+
+- **0.5 mm crops helped central detail targets.**
+  - *Per-label crops:* 224 px windows at 0.5 mm on 75% of slices scored 0.891703 (−0.0011
+    against `00-baseline`).
+  - *Gains:* ACL +0.0111, synovitis +0.0077 and medial OA +0.0057.
+  - *Losses:* edge targets such as the lateral meniscus (−0.0102) and fracture (−0.0085), whose
+    slices or regions the crops left out
+    ([result](../validation/results/2026-09-16-per-label-crops-result.md#per-target-auc)).
+- **0.875 mm on every slice cost detail targets.**
+  - *Setup:* learned zoom's ReXNet-200 evidence was in effect at 0.875 mm on every slice.
+  - *Result:* 0.869951 (−0.0228).
+  - *Losses:* the lateral meniscus −0.1057, MCL −0.0671 and ACL −0.0223.
+  - *Diffuse findings held:* effusion +0.0055 and contusion +0.0004
+    ([result](../validation/results/2026-09-16-learned-zoom-result.md#per-target-auc)).
+- **Coverage mattered as much as resolution.** Runs that cropped about a quarter of the slices
+  at 0.5 mm scored 0.8796 (shared pooling) and 0.8451 (private pooling).
+
+## Depth sampling
+
+- **Gaps:** at 1× density each series gives 5–6 triplets with a median gap of 16.5–16.9 mm
+  (4–5 slices), and 36–58% of candidate slices fall inside some triplet. 2× halves the gap
+  (8–9 mm) and covers 71–88%.
+- **Clinical rule:** radiologists require a meniscal tear to appear on two images, which
+  argues against sparse slice sampling for menisci.
+
+## External evidence
+
+- **Clinical protocols:** 3–4 mm slices, FOV 130–180 mm, and in-plane 0.35–0.7 mm acquired.
+  ACR accreditation requires a pixel area ≤0.6 mm². Zero-filled interpolation adds no
+  information.
+- **Knee deep learning:** region crops beat full-scale inputs. Tack 2021: medial anterior
+  horn AUC 0.74 → 0.87 → 0.94 for full scale → crop → crop with box loss. No knee
+  resolution ablation exists.
+- **Kaggle winners:** 384–512 px whole images with 224–384 px region crops (lumbar spine,
+  abdominal trauma). None quantified a resolution gain.
+- **Public knee notebooks:** 336 px over 130–150 mm. Unverified working notes report 384 px
+  / 140 mm best, and 224 px −0.003.
+- **CNN scaling:** doubling resolution (4× compute) gives about +1.5–2.8 ImageNet points,
+  flattening at high resolution. Small medical findings benefit most from resolution
+  (chest X-ray nodules). Downsampling must be antialiased; the repository resampler is.
+
+## Compute constraints
+
+- **Pixel cost:** backbone compute and activations scale with pixels: 288² ≈ 1.65× and
+  320² ≈ 2.04× of 224². ReXNet-200 measured 2.462 GMACs per triplet at 280 px against 1.526 at
+  224 px, which is 1.61× for 1.56× the pixels
+  ([budget](../modeling/backbone-swaps.md#current-budget)).
+- **Training memory:** training already peaks at 20.5 GB of 24 GB at batch 8 (`00-baseline`:
+  20.02 GB), so a 1.65× input needs batch 4 with gradient accumulation 2, or fewer triplets.
+- **Kaggle:** inference runs on two T4s with 4 studies per GPU, in FP16 with fixed 64-image
+  backbone chunks. The backbone forward is about a quarter of prediction time at 16 loader
+  workers ([profiling](../inference/2026-09-15-kaggle-inference-profiling.md)).

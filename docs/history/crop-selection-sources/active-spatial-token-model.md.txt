@@ -1,0 +1,180 @@
+# Active spatial token model
+
+The active model applies target-specific attention MIL to two token sets: coarse tokens
+from a light scout on every whole canvas and fine tokens from ReXNet-200 on crops each label
+selects, as described in [crop selection](#crop-selection). ReXNet-200 gives 49 fine tokens
+per 224-pixel crop and the scout 361 coarse tokens per 300-pixel canvas, so a study yields
+1,176 fine tokens (24 crops) and, at the 64-canvas validation budget, up to 23,104 coarse
+tokens before masking. The MIL head uses no global pooling, regional queries, token
+interaction or grid reduction. The scorer stays 256→128→12 with its configured dropout,
+followed by per-target weighted features and linear heads, all shared by both token sets.
+
+Tokens receive four additive embeddings:
+
+| Embedding | Definition |
+|---|---|
+| 1D | Sinusoidal middle-slice distance in mm from the acquisition midpoint |
+| 2D | Anchor in the augmented canvas, plus the crop's integer offset for fine tokens, normalized independently to each canvas axis; 2→64→256 GELU MLP |
+| Plane | Learned Axial, Coronal, Sagittal embeddings |
+| Contrast | Learned metadata pairs `(0,0)` and `(1,1)` for fluid sensitivity/fat suppression |
+
+`encode_batch` adds them to the coarse projected features, applies the shared `mil_norm` and
+scores and pools the coarse tokens once (step 3 of [crop selection](#crop-selection));
+`pool_encoded` does the same for the fine tokens and mixes both pools with a learned per-label
+gate (step 7). Plane and contrast lookup buffers derive from configured metadata rather
+than slot order. The ReXNet adapter derives stride 32 and origin 0 from its convolutions.
+The scout adapter derives origin 0 at strides 16 and 32 from the scout's convolutions in
+module order. The [CoAtNet adapter](coatnet-224-spatial-backbone.md) derives stride 32 and
+origin 12 using its main convolution branch and attention pooling; other backbone mappings
+fail explicitly. Geometry and the coordinate MLP execute in float32 outside autocast;
+embeddings are cast to visual-feature dtype.
+
+Tokens carry no patient-coordinate geometry: the model reads neither LPS points nor the study
+center, and visual validity alone decides token membership. The per-token points and their
+geometry validity were removed with the [attention prior](#retired-attention-prior) on
+2026-09-16. Series dropout remains 0.20, restoring one present type when necessary.
+
+## Crop selection
+
+Implemented on 2026-09-15 from the [crop selection plan](../../crop-selection-plan.md), which
+owns the original rationale; runs and later revisions are tracked in
+[ongoing work](../ongoing.md#crop-selection). The shared-crops recipe below (2026-09-16) scored
+0.879626 ([result](../validation/2026-09-16-shared-crops-result.md)), below per-label crops
+(0.891703), because its crops cover few slices. It replaced the label-private recipe, whose private fine
+pooling and label FiLM are rejected
+([result](../validation/2026-09-16-label-private-crops-result.md)). `configs/baseline.yaml`
+carries it: 300-pixel canvases at 0.5 mm (150 mm), 224-pixel crops (112 mm,
+`data.crops_per_label: 2`) and `model.scout_backbone: mobilenetv3_small_100.lamb_in1k`. Crop
+selection replaced the full-triplet path, whose `00-baseline` run (0.892763) is the comparison and is
+reproduced from its saved configuration and source archive. `encode_batch` runs, in order:
+
+1. Series dropout, study reflection on uint8 canvases, then the existing affine,
+   gamma/contrast and noise augmentation on whole canvases, per series.
+2. The scout's stride-16 map (48 channels, 19×19) concatenated with its stride-32 map
+   (576 channels, 10×10) sampled bilinearly at the stride-16 anchors, projected 624→256 into
+   one coarse token per cell. Coarse geometry (canvas 2D anchors and visual validity) uses the
+   canvas augmentation and reflection inverses.
+3. **The coarse pool, computed once with gradient:** the embeddings, `mil_norm` and the
+   attention MLP give raw coarse scores `r`, and one float32 softmax per study and label over
+   its valid coarse tokens gives the coarse attention and pool. Selection reads a detached copy
+   of that attention; pooling (step 7) reuses the same scores and pool. The shared head applied
+   to the coarse pool alone is the draft, logged as `val_draft_macro_auc`.
+4. **Value map:** each label's own coarse attention `a_t` per cell
+   (`crop_selection.value_map`, the one place to swap the selection signal). Selection is
+   independent per label, so the earlier `ŷ_t(1−ŷ_t)·‖w_t‖` factor only added a per-label
+   constant to log scores; it was dropped on 2026-09-16 without changing any choice.
+5. **Per-label selection:** each label independently takes exactly
+   `data.crops_per_label` crops per study. A cell's gain is that label's value summed over its
+   14×14 footprint; training adds one Gumbel draw per canvas, cell and label to `log gain`,
+   evaluation takes the plain argmax, and each canvas offers its best cell. A label takes its
+   best canvas; each further crop takes its best unused canvas on a **plane the label has not
+   used yet**, then any unused canvas. Only when no unused canvas is left does it add a second
+   cell on a canvas it already cropped: the best selectable cell at least 3 scout cells
+   (Chebyshev, 48 px, 24 mm) from its crops there, else its best untaken selectable cell. The
+   count stays exact; a crop repeats only in a study with fewer selectable cells than `k`.
+   Labels do not compete: several may choose the same canvas at the same or different cells,
+   and every choice is still cut and encoded, so a study always has 24 crops in training and
+   validation. A selectable cell's crop leaves the canvas by less than one scout stride (6×6
+   cells per axis at 300/224), and its anchor lies inside all three channels' valid
+   rectangles; a study without selectable cells gets no crops. `encoded["crops"]` keeps each
+   crop's choosing label for analysis; nothing downstream reads it.
+6. Integer 224-pixel windows of the augmented, unnormalized canvas with top-left
+   `anchor − 112`, zero outside the canvas. ReXNet-200's plain `forward_features`, without
+   label conditioning, gives 49 fine tokens per crop. Fine geometry composes the integer offset
+   with the canvas inverses, and each fine token lands on a coarse cell whose raw coarse score
+   is added to its own.
+7. **Gated pooling over shared fine tokens:** per study and label, the coarse pool of step 3
+   and one softmax over **all** valid fine tokens of the study's 24 crops, mixed as
+   `g_t · coarse + (1 − g_t) · fine` with `g_t = sigmoid(·)` of a learned per-label parameter
+   initialized to 0 (`g_t = 0.5`). A crop chosen by several labels is encoded and pooled once
+   per choice, so every label's softmax sees it with that multiplicity. A study without valid
+   fine tokens uses its coarse pool alone. One shared head row per label classifies the mix;
+   tying it to the coarse pool keeps that pool a valid classifier on its own (the draft), which
+   is why the mix is not replaced by separate coarse and fine classifier rows. BCE on the mixed
+   logits is the only loss.
+
+Construction probes ReXNet-200 at the crop size and the scout at the canvas size, and
+rejects crops not smaller than canvases or whose half size, backbone stride or backbone
+anchor origin is not a multiple of the scout stride; the CoAtNet origin of 12 fails that
+check. `scout.backbone.*` trains at the backbone learning rate; the scout projection and the
+gate use the head learning rate, the gate without weight decay. FP16 inference
+(`use_fixed_backbone_chunks`) pads crops to fixed 64-image chunks. The label-private draft
+needed autocast with `cache_enabled=False`, as Lightning runs it, because its no-grad call of
+the attention MLP could cache gradient-free half-precision weights; no parameterised module
+runs under `no_grad` now. The label-private step peaked at 21.3 GiB allocated and took 0.46 s
+at batch 8 on the RTX 3090 (`outputs/profiling/private-crops-gpu`); the shared-crops step has
+not been profiled. Launch the fold-0 run with:
+
+```bash
+rtk proxy uv run --locked just train shared-crops configs/baseline.yaml 0
+```
+
+## Retired token graph
+
+A local kNN message-passing graph over all spatial tokens was implemented on 2026-09-14
+and retired on 2026-09-15 because trained models did not use it. It had replaced the
+additive 3D embedding, `unknown_3d` and its study-level 3D dropout, which stay removed.
+Two fold-0 runs, both measured with the encoding diagnostic:
+
+| Run | Graph setup | Macro AUC | Control | Without graph |
+|---|---|---:|---|---:|
+| `token-graph` | Two zero-initialized residual layers before `mil_norm`, head learning rate | 0.892376 | Champion 0.892360 | +0.000007 |
+| `graph-forced` | Default output initialization, update after `mil_norm`, learning rate 0.0018 without weight decay | 0.892679 | `00-baseline` 0.892763 | +0.000039 |
+
+The [token-graph result](../validation/2026-09-14-token-graph-result.md) owns the
+measurements. The plan and graph-era sources are archived as
+[historical token-graph sources](../history/token-graph-sources/README.md); the run
+source archives `outputs/token-graph/source_snapshot.zip` and
+`outputs/graph-forced/source_snapshot.zip` reproduce each run. Removing the graph
+changed the source, spatial-token and preprocessing identities, so every earlier
+checkpoint, including `00-baseline` and `attention-prior`, requires its archived sources.
+
+## Retired attention prior
+
+Implemented on 2026-09-15 from the
+[position research](../research/position-encoding.md#phase-1-head-only-changes) and retired on
+2026-09-16. Its fold-0 run [regressed by 0.002177](../validation/2026-09-15-attention-prior-result.md)
+against the matched `00-baseline` control, and its learned priors stayed nearly flat. With
+`model.attention_prior: gaussian_1d_2d_3d` it added three per-target log-biases
+`-0.5 * sum_k ((q_k - mu_k) / sigma_k)^2` (float32, `mu = 0` and `sigma = 2` initially, head
+learning rate without weight decay) to the coarse and fine attention scores before masking:
+
+| Term | Tokens | Input `q` | Parameters |
+|---|---|---|---|
+| 3D | Geometry- and visually valid; others got zero | `(abs(dx), dy, dz)` in 100 mm units, relative to the study's mean valid token point | Per target, `[12, 3]` |
+| 1D | Visually valid | `abs(1D position)` in 100 mm units | Per plane and target, `[3, 12]` |
+| 2D | Visually valid | 2D embedding input: `abs(x)` for Axial and Coronal, signed `x` for Sagittal, always signed `y` | Per plane and target, `[3, 12, 2]` |
+
+The 3D term was the only reader of each token's patient point, the middle-slice LPS anchor with
+reflection `S = diag(−1, 1, 1)` applied to the absolute point, and of its geometry validity.
+Retirement removed `attention_prior.py`, `model.attention_prior`, `configs/attention-prior.yaml`,
+those per-token points and validity, the collated `patient_maps` and `geometry_valid` tensors
+and the diagnostic's prior variants; the [reflection preview](../data-preparation/reflection-geometry-and-previews.md)
+computes its own LPS anchors. The measured run's sources are in
+`outputs/attention-prior/source_snapshot.zip`, and the last implementation is in
+`outputs/label-private-crops/source_snapshot.zip`.
+
+## Five-embedding predecessor
+
+The `spatial-tokens-five-embeddings` run, and every later run up to the champion, also
+added a 3D embedding (patient LPS minus the accepted study center, divided by 100 mm,
+through a 3→64→256 GELU MLP), used a learned `unknown_3d` vector for missing geometry and
+replaced available 3D with it for 0.10 of studies during training. It kept seed 42,
+`all_5fold_v3`, 224 pixels, 140 mm, 2× validation density, pretrained initialization,
+augmentation, labels, loss, optimizer and ten-epoch budget. Strict determinism remained
+disabled as in the incoming recipe; the historical average-pooling reference enabled it,
+so this execution difference must accompany later comparisons. The five embeddings and
+removal of the regional branch constituted one experiment. It was launched with:
+
+```bash
+rtk proxy uv run --locked just train spatial-tokens-five-embeddings
+```
+
+The completed run is saved in `outputs/spatial-tokens-five-embeddings/`. It selected
+epoch 10 at 0.889506 fold-0 macro AUC and **0.929 public AUC**, later surpassed by
+[3dsampling at 0.930](../validation/2026-09-13-3dsampling-validation-comparison.md); see the
+[validation comparison](../validation/2026-09-13-spatial-token-validation-comparison.md)
+for target changes, uncertainty, learning curves, timing and memory, and the
+[submission record](../inference/2026-09-13-spatial-token-submission.md).
+Historical checkpoints require their original
+source bundles; current source/config identities reject them without migration.

@@ -11,12 +11,13 @@ From the repository root:
 
 ```bash
 rtk proxy uv sync --locked
-rtk proxy uv run --locked python -m knee_abnormality.config configs/baseline.yaml
+rtk proxy uv run --locked python -m knee_abnormality.config configs/training.yaml
 rtk proxy uv run --locked python -m scripts.tools.validation prepare
-rtk proxy uv run --locked python -m scripts.pipeline.train configs/baseline.yaml
+rtk proxy uv run --locked python -m scripts.pipeline.train configs/training.yaml
 ```
 
-Shared Python code lives in `src/knee_abnormality/`. `uv sync` installs it in
+Shared Python code lives in `src/knee_abnormality/` (`data/`, `modeling/`,
+`training/`, `evaluation/` and `inference/` subpackages). `uv sync` installs it in
 editable mode, so scripts and notebooks can import `knee_abnormality` while
 source edits take effect immediately. Select `.venv/bin/python` in your editor
 or notebook.
@@ -33,7 +34,7 @@ and remote identities are explicit:
 
 ```bash
 rtk proxy uv run --locked just train RUN_ID
-rtk proxy uv run --locked just export CHECKPOINT OUTPUT WHEEL_DIR 3.12 manylinux_x86_64 VERIFICATION_RECORD
+rtk proxy uv run --locked just export CHECKPOINT OUTPUT
 rtk proxy uv run --locked just infer BUNDLE DATA_ROOT OUTPUT auto auto 8 2
 rtk proxy uv run --locked just submit BUNDLE OWNER/DATASET OWNER/NOTEBOOK RECORD "Fold 0"
 ```
@@ -45,19 +46,19 @@ a private Kaggle Dataset, runs the attached notebook with Internet disabled,
 validates its output, and submits only that successful saved version. A bare
 `just` lists these recipes without starting work.
 
-- [Project architecture](docs/architecture.md): where code belongs, component
+- [Project architecture](docs/architecture/INDEX.md): where code belongs, component
   boundaries, configuration, reusable caches, and fast experiment iteration.
 - [Documentation index](docs/INDEX.md): evidence, procedures, and decisions.
 - [Script index](scripts/INDEX.md): find existing commands and place new scripts.
 - [Ongoing work](docs/ongoing.md): the next implementation steps.
-- [Future work](docs/future-work.md): ranked inexpensive experiments and longer-term ideas.
-- [Environment](docs/environment.md): dependency pins and setup details.
+- [Backlog](docs/backlog/INDEX.md): ideas not yet started, by experiment type.
+- [Environment](docs/architecture/environment.md): dependency pins and setup details.
 
 The maintained train/predict entry points live in `scripts/pipeline/`; label and
 metadata preparation are shared setup code rather than a separate command.
 Reusable acquisition and validation utilities live in `scripts/tools/`.
 Metadata/label audits, environment probes, and one-off investigations belong
 in `scripts/adhoc/`. See the
-[script separation rules](docs/architecture.md#maintained-workflow-versus-ad-hoc-work).
+[script separation rules](docs/architecture/code-organization.md#maintained-workflow-versus-ad-hoc-work).
 Data, credentials, weights, and generated run artifacts stay outside version
 control.

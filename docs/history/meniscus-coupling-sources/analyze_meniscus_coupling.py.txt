@@ -1,0 +1,339 @@
+import json
+import shutil
+from pathlib import Path
+from zipfile import ZipFile
+
+import numpy as np
+import polars as pl
+import torch
+from pydantic import Field
+from sklearn.metrics import roc_auc_score
+from torch.nn import functional as F
+
+from knee_abnormality.cli import CLISettings
+from knee_abnormality.metrics import aucs, validation_metrics
+from knee_abnormality.provenance import sha256_file
+from scripts.adhoc.compare_public_labels import bootstrap_auc
+
+STUDY = "StudyInstanceUID"
+PAIRS = {
+    "meniscus": ("Medial Meniscus", "Lateral Meniscus"),
+    "oa": ("Medial OA", "Lateral OA"),
+}
+
+
+class AnalyzeCLI(CLISettings):
+    reference: Path = Path("outputs/reflection-sigma40")
+    candidate: Path = Path("outputs/meniscus-soft-coupling")
+    output_dir: Path = Path("outputs/analysis/meniscus-coupling-20260914")
+    headers: Path = Path(
+        "outputs/analysis/sharing-disagreement-20260914/study_headers.parquet"
+    )
+    bootstrap_draws: int = Field(default=2000, ge=100)
+    seed: int = 20260914
+
+
+def fingerprint(path):
+    return {"path": str(path), "sha256": sha256_file(path)}
+
+
+def differences(reference, candidate):
+    return {
+        key: {"reference": reference.get(key), "candidate": candidate.get(key)}
+        for key in sorted(reference.keys() | candidate.keys())
+        if reference.get(key) != candidate.get(key)
+    }
+
+
+def classifier_coupling_metrics(classifier_weight, indices):
+    medial, lateral = (classifier_weight[index].detach().float() for index in indices)
+    difference = medial - lateral
+    return {
+        "weight_mse": float(difference.square().mean()),
+        "weight_distance": float(difference.norm()),
+        "medial_weight_norm": float(medial.norm()),
+        "lateral_weight_norm": float(lateral.norm()),
+        "weight_cosine_similarity": float(F.cosine_similarity(medial, lateral, dim=0)),
+    }
+
+
+def analyze(settings):
+    torch.set_num_threads(1)
+    settings.output_dir.mkdir(parents=True, exist_ok=False)
+    roots = {"reference": settings.reference, "candidate": settings.candidate}
+    configs = {
+        name: json.loads((root / "effective_config.json").read_text())
+        for name, root in roots.items()
+    }
+    if differences(configs["reference"], configs["candidate"]).keys() - {
+        "name",
+        "loss",
+    }:
+        raise ValueError("Comparison requires matching configurations except name/loss")
+    config = configs["candidate"]
+    split = Path(config["paths"]["data_root"]) / "folds" / config["validation"]["split"]
+    if config["validation"]["folds"] != [0]:
+        raise ValueError("This investigation requires fold 0")
+    targets_path, studies_path = split / "targets.csv", split / "studies.csv"
+    labels = pl.read_csv(targets_path)
+    targets = labels.columns[1:]
+    frame = (
+        pl.read_csv(studies_path)
+        .filter(pl.col("fold") == 0)
+        .join(labels, on=STUDY, validate="1:1")
+        .join(
+            pl.read_parquet(settings.headers).select(STUDY, "vendor"),
+            on=STUDY,
+            validate="1:1",
+            how="left",
+        )
+        .sort(STUDY)
+    )
+    if frame["vendor"].null_count():
+        raise ValueError("Missing acquisition metadata")
+    truth = frame.select(targets).to_numpy().astype(float)
+    hard = (truth >= 0.5).astype(int)
+    indices = {name: [targets.index(t) for t in pair] for name, pair in PAIRS.items()}
+    predictions, runs, inputs = {}, {}, {}
+    for name, root in roots.items():
+        fold = root / "fold_0"
+        selected = json.loads((fold / "selected_checkpoint.json").read_text())
+        checkpoint_path = fold / Path(selected["path"]).name
+        checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
+        epoch = checkpoint["epoch"]
+        weights = classifier_coupling_metrics(
+            checkpoint["state_dict"]["model.head.weight"],
+            indices["meniscus"],
+        )
+        biases = checkpoint["state_dict"]["model.head.bias"][
+            indices["meniscus"]
+        ].tolist()
+        del checkpoint
+        prediction_path = fold / "validation_predictions.csv"
+        prediction = pl.read_csv(prediction_path).sort(STUDY)
+        if prediction[STUDY].to_list() != frame[STUDY].to_list():
+            raise ValueError(f"Prediction membership mismatch: {name}")
+        predictions[name] = prediction.select(targets).to_numpy().astype(float)
+        metrics = validation_metrics(
+            truth, predictions[name], targets, frame["is_gold"].to_numpy()
+        )
+        saved = json.loads(
+            (fold / "epochs" / f"metrics_epoch_{epoch:03d}.json").read_text()
+        )
+        if abs(metrics["macro_auc"] - saved["macro_auc"]) > 1e-12:
+            raise ValueError(
+                f"Selected predictions do not reproduce recorded AUC: {name}"
+            )
+        inputs[name] = json.loads((fold / "input_identity.json").read_text())
+        epoch_paths = sorted((fold / "epochs").glob("metrics_epoch_*.json"))
+        files = [
+            root / "effective_config.json",
+            root / "provenance.json",
+            root / "source_snapshot.zip",
+            checkpoint_path,
+            prediction_path,
+        ]
+        files += sorted(fold.glob("*.json")) + epoch_paths
+        initial = fold / "epochs" / "classifier_initialization.json"
+        if initial.exists():
+            files.append(initial)
+        runs[name] = {
+            "selected_epoch": epoch + 1,
+            "metrics": metrics,
+            "classifier_coupling": weights,
+            "meniscus_biases": biases,
+            "initial_classifier": json.loads(initial.read_text())
+            if initial.exists()
+            else None,
+            "epochs": [
+                {
+                    "epoch": int(p.stem.rsplit("_", 1)[1]) + 1,
+                    **json.loads(p.read_text()),
+                }
+                for p in epoch_paths
+            ],
+            "timing": json.loads((fold / "timing.json").read_text()),
+            "files": [fingerprint(p) for p in files],
+        }
+    identity_diff = differences(inputs["reference"], inputs["candidate"])
+    if identity_diff.keys() - {"preprocessing_identity"}:
+        raise ValueError(f"Unexpected input identity differences: {identity_diff}")
+    with (
+        ZipFile(settings.reference / "source_snapshot.zip") as left,
+        ZipFile(settings.candidate / "source_snapshot.zip") as right,
+    ):
+        source_changes = [
+            name
+            for name in sorted(set(left.namelist()) | set(right.namelist()))
+            if name not in left.namelist()
+            or name not in right.namelist()
+            or left.read(name) != right.read(name)
+        ]
+
+    def subset(mask, selected_targets):
+        ix = [targets.index(t) for t in selected_targets]
+        return {
+            "studies": int(mask.sum()),
+            "positive_counts": dict(
+                zip(
+                    selected_targets,
+                    hard[mask][:, ix].sum(axis=0).tolist(),
+                    strict=True,
+                )
+            ),
+            **{
+                name: aucs(
+                    hard[mask][:, ix],
+                    values[mask][:, ix],
+                    selected_targets,
+                    strict=False,
+                )
+                for name, values in predictions.items()
+            },
+        }
+
+    conditional = []
+    exclusive = {}
+    codes = {name: hard[:, ix[0]] + 2 * hard[:, ix[1]] for name, ix in indices.items()}
+    for family, ix in indices.items():
+        other = "oa" if family == "meniscus" else "meniscus"
+        for side, index in enumerate(ix):
+            for condition, flags in [
+                ("opposite_compartment", hard[:, ix[1 - side]]),
+                (f"any_{other}", (codes[other] > 0).astype(int)),
+            ]:
+                for value in (0, 1):
+                    conditional.append(
+                        {
+                            "family": family,
+                            "target": targets[index],
+                            "condition": condition,
+                            "value": value,
+                            **subset(flags == value, [targets[index]]),
+                        }
+                    )
+        mask = np.isin(codes[family], [1, 2])
+        exclusive[family] = {
+            "studies": int(mask.sum()),
+            "medial_only": int((codes[family] == 1).sum()),
+            "lateral_only": int((codes[family] == 2).sum()),
+        }
+        for name, values in predictions.items():
+            p = np.clip(values[mask][:, ix], 1e-7, 1 - 1e-7)
+            logits = np.log(p) - np.log1p(-p)
+            margin = logits[:, 0] - logits[:, 1]
+            medial = codes[family][mask] == 1
+            exclusive[family][name] = {
+                "logit_margin_auc": float(roc_auc_score(medial, margin)),
+                "correct_side_fraction": float(
+                    (
+                        (margin > 0) * medial
+                        + (margin < 0) * ~medial
+                        + 0.5 * (margin == 0)
+                    ).mean()
+                ),
+                "mean_signed_logit_margin": float(
+                    (margin * np.where(medial, 1, -1)).mean()
+                ),
+            }
+    vendors = {
+        vendor: subset(frame["vendor"].to_numpy() == vendor, targets)
+        for vendor in sorted(frame["vendor"].unique().to_list())
+    }
+    groups, inverse = np.unique(frame["report_group"].to_numpy(), return_inverse=True)
+    rng = np.random.default_rng(settings.seed)
+    counts = rng.multinomial(
+        len(groups),
+        np.full(len(groups), 1 / len(groups)),
+        size=settings.bootstrap_draws,
+    )[:, inverse]
+    positive = counts @ hard
+    valid = ((positive > 0) & (positive < counts.sum(axis=1, keepdims=True))).all(
+        axis=1
+    )
+    counts = counts[valid]
+    intervals = {}
+    families = {
+        "all": list(range(len(targets))),
+        **indices,
+        "other_eight": [
+            i
+            for i in range(len(targets))
+            if i not in indices["meniscus"] + indices["oa"]
+        ],
+    }
+    for family, ix in families.items():
+        delta = bootstrap_auc(
+            hard[:, ix], predictions["candidate"][:, ix], counts
+        ) - bootstrap_auc(hard[:, ix], predictions["reference"][:, ix], counts)
+        intervals[family] = {
+            "delta_percentile_95": np.percentile(delta, [2.5, 97.5]).tolist(),
+            **{
+                name: float(
+                    np.mean(
+                        [
+                            runs[name]["metrics"]["per_target_auc"][targets[i]]
+                            for i in ix
+                        ]
+                    )
+                )
+                for name in runs
+            },
+        }
+    report = {
+        "settings": settings.model_dump(mode="json"),
+        "studies": frame.height,
+        "targets": targets,
+        "runs": runs,
+        "config_differences": differences(configs["reference"], configs["candidate"]),
+        "input_identity_differences": identity_diff,
+        "changed_source_archive_members": source_changes,
+        "inputs": [
+            fingerprint(p) for p in [targets_path, studies_path, settings.headers]
+        ],
+        "analysis_sources": [
+            fingerprint(Path(p))
+            for p in [
+                __file__,
+                "scripts/adhoc/compare_public_labels.py",
+                "src/knee_abnormality/metrics.py",
+            ]
+        ],
+        "conditional_auc": conditional,
+        "exclusive_positive": exclusive,
+        "vendor_auc": vendors,
+        "paired_report_group_bootstrap": {
+            "groups": len(groups),
+            "draws": settings.bootstrap_draws,
+            "valid_draws": int(valid.sum()),
+            "seed": settings.seed,
+            "families": intervals,
+        },
+        "limitations": [
+            "Saved predictions and CPU-loaded checkpoint weights only; no model execution or GPU access.",
+            "One training seed and one development fold; paired bootstrap conditions on selected predictions, excludes training and checkpoint-selection variability.",
+            "Vendor is an acquisition proxy, not a site label; hidden public composition and candidate public score are unknown.",
+            "Preprocessing source and metadata include the statically reviewed CoAtNet adapter refactor; no contemporaneous zero-coupling control was trained.",
+        ],
+    }
+    (settings.output_dir / "comparison.json").write_text(
+        json.dumps(report, indent=2, allow_nan=False) + "\n"
+    )
+    source_dir = settings.output_dir / "source"
+    source_dir.mkdir()
+    for item in report["analysis_sources"]:
+        shutil.copy2(item["path"], source_dir / Path(item["path"]).name)
+    print(
+        json.dumps(
+            {
+                "artifact": str(settings.output_dir / "comparison.json"),
+                "families": intervals,
+                "exclusive_positive": exclusive,
+            },
+            indent=2,
+        )
+    )
+
+
+if __name__ == "__main__":
+    analyze(AnalyzeCLI())

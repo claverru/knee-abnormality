@@ -1,21 +1,26 @@
 import json
+import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
 import numpy as np
 import polars as pl
+import yaml
+from pydantic_settings import SettingsError
 
 from knee_abnormality.cli import CLISettings
 from knee_abnormality.config import LabelsConfig, load_config
-from knee_abnormality.labels import STUDY, load_fold_labels, require_unique_ids
+from knee_abnormality.data.labels import STUDY, load_fold_labels, require_unique_ids
 from knee_abnormality.provenance import sha256_file
 
 
 class PrepareCLI(CLISettings):
-    config: Path = Path("configs/baseline.yaml")
-    comparison_manifest: Path = Path("docs/public-label-comparison-sources.json")
+    config: Path = Path("configs/training.yaml")
+    comparison_manifest: Path = Path(
+        "configs/labels/public-label-comparison-sources.json"
+    )
     output_dir: Path = Path("data/labels/prepared/tonylin-soft-v3")
-    output_manifest: Path = Path("docs/tonylin-label-sources.json")
+    output_manifest: Path = Path("configs/labels/tonylin-label-sources.json")
 
 
 def fingerprint(path):
@@ -133,8 +138,20 @@ def prepare(settings):
     return report
 
 
-def main():
-    print(json.dumps(prepare(PrepareCLI()), indent=2))
+def main() -> None:
+    try:
+        report = prepare(PrepareCLI())
+    except (
+        OSError,
+        StopIteration,
+        TypeError,
+        ValueError,
+        yaml.YAMLError,
+        SettingsError,
+    ) as error:
+        print(f"Tonylin label preparation error: {error!r}", file=sys.stderr)
+        raise SystemExit(2) from None
+    print(json.dumps(report, indent=2))
 
 
 if __name__ == "__main__":

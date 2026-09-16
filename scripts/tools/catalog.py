@@ -7,7 +7,7 @@ import yaml
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
 from pydantic_settings import CliPositionalArg, SettingsError
 
-from knee_abnormality.cli import NonExitingCLISettings
+from knee_abnormality.cli import CLISettings
 
 ROOT = Path(__file__).resolve().parents[2]
 Identifier = Annotated[str, StringConstraints(pattern=r"^[a-z][a-z0-9-]*$")]
@@ -54,7 +54,7 @@ class Catalog(BaseModel):
     scripts: list[ScriptEntry]
 
 
-class CatalogCLI(NonExitingCLISettings):
+class CatalogCLI(CLISettings):
     action: CliPositionalArg[Literal["search", "show", "check"]] = Field(
         description="search, show, or check"
     )
