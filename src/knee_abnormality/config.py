@@ -18,7 +18,12 @@ from pydantic import (
 )
 from pydantic_settings import CliPositionalArg, SettingsError
 
-from knee_abnormality.cli import NonExitingCLISettings
+from knee_abnormality.cli import CLISettings
+
+SLICES_PER_INPUT = 3
+TEST_IMAGE_MULTIPLIER = 2
+INFERENCE_BATCH_SIZE = 4
+INFERENCE_NUM_WORKERS = 16
 
 Identifier = Annotated[str, StringConstraints(pattern=r"^[A-Za-z0-9][A-Za-z0-9_.-]*$")]
 Fold = Annotated[StrictInt, Field(ge=0)]
@@ -95,12 +100,8 @@ class DataConfig(ConfigModel):
         default_factory=ReflectionAugmentationConfig
     )
     series_types: Annotated[tuple[SeriesTypeConfig, ...], Field(min_length=1)]
-    position_encoding: Literal["physical_mm"] = "physical_mm"
-    position_reference: Literal["center"] = "center"
     sampling_sigma_mm: PositiveFiniteFloat = 80.0
     validation_image_multiplier: Annotated[StrictInt, Field(gt=0)] = 1
-    input_channels: Literal[3] = 3
-    input_mode: Literal["adjacent_triplets"] = "adjacent_triplets"
     intensity_augmentation: IntensityAugmentationConfig = Field(
         default_factory=IntensityAugmentationConfig
     )
@@ -114,30 +115,16 @@ class DataConfig(ConfigModel):
     image_size: Annotated[StrictInt, Field(gt=0)]
     lower_quantile: Annotated[float, Field(ge=0, le=1)]
     upper_quantile: Annotated[float, Field(ge=0, le=1)]
-    mean: FiniteFloat | tuple[FiniteFloat, ...]
-    std: PositiveFiniteFloat | tuple[PositiveFiniteFloat, ...]
-
-    @property
-    def slices_per_input(self) -> int:
-        return 3
+    mean: tuple[FiniteFloat, FiniteFloat, FiniteFloat]
+    std: tuple[PositiveFiniteFloat, PositiveFiniteFloat, PositiveFiniteFloat]
 
     @model_validator(mode="after")
     def triplet_inputs(self) -> "DataConfig":
-        if any(kind.max_images % 3 for kind in self.series_types):
+        if any(kind.max_images % SLICES_PER_INPUT for kind in self.series_types):
             raise ValueError(
                 "Triplet max_images limits count channel appearances and must be multiples of three"
             )
         return self
-
-    @field_validator("mean", "std")
-    @classmethod
-    def normalization_channels(
-        cls, value: float | tuple[float, ...], info: ValidationInfo
-    ) -> float | tuple[float, ...]:
-        channels = len(value) if isinstance(value, tuple) else 1
-        if channels != info.data.get("input_channels", 1):
-            raise ValueError("normalization must provide one value per input channel")
-        return value
 
     @field_validator("series_types")
     @classmethod
@@ -163,13 +150,19 @@ class DataConfig(ConfigModel):
 class ModelConfig(ConfigModel):
     backbone: Identifier
     pretrained: bool
-    projection_width: Literal[256]
     channels_last: bool = False
     checkpoint_backbone: bool = False
     backbone_eval: bool = False
-    mil_attention_width: Literal[128] = 128
     dropout: Annotated[float, Field(ge=0, lt=1)]
     series_dropout: Annotated[float, Field(ge=0, lt=1)]
+
+    @model_validator(mode="after")
+    def checkpointing_requires_backbone_eval(self) -> "ModelConfig":
+        if self.checkpoint_backbone and not self.backbone_eval:
+            raise ValueError(
+                "checkpoint_backbone requires backbone_eval=true to preserve training-mode BatchNorm"
+            )
+        return self
 
 
 class OptimizerConfig(ConfigModel):
@@ -185,9 +178,6 @@ class OptimizerConfig(ConfigModel):
 
 class TrainerConfig(ConfigModel):
     max_epochs: Annotated[StrictInt, Field(gt=0)]
-    precision: Literal["bf16-mixed"]
-    accelerator: Literal["auto", "cpu", "gpu"]
-    devices: Literal[1]
     batch_size: Annotated[StrictInt, Field(gt=0)]
     accumulate_grad_batches: Annotated[StrictInt, Field(gt=0)]
     gradient_clip_val: Annotated[float, Field(gt=0)]
@@ -242,16 +232,13 @@ def load_config(
     path = path.expanduser().resolve()
     with path.open(encoding="utf-8") as stream:
         raw = yaml.safe_load(stream)
-    bundle_fields = {
+    if isinstance(raw, dict) and set(raw) == {
         "schema_version",
         "experiment",
         "targets",
         "fold",
-    }
-    if isinstance(raw, dict) and set(raw) in (
-        bundle_fields,
-        bundle_fields | {"inference"},
-    ):
+        "inference",
+    }:
         raw = raw["experiment"]
     config = ExperimentConfig.model_validate(raw, context={"config_dir": path.parent})
 
@@ -275,7 +262,7 @@ def load_config(
     return config
 
 
-class ConfigCLI(NonExitingCLISettings):
+class ConfigCLI(CLISettings):
     config: CliPositionalArg[Path] = Field(description="Experiment YAML file")
     data_root: Path | None = Field(
         default=None, description="Data location, relative to the working directory"

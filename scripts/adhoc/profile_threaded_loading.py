@@ -3,6 +3,7 @@ import json
 import math
 import multiprocessing
 import os
+import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
 from itertools import repeat as repeat_value
@@ -12,19 +13,22 @@ from typing import Literal
 
 import numpy as np
 import torch
+import yaml
 from pydantic import Field
-from pydantic_settings import CliPositionalArg
+from pydantic_settings import CliPositionalArg, SettingsError
 from torch.utils.data import Subset
 
 from knee_abnormality.cli import CLISettings
-from knee_abnormality.config import load_config
-from knee_abnormality.dataset import (
+from knee_abnormality.config import SLICES_PER_INPUT, load_config
+from knee_abnormality.data.dataset import (
     KneeStudyDataset,
     build_data_loader,
     collate_studies,
 )
-from knee_abnormality.model import KneeAbnormalityModel
-from knee_abnormality.preprocessing.preparation import decode_slice
+from knee_abnormality.data.labels import STUDY
+from knee_abnormality.data.preprocessing.preparation import decode_slice
+from knee_abnormality.inference.engine import move_batch
+from knee_abnormality.modeling.model import KneeAbnormalityModel
 from knee_abnormality.profiling import (
     finish_profile,
     profile_manifest,
@@ -33,8 +37,7 @@ from knee_abnormality.profiling import (
     training_step,
     write_profile_manifest,
 )
-from knee_abnormality.runtime import move_batch
-from knee_abnormality.training import build_optimizer
+from knee_abnormality.training.lightning import build_optimizer
 
 
 class ProfileCLI(CLISettings):
@@ -151,7 +154,7 @@ def profile(config, source, args):
     loader = build_data_loader(
         Subset(dataset, order),
         config.trainer,
-        batch_size=size,
+        size,
         num_workers=args.workers,
         pin_memory=args.mode == "gpu",
         persistent_workers=True,
@@ -203,8 +206,7 @@ def profile(config, source, args):
                     "loss": loss,
                     "studies": batch["study_uid"],
                     "inputs": int(batch["slice_mask"].sum()),
-                    "slices": int(batch["slice_mask"].sum())
-                    * config.data.slices_per_input,
+                    "slices": int(batch["slice_mask"].sum()) * SLICES_PER_INPUT,
                 }
             )
             if (step + 1) % 8 == 0:
@@ -238,8 +240,7 @@ def profile(config, source, args):
     return {"passes": passes, "iterator_seconds": iterator_seconds, "order": order}
 
 
-def main():
-    args = ProfileCLI()
+def run(args: ProfileCLI) -> None:
     config = load_config(args.config)
     allocator, snapshot = setup_profile(
         config,
@@ -261,7 +262,7 @@ def main():
         labels,
         time.perf_counter() - started,
         {
-            "study_ids": dataset.studies["StudyInstanceUID"].to_list(),
+            "study_ids": dataset.studies[STUDY].to_list(),
             "start_method": multiprocessing.get_start_method(),
             "cpu_count": os.cpu_count(),
             "thread_environment": {
@@ -283,6 +284,14 @@ def main():
         audit(dataset, args) if args.mode == "audit" else profile(config, dataset, args)
     )
     finish_profile(args.output_dir, result, started)
+
+
+def main() -> None:
+    try:
+        run(ProfileCLI())
+    except (OSError, RuntimeError, ValueError, yaml.YAMLError, SettingsError) as error:
+        print(f"Threaded loading profile error: {error}", file=sys.stderr)
+        raise SystemExit(2) from None
 
 
 if __name__ == "__main__":

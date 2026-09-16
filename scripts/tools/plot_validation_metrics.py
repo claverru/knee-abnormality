@@ -9,7 +9,7 @@ import matplotlib
 from pydantic import Field
 from pydantic_settings import CliPositionalArg, SettingsError
 
-from knee_abnormality.cli import NonExitingCLISettings
+from knee_abnormality.cli import CLISettings
 
 matplotlib.use("Agg")
 from matplotlib import pyplot as plt
@@ -18,9 +18,9 @@ ROOT = Path(__file__).resolve().parents[2]
 EPOCH_PATTERN = re.compile(r"metrics_epoch_(\d+)\.json$")
 
 
-class PlotCLI(NonExitingCLISettings):
+class PlotCLI(CLISettings):
     runs: CliPositionalArg[list[str]] = Field(min_length=1)
-    output: Path = Path("outputs/validation_metrics.png")
+    output: Path = Path("outputs/analysis/validation_metrics.png")
 
 
 @dataclass(frozen=True)
@@ -37,9 +37,9 @@ def resolve_run(value: str) -> Path:
     candidate = Path(value).expanduser()
     if candidate.is_dir():
         return candidate.resolve()
-    under_outputs = ROOT / "outputs" / value
-    if under_outputs.is_dir():
-        return under_outputs
+    under_training = ROOT / "outputs" / "training" / value
+    if under_training.is_dir():
+        return under_training
     raise ValueError(f"Run folder not found: {value}")
 
 
@@ -77,7 +77,9 @@ def load_metric_series(run: Path) -> list[MetricSeries]:
             )
         except (KeyError, TypeError, json.JSONDecodeError) as error:
             raise ValueError(f"Invalid metric file {path}: {error}") from error
-        if not all(isinstance(value, int | float) for value in required_values) or not all(
+        if not all(
+            isinstance(value, int | float) for value in required_values
+        ) or not all(
             value is None or isinstance(value, int | float) for value in subgroup_values
         ):
             raise ValueError(f"Invalid metric values in {path}")
@@ -120,7 +122,9 @@ def plot(series: list[MetricSeries], output: Path) -> None:
     )
     for axis, (title, attribute, ylabel) in zip(axes.flat, panels, strict=True):
         for item in series:
-            axis.plot(item.epochs, getattr(item, attribute), marker="o", label=item.label)
+            axis.plot(
+                item.epochs, getattr(item, attribute), marker="o", label=item.label
+            )
         axis.set_title(title)
         axis.set_xlabel("Epoch")
         axis.set_ylabel(ylabel)

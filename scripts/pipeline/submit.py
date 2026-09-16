@@ -14,8 +14,8 @@ from pydantic import Field, StringConstraints
 from pydantic_settings import SettingsError
 from requests import HTTPError
 
-from knee_abnormality.bundle import verify_bundle
-from knee_abnormality.cli import NonExitingCLISettings
+from knee_abnormality.cli import CLISettings
+from knee_abnormality.inference.bundle import verify_bundle
 from knee_abnormality.provenance import sha256_file
 
 KaggleId = Annotated[
@@ -23,7 +23,7 @@ KaggleId = Annotated[
 ]
 
 
-class SubmitCLI(NonExitingCLISettings):
+class SubmitCLI(CLISettings):
     bundle: Path
     dataset: KaggleId
     notebook: KaggleId
@@ -230,6 +230,14 @@ def submit(args: SubmitCLI) -> dict:
     record_path = args.record.expanduser().resolve()
     if record_path.exists():
         raise FileExistsError(f"Submission record already exists: {record_path}")
+    dataset_title = (
+        args.dataset_title or args.dataset.split("/", 1)[1].replace("-", " ").title()
+    )
+    if not 6 <= len(dataset_title) <= 50:
+        raise ValueError("Kaggle dataset title must contain 6 to 50 characters")
+    notebook_title = args.notebook.split("/", 1)[1].replace("-", " ").title()
+    if not 5 <= len(notebook_title) <= 50:
+        raise ValueError("Kaggle notebook title must contain 5 to 50 characters")
     record_path.parent.mkdir(parents=True, exist_ok=True)
     manifest = verify_bundle(bundle)
     if not manifest.get("ready"):
@@ -266,15 +274,9 @@ def submit(args: SubmitCLI) -> dict:
             dataset_dir = temporary / "dataset"
             dataset_dir.mkdir()
             shutil.copytree(bundle, dataset_dir / "bundle")
-            title = (
-                args.dataset_title
-                or args.dataset.split("/", 1)[1].replace("-", " ").title()
-            )
-            if not 6 <= len(title) <= 50:
-                raise ValueError("Kaggle dataset title must contain 6 to 50 characters")
             metadata = {
                 "id": args.dataset,
-                "title": title,
+                "title": dataset_title,
                 "licenses": [{"name": args.dataset_license}],
                 "description": f"Private inference bundle {record['bundle_manifest_sha256']}",
             }
@@ -346,11 +348,6 @@ def submit(args: SubmitCLI) -> dict:
             notebook_dir = temporary / "notebook"
             notebook_dir.mkdir()
             shutil.copy2(bundle / "inference.ipynb", notebook_dir / "inference.ipynb")
-            notebook_title = args.notebook.split("/", 1)[1].replace("-", " ").title()
-            if len(notebook_title) < 5:
-                raise ValueError(
-                    "Kaggle notebook title must contain at least 5 characters"
-                )
             notebook_metadata = {
                 "id": args.notebook,
                 "title": notebook_title,

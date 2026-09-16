@@ -1,29 +1,35 @@
 # Ongoing work
 
-Active work and tasks planned for the short term. Follow the
-[work-tracking rules](../AGENTS.md#work-tracking).
+A snapshot of where the project stands and what comes next, so the thread is not lost. Details
+live in the linked documents; follow the [work-tracking rules](../AGENTS.md#work-tracking).
 
-Follow the [competition repository architecture](architecture.md), with
-on-the-fly pixel preparation and small development runs before full comparisons.
-Use the maintained workflow in `scripts/pipeline/`; keep one-off
-investigations in `scripts/adhoc/` and reusable utilities in `scripts/tools/`.
-Tasks below are pending, in implementation order.
+## State (2026-09-16)
 
-The [modeling notes](modeling.md#implemented-baseline) own the current
-baseline recipe and fold-0 result; `configs/baseline.yaml` owns its defaults.
-Do not duplicate those values here. Saved checkpoint configuration, rather than
-the mutable baseline YAML, governs reproduction and submission.
+- **Code:** the full-slice `00-baseline` recipe (fold 0 0.892763, public 0.934), restored on
+  2026-09-16 ([current model](modeling/current-model.md)).
+- **Best submission:** the reflection/sigma-40 champion, 0.936 public
+  ([fast runtime](inference/submissions/2026-09-15-fast-champion-submission.md)).
+- **Dropped:** learned crop selection ([record](history/crop-selection-investigation.md)).
+- **Strategy:** iterate on fold 0; folds, ensembling, bigger images and TTA wait for the
+  [final phase](backlog/endgame.md)
+  ([validation strategy](validation/validation-strategy.md)).
 
-Current strategy, selected on 2026-09-11: iterate on **fold 0** until near the
-end of the competition. Additional-fold training and ensembling are deferred.
-Keep fold membership, validation targets and the comparison recipe fixed.
+## In progress
 
-The unverified settings and results remain hypotheses to reproduce and improve,
-not established requirements. When a task is completed, move durable
-findings to its linked canonical document and remove the completed task here.
+- Package restructure, `configs/training.yaml` rename, label manifests in `configs/labels/`,
+  model-doc split and code-review refactors: done, awaiting commit.
+- Docs [backlog](backlog/INDEX.md) replacing `future-work.md` and the root `overnight.md`: done,
+  awaiting commit.
 
-The user launches training and the [encoding diagnostic](validation.md#manual-encoding-usage-diagnosis)
-manually. No training, optimizer-step checks, automatic diagnostics, extra seeds,
-or baseline reruns are scheduled. Use fresh artifact directories and
-retain source/config/checkpoint/input identities. These single-fold comparisons
-cannot resolve training-seed variability or establish small repeatable gains.
+## Next
+
+1. Next overnight queue: the user decides the
+   [proposed list](backlog/overnight.md#next-queue-proposed-pending-the-users-decisions) (SWA tail
+   learning rate, seed replicate); weight averaging is implemented first if the user asks
+   ([small change](backlog/small-changes.md#weight-averaging)); then the launcher's run list is
+   replaced and the user launches the queue. The saved-prediction comparison of `03-min-lr-0.1`
+   with `00-baseline` is done: +0.00041, not established.
+2. Data-loading speedups, shipped with the next retrain
+   ([plan](inference/loading-speedup-plan.md)).
+3. Submit the main-thread warm-up with the next submission; torch-free coordinator
+   ([runtime changes](inference/loading-speedup-plan.md#runtime-changes-outside-the-preprocessing-identity)).

@@ -20,7 +20,8 @@ sequence augmentation, and 1D convolutions among unsuccessful experiments.
 mean/max pooling, attention, and a small RNN cheaply. If the encoder is trained
 on competition labels, build the cache separately for each validation fold.
 A single cache from a model trained on all studies cannot support held-out
-evaluation of the head.
+evaluation of the head. A frozen-feature screen also cannot establish the ranking after
+end-to-end fine-tuning.
 
 Neighbor differences are an inexpensive optional feature, but compute them only
 within a consistently ordered series. Their interpretation changes with slice
@@ -73,7 +74,7 @@ it does **not** prove the training checkpoint, upstream segmenter, or all
 downstream features are free of leakage.
 [4](https://github.com/TheoViel/kaggle_rsna_abdominal_trauma/blob/6e9d193cb60b11c2a3c1597d430d53615173b441/src/inference/extract_features.py)
 
-For this repository, the [current split](../validation.md#project-validation-protocol)
+For this repository, the [current split](../validation/project-validation-protocol.md)
 assigns every study to one validation fold and can produce OOF predictions for
 all 4,407 studies. The older `gold_5fold_v1` protocol shared most report-only
 studies across training folds; predictions from that historical pool must not

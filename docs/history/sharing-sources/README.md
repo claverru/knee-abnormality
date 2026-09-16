@@ -4,9 +4,9 @@ These exact text snapshots preserve the 1C implementation and investigations
 from branch `1C` at `3b8c2cc1c7f7fbfe76ef2b149c91dba0c354002f`. They are historical records,
 not active entry points in the script catalog. Current training retains
 independent classifiers and attention, with sigma 40 and optional CoAtNet support.
-The [experiment results](../../sharing-experiments.md),
-[generalization investigation](../../sharing-generalization.md) and
-[disagreement audit](../../sharing-disagreement-audit.md) own the findings.
+The [experiment results](../sharing/INDEX.md),
+[generalization investigation](../sharing/generalization-investigation.md) and
+[disagreement audit](../sharing/oa-and-meniscus-disagreement-audit.md) own the findings.
 
 | Original path | Source snapshot | SHA-256 |
 |---|---|---|

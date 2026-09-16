@@ -2,13 +2,16 @@ import html
 import json
 import platform
 import re
+import sys
 import unicodedata
 from datetime import UTC, datetime
 from pathlib import Path
 
 import polars as pl
+from pydantic_settings import SettingsError
 
 from knee_abnormality.cli import CLISettings
+from knee_abnormality.data.labels import STUDY
 from knee_abnormality.provenance import sha256_file
 
 
@@ -18,25 +21,54 @@ class Settings(CLISettings):
 
 
 HEADINGS = (
-    "findings", "imaging findings", "results", "impression", "impressions",
-    "conclusion", "conclusions", "coclusion", "interpretation", "hallazgos",
-    "resultados", "impresion", "conclusiones", "bulgular", "sonuc",
-    "bevindingen", "besluit", "conclusie", "befund", "beurteilung",
-    "constatations", "resultats", "trouvailles", "мр находка", "заключение",
-    "ευρηματα", "συμπερασμα",
+    "findings",
+    "imaging findings",
+    "results",
+    "impression",
+    "impressions",
+    "conclusion",
+    "conclusions",
+    "coclusion",
+    "interpretation",
+    "hallazgos",
+    "resultados",
+    "impresion",
+    "conclusiones",
+    "bulgular",
+    "sonuc",
+    "bevindingen",
+    "besluit",
+    "conclusie",
+    "befund",
+    "beurteilung",
+    "constatations",
+    "resultats",
+    "trouvailles",
+    "мр находка",
+    "заключение",
+    "ευρηματα",
+    "συμπερασμα",
 )
 FINDINGS = (
-    "findings", "imaging findings", "results", "hallazgos", "resultados",
-    "bulgular", "bevindingen", "befund", "constatations", "resultats",
-    "trouvailles", "мр находка", "ευρηματα",
+    "findings",
+    "imaging findings",
+    "results",
+    "hallazgos",
+    "resultados",
+    "bulgular",
+    "bevindingen",
+    "befund",
+    "constatations",
+    "resultats",
+    "trouvailles",
+    "мр находка",
+    "ευρηματα",
 )
 PLACEHOLDERS = re.compile(
     r"\[(?:date|time|redacted|id|name|age|year|month|identifier|gender|profession|"
     r"affiliation|day|title|bilateral note[^\]]*)\]"
 )
-FINDINGS_START = re.compile(
-    r"(?:^|(?<=[\n.!?]))\s*(?:" + "|".join(FINDINGS) + r")\s*:"
-)
+FINDINGS_START = re.compile(r"(?:^|(?<=[\n.!?]))\s*(?:" + "|".join(FINDINGS) + r")\s*:")
 HEADING = re.compile(r"\b(?:" + "|".join(HEADINGS) + r")\s*:")
 ADMIN_LINE = re.compile(
     r"(?m)^\s*(?:signed by|signed on|electronically signed|dictated by|reported by|"
@@ -70,18 +102,130 @@ REPLACEMENTS = (
 REPLACEMENTS = tuple((re.compile(pattern), value) for pattern, value in REPLACEMENTS)
 STOPWORDS = frozenset(
     [
-        "a", "an", "the", "and", "or", "of", "to", "in", "at", "by", "for", "from",
-        "with", "as", "is", "are", "was", "were", "be", "been", "being", "this", "that",
-        "these", "those", "there", "it", "its", "which", "within", "also",
-        "el", "la", "los", "las", "un", "una", "unos", "unas", "de", "del", "al", "en",
-        "y", "o", "con", "por", "para", "se", "es", "son",
-        "le", "les", "des", "du", "au", "aux", "une", "et", "ou", "dans", "avec", "sur",
-        "est", "sont", "der", "die", "das", "den", "dem", "des", "ein", "eine", "einer",
-        "einem", "einen", "und", "oder", "im", "am", "mit", "von", "zu", "zum", "zur",
-        "ist", "sind", "de", "het", "een", "van", "en", "of", "in", "op", "met", "voor",
-        "aan", "is", "zijn", "ve", "ile", "bir", "olarak",
-        "и", "в", "във", "на", "за", "от", "с", "със", "по", "при",
-        "και", "του", "της", "των", "το", "τα", "την", "τον", "σε", "με",
+        "a",
+        "an",
+        "the",
+        "and",
+        "or",
+        "of",
+        "to",
+        "in",
+        "at",
+        "by",
+        "for",
+        "from",
+        "with",
+        "as",
+        "is",
+        "are",
+        "was",
+        "were",
+        "be",
+        "been",
+        "being",
+        "this",
+        "that",
+        "these",
+        "those",
+        "there",
+        "it",
+        "its",
+        "which",
+        "within",
+        "also",
+        "el",
+        "la",
+        "los",
+        "las",
+        "un",
+        "una",
+        "unos",
+        "unas",
+        "de",
+        "del",
+        "al",
+        "en",
+        "y",
+        "o",
+        "con",
+        "por",
+        "para",
+        "se",
+        "es",
+        "son",
+        "le",
+        "les",
+        "des",
+        "du",
+        "au",
+        "aux",
+        "une",
+        "et",
+        "ou",
+        "dans",
+        "avec",
+        "sur",
+        "est",
+        "sont",
+        "der",
+        "die",
+        "das",
+        "den",
+        "dem",
+        "des",
+        "ein",
+        "eine",
+        "einer",
+        "einem",
+        "einen",
+        "und",
+        "oder",
+        "im",
+        "am",
+        "mit",
+        "von",
+        "zu",
+        "zum",
+        "zur",
+        "ist",
+        "sind",
+        "de",
+        "het",
+        "een",
+        "van",
+        "en",
+        "of",
+        "in",
+        "op",
+        "met",
+        "voor",
+        "aan",
+        "is",
+        "zijn",
+        "ve",
+        "ile",
+        "bir",
+        "olarak",
+        "и",
+        "в",
+        "във",
+        "на",
+        "за",
+        "от",
+        "с",
+        "със",
+        "по",
+        "при",
+        "και",
+        "του",
+        "της",
+        "των",
+        "το",
+        "τα",
+        "την",
+        "τον",
+        "σε",
+        "με",
     ]
 )
 TOKEN = re.compile(r"[^\W\d_]+", re.UNICODE)
@@ -91,7 +235,8 @@ def unicode_text(text: str) -> str:
     text = html.unescape(text).casefold().replace("ı", "i").replace("œ", "oe")
     text = text.replace("æ", "ae").replace("ø", "o").replace("ł", "l")
     text = "".join(
-        char for char in unicodedata.normalize("NFKD", text)
+        char
+        for char in unicodedata.normalize("NFKD", text)
         if not unicodedata.combining(char) and unicodedata.category(char) != "Cf"
     )
     return text.replace("\r\n", "\n").replace("\r", "\n")
@@ -101,17 +246,20 @@ def heavy_text(text: str) -> str:
     text = PLACEHOLDERS.sub(" ", unicode_text(text))
     heading = FINDINGS_START.search(text)
     if heading is not None:
-        text = text[heading.end():]
+        text = text[heading.end() :]
     text = ADMIN_LINE.sub(" ", text)
     text = HEADING.sub(". ", text)
     text = re.sub(r"(?m)^\s*\d+[.)]\s*", "", text)
     for pattern, value in REPLACEMENTS:
         text = pattern.sub(value, text)
     text = re.sub(r"\btechnique\s*:\s*mr\s+(?:of\s+the\s+)?knee\s*\.", " ", text)
-    text = re.sub(r"\b\d+(?:[.,]\d+)*(?:\s*[-–/]\s*\d+(?:[.,]\d+)*)?\b", " number ", text)
+    text = re.sub(
+        r"\b\d+(?:[.,]\d+)*(?:\s*[-–/]\s*\d+(?:[.,]\d+)*)?\b", " number ", text
+    )
     text = re.sub(
         r"\bnumber(?:\s*[x×]\s*number)*\s*(?:mm|cm|millimet(?:er|re)s?|centimet(?:er|re)s?)\b",
-        " measurement ", text,
+        " measurement ",
+        text,
     )
     text = LATERALITY.sub(" ", text)
     text = re.sub(r"['’]s\b", "", text)
@@ -120,7 +268,9 @@ def heavy_text(text: str) -> str:
     clauses = []
     for clause in re.split(r"[.!?;]+|\n\s*\n", text):
         tokens = [token for token in TOKEN.findall(clause) if token not in STOPWORDS]
-        tokens = [token for i, token in enumerate(tokens) if not i or token != tokens[i - 1]]
+        tokens = [
+            token for i, token in enumerate(tokens) if not i or token != tokens[i - 1]
+        ]
         if tokens:
             clauses.append(" ".join(tokens))
     return " ; ".join(dict.fromkeys(clauses))
@@ -140,28 +290,39 @@ def stage_summary(frame: pl.DataFrame, column: str) -> dict:
     }
 
 
-def main() -> None:
-    settings = Settings()
-    frame = pl.read_csv(settings.input, columns=["StudyInstanceUID", "Report"])
+def normalize(settings: Settings) -> dict:
+    frame = pl.read_csv(settings.input, columns=[STUDY, "Report"])
     if frame["Report"].null_count():
         raise ValueError("Report contains null values")
     frame = frame.with_columns(
-        pl.col("Report").map_elements(
-            lambda text: " ".join(text.casefold().split()), return_dtype=pl.String,
-        ).alias("case_whitespace"),
-        pl.col("Report").map_elements(
+        pl.col("Report")
+        .map_elements(
+            lambda text: " ".join(text.casefold().split()),
+            return_dtype=pl.String,
+        )
+        .alias("case_whitespace"),
+        pl.col("Report")
+        .map_elements(
             lambda text: " ".join(re.findall(r"[^\W_]+", unicode_text(text))),
             return_dtype=pl.String,
-        ).alias("unicode_punctuation"),
-        pl.col("Report").map_elements(heavy_text, return_dtype=pl.String).alias("heavy"),
+        )
+        .alias("unicode_punctuation"),
+        pl.col("Report")
+        .map_elements(heavy_text, return_dtype=pl.String)
+        .alias("heavy"),
     ).with_columns(
-        pl.col("heavy").map_elements(
+        pl.col("heavy")
+        .map_elements(
             lambda text: " ; ".join(sorted(set(text.split(" ; ")))),
             return_dtype=pl.String,
-        ).alias("sentence_set"),
-        pl.col("heavy").map_elements(
-            lambda text: " ".join(sorted(set(TOKEN.findall(text)))), return_dtype=pl.String,
-        ).alias("token_set"),
+        )
+        .alias("sentence_set"),
+        pl.col("heavy")
+        .map_elements(
+            lambda text: " ".join(sorted(set(TOKEN.findall(text)))),
+            return_dtype=pl.String,
+        )
+        .alias("token_set"),
     )
     settings.output_dir.mkdir(parents=True, exist_ok=True)
     normalized_path = settings.output_dir / "normalized_reports.parquet"
@@ -170,9 +331,10 @@ def main() -> None:
     frame.filter(pl.col("token_set") != "").group_by("token_set").agg(
         pl.len().alias("rows"),
         pl.col("Report").n_unique().alias("raw_variants"),
-        pl.col("StudyInstanceUID").sort().str.join("|").alias("study_ids"),
+        pl.col(STUDY).sort().str.join("|").alias("study_ids"),
     ).filter(pl.col("rows") > 1).sort(
-        ["rows", "token_set"], descending=[True, False],
+        ["rows", "token_set"],
+        descending=[True, False],
     ).write_csv(groups_path)
     summary = {
         "created_at": datetime.now(UTC).isoformat(),
@@ -188,8 +350,12 @@ def main() -> None:
         "stages": {
             column: stage_summary(frame, column)
             for column in (
-                "Report", "case_whitespace", "unicode_punctuation", "heavy",
-                "sentence_set", "token_set",
+                "Report",
+                "case_whitespace",
+                "unicode_punctuation",
+                "heavy",
+                "sentence_set",
+                "token_set",
             )
         },
         "artifacts": {
@@ -203,7 +369,18 @@ def main() -> None:
             "Groups do not establish identical clinical meaning, patients or images.",
         ],
     }
-    (settings.output_dir / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")
+    (settings.output_dir / "summary.json").write_text(
+        json.dumps(summary, indent=2) + "\n"
+    )
+    return summary
+
+
+def main() -> None:
+    try:
+        summary = normalize(Settings())
+    except (OSError, ValueError, SettingsError) as error:
+        print(f"Report normalization error: {error}", file=sys.stderr)
+        raise SystemExit(2) from None
     print(json.dumps(summary, indent=2))
 
 

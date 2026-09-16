@@ -3,6 +3,7 @@ import gc
 import hashlib
 import json
 import pstats
+import sys
 import time
 from pathlib import Path
 from typing import Literal
@@ -10,18 +11,20 @@ from typing import Literal
 import numpy as np
 import pytorch_lightning as L
 import torch
+import yaml
 from pydantic import Field
-from pydantic_settings import CliPositionalArg
+from pydantic_settings import CliPositionalArg, SettingsError
 from torch.utils.data import Subset
 
 from knee_abnormality.cli import CLISettings
-from knee_abnormality.config import ExperimentConfig, load_config
-from knee_abnormality.dataset import (
+from knee_abnormality.config import SLICES_PER_INPUT, ExperimentConfig, load_config
+from knee_abnormality.data.dataset import (
     KneeStudyDataset,
     build_data_loader,
     collate_studies,
 )
-from knee_abnormality.model import KneeAbnormalityModel
+from knee_abnormality.inference.engine import move_batch
+from knee_abnormality.modeling.model import KneeAbnormalityModel
 from knee_abnormality.profiling import (
     finish_profile,
     profile_manifest,
@@ -30,8 +33,11 @@ from knee_abnormality.profiling import (
     training_step,
     write_profile_manifest,
 )
-from knee_abnormality.runtime import move_batch
-from knee_abnormality.training import BaselineModule, build_optimizer
+from knee_abnormality.training.lightning import (
+    PRECISION,
+    KneeModule,
+    build_optimizer,
+)
 
 
 class ProfileCLI(CLISettings):
@@ -136,7 +142,7 @@ def gpu_candidate(
         "status": "ok",
         "study_ids": batch["study_uid"],
         "inputs": int(batch["slice_mask"].sum()),
-        "slices": int(batch["slice_mask"].sum()) * config.data.slices_per_input,
+        "slices": int(batch["slice_mask"].sum()) * SLICES_PER_INPUT,
         "step_seconds": durations,
         "studies_per_second": size / float(np.mean(durations)),
         "peak_allocated_gib": torch.cuda.max_memory_allocated() / 2**30,
@@ -157,9 +163,9 @@ def gpu_profile(
     config: ExperimentConfig, dataset: KneeStudyDataset, args: ProfileCLI
 ) -> dict:
     sizes = sorted(set(args.batch_sizes))
-    if min(sizes) < 1 or max(sizes) > 4:
+    if min(sizes) < 1 or max(sizes) > min(8, len(dataset)):
         raise ValueError(
-            "GPU profiling supports batch sizes 1 through 4 using distinct maximum-load studies"
+            "GPU profiling supports batch sizes 1 through 8 using distinct maximum-load studies"
         )
     items = [dataset[index] for index in range(max(sizes))]
     rows = []
@@ -199,7 +205,6 @@ def loader_candidate(
 ) -> dict:
     dataset._slice_index.clear()
     dataset._study_references.clear()
-    dataset._center_projections.clear()
     dataset.training = True
     count = (args.warmup + args.steps) * size
     if count > len(dataset):
@@ -211,7 +216,7 @@ def loader_candidate(
     loader = build_data_loader(
         sample,
         config.trainer,
-        batch_size=size,
+        size,
         num_workers=workers,
         persistent_workers=False,
     )
@@ -242,7 +247,7 @@ def loader_candidate(
             durations.append(time.perf_counter() - started)
             count = int(batch["slice_mask"].sum())
             inputs.append(count)
-            slices.append(count * config.data.slices_per_input)
+            slices.append(count * SLICES_PER_INPUT)
     return {
         "batch_size": size,
         "workers": workers,
@@ -306,8 +311,7 @@ class BatchTimings(L.Callback):
                     "loss": loss,
                     "studies": len(batch["study_uid"]),
                     "inputs": int(batch["slice_mask"].sum()),
-                    "slices": int(batch["slice_mask"].sum())
-                    * pl_module.config_model.data.slices_per_input,
+                    "slices": int(batch["slice_mask"].sum()) * SLICES_PER_INPUT,
                 }
             )
         self.previous_end = ended
@@ -326,9 +330,10 @@ def lightning_profile(
     loader = build_data_loader(
         dataset,
         settings,
+        settings.batch_size,
         shuffle=True,
     )
-    module = BaselineModule(
+    module = KneeModule(
         config,
         dataset.targets,
         config.validation.folds[0],
@@ -343,7 +348,7 @@ def lightning_profile(
         max_epochs=settings.max_epochs,
         accelerator="gpu",
         devices=1,
-        precision=settings.precision,
+        precision=PRECISION,
         accumulate_grad_batches=settings.accumulate_grad_batches,
         gradient_clip_val=settings.gradient_clip_val,
         deterministic=settings.deterministic,
@@ -371,8 +376,7 @@ def lightning_profile(
     return result
 
 
-def main() -> None:
-    args = ProfileCLI()
+def run(args: ProfileCLI) -> None:
     config = load_config(args.config)
     allocator_config, source = setup_profile(
         config, args.output_dir, args.threads, [Path(__file__), args.config]
@@ -397,6 +401,14 @@ def main() -> None:
     else:
         result.update(lightning_profile(config, dataset, args))
     finish_profile(args.output_dir, result, started)
+
+
+def main() -> None:
+    try:
+        run(ProfileCLI())
+    except (OSError, RuntimeError, ValueError, yaml.YAMLError, SettingsError) as error:
+        print(f"Training profile error: {error}", file=sys.stderr)
+        raise SystemExit(2) from None
 
 
 if __name__ == "__main__":

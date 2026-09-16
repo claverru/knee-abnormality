@@ -8,14 +8,31 @@ scripts:
     commands:
       - rtk proxy uv run --locked python -m scripts.tools.prepare_tonylin_labels --help
       - rtk proxy uv run --locked python -m scripts.tools.prepare_tonylin_labels
-    inputs: [docs/public-label-comparison-sources.json, Pinned Tonylin release-3 CSV and metadata, Official training metadata, Experiment config and existing split]
-    outputs: [data/labels/prepared/tonylin-soft-v3/labels.csv, data/labels/prepared/tonylin-soft-v3/preparation.json, docs/tonylin-label-sources.json]
+    inputs: [configs/labels/public-label-comparison-sources.json, Pinned Tonylin release-3 CSV and metadata, Official training metadata, Experiment config and existing split]
+    outputs: [data/labels/prepared/tonylin-soft-v3/labels.csv, data/labels/prepared/tonylin-soft-v3/preparation.json, configs/labels/tonylin-label-sources.json]
     notes:
       - Selects and renames only the twelve *_soft columns; preserves values and ignores the publisher's folds and hard labels.
       - Loads real fold-label tables through the training loader without pixels, model execution, training or tests.
-      - Preserves existing split files and the input YAML; requires fresh output directory and manifest paths.
+      - Preserves existing split files and the input YAML; requires fresh output directory and manifest paths, so rerunning it needs new --output-dir and --output-manifest values.
       - Tonylin scored 0.921 publicly versus Steven v4's 0.929; the baseline returned to Steven and this utility is retained for reproduction.
-    docs: [docs/supervision.md#training-with-tonylin-soft-labels]
+    docs: [docs/modeling/supervision.md#training-with-tonylin-soft-labels]
+
+  - id: compare-fold-runs
+    path: scripts/tools/compare_fold_runs.py
+    summary: Compare a candidate fold run with a reference run from saved predictions and checkpoint tensors, with paired report-group bootstrap intervals.
+    tags: [compare, comparison, validation, fold, auc, bce, gold, bootstrap, margin, cross-talk, compartment, vendor, strata, epochs, timing, memory]
+    commands:
+      - rtk proxy env CUDA_VISIBLE_DEVICES= POLARS_MAX_THREADS=1 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 uv run --locked python -m scripts.tools.compare_fold_runs --reference outputs/training/overnight-20260914T220805Z-ozsz4qbu/runs/00-baseline --candidate outputs/training/overnight-20260914T220805Z-ozsz4qbu/runs/03-min-lr-0.1 --output-dir outputs/analysis/min-lr-0.1-vs-00-baseline --allowed-config-differences name,optimizer.minimum_lr_ratio
+    inputs: [Reference and candidate run directories, Frozen fold targets and membership, Saved study headers parquet with vendor]
+    outputs: [Comparison JSON with input, run and source fingerprints, Analysis source copies under source/ with repository-relative paths]
+    notes:
+      - CPU only; reads checkpoints raw (unvalidated) and loads saved predictions and checkpoint tensors without model construction, so it compares runs from retired model code.
+      - --headers defaults to outputs/analysis/sharing-disagreement-20260914/study_headers.parquet, the per-study vendor table from the sharing disagreement audit.
+      - Rejects configuration differences outside --allowed-config-differences (dotted keys or prefixes; default name) and input identity differences outside --allowed-input-identity-differences.
+      - Reports selected epochs, full-fold and per-target AUC, BCE, gold and report-derived metrics, family means, exclusive-positive margins, lateral cross-talk, vendor strata with supports, prediction changes, epoch curves, timing and peak memory, parameters present in only one run and changed src/configs archive members.
+      - Uses paired report-group bootstrap intervals for all targets, the meniscus and OA pairs, the other eight targets and both margins; intervals exclude training-seed and checkpoint-selection variability.
+      - Output directory must be fresh; selected predictions must reproduce their recorded epoch macro AUC.
+    docs: [docs/validation/fold-run-comparison.md]
 
   - id: plot-validation-metrics
     path: scripts/tools/plot_validation_metrics.py
@@ -23,24 +40,24 @@ scripts:
     tags: [plot, validation, metrics, auc, bce, experiments, comparison, runs]
     commands:
       - rtk proxy uv run --locked python -m scripts.tools.plot_validation_metrics baseline0 baseline1 baseline4
-      - rtk proxy uv run --locked python -m scripts.tools.plot_validation_metrics outputs/baseline0 outputs/baseline4 --output outputs/comparisons/baselines.png
-    inputs: [Run folders under outputs/ containing fold epoch metric JSON files]
+      - rtk proxy uv run --locked python -m scripts.tools.plot_validation_metrics outputs/training/baseline0 outputs/training/baseline4 --output outputs/analysis/baselines.png
+    inputs: [Run folders under outputs/training/ containing fold epoch metric JSON files]
     outputs: [PNG comparison plot of validation, gold, report-derived macro AUC and soft-target BCE]
     notes:
-      - Each run name resolves relative to outputs/ unless it is an existing folder path.
+      - Each run name resolves relative to outputs/training/ unless it is an existing folder path.
       - Runs with several folds produce one line per fold.
       - Undefined subgroup macro AUCs appear as gaps; full-validation AUC and BCE must be numeric.
-      - The default output is outputs/validation_metrics.png and is overwritten on every run.
-    docs: [docs/validation.md#experiment-workflow]
+      - The default output is outputs/analysis/validation_metrics.png and is overwritten on every run.
+    docs: [docs/validation/plot-validation-metrics.md]
 
   - id: submission-job
     path: scripts/tools/submission_job.py
     summary: Launch a detached submission service or inspect its saved status, stage durations and runner logs.
     tags: [submit, background, systemd, progress, logs, timing, kaggle]
     commands:
-      - rtk proxy uv run --locked just submit outputs/exports/run-fold0 OWNER/knee-fold0-bundle OWNER/knee-inference outputs/submissions/run-fold0.json
-      - rtk proxy uv run --locked just submit-status outputs/submissions/run-fold0.json
-      - rtk proxy uv run --locked just submit-logs outputs/submissions/run-fold0.json
+      - rtk proxy uv run --locked just submit outputs/submission/exports/run-fold0 OWNER/knee-fold0-bundle OWNER/knee-inference outputs/submission/records/run-fold0.json
+      - rtk proxy uv run --locked just submit-status outputs/submission/records/run-fold0.json
+      - rtk proxy uv run --locked just submit-logs outputs/submission/records/run-fold0.json
       - rtk proxy uv run --locked python -m scripts.tools.submission_job --help
     inputs: [Ready bundle for start, Kaggle dataset and notebook IDs for start, Unique workflow record path, Existing workflow record or runner log for inspection]
     outputs: [Detached user systemd service for start, JSON status and stage durations, Runner log excerpt or explicit live follow]
@@ -49,23 +66,25 @@ scripts:
       - Requires Linux user systemd for start and the current project environment; quotes arguments through subprocess arrays and rejects existing records or logs.
       - Status and logs also read older manually launched runners using the matching record-stem-runner.log convention.
       - Logs return the last 60 lines by default; only explicit --follow waits for more output. Stage durations include polling delay and are not official hidden-test execution time.
-    docs: [docs/inference-efficiency.md#justfile-recipes]
+    docs: [docs/inference/justfile-recipes.md]
 
   - id: verify-inference
     path: scripts/tools/verify_inference.py
-    summary: Optionally check a bounded real-study parity sample and FP32 inference memory when explicitly requested during export.
-    tags: [inference, verify, parity, sample, vram, export, submission]
+    summary: Manually check a bounded real-study parity sample, FP32 inference memory and example output of an exported bundle using the bundle's own source.
+    tags: [inference, verify, parity, sample, vram, export, submission, bundle]
     commands:
       - rtk proxy uv run --locked python -m scripts.tools.verify_inference --help
-    inputs: [Export staging bundle, Exporter-generated request JSON, Saved epoch predictions, Local validation and example DICOMs]
-    outputs: [Sample parity and example predictions, Verification record with FP32 peak memory and codec evidence]
+      - rtk proxy uv run --locked env PYTHONPATH=outputs/submission/exports/run-fold0/code python -m scripts.tools.verify_inference --bundle outputs/submission/exports/run-fold0 --request-file outputs/submission/verification/run-fold0-request.json
+    inputs: [Exported bundle with the current package layout, Request JSON, Saved epoch predictions, Local validation and example DICOMs, Native BF16 CUDA device]
+    outputs: [verification_sample.csv, verification_example.csv and verification.json written inside the bundle]
     notes:
+      - Run from the repository root with PYTHONPATH set to the bundle's code directory; it refuses to run unless knee_abnormality is imported from that directory. Export no longer invokes it, and writing the three files changes the bundle inventory, so run it on a copy when the bundle must still verify.
+      - The request JSON holds config (the checkpoint's saved experiment config with local paths), reference_csv (the fold's saved validation_epoch_NNN.csv), samples, image_multiplier, batch_size, checkpoint_sha256, bundled_source_sha256 and codec_evidence (recorded as given).
       - Complexity ranking estimates overlapping triplet capacity; actual geometry-constrained counts come from preparation.
-      - Invoked only by explicit export --quick-verify from the frozen copy of this script inside the staging bundle; routine exports and submissions do not run it.
-      - Preserves complete original validation batches selected across low and high input counts; defaults to about 16 studies.
+      - Preserves complete original validation batches selected across low and high input counts; samples=16 selects about 16 studies.
       - Compares saved predictions at their original density, then checks the requested inference density separately without reporting sample AUC.
       - Uses the existing checkpoint without training; source, checkpoint, multiplier and verified codec identities are recorded.
-    docs: [docs/inference-efficiency.md#fast-submission-preparation]
+    docs: [docs/inference/fast-submission-preparation.md]
 
   - id: script-catalog
     path: scripts/tools/catalog.py
@@ -93,7 +112,7 @@ scripts:
     notes:
       - Uses network access and substantial disk space; defaults to a 50 GiB free-space reserve.
       - Override storage with --data-dir; resume state belongs to that destination.
-    docs: [docs/data-preparation.md#downloading-and-extracting-the-images]
+    docs: [docs/data-preparation/downloading-and-extracting-images.md]
 
   - id: validation
     path: scripts/tools/validation.py
@@ -102,8 +121,7 @@ scripts:
     commands:
       - rtk proxy uv run --locked python -m scripts.tools.validation --help
       - rtk proxy uv run --locked python -m scripts.tools.validation prepare
-      - rtk proxy uv run --locked python -m scripts.tools.validation score --predictions outputs/oof.csv
-      - rtk proxy uv run --locked python -m scripts.tools.validation score --split-dir data/folds/gold_5fold_v1 --predictions outputs/legacy-oof.csv
+      - rtk proxy uv run --locked python -m scripts.tools.validation score --predictions outputs/training/run/oof_predictions.csv
     inputs: [Experiment config, Official training and submission CSVs, Pinned public labels for preparation, Saved split and OOF CSV for scoring]
     outputs: [data/folds/all_5fold_v3/ with studies.csv and frozen targets.csv plus full and gold label_counts.csv for prepare, JSON metrics on stdout for score]
     notes:
@@ -111,18 +129,18 @@ scripts:
       - Preparation stratifies report groups using positive and negative effective-label and gold-only target indicators plus is_gold. Duplicate reports remain in one fold.
       - Preparation rejects insufficient report-group support and any assignment missing a positive or negative class for a full-fold or gold target before saving artifacts.
       - Training retains soft labels; AUC binarizes frozen evaluation targets at 0.5 and reports gold and report-derived diagnostics separately. A gold macro AUC is null if any target lacks both classes.
-      - Scoring requires every assigned study exactly once with saved fold IDs and twelve prediction columns; legacy protocol version 1 still scores only its 58 reference studies.
-    docs: [docs/validation.md#reproduce-and-score]
+      - Scoring requires every assigned study exactly once with saved fold IDs and twelve prediction columns and accepts only split protocol version 2; the scorer and its protocol checks live in knee_abnormality.evaluation.scoring and knee_abnormality.data.labels, shared with training's OOF scoring.
+    docs: [docs/validation/project-validation-protocol.md#reproduce-and-score]
 
   - id: preview-augmentations
     path: scripts/tools/preview_augmentations.py
     summary: Browse study-coherent reflection and other augmentations with source geometry and optional bounded CUDA profiling.
     tags: [preview, augmentation, reflection, geometry, profiling, cuda, kornia, affine, noise, gamma, contrast, image, visualization, plane, mri, triplet, channel]
     commands:
-      - rtk proxy uv run --locked python -m scripts.tools.preview_augmentations configs/baseline.yaml --output-dir outputs/previews/triplet-augmentations-new
-      - rtk proxy uv run --locked python -m scripts.tools.preview_augmentations configs/baseline.yaml --seed 100 --variants 6 --output-dir outputs/previews/augmentations-seed100
-      - rtk proxy uv run --locked python -m scripts.tools.preview_augmentations configs/baseline.yaml --sampling training --epoch 2 --output-dir outputs/previews/training-augmentations-epoch2
-      - rtk proxy uv run --locked python -m scripts.tools.preview_augmentations configs/baseline.yaml --variants 1 --profile-cuda true --output-dir outputs/previews/reflection-profile-new
+      - rtk proxy uv run --locked python -m scripts.tools.preview_augmentations configs/training.yaml --output-dir outputs/previews/triplet-augmentations-new
+      - rtk proxy uv run --locked python -m scripts.tools.preview_augmentations configs/training.yaml --seed 100 --variants 6 --output-dir outputs/previews/augmentations-seed100
+      - rtk proxy uv run --locked python -m scripts.tools.preview_augmentations configs/training.yaml --sampling training --epoch 2 --output-dir outputs/previews/training-augmentations-epoch2
+      - rtk proxy uv run --locked python -m scripts.tools.preview_augmentations configs/training.yaml --variants 1 --profile-cuda true --output-dir outputs/previews/reflection-profile-new
     inputs: [Experiment config, Example-test or fold-0 validation DICOMs and metadata, Optional existing geometry header audit]
     outputs: [Offline preview.html, overview.png, effective_config.json, manifest.json, Recursive project-relative source snapshot]
     notes:
@@ -133,9 +151,10 @@ scripts:
       - Keeps all selected acquisitions separately selectable within each plane/contrast, with centered physical positions and the shared type budget when configured.
       - HTML and overview default to forced eligible pure study reflection; combined forced/sampled augmentation remains selectable. Reflection decisions synchronize across all acquisitions in a study.
       - Each sampled variant uses one advancing seeded CPU generator for study reflection and acquisition augmentation draws; gates consume separate random values.
-      - Displays fixed-scale triplet RGB or grayscale channels before normalization, source-channel correspondence, signed positions, centered LPS anchors, eligibility and source laterality from the optional --geometry-headers audit.
+      - Displays fixed-scale triplet RGB or grayscale channels before normalization, source-channel correspondence, signed positions, LPS anchors centered on the preview's own study reference, visual and geometry validity, eligibility and source laterality from the optional --geometry-headers audit.
       - Records per-acquisition transform parameters, pixel-noise seeds and Kornia versions; geometry and noise strength are shared across triplets while pixel noise is independent.
-      - The manifest records the configured backbone's spatial mapping identity without constructing the backbone.
+      - The manifest records the preprocessing identity with the configured backbone's spatial mapping without constructing the backbone.
+      - LPS anchors come from each prepared series' middle-slice patient maps, which the model does not use.
       - Records raw-slice and CNN-input counts separately; triplet positions identify middle slices. CPU random draws need not match CUDA draws with the same seed.
       - Refuses existing output directories; choose a new --output-dir for each regenerated preview.
-    docs: [docs/data-preparation.md#preview-augmentations]
+    docs: [docs/data-preparation/preview-augmentations.md]

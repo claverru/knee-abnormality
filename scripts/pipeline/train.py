@@ -2,7 +2,6 @@ import hashlib
 import json
 import os
 import shutil
-import subprocess
 import sys
 import time
 import zipfile
@@ -19,26 +18,28 @@ from pydantic_settings import CliPositionalArg, SettingsError
 from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
 from pytorch_lightning.loggers import CSVLogger
 
-from knee_abnormality.checkpoints import (
+from knee_abnormality.cli import CLISettings
+from knee_abnormality.config import ExperimentConfig, Fold, load_config
+from knee_abnormality.data.labels import STUDY
+from knee_abnormality.evaluation.predictions import make_prediction_frame
+from knee_abnormality.evaluation.scoring import score
+from knee_abnormality.identity import preprocessing_identity
+from knee_abnormality.inference.checkpoint import (
+    load_checkpoint_model,
+    read_checkpoint,
+)
+from knee_abnormality.inference.engine import predict_loader, resolve_device
+from knee_abnormality.provenance import git_revision, sha256_file
+from knee_abnormality.training.checkpoints import (
     CheckpointRelocation,
     training_input_identity,
     validate_resume_checkpoint,
 )
-from knee_abnormality.cli import NonExitingCLISettings
-from knee_abnormality.config import ExperimentConfig, Fold, load_config
-from knee_abnormality.inference import (
-    load_checkpoint_model,
-    make_prediction_frame,
-    predict_loader,
-)
-from knee_abnormality.preprocessing_identity import preprocessing_identity
-from knee_abnormality.provenance import sha256_file
-from knee_abnormality.runtime import configure_cuda_allocator
-from knee_abnormality.training import BaselineModule, KneeDataModule
-from scripts.tools.validation import score
+from knee_abnormality.training.cuda import configure_cuda_allocator
+from knee_abnormality.training.lightning import PRECISION, KneeDataModule, KneeModule
 
 
-class TrainCLI(NonExitingCLISettings):
+class TrainCLI(CLISettings):
     config: CliPositionalArg[Path] = Field(description="Experiment YAML file")
     data_root: Path | None = None
     output_root: Path | None = None
@@ -48,21 +49,17 @@ class TrainCLI(NonExitingCLISettings):
     limit_train: int | None = Field(default=None, gt=0)
 
 
-def _command(args: list[str]) -> str | None:
-    result = subprocess.run(args, text=True, capture_output=True, check=False)
-    return result.stdout.strip() if result.returncode == 0 else None
-
-
 def _snapshot(run_dir: Path, config_path: Path, config: ExperimentConfig) -> None:
     shutil.copy2(config_path, run_dir / "input_config.yaml")
     (run_dir / "effective_config.json").write_text(
         json.dumps(config.model_dump(mode="json"), indent=2) + "\n"
     )
+    commit, status = git_revision(Path.cwd())
     provenance = {
         "preprocessing_identity": preprocessing_identity(config.model.backbone),
         "created_at": datetime.now(UTC).isoformat(),
-        "git_commit": _command(["git", "rev-parse", "HEAD"]),
-        "git_status": _command(["git", "status", "--short"]),
+        "git_commit": commit,
+        "git_status": status,
         "cuda_allocator_config": os.environ.get(
             "PYTORCH_CUDA_ALLOC_CONF", os.environ.get("PYTORCH_ALLOC_CONF")
         ),
@@ -83,7 +80,6 @@ def _snapshot(run_dir: Path, config_path: Path, config: ExperimentConfig) -> Non
     files = [
         Path("AGENTS.md"),
         Path("README.md"),
-        Path("plan.md"),
         Path("pyproject.toml"),
         Path("uv.lock"),
     ]
@@ -95,8 +91,7 @@ def _snapshot(run_dir: Path, config_path: Path, config: ExperimentConfig) -> Non
                 if path.is_file() and "__pycache__" not in path.parts:
                     archive.write(path)
         for path in files:
-            if path.exists():
-                archive.write(path)
+            archive.write(path)
 
 
 def _state_sha256(state: dict[str, torch.Tensor]) -> str:
@@ -118,9 +113,8 @@ def _check_resume(
     training_studies: int,
     input_identity: dict,
 ) -> None:
-    checkpoint = torch.load(path, map_location="cpu", weights_only=False)
     validate_resume_checkpoint(
-        checkpoint, config, targets, fold, training_studies, input_identity
+        read_checkpoint(path), config, targets, fold, training_studies, input_identity
     )
 
 
@@ -151,7 +145,7 @@ def run_fold(
     (fold_dir / "input_identity.json").write_text(
         json.dumps(input_identity, indent=2) + "\n"
     )
-    module = BaselineModule(
+    module = KneeModule(
         config,
         labels.targets,
         fold,
@@ -215,9 +209,9 @@ def run_fold(
     trainer = L.Trainer(
         default_root_dir=fold_dir,
         max_epochs=config.trainer.max_epochs,
-        precision=config.trainer.precision,
-        accelerator=config.trainer.accelerator,
-        devices=config.trainer.devices,
+        precision=PRECISION,
+        accelerator="auto",
+        devices=1,
         accumulate_grad_batches=config.trainer.accumulate_grad_batches,
         gradient_clip_val=config.trainer.gradient_clip_val,
         deterministic=config.trainer.deterministic,
@@ -251,12 +245,12 @@ def run_fold(
         )
         + "\n"
     )
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = resolve_device("auto")
     model = load_checkpoint_model(
         config, labels.targets, best_path, device, expected_fold=fold
     )
     prediction_started = time.perf_counter()
-    study_ids, predictions = predict_loader(model, data.val_dataloader(), device)
+    study_ids, predictions, _ = predict_loader(model, data.val_dataloader(), device)
     prediction_seconds = time.perf_counter() - prediction_started
     make_prediction_frame(study_ids, predictions, labels.targets, fold).write_csv(
         fold_dir / "validation_predictions.csv"
@@ -292,24 +286,6 @@ def main() -> None:
             folds=args.folds,
         )
         torch.set_float32_matmul_precision("high")
-        if config.model.checkpoint_backbone and not config.model.backbone_eval:
-            if args.resume is None:
-                raise ValueError(
-                    "Training with activation checkpointing requires backbone_eval=true; "
-                    "disable checkpoint_backbone to preserve training-mode BatchNorm"
-                )
-            config = config.model_copy(
-                update={
-                    "model": config.model.model_copy(
-                        update={"checkpoint_backbone": False}
-                    )
-                }
-            )
-            print(
-                "Resuming with activation checkpointing disabled to preserve "
-                "training-mode BatchNorm; GPU memory use may increase.",
-                file=sys.stderr,
-            )
         if args.resume is not None and len(config.validation.folds) != 1:
             raise ValueError("--resume requires exactly one selected fold")
         run_id = (
@@ -341,7 +317,7 @@ def main() -> None:
                 pl.read_csv(run_dir / f"fold_{fold}" / "validation_predictions.csv")
                 for fold in config.validation.folds
             ]
-        ).sort("StudyInstanceUID")
+        ).sort(STUDY)
         oof_path = run_dir / "oof_predictions.csv"
         predictions.write_csv(oof_path)
         protocol = json.loads((config.split_dir / "protocol.json").read_text())

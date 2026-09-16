@@ -1,0 +1,113 @@
+# Swapping a backbone
+
+Cost and code requirements for replacing either backbone of the
+[learned-zoom model](active-spatial-token-model.md#learned-zoom): the main glimpse backbone
+(`model.backbone`, ReXNet-200) or the scout (`model.scout_backbone`, MobileNetV3-small).
+Measured on 2026-09-16 (timm 1.0.26, torch 2.10) against `configs/baseline.yaml` at `ea19772`
+plus working changes. All costs are parameter and multiply-add (GMAC) counts, not timings;
+time real candidates on a Kaggle T4. Evidence on which families suit MRI is in
+[backbone MRI evidence](../research/backbone-mri-evidence.md); scout candidates are in
+[scout backbone candidates](../research/scout-backbones.md); EfficientNet preprocessing and
+BatchNorm handling are in [EfficientNet training](../research/efficientnet-training.md).
+
+## Current budget
+
+Parameters total 15.67M:
+
+| Component | Parameters | Share |
+|---|---:|---:|
+| ReXNet-200 | 13.81M | 88.1% |
+| Glimpse projection (2560→256) | 0.66M | 4.2% |
+| Scout backbone `mobilenetv3_small_100.lamb_in1k` | 0.93M | 5.9% |
+| Scout projection (624→256) | 0.16M | 1.0% |
+| Attention, demand, embeddings, head | 0.13M | 0.8% |
+
+Forward compute per study, in GMACs:
+
+| Component | Per unit | Training | Inference, 2× images |
+|---|---:|---:|---:|
+| Scout at 300 px | 0.104 per canvas | 2.10 (6.7%) | 5.26 (6.8%) |
+| Coarse-token heads (scout projection, attention, 2D position, demand, k-means) | 0.108 per canvas | 2.20 (7.0%) | 5.49 (7.1%) |
+| ReXNet-200 context glimpse, 160 px | 0.781 per canvas | 15.85 (50.4%) | 39.66 (50.9%) |
+| ReXNet-200 detail glimpse, 224 px | 1.526 per glimpse | 10.68 (34.0%) | 25.95 (33.3%) |
+| Context and detail token heads | 0.018 per canvas, 0.035 per glimpse | 0.60 (1.9%) | 1.49 (1.9%) |
+| **Total** | | **31.4** | **77.9** |
+
+- **Main backbone:** ReXNet-200 takes about 84% of compute and 88% of parameters.
+- **Scout:** under 7% of compute, about 14% with its coarse-token heads.
+- **Canvases per study (K):** 25.4 at 1× image limits and 50.8 at 2×, averaged over the 4,407
+  training studies. Each series type contributes min(images − 2, its triplet limit × the
+  multiplier) triplets.
+- **Training:** K ≈ 20, since series dropout 0.2 removes about a fifth of the series.
+- **Detail glimpses (N):** ceil(0.333 K), about 7 in training and 17 at inference, matching the
+  profiled fold-0 counts.
+- **Backward pass:** it scales all trained parts roughly alike, so the shares hold for training
+  steps. Selection runs without gradient.
+- **Method:** backbone GMACs come from `torch.utils.flop_counter.FlopCounterMode`, halved. Head
+  costs are analytic, from layer sizes. Scripts are in
+  [`outputs/research/scout-backbones-20260916`](../../outputs/research/scout-backbones-20260916)
+  (`budget.py`).
+
+## Delta formulas
+
+C is the feature channel count entering the 256-wide projection; each channel adds 256
+parameters and 256 multiply-adds per token.
+
+- **Main backbone** (stride 32, so still 25 context and 49 detail tokens):
+  - Δparameters = ΔP + 256 ΔC, with C = `num_features` (2560 now).
+  - Δcompute = [K ΔG₁₆₀ + N ΔG₂₂₄ + (25 K + 49 N) · 256 ΔC / 10⁹] / total.
+  - A different stride changes the token counts, and with them attention and head costs.
+- **Scout** (361 coarse tokens):
+  - Δparameters = ΔP + 256 ΔC, with C the concatenated stride-16 and stride-32 channels (624
+    now).
+  - Δcompute = K (ΔG₃₀₀ + 361 · 256 ΔC / 10⁹) / total.
+  - K/total is about 0.65 in both settings, so training and inference deltas agree within
+    0.4 points.
+
+## Code requirements
+
+**Main backbone** (`KneeAbnormalityModel.__init__`):
+
+- **Mapping:** the name must have a `BACKBONE_MAPPINGS` entry, and `backbone_mapping` must
+  reproduce it. Only `_rexnet_mapping` and `_coatnet_mapping` exist, so any other family needs
+  its own mapping function.
+- **Features:** `forward_features` must return NCHW with `num_features` channels.
+- **Input sizes:** it must accept both 224 px detail and 160 px context inputs. Fixed-size
+  models fail; [CoAtNet](coatnet-224-spatial-backbone.md) fails at the context size.
+- **Anchors:** context and detail anchors are derived from the mapping, so any origin works.
+
+**Scout** (`CoarseScout`, `GlimpseLayout`):
+
+- **Mapping:** `features_only` with stride-16 and stride-32 outputs (`out_indices` is fixed at
+  `(3, 4)` today). `scout_mappings` must reproduce a `SCOUT_MAPPINGS` entry.
+- **Grid:** `GlimpseLayout` requires a square, isotropic grid.
+- **No alignment:** detail offsets are floored from anchors and fine tokens take the nearest
+  scout cell, so the scout grid need not line up with glimpses.
+
+## Mapping pitfalls
+
+`_spatial_mapping` walks the convolutions it is given in order. Applying it to every
+convolution in module order is exact only for single-path networks with static padding. The
+2026-09-16 sweep of timm models found these categories:
+
+- **native:** a single path with symmetric padding gives origin 0 at strides 16 and 32 for
+  MobileNetV3/V4, EfficientNet, ReXNet and EfficientViT-B. Only a mapping entry is needed.
+- **Offset origin:** these need a mapping entry with the true origin.
+  - *ConvNeXt:* the patchify stem gives 7.5 px (6 px for `_ols` variants) at stride 16, and
+    grids floor (18×18 at 300 px).
+  - *HGNetV2:* the stem pads with `F.pad` and uses a stride-1 max pool, which the walker does
+    not see, so its reported 2 px origin needs verifying.
+- **Walker wrong:** these need a family-specific function.
+  - *RepGhost and GhostNet:* strided shortcut convolutions are counted twice (reported stride
+    128/512). Every strided convolution has an odd kernel and symmetric padding, so the true
+    origin is 0.
+  - *RegNet:* strided 1×1 shortcuts are counted twice; origin 0 expected but unverified.
+  - *TensorFlow-ported `tf_` models:* "same" padding is dynamic and asymmetric, so a static walk
+    is unreliable.
+  - *Reparameterizable families (FastViT, MobileOne, EfficientFormer):* parallel branches break
+    the walk.
+- **Fixed input size:** LeViT, EfficientViT-M and EfficientFormer/V2 run only at their native
+  size. As a scout they need `scout_size: 224` (0.67 mm, 14×14 grid); as the main backbone they
+  cannot serve two glimpse sizes.
+- **ViT-like:** stride 16 only (a stride-32 map would need 2×2 pooling), a 7.5 px patch origin,
+  and interpolated position embeddings; `img_size` or `dynamic_img_size` must be set.

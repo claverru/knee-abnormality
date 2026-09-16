@@ -1,6 +1,8 @@
 import json
 import logging
+import os
 import sys
+import tempfile
 import time
 from pathlib import Path
 from typing import Literal
@@ -11,21 +13,27 @@ import yaml
 from pydantic import Field
 from pydantic_settings import CliPositionalArg, SettingsError
 
-from knee_abnormality.cli import NonExitingCLISettings
-from knee_abnormality.config import Fold, load_config
-from knee_abnormality.dataset import resolve_raw_dir
-from knee_abnormality.inference import (
-    load_checkpoint_model,
-    make_prediction_frame,
-    predict_loader,
-    prediction_data,
-    prediction_loader,
+from knee_abnormality.cli import CLISettings
+from knee_abnormality.config import (
+    INFERENCE_BATCH_SIZE,
+    INFERENCE_NUM_WORKERS,
+    Fold,
+    load_config,
+)
+from knee_abnormality.data.labels import STUDY
+from knee_abnormality.data.sources import prediction_studies
+from knee_abnormality.inference.bundle import discover_kaggle_data_root, verify_bundle
+from knee_abnormality.inference.engine import (
+    prediction_image_multiplier,
     resolve_device,
-    resolve_precision,
+)
+from knee_abnormality.inference.processes import (
+    PredictionRequest,
+    run_prediction_processes,
 )
 
 
-class PredictCLI(NonExitingCLISettings):
+class PredictCLI(CLISettings):
     config: CliPositionalArg[Path] = Field(
         description="Experiment YAML or saved effective_config.json file"
     )
@@ -36,23 +44,30 @@ class PredictCLI(NonExitingCLISettings):
     fold: Fold | None = None
     data_root: Path | None = None
     label_manifest: Path | None = None
-    batch_size: int | None = Field(default=None, gt=0)
-    num_workers: int | None = Field(default=None, ge=0)
+    batch_size: int | None = Field(
+        default=None,
+        gt=0,
+        description="Studies per GPU batch; defaults to the bundle or repository value",
+    )
+    num_workers: int | None = Field(
+        default=None,
+        ge=0,
+        description="Total loader workers across all GPUs; defaults to the bundle or repository value",
+    )
     device: Literal["auto", "cpu", "cuda"] = "auto"
     precision: Literal["auto", "fp32", "fp16", "bf16"] = "auto"
     image_multiplier: int | None = Field(default=None, gt=0)
 
 
 def main() -> None:
+    started_at = time.time()
+    started = time.perf_counter()
     logging.basicConfig(level=logging.INFO)
     try:
         args = PredictCLI()
         bundle = args.bundle.expanduser().resolve() if args.bundle is not None else None
-        manifest = None
-        if bundle is not None:
-            from knee_abnormality.bundle import verify_bundle
-
-            manifest = verify_bundle(bundle)
+        manifest = verify_bundle(bundle) if bundle is not None else None
+        verified = time.perf_counter()
         if args.checkpoint is not None and bundle is not None:
             raise ValueError("A bundle supplies its own checkpoint")
         config_path = args.config.expanduser().resolve()
@@ -61,108 +76,158 @@ def main() -> None:
         if bundle is None and args.checkpoint is None:
             raise ValueError("Repository inference requires --checkpoint")
         checkpoint_path = (
-            args.checkpoint if args.checkpoint is not None else bundle / "model.ckpt"
+            (args.checkpoint if args.checkpoint is not None else bundle / "model.ckpt")
+            .expanduser()
+            .resolve()
         )
         data_root = args.data_root
         if data_root is None and bundle is not None and Path("/kaggle/input").is_dir():
-            from knee_abnormality.bundle import discover_kaggle_data_root
-
             data_root = discover_kaggle_data_root()
         config = load_config(
             config_path,
             data_root=data_root,
             label_manifest=args.label_manifest,
         )
-        torch.set_float32_matmul_precision("high")
-        image_multiplier = args.image_multiplier
-        if manifest is not None:
-            recorded = manifest.get("runtime", {}).get("image_multiplier")
-            if recorded is not None:
-                if image_multiplier is not None and image_multiplier != recorded:
-                    raise ValueError(
-                        "Export a new bundle to change its image multiplier"
-                    )
-                image_multiplier = recorded
-        fold = args.fold if args.fold is not None else config.validation.folds[0]
-        dataset, targets, studies = prediction_data(
-            config, args.split, fold, image_multiplier=image_multiplier
+        runtime = (
+            manifest["runtime"]
+            if manifest is not None
+            else {
+                "image_multiplier": args.image_multiplier,
+                "batch_size": INFERENCE_BATCH_SIZE,
+                "num_workers": INFERENCE_NUM_WORKERS,
+            }
         )
-        image_multiplier = dataset.image_limit_multiplier
-        batch_size = args.batch_size
-        if batch_size is None and manifest is not None:
-            batch_size = manifest.get("runtime", {}).get("batch_size")
-        loader = prediction_loader(
-            config,
-            dataset,
-            batch_size=batch_size,
-            num_workers=args.num_workers,
+        if (
+            manifest is not None
+            and args.image_multiplier is not None
+            and args.image_multiplier != runtime["image_multiplier"]
+        ):
+            raise ValueError("Export a new bundle to change its image multiplier")
+        fold = args.fold if args.fold is not None else config.validation.folds[0]
+        targets, studies, _ = prediction_studies(config, args.split, fold)
+        image_multiplier = (
+            prediction_image_multiplier(config, args.split)
+            if runtime["image_multiplier"] is None
+            else runtime["image_multiplier"]
+        )
+        batch_size = (
+            runtime["batch_size"] if args.batch_size is None else args.batch_size
+        )
+        num_workers = (
+            runtime["num_workers"] if args.num_workers is None else args.num_workers
         )
         device = resolve_device(args.device)
-        actual_precision, _ = resolve_precision(args.precision, device)
-        started = time.perf_counter()
-        model = load_checkpoint_model(
-            config,
-            targets,
-            checkpoint_path,
-            device,
-            expected_fold=fold if args.split == "validation" else None,
-        )
-        loaded = time.perf_counter()
-        study_ids, predictions = predict_loader(model, loader, device, args.precision)
-        predicted = time.perf_counter()
-        frame = make_prediction_frame(
-            study_ids,
-            predictions,
-            targets,
-            fold if args.split == "validation" else None,
-        )
-        if args.split == "test":
-            template = pl.read_csv(
-                resolve_raw_dir(config.paths.data_root, "test")
-                / "sample_submission.csv"
+        gpu_ids: list[str | None] = [None]
+        if device.type == "cuda":
+            count = torch.cuda.device_count()
+            if count < 1:
+                raise RuntimeError("No CUDA device is available for inference")
+            visible = os.environ.get("CUDA_VISIBLE_DEVICES")
+            gpu_ids = (
+                [value.strip() for value in visible.split(",")][:count]
+                if visible is not None
+                else [str(index) for index in range(count)]
             )
+        gpu_ids = gpu_ids[: studies.height]
+        worker_count = len(gpu_ids)
+        output = args.output.expanduser().resolve()
+        output.parent.mkdir(parents=True, exist_ok=True)
+        logging.getLogger(__name__).info(
+            "Inference uses %s processes, %s studies per device, %s total loader workers",
+            worker_count,
+            batch_size,
+            num_workers,
+        )
+        spawning = time.perf_counter()
+        with tempfile.TemporaryDirectory(
+            prefix=f".{output.stem}-workers-", dir=output.parent
+        ) as temporary:
+            directory = Path(temporary)
+            study_ids = studies[STUDY].to_list()
+            requests = [
+                PredictionRequest(
+                    config=config,
+                    checkpoint=checkpoint_path,
+                    split=args.split,
+                    fold=fold,
+                    image_multiplier=image_multiplier,
+                    batch_size=batch_size,
+                    num_workers=num_workers // worker_count
+                    + int(index < num_workers % worker_count),
+                    device=device.type,
+                    precision=args.precision,
+                    study_ids=study_ids[index::worker_count],
+                    worker_index=index,
+                    output=directory / f"predictions-{index}.csv",
+                )
+                for index in range(worker_count)
+            ]
+            workers = run_prediction_processes(requests, gpu_ids, directory)
+            predicted = time.perf_counter()
+            frame = pl.concat([pl.read_csv(request.output) for request in requests])
+            columns = [STUDY]
+            if args.split == "validation":
+                columns.append("fold")
+            columns.extend(targets)
             if (
-                frame.columns != template.columns
-                or set(frame["StudyInstanceUID"]) != set(studies["StudyInstanceUID"])
-                or set(template["StudyInstanceUID"]) != set(studies["StudyInstanceUID"])
+                frame.columns != columns
+                or frame.height != studies.height
+                or frame[STUDY].n_unique() != studies.height
+                or set(frame[STUDY]) != set(study_ids)
             ):
                 raise ValueError(
-                    "Test predictions do not match the submission schema and studies"
+                    "Worker outputs do not cover every requested study exactly once"
                 )
-            frame = template.select("StudyInstanceUID").join(
-                frame, on="StudyInstanceUID", how="left", validate="1:1"
+            frame = studies.select(STUDY).join(
+                frame,
+                on=STUDY,
+                how="left",
+                validate="1:1",
+                maintain_order="left",
             )
-            if (
-                frame.height != studies.height
-                or frame.select(
-                    pl.any_horizontal(
-                        pl.col(targets).is_null()
-                        | ~pl.col(targets).is_finite()
-                        | ~pl.col(targets).is_between(0, 1)
-                    ).any()
-                ).item()
-            ):
-                raise ValueError("Submission contains missing or invalid predictions")
-        args.output.parent.mkdir(parents=True, exist_ok=True)
-        frame.write_csv(args.output)
-        finished = time.perf_counter()
-        print(
-            json.dumps(
-                {
-                    "output": str(args.output.expanduser().resolve()),
-                    "studies": frame.height,
-                    "device": str(device),
-                    "precision": actual_precision,
-                    "image_multiplier": image_multiplier,
-                    "batch_size": loader.batch_size,
-                    "model_load_seconds": loaded - started,
-                    "prediction_seconds": predicted - loaded,
-                    "write_seconds": finished - predicted,
-                    "studies_per_second": frame.height / (predicted - loaded),
-                }
-            )
-        )
+            if frame.select(
+                pl.any_horizontal(
+                    pl.col(targets).is_null()
+                    | ~pl.col(targets).is_finite()
+                    | ~pl.col(targets).is_between(0, 1)
+                ).any()
+            ).item():
+                raise ValueError(
+                    "Worker outputs contain missing or invalid predictions"
+                )
+            if args.split == "validation" and not (frame["fold"] == fold).all():
+                raise ValueError("Worker outputs contain the wrong validation fold")
+            staged_output = directory / "merged.csv"
+            frame.write_csv(staged_output)
+            precisions = {worker["precision"] for worker in workers}
+            result = {
+                "output": str(output),
+                "studies": frame.height,
+                "device": str(device),
+                "devices": worker_count,
+                "precision": next(iter(precisions))
+                if len(precisions) == 1
+                else "mixed",
+                "image_multiplier": image_multiplier,
+                "batch_size": batch_size,
+                "batch_size_scope": "per_device",
+                "num_workers": num_workers,
+                "num_workers_scope": "total",
+                "started_at": started_at,
+                "verify_seconds": verified - started,
+                "setup_seconds": spawning - verified,
+                "worker_wall_seconds": predicted - spawning,
+                "write_seconds": time.perf_counter() - predicted,
+                "studies_per_second": frame.height / (predicted - spawning),
+                "workers": workers,
+            }
+            staged_runtime = directory / "runtime.json"
+            staged_runtime.write_text(json.dumps(result, indent=2) + "\n")
+            staged_runtime.replace(output.with_suffix(".runtime.json"))
+            staged_output.replace(output)
+        print(json.dumps(result))
     except (
+        KeyError,
         OSError,
         RuntimeError,
         TypeError,

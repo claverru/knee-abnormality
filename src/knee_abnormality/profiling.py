@@ -1,6 +1,5 @@
 import json
 import os
-import shutil
 import time
 from datetime import UTC, datetime
 from importlib.metadata import version
@@ -11,12 +10,13 @@ import polars as pl
 import pytorch_lightning as L
 import torch
 
-from knee_abnormality.config import ExperimentConfig
-from knee_abnormality.dataset import KneeStudyDataset, build_series_index
-from knee_abnormality.labels import FoldLabels, load_fold_labels
-from knee_abnormality.provenance import sha256_file
-from knee_abnormality.runtime import configure_cuda_allocator
-from knee_abnormality.training import masked_binary_cross_entropy_with_logits
+from knee_abnormality.config import SLICES_PER_INPUT, ExperimentConfig
+from knee_abnormality.data.dataset import KneeStudyDataset
+from knee_abnormality.data.labels import STUDY, FoldLabels, load_fold_labels
+from knee_abnormality.data.sources import build_series_index
+from knee_abnormality.provenance import copy_sources, sha256_file
+from knee_abnormality.training.cuda import configure_cuda_allocator
+from knee_abnormality.training.lightning import masked_binary_cross_entropy_with_logits
 
 
 def sample_dataset(
@@ -25,11 +25,12 @@ def sample_dataset(
     labels = load_fold_labels(config, config.validation.folds[0])
     index = build_series_index(config.paths.data_root, config.data, "train")
     ranked = sorted(
-        labels.training["StudyInstanceUID"].to_list(),
+        labels.training[STUDY].to_list(),
         key=lambda uid: (
             -sum(
                 min(
-                    sum(max(c.image_count - 2, 0) for c in values), kind.max_images // 3
+                    sum(max(c.image_count - 2, 0) for c in values),
+                    kind.max_images // SLICES_PER_INPUT,
                 )
                 for values, kind in zip(
                     index[uid].slots, config.data.series_types, strict=True
@@ -39,9 +40,13 @@ def sample_dataset(
         ),
     )
     rng = np.random.default_rng(config.seed)
-    selected = ranked[:4] + rng.choice(ranked[4:], count - 4, replace=False).tolist()
-    rows = pl.DataFrame({"StudyInstanceUID": selected}).join(
-        labels.training, on="StudyInstanceUID", how="left", maintain_order="left"
+    heaviest = min(count, 8)
+    selected = (
+        ranked[:heaviest]
+        + rng.choice(ranked[heaviest:], count - heaviest, replace=False).tolist()
+    )
+    rows = pl.DataFrame({STUDY: selected}).join(
+        labels.training, on=STUDY, how="left", maintain_order="left"
     )
     dataset = KneeStudyDataset(
         rows, index, config.data, labels.targets, False, config.seed
@@ -51,7 +56,7 @@ def sample_dataset(
 
 def training_step(model, optimizer, batch: dict, config: ExperimentConfig) -> float:
     optimizer.zero_grad(set_to_none=True)
-    with torch.autocast("cuda", dtype=torch.bfloat16):
+    with torch.autocast("cuda", dtype=torch.bfloat16, cache_enabled=False):
         logits = model(batch)
     loss = masked_binary_cross_entropy_with_logits(
         logits.float(), batch["target"], batch["target_observed"]
@@ -76,23 +81,7 @@ def setup_profile(
     torch.use_deterministic_algorithms(config.trainer.deterministic)
     torch.backends.cudnn.benchmark = False
     snapshot = output_dir / "source"
-    snapshot.mkdir()
-    project_root = Path.cwd().resolve()
-    paths = [Path("src/knee_abnormality"), *source_paths]
-    files = []
-    for path in paths:
-        path = path.resolve()
-        files.extend(path.rglob("*.py") if path.is_dir() else [path])
-    for path in files:
-        if not path.is_file():
-            continue
-        if path.is_relative_to(project_root):
-            relative = path.relative_to(project_root)
-        else:
-            relative = Path("external") / path.relative_to(path.anchor)
-        destination = snapshot / relative
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(path, destination)
+    copy_sources([Path("src/knee_abnormality"), *source_paths], snapshot)
     return allocator, snapshot
 
 

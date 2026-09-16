@@ -1,0 +1,38 @@
+# Spatial-token model shapes
+
+Current [crop-selection model](modeling/active-spatial-token-model.md#crop-selection) at
+the baseline's 300-pixel canvases and 224-pixel crops. `K` is the number of kept canvases in
+the batch, `B` the number of studies, and `N` the number of crops: `data.crops_per_label` (2)
+for each of the 12 labels, so 24 per study with selectable cells, pooled by every label. Historical 1C
+changes only the readout and classifier grouping described in
+[modeling](modeling/retired-side-and-compartment-variants.md#historical-disease-sharing).
+
+```mermaid
+flowchart TD
+    Input["Prepared uint8 triplets<br/>[series, padded inputs, 3, 300, 300]"] --> Keep["Slice mask and retained series<br/>Training series dropout 0.20; restore one if empty"]
+    Keep --> Aug["Study reflection on uint8, then per-series affine, intensity and noise<br/>Augmented float canvases [K, 3, 300, 300]"]
+    Aug --> Scout["MobileNetV3 scout on normalized canvases<br/>Stride 16 [K, 48, 19, 19]; stride 32 [K, 576, 10, 10]"]
+    Scout --> Coarse["Stride 32 sampled bilinearly at stride-16 anchors, concatenated<br/>Linear 624→256 [K, 361, 256]"]
+    Aug --> Inverse["Canvas augmentation inverse, then reflection inverse<br/>Float32 outside autocast [K, 3, 3]"]
+    Inverse --> CoarseGeometry["Coarse anchors: origin 0, stride 16<br/>2D canvas xy and visual validity [K, 361]"]
+    Coarse --> CoarseTokens["+ 1D, 2D, plane, contrast embeddings<br/>Shared LayerNorm → coarse tokens [K × 361, 256]"]
+    CoarseGeometry --> CoarseTokens
+    CoarseTokens --> CoarsePool["Computed once, with gradient: attention MLP 256→128→12 scores r [K × 361, 12]<br/>Coarse mask: study and visual validity [B, 1, K × 361]; fail if a study has none<br/>Float32 softmax per study and label → attention a [B, 12, K × 361], coarse pool [B, 12, 256]"]
+    CoarsePool --> Value["Value map: detached per-label attention a → [K, 361, 12]"]
+    CoarseGeometry --> Selectable["Selectable cells: ring rule and anchor inside all channel rectangles<br/>[K, 361]"]
+    Value --> Coverage["Per-label selection, float32 without gradient<br/>Per-label 14×14 footprint value, log gain + Gumbel in training, argmax in evaluation<br/>Each label: crops_per_label canvases, one crop per canvas, unused planes first,<br/>then unused canvases, then a second cell on a used canvas ≥ 3 cells from its crops there<br/>(else its best untaken cell); labels may share crops, each choice is kept<br/>Crops: study, canvas, cell, label (analysis only) [N = 24 per study]"]
+    Selectable --> Coverage
+    Coverage --> Crops["Integer windows of augmented canvases, top-left anchor − 112<br/>Zero outside the canvas; normalize [N, 3, 224, 224]"]
+    Aug --> Crops
+    Crops --> CNN["ReXNet-200 forward_features [N, 2560, 7, 7]<br/>Linear 2560→256 [N, 49, 256]"]
+    Inverse --> FineGeometry["Canvas inverse composed with integer crop offset<br/>Anchors origin 0, stride 32; each lands on a coarse cell [N, 49]"]
+    Coverage --> FineGeometry
+    CNN --> FineTokens["+ 1D, 2D (canvas frame), plane, contrast from the canvas<br/>Shared LayerNorm → fine tokens [N × 49, 256]"]
+    FineGeometry --> FineTokens
+    FineTokens --> FinePool["Fine scores: attention MLP(fine) + r of the cell under the token [N × 49, 12]<br/>Fine mask: study and visual validity [B, 1, N × 49]<br/>Float32 softmax per study and label over all of the study's fine tokens → fine pool [B, 12, 256]"]
+    CoarsePool --> FinePool
+    CoarsePool --> MIL["Gate g = sigmoid(learned [12], init 0): g · coarse + (1 − g) · fine<br/>Coarse pool alone for a study without valid fine tokens [B, 12, 256]"]
+    FinePool --> MIL
+    MIL --> Head["Twelve independent classifier vectors and biases<br/>12 study logits → BCE"]
+    CoarsePool --> Draft["Same head on the coarse pool alone<br/>Draft logits [B, 12], logged as val_draft_macro_auc"]
+```

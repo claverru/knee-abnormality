@@ -1,7 +1,6 @@
 import base64
 import hashlib
 import json
-import shutil
 import sys
 from dataclasses import replace
 from importlib.metadata import version
@@ -16,7 +15,13 @@ from PIL import Image, ImageDraw, ImageFont
 from pydantic import Field
 from pydantic_settings import CliPositionalArg, SettingsError
 
-from knee_abnormality.augmentation import (
+from knee_abnormality.cli import CLISettings
+from knee_abnormality.config import SLICES_PER_INPUT, load_config
+from knee_abnormality.data.dataset import collate_studies
+from knee_abnormality.data.labels import STUDY
+from knee_abnormality.identity import preprocessing_identity
+from knee_abnormality.inference.engine import prediction_data
+from knee_abnormality.modeling.augmentation import (
     AugmentationParameters,
     ImageAugmentation,
     affine_matrices,
@@ -28,13 +33,8 @@ from knee_abnormality.augmentation import (
     sample_augmentation_parameters,
     sample_reflection_parameters,
 )
-from knee_abnormality.cli import NonExitingCLISettings
-from knee_abnormality.config import load_config
-from knee_abnormality.dataset import collate_studies
-from knee_abnormality.inference import prediction_data
-from knee_abnormality.preprocessing_identity import preprocessing_identity
-from knee_abnormality.provenance import sha256_file
-from knee_abnormality.spatial_tokens import feature_geometry
+from knee_abnormality.modeling.spatial_tokens import feature_geometry
+from knee_abnormality.provenance import copy_sources, sha256_file
 
 PAGE = """<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
@@ -77,15 +77,12 @@ const variant = document.getElementById('variant');
 const force = document.getElementById('force');
 const reflection = document.getElementById('reflection');
 const display = document.getElementById('display');
-const triplets = data.slices_per_input === 3;
-display.disabled = !triplets;
-if (!triplets) display.options[0].textContent = 'Grayscale slice';
 const positions = new Map();
 const acquisitions = new Map();
 data.studies.forEach((uid,i) => study.add(new Option(`Example ${i+1} · …${uid.slice(-8)}`,uid)));
 study.value = data.studies[0];
 data.seeds.forEach((seed,i) => variant.add(new Option(`Seed ${seed}`,i)));
-document.getElementById('intro').textContent = `${data.image_size} px · ${(data.image_size*data.spacing_mm).toFixed(1)} mm crop · ${data.sampling} slice sampling · ${triplets ? 'three consecutive slices per input' : 'one slice per input'} · Kornia · affine ${100*data.settings.affine.probability}% · gamma/contrast ${100*data.settings.intensity.probability}% · noise ${100*data.settings.noise.probability}%`;
+document.getElementById('intro').textContent = `${data.image_size} px · ${(data.image_size*data.spacing_mm).toFixed(1)} mm crop · ${data.sampling} slice sampling · three consecutive slices per input · Kornia · affine ${100*data.settings.affine.probability}% · gamma/contrast ${100*data.settings.intensity.probability}% · noise ${100*data.settings.noise.probability}%`;
 function render() {
   const draw = Number(variant.value);
   const cards = document.getElementById('cards');
@@ -94,7 +91,7 @@ function render() {
     ? 'Enabled transforms are forced on for comparison. Uncheck the box to respect their independently sampled training probabilities. Images use a fixed display scale before backbone normalization.'
     : 'Training probabilities are active. Geometry, gamma, contrast and noise strength are shared within each acquisition; pixel noise varies between slices. Images use a fixed display scale before backbone normalization.';
   if (reflection.checked) document.getElementById('explanation').textContent = 'Pure forced study reflection, respecting eligibility. Axial/coronal columns reverse; sagittal channels reverse. Targets retain their identities. Source laterality is unchanged metadata. Unavailable categories: ' + data.coverage.unavailable_categories.join(', ');
-  if (triplets) document.getElementById('explanation').textContent += ' The composite maps consecutive MRI slices to red, green and blue; select a channel to inspect its grayscale slice.';
+  document.getElementById('explanation').textContent += ' The composite maps consecutive MRI slices to red, green and blue; select a channel to inspect its grayscale slice.';
   data.types.forEach((type,slot) => {
     const candidates = data.series.filter(row => row.slot === slot && (study.value === 'all' || row.study_uid === study.value));
     const acquisitionKey = `${study.value}/${slot}`;
@@ -148,9 +145,8 @@ function render() {
       content.querySelector('.augmented').src = augmented;
       const geometry = reflection.checked ? entry.reflected_anchors : (force.checked ? sample.anchors : sample.sampled_anchors);
       const association = geometry.source_channels[index];
-      content.querySelector('.paths').textContent = association.map((source, channel) => `Output channel ${channel+1} ← source channel ${source+1}: ${entry.selected_paths[index][source]}`).join(String.fromCharCode(10)) + '\\nCentered LPS anchors in mm (3×3 final image grid, unavailable = null):\\nBefore: ' + JSON.stringify(entry.original_anchors.centered_xyz_mm[index]) + '\\nAfter: ' + JSON.stringify(geometry.centered_xyz_mm[index]) + '\\nVisual validity: ' + JSON.stringify(geometry.visual_valid[index]) + '\\n3D availability: ' + JSON.stringify(geometry.available_3d[index]);
-      const unit = data.position_encoding === 'physical_mm' ? `mm from acquisition ${data.position_reference}` : 'ordered slice index';
-      content.querySelector('.position').textContent = `${triplets ? 'Triplet' : 'Slice'} ${index+1} / ${entry.original.length} · ${triplets ? 'middle slice: ' : ''}${entry.positions[index].toFixed(2)} → ${geometry.positions[index].toFixed(2)} ${unit}`;
+      content.querySelector('.paths').textContent = association.map((source, channel) => `Output channel ${channel+1} ← source channel ${source+1}: ${entry.selected_paths[index][source]}`).join(String.fromCharCode(10)) + '\\nCentered LPS anchors in mm (3×3 final image grid, unavailable = null):\\nBefore: ' + JSON.stringify(entry.original_anchors.centered_xyz_mm[index]) + '\\nAfter: ' + JSON.stringify(geometry.centered_xyz_mm[index]) + '\\nVisual validity: ' + JSON.stringify(geometry.visual_valid[index]) + '\\nGeometry validity: ' + JSON.stringify(geometry.geometry_valid[index]);
+      content.querySelector('.position').textContent = `Triplet ${index+1} / ${entry.original.length} · middle slice: ${entry.positions[index].toFixed(2)} → ${geometry.positions[index].toFixed(2)} mm from acquisition center`;
     }
     slider.addEventListener('input',update); update(); card.append(content); cards.append(card);
   });
@@ -161,8 +157,8 @@ render();
 """
 
 
-class PreviewCLI(NonExitingCLISettings):
-    config: CliPositionalArg[Path] = Path("configs/baseline.yaml")
+class PreviewCLI(CLISettings):
+    config: CliPositionalArg[Path] = Path("configs/training.yaml")
     output_dir: Path = Path("outputs/previews/augmentations")
     study_uid: str | None = None
     seed: int | None = Field(default=None, ge=0, lt=2**32)
@@ -182,15 +178,16 @@ class PreviewCLI(NonExitingCLISettings):
 def encode_image(pixels: torch.Tensor) -> str:
     stream = BytesIO()
     if pixels.ndim == 3:
-        pixels = pixels[0] if pixels.shape[0] == 1 else pixels.permute(1, 2, 0)
+        pixels = pixels.permute(1, 2, 0)
     Image.fromarray(pixels.numpy()).save(stream, format="PNG")
     return "data:image/png;base64," + base64.b64encode(stream.getvalue()).decode()
 
 
 def encode_channels(images: torch.Tensor) -> list[list[str]]:
-    if images.ndim != 4 or images.shape[1] != 3:
-        return []
-    return [[encode_image(image[channel]) for image in images] for channel in range(3)]
+    return [
+        [encode_image(image[channel]) for image in images]
+        for channel in range(SLICES_PER_INPUT)
+    ]
 
 
 def overview(data: dict, output: Path) -> None:
@@ -229,8 +226,7 @@ def overview(data: dict, output: Path) -> None:
         ):
             pixels = Image.open(BytesIO(base64.b64decode(encoded.split(",", 1)[1])))
             canvas.paste(pixels, (16 + column * (size + 16), top + 28))
-        unit = "Triplet" if data["slices_per_input"] == 3 else "Slice"
-        detail = f"{unit} {index + 1}/{len(entry['original'])} · eligible {entry['study_reflection_eligible']}"
+        detail = f"Triplet {index + 1}/{len(entry['original'])} · eligible {entry['study_reflection_eligible']}"
         draw.text((16, top + size + 38), detail, fill="#8dc8ff", font=font)
         draw.text(
             (16, top + size + 58),
@@ -256,22 +252,32 @@ def anchor_record(series, center, eligible, sagittal, inverse=None):
     if inverse is None:
         inverse = torch.eye(3)[None].expand(count, -1, -1)
     inverse = reflection_inverse(inverse, reflected, planes, size)
-    center_valid = center is not None and center.point is not None
-    centers = torch.tensor(center.point if center_valid else (0, 0, 0)).expand(
-        count, -1
-    )
-    _, xyz, visual, available = feature_geometry(
-        series.patient_maps,
+    _, visual = feature_geometry(
         series.valid_rects,
-        series.geometry_valid,
         inverse,
         (3, 3),
         (size, size),
         (0, 0, (size - 1) / 2, (size - 1) / 2),
-        centers,
-        torch.full((count,), center_valid),
-        reflected,
         association,
+    )
+    steps = torch.arange(3, dtype=torch.float32) * (size - 1) / 2
+    y, x = torch.meshgrid(steps, steps, indexing="ij")
+    anchors = torch.stack((x.flatten(), y.flatten(), torch.ones(9)), -1)
+    prepared = torch.einsum("nij,kj->nki", inverse.float(), anchors)
+    middle = series.patient_maps.shape[1] // 2
+    points = torch.einsum(
+        "nij,nkj->nki", series.patient_maps[:, middle].float(), prepared
+    ) * torch.where(
+        reflected[:, None, None], torch.tensor([-1.0, 1.0, 1.0]), torch.ones(3)
+    )
+    geometry = series.geometry_valid[:, None] & torch.isfinite(points).all(-1)
+    points = torch.where(geometry[..., None], points, 0.0)
+    centered = geometry & (center is not None and center.point is not None)
+    reference = (
+        torch.tensor(center.point, dtype=torch.float32)
+        * torch.tensor([-1.0 if eligible else 1.0, 1.0, 1.0])
+        if centered.any()
+        else torch.zeros(3)
     )
     return {
         "source_channels": association.tolist(),
@@ -279,14 +285,14 @@ def anchor_record(series, center, eligible, sagittal, inverse=None):
         "centered_xyz_mm": [
             [
                 point if valid else None
-                for point, valid in zip(points, flags, strict=True)
+                for point, valid in zip(values, flags, strict=True)
             ]
-            for points, flags in zip(
-                (xyz * 100).tolist(), available.tolist(), strict=True
+            for values, flags in zip(
+                (points - reference).tolist(), centered.tolist(), strict=True
             )
         ],
         "visual_valid": visual.tolist(),
-        "available_3d": available.tolist(),
+        "geometry_valid": geometry.tolist(),
     }
 
 
@@ -381,7 +387,7 @@ def create_preview(args: PreviewCLI) -> dict:
     dataset.set_epoch(args.epoch)
     indices = [
         index
-        for index, uid in enumerate(dataset.studies["StudyInstanceUID"])
+        for index, uid in enumerate(dataset.studies[STUDY])
         if args.study_uid is None or uid == args.study_uid
     ]
     if not indices:
@@ -514,11 +520,7 @@ def create_preview(args: PreviewCLI) -> dict:
             }
         )
         for index, (entry, stack) in enumerate(zip(entries, stacks, strict=True)):
-            pixels = (
-                (stack if stack.ndim == 4 else stack[:, None])
-                .to(torch.float32)
-                .div_(255.0)
-            )
+            pixels = stack.to(torch.float32).div_(255.0)
             series_index = torch.full((len(stack),), index, dtype=torch.int64)
             noise_seed = variant_seed * len(entries) + index
             record = {
@@ -619,9 +621,7 @@ def create_preview(args: PreviewCLI) -> dict:
         "split": args.split,
         "reflection_probability": config.data.reflection_augmentation.probability,
         "image_size": config.data.image_size,
-        "slices_per_input": config.data.slices_per_input,
-        "position_encoding": config.data.position_encoding,
-        "position_reference": config.data.position_reference,
+        "slices_per_input": SLICES_PER_INPUT,
         "spacing_mm": config.data.spacing_mm,
         "sampling_sigma_mm": config.data.sampling_sigma_mm,
         "sampling": args.sampling,
@@ -630,7 +630,7 @@ def create_preview(args: PreviewCLI) -> dict:
             name: setting.model_dump(mode="json") for name, setting in settings.items()
         },
         "types": [kind.model_dump(mode="json") for kind in config.data.series_types],
-        "studies": dataset.studies["StudyInstanceUID"].gather(indices).to_list(),
+        "studies": dataset.studies[STUDY].gather(indices).to_list(),
         "seeds": seeds,
         "series": entries,
     }
@@ -647,37 +647,26 @@ def create_preview(args: PreviewCLI) -> dict:
     (output / "effective_config.json").write_text(
         config.model_dump_json(indent=2) + "\n"
     )
-    sources = [
-        Path(__file__).resolve(),
-        *[
-            Path("src/knee_abnormality") / name
-            for name in (
-                "augmentation.py",
-                "config.py",
-                "dataset.py",
-                "inference.py",
-                "spatial_tokens.py",
-                "preprocessing_identity.py",
-                "model.py",
-            )
+    source_sha256 = copy_sources(
+        [
+            Path(__file__),
+            *(
+                Path("src/knee_abnormality") / name
+                for name in (
+                    "config.py",
+                    "identity.py",
+                    "data/dataset.py",
+                    "data/sources.py",
+                    "inference/engine.py",
+                    "modeling/augmentation.py",
+                    "modeling/model.py",
+                    "modeling/spatial_tokens.py",
+                )
+            ),
+            Path("src/knee_abnormality/data/preprocessing"),
         ],
-        Path("src/knee_abnormality/preprocessing"),
-    ]
-    project_root = Path.cwd().resolve()
-    source_files = []
-    for source in sources:
-        source = source.resolve()
-        source_files.extend(
-            path
-            for path in (source.rglob("*.py") if source.is_dir() else [source])
-            if path.is_file()
-        )
-    (output / "source").mkdir()
-    for source in source_files:
-        relative = source.relative_to(project_root)
-        destination = output / "source" / relative
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(source, destination)
+        output / "source",
+    )
     manifest = {
         "preprocessing_identity": preprocessing_identity(config.model.backbone),
         "coverage": coverage,
@@ -699,10 +688,7 @@ def create_preview(args: PreviewCLI) -> dict:
             name: version(name)
             for name in ("torch", "kornia", "kornia-rs", "pillow", "pydicom", "polars")
         },
-        "source_sha256": {
-            str(path.relative_to(project_root)): sha256_file(path)
-            for path in source_files
-        },
+        "source_sha256": source_sha256,
         "input_sha256": {
             name: sha256_file(config.raw_dir / name)
             for name in (

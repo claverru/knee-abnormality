@@ -12,17 +12,16 @@ from iterstrat.ml_stratifiers import MultilabelStratifiedKFold
 from pydantic import Field
 from pydantic_settings import CliPositionalArg, SettingsError
 
-from knee_abnormality.cli import NonExitingCLISettings
+from knee_abnormality.cli import CLISettings
 from knee_abnormality.config import ExperimentConfig, load_config
-from knee_abnormality.labels import (
-    load_evaluation_targets,
+from knee_abnormality.data.labels import (
+    STUDY,
+    TARGET_THRESHOLD,
     load_source,
     require_unique_ids,
 )
-from knee_abnormality.metrics import TARGET_THRESHOLD, validation_metrics
+from knee_abnormality.evaluation.scoring import score
 from knee_abnormality.provenance import sha256_file
-
-STUDY = "StudyInstanceUID"
 
 
 def make_folds(
@@ -203,7 +202,8 @@ def prepare(
         "generator_sha256": {
             "validation.py": sha256_file(Path(__file__)),
             "labels.py": sha256_file(
-                Path(__file__).resolve().parents[2] / "src/knee_abnormality/labels.py"
+                Path(__file__).resolve().parents[2]
+                / "src/knee_abnormality/data/labels.py"
             ),
         },
         "versions": {
@@ -252,101 +252,9 @@ def prepare(
     return metadata
 
 
-def score_predictions(
-    reference: pl.DataFrame,
-    predictions: pl.DataFrame,
-    targets: list[str],
-    n_splits: int,
-) -> dict:
-    require_unique_ids(reference, "Reference table", reject_blank=True)
-    require_unique_ids(predictions, "Predictions", reject_blank=True)
-    if set(predictions.columns) != {STUDY, "fold", *targets}:
-        raise ValueError(
-            "Predictions must contain study ID, producing fold, and exactly the target columns"
-        )
-    if predictions.schema["fold"] not in (pl.Int32, pl.Int64):
-        raise ValueError("Prediction fold must be an integer")
-    reference = reference.sort(STUDY)
-    predictions = predictions.sort(STUDY)
-    if not reference[STUDY].equals(predictions[STUDY]):
-        raise ValueError("Predictions must match all and only the reference study IDs")
-    if predictions["fold"].null_count() or not np.array_equal(
-        reference["fold"].to_numpy(), predictions["fold"].to_numpy()
-    ):
-        raise ValueError("Prediction folds do not match the frozen assignments")
-    if set(reference["fold"].to_list()) != set(range(n_splits)):
-        raise ValueError("Reference table must cover every fold")
-    if any(not predictions.schema[target].is_numeric() for target in targets):
-        raise ValueError("Predictions must be numeric")
-    y = reference.select(targets).to_numpy().astype(float)
-    prediction = predictions.select(targets).to_numpy().astype(float)
-    if not np.isfinite(prediction).all() or ((prediction < 0) | (prediction > 1)).any():
-        raise ValueError("Predictions must be finite probabilities in [0, 1]")
-    gold = (
-        reference["is_gold"].to_numpy()
-        if "is_gold" in reference.columns
-        else np.ones(reference.height, dtype=bool)
-    )
-    pooled = validation_metrics(y, prediction, targets, gold)
-    folds = []
-    for fold in range(n_splits):
-        mask = reference["fold"].to_numpy() == fold
-        folds.append(
-            {
-                "fold": fold,
-                **validation_metrics(y[mask], prediction[mask], targets, gold[mask]),
-            }
-        )
-    return {
-        "validation_studies": reference.height,
-        "reference_studies": int(gold.sum()),
-        "pooled_oof": pooled,
-        "folds": folds,
-        "mean_fold_macro_auc": float(np.mean([row["macro_auc"] for row in folds])),
-    }
-
-
-def score(data_dir: Path, split_dir: Path, predictions_path: Path) -> dict:
-    protocol = json.loads((split_dir / "protocol.json").read_text())
-    if protocol["protocol_version"] not in {1, 2}:
-        raise ValueError("Unsupported split protocol")
-    for name, expected in protocol["input_sha256"].items():
-        if sha256_file(data_dir / name) != expected:
-            raise ValueError(f"{name} differs from the frozen split source")
-    if sha256_file(split_dir / "studies.csv") != protocol["manifest_sha256"]:
-        raise ValueError("Split manifest differs from its recorded hash")
-    manifest = pl.read_csv(split_dir / "studies.csv")
-    if protocol["protocol_version"] == 2:
-        if protocol["validation_target_threshold"] != TARGET_THRESHOLD:
-            raise ValueError("Unsupported frozen validation target threshold")
-        evaluation = load_evaluation_targets(split_dir, protocol)
-        if set(evaluation[STUDY]) != set(manifest[STUDY]):
-            raise ValueError("Frozen evaluation targets must cover all split studies")
-        reference = manifest.select(STUDY, "fold", "is_gold").join(
-            evaluation, on=STUDY, how="left", validate="1:1"
-        )
-    else:
-        train = pl.read_csv(data_dir / "train.csv", infer_schema_length=None)
-        reference = (
-            manifest.filter(pl.col("is_gold"))
-            .select(STUDY, "fold", "is_gold")
-            .join(train.select(STUDY, *protocol["targets"]), on=STUDY, validate="1:1")
-        )
-    predictions = pl.read_csv(predictions_path, infer_schema_length=None)
-    result = score_predictions(
-        reference, predictions, protocol["targets"], protocol["n_splits"]
-    )
-    return {
-        "manifest_sha256": protocol["manifest_sha256"],
-        "validation_scope": protocol.get("validation_scope", "gold_only"),
-        "predictions_sha256": sha256_file(predictions_path),
-        **result,
-    }
-
-
-class ValidationCLI(NonExitingCLISettings):
+class ValidationCLI(CLISettings):
     command: CliPositionalArg[Literal["prepare", "score"]]
-    config: Path = Path("configs/baseline.yaml")
+    config: Path = Path("configs/training.yaml")
     data_dir: Path | None = None
     split_dir: Path | None = None
     n_splits: int = Field(default=5, ge=2)

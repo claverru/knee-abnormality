@@ -1,32 +1,32 @@
 import hashlib
 import json
-import shutil
+import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
 import numpy as np
 import polars as pl
 import torch
+import yaml
 from pydantic import Field
+from pydantic_settings import SettingsError
 
 from knee_abnormality.cli import CLISettings
-from knee_abnormality.config import load_config
-from knee_abnormality.dataset import (
-    KneeStudyDataset,
-    build_series_index,
-    collate_studies,
-)
-from knee_abnormality.preprocessing.geometry import estimate_reference
-from knee_abnormality.preprocessing.intensity import _linear_quantiles
-from knee_abnormality.preprocessing.preparation import decode_series
-from knee_abnormality.preprocessing_identity import preprocessing_identity
-from knee_abnormality.provenance import sha256_file
+from knee_abnormality.config import SLICES_PER_INPUT, load_config
+from knee_abnormality.data.dataset import KneeStudyDataset, collate_studies
+from knee_abnormality.data.labels import STUDY
+from knee_abnormality.data.preprocessing.geometry import estimate_reference
+from knee_abnormality.data.preprocessing.intensity import _linear_quantiles
+from knee_abnormality.data.preprocessing.preparation import decode_series
+from knee_abnormality.data.sources import build_series_index
+from knee_abnormality.identity import preprocessing_identity
+from knee_abnormality.provenance import copy_sources, sha256_file
 from scripts.adhoc.analyze_physical_sampling import read_acquisitions
 from scripts.adhoc.profile_threaded_loading import ThreadedStudyDataset
 
 
 class InspectCLI(CLISettings):
-    config: Path = Path("configs/baseline.yaml")
+    config: Path = Path("configs/training.yaml")
     headers: Path = Path("outputs/analysis/geometry-metadata-20260912/headers.parquet")
     inventory: Path = Path("data/metadata/train_series_image_counts.parquet")
     output_dir: Path
@@ -47,8 +47,7 @@ def digest(value):
     return value
 
 
-def main():
-    args = InspectCLI()
+def inspect(args: InspectCLI) -> dict:
     args.output_dir.mkdir(parents=True, exist_ok=False)
     torch.set_num_threads(1)
     config = load_config(args.config)
@@ -56,11 +55,15 @@ def main():
     accepted, rejected = [], []
     for uid, values in acquisitions.items():
         reference = estimate_reference(
-            tuple((a.uid, a.plane, a.geometry) for a in values if len(a.records) >= 3)
+            tuple(
+                (a.uid, a.plane, a.geometry)
+                for a in values
+                if len(a.records) >= SLICES_PER_INPUT
+            )
         )
         (accepted if reference.point is not None else rejected).append(uid)
     uids = sorted(rejected + accepted[: args.accepted_studies])
-    studies = pl.DataFrame({"StudyInstanceUID": uids})
+    studies = pl.DataFrame({STUDY: uids})
     index = build_series_index(config.paths.data_root, config.data, "train")
     source_files = [
         Path(__file__),
@@ -68,12 +71,7 @@ def main():
         Path("scripts/adhoc/analyze_physical_sampling.py"),
         *Path("src/knee_abnormality").rglob("*.py"),
     ]
-    for path in source_files:
-        destination = (
-            args.output_dir / "source" / path.resolve().relative_to(Path.cwd())
-        )
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(path, destination)
+    copy_sources(source_files, args.output_dir / "source")
     manifest = {
         "created_at": datetime.now(UTC).isoformat(),
         "settings": args.model_dump(mode="json"),
@@ -224,7 +222,16 @@ def main():
     (args.output_dir / "manifest.json").write_text(
         json.dumps(manifest, indent=2) + "\n"
     )
-    print(json.dumps(report["summary"], indent=2))
+    return report["summary"]
+
+
+def main() -> None:
+    try:
+        summary = inspect(InspectCLI())
+    except (OSError, RuntimeError, ValueError, yaml.YAMLError, SettingsError) as error:
+        print(f"Physical preparation inspection error: {error}", file=sys.stderr)
+        raise SystemExit(2) from None
+    print(json.dumps(summary, indent=2))
 
 
 if __name__ == "__main__":

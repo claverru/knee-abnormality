@@ -14,5 +14,5 @@ file into the current package does not reproduce that environment.
 - [Regional usage diagnosis](diagnose_fusion_usage.py.txt)
 
 Measurements and original artifact locations remain in
-[validation](../../validation.md#2026-09-13-per-plane-fusion-usage-diagnosis) and
-[modeling](../../modeling.md#per-plane-coverage-radius).
+[validation](../../validation/results/2026-09-13-per-plane-fusion-usage-diagnosis.md) and
+[modeling](../../modeling/historical-regional-fusion.md#per-plane-coverage-radius).

@@ -1,5 +1,5 @@
 import json
-import shutil
+import sys
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -8,32 +8,32 @@ from pathlib import Path
 
 import numpy as np
 import polars as pl
+import yaml
 from pydantic import Field
+from pydantic_settings import SettingsError
 
 from knee_abnormality.cli import CLISettings
 from knee_abnormality.config import load_config
-from knee_abnormality.preprocessing.geometry import (
+from knee_abnormality.data.labels import STUDY
+from knee_abnormality.data.preprocessing.geometry import (
     NativePose,
     PoseLayout,
     estimate_reference,
     summarize_series,
 )
-from knee_abnormality.preprocessing.sampling import (
+from knee_abnormality.data.preprocessing.sampling import (
     build_pool,
     select_triplets,
     target_depths,
 )
-from knee_abnormality.preprocessing.series import (
-    KNOWN_BAD_INSTANCES,
-    IndexedSeries,
-    SliceRecord,
-)
-from knee_abnormality.preprocessing_identity import preprocessing_identity
-from knee_abnormality.provenance import sha256_file
+from knee_abnormality.data.preprocessing.series import IndexedSeries, SliceRecord
+from knee_abnormality.data.sources import KNOWN_BAD_INSTANCES, SERIES
+from knee_abnormality.identity import preprocessing_identity
+from knee_abnormality.provenance import copy_sources, sha256_file
 
 
 class AnalyzeCLI(CLISettings):
-    config: Path = Path("configs/baseline.yaml")
+    config: Path = Path("configs/training.yaml")
     headers: Path = Path("outputs/analysis/geometry-metadata-20260912/headers.parquet")
     inventory: Path = Path("data/metadata/train_series_image_counts.parquet")
     reference: Path = Path(
@@ -70,9 +70,9 @@ def distribution(values):
 
 def read_acquisitions(settings):
     inventory = pl.read_parquet(settings.inventory)
-    fat = dict(inventory.select("SeriesInstanceUID", "Fat_Suppression").iter_rows())
+    fat = dict(inventory.select(SERIES, "Fat_Suppression").iter_rows())
     result = defaultdict(list)
-    for part in pl.read_parquet(settings.headers).partition_by("SeriesInstanceUID"):
+    for part in pl.read_parquet(settings.headers).partition_by(SERIES):
         first = part.row(0, named=True)
         records = []
         for row in part.iter_rows(named=True):
@@ -111,11 +111,11 @@ def read_acquisitions(settings):
             for i, r in enumerate(records)
         )
         item = Acquisition(
-            first["SeriesInstanceUID"],
-            first["StudyInstanceUID"],
+            first[SERIES],
+            first[STUDY],
             first["Anatomical_Plane"],
             first["Fluid_Sensitive"],
-            fat[first["SeriesInstanceUID"]],
+            fat[first[SERIES]],
             records,
             summarize_series(records),
         )
@@ -126,16 +126,13 @@ def read_acquisitions(settings):
     }
 
 
-def main():
-    settings = AnalyzeCLI()
+def analyze(settings: AnalyzeCLI) -> None:
     output = settings.output_dir
     output.mkdir(parents=True, exist_ok=False)
     config = load_config(settings.config)
     acquired = read_acquisitions(settings)
     folds = dict(
-        pl.read_csv(config.split_dir / "studies.csv")
-        .select("StudyInstanceUID", "fold")
-        .iter_rows()
+        pl.read_csv(config.split_dir / "studies.csv").select(STUDY, "fold").iter_rows()
     )
     kinds = {
         (k.plane, k.fluid_sensitive, k.fat_suppression): k
@@ -151,10 +148,7 @@ def main():
         config.split_dir / "protocol.json",
         Path("uv.lock"),
     ]
-    for path in source_files:
-        destination = output / "source" / path.resolve().relative_to(Path.cwd())
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(path, destination)
+    copy_sources(source_files, output / "source")
     manifest = {
         "created_at": datetime.now(UTC).isoformat(),
         "settings": settings.model_dump(mode="json"),
@@ -388,6 +382,14 @@ def main():
         if p.is_file() and p.name != "manifest.json"
     }
     (output / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
+
+
+def main() -> None:
+    try:
+        analyze(AnalyzeCLI())
+    except (OSError, ValueError, yaml.YAMLError, SettingsError) as error:
+        print(f"Physical sampling analysis error: {error}", file=sys.stderr)
+        raise SystemExit(2) from None
 
 
 if __name__ == "__main__":

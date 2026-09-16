@@ -3,7 +3,7 @@
 Start here to find an existing command or decide where a new script belongs.
 The catalogs hold script metadata; the [maintenance skill](../.agents/skills/scripts-maintainer/SKILL.md)
 defines how agents search, create, move, and promote scripts. Component
-boundaries live in the [project architecture](../docs/architecture.md).
+boundaries live in the [project architecture](../docs/architecture/INDEX.md).
 
 ## Find a script
 
@@ -38,8 +38,10 @@ discovery never imports or executes indexed scripts.
 | Investigate a question, profile behavior, or reproduce an audit | `adhoc/` | [adhoc/catalog.yaml](adhoc/catalog.yaml) |
 
 The catalog covers Python scripts under `scripts/`, excluding `__init__.py`.
+Non-Python assets belong to the script that reads them and appear in its
+`inputs`, such as the bundle notebook template `pipeline/inference.ipynb`.
 Shared implementation modules and the config inspector remain described
-in the [architecture](../docs/architecture.md#where-code-belongs). Proposed
+in the [architecture](../docs/architecture/code-organization.md#where-code-belongs). Proposed
 scripts belong in [ongoing work](../docs/ongoing.md) until implemented.
 
 ## Catalog format
@@ -90,10 +92,10 @@ The repository skill lives under `.agents/skills/`, following the
 The root `AGENTS.md` also links it directly so the maintenance instructions can
 be read even when a session has not refreshed its skill list.
 
-## Spatial-token diagnosis and retired regional work
+## Spatial-token diagnosis and retired work
 
 Use `diagnose-encoding-usage` for the manually invoked post-training spatial-token
-interventions; see [the procedure](../docs/validation.md#manual-encoding-usage-diagnosis).
+interventions; see [the procedure](../docs/validation/manual-encoding-usage-diagnosis.md).
 Removed regional coverage, usage and profiling commands are preserved as
 [historical source snapshots](../docs/history/regional-sources/README.md), outside
 the executable catalog. Reproduce them only with their original analysis/run
@@ -103,4 +105,17 @@ The [historical sharing sources](../docs/history/sharing-sources/README.md)
 preserve the 1C compartment diagnostic, CPU generalization/case-mixture audits,
 blinded disagreement audit and eleven-run overnight launcher. They are text
 records outside the executable catalog and require their original runtimes.
-The current seven-run launcher does not reproduce that historical queue.
+The current sixteen-run launcher does not reproduce that historical queue.
+
+The crop-selection scripts `analyze_crop_diversity.py`, `evaluate_crop_placement.py` and
+`probe_glimpses.py` were removed with the crop-selection code on 2026-09-16; the
+[historical crop-selection sources](../docs/history/crop-selection-sources/README.md) locate
+their archived code. The token graph's edge diagnostics were removed from
+`diagnose-encoding-usage` with the graph; the
+[historical token-graph sources](../docs/history/token-graph-sources/README.md) keep them.
+
+`analyze_knee_side_embedding.py` and `analyze_meniscus_coupling.py` were removed on
+2026-09-16 with their candidate runs' checkpoints; the
+[historical knee-side sources](../docs/history/knee-side-sources/README.md) and
+[historical meniscus-coupling sources](../docs/history/meniscus-coupling-sources/README.md)
+keep their code.

@@ -1,0 +1,420 @@
+# Ongoing work
+
+Active work and tasks planned for the short term. Follow the
+[work-tracking rules](../AGENTS.md#work-tracking).
+
+Follow the [competition repository architecture](architecture/INDEX.md), with
+on-the-fly pixel preparation and small development runs before full comparisons.
+Use the maintained workflow in `scripts/pipeline/`; keep one-off
+investigations in `scripts/adhoc/` and reusable utilities in `scripts/tools/`.
+Tasks below are pending, in implementation order.
+
+The [modeling notes](modeling/implemented-baseline.md) own the current
+baseline recipe and fold-0 result; `configs/baseline.yaml` owns its defaults.
+Do not duplicate those values here. Saved checkpoint configuration, rather than
+the mutable baseline YAML, governs reproduction and submission.
+
+Current strategy, selected on 2026-09-11: iterate on **fold 0** until near the
+end of the competition. Additional-fold training and ensembling are deferred.
+Keep fold membership, validation targets and the comparison recipe fixed.
+
+The unverified settings and results remain hypotheses to reproduce and improve,
+not established requirements. When a task is completed, move durable
+findings to its linked canonical document and remove the completed task here.
+
+The user launches training and the [encoding diagnostic](validation/manual-encoding-usage-diagnosis.md)
+manually. No training, optimizer-step checks, automatic diagnostics, extra seeds,
+or baseline reruns are scheduled. Use fresh artifact directories and
+retain source/config/checkpoint/input identities. These single-fold comparisons
+cannot resolve training-seed variability or establish small repeatable gains.
+
+## Crop selection
+
+The code carries [candidate run 0](#candidate-next-runs), learned zoom, trained on 2026-09-16 (0.869951; the detail
+glimpses went unused, [result](validation/2026-09-16-learned-zoom-result.md)): 360-pixel canvases at 150/360 mm, a MobileNetV3 scout on a 300-pixel
+downsample (361 coarse tokens per canvas), one 160-pixel context glimpse per canvas and detail
+glimpses placed by a demand head and greedy facility location, all pooled in one softmax per label.
+[Modeling](modeling/active-spatial-token-model.md#learned-zoom) owns the recipe and its profiled
+cost; the replaced shared-crops recipe is summarised under
+[crop selection](modeling/active-spatial-token-model.md#crop-selection), and
+[the plan](../crop-selection-plan.md) keeps the original rationale. Below: what the runs
+established, the open problems by theme, and the candidate next runs to choose from.
+
+### Results so far
+
+Fold 0 of `all_5fold_v3`, seed 42, macro AUC at the selected epoch; controls are the full-triplet
+`00-baseline` (0.892763) and the champion (0.892360, public 0.936).
+
+| Run | Crops | Macro AUC | vs `00-baseline` | Record |
+|---|---|---:|---:|---|
+| 160 px | one per kept canvas, summed value map, 15-epoch extension | 0.887151 | −0.0056 | [result](validation/2026-09-15-crop-selection-result.md) |
+| Two crops | 160 px, two per kept canvas | 0.889409 | −0.0034 | [result](validation/2026-09-15-two-crops-result.md) |
+| crop224 | 224 px on 75% of canvases, summed value map | 0.891624 | −0.0011 | [result](validation/2026-09-16-crop224-result.md) |
+| per-label | 224 px on 75%, equal label quotas, union pooling | 0.891703 | −0.0011 | [result](validation/2026-09-16-per-label-crops-result.md) |
+| label-private | 2 per label, plane spread, private gated pooling, label FiLM | 0.845131 | −0.0476 | [result](validation/2026-09-16-label-private-crops-result.md) |
+| shared | 2 per label, plane spread, shared gated pooling | 0.879626 | −0.0131 | [result](validation/2026-09-16-shared-crops-result.md) |
+| learned zoom | 160 px context on every slice (0.875 mm), learned 224 px detail (0.42 mm), one softmax | 0.869951 | −0.0228 | [result](validation/2026-09-16-learned-zoom-result.md) |
+
+What the runs established (single seed, fold 0):
+
+- **Zoom helps central targets; the losses are at the edges.** Per-label against `00-baseline`:
+  ACL +0.0111, synovitis +0.0077, medial OA +0.0057; lateral meniscus −0.0102, fracture −0.0085,
+  MCL −0.0064, Baker's cyst −0.0039. Uncropped canvases are mostly edge slices, and fracture pairs
+  are the most expensive
+  ([pair costs](validation/target-level-diagnostics.md#cost-of-a-reversed-pair)). Resolution at a
+  fixed field of view is untested ([input resolution](research/input-resolution.md)).
+- **At 224 pixels, slice coverage matters more than per-label targeting.** Score follows how many
+  canvases ReXNet-200 sees: all (`00-baseline`) 0.8928; 75% (crop224, per-label) 0.8916–0.8917;
+  about 13 of a study's 51 validation canvases (shared, against about 38 for per-label) 0.8796;
+  the same coverage pooled privately (label-private) 0.8451. Four crops per label at inference
+  recover 0.003 of shared's 0.012 gap to per-label. This is a cross-run pattern, not a controlled
+  run ([shared crops](validation/2026-09-16-shared-crops-result.md#reading)).
+- **Selection adds little because the value map is weak.** Learned placement beat uniform and
+  centred 160-pixel crops by about 0.005, a gap inflated by training on learned crops
+  ([placement ablation](validation/2026-09-15-crop-selection-result.md#placement-ablation)). On
+  the label-private checkpoint with shared pooling, attention beat random selection by 0.004, and
+  a label's attention on its chosen canvas has a normalised entropy of 0.97–0.99
+  ([probe](validation/2026-09-16-label-private-crops-result.md#selection-signal-probe)). In
+  per-label, crop centres of studies with and without a finding differ by only 0.1–3.6 mm
+  ([placement](validation/2026-09-16-per-label-crops-result.md#placement)).
+- **A trained coarse pool makes placement study-specific only while fine pooling is weak.**
+  Label-private's gated coarse pool reached 0.82 (other runs' drafts ended at 0.61–0.71), and its
+  crop centres of positive and negative studies differ by up to 14.5 mm. With shared fine pooling
+  the pool fell back to 0.65, and detail labels settled on a fixed lower position.
+- **Private fine pooling starves ReXNet-200.** Label-private lost 0.047 to per-label, most on the
+  menisci and ligaments; more crops or shared pooling at inference recover at most 0.004. The gate
+  (0.505–0.537) and label FiLM (mean |scale| about 0.02) barely moved.
+- **Misses can be recognition failures.** A detected fracture relied on crops other labels chose;
+  a missed one lay inside other labels' crops and was not recognised
+  ([renders](validation/2026-09-16-per-label-crops-result.md#visual-review-of-fracture-cases)).
+
+### Open problems and options
+
+Each option states whether a measured result backs it; otherwise it is a hypothesis. Options
+marked *glimpse set* are parts of the recommended
+[learned glimpse sets](#candidate-next-runs) run (run 1). Those marked *in run 0* are implemented,
+in the form described there, by learned zoom, which awaits training.
+
+#### Coverage and set selection
+
+Independent per-label choices collapse onto favourite slices (shared crops: 24 crops on about 13
+canvases), and fixed rules (one crop per canvas, plane spread, label quotas, the 75% fraction)
+stand in for a set-level objective.
+
+- **Label-weighted facility location over a shared budget** (*glimpse set*, *in run 0* as
+  greedy selection without a per-label scale preference; hypothesis). Each
+  label has a demand on each scout token. A glimpse covers the tokens inside its footprint,
+  weighted by a learned per-label scale preference, and partially covers similar tokens elsewhere
+  through per-study latent clusters, so redundancy is judged by appearance and crossing planes
+  need no millimetre rule (millimetre overlap is meaningful only between parallel crops). Greedy
+  maximisation of the total covered demand fills the budget and replaces the fixed rules; a
+  redundant glimpse has no gain by construction. Choosing glimpses that act as centroids of a
+  label's feature clusters is weighted k-medians, which greedy facility location approximates.
+- **k-DPP selection policy** (*glimpse set*; hypothesis). A determinantal point process with
+  kernel = demand quality × feature similarity samples diverse sets with exact probabilities, so
+  exploration and policy gradients are consistent rather than bolted onto a greedy rule; with
+  64-dimensional low-rank features it stays cheap for about 3,600 candidates per study. The simpler
+  alternative is stochastic greedy selection: a softmax over marginal gains with an annealed
+  temperature (*in run 0* without annealing: Gumbel-max on log gain).
+- **Budget matched to the champion's compute** (*glimpse set*; hypothesis): the canvas count at
+  validation (about 51 at 2× images); in training a cap of 24 ReXNet-200 glimpses per study
+  including exploration (for example 16 chosen plus 8 exploration), the setting that fit in
+  22.5 GiB, since training studies average about 25 canvases and heavy studies have many more.
+  The model chooses context or detail per slice. Measured limit: a GPU profile of the eight heaviest studies peaked
+  at 21.3 GiB with 224-pixel crops on 75% of canvases and ran out of memory with crops on all of
+  them ([crop224](validation/2026-09-16-crop224-result.md#setup)).
+- **Per-slice canvas centring** (hypothesis; a preprocessing change): superior axial slices sit
+  off-centre because every canvas is centred on one study point
+  ([fracture review](validation/2026-09-16-per-label-crops-result.md#visual-review-of-fracture-cases)).
+
+#### Scale and in-plane precision
+
+One scale serves all labels, although zoom helped central targets and hurt peripheral ones. A
+224-pixel crop covers 14 of 19 scout rows, so it can move only 16 mm up or 24 mm down from the
+canvas centre. Measured: 224-pixel crops scored 0.004473 above one 160-pixel crop per canvas and
+improved every target except medial meniscus and medial OA
+([crop224](validation/2026-09-16-crop224-result.md#reading)).
+
+- **Glimpses at two scales** (*glimpse set*, *in run 0* with one centred context glimpse per
+  canvas at 160 pixels and 0.875 mm instead of 224 pixels at 0.625 mm; hypothesis). A glimpse is
+  (canvas, cell, scale):
+  detail 224 px at 0.42 mm (94 mm, movable about ±28 mm) or context 224 px at 0.625 mm (140 mm,
+  the champion's view). Canvases are prepared at 0.42 mm (360 px for 150 mm, 1.44× today's
+  pixels); the scout and the context glimpses read GPU downsamples. A scale embedding marks
+  glimpse tokens, and fine tokens map to the nearest scout cell. Evidence for the detail spacing:
+  0.417 mm keeps the full acquired band in 85% of series against 59% at 0.5 mm, but stored pixels
+  are about 2× interpolated, and the same research concludes that finer than about 0.5 mm adds
+  almost nothing ([input resolution](research/input-resolution.md)).
+- **Training-only crop jitter** (hypothesis): ±1 scout cell (±8 mm), in whole cells so fine tokens
+  stay on coarse cells; tests whether findings sit inside the crop with margin.
+- **Per-plane spacing** is tracked in [future work](future-work.md#per-plane-geometry).
+
+#### Selection signal
+
+A glimpse is a discrete choice with no gradient, and the model only sees the outcome of the
+glimpses it took. One attention now serves both pooling, where a flat average works, and
+selection, which needs peaks. The gated recipe's fine softmax renormalises over the chosen crops
+only, so a chosen crop is never compared with unchosen regions; per-label, the best crop run,
+pooled coarse and fine tokens in one softmax. Learned selectors are reported to collapse
+([research](research/learned-crop-selection.md#learned-patch-selection-in-the-literature)). All
+options below are hypotheses.
+
+- **A demand head separate from the pooling attention** (*glimpse set*, *in run 0*): a small
+  per-label head on scout tokens.
+- **Union pooling with demand in the logits** (*glimpse set*, *in run 0*): coarse and glimpse tokens in one
+  softmax per label, each glimpse token's logit adding its glimpse's log-demand, so demand
+  competes with unchosen regions.
+- **Per-label removal credit** (*glimpse set*): how much each label's BCE rises when a glimpse's
+  tokens are removed from pooling, computed with pooling passes only (no backbone recompute).
+  Redundant glimpses score near zero, so credit also rewards diversity. For a matched pair the
+  members overlap, so removing one barely matters while the other stays; the pair is judged by a
+  swap instead: label t prefers A when its BCE is lower with A pooled and B removed than with B
+  pooled and A removed. The pairwise loss replaces the policy-gradient reward of the first draft;
+  the k-DPP or stochastic greedy selection still provides exploration.
+- **Matched exploration pairs with a pairwise loss** (*glimpse set*, the recommended signal; the
+  idea behind RLOO and GRPO baselines: judge each sample against alternatives for the same input).
+  - Besides the B chosen glimpses, training adds E exploration glimpses, each a sibling of a
+    chosen one that differs in one decision: same slice at another position, the neighbouring
+    slice, or the other scale. All B+E go through ReXNet-200 (E=8 is about +33% backbone cost,
+    training only). Under a k-DPP, a pair is a DPP sample against its sibling.
+  - A Bradley–Terry loss, −log σ(s_A − s_B), on the pair's demand-derived selection scores takes
+    its preference from the swap credit. Pairs share the study, so study-level noise cancels.
+  - It is a second loss term, but its targets come from the task BCE on the same batch and it
+    touches only the selector; the classifier is still trained by the BCE alone.
+- **Glimpse-outcome predictor** (JEPA-like world model; the fallback if pairwise credit is too
+  noisy). A small head on scout tokens predicts the ReXNet-200 embedding a glimpse would produce
+  at any candidate, trained on every glimpse taken, exploration included. Selection can then
+  estimate each candidate's effect on each label's logits without running ReXNet-200. It never
+  feeds the classifier. The strongest and most expensive of these options.
+
+#### Latent space
+
+Facility location and the k-DPP judge similarity in feature space, so the latent space matters
+more than the algorithm. The scout is ImageNet-pretrained, and the class-activation probe chased
+bright superficial signal, so similarity may track intensity rather than anatomy (hypothesis).
+Compute similarity before the plane and contrast embeddings are added, or those split clusters
+trivially.
+
+- **Self-supervised scout pretraining (DINO)** (hypothesis; a parallel track). DINO's multi-crop
+  matches this design: global views are scout canvases, local views are crops, and a
+  student–teacher agreement loss teaches the scout what crops contain. Pretraining the scout on
+  the roughly 175k training canvases without labels would give an anatomy-aware latent space for
+  facility location or the k-DPP. A separate pretraining run of a few hours (estimate); the
+  classifier's loss is unchanged.
+
+#### Recognition and fusion
+
+The scout and crop branches meet only in attention pooling, a missed fracture lay inside other
+labels' crops, and label FiLM barely moved (see the findings above).
+
+- **Branch fusion, global to local** (hypothesis; later): add a zero-initialised 1×1 projection of
+  the crop's 14×14 scout cells (624 channels) to ReXNet-200's `features.10` (257 channels,
+  stride 16), and scale and shift the same activations with a vector pooled over the whole canvas,
+  keeping selection on the unfused scout. The cells align exactly only while crops share the
+  scout's 0.5 mm spacing. It targets recognition and edge context
+  ([GLNet](research/learned-crop-selection.md#global-local-branch-fusion), from dense, fully
+  supervised tasks).
+- **Crop-to-overview fusion** (local to global; hypothesis).
+
+#### Aggregation
+
+Private fine pooling is rejected (below). Measured: in shared crops the coarse pool added only
+0.0024 over fine-only pooling, and the gates ended at 0.47–0.49
+([probes](validation/2026-09-16-shared-crops-result.md#inference-probes)). Glimpse sets use
+[union pooling with demand](#selection-signal).
+
+- **Several attention heads per label** (hypothesis).
+- **Acquisition-count-normalised attention** is tracked in
+  [future work](future-work.md#attention-pooling).
+
+#### Rejected, superseded and deferred
+
+- **Rejected:** private fine pooling and label FiLM
+  ([label-private](validation/2026-09-16-label-private-crops-result.md)); two crops per label with
+  plane spread, also with shared pooling
+  ([shared crops](validation/2026-09-16-shared-crops-result.md)); selecting by class-activation
+  evidence instead of attention, which lost 0.0006–0.0023 and aimed at bright superficial signal
+  ([probe](validation/2026-09-16-label-private-crops-result.md#selection-signal-probe)).
+- **Superseded by the glimpse-set design:** a higher Gumbel temperature early in training
+  (stochastic selection or the k-DPP); selecting from the separately trained, gated coarse pool
+  (the demand head); a study-dependent gate, and a soft per-label bias that shows other labels'
+  crops (union pooling, where glimpses have no owning label).
+- **Deferred:** per-label learned prototypes as the coarse attention score; weak location labels
+  from reports (the strongest signal, but an auxiliary loss); a second selection pass after seeing
+  the first crops; light token mixing across coarse tokens (the token graph
+  [tied](modeling/active-spatial-token-model.md#retired-token-graph) on the full-triplet model); a
+  larger scout ([candidates and costs](research/scout-backbones.md); it already reads the crops'
+  pixels at the same spacing, and its pool reached 0.82 with nearly flat attention, so flat maps
+  look like a training-signal problem, not capacity).
+
+### Simplifications and housekeeping
+
+- **Epoch time** did not change with the simplifications (attention-only value map, one coarse
+  pass, no prior, no FiLM): 237 s per epoch including validation for shared crops against 234 s
+  for label-private and about 200 s for crop224 and per-label
+  ([shared crops](validation/2026-09-16-shared-crops-result.md#setup)). Learned zoom is
+  [profiled](modeling/active-spatial-token-model.md#learned-zoom); record its epoch time and peak
+  memory from the run.
+- **Batch memory headroom** (learned zoom): the eight heaviest training studies with series
+  dropout off (256 canvases) run out of memory at batch 8 (about 23.8 GiB), while simulated
+  training batches peak at about 21 GiB. If a run does hit an out-of-memory error, choose between
+  batch 7 and a per-batch canvas cap; neither is applied.
+
+### Candidate next runs
+
+Ordered by the current recommendation, which is not a decision. Run 0 finished at 0.869951 with
+unused detail glimpses ([result](validation/2026-09-16-learned-zoom-result.md)), which weakens
+runs 1 and 2 as designed; the plan below awaits a new decision. Each run is compared on fold 0 against per-label
+(0.891703) and `00-baseline` (0.892763).
+
+0. **Learned zoom on full context** (chosen first; a cheap version of run 1, trained from
+   scratch, no champion reuse and no control run). **Implemented on 2026-09-16, awaiting
+   training** ([recipe and profile](modeling/active-spatial-token-model.md#learned-zoom)):
+   ```bash
+   rtk proxy uv run --locked just train learned-zoom configs/baseline.yaml 0
+   ```
+   Then probe the selected checkpoint (GPU, one validation pass per condition):
+   ```bash
+   rtk proxy uv run --locked python -m scripts.adhoc.probe_glimpses outputs/learned-zoom --output-dir outputs/analysis/learned-zoom-probes
+   ```
+   - *Changes:* canvases at 360 px and 0.4167 mm (150 mm), the scout on a 300 px GPU downsample;
+     one centred context glimpse per canvas at 160 px and 0.875 mm (140 mm, 5×5 tokens); detail
+     glimpses at about one per three canvases (7.0 per training study after series dropout and
+     17.4 at 2× validation images, keeping the context-to-detail balance) at 224 px and 0.4167 mm
+     (93 mm, window centres −35 to +29 mm from the canvas centre) placed by a demand
+     head and greedy label-weighted facility location; coarse, context and detail tokens in one
+     softmax per label with each detail token's logit adding its glimpse's log-demand. No
+     exploration pairs or swap credit yet.
+   - *Tests:* whether learned zoom adds information on top of full slice coverage. Usage is read
+     from training: log each label's attention share on detail tokens per validation epoch.
+     Probes on the checkpoint: detail glimpses removed, random detail glimpses, and half and double
+     the detail budget.
+   - *Evidence:* full slice coverage is what the 224-pixel crop runs rewarded; 0.4167 mm keeps the
+     acquired detail of 85% of series; selection is a hypothesis.
+   - *Main risk:* 0.875 mm context is coarser than the champion's 0.625 mm, so the score floor is
+     unknown, and about 7 detail glimpses per training study may be too few to matter.
+   - *Cost against shared crops:* ReXNet-200 pixels −27% in training and +80% at validation;
+     measured step 0.43–0.49 s and 17.9–20.9 GiB for batches of 6–7 maximum-load studies, with
+     selection 3% of the step; about 15 GiB for an average training batch and about 21 GiB for the
+     heaviest simulated one (estimates); epoch time estimated about the same as 237 s, with
+     validation somewhat longer; 1.44× loader pixels and 22% more CPU preparation per study. If
+     learned detail barely beats random, add matched pairs with swap credit (run 1).
+1. **Learned glimpse sets** (recommended).
+   - *Changes:* [two-scale glimpses](#scale-and-in-plane-precision) on 0.42 mm canvases; a k-DPP
+     policy over [label-weighted facility location](#coverage-and-set-selection) with a budget
+     matched to the champion's compute; a demand head, union pooling with log-demand, and matched
+     exploration pairs with per-label swap credit and the pairwise loss
+     ([selection signal](#selection-signal)).
+   - *Tests:* whether a set-level objective and a comparative selection signal beat fixed
+     per-label rules. Attribution without retraining: inference probes with random glimpses,
+     detail only, context only, no latent coverage, uniform demand and budget sweeps.
+   - *Evidence:* the coverage pattern and the central-versus-peripheral split are measured; every
+     selection component is a hypothesis.
+   - *Main risk:* learned selectors collapse, many parts change at once, and the scout's latent
+     space may track intensity rather than anatomy.
+   - *Cost:* about 11 GB of loader shared memory; ReXNet-200 capped at 24 glimpses per training
+     study including exploration (today's 22.5 GiB setting) and the canvas count at validation;
+     selection and swap passes unprofiled.
+2. **Glimpse sets with the outcome predictor** (the fallback).
+   - *Changes:* run 1 with the [glimpse-outcome predictor](#selection-signal) instead of pairwise
+     swap credit.
+   - *Tests:* whether a learned estimate of each candidate's effect selects better than
+     per-batch credit.
+   - *Evidence:* none measured.
+   - *Main risk:* the head must predict ReXNet-200 embeddings from scout tokens.
+   - *Cost:* the most expensive selector option; not estimated.
+3. **DINO scout pretraining** (a parallel track feeding run 1 or 2).
+   - *Changes:* [self-supervised pretraining](#latent-space) of the scout; the classifier's loss
+     is unchanged.
+   - *Tests:* whether an anatomy-aware latent space improves facility location or the k-DPP.
+   - *Evidence:* indirect, from the class-activation probe's pull towards bright signal.
+   - *Main risk:* no readout until a glimpse-set run uses it.
+   - *Cost:* a separate pretraining run of a few hours (estimate).
+4. **Anatomical glimpses** (the lower-risk alternative).
+   - *Changes:* detail windows fixed in patient coordinates around the structures (medial and
+     lateral compartments, notch, patellofemoral joint, posteromedial corner, MCL), projected onto
+     each slice, plus a context glimpse per slice; no learned placement.
+   - *Tests:* whether fixed anatomical coverage keeps the central gains and recovers the
+     peripheral targets without a learned selector.
+   - *Evidence:* none measured; placement relies on the unsupervised joint-centre estimate.
+   - *Main risk:* the joint line is more than 25 mm from the image centre in 6–16% of
+     series ([input resolution](research/input-resolution.md#field-of-view-and-joint-position)).
+   - *Cost:* the removed patient-point geometry returns; the number of windows per slice sets the
+     ReXNet-200 compute.
+5. **Branch fusion** (later, on whichever recipe is current).
+   - *Changes:* [global-to-local fusion](#recognition-and-fusion) into ReXNet-200's `features.10`.
+   - *Tests:* recognition and edge context inside crops.
+   - *Evidence:* GLNet on dense, fully supervised tasks; a hypothesis here.
+   - *Main risk:* transfer from segmentation, and alignment once crops leave the scout's spacing.
+   - *Cost:* a zero-initialised projection and a canvas-pooled scale and shift; unprofiled.
+
+## Inference optimization
+
+Measured on Kaggle's two T4s with the champion; the
+[profiling record](inference/2026-09-15-kaggle-inference-profiling.md) owns the evidence. The
+submitted runtime already uses 16 loader workers and FP16 with fixed 64-image channels-last
+backbone chunks ([submission](inference/2026-09-15-fast-champion-submission.md), 0.936 public).
+Loading dominates: DICOM slice-header reads over NFS are 72% of cold loading time.
+
+### Runtime changes (outside the preprocessing identity)
+
+- **Main-thread warm-up** is implemented in the checkout and ships with the next submission: the
+  worker indexes in a background thread while the main thread loads the model and runs one zero
+  chunk (first FP16 batch 1.1–1.8 s instead of 26–34 s; worker wall 318 s versus 326 s).
+  A learned-zoom submission also needs the scout chunked and warmed, since its canvas count
+  varies per batch; ReXNet-200 chunks are already warmed at both glimpse sizes.
+- **Torch-free coordinator:** `predict.py` imports the model stack only to count GPUs and read
+  study IDs. Count GPUs with `nvidia-smi -L` or `CUDA_VISIBLE_DEVICES` and read the template and
+  series CSVs without importing `inference.py` (`resolve_raw_dir` lives in `dataset.py`, so moving
+  it is an identity change). Coordinator imports take 35–55 s before `main`; at the efficiency
+  formula's 32,400 s scale, 30 s is 0.00093 of the score.
+
+### Loading code changes (identity changes, ship with a retrain)
+
+These edit `dataset.py` and `preprocessing/`, so they change the preprocessing identity and ship
+with a retrain. Costs are from the sequential 100-study loading profile (cold, then warm OS cache);
+file names are SOP instance UIDs, so every slice header must still be read to order slices.
+Validate each change locally on CPU: every train series must produce identical `IndexedSeries`
+records, selections and prepared tensors.
+
+1. **Index only the worker's studies** (`build_series_index`, `prediction_data`). The index covers
+   the whole split although each worker predicts half of it: pass the worker's study IDs and filter
+   the series CSV before touching disk. Measured: 24–64 s per worker for 904 studies.
+2. **List each series directory once** (`build_series_index`, `index_series`; series listing 3.1 s
+   cold). Without the image-count parquet, as on Kaggle, the index globs `*.dcm` only to order
+   candidates, and `index_series` globs the same directory again. Take counts from one listing,
+   keeping the `(image_count, uid)` order and the `KNOWN_BAD_SERIES` adjustment.
+3. **Minimal header parser** (`read_header`; slice headers 146 s cold, 35 s warm, 19,191 files).
+   pydicom `read_partial` costs 1.8 ms of CPU per header, 46% of warm loading CPU. Read one fixed
+   prefix per file (extended only if the pixel-data element lies beyond it) and scan explicit-VR
+   little-endian elements for the tags `DicomHeader` uses: image position and orientation, pixel
+   spacing, slice location, instance number, rows, columns, bits stored, pixel representation,
+   rescale slope and intercept, transfer syntax and the pixel-data offset and length. Fall back to
+   pydicom for any other encoding.
+4. **Threaded header reads within a series** (`index_series`). NFS latency is 111 s of the 146 s
+   cold header cost: read the series' prefixes with a small thread pool, then parse in order. Raw
+   reads scaled from 96 to 872 files/s with 16 threads; parsing holds the GIL, so this needs
+   change 3 to pay off.
+5. **Threaded frame reads within a series** (`decode_series`, `read_frame`; frame reads 25.5 s cold,
+   12.5 s warm, 11,930 frames). Each selected slice reopens its file and reads the pixel payload
+   serially; read the unique slices' payloads with the same thread pool (13 s of the cost is NFS
+   latency), keeping failure handling per path.
+6. **Resample a series in one pass** (`resample_crop`; 8.2 s). Every slice runs two scipy sparse
+   products; slices of one series share shape and spacing, so apply the cached axis filters to the
+   stacked frames at once, and apply rescale before stacking.
+7. **Cheaper exact intensity bounds and normalization** (`_linear_quantiles`, `_normalize_pixels`;
+   7.6 s). Partitioning concatenates every valid resampled pixel of an acquisition; use exact
+   histogram-assisted selection (the [future-work](future-work.md#data-preparation) comparison)
+   and fold the clip, shift, scale and rounding passes together.
+8. **Profile geometry and triplet sampling** (`estimate_reference`, `project_reference`,
+   `build_pool`, `select_triplets`; 7.0 s, unchanged when warm, so pure CPU) before choosing a
+   change; scipy `truncnorm`, `logsumexp` and `linear_sum_assignment` run per slot.
+9. **GPU resampling and normalization** only if CPU still limits after 3–8: decode raw frames on
+   CPU, then crop-resample, clip and normalize on the mostly idle GPUs. This changes numerics.
+
+Rough sequential estimate if 3–7 each remove most of their measured cost: 2.03 s per cold study
+falls toward 0.5–0.6 s, after which the two T4s' forward pass, not loading, would set throughput.
+
+Do not pursue: autocast FP16 with variable shapes, more than 16 loader workers, notebook
+pre-reading of DICOMs or packages, a local bytecode cache, or TPU notebooks (not allowed for
+submission).

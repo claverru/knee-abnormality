@@ -1,4 +1,5 @@
 import json
+import sys
 from datetime import UTC, datetime
 from importlib.metadata import version
 from pathlib import Path
@@ -6,18 +7,17 @@ from pathlib import Path
 import numpy as np
 import polars as pl
 from pydantic import Field
+from pydantic_settings import SettingsError
 from scipy.stats import spearmanr
 
 from knee_abnormality.cli import CLISettings
-from knee_abnormality.labels import require_unique_ids
-from knee_abnormality.metrics import aucs
+from knee_abnormality.data.labels import STUDY, require_unique_ids
+from knee_abnormality.evaluation.metrics import aucs, bootstrap_auc
 from knee_abnormality.provenance import sha256_file
-
-STUDY = "StudyInstanceUID"
 
 
 class CompareCLI(CLISettings):
-    manifest: Path = Path("docs/public-label-comparison-sources.json")
+    manifest: Path = Path("configs/labels/public-label-comparison-sources.json")
     output_dir: Path = Path("data/labels/audit/new-public-20260913/results")
     seed: int = 20260913
     bootstrap_draws: int = Field(default=5000, ge=100)
@@ -25,20 +25,6 @@ class CompareCLI(CLISettings):
 
 def matrix(frame, targets):
     return frame.select(targets).to_numpy().astype(float)
-
-
-def bootstrap_auc(truth, scores, counts):
-    result = np.zeros(len(counts))
-    for target in range(truth.shape[1]):
-        positive = truth[:, target] == 1
-        pos = counts[:, positive]
-        neg = counts[:, ~positive]
-        difference = scores[positive, target, None] - scores[~positive, target]
-        wins = (difference > 0).astype(float) + 0.5 * (difference == 0)
-        result += (pos * (neg @ wins.T)).sum(axis=1) / (
-            pos.sum(axis=1) * neg.sum(axis=1)
-        )
-    return result / truth.shape[1]
 
 
 def paired_interval(truth, left, right, draws, seed):
@@ -273,9 +259,13 @@ def compare(settings):
     return report
 
 
-def main():
-    settings = CompareCLI()
-    report = compare(settings)
+def main() -> None:
+    try:
+        settings = CompareCLI()
+        report = compare(settings)
+    except (KeyError, OSError, ValueError, SettingsError) as error:
+        print(f"Public label comparison error: {error}", file=sys.stderr)
+        raise SystemExit(2) from None
     print(
         json.dumps(
             {"output_dir": str(settings.output_dir), "sources": report["sources"]},
