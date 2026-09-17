@@ -123,16 +123,38 @@ validation checks the producing fold. Resume also checks numerical training
 settings and the original input identities. Legacy checkpoints without those
 identities require their archived source/bundle, even for prediction with the
 same config. Every new checkpoint and input identity records the preprocessing
-algorithm (`physical_gaussian_overlap_spatial_tokens_reflection_v9`), the reflection,
-sampling and spatial-token identities, fixed reliability values, the selected backbone's
-spatial mapping and a stable digest of the package-relative sources listed in
-`identity.PREPROCESSING_SOURCES`: `data/dataset.py`, the seven `data/preprocessing/` modules,
-`modeling/augmentation.py`, `modeling/model.py` and `modeling/spatial_tokens.py`. The `v9`
-label marks the 2026-09-16 package restructure; checkpoints with any earlier identity need
-their archived sources. Export validates the actual
+algorithm (`ranked_filtered_physical_gaussian_overlap_spatial_tokens_reflection_v10`), the
+reflection, sampling, series-filtering and spatial-token identities, fixed reliability values, the
+selected backbone's spatial mapping and a stable digest of the package-relative sources listed in
+`identity.PREPROCESSING_SOURCES`: `data/dataset.py`, the eight `data/preprocessing/` modules
+(including `filtering.py`), `modeling/augmentation.py`, `modeling/model.py` and
+`modeling/spatial_tokens.py`. The `v10` label marks the 2026-09-17 series exclusions and fixed
+source ranking; `v9` marked the 2026-09-16 package restructure. Checkpoints with any earlier
+identity need their archived sources. Prediction does not compare the configured seed, because
+evaluation sampling uses none; resume still requires the saved seed. Export validates the actual
 copied sources; bundled prediction recomputes the identity without training data.
 See [implemented corrections](../history/baseline1-review.md#implemented-corrections)
 for allowed runtime/storage changes and baseline1 compatibility.
+
+**Weight averaging** (`optimizer.weight_averaging`, required, `null` by default) is a
+discriminated union: `null`, `{method: ema, decay}` or `{method: swa, epochs}`, one method per
+run; a config validator rejects SWA `epochs` greater than `trainer.max_epochs` minus
+`optimizer.warmup_epochs`. See the
+[schedule doc](../modeling/schedule-and-augmentation.md#weight-averaging) for the averaging
+semantics. When set, `KneeModule` keeps a deep-copied averaged model alongside the live one and
+rewrites checkpoints on save: the saved `state_dict`'s `model.*` keys hold the averaged weights
+(what selection, prediction, export and `compare_fold_runs` use, unchanged), and a new top-level
+`live_state_dict` key holds the live, unaveraged weights, restored to `model.*` on resume and
+dropped by export's checkpoint allowlist. Validation scores both models on the same batches every
+epoch: `val_macro_auc`, `val_soft_target_bce` and `val_gold_macro_auc` always score the saved
+(averaged) weights, while `val_live_macro_auc`, `val_live_soft_target_bce` and
+`val_live_gold_macro_auc` score the live ones. The per-epoch files gain `epochs/live_metrics_epoch_*.json`
+and `epochs/live_validation_epoch_*.csv` alongside the existing (unprefixed) ones. With
+`weight_averaging: null`, none of this exists: no `live_state_dict`, no `val_live_*` metrics, no
+`live_*` files. Independent of weight averaging, `KneeModule` always logs the pre-clip total
+gradient norm as the `grad_norm` step metric, and `timing.json` always records
+`batch_norm_refresh_seconds` (0 unless a SWA run actually refreshed BatchNorm statistics that
+epoch).
 
 Keep reusable metadata and label tables under `data/`, outside run directories.
 Preserve original gold/silver

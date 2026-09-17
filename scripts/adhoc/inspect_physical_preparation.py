@@ -89,12 +89,11 @@ def inspect(args: InspectCLI) -> dict:
     rows, comparisons = [], []
     for training in (False, True):
         multiplier = 1 if training else config.data.validation_image_multiplier
-        serial = KneeStudyDataset(
-            studies, index, config.data, (), training, config.seed, multiplier
-        )
+        seed = config.seed if training else None
+        serial = KneeStudyDataset(studies, index, config.data, (), seed, multiplier)
         threaded = ThreadedStudyDataset(serial, 4)
         reordered = KneeStudyDataset(
-            studies.reverse(), index, config.data, (), training, config.seed, multiplier
+            studies.reverse(), index, config.data, (), seed, multiplier
         )
         for i, uid in enumerate(uids):
             first, second, third = serial[i], threaded[i], reordered[len(uids) - 1 - i]
@@ -114,7 +113,9 @@ def inspect(args: InspectCLI) -> dict:
                     candidate = next(
                         c for c in index[uid].slots[slot] if c.uid == value.uid
                     )
-                    records = {str(r.path): r for r in serial._records(candidate)}
+                    records = {
+                        str(r.path): r for r in serial._indexed(candidate).records
+                    }
                     unique_paths = sorted(
                         {p for group in value.selected_paths for p in group},
                         key=lambda p: records[p].original_index,

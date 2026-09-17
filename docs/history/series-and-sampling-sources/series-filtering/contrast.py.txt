@@ -1,0 +1,140 @@
+import numpy as np
+import polars as pl
+from sklearn.ensemble import HistGradientBoostingClassifier
+from sklearn.metrics import roc_auc_score
+from sklearn.model_selection import GroupKFold
+
+from common import OUT, load
+
+FS_DESC = r"(?i)(\bfs\b|_fs|fs_|fs\+|\+fs|fat.?sat|fatsat|spir|spair|stir|tirm|(^|[^a-z])we([^a-z]|$)|water|dixon|\bsat\b|\bfs$|pdfs|t2fs|fsa|fse fs|ideal|wats)"
+FS_NEGATED = r"(?i)(non.?fat|non.?fs|no.?fs|no.?fat)"
+FS_DESC_EXTRA = r"(?i)(f/s)"
+INTENSITY = [
+    "i_q10",
+    "i_q25",
+    "i_q50",
+    "i_q75",
+    "i_q90",
+    "i_bright_fraction",
+    "i_ring_median",
+    "i_inner_median",
+    "i_central_median",
+    "i_body_fraction",
+]
+
+
+def tokens(value):
+    return set((value or "").split("\\"))
+
+
+def header_class(frame):
+    options = frame["h_ScanOptions"].to_list()
+    sequence = frame["h_ScanningSequence"].to_list()
+    variant = frame["h_SequenceVariant"].to_list()
+    descriptions = frame["desc"].to_list()
+    te = frame["te"].to_list()
+    tr = frame["tr"].to_list()
+    ti = frame["ti"].to_list()
+    rows = []
+    fs_desc = (
+        (frame["desc"].str.contains(FS_DESC) | frame["desc"].str.contains(FS_DESC_EXTRA))
+        & ~frame["desc"].str.contains(FS_NEGATED)
+    ).to_list()
+    steady = (
+        frame["h_SequenceName"].fill_null("").str.contains(r"(?i)de3d|tfi")
+        | frame["desc"].str.contains(r"(?i)dess|de3d|trufi")
+    ).to_list()
+    for opt, seq, var, desc, e, r, i, dfs, dess in zip(options, sequence, variant, descriptions, te, tr, ti, fs_desc, steady, strict=True):
+        opt_tokens = tokens(opt)
+        token_fs = bool(opt_tokens & {"FS", "WE"})
+        inversion = "IR" in tokens(seq) or ("IR" in tokens(var)) or (i is not None and 50 < i < 300)
+        has_headers = e is not None or opt is not None
+        desc_informative = bool(desc) and desc != "DummySeriesDesc!"
+        gradient = "GR" in tokens(seq) and "SE" not in tokens(seq) and "IR" not in tokens(seq)
+        evidence = token_fs or inversion or dfs
+        if evidence:
+            kind = "fatsup"
+        elif has_headers or desc_informative:
+            kind = "nonfs"
+        else:
+            kind = "unknown"
+        t1_like = (
+            e is not None
+            and r is not None
+            and e < 20
+            and r < 1000
+            and not inversion
+            and not dess
+        )
+        t2_like = e is not None and e >= 60
+        if kind == "fatsup" and t1_like:
+            weighting = "t1_fatsup"
+        elif kind == "nonfs" and t2_like:
+            weighting = "t2_nonfs"
+        elif kind == "nonfs" and t1_like:
+            weighting = "t1"
+        elif kind == "nonfs":
+            weighting = "pd_or_other_nonfs"
+        elif kind == "fatsup":
+            weighting = "fluid_fatsup"
+        else:
+            weighting = "unknown"
+        rows.append(
+            {
+                "token_fs": token_fs,
+                "inversion": inversion,
+                "desc_fs": bool(dfs),
+                "header_class": kind,
+                "weighting": weighting,
+                "gradient_echo": gradient,
+            }
+        )
+    return pl.DataFrame(rows)
+
+
+def oof(frame, columns, label, groups):
+    x = frame.select(columns).to_numpy().astype(float)
+    y = frame[label].to_numpy()
+    prediction = np.zeros(len(y))
+    for train, test in GroupKFold(5).split(x, y, groups):
+        model = HistGradientBoostingClassifier(max_iter=300, learning_rate=0.08, random_state=0)
+        model.fit(x[train], y[train])
+        prediction[test] = model.predict_proba(x[test])[:, 1]
+    return prediction
+
+
+def main():
+    frame = load()
+    frame = pl.concat([frame, header_class(frame)], how="horizontal")
+    numeric = frame.with_columns(
+        pl.col("token_fs").cast(pl.Float64),
+        pl.col("inversion").cast(pl.Float64),
+        pl.col("gradient_echo").cast(pl.Float64),
+        (pl.col("h_MRAcquisitionType") == "3D").cast(pl.Float64).alias("is3d"),
+    )
+    groups = frame["StudyInstanceUID"].to_numpy()
+    header_columns = ["token_fs", "inversion", "gradient_echo", "is3d", "te", "tr", "ti", "flip"]
+    train = numeric.filter(pl.col("split") == "train")
+    probabilities = {
+        "p_intensity": oof(train, INTENSITY, "fluid", train["StudyInstanceUID"].to_numpy()),
+        "p_header": oof(train, header_columns, "fluid", train["StudyInstanceUID"].to_numpy()),
+        "p_both": oof(train, INTENSITY + header_columns, "fluid", train["StudyInstanceUID"].to_numpy()),
+    }
+    for key, value in probabilities.items():
+        print(key, "OOF AUC", round(roc_auc_score(train["fluid"].to_numpy(), value), 4))
+    result = frame.filter(pl.col("split") == "train").with_columns(
+        *[pl.Series(key, value) for key, value in probabilities.items()]
+    )
+    columns = ["SeriesInstanceUID", "token_fs", "inversion", "desc_fs", "header_class", "weighting", "gradient_echo", *probabilities]
+    test = frame.filter(pl.col("split") == "test")
+    models = {}
+    for key, cols in (("p_intensity", INTENSITY), ("p_header", header_columns), ("p_both", INTENSITY + header_columns)):
+        model = HistGradientBoostingClassifier(max_iter=300, learning_rate=0.08, random_state=0)
+        model.fit(train.select(cols).to_numpy().astype(float), train["fluid"].to_numpy())
+        models[key] = model.predict_proba(numeric.filter(pl.col("split") == "test").select(cols).to_numpy().astype(float))[:, 1]
+    test = test.with_columns(*[pl.Series(k, v) for k, v in models.items()])
+    pl.concat([result.select(columns), test.select(columns)]).write_parquet(OUT / "contrast_signals.parquet")
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,48 @@
+import pickle
+import sys
+from collections import Counter
+from concurrent.futures import ProcessPoolExecutor
+from pathlib import Path
+
+import polars as pl
+
+ROOT = Path("/home/claudio/src/knee-abnormality")
+sys.path.insert(0, str(ROOT / "src"))
+from knee_abnormality.config import load_config
+from knee_abnormality.data.dataset import KneeStudyDataset
+from knee_abnormality.data.labels import STUDY
+from knee_abnormality.data.preprocessing.sampling import build_pool
+from knee_abnormality.data.sources import build_series_index
+
+DESIGN = pickle.load(open("/tmp/claude-1000/-home-claudio-src-knee-abnormality/3009ed4f-64e2-4456-a606-3a5616d48256/scratchpad/tiebreak-design/followup_coverage.pkl", "rb"))
+CONFIG = load_config(ROOT / "configs/training.yaml")
+INDEX = build_series_index(CONFIG.paths.data_root, CONFIG.data, "train")
+
+
+def study(uid):
+    item = INDEX[uid]
+    ds = KneeStudyDataset(pl.DataFrame({STUDY: [uid]}), {uid: item}, CONFIG.data, (), None)
+    ds._index_study_geometry(item)
+    out = []
+    for entry in DESIGN[uid]:
+        slot = entry["slot"]
+        kind = CONFIG.data.series_types[slot]
+        excluded = ds._excluded_series[uid]
+        sources = tuple((c.uid, ds._indexed(c)) for c in sorted(item.slots[slot], key=lambda c: c.uid) if c.uid not in excluded)
+        pool = build_pool(sources, kind.plane, ds._study_references[uid], CONFIG.data.spacing_mm, 70.0)
+        expected = entry["v_order"] if entry["reference_accepted"] else entry["q_order"]
+        out.append((uid, slot, entry["reference_accepted"], list(pool.ranking), expected, bool(excluded)))
+    return out
+
+
+rows = []
+with ProcessPoolExecutor(30) as pool:
+    for result in pool.map(study, sorted(DESIGN), chunksize=4):
+        rows.extend(result)
+counts = Counter()
+for uid, slot, accepted, got, expected, excluded in rows:
+    same = got == expected
+    counts[(accepted, same)] += 1
+    if not same:
+        print(uid[-8:], slot, "accepted" if accepted else "rejected", "excl" if excluded else "", "got", [g[-6:] for g in got], "design", [e[-6:] for e in expected])
+print(counts)

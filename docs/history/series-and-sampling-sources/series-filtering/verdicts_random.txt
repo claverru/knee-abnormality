@@ -1,0 +1,41 @@
+# random unflagged studies: study8 verdict note (verdict ok = all series target knee with plausible slot)
+89554669 ok
+76737254 ok
+62380604 ok
+87793270 ok
+98552043 ok
+01839124 ok
+73002676 ok
+10924327 ok
+86693385 ok
+48931799 ok
+73383874 ok
+06570285 ok
+71351097 ok
+83979079 ok (weak SPIR)
+59352518 ok
+84624187 ok (cor_fluid 70473115 weak SPIR, zoom-d)
+73230767 ok
+92255704 ok
+06248845 ok
+65581536 ok (bond oblique in cor_t1pd)
+69694306 ok (bond oblique in cor_t1pd)
+31739312 ok (38938411, 50247932 weak SPIR, zoom-d)
+29650792 ok
+18036330 ok
+62587026 ok
+92295932 ok
+49003589 ok
+66593229 ok
+63052476 miss ax_t1pd 78314962 RT.3D_WATSc is fat-suppressed T1 GRE (T1FS regex miss: WATS)
+71061813 ok
+06987675 ok
+68280311 ok
+57540052 ok
+86132211 ok
+60720571 ok (37849845 FS, zoom-d)
+30438642 ok
+41171100 ok
+82127791 ok
+01362618 ok
+91069601 ok

@@ -7,10 +7,12 @@ rules in the preprocessing identity. Source hashing includes
 runtime dependency manifest. SciPy is already installed in the pinned Kaggle
 runtime and is a locked project dependency. No new package is introduced.
 
-Checkpoint compatibility checks require the configured seed to match the saved
-seed because it affects evaluation supplier selection for overlapping
-acquisitions. A mismatch reports `seed`; use the run's `effective_config.json`
-to preserve its original validation and test inputs.
+Until 2026-09-17, checkpoint compatibility checks required the configured seed to
+match the saved seed, because a seeded permutation broke evaluation supplier ties
+between overlapping acquisitions. Since identity `…reflection_v10`, a fixed
+[source ranking](../data-preparation/physical-sampling/implemented-sampler.md)
+breaks them, prediction datasets receive no seed and the check is gone; resume
+still compares the seed with the rest of the training settings.
 
 Old checkpoints and bundles retain their original config and source; strict
 identity validation rejects using them with this sampler. Keep the 2× inference

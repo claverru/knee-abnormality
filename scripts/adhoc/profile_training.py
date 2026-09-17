@@ -205,7 +205,7 @@ def loader_candidate(
 ) -> dict:
     dataset._slice_index.clear()
     dataset._study_references.clear()
-    dataset.training = True
+    dataset.training_seed = config.seed
     count = (args.warmup + args.steps) * size
     if count > len(dataset):
         raise ValueError(f"Need --samples at least {count} for this loader profile")
@@ -326,7 +326,7 @@ def lightning_profile(
         raise ValueError(
             "Increase --samples so the bounded Lightning run stops before exhausting its study subset"
         )
-    dataset.training = True
+    dataset.training_seed = config.seed
     loader = build_data_loader(
         dataset,
         settings,

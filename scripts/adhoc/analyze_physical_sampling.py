@@ -26,7 +26,11 @@ from knee_abnormality.data.preprocessing.sampling import (
     select_triplets,
     target_depths,
 )
-from knee_abnormality.data.preprocessing.series import IndexedSeries, SliceRecord
+from knee_abnormality.data.preprocessing.series import (
+    IndexedSeries,
+    SeriesSummary,
+    SliceRecord,
+)
 from knee_abnormality.data.sources import KNOWN_BAD_INSTANCES, SERIES
 from knee_abnormality.identity import preprocessing_identity
 from knee_abnormality.provenance import copy_sources, sha256_file
@@ -188,9 +192,14 @@ def analyze(settings: AnalyzeCLI) -> None:
             if kind not in kinds:
                 continue
             pool = build_pool(
-                tuple((a.uid, IndexedSeries(a.records, a.geometry)) for a in items),
+                tuple(
+                    (a.uid, IndexedSeries(a.records, a.geometry, SeriesSummary()))
+                    for a in items
+                ),
                 kind[0],
                 reference,
+                config.data.spacing_mm,
+                config.data.image_size * config.data.spacing_mm / 2,
             )
             identity = {
                 "study_uid": study,
@@ -237,10 +246,9 @@ def analyze(settings: AnalyzeCLI) -> None:
                         kinds[kind].max_images // 3 * multiplier,
                         config.data.sampling_sigma_mm,
                         config.data.image_size * config.data.spacing_mm / 2,
-                        settings.seed,
                         study,
                         kind,
-                        mode == "training",
+                        settings.seed if mode == "training" else None,
                         epoch,
                     )
                     meta = selection.metadata

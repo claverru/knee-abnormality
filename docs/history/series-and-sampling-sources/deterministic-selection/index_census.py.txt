@@ -1,0 +1,219 @@
+import json
+import sys
+import time
+from collections import Counter
+from concurrent.futures import ProcessPoolExecutor
+from dataclasses import replace
+from pathlib import Path
+
+import numpy as np
+import polars as pl
+
+ROOT = Path("/home/claudio/src/knee-abnormality")
+sys.path.insert(0, str(ROOT / "src"))
+
+from knee_abnormality.config import SLICES_PER_INPUT, load_config
+from knee_abnormality.data.dataset import KneeStudyDataset
+from knee_abnormality.data.labels import STUDY
+from knee_abnormality.data.preprocessing.filtering import volume_center
+from knee_abnormality.data.preprocessing.geometry import estimate_reference
+from knee_abnormality.data.preprocessing.sampling import (
+    build_pool,
+    crop_coverage,
+    select_triplets,
+)
+from knee_abnormality.data.sources import build_series_index
+
+CONFIG = load_config(ROOT / "configs/training.yaml")
+OUT = ROOT / "outputs/analysis/deterministic-selection-20260917"
+INDEX = {split: build_series_index(CONFIG.paths.data_root, CONFIG.data, split) for split in ("train", "test")}
+CRITERIA = ("reformat", "newer", "coverage", "resolution", "uid")
+
+
+def key_parts(pool, sources, reference):
+    radius = CONFIG.data.image_size * CONFIG.data.spacing_mm / 2
+    summaries = {uid: s.summary for uid, s in sources.items()}
+    coverage = {uid: crop_coverage(s, reference.point, radius) for uid, s in sources.items()}
+    covered = all(v is not None for v in coverage.values())
+    resolved = all(s.acquired_resolution_mm is not None for s in summaries.values())
+
+    def newer(uid):
+        own = summaries[uid]
+        if own.signature is None or own.series_number is None:
+            return 0
+        return sum(
+            o.signature == own.signature and o.series_number is not None and o.series_number > own.series_number
+            for k, o in summaries.items()
+            if k != uid
+        )
+
+    return {
+        uid: (
+            summaries[uid].reformat,
+            newer(uid),
+            -round(coverage[uid], 1) if covered else 0,
+            round(max(summaries[uid].acquired_resolution_mm, CONFIG.data.spacing_mm), 2) if resolved else 0,
+            uid,
+        )
+        for uid in sources
+    }
+
+
+def study(args):
+    split, uid = args
+    item = INDEX[split][uid]
+    dataset = KneeStudyDataset(pl.DataFrame({STUDY: [uid]}), {uid: item}, CONFIG.data, (), None)
+    dataset._index_study_geometry(item)
+    excluded = dataset._excluded_series[uid]
+    reference = dataset._study_references[uid]
+    indexed, planes = {}, {}
+    for slot, values in enumerate(item.slots):
+        for candidate in values:
+            try:
+                indexed[candidate.uid] = dataset._indexed(candidate)
+                planes.setdefault(candidate.uid, CONFIG.data.series_types[slot].plane)
+            except Exception:
+                pass
+    unfiltered = estimate_reference(
+        tuple(
+            (u, planes[u], s.geometry)
+            for u, s in sorted(indexed.items())
+            if len(s.records) >= SLICES_PER_INPUT
+        )
+    )
+    series_rows, slot_rows = [], []
+    radius = CONFIG.data.image_size * CONFIG.data.spacing_mm / 2
+    for slot, values in enumerate(item.slots):
+        kind = CONFIG.data.series_types[slot]
+        for candidate in values:
+            value = indexed.get(candidate.uid)
+            center = volume_center(value.geometry) if value is not None else None
+            summary = value.summary if value is not None else None
+            series_rows.append(
+                {
+                    "split": split,
+                    "StudyInstanceUID": uid,
+                    "SeriesInstanceUID": candidate.uid,
+                    "slot": slot,
+                    "indexed": value is not None,
+                    "records": len(value.records) if value is not None else None,
+                    "excluded": candidate.uid in excluded,
+                    "removed_instances": summary.removed_instances if summary else None,
+                    "receive_coil": summary.receive_coil if summary else None,
+                    "series_number": summary.series_number if summary else None,
+                    "reformat": summary.reformat if summary else None,
+                    "has_signature": summary.signature is not None if summary else None,
+                    "acquired_resolution_mm": summary.acquired_resolution_mm if summary else None,
+                    "volume_center_x": float(center[0]) if center is not None else None,
+                }
+            )
+        sources = tuple(
+            (c.uid, indexed[c.uid]) for c in sorted(values, key=lambda c: c.uid) if c.uid not in excluded and c.uid in indexed
+        )
+        if not sources:
+            continue
+        pool = build_pool(sources, kind.plane, reference, CONFIG.data.spacing_mm, radius)
+        if len(pool.ranking) < 2:
+            continue
+        uid_pool = replace(pool, ranking=tuple(sorted(pool.ranking)))
+        budget = kind.max_images * CONFIG.data.validation_image_multiplier // 3
+        key = (kind.plane, kind.fluid_sensitive, kind.fat_suppression)
+        picks = {}
+        for name, candidate_pool in (("ranked", pool), ("uid", uid_pool)):
+            selection = select_triplets(candidate_pool, budget, CONFIG.data.sampling_sigma_mm, radius, uid, key, None)
+            picks[name] = sorted((t.uid, t.records[1].path.name) for t in selection.triplets)
+        parts = key_parts(pool, dict(sources), reference)
+        ranked_sources = [u for u in pool.ranking]
+        decided = next(
+            (
+                name
+                for index, name in enumerate(CRITERIA)
+                if len({parts[u][index] for u in ranked_sources}) > 1
+            ),
+            None,
+        )
+        slot_rows.append(
+            {
+                "split": split,
+                "StudyInstanceUID": uid,
+                "slot": slot,
+                "physical": pool.physical,
+                "sources": len(pool.ranking),
+                "ranking_differs_from_uid": list(pool.ranking) != sorted(pool.ranking),
+                "triplets_differ_from_uid": picks["ranked"] != picks["uid"],
+                "first_differing_criterion": decided,
+                "differing_criteria": ",".join(
+                    name for index, name in enumerate(CRITERIA[:-1]) if len({parts[u][index] for u in ranked_sources}) > 1
+                ),
+                "triplets": len(picks["ranked"]),
+            }
+        )
+    summary = {
+        "split": split,
+        "StudyInstanceUID": uid,
+        "excluded": sorted(excluded),
+        "reference_before": unfiltered.reason or "accepted",
+        "rms_before": unfiltered.rms_mm,
+        "reference_after": reference.reason or "accepted",
+        "rms_after": reference.rms_mm,
+    }
+    return summary, series_rows, slot_rows
+
+
+def main():
+    OUT.mkdir(parents=True, exist_ok=True)
+    jobs = [(split, uid) for split in ("test", "train") for uid in sorted(INDEX[split])]
+    started = time.perf_counter()
+    studies, series, slots = [], [], []
+    with ProcessPoolExecutor(30) as pool:
+        for done, (summary, rows, slot_rows) in enumerate(pool.map(study, jobs, chunksize=4), 1):
+            studies.append(summary)
+            series.extend(rows)
+            slots.extend(slot_rows)
+            if done % 500 == 0:
+                print(done, len(jobs), round(time.perf_counter() - started), flush=True)
+    studies = pl.DataFrame(studies, infer_schema_length=None)
+    series = pl.DataFrame(series, infer_schema_length=None)
+    slots = pl.DataFrame(slots, infer_schema_length=None)
+    studies.write_parquet(OUT / "index_studies.parquet")
+    series.write_parquet(OUT / "index_series.parquet")
+    slots.write_parquet(OUT / "index_slots.parquet")
+    folds = pl.read_csv(ROOT / "data/folds/all_5fold_v3/studies.csv").select(STUDY, "fold")
+    slots = slots.join(folds, on=STUDY, how="left")
+    census = pl.read_parquet(ROOT / "outputs/analysis/series-filtering-20260917/series_mid_centres.parquet")
+    compare = series.join(census, on="SeriesInstanceUID", how="inner").filter(pl.col("volume_center_x").is_not_null())
+    report = {
+        "studies": studies.height,
+        "series": series.height,
+        "indexed_series": int(series["indexed"].sum()),
+        "excluded_series": series.filter(pl.col("excluded")).select("split", STUDY, "SeriesInstanceUID", "slot", "receive_coil", "volume_center_x").to_dicts(),
+        "guard_removed_instances": int(series["removed_instances"].fill_null(0).sum()),
+        "guard_series_with_removals": series.filter(pl.col("removed_instances") > 0).select("split", STUDY, "SeriesInstanceUID", "removed_instances").to_dicts(),
+        "reference_changes": studies.filter(pl.col("reference_before") != pl.col("reference_after")).select("split", STUDY, "reference_before", "rms_before", "reference_after", "rms_after").to_dicts(),
+        "volume_center_x_max_abs_diff_vs_census": float((compare["volume_center_x"] - compare["mx"]).abs().max()),
+        "volume_center_x_compared": compare.height,
+        "summary_missing": {
+            "receive_coil": int(series["receive_coil"].is_null().sum()),
+            "series_number": int(series["series_number"].is_null().sum()),
+            "signature": int((~series["has_signature"].fill_null(False)).sum()),
+            "acquired_resolution": int(series["acquired_resolution_mm"].is_null().sum()),
+        },
+        "reformat_series": int(series["reformat"].fill_null(False).sum()),
+    }
+    for name, frame in (("all_train", slots.filter(pl.col("split") == "train")), ("fold0", slots.filter(pl.col("fold") == 0)), ("test", slots.filter(pl.col("split") == "test"))):
+        report[f"slots_{name}"] = {
+            "repeated_slots": frame.height,
+            "ranking_differs_from_uid": int(frame["ranking_differs_from_uid"].sum()) if frame.height else 0,
+            "triplets_differ_from_uid": int(frame["triplets_differ_from_uid"].sum()) if frame.height else 0,
+            "first_differing_criterion": dict(Counter(frame["first_differing_criterion"].to_list())) if frame.height else {},
+            "criterion_differs_in_slots": {
+                c: int(frame["differing_criteria"].str.contains(c).sum()) for c in CRITERIA[:-1]
+            } if frame.height else {},
+        }
+    (OUT / "index_report.json").write_text(json.dumps(report, indent=1, default=str) + "\n")
+    print(json.dumps(report, indent=1, default=str))
+    print("done", round(time.perf_counter() - started))
+
+
+if __name__ == "__main__":
+    main()

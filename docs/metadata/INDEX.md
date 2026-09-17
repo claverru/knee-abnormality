@@ -8,3 +8,4 @@
 | Checking how many studies have usable left/right tags or description text, conflicting side tags and acquisition-dependent missingness | [2026-09-14 knee-side metadata audit](2026-09-14-knee-side-metadata-audit.md) |
 | Assessing coordinate-based knee-side inference, potential 96.85% coverage, scanner conventions and metadata-only uncertainty | [Knee-side coordinate investigation](knee-side-coordinate-investigation.md) |
 | Checking the audited left/right/unknown policy, its 96.14% training coverage, abstentions and example-test sides | [Knee-side policy audit](knee-side-policy-audit.md) |
+| Checking how many series are non-knee, other-knee, low-resolution or plane/contrast mislabelled, their triplet share and inference effect, or the proposed series filtering and cleaning rule | [Series filtering and cleaning census](series-filtering-census.md) |

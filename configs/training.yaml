@@ -62,6 +62,7 @@ optimizer:
   epsilon: 0.00000001
   warmup_epochs: 1
   minimum_lr_ratio: 0.01
+  weight_averaging: null
 
 trainer:
   max_epochs: 10

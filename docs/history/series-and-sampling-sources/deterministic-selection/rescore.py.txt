@@ -1,0 +1,143 @@
+import json
+import sys
+import time
+from pathlib import Path
+
+import numpy as np
+import polars as pl
+import torch
+
+ROOT = Path("/home/claudio/src/knee-abnormality")
+sys.path.insert(0, str(ROOT / "src"))
+
+from knee_abnormality.config import ExperimentConfig, load_config
+from knee_abnormality.data.dataset import build_data_loader
+from knee_abnormality.data.labels import STUDY
+from knee_abnormality.evaluation.metrics import bootstrap_auc, validation_metrics
+from knee_abnormality.evaluation.predictions import make_prediction_frame
+from knee_abnormality.identity import preprocessing_identity
+from knee_abnormality.inference.checkpoint import checkpoint_model, read_checkpoint
+from knee_abnormality.inference.engine import move_batch, prediction_data
+
+RUNS = ROOT / "outputs/training/overnight-20260916T214520Z-t8k_kw2z/runs"
+NAMES = ("00-control", "01-control-seed-43", "02-control-seed-44", "03-ema-0.999")
+OUT = ROOT / "outputs/analysis/deterministic-selection-20260917/rescore"
+DRAWS = 2000
+
+
+def score_run(name: str, device: torch.device) -> dict:
+    run = RUNS / name
+    selected = json.loads((run / "fold_0/selected_checkpoint.json").read_text())
+    checkpoint = read_checkpoint(Path(selected["path"]))
+    saved = checkpoint["hyper_parameters"]
+    config = ExperimentConfig.model_validate(saved["config"])
+    effective = load_config(run / "effective_config.json")
+    if config.data != effective.data or config.model != effective.model:
+        raise ValueError(f"{name}: checkpoint and effective config differ")
+    dataset, targets, _ = prediction_data(effective, "validation", 0)
+    if saved["fold"] != 0 or saved["targets"] != list(targets):
+        raise ValueError(f"{name}: checkpoint fold or targets differ")
+    model = checkpoint_model(checkpoint, effective, targets, device)
+    loader = build_data_loader(
+        dataset, effective.trainer, effective.trainer.batch_size, num_workers=16
+    )
+    studies, truth, gold, outputs = [], [], [], []
+    excluded = set()
+    started = time.perf_counter()
+    with torch.inference_mode(), torch.autocast("cuda", dtype=torch.bfloat16):
+        for batch in loader:
+            studies.extend(batch["study_uid"])
+            truth.append(batch["target"].numpy())
+            gold.append(batch["is_gold"].numpy())
+            excluded.update(
+                uid
+                for item in batch["sampling"]
+                for slot in item
+                for uid in slot["excluded_sources"]
+            )
+            batch = move_batch(batch, device)
+            outputs.append(torch.sigmoid(model(batch).to(torch.float32)).cpu().numpy())
+    seconds = time.perf_counter() - started
+    prediction = np.concatenate(outputs)
+    truth, gold = np.concatenate(truth), np.concatenate(gold)
+    metrics = validation_metrics(truth, prediction, targets, gold)
+    frame = make_prediction_frame(studies, prediction, targets, 0)
+    frame.write_csv(OUT / f"{name}_validation_predictions.csv")
+    saved_frame = pl.read_csv(run / "fold_0/validation_predictions.csv")
+    saved_frame = pl.DataFrame({STUDY: studies}).join(
+        saved_frame, on=STUDY, how="left", validate="1:1", maintain_order="left"
+    )
+    saved_prediction = saved_frame.select(targets).to_numpy()
+    saved_metrics = validation_metrics(truth, saved_prediction, targets, gold)
+    return {
+        "name": name,
+        "checkpoint": selected["path"],
+        "selected_score": selected["score"],
+        "saved_predictions_macro_auc": saved_metrics["macro_auc"],
+        "new_macro_auc": metrics["macro_auc"],
+        "delta_vs_saved": metrics["macro_auc"] - saved_metrics["macro_auc"],
+        "new_per_target_auc": metrics["per_target_auc"],
+        "saved_per_target_auc": saved_metrics["per_target_auc"],
+        "new_soft_target_bce": metrics["soft_target_bce"],
+        "saved_soft_target_bce": saved_metrics["soft_target_bce"],
+        "excluded_series_seen": sorted(excluded),
+        "studies": len(studies),
+        "seconds": seconds,
+        "_arrays": (studies, truth, prediction, saved_prediction),
+    }
+
+
+def main():
+    OUT.mkdir(parents=True, exist_ok=True)
+    device = torch.device("cuda")
+    results = [score_run(name, device) for name in NAMES]
+    studies, truth = results[0]["_arrays"][:2]
+    hard = (truth >= 0.5).astype(np.int8)
+    folds = pl.read_csv(ROOT / "data/folds/all_5fold_v3/studies.csv").select(STUDY, "report_group")
+    groups = pl.DataFrame({STUDY: studies}).join(folds, on=STUDY, how="left", maintain_order="left")["report_group"].to_numpy()
+    unique, inverse = np.unique(groups, return_inverse=True)
+    rng = np.random.default_rng(20260917)
+    counts = rng.multinomial(len(unique), np.full(len(unique), 1 / len(unique)), size=DRAWS)[:, inverse]
+    positive = counts @ hard
+    valid = ((positive > 0) & (positive < counts.sum(axis=1, keepdims=True))).all(axis=1)
+    deltas = {}
+    for result in results:
+        assert result["_arrays"][0] == studies
+        _, _, new, old = result.pop("_arrays")
+        delta = bootstrap_auc(hard, new, counts[valid]) - bootstrap_auc(hard, old, counts[valid])
+        deltas[result["name"]] = delta
+        result["paired_report_group_bootstrap_delta"] = {
+            "mean": float(delta.mean()),
+            "ci95": [float(np.quantile(delta, 0.025)), float(np.quantile(delta, 0.975))],
+            "valid_draws": int(valid.sum()),
+        }
+    controls = [r for r in results if r["name"] != "03-ema-0.999"]
+    pooled = np.mean([deltas[r["name"]] for r in controls], axis=0)
+    new_values = [r["new_macro_auc"] for r in controls]
+    old_values = [r["saved_predictions_macro_auc"] for r in controls]
+    report = {
+        "preprocessing_identity": preprocessing_identity("rexnet_200.nav_in1k")["algorithm"],
+        "bypass": "checkpoint preprocessing identity not validated (scratch script only); data and model config compared with effective_config.json",
+        "precision": "bf16 autocast, batch size 8, dataset order, 16 workers",
+        "runs": results,
+        "controls": {
+            "saved_macro_auc": old_values,
+            "new_macro_auc": new_values,
+            "saved_spread": max(old_values) - min(old_values),
+            "new_spread": max(new_values) - min(new_values),
+            "saved_std": float(np.std(old_values, ddof=1)),
+            "new_std": float(np.std(new_values, ddof=1)),
+            "saved_mean": float(np.mean(old_values)),
+            "new_mean": float(np.mean(new_values)),
+            "pooled_delta": {
+                "mean": float(pooled.mean()),
+                "ci95": [float(np.quantile(pooled, 0.025)), float(np.quantile(pooled, 0.975))],
+            },
+        },
+    }
+    (OUT / "rescore.json").write_text(json.dumps(report, indent=1) + "\n")
+    print(json.dumps(report, indent=1))
+
+
+if __name__ == "__main__":
+    main()

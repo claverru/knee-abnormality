@@ -2,6 +2,10 @@
 
 | Read when | Document |
 |---|---|
+| Reviewing the series filtering and deterministic source ranking runs (seeds 42–44, mean 0.8907, public 0.933): a tie with the seed controls, prediction agreement between runs, and why run-to-run noise comes from training | [2026-09-17 ranked-filtered result](2026-09-17-ranked-filtered-result.md) |
+| Reviewing per-type removal and attention-share evidence, proposed per-type budgets and availability-driven prevalence shifts | [2026-09-17 plane/contrast importance](2026-09-17-plane-contrast-importance.md) |
+| Reviewing the 2026-09-17 overnight queue: three control seeds (0.0032 spread), EMA/SWA gains, affine-off and 20-epoch losses, and ties for the other hyperparameters | [2026-09-17 overnight results](2026-09-17-overnight-results.md) |
+| Reviewing the user-launched runs on the restored code (min_lr 0.1, series dropout 0.25/0.3, fewer slices): ties, a speed–accuracy trade-off and run-to-run noise | [2026-09-16 restored-code hyperparameter runs](2026-09-16-restored-code-hyperparameter-runs.md) |
 | Reviewing learned zoom (context on every slice plus learned detail glimpses), the last run of the dropped crop-selection investigation: unused detail, a 0.022 regression against per-label, and the resolution pattern | [2026-09-16 learned-zoom result](2026-09-16-learned-zoom-result.md) |
 | Reviewing shared crops (2 per label, shared pooling): a 0.012 regression against per-label explained by slice coverage, with inference probes | [2026-09-16 shared crops result](2026-09-16-shared-crops-result.md) |
 | Reviewing label-private crops (2 per label, private gated pooling, label FiLM): a 0.047 regression with study-specific placement and inference probes | [2026-09-16 label-private crops result](2026-09-16-label-private-crops-result.md) |

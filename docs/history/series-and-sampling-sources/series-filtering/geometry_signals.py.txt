@@ -1,0 +1,152 @@
+from collections import Counter
+from pathlib import Path
+
+import numpy as np
+import polars as pl
+
+ROOT = Path("/home/claudio/src/knee-abnormality")
+OUT = ROOT / "outputs/analysis/series-filtering-20260917"
+AXES = {"Axial": 2, "Coronal": 1, "Sagittal": 0}
+MAXIMUM_RMS = 10.0
+MAXIMUM_RESIDUAL = 20.0
+MAXIMUM_CONDITION = 1e3
+THRESHOLD = 20.0
+
+
+def fit(usable):
+    counts = Counter(plane for _, plane, _, _ in usable)
+    if len(counts) < 2:
+        return {"reason": "insufficient_planes"}
+    matrix = np.zeros((3, 3))
+    rhs = np.zeros(3)
+    parts = []
+    for uid, plane, center, normal in usable:
+        unit = normal / np.linalg.norm(normal)
+        projection = np.eye(3) - np.outer(unit, unit)
+        weight = 1 / counts[plane]
+        matrix += weight * projection
+        rhs += weight * projection @ center
+        parts.append((uid, weight, projection, center))
+    condition = float(np.linalg.cond(matrix))
+    if not np.isfinite(condition) or condition > MAXIMUM_CONDITION:
+        return {"reason": "ill_conditioned"}
+    point = np.linalg.solve(matrix, rhs)
+    residuals = {uid: float(np.linalg.norm(p @ (point - c))) for uid, _, p, c in parts}
+    rms = float(np.sqrt(sum(w * residuals[uid] ** 2 for uid, w, _, _ in parts) / len(counts)))
+    return {"reason": None, "point": point, "residuals": residuals, "rms": rms}
+
+
+def current(usable):
+    result = fit(usable)
+    if result["reason"] is None:
+        if result["rms"] > MAXIMUM_RMS:
+            result["reason"] = "excessive_rms"
+        elif max(result["residuals"].values()) > MAXIMUM_RESIDUAL:
+            result["reason"] = "excessive_residual"
+    return result
+
+
+def robust(usable):
+    retained = list(usable)
+    dropped = {}
+    while True:
+        result = fit(retained)
+        if result["reason"] is not None:
+            if dropped:
+                result["reason"] += "_after_drop"
+            break
+        worst = max(result["residuals"], key=lambda uid: (result["residuals"][uid], uid))
+        if result["residuals"][worst] <= THRESHOLD:
+            if result["rms"] > MAXIMUM_RMS:
+                result["reason"] = "excessive_rms"
+            break
+        dropped[worst] = result["residuals"][worst]
+        retained = [item for item in retained if item[0] != worst]
+    result["dropped"] = dropped
+    return result
+
+
+def series_signals(row, point):
+    normal = np.asarray(row["normal"], dtype=float)
+    unit = normal / np.linalg.norm(normal)
+    center = np.asarray(row["center"], dtype=float)
+    lo, hi = sorted(row["bounds"])
+    scale = np.linalg.norm(normal)
+    slab_mid = (lo + hi) / 2 / scale
+    volume_center = center + unit * (slab_mid - float(np.dot(center, unit)))
+    depth = float(np.dot(point, unit))
+    outside = max(lo / scale - depth, depth - hi / scale, 0.0)
+    orientation = np.asarray(row["middle_orientation"], dtype=float).reshape(2, 3)
+    spacing = row["pixel_spacing"]
+    delta = point - np.asarray(row["middle_position"], dtype=float)
+    u = float(np.dot(delta, orientation[0]))
+    v = float(np.dot(delta, orientation[1]))
+    width = (row["columns"] - 1) * spacing[1]
+    height = (row["rows"] - 1) * spacing[0]
+    fov_outside = float(np.hypot(max(-u, u - width, 0.0), max(-v, v - height, 0.0)))
+    offset = volume_center - point
+    return {
+        "inplane_mm": float(np.linalg.norm((point - center) - np.dot(point - center, unit) * unit)),
+        "outside_range_mm": outside,
+        "fov_outside_mm": fov_outside,
+        "edge_margin_mm": float(min(u, width - u, v, height - v)),
+        "offset_x": float(offset[0]),
+        "offset_y": float(offset[1]),
+        "offset_z": float(offset[2]),
+        "offset_mm": float(np.linalg.norm(offset)),
+        "point_x": float(point[0]),
+        "obliquity_deg": float(np.degrees(np.arccos(min(1.0, abs(unit[AXES[row["plane"]]]))))),
+        "normal_axis_agrees": int(np.argmax(np.abs(unit))) == AXES[row["plane"]],
+        "slab_mm": (hi - lo) / scale,
+        "fov_rows_mm": height,
+        "fov_cols_mm": width,
+    }
+
+
+def main():
+    series = pl.read_parquet(OUT / "census_series.parquet")
+    rows_by_study = {}
+    for row in series.iter_rows(named=True):
+        rows_by_study.setdefault((row["split"], row["StudyInstanceUID"]), []).append(row)
+    study_rows, signal_rows = [], []
+    for (split, study), rows in rows_by_study.items():
+        usable = sorted(
+            (r["SeriesInstanceUID"], r["plane"], np.asarray(r["center"]), np.asarray(r["normal"]))
+            for r in rows
+            if r["indexed"] and r["geometry_reason"] is None and (r["n_records"] or 0) >= 3
+        )
+        ls = current(usable)
+        rb = robust(usable)
+        accepted = rb["reason"] is None
+        point = rb["point"] if accepted else None
+        study_rows.append(
+            {
+                "split": split,
+                "StudyInstanceUID": study,
+                "current_reason": ls["reason"] or "accepted",
+                "robust_reason": rb["reason"] or "accepted",
+                "robust_rms_mm": rb.get("rms") if accepted else None,
+                "robust_dropped": len(rb["dropped"]),
+                "robust_point": list(point) if point is not None else None,
+                "usable_series": len(usable),
+                "median_center_x": float(np.median([u[2][0] for u in usable])) if usable else None,
+            }
+        )
+        for r in rows:
+            item = {
+                "SeriesInstanceUID": r["SeriesInstanceUID"],
+                "robust_accepted": accepted,
+                "current_accepted": ls["reason"] is None,
+                "robust_dropped": r["SeriesInstanceUID"] in rb["dropped"],
+                "robust_drop_residual_mm": rb["dropped"].get(r["SeriesInstanceUID"]),
+            }
+            if point is not None and r["indexed"] and r["geometry_reason"] is None and r.get("middle_orientation") is not None:
+                item.update(series_signals(r, point))
+            signal_rows.append(item)
+    pl.DataFrame(study_rows, infer_schema_length=None).write_parquet(OUT / "robust_studies.parquet")
+    pl.DataFrame(signal_rows, infer_schema_length=None).write_parquet(OUT / "geometry_signals.parquet")
+    print(len(study_rows), len(signal_rows))
+
+
+if __name__ == "__main__":
+    main()

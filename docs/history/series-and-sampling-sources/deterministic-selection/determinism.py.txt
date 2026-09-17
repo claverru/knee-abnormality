@@ -1,0 +1,112 @@
+import hashlib
+import json
+import sys
+import time
+from concurrent.futures import ProcessPoolExecutor
+from multiprocessing import get_context
+from pathlib import Path
+
+import numpy as np
+
+ROOT = Path("/home/claudio/src/knee-abnormality")
+sys.path.insert(0, str(ROOT / "src"))
+
+from knee_abnormality.config import load_config
+from knee_abnormality.data.dataset import KneeStudyDataset
+from knee_abnormality.data.labels import load_fold_labels
+from knee_abnormality.data.preprocessing.spatial import ResampledSlice
+from knee_abnormality.data.sources import build_series_index
+from knee_abnormality.inference.engine import prediction_data
+
+OUT = ROOT / "outputs/analysis/deterministic-selection-20260917"
+BASE = load_config(ROOT / "configs/training.yaml")
+TRAINING_STUDIES = 400
+SIZE = BASE.data.image_size
+IMAGE = np.linspace(0, 1, SIZE * SIZE, dtype=np.float32).reshape(SIZE, SIZE)
+TRANSFORM = np.eye(3, dtype=np.float32)
+
+
+def fake_decode(records, spacing_mm, image_size):
+    return tuple(ResampledSlice(IMAGE, (0, 0, SIZE, SIZE), TRANSFORM) for _ in records)
+
+
+def dataset_for(mode, seed):
+    config = BASE.model_copy(update={"seed": seed})
+    if mode == "evaluation":
+        dataset, _, _ = prediction_data(config, "validation", 0)
+    else:
+        labels = load_fold_labels(config, 0)
+        dataset = KneeStudyDataset(
+            labels.training.head(TRAINING_STUDIES),
+            build_series_index(config.paths.data_root, config.data, "train"),
+            config.data,
+            labels.targets,
+            config.seed,
+        )
+    dataset._decode_series = fake_decode
+    return dataset
+
+
+def run(job):
+    mode, seed, epoch, start, stop = job
+    dataset = dataset_for(mode, seed)
+    dataset.set_epoch(epoch)
+    result = {}
+    for index in range(start, min(stop, len(dataset))):
+        item = dataset[index]
+        selection = [
+            [[series.uid, list(series.selected_paths)] for series in values]
+            for values in item["series"]
+        ]
+        payload = json.dumps(
+            [selection, list(item["failures"]), [m["excluded_sources"] for m in item["sampling"]]]
+        )
+        result[item["study_uid"]] = hashlib.sha256(payload.encode()).hexdigest()
+    return result
+
+
+def collect(pool, mode, seed, epoch, total):
+    step = 16
+    jobs = [(mode, seed, epoch, start, start + step) for start in range(0, total, step)]
+    merged = {}
+    for part in pool.map(run, jobs):
+        merged.update(part)
+    return merged
+
+
+def differing(a, b):
+    assert a.keys() == b.keys()
+    return sum(a[k] != b[k] for k in a)
+
+
+def main():
+    started = time.perf_counter()
+    validation = 904
+    report = {"validation_studies": validation, "training_studies": TRAINING_STUDIES}
+    runs = {}
+    with ProcessPoolExecutor(30, mp_context=get_context("spawn")) as pool:
+        runs["eval_seed42_a"] = collect(pool, "evaluation", 42, 0, validation)
+        runs["eval_seed43"] = collect(pool, "evaluation", 43, 0, validation)
+    with ProcessPoolExecutor(30, mp_context=get_context("spawn")) as pool:
+        runs["eval_seed42_b"] = collect(pool, "evaluation", 42, 0, validation)
+        runs["eval_seed42_epoch3"] = collect(pool, "evaluation", 42, 3, validation)
+        runs["train_seed42_epoch0_a"] = collect(pool, "training", 42, 0, TRAINING_STUDIES)
+        runs["train_seed42_epoch0_b"] = collect(pool, "training", 42, 0, TRAINING_STUDIES)
+        runs["train_seed43_epoch0"] = collect(pool, "training", 43, 0, TRAINING_STUDIES)
+        runs["train_seed42_epoch1"] = collect(pool, "training", 42, 1, TRAINING_STUDIES)
+    pairs = [
+        ("eval_seed42_a", "eval_seed43"),
+        ("eval_seed42_a", "eval_seed42_b"),
+        ("eval_seed42_a", "eval_seed42_epoch3"),
+        ("train_seed42_epoch0_a", "train_seed42_epoch0_b"),
+        ("train_seed42_epoch0_a", "train_seed43_epoch0"),
+        ("train_seed42_epoch0_a", "train_seed42_epoch1"),
+    ]
+    report["studies_with_different_selection"] = {f"{a} vs {b}": differing(runs[a], runs[b]) for a, b in pairs}
+    report["seconds"] = round(time.perf_counter() - started)
+    (OUT / "determinism.json").write_text(json.dumps(report, indent=1) + "\n")
+    print(json.dumps(report, indent=1))
+
+
+if __name__ == "__main__":
+    main()

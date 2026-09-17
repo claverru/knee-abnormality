@@ -59,8 +59,7 @@ class ThreadedStudyDataset(KneeStudyDataset):
             source.series_index,
             source.data,
             source.targets,
-            source.training,
-            source.seed,
+            source.training_seed,
             source.image_limit_multiplier,
         )
         self.set_epoch(source.epoch.value)

@@ -1,11 +1,11 @@
 # Endgame
 
-Final-phase work, deliberately deferred by the
-[fold-0 iteration strategy](../validation/validation-strategy.md); bigger images joined on
-2026-09-16. These entries wait for the final phase; when one starts, move it to
+Final-phase work, deliberately deferred by the [fold-0 iteration
+strategy](../validation/validation-strategy.md); bigger images joined on 2026-09-16 and weight
+averaging on 2026-09-17. These entries wait for the final phase; when one starts, move it to
 [ongoing work](../ongoing.md) and remove it from this file in the same change. Fold-0 results that
-bear on them are recorded here as evidence. Each entry says whether its motivation is measured or
-a hypothesis.
+bear on them are recorded here as evidence. Each entry says whether its motivation is measured or a
+hypothesis.
 
 ## Ensembling
 
@@ -58,6 +58,12 @@ and the sampler's 70 mm in-plane radius.
   24 GB GPU needs gradient accumulation (for example batch 4 × 2) or activation checkpointing. The
   model allows `model.checkpoint_backbone` only with `model.backbone_eval: true`, which also
   changes BatchNorm behaviour.
+- *`model.backbone_eval` alone:* moved here from the [overnight queue](overnight.md) on
+  2026-09-16 (the user's decision) because it only matters as the gate for
+  `model.checkpoint_backbone` above; an isolated on/off comparison at the current image size is
+  not worth a queue slot. `baseline0` (`resnet50d.ra4_e3600_r224_in1k`) and `baseline1`
+  (`resnet50d.ra2_in1k`) both trained with `backbone_eval: true` and `checkpoint_backbone: true`,
+  but neither has a recorded comparison against `backbone_eval: false` on the same recipe.
 - *Host memory:* loader memory grows with pixels
   ([host memory](../modeling/training-runtime-and-memory.md#host-memory-with-larger-inputs)).
 - *Inference:* the backbone forward is about a quarter of Kaggle prediction time at 16 loader
@@ -70,6 +76,75 @@ transformations with consistent geometry and target handling, recording total in
 Training reflection is implemented;
 [reflection TTA](../modeling/schedule-and-augmentation.md#study-level-knee-reflection) has not been
 evaluated.
+
+## Weight averaging
+
+**EMA or SWA as the final recipe's default** (measured on fold 0; moved here on 2026-09-17, the
+user's decision). Both are implemented behind `optimizer.weight_averaging` (`null`, feature off, in
+`configs/training.yaml`) and were measured by `03-ema-0.999` and `04-swa-3` of the 2026-09-17
+queue ([result](../validation/results/2026-09-17-overnight-results.md#weight-averaging)): averaged
+weights beat the live ones by about +0.00015 at the best epoch and +0.0005 at the last, and lower
+BCE; EMA costs +153 s per run and SWA +369 s. The EMA checkpoint scored 0.929 public, +0.001 over
+its own live weights (0.928). The gain is small against seed noise, so fold-0 experiments train
+without it until the final phase.
+
+- *Before adopting it:* validate the live weights only at the last epoch. The second validation
+  pass is all of EMA's +153 s (about 17 s per epoch; training steps are unchanged), so this cuts
+  the overhead to about 17 s.
+- *Follow-ups:* EMA decays 0.998 and 0.9995, EMA with `minimum_lr_ratio: 0.1`, and SWA paired with
+  a non-vanishing tail learning rate (`minimum_lr_ratio: 0.1`), which `04-swa-3` does not test.
+- *Implementation:* EMA and SWA share one hand-written averager in `KneeModule`
+  (`src/knee_abnormality/training/lightning.py`); `optimizer.weight_averaging` takes
+  `{method: ema, decay}` or `{method: swa, epochs}` (`src/knee_abnormality/config.py`,
+  `EMAConfig`/`SWAConfig`/`WeightAveragingConfig`), and an `ExperimentConfig` validator rejects SWA
+  `epochs` greater than `trainer.max_epochs` minus `optimizer.warmup_epochs`. The
+  [optimizer research](../research/optimizer-research.md#4-ema-first-additional-training-feature)
+  gives the background, the
+  ["Weight averaging" schedule section](../modeling/schedule-and-augmentation.md#weight-averaging)
+  the semantics as shipped, and
+  [configs and experiment artifacts](../architecture/configs-and-experiment-artifacts.md#experiment-artifacts-and-reproducibility)
+  the `live_state_dict` checkpoint key, `val_live_*` metrics and `epochs/live_*` files that appear
+  only when `weight_averaging` is set. The design choices:
+
+- *Averager:* a hand-written `deepcopy` of the live model inside the Lightning module, updated
+  after each optimizer step with a stateless per-step weight. Floating tensors (parameters and
+  BatchNorm statistics) are interpolated, integer buffers copied, and the copy is exact while the
+  weight is 1. A second constructed model would draw from the global RNG and shift the DataLoader
+  shuffle. `AveragedModel` pushes int64 buffers through float arithmetic, timm `ModelEmaV3` cannot
+  weight uniformly for SWA, and a callback cannot swap weights before the strict checkpoint load.
+- *EMA:* copy the live weights until warm-up ends (step 438), then average with decay 0.999 per
+  update. Its 1,000-step (2.3-epoch) horizon matches the cosine tail, where `00-baseline`'s live
+  AUC was flat (0.89269, 0.89269, 0.89205, 0.89276 at epochs 7–10). Decay 0.99 (100 steps) would
+  stay close to the live weights, and 0.9995 puts half its weight on epochs 5–7. BatchNorm
+  statistics are averaged with the weights.
+- *SWA:* a uniform per-step average over the last K = 3 epochs (from step 3,066) with the schedule
+  unchanged. Lightning's `StochasticWeightAveraging` is unsuitable: it swaps in an epoch-level
+  `SWALR`, flattens the 3:1 backbone:head learning-rate ratio, leaves out the final epoch, adds a
+  pseudo-epoch that becomes a selection candidate, keeps the average out of the saved `model.*`
+  weights, and resets BatchNorm statistics that `backbone_eval` never re-estimates.
+- *SWA BatchNorm refresh:* at the end of each window epoch, re-estimate the BatchNorm layers that
+  are in training mode (none under `backbone_eval`) with a forward-only pass over an unshuffled
+  training loader, under the training precision and a forked RNG so the training random streams
+  stay untouched.
+- *Saved and validated weights:* checkpoints store the averaged weights as `model.*`, so
+  prediction, export and fold-run comparisons use them unchanged, and the live weights alongside
+  in `live_state_dict`, which export drops.
+  - Both models are validated on the same batches every epoch: `val_macro_auc` scores the averaged
+    weights, while `val_live_*` metrics and `live_*` epoch files record the live ones.
+  - Checkpoint selection and early stopping use only the averaged score, keeping the control's 10
+    candidates.
+  - Where the copy equals the live model (EMA epoch 1, SWA epochs 1–7), both metric sets must
+    match.
+- *Costs (estimated before the runs):* +58 MB of GPU memory (0.3% of the 20.0 GiB peak), checkpoints from 175 to
+  about 233 MB, a few seconds of updates, about 3 min per run for the second validation forward,
+  and 1–1.5 min per SWA refresh (3–4.5 min for K = 3).
+- *External evidence:* one public EfficientNet-B0 fold-0 ablation reported 0.7914 → 0.7940 with
+  EMA, judged noise by its author
+  ([public findings](../research/public-research.md#geometry-sampling-encoders-and-losses)), and a
+  public training notebook averages its top epochs' weights
+  ([public code](../research/public-research.md#public-code-worth-inspecting)). Averaging
+  baseline1's epoch 7–9 probabilities gained +0.004267 on 12 reused validation studies, which is
+  not a validated gain ([baseline1 review](../history/baseline1-review.md#follow-up-experiments)).
 
 ## Distillation
 

@@ -1,0 +1,213 @@
+# series8 verdict note   (sheets geo-000..geo-011)
+85729062 knee_target plane-odd bond view
+89501577 contralateral bilateral 06656162 (right-side series; left side kept; side of report unknown)
+86705979 contralateral bilateral 06656162
+68647490 contralateral bilateral 06656162
+81580517 knee_other_session RT. philips second session
+30064903 knee_other_session RT. philips second session
+73211696 knee_target shifted
+64426170 knee_target shifted
+91845770 knee_partial patellar small fov
+52417375 knee_partial patellar small fov
+39550198 knee_partial patellar small fov
+09648552 knee_target large fov coronal
+08570567 knee_target oblique cor
+51797277 knee_partial patellar
+50049263 knee_partial patellar
+82572737 knee_partial patellar
+89344702 non_knee calf-level axial z-75 (study 77308505)
+68097718 knee_partial patellar
+05901281 knee_partial patellar
+34455346 knee_target tirm sag in rejected study
+# geo-012..015
+83622405 knee_partial axial slab below joint (proximal tibia)
+85840362 knee_target plane-odd ACL oblique in ax slot; study 34605778 has cor/sag swapped vs anatomy
+29682379 knee_target plane-odd COR ACL oblique in ax slot
+15215382 knee_target shifted
+67991076 contralateral single sag T1 at x+225
+91142745 knee_partial patellar
+55465602 knee_partial patellar
+51646169 contralateral bilateral 85971577
+57834661 contralateral bilateral 85971577
+84130120 contralateral bilateral 85971577
+97812508 contralateral bilateral 85971577
+27679328 contralateral bilateral 85971577
+96340552 knee_partial patellar
+90973147 knee_target shifted sag
+26484859 knee_target plane-odd cor obl
+06599222 knee_partial patellar
+39042089 knee_partial patellar
+55506364 knee_target huge fov axial n200 (dummy desc)
+71955208 contralateral bilateral 52975364
+08146801 contralateral bilateral 52975364
+81685670 contralateral bilateral 52975364
+98577223 contralateral bilateral 52975364
+55381542 contralateral bilateral 52975364
+# geo-016..019
+64710338 knee_target huge fov axial n200
+42675472 knee_partial patellar
+38745514 knee_partial patellar
+73177229 knee_partial patellar
+15304445 knee_partial axial slab below joint (proximal tibia)
+89719112 knee_partial patellar
+19399721 knee_partial patellar
+36032297 knee_target huge fov axial n200
+55199670 knee_target plane-odd PCL oblique
+99922752 knee_target plane-odd ACL oblique
+07443880 knee_target shifted tirm sag (inplane 40)
+42647528 knee_partial patellar
+13661789 non_knee distal thigh axial (only ax_fluid of study)
+99215810 knee_partial patellar
+47735726 non_knee thigh axial z+91
+67026299 knee_partial patellar
+16841190 knee_partial patellar
+# geo-020..023
+96559557 knee_partial patellar
+16008717 knee_partial patellar
+90554644 knee_partial patellar
+32672669 knee_target shifted tirm sag
+49277107 knee_target huge fov axial n200
+64299268 knee_partial patellar
+71698525 knee_target huge fov axial n200
+10071183 knee_partial patellar
+32625063 knee_partial patellar
+89804804 knee_partial patellar
+02257831 knee_partial patellar
+72814604 knee_target huge fov axial n200
+38310027 knee_partial patellar
+62859536 knee_target huge fov axial n200
+53468143 contralateral bilateral 62455084
+25214963 contralateral bilateral 62455084
+70505002 contralateral bilateral 62455084
+32003355 contralateral bilateral 62455084
+55128190 contralateral bilateral 62455084
+41923460 knee_target plane-odd ACL oblique
+82120967 non_knee thigh axial z+74
+39696738 knee_partial patellar
+# geo-024..027
+53315672 knee_target shifted sag
+19181923 knee_target plane-odd PCL oblique
+81623953 knee_target shifted coronal (tibia-centred)
+54856227 knee_target shifted coronal (tibia-centred)
+83435949 knee_target shifted coronal (tibia-centred)
+52401259 knee_target shifted
+46134753 knee_partial patellar
+62403587 knee_target huge fov axial n200
+84934618 knee_target shifted me2d sag
+78910250 knee_partial patellar
+08225800 contralateral bilateral 30589893
+92868018 contralateral bilateral 30589893
+24636075 contralateral bilateral 30589893
+92879473 contralateral bilateral 30589893
+92344184 contralateral bilateral 30589893
+53369157 knee_partial patellar
+74297438 knee_partial patellar
+32413080 knee_partial patellar
+19247081 knee_partial patellar
+59280991 knee_partial patellar
+38828766 knee_partial patellar
+# geo-028..031
+25085240 knee_partial patellar
+18799999 knee_partial patellar
+96296890 non_knee ankle 93672103
+41789995 non_knee ankle 93672103
+01151177 non_knee ankle 93672103
+77360018 non_knee ankle 93672103
+67763734 non_knee ankle 93672103
+72756444 knee_target zero-TE GE 3D (odd contrast)
+25649605 knee_target shifted 3D
+94280767 non_knee distal thigh axial z+59 with suprapatellar recess (borderline)
+21790350 knee_partial patellar
+81743064 knee_partial patellar
+05089851 knee_partial patellar
+51262523 knee_partial patellar duplicate recon
+40574302 knee_partial patellar
+59228220 knee_other_session LT. philips naming
+23176984 knee_other_session LT. philips naming
+41496380 knee_target huge fov axial n200
+37817644 knee_target huge fov axial n200
+93412021 knee_partial patellar
+50019781 knee_partial patellar
+39835970 knee_partial patellar
+# geo-032..035
+85451818 knee_target plane-odd ACL oblique
+30134048 knee_partial patellar
+53057994 knee_partial patellar
+61303301 knee_other_session sag pair shifted 70 mm in y, same side (x -116); misread earlier as x+247
+91594207 knee_other_session sag pair shifted 70 mm in y, same side
+24765146 knee_partial patellar
+65458015 knee_partial patellar
+34588134 knee_partial patellar
+07938154 knee_partial patellar
+81837116 knee_partial patellar
+86022966 knee_partial patellar
+70259830 knee_target huge fov axial n200
+64570686 knee_partial patellar
+07331914 knee_partial patellar
+29224643 knee_target shifted sag
+33830134 non_knee thigh axial z+60 (only ax_t1pd)
+28519054 knee_target huge fov coronal thigh+knee (fov 309)
+79195836 knee_partial patellar
+# geo-036..039
+46262485 knee_partial patellar
+57124787 knee_partial patellar (FS image in ax_t1pd slot)
+35342086 knee_target shifted sag
+90802537 knee_partial patellar
+87278679 knee_partial patellar
+89735027 knee_partial patellar
+17320671 knee_partial patellar
+12331060 knee_target plane-odd ACL oblique
+90813188 knee_partial patellar
+96824603 knee_partial patellar
+14378321 knee_partial patellar
+38606747 knee_partial patellar
+04542780 knee_partial patellar
+68614953 knee_partial patellar
+96080837 knee_target huge fov axial n200
+59384406 knee_partial patellar
+# geo-040..043
+02690335 knee_partial patellar
+75201849 contralateral bilateral 32682289
+96703556 contralateral bilateral 32682289
+05454660 contralateral bilateral 32682289
+74086548 contralateral bilateral 32682289
+78904065 knee_partial patellar
+56518487 knee_partial patellar
+76836287 knee_partial patellar
+17091253 knee_partial patellar
+11552056 knee_partial patellar
+58849853 knee_partial patellar
+71469433 knee_target huge fov axial n200
+27976641 knee_partial patellar
+58143546 knee_partial patellar
+11811390 knee_target huge fov axial n200
+38499145 knee_partial patellar
+04361759 knee_target DESS large fov shifted
+56739196 contralateral bilateral 08545893
+72393219 contralateral bilateral 08545893
+75169045 contralateral bilateral 08545893
+00314871 contralateral bilateral 08545893
+96732424 contralateral bilateral 08545893
+81674293 knee_target huge fov axial n200 both knees in view
+# geo-044..046
+88342895 knee_partial patellar
+37089011 knee_partial patellar
+86428319 knee_partial patellar
+77755627 knee_partial patellar
+03684264 knee_partial patellar
+53276418 knee_target shifted coronal (femur-centred)
+17521395 knee_partial patellar
+62925239 knee_partial patellar
+80423925 knee_partial patellar
+53257079 knee_partial patellar
+12874345 knee_partial patellar
+87793416 knee_partial patellar
+14760043 knee_partial patellar
+21988730 non_knee calf axial 63928925 (rejected study)
+30313745 non_knee calf axial 63928925 (rejected study)
+97645662 non_knee calf coronal 63928925 (rejected study)
+19346131 contralateral bilateral 06656162 other side (L-tagged)
+72938005 contralateral bilateral 06656162 other side
+99288143 contralateral bilateral 06656162 other side
+09831191 contralateral bilateral 06656162 other side
+72183063 contralateral bilateral 06656162 other side

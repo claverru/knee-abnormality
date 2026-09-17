@@ -8,6 +8,46 @@ remove the entry from this file. Runs follow the
 [controlled-comparison rules](../validation/validation-strategy.md#controlled-comparisons). Each
 entry says whether its motivation is measured or a hypothesis.
 
+## Superseded same-protocol retakes
+
+**Hypothesis (measured composition, untested as a change).** Drop the superseded series when a
+study has a true same-protocol retake with a later `SeriesNumber` (51 of 661 repeated-type slots
+in fold-0 validation, about 258 of 6,868 repeated-slot triplets, 0.6% of all validation triplets),
+instead of letting the tie-break arbitrate between them. This is the one lever in the [tie-break
+investigation](../data-preparation/physical-sampling/evaluation-tie-break-investigation.md) that
+changes realized triplet quality rather than just determinism. The implemented source ranking
+already prefers the newest retake when entitlements tie, but a superseded series still supplies its
+entitlement share of the targets.
+
+## Per-type budget reallocation
+
+**Hypothesis, evidence from removal and capacity analysis.** Shrink axial T1/PD's `max_images`
+budget (rarest type: 179 of 904 fold-0 validation studies, weakest and mixed-sign removal effect)
+and grow fluid types' budgets (largest per-type removal effects, and already over-attended
+relative to token share — see the updated [attention pooling](#attention-pooling) entry), with a
+missing-type fallback order: same plane's other contrast first, then coronal fluid, axial fluid,
+sagittal fluid, until a series runs out of positions. Two candidate budgets against the current
+18/18/15/15/15/15 (axial T1/PD, axial fluid, coronal T1/PD, coronal fluid, sagittal T1/PD,
+sagittal fluid): A = 9/18/15/21/15/18 (totals 96 all-types, 87 typical five-type study); B =
+9/18/12/21/12/15 (totals 87 and 78). Series capacity supports both without shortfall
+([evidence](../validation/results/2026-09-17-plane-contrast-importance.md#proposed-per-type-budgets)).
+
+- *Caveats:* leave-one-type-out removal on a trained checkpoint measures reliance under the
+  current budget, not the marginal value of adding slices; series dropout gets no reallocation
+  today; keep-only-plane/contrast checkpoints are off-distribution (trained on all six types,
+  evaluated with five zeroed); removal happens after preparation, so these numbers do not capture
+  a geometry shift from a genuinely smaller acquisition set. Axial T1/PD's removal effect is also
+  confounded with an easier study population — studies that have it show lower intact macro AUC
+  (0.8855 vs 0.8920) and different target prevalence (e.g. ACL 26.3% vs 19.5%).
+- *Earlier, related evidence:* fewer slices already cost accuracy in the restored-code queue: 20%
+  fewer slices (15/15/12/12/12/12) lost 0.0041 macro AUC and trained 20% faster, 35% fewer
+  (12/12/9/9/9/9) lost 0.0051 and trained 37% faster
+  ([result](../validation/results/2026-09-16-restored-code-hyperparameter-runs.md)), a uniform cut
+  rather than a per-type reallocation.
+- *Run:* against a fresh control, report per-target AUC (plane/contrast budgets affect targets
+  unevenly) and realized triplet-quality proxies, since reallocation is a budget change, not just
+  a total-slice change.
+
 ## Attention pooling
 
 - **Acquisition-count-normalized attention** (hypothesis; external evidence only). Subtract
@@ -22,74 +62,110 @@ entry says whether its motivation is measured or a hypothesis.
     this change ("acquisition-count-normalized MIL attention: subtract log retained windows per
     acquisition", scored 0.92304 with model, sampler and optimizer unchanged), with no control
     delta recorded.
+  - *Attention already skews toward fluid types, not toward budget.* On studies with all six
+    types, mean attention-share ÷ token-share across all targets and the three 2026-09-17 control
+    checkpoints is 0.63 (axial T1/PD), 1.18 (axial fluid), 0.73 (coronal T1/PD), 1.17 (coronal
+    fluid), 0.86 (sagittal T1/PD), 1.46 (sagittal fluid): every fluid type is over-attended and
+    every T1/PD type under-attended relative to its token share, even though each plane's T1/PD
+    and fluid budgets are equal (18/18, 15/15, 15/15 images) ([type-importance
+    result](../validation/results/2026-09-17-plane-contrast-importance.md#attention-already-over-weights-fluid-types)).
+    Normalizing by token count would flatten this further toward equal per-token attention; the
+    per-type removal evidence in the same result says fluid types deserve more, not less, weight,
+    so acquisition-count normalization and the type-importance evidence pull in opposite
+    directions and should not both be adopted uncritically.
   - *Run:* keep the sampler, supervision and budget fixed, and report per-target AUC, since plane
     budgets differ per target.
 - **Several attention heads per label** (hypothesis, no design yet). Listed during the
   [crop-selection investigation](../history/crop-selection-investigation.md#options-not-pursued).
-
-## Weight averaging
-
-**EMA and SWA through one averager** (hypothesis; neither exists in the code or has been tested
-here). One new option, `optimizer.weight_averaging`: `null`, `{method: ema, decay}` or
-`{method: swa, epochs}`, one method per run. It is required, with `null` in
-`configs/training.yaml`, and SWA `epochs` must not exceed `trainer.max_epochs` minus
-`optimizer.warmup_epochs`. Once implemented, the runs are `02-ema-0.999` and `03-swa` in the
-[overnight queue](overnight.md#next-queue-proposed-pending-the-users-decisions). The
-[optimizer research](../research/optimizer-research.md#4-ema-first-additional-training-feature)
-gives the background; this design comes from the 2026-09-16 queue design pass.
-
-- *Averager:* a hand-written `deepcopy` of the live model inside the Lightning module, updated
-  after each optimizer step with a stateless per-step weight. Floating tensors (parameters and
-  BatchNorm statistics) are interpolated, integer buffers copied, and the copy is exact while the
-  weight is 1. A second constructed model would draw from the global RNG and shift the DataLoader
-  shuffle. `AveragedModel` pushes int64 buffers through float arithmetic, timm `ModelEmaV3` cannot
-  weight uniformly for SWA, and a callback cannot swap weights before the strict checkpoint load.
-- *EMA:* copy the live weights until warm-up ends (step 438), then average with decay 0.999 per
-  update. Its 1,000-step (2.3-epoch) horizon matches the cosine tail, where `00-baseline`'s live
-  AUC was flat (0.89269, 0.89269, 0.89205, 0.89276 at epochs 7–10). Decay 0.99 (100 steps) would
-  stay close to the live weights, and 0.9995 puts half its weight on epochs 5–7. BatchNorm
-  statistics are averaged with the weights.
-- *SWA:* a uniform per-step average over the last K = 3 epochs (from step 3,066) with the schedule
-  unchanged. Lightning's `StochasticWeightAveraging` is unsuitable: it swaps in an epoch-level
-  `SWALR`, flattens the 3:1 backbone:head learning-rate ratio, leaves out the final epoch, adds a
-  pseudo-epoch that becomes a selection candidate, keeps the average out of the saved `model.*`
-  weights, and resets BatchNorm statistics that `backbone_eval` never re-estimates.
-- *SWA BatchNorm refresh:* at the end of each window epoch, re-estimate the BatchNorm layers that
-  are in training mode (none under `backbone_eval`) with a forward-only pass over an unshuffled
-  training loader, under the training precision and a forked RNG so the training random streams
-  stay untouched.
-- *Saved and validated weights:* checkpoints store the averaged weights as `model.*`, so
-  prediction, export and fold-run comparisons use them unchanged, and the live weights alongside
-  in `live_state_dict`, which export drops.
-  - Both models are validated on the same batches every epoch: `val_macro_auc` scores the averaged
-    weights, while `val_live_*` metrics and `live_*` epoch files record the live ones.
-  - Checkpoint selection and early stopping use only the averaged score, keeping the control's 10
-    candidates.
-  - Where the copy equals the live model (EMA epoch 1, SWA epochs 1–7), both metric sets must
-    match.
-- *Costs (estimated):* +58 MB of GPU memory (0.3% of the 20.0 GiB peak), checkpoints from 175 to
-  about 233 MB, a few seconds of updates, about 3 min per run for the second validation forward,
-  and 1–1.5 min per SWA refresh (3–4.5 min for K = 3).
-- *Comparisons:* EMA against `00-control` and against its own live weights; SWA against its live
-  weights. Report last-epoch values for both models, which involve no selection. EMA averages
-  BatchNorm statistics while SWA recomputes them, so part of an EMA-versus-SWA difference is not
-  the averaging itself.
-- *External evidence:* one public EfficientNet-B0 fold-0 ablation reported 0.7914 → 0.7940 with
-  EMA, judged noise by its author
-  ([public findings](../research/public-research.md#geometry-sampling-encoders-and-losses)), and a
-  public training notebook averages its top epochs' weights
-  ([public code](../research/public-research.md#public-code-worth-inspecting)). Averaging
-  baseline1's epoch 7–9 probabilities gained +0.004267 on 12 reused validation studies, which is
-  not a validated gain ([baseline1 review](../history/baseline1-review.md#follow-up-experiments)).
+- **Attention temperature** (hypothesis; read-only diagnostic first). Divide the scorer output by
+  one shared `tau` before the masked softmax in `_attention_pool`
+  (`src/knee_abnormality/modeling/model.py`), with `tau` 0.75, 1.0 and 1.5, on the three 2026-09-17
+  control checkpoints; 1.0 must reproduce the saved predictions. Run `encode_batch` once per batch
+  and pool three times.
+  - *Why:* validation bags hold up to 64 triplets against 32 in training, and series dropout acts
+    only in training, so the trained scorer may pool the denser bag too sharply or too diffusely.
+    More tokens alone do not dilute attention (duplicating every token leaves pooling unchanged);
+    the question is about different additional evidence.
+  - *Not logit calibration:* scaling a target's final logits keeps its AUC; attention temperature
+    changes the evidence mixture and can change rankings.
+  - *Report:* macro and per-target AUC for all three values, optionally attention entropy or
+    effective token count. Select one shared value, not one per target. Retraining can absorb a
+    shared temperature into the scorer's last layer, so the value is a cheap direction check.
+- **Identity-initialized gated attention** (hypothesis; external evidence only). Multiply the
+  scorer's tanh branch by a gate that starts at one:
+  `a_t(h) = w_t^T [tanh(V h + b_V) * 2 sigmoid(U h + b_U)] + b_t`, with `U` and `b_U` zero. Keep
+  the dropout placement and probability, and the linear head.
+  - *Why:* each token's score comes from one hidden transformation (256→128→tanh→12). The gated
+    form of [attention-based deep MIL](https://proceedings.mlr.press/v80/ilse18a.html)
+    ([authors' code](https://github.com/AMLab-Amsterdam/AttentionDeepMIL/blob/master/model.py))
+    adds a multiplicative selection branch. Gated pooling appeared here only inside the retired
+    [crop-selection models](../history/crop-selection-investigation.md), never in isolation. The
+    existing scorer may already have enough capacity.
+  - *Cost:* one `Linear(256, 128)` per token, 32,896 parameters; no extra backbone pass.
+  - *Checks:* construct the branch without shifting the existing initialization or the training
+    random stream (zeroing a layer still consumes RNG at construction); logits equal the ungated
+    model's at initialization on identical inputs; gate parameters get gradients and sit in the
+    head's optimizer group; masking and per-study normalization unchanged.
+  - *Run:* alone, not combined with temperature, the readout below, several heads or count
+    normalization.
+- **Per-target residual nonlinear readout** (hypothesis). Keep the linear head and add, for each
+  target, an independent `Linear(256, 32) → GELU → Linear(32, 1)` on that target's pooled vector
+  (after `pooled` in `_attention_pool`), with the last layer zero-initialized and no new dropout:
+  `s_t = w_t^T z_t + b_t + v_t^T GELU(U_t z_t + c_t) + d_t`.
+  - *Why:* attention weights sum to one, so today's logit is an attention-weighted average of
+    linear token scores; the pooled vector gets no nonlinear readout. It cannot recover
+    information discarded by pooling or add token-to-token geometry.
+  - *Cost:* 99,084 parameters over the 12 branches, applied to pooled vectors, not tokens.
+  - *Checks:* vectorize the branches but keep them independent and in target order; baseline
+    logits at initialization, finite gradients, correct optimizer group. The residual path is
+    intentional; do not replace the linear head.
+  - *Distinct from* the shared nonlinear disease features of
+    [medial and lateral transfer](big-bets.md#medial-and-lateral-disease-transfer): no coupling
+    between targets. *Risk:* extra capacity may fit report-label noise, so judge per-target AUC,
+    not training BCE. Run it separately from gated attention.
 
 ## Gradient-norm logging
 
-**Log the pre-clip total gradient norm** (diagnostic; no option). Nobody knows whether
-`trainer.gradient_clip_val: 1.0` ever binds, so clipping runs at 0.5 or 5.0 may be no-ops. Log the
-norm in the Lightning module's `on_before_optimizer_step`, where Lightning 2.x still sees
-unclipped gradients; it is read-only and draws no randomness, so numerics are unchanged. Whether
-it ships with the weight-averaging change is the user's call. It unblocks the
+**Implemented (2026-09-16), shipped with the weight-averaging change.** `KneeModule` logs the
+pre-clip total gradient norm as the `grad_norm` step metric (diagnostic; no option, always on) from
+`on_before_optimizer_step`, where Lightning 2.x still sees unclipped gradients
+(`torch.nn.utils.get_total_norm` over `self.model.parameters()`, which only reads `.grad`; it draws
+no randomness and does not clip, so numerics are unchanged — verified bit-identical against the
+pre-change code with the gate off). Nobody yet knows whether `trainer.gradient_clip_val: 1.0` ever
+binds; that reading comes from the first run that logs it. It unblocks the
 [clipping candidates](overnight.md#candidates-for-later-queues).
+
+## 3D embedding: training-time effect
+
+**Hypothesis; needs multiple seeds.** The retired additive 3D embedding is ignored at inference:
+replacing it with the `unknown_3d` vector changed fold-0 macro AUC by +0.000037 [−0.00011,
++0.00017] on the knee-side checkpoint
+([result](../validation/results/2026-09-14-knee-side-embedding-result.md)), and the champion scored
+0.936 publicly both with and without it
+([submission](../inference/submissions/2026-09-15-champion-without-3d-at-inference.md)). Yet the
+champion (with 3D, one training) scored 0.936, above all four no-3D trainings of the same recipe
+(0.928–0.934, mean 0.931, standard deviation about 0.0025;
+[seed controls](../inference/submissions/2026-09-17-seed-control-submissions.md)). The simplest
+explanation is a lucky run; a training-time effect is possible but unproven.
+
+- **Possible mechanisms:** scaffolding (position helps attention and the backbone learn
+  position-aware features early, after which visual features carry the information and 3D is
+  ignored); regularisation (per-study embeddings that flip with reflection change token norms,
+  normalisation statistics and attention temperature); a different random stream (adding a
+  module changes initialisation draws, so a 3D and a no-3D model at the same seed are effectively
+  different seeds, which alone could explain the public gap).
+- **Change:** restore the embedding from the champion's source snapshot
+  (`outputs/training/reflection-sigma40/source_snapshot.zip`) behind a three-way option: real 3D,
+  placebo (same module, every token gets `unknown_3d`, so random-number use and capacity match)
+  and none (today's model).
+- **Test:** three arms × about three seeds (nine runs, about 4.5 hours, one overnight queue). Real
+  versus placebo isolates the information at an equal random stream; placebo versus none isolates
+  the module. Fold 0 probably shows a tie again, so the evidence would come mostly from public
+  scores (three submissions per arm). To check scaffolding directly, save a checkpoint every epoch
+  in the real-3D arm and run the 3D removal on each: removal should hurt early and not at the end;
+  logging the gradient norm reaching the embedding shows the same.
+- **Priority:** low; do it only to settle the question. Seed-to-seed spread (fold 0 0.0032,
+  public up to 0.006) is the context for any result.
 
 ## Report-label supervision
 
@@ -118,13 +194,26 @@ it ships with the weight-averaging change is the user's call. It unblocks the
 ## Augmentation families
 
 Measured so far: stronger intensity (+0.000249) and no noise (+0.000105) on
-[1C](../history/sharing/2026-09-14-overnight-hyperparameter-results.md), treated as settled, and
+[1C](../history/sharing/2026-09-14-overnight-hyperparameter-results.md), treated as settled,
 strong affine (−0.002389) on the
-[current base](../validation/results/2026-09-15-overnight-results.md). Affine-off and
-intensity-off runs never started; they need no code and are `09-affine-off` and
-`15-intensity-off` in the [overnight queue](overnight.md#next-queue-proposed-pending-the-users-decisions),
-whose [later candidates](overnight.md#candidates-for-later-queues) hold the other probability and
+[current base](../validation/results/2026-09-15-overnight-results.md), and on the restored code
+affine off (−0.0041 [−0.0078, −0.0002]) and noise probability 0.3 (−0.0019)
+([result](../validation/results/2026-09-17-overnight-results.md)). Intensity-off was dropped by
+[user decision](overnight.md#user-decisions-2026-09-16); the
+[later candidates](overnight.md#candidates-for-later-queues) hold the other probability and
 strength values of the existing families.
+
+- **Late affine shutdown** (hypothesis; needs epoch-dependent augmentation). Affine probability
+  0.7 for epochs 1–8 and 0 for epochs 9–10 (zero-based `current_epoch >= 8`), everything else
+  unchanged, including series dropout, whose removal would also change the image workload.
+  - *Why:* affine off for the whole run and the stronger affine both lost, so the current affine
+    helps overall; this asks whether it still helps in the low-learning-rate tail.
+  - *Implementation:* pass the epoch from `src/knee_abnormality/training/lightning.py` to the
+    model's augmentation sampling and derive the effective probability without changing the saved
+    recipe; log it, restore it on resume, and keep the other families' random draws unchanged where
+    feasible.
+  - *Run:* report the fixed last epoch as well as the selected one. Two clean epochs may be too
+    short to matter; do not sweep the shutdown epoch before the first comparison is informative.
 
 - **Transform ordering and selected interactions** (hypothesis; untested), after the family
   probabilities and strengths are compared. Keep supervision, sampling, model and training budget
@@ -140,23 +229,19 @@ strength values of the existing families.
 Validation inputs stay unaugmented; inference augmentation belongs to the
 [endgame](endgame.md#test-time-augmentation).
 
-## Non-target series filtering
+## Contrast slot relabel
 
-**Filter series that are not the target knee** (measured in individual studies; prevalence
-unmeasured). Training study `…93672103` contains five ankle series (talus, calcaneus, malleoli)
-filed in knee slots, and at least one study appears bilateral (the other knee's axial, coronal and
-sagittal series) ([renders](../../outputs/analysis/study-center-robust-20260915/renders/)). All of
-them currently reach the model. `BodyPartExamined` cannot flag them: those ankle series are
-tagged KNEE, while knee series carry ANKLE, WRIST, HEART or spine tags.
-
-1. Measure how common this is: visually census the 159 series dropped by the
-   [robust center fit](big-bets.md#robust-study-center), which are the strongest candidates, then
-   check other signals (field of view far from the study's other series, center projection
-   outside the acquired range, unusual slice counts or extents).
-2. Decide on a rule (geometric consistency with the study's main knee series, or a cheap
-   image-based body-part check) and whether excluded series are dropped or down-weighted.
-3. Check the test examples for the same pattern. Any rule must run identically at Kaggle
-   inference.
+**Hypothesis (prevalence and inference-only effect measured; training effect untested).** Move
+contrast-mislabelled series to the same plane's other slot: fat-suppressed fluid series out of
+T1/PD slots and T2/T2* series without fat suppression out of fluid slots, only when headers and a
+cheap intensity check on three decoded slices agree (12 training series, 12/12 reviewed
+precision; relabelling the 4 fold-0 series moved macro AUC by +0.009 ×1000 on the control
+checkpoints). This is the part of the [series-filtering census
+rule](../metadata/series-filtering-census.md#proposed-rule-series-filtering-and-cleaning) that the
+[implemented drops](../metadata/series-filtering-census.md#implemented-rule-2026-09-17) left out;
+it needs one extra header per series and three decoded slices at Kaggle inference, and it changes
+the preprocessing identity. Plane relabelling (one swapped study) stays out: it cost −0.21 ×1000
+on all three control checkpoints.
 
 ## Per-plane spacing
 

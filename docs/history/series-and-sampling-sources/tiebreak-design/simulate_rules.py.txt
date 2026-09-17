@@ -1,0 +1,299 @@
+import pickle
+import re
+import sys
+import time
+from collections import Counter
+from multiprocessing import get_context
+from pathlib import Path
+
+import numpy as np
+import polars as pl
+
+OUT = Path(__file__).resolve().parent
+sys.path.insert(0, str(OUT))
+import sensitivity as base
+
+from knee_abnormality.config import load_config
+from knee_abnormality.data.preprocessing import sampling
+from knee_abnormality.data.preprocessing.sampling import (
+    build_pool,
+    geometry_groups,
+    select_triplets,
+    target_depths,
+)
+from scipy.optimize import linear_sum_assignment
+
+ROOT = base.ROOT
+SPACING = 0.625
+INFO = {}
+
+
+def f(x):
+    try:
+        v = float(x)
+        return v if np.isfinite(v) else None
+    except (TypeError, ValueError):
+        return None
+
+
+def load_info():
+    headers = pl.read_parquet(OUT / "repeated_headers.parquet")
+    acq = pl.read_parquet(
+        ROOT / "outputs/analysis/input-resolution-research-20260915/acquisition/series_acquisition.parquet"
+    ).filter(pl.col("split") == "train").select(
+        "SeriesInstanceUID", "acq_res_best", "acq_res_worst", "ps_max", "vendor", "is_3d"
+    )
+    table = headers.join(acq, on="SeriesInstanceUID", how="left")
+    info = {}
+    for r in table.iter_rows(named=True):
+        desc = (r["SeriesDescription"] or "").lower()
+        info[r["SeriesInstanceUID"]] = {
+            "series_number": f(r["SeriesNumber"]),
+            "reformat": "PROJECTION" in (r["ImageType"] or "")
+            or "DERIVED" in (r["ImageType"] or "")
+            or "SECONDARY" in (r["ImageType"] or "")
+            or bool(re.search(r"\bmpr\b|reformat", desc)),
+            "signature": (
+                round(f(r["RepetitionTime"]) or -1),
+                round(f(r["EchoTime"]) or -1),
+                r["EchoTrainLength"],
+                r["FlipAngle"],
+                r["MRAcquisitionType"],
+                r["SequenceVariant"],
+                r["ScanOptions"],
+                r["Rows"],
+                r["Columns"],
+            )
+            if f(r["RepetitionTime"]) is not None and f(r["EchoTime"]) is not None
+            else None,
+            "acq_worst": r["acq_res_worst"],
+            "acq_best": r["acq_res_best"],
+            "ps_max": r["ps_max"],
+            "thickness": f(r["SliceThickness"]),
+            "vendor": r["vendor"],
+            "is_3d": r["MRAcquisitionType"] == "3D",
+            "desc": r["SeriesDescription"],
+        }
+    return info
+
+
+def superseded(uid, sources):
+    me = INFO[uid]
+    if me["signature"] is None or me["series_number"] is None:
+        return 0
+    return int(
+        any(
+            other != uid
+            and INFO[other]["signature"] == me["signature"]
+            and INFO[other]["series_number"] is not None
+            and INFO[other]["series_number"] > me["series_number"]
+            for other in sources
+        )
+    )
+
+
+import os
+CRITERIA = tuple(os.environ.get("CRITERIA", "reformat,acq_worst,acq_best,superseded,thickness,uid").split(","))
+
+
+def criterion_values(sources):
+    known = {
+        k: all(INFO[s][k] is not None for s in sources)
+        for k in ("acq_worst", "acq_best", "thickness")
+    }
+    values = {}
+    for s in sources:
+        i = INFO[s]
+        values[s] = {
+            "reformat": int(i["reformat"]),
+            "acq_worst": round(max(i["acq_worst"], SPACING), 2) if known["acq_worst"] else 0,
+            "acq_best": round(max(i["acq_best"], SPACING), 2) if known["acq_best"] else 0,
+            "superseded": superseded(s, sources),
+            "thickness": round(i["thickness"], 1) if known["thickness"] else 0,
+            "uid": s,
+        }
+    return values
+
+
+def quality_order(sources, criteria=CRITERIA):
+    values = criterion_values(sources)
+    return sorted(sources, key=lambda s: tuple(values[s][c] for c in criteria))
+
+
+def select_custom(pool, budget, sigma, radius, order, row_key=None, tol=0.0):
+    groups = geometry_groups(pool, radius)
+    count = min(budget, len(groups))
+    if not count:
+        return (), []
+    percentiles = (np.arange(count) + 0.5) / count
+    targets = target_depths(pool, percentiles, sigma)
+    sources = sorted({v.uid for v in pool.candidates})
+    entitlement = dict.fromkeys(sources, 0.0)
+    assigned = dict.fromkeys(sources, 0)
+    preferred = [None] * count
+    eligible = [
+        {v.uid for v in pool.candidates if v.support[0] <= t <= v.support[1]}
+        for t in targets
+    ]
+    rank = {s: i for i, s in enumerate(order)}
+    decisions = []
+    for row in np.argsort(targets):
+        choices = [s for s in order if s in eligible[row]]
+        for s in choices:
+            entitlement[s] += 1 / len(choices)
+        best = max(entitlement[s] - assigned[s] for s in choices)
+        tied = [s for s in choices if entitlement[s] - assigned[s] >= best - tol]
+        if row_key is not None and len(tied) > 1:
+            source = min(tied, key=lambda s: (row_key(s, targets[row]), rank[s]))
+        else:
+            source = tied[0]
+        decisions.append((int(row), tuple(tied), source))
+        preferred[row] = source
+        assigned[source] += 1
+    alternatives, errors = {}, []
+    for row, target in enumerate(targets):
+        for column, group in enumerate(groups):
+            candidates = [v for v in group if v.support[0] <= target <= v.support[1]]
+            if candidates:
+                value = min(
+                    candidates,
+                    key=lambda v: (
+                        v.uid != preferred[row],
+                        (v.depth - target) ** 2,
+                        v.uid,
+                        str(v.records[1].path),
+                    ),
+                )
+                error = (value.depth - target) ** 2
+                alternatives[row, column] = (value, error)
+                errors.append(error)
+    scale = max(errors, default=0.0) or 1.0
+    change_cost = count + 1.0
+    missing_cost = count * (change_cost + 1) + 1
+    costs = np.full((count, len(groups) + count), missing_cost)
+    costs[:, : len(groups)] = np.inf
+    for (row, col), (value, error) in alternatives.items():
+        costs[row, col] = (value.uid != preferred[row]) * change_cost + error / scale
+    rows, cols = linear_sum_assignment(costs)
+    selected = []
+    for row, col in zip(rows, cols, strict=True):
+        if col < len(groups):
+            value, error = alternatives[row, col]
+            selected.append((value, float(targets[row])))
+    return tuple(selected), decisions
+
+
+def nearest_distance(pool, uid, target):
+    own = [v.depth for v in pool.candidates if v.uid == uid and v.support[0] <= target <= v.support[1]]
+    return min(abs(d - target) for d in own)
+
+
+def describe(selected, physical):
+    return {
+        "key": tuple(sorted((v.uid, v.records[1].path.name) for v, _ in selected)),
+        "abs_error": [abs(v.depth - t) for v, t in selected] if physical else [],
+        "uids": [v.uid for v, _ in selected],
+    }
+
+
+def process(study_uid):
+    config = base.load_config(ROOT / "configs/training.yaml")
+    dataset = base.WORKER["dataset"]
+    study = dataset.series_index[study_uid]
+    dataset._index_study_geometry(study)
+    reference = dataset._study_references[study_uid]
+    out = []
+    for slot, values in enumerate(study.slots):
+        if len(values) < 2:
+            continue
+        kc = config.data.series_types[slot]
+        kind = (kc.plane, kc.fluid_sensitive, kc.fat_suppression)
+        sources = []
+        for c in sorted(values, key=lambda c: c.uid):
+            dataset._records(c)
+            sources.append((c.uid, dataset._slice_index[c.directory]))
+        pool = build_pool(tuple(sources), kc.plane, reference, set(), set())
+        budget = kc.max_images * config.data.validation_image_multiplier // 3
+        sigma = config.data.sampling_sigma_mm
+        radius = config.data.image_size * config.data.spacing_mm / 2
+        pool_sources = sorted({v.uid for v in pool.candidates})
+        if len(pool_sources) < 2:
+            continue
+        rules = {}
+        for seed in (42, 43, 44):
+            order = base.seeded_order(seed, study_uid, kind, pool_sources)
+            sel, dec = select_custom(pool, budget, sigma, radius, order)
+            real = select_triplets(pool, budget, sigma, radius, seed, study_uid, kind, False)
+            assert tuple(sorted((t.uid, t.records[1].path.name) for t in real.triplets)) == describe(sel, pool.physical)["key"]
+            rules[f"seed{seed}"] = (sel, dec)
+        uid_order = list(pool_sources)
+        sel, dec = select_custom(pool, budget, sigma, radius, uid_order)
+        real = base.select_with_order(pool, budget, sigma, radius, study_uid, kind, uid_order)
+        assert tuple(sorted((t.uid, t.records[1].path.name) for t in real.triplets)) == describe(sel, pool.physical)["key"]
+        rules["uid"] = (sel, dec)
+        q_order = quality_order(pool_sources)
+        rules["quality"] = select_custom(pool, budget, sigma, radius, q_order, tol=1e-9)
+        rules["reverse_quality"] = select_custom(pool, budget, sigma, radius, q_order[::-1], tol=1e-9)
+        if pool.physical:
+            row_key = lambda s, t: round(nearest_distance(pool, s, t), 1)
+            rules["closest_then_quality"] = select_custom(pool, budget, sigma, radius, q_order, row_key, tol=1e-9)
+        else:
+            rules["closest_then_quality"] = rules["quality"]
+        values = criterion_values(pool_sources)
+        count = min(budget, len(geometry_groups(pool, radius)))
+        rules_targets = target_depths(pool, (np.arange(count) + 0.5) / count, sigma)
+        deciding = []
+        for row, tied, chosen in rules["quality"][1]:
+            if len(tied) < 2:
+                continue
+            decided = None
+            for c in CRITERIA:
+                if len({values[s][c] for s in tied}) > 1:
+                    decided = c
+                    break
+            deciding.append(decided)
+        closest_deciding = []
+        if pool.physical:
+            for row, tied, chosen in rules["closest_then_quality"][1]:
+                if len(tied) < 2:
+                    continue
+                target = rules_targets[row]
+                closest_deciding.append(len({round(nearest_distance(pool, s, target), 1) for s in tied}) > 1)
+        out.append(
+            {
+                "closest_deciding": closest_deciding,
+                "study": study_uid,
+                "slot": slot,
+                "kind": kind,
+                "physical": pool.physical,
+                "sources": pool_sources,
+                "quality_order": q_order,
+                "values": values,
+                "vendor": INFO[pool_sources[0]]["vendor"],
+                "rules": {k: (describe(sel, pool.physical), dec) for k, (sel, dec) in rules.items()},
+                "deciding": deciding,
+                "count": min(budget, len(geometry_groups(pool, radius))),
+            }
+        )
+    return study_uid, out
+
+
+def init(config_path):
+    base.init(config_path)
+    INFO.update(load_info())
+
+
+def main():
+    config_path = ROOT / "configs/training.yaml"
+    data = pickle.load(open(OUT / "sensitivity.pkl", "rb"))
+    start = time.time()
+    results = {}
+    with get_context("spawn").Pool(16, initializer=init, initargs=(config_path,)) as pool:
+        for study, out in pool.imap_unordered(process, data["repeated"], chunksize=2):
+            results[study] = out
+    pickle.dump(results, open(OUT / os.environ.get("RULES_OUT", "rules.pkl"), "wb"))
+    print("done", time.time() - start)
+
+
+if __name__ == "__main__":
+    main()

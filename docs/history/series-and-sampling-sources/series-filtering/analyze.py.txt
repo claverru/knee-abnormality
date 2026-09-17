@@ -1,0 +1,99 @@
+import json
+import sys
+from pathlib import Path
+
+import numpy as np
+import polars as pl
+
+ROOT = Path("/home/claudio/src/knee-abnormality")
+sys.path.insert(0, str(ROOT / "src"))
+
+from knee_abnormality.config import load_config
+from knee_abnormality.data.labels import STUDY, TARGET_THRESHOLD, load_fold_labels
+from knee_abnormality.evaluation.metrics import bootstrap_auc
+
+QUEUE = ROOT / "outputs/training/overnight-20260916T214520Z-t8k_kw2z/runs"
+RUNS = ("00-control", "01-control-seed-43", "02-control-seed-44")
+OUT = ROOT / "outputs/analysis/series-filtering-20260917"
+RAW = OUT / "inference"
+DRAWS = 2000
+SEED = 20260917
+
+
+def main():
+    data = [np.load(RAW / f"{run}.npz") for run in RUNS]
+    study = data[0]["study"]
+    variants = data[0]["variants"].tolist()
+    targets = data[0]["targets"].tolist()
+    config = load_config(QUEUE / RUNS[0] / "effective_config.json")
+    labels = load_fold_labels(config, 0)
+    validation = labels.validation
+    if validation[STUDY].to_list() != study.tolist():
+        raise ValueError("Label order differs")
+    hard = (validation.select([f"target_{t}" for t in targets]).to_numpy() >= TARGET_THRESHOLD).astype(int)
+    groups_frame = pl.read_csv(ROOT / "data/folds/all_5fold_v3/studies.csv").select(STUDY, "report_group")
+    groups = validation.select(STUDY).join(groups_frame, on=STUDY, how="left")["report_group"].to_numpy()
+    unique, inverse = np.unique(groups, return_inverse=True)
+    rng = np.random.default_rng(SEED)
+    counts = rng.multinomial(len(unique), np.full(len(unique), 1 / len(unique)), size=DRAWS)[:, inverse]
+    positive = counts @ hard
+    valid = ((positive > 0) & (positive < counts.sum(axis=1, keepdims=True))).all(axis=1)
+    counts = counts[valid]
+    full = np.ones((1, len(study)))
+    inference = json.loads((RAW / "inference.json").read_text())
+    rows = []
+    for variant in variants[1:]:
+        point, draws, per_run = [], [], []
+        for item in data:
+            intact = item["predictions"][0]
+            candidate = item["predictions"][variants.index(variant)]
+            d_point = float(bootstrap_auc(hard, candidate, full)[0] - bootstrap_auc(hard, intact, full)[0])
+            changed = np.any(candidate != intact, axis=1)
+            if changed.any():
+                d_draws = bootstrap_auc(hard, candidate, counts) - bootstrap_auc(hard, intact, counts)
+            else:
+                d_draws = np.zeros(len(counts))
+            point.append(d_point)
+            draws.append(d_draws)
+            per_run.append(d_point)
+        mean_draws = np.mean(draws, axis=0)
+        details = [run["variants"][variant] for run in inference["runs"]]
+        series = inference["variant_series"][variant]
+        rows.append(
+            {
+                "variant": variant,
+                "series_dropped": len(series["dropped"]),
+                "series_moved": len(series["moved"]),
+                "studies_affected": details[0]["affected_studies"],
+                "delta_macro_x1000": round(1000 * float(np.mean(point)), 3),
+                "ci_low_x1000": round(1000 * float(np.quantile(mean_draws, 0.025)), 3),
+                "ci_high_x1000": round(1000 * float(np.quantile(mean_draws, 0.975)), 3),
+                "per_checkpoint_x1000": [round(1000 * v, 3) for v in per_run],
+                "sign_agreement": int(max(sum(v > 0 for v in per_run), sum(v < 0 for v in per_run))),
+                "mean_abs_prob_delta_affected": round(float(np.mean([d.get("mean_abs_delta", 0.0) for d in details])), 5),
+                "max_abs_prob_delta_affected": round(float(np.max([d.get("max_abs_delta", 0.0) for d in details])), 5),
+                "triplets_before": details[0].get("triplets_before", 0),
+                "triplets_after": details[0].get("triplets_after", 0),
+                "emptied_slots": details[0].get("emptied_slots", 0),
+                "filled_slots": details[0].get("filled_slots", 0),
+            }
+        )
+    table = pl.DataFrame(rows)
+    table.with_columns(pl.col("per_checkpoint_x1000").cast(pl.List(pl.String)).list.join(";")).write_csv(OUT / "inference_deltas.csv")
+    intact_macro = [float(bootstrap_auc(hard, item["predictions"][0], full)[0]) for item in data]
+    result = {
+        "intact_macro_auc": dict(zip(RUNS, intact_macro, strict=True)),
+        "bootstrap": {"unit": "report group", "groups": len(unique), "draws": DRAWS, "valid_draws": int(valid.sum()), "seed": SEED},
+        "intact_recompute_max_abs_vs_saved": {run["run"]: run["intact_recompute_max_abs_vs_saved"] for run in inference["runs"]},
+        "variants": rows,
+    }
+    (OUT / "inference_results.json").write_text(json.dumps(result, indent=1) + "\n")
+    pl.Config.set_tbl_rows(30)
+    pl.Config.set_tbl_cols(20)
+    pl.Config.set_tbl_width_chars(250)
+    print(table)
+    print(json.dumps({k: v for k, v in result.items() if k != "variants"}, indent=1))
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,14 @@
+import polars as pl
+
+from common import OUT
+
+flags = pl.read_parquet(OUT / "series_flags.parquet").filter(pl.col("split") == "train")
+flag_columns = ["f_far", "f_contralateral", "f_robust_dropped", "f_projects_outside", "f_study_rejected", "f_lowres", "f_t1fs_in_t1pd", "f_fluidfs_in_t1pd", "f_nonfs_in_fluid", "f_swapped_plane_study", "f_zero_te", "f_desc_plane"]
+studies = flags.group_by("StudyInstanceUID").agg([pl.col(c).any() for c in flag_columns])
+clean = studies.filter(~pl.any_horizontal(flag_columns)).sample(n=40, seed=20260917, shuffle=True)
+spec = clean.select("StudyInstanceUID").with_columns(
+    pl.lit([], dtype=pl.List(pl.String)).alias("flagged"),
+    pl.lit("RANDOM unflagged study").alias("note"),
+)
+spec.write_parquet(OUT / "review_random_spec.parquet")
+print(spec.height, flags.filter(pl.col("StudyInstanceUID").is_in(spec["StudyInstanceUID"].implode())).height)

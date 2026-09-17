@@ -28,9 +28,33 @@ The per-type triplet budget is `max_images / 3` times the image multiplier:
 that for validation/inference. Gaussian probability over the union is divided
 into equal bands. Training draws within each band; evaluation uses midpoints.
 Training chooses a covering acquisition uniformly. Evaluation allocates each
-target's fractional supplier entitlement to the largest outstanding deficit.
+target's fractional supplier entitlement (exact fractions) to the largest
+outstanding deficit and breaks exact ties by the pool's source ranking.
 Source preference precedes nearest-slice placement, and a target can only use
 candidates from a run whose own support contains it.
+
+Each candidate pool stores one fixed source ranking (`CandidatePool.ranking`,
+`source_ranking` in `sampling.py`) over the series that contributed candidates;
+both modes list covering acquisitions in this order. The first difference wins:
+
+1. originals before reformats (`ImageType` containing DERIVED, SECONDARY or
+   PROJECTION, or `mpr`/`reformat` in the description);
+2. fewer newer retakes: the number of other series in the slot with the same
+   signature (TR and TE rounded to 1 ms, echo train length, flip angle,
+   `MRAcquisitionType`, `SequenceVariant`, `ScanOptions`, rows, columns) and a
+   higher `SeriesNumber`, so the latest retake comes first;
+3. higher crop coverage, rounded to 0.1: the share of the 140-mm square centred
+   on the projection of the accepted study centre that lies inside the middle
+   slice's image;
+4. finer acquired in-plane resolution (worst axis of field of view ÷
+   `AcquisitionMatrix`), clipped at `data.spacing_mm` and rounded to 0.01 mm;
+5. `SeriesInstanceUID`.
+
+A value that is missing for any ranked series (no accepted centre, no pose, no
+matrix) ties that step for the whole slot; a series without TR/TE or
+`SeriesNumber` counts no newer retakes. The tags come from the headers the
+indexer already parses ([series summary](../current-preparation.md#series-indexing-guards-and-exclusions)).
+Design and evidence: [tie-break investigation](evaluation-tie-break-investigation.md).
 
 Alternative middle planes are grouped by deterministic complete-link geometry:
 every pair must satisfy `abs(offset_a-offset_b) + R*norm(normal_a-normal_b) <= 0.1`
@@ -52,10 +76,13 @@ are distinct within each acquisition; no cross-series physical deduplication is
 claimed. All local inputs are unknown for XYZ embedding. Types without usable
 complete inputs remain masked; a completely unusable study fails explicitly.
 
-SHA-256 seeds include the configured seed, study UID, type and operation, plus
-epoch only for randomized sampling. Separate streams govern target percentiles,
-supplier choices, band order and source ties; retries reuse them against rebuilt
-support. Dataset order and decode completion order do not select inputs.
+Only training draws random numbers. SHA-256 seeds include the configured seed,
+study UID, type, operation and epoch; separate streams govern target
+percentiles, supplier choices and band order, and retries reuse them against
+rebuilt support. Evaluation uses midpoints, target order and the ranking, so it
+does not depend on the seed: evaluation and prediction datasets receive no seed
+(`training_seed=None`). Dataset order and decode completion order do not select
+inputs.
 Copying a source does not multiply continuous physical target mass with center
 and support fixed. Copies still change supplier alternatives, and the unchanged
 reference estimator or changed grids can affect results; full duplicate
@@ -64,6 +91,7 @@ invariance and exact final source shares are not claimed.
 [Preparation](../current-preparation.md#overlapping-triplet-preparation) normalizes each
 unique retained source slice once and gathers overlapping appearances. Item-local
 resample/failure caches allow fresh clipping populations after retry selection.
-The strict identity is `physical_gaussian_overlap_spatial_tokens_v1` and records
-fixed rules as well as recursive source hashes. Model fitting and checkpoint
+The strict identity is
+`ranked_filtered_physical_gaussian_overlap_spatial_tokens_reflection_v10` and
+records fixed rules as well as recursive source hashes. Model fitting and checkpoint
 execution are outside this implementation.

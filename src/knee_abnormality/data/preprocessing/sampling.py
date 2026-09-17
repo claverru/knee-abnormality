@@ -1,6 +1,8 @@
 import hashlib
 import json
+import math
 from dataclasses import dataclass, replace
+from fractions import Fraction
 from pathlib import Path
 
 import numpy as np
@@ -12,6 +14,7 @@ from knee_abnormality.data.preprocessing.geometry import (
     RELIABILITY,
     StudyReference,
     summarize_series,
+    valid_pose,
 )
 from knee_abnormality.data.preprocessing.series import IndexedSeries, SliceRecord
 
@@ -23,12 +26,13 @@ SAMPLING_IDENTITY = {
     "grouping": "complete_link_offset_plus_crop_radius_normal_distance",
     "support": "union_of_run_middle_extents_singleton_neighbor_cells",
     "targets": "stratified_truncated_gaussian_patient_axis",
-    "suppliers": "uniform_random_or_fractional_entitlement_before_assignment",
+    "suppliers": "uniform_random_or_exact_fractional_entitlement_before_assignment",
+    "source_ranking": "original_then_newest_same_signature_then_crop_coverage_0.1_then_acquired_resolution_0.01_then_uid",
     "assignment": "maximum_cardinality_then_supplier_changes_then_squared_error",
     "fallback": "union_uniform_acquisition_local_affine_run_support_unknown_xyz",
     "normalization": "unique_retained_complete_triplet_slices_once",
     "retry": "split_original_runs_at_failed_paths_fixed_center_and_spacing",
-    "seed": "sha256_seed_study_type_operation_randomized_epoch_only",
+    "seed": "sha256_training_seed_study_type_operation_epoch_evaluation_unseeded",
 }
 AXES = {"Axial": 2, "Coronal": 1, "Sagittal": 0}
 
@@ -49,6 +53,7 @@ class CandidatePool:
     candidates: tuple[Triplet, ...]
     physical: bool
     diagnostics: dict
+    ranking: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -58,7 +63,7 @@ class Selection:
 
 
 def operation_seed(
-    seed: int, study: str, kind: tuple, operation: str, epoch: int | None
+    seed: int, study: str, kind: tuple, operation: str, epoch: int
 ) -> int:
     payload = json.dumps((seed, study, kind, operation, epoch), separators=(",", ":"))
     return int.from_bytes(hashlib.sha256(payload.encode()).digest()[:8], "little")
@@ -117,10 +122,74 @@ def usable_local_order(indexed: IndexedSeries) -> bool:
     }
 
 
+def crop_coverage(
+    indexed: IndexedSeries, point: tuple[float, float, float] | None, radius: float
+) -> float | None:
+    records = indexed.records
+    pose = records[len(records) // 2].pose if records else None
+    if point is None or pose is None or not valid_pose(pose):
+        return None
+    layout = pose.layout
+    axes = np.asarray(layout.orientation, dtype=np.float64).reshape(2, 3)
+    u, v = axes @ (np.asarray(point) - np.asarray(pose.position, dtype=np.float64))
+    width = (layout.columns - 1) * layout.spacing[1]
+    height = (layout.rows - 1) * layout.spacing[0]
+    overlap = max(0.0, min(u + radius, width) - max(u - radius, 0.0)) * max(
+        0.0, min(v + radius, height) - max(v - radius, 0.0)
+    )
+    value = float(overlap / (2 * radius) ** 2)
+    return value if math.isfinite(value) else None
+
+
+def source_ranking(
+    sources: dict[str, IndexedSeries],
+    point: tuple[float, float, float] | None,
+    spacing_mm: float,
+    radius: float,
+) -> tuple[str, ...]:
+    summaries = {uid: indexed.summary for uid, indexed in sources.items()}
+    coverage = {
+        uid: crop_coverage(indexed, point, radius) for uid, indexed in sources.items()
+    }
+    covered = all(value is not None for value in coverage.values())
+    resolved = all(
+        summary.acquired_resolution_mm is not None for summary in summaries.values()
+    )
+
+    def newer(uid: str) -> int:
+        own = summaries[uid]
+        if own.signature is None or own.series_number is None:
+            return 0
+        return sum(
+            other.signature == own.signature
+            and other.series_number is not None
+            and other.series_number > own.series_number
+            for key, other in summaries.items()
+            if key != uid
+        )
+
+    return tuple(
+        sorted(
+            sources,
+            key=lambda uid: (
+                summaries[uid].reformat,
+                newer(uid),
+                -round(coverage[uid], 1) if covered else 0,
+                round(max(summaries[uid].acquired_resolution_mm, spacing_mm), 2)
+                if resolved
+                else 0,
+                uid,
+            ),
+        )
+    )
+
+
 def build_pool(
     sources: tuple[tuple[str, IndexedSeries], ...],
     plane: str,
     reference: StudyReference,
+    spacing_mm: float,
+    radius: float,
     failed_paths: set[Path] | None = None,
     failed_sources: set[str] | None = None,
 ) -> CandidatePool:
@@ -222,8 +291,17 @@ def build_pool(
                 )
                 for v in values
             )
+    candidates = tuple(physical or local)
+    used = {v.uid for v in candidates}
+    ranking = source_ranking(
+        {uid: indexed for uid, indexed in sources if uid in used},
+        reference.point,
+        spacing_mm,
+        radius,
+    )
     diagnostics["path"] = "physical" if physical else "local" if local else "unusable"
-    return CandidatePool(tuple(physical or local), bool(physical), diagnostics)
+    diagnostics["source_ranking"] = list(ranking)
+    return CandidatePool(candidates, bool(physical), diagnostics, ranking)
 
 
 def union_support(candidates: tuple[Triplet, ...]) -> np.ndarray:
@@ -311,10 +389,9 @@ def select_triplets(
     budget: int,
     sigma: float,
     radius: float,
-    seed: int,
     study: str,
     kind: tuple,
-    training: bool,
+    training_seed: int | None,
     epoch: int = 0,
 ) -> Selection:
     if budget < 1 or not np.isfinite(sigma) or sigma <= 0:
@@ -339,19 +416,20 @@ def select_triplets(
     if not count:
         return Selection((), metadata)
 
+    training = training_seed is not None
+
     def rng(operation):
         return np.random.default_rng(
-            operation_seed(seed, study, kind, operation, epoch if training else None)
+            operation_seed(training_seed, study, kind, operation, epoch)
         )
 
     percentiles = (
         np.arange(count) + (rng("targets").random(count) if training else 0.5)
     ) / count
     targets = target_depths(pool, percentiles, sigma)
-    sources = sorted({v.uid for v in pool.candidates})
-    source_order = list(rng("source_order").permutation(sources))
-    supplier_rng = rng("suppliers")
-    entitlement = dict.fromkeys(sources, 0.0)
+    sources = pool.ranking
+    supplier_rng = rng("suppliers") if training else None
+    entitlement = dict.fromkeys(sources, Fraction(0))
     assigned = dict.fromkeys(sources, 0)
     preferred = [None] * count
     eligible = [
@@ -360,9 +438,9 @@ def select_triplets(
     ]
     order = rng("band_order").permutation(count) if training else np.argsort(targets)
     for row in order:
-        choices = [s for s in source_order if s in eligible[row]]
+        choices = [s for s in sources if s in eligible[row]]
         for source in choices:
-            entitlement[source] += 1 / len(choices)
+            entitlement[source] += Fraction(1, len(choices))
         source = (
             choices[int(supplier_rng.integers(len(choices)))]
             if training
@@ -423,7 +501,7 @@ def select_triplets(
         shortfall=budget - len(selected),
         targets=targets.tolist(),
         assignments=placements,
-        target_entitlements=entitlement,
+        target_entitlements={s: float(value) for s, value in entitlement.items()},
         preferred_counts=assigned,
         realized_counts={s: sum(v.uid == s for v in selected) for s in sources},
     )

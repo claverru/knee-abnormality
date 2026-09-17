@@ -165,6 +165,19 @@ class ModelConfig(ConfigModel):
         return self
 
 
+class EMAConfig(ConfigModel):
+    method: Literal["ema"]
+    decay: Annotated[float, Field(gt=0, lt=1)]
+
+
+class SWAConfig(ConfigModel):
+    method: Literal["swa"]
+    epochs: Annotated[StrictInt, Field(gt=0)]
+
+
+WeightAveragingConfig = Annotated[EMAConfig | SWAConfig, Field(discriminator="method")]
+
+
 class OptimizerConfig(ConfigModel):
     backbone_lr: Annotated[float, Field(gt=0)]
     head_lr: Annotated[float, Field(gt=0)]
@@ -174,6 +187,7 @@ class OptimizerConfig(ConfigModel):
     epsilon: Annotated[float, Field(gt=0)]
     warmup_epochs: Annotated[StrictInt, Field(ge=0)]
     minimum_lr_ratio: Annotated[float, Field(gt=0, le=1)]
+    weight_averaging: WeightAveragingConfig | None
 
 
 class TrainerConfig(ConfigModel):
@@ -211,6 +225,18 @@ class ExperimentConfig(ConfigModel):
     model: ModelConfig
     optimizer: OptimizerConfig
     trainer: TrainerConfig
+
+    @model_validator(mode="after")
+    def swa_window_fits_schedule(self) -> "ExperimentConfig":
+        averaging = self.optimizer.weight_averaging
+        if isinstance(averaging, SWAConfig) and averaging.epochs > (
+            self.trainer.max_epochs - self.optimizer.warmup_epochs
+        ):
+            raise ValueError(
+                "optimizer.weight_averaging.epochs must not exceed "
+                "trainer.max_epochs minus optimizer.warmup_epochs"
+            )
+        return self
 
     @property
     def split_dir(self) -> Path:

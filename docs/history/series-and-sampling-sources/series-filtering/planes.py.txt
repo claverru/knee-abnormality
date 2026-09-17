@@ -1,0 +1,52 @@
+import re
+
+import numpy as np
+import polars as pl
+
+from common import OUT, load
+
+PATTERNS = {
+    "Sagittal": r"(^|[^a-z])(sag|sagittal|sagital|sg)([^a-z]|$)|sag",
+    "Coronal": r"(^|[^a-z])(cor|coronal|co)([^a-z]|$)|cor",
+    "Axial": r"(^|[^a-z])(ax|axi|axial|tra|transverse|trans)([^a-z]|$)|axi|tra_|_tra|rotula|patella",
+}
+
+
+def desc_plane(text):
+    lowered = (text or "").lower()
+    hits = [plane for plane, pattern in PATTERNS.items() if re.search(pattern, lowered)]
+    return hits[0] if len(hits) == 1 else ("ambiguous" if hits else None)
+
+
+def main():
+    frame = load()
+    rows = []
+    for row in frame.iter_rows(named=True):
+        orientation = np.asarray(row["middle_orientation"]).reshape(2, 3)
+        normal = np.cross(orientation[0], orientation[1])
+        normal /= np.linalg.norm(normal)
+        order = np.argsort(-np.abs(normal))
+        rows.append(
+            {
+                "SeriesInstanceUID": row["SeriesInstanceUID"],
+                "desc_plane": desc_plane(row["desc"]),
+                "normal_margin_deg": float(np.degrees(np.arcsin(min(1, abs(normal[order[0]])))) - np.degrees(np.arcsin(min(1, abs(normal[order[1]]))))),
+            }
+        )
+    out = pl.DataFrame(rows)
+    out.write_parquet(OUT / "plane_signals.parquet")
+    merged = frame.join(out, on="SeriesInstanceUID")
+    merged = merged.with_columns(
+        (pl.col("desc_plane").is_in(["Axial", "Coronal", "Sagittal"]) & (pl.col("desc_plane") != pl.col("plane"))).alias("desc_plane_mismatch")
+    )
+    pl.Config.set_tbl_rows(60)
+    pl.Config.set_tbl_width_chars(250)
+    pl.Config.set_fmt_str_lengths(40)
+    print(merged.group_by("desc_plane").len())
+    print(merged.filter(pl.col("desc_plane_mismatch")).group_by("plane", "desc_plane", "desc").agg(pl.len(), pl.col("obliquity_deg").median().round(1), pl.col("study8").n_unique()).sort("len", descending=True))
+    print(merged.select(pl.col("obliquity_deg").cut([20, 30, 35, 40, 45]).value_counts(sort=False)).unnest("obliquity_deg"))
+    print(merged.filter(pl.col("obliquity_deg") > 35).group_by("plane", "desc").agg(pl.len(), pl.col("obliquity_deg").median().round(1)).sort("len", descending=True).head(25))
+
+
+if __name__ == "__main__":
+    main()

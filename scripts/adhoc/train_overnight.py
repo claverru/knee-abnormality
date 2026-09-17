@@ -1,11 +1,14 @@
 import csv
+import hashlib
 import json
 import os
+import re
 import resource
 import signal
 import subprocess
 import sys
 import tempfile
+import time
 from copy import deepcopy
 from datetime import UTC, datetime
 from pathlib import Path
@@ -16,8 +19,53 @@ from pydantic_settings import CliImplicitFlag, SettingsError
 
 from knee_abnormality.cli import CLISettings
 from knee_abnormality.config import ExperimentConfig, load_config
+from knee_abnormality.provenance import sha256_file
 
 ROOT = Path(__file__).resolve().parents[2]
+SOURCE_DIRS = ("src", "scripts", "configs")
+SUMMARY_HEADER = [
+    "experiment",
+    "selected_epoch",
+    "best_val_macro_auc",
+    "last_val_macro_auc",
+    "delta_best_vs_control",
+    "delta_last_vs_control",
+    "live_best_val_macro_auc",
+    "live_last_val_macro_auc",
+    "soft_target_bce_at_selected",
+    "gold_macro_auc_at_selected",
+    "training_seconds",
+    "batch_norm_refresh_seconds",
+    "optimizer_steps",
+    "peak_cuda_memory_gib",
+]
+
+EXPERIMENTS = (
+    ("00-control", {}),
+    ("01-control-seed-43", {"seed": 43}),
+    ("02-control-seed-44", {"seed": 44}),
+    (
+        "03-ema-0.999",
+        {"optimizer": {"weight_averaging": {"method": "ema", "decay": 0.999}}},
+    ),
+    (
+        "04-swa-3",
+        {"optimizer": {"weight_averaging": {"method": "swa", "epochs": 3}}},
+    ),
+    ("05-epochs-20", {"trainer": {"max_epochs": 20, "patience": 20}}),
+    ("06-beta2-0.99", {"optimizer": {"beta2": 0.99}}),
+    ("07-affine-off", {"data": {"affine_augmentation": {"probability": 0.0}}}),
+    ("08-slower-head", {"optimizer": {"head_lr": 0.0003}}),
+    ("09-warmup-0", {"optimizer": {"warmup_epochs": 0}}),
+    (
+        "10-clip-0.001",
+        {"data": {"lower_quantile": 0.001, "upper_quantile": 0.999}},
+    ),
+    ("11-clip-0.01", {"data": {"lower_quantile": 0.01, "upper_quantile": 0.99}}),
+    ("12-grad-clip-0.5", {"trainer": {"gradient_clip_val": 0.5}}),
+    ("13-grad-clip-5", {"trainer": {"gradient_clip_val": 5.0}}),
+    ("14-noise-0.3", {"data": {"noise_augmentation": {"probability": 0.3}}}),
+)
 
 
 class OvernightCLI(CLISettings):
@@ -29,56 +77,72 @@ class OvernightCLI(CLISettings):
 
 def merge(values: dict, changes: dict) -> None:
     for key, value in changes.items():
-        if isinstance(value, dict):
+        if isinstance(value, dict) and isinstance(values.get(key), dict):
             merge(values[key], value)
         else:
             values[key] = value
 
 
-def prepare_queue(config_path: Path) -> tuple[Path, list[Path]]:
+def override_keys(base: dict, changes: dict, prefix: str = "") -> list[str]:
+    keys = []
+    for key, value in changes.items():
+        path = f"{prefix}{key}"
+        if isinstance(value, dict) and isinstance(base.get(key), dict):
+            keys.extend(override_keys(base[key], value, f"{path}."))
+        else:
+            keys.append(path)
+    return keys
+
+
+def source_fingerprint() -> str:
+    result = subprocess.run(
+        [
+            "git",
+            "ls-files",
+            "--cached",
+            "--others",
+            "--exclude-standard",
+            "--",
+            *SOURCE_DIRS,
+        ],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    digest = hashlib.sha256()
+    for relative in sorted(result.stdout.splitlines()):
+        digest.update(relative.encode())
+        digest.update(sha256_file(ROOT / relative).encode())
+    return digest.hexdigest()
+
+
+def gpu_processes() -> list[str]:
+    try:
+        result = subprocess.run(
+            ["nvidia-smi", "--query-compute-apps=pid", "--format=csv,noheader"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+    except FileNotFoundError:
+        return []
+    return [line for line in result.stdout.splitlines() if line.strip()]
+
+
+def prepare_queue(
+    config_path: Path,
+) -> tuple[Path, list[Path], dict[str, list[str]]]:
     base = load_config(config_path).model_dump(mode="json")
     base["seed"] = 42
     base["validation"] = {"split": "all_5fold_v3", "folds": [0]}
-    experiments = (
-        ("00-baseline", {}),
-        ("01-sigma30", {"data": {"sampling_sigma_mm": 30.0}}),
-        ("02-higher-lr", {"optimizer": {"backbone_lr": 3e-4, "head_lr": 9e-4}}),
-        ("03-min-lr-0.1", {"optimizer": {"minimum_lr_ratio": 0.1}}),
-        ("04-series-dropout-0.3", {"model": {"series_dropout": 0.3}}),
-        ("05-wd-0.05", {"optimizer": {"weight_decay": 0.05}}),
-        (
-            "06-affine-strong",
-            {
-                "data": {
-                    "affine_augmentation": {
-                        "rotation_degrees": 15.0,
-                        "translation_fraction": 0.08,
-                        "scale_range": [0.9, 1.1],
-                    }
-                }
-            },
-        ),
-        ("07-crop130", {"data": {"spacing_mm": 130 / 224}}),
-        ("08-clip-0.01", {"data": {"lower_quantile": 0.01, "upper_quantile": 0.99}}),
-        ("09-epochs12", {"trainer": {"max_epochs": 12, "patience": 12}}),
-        (
-            "10-clip-0.001",
-            {"data": {"lower_quantile": 0.001, "upper_quantile": 0.999}},
-        ),
-        ("11-warmup-0", {"optimizer": {"warmup_epochs": 0}}),
-        ("12-slower-head", {"optimizer": {"head_lr": 3e-4}}),
-        ("13-affine-off", {"data": {"affine_augmentation": {"probability": 0.0}}}),
-        (
-            "14-intensity-off",
-            {"data": {"intensity_augmentation": {"probability": 0.0}}},
-        ),
-        ("15-backbone-eval", {"model": {"backbone_eval": True}}),
-    )
     configs = []
-    for name, changes in experiments:
+    overrides = {}
+    for name, changes in EXPERIMENTS:
         values = deepcopy(base)
         values["name"] = name
         merge(values, changes)
+        overrides[name] = override_keys(base, changes)
         config = ExperimentConfig.model_validate(values)
         if not (config.split_dir / "protocol.json").is_file():
             raise FileNotFoundError(f"Missing prepared split: {config.split_dir}")
@@ -96,7 +160,7 @@ def prepare_queue(config_path: Path) -> tuple[Path, list[Path]]:
         path = queue / "configs" / f"{config.name}.yaml"
         path.write_text(yaml.safe_dump(values, sort_keys=False), encoding="utf-8")
         paths.append(path)
-    return queue, paths
+    return queue, paths, overrides
 
 
 def run_command(command: list[str], log_path: Path) -> int:
@@ -129,21 +193,167 @@ def run_command(command: list[str], log_path: Path) -> int:
             raise
 
 
-def run_queue(queue: Path, configs: list[Path]) -> int:
+def read_epoch_metrics(fold_dir: Path, prefix: str) -> list[tuple[int, dict]]:
+    pattern = re.compile(rf"^{re.escape(prefix)}metrics_epoch_(\d+)\.json$")
+    records = []
+    for path in sorted((fold_dir / "epochs").glob(f"{prefix}metrics_epoch_*.json")):
+        match = pattern.match(path.name)
+        if match is not None:
+            records.append((int(match.group(1)), json.loads(path.read_text())))
+    return sorted(records, key=lambda item: item[0])
+
+
+def run_summary(run_dir: Path) -> dict | None:
+    fold_dir = run_dir / "fold_0"
+    selected_path = fold_dir / "selected_checkpoint.json"
+    timing_path = fold_dir / "timing.json"
+    if not selected_path.is_file() or not timing_path.is_file():
+        return None
+    selected = json.loads(selected_path.read_text())
+    timing = json.loads(timing_path.read_text())
+    records = read_epoch_metrics(fold_dir, "")
+    if not records:
+        return None
+    by_epoch = dict(records)
+    match = re.search(r"epoch=(\d+)", Path(selected["path"]).name)
+    selected_index = int(match.group(1)) if match is not None else records[-1][0]
+    selected_record = by_epoch.get(selected_index, records[-1][1])
+    _, last_record = records[-1]
+    live_records = read_epoch_metrics(fold_dir, "live_")
+    live_best = (
+        max(record["macro_auc"] for _, record in live_records) if live_records else None
+    )
+    live_last = live_records[-1][1]["macro_auc"] if live_records else None
+    peak_bytes = timing.get("peak_cuda_allocated_bytes")
+    return {
+        "selected_epoch": selected_index + 1,
+        "best_val_macro_auc": selected["score"],
+        "last_val_macro_auc": last_record["macro_auc"],
+        "live_best_val_macro_auc": live_best,
+        "live_last_val_macro_auc": live_last,
+        "soft_target_bce_at_selected": selected_record["soft_target_bce"],
+        "gold_macro_auc_at_selected": selected_record["gold"]["macro_auc"],
+        "training_seconds": timing["training_seconds"],
+        "batch_norm_refresh_seconds": timing.get("batch_norm_refresh_seconds", 0.0),
+        "optimizer_steps": timing["optimizer_steps"],
+        "peak_cuda_memory_gib": peak_bytes / 2**30 if peak_bytes is not None else None,
+    }
+
+
+def write_summary(queue: Path, configs: list[Path]) -> None:
+    summaries = {}
+    for config in configs:
+        summary = run_summary(queue / "runs" / config.stem)
+        if summary is not None:
+            summaries[config.stem] = summary
+    control = summaries.get("00-control")
+    with (queue / "summary.tsv").open("w", encoding="utf-8", newline="") as stream:
+        writer = csv.writer(stream, delimiter="\t")
+        writer.writerow(SUMMARY_HEADER)
+        for config in configs:
+            summary = summaries.get(config.stem)
+            if summary is None:
+                continue
+            delta_best = (
+                summary["best_val_macro_auc"] - control["best_val_macro_auc"]
+                if control is not None
+                else None
+            )
+            delta_last = (
+                summary["last_val_macro_auc"] - control["last_val_macro_auc"]
+                if control is not None
+                else None
+            )
+            writer.writerow(
+                [
+                    config.stem,
+                    summary["selected_epoch"],
+                    summary["best_val_macro_auc"],
+                    summary["last_val_macro_auc"],
+                    delta_best,
+                    delta_last,
+                    summary["live_best_val_macro_auc"],
+                    summary["live_last_val_macro_auc"],
+                    summary["soft_target_bce_at_selected"],
+                    summary["gold_macro_auc_at_selected"],
+                    summary["training_seconds"],
+                    summary["batch_norm_refresh_seconds"],
+                    summary["optimizer_steps"],
+                    summary["peak_cuda_memory_gib"],
+                ]
+            )
+
+
+def print_comparison_commands(
+    queue: Path,
+    configs: list[Path],
+    completed: set[str],
+    overrides: dict[str, list[str]],
+) -> None:
+    if "00-control" not in completed:
+        print("Skipping comparison commands: 00-control did not complete", flush=True)
+        return
+    control_dir = queue / "runs" / "00-control"
+    for config in configs:
+        name = config.stem
+        if name == "00-control" or name not in completed:
+            continue
+        allowed = ",".join(["name", *overrides[name]])
+        candidate_dir = queue / "runs" / name
+        output_dir = (
+            ROOT / "outputs" / "analysis" / f"{queue.name}-{name}-vs-00-control"
+        )
+        print(
+            "rtk proxy uv run --locked python -m scripts.tools.compare_fold_runs "
+            f"{control_dir} {candidate_dir} --output-dir {output_dir} "
+            f"--allowed-config-differences {allowed}",
+            flush=True,
+        )
+
+
+def run_queue(
+    queue: Path,
+    configs: list[Path],
+    overrides: dict[str, list[str]],
+    fingerprint: str,
+) -> int:
     failed = False
-    completed = []
+    stopped = False
+    completed_dirs = []
+    completed_names = set()
     with (queue / "status.tsv").open("w", encoding="utf-8", newline="") as stream:
         writer = csv.writer(stream, delimiter="\t")
-        writer.writerow(["experiment", "exit_code", "run_dir", "log"])
+        writer.writerow(
+            [
+                "experiment",
+                "started_at",
+                "finished_at",
+                "wall_seconds",
+                "exit_code",
+                "run_dir",
+                "log",
+            ]
+        )
         stream.flush()
         for config in configs:
+            if source_fingerprint() != fingerprint:
+                print(
+                    "Source under src/, scripts/ or configs/ changed since queue "
+                    "start; stopping the queue.",
+                    file=sys.stderr,
+                    flush=True,
+                )
+                stopped = True
+                break
             name = config.stem
             log_path = queue / "logs" / f"{name}.log"
             run_dir = queue / "runs" / name
+            started = datetime.now(UTC)
             print(
-                f"[{datetime.now(UTC).isoformat()}] Starting {name}: {log_path}",
+                f"[{started.isoformat()}] Starting {name}: {log_path}",
                 flush=True,
             )
+            wall_started = time.perf_counter()
             status = run_command(
                 [
                     sys.executable,
@@ -156,21 +366,35 @@ def run_queue(queue: Path, configs: list[Path]) -> int:
                 ],
                 log_path,
             )
-            writer.writerow([name, status, run_dir, log_path])
+            wall_seconds = time.perf_counter() - wall_started
+            finished = datetime.now(UTC)
+            writer.writerow(
+                [
+                    name,
+                    started.isoformat(),
+                    finished.isoformat(),
+                    f"{wall_seconds:.3f}",
+                    status,
+                    run_dir,
+                    log_path,
+                ]
+            )
             stream.flush()
             print(f"Finished {name} with exit code {status}", flush=True)
             if status == 0:
-                completed.append(str(run_dir))
+                completed_dirs.append(str(run_dir))
+                completed_names.add(name)
             else:
                 failed = True
-    if completed:
+            write_summary(queue, configs)
+    if completed_dirs:
         status = run_command(
             [
                 sys.executable,
                 "-u",
                 "-m",
                 "scripts.tools.plot_validation_metrics",
-                *completed,
+                *completed_dirs,
                 "--output",
                 str(queue / "validation_metrics.png"),
             ],
@@ -180,6 +404,10 @@ def run_queue(queue: Path, configs: list[Path]) -> int:
             print(f"Comparison plot failed; see {queue / 'logs/plot.log'}", flush=True)
             failed = True
     print(f"Queue complete. Run status: {queue / 'status.tsv'}", flush=True)
+    print(f"Run summary: {queue / 'summary.tsv'}", flush=True)
+    print_comparison_commands(queue, configs, completed_names, overrides)
+    if stopped:
+        return 3
     return int(failed)
 
 
@@ -194,19 +422,28 @@ def main() -> None:
         signal.signal(signal.SIGTERM, stop_queue)
         limits_before = resource.getrlimit(resource.RLIMIT_NOFILE)
         if not args.prepare_only:
+            busy = gpu_processes()
+            if busy:
+                print(
+                    f"Refusing to start: {len(busy)} active GPU compute process(es)",
+                    file=sys.stderr,
+                )
+                raise SystemExit(2)
             resource.setrlimit(
                 resource.RLIMIT_NOFILE, (limits_before[1], limits_before[1])
             )
-        queue, configs = prepare_queue(args.config)
+        queue, configs, overrides = prepare_queue(args.config)
         print(f"Prepared {len(configs)} experiments: {queue}", flush=True)
         if args.prepare_only:
             return
+        fingerprint = source_fingerprint()
         limits_after = resource.getrlimit(resource.RLIMIT_NOFILE)
         (queue / "runtime.json").write_text(
             json.dumps(
                 {
                     "open_file_limits_before": limits_before,
                     "open_file_limits": limits_after,
+                    "source_fingerprint": fingerprint,
                 },
                 indent=2,
             )
@@ -216,8 +453,14 @@ def main() -> None:
         print(
             f"Open-file limit: {limits_after[0]} (was {limits_before[0]})", flush=True
         )
-        status = run_queue(queue, configs)
-    except (OSError, ValueError, yaml.YAMLError, SettingsError) as error:
+        status = run_queue(queue, configs, overrides, fingerprint)
+    except (
+        OSError,
+        ValueError,
+        yaml.YAMLError,
+        SettingsError,
+        subprocess.CalledProcessError,
+    ) as error:
         print(f"Overnight queue error: {error}", file=sys.stderr)
         raise SystemExit(2) from None
     raise SystemExit(status)

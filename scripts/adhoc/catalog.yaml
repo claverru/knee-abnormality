@@ -45,6 +45,7 @@ scripts:
       - Reads saved metadata only; no pixels, models, training or tests.
       - The source manifest records the configured backbone's spatial mapping identity; the script and every package module are copied to source/<repo-relative path>.
       - Calls the production sampler for both dataset modes, including rejected-center local fallback; retains the original comparison as an archived summary.
+      - Saved headers carry no series tags and bypass the loader's series exclusions and instance guard, so the source ranking sees only crop coverage and UID.
       - Default seed 20260913 and 32 randomized epochs; validation uses the configured multiplier.
       - Records target and realized coverage, intended and realized source shares, gap splits, plane disagreements, singletons and shortfalls.
       - Existing output directories are refused. Historical prototype source remains in outputs/analysis/physical-sampling-20260913/geometry-v3/source/.
@@ -119,19 +120,21 @@ scripts:
     docs: [docs/metadata/report-normalization.md]
   - id: train-overnight
     path: scripts/adhoc/train_overnight.py
-    summary: Run the sixteen planned hyperparameter experiments sequentially on fold 0.
-    tags: [train, overnight, queue, hyperparameters, learning-rate, weight-decay, sampling, augmentation, crop, clipping, epochs, experiments]
+    summary: Run the fifteen prepared hyperparameter experiments sequentially on fold 0.
+    tags: [train, overnight, queue, hyperparameters, weight-averaging, ema, swa, beta2, augmentation, clipping, epochs, gradient-clipping, experiments]
     commands:
-      - rtk proxy uv run --locked python -m scripts.adhoc.train_overnight
+      - nohup rtk proxy uv run --locked python -m scripts.adhoc.train_overnight > outputs/training/overnight.out 2>&1 &
       - rtk proxy uv run --locked python -m scripts.adhoc.train_overnight --prepare-only
     inputs: [configs/training.yaml, Prepared all_5fold_v3 split, Training DICOMs, Pinned labels and pretrained backbone]
-    outputs: [Unique outputs/training/overnight-* directory with sixteen YAML configs, Per-run artifacts and logs, status.tsv exit codes, runtime.json open-file limits, Validation comparison PNG for successful runs]
+    outputs: [Unique outputs/training/overnight-* directory with fifteen YAML configs, Per-run artifacts and logs, status.tsv start/finish/wall time and exit codes, summary.tsv per-run metrics rewritten after every run, runtime.json open-file limits and source fingerprint, Validation comparison PNG for successful runs]
     notes:
-      - Snapshots all sixteen configs before training and fixes split v3, fold 0 and seed 42; other settings come from --config (default configs/training.yaml).
-      - Starts fresh runs in order from 00-baseline, each with at most one change; 09-epochs12 has twelve epochs and the others use the configured budget.
-      - Continues after individual training failures and returns nonzero if training or plotting fails. SIGINT or SIGTERM stops the queue and terminates its active process group.
-      - Uses pydantic-settings for --config and --prepare-only; preparation never starts training.
-      - Raises the process soft open-file limit to its inherited hard limit before training and records both limits in runtime.json.
+      - Snapshots all fifteen configs before training and fixes split v3 and fold 0, seed 42 unless a run overrides it; other settings come from --config (default configs/training.yaml).
+      - Starts fresh runs in order from 00-control, each with exactly its listed overrides; see docs/backlog/overnight.md for the run list.
+      - Refuses to start if nvidia-smi reports an active GPU compute process (skipped only if nvidia-smi is missing), and refuses to continue if a content-hash fingerprint of tracked and untracked src/, scripts/ or configs/ files changes mid-queue.
+      - Continues after individual training failures and returns nonzero if training, plotting or the source-fingerprint check fails. SIGINT or SIGTERM stops the queue and terminates its active process group.
+      - Prints one scripts.tools.compare_fold_runs command per completed non-control run against 00-control, with --allowed-config-differences set from that run's own overrides.
+      - Uses pydantic-settings for --config and --prepare-only; preparation never starts training or checks the GPU.
+      - Raises the process soft open-file limit to its inherited hard limit before training and records both limits and the starting source fingerprint in runtime.json.
       - Runs training and comparison plotting without invoking Codex or submitting to Kaggle.
       - Every invocation creates a new queue.
     docs: [docs/validation/overnight-hyperparameter-queue.md, docs/backlog/overnight.md]
