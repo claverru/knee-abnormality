@@ -105,9 +105,11 @@ evidence is object detection.
 
 ## Robust study center
 
-**Robust study center with per-series sampling paths** (rejection counts and rescue analysis
-measured on CPU; an inference-only fold-0 re-score is below; the effect of training with it is
-untested).
+**Robust study center with per-series sampling paths.** It is implemented behind
+`data.robust_center_outlier_mm`, and one seed-42 run is queued
+([implementation](#implementation-2026-09-17)). Rejection counts and the rescue analysis are
+measured on CPU, and an inference-only fold-0 re-score is below. The effect of training with it is
+untested.
 
 - *Problem:* 178 of 4,407 train centers are rejected (170 RMS above 10 mm, 8 with one series above
   20 mm), often because of one or two stray series, so the whole study falls back to local
@@ -124,7 +126,8 @@ untested).
 - *Gate on range rather than retention:* retained series from the other knee in bilateral
   studies, or from an ankle series filed in a knee slot, project up to 184 mm outside their range
   (see the [series-filtering census](../metadata/series-filtering-census.md#implemented-rule-2026-09-17); the ankle and stray other-knee series are now dropped before the fit).
-- *Cost:* it changes the preprocessing identity and needs a fresh fold-0 run.
+- *Cost:* setting the option adds a `robust_center` entry to the preprocessing identity, so the
+  run starts fresh on fold 0.
 
 ### Robust-centre re-score (2026-09-17)
 
@@ -161,6 +164,32 @@ Script: [`robust_rescore.py`](../history/series-and-sampling-sources/series-filt
 - Per target (20 mm fit, 21 studies): medial and lateral OA fall by 0.56 ×1000 each and effusion
   rises by 0.56, with the same sign on all three checkpoints. These studies contain only 1–4
   positives for each of these targets.
+
+### Implementation (2026-09-17)
+
+The option reproduces the 20 mm patch above. The implemented behaviour, the identity effects and
+the CPU verification (null against HEAD, 20 mm and 10 mm) are recorded in
+[current preparation](../data-preparation/current-preparation.md#robust-study-centre-option).
+One run is queued: `robust-center-seed42`, paired with `ranked-filtered-seed42` (0.889573)
+([overnight queue](overnight.md#next-queue)).
+
+- *Counts:* after the ankle exclusion, 177 training studies are rejected, and 20 mm rescues 130 of
+  them (21 of 31 on fold 0). The 10 mm threshold rescues all 177 and excludes 256 series from the
+  fits, against 155 at 20 mm. No inference check has been run at 10 mm.
+- *Re-score (measured, inference only):* the `ranked-filtered-seed42` epoch-9 checkpoint was run
+  with the option at 20 mm, with the identity check bypassed.
+  - The 21 rescued fold-0 studies were re-scored at batch size 1 with bf16 autocast; the other
+    883 studies keep their saved predictions.
+  - Macro AUC moves from 0.889573 to 0.889228 (−0.00035).
+  - A batch-1 recompute without the option gives 0.889574, with a maximum probability difference
+    of 0.0019 from the saved predictions.
+  - All 105 non-empty slots of these studies switch from local to physical sampling, and the mean
+    absolute probability change is 0.028.
+  - The three control checkpoints above averaged −0.0001 (from −0.00004 to −0.00015), so this
+    checkpoint loses more than any of them. The result comes from one checkpoint and 21 studies
+    (`outputs/analysis/robust-center-implementation-20260917/rescore.json`).
+- *Expectation:* the run is expected to tie. Seed-to-seed noise is 0.0015–0.0018, so a single run
+  cannot resolve a change of this size.
 
 ## Parked until a specific need
 

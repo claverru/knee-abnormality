@@ -23,7 +23,9 @@ def validate_checkpoint(
         raise TypeError("Checkpoint must include its saved configuration and targets")
     saved_config = ExperimentConfig.model_validate(saved["config"])
     validate_preprocessing_identity(
-        saved.get("preprocessing_identity"), saved_config.model.backbone
+        saved.get("preprocessing_identity"),
+        saved_config.model.backbone,
+        saved_config.data.robust_center_outlier_mm,
     )
     if saved.get("targets") != list(targets):
         raise ValueError(

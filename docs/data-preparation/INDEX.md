@@ -2,7 +2,7 @@
 
 | Read when | Document |
 |---|---|
-| Understanding current on-the-fly preparation: series header summary, within-series instance guard, non-knee and stray other-knee series exclusion, 224-pixel/0.625-mm crops, overlapping triplets, clipping and retries | [Current preparation and overlapping triplets](current-preparation.md) |
+| Understanding current on-the-fly preparation: series header summary, within-series instance guard, non-knee and stray other-knee series exclusion, the optional robust study centre (`data.robust_center_outlier_mm`), 224-pixel/0.625-mm crops, overlapping triplets, clipping and retries | [Current preparation and overlapping triplets](current-preparation.md) |
 | Downloading and extracting the image archive, resuming it, or checking the completed acquisition audit | [Downloading and extracting the images](downloading-and-extracting-images.md) |
 | Checking the official data contract, contrast flags, DICOM encodings and the confirmed truncated pixel payloads | [Public data contract and decoding](public-data-contract-and-decoding.md) |
 | Reviewing the reported historical cache recipe, data redundancy, resolution tradeoffs, slice ordering and open preprocessing questions | [Unverified preprocessing notes and open questions](unverified-preprocessing-notes.md) |

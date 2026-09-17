@@ -18,6 +18,8 @@ planes are required, with condition number at most `1e3`, plane-balanced RMS
 at most 10 mm and every contributing residual at most 20 mm. Different frame
 IDs across series are recorded; inconsistent IDs within a series are rejected.
 These are engineering screening constants, not measured anatomical tolerances.
+The optional refit of rejected studies (`data.robust_center_outlier_mm`) is described in
+[current preparation](current-preparation.md#robust-study-centre-option).
 
 Every diagnostic projection requires consistent geometry and patient-derived
 positions for all retained slices. Missing/mixed provenance, rejected study

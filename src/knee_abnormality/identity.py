@@ -2,7 +2,10 @@ import hashlib
 from pathlib import Path
 
 from knee_abnormality.data.preprocessing.filtering import FILTERING_IDENTITY
-from knee_abnormality.data.preprocessing.geometry import RELIABILITY
+from knee_abnormality.data.preprocessing.geometry import (
+    RELIABILITY,
+    ROBUST_CENTER_IDENTITY,
+)
 from knee_abnormality.data.preprocessing.sampling import SAMPLING_IDENTITY
 from knee_abnormality.modeling.augmentation import REFLECTION_IDENTITY
 from knee_abnormality.modeling.spatial_tokens import (
@@ -27,7 +30,11 @@ PREPROCESSING_SOURCES = (
 )
 
 
-def preprocessing_identity(backbone: str, package_root: Path = PACKAGE_ROOT) -> dict:
+def preprocessing_identity(
+    backbone: str,
+    robust_center_outlier_mm: float | None,
+    package_root: Path = PACKAGE_ROOT,
+) -> dict:
     digest = hashlib.sha256()
     for name in PREPROCESSING_SOURCES:
         relative = name.encode()
@@ -36,7 +43,7 @@ def preprocessing_identity(backbone: str, package_root: Path = PACKAGE_ROOT) -> 
         digest.update(relative)
         digest.update(len(payload).to_bytes(8, "big"))
         digest.update(payload)
-    return {
+    identity = {
         "algorithm": "ranked_filtered_physical_gaussian_overlap_spatial_tokens_reflection_v10",
         "reflection": dict(REFLECTION_IDENTITY),
         "sampling": dict(SAMPLING_IDENTITY),
@@ -48,12 +55,21 @@ def preprocessing_identity(backbone: str, package_root: Path = PACKAGE_ROOT) -> 
         },
         "sources_sha256": digest.hexdigest(),
     }
+    if robust_center_outlier_mm is not None:
+        identity["robust_center"] = {
+            **ROBUST_CENTER_IDENTITY,
+            "outlier_mm": robust_center_outlier_mm,
+        }
+    return identity
 
 
 def validate_preprocessing_identity(
-    recorded: object, backbone: str, package_root: Path = PACKAGE_ROOT
+    recorded: object,
+    backbone: str,
+    robust_center_outlier_mm: float | None,
+    package_root: Path = PACKAGE_ROOT,
 ) -> dict:
-    current = preprocessing_identity(backbone, package_root)
+    current = preprocessing_identity(backbone, robust_center_outlier_mm, package_root)
     if recorded != current:
         raise ValueError(
             "Checkpoint preprocessing_identity is missing or differs from the executing sources. "

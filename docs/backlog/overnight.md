@@ -11,8 +11,23 @@ from this file.
 
 ## Next queue
 
-Empty: the 2026-09-17 queue finished ([results](../validation/results/2026-09-17-overnight-results.md)).
-Build the next one from "Candidates for later queues" below.
+One run, launched on its own rather than by the queue launcher. The 2026-09-17 queue finished
+([results](../validation/results/2026-09-17-overnight-results.md)); build the following queue from
+"Candidates for later queues" below.
+
+- **`robust-center-seed42`** (`data.robust_center_outlier_mm: 20.0`, the
+  [robust study centre](big-bets.md#implementation-2026-09-17); otherwise
+  `configs/training.yaml`, seed 42, fold 0). Config:
+  `outputs/training/configs/robust-center-seed42.yaml`. It is paired with
+  `outputs/training/ranked-filtered-seed42` (0.889573).
+
+  ```bash
+  rtk proxy uv run --locked just train robust-center-seed42 outputs/training/configs/robust-center-seed42.yaml 0
+  ```
+
+  Expectation: a tie. The inference-only check measured −0.0001 on fold 0 (mean of three
+  control checkpoints); on the `ranked-filtered-seed42` checkpoint it measured −0.00035. Seed
+  noise is 0.0015–0.0018, so one run cannot separate the two.
 
 ## User decisions (2026-09-16)
 

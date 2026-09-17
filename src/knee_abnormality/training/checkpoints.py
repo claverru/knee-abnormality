@@ -70,7 +70,9 @@ def training_input_identity(
     )
     return {
         "version": 1,
-        "preprocessing_identity": preprocessing_identity(config.model.backbone),
+        "preprocessing_identity": preprocessing_identity(
+            config.model.backbone, config.data.robust_center_outlier_mm
+        ),
         "label_manifest_sha256": labels.provenance["manifest_sha256"],
         "split_protocol_sha256": labels.provenance["split_protocol_sha256"],
         "membership_sha256": labels.provenance["membership_sha256"],

@@ -37,6 +37,9 @@ seeds 42–44 against the ranked-filtered runs
 
 Also pending:
 
+- **Robust study centre:** implemented behind `data.robust_center_outlier_mm`, and one seed-42
+  run is queued ([overnight](backlog/overnight.md#next-queue)). The code changed the source
+  digest, so the ranked-filtered checkpoints need their archived sources.
 - Data-loading speedups, shipped with the next retrain
   ([plan](inference/loading-speedup-plan.md)).
 - Submit the main-thread warm-up with the next submission; torch-free coordinator

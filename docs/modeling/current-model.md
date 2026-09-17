@@ -29,6 +29,7 @@ are:
 | `data.image_size`, `data.spacing_mm` | 224, 0.625 (140 mm) |
 | `data.sampling_sigma_mm`, `data.validation_image_multiplier` | 40.0, 2 |
 | `data.reflection_augmentation.probability` | 0.5 |
+| `data.robust_center_outlier_mm` | `null`: plain study centre ([option](../data-preparation/current-preparation.md#robust-study-centre-option)) |
 | `model.backbone` | `rexnet_200.nav_in1k`, pretrained |
 | Projection and attention widths | 256 and 128 (`PROJECTION_WIDTH`, `MIL_ATTENTION_WIDTH`, constants) |
 | `model.dropout`, `model.series_dropout` | 0.0, 0.2 |
