@@ -1,0 +1,102 @@
+import sys
+import json
+from pathlib import Path
+
+import numpy as np
+import polars as pl
+
+sys.path.insert(0, "/home/claudio/src/knee-abnormality/outputs/analysis/token-cache-20260917")
+import cache_lib  # noqa: E402
+
+OUT = Path("/home/claudio/src/knee-abnormality/outputs/analysis/allocation-neyman-20260917")
+cache = cache_lib.load()
+SLOTS = cache_lib.SLOTS
+n_labels = len(cache.targets)
+
+data = np.load(OUT / "per_study_stats.npz")
+W, S, C = data["W"], data["S"], data["C"]
+available = data["available"]
+search_idx = data["search_idx"]
+
+patterns_df = pl.read_parquet(OUT / "study_patterns.parquet")
+study_index = {s: i for i, s in enumerate(cache.studies)}
+pattern_of = {study_index[row["study"]]: row["pattern"] for row in patterns_df.iter_rows(named=True)}
+
+by_pattern = {}
+for i in search_idx:
+    by_pattern.setdefault(pattern_of[i], []).append(i)
+
+results = {}
+for pattern, idxs in by_pattern.items():
+    idxs = np.array(idxs)
+    avail_row = available[idxs[0]]
+    for j in idxs:
+        assert (available[j] == avail_row).all()
+    present = np.nonzero(avail_row)[0]
+
+    Wm = W[idxs][:, present, :].mean(0)  # [types_present, labels]
+    Sm = S[idxs][:, present, :].mean(0)
+    Cm = C[idxs][:, present, :]  # [studies, types_present, labels]
+
+    neyman_raw = Wm * Sm  # [types_present, labels]
+    col_sum = neyman_raw.sum(0, keepdims=True)
+    col_sum[col_sum == 0] = 1.0
+    neyman_norm = neyman_raw / col_sum  # normalised per label
+
+    neyman_mean_label = neyman_norm.mean(1)  # [types_present]
+    neyman_mean_label = neyman_mean_label / neyman_mean_label.sum()
+
+    neyman_worst_label = neyman_norm.max(1)
+    neyman_worst_label = neyman_worst_label / neyman_worst_label.sum()
+
+    hard = cache.hard[idxs]  # [studies, labels]
+    sep_share = np.zeros((len(present), n_labels))
+    for li in range(n_labels):
+        pos = hard[:, li] == 1
+        neg = hard[:, li] == 0
+        if pos.sum() == 0 or neg.sum() == 0:
+            continue
+        d = Cm[pos, :, li].mean(0) - Cm[neg, :, li].mean(0)
+        total = d.sum()
+        if abs(total) < 1e-12:
+            continue
+        sep_share[:, li] = d / total
+
+    sep_share_mean_label = sep_share.mean(1)
+    ssum = sep_share_mean_label.sum()
+    sep_share_mean_label = sep_share_mean_label / ssum if ssum != 0 else np.ones(len(present)) / len(present)
+
+    token_share = np.array([
+        np.mean([
+            min(cache_lib.DEFAULT_COUNTS[s], int(cache.capacity[i, s]))
+            for i in idxs
+        ])
+        for s in present
+    ])
+    token_share = token_share / token_share.sum()
+
+    efficiency = np.divide(sep_share_mean_label, token_share, out=np.zeros_like(token_share), where=token_share > 0)
+    efficiency_norm = efficiency / efficiency.sum() if efficiency.sum() != 0 else token_share
+
+    results[pattern] = {
+        "present": present.tolist(),
+        "n_studies": len(idxs),
+        "W": Wm.tolist(),
+        "S": Sm.tolist(),
+        "neyman_mean_label": neyman_mean_label.tolist(),
+        "neyman_worst_label": neyman_worst_label.tolist(),
+        "sep_share_mean_label": sep_share_mean_label.tolist(),
+        "token_share": token_share.tolist(),
+        "efficiency_norm": efficiency_norm.tolist(),
+    }
+
+(OUT / "pattern_weights.json").write_text(json.dumps(results, indent=2))
+
+for pattern, r in results.items():
+    names = [SLOTS[s] for s in r["present"]]
+    print(pattern, "n=", r["n_studies"])
+    print("  present:", names)
+    print("  neyman_mean :", [round(v, 3) for v in r["neyman_mean_label"]])
+    print("  neyman_worst:", [round(v, 3) for v in r["neyman_worst_label"]])
+    print("  sep_share   :", [round(v, 3) for v in r["sep_share_mean_label"]])
+    print("  efficiency  :", [round(v, 3) for v in r["efficiency_norm"]])

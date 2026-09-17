@@ -20,10 +20,12 @@ from pytorch_lightning.plugins.io import TorchCheckpointIO
 
 from knee_abnormality.cli import CLISettings
 from knee_abnormality.config import (
+    ATTENTION_TEMPERATURE,
     INFERENCE_BATCH_SIZE,
     INFERENCE_NUM_WORKERS,
     TEST_IMAGE_MULTIPLIER,
     ExperimentConfig,
+    PositiveFiniteFloat,
     load_config,
 )
 from knee_abnormality.identity import validate_preprocessing_identity
@@ -71,6 +73,7 @@ class ExportCLI(CLISettings):
     target_python: str | None = Field(default=None, pattern=r"^\d+\.\d+$")
     target_platform: str | None = None
     image_multiplier: int = Field(default=TEST_IMAGE_MULTIPLIER, gt=0)
+    attention_temperature: PositiveFiniteFloat = ATTENTION_TEMPERATURE
     inference_batch_size: int = Field(default=INFERENCE_BATCH_SIZE, gt=0)
     inference_num_workers: int = Field(default=INFERENCE_NUM_WORKERS, ge=0)
 
@@ -323,7 +326,10 @@ def export_bundle(args: ExportCLI) -> dict:
             "experiment": config,
             "targets": list(targets),
             "fold": fold,
-            "inference": {"image_multiplier": args.image_multiplier},
+            "inference": {
+                "image_multiplier": args.image_multiplier,
+                "attention_temperature": args.attention_temperature,
+            },
         }
         (temporary / "config.json").write_text(
             json.dumps(bundle_config, indent=2) + "\n", encoding="utf-8"
@@ -332,7 +338,13 @@ def export_bundle(args: ExportCLI) -> dict:
         TorchCheckpointIO().save_checkpoint(exported, temporary / "model.ckpt")
         portable_config = load_config(temporary / "config.json")
         validate_checkpoint(exported, portable_config, targets)
-        checkpoint_model(exported, portable_config, targets, torch.device("cpu"))
+        checkpoint_model(
+            exported,
+            portable_config,
+            targets,
+            torch.device("cpu"),
+            args.attention_temperature,
+        )
         dependencies_by_name = {
             record["name"]: record
             for record in (
@@ -412,6 +424,7 @@ def export_bundle(args: ExportCLI) -> dict:
                 "device": "auto",
                 "precision": "auto",
                 "image_multiplier": args.image_multiplier,
+                "attention_temperature": args.attention_temperature,
                 "batch_size": args.inference_batch_size,
                 "batch_size_scope": "per_device",
                 "num_workers": args.inference_num_workers,

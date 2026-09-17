@@ -91,7 +91,7 @@ coronal T1/PD, coronal fluid, sagittal T1/PD, sagittal fluid):
 
 Both shrink axial T1/PD (rarest, weakest evidence) and grow fluid types (largest removal effects,
 already over-attended); B also shrinks coronal/sagittal T1/PD. Series capacity supports both:
-`validation_triplet_capacity_summary.csv` shows the p10 capacity per type is 16–26 images at the
+`validation_triplet_capacity_summary.csv` shows the p10 capacity per type is 16–26 triplets at the
 current budgets, well above either proposal, with 0% of slots short.
 
 **Missing-type fallback**, when a study lacks a type its budget would otherwise fill: use the same

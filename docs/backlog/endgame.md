@@ -77,6 +77,33 @@ Training reflection is implemented;
 [reflection TTA](../modeling/schedule-and-augmentation.md#study-level-knee-reflection) has not been
 evaluated.
 
+**More evaluation triplets** (measured on frozen checkpoints; not trained or submitted). On the
+fold-0 [token cache](../ongoing.md#triplet-budget-allocation), scaling the evaluation triplet counts
+of the three ranked-filtered checkpoints gives a mean macro AUC of:
+
+| Scale | Mean triplets per study | Macro AUC |
+|---|---:|---:|
+| ×1, the training allocation | 25.4 | 0.8873 |
+| ×2, the current `validation_image_multiplier` | 50.7 | 0.8907 |
+| ×2.5 | 65.2 | 0.8920 |
+| ×3 | 75.9 | 0.8922 |
+| ×4 | 99.3 | 0.8922 |
+| Every candidate | 165.1 | 0.8896 |
+
+These counts come from the cache with the whole-series intensity window, which is within 1e-4 of
+the exact pipeline at the default allocation. They change the token count, so they are confounded
+with the training/evaluation bag-size mismatch: the model trains on about 25 triplets per study and
+the rows above reach 165, where the attention softmax spreads over far more tokens than in
+training. The flattening past ×3, and the drop at every candidate, may be that penalty rather than
+saturation. The [attention temperature and count-normalised attention entries](small-changes.md#attention-pooling)
+address the same mismatch. `validation_image_multiplier` must be an integer, so ×3 is the next setting. Kaggle inference time grows with the count.
+The only recorded public comparison went the other way: on 2026-09-11, baseline4 scored 0.912 at
+×3 against 0.913 at ×2 with the same checkpoint
+([image count](../inference/inference-image-count-and-memory.md)). That checkpoint predates
+physical sampling and spatial tokens, and the difference is one rounding step. The user also
+reports a worse public score at ×3; its score and model are not recorded yet.
+Confirm with the exact path, and weigh the runtime, before changing the multiplier.
+
 ## Weight averaging
 
 **EMA or SWA as the final recipe's default** (measured on fold 0; moved here on 2026-09-17, the

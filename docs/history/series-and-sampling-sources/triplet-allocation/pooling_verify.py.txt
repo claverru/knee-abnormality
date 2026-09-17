@@ -1,0 +1,28 @@
+import sys
+
+import numpy as np
+import pooling_lib as pl_
+
+which = sys.argv[1] if len(sys.argv) > 1 else "main"
+cache = pl_.load_cache(which)
+rule = (12, 12, 10, 10, 10, 10)
+ref = cache.score_rule(rule, half=None)
+mine = pl_.score_variant(cache, rule, tau=1.0, count_norm=False, half=None)
+print(which, "macro_auc_mean ref", ref["macro_auc_mean"], "mine", mine["macro_auc_mean"])
+for run in cache.runs:
+    a = ref["runs"][run]["logits"]
+    b = mine["runs"][run]["logits"]
+    diff = np.abs(a - b)
+    finite = np.isfinite(a) & np.isfinite(b)
+    print(
+        "  run",
+        run,
+        "max abs logit diff",
+        float(np.nanmax(diff[finite])),
+        "mean abs",
+        float(np.nanmean(diff[finite])),
+        "macro_auc ref",
+        ref["runs"][run]["macro_auc"],
+        "mine",
+        mine["runs"][run]["macro_auc"],
+    )

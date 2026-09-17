@@ -1,0 +1,25 @@
+import polars as pl
+df = pl.read_csv("outputs/analysis/type-importance-20260917/validation_triplet_capacity.csv")
+types = ["ax_t1pd","ax_fluid","cor_t1pd","cor_fluid","sag_t1pd","sag_fluid"]
+base = dict(zip(types,[6,6,5,5,5,5]))
+other = {"ax_t1pd":"ax_fluid","ax_fluid":"ax_t1pd","cor_t1pd":"cor_fluid","cor_fluid":"cor_t1pd","sag_t1pd":"sag_fluid","sag_fluid":"sag_t1pd"}
+chain = ["cor_fluid","ax_fluid","sag_fluid"]
+for mult in (1,2):
+    rows=[]
+    for (study,), g in df.group_by("study"):
+        cap = dict(zip(g["type"], g["capacity"]))
+        budget = {t: base[t]*mult for t in cap}
+        before = sum(min(budget[t],cap[t]) for t in cap)
+        for t in types:
+            if t in cap: continue
+            need = base[t]*mult
+            for d in [other[t]]+chain:
+                if d not in cap or need==0: continue
+                take = min(need, cap[d]-budget[d])
+                if take>0: budget[d]+=take; need-=take
+        after = sum(min(budget[t],cap[t]) for t in cap)
+        rows.append(dict(study=study, n=len(cap), before=before, after=after, full=sum(base.values())*mult, **{f"b_{t}":budget.get(t,0) for t in types}))
+    r = pl.DataFrame(rows)
+    print("mult",mult, "studies",r.height, "changed",(r["after"]>r["before"]).sum(), "mean before",r["before"].mean(),"after",r["after"].mean(),"full",r["full"][0], "short of full",(r["after"]<r["full"]).sum())
+    print(r.group_by("n").agg(pl.len(), pl.col("before").mean(), pl.col("after").mean()).sort("n"))
+    print(r.select([pl.col(f"b_{t}").filter(pl.col(f"b_{t}")>0).mean().alias(t) for t in types]))

@@ -1,0 +1,173 @@
+import sys
+import json
+import numpy as np
+
+sys.path.insert(0, "/home/claudio/src/knee-abnormality/outputs/analysis/token-cache-20260917")
+import cache_lib
+
+OUT = "/home/claudio/src/knee-abnormality/outputs/analysis/allocation-substitution-20260917"
+
+cache = cache_lib.load()
+SLOTS = cache_lib.SLOTS
+DEFAULT = cache_lib.DEFAULT_COUNTS
+
+
+def apply_shares(counts, idxs, shares, budget):
+    counts = list(counts)
+    floor_shares = [int(np.floor(s)) for s in shares]
+    remainder = budget - sum(floor_shares)
+    order = sorted(range(len(idxs)), key=lambda i: -(shares[i] - floor_shares[i]))
+    add = list(floor_shares)
+    i = 0
+    while remainder > 0 and order:
+        add[order[i % len(order)]] += 1
+        remainder -= 1
+        i += 1
+    for idx, a in zip(idxs, add):
+        counts[idx] += a
+    return counts
+
+
+def proportional_rule(available, capacity):
+    counts = list(DEFAULT)
+    missing = [i for i in range(6) if not available[i]]
+    present = [i for i in range(6) if available[i]]
+    if not missing or not present:
+        return counts
+    total_budget = sum(counts[i] for i in missing)
+    for i in missing:
+        counts[i] = 0
+    wsum = sum(DEFAULT[i] for i in present)
+    if wsum <= 0:
+        return counts
+    shares = [total_budget * DEFAULT[i] / wsum for i in present]
+    return apply_shares(counts, present, shares, total_budget)
+
+
+PLANE_PARTNER = {0: 1, 1: 0, 2: 3, 3: 2, 4: 5, 5: 4}
+COR_T1PD = 2
+
+
+def hybrid_rule(available, capacity):
+    counts = list(DEFAULT)
+    missing = [i for i in range(6) if not available[i]]
+    if not missing:
+        return counts
+    leftover_types, leftover_budget = [], 0
+    for t in missing:
+        budget = counts[t]
+        counts[t] = 0
+        if t == COR_T1PD and available[PLANE_PARTNER[t]]:
+            counts[PLANE_PARTNER[t]] += budget
+        else:
+            leftover_budget += budget
+            leftover_types.append(t)
+    if leftover_budget > 0:
+        present = [i for i in range(6) if available[i] and i not in leftover_types]
+        wsum = sum(DEFAULT[i] for i in present)
+        if wsum > 0:
+            shares = [leftover_budget * DEFAULT[i] / wsum for i in present]
+            counts = apply_shares(counts, present, shares, leftover_budget)
+    return counts
+
+
+def score(rule_or_counts, mask, runs=None):
+    runs = runs or cache.runs
+    ids, per_study = cache.allocation_ids(rule_or_counts, mask)
+    logits = {run: cache.logits_from_ids(run, ids, per_study) for run in runs}
+    result = {"studies": int(mask.sum()), "mean_triplets": float(per_study[mask].mean())}
+    result["runs"] = {}
+    for run in runs:
+        probs = 1 / (1 + np.exp(-logits[run]))
+        m = cache_lib.aucs(cache.hard[mask], probs[mask], cache.targets, strict=False)
+        result["runs"][run] = {"probabilities": probs, **m}
+    macro_vals = [v["macro_auc"] for v in result["runs"].values() if v["macro_auc"] is not None]
+    result["macro_auc_mean"] = float(np.mean(macro_vals)) if macro_vals else None
+    result["per_run_macro"] = {run: result["runs"][run]["macro_auc"] for run in runs}
+    return result
+
+
+def mean_abs_prob_delta(res_a, res_b, mask):
+    diffs = []
+    for run in cache.runs:
+        pa = res_a["runs"][run]["probabilities"][mask]
+        pb = res_b["runs"][run]["probabilities"][mask]
+        diffs.append(float(np.nanmean(np.abs(pa - pb))))
+    return float(np.mean(diffs)), diffs
+
+
+def paired_bootstrap_macro(res_a, res_b, mask, n_boot=1000, seed=0):
+    rng = np.random.default_rng(seed)
+    idx = np.where(mask)[0]
+    n = len(idx)
+    per_run = []
+    for run in cache.runs:
+        pa = res_a["runs"][run]["probabilities"]
+        pb = res_b["runs"][run]["probabilities"]
+        y = cache.hard
+        boots = np.empty(n_boot)
+        for b in range(n_boot):
+            sample = rng.choice(idx, size=n, replace=True)
+            ma = cache_lib.aucs(y[sample], pa[sample], cache.targets, strict=False)["macro_auc"]
+            mb = cache_lib.aucs(y[sample], pb[sample], cache.targets, strict=False)["macro_auc"]
+            boots[b] = (ma - mb) if (ma is not None and mb is not None) else np.nan
+        per_run.append(boots)
+    stacked = np.nanmean(per_run, axis=0)
+    lo, hi = np.nanpercentile(stacked, [2.5, 97.5])
+    return {"mean": float(np.nanmean(stacked)), "ci95": [float(lo), float(hi)], "seed": seed, "n_boot": n_boot}
+
+
+search = cache.half_mask("search")
+confirm = cache.half_mask("confirm")
+avail = cache.available
+
+out = {}
+
+for half_name, mask in (("search", search), ("confirm", confirm)):
+    default_res = score(list(DEFAULT), mask)
+    prop_res = score(proportional_rule, mask)
+    hybrid_res = score(hybrid_rule, mask)
+    p_default_prop, _ = mean_abs_prob_delta(default_res, prop_res, mask)
+    p_default_hybrid, _ = mean_abs_prob_delta(default_res, hybrid_res, mask)
+    p_prop_hybrid, _ = mean_abs_prob_delta(prop_res, hybrid_res, mask)
+    out[half_name] = {
+        "n": int(mask.sum()),
+        "default": {
+            "macro_auc_mean": default_res["macro_auc_mean"],
+            "per_run_macro": default_res["per_run_macro"],
+            "mean_triplets": default_res["mean_triplets"],
+        },
+        "proportional": {
+            "macro_auc_mean": prop_res["macro_auc_mean"],
+            "per_run_macro": prop_res["per_run_macro"],
+            "mean_triplets": prop_res["mean_triplets"],
+            "gain_over_default": prop_res["macro_auc_mean"] - default_res["macro_auc_mean"],
+            "p_vs_default": p_default_prop,
+        },
+        "hybrid": {
+            "macro_auc_mean": hybrid_res["macro_auc_mean"],
+            "per_run_macro": hybrid_res["per_run_macro"],
+            "mean_triplets": hybrid_res["mean_triplets"],
+            "gain_over_default": hybrid_res["macro_auc_mean"] - default_res["macro_auc_mean"],
+            "p_vs_default": p_default_hybrid,
+        },
+        "prop_vs_hybrid_p": p_prop_hybrid,
+    }
+    print(half_name, "n", int(mask.sum()))
+    print(" default   ", default_res["macro_auc_mean"], default_res["mean_triplets"])
+    print(" proportional", prop_res["macro_auc_mean"], prop_res["mean_triplets"], "p_vs_default", p_default_prop)
+    print(" hybrid    ", hybrid_res["macro_auc_mean"], hybrid_res["mean_triplets"], "p_vs_default", p_default_hybrid)
+
+    if half_name == "search":
+        boot_prop = paired_bootstrap_macro(prop_res, default_res, mask, n_boot=500, seed=0)
+        boot_hybrid = paired_bootstrap_macro(hybrid_res, default_res, mask, n_boot=500, seed=0)
+        boot_prop_hybrid = paired_bootstrap_macro(prop_res, hybrid_res, mask, n_boot=500, seed=0)
+        out[half_name]["bootstrap_proportional_vs_default"] = boot_prop
+        out[half_name]["bootstrap_hybrid_vs_default"] = boot_hybrid
+        out[half_name]["bootstrap_proportional_vs_hybrid"] = boot_prop_hybrid
+        print(" boot prop-default", boot_prop)
+        print(" boot hybrid-default", boot_hybrid)
+        print(" boot prop-hybrid", boot_prop_hybrid)
+
+with open(f"{OUT}/finalists.json", "w") as f:
+    json.dump(out, f, indent=2)

@@ -1,7 +1,7 @@
 # Historical series and sampling analysis sources
 
 Scratch analysis code from the 2026-09-17 session that produced the series filtering, source ranking,
-plane/contrast importance, run-agreement and robust-centre implementation findings. The scripts ran from a session scratch
+plane/contrast importance, per-type contribution, run-agreement and robust-centre implementation findings. The scripts ran from a session scratch
 directory (`/tmp/claude-1000/<session>/scratchpad/<folder>/`) against the uncommitted tree of that day,
 so their hardcoded paths, sibling imports (`common.py`) and bypassed identity checks are
 snapshots, not maintained commands; they sit outside the executable
@@ -35,6 +35,44 @@ Plane/contrast importance: leave-one-type-out inference on the three 2026-09-17 
 | `infer.py` | [infer.py.txt](type-importance/infer.py.txt) | `eba02d0e59f397a8929d1712060d1437391d2e8f45f5761799d0e9b050c566e0` |
 | `numerics.py` | [numerics.py.txt](type-importance/numerics.py.txt) | `54bf66a3897e78945b5afaac484f5037612991503b951c787c7c62e1d57014dd` |
 | `numerics_no_tf32.py` | [numerics_no_tf32.py.txt](type-importance/numerics_no_tf32.py.txt) | `01ab5fd06b534a4810c2129b6c5b3e80a1644c31381aca663433911f8e849292` |
+
+## triplet-allocation
+
+Triplet budget allocation investigation: exact per-type logit contributions of the three ranked-filtered checkpoints (`infer.py` ran with `PYTHONPATH` on the checkpoints' extracted `source_snapshot.zip`; `summarize.py` builds the tables), a paired-bootstrap detection floor for test-time variants of one checkpoint (`detection_floor.py`, CPU, outputs in `outputs/analysis/detection-floor-20260917/`), the fold-0 token cache (`token-cache-20260917/*.py`, which stay runnable in that output folder with their own copy of the archived sources; `cache_lib.py` and `exact.py` are its API, documented in the folder's `README.md`), the phase-2 allocation analyses on that cache (`allocation-{curves,substitution,series,neyman,search-theory}-20260917/`, each script run from the repository root; the Neyman scripts ran from the session scratchpad and were copied into their output folder, and the two `*_confirm.py` series scripts are the search scripts rerun on the confirm half), the attention-temperature and bag-size rescoring of both caches (`pooling-bagsize-20260917/*.py`, CPU, findings in the [temperature record](../../validation/results/2026-09-17-attention-temperature.md)), and a simulation of the specified missing-type fill on the fold-0 triplet capacities of the [type-importance](#type-importance) outputs (`fill_sim.py`, run from the repository root, printed only). Findings: [record](../../validation/results/2026-09-17-type-contribution.md) and the [ongoing investigation](../../ongoing.md#triplet-budget-allocation) and the [test-time allocation record](../../validation/results/2026-09-17-test-time-allocation.md). Outputs: `outputs/analysis/type-contribution-20260917/`, `outputs/analysis/token-cache-20260917/`.
+
+| Original file | Snapshot | SHA-256 |
+|---|---|---|
+| `detection_floor.py` | [detection_floor.py.txt](triplet-allocation/detection_floor.py.txt) | `ffb8db15c77a0e7cabb91fb915afdc00b71125989c53442e62b691f9b051026d` |
+| `fill_sim.py` | [fill_sim.py.txt](triplet-allocation/fill_sim.py.txt) | `41fd3af9e8a7a96372f9eded1db5220d881eeee60a87d959655714592414a25d` |
+| `token-cache-20260917/build_pools.py` | [token_cache_build_pools.py.txt](triplet-allocation/token_cache_build_pools.py.txt) | `90978e774872771feb2db0cf158e4830913b093a0e606333d670b7d1c36dd655` |
+| `token-cache-20260917/cache_lib.py` | [token_cache_cache_lib.py.txt](triplet-allocation/token_cache_cache_lib.py.txt) | `f0863c0f932a2369ccba5e8ed18ae8d5c91531e754976dec65a642542be72e9f` |
+| `token-cache-20260917/check_exact.py` | [token_cache_check_exact.py.txt](triplet-allocation/token_cache_check_exact.py.txt) | `40dc2606d05afaaccd8fef4877aec1ff87b75c02422e962e8ed144b3a965fd96` |
+| `token-cache-20260917/check_pipeline.py` | [token_cache_check_pipeline.py.txt](triplet-allocation/token_cache_check_pipeline.py.txt) | `ae8bd084873bf59ebfac8187c3141da5505f8f2a9bdb17f676276680c5700ebe` |
+| `token-cache-20260917/encode_cache.py` | [token_cache_encode_cache.py.txt](triplet-allocation/token_cache_encode_cache.py.txt) | `ca06e6bb90650461f21f5615fde4a2d96a12c66cdc25f3b867d381a7927e01e2` |
+| `token-cache-20260917/exact.py` | [token_cache_exact.py.txt](triplet-allocation/token_cache_exact.py.txt) | `738b93fd105f65e6a1406804c84c8c676f2ca9926e559d332425bde8ae3f09e3` |
+| `token-cache-20260917/finalize.py` | [token_cache_finalize.py.txt](triplet-allocation/token_cache_finalize.py.txt) | `123f914c5486ee1b24a6b59dbd7e1fc876cdba0b01361cafad49a704620ed8e5` |
+| `allocation-curves-20260917/curves.py` | [curves_curves.py.txt](triplet-allocation/curves_curves.py.txt) | `af48ad6b708a28ef8d163ef8a65d96fed203529b0270165a6ccc066088cdb1fe` |
+| `allocation-substitution-20260917/run_substitution.py` | [substitution_run_substitution.py.txt](triplet-allocation/substitution_run_substitution.py.txt) | `2bb3f6bd1b172d9c3c24ce264e002c1dcdfda8475ae6ed85db4ce8edef6b6eea` |
+| `allocation-substitution-20260917/finalists.py` | [substitution_finalists.py.txt](triplet-allocation/substitution_finalists.py.txt) | `8649a5f645a2335096f07b5ed7220b1e9357c5efad2bbfc8fc3013e33f520b81` |
+| `allocation-series-20260917/step2_default_split.py` | [series_step2_default_split.py.txt](triplet-allocation/series_step2_default_split.py.txt) | `dbf1966f0832e1646863ed31d380af0c135a898d9c604dd5093d7e099505b1dc` |
+| `allocation-series-20260917/step3_marginal_k.py` | [series_step3_marginal_k.py.txt](triplet-allocation/series_step3_marginal_k.py.txt) | `a00d1f1495c075c4dc41a24b161868d4dce4cf967f22b63f97b86a2c42178b27` |
+| `allocation-series-20260917/step2_default_split_confirm.py` | [series_step2_default_split_confirm.py.txt](triplet-allocation/series_step2_default_split_confirm.py.txt) | `713589acd1c98ad2518bd0925f072a4886cfa522b2c1fd2ab9cefbb59c05d17c` |
+| `allocation-series-20260917/step3_marginal_k_confirm.py` | [series_step3_marginal_k_confirm.py.txt](triplet-allocation/series_step3_marginal_k_confirm.py.txt) | `482c278f72c935c7ea7f4e686a05798b71eda6651b3f6a1690c57580e76ff60c` |
+| `allocation-neyman-20260917/build_weights.py` | [neyman_build_weights.py.txt](triplet-allocation/neyman_build_weights.py.txt) | `77f11417b7e658dce057def5a722184627292b65aadf363f012b85562a42f276` |
+| `allocation-neyman-20260917/aggregate.py` | [neyman_aggregate.py.txt](triplet-allocation/neyman_aggregate.py.txt) | `e9f26d398902a4181f7efd9b4b08495fcd359c9746c02bb2e45be27689a58da4` |
+| `allocation-neyman-20260917/rules.py` | [neyman_rules.py.txt](triplet-allocation/neyman_rules.py.txt) | `dc4c6fb2f5659c80c695541eb40c88271555ada02fa26227f9cd67eb7962476d` |
+| `allocation-neyman-20260917/run_scoring.py` | [neyman_run_scoring.py.txt](triplet-allocation/neyman_run_scoring.py.txt) | `56028b0d9c169564aae503646d9a75d708b8577b23e1a28a8f08da054ebab43f` |
+| `allocation-neyman-20260917/confirm.py` | [neyman_confirm.py.txt](triplet-allocation/neyman_confirm.py.txt) | `34fc9551e776cb32f0a777858f168656f91ff462c7b8545a24eda3cd0d016f7d` |
+| `allocation-search-theory-20260917/depth_profiles.py` | [search_theory_depth_profiles.py.txt](triplet-allocation/search_theory_depth_profiles.py.txt) | `706f370df8e68a1de46c78876e981b7997f86d5dfd0ceb75e673a87b8d8126d4` |
+| `allocation-search-theory-20260917/waterfill.py` | [search_theory_waterfill.py.txt](triplet-allocation/search_theory_waterfill.py.txt) | `44837675d0a1fe293241dbd1e45ce09060d9ebdcdc2ed7bb2021d2a1be86ee78` |
+| `allocation-search-theory-20260917/confirm.py` | [search_theory_confirm.py.txt](triplet-allocation/search_theory_confirm.py.txt) | `d53550ebcdd5ad5ac9b3b24e6be80b7e7375b54202a92082bc0104152c0a58ab` |
+| `pooling-bagsize-20260917/pooling_lib.py` | [pooling_pooling_lib.py.txt](triplet-allocation/pooling_pooling_lib.py.txt) | `e3e088ab56ab95bb936322dde311d79785cfb322e64adc340f2036c37ae0029a` |
+| `pooling-bagsize-20260917/run_variants.py` | [pooling_run_variants.py.txt](triplet-allocation/pooling_run_variants.py.txt) | `cf40757980a254b2ae8a37c482dc658f05eb6bcf97c1cb2b8052c17f0ce99f02` |
+| `pooling-bagsize-20260917/tau_sweep.py` | [pooling_tau_sweep.py.txt](triplet-allocation/pooling_tau_sweep.py.txt) | `7a29d96cc28412caac031cf42346462fe493887f347a2b9fb6e8151ba6840ebb` |
+| `pooling-bagsize-20260917/tau_bootstrap.py` | [pooling_tau_bootstrap.py.txt](triplet-allocation/pooling_tau_bootstrap.py.txt) | `2ed141ec44196133e16c1e2f791d34fb3ed572182f08e9dbdc09d24fc085f4c2` |
+| `pooling-bagsize-20260917/verify.py` | [pooling_verify.py.txt](triplet-allocation/pooling_verify.py.txt) | `b05aa866aa757af12fe071813cf1da975b10b5e5aaa411597b9dc2246b419467` |
+| `infer.py` | [infer.py.txt](triplet-allocation/infer.py.txt) | `4ddfcb8d470beda1a5f9e01a84cd4bd3e20a7633f4b7adb49c4b4d271823336b` |
+| `summarize.py` | [summarize.py.txt](triplet-allocation/summarize.py.txt) | `956689bd4be7618c32485f88329d6efc94ca730ef75c5fabe273b63e54e415d4` |
 
 ## series-filtering
 

@@ -1,0 +1,116 @@
+import json
+import pickle
+import sys
+import time
+from multiprocessing import Pool
+from pathlib import Path
+
+import knee_abnormality
+import polars as pl
+
+from knee_abnormality.config import load_config
+from knee_abnormality.data.dataset import PREPARATION_ERRORS
+from knee_abnormality.data.labels import STUDY, load_fold_labels
+from knee_abnormality.data.preprocessing.sampling import build_pool
+from knee_abnormality.inference.engine import (
+    prediction_dataset,
+    prediction_image_multiplier,
+)
+
+ROOT = Path("/home/claudio/src/knee-abnormality")
+OUT = ROOT / "outputs/analysis/token-cache-20260917"
+RUN = ROOT / "outputs/training/ranked-filtered-seed42"
+SLOTS = ("ax_t1pd", "ax_fluid", "cor_t1pd", "cor_fluid", "sag_t1pd", "sag_fluid")
+DATASET = None
+
+
+def study_state(index):
+    dataset = DATASET
+    row = dataset.studies.row(index, named=True)
+    study = dataset.series_index[row[STUDY]]
+    dataset._index_study_geometry(study)
+    excluded = dataset._excluded_series[study.uid]
+    reference = dataset._study_references[study.uid]
+    radius = dataset.data.image_size * dataset.data.spacing_mm / 2
+    slots = []
+    for slot in range(len(study.slots)):
+        candidates = {c.uid: c for c in study.slots[slot] if c.uid not in excluded}
+        sources, index_failures = [], []
+        for uid, candidate in sorted(candidates.items()):
+            try:
+                sources.append((uid, dataset._indexed(candidate)))
+            except PREPARATION_ERRORS as error:
+                index_failures.append(f"{uid}: {type(error).__name__}: {error}")
+        kind = dataset.data.series_types[slot]
+        pool = build_pool(
+            tuple(sources),
+            kind.plane,
+            reference,
+            dataset.data.spacing_mm,
+            radius,
+            set(),
+            set(),
+        )
+        slots.append(
+            {
+                "sources": tuple(sources),
+                "directories": {uid: str(c.directory) for uid, c in candidates.items()},
+                "excluded_sources": sorted(
+                    c.uid for c in study.slots[slot] if c.uid in excluded
+                ),
+                "index_failures": index_failures,
+                "base_candidates": len(pool.candidates),
+                "physical": pool.physical,
+            }
+        )
+    return study.uid, {"reference": reference, "excluded": excluded, "slots": slots}
+
+
+def main():
+    global DATASET
+    print(knee_abnormality.__file__, flush=True)
+    started = time.perf_counter()
+    config = load_config(RUN / "effective_config.json")
+    labels = load_fold_labels(config, 0)
+    multiplier = prediction_image_multiplier(config, "validation")
+    DATASET = prediction_dataset(config, labels.targets, labels.validation, "train", multiplier)
+    workers = int(sys.argv[1]) if len(sys.argv) > 1 else 28
+    with Pool(workers) as pool:
+        states = dict(pool.imap(study_state, range(len(DATASET)), chunksize=4))
+    order = labels.validation[STUDY].to_list()
+    rows = [
+        {
+            "study": uid,
+            "slot": slot,
+            "slot_name": SLOTS[slot],
+            "sources": len(value["sources"]),
+            "excluded_sources": len(value["excluded_sources"]),
+            "index_failures": len(value["index_failures"]),
+            "base_candidates": value["base_candidates"],
+            "physical": value["physical"],
+        }
+        for uid in order
+        for slot, value in enumerate(states[uid]["slots"])
+    ]
+    OUT.mkdir(parents=True, exist_ok=True)
+    with (OUT / "pools_raw.pkl").open("wb") as stream:
+        pickle.dump({"order": order, "states": states}, stream, protocol=5)
+    frame = pl.DataFrame(rows)
+    frame.write_csv(OUT / "pool_sources.csv")
+    print(
+        json.dumps(
+            {
+                "studies": len(order),
+                "seconds": time.perf_counter() - started,
+                "base_candidates": int(frame["base_candidates"].sum()),
+                "index_failures": int(frame["index_failures"].sum()),
+                "excluded_sources": int(frame["excluded_sources"].sum()),
+            }
+        ),
+        flush=True,
+    )
+    print(frame.group_by("slot_name").agg(pl.col("base_candidates").sum(), (pl.col("sources") > 1).sum().alias("multi"), (pl.col("base_candidates") > 0).sum().alias("present")).sort("slot_name"))
+
+
+if __name__ == "__main__":
+    main()
