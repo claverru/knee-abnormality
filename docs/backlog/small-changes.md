@@ -19,6 +19,53 @@ changes realized triplet quality rather than just determinism. The implemented s
 already prefers the newest retake when entitlements tie, but a superseded series still supplies its
 entitlement share of the targets.
 
+## Study-level triplet total
+
+**Hypothesis (test-time ties; training effect untested).** Today each type has a fixed budget, so a
+study's total depends on which types it has: fold 0 has 112 studies at 32 training triplets, 529
+at 26 and about 260 at 21. Here the total is set per study and split over the present types in
+proportion to today's budgets (6/6/5/5/5/5). This applies in training, validation and Kaggle
+inference, and changes the preprocessing identity. It is part of the
+[allocation investigation](../ongoing.md#triplet-budget-allocation). Each variant is its own run.
+
+- **Top-up** (preferred). A study whose per-type budgets sum below T = 26 training triplets is
+  raised to 26, and studies at or above 26 keep their budgets.
+  - *Compute:* +5.5% on fold 0 (26.8 against 25.4 training triplets per study).
+  - *Why:* proportional renormalisation was the best missing-type rule measured, and no study
+    loses triplets. That matters because trained uniform cuts cost 0.004–0.005 (`less_images`,
+    `less_less_images`).
+  - *Test time, frozen checkpoints, T = 52 evaluation triplets:* +0.0011 on search and −0.0002 on
+    confirm (p ≈ 0.006), a tie.
+- **Fixed total.** Every study gets T = 26 training triplets, so six-type studies drop from 32 to
+  26.
+  - *Compute:* +2.5%.
+  - *Test time:* +0.0009 on search and −0.0006 on confirm, a tie.
+  - *Risk:* the six-type cut is about the size of cut that hurt in training.
+- *Implementation:* compute each study's counts from its present slots before `select_triplets`,
+  using largest-remainder rounding. Cap each count at the slot's capacity and redistribute the
+  excess.
+- *Run:* report per-target AUC and realised triplets per availability pattern.
+
+## Repeated-series share
+
+**Hypothesis (the value of a second series is measured on frozen checkpoints; the rule is untested
+in training).** A slot with k usable series gets its base budget × (1 + β·(k − 1)). The increase is
+taken proportionally from the study's other present slots, so the total stays fixed. Fold 0 has
+660 repeated slots in 436 studies.
+
+- *Why:* on the [test-time allocation](../validation/results/2026-09-17-test-time-allocation.md#repeated-series-in-one-slot)
+  cache, keeping only the top-ranked series cost 0.0019 on search and 0.0037 on confirm. Extra
+  triplets also helped more from the second series than from the top one in all six comparisons.
+- *Test time, frozen checkpoints:*
+
+  | β | Search | Confirm |
+  |---|---:|---:|
+  | 0.5 | +0.0003 | −0.0003 |
+  | 1.0 | −0.0010 | −0.0015 |
+
+  A frozen model does not reward the larger share, so any gain would have to come from training.
+- *Run:* β = 0.5, one run, with the split between series left to the sampler.
+
 ## Per-type budget reallocation
 
 **Hypothesis, evidence from removal and capacity analysis.** Shrink axial T1/PD's `max_images`
@@ -47,50 +94,47 @@ sagittal fluid): A = 9/18/15/21/15/18 (totals 96 all-types, 87 typical five-type
 - *Run:* against a fresh control, report per-target AUC (plane/contrast budgets affect targets
   unevenly) and realized triplet-quality proxies, since reallocation is a budget change, not just
   a total-slice change.
+- *Test-time evidence (2026-09-17):* on frozen checkpoints,
+  [reallocations among present types did not confirm](../validation/results/2026-09-17-test-time-allocation.md).
+  For a missing type, the fallback order above scored worse than losing the budget, while
+  proportional renormalisation over the present types did better. The proportional gain matches
+  uniform scaling at the same compute. A training run is still the only test of a
+  training-time allocation.
+- **Random per-type allocation in training is retired.** Drawing each study's per-type counts from
+  a Dirichlet every epoch tied
+  ([result](../validation/results/2026-09-17-allocation-concentration-result.md)) and its purpose,
+  making a test-time allocation search on-distribution, came to nothing: that checkpoint responds
+  to reallocation exactly like the fixed-split ones
+  ([test-time allocation](../validation/results/2026-09-17-test-time-allocation.md#the-allocation-trained-checkpoint-responds-the-same)).
+  The option was removed from the code.
+- **Reallocation after series dropout** (hypothesis). Give a dropped slot's triplets to the
+  study's remaining types by the allocation rule. This needs dropout to move from the model to
+  the sampler, because today it drops encoded series in `model.py`.
 
 ## Attention pooling
 
-- **Acquisition-count-normalized attention** (hypothesis; external evidence only). Subtract
-  `log(tokens contributed by the acquisition)` from each token's attention score, so every series
-  starts with the same attention mass whatever its triplet count.
-  - *Why:* a study's softmax runs over the spatial tokens of every retained triplet, so a series
-    with twelve sampled triplets outweighs one with a single triplet by count alone. The per-plane
-    budgets in `data.series_types` (18 axial versus 15 coronal and sagittal, times the image
-    multiplier) skew attention by sampling budget rather than evidence. Nothing balances series
-    against series.
-  - *Evidence (unverified here):* an experiment log from another of the user's competitions kept
-    this change ("acquisition-count-normalized MIL attention: subtract log retained windows per
-    acquisition", scored 0.92304 with model, sampler and optimizer unchanged), with no control
-    delta recorded.
-  - *Attention already skews toward fluid types, not toward budget.* On studies with all six
-    types, mean attention-share ÷ token-share across all targets and the three 2026-09-17 control
-    checkpoints is 0.63 (axial T1/PD), 1.18 (axial fluid), 0.73 (coronal T1/PD), 1.17 (coronal
-    fluid), 0.86 (sagittal T1/PD), 1.46 (sagittal fluid): every fluid type is over-attended and
-    every T1/PD type under-attended relative to its token share, even though each plane's T1/PD
-    and fluid budgets are equal (18/18, 15/15, 15/15 images) ([type-importance
-    result](../validation/results/2026-09-17-plane-contrast-importance.md#attention-already-over-weights-fluid-types)).
-    Normalizing by token count would flatten this further toward equal per-token attention; the
-    per-type removal evidence in the same result says fluid types deserve more, not less, weight,
-    so acquisition-count normalization and the type-importance evidence pull in opposite
-    directions and should not both be adopted uncritically.
-  - *Run:* keep the sampler, supervision and budget fixed, and report per-target AUC, since plane
-    budgets differ per target.
+Acquisition-count-normalised attention was implemented, trained and
+[rejected](../validation/results/2026-09-17-count-normalized-attention-result.md): equalising each
+series' attention mass lost 0.0035 [−0.0069, −0.0001] against the same recipe without it, with the
+menisci worst hit, and it was neutral-to-negative at inference. The option was removed from the
+code.
+
 - **Several attention heads per label** (hypothesis, no design yet). Listed during the
   [crop-selection investigation](../history/crop-selection-investigation.md#options-not-pursued).
-- **Attention temperature** (hypothesis; read-only diagnostic first). Divide the scorer output by
-  one shared `tau` before the masked softmax in `_attention_pool`
-  (`src/knee_abnormality/modeling/model.py`), with `tau` 0.75, 1.0 and 1.5, on the three 2026-09-17
-  control checkpoints; 1.0 must reproduce the saved predictions. Run `encode_batch` once per batch
-  and pool three times.
-  - *Why:* validation bags hold up to 64 triplets against 32 in training, and series dropout acts
-    only in training, so the trained scorer may pool the denser bag too sharply or too diffusely.
-    More tokens alone do not dilute attention (duplicating every token leaves pooling unchanged);
-    the question is about different additional evidence.
+- **Attention temperature** (**measured on frozen checkpoints; not implemented**). Divide the
+  scorer output by one shared `tau` before the masked softmax in `_attention_pool`
+  (`src/knee_abnormality/modeling/model.py`). The diagnostic is done: on the token caches, `tau`
+  0.75 gains +0.0024 [+0.0012, +0.0037] macro AUC over 1.0 at today's allocation, with a smooth
+  peak at 0.7–0.75 and every one of four checkpoints gaining 0.0021–0.0026
+  ([result](../validation/results/2026-09-17-attention-temperature.md)).
   - *Not logit calibration:* scaling a target's final logits keeps its AUC; attention temperature
     changes the evidence mixture and can change rankings.
-  - *Report:* macro and per-target AUC for all three values, optionally attention entropy or
-    effective token count. Select one shared value, not one per target. Retraining can absorb a
-    shared temperature into the scorer's last layer, so the value is a cheap direction check.
+  - *Implementation:* one shared value, not one per target. Inference only needs the pooling
+    change, so existing checkpoints and their Kaggle bundles can use it; decide whether training
+    also uses it, since a trained scorer can absorb a shared temperature into its last layer and
+    may move the optimum.
+  - *Before adopting:* confirm on the exact path rather than the cache, then on the leaderboard;
+    the fold-0 gain is the size that has failed to transfer before.
 - **Identity-initialized gated attention** (hypothesis; external evidence only). Multiply the
   scorer's tanh branch by a gate that starts at one:
   `a_t(h) = w_t^T [tanh(V h + b_V) * 2 sigmoid(U h + b_U)] + b_t`, with `U` and `b_U` zero. Keep

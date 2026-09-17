@@ -1,0 +1,419 @@
+import hashlib
+import json
+import math
+import sys
+import time
+from collections import defaultdict
+from pathlib import Path
+
+import knee_abnormality
+import numpy as np
+import polars as pl
+import torch
+from torch.utils.data import DataLoader, Dataset
+
+ROOT = Path("/home/claudio/src/knee-abnormality")
+OUT = ROOT / "outputs/analysis/token-cache-20260917"
+sys.path.insert(0, str(OUT))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+import cache_lib  # noqa: E402
+from encode_cache import candidate_series, encode_tokens, synthetic_batch  # noqa: E402
+from knee_abnormality.config import load_config  # noqa: E402
+from knee_abnormality.data.labels import STUDY, load_fold_labels  # noqa: E402
+from knee_abnormality.data.preprocessing.preparation import prepare_series  # noqa: E402
+from knee_abnormality.data.preprocessing.sampling import build_pool  # noqa: E402
+from knee_abnormality.inference.checkpoint import load_checkpoint_model  # noqa: E402
+from knee_abnormality.inference.engine import (  # noqa: E402
+    prediction_dataset,
+    prediction_image_multiplier,
+)
+from knee_abnormality.training.cuda import configure_cuda_allocator  # noqa: E402
+
+RUNS = cache_lib.RUNS
+DETAIL_STUDIES = 30
+
+
+class RealStudies(Dataset):
+    def __init__(self, dataset, detail):
+        self.dataset = dataset
+        self.detail = detail
+
+    def __len__(self):
+        return len(self.dataset)
+
+    def __getitem__(self, index):
+        item = self.dataset[index]
+        keep = item["study_uid"] in self.detail
+        slots = [
+            {
+                "keys": [(a["uid"], a["middle_path"]) for a in meta["assignments"]],
+                "attempts": meta["attempts"],
+                "capacity": meta["capacity"],
+                "triplets": meta["triplets"],
+                "failed_paths": meta["failed_paths"],
+                "failed_sources": meta["failed_sources"],
+            }
+            for meta in item["sampling"]
+        ]
+        series = []
+        for slot, values in enumerate(item["series"]):
+            for value in values:
+                entry = {
+                    "slot": slot,
+                    "uid": value.uid,
+                    "window": value.intensity_bounds,
+                    "middles": [group[1] for group in value.selected_paths],
+                }
+                if keep:
+                    entry.update(
+                        images=value.images,
+                        positions=value.positions,
+                        valid_rects=value.valid_rects,
+                    )
+                series.append(entry)
+        return {
+            "study": item["study_uid"],
+            "slots": slots,
+            "series": series,
+            "failures": list(item["failures"]),
+        }
+
+
+def cache_window_series(cache, study, slot, uid, middles, data):
+    state = cache.states[study]
+    kind = data.series_types[slot]
+    pool = build_pool(
+        state["slots"][slot]["sources"],
+        kind.plane,
+        state["reference"],
+        data.spacing_mm,
+        cache.radius,
+        set(),
+        set(),
+    )
+    triplets = candidate_series(pool)[uid]
+    records = tuple(r for t in triplets for r in t.records)
+    prepared = prepare_series(
+        records, data.spacing_mm, data.image_size, data.lower_quantile, data.upper_quantile
+    )
+    order = {group[1]: i for i, group in enumerate(prepared.selected_paths)}
+    rows = torch.as_tensor([order[m] for m in middles])
+    return {
+        "slot": slot,
+        "images": prepared.images[rows],
+        "positions": prepared.positions[rows],
+        "valid_rects": prepared.valid_rects[rows],
+        "window": prepared.intensity_bounds,
+    }
+
+
+def encode_series(models, items, data, device):
+    batch = synthetic_batch(items, data.image_size)
+    batch = {k: v.to(device) for k, v in batch.items()}
+    output = {}
+    with torch.inference_mode():
+        for name, model in models.items():
+            scores, contribution, valid = encode_tokens(model, batch)
+            output[name] = (
+                scores.cpu().numpy(),
+                contribution.cpu().numpy(),
+                valid.cpu().numpy(),
+            )
+    torch.cuda.synchronize()
+    return output
+
+
+def pooled(scores, contribution, valid, bias):
+    scores = scores.reshape(-1, scores.shape[-1]).astype(np.float64)
+    contribution = contribution.reshape(-1, contribution.shape[-1]).astype(np.float64)
+    keep = valid.reshape(-1)
+    scores, contribution = scores[keep], contribution[keep]
+    weights = np.exp(scores - scores.max(0))
+    weights /= weights.sum(0)
+    return (weights * contribution).sum(0) + bias
+
+
+def diff_stats(a, b):
+    delta = np.abs(np.asarray(a, dtype=np.float64) - np.asarray(b, dtype=np.float64))
+    return {"max_abs": float(delta.max()), "mean_abs": float(delta.mean())}
+
+
+def round_half_up(value):
+    return int(math.floor(value + 0.5))
+
+
+def main():
+    print(knee_abnormality.__file__, flush=True)
+    started = time.perf_counter()
+    workers = int(sys.argv[1]) if len(sys.argv) > 1 else 24
+    cache = cache_lib.TokenCache()
+    (OUT / "checks").mkdir(exist_ok=True)
+    report = {"source": knee_abnormality.__file__}
+    run_dir = ROOT / "outputs/training" / RUNS[0]
+    config = load_config(run_dir / "effective_config.json")
+    labels = load_fold_labels(config, 0)
+    data = config.data
+    detail = sorted(cache.studies, key=lambda s: hashlib.sha256(s.encode()).hexdigest())[:DETAIL_STUDIES]
+    dataset = prediction_dataset(
+        config,
+        labels.targets,
+        labels.validation,
+        "train",
+        prediction_image_multiplier(config, "validation"),
+    )
+    loader = DataLoader(
+        RealStudies(dataset, set(detail)),
+        batch_size=None,
+        num_workers=workers,
+        prefetch_factor=4,
+    )
+    real = {}
+    for item in loader:
+        real[item["study"]] = item
+    report["real_pass_seconds"] = time.perf_counter() - started
+    if list(real) != list(cache.studies):
+        raise ValueError("Real pass order differs")
+
+    tick = time.perf_counter()
+    mismatch_rows = []
+    slot_checks = defaultdict(int)
+    for study, item in real.items():
+        index = cache.study_index[study]
+        for slot, value in enumerate(item["slots"]):
+            n = cache_lib.DEFAULT_COUNTS[slot]
+            present = bool(cache.available[index, slot])
+            emulated = list(cache.select(study, slot, n)) if present else []
+            metadata = cache.selection_metadata(study, slot, n) if present else {}
+            table_ids = cache.selected_ids(study, slot, n)
+            live_ids = cache.ids(emulated, study, slot)
+            slot_checks["slots"] += 1
+            slot_checks["present"] += present
+            slot_checks["real_present"] += bool(value["keys"])
+            slot_checks["attempts_gt1_real"] += value["attempts"] > 1
+            slot_checks["real_failed_paths"] += bool(value["failed_paths"])
+            slot_checks["real_failed_sources"] += bool(value["failed_sources"])
+            slot_checks["ordered_equal"] += emulated == [tuple(k) for k in value["keys"]]
+            slot_checks["set_equal"] += set(emulated) == {tuple(k) for k in value["keys"]}
+            slot_checks["table_equal"] += np.array_equal(table_ids, live_ids)
+            if present:
+                slot_checks["capacity_equal"] += metadata["capacity"] == value["capacity"]
+                slot_checks["cache_capacity_equal"] += int(cache.capacity[index, slot]) == value["capacity"]
+                slot_checks["shortfall_slots"] += value["triplets"] < n
+            if emulated != [tuple(k) for k in value["keys"]]:
+                mismatch_rows.append(
+                    {
+                        "study": study,
+                        "slot": slot,
+                        "real": len(value["keys"]),
+                        "emulated": len(emulated),
+                        "common": len(set(emulated) & {tuple(k) for k in value["keys"]}),
+                    }
+                )
+    report["selection_check"] = {
+        **{k: int(v) for k, v in slot_checks.items()},
+        "mismatched_slots": len(mismatch_rows),
+        "mismatches": mismatch_rows[:20],
+        "real_conditions": int(sum(len(item["failures"]) for item in real.values())),
+        "seconds": time.perf_counter() - tick,
+    }
+    real_series = {
+        (study, s["slot"], s["uid"]): s for study, item in real.items() for s in item["series"]
+    }
+    windows = []
+    series_table = pl.read_parquet(OUT / "series.parquet")
+    for study, slot, uid, low, high, unique, candidates in series_table.select(
+        "study", "slot", "series", "window_low", "window_high", "unique_slices", "candidates"
+    ).iter_rows():
+        value = real_series.get((study, slot, uid))
+        if value is None:
+            continue
+        real_low, real_high = value["window"]
+        span = real_high - real_low
+        windows.append(
+            {
+                "study": study,
+                "slot": slot,
+                "series": uid,
+                "real_low": real_low,
+                "real_high": real_high,
+                "cache_low": low,
+                "cache_high": high,
+                "low_shift_of_span": (low - real_low) / span,
+                "high_shift_of_span": (high - real_high) / span,
+                "span_ratio": (high - low) / span,
+                "selected": len(value["middles"]),
+                "candidates": candidates,
+            }
+        )
+    windows = pl.DataFrame(windows)
+    windows.write_parquet(OUT / "checks/window_shift.parquet")
+    report["window_shift"] = {
+        "series": windows.height,
+        "abs_low_shift_of_span": windows["low_shift_of_span"].abs().describe().to_dicts(),
+        "abs_high_shift_of_span": windows["high_shift_of_span"].abs().describe().to_dicts(),
+        "span_ratio_quantiles": {
+            str(q): float(windows["span_ratio"].quantile(q)) for q in (0.01, 0.05, 0.5, 0.95, 0.99)
+        },
+        "abs_high_shift_quantiles": {
+            str(q): float(windows["high_shift_of_span"].abs().quantile(q)) for q in (0.5, 0.9, 0.99, 1.0)
+        },
+    }
+
+    tick = time.perf_counter()
+    default = cache.score_rule(cache_lib.DEFAULT_COUNTS)
+    comparison = {}
+    for run in RUNS:
+        saved = pl.read_csv(ROOT / "outputs/training" / run / "fold_0/validation_predictions.csv")
+        if saved[STUDY].to_list() != list(cache.studies):
+            raise ValueError("Saved order differs")
+        saved_values = saved.select(cache.targets).to_numpy()
+        emulated = default["runs"][run]["probabilities"]
+        saved_metrics = cache.evaluate(saved_values)
+        token_logits = np.stack(
+            [cache.pool_logits(run, study, cache_lib.DEFAULT_COUNTS) for study in cache.studies]
+        )
+        comparison[run] = {
+            "probability_diff": diff_stats(emulated, saved_values),
+            "logit_diff_vs_saved": diff_stats(
+                default["runs"][run]["logits"], np.log(saved_values) - np.log1p(-saved_values)
+            ),
+            "token_path_vs_triplet_path_logit_max_abs": diff_stats(
+                token_logits, default["runs"][run]["logits"]
+            )["max_abs"],
+            "macro_auc_emulated": default["runs"][run]["macro_auc"],
+            "macro_auc_saved": saved_metrics["macro_auc"],
+            "macro_auc_diff": default["runs"][run]["macro_auc"] - saved_metrics["macro_auc"],
+            "per_target_auc_diff": {
+                t: default["runs"][run]["per_target_auc"][t] - saved_metrics["per_target_auc"][t]
+                for t in cache.targets
+            },
+        }
+    report["probability_check"] = comparison
+    report["probability_check_seconds"] = time.perf_counter() - tick
+
+    configure_cuda_allocator()
+    torch.set_float32_matmul_precision("high")
+    torch.backends.cudnn.benchmark = False
+    device = torch.device("cuda")
+    models = {}
+    for run in RUNS:
+        directory = ROOT / "outputs/training" / run
+        run_config = load_config(directory / "effective_config.json")
+        selected = json.loads((directory / "fold_0/selected_checkpoint.json").read_text())
+        models[run] = load_checkpoint_model(
+            run_config,
+            labels.targets,
+            directory / "fold_0" / Path(selected["path"]).name,
+            device,
+            expected_fold=0,
+        )
+    tick = time.perf_counter()
+    token_rows = defaultdict(lambda: defaultdict(list))
+    logit_rows = defaultdict(lambda: defaultdict(list))
+    for study in detail:
+        entries = [s for s in real[study]["series"]]
+        real_items = [
+            {
+                "slot": s["slot"],
+                "images": s["images"],
+                "positions": s["positions"],
+                "valid_rects": s["valid_rects"],
+            }
+            for s in entries
+        ]
+        window_items = [
+            cache_window_series(cache, study, s["slot"], s["uid"], s["middles"], data)
+            for s in entries
+        ]
+        ids = np.concatenate(
+            [cache.ids([(s["uid"], m) for m in s["middles"]], study, s["slot"]) for s in entries]
+        )
+        real_tokens = encode_series(models, real_items, data, device)
+        window_tokens = encode_series(models, window_items, data, device)
+        for run in RUNS:
+            stored_scores = np.asarray(cache.scores[run][ids])
+            stored_contribution = np.asarray(cache.contribution[run][ids])
+            stored_valid = np.asarray(cache.visual_valid[ids])
+            variants = {
+                "real": real_tokens[run],
+                "cache_window_reencoded": window_tokens[run],
+                "stored": (stored_scores, stored_contribution, stored_valid),
+            }
+            for left, right in (
+                ("real", "stored"),
+                ("real", "cache_window_reencoded"),
+                ("cache_window_reencoded", "stored"),
+            ):
+                a, b = variants[left], variants[right]
+                if not np.array_equal(a[2], b[2]):
+                    token_rows[run][f"{left}_vs_{right}_valid_mismatch"].append(1)
+                keep = a[2] & b[2]
+                token_rows[run][f"{left}_vs_{right}_scores"].append(np.abs(a[0] - b[0])[keep])
+                token_rows[run][f"{left}_vs_{right}_contribution"].append(
+                    np.abs(a[1] - b[1])[keep]
+                )
+                logit_rows[run][f"{left}_vs_{right}"].append(
+                    pooled(*a, cache.bias[run]) - pooled(*b, cache.bias[run])
+                )
+            logit_rows[run]["stored_vs_triplet_summary"].append(
+                pooled(*variants["stored"], cache.bias[run])
+                - cache.logits_from_sets(run, {study: ids})[cache.study_index[study]]
+            )
+    normalization = {}
+    for run in RUNS:
+        entry = {}
+        for key, values in token_rows[run].items():
+            if key.endswith("valid_mismatch"):
+                entry[key] = int(sum(values))
+                continue
+            flat = np.concatenate([v.ravel() for v in values])
+            entry[key] = {
+                "max_abs": float(flat.max()),
+                "mean_abs": float(flat.mean()),
+                "p99_abs": float(np.quantile(flat, 0.99)),
+            }
+        for key, values in logit_rows[run].items():
+            flat = np.abs(np.stack(values))
+            entry[f"logit_{key}"] = {"max_abs": float(flat.max()), "mean_abs": float(flat.mean())}
+        normalization[run] = entry
+    report["normalization_check"] = {
+        "studies": detail,
+        "per_run": normalization,
+        "seconds": time.perf_counter() - tick,
+    }
+
+    tick = time.perf_counter()
+    scales = (0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 3.0)
+    smoke = []
+    rules = [("training", cache_lib.TRAINING_COUNTS)]
+    rules += [
+        (f"default_x{scale}", tuple(round_half_up(v * scale) for v in cache_lib.DEFAULT_COUNTS))
+        for scale in scales
+    ]
+    rules.append(("capacity", cache.capacity))
+    for name, rule in rules:
+        result = cache.score_rule(rule)
+        row = {
+            "rule": name,
+            "counts": "/".join(map(str, rule)) if isinstance(rule, tuple) else "capacity",
+            "mean_triplets": result["mean_triplets"],
+            "macro_auc_mean": result["macro_auc_mean"],
+        }
+        for run in RUNS:
+            row[run] = result["runs"][run]["macro_auc"]
+        for half in ("search", "confirm"):
+            part = cache.score_rule(rule, half=half)
+            row[f"{half}_macro_auc_mean"] = part["macro_auc_mean"]
+        smoke.append(row)
+        print(json.dumps(row), flush=True)
+    pl.DataFrame(smoke).write_csv(OUT / "checks/allocation_smoke.csv")
+    report["allocation_smoke"] = smoke
+    report["allocation_smoke_seconds"] = time.perf_counter() - tick
+    report["total_seconds"] = time.perf_counter() - started
+    (OUT / "checks/checks.json").write_text(json.dumps(report, indent=2) + "\n")
+    print(json.dumps({k: v for k, v in report.items() if k != "allocation_smoke"}, indent=1)[:6000])
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,101 @@
+import hashlib
+import json
+import shutil
+import sys
+import time
+import zipfile
+from pathlib import Path
+
+ROOT = Path("/home/claudio/src/knee-abnormality")
+OUT = ROOT / "outputs/analysis/token-cache-20260917"
+RUNS = ("ranked-filtered-seed42", "ranked-filtered-seed43", "ranked-filtered-seed44")
+
+
+def copy_snapshot(source):
+    target = OUT / "snapshot_src"
+    if target.exists():
+        shutil.rmtree(target)
+    shutil.copytree(
+        source / "knee_abnormality",
+        target / "knee_abnormality",
+        ignore=shutil.ignore_patterns("__pycache__"),
+    )
+    for run in RUNS:
+        with zipfile.ZipFile(ROOT / "outputs/training" / run / "source_snapshot.zip") as archive:
+            members = [m for m in archive.namelist() if m.startswith("src/knee_abnormality/") and m.endswith(".py")]
+            for member in members:
+                local = target / member.removeprefix("src/")
+                if archive.read(member) != local.read_bytes():
+                    raise ValueError(f"{run}: {member} differs from the snapshot copy")
+    return len(members)
+
+
+def main():
+    started = time.perf_counter()
+    checked = copy_snapshot(Path(sys.argv[1]))
+    sys.path.insert(0, str(OUT))
+    import knee_abnormality
+    import polars as pl
+
+    from knee_abnormality.config import load_config
+    from knee_abnormality.data.labels import STUDY, load_fold_labels
+
+    print(knee_abnormality.__file__, flush=True)
+    config = load_config(ROOT / "outputs/training" / RUNS[0] / "effective_config.json")
+    labels = load_fold_labels(config, 0)
+    labels.validation.select(
+        STUDY, "is_gold", *[f"target_{t}" for t in labels.targets]
+    ).write_parquet(OUT / "targets.parquet")
+    import cache_lib
+
+    cache = cache_lib.TokenCache(load_tables=False)
+    table_started = time.perf_counter()
+    table = cache.build_selection_table(int(sys.argv[2]) if len(sys.argv) > 2 else 28)
+    table_seconds = time.perf_counter() - table_started
+    rows = []
+    for index, study in enumerate(cache.studies):
+        pattern = "+".join(name for name, v in zip(cache_lib.SLOTS, cache.available[index]) if v)
+        rows.append(
+            {
+                "study": study,
+                "pattern": pattern,
+                "hash": hashlib.sha256(study.encode()).hexdigest(),
+            }
+        )
+    frame = pl.DataFrame(rows).with_row_index("order")
+    frame = (
+        frame.sort("pattern", "hash")
+        .with_columns(
+            pl.int_range(pl.len()).over("pattern").alias("rank")
+        )
+        .with_columns(
+            pl.when(pl.col("rank") % 2 == 0)
+            .then(pl.lit("search"))
+            .otherwise(pl.lit("confirm"))
+            .alias("half")
+        )
+        .sort("order")
+    )
+    frame.select("study", "pattern", "half").write_csv(OUT / "split.csv")
+    summary = frame.group_by("pattern", "half").len().sort("pattern", "half")
+    print(summary)
+    print(frame.group_by("half").len())
+    (OUT / "finalize.json").write_text(
+        json.dumps(
+            {
+                "snapshot_files_checked_per_run": checked,
+                "selection_rows": int((table["length"] > 0).sum()),
+                "selected_ids_stored": int(len(table["ids"])),
+                "max_capacity": int(table["capacity"].max()),
+                "table_seconds": table_seconds,
+                "total_seconds": time.perf_counter() - started,
+                "split": frame.group_by("half").len().sort("half").to_dicts(),
+            },
+            indent=2,
+        )
+        + "\n"
+    )
+
+
+if __name__ == "__main__":
+    main()

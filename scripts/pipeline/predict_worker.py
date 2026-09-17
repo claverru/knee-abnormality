@@ -51,6 +51,7 @@ def predict_request(request: PredictionRequest) -> dict:
             request.checkpoint,
             device,
             expected_fold=request.fold if request.split == "validation" else None,
+            attention_temperature=request.attention_temperature,
         )
         if actual_precision == "fp16":
             use_fixed_backbone_chunks(model, request.config.data.image_size)
@@ -93,6 +94,7 @@ def predict_request(request: PredictionRequest) -> dict:
     frame.write_csv(request.output)
     result = {
         "worker_index": request.worker_index,
+        "attention_temperature": request.attention_temperature,
         "studies": frame.height,
         "device": str(device),
         "gpu_name": torch.cuda.get_device_name() if device.type == "cuda" else None,

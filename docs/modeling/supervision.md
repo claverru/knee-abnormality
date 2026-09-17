@@ -123,14 +123,19 @@ submission are covered by the completed result linked above.
 
 ## Official labeling context
 
-The [host's annotation overview](https://www.kaggle.com/competitions/rsna-knee-abnormality-detection/discussion/733343)
-describes examination-level reference labels from two MSK radiologists, with
-disagreements adjudicated by a third. Borderline findings were graded negative.
-The rubric distinguishes high-grade ACL/MCL tears from mild degeneration or
-sprain; meniscal surface-reaching tears from intrasubstance degeneration; and
-moderate/large effusions and Baker's cysts from minor findings. OA requires a
-substantial area of high-grade cartilage loss. Use the complete rubric when
-designing extraction, rather than marking every abnormality mention positive.
+The [official label criteria](../metadata/official-label-criteria.md) hold the
+host's verbatim rubric: examination-level reference labels from two MSK
+radiologists with a third adjudicating, borderline findings graded negative,
+high-grade ACL/MCL tears distinguished from mild degeneration or sprain,
+meniscal surface-reaching tears from intrasubstance degeneration, moderate/large
+effusions and Baker's cysts from minor findings, and OA requiring a substantial
+area of high-grade cartilage loss. Use the complete rubric when designing
+extraction, rather than marking every abnormality mention positive.
+
+That document also records two host statements that constrain supervision: the
+image-derived label is authoritative wherever report text disagrees, and a
+negative means the finding was annotated absent rather than unannotated, so
+report silence is an unobserved label and not a missing one.
 
 The [official data page](https://www.kaggle.com/competitions/rsna-knee-abnormality-detection/data)
 confirms that reports are training-only and are not provided for test studies.

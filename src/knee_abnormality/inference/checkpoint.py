@@ -2,7 +2,11 @@ from pathlib import Path
 
 import torch
 
-from knee_abnormality.config import ExperimentConfig
+from knee_abnormality.config import (
+    ATTENTION_TEMPERATURE,
+    ExperimentConfig,
+    validate_attention_temperature,
+)
 from knee_abnormality.identity import validate_preprocessing_identity
 from knee_abnormality.modeling.model import KneeAbnormalityModel
 from knee_abnormality.provenance import sha256_file
@@ -72,11 +76,23 @@ def validate_checkpoint(
     return saved_config
 
 
+def apply_attention_temperature(
+    model: KneeAbnormalityModel, temperature: float
+) -> float:
+    temperature = validate_attention_temperature(temperature)
+    scorer = model.attention[-1]
+    with torch.no_grad():
+        scorer.weight.div_(temperature)
+        scorer.bias.div_(temperature)
+    return temperature
+
+
 def checkpoint_model(
     checkpoint: dict,
     config: ExperimentConfig,
     targets: tuple[str, ...],
     device: torch.device,
+    attention_temperature: float = ATTENTION_TEMPERATURE,
 ) -> KneeAbnormalityModel:
     state = {
         key.removeprefix("model."): value
@@ -87,6 +103,7 @@ def checkpoint_model(
         config.model, config.data, len(targets), load_pretrained=False
     )
     model.load_state_dict(state, strict=True)
+    apply_attention_temperature(model, attention_temperature)
     model.to(device).eval()
     return model
 
@@ -98,7 +115,8 @@ def load_checkpoint_model(
     device: torch.device,
     *,
     expected_fold: int | None = None,
+    attention_temperature: float = ATTENTION_TEMPERATURE,
 ) -> KneeAbnormalityModel:
     checkpoint = read_checkpoint(checkpoint_path)
     validate_checkpoint(checkpoint, config, targets, expected_fold)
-    return checkpoint_model(checkpoint, config, targets, device)
+    return checkpoint_model(checkpoint, config, targets, device, attention_temperature)

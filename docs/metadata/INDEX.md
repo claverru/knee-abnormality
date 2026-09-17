@@ -2,6 +2,7 @@
 
 | Read when | Document |
 |---|---|
+| Quoting the host's verbatim twelve-target criteria, the image-over-report precedence, the absence of target missingness, or retrieving forum discussions through the Kaggle SDK | [Official label criteria](official-label-criteria.md) |
 | Downloading the five official CSVs, checking their schemas, hashes, identifiers, joins and the approximate hidden test split | [Official CSV audit](official-csv-audit.md) |
 | Checking representative scanner headers, series metadata combinations, images per series or historical shortest-series limits | [Acquisition and series profiles](acquisition-and-series-profiles.md) |
 | Reproducing the heavy lexical report normalization and its duplicate-fingerprint counts | [Heavy report normalization](report-normalization.md) |

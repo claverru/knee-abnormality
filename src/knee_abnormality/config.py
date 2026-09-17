@@ -1,4 +1,5 @@
 import json
+import math
 import sys
 from pathlib import Path
 from typing import Annotated, Literal
@@ -22,12 +23,22 @@ from knee_abnormality.cli import CLISettings
 
 SLICES_PER_INPUT = 3
 TEST_IMAGE_MULTIPLIER = 2
+ATTENTION_TEMPERATURE = 1.0
 INFERENCE_BATCH_SIZE = 4
 INFERENCE_NUM_WORKERS = 16
 
 Identifier = Annotated[str, StringConstraints(pattern=r"^[A-Za-z0-9][A-Za-z0-9_.-]*$")]
 Fold = Annotated[StrictInt, Field(ge=0)]
 PositiveFiniteFloat = Annotated[float, Field(gt=0, allow_inf_nan=False)]
+
+
+def validate_attention_temperature(value: object) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise TypeError("Attention temperature must be a positive finite float")
+    result = float(value)
+    if not math.isfinite(result) or result <= 0:
+        raise ValueError("Attention temperature must be a positive finite float")
+    return result
 
 
 def ordered_range(value: tuple[float, float]) -> tuple[float, float]:

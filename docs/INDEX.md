@@ -9,7 +9,7 @@ Working knowledge for the [RSNA Knee Abnormality Detection competition](https://
 | Deciding how far to trust unverified working notes and how to iterate from the baseline | [How to use these notes](#how-to-use-these-notes) |
 | Deciding where code belongs, setting up Python and matching dependencies or Lightning to Kaggle's GPU image, or following the geometry contract, data flow, config and experiment-artifact rules | [Architecture](architecture/INDEX.md) |
 | Finding a reusable script, locating an investigation, or adding and indexing a command | [Script index](../scripts/INDEX.md) |
-| Downloading small competition files or checking CSV schemas, report normalization, series profiles, image counts or knee-side metadata | [Competition metadata](metadata/INDEX.md) |
+| Downloading small competition files or checking CSV schemas, report normalization, series profiles, image counts, knee-side metadata or the host's verbatim label criteria | [Competition metadata](metadata/INDEX.md) |
 | Downloading or preparing MRI images, DICOM reading, preprocessing profiles, loader threading, augmentation previews, reflection geometry, or the implemented physical sampler, its verification and metadata analysis | [Data preparation](data-preparation/INDEX.md) |
 | Choosing public label files or checking their coverage, uncertainty semantics, reference agreement and newer label comparisons | [Public label audit](public-labels/INDEX.md) |
 | Choosing or swapping a backbone, following tensor shapes, checking reference-label coverage and supervision (inferred labels, Tonylin setup), or understanding the current full-slice spatial-token model, its recipe and reproduction, inputs, schedule or reflection | [Modeling](modeling/INDEX.md) |

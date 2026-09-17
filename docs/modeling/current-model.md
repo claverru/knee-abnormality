@@ -33,6 +33,7 @@ are:
 | `model.backbone` | `rexnet_200.nav_in1k`, pretrained |
 | Projection and attention widths | 256 and 128 (`PROJECTION_WIDTH`, `MIL_ATTENTION_WIDTH`, constants) |
 | `model.dropout`, `model.series_dropout` | 0.0, 0.2 |
+| `model.count_normalized_attention` | `false`: a series' attention mass grows with its triplet count; `true` subtracts `log(that acquisition's valid tokens)` from each token's score in `_attention_pool` ([entry](../backlog/small-changes.md#attention-pooling)) |
 | Precision | BF16 mixed on one automatically selected device (`PRECISION`, a constant) |
 
 The optimizer, schedule and trainer settings are described in

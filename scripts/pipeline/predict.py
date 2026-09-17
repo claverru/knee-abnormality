@@ -15,9 +15,11 @@ from pydantic_settings import CliPositionalArg, SettingsError
 
 from knee_abnormality.cli import CLISettings
 from knee_abnormality.config import (
+    ATTENTION_TEMPERATURE,
     INFERENCE_BATCH_SIZE,
     INFERENCE_NUM_WORKERS,
     Fold,
+    PositiveFiniteFloat,
     load_config,
 )
 from knee_abnormality.data.labels import STUDY
@@ -57,6 +59,10 @@ class PredictCLI(CLISettings):
     device: Literal["auto", "cpu", "cuda"] = "auto"
     precision: Literal["auto", "fp32", "fp16", "bf16"] = "auto"
     image_multiplier: int | None = Field(default=None, gt=0)
+    attention_temperature: PositiveFiniteFloat | None = Field(
+        default=None,
+        description="Pooling softmax temperature; defaults to the bundle or repository value",
+    )
 
 
 def main() -> None:
@@ -93,6 +99,9 @@ def main() -> None:
             if manifest is not None
             else {
                 "image_multiplier": args.image_multiplier,
+                "attention_temperature": ATTENTION_TEMPERATURE
+                if args.attention_temperature is None
+                else args.attention_temperature,
                 "batch_size": INFERENCE_BATCH_SIZE,
                 "num_workers": INFERENCE_NUM_WORKERS,
             }
@@ -103,6 +112,12 @@ def main() -> None:
             and args.image_multiplier != runtime["image_multiplier"]
         ):
             raise ValueError("Export a new bundle to change its image multiplier")
+        if (
+            manifest is not None
+            and args.attention_temperature is not None
+            and args.attention_temperature != runtime["attention_temperature"]
+        ):
+            raise ValueError("Export a new bundle to change its attention temperature")
         fold = args.fold if args.fold is not None else config.validation.folds[0]
         targets, studies, _ = prediction_studies(config, args.split, fold)
         image_multiplier = (
@@ -151,6 +166,7 @@ def main() -> None:
                     split=args.split,
                     fold=fold,
                     image_multiplier=image_multiplier,
+                    attention_temperature=runtime["attention_temperature"],
                     batch_size=batch_size,
                     num_workers=num_workers // worker_count
                     + int(index < num_workers % worker_count),
@@ -209,6 +225,7 @@ def main() -> None:
                 if len(precisions) == 1
                 else "mixed",
                 "image_multiplier": image_multiplier,
+                "attention_temperature": runtime["attention_temperature"],
                 "batch_size": batch_size,
                 "batch_size_scope": "per_device",
                 "num_workers": num_workers,

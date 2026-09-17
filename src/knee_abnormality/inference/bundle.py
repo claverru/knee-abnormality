@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 
+from knee_abnormality.config import validate_attention_temperature
 from knee_abnormality.provenance import sha256_file
 
 BUNDLE_SCHEMA_VERSION = 1
@@ -56,6 +57,15 @@ def verify_bundle(root: Path) -> dict:
         or multiplier != manifest["runtime"]["image_multiplier"]
     ):
         raise ValueError("Bundle inference image multiplier differs from the manifest")
+    temperature = validate_attention_temperature(
+        config["inference"]["attention_temperature"]
+    )
+    if temperature != validate_attention_temperature(
+        manifest["runtime"]["attention_temperature"]
+    ):
+        raise ValueError(
+            "Bundle inference attention temperature differs from the manifest"
+        )
     return manifest
 
 

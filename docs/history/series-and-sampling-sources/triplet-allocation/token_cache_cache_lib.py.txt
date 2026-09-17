@@ -1,0 +1,379 @@
+import hashlib
+import json
+import pickle
+import sys
+from functools import lru_cache
+from multiprocessing import Pool
+from pathlib import Path
+
+import numpy as np
+import polars as pl
+
+CACHE = Path(__file__).resolve().parent
+SNAPSHOT = CACHE / "snapshot_src"
+if "knee_abnormality" not in sys.modules:
+    sys.path.insert(0, str(SNAPSHOT))
+
+import knee_abnormality  # noqa: E402
+from knee_abnormality.config import SeriesTypeConfig  # noqa: E402
+from knee_abnormality.data.labels import STUDY, TARGET_THRESHOLD  # noqa: E402
+from knee_abnormality.data.preprocessing.sampling import (  # noqa: E402
+    build_pool,
+    geometry_groups,
+    select_triplets,
+)
+from knee_abnormality.evaluation.metrics import aucs  # noqa: E402
+
+for _relative in (
+    "data/preprocessing/sampling.py",
+    "data/preprocessing/preparation.py",
+    "data/dataset.py",
+    "modeling/model.py",
+    "evaluation/metrics.py",
+):
+    _loaded = Path(knee_abnormality.__file__).parent / _relative
+    _expected = SNAPSHOT / "knee_abnormality" / _relative
+    if hashlib.sha256(_loaded.read_bytes()).digest() != hashlib.sha256(
+        _expected.read_bytes()
+    ).digest():
+        raise ImportError(f"knee_abnormality is not the archived snapshot: {_relative}")
+
+SLOTS = ("ax_t1pd", "ax_fluid", "cor_t1pd", "cor_fluid", "sag_t1pd", "sag_fluid")
+RUNS = ("ranked-filtered-seed42", "ranked-filtered-seed43", "ranked-filtered-seed44")
+DEFAULT_COUNTS = (12, 12, 10, 10, 10, 10)
+TRAINING_COUNTS = (6, 6, 5, 5, 5, 5)
+TOKENS = 49
+_STATE = None
+
+
+def combine(lse, mixed, per_study, bias):
+    per_study = np.asarray(per_study, dtype=np.int64)
+    logits = np.full((len(per_study), lse.shape[1]), np.nan)
+    present = per_study > 0
+    if not present.any():
+        return logits
+    starts = (np.cumsum(per_study) - per_study)[present]
+    segment = np.repeat(np.arange(present.sum()), per_study[present])
+    peak = np.maximum.reduceat(lse, starts, axis=0)
+    if not np.isfinite(peak).all():
+        raise ValueError("A study has no visually valid spatial tokens")
+    total = peak + np.log(np.add.reduceat(np.exp(lse - peak[segment]), starts, axis=0))
+    weights = np.exp(lse - total[segment])
+    logits[present] = np.add.reduceat(weights * mixed, starts, axis=0) + bias
+    return logits
+
+
+class TokenCache:
+    def __init__(self, root=CACHE, runs=RUNS, load_tables=True):
+        self.root = Path(root)
+        self.runs = tuple(runs)
+        self.build = json.loads((self.root / "build.json").read_text())
+        with (self.root / "pools.pkl").open("rb") as stream:
+            pools = pickle.load(stream)
+        self.studies = tuple(pools["order"])
+        self.states = pools["states"]
+        self.series_types = tuple(
+            SeriesTypeConfig.model_validate(kind) for kind in pools["series_types"]
+        )
+        data = self.build["data"]
+        self.spacing_mm = data["spacing_mm"]
+        self.radius = data["image_size"] * data["spacing_mm"] / 2
+        self.sigma = data["sampling_sigma_mm"]
+        self.study_index = {uid: i for i, uid in enumerate(self.studies)}
+        self.triplets = pl.read_parquet(self.root / "triplets.parquet")
+        if self.triplets["triplet"].to_list() != list(range(self.triplets.height)):
+            raise ValueError("Triplet ids must be dense and ordered")
+        self.triplet_study = (
+            self.triplets["study"].replace_strict(self.study_index).to_numpy()
+        )
+        self.triplet_slot = self.triplets["slot"].to_numpy()
+        self.key_to_id = {
+            (study, slot, series, middle): triplet
+            for triplet, study, slot, series, middle in self.triplets.select(
+                "triplet", "study", "slot", "series", "middle_path"
+            ).iter_rows()
+        }
+        labels = pl.read_parquet(self.root / "targets.parquet")
+        if labels[STUDY].to_list() != list(self.studies):
+            raise ValueError("Target order differs from cache order")
+        self.targets = tuple(c.removeprefix("target_") for c in labels.columns if c.startswith("target_"))
+        self.y = labels.select(f"target_{t}" for t in self.targets).to_numpy()
+        self.hard = (self.y >= TARGET_THRESHOLD).astype(np.int8)
+        self.is_gold = labels["is_gold"].to_numpy()
+        tokens = self.root / "tokens"
+        self.bias = {run: np.asarray(self.build["bias"][run], dtype=np.float64) for run in self.runs}
+        self.lse = {run: np.load(tokens / f"{run}_triplet_lse.npy") for run in self.runs}
+        self.mixed = {run: np.load(tokens / f"{run}_triplet_mixed.npy") for run in self.runs}
+        self.visual_valid = np.load(tokens / "visual_valid.npy", mmap_mode="r")
+        self.scores = {run: np.load(tokens / f"{run}_scores.npy", mmap_mode="r") for run in self.runs}
+        self.contribution = {
+            run: np.load(tokens / f"{run}_contribution.npy", mmap_mode="r") for run in self.runs
+        }
+        self.split = None
+        if (self.root / "split.csv").exists():
+            self.split = pl.read_csv(self.root / "split.csv", schema_overrides={"pattern": pl.String})
+            if self.split["study"].to_list() != list(self.studies):
+                raise ValueError("Split order differs from cache order")
+        self._select = lru_cache(maxsize=None)(self._select_uncached)
+        self._pool = lru_cache(maxsize=None)(self._pool_uncached)
+        self.table = None
+        if load_tables and (self.root / "selections.npz").exists():
+            table = np.load(self.root / "selections.npz")
+            self.table = {key: table[key] for key in table.files}
+            self.capacity = self.table["capacity"]
+        else:
+            self.capacity = np.asarray(
+                [[self.base_capacity(s, k) for k in range(len(SLOTS))] for s in self.studies]
+            )
+        self.available = self.capacity > 0
+
+    def half_mask(self, half=None):
+        if half is None:
+            return np.ones(len(self.studies), dtype=bool)
+        if self.split is None:
+            raise ValueError("split.csv is missing")
+        return (self.split["half"] == half).to_numpy()
+
+    def _pool_uncached(self, study, slot, failed_paths, failed_sources):
+        state = self.states[study]
+        kind = self.series_types[slot]
+        return build_pool(
+            state["slots"][slot]["sources"],
+            kind.plane,
+            state["reference"],
+            self.spacing_mm,
+            self.radius,
+            set(failed_paths),
+            set(failed_sources),
+        )
+
+    def base_capacity(self, study, slot):
+        return len(geometry_groups(self._pool(study, slot, frozenset(), frozenset()), self.radius))
+
+    def _select_uncached(self, study, slot, n):
+        if n < 1:
+            return (), {"requested_triplets": n, "triplets": 0, "attempts": 0}
+        state = self.states[study]["slots"][slot]
+        kind = self.series_types[slot]
+        known_paths, known_sources = state["failed_paths"], state["failed_sources"]
+        failed_paths, failed_sources, attempts = frozenset(), frozenset(), 0
+        while True:
+            pool = self._pool(study, slot, failed_paths, failed_sources)
+            selection = select_triplets(
+                pool,
+                n,
+                self.sigma,
+                self.radius,
+                study,
+                (kind.plane, kind.fluid_sensitive, kind.fat_suppression),
+                None,
+                0,
+            )
+            attempts += 1
+            uids = {t.uid for t in selection.triplets}
+            new_sources = uids & known_sources
+            new_paths = {
+                r.path
+                for t in selection.triplets
+                if t.uid not in known_sources
+                for r in t.records
+            } & known_paths
+            if not new_paths and not new_sources:
+                keys = tuple((t.uid, str(t.records[1].path)) for t in selection.triplets)
+                metadata = {
+                    **selection.metadata,
+                    "attempts": attempts,
+                    "failed_paths": sorted(map(str, failed_paths)),
+                    "failed_sources": sorted(failed_sources),
+                }
+                return keys, metadata
+            if not ((new_paths - failed_paths) or (new_sources - failed_sources)):
+                raise RuntimeError("Preparation retry made no progress")
+            failed_paths = failed_paths | new_paths
+            failed_sources = failed_sources | new_sources
+
+    def select(self, study, slot, n):
+        return self._select(study, slot, int(n))[0]
+
+    def selection_metadata(self, study, slot, n):
+        return self._select(study, slot, int(n))[1]
+
+    def ids(self, keys, study, slot):
+        return np.asarray([self.key_to_id[(study, slot, series, middle)] for series, middle in keys], dtype=np.int64)
+
+    def selected_ids(self, study, slot, n):
+        index = self.study_index[study]
+        n = min(int(n), int(self.capacity[index, slot]))
+        if self.table is not None:
+            start = self.table["start"][index, slot, n]
+            return self.table["ids"][start : start + self.table["length"][index, slot, n]].astype(np.int64)
+        return self.ids(self.select(study, slot, n), study, slot)
+
+    def build_selection_table(self, workers=28):
+        global _STATE
+        _STATE = self
+        jobs = [(s, k) for s in self.studies for k in range(len(SLOTS))]
+        with Pool(workers) as pool:
+            results = pool.map(_slot_table_with_ids, jobs, chunksize=8)
+        capacity = np.zeros((len(self.studies), len(SLOTS)), dtype=np.int64)
+        for study, slot, value, _ in results:
+            capacity[self.study_index[study], slot] = value
+        width = int(capacity.max()) + 1
+        start = np.zeros((len(self.studies), len(SLOTS), width), dtype=np.int64)
+        length = np.zeros((len(self.studies), len(SLOTS), width), dtype=np.int32)
+        chunks, cursor = [], 0
+        for study, slot, _, selections in results:
+            index = self.study_index[study]
+            for n, ids in enumerate(selections, start=1):
+                start[index, slot, n] = cursor
+                length[index, slot, n] = len(ids)
+                chunks.append(ids.astype(np.int32))
+                cursor += len(ids)
+        ids = np.concatenate(chunks) if chunks else np.zeros(0, dtype=np.int32)
+        np.savez(self.root / "selections.npz", ids=ids, start=start, length=length, capacity=capacity)
+        self.table = {"ids": ids, "start": start, "length": length, "capacity": capacity}
+        self.capacity = capacity
+        self.available = capacity > 0
+        return self.table
+
+    def counts_for(self, rule):
+        if callable(rule):
+            counts = np.asarray(
+                [
+                    rule(tuple(bool(v) for v in self.available[i]), tuple(int(v) for v in self.capacity[i]))
+                    for i in range(len(self.studies))
+                ],
+                dtype=np.int64,
+            )
+        else:
+            counts = np.asarray(rule, dtype=np.int64)
+            if counts.ndim == 1:
+                counts = np.broadcast_to(counts, (len(self.studies), len(SLOTS)))
+        if counts.shape != (len(self.studies), len(SLOTS)) or (counts < 0).any():
+            raise ValueError("Counts must be non-negative with shape (studies, 6)")
+        return np.where(self.available, np.minimum(counts, self.capacity), 0)
+
+    def allocation_ids(self, rule, mask=None):
+        if self.table is None:
+            raise ValueError("selections.npz is missing; call build_selection_table")
+        counts = self.counts_for(rule)
+        if mask is not None:
+            counts = np.where(np.asarray(mask)[:, None], counts, 0)
+        rows = np.arange(len(self.studies))[:, None]
+        slots = np.arange(len(SLOTS))[None]
+        starts = self.table["start"][rows, slots, counts].ravel()
+        lengths = self.table["length"][rows, slots, counts].ravel().astype(np.int64)
+        total = int(lengths.sum())
+        offsets = np.repeat(starts - np.cumsum(lengths) + lengths, lengths) + np.arange(total)
+        ids = self.table["ids"][offsets].astype(np.int64)
+        per_study = lengths.reshape(len(self.studies), len(SLOTS)).sum(1)
+        return ids, per_study
+
+    def logits_from_ids(self, run, ids, per_study):
+        ids = np.asarray(ids, dtype=np.int64)
+        return combine(self.lse[run][ids], self.mixed[run][ids], per_study, self.bias[run])
+
+    def logits_from_sets(self, run, id_sets):
+        if isinstance(id_sets, dict):
+            id_sets = [id_sets.get(study, ()) for study in self.studies]
+        if len(id_sets) != len(self.studies):
+            raise ValueError("Provide one id set per cached study (empty to skip)")
+        arrays = [np.asarray(v, dtype=np.int64).ravel() for v in id_sets]
+        for index, values in enumerate(arrays):
+            if len(values) and not (self.triplet_study[values] == index).all():
+                raise ValueError(f"Triplet ids of another study given for {self.studies[index]}")
+        ids = np.concatenate(arrays) if arrays else np.zeros(0, dtype=np.int64)
+        return self.logits_from_ids(run, ids, [len(v) for v in arrays])
+
+    def evaluate(self, probabilities, mask=None):
+        mask = np.ones(len(self.studies), dtype=bool) if mask is None else np.asarray(mask)
+        values = probabilities[mask]
+        if not np.isfinite(values).all():
+            raise ValueError("Evaluated studies need at least one triplet")
+        return aucs(self.hard[mask], values, self.targets)
+
+    def score_logits(self, logits_by_run, per_study, mask=None):
+        mask = self.half_mask(None) if mask is None else np.asarray(mask)
+        result = {"studies": int(mask.sum()), "mean_triplets": float(per_study[mask].mean()), "runs": {}}
+        for run, logits in logits_by_run.items():
+            probabilities = 1 / (1 + np.exp(-logits))
+            metrics = self.evaluate(probabilities, mask)
+            result["runs"][run] = {"probabilities": probabilities, "logits": logits, **metrics}
+        result["macro_auc_mean"] = float(np.mean([v["macro_auc"] for v in result["runs"].values()]))
+        return result
+
+    def score_rule(self, rule, runs=None, half=None, mask=None):
+        evaluated = self.half_mask(half) if mask is None else np.asarray(mask)
+        ids, per_study = self.allocation_ids(rule, evaluated)
+        logits = {run: self.logits_from_ids(run, ids, per_study) for run in (runs or self.runs)}
+        result = self.score_logits(logits, np.asarray(per_study), evaluated)
+        result["counts"] = self.counts_for(rule)
+        return result
+
+    def score_sets(self, id_sets, runs=None, half=None, mask=None):
+        if isinstance(id_sets, dict):
+            id_sets = [id_sets.get(study, ()) for study in self.studies]
+        per_study = np.asarray([len(v) for v in id_sets])
+        if mask is not None:
+            evaluated = np.asarray(mask)
+        elif half is not None:
+            evaluated = self.half_mask(half)
+        else:
+            evaluated = per_study > 0
+        logits = {run: self.logits_from_sets(run, id_sets) for run in (runs or self.runs)}
+        return self.score_logits(logits, np.asarray(per_study), evaluated)
+
+    def token_arrays(self, run, ids):
+        ids = np.sort(np.asarray(ids, dtype=np.int64))
+        return self.scores[run][ids], self.contribution[run][ids], self.visual_valid[ids]
+
+    def pool_logits_from_ids(self, run, ids):
+        scores, contribution, valid = self.token_arrays(run, ids)
+        scores = scores.reshape(-1, len(self.targets)).astype(np.float64)
+        contribution = contribution.reshape(-1, len(self.targets)).astype(np.float64)
+        valid = valid.reshape(-1)
+        if not valid.any():
+            raise ValueError("A study has no visually valid spatial tokens")
+        scores, contribution = scores[valid], contribution[valid]
+        peak = scores.max(0)
+        weights = np.exp(scores - peak)
+        weights /= weights.sum(0)
+        return (weights * contribution).sum(0) + self.bias[run]
+
+    def pool_logits(self, run, study, counts):
+        counts = np.asarray(counts, dtype=np.int64)
+        index = self.study_index[study]
+        ids = np.concatenate(
+            [
+                self.ids(self.select(study, slot, n), study, slot)
+                for slot, n in enumerate(counts)
+                if n > 0 and self.available[index, slot]
+            ]
+            or [np.zeros(0, dtype=np.int64)]
+        )
+        return self.pool_logits_from_ids(run, ids)
+
+    def sets_from_ids(self, ids, per_study):
+        bounds = np.cumsum(np.asarray(per_study, dtype=np.int64))
+        return np.split(np.asarray(ids, dtype=np.int64), bounds[:-1])
+
+    def triplets_of(self, study, slot=None, series=None):
+        frame = self.triplets.filter(pl.col("study") == study)
+        if slot is not None:
+            frame = frame.filter(pl.col("slot") == slot)
+        if series is not None:
+            frame = frame.filter(pl.col("series") == series)
+        return frame
+
+
+def _slot_table_with_ids(job):
+    study, slot = job
+    cache = _STATE
+    capacity = cache.base_capacity(study, slot)
+    return study, slot, capacity, [
+        cache.ids(cache.select(study, slot, n), study, slot) for n in range(1, capacity + 1)
+    ]
+
+
+def load(root=CACHE, runs=RUNS):
+    return TokenCache(root, runs)

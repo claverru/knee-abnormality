@@ -1,0 +1,78 @@
+import sys
+import json
+from pathlib import Path
+
+import numpy as np
+
+sys.path.insert(0, "/home/claudio/src/knee-abnormality/outputs/analysis/token-cache-20260917")
+import cache_lib  # noqa: E402
+
+sys.path.insert(0, "/tmp/claude-1000/-home-claudio-src-knee-abnormality/0c4765fd-80a4-42fe-a9a9-564d5c236803/scratchpad")
+import rules  # noqa: E402
+
+OUT = Path("/home/claudio/src/knee-abnormality/outputs/analysis/allocation-neyman-20260917")
+cache = cache_lib.load()
+
+rule_v1_mean = rules.make_rule("neyman_mean_label", "variant1")
+
+default_confirm = cache.score_rule(cache_lib.DEFAULT_COUNTS, half="confirm")
+neyman_confirm = cache.score_rule(rule_v1_mean, half="confirm")
+
+print("confirm default", default_confirm["mean_triplets"], default_confirm["macro_auc_mean"])
+print("confirm neyman_mean_v1", neyman_confirm["mean_triplets"], neyman_confirm["macro_auc_mean"])
+for run in cache.runs:
+    print(run, "default", default_confirm["runs"][run]["macro_auc"], "neyman", neyman_confirm["runs"][run]["macro_auc"])
+
+mask = cache.half_mask("confirm")
+rng = np.random.default_rng(20260917)
+n_boot = 500
+deltas = []
+p_vals = []
+for run in cache.runs:
+    pd_ = default_confirm["runs"][run]["probabilities"][mask]
+    pn_ = neyman_confirm["runs"][run]["probabilities"][mask]
+    p_vals.append(np.abs(pn_ - pd_).mean())
+
+studies_idx = np.nonzero(mask)[0]
+n = len(studies_idx)
+hard_all = cache.hard
+targets = cache.targets
+
+
+def macro_auc_for_mask(probs, hard, sub_mask):
+    from knee_abnormality.evaluation.metrics import aucs
+    return aucs(hard[sub_mask], probs[sub_mask], targets)["macro_auc"]
+
+sys.path.insert(0, str(Path(cache.root) / "snapshot_src"))
+
+boot_deltas = {run: [] for run in cache.runs}
+for b in range(n_boot):
+    sample = rng.choice(studies_idx, size=n, replace=True)
+    for run in cache.runs:
+        pd_full = default_confirm["runs"][run]["probabilities"]
+        pn_full = neyman_confirm["runs"][run]["probabilities"]
+        auc_d = macro_auc_for_mask(pd_full, hard_all, sample)
+        auc_n = macro_auc_for_mask(pn_full, hard_all, sample)
+        boot_deltas[run].append(auc_n - auc_d)
+
+summary = {}
+for i, run in enumerate(cache.runs):
+    arr = np.array(boot_deltas[run])
+    summary[run] = {
+        "p_mean_abs_prob_change": float(p_vals[i]),
+        "delta_macro_auc": neyman_confirm["runs"][run]["macro_auc"] - default_confirm["runs"][run]["macro_auc"],
+        "boot_mean": float(arr.mean()),
+        "boot_std": float(arr.std()),
+        "boot_ci95": [float(np.percentile(arr, 2.5)), float(np.percentile(arr, 97.5))],
+    }
+    print(run, summary[run])
+
+mean_delta = neyman_confirm["macro_auc_mean"] - default_confirm["macro_auc_mean"]
+print("mean over 3 runs delta macro auc (confirm)", mean_delta)
+
+(OUT / "confirm_summary.json").write_text(json.dumps({
+    "default": {"mean_triplets": default_confirm["mean_triplets"], "macro_auc_mean": default_confirm["macro_auc_mean"]},
+    "neyman_mean_v1": {"mean_triplets": neyman_confirm["mean_triplets"], "macro_auc_mean": neyman_confirm["macro_auc_mean"]},
+    "mean_delta_macro_auc": mean_delta,
+    "per_run": summary,
+}, indent=2))

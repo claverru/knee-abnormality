@@ -1,0 +1,168 @@
+import json
+import sys
+import time
+from functools import lru_cache
+from pathlib import Path
+
+import numpy as np
+import torch
+from torch.utils.data import DataLoader, Dataset
+
+HERE = Path(__file__).resolve().parent
+if str(HERE) not in sys.path:
+    sys.path.insert(0, str(HERE))
+
+import cache_lib  # noqa: E402
+from encode_cache import encode_tokens, summarize, synthetic_batch  # noqa: E402
+from knee_abnormality.config import load_config  # noqa: E402
+from knee_abnormality.data.labels import load_fold_labels  # noqa: E402
+from knee_abnormality.data.preprocessing.preparation import prepare_series  # noqa: E402
+from knee_abnormality.inference.checkpoint import load_checkpoint_model  # noqa: E402
+from knee_abnormality.training.cuda import configure_cuda_allocator  # noqa: E402
+
+ROOT = Path("/home/claudio/src/knee-abnormality")
+CHUNK_TRIPLETS = 480
+
+
+class SelectedStudies(Dataset):
+    def __init__(self, cache, id_sets):
+        self.cache = cache
+        self.id_sets = id_sets
+        self.slot = cache.triplet_slot
+        self.series = cache.triplets["series"].to_list()
+        self.middle = cache.triplets["middle_path"].to_list()
+        data = cache.build["data"]
+        self.settings = (
+            data["spacing_mm"],
+            data["image_size"],
+            data["lower_quantile"],
+            data["upper_quantile"],
+        )
+        self.lookup = lru_cache(maxsize=64)(self._lookup)
+
+    def __len__(self):
+        return len(self.id_sets)
+
+    def _lookup(self, study, slot):
+        pool = self.cache._pool(study, slot, frozenset(), frozenset())
+        return {(t.uid, str(t.records[1].path)): t for t in pool.candidates}
+
+    def __getitem__(self, index):
+        study = self.cache.studies[index]
+        groups = {}
+        for triplet in self.id_sets[index]:
+            groups.setdefault((int(self.slot[triplet]), self.series[triplet]), []).append(int(triplet))
+        series = []
+        for (slot, uid), ids in sorted(groups.items()):
+            lookup = self.lookup(study, slot)
+            triplets = [lookup[(uid, self.middle[i])] for i in ids]
+            records = tuple(r for t in triplets for r in t.records)
+            prepared = prepare_series(records, *self.settings)
+            if prepared.failed_paths or prepared.constant or len(prepared.selected_paths) != len(ids):
+                raise RuntimeError(f"{study} {uid}: preparation failure; the cache has none")
+            series.append(
+                {
+                    "slot": slot,
+                    "ids": torch.as_tensor(ids),
+                    "images": prepared.images,
+                    "positions": prepared.positions,
+                    "valid_rects": prepared.valid_rects,
+                    "window": prepared.intensity_bounds,
+                }
+            )
+        return {"index": index, "series": series}
+
+
+def load_models(runs, device):
+    models = {}
+    for run in runs:
+        directory = ROOT / "outputs/training" / run
+        config = load_config(directory / "effective_config.json")
+        labels = load_fold_labels(config, 0)
+        selected = json.loads((directory / "fold_0/selected_checkpoint.json").read_text())
+        models[run] = load_checkpoint_model(
+            config,
+            labels.targets,
+            directory / "fold_0" / Path(selected["path"]).name,
+            device,
+            expected_fold=0,
+        )
+    return models
+
+
+def exact_summaries(cache, id_sets, runs=None, workers=24, models=None):
+    runs = tuple(runs or cache.runs)
+    configure_cuda_allocator()
+    torch.set_float32_matmul_precision("high")
+    torch.backends.cudnn.benchmark = False
+    device = torch.device("cuda")
+    models = models or load_models(runs, device)
+    image_size = cache.build["data"]["image_size"]
+    ids = np.concatenate([np.asarray(v, dtype=np.int64) for v in id_sets])
+    position = {int(i): p for p, i in enumerate(ids)}
+    if len(position) != len(ids):
+        raise ValueError("A triplet id appears twice")
+    lse = {run: np.full((len(ids), len(cache.targets)), np.nan) for run in runs}
+    mixed = {run: np.full((len(ids), len(cache.targets)), np.nan) for run in runs}
+    windows = []
+    pending, count = [], 0
+
+    def flush():
+        nonlocal pending, count
+        if not pending:
+            return
+        batch = synthetic_batch(pending, image_size)
+        batch = {k: v.pin_memory().to(device, non_blocking=True) for k, v in batch.items()}
+        rows = np.asarray([position[int(i)] for item in pending for i in item["ids"]])
+        with torch.inference_mode():
+            for run in runs:
+                scores, contribution, valid = encode_tokens(models[run], batch)
+                a, b = summarize(scores, contribution, valid)
+                lse[run][rows] = a.cpu().numpy()
+                mixed[run][rows] = b.cpu().numpy()
+        pending, count = [], 0
+
+    loader = DataLoader(
+        SelectedStudies(cache, id_sets),
+        batch_size=None,
+        num_workers=workers,
+        prefetch_factor=2,
+    )
+    for item in loader:
+        for series in item["series"]:
+            windows.append((item["index"], series["slot"], *series["window"]))
+            pending.append(series)
+            count += len(series["ids"])
+            if count >= CHUNK_TRIPLETS:
+                flush()
+    flush()
+    torch.cuda.synchronize()
+    return ids, lse, mixed, windows
+
+
+def exact_score(cache, rule=None, id_sets=None, runs=None, half=None, mask=None, workers=24, models=None):
+    runs = tuple(runs or cache.runs)
+    if (rule is None) == (id_sets is None):
+        raise ValueError("Give exactly one of rule or id_sets")
+    if rule is not None:
+        evaluated = cache.half_mask(half) if mask is None else np.asarray(mask)
+        ids, per_study = cache.allocation_ids(rule, evaluated)
+        id_sets = cache.sets_from_ids(ids, per_study)
+    else:
+        if isinstance(id_sets, dict):
+            id_sets = [id_sets.get(study, ()) for study in cache.studies]
+        per_study = np.asarray([len(v) for v in id_sets])
+        evaluated = (
+            np.asarray(mask) if mask is not None else cache.half_mask(half) if half is not None else per_study > 0
+        )
+    started = time.perf_counter()
+    ids, lse, mixed, windows = exact_summaries(cache, id_sets, runs, workers, models)
+    per_study = np.asarray([len(v) for v in id_sets])
+    logits = {run: cache_lib.combine(lse[run], mixed[run], per_study, cache.bias[run]) for run in runs}
+    result = cache.score_logits(logits, per_study, evaluated)
+    result["seconds"] = time.perf_counter() - started
+    result["ids"] = ids
+    result["triplet_lse"] = lse
+    result["triplet_mixed"] = mixed
+    result["windows"] = windows
+    return result

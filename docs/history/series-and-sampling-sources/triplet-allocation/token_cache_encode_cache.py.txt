@@ -1,0 +1,430 @@
+import json
+import pickle
+import shutil
+import sys
+import time
+from collections import defaultdict
+from pathlib import Path
+
+import knee_abnormality
+import numpy as np
+import polars as pl
+import torch
+from torch.utils.data import DataLoader, Dataset
+
+from knee_abnormality.config import load_config
+from knee_abnormality.data.dataset import PREPARATION_ERRORS
+from knee_abnormality.data.labels import STUDY, load_fold_labels
+from knee_abnormality.data.preprocessing.preparation import prepare_series
+from knee_abnormality.data.preprocessing.sampling import build_pool
+from knee_abnormality.inference.checkpoint import load_checkpoint_model
+from knee_abnormality.training.cuda import configure_cuda_allocator
+
+ROOT = Path("/home/claudio/src/knee-abnormality")
+OUT = ROOT / "outputs/analysis/token-cache-20260917"
+RUNS = ("ranked-filtered-seed42", "ranked-filtered-seed43", "ranked-filtered-seed44")
+SLOTS = ("ax_t1pd", "ax_fluid", "cor_t1pd", "cor_fluid", "sag_t1pd", "sag_fluid")
+CHUNK_TRIPLETS = 480
+TOKENS = 49
+LABELS = 12
+
+
+def candidate_series(pool):
+    grouped = defaultdict(list)
+    for triplet in pool.candidates:
+        grouped[triplet.uid].append(triplet)
+    return grouped
+
+
+class CandidateStudies(Dataset):
+    def __init__(self, order, states, data):
+        self.order = order
+        self.states = states
+        self.data = data
+
+    def __len__(self):
+        return len(self.order)
+
+    def __getitem__(self, index):
+        uid = self.order[index]
+        state = self.states[uid]
+        data = self.data
+        radius = data.image_size * data.spacing_mm / 2
+        series = []
+        slots = []
+        for slot, value in enumerate(state["slots"]):
+            kind = data.series_types[slot]
+            pool = build_pool(
+                value["sources"],
+                kind.plane,
+                state["reference"],
+                data.spacing_mm,
+                radius,
+                set(),
+                set(),
+            )
+            failed_paths, failed_sources, conditions, cache = set(), set(), [], {}
+            for source, triplets in sorted(candidate_series(pool).items()):
+                records = tuple(r for t in triplets for r in t.records)
+                try:
+                    prepared = prepare_series(
+                        records,
+                        data.spacing_mm,
+                        data.image_size,
+                        data.lower_quantile,
+                        data.upper_quantile,
+                        cache=cache,
+                    )
+                except PREPARATION_ERRORS as error:
+                    failed_sources.add(source)
+                    conditions.append(f"{source}: {type(error).__name__}: {error}")
+                    continue
+                conditions.extend(prepared.failures)
+                if prepared.constant:
+                    failed_sources.add(source)
+                    conditions.append(f"{source}: constant prepared series")
+                    continue
+                failed_paths.update(prepared.failed_paths)
+                lookup = {str(t.records[1].path): t for t in triplets}
+                meta = []
+                for group in prepared.selected_paths:
+                    triplet = lookup[group[1]]
+                    if tuple(str(r.path) for r in triplet.records) != group:
+                        raise ValueError("Prepared group differs from candidate records")
+                    meta.append(
+                        (
+                            group[1],
+                            triplet.depth,
+                            triplet.support[0],
+                            triplet.support[1],
+                            triplet.run,
+                        )
+                    )
+                series.append(
+                    {
+                        "slot": slot,
+                        "uid": source,
+                        "images": prepared.images,
+                        "positions": prepared.positions,
+                        "valid_rects": prepared.valid_rects,
+                        "meta": meta,
+                        "window": prepared.intensity_bounds,
+                        "unique_slices": prepared.unique_slice_count,
+                        "pixels": prepared.intensity_pixel_count,
+                        "candidates": len(triplets),
+                    }
+                )
+            slots.append(
+                {
+                    "failed_paths": sorted(map(str, failed_paths)),
+                    "failed_sources": sorted(failed_sources),
+                    "conditions": conditions,
+                    "physical": pool.physical,
+                    "base_candidates": len(pool.candidates),
+                }
+            )
+        return {"study": uid, "series": series, "slots": slots}
+
+
+def synthetic_batch(chunk, image_size):
+    count = len(chunk)
+    longest = max(item["images"].shape[0] for item in chunk)
+    images = torch.zeros((count, longest, 3, image_size, image_size), dtype=torch.uint8)
+    positions = torch.zeros((count, longest))
+    rects = torch.zeros((count, longest, 3, 4))
+    mask = torch.zeros((count, longest), dtype=torch.bool)
+    presence = torch.zeros((count, len(SLOTS)), dtype=torch.bool)
+    types = torch.empty(count, dtype=torch.int64)
+    for index, item in enumerate(chunk):
+        size = item["images"].shape[0]
+        images[index, :size] = item["images"]
+        positions[index, :size] = item["positions"]
+        rects[index, :size] = item["valid_rects"]
+        mask[index, :size] = True
+        presence[index, item["slot"]] = True
+        types[index] = item["slot"]
+    return {
+        "images": images,
+        "slice_positions": positions,
+        "valid_rects": rects,
+        "slice_mask": mask,
+        "series_presence": presence,
+        "series_study_index": torch.arange(count),
+        "series_type_index": types,
+        "reflection_eligible": torch.zeros(count, dtype=torch.bool),
+    }
+
+
+def encode_tokens(model, batch):
+    with torch.autocast("cuda", dtype=torch.bfloat16):
+        encoded = model.encode_batch(batch)
+        tokens = (
+            encoded["features"]
+            + encoded["position_1d"][:, None]
+            + encoded["position_2d"][None]
+            + encoded["plane"][:, None]
+            + encoded["contrast"][:, None]
+        )
+        normed = model.mil_norm(tokens)
+        scores = model.attention(normed)
+    scores = scores.float()
+    contribution = normed.float() @ model.head.weight.float().T
+    return scores, contribution, encoded["visual_valid"]
+
+
+def summarize(scores, contribution, valid):
+    masked = scores.double().masked_fill(~valid[..., None], -torch.inf)
+    lse = torch.logsumexp(masked, dim=1)
+    weights = torch.nan_to_num((masked - lse[:, None]).exp(), nan=0.0)
+    mixed = (weights * contribution.double()).sum(1)
+    return lse, mixed
+
+
+class Writer:
+    def __init__(self, path):
+        self.path = path
+        self.stream = path.with_suffix(".tmp").open("wb")
+        self.shape = None
+        self.dtype = None
+        self.rows = 0
+
+    def write(self, array):
+        array = np.ascontiguousarray(array)
+        if self.shape is None:
+            self.shape, self.dtype = array.shape[1:], array.dtype
+        if array.shape[1:] != self.shape or array.dtype != self.dtype:
+            raise ValueError("Inconsistent chunk")
+        self.stream.write(array.tobytes())
+        self.rows += len(array)
+
+    def close(self):
+        self.stream.close()
+        temporary = self.path.with_suffix(".tmp")
+        header = {
+            "descr": np.lib.format.dtype_to_descr(self.dtype),
+            "fortran_order": False,
+            "shape": (self.rows, *self.shape),
+        }
+        with self.path.open("wb") as target, temporary.open("rb") as source:
+            np.lib.format.write_array_header_1_0(target, header)
+            shutil.copyfileobj(source, target, length=64 << 20)
+        temporary.unlink()
+
+
+def main():
+    print(knee_abnormality.__file__, flush=True)
+    configure_cuda_allocator()
+    torch.set_float32_matmul_precision("high")
+    torch.backends.cudnn.benchmark = False
+    started = time.perf_counter()
+    workers = int(sys.argv[1]) if len(sys.argv) > 1 else 24
+    limit = int(sys.argv[2]) if len(sys.argv) > 2 else None
+    with (OUT / "pools_raw.pkl").open("rb") as stream:
+        raw = pickle.load(stream)
+    order, states = raw["order"], raw["states"]
+    if limit:
+        order = order[:limit]
+    device = torch.device("cuda")
+    models, configs = {}, {}
+    for name in RUNS:
+        run_dir = ROOT / "outputs/training" / name
+        config = load_config(run_dir / "effective_config.json")
+        labels = load_fold_labels(config, 0)
+        if labels.validation[STUDY].to_list()[: len(order)] != order:
+            raise ValueError("Validation order differs")
+        selected = json.loads((run_dir / "fold_0/selected_checkpoint.json").read_text())
+        checkpoint = run_dir / "fold_0" / Path(selected["path"]).name
+        models[name] = load_checkpoint_model(
+            config, labels.targets, checkpoint, device, expected_fold=0
+        )
+        configs[name] = {"checkpoint": str(checkpoint), "score": selected["score"]}
+    data = config.data
+    dataset = CandidateStudies(order, states, data)
+    loader = DataLoader(
+        dataset,
+        batch_size=None,
+        num_workers=workers,
+        prefetch_factor=2,
+        pin_memory=False,
+    )
+    OUT.mkdir(parents=True, exist_ok=True)
+    tokens_dir = OUT / "tokens"
+    tokens_dir.mkdir(exist_ok=True)
+    writers = {
+        name: {
+            "scores": Writer(tokens_dir / f"{name}_scores.npy"),
+            "contribution": Writer(tokens_dir / f"{name}_contribution.npy"),
+            "lse": Writer(tokens_dir / f"{name}_triplet_lse.npy"),
+            "mixed": Writer(tokens_dir / f"{name}_triplet_mixed.npy"),
+        }
+        for name in RUNS
+    }
+    valid_writer = Writer(tokens_dir / "visual_valid.npy")
+    triplet_rows, series_rows, slot_rows = [], [], []
+    pending, pending_count = [], 0
+    stats = {"batches": 0, "encode_seconds": 0.0, "grid": None}
+
+    def flush():
+        nonlocal pending, pending_count
+        if not pending:
+            return
+        tick = time.perf_counter()
+        batch = synthetic_batch(pending, data.image_size)
+        batch = {k: v.pin_memory().to(device, non_blocking=True) for k, v in batch.items()}
+        reference_valid = None
+        with torch.inference_mode():
+            for name, model in models.items():
+                scores, contribution, valid = encode_tokens(model, batch)
+                if scores.shape[1] != TOKENS:
+                    raise ValueError(f"Unexpected token count {scores.shape}")
+                if reference_valid is None:
+                    reference_valid = valid
+                elif not torch.equal(reference_valid, valid):
+                    raise ValueError("Visual validity differs between checkpoints")
+                lse, mixed = summarize(scores, contribution, valid)
+                target = writers[name]
+                target["scores"].write(scores.cpu().numpy())
+                target["contribution"].write(contribution.cpu().numpy())
+                target["lse"].write(lse.cpu().numpy())
+                target["mixed"].write(mixed.cpu().numpy())
+            valid_writer.write(reference_valid.cpu().numpy())
+        torch.cuda.synchronize()
+        stats["encode_seconds"] += time.perf_counter() - tick
+        stats["batches"] += 1
+        pending, pending_count = [], 0
+
+    for position, item in enumerate(loader):
+        study = item["study"]
+        for slot, value in enumerate(item["slots"]):
+            slot_rows.append(
+                {
+                    "study": study,
+                    "slot": slot,
+                    "base_candidates": value["base_candidates"],
+                    "physical": value["physical"],
+                    "failed_paths": value["failed_paths"],
+                    "failed_sources": value["failed_sources"],
+                    "conditions": value["conditions"],
+                }
+            )
+        for series in item["series"]:
+            first = len(triplet_rows)
+            for middle, depth, low, high, run in series["meta"]:
+                triplet_rows.append(
+                    {
+                        "triplet": len(triplet_rows),
+                        "study": study,
+                        "slot": series["slot"],
+                        "series": series["uid"],
+                        "middle_path": middle,
+                        "depth": depth,
+                        "support_low": low,
+                        "support_high": high,
+                        "run": run,
+                    }
+                )
+            positions = series["positions"].numpy()
+            for offset, row in enumerate(triplet_rows[first:]):
+                row["position_mm"] = float(positions[offset])
+            series_rows.append(
+                {
+                    "study": study,
+                    "slot": series["slot"],
+                    "series": series["uid"],
+                    "candidates": series["candidates"],
+                    "encoded": len(series["meta"]),
+                    "first_triplet": first,
+                    "window_low": series["window"][0],
+                    "window_high": series["window"][1],
+                    "unique_slices": series["unique_slices"],
+                    "window_pixels": series["pixels"],
+                }
+            )
+            if not len(series["meta"]):
+                continue
+            pending.append(series)
+            pending_count += len(series["meta"])
+            if pending_count >= CHUNK_TRIPLETS:
+                flush()
+        if (position + 1) % 50 == 0:
+            print(
+                f"{position + 1}/{len(order)} triplets={len(triplet_rows)} "
+                f"elapsed={time.perf_counter() - started:.0f}s "
+                f"encode={stats['encode_seconds']:.0f}s",
+                flush=True,
+            )
+    flush()
+    for target in writers.values():
+        for writer in target.values():
+            writer.close()
+    valid_writer.close()
+    for name in RUNS:
+        for key in ("scores", "contribution", "lse", "mixed"):
+            if writers[name][key].rows != len(triplet_rows):
+                raise ValueError("Row count mismatch")
+    valid = np.load(tokens_dir / "visual_valid.npy", mmap_mode="r")
+    triplets = pl.DataFrame(triplet_rows).with_columns(
+        (pl.col("triplet") * TOKENS).alias("token_offset"),
+        pl.lit(TOKENS).alias("tokens"),
+        pl.Series("valid_tokens", valid.sum(1).astype(np.int32)),
+        pl.col("slot").replace_strict(dict(enumerate(SLOTS))).alias("slot_name"),
+    )
+    series_frame = pl.DataFrame(series_rows)
+    triplets = triplets.join(
+        series_frame.select("study", "slot", "series", "window_low", "window_high"),
+        on=("study", "slot", "series"),
+        how="left",
+        validate="m:1",
+    ).sort("triplet")
+    triplets.write_parquet(OUT / "triplets.parquet")
+    series_frame.write_parquet(OUT / "series.parquet")
+    slot_frame = pl.DataFrame(slot_rows)
+    slot_frame.write_parquet(OUT / "slot_failures.parquet")
+    bias = {
+        name: model.head.bias.detach().float().cpu().numpy().tolist()
+        for name, model in models.items()
+    }
+    failures = {
+        (row["study"], row["slot"]): (row["failed_paths"], row["failed_sources"])
+        for row in slot_rows
+    }
+    for study in order:
+        for slot, value in enumerate(states[study]["slots"]):
+            paths, sources = failures[(study, slot)]
+            value["failed_paths"] = frozenset(Path(p) for p in paths)
+            value["failed_sources"] = frozenset(sources)
+    with (OUT / "pools.pkl").open("wb") as stream:
+        pickle.dump(
+            {"order": order, "states": states, "series_types": [k.model_dump() for k in data.series_types]},
+            stream,
+            protocol=5,
+        )
+    report = {
+        "runs": configs,
+        "bias": bias,
+        "studies": len(order),
+        "triplets": len(triplet_rows),
+        "tokens_per_triplet": TOKENS,
+        "series": len(series_rows),
+        "slots_with_failed_paths": int(sum(bool(r["failed_paths"]) for r in slot_rows)),
+        "slots_with_failed_sources": int(sum(bool(r["failed_sources"]) for r in slot_rows)),
+        "studies_with_failures": len({r["study"] for r in slot_rows if r["failed_paths"] or r["failed_sources"]}),
+        "conditions": int(sum(len(r["conditions"]) for r in slot_rows)),
+        "workers": workers,
+        "chunk_triplets": CHUNK_TRIPLETS,
+        "batches": stats["batches"],
+        "encode_seconds": stats["encode_seconds"],
+        "total_seconds": time.perf_counter() - started,
+        "precision": "bf16 autocast; scores cast to float32; contribution = float32(mil_norm) @ head.weight.T; triplet_lse/mixed float64",
+        "torch": torch.__version__,
+        "gpu": torch.cuda.get_device_name(0),
+        "peak_cuda_allocated_bytes": torch.cuda.max_memory_allocated(),
+        "source": knee_abnormality.__file__,
+        "data": data.model_dump(mode="json"),
+    }
+    (OUT / "build.json").write_text(json.dumps(report, indent=2) + "\n")
+    print(json.dumps({k: v for k, v in report.items() if k not in {"data", "bias"}}), flush=True)
+
+
+if __name__ == "__main__":
+    main()

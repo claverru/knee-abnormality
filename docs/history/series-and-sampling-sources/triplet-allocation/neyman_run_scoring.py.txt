@@ -1,0 +1,70 @@
+import sys
+import json
+from pathlib import Path
+
+import numpy as np
+
+sys.path.insert(0, "/home/claudio/src/knee-abnormality/outputs/analysis/token-cache-20260917")
+import cache_lib  # noqa: E402
+
+sys.path.insert(0, "/tmp/claude-1000/-home-claudio-src-knee-abnormality/0c4765fd-80a4-42fe-a9a9-564d5c236803/scratchpad")
+import rules  # noqa: E402
+
+OUT = Path("/home/claudio/src/knee-abnormality/outputs/analysis/allocation-neyman-20260917")
+cache = cache_lib.load()
+
+default_search = cache.score_rule(cache_lib.DEFAULT_COUNTS, half="search")
+target_mean = default_search["mean_triplets"]
+print("default search mean_triplets", target_mean, "macro_auc_mean", default_search["macro_auc_mean"])
+
+
+def realized_mean(rule):
+    return cache.score_rule(rule, half="search")["mean_triplets"]
+
+
+def calibrate(method, lo=20, hi=90, iters=14):
+    for _ in range(iters):
+        mid = (lo + hi) / 2
+        rule = rules.make_rule(method, "variant2", fixed_budget=mid)
+        m = realized_mean(rule)
+        if m < target_mean:
+            lo = mid
+        else:
+            hi = mid
+    return (lo + hi) / 2
+
+
+results = {}
+results["default"] = default_search
+
+rule_v1_mean = rules.make_rule("neyman_mean_label", "variant1")
+results["neyman_mean_v1"] = cache.score_rule(rule_v1_mean, half="search")
+
+b2_mean = calibrate("neyman_mean_label")
+rule_v2_mean = rules.make_rule("neyman_mean_label", "variant2", fixed_budget=b2_mean)
+results["neyman_mean_v2"] = cache.score_rule(rule_v2_mean, half="search")
+results["neyman_mean_v2"]["fixed_budget"] = b2_mean
+
+rule_sep = rules.make_rule("sep_share_mean_label", "variant1")
+results["sep_share_v1"] = cache.score_rule(rule_sep, half="search")
+
+rule_eff = rules.make_rule("efficiency_norm", "variant1")
+results["efficiency_v1"] = cache.score_rule(rule_eff, half="search")
+
+summary = {}
+for name, r in results.items():
+    summary[name] = {
+        "mean_triplets": r["mean_triplets"],
+        "macro_auc_mean": r["macro_auc_mean"],
+        "per_run": {run: r["runs"][run]["macro_auc"] for run in cache.runs},
+        "fixed_budget": r.get("fixed_budget"),
+    }
+    print(name, summary[name])
+
+(OUT / "search_summary.json").write_text(json.dumps(summary, indent=2))
+
+np.savez(
+    OUT / "search_probs.npz",
+    **{f"{name}_{run}": results[name]["runs"][run]["probabilities"] for name in results for run in cache.runs}
+)
+print("saved")

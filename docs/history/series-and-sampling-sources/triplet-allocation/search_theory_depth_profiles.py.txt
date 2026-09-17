@@ -1,0 +1,142 @@
+import sys
+import pickle
+import numpy as np
+import polars as pl
+
+sys.path.insert(0, "outputs/analysis/token-cache-20260917")
+import cache_lib
+
+cache = cache_lib.load()
+SLOTS = cache_lib.SLOTS
+n_studies = len(cache.studies)
+
+with open(cache.root / "pools.pkl", "rb") as f:
+    pools = pickle.load(f)
+physical_table = np.zeros((n_studies, 6), dtype=bool)
+for i, study in enumerate(cache.studies):
+    slots = pools["states"][study]["slots"]
+    for k in range(6):
+        physical_table[i, k] = bool(slots[k]["physical"])
+
+search_mask = cache.half_mask("search")
+confirm_mask = cache.half_mask("confirm")
+
+triplet_study = cache.triplet_study
+triplet_slot = cache.triplet_slot
+depth = cache.triplets["depth"].to_numpy()
+
+in_search = search_mask[triplet_study]
+phys = physical_table[triplet_study, triplet_slot]
+
+share_local_overall = float((~phys[in_search]).mean())
+share_local_by_type = {
+    SLOTS[k]: float((~phys[in_search & (triplet_slot == k)]).mean())
+    for k in range(6)
+}
+
+print("share_local_overall", share_local_overall)
+print("share_local_by_type", share_local_by_type)
+
+edges = np.arange(-70, 80, 10.0)
+n_bins = len(edges) - 1
+bin_idx = np.digitize(np.clip(depth, edges[0] + 1e-6, edges[-1] - 1e-6), edges) - 1
+bin_idx = np.clip(bin_idx, 0, n_bins - 1)
+
+valid = in_search & phys
+outlier = valid & ((depth < edges[0]) | (depth >= edges[-1]))
+print("outlier_share_of_valid", float(outlier.sum()) / max(1, valid.sum()))
+
+cell_id = np.where(valid, triplet_slot * n_bins + bin_idx, -1)
+n_cells = 6 * n_bins
+
+mixed_avg = np.mean([cache.mixed[r] for r in cache.runs], axis=0)  # [T,12]
+hard = cache.hard  # [studies,12]
+targets = cache.targets
+
+rows = []
+for li, label in enumerate(targets):
+    pos_t = hard[triplet_study, li].astype(bool)
+    pos_mask = valid & pos_t
+    neg_mask = valid & ~pos_t
+    pos_sum = np.bincount(cell_id[pos_mask], weights=mixed_avg[pos_mask, li], minlength=n_cells)
+    pos_cnt = np.bincount(cell_id[pos_mask], minlength=n_cells)
+    neg_sum = np.bincount(cell_id[neg_mask], weights=mixed_avg[neg_mask, li], minlength=n_cells)
+    neg_cnt = np.bincount(cell_id[neg_mask], minlength=n_cells)
+    with np.errstate(invalid="ignore", divide="ignore"):
+        pos_mean = pos_sum / pos_cnt
+        neg_mean = neg_sum / neg_cnt
+    sep = pos_mean - neg_mean
+    for k in range(6):
+        for b in range(n_bins):
+            cid = k * n_bins + b
+            rows.append(
+                {
+                    "label": label,
+                    "type": SLOTS[k],
+                    "bin_low": float(edges[b]),
+                    "bin_high": float(edges[b + 1]),
+                    "n_pos": int(pos_cnt[cid]),
+                    "n_neg": int(neg_cnt[cid]),
+                    "separation": float(sep[cid]),
+                }
+            )
+
+sep_df = pl.DataFrame(rows)
+sep_df.write_parquet("outputs/analysis/allocation-search-theory-20260917/separation.parquet")
+print(sep_df.shape)
+
+# large-n attention share: request far above capacity per type, clamped automatically
+large_rule = (999, 999, 999, 999, 999, 999)
+ids, per_study = cache.allocation_ids(large_rule, mask=search_mask)
+present = per_study > 0
+starts = (np.cumsum(per_study) - per_study)[present]
+lengths = per_study[present]
+
+t_slot = triplet_slot[ids]
+t_bin = bin_idx[ids]
+t_phys = phys[ids]
+t_valid_cell = t_phys & (depth[ids] >= edges[0]) & (depth[ids] < edges[-1])
+t_cell = np.where(t_valid_cell, t_slot * n_bins + t_bin, -1)
+
+weight_rows = []
+for label_i, label in enumerate(targets):
+    accum_w = np.zeros(n_cells)
+    accum_c = np.zeros(n_cells)
+    for run in cache.runs:
+        lse_full = cache.lse[run][ids, label_i]
+        peak = np.maximum.reduceat(lse_full, starts)
+        total = peak + np.log(np.add.reduceat(np.exp(lse_full - np.repeat(peak, lengths)), starts))
+        weight = np.exp(lse_full - np.repeat(total, lengths))
+        mask_c = t_cell >= 0
+        accum_w += np.bincount(t_cell[mask_c], weights=weight[mask_c], minlength=n_cells)
+        accum_c += np.bincount(t_cell[mask_c], minlength=n_cells)
+    with np.errstate(invalid="ignore", divide="ignore"):
+        mean_w = accum_w / accum_c
+    for k in range(6):
+        for b in range(n_bins):
+            cid = k * n_bins + b
+            weight_rows.append(
+                {
+                    "label": label,
+                    "type": SLOTS[k],
+                    "bin_low": float(edges[b]),
+                    "bin_high": float(edges[b + 1]),
+                    "mean_attention_share": float(mean_w[cid]) if accum_c[cid] > 0 else float("nan"),
+                    "n_triplets_large_n": int(accum_c[cid] / 3),
+                }
+            )
+
+attn_df = pl.DataFrame(weight_rows)
+attn_df.write_parquet("outputs/analysis/allocation-search-theory-20260917/attention_share.parquet")
+print(attn_df.shape)
+
+merged = sep_df.join(attn_df, on=["label", "type", "bin_low", "bin_high"], how="left")
+merged.write_parquet("outputs/analysis/allocation-search-theory-20260917/depth_profiles.parquet")
+merged.write_csv("outputs/analysis/allocation-search-theory-20260917/depth_profiles.csv")
+print("done")
+print("share_local_overall", share_local_overall, file=open("outputs/analysis/allocation-search-theory-20260917/local_share.txt", "w"))
+with open("outputs/analysis/allocation-search-theory-20260917/local_share.txt", "w") as f:
+    f.write(f"share_local_overall\t{share_local_overall}\n")
+    for k, v in share_local_by_type.items():
+        f.write(f"share_local\t{k}\t{v}\n")
+    f.write(f"outlier_share_of_valid\t{float(outlier.sum()) / max(1, valid.sum())}\n")

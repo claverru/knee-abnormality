@@ -11,7 +11,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from knee_abnormality.config import ExperimentConfig, Fold
+from knee_abnormality.config import ExperimentConfig, Fold, PositiveFiniteFloat
 
 
 class PredictionRequest(BaseModel):
@@ -22,6 +22,7 @@ class PredictionRequest(BaseModel):
     split: Literal["test", "validation"]
     fold: Fold
     image_multiplier: int = Field(gt=0)
+    attention_temperature: PositiveFiniteFloat
     batch_size: int = Field(gt=0)
     num_workers: int = Field(ge=0)
     device: Literal["cpu", "cuda"]

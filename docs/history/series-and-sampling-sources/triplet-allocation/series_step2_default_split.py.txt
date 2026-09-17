@@ -1,0 +1,207 @@
+import sys, time, json
+sys.path.insert(0, "/home/claudio/src/knee-abnormality/outputs/analysis/token-cache-20260917")
+import numpy as np
+import cache_lib
+from knee_abnormality.data.preprocessing.sampling import build_pool, select_triplets
+
+t0 = time.time()
+cache = cache_lib.load()
+print("loaded", time.time() - t0, flush=True)
+
+SLOT_NAMES = cache_lib.SLOTS
+DEFAULT = cache_lib.DEFAULT_COUNTS
+half_mask = cache.half_mask("search")
+search_idx = np.nonzero(half_mask)[0]
+studies = cache.studies
+
+series_col = cache.triplets["series"].to_numpy()
+triplet_id_col = cache.triplets["triplet"].to_numpy()
+
+repeated = []
+for i in search_idx:
+    study = studies[i]
+    state = cache.states[study]
+    for slot in range(6):
+        pool = cache._pool(study, slot, frozenset(), frozenset())
+        uids = sorted({v.uid for v in pool.candidates})
+        if len(uids) < 2:
+            continue
+        ranking = [u for u in pool.ranking if u in uids]
+        top_uid = ranking[0]
+        other_uids = ranking[1:]
+        sources = dict(state["slots"][slot]["sources"])
+        sig_top = sources[top_uid].summary.signature
+        sig_next = sources[ranking[1]].summary.signature
+        if sig_top is None or sig_next is None:
+            cls = "minimal_headers"
+        elif sig_top == sig_next:
+            cls = "same_protocol_retake"
+        elif sig_top[-2:] == sig_next[-2:]:
+            cls = "same_geometry_diff_protocol"
+        else:
+            cls = "different_geometry_protocol"
+        repeated.append(dict(
+            study=study, i=int(i), slot=slot, slot_name=SLOT_NAMES[slot],
+            n_sources=len(ranking), cls=cls, top_uid=top_uid, other_uids=tuple(other_uids),
+        ))
+
+print("repeated slots (search half):", len(repeated), time.time() - t0, flush=True)
+from collections import Counter
+print(Counter(r["cls"] for r in repeated))
+
+def default_ids(study, slot):
+    n = DEFAULT[slot]
+    return cache.selected_ids(study, slot, n)
+
+def variant_ids(study, slot, source_uids, n):
+    state = cache.states[study]
+    kind = cache.series_types[slot]
+    sources = tuple((u, s) for u, s in state["slots"][slot]["sources"] if u in source_uids)
+    pool = build_pool(sources, kind.plane, state["reference"], cache.spacing_mm, cache.radius, set(), set())
+    sel = select_triplets(pool, n, cache.sigma, cache.radius, study,
+                           (kind.plane, kind.fluid_sensitive, kind.fat_suppression), None, 0)
+    keys = tuple((t.uid, str(t.records[1].path)) for t in sel.triplets)
+    return cache.ids(keys, study, slot)
+
+def base_ids_for_all(counts_override=None):
+    id_sets = []
+    for i, study in enumerate(studies):
+        parts = []
+        for slot in range(6):
+            n = DEFAULT[slot] if counts_override is None else counts_override.get((i, slot), DEFAULT[slot])
+            if not cache.available[i, slot]:
+                continue
+            parts.append(cache.selected_ids(study, slot, n))
+        id_sets.append(np.concatenate(parts) if parts else np.zeros(0, dtype=np.int64))
+    return id_sets
+
+t1 = time.time()
+top_only_cache = {}
+other_only_cache = {}
+default_split_cache = {}
+top_share_cache = {}
+other_share_cache = {}
+
+for r in repeated:
+    key = (r["study"], r["slot"])
+    n = DEFAULT[r["slot"]]
+    d_ids = default_ids(*key)
+    default_split_cache[key] = d_ids
+    src = series_col[d_ids]
+    top_ids = d_ids[np.isin(src, [r["top_uid"]])]
+    other_ids = d_ids[~np.isin(src, [r["top_uid"]])]
+    top_share_cache[key] = top_ids
+    other_share_cache[key] = other_ids
+    top_only_cache[key] = variant_ids(*key, {r["top_uid"]}, n)
+    other_only_cache[key] = variant_ids(*key, set(r["other_uids"]), n)
+
+print("variant selections built", time.time() - t1, flush=True)
+
+def build_scenario_v2(condition):
+    id_sets = []
+    rep_by_i = {}
+    for r in repeated:
+        rep_by_i.setdefault(r["i"], []).append(r)
+    for i, study in enumerate(studies):
+        parts = []
+        rslots = {r["slot"]: r for r in rep_by_i.get(i, [])}
+        for slot in range(6):
+            if not cache.available[i, slot]:
+                continue
+            if slot in rslots:
+                r = rslots[slot]
+                key = (r["study"], r["slot"])
+                if condition == "default":
+                    ids = default_split_cache[key]
+                elif condition == "top_only":
+                    ids = top_only_cache[key]
+                elif condition == "other_only":
+                    ids = other_only_cache[key]
+                parts.append(ids)
+            else:
+                parts.append(cache.selected_ids(study, slot, DEFAULT[slot]))
+        id_sets.append(np.concatenate(parts) if parts else np.zeros(0, dtype=np.int64))
+    return id_sets
+
+mask_affected = np.zeros(len(studies), dtype=bool)
+for r in repeated:
+    mask_affected[r["i"]] = True
+
+results = {}
+scen_ids = {}
+for cond in ["default", "top_only", "other_only"]:
+    ids = build_scenario_v2(cond)
+    scen_ids[cond] = ids
+    res = cache.score_sets(ids, half="search", mask=mask_affected)
+    results[cond] = res
+    print(cond, "macro_auc_mean", res["macro_auc_mean"], "mean_triplets", res["mean_triplets"], time.time() - t0, flush=True)
+
+def probs(cond, run):
+    return results[cond]["runs"][run]["probabilities"]
+
+runs = cache.runs
+p_top = np.nanmean([np.abs(probs("top_only", r) - probs("default", r)) for r in runs])
+p_other = np.nanmean([np.abs(probs("other_only", r) - probs("default", r)) for r in runs])
+print("mean|delta prob| top_only vs default:", p_top)
+print("mean|delta prob| other_only vs default:", p_other)
+
+deltas_top_default = {r: results["top_only"]["runs"][r]["macro_auc"] - results["default"]["runs"][r]["macro_auc"] for r in runs}
+deltas_other_default = {r: results["other_only"]["runs"][r]["macro_auc"] - results["default"]["runs"][r]["macro_auc"] for r in runs}
+print("delta macro auc top_only - default per run:", deltas_top_default)
+print("delta macro auc other_only - default per run:", deltas_other_default)
+print("mean delta top-default:", np.mean(list(deltas_top_default.values())))
+print("mean delta other-default:", np.mean(list(deltas_other_default.values())))
+
+def paired_bootstrap_mean_delta(probA_by_run, probB_by_run, mask, n_boot=500, seed=0):
+    rng = np.random.default_rng(seed)
+    idxs = np.nonzero(mask)[0]
+    hard_full = cache.hard
+    targets = cache.targets
+    boots = []
+    for _ in range(n_boot):
+        samp = rng.choice(idxs, size=len(idxs), replace=True)
+        vals = []
+        for r in runs:
+            aucA = cache.evaluate(probA_by_run[r], np.isin(np.arange(len(studies)), samp) & False)
+        boots.append(0)
+    return boots
+
+# Simpler paired bootstrap directly on macro auc mean over runs, resampling studies with replacement
+def bootstrap_macro_auc(condition, mask, n_boot=500, seed=0):
+    rng = np.random.default_rng(seed)
+    idxs = np.nonzero(mask)[0]
+    out = np.zeros(n_boot)
+    for b in range(n_boot):
+        samp = rng.choice(idxs, size=len(idxs), replace=True)
+        vals = []
+        for r in runs:
+            p = probs(condition, r)
+            hard = cache.hard
+            from knee_abnormality.evaluation.metrics import aucs
+            m = aucs(hard[samp], p[samp], cache.targets)
+            vals.append(m["macro_auc"])
+        out[b] = np.mean(vals)
+    return out
+
+boot_default = bootstrap_macro_auc("default", mask_affected, n_boot=500, seed=0)
+boot_top = bootstrap_macro_auc("top_only", mask_affected, n_boot=500, seed=0)
+boot_other = bootstrap_macro_auc("other_only", mask_affected, n_boot=500, seed=0)
+
+diff_top = boot_top - boot_default
+diff_other = boot_other - boot_default
+print("bootstrap top-default: mean", diff_top.mean(), "SE", diff_top.std(), "95% CI", np.percentile(diff_top, [2.5, 97.5]))
+print("bootstrap other-default: mean", diff_other.mean(), "SE", diff_other.std(), "95% CI", np.percentile(diff_other, [2.5, 97.5]))
+
+with open("/tmp/step2_out.json", "w") as f:
+    json.dump({
+        "n_repeated_search": len(repeated),
+        "class_counts": dict(Counter(r["cls"] for r in repeated)),
+        "mean_triplets": {c: results[c]["mean_triplets"] for c in results},
+        "macro_auc_mean": {c: results[c]["macro_auc_mean"] for c in results},
+        "p_top": float(p_top), "p_other": float(p_other),
+        "delta_top_default_per_run": {k: float(v) for k, v in deltas_top_default.items()},
+        "delta_other_default_per_run": {k: float(v) for k, v in deltas_other_default.items()},
+        "boot_top_default_mean": float(diff_top.mean()), "boot_top_default_ci": [float(x) for x in np.percentile(diff_top,[2.5,97.5])],
+        "boot_other_default_mean": float(diff_other.mean()), "boot_other_default_ci": [float(x) for x in np.percentile(diff_other,[2.5,97.5])],
+    }, f, indent=2)
+print("TOTAL TIME", time.time() - t0)

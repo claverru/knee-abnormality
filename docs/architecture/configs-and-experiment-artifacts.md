@@ -141,6 +141,15 @@ copied sources; bundled prediction recomputes the identity without training data
 See [implemented corrections](../history/baseline1-review.md#implemented-corrections)
 for allowed runtime/storage changes and baseline1 compatibility.
 
+**Count-normalised attention** (`model.count_normalized_attention`, required, `false` in
+`configs/training.yaml`) subtracts `log(that acquisition's valid tokens in the study)` from every
+token's attention score before the masked softmax in `_attention_pool`, so a series' attention
+mass no longer grows with the number of triplets it contributed. It applies in training,
+validation and inference alike, and `false` is bit-identical to the earlier code. Because it lives
+in `modeling/model.py`, which is in `identity.PREPROCESSING_SOURCES`, it changes the preprocessing
+source digest and is a fresh-runs-only change; earlier checkpoints keep validating against their
+archived sources.
+
 **Robust study centre** (`data.robust_center_outlier_mm`, required, `null` in
 `configs/training.yaml`) is a threshold in millimetres. When it is set, a rejected study centre is
 refitted without its outlier series; `null` keeps the plain fit. Behaviour, identity and

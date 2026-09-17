@@ -1,0 +1,168 @@
+import sys, time, json
+sys.path.insert(0, "/home/claudio/src/knee-abnormality/outputs/analysis/token-cache-20260917")
+import numpy as np
+import cache_lib
+from knee_abnormality.data.preprocessing.sampling import build_pool, select_triplets
+from collections import Counter
+
+t0 = time.time()
+cache = cache_lib.load()
+SLOT_NAMES = cache_lib.SLOTS
+DEFAULT = cache_lib.DEFAULT_COUNTS
+half_mask = cache.half_mask("confirm")
+search_idx = np.nonzero(half_mask)[0]
+studies = cache.studies
+series_col = cache.triplets["series"].to_numpy()
+runs = cache.runs
+
+repeated = []
+for i in search_idx:
+    study = studies[i]
+    state = cache.states[study]
+    for slot in range(6):
+        pool = cache._pool(study, slot, frozenset(), frozenset())
+        uids = sorted({v.uid for v in pool.candidates})
+        if len(uids) < 2:
+            continue
+        ranking = [u for u in pool.ranking if u in uids]
+        top_uid = ranking[0]
+        other_uids = ranking[1:]
+        sources = dict(state["slots"][slot]["sources"])
+        sig_top = sources[top_uid].summary.signature
+        sig_next = sources[ranking[1]].summary.signature
+        if sig_top is None or sig_next is None:
+            cls = "minimal_headers"
+        elif sig_top == sig_next:
+            cls = "same_protocol_retake"
+        elif sig_top[-2:] == sig_next[-2:]:
+            cls = "same_geometry_diff_protocol"
+        else:
+            cls = "different_geometry_protocol"
+        repeated.append(dict(study=study, i=int(i), slot=slot, slot_name=SLOT_NAMES[slot],
+                              cls=cls, top_uid=top_uid, other_uids=tuple(other_uids)))
+print("repeated", len(repeated), Counter(r["cls"] for r in repeated), time.time() - t0, flush=True)
+
+def variant_ids(study, slot, source_uids, n):
+    state = cache.states[study]
+    kind = cache.series_types[slot]
+    sources = tuple((u, s) for u, s in state["slots"][slot]["sources"] if u in source_uids)
+    pool = build_pool(sources, kind.plane, state["reference"], cache.spacing_mm, cache.radius, set(), set())
+    sel = select_triplets(pool, n, cache.sigma, cache.radius, study,
+                           (kind.plane, kind.fluid_sensitive, kind.fat_suppression), None, 0)
+    keys = tuple((t.uid, str(t.records[1].path)) for t in sel.triplets)
+    return cache.ids(keys, study, slot)
+
+t1 = time.time()
+default_ids_c, top_default_c, other_default_c = {}, {}, {}
+for r in repeated:
+    key = (r["study"], r["slot"])
+    n = DEFAULT[r["slot"]]
+    d_ids = cache.selected_ids(*key, n)
+    default_ids_c[key] = d_ids
+    src = series_col[d_ids]
+    top_ids = d_ids[np.isin(src, [r["top_uid"]])]
+    other_ids = d_ids[~np.isin(src, [r["top_uid"]])]
+    top_default_c[key] = top_ids
+    other_default_c[key] = other_ids
+print("default splits built", time.time() - t1, flush=True)
+
+Ks = [2, 4, 6]
+extra_to_other_c = {k: {} for k in Ks}
+extra_to_top_c = {k: {} for k in Ks}
+for r in repeated:
+    key = (r["study"], r["slot"])
+    n_top = len(top_default_c[key]); n_other = len(other_default_c[key])
+    for k in Ks:
+        extra_to_other_c[k][key] = variant_ids(r["study"], r["slot"], set(r["other_uids"]), n_other + k)
+        extra_to_top_c[k][key] = variant_ids(r["study"], r["slot"], {r["top_uid"]}, n_top + k)
+print("+k variants built", time.time() - t1, flush=True)
+
+rep_by_i = {}
+for r in repeated:
+    rep_by_i.setdefault(r["i"], []).append(r)
+
+def build_scenario(mode, k=None):
+    id_sets = []
+    for i, study in enumerate(studies):
+        parts = []
+        rslots = {r["slot"]: r for r in rep_by_i.get(i, [])}
+        for slot in range(6):
+            if not cache.available[i, slot]:
+                continue
+            if slot in rslots:
+                r = rslots[slot]
+                key = (r["study"], r["slot"])
+                if mode == "default":
+                    ids = default_ids_c[key]
+                elif mode == "extra_other":
+                    ids = np.concatenate([top_default_c[key], extra_to_other_c[k][key]])
+                elif mode == "extra_top":
+                    ids = np.concatenate([other_default_c[key], extra_to_top_c[k][key]])
+                parts.append(ids)
+            else:
+                parts.append(cache.selected_ids(study, slot, DEFAULT[slot]))
+        id_sets.append(np.concatenate(parts) if parts else np.zeros(0, dtype=np.int64))
+    return id_sets
+
+mask_affected = np.zeros(len(studies), dtype=bool)
+for r in repeated:
+    mask_affected[r["i"]] = True
+
+from knee_abnormality.evaluation.metrics import aucs
+
+def bootstrap_macro_auc(probs_by_run, mask, n_boot=500, seed=0):
+    rng = np.random.default_rng(seed)
+    idxs = np.nonzero(mask)[0]
+    out = np.zeros(n_boot)
+    hard = cache.hard
+    for b in range(n_boot):
+        samp = rng.choice(idxs, size=len(idxs), replace=True)
+        vals = [aucs(hard[samp], probs_by_run[r][samp], cache.targets)["macro_auc"] for r in runs]
+        out[b] = np.mean(vals)
+    return out
+
+results = {}
+for k in Ks:
+    ids_other = build_scenario("extra_other", k)
+    ids_top = build_scenario("extra_top", k)
+    res_other = cache.score_sets(ids_other, half="confirm", mask=mask_affected)
+    res_top = cache.score_sets(ids_top, half="confirm", mask=mask_affected)
+    results[k] = {"extra_other": res_other, "extra_top": res_top}
+    d = res_other["macro_auc_mean"] - res_top["macro_auc_mean"]
+    p = np.nanmean([np.abs(res_other["runs"][r]["probabilities"] - res_top["runs"][r]["probabilities"]) for r in runs])
+    boot_other = bootstrap_macro_auc({r: res_other["runs"][r]["probabilities"] for r in runs}, mask_affected, 500, 0)
+    boot_top = bootstrap_macro_auc({r: res_top["runs"][r]["probabilities"] for r in runs}, mask_affected, 500, 0)
+    diff = boot_other - boot_top
+    print(f"k={k}: macro_auc extra_other={res_other['macro_auc_mean']:.6f} extra_top={res_top['macro_auc_mean']:.6f} "
+          f"delta={d:.6f} p={p:.5f} mean_triplets_other={res_other['mean_triplets']:.2f} mean_triplets_top={res_top['mean_triplets']:.2f}",
+          flush=True)
+    print(f"   bootstrap delta mean={diff.mean():.6f} SE={diff.std():.6f} CI95=[{np.percentile(diff,2.5):.6f},{np.percentile(diff,97.5):.6f}]", flush=True)
+
+    # per-class breakdown
+    for cls in ["different_geometry_protocol", "same_geometry_diff_protocol", "same_protocol_retake", "minimal_headers"]:
+        cls_mask = np.zeros(len(studies), dtype=bool)
+        for r in repeated:
+            if r["cls"] == cls:
+                cls_mask[r["i"]] = True
+        if cls_mask.sum() == 0:
+            continue
+        try:
+            vals_other = [aucs(cache.hard[cls_mask], res_other["runs"][r]["probabilities"][cls_mask], cache.targets)["macro_auc"] for r in runs]
+            vals_top = [aucs(cache.hard[cls_mask], res_top["runs"][r]["probabilities"][cls_mask], cache.targets)["macro_auc"] for r in runs]
+            print(f"    class={cls} n={int(cls_mask.sum())} extra_other={np.mean(vals_other):.5f} extra_top={np.mean(vals_top):.5f} delta={np.mean(vals_other)-np.mean(vals_top):.5f}", flush=True)
+        except ValueError as e:
+            p_o = np.nanmean([np.abs(res_other["runs"][r]["probabilities"][cls_mask] - res_top["runs"][r]["probabilities"][cls_mask]) for r in runs])
+            print(f"    class={cls} n={int(cls_mask.sum())} macro AUC undefined ({e}); mean|delta prob|={p_o:.5f}", flush=True)
+
+print("TOTAL TIME", time.time() - t0)
+
+out = {"class_counts": dict(Counter(r["cls"] for r in repeated)), "k_results": {}}
+for k in Ks:
+    out["k_results"][k] = {
+        "macro_auc_extra_other": results[k]["extra_other"]["macro_auc_mean"],
+        "macro_auc_extra_top": results[k]["extra_top"]["macro_auc_mean"],
+        "mean_triplets_other": results[k]["extra_other"]["mean_triplets"],
+        "mean_triplets_top": results[k]["extra_top"]["mean_triplets"],
+    }
+with open("outputs/analysis/allocation-series-20260917/step3_confirm_results.json", "w") as f:
+    json.dump(out, f, indent=2)
