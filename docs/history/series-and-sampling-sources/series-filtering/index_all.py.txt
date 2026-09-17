@@ -1,0 +1,319 @@
+import math
+import pickle
+import sys
+import time
+from concurrent.futures import ProcessPoolExecutor
+from pathlib import Path
+
+import numpy as np
+import polars as pl
+import pydicom
+from scipy import ndimage
+
+ROOT = Path("/home/claudio/src/knee-abnormality")
+sys.path.insert(0, str(ROOT / "src"))
+
+from knee_abnormality.config import load_config
+from knee_abnormality.data.dataset import KneeStudyDataset
+from knee_abnormality.data.labels import STUDY
+from knee_abnormality.data.preprocessing.dicom import PREPARATION_ERRORS, read_frame
+from knee_abnormality.data.preprocessing.sampling import build_pool, select_triplets
+from knee_abnormality.data.sources import build_series_index
+
+RUN = ROOT / "outputs/training/overnight-20260916T214520Z-t8k_kw2z/runs/00-control"
+OUT = ROOT / "outputs/analysis/series-filtering-20260917"
+CONFIG = load_config(RUN / "effective_config.json")
+INDEX = {
+    split: build_series_index(CONFIG.paths.data_root, CONFIG.data, split)
+    for split in ("train", "test")
+}
+TRAIN_EPOCHS = 4
+FIELDS = [
+    "SeriesDescription",
+    "ProtocolName",
+    "StudyDescription",
+    "BodyPartExamined",
+    "Laterality",
+    "ImageLaterality",
+    "ImageType",
+    "ScanningSequence",
+    "SequenceVariant",
+    "ScanOptions",
+    "SequenceName",
+    "PulseSequenceName",
+    "MRAcquisitionType",
+    "RepetitionTime",
+    "EchoTime",
+    "InversionTime",
+    "EchoTrainLength",
+    "FlipAngle",
+    "NumberOfAverages",
+    "ContrastBolusAgent",
+    "SliceThickness",
+    "SpacingBetweenSlices",
+    "AcquisitionMatrix",
+    "PercentPhaseFieldOfView",
+    "PixelBandwidth",
+    "Manufacturer",
+    "ManufacturerModelName",
+    "MagneticFieldStrength",
+    "ReceiveCoilName",
+    "TransmitCoilName",
+    "SeriesNumber",
+    "AcquisitionNumber",
+    "PatientPosition",
+    "DiffusionBValue",
+    "NumberOfFrames",
+    "ImageComments",
+    "DerivationDescription",
+    "EchoNumbers",
+    "NumberOfTemporalPositions",
+    "RescaleType",
+    "WindowCenter",
+    "WindowWidth",
+    "PatientSex",
+]
+
+
+def text(dataset, key):
+    value = dataset.get(key)
+    if value is None:
+        return None
+    if isinstance(value, pydicom.multival.MultiValue):
+        return "\\".join(str(item) for item in value)
+    return str(value)
+
+
+def slice_features(frame):
+    pixels = frame.pixels * frame.slope + frame.intercept
+    step = max(1, max(pixels.shape) // 160)
+    image = pixels[::step, ::step].astype(np.float64)
+    spacing = max(frame.row_spacing, frame.column_spacing) * step
+    top = float(np.quantile(image, 0.995))
+    if not np.isfinite(top) or top <= 0:
+        return None
+    mask = image > 0.12 * top
+    mask = ndimage.binary_opening(mask, iterations=1)
+    labels, count = ndimage.label(mask)
+    if count == 0:
+        return None
+    sizes = ndimage.sum(mask, labels, range(1, count + 1))
+    body = ndimage.binary_fill_holes(labels == int(np.argmax(sizes)) + 1)
+    values = image[body]
+    if values.size < 50:
+        return None
+    q99 = float(np.quantile(values, 0.99))
+    radius = max(1, int(round(8.0 / spacing)))
+    inner = ndimage.binary_erosion(body, iterations=radius)
+    ring = body & ~inner
+    height, width = image.shape
+    rows, cols = np.nonzero(body)
+    r0, r1 = np.quantile(rows, [0.3, 0.7])
+    c0, c1 = np.quantile(cols, [0.3, 0.7])
+    central = image[int(r0) : int(r1) + 1, int(c0) : int(c1) + 1]
+    quantiles = np.quantile(values, [0.1, 0.25, 0.5, 0.75, 0.9]) / q99
+    return {
+        "body_fraction": float(body.mean()),
+        "body_width_mm": float((cols.max() - cols.min() + 1) * spacing),
+        "body_height_mm": float((rows.max() - rows.min() + 1) * spacing),
+        "q10": float(quantiles[0]),
+        "q25": float(quantiles[1]),
+        "q50": float(quantiles[2]),
+        "q75": float(quantiles[3]),
+        "q90": float(quantiles[4]),
+        "bright_fraction": float((values > 0.5 * q99).mean()),
+        "ring_median": float(np.median(image[ring]) / q99) if ring.any() else math.nan,
+        "inner_median": float(np.median(image[inner]) / q99) if inner.any() else math.nan,
+        "central_median": float(np.median(central) / q99) if central.size else math.nan,
+        "field_mm_rows": float(height * spacing),
+        "field_mm_cols": float(width * spacing),
+    }
+
+
+def series_row(split, study, slot, candidate, indexed, reference):
+    kind = CONFIG.data.series_types[slot]
+    row = {
+        "split": split,
+        "StudyInstanceUID": study,
+        "SeriesInstanceUID": candidate.uid,
+        "slot": slot,
+        "plane": kind.plane,
+        "fluid": kind.fluid_sensitive,
+        "fat": kind.fat_suppression,
+        "n_files": candidate.image_count,
+        "directory": str(candidate.directory),
+        "indexed": indexed is not None,
+    }
+    if indexed is None:
+        return row
+    records = indexed.records
+    geometry = indexed.geometry
+    positions = np.asarray([r.physical_position for r in records], dtype=float)
+    gaps = np.diff(positions)
+    row.update(
+        n_records=len(records),
+        position_sources="|".join(sorted({r.position_source for r in records})),
+        geometry_reason=geometry.reason,
+        native_poses_valid=geometry.native_poses_valid,
+        center=list(geometry.center) if geometry.center else None,
+        normal=list(geometry.normal) if geometry.normal else None,
+        bounds=list(geometry.bounds) if geometry.bounds else None,
+        frame_uid_count=len(geometry.frame_uids),
+        orientation_change=geometry.orientation_change,
+        line_departure_mm=geometry.line_departure_mm,
+        median_gap=float(np.median(gaps)) if len(gaps) else None,
+        max_gap=float(np.max(gaps)) if len(gaps) else None,
+        min_gap=float(np.min(gaps)) if len(gaps) else None,
+        unique_positions=int(len(np.unique(np.round(positions, 2)))),
+        residual_mm=dict(reference.residuals_mm).get(candidate.uid),
+    )
+    if not records:
+        return row
+    middle = records[len(records) // 2]
+    if middle.pose is not None:
+        layout = middle.pose.layout
+        row.update(
+            middle_position=list(middle.pose.position),
+            middle_orientation=list(layout.orientation),
+            pixel_spacing=list(layout.spacing),
+            rows=layout.rows,
+            columns=layout.columns,
+        )
+    samples = [records[int(round(f * (len(records) - 1)))] for f in (0.25, 0.5, 0.75)]
+    row["sample_paths"] = [str(r.path) for r in samples]
+    row["sample_positions"] = [float(r.physical_position) for r in samples]
+    try:
+        dataset = pydicom.dcmread(middle.path, stop_before_pixels=True)
+        for key in FIELDS:
+            row[f"h_{key}"] = text(dataset, key)
+    except PREPARATION_ERRORS as error:
+        row["header_error"] = repr(error)
+    features = []
+    for record in samples:
+        try:
+            value = slice_features(read_frame(record.path, record.descriptor))
+        except PREPARATION_ERRORS:
+            value = None
+        if value is not None:
+            features.append(value)
+    row["intensity_slices"] = len(features)
+    if features:
+        for key in features[0]:
+            row[f"i_{key}"] = float(np.nanmean([f[key] for f in features]))
+        row["i_mid_body_width_mm"] = features[len(features) // 2]["body_width_mm"]
+    return row
+
+
+def selections(dataset, item, reference):
+    rows = []
+    for slot, values in enumerate(item.slots):
+        if not values:
+            continue
+        kind = CONFIG.data.series_types[slot]
+        sources = []
+        for candidate in sorted(values, key=lambda c: c.uid):
+            indexed = dataset._slice_index.get(candidate.directory)
+            if indexed is not None:
+                sources.append((candidate.uid, indexed))
+        pool = build_pool(tuple(sources), kind.plane, reference, set(), set())
+        key = (kind.plane, kind.fluid_sensitive, kind.fat_suppression)
+        sigma = CONFIG.data.sampling_sigma_mm
+        radius = CONFIG.data.image_size * CONFIG.data.spacing_mm / 2
+        result = {
+            "slot": slot,
+            "path": pool.diagnostics["path"],
+            "source_status": dict(pool.diagnostics["sources"]),
+            "series": [c.uid for c in values],
+        }
+        for multiplier in (1, 2):
+            budget = kind.max_images * multiplier // 3
+            selection = select_triplets(
+                pool, budget, sigma, radius, CONFIG.seed, item.uid, key, False
+            )
+            result[f"eval_m{multiplier}"] = dict(
+                selection.metadata.get("realized_counts", {})
+            )
+            result[f"eval_m{multiplier}_triplets"] = selection.metadata["triplets"]
+            result[f"capacity"] = selection.metadata["capacity"]
+        totals = {}
+        for epoch in range(TRAIN_EPOCHS):
+            selection = select_triplets(
+                pool,
+                kind.max_images // 3,
+                sigma,
+                radius,
+                CONFIG.seed,
+                item.uid,
+                key,
+                True,
+                epoch,
+            )
+            for uid, count in selection.metadata.get("realized_counts", {}).items():
+                totals[uid] = totals.get(uid, 0) + count / TRAIN_EPOCHS
+        result["train_m1_mean"] = totals
+        rows.append(result)
+    return rows
+
+
+def study(args):
+    split, uid = args
+    item = INDEX[split][uid]
+    dataset = KneeStudyDataset(
+        pl.DataFrame({STUDY: [uid]}), {uid: item}, CONFIG.data, (), False, CONFIG.seed
+    )
+    dataset._index_study_geometry(item)
+    reference = dataset._study_references[uid]
+    series = []
+    for slot, values in enumerate(item.slots):
+        for candidate in values:
+            series.append(
+                series_row(
+                    split,
+                    uid,
+                    slot,
+                    candidate,
+                    dataset._slice_index.get(candidate.directory),
+                    reference,
+                )
+            )
+    summary = {
+        "split": split,
+        "StudyInstanceUID": uid,
+        "reference_reason": reference.reason or "accepted",
+        "reference_point": list(reference.point) if reference.point else None,
+        "reference_rms_mm": reference.rms_mm,
+        "reference_condition": reference.condition,
+        "reference_contributors": len(reference.contributors),
+    }
+    return summary, series, selections(dataset, item, reference)
+
+
+def main():
+    jobs = [(split, uid) for split in ("test", "train") for uid in sorted(INDEX[split])]
+    if len(sys.argv) > 1:
+        jobs = jobs[: int(sys.argv[1])]
+    started = time.perf_counter()
+    summaries, series, picks = [], [], {}
+    with ProcessPoolExecutor(28) as pool:
+        for done, (summary, rows, chosen) in enumerate(
+            pool.map(study, jobs, chunksize=4), start=1
+        ):
+            summaries.append(summary)
+            series.extend(rows)
+            picks[(summary["split"], summary["StudyInstanceUID"])] = chosen
+            if done % 250 == 0:
+                print(done, len(jobs), round(time.perf_counter() - started), flush=True)
+    suffix = "" if len(sys.argv) == 1 else "_smoke"
+    pl.DataFrame(summaries, infer_schema_length=None).write_parquet(
+        OUT / f"census_studies{suffix}.parquet"
+    )
+    pl.DataFrame(series, infer_schema_length=None).write_parquet(
+        OUT / f"census_series{suffix}.parquet"
+    )
+    with open(OUT / f"census_selections{suffix}.pkl", "wb") as stream:
+        pickle.dump(picks, stream)
+    print("done", len(summaries), len(series), round(time.perf_counter() - started))
+
+
+if __name__ == "__main__":
+    main()

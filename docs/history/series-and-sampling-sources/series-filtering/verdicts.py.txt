@@ -1,0 +1,41 @@
+import polars as pl
+
+from common import OUT, load
+
+HERE = __file__.rsplit("/", 1)[0]
+
+
+def read(name):
+    rows = []
+    for line in open(f"{HERE}/{name}"):
+        if line.startswith("#") or not line.strip():
+            continue
+        key, verdict, *note = line.split()
+        rows.append({"series8": key, "verdict": verdict, "note": " ".join(note)})
+    return pl.DataFrame(rows).unique("series8", keep="last")
+
+
+def geometry_table():
+    frame = load().join(pl.read_parquet(OUT / "series_mid_centres.parquet"), on="SeriesInstanceUID")
+    verdicts = read("verdicts_geo.txt")
+    return frame.join(verdicts, on="series8", how="left")
+
+
+if __name__ == "__main__":
+    pl.Config.set_tbl_rows(80)
+    pl.Config.set_tbl_cols(30)
+    pl.Config.set_tbl_width_chars(250)
+    pl.Config.set_fmt_str_lengths(30)
+    frame = geometry_table()
+    reviewed = frame.filter(pl.col("verdict").is_not_null())
+    print(reviewed.group_by("verdict").agg(
+        pl.len(),
+        pl.col("robust_dropped").sum().alias("dropped"),
+        pl.col("offset_mm").median().round(0).alias("off_med"),
+        pl.col("offset_z").abs().median().round(0).alias("absz_med"),
+        pl.col("outside_range_mm").median().round(0).alias("or_med"),
+        pl.col("fov_rows_mm").median().round(0).alias("fov_med"),
+    ))
+    print(reviewed.filter(pl.col("verdict").is_in(["non_knee", "contralateral", "knee_other_session"])).select(
+        "study8", "series8", "slot_name", "verdict", "robust_accepted", "robust_dropped", "offset_x", "offset_y", "offset_z", "offset_mm", "outside_range_mm", "fov_outside_mm", "inplane_mm"
+    ).sort("verdict", "study8"))

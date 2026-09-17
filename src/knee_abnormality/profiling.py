@@ -48,9 +48,7 @@ def sample_dataset(
     rows = pl.DataFrame({STUDY: selected}).join(
         labels.training, on=STUDY, how="left", maintain_order="left"
     )
-    dataset = KneeStudyDataset(
-        rows, index, config.data, labels.targets, False, config.seed
-    )
+    dataset = KneeStudyDataset(rows, index, config.data, labels.targets, None)
     return dataset, labels
 
 

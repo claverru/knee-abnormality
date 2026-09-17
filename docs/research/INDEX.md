@@ -20,6 +20,7 @@
 | Considering genuine 3D CNNs (timm_3d or MONAI ResNet/EfficientNet with inflated or MedicalNet weights): volume construction, axis conventions, study fusion and a gated, unexecuted experiment plan | [Volumetric CNNs](volumetric-cnns.md) |
 | Training a pretrained timm EfficientNet: matching checkpoint preprocessing, BatchNorm statistics policy, the spatial-mapping blocker and an unexecuted learning-rate × BatchNorm plan | [EfficientNet training](efficientnet-training.md) |
 | Revisiting a scout backbone if a scout design returns: the historical timm survey with learned-zoom size and compute deltas, adaptation category and MRI evidence | [Scout backbone candidates](scout-backbones.md) |
+| Filtering series that should not reach the classifier (other anatomy, contralateral knee, localizers, reformats, post-contrast) or checking plane and contrast labels: ranked header, geometry, image and model signals with cost, tag coverage, reported reliability and candidate rules | [Series-filtering signals](series-filtering-signals.md) |
 | Choosing external knee data or evaluating pretrained model ideas | [Pretraining and external data](pretraining-and-external-data.md) |
 | Finding inspectable implementations and avoiding misleading notebook defaults | [Public code and notebooks](code-and-notebooks.md) |
 | Recovering exact reviewed code versions | [Code source manifest](source-manifest.json) |

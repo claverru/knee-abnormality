@@ -10,6 +10,7 @@
 | Recovering crop-selection and learned-zoom documentation snapshots, the last crop-era ongoing work, run source archives and retired placement scripts | [Historical crop-selection sources](crop-selection-sources/README.md) |
 | Recovering the retired kNN token graph's module, model, config, optimizer, identity and diagnostic sources, forced-training config and plan | [Historical token-graph sources](token-graph-sources/README.md) |
 | Recovering the retired knee-side embedding's integration patch, metadata resolver, policy audit, comparison analysis and plan | [Historical knee-side sources](knee-side-sources/README.md) |
+| Recovering the 2026-09-17 scratch analysis code behind the tie-break, plane/contrast importance, series filtering census, ranking verification and prediction-agreement findings | [Historical series and sampling sources](series-and-sampling-sources/README.md) |
 | Recovering the retired soft meniscus-coupling comparison analysis | [Historical meniscus-coupling sources](meniscus-coupling-sources/README.md) |
 | Finding removed regional investigation sources and original reproduction bundles | [Historical regional sources](regional-sources/README.md) |
 | Recovering the original 1C architecture, audit commands and overnight definitions without changing current training | [Historical sharing sources](sharing-sources/README.md) |

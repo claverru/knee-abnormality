@@ -1,6 +1,7 @@
 import hashlib
 from pathlib import Path
 
+from knee_abnormality.data.preprocessing.filtering import FILTERING_IDENTITY
 from knee_abnormality.data.preprocessing.geometry import RELIABILITY
 from knee_abnormality.data.preprocessing.sampling import SAMPLING_IDENTITY
 from knee_abnormality.modeling.augmentation import REFLECTION_IDENTITY
@@ -13,6 +14,7 @@ PACKAGE_ROOT = Path(__file__).resolve().parent
 PREPROCESSING_SOURCES = (
     "data/dataset.py",
     "data/preprocessing/dicom.py",
+    "data/preprocessing/filtering.py",
     "data/preprocessing/geometry.py",
     "data/preprocessing/intensity.py",
     "data/preprocessing/preparation.py",
@@ -35,9 +37,10 @@ def preprocessing_identity(backbone: str, package_root: Path = PACKAGE_ROOT) -> 
         digest.update(len(payload).to_bytes(8, "big"))
         digest.update(payload)
     return {
-        "algorithm": "physical_gaussian_overlap_spatial_tokens_reflection_v9",
+        "algorithm": "ranked_filtered_physical_gaussian_overlap_spatial_tokens_reflection_v10",
         "reflection": dict(REFLECTION_IDENTITY),
         "sampling": dict(SAMPLING_IDENTITY),
+        "filtering": dict(FILTERING_IDENTITY),
         "reliability": dict(RELIABILITY),
         "spatial_tokens": {
             **SPATIAL_TOKEN_IDENTITY,

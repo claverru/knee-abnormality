@@ -10,6 +10,7 @@ from torch.utils.data import DataLoader, Dataset
 from knee_abnormality.config import SLICES_PER_INPUT, DataConfig, TrainerConfig
 from knee_abnormality.data.labels import STUDY
 from knee_abnormality.data.preprocessing.dicom import PREPARATION_ERRORS
+from knee_abnormality.data.preprocessing.filtering import excluded_series
 from knee_abnormality.data.preprocessing.geometry import (
     StudyReference,
     estimate_reference,
@@ -21,11 +22,7 @@ from knee_abnormality.data.preprocessing.preparation import (
     prepare_series,
 )
 from knee_abnormality.data.preprocessing.sampling import build_pool, select_triplets
-from knee_abnormality.data.preprocessing.series import (
-    IndexedSeries,
-    SliceRecord,
-    index_series,
-)
+from knee_abnormality.data.preprocessing.series import IndexedSeries, index_series
 from knee_abnormality.data.sources import SeriesCandidate, StudySeries
 
 
@@ -36,8 +33,7 @@ class KneeStudyDataset(Dataset):
         series_index: dict[str, StudySeries],
         data: DataConfig,
         targets: tuple[str, ...],
-        training: bool,
-        seed: int,
+        training_seed: int | None,
         image_limit_multiplier: int = 1,
     ) -> None:
         if image_limit_multiplier < 1:
@@ -46,12 +42,12 @@ class KneeStudyDataset(Dataset):
         self.series_index = series_index
         self.data = data
         self.targets = targets
-        self.training = training
-        self.seed = seed
+        self.training_seed = training_seed
         self.image_limit_multiplier = image_limit_multiplier
         self.epoch = Value("q", 0)
         self._slice_index: dict[Path, IndexedSeries] = {}
         self._study_references: dict[str, StudyReference] = {}
+        self._excluded_series: dict[str, frozenset[str]] = {}
         missing = set(studies[STUDY].to_list()) - set(series_index)
         if missing:
             raise ValueError(
@@ -64,12 +60,12 @@ class KneeStudyDataset(Dataset):
     def __len__(self) -> int:
         return self.studies.height
 
-    def _records(self, candidate: SeriesCandidate) -> tuple[SliceRecord, ...]:
-        records = self._slice_index.get(candidate.directory)
-        if records is None:
-            records = index_series(candidate.directory)
-            self._slice_index[candidate.directory] = records
-        return records.records
+    def _indexed(self, candidate: SeriesCandidate) -> IndexedSeries:
+        indexed = self._slice_index.get(candidate.directory)
+        if indexed is None:
+            indexed = index_series(candidate.directory)
+            self._slice_index[candidate.directory] = indexed
+        return indexed
 
     def _index_study_geometry(self, study: StudySeries) -> None:
         if study.uid in self._study_references:
@@ -80,17 +76,20 @@ class KneeStudyDataset(Dataset):
                 candidates.setdefault(
                     candidate.uid, (candidate, self.data.series_types[slot].plane)
                 )
-        eligible = []
+        indexed = {}
         for uid, (candidate, plane) in sorted(candidates.items()):
             try:
-                records = self._records(candidate)
+                indexed[uid] = (self._indexed(candidate), plane)
             except PREPARATION_ERRORS:
                 continue
-            if len(records) >= SLICES_PER_INPUT:
-                eligible.append(
-                    (uid, plane, self._slice_index[candidate.directory].geometry)
-                )
-        self._study_references[study.uid] = estimate_reference(tuple(eligible))
+        excluded = excluded_series({uid: value for uid, (value, _) in indexed.items()})
+        eligible = tuple(
+            (uid, plane, value.geometry)
+            for uid, (value, plane) in indexed.items()
+            if uid not in excluded and len(value.records) >= SLICES_PER_INPUT
+        )
+        self._excluded_series[study.uid] = excluded
+        self._study_references[study.uid] = estimate_reference(eligible)
 
     def _decode_series(self, records, spacing_mm, image_size):
         return decode_series(records, spacing_mm, image_size)
@@ -135,15 +134,16 @@ class KneeStudyDataset(Dataset):
             return None
 
     def _prepare_slot(self, study, slot, failures):
-        candidates = {c.uid: c for c in study.slots[slot]}
+        excluded = self._excluded_series[study.uid]
+        candidates = {c.uid: c for c in study.slots[slot] if c.uid not in excluded}
         sources = []
         for uid, candidate in sorted(candidates.items()):
             try:
-                self._records(candidate)
-                sources.append((uid, self._slice_index[candidate.directory]))
+                sources.append((uid, self._indexed(candidate)))
             except PREPARATION_ERRORS as error:
                 failures.append(f"{uid}: {type(error).__name__}: {error}")
         kind = self.data.series_types[slot]
+        radius = self.data.image_size * self.data.spacing_mm / 2
         failed_paths, failed_sources, cache = set(), set(), {}
         attempts = 0
         while True:
@@ -151,6 +151,8 @@ class KneeStudyDataset(Dataset):
                 tuple(sources),
                 kind.plane,
                 self._study_references[study.uid],
+                self.data.spacing_mm,
+                radius,
                 failed_paths,
                 failed_sources,
             )
@@ -158,11 +160,10 @@ class KneeStudyDataset(Dataset):
                 pool,
                 kind.max_images * self.image_limit_multiplier // 3,
                 self.data.sampling_sigma_mm,
-                self.data.image_size * self.data.spacing_mm / 2,
-                self.seed,
+                radius,
                 study.uid,
                 (kind.plane, kind.fluid_sensitive, kind.fat_suppression),
-                self.training,
+                self.training_seed,
                 self.epoch.value,
             )
             values, new_paths, new_sources = [], set(), set()
@@ -191,6 +192,9 @@ class KneeStudyDataset(Dataset):
                     "attempts": attempts,
                     "failed_paths": sorted(map(str, failed_paths)),
                     "failed_sources": sorted(failed_sources),
+                    "excluded_sources": sorted(
+                        c.uid for c in study.slots[slot] if c.uid in excluded
+                    ),
                     "decoded_unique_paths": len(cache),
                 }
                 return tuple(values), metadata

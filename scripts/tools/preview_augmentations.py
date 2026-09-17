@@ -382,8 +382,7 @@ def create_preview(args: PreviewCLI) -> dict:
     torch.set_num_threads(1)
     dataset, _, _ = prediction_data(config, args.split, 0)
     seed = config.seed if args.seed is None else args.seed
-    dataset.training = args.sampling == "training"
-    dataset.seed = seed
+    dataset.training_seed = seed if args.sampling == "training" else None
     dataset.set_epoch(args.epoch)
     indices = [
         index

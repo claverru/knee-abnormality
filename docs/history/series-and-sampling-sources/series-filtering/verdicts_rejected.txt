@@ -1,0 +1,48 @@
+# robust-rejected studies (47) + test examples: study8 verdict note
+14183729 all_knee
+81074302 all_knee
+86653502 all_knee
+55725945 all_knee
+76699300 all_knee
+69242644 all_knee
+77248612 all_knee
+73096909 all_knee
+59591665 all_knee
+02390614 all_knee
+12671014 all_knee
+61185643 all_knee
+23222742 all_knee (sag_fluid 39944439 peripheral slice)
+53297949 all_knee
+98163082 all_knee
+56929507 all_knee
+65911261 all_knee
+24202519 all_knee
+29527637 all_knee
+70919222 all_knee
+42235135 all_knee
+39762111 all_knee
+71483491 all_knee
+70139848 all_knee
+99606924 all_knee
+91931824 all_knee
+09596023 all_knee
+63928925 non_knee_series 21988730,30313745,97645662 calf-level axial x2 + calf-centred coronal (gastrocnemius lesion study); sagittals include knee
+80456420 all_knee
+40136393 all_knee
+13759069 all_knee
+03350286 all_knee
+79141456 all_knee
+64501760 all_knee
+42210115 all_knee (sag_fluid 65264936 posterior-shifted)
+86508585 all_knee
+78336182 all_knee
+88365785 all_knee
+56525658 all_knee
+85561578 all_knee
+53071577 all_knee (cor_fluid 84988739 posterior soft tissue slice)
+34699743 all_knee (bond_416 oblique)
+69597946 all_knee
+68769509 all_knee
+35276191 test_all_knee
+56991776 test_all_knee
+97591402 test_all_knee

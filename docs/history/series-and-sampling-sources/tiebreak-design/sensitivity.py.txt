@@ -1,0 +1,291 @@
+import itertools
+import pickle
+import sys
+import time
+import types
+from multiprocessing import get_context
+from pathlib import Path
+
+import numpy as np
+
+ROOT = Path("/home/claudio/src/knee-abnormality")
+OUT = Path(__file__).resolve().parent
+sys.path.insert(0, str(ROOT / "src"))
+
+from knee_abnormality.config import load_config
+from knee_abnormality.data.dataset import KneeStudyDataset
+from knee_abnormality.data.labels import load_fold_labels
+from knee_abnormality.data.preprocessing import sampling
+from knee_abnormality.data.preprocessing.sampling import (
+    AXES,
+    build_pool,
+    geometry_groups,
+    select_triplets,
+    target_depths,
+)
+from knee_abnormality.data.sources import build_series_index
+
+SEEDS = list(range(42, 52))
+MAX_PERMS = 120
+REAL_NP = np
+
+
+class FixedOrderRng:
+    def __init__(self, order):
+        self.order = order
+
+    def permutation(self, sources):
+        assert sorted(self.order) == list(sources)
+        return REAL_NP.asarray(self.order)
+
+
+class NpProxy(types.ModuleType):
+    def __init__(self, order):
+        super().__init__("np_proxy")
+        self._order = order
+        self.random = types.SimpleNamespace(default_rng=lambda seed: FixedOrderRng(order))
+
+    def __getattr__(self, name):
+        return getattr(REAL_NP, name)
+
+
+def select_with_order(pool, budget, sigma, radius, study, kind, order):
+    sampling.np = NpProxy(list(order))
+    try:
+        return select_triplets(pool, budget, sigma, radius, 0, study, kind, False)
+    finally:
+        sampling.np = REAL_NP
+
+
+def outcome(selection):
+    return tuple(sorted((t.uid, t.records[1].path.name) for t in selection.triplets))
+
+
+def seeded_order(seed, study, kind, sources):
+    return [
+        str(x)
+        for x in np.random.default_rng(
+            sampling.operation_seed(seed, study, kind, "source_order", None)
+        ).permutation(sources)
+    ]
+
+
+def trace_preferred(pool, targets, order):
+    count = len(targets)
+    entitlement = dict.fromkeys(order, 0.0)
+    assigned = dict.fromkeys(order, 0)
+    eligible = [
+        {v.uid for v in pool.candidates if v.support[0] <= t <= v.support[1]}
+        for t in targets
+    ]
+    preferred = [None] * count
+    rows = []
+    for row in np.argsort(targets):
+        choices = [s for s in order if s in eligible[row]]
+        for s in choices:
+            entitlement[s] += 1 / len(choices)
+        deficits = [entitlement[s] - assigned[s] for s in choices]
+        best = max(deficits)
+        exact = sum(d == best for d in deficits)
+        near = sum(abs(d - best) <= 1e-9 for d in deficits)
+        source = max(choices, key=lambda s: entitlement[s] - assigned[s])
+        preferred[row] = source
+        assigned[source] += 1
+        rows.append(
+            {
+                "row": int(row),
+                "choices": len(choices),
+                "exact_tie": exact,
+                "near_tie": near,
+                "chosen": source,
+            }
+        )
+    return preferred, rows, eligible
+
+
+def series_summary(uid, indexed, pool, reference, plane):
+    records = indexed.records
+    geometry = indexed.geometry
+    positions = np.asarray([r.physical_position for r in records], dtype=float)
+    gaps = np.diff(positions)
+    pose = next((r.pose for r in records if r.pose is not None), None)
+    obliquity = None
+    if geometry.normal is not None:
+        n = np.asarray(geometry.normal, dtype=float)
+        n = n / np.linalg.norm(n)
+        obliquity = float(np.degrees(np.arccos(min(1.0, abs(n[AXES[plane]])))))
+    own = [v for v in pool.candidates if v.uid == uid]
+    depths = np.asarray(sorted(v.depth for v in own))
+    supports = sorted({v.support for v in own})
+    return {
+        "uid": uid,
+        "n_records": len(records),
+        "median_gap": float(np.median(gaps)) if len(gaps) else None,
+        "min_gap": float(np.min(gaps)) if len(gaps) else None,
+        "max_gap": float(np.max(gaps)) if len(gaps) else None,
+        "pixel_spacing": tuple(pose.layout.spacing) if pose else None,
+        "rows": pose.layout.rows if pose else None,
+        "columns": pose.layout.columns if pose else None,
+        "frame_uid": pose.layout.frame_uid if pose else None,
+        "geometry_reason": geometry.reason,
+        "obliquity_deg": obliquity,
+        "pool_status": pool.diagnostics["sources"].get(uid),
+        "n_candidates": len(own),
+        "depths": depths.tolist(),
+        "supports": supports,
+        "center": geometry.center,
+        "normal": geometry.normal,
+    }
+
+
+def process(args):
+    study_uid, config_path = args
+    config = load_config(config_path)
+    dataset = WORKER["dataset"]
+    study = dataset.series_index[study_uid]
+    dataset._index_study_geometry(study)
+    reference = dataset._study_references[study_uid]
+    results = []
+    multiplier = config.data.validation_image_multiplier
+    for slot, values in enumerate(study.slots):
+        if len(values) < 2:
+            continue
+        kind_config = config.data.series_types[slot]
+        kind = (kind_config.plane, kind_config.fluid_sensitive, kind_config.fat_suppression)
+        sources = []
+        errors = []
+        for candidate in sorted(values, key=lambda c: c.uid):
+            try:
+                dataset._records(candidate)
+                sources.append((candidate.uid, dataset._slice_index[candidate.directory]))
+            except Exception as error:
+                errors.append((candidate.uid, repr(error)))
+        pool = build_pool(tuple(sources), kind_config.plane, reference, set(), set())
+        budget = kind_config.max_images * multiplier // 3
+        sigma = config.data.sampling_sigma_mm
+        radius = config.data.image_size * config.data.spacing_mm / 2
+        pool_sources = sorted({v.uid for v in pool.candidates})
+        entry = {
+            "study": study_uid,
+            "slot": slot,
+            "kind": kind,
+            "n_series": len(values),
+            "series_uids": [c.uid for c in values],
+            "errors": errors,
+            "physical": pool.physical,
+            "path": pool.diagnostics["path"],
+            "pool_sources": pool_sources,
+            "reference_ok": reference.point is not None,
+            "reference_reason": reference.reason,
+            "budget": budget,
+            "series": [
+                series_summary(uid, indexed, pool, reference, kind_config.plane)
+                for uid, indexed in sources
+            ],
+        }
+        seeds = {}
+        for seed in SEEDS:
+            selection = select_triplets(
+                pool, budget, sigma, radius, seed, study_uid, kind, False
+            )
+            seeds[seed] = {
+                "outcome": outcome(selection),
+                "preferred": [a["preferred_uid"] for a in selection.metadata["assignments"]],
+                "changed": sum(a["supplier_changed"] for a in selection.metadata["assignments"]),
+                "order": seeded_order(seed, study_uid, kind, pool_sources),
+            }
+        entry["seeds"] = seeds
+        if not pool.candidates:
+            entry["count"] = 0
+            results.append(entry)
+            continue
+        groups = geometry_groups(pool, radius)
+        count = min(budget, len(groups))
+        entry["count"] = count
+        entry["n_groups"] = len(groups)
+        entry["mixed_groups"] = sum(len({v.uid for v in g}) > 1 for g in groups)
+        percentiles = (np.arange(count) + 0.5) / count
+        targets = target_depths(pool, percentiles, sigma)
+        entry["targets"] = targets.tolist()
+        for seed in SEEDS[:1]:
+            order = seeds[seed]["order"]
+            real = select_with_order(pool, budget, sigma, radius, study_uid, kind, order)
+            assert outcome(real) == seeds[seed]["outcome"], "proxy mismatch"
+            preferred, rows, eligible = trace_preferred(pool, targets, order)
+            for a in select_triplets(pool, budget, sigma, radius, seed, study_uid, kind, False).metadata["assignments"]:
+                assert preferred[a["band"]] == a["preferred_uid"], "trace mismatch"
+            entry["trace_seed42"] = rows
+        entry["eligible"] = [sorted(e) for e in eligible]
+        nearest = []
+        for t in targets:
+            row = {}
+            for uid in pool_sources:
+                own = [v.depth for v in pool.candidates if v.uid == uid and v.support[0] <= t <= v.support[1]]
+                row[uid] = float(min(abs(d - t) for d in own)) if own else None
+            nearest.append(row)
+        entry["nearest"] = nearest
+        if __import__("math").factorial(len(pool_sources)) <= MAX_PERMS:
+            perms = list(itertools.permutations(pool_sources))
+        else:
+            rng = np.random.default_rng(0)
+            perms = [tuple(rng.permutation(pool_sources)) for _ in range(MAX_PERMS)]
+        permutation_outcomes = {}
+        permutation_preferred = {}
+        tie_rows = []
+        for order in perms:
+            selection = select_with_order(pool, budget, sigma, radius, study_uid, kind, order)
+            permutation_outcomes[tuple(order)] = outcome(selection)
+            preferred, rows, _ = trace_preferred(pool, targets, list(order))
+            permutation_preferred[tuple(order)] = tuple(preferred)
+            tie_rows.append(rows)
+        entry["perm_outcomes"] = permutation_outcomes
+        entry["perm_preferred"] = permutation_preferred
+        entry["perm_ties"] = tie_rows
+        entry["exhaustive"] = __import__("math").factorial(len(pool_sources)) <= MAX_PERMS
+        results.append(entry)
+    return study_uid, results
+
+
+WORKER = {}
+
+
+def init(config_path):
+    config = load_config(config_path)
+    index = build_series_index(config.paths.data_root, config.data, "train")
+    labels = load_fold_labels(config, 0)
+    WORKER["dataset"] = KneeStudyDataset(
+        labels.validation,
+        index,
+        config.data,
+        labels.targets,
+        False,
+        config.seed,
+        config.data.validation_image_multiplier,
+    )
+
+
+def main():
+    config_path = ROOT / "configs/training.yaml"
+    config = load_config(config_path)
+    index = build_series_index(config.paths.data_root, config.data, "train")
+    labels = load_fold_labels(config, 0)
+    studies = labels.validation["StudyInstanceUID"].to_list()
+    repeated = [s for s in studies if any(len(v) >= 2 for v in index[s].slots)]
+    slots = sum(len(v) >= 2 for s in repeated for v in index[s].slots)
+    print(len(studies), len(repeated), slots, flush=True)
+    start = time.time()
+    output = {}
+    with get_context("spawn").Pool(16, initializer=init, initargs=(config_path,)) as pool:
+        for i, (study, results) in enumerate(
+            pool.imap_unordered(process, [(s, config_path) for s in repeated], chunksize=2)
+        ):
+            output[study] = results
+            if i % 50 == 0:
+                print(i, time.time() - start, flush=True)
+    with open(OUT / "sensitivity.pkl", "wb") as stream:
+        pickle.dump({"studies": studies, "repeated": repeated, "results": output}, stream)
+    print("done", time.time() - start)
+
+
+if __name__ == "__main__":
+    main()

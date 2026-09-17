@@ -1,0 +1,110 @@
+import itertools
+import json
+from pathlib import Path
+
+import numpy as np
+import polars as pl
+from scipy.stats import spearmanr
+
+from knee_abnormality.config import load_config
+from knee_abnormality.data.labels import STUDY, TARGET_THRESHOLD, load_fold_labels
+from knee_abnormality.evaluation.metrics import aucs
+
+root = Path.cwd()
+out = root / "outputs/analysis/prediction-agreement-20260917"
+out.mkdir(parents=True, exist_ok=True)
+rescore = root / "outputs/analysis/deterministic-selection-20260917/rescore"
+queue = root / "outputs/training/overnight-20260916T214520Z-t8k_kw2z/runs"
+sources = {
+    "new42": root / "outputs/training/ranked-filtered-seed42/fold_0/validation_predictions.csv",
+    "new43": root / "outputs/training/ranked-filtered-seed43/fold_0/validation_predictions.csv",
+    "new44": root / "outputs/training/ranked-filtered-seed44/fold_0/validation_predictions.csv",
+    "ctl42": rescore / "00-control_validation_predictions.csv",
+    "ctl43": rescore / "01-control-seed-43_validation_predictions.csv",
+    "ctl44": rescore / "02-control-seed-44_validation_predictions.csv",
+    "ctl42_old": queue / "00-control/fold_0/validation_predictions.csv",
+    "ctl43_old": queue / "01-control-seed-43/fold_0/validation_predictions.csv",
+    "ctl44_old": queue / "02-control-seed-44/fold_0/validation_predictions.csv",
+}
+config = load_config(root / "configs/training.yaml")
+labels = load_fold_labels(config, 0)
+targets = list(labels.targets)
+validation = labels.validation.sort(STUDY)
+y = validation.select(f"target_{t}" for t in targets).to_numpy().astype(np.float64)
+hard = (y >= TARGET_THRESHOLD).astype(np.int8)
+preds = {}
+for name, path in sources.items():
+    frame = pl.read_csv(path).sort(STUDY)
+    assert frame[STUDY].to_list() == validation[STUDY].to_list(), name
+    preds[name] = frame.select(targets).to_numpy().astype(np.float64)
+
+
+def logit(p):
+    p = np.clip(p, 1e-6, 1 - 1e-6)
+    return np.log(p) - np.log1p(-p)
+
+
+summary = {}
+for name, p in preds.items():
+    a = aucs(hard, p, targets)
+    q = np.clip(p, 1e-7, 1 - 1e-7)
+    summary[name] = {
+        "macro_auc": a["macro_auc"],
+        "per_target_auc": a["per_target_auc"],
+        "bce": float(-(y * np.log(q) + (1 - y) * np.log1p(-q)).mean()),
+        "mean_prob": float(p.mean()),
+        "mean_prob_per_target": dict(zip(targets, p.mean(0).tolist())),
+        "logit_std": float(logit(p).std()),
+    }
+
+
+def pair(a, b):
+    pa, pb = preds[a], preds[b]
+    la, lb = logit(pa), logit(pb)
+    per_target_spearman = [spearmanr(pa[:, i], pb[:, i]).statistic for i in range(len(targets))]
+    auc_a, auc_b = summary[a]["per_target_auc"], summary[b]["per_target_auc"]
+    ens = aucs(hard, (pa + pb) / 2, targets)["macro_auc"]
+    return {
+        "pair": f"{a}~{b}",
+        "logit_pearson": float(np.corrcoef(la.ravel(), lb.ravel())[0, 1]),
+        "mean_target_spearman": float(np.mean(per_target_spearman)),
+        "min_target_spearman": float(np.min(per_target_spearman)),
+        "mean_abs_prob_diff": float(np.abs(pa - pb).mean()),
+        "p95_abs_prob_diff": float(np.quantile(np.abs(pa - pb), 0.95)),
+        "rms_logit_diff": float(np.sqrt(((la - lb) ** 2).mean())),
+        "mean_prob_shift": float((pa - pb).mean()),
+        "macro_auc_diff": summary[a]["macro_auc"] - summary[b]["macro_auc"],
+        "mean_abs_target_auc_diff": float(np.mean([abs(auc_a[t] - auc_b[t]) for t in targets])),
+        "ensemble_macro_auc": ens,
+        "ensemble_gain_over_mean": ens - (summary[a]["macro_auc"] + summary[b]["macro_auc"]) / 2,
+    }
+
+
+groups = {
+    "new_vs_new": list(itertools.combinations(["new42", "new43", "new44"], 2)),
+    "control_vs_control_new_eval": list(itertools.combinations(["ctl42", "ctl43", "ctl44"], 2)),
+    "control_vs_control_old_eval": list(itertools.combinations(["ctl42_old", "ctl43_old", "ctl44_old"], 2)),
+    "same_checkpoint_old_vs_new_eval": [("ctl42", "ctl42_old"), ("ctl43", "ctl43_old"), ("ctl44", "ctl44_old")],
+    "new_vs_same_seed_control": [("new42", "ctl42"), ("new43", "ctl43"), ("new44", "ctl44")],
+    "new_vs_other_seed_control": [("new42", "ctl43"), ("new42", "ctl44"), ("new43", "ctl42"), ("new43", "ctl44"), ("new44", "ctl42"), ("new44", "ctl43")],
+}
+pairs = {g: [pair(a, b) for a, b in v] for g, v in groups.items()}
+(out / "summary.json").write_text(json.dumps({"models": summary, "pairs": pairs}, indent=1))
+rows = [{"group": g, **r} for g, v in pairs.items() for r in v]
+pl.DataFrame(rows).write_csv(out / "pairs.csv")
+print(f"{'model':10} {'macro':>8} {'bce':>8} {'meanp':>7} {'lstd':>6}")
+for n, s in summary.items():
+    print(f"{n:10} {s['macro_auc']:.6f} {s['bce']:.5f} {s['mean_prob']:.4f} {s['logit_std']:.3f}")
+cols = ["logit_pearson", "mean_target_spearman", "min_target_spearman", "mean_abs_prob_diff", "rms_logit_diff", "mean_prob_shift", "macro_auc_diff", "mean_abs_target_auc_diff", "ensemble_gain_over_mean"]
+print("pair".ljust(22) + " ".join(c[:10].rjust(10) for c in cols))
+for g, v in pairs.items():
+    print(f"-- {g}")
+    for r in v:
+        print(r["pair"].ljust(22) + " ".join(f"{r[c]:10.4f}" for c in cols))
+print("per-target mean prob")
+print("target".ljust(18) + " ".join(n.rjust(9) for n in preds))
+for i, t in enumerate(targets):
+    print(t.ljust(18) + " ".join(f"{summary[n]['mean_prob_per_target'][t]:9.4f}" for n in preds))
+print("per-target AUC")
+for t in targets:
+    print(t.ljust(18) + " ".join(f"{summary[n]['per_target_auc'][t]:9.4f}" for n in preds))

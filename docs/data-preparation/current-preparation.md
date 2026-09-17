@@ -11,6 +11,46 @@ Earlier 0.80 mm inspections and the
 historical cached-pipeline notes below are unverified evidence, not current
 defaults.
 
+## Series indexing, guards and exclusions
+
+Implemented 2026-09-17; the same `KneeStudyDataset` path runs in training,
+validation and Kaggle inference.
+
+- **Headers:** `index_series` (`data/preprocessing/series.py`) parses every
+  file's pre-pixel header once. Besides the pose and pixel descriptor it keeps
+  12 series tags (`SeriesTags` in `dicom.py`) and stores the most common tag set
+  as a compact `SeriesSummary`: `SeriesNumber`, reformat flag, same-protocol
+  signature, acquired in-plane resolution and `ReceiveCoilName`. No extra file
+  is read; tag parsing adds about 65 µs per header (30–45% of warm header
+  indexing, measured on 337 series).
+- **Instance guard:** within a series, instances whose rows or columns differ
+  from the most supported layout, or whose pixel spacing or orientation differ
+  from it by more than the orientation tolerance (1e-3), are removed before
+  sorting. Instances without a
+  pose are kept; if no layout is self-consistent, nothing is removed. This is a
+  hidden-test defence ([research](../research/series-filtering-signals.md#localizers-scouts-and-calibration));
+  it removes no training or example-test instance.
+- **Study exclusions** (`data/preprocessing/filtering.py`), decided on all
+  indexed series of a study before `estimate_reference` and applied to every
+  slot:
+  - *Non-knee coil:* when a study uses more than one non-empty
+    `ReceiveCoilName` and at least one of them does not name a non-knee part,
+    series whose coil name contains ankle, foot, wrist, hand, elbow, shoulder,
+    hip, head, neck or breast, and not knee, are dropped. Body and spine coils
+    are not anatomy words.
+  - *Stray other knee:* when series volume centres spread more than 150 mm in
+    patient x, the study is split at the largest x gap, and a side with one
+    series is dropped if the other side has at least two. Bilateral exams keep
+    both sides.
+  - A rule never drops every series of a study; missing tags or geometry keep
+    the series. Thigh, calf, patellar, oblique and other far series are kept.
+    Slot metadata lists dropped series as `excluded_sources`.
+- **Effect (all 4,407 training and 3 example-test studies):** 6 series dropped,
+  exactly the 5 ankle series of `…93672103` and the stray sagittal of
+  `…42012883`; the 5 body/spine-coil studies are untouched; one study centre
+  changes (`…93672103`, RMS 42.05 → 0.48 mm, now accepted); the guard removes
+  nothing ([census](../metadata/series-filtering-census.md#implemented-rule-2026-09-17)).
+
 ## Overlapping triplet preparation
 
 Production uses the [shared physical sampler](physical-sampling/implemented-sampler.md).

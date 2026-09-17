@@ -1,0 +1,50 @@
+import sys
+
+import polars as pl
+
+from common import OUT, load
+
+
+def reference_for(frame, row):
+    same = frame.filter(
+        (pl.col("StudyInstanceUID") == row["StudyInstanceUID"])
+        & (pl.col("plane") == row["plane"])
+        & (pl.col("SeriesInstanceUID") != row["SeriesInstanceUID"])
+    )
+    if same.height == 0:
+        same = frame.filter(
+            (pl.col("StudyInstanceUID") == row["StudyInstanceUID"])
+            & (pl.col("SeriesInstanceUID") != row["SeriesInstanceUID"])
+        )
+    if same.height == 0:
+        return None
+    return same.sort(pl.col("inplane_mm").fill_null(999), pl.col("outside_range_mm").fill_null(999)).row(0, named=True)["SeriesInstanceUID"]
+
+
+def build(series8, name, extra=None, frame=None):
+    frame = load() if frame is None else frame
+    rows = []
+    for key in series8:
+        row = frame.filter(pl.col("series8") == key).row(0, named=True)
+        offset = (
+            f"off {row['offset_x']:.0f},{row['offset_y']:.0f},{row['offset_z']:.0f} inpl {row['inplane_mm']:.0f} fo{row['fov_outside_mm']:.0f} or{row['outside_range_mm']:.0f}"
+            if row["offset_mm"] is not None
+            else "no-centre"
+        )
+        title = (
+            f"{row['study8']} {row['series8']} {row['slot_name']} n{row['n_records']} fov{row['fov_rows_mm'] or 0:.0f} slab{row['slab_mm'] or 0:.0f} {row['desc'][:30]}\n"
+            f"{offset} TE{row['te']} TR{row['tr']} {(extra or {}).get(key, '')}"
+        )
+        rows.append(
+            {
+                "SeriesInstanceUID": row["SeriesInstanceUID"],
+                "StudyInstanceUID": row["StudyInstanceUID"],
+                "title": title,
+                "reference": reference_for(frame, row),
+            }
+        )
+    pl.DataFrame(rows).write_parquet(OUT / f"rows_{name}.parquet")
+
+
+if __name__ == "__main__":
+    build(sys.argv[2].split(","), sys.argv[1])

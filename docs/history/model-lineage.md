@@ -63,7 +63,9 @@ The same day, the package moved into the `data/`, `modeling/`, `training/`, `eva
 `inference/` subpackages, single-value config fields became code constants, and the preprocessing
 identity became `physical_gaussian_overlap_spatial_tokens_reflection_v9`. The
 [current model](../modeling/current-model.md#00-baseline-result) records the result and the
-restoration checks.
+restoration checks. On 2026-09-17 the identity became
+`ranked_filtered_physical_gaussian_overlap_spatial_tokens_reflection_v10` (series exclusions and
+a fixed evaluation source ranking; model unchanged).
 
 ## Retired crop selection and learned zoom
 

@@ -1,0 +1,156 @@
+import itertools
+import pickle
+from collections import Counter
+from pathlib import Path
+
+import numpy as np
+
+OUT = Path(__file__).resolve().parent
+data = pickle.load(open(OUT / "sensitivity.pkl", "rb"))
+entries = [e for r in data["results"].values() for e in r]
+print("studies", len(data["studies"]), "repeated studies", len(data["repeated"]), "slots", len(entries))
+print("n_series per slot", Counter(e["n_series"] for e in entries))
+print("pool sources per slot", Counter(len(e["pool_sources"]) for e in entries))
+print("path", Counter(e["path"] for e in entries))
+print("kind", Counter(e["kind"] for e in entries))
+print("errors", sum(bool(e["errors"]) for e in entries))
+status = Counter(s["pool_status"] for e in entries for s in e["series"])
+print("series pool status", status)
+
+
+def overlap(a, b):
+    a, b = Counter(a), Counter(b)
+    return sum((a & b).values())
+
+
+seeds = sorted(entries[0]["seeds"])
+pairs = list(itertools.combinations(seeds, 2))
+slot_diff_any = []
+slot_pair_rate = []
+trip_pair_rate = []
+pref_diff_any = []
+for e in entries:
+    outs = [e["seeds"][s]["outcome"] for s in seeds]
+    slot_diff_any.append(len(set(outs)) > 1)
+    diffs = [e["seeds"][a]["outcome"] != e["seeds"][b]["outcome"] for a, b in pairs]
+    slot_pair_rate.append(np.mean(diffs))
+    rates = []
+    for a, b in pairs:
+        oa, ob = e["seeds"][a]["outcome"], e["seeds"][b]["outcome"]
+        n = max(len(oa), len(ob))
+        rates.append(1 - overlap(oa, ob) / n if n else 0.0)
+    trip_pair_rate.append(np.mean(rates))
+    e["trip_pair_rate"] = np.mean(rates)
+    e["slot_pair_rate"] = np.mean(diffs)
+    e["diff_any"] = len(set(outs)) > 1
+print()
+print("slots differing across 10 seeds:", sum(slot_diff_any), "/", len(entries))
+print("mean pairwise slot-difference rate:", np.mean(slot_pair_rate))
+for a, b in [(42, 43), (42, 44), (43, 44)]:
+    d = [e["seeds"][a]["outcome"] != e["seeds"][b]["outcome"] for e in entries]
+    tr = []
+    tot = 0
+    same = 0
+    for e in entries:
+        oa, ob = e["seeds"][a]["outcome"], e["seeds"][b]["outcome"]
+        tot += max(len(oa), len(ob))
+        same += overlap(oa, ob)
+    studies = {e["study"] for e in entries if e["seeds"][a]["outcome"] != e["seeds"][b]["outcome"]}
+    print(f"seed {a} vs {b}: slots differ {sum(d)}/{len(d)}; studies differ {len(studies)}/{len(data['studies'])} ({len(studies)/len(data['repeated']):.3f} of repeated); triplets differ {tot-same}/{tot} in repeated slots")
+print("mean per-slot pairwise triplet-difference share:", np.mean(trip_pair_rate))
+
+studies_any = {e["study"] for e in entries if e["diff_any"]}
+print("studies with any differing slot across 10 seeds:", len(studies_any))
+
+perm_sens = []
+exp_diff = []
+for e in entries:
+    po = e.get("perm_outcomes")
+    if not po:
+        perm_sens.append(False)
+        exp_diff.append(0.0)
+        continue
+    c = Counter(po.values())
+    p = np.asarray(list(c.values())) / sum(c.values())
+    perm_sens.append(len(c) > 1)
+    exp_diff.append(1 - (p**2).sum())
+    e["perm_sensitive"] = len(c) > 1
+    e["n_outcomes"] = len(c)
+print("order-sensitive slots (any permutation differs):", sum(perm_sens), "/", len(entries))
+print("expected P(two random seeds differ) mean:", np.mean(exp_diff))
+print("n distinct outcomes over permutations:", Counter(e.get("n_outcomes", 0) for e in entries))
+
+total_trip = sum(len(e["seeds"][42]["outcome"]) for e in entries)
+print("triplets in repeated slots (seed 42):", total_trip)
+
+# tie structure
+row_stats = Counter()
+first_row_tie = 0
+tie_rows_per_slot = []
+for e in entries:
+    rows = e.get("trace_seed42", [])
+    ties = sum(r["exact_tie"] > 1 for r in rows)
+    near_only = sum(r["near_tie"] > r["exact_tie"] for r in rows)
+    tie_rows_per_slot.append(ties)
+    row_stats["rows"] += len(rows)
+    row_stats["multi_choice_rows"] += sum(r["choices"] > 1 for r in rows)
+    row_stats["exact_tie_rows"] += ties
+    row_stats["near_not_exact"] += near_only
+    if rows and rows[0]["exact_tie"] > 1:
+        first_row_tie += 1
+print(row_stats, "first-row ties", first_row_tie)
+print("tie rows per slot distribution", Counter(tie_rows_per_slot))
+
+# coverage classes
+def coverage_class(e):
+    elig = e.get("eligible")
+    if not elig:
+        return "no_pool"
+    srcs = e["pool_sources"]
+    if len(srcs) < 2:
+        return "single_source_in_pool"
+    full = all(set(x) == set(srcs) for x in elig)
+    if full:
+        return "all_cover_all_targets"
+    some = any(len(x) > 1 for x in elig)
+    return "partial_overlap" if some else "disjoint"
+
+
+cls = Counter()
+cls_sens = Counter()
+cls_rate = {}
+for e in entries:
+    c = coverage_class(e)
+    e["cov"] = c
+    cls[c] += 1
+    cls_sens[c] += e.get("perm_sensitive", False)
+    cls_rate.setdefault(c, []).append(e["trip_pair_rate"])
+for c in cls:
+    print(c, cls[c], "order-sensitive", cls_sens[c], "mean pair triplet diff", round(np.mean(cls_rate[c]), 3))
+
+# where no tie matters: explain
+for e in entries:
+    if e["cov"] == "all_cover_all_targets" and not e.get("perm_sensitive"):
+        print("insensitive full coverage", e["study"][-6:], e["kind"], e["count"], e["n_groups"], e["mixed_groups"])
+
+# supplier changes
+chg = Counter(e["seeds"][42]["changed"] > 0 for e in entries)
+print("slots with supplier changes seed42", chg)
+short = Counter(len(e["seeds"][42]["outcome"]) < e["budget"] for e in entries)
+print("slots with shortfall", short)
+print("mixed groups slots", sum(e.get("mixed_groups", 0) > 0 for e in entries))
+
+# does preferred difference always imply triplet difference
+pd = 0
+pd_same = 0
+for e in entries:
+    pp = e.get("perm_preferred")
+    if not pp:
+        continue
+    for a, b in itertools.combinations(pp, 2):
+        if pp[a] != pp[b]:
+            pd += 1
+            pd_same += e["perm_outcomes"][a] == e["perm_outcomes"][b]
+print("perm pairs with differing preferred:", pd, "of which same triplets:", pd_same)
+
+pickle.dump(entries, open(OUT / "entries.pkl", "wb"))

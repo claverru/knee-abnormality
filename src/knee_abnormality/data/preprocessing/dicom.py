@@ -8,6 +8,7 @@ from pathlib import Path
 import numpy as np
 import pydicom
 from pydicom.filereader import read_partial
+from pydicom.multival import MultiValue
 
 from knee_abnormality.data.preprocessing.geometry import NativePose, PoseLayout
 
@@ -22,12 +23,29 @@ PREPARATION_ERRORS = (
 
 
 @dataclass(frozen=True, slots=True)
+class SeriesTags:
+    series_number: float | None
+    image_type: tuple[str, ...]
+    description: str | None
+    repetition_time: float | None
+    echo_time: float | None
+    echo_train_length: float | None
+    flip_angle: float | None
+    acquisition_type: str | None
+    sequence_variant: tuple[str, ...]
+    scan_options: tuple[str, ...]
+    acquisition_matrix: tuple[float, ...]
+    receive_coil: str | None
+
+
+@dataclass(frozen=True, slots=True)
 class DicomHeader:
     physical_position: float | None
     instance_number: float | None
     descriptor: NativePixelDescriptor | None
     position_source: str
     pose: NativePose | None
+    tags: SeriesTags
 
 
 @dataclass(frozen=True, slots=True)
@@ -82,6 +100,56 @@ def _native_pose(dataset: pydicom.Dataset) -> NativePose | None:
         )
     except PREPARATION_ERRORS:
         return None
+
+
+def _values(dataset: pydicom.Dataset, keyword: str) -> tuple[str, ...]:
+    try:
+        value = dataset.get(keyword)
+        if value is None:
+            return ()
+        items = value if isinstance(value, MultiValue | list | tuple) else (value,)
+        return tuple(text for item in items if (text := str(item).strip()))
+    except PREPARATION_ERRORS:
+        return ()
+
+
+def _text(dataset: pydicom.Dataset, keyword: str) -> str | None:
+    values = _values(dataset, keyword)
+    return "\\".join(values) if values else None
+
+
+def _number(dataset: pydicom.Dataset, keyword: str) -> float | None:
+    values = _values(dataset, keyword)
+    try:
+        value = float(values[0]) if len(values) == 1 else None
+    except ValueError:
+        return None
+    return value if value is not None and math.isfinite(value) else None
+
+
+def _numbers(dataset: pydicom.Dataset, keyword: str) -> tuple[float, ...]:
+    try:
+        values = tuple(float(value) for value in _values(dataset, keyword))
+    except ValueError:
+        return ()
+    return values if all(math.isfinite(value) for value in values) else ()
+
+
+def _series_tags(dataset: pydicom.Dataset) -> SeriesTags:
+    return SeriesTags(
+        _number(dataset, "SeriesNumber"),
+        tuple(value.upper() for value in _values(dataset, "ImageType")),
+        _text(dataset, "SeriesDescription"),
+        _number(dataset, "RepetitionTime"),
+        _number(dataset, "EchoTime"),
+        _number(dataset, "EchoTrainLength"),
+        _number(dataset, "FlipAngle"),
+        _text(dataset, "MRAcquisitionType"),
+        _values(dataset, "SequenceVariant"),
+        _values(dataset, "ScanOptions"),
+        _numbers(dataset, "AcquisitionMatrix"),
+        _text(dataset, "ReceiveCoilName"),
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -174,6 +242,7 @@ def read_header(path: Path) -> DicomHeader:
         _native_descriptor(dataset, pixel_element, info),
         "instance_number" if instance is not None else source,
         _native_pose(dataset),
+        _series_tags(dataset),
     )
 
 

@@ -1,0 +1,80 @@
+import json
+
+import polars as pl
+
+from common import OUT
+from verdicts import read
+
+flags = pl.read_parquet(OUT / "series_flags.parquet").filter(pl.col("split") == "train")
+geo = read("verdicts_geo.txt").rename({"verdict": "geo", "note": "geo_note"})
+contrast = read("verdicts_contrast.txt").rename({"verdict": "con", "note": "con_note"})
+frame = flags.join(geo, on="series8", how="left").join(contrast, on="series8", how="left")
+non_target = ["non_knee", "contralateral"]
+
+
+def geo_row(name, mask):
+    subset = frame.filter(mask)
+    reviewed = subset.filter(pl.col("geo").is_not_null())
+    counts = dict(reviewed.group_by("geo").len().iter_rows())
+    return {
+        "flag": name,
+        "flagged": subset.height,
+        "reviewed": reviewed.height,
+        "verdicts": counts,
+        "non_target_precision": round(sum(counts.get(k, 0) for k in non_target) / max(reviewed.height, 1), 3),
+    }
+
+
+rows = [
+    geo_row("f_far (proposed non-knee rule)", pl.col("f_far")),
+    geo_row("f_contralateral (x-spread > 150 mm)", pl.col("f_contralateral")),
+    geo_row("f_robust_dropped (20 mm robust fit)", pl.col("f_robust_dropped")),
+    geo_row("f_projects_outside (slab or FOV)", pl.col("f_projects_outside")),
+    geo_row("offset_mm > 80", pl.col("offset_mm") > 80),
+    geo_row("f_lowres (pixel > 1 mm)", pl.col("f_lowres")),
+    geo_row("f_small_fov_axial (< 110 mm)", pl.col("f_small_fov_axial")),
+]
+
+
+def con_row(name, mask, positive):
+    subset = frame.filter(mask)
+    reviewed = subset.filter(pl.col("con").is_not_null())
+    counts = dict(reviewed.group_by("con").len().iter_rows())
+    return {
+        "flag": name,
+        "flagged": subset.height,
+        "reviewed": reviewed.height,
+        "verdicts": counts,
+        "precision": round(sum(counts.get(k, 0) for k in positive) / max(reviewed.height, 1), 3),
+    }
+
+
+rows += [
+    con_row("f_t1fs_in_t1pd", pl.col("f_t1fs_in_t1pd"), ["t1_fs"]),
+    con_row("f_fluidfs_in_t1pd (header only)", pl.col("f_fluidfs_in_t1pd"), ["fluid_fs_in_t1pd"]),
+    con_row("f_fluidfs_in_t1pd_confirmed (header and intensity)", pl.col("f_fluidfs_in_t1pd_confirmed"), ["fluid_fs_in_t1pd"]),
+    con_row("f_nonfs_in_fluid (header only)", pl.col("f_nonfs_in_fluid"), ["fluid_nonfs_in_fluid"]),
+    con_row("f_nonfs_in_fluid_confirmed (header and intensity)", pl.col("f_nonfs_in_fluid_confirmed"), ["fluid_nonfs_in_fluid"]),
+    con_row(
+        "intensity-only disagreement",
+        pl.col("f_intensity_disagrees") & ~pl.col("f_t1fs_in_t1pd") & ~pl.col("f_fluidfs_in_t1pd") & ~pl.col("f_nonfs_in_fluid"),
+        ["fluid_fs_in_t1pd", "fluid_nonfs_in_fluid"],
+    ),
+]
+random_rows = [line.split() for line in open(__file__.rsplit("/", 1)[0] + "/verdicts_random.txt") if line.strip() and not line.startswith("#")]
+random_studies = [r[0] for r in random_rows]
+random_series = flags.filter(pl.col("study8").is_in(random_studies))
+result = {
+    "flags": rows,
+    "random_unflagged_sample": {
+        "studies": len(random_studies),
+        "series": random_series.height,
+        "misses": [" ".join(r) for r in random_rows if r[1] == "miss"],
+        "note": "sampled from studies without drop, relabel, contralateral, robust, low-res, T1 FS, zero-TE or description-plane flags (seed 20260917)",
+    },
+    "rejected_study_review": "all 47 robust-rejected studies reviewed: 46 all target knee, 63928925 has 3 calf-level series (not catchable by the centre rule)",
+}
+(OUT / "precision.json").write_text(json.dumps(result, indent=1) + "\n")
+for row in rows:
+    print(row)
+print(result["random_unflagged_sample"])

@@ -1,0 +1,110 @@
+import json
+import pickle
+
+import polars as pl
+
+from common import OUT
+from verdicts import read
+
+MANUAL_NON_KNEE = {"21988730", "30313745", "97645662"}
+
+
+def triplets():
+    selections = pickle.load(open(OUT / "census_selections.pkl", "rb"))
+    rows = []
+    for (split, study), slots in selections.items():
+        for slot in slots:
+            for uid in slot["series"]:
+                rows.append(
+                    {
+                        "SeriesInstanceUID": uid,
+                        "train_triplets": float(slot["train_m1_mean"].get(uid, 0.0)),
+                        "eval_triplets": float(slot["eval_m2"].get(uid, 0)),
+                        "eval_m1_triplets": float(slot["eval_m1"].get(uid, 0)),
+                        "slot_path": slot["path"],
+                    }
+                )
+    return pl.DataFrame(rows)
+
+
+def categories(flags):
+    geo = read("verdicts_geo.txt")
+    confirmed_non_knee = set(geo.filter(pl.col("verdict") == "non_knee")["series8"])
+    return {
+        "1_non_knee_flag": pl.col("f_far"),
+        "1_non_knee_confirmed": pl.col("series8").is_in(sorted(confirmed_non_knee | MANUAL_NON_KNEE)),
+        "2_contralateral_all": pl.col("f_contralateral"),
+        "2_contralateral_bilateral_exam": pl.col("f_contralateral") & pl.col("bilateral_exam"),
+        "2_contralateral_stray": pl.col("f_stray_contralateral"),
+        "3_localizer_or_tiny": pl.col("n_records") < 11,
+        "3_lowres_pixel_gt_1mm": pl.col("f_lowres"),
+        "3_small_fov_axial_lt_110mm": pl.col("f_small_fov_axial"),
+        "3_thin_slab_lt_25mm": pl.col("slab_mm") < 25,
+        "4_plane_label_vs_normal": ~pl.col("normal_axis_agrees"),
+        "4_oblique_gt_30deg": pl.col("f_oblique"),
+        "4_desc_plane_mismatch": pl.col("f_desc_plane"),
+        "4_desc_plane_mismatch_lt_25deg": pl.col("f_desc_plane") & (pl.col("obliquity_deg") < 25),
+        "4_swapped_plane_study": pl.col("f_swapped_plane_study"),
+        "5_t1fs_in_t1pd": pl.col("f_t1fs_in_t1pd"),
+        "5_fluidfs_in_t1pd_header": pl.col("f_fluidfs_in_t1pd"),
+        "5_fluidfs_in_t1pd_confirmed": pl.col("f_fluidfs_in_t1pd_confirmed"),
+        "5_nonfs_in_fluid_header": pl.col("f_nonfs_in_fluid"),
+        "5_nonfs_in_fluid_confirmed": pl.col("f_nonfs_in_fluid_confirmed"),
+        "5_intensity_only_disagreement": pl.col("f_intensity_disagrees") & ~pl.col("f_t1fs_in_t1pd") & ~pl.col("f_fluidfs_in_t1pd") & ~pl.col("f_nonfs_in_fluid"),
+        "5_t2_nonfs_in_t1pd_convention": pl.col("f_t2_nonfs_in_t1pd"),
+        "5_zero_te": pl.col("f_zero_te"),
+        "6_robust_dropped": pl.col("f_robust_dropped"),
+        "6_projects_outside_range": pl.col("f_projects_outside"),
+        "6_study_rejected_by_robust_fit": pl.col("f_study_rejected"),
+        "6_3d_acquisition": pl.col("f_3d"),
+        "6_dess": pl.col("desc").str.contains(r"(?i)de3d|dess"),
+        "6_post_contrast": pl.col("f_post_contrast"),
+        "6_mpr_reformat": pl.col("f_reformat"),
+        "action_drop": pl.col("action") == "drop",
+        "action_relabel": pl.col("action") == "relabel",
+    }
+
+
+def summarize(frame, mask, name):
+    subset = frame.filter(mask)
+    train_total = frame["train_triplets"].sum()
+    eval_total = frame["eval_triplets"].sum()
+    return {
+        "category": name,
+        "series": subset.height,
+        "studies": subset["StudyInstanceUID"].n_unique(),
+        "train_triplet_share_pct": round(100 * subset["train_triplets"].sum() / train_total, 4),
+        "eval_triplet_share_pct": round(100 * subset["eval_triplets"].sum() / eval_total, 4),
+        "train_triplets": round(subset["train_triplets"].sum(), 1),
+        "eval_triplets": round(subset["eval_triplets"].sum(), 1),
+    }
+
+
+def main():
+    flags = pl.read_parquet(OUT / "series_flags.parquet")
+    extra = pl.read_parquet(OUT / "geometry_signals.parquet").select("SeriesInstanceUID", "slab_mm", "normal_axis_agrees")
+    frame = flags.join(extra, on="SeriesInstanceUID").join(triplets(), on="SeriesInstanceUID")
+    train = frame.filter(pl.col("split") == "train")
+    fold0 = train.filter(pl.col("fold") == 0)
+    test = frame.filter(pl.col("split") == "test")
+    rows = []
+    for name, mask in categories(frame).items():
+        for scope, data in (("all_train", train), ("fold0_validation", fold0), ("local_test_examples", test)):
+            rows.append({"scope": scope, **summarize(data, mask.fill_null(False), name)})
+    table = pl.DataFrame(rows)
+    table.write_csv(OUT / "category_counts.csv")
+    frame.write_parquet(OUT / "series_flags_with_triplets.parquet")
+    pl.Config.set_tbl_rows(120)
+    pl.Config.set_tbl_width_chars(220)
+    print(table.filter(pl.col("scope") != "local_test_examples"))
+    print(table.filter((pl.col("scope") == "local_test_examples") & (pl.col("series") > 0)))
+    totals = {
+        scope: {"series": data.height, "studies": data["StudyInstanceUID"].n_unique(), "train_triplets": data["train_triplets"].sum(), "eval_triplets": data["eval_triplets"].sum()}
+        for scope, data in (("all_train", train), ("fold0_validation", fold0), ("local_test_examples", test))
+    }
+    (OUT / "category_totals.json").write_text(json.dumps(totals, indent=1))
+    print(totals)
+
+
+if __name__ == "__main__":
+    main()

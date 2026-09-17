@@ -1,0 +1,26 @@
+from pathlib import Path
+
+import polars as pl
+
+ROOT = Path("/home/claudio/src/knee-abnormality")
+OUT = ROOT / "outputs/analysis/series-filtering-20260917"
+SLOT_NAMES = ("ax_t1pd", "ax_fluid", "cor_t1pd", "cor_fluid", "sag_t1pd", "sag_fluid")
+
+
+def load():
+    series = pl.read_parquet(OUT / "census_series.parquet")
+    signals = pl.read_parquet(OUT / "geometry_signals.parquet")
+    folds = pl.read_csv(ROOT / "data/folds/all_5fold_v3/studies.csv").select("StudyInstanceUID", "fold", "report_group")
+    frame = series.join(signals, on="SeriesInstanceUID", how="left").join(folds, on="StudyInstanceUID", how="left")
+    return frame.with_columns(
+        pl.col("slot").map_elements(lambda s: SLOT_NAMES[s], return_dtype=pl.String).alias("slot_name"),
+        pl.col("h_SeriesDescription").fill_null("").alias("desc"),
+        pl.col("h_RepetitionTime").cast(pl.Float64, strict=False).alias("tr"),
+        pl.col("h_EchoTime").cast(pl.Float64, strict=False).alias("te"),
+        pl.col("h_InversionTime").cast(pl.Float64, strict=False).alias("ti"),
+        pl.col("h_FlipAngle").cast(pl.Float64, strict=False).alias("flip"),
+        pl.col("h_MagneticFieldStrength").cast(pl.Float64, strict=False).alias("field"),
+        pl.col("h_Manufacturer").fill_null("").str.to_lowercase().alias("vendor_raw"),
+        pl.col("StudyInstanceUID").str.slice(-8).alias("study8"),
+        pl.col("SeriesInstanceUID").str.slice(-8).alias("series8"),
+    )

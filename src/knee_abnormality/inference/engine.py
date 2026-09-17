@@ -176,8 +176,7 @@ def prediction_dataset(
         build_series_index(config.paths.data_root, config.data, metadata_split),
         config.data,
         targets,
-        False,
-        config.seed,
+        None,
         image_multiplier,
     )
 

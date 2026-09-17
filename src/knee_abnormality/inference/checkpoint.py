@@ -49,8 +49,6 @@ def validate_checkpoint(
             if identity.get(name) != sha256_file(path):
                 raise ValueError(f"Checkpoint validation input mismatch: {name}")
     differences = []
-    if config.seed != saved_config.seed:
-        differences.append("seed")
     for section in ("data", "model"):
         actual = getattr(config, section).model_dump(mode="json")
         expected = getattr(saved_config, section).model_dump(mode="json")

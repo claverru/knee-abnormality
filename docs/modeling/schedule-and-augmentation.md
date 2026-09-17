@@ -30,6 +30,43 @@ Use the [augmentation viewer](../data-preparation/preview-augmentations.md) to
 inspect original/augmented example-test slices for each plane–contrast type,
 with per-series parameters and seeded draws from the shared implementation.
 
+## Weight averaging
+
+Implemented on 2026-09-16, gated by `optimizer.weight_averaging` (`null` by default, one method
+per run: `{method: ema, decay}` or `{method: swa, epochs}`; mutually exclusive by construction).
+`KneeModule` keeps a hand-written averaged copy of the model, updated after every optimizer step,
+never a second constructed model — constructing one would draw from the global CPU RNG and shift
+the DataLoader shuffle. The design and its rejection of Lightning's `StochasticWeightAveraging`,
+`AveragedModel` and timm's `ModelEmaV3` are recorded in the
+[weight-averaging endgame entry](../backlog/endgame.md#weight-averaging); this section is the
+semantics as shipped.
+
+- **EMA:** the averaged copy tracks the live model exactly (an exact copy, not a decay-1 lerp)
+  until the warm-up steps end, then every step lerps it toward the live weights with weight
+  `1 - decay`. Floating parameters and BatchNorm running statistics are averaged; integer buffers
+  (`num_batches_tracked`, the `plane_lookup`/`contrast_lookup` token tables) are always copied
+  exactly. The update runs in float32 outside autocast.
+- **SWA:** the schedule is unchanged — no `SWALR`, no epoch-interval scheduler swap, the tail
+  learning rate is still set through `minimum_lr_ratio`. The averaged copy is a uniform
+  (Polyak) average over every optimizer step of the last `epochs` epochs, final step included; at
+  the end of each of those epochs, before that epoch's validation, BatchNorm statistics of the
+  averaged model are refreshed with a forward-only pass over an unshuffled training loader, under
+  the same bf16 autocast as training, inside `torch.random.fork_rng` (CPU and CUDA) so the training
+  random streams are untouched. Only BatchNorm layers that are actually in training mode are
+  refreshed, so `model.backbone_eval: true` keeps its pretrained statistics untouched and the
+  refresh is skipped entirely.
+- **Validation and checkpoints:** every epoch validates both the saved (averaged, when the gate is
+  on) and the live weights on the same batches; `val_macro_auc` and checkpoint
+  selection/early-stopping always score the saved weights, and live results are logged separately
+  (`val_live_*`, `epochs/live_*`). Checkpoints store the averaged weights as the ordinary `model.*`
+  state and the live weights under `live_state_dict`; prediction, export and `compare_fold_runs`
+  need no change. See
+  [configs and experiment artifacts](../architecture/configs-and-experiment-artifacts.md#experiment-artifacts-and-reproducibility)
+  for the full artifact list.
+- **Gradient-norm logging** ships alongside weight averaging, independent of the gate: the
+  pre-clip total gradient norm is always logged as `grad_norm`
+  ([small change](../backlog/small-changes.md#gradient-norm-logging)).
+
 ## Study-level knee reflection
 
 Implemented on 2026-09-13. The candidate `spatial-tokens-reflection` adds

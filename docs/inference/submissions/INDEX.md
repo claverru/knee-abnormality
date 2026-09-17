@@ -1,9 +1,14 @@
 # Submission ledger
 
-All 22 Kaggle competition submissions, newest first, with submission times in UTC from `kaggle competitions submissions` on 2026-09-16. The 16 dated records in this folder cover 20 of them (original 1C, the September 12 overnight queue and the baseline3 artifact each cover several); the baseline4 2× and 3× density comparisons are recorded in [Inference image count and memory](../inference-image-count-and-memory.md).
+All 27 Kaggle competition submissions, newest first, with submission times in UTC from `kaggle competitions submissions` (2026-09-16, plus the five 2026-09-17 submissions). The 19 dated records in this folder cover 25 of them (original 1C, the September 12 overnight queue and the baseline3 artifact each cover several); the baseline4 2× and 3× density comparisons are recorded in [Inference image count and memory](../inference-image-count-and-memory.md).
 
 | Submitted (UTC) | Submission | Public AUC | ID | Record |
 |---|---|---:|---:|---|
+| 2026-09-17 11:40 | Ranked-filtered seed 42 (series filtering and deterministic source ranking, fold-0 0.889573); 13m 16s launch to score | 0.933 | 56303522 | [Ranked-filtered](2026-09-17-ranked-filtered-submission.md) |
+| 2026-09-17 07:58 | Seed-44 control (`02-control-seed-44`, fold-0 0.891627) | 0.931 | 56299154 | [Seed controls](2026-09-17-seed-control-submissions.md) |
+| 2026-09-17 07:58 | Seed-43 control (`01-control-seed-43`, fold-0 0.889837) | 0.931 | 56299151 | [Seed controls](2026-09-17-seed-control-submissions.md) |
+| 2026-09-17 07:32 | Seed-42 control (`00-control`, fold-0 0.892995), the EMA run's live weights; 12m 16s launch to score | 0.928 | 56298600 | [Seed controls](2026-09-17-seed-control-submissions.md) |
+| 2026-09-17 07:17 | EMA 0.999 (`03-ema-0.999`, fold-0 0.893155), fast runtime; 13m 47s launch to score | 0.929 | 56298280 | [EMA](2026-09-17-ema-submission.md) |
 | 2026-09-15 21:28 | Reflection/sigma-40 champion with 16 loader workers and automatic FP16 backbone chunks; 10m 05s submission to score | 0.936 | 56262847 | [Fast champion](2026-09-15-fast-champion-submission.md) |
 | 2026-09-15 08:27 | Champion with every 3D embedding replaced by `unknown_3d` at inference | 0.936 | 56249900 | [Champion without 3D](2026-09-15-champion-without-3d-at-inference.md) |
 | 2026-09-15 07:58 | Overnight `00-baseline`: graph off, no 3D, trained on current code | 0.934 | 56249358 | [Overnight 00-baseline](2026-09-15-overnight-00-baseline-submission.md) |

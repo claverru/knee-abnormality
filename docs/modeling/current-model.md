@@ -108,7 +108,10 @@ center, and visual validity alone decides token membership.
 The model lives in `src/knee_abnormality/modeling/` (`model.py`, `spatial_tokens.py`,
 `augmentation.py`). The spatial-token identity is
 `all_valid_spatial_tokens_four_embeddings_v6`, inside preprocessing identity
-`physical_gaussian_overlap_spatial_tokens_reflection_v9`
+`ranked_filtered_physical_gaussian_overlap_spatial_tokens_reflection_v10` since 2026-09-17
+([series exclusions](../data-preparation/current-preparation.md#series-indexing-guards-and-exclusions)
+and the fixed [source ranking](../data-preparation/physical-sampling/implemented-sampler.md));
+checkpoints trained before then, including the 2026-09-17 controls, record `…reflection_v9`
 ([identity rules](../architecture/configs-and-experiment-artifacts.md#experiment-artifacts-and-reproducibility)).
 
 ## `00-baseline` result

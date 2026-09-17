@@ -40,7 +40,9 @@ records, selections and prepared tensors.
    little-endian elements for the tags `DicomHeader` uses: image position and orientation, pixel
    spacing, slice location, instance number, rows, columns, bits stored, pixel representation,
    rescale slope and intercept, transfer syntax and the pixel-data offset and length. Fall back to
-   pydicom for any other encoding.
+   pydicom for any other encoding. Since identity `…reflection_v10` the header also yields 12
+   series tags for the [series summary](../data-preparation/current-preparation.md#series-indexing-guards-and-exclusions)
+   (about 65 µs per header through pydicom), which a raw parser must cover too.
 4. **Threaded header reads within a series** (`index_series`). NFS latency is 111 s of the 146 s
    cold header cost: read the series' prefixes with a small thread pool, then parse in order. Raw
    reads scaled from 96 to 872 files/s with 16 threads; parsing holds the GIL, so this needs
