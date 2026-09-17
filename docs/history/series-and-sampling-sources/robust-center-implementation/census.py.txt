@@ -1,0 +1,133 @@
+import dataclasses
+import json
+import pickle
+import sys
+import time
+from multiprocessing import get_context
+from pathlib import Path
+
+ROOT = Path("/home/claudio/src/knee-abnormality")
+SOURCE = Path(sys.argv[1])
+OUTPUT = Path(sys.argv[2])
+OPTIONS = json.loads(sys.argv[3])
+sys.path.insert(0, str(SOURCE))
+
+import polars as pl
+
+from knee_abnormality.config import ExperimentConfig
+from knee_abnormality.data.dataset import KneeStudyDataset
+from knee_abnormality.data.labels import STUDY
+from knee_abnormality.data.preprocessing.dicom import PREPARATION_ERRORS
+from knee_abnormality.data.preprocessing.sampling import build_pool, select_triplets
+from knee_abnormality.data.sources import build_series_index
+
+import knee_abnormality
+
+assert Path(knee_abnormality.__file__).is_relative_to(SOURCE), knee_abnormality.__file__
+
+RUN = ROOT / "outputs/training/ranked-filtered-seed42"
+raw = json.loads((RUN / "effective_config.json").read_text())
+raw = {k: v for k, v in raw.items() if k in ExperimentConfig.model_fields}
+folds = dict(
+    pl.read_csv(ROOT / "data/folds/all_5fold_v3/studies.csv")
+    .select(STUDY, "fold")
+    .iter_rows()
+)
+
+
+def data_config(option):
+    values = json.loads(json.dumps(raw))
+    if option != "absent":
+        values["data"]["robust_center_outlier_mm"] = option
+    return ExperimentConfig.model_validate(values).data
+
+
+DATA = {str(option): data_config(option) for option in OPTIONS}
+INDEX = build_series_index(ROOT / "data", next(iter(DATA.values())), "train")
+
+
+def slot_selection(dataset, study, slot, reference, multiplier, seed):
+    data = dataset.data
+    excluded = dataset._excluded_series[study.uid]
+    candidates = {c.uid: c for c in study.slots[slot] if c.uid not in excluded}
+    sources = []
+    for uid, candidate in sorted(candidates.items()):
+        try:
+            sources.append((uid, dataset._indexed(candidate)))
+        except PREPARATION_ERRORS:
+            pass
+    kind = data.series_types[slot]
+    radius = data.image_size * data.spacing_mm / 2
+    pool = build_pool(
+        tuple(sources), kind.plane, reference, data.spacing_mm, radius, set(), set()
+    )
+    selection = select_triplets(
+        pool,
+        kind.max_images * multiplier // 3,
+        data.sampling_sigma_mm,
+        radius,
+        study.uid,
+        (kind.plane, kind.fluid_sensitive, kind.fat_suppression),
+        seed,
+        0,
+    )
+    return {
+        "physical": pool.physical,
+        "sources": dict(pool.diagnostics["sources"]),
+        "pool_uids": sorted({v.uid for v in pool.candidates}),
+        "ranking": list(pool.ranking),
+        "selected": [(v.uid, str(v.records[1].path)) for v in selection.triplets],
+        "depths": [round(v.depth, 9) for v in selection.triplets],
+    }
+
+
+def work(uid):
+    study = INDEX[uid]
+    fold0 = folds[uid] == 0
+    result = {"study": uid, "fold": folds[uid], "options": {}}
+    shared = None
+    rejected = None
+    for name, data in DATA.items():
+        dataset = KneeStudyDataset(
+            pl.DataFrame({STUDY: [uid]}), {uid: study}, data, (), None
+        )
+        if shared is not None:
+            dataset._slice_index = shared
+        dataset._index_study_geometry(study)
+        shared = dataset._slice_index
+        reference = dataset._study_references[uid]
+        entry = {
+            "reference": tuple(
+                getattr(reference, f.name) for f in dataclasses.fields(reference)
+            ),
+            "point": reference.point,
+            "reason": reference.reason,
+            "rms": reference.rms_mm,
+            "outliers": getattr(reference, "outliers", None),
+            "excluded": sorted(dataset._excluded_series[uid]),
+        }
+        if rejected is None:
+            rejected = reference.reason is not None
+        if fold0 or rejected:
+            entry["eval"] = [
+                slot_selection(dataset, study, slot, reference, 2, None)
+                for slot in range(len(study.slots))
+            ]
+        result["options"][name] = entry
+    return result
+
+
+def main():
+    started = time.perf_counter()
+    uids = sorted(INDEX)
+    limit = int(sys.argv[4]) if len(sys.argv) > 4 else None
+    if limit:
+        uids = uids[:limit]
+    with get_context("fork").Pool(28) as pool:
+        results = pool.map(work, uids, chunksize=4)
+    OUTPUT.write_bytes(pickle.dumps(results))
+    print(len(results), "studies", round(time.perf_counter() - started), "s")
+
+
+if __name__ == "__main__":
+    main()

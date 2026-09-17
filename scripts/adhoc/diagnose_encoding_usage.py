@@ -466,7 +466,9 @@ def diagnose(args: DiagnoseCLI) -> None:
         "current_input_identity": current_input_identity,
         "checkpoint_input_identity": checkpoint_metadata["input_identity"],
         "actual_inputs_sha256": sha256_file(args.output_dir / "inputs.json"),
-        "preprocessing_identity": preprocessing_identity(config.model.backbone),
+        "preprocessing_identity": preprocessing_identity(
+            config.model.backbone, config.data.robust_center_outlier_mm
+        ),
         "label_split_provenance": fold_labels.provenance,
         "source_sha256": source_sha256,
         "versions": {

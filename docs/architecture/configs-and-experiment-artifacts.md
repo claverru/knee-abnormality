@@ -125,16 +125,31 @@ identities require their archived source/bundle, even for prediction with the
 same config. Every new checkpoint and input identity records the preprocessing
 algorithm (`ranked_filtered_physical_gaussian_overlap_spatial_tokens_reflection_v10`), the
 reflection, sampling, series-filtering and spatial-token identities, fixed reliability values, the
-selected backbone's spatial mapping and a stable digest of the package-relative sources listed in
+selected backbone's spatial mapping, a `robust_center` entry only when
+`data.robust_center_outlier_mm` is set, and a stable digest of the package-relative sources listed in
 `identity.PREPROCESSING_SOURCES`: `data/dataset.py`, the eight `data/preprocessing/` modules
 (including `filtering.py`), `modeling/augmentation.py`, `modeling/model.py` and
 `modeling/spatial_tokens.py`. The `v10` label marks the 2026-09-17 series exclusions and fixed
 source ranking; `v9` marked the 2026-09-16 package restructure. Checkpoints with any earlier
-identity need their archived sources. Prediction does not compare the configured seed, because
+identity need their archived sources. The robust-centre code of 2026-09-17 changed the source
+digest but left every other identity field unchanged. The three ranked-filtered checkpoints
+(`ranked-filtered-seed42`, `-seed43`, `-seed44`) therefore no longer validate against the working
+tree and need their archived sources (`source_snapshot.zip`). Their Kaggle bundles carry their
+own code and are unaffected. Prediction does not compare the configured seed, because
 evaluation sampling uses none; resume still requires the saved seed. Export validates the actual
 copied sources; bundled prediction recomputes the identity without training data.
 See [implemented corrections](../history/baseline1-review.md#implemented-corrections)
 for allowed runtime/storage changes and baseline1 compatibility.
+
+**Robust study centre** (`data.robust_center_outlier_mm`, required, `null` in
+`configs/training.yaml`) is a threshold in millimetres. When it is set, a rejected study centre is
+refitted without its outlier series; `null` keeps the plain fit. Behaviour, identity and
+verification are described in
+[current preparation](../data-preparation/current-preparation.md#robust-study-centre-option).
+Configs and checkpoints saved before 2026-09-17 lack the field and fail validation. Use their
+archived sources, or add `robust_center_outlier_mm: null` to a run config that has not been
+trained yet. Prediction and Kaggle bundles use the value saved in the checkpoint's config.
+Prediction rejects a config whose value differs from it, as for any other data field.
 
 **Weight averaging** (`optimizer.weight_averaging`, required, `null` by default) is a
 discriminated union: `null`, `{method: ema, decay}` or `{method: swa, epochs}`, one method per

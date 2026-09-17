@@ -667,7 +667,9 @@ def create_preview(args: PreviewCLI) -> dict:
         output / "source",
     )
     manifest = {
-        "preprocessing_identity": preprocessing_identity(config.model.backbone),
+        "preprocessing_identity": preprocessing_identity(
+            config.model.backbone, config.data.robust_center_outlier_mm
+        ),
         "coverage": coverage,
         "profile": profile,
         "split": args.split,

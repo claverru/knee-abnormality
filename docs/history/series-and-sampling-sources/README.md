@@ -1,7 +1,7 @@
 # Historical series and sampling analysis sources
 
 Scratch analysis code from the 2026-09-17 session that produced the series filtering, source ranking,
-plane/contrast importance and run-agreement findings. The scripts ran from a session scratch
+plane/contrast importance, run-agreement and robust-centre implementation findings. The scripts ran from a session scratch
 directory (`/tmp/claude-1000/<session>/scratchpad/<folder>/`) against the uncommitted tree of that day,
 so their hardcoded paths, sibling imports (`common.py`) and bypassed identity checks are
 snapshots, not maintained commands; they sit outside the executable
@@ -93,3 +93,13 @@ Rough visual check of three off-knee series against their studies' sagittal seri
 | Original file | Snapshot | SHA-256 |
 |---|---|---|
 | `render.py` | [render.py.txt](offknee-review/render.py.txt) | `33813fce8e491d144c8d3f70d4a4bae44cefb3ce74dc6e4b0e6d44239f60c5d0` |
+
+## robust-center-implementation
+
+Verification of the `data.robust_center_outlier_mm` implementation: study centres and evaluation pools for all training studies under HEAD and under the option at null, 20 and 10 mm (run as `census.py <src root> <output pickle> <options JSON>`), their comparison with the re-score patch, and the fold-0 re-score of `ranked-filtered-seed42` with the identity check bypassed. Findings: [record](../../data-preparation/current-preparation.md#robust-study-centre-option). Outputs: `outputs/analysis/robust-center-implementation-20260917/` (`report.json`, `rescore.json`); pickles were not kept.
+
+| Original file | Snapshot | SHA-256 |
+|---|---|---|
+| `analyze.py` | [analyze.py.txt](robust-center-implementation/analyze.py.txt) | `2a16ba88dca9a6a04d01d19258560689f98813369bc998a48197b746ad7b1abf` |
+| `census.py` | [census.py.txt](robust-center-implementation/census.py.txt) | `8c6c7a4a08fdbf6bb3a548a1460361adcdca0340f6518f4c2b2406e6e8996cca` |
+| `rescore.py` | [rescore.py.txt](robust-center-implementation/rescore.py.txt) | `94af73c74fe3b5bb98746d48b812ece152a204b44378def2eb4f41a18b1f3009` |

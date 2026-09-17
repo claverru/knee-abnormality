@@ -56,7 +56,9 @@ def _snapshot(run_dir: Path, config_path: Path, config: ExperimentConfig) -> Non
     )
     commit, status = git_revision(Path.cwd())
     provenance = {
-        "preprocessing_identity": preprocessing_identity(config.model.backbone),
+        "preprocessing_identity": preprocessing_identity(
+            config.model.backbone, config.data.robust_center_outlier_mm
+        ),
         "created_at": datetime.now(UTC).isoformat(),
         "git_commit": commit,
         "git_status": status,

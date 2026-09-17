@@ -102,6 +102,7 @@ class DataConfig(ConfigModel):
     series_types: Annotated[tuple[SeriesTypeConfig, ...], Field(min_length=1)]
     sampling_sigma_mm: PositiveFiniteFloat = 80.0
     validation_image_multiplier: Annotated[StrictInt, Field(gt=0)] = 1
+    robust_center_outlier_mm: PositiveFiniteFloat | None
     intensity_augmentation: IntensityAugmentationConfig = Field(
         default_factory=IntensityAugmentationConfig
     )

@@ -6,7 +6,8 @@
 dimensions and frame ID. Native values are not rounded to a representative pose.
 `IndexedSeries` adds bounds, pose validity, orientation/center-line consistency
 and rejection reasons. `StudyReference` records an accepted point or explicit
-unavailability, contributors, conditioning, plane-balanced residuals and frame IDs.
+unavailability, contributors, conditioning, plane-balanced residuals, frame IDs and, for a
+robust refit, the series excluded from the fit (`outliers`).
 `CenterProjection` records each series' diagnostic projection or rejection reason.
 The worker index caches compact CPU values without pixels or dense grids.
 Prepared triplets carry per-channel crop-to-patient maps, series/native reliability and

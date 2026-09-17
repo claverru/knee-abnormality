@@ -156,7 +156,9 @@ def analyze(settings: AnalyzeCLI) -> None:
     manifest = {
         "created_at": datetime.now(UTC).isoformat(),
         "settings": settings.model_dump(mode="json"),
-        "preprocessing_identity": preprocessing_identity(config.model.backbone),
+        "preprocessing_identity": preprocessing_identity(
+            config.model.backbone, config.data.robust_center_outlier_mm
+        ),
         "inputs": [
             {"path": str(p.resolve()), "sha256": sha256_file(p)}
             for p in inputs + source_files
@@ -174,7 +176,8 @@ def analyze(settings: AnalyzeCLI) -> None:
                 (a.uid, a.plane, a.geometry)
                 for a in acquisitions
                 if len(a.records) >= 3
-            )
+            ),
+            config.data.robust_center_outlier_mm,
         )
         centers.append(
             {
