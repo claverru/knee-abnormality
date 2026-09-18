@@ -17,6 +17,7 @@ from knee_abnormality.cli import CLISettings
 from knee_abnormality.config import (
     ATTENTION_TEMPERATURE,
     INFERENCE_BATCH_SIZE,
+    INFERENCE_IO_THREADS,
     INFERENCE_NUM_WORKERS,
     Fold,
     PositiveFiniteFloat,
@@ -55,6 +56,11 @@ class PredictCLI(CLISettings):
         default=None,
         ge=0,
         description="Total loader workers across all GPUs; defaults to the bundle or repository value",
+    )
+    io_threads: int | None = Field(
+        default=None,
+        gt=0,
+        description="Reader threads per loader worker; defaults to the repository value",
     )
     device: Literal["auto", "cpu", "cuda"] = "auto"
     precision: Literal["auto", "fp32", "fp16", "bf16"] = "auto"
@@ -131,6 +137,9 @@ def main() -> None:
         num_workers = (
             runtime["num_workers"] if args.num_workers is None else args.num_workers
         )
+        io_threads = (
+            INFERENCE_IO_THREADS if args.io_threads is None else args.io_threads
+        )
         device = resolve_device(args.device)
         gpu_ids: list[str | None] = [None]
         if device.type == "cuda":
@@ -148,10 +157,11 @@ def main() -> None:
         output = args.output.expanduser().resolve()
         output.parent.mkdir(parents=True, exist_ok=True)
         logging.getLogger(__name__).info(
-            "Inference uses %s processes, %s studies per device, %s total loader workers",
+            "Inference uses %s processes, %s studies per device, %s total loader workers, %s io threads",
             worker_count,
             batch_size,
             num_workers,
+            io_threads,
         )
         spawning = time.perf_counter()
         with tempfile.TemporaryDirectory(
@@ -170,6 +180,7 @@ def main() -> None:
                     batch_size=batch_size,
                     num_workers=num_workers // worker_count
                     + int(index < num_workers % worker_count),
+                    io_threads=io_threads,
                     device=device.type,
                     precision=args.precision,
                     study_ids=study_ids[index::worker_count],

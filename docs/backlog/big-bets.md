@@ -25,6 +25,20 @@ patient points. Remaining (hypotheses), from the
   while pooling appearance alone for the independent classifiers.
 - **Common knee orientation** (approach 4) and **learned landmarks or localization supervision**
   (approach 7, which depends on a rules-compatible knee segmenter).
+- **Side-conditioned sagittal sampling centre** (measured premise, unmeasured payoff). Sagittal
+  slices step along patient L, and the compartment labels sit about 31 mm off the study centre
+  while the sagittal draw is centred on it. The [spatial importance
+  map](../ongoing/peripheral-coverage.md#spatial-importance-map) shows a central trough on that
+  axis alone, flanks minus centre +0.126 against -0.634 coronal and -1.099 axial, carried by the
+  compartment labels and symmetric about zero. The symmetry is the problem: pooled left and right
+  knees make "medial and lateral matter equally" and "only medial matters, seen twice" produce the
+  same picture. Two blockers, in order. First, the export centres and scales L but never mirrors by
+  knee side, so it must be re-exported with left knees mirrored before the lobes can be told apart;
+  the per-study utilities for that live outside this repository. Second, the offset must flip sign
+  per knee side, and knee side does not exist anywhere in `src/` since the embedding was retired,
+  so it would have to be derived from the [audited policy](../metadata/knee-side-policy-audit.md)
+  at 96.14% training coverage and plumbed into preprocessing, with the abstentions taking no
+  offset. That plumbing, not the offset, is the size of this bet.
 
 Approaches 2 and 3 act through the 3D coordinate branch that approach 1's checkpoint barely used;
 the user also declined approach 3 on 2026-09-14. Image-based side inference is deferred by user

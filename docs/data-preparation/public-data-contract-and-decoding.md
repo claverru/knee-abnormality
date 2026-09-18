@@ -38,6 +38,17 @@ Log decode failures by UID, distinguish missing codecs from malformed payloads,
 and explicitly handle missing slices/series while preserving one prediction row
 per test study.
 
+**The host tried to replace these files on 2026-09-17** and the attempt may have
+failed: every competition file now carries a 2026-09-17 22:14 UTC creation date,
+several download links broke, and the host answered on 2026-09-18 that "we
+attempted to update the dataset recently to fix the corrupted DICOMs, but it
+looks like the update may have failed"
+([thread](https://www.kaggle.com/competitions/rsna-knee-abnormality-detection/discussion/741916)).
+Our copy predates that upload. Once downloads work again, re-fetch these two
+studies and recheck them: `KNOWN_BAD_SERIES` and `KNOWN_BAD_INSTANCES` in
+`src/knee_abnormality/data/preprocessing/exclusions.py` name exactly these files,
+and a successful repair would make those exclusions discard usable slices.
+
 For physical ordering, adjacent-triplet selection and cache tradeoffs, see the
 [public geometry evidence](../research/public-research.md#geometry-sampling-encoders-and-losses)
 and [runtime lessons](../research/public-research.md#data-access-and-runtime-lessons).

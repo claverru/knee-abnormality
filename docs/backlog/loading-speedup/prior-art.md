@@ -33,6 +33,35 @@ measurement on our data, and two of them have since been closed here by our own 
   minimal tag set are standard in those solutions and are what `read_header` and `read_frame`
   already do.
 
+## This competition, checked 2026-09-18
+
+Self-reported by competitors, with no linked runs
+([sweep](../../research/public-research.md#slice-density-and-the-board-2026-09-18-re-sweep),
+[timings](../../inference/runtime-evidence-and-leads.md)).
+
+- **The team leading both boards submits in about five minutes** and says reading is still 60–70%
+  of that, so a loader-dominated profile is normal here and ours is not pathological. Their model
+  is one single-fold CNN, which is where most of the difference lives.
+- **Four CPU threads behind a queue took one competitor's preprocessing from about an hour to
+  15 minutes.** Nothing to take: that is the step we are already past. We run 16 loader workers
+  with a shared io pool, decoding overlaps the forward pass, and the box is
+  [CPU-saturated at 95.4% with the GPUs at 24%](attribution.md#the-box-is-out-of-cpu-not-waiting-on-nfs),
+  so more concurrency has nothing left to hide.
+- **A bounded decode queue per GPU** is what the public two-T4 notebook keeps ahead of each device.
+  Same shape as our open [bounded ordered payload window](candidates.md#bit-exact-batch-into-the-retrain),
+  which is motivated by transient RAM rather than by wall — their use of it is weak support for the
+  formulation, not evidence that it is fast.
+- **One header scan reused across every model arm** bought that notebook 13.5% and 8.8% on two
+  stages with identical predictions. We already parse each header exactly once per file per run, so
+  the equivalent saving is
+  [already banked](closed.md#ruled-out-by-arithmetic-or-by-the-environment); what it confirms is
+  that re-reading headers per arm is the common mistake, which matters if we ever blend arms.
+- **Two environment details worth keeping.** A recursive search for auxiliary files under the
+  mounted competition directory walks every test DICOM; and `CUDNN_CONV_WSCAP_DBG=1024`, set before
+  the first torch import, caps eager convolution workspaces under the T4's 16 GiB. Neither is a
+  lever for us today — our lookups are explicit and the backbone is small — but the second is the
+  guard to remember if a larger backbone ever ships.
+
 ## Published dataloader profiles for comparison
 
 Our split is ordinary for a CPU-bound pipeline and unusual only among medical-imaging pipelines,

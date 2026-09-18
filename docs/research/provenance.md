@@ -6,12 +6,16 @@ attempts, and changing conclusions, but lack the complete configurations,
 checkpoints, and run artifacts needed for independent reproduction. Treat their
 measurements as experiment leads rather than project results.
 
-The [public-source investigation](public-research.md), checked on 2026-09-09,
-has separate provenance: direct Kaggle discussion text, official pages, and
-downloaded public notebook source. It distinguishes reported measurements from
-inspected implementations and project proposals. It did not reproduce training
-or submission scores. Notebook snapshot identities are recorded in its
-[source manifest](public-notebook-sources.json).
+The [public-source investigation](public-research.md), checked on 2026-09-09 and
+re-swept on 2026-09-18, has separate provenance: direct Kaggle discussion text,
+official pages, and downloaded public notebook source. It distinguishes reported
+measurements from inspected implementations and project proposals. It did not
+reproduce training or submission scores. Notebook snapshot identities are
+recorded in its [source manifest](public-notebook-sources.json). The re-sweep
+read threads through the forum API
+(`discussions.DiscussionsService/GetForumTopicById`) and listed notebooks,
+datasets and both leaderboards through the Kaggle CLI 2.0.2; no notebook was
+executed and no attached weights or caches were audited.
 
 The [public-label audit](../public-labels/INDEX.md), completed on 2026-09-10,
 downloads and fingerprints the Steven Lee and Pilkwang label datasets plus

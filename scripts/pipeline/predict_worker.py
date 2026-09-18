@@ -65,6 +65,7 @@ def predict_request(request: PredictionRequest) -> dict:
             studies,
             metadata_split,
             request.image_multiplier,
+            request.io_threads,
         )
         loader = build_data_loader(
             dataset,
@@ -105,6 +106,7 @@ def predict_request(request: PredictionRequest) -> dict:
         else None,
         "batch_size": request.batch_size,
         "num_workers": request.num_workers,
+        "io_threads": request.io_threads,
         "started_at": started_at,
         "data_setup_seconds": data_setup_seconds,
         "model_load_seconds": model_load_seconds,

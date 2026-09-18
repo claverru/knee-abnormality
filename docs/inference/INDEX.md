@@ -21,7 +21,8 @@
 | Choosing loader workers or precision on Kaggle's two T4s, or finding what slows inference: FP32/FP16, 4–24 workers, startup, indexing and per-stage DICOM loading costs over NFS | [2026-09-15 Kaggle inference profiling](2026-09-15-kaggle-inference-profiling.md) |
 | What the loading speedups bought end to end: x4 at 1,300 studies on two T4s, the cold stage breakdown against the 2026-09-15 baseline, and the header thread sweep behind `INFERENCE_IO_THREADS` | [2026-09-18 Kaggle x4 profile after the loading changes](2026-09-18-kaggle-x4-profile-after-loading-changes.md) |
 | What the index changes bought end to end, and the first loading stage table with a real CPU column: why the frame stage is CPU-bound and the indexing bucket is NFS latency | [2026-09-18 Kaggle x4 profile after the index changes](2026-09-18-kaggle-x4-profile-after-index-changes.md) |
-| Reviewing unverified submission timings, runtime leads, training-throughput anecdotes and open efficiency questions | [Unverified runtime evidence and efficiency leads](runtime-evidence-and-leads.md) |
+| What the bit-exact CPU cluster bought with trained weights — 350.8 s worker wall, 3.705 studies/s, loader CPU down a fifth — and the machine-adjusted stage table that flags the resample band | [2026-09-18 Kaggle x4 profile after the CPU cluster](2026-09-18-kaggle-x4-profile-after-cpu-cluster.md) |
+| Reviewing unverified submission timings, runtime leads, training-throughput anecdotes, the public two-T4 notebook's techniques and open efficiency questions | [Unverified runtime evidence and efficiency leads](runtime-evidence-and-leads.md) |
 
 ## Submission records
 

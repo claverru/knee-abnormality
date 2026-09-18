@@ -106,6 +106,11 @@ circumstantial evidence, from fold 0 and a single seed.
   abdominal trauma). None quantified a resolution gain.
 - **Public knee notebooks:** 336 px over 130–150 mm. Unverified working notes report 384 px
   / 140 mm best, and 224 px −0.003.
+- **Public slice-density ablation (2026-09-18):** on one CoAtNet pipeline, 44 slices spread over
+  2–98% of each series scored 0.917 against 0.926 for the same 44 over 6–94%, and restoring
+  density at the wide span gave 0.928 at 64 slices and 0.932 at 80; a competitor above 0.94 puts
+  the field-of-view sweet spot at 140–160 mm and calls 224–288 px sufficient
+  ([public research](public-research.md#slice-density-and-the-board-2026-09-18-re-sweep)).
 - **CNN scaling:** doubling resolution (4× compute) gives about +1.5–2.8 ImageNet points,
   flattening at high resolution. Small medical findings benefit most from resolution
   (chest X-ray nodules). Downsampling must be antialiased; the repository resampler is.

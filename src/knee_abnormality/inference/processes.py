@@ -25,6 +25,7 @@ class PredictionRequest(BaseModel):
     attention_temperature: PositiveFiniteFloat
     batch_size: int = Field(gt=0)
     num_workers: int = Field(ge=0)
+    io_threads: int = Field(gt=0)
     device: Literal["cpu", "cuda"]
     precision: Literal["auto", "fp32", "fp16", "bf16"]
     study_ids: list[str] = Field(min_length=1)

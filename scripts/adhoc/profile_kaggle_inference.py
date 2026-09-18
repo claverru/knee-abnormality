@@ -128,6 +128,16 @@ CONDITIONS = {
         "num_workers": 16,
         "accelerator": "NvidiaTeslaT4Highmem",
     },
+    **{
+        f"fp16-b4-w16-io{threads}": {
+            "kind": "prediction",
+            "precision": "fp16",
+            "batch_size": 4,
+            "num_workers": 16,
+            "io_threads": threads,
+        }
+        for threads in (1, 2, 4, 8, 16)
+    },
     "precision-chunks": {"kind": "precision", "studies": 32},
     "loading": {
         "kind": "loading",
@@ -204,6 +214,7 @@ from knee_abnormality.data import dataset as dataset_module
 from knee_abnormality.data.preprocessing import dicom as dicom_module
 from knee_abnormality.data.preprocessing import preparation as preparation_module
 from knee_abnormality.data.preprocessing import series as series_module
+from knee_abnormality.data.preprocessing import spatial as spatial_module
 from knee_abnormality.inference import engine as engine_module
 
 config = load_config(bundle / "config.json", data_root=data_root)
@@ -268,7 +279,16 @@ for module, name in (
 ):
     timed_on_threads(module, name)
 
+def reset_process_caches():
+    dicom_module._TAGS_CACHE.clear()
+    spatial_module._axis_filter.cache_clear()
+    if dicom_module._POOL is not None:
+        dicom_module._POOL.shutdown(wait=True)
+        dicom_module._POOL = None
+        dicom_module._POOL_IDENTITY = None
+
 def run_pass():
+    reset_process_caches()
     timings.clear()
     processor_seconds.clear()
     counts.clear()
@@ -548,6 +568,8 @@ command = [
     "--batch-size", str(CONDITION["batch_size"]),
     "--num-workers", str(CONDITION["num_workers"]),
 ]
+if CONDITION.get("io_threads") is not None:
+    command += ["--io-threads", str(CONDITION["io_threads"])]
 environment_variables = os.environ.copy()
 environment_variables["PYTHONPATH"] = str(bundle / "code")
 record = {"notebook_started_at": notebook_started_at, "cell_started_at": time.time()}
@@ -927,22 +949,34 @@ def process_usage(path: Path, start: float, end: float) -> dict:
     }
 
 
-def gpu_usage(path: Path) -> dict:
+def gpu_usage(path: Path, start: float, end: float) -> dict:
     if not path.stat().st_size:
         return {"mean_utilization_while_loaded": None, "max_memory_mib": None}
-    frame = pl.read_csv(
-        path,
-        has_header=False,
-        new_columns=["timestamp", "index", "utilization", "memory_mib"],
-        schema_overrides={"utilization": pl.Float64, "memory_mib": pl.Float64},
-        ignore_errors=True,
-    ).drop_nulls()
-    active = frame.filter(pl.col("memory_mib") > 1000)
+    frame = (
+        pl.read_csv(
+            path,
+            has_header=False,
+            new_columns=["timestamp", "index", "utilization", "memory_mib"],
+            schema_overrides={"utilization": pl.Float64, "memory_mib": pl.Float64},
+            ignore_errors=True,
+        )
+        .drop_nulls()
+        .with_columns(
+            pl.col("timestamp")
+            .str.strip_chars()
+            .str.to_datetime("%Y/%m/%d %H:%M:%S%.3f", time_zone="UTC", strict=False)
+            .dt.epoch("s")
+            .alias("epoch")
+        )
+    )
+    window = frame.filter(pl.col("epoch").is_between(start, end))
     return {
-        "mean_utilization_while_loaded": float(active["utilization"].mean())
-        if active.height
+        "samples": window.height,
+        "seconds": end - start,
+        "mean_utilization": float(window["utilization"].mean())
+        if window.height
         else None,
-        "max_memory_mib": float(frame["memory_mib"].max()) if frame.height else None,
+        "max_memory_mib": float(window["memory_mib"].max()) if window.height else None,
     }
 
 
@@ -1045,11 +1079,8 @@ def loading_summary(result: dict) -> dict:
 
 
 def analyze(args: ProfileCLI) -> dict:
-    if args.target_studies is not None:
-        raise ValueError(
-            "target_studies profiles timing over studies outside the fold; scoring needs the fold alone"
-        )
     output = args.output_dir.expanduser().resolve()
+    scoring = args.target_studies is None
     truth_frame = fold_frame(args)
     targets = [
         name
@@ -1058,14 +1089,18 @@ def analyze(args: ProfileCLI) -> dict:
     ]
     truth = truth_frame.select(targets).to_numpy().astype(float)
     gold = truth_frame["is_gold"].to_numpy()
-    reference = pl.read_csv(args.reference_predictions).sort(STUDY)
-    if reference[STUDY].to_list() != truth_frame[STUDY].to_list():
-        raise ValueError("Reference predictions do not cover the fold")
-    reference_values = reference.select(targets).to_numpy().astype(float)
-    predictions = {"local_bf16_reference": reference_values}
+    predictions = {}
+    reference_values = None
+    if scoring:
+        reference = pl.read_csv(args.reference_predictions).sort(STUDY)
+        if reference[STUDY].to_list() != truth_frame[STUDY].to_list():
+            raise ValueError("Reference predictions do not cover the fold")
+        reference_values = reference.select(targets).to_numpy().astype(float)
+        predictions["local_bf16_reference"] = reference_values
     summary = {
         "created_at": datetime.now(UTC).isoformat(),
-        "studies": truth_frame.height,
+        "studies": truth_frame.height if scoring else args.target_studies,
+        "scoring": scoring,
         "runs": {},
     }
     for run_dir in sorted((output / "runs").glob("*")):
@@ -1083,12 +1118,24 @@ def analyze(args: ProfileCLI) -> dict:
         runtime = json.loads(profile.read_text())
         launch_record = json.loads((profile_dir / "launch.json").read_text())
         environment = json.loads((profile_dir / "environment.json").read_text())
-        frame = pl.read_csv(profile_dir / "predictions.csv").sort(STUDY)
-        if frame[STUDY].to_list() != truth_frame[STUDY].to_list():
-            raise ValueError(f"{run_dir.name} predictions do not cover the fold")
-        values = frame.select(targets).to_numpy().astype(float)
-        predictions[run_dir.name] = values
-        metrics = validation_metrics(truth, values, targets, gold)
+        scores = {}
+        if scoring:
+            frame = pl.read_csv(profile_dir / "predictions.csv").sort(STUDY)
+            if frame[STUDY].to_list() != truth_frame[STUDY].to_list():
+                raise ValueError(f"{run_dir.name} predictions do not cover the fold")
+            values = frame.select(targets).to_numpy().astype(float)
+            predictions[run_dir.name] = values
+            metrics = validation_metrics(truth, values, targets, gold)
+            scores = {
+                "macro_auc": metrics["macro_auc"],
+                "per_target_auc": metrics["per_target_auc"],
+                "max_abs_difference_from_local_bf16": float(
+                    np.abs(values - reference_values).max()
+                ),
+                "mean_abs_difference_from_local_bf16": float(
+                    np.abs(values - reference_values).mean()
+                ),
+            }
         workers = []
         for worker in runtime["workers"]:
             steady = worker["batches"][1:]
@@ -1131,6 +1178,14 @@ def analyze(args: ProfileCLI) -> dict:
                 }
             )
         spawn = min(worker["spawned_at"] for worker in runtime["workers"])
+        predicting = max(
+            worker["started_at"]
+            + worker.get(
+                "setup_wall_seconds",
+                worker["data_setup_seconds"] + worker["model_load_seconds"],
+            )
+            for worker in runtime["workers"]
+        )
         end = max(
             worker["started_at"]
             + worker.get(
@@ -1153,14 +1208,7 @@ def analyze(args: ProfileCLI) -> dict:
             },
             "condition": environment["condition"],
             "precision": runtime["precision"],
-            "macro_auc": metrics["macro_auc"],
-            "per_target_auc": metrics["per_target_auc"],
-            "max_abs_difference_from_local_bf16": float(
-                np.abs(values - reference_values).max()
-            ),
-            "mean_abs_difference_from_local_bf16": float(
-                np.abs(values - reference_values).mean()
-            ),
+            **scores,
             "command_seconds": launch_record["finished_at"]
             - launch_record["launched_at"],
             "notebook": {
@@ -1184,11 +1232,17 @@ def analyze(args: ProfileCLI) -> dict:
             "setup_seconds": runtime["setup_seconds"],
             "worker_wall_seconds": runtime["worker_wall_seconds"],
             "studies_per_second": runtime["studies_per_second"],
-            "cpu_during_prediction": cpu_usage(profile_dir / "cpu.csv", spawn, end),
-            "processes_during_prediction": process_usage(
-                profile_dir / "processes.csv", spawn, end
+            "cpu_during_setup": cpu_usage(profile_dir / "cpu.csv", spawn, predicting),
+            "cpu_during_prediction": cpu_usage(
+                profile_dir / "cpu.csv", predicting, end
             ),
-            "gpu": gpu_usage(profile_dir / "gpu.csv"),
+            "processes_during_setup": process_usage(
+                profile_dir / "processes.csv", spawn, predicting
+            ),
+            "processes_during_prediction": process_usage(
+                profile_dir / "processes.csv", predicting, end
+            ),
+            "gpu": gpu_usage(profile_dir / "gpu.csv", predicting, end),
             "workers": workers,
         }
     if "fp32-b4-w4" in predictions and "fp16-b4-w4" in predictions:
@@ -1207,9 +1261,10 @@ def analyze(args: ProfileCLI) -> dict:
                 np.abs(predictions["fp16-b4-w4"] - predictions["fp32-b4-w4"]).mean()
             ),
         }
-    summary["local_bf16_reference_macro_auc"] = validation_metrics(
-        truth, reference_values, targets, gold
-    )["macro_auc"]
+    if scoring:
+        summary["local_bf16_reference_macro_auc"] = validation_metrics(
+            truth, reference_values, targets, gold
+        )["macro_auc"]
     (output / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")
     return summary
 

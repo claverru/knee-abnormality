@@ -28,6 +28,11 @@ Active lines of development have their own documents in [this folder](INDEX.md).
 - **Validation at ×1** since 2026-09-17 (user decision): fold-0 scores from then on sit about
   0.0035 below the earlier ×2 numbers and are comparable only with a ×1 control. Submissions are
   unaffected; the bundle's test multiplier is separate.
+- **Current checkpoint, 2026-09-18:** `control-check` fold 0, best epoch 6, validation macro AUC
+  **0.88477**, preprocessing identity `b8b6c639`. It is the first checkpoint carrying the loading
+  changes, it sits inside the ×1 cohort spread (median 0.88707, sd 0.00331, and the cohort's own two
+  controls are 0.88380 and 0.88645), and `outputs/submission/exports/control-check-x4-tau075` is
+  exported from it at ×4 and temperature 0.75.
 - **Adopted 2026-09-18:** `data.study_triplet_total: 26`, a floor on a study's training triplets
   that scales the types it has in proportion to their budgets. Fold 0 put it at +0.0033 over the
   control mean, inside the control spread, so the case is structural: it only ever adds triplets,

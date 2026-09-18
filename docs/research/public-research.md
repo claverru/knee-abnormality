@@ -18,6 +18,11 @@ canonical review of public evidence from the current knee competition.
 - Screened all 106 discussion titles returned by the competition forum and
   retrieved 26 relevant threads; reviewed experiment reports, corrections,
   host answers, and troubleshooting posts.
+- **Re-swept on 2026-09-18** through the forum API and the Kaggle CLI: all 114
+  topics screened, the 27 threads active since 2026-09-08 read in full, the
+  notebook and dataset listings sorted by date and by votes, both leaderboards
+  pulled, and one inference notebook downloaded. The findings are collected in
+  [the 2026-09-18 section](#slice-density-and-the-board-2026-09-18-re-sweep).
 - Inspected downloaded source for six public Kaggle code entries: five
   notebooks and one training script. Selection covered the popular baseline,
   higher-resolution DINO, large ensembles, and a different backbone family.
@@ -99,6 +104,76 @@ are candidates, not an established optimum. Keep missing-slot masks and verify
 what a thin structure looks like after the complete transform. Current
 [preparation notes](../data-preparation/INDEX.md) and [modeling notes](../modeling/INDEX.md) retain
 the alternative unverified recipe.
+
+## Slice density and the board (2026-09-18 re-sweep)
+
+Public LB top is **0.957**, 21 teams stand above 0.950 and 124 above 0.941 — the
+plateau of the forked public notebook. Our best is 0.939, and our 0.936
+submission holds efficiency rank 16 of the 3,819 scored teams.
+
+### Slice density, not span
+
+The Raptor author published each corpus' geometry with matched public scores
+([thread](https://www.kaggle.com/competitions/rsna-knee-abnormality-detection/discussion/737696)).
+One architecture (CoAtNet-384), one label set and one windowing code throughout;
+the corpora are percentage-span resamplings of every series, at a 140 mm crop
+stored at 336 px.
+
+| Corpus | Public |
+|---|---:|
+| 44 slices over 6–94% of each series | 0.926 |
+| 44 slices over 2–98% | 0.917 |
+| 64 slices over 2–98% | 0.928 |
+| 80 slices over 2–98% (22 sagittal-fluid, 18 sagittal, 15 coronal-fluid, 10 coronal, 15 axial) | 0.932 |
+
+- **Widening the reach at a fixed slice count cost 0.009**, and restoring density
+  by adding slices recovered it and more. The author's summary is that density is
+  the lever rather than span, with **1.20% of the stack per slice** the finest and
+  the best measured.
+- **Evaluation windows are a separate axis.** The same weights on the 64-slice
+  corpus read **0.924 at 42 windows and 0.927 at 62**. The 80-slice corpus needs
+  78 windows for full coverage and its 0.932 is not available at 62, where a fifth
+  of the volume goes unread; a checkpoint swap and a coverage change then stop
+  being separable.
+- **SWA was a null** for the same author: 0.9167 against 0.9150 on the 58 gold
+  studies, nothing on average over six pairs, and 0.938 against 0.937 on the board.
+- **Limits:** unreplicated single submissions 0.001–0.009 apart on a board that
+  displays three decimals, and window counts are not held constant across every
+  row. The geometry is not ours either: these corpora resample a fixed percentage
+  of each series, while our sampler places triplets by physical distance from the
+  study centre. The transferable claim is the direction — more samples at the same
+  reach beat the same samples spread wider — not the numbers.
+- **Project implication:** it agrees with our own measurements (20% fewer slices
+  −0.0041 and 35% fewer −0.0051, [runs](../validation/results/2026-09-16-restored-code-hyperparameter-runs.md);
+  sigma 60, 80 and 120 all worse than 40) and points at the one untested
+  direction, denser per-type budgets at the current reach, filed in the
+  [overnight candidates](../backlog/overnight.md#candidates-for-later-queues). The
+  window-count axis is our evaluation multiplier, open above ×4 in
+  [endgame](../backlog/endgame.md#test-time-augmentation).
+
+### Single-model scores at the top of the board
+
+- A **single-fold CoAtNet at 224 px reached 0.950**. The author attributes it to
+  label work begun after noticing that their OOF predictions beat the extracted
+  training labels on the 58 gold studies.
+- The team now leading both boards reports **0.949 from one single-fold model
+  scoring in about five minutes**, labels extracted locally with Gemma, about
+  0.930 on gold ([thread](https://www.kaggle.com/competitions/rsna-knee-abnormality-detection/discussion/735304)).
+- Other reports: CoAtNet-384 single fold 0.937, CoAtNet-288 full-train 0.938,
+  CoAtNet-224 0.930. Two participants above 0.94 state that resolution is not a
+  major driver at 224–288 px, and one puts the **field-of-view sweet spot at
+  140–160 mm** against 100 mm. Our recipe sits inside that window (224 px at
+  0.625 mm/px is 140 mm).
+- The most-upvoted advice in the [plateau thread](https://www.kaggle.com/competitions/rsna-knee-abnormality-detection/discussion/740610)
+  is to rank changes on report-label CV rather than on gold or the board, with a
+  **0.003 threshold** for a genuine improvement — the same floor our replicate
+  spread gives ([state](../ongoing/state.md)).
+- That thread also reports two more nulls from a 20-checkpoint DINOv2 pipeline at
+  0.903: explicit 2×2 spatial region tokens appended to the label-query attention
+  (+0.000003 over two folds) and swapping in another public label table.
+- These are unreplicated self-reports with incomplete recipes. What they establish
+  is that single models in the 0.94–0.95 range exist on several backbones, not how
+  they were obtained.
 
 ## Validation and ensembling
 
