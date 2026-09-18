@@ -24,14 +24,34 @@ rerun the baseline on this split before comparing new experiments.
 
 Change one factor against a matched control, and predefine the principal comparison and
 checkpoint rule; never search seeds for an apparent improvement. Preserve seed 42, model
-size, training budget, image dimensions, physical crop, slice budget and 2× validation
-density unless one of them is the factor. Training targets stay soft unless supervision
+size, training budget, image dimensions, physical crop, slice budget and the configured
+validation density (×1 since 2026-09-17) unless one of them is the factor. Training targets stay soft unless supervision
 is the factor; validation memberships and
 [frozen targets](project-validation-protocol.md#frozen-evaluation-targets-and-metrics)
 never change. Record full-fold and per-target AUC, gold diagnostics, BCE, runtime, peak
 VRAM and the distinct slices and TTA passes used, and keep all 904 validation predictions
 with the run's [identities](../architecture/configs-and-experiment-artifacts.md). Export
 parity is not required for each run or submission.
+
+### What a comparison can resolve
+
+- **Training runs** carry run-to-run noise with a standard deviation of about 0.0015–0.0018, so a
+  single-run difference below about 0.003 carries no information even at a matched seed. The
+  2026-09-17 seed controls spanned 0.0032 at ×2 validation and the 2026-09-18 pair spanned 0.0026
+  at ×1 ([overnight results](results/2026-09-18-overnight-results.md)). A queue of many runs
+  against one control will produce an apparent winner by luck: `series-share` topped seventeen
+  runs at +0.0044 over the control mean and then lost 0.004 publicly.
+- **Test-time variants of one frozen checkpoint** are far cheaper to resolve, because the paired
+  bootstrap over studies removes training variability. Measured over 36 pairs, the standard error
+  of Δ macro AUC scales with how much the variant moves the predictions: SE ≈ 0.067 × p^1.05,
+  where p is the mean absolute probability change (R² 0.83). The 95% resolvable difference on full
+  fold 0 is therefore about 0.0003 at p = 0.003, 0.001 at p = 0.01 and 0.002 at p = 0.02; on one
+  half of the split about 1.46× larger, and 0.67–0.91× smaller when averaged over three
+  checkpoints. Script and outputs:
+  [snapshot](../history/series-and-sampling-sources/README.md#triplet-allocation),
+  `outputs/analysis/detection-floor-20260917/`.
+- **Validation multiplier:** scores at ×1 sit about 0.0035 below the same checkpoints at ×2, so
+  runs are comparable only with a control at the same multiplier.
 
 The user launches training and the
 [encoding diagnostic](manual-encoding-usage-diagnosis.md) manually; agents schedule no

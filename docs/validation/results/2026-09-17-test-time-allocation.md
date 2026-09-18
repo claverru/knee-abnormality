@@ -13,7 +13,7 @@ Two findings did hold on both halves:
   while extra triplets from it help at least as much as extra triplets from the top-ranked
   series.
 
-Part of the [triplet budget allocation investigation](../../ongoing.md#triplet-budget-allocation).
+Part of the [triplet budget allocation investigation](../../ongoing.md#triplet-budget-allocation-closed-2026-09-18).
 
 ## Setup
 
@@ -27,7 +27,7 @@ Part of the [triplet budget allocation investigation](../../ongoing.md#triplet-b
   0.003–0.005 higher at every allocation, so differences are compared within a half.
 - **Scores:** means over the three checkpoints. The CIs are paired bootstraps over studies with
   500 resamples, run under a 15-minute time cap per analysis.
-- **Detection floor:** from the [detection floor](../../ongoing.md#triplet-budget-allocation),
+- **Detection floor:** from the [comparison resolution rules](../validation-strategy.md#what-a-comparison-can-resolve),
   about 0.002–0.003 on one half for changes of p ≈ 0.02–0.03.
 - **Scripts:** [snapshots](../../history/series-and-sampling-sources/README.md#triplet-allocation).
   Outputs: `outputs/analysis/allocation-{curves,substitution,series,neyman,search-theory}-20260917/`.

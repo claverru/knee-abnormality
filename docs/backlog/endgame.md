@@ -77,32 +77,30 @@ Training reflection is implemented;
 [reflection TTA](../modeling/schedule-and-augmentation.md#study-level-knee-reflection) has not been
 evaluated.
 
-**More evaluation triplets** (measured on frozen checkpoints; not trained or submitted). On the
-fold-0 [token cache](../ongoing.md#triplet-budget-allocation), scaling the evaluation triplet counts
-of the three ranked-filtered checkpoints gives a mean macro AUC of:
+**More evaluation triplets: measured publicly, adopted.** With the attention temperature at 0.75,
+`ranked-filtered-seed42` scored 0.938 at ×3 and 0.939 at ×4, against 0.933 at ×2
+([submissions](../inference/submissions/2026-09-18-temperature-and-count-submissions.md)). Fold 0
+had predicted the temperature and ×3 together at +0.0046 against +0.005 measured.
 
-| Scale | Mean triplets per study | Macro AUC |
-|---|---:|---:|
-| ×1, the training allocation | 25.4 | 0.8873 |
-| ×2, the current `validation_image_multiplier` | 50.7 | 0.8907 |
-| ×2.5 | 65.2 | 0.8920 |
-| ×3 | 75.9 | 0.8922 |
-| ×4 | 99.3 | 0.8922 |
-| Every candidate | 165.1 | 0.8896 |
+| Evaluation scale | Mean triplets | Fold-0 macro AUC, τ 1.0 | τ 0.75 | Public, τ 0.75 |
+|---|---:|---:|---:|---:|
+| ×1 | 25.4 | 0.8873 | 0.8889 | – |
+| ×2 | 50.7 | 0.8907 | 0.8930 | 0.933 at τ 1.0 |
+| ×3 | 75.9 | 0.8922 | 0.8954 | **0.938** |
+| ×4 | 99.3 | 0.8922 | 0.8954 | **0.939** |
+| Every candidate | 165.1 | 0.8896 | 0.8942 | – |
 
-These counts come from the cache with the whole-series intensity window, which is within 1e-4 of
-the exact pipeline at the default allocation. They change the token count, so they are confounded
-with the training/evaluation bag-size mismatch: the model trains on about 25 triplets per study and
-the rows above reach 165, where the attention softmax spreads over far more tokens than in
-training. The flattening past ×3, and the drop at every candidate, may be that penalty rather than
-saturation. The [attention temperature and count-normalised attention entries](small-changes.md#attention-pooling)
-address the same mismatch. `validation_image_multiplier` must be an integer, so ×3 is the next setting. Kaggle inference time grows with the count.
-The only recorded public comparison went the other way: on 2026-09-11, baseline4 scored 0.912 at
-×3 against 0.913 at ×2 with the same checkpoint
-([image count](../inference/inference-image-count-and-memory.md)). That checkpoint predates
-physical sampling and spatial tokens, and the difference is one rounding step. The user also
-reports a worse public score at ×3; its score and model are not recorded yet.
-Confirm with the exact path, and weigh the runtime, before changing the multiplier.
+- **Open:** where the count stops paying above ×4, and what it costs. ×3 and ×4 differ by one
+  rounding step publicly and were tied on fold 0, while inference time grows with the count and
+  counts toward the efficiency prize. The submit-to-scored times we have (9–11 minutes) mix
+  different batch sizes and queueing noise, so a local profile at fixed batch is the way to
+  measure it.
+- **Earlier contrary evidence is explained:** on 2026-09-11 baseline4 scored 0.912 at ×3 against
+  0.913 at ×2 ([image count](../inference/inference-image-count-and-memory.md)). That was at
+  τ 1.0, where extra triplets draw attention away from the good ones; sharper pooling is what
+  makes the larger counts pay.
+- `validation_image_multiplier` is an integer and separate from the bundle's test multiplier,
+  which is what the submissions above set.
 
 ## Weight averaging
 

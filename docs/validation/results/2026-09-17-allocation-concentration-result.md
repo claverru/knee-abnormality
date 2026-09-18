@@ -45,7 +45,7 @@ splits, not a mild perturbation.
 ## Reading
 
 - **The model does not need its training split.** This is the first training-time evidence in the
-  [allocation investigation](../../ongoing.md#triplet-budget-allocation), after test-time
+  [allocation investigation](../../ongoing.md#triplet-budget-allocation-closed-2026-09-18), after test-time
   reallocation on fixed-split checkpoints
   [failed to confirm](2026-09-17-test-time-allocation.md).
 - **It unblocks the search.** A token cache built on this checkpoint scores any allocation

@@ -17,7 +17,7 @@ data:
   reflection_augmentation:
     probability: 0.5
   sampling_sigma_mm: 40.0
-  validation_image_multiplier: 2
+  validation_image_multiplier: 1
   robust_center_outlier_mm: null
   intensity_augmentation:
     probability: 0.5

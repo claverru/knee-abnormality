@@ -3,7 +3,7 @@
 **Fluid series carry about three quarters of the positive–negative logit separation, and every
 fluid type contributes more per token than any T1/PD type.** Sagittal fluid is the most efficient
 type and axial T1/PD the least. The per-label pattern follows clinical practice. This is
-evidence for the [triplet budget allocation investigation](../../ongoing.md#triplet-budget-allocation).
+evidence for the [triplet budget allocation investigation](../../ongoing.md#triplet-budget-allocation-closed-2026-09-18).
 
 ## Method
 
