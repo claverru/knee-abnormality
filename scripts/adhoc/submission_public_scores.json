@@ -1,0 +1,315 @@
+{
+  "version": 1,
+  "recorded": "2026-09-18",
+  "ledger": "docs/inference/submissions/INDEX.md",
+  "comparable_cohort": {
+    "split": "all_5fold_v3",
+    "labels": "steven_v4",
+    "validation_image_multiplier": 2,
+    "inference": "attention temperature 1.0, 2x test images, all reliable 3D",
+    "accuracy_neutral_inference": [
+      "batch size",
+      "loader workers",
+      "FP16 or FP32",
+      "one or two GPU processes"
+    ]
+  },
+  "plateau_from": "2026-09-13",
+  "submissions": [
+    {
+      "name": "baseline3",
+      "run": "outputs/training/baseline3",
+      "public": 0.878,
+      "submitted": "2026-09-11",
+      "submission_id": 56164711,
+      "inference": "2x",
+      "excluded": "split all_5fold_v1"
+    },
+    {
+      "name": "baseline4 1x",
+      "run": "outputs/training/baseline4",
+      "public": 0.910,
+      "submitted": "2026-09-11",
+      "submission_id": 56167669,
+      "inference": "1x",
+      "excluded": "split all_5fold_v1, 1x test images"
+    },
+    {
+      "name": "baseline4 2x",
+      "run": "outputs/training/baseline4",
+      "public": 0.913,
+      "submitted": "2026-09-11",
+      "submission_id": 56169438,
+      "inference": "2x",
+      "excluded": "split all_5fold_v1"
+    },
+    {
+      "name": "baseline4 3x",
+      "run": "outputs/training/baseline4",
+      "public": 0.912,
+      "submitted": "2026-09-11",
+      "submission_id": 56169445,
+      "inference": "3x",
+      "excluded": "split all_5fold_v1, 3x test images"
+    },
+    {
+      "name": "overnight 02-longer",
+      "run": "outputs/training/overnight-20260911T234416Z-8du9a4nh/runs/02-longer",
+      "public": 0.913,
+      "submitted": "2026-09-12",
+      "submission_id": 56181804,
+      "inference": "2x",
+      "excluded": null
+    },
+    {
+      "name": "overnight 04-higher-lr",
+      "run": "outputs/training/overnight-20260911T234416Z-8du9a4nh/runs/04-higher-lr",
+      "public": 0.918,
+      "submitted": "2026-09-12",
+      "submission_id": 56181821,
+      "inference": "2x",
+      "excluded": null
+    },
+    {
+      "name": "overnight 05-faster-head",
+      "run": "outputs/training/overnight-20260911T234416Z-8du9a4nh/runs/05-faster-head",
+      "public": 0.903,
+      "submitted": "2026-09-12",
+      "submission_id": 56181919,
+      "inference": "2x",
+      "excluded": null
+    },
+    {
+      "name": "crop140mm",
+      "run": "outputs/training/crop140mm",
+      "public": 0.925,
+      "submitted": "2026-09-12",
+      "submission_id": 56182948,
+      "inference": "2x",
+      "excluded": null
+    },
+    {
+      "name": "spatial-fusion",
+      "run": "outputs/training/spatial-fusion",
+      "public": 0.920,
+      "submitted": "2026-09-12",
+      "submission_id": 56190442,
+      "inference": "2x",
+      "excluded": null
+    },
+    {
+      "name": "spatial-tokens-five-embeddings",
+      "run": "outputs/training/spatial-tokens-five-embeddings",
+      "public": 0.929,
+      "submitted": "2026-09-13",
+      "submission_id": 56206027,
+      "inference": "2x",
+      "excluded": null
+    },
+    {
+      "name": "tonylin-soft-v3",
+      "run": "outputs/training/tonylin-soft-v3",
+      "public": 0.921,
+      "submitted": "2026-09-13",
+      "submission_id": 56208424,
+      "inference": "2x",
+      "excluded": "labels tonylin_soft"
+    },
+    {
+      "name": "3dsampling",
+      "run": "outputs/training/3dsampling",
+      "public": 0.930,
+      "submitted": "2026-09-13",
+      "submission_id": 56210103,
+      "inference": "2x",
+      "excluded": null
+    },
+    {
+      "name": "spatial-tokens-reflection",
+      "run": "outputs/training/spatial-tokens-reflection",
+      "public": 0.931,
+      "submitted": "2026-09-13",
+      "submission_id": 56211972,
+      "inference": "2x",
+      "excluded": null
+    },
+    {
+      "name": "meniscus-oa-classifiers (1B)",
+      "run": "outputs/training/meniscus-oa-classifiers",
+      "public": 0.925,
+      "submitted": "2026-09-13",
+      "submission_id": 56215113,
+      "inference": "2x",
+      "excluded": null
+    },
+    {
+      "name": "overnight 02-central-sampling",
+      "run": "outputs/training/overnight-20260913T214822Z-74udtekr/runs/02-central-sampling",
+      "public": 0.931,
+      "submitted": "2026-09-14",
+      "submission_id": 56224822,
+      "inference": "2x",
+      "excluded": null
+    },
+    {
+      "name": "disease-compartment-attention (1C)",
+      "run": "outputs/training/disease-compartment-attention",
+      "public": 0.928,
+      "submitted": "2026-09-14",
+      "submission_id": 56225269,
+      "inference": "2x, batch 4",
+      "excluded": null
+    },
+    {
+      "name": "meniscus-classifier (1A)",
+      "run": "outputs/training/meniscus-classifier",
+      "public": 0.930,
+      "submitted": "2026-09-14",
+      "submission_id": 56226273,
+      "inference": "2x, two GPU processes",
+      "excluded": null
+    },
+    {
+      "name": "reflection-sigma40",
+      "run": "outputs/training/reflection-sigma40",
+      "public": 0.936,
+      "submitted": "2026-09-14",
+      "submission_id": 56230573,
+      "inference": "2x, two GPU processes",
+      "excluded": null
+    },
+    {
+      "name": "overnight 00-baseline",
+      "run": "outputs/training/overnight-20260914T220805Z-ozsz4qbu/runs/00-baseline",
+      "public": 0.934,
+      "submitted": "2026-09-15",
+      "submission_id": 56249358,
+      "inference": "2x, two GPU processes",
+      "excluded": null
+    },
+    {
+      "name": "reflection-sigma40 without 3D",
+      "run": "outputs/training/reflection-sigma40",
+      "public": 0.936,
+      "submitted": "2026-09-15",
+      "submission_id": 56249900,
+      "inference": "2x, unknown_3d substituted",
+      "excluded": "inference substitutes unknown_3d, same weights as reflection-sigma40"
+    },
+    {
+      "name": "reflection-sigma40 fast runtime",
+      "run": "outputs/training/reflection-sigma40",
+      "public": 0.936,
+      "submitted": "2026-09-15",
+      "submission_id": 56262847,
+      "inference": "2x, FP16, 16 workers",
+      "excluded": "same weights as reflection-sigma40"
+    },
+    {
+      "name": "overnight 03-ema-0.999",
+      "run": "outputs/training/overnight-20260916T214520Z-t8k_kw2z/runs/03-ema-0.999",
+      "public": 0.929,
+      "submitted": "2026-09-17",
+      "submission_id": 56298280,
+      "inference": "2x",
+      "excluded": null
+    },
+    {
+      "name": "overnight 00-control",
+      "run": "outputs/training/overnight-20260916T214520Z-t8k_kw2z/runs/00-control",
+      "public": 0.928,
+      "submitted": "2026-09-17",
+      "submission_id": 56298600,
+      "inference": "2x",
+      "excluded": null
+    },
+    {
+      "name": "overnight 01-control-seed-43",
+      "run": "outputs/training/overnight-20260916T214520Z-t8k_kw2z/runs/01-control-seed-43",
+      "public": 0.931,
+      "submitted": "2026-09-17",
+      "submission_id": 56299151,
+      "inference": "2x",
+      "excluded": null
+    },
+    {
+      "name": "overnight 02-control-seed-44",
+      "run": "outputs/training/overnight-20260916T214520Z-t8k_kw2z/runs/02-control-seed-44",
+      "public": 0.931,
+      "submitted": "2026-09-17",
+      "submission_id": 56299154,
+      "inference": "2x",
+      "excluded": null
+    },
+    {
+      "name": "ranked-filtered-seed42",
+      "run": "outputs/training/ranked-filtered-seed42",
+      "public": 0.933,
+      "submitted": "2026-09-17",
+      "submission_id": 56303522,
+      "inference": "2x",
+      "excluded": null
+    },
+    {
+      "name": "ranked-filtered-seed42 tau 0.75, 3x",
+      "run": "outputs/training/ranked-filtered-seed42",
+      "public": 0.938,
+      "submitted": "2026-09-18",
+      "submission_id": 56322551,
+      "inference": "3x, attention temperature 0.75",
+      "excluded": "attention temperature 0.75, 3x test images"
+    },
+    {
+      "name": "ranked-filtered-seed42 tau 0.75, 4x",
+      "run": "outputs/training/ranked-filtered-seed42",
+      "public": 0.939,
+      "submitted": "2026-09-18",
+      "submission_id": null,
+      "inference": "4x, attention temperature 0.75",
+      "excluded": "attention temperature 0.75, 4x test images"
+    },
+    {
+      "name": "overnight 07-series-share-1.0",
+      "run": "outputs/training/overnight-20260917T215351Z-ik2qer7m/runs/07-series-share-1.0",
+      "public": 0.929,
+      "submitted": "2026-09-18",
+      "submission_id": null,
+      "inference": "2x",
+      "excluded": "1x validation multiplier"
+    },
+    {
+      "name": "robust-center-20-topup-26",
+      "run": "outputs/training/robust-center-20-topup-26",
+      "public": 0.938,
+      "submitted": "2026-09-18",
+      "submission_id": 56325019,
+      "inference": "4x, attention temperature 0.75",
+      "excluded": "1x validation multiplier, attention temperature 0.75, 4x test images"
+    }
+  ],
+  "replicate_groups": [
+    {
+      "name": "seed controls 2026-09-16 queue",
+      "runs": [
+        "outputs/training/overnight-20260916T214520Z-t8k_kw2z/runs/00-control",
+        "outputs/training/overnight-20260916T214520Z-t8k_kw2z/runs/01-control-seed-43",
+        "outputs/training/overnight-20260916T214520Z-t8k_kw2z/runs/02-control-seed-44"
+      ]
+    },
+    {
+      "name": "ranked-filtered seeds 42-44",
+      "runs": [
+        "outputs/training/ranked-filtered-seed42",
+        "outputs/training/ranked-filtered-seed43",
+        "outputs/training/ranked-filtered-seed44"
+      ]
+    },
+    {
+      "name": "unseeded controls 2026-09-18 queue",
+      "runs": [
+        "outputs/training/overnight-20260917T215351Z-ik2qer7m/runs/00-control",
+        "outputs/training/overnight-20260917T215351Z-ik2qer7m/runs/control-2"
+      ]
+    }
+  ]
+}

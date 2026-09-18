@@ -2,6 +2,8 @@
 
 | Read when | Document |
 |---|---|
+| Reviewing the rejected EfficientNet backbones (B3, B0, B0 at a doubled backbone rate): the confirmed macro losses, the underfitting diagnosis that contradicts the EfficientNet training report, the per-label anatomy pattern, and the +0.0043 ensemble complementarity | [2026-09-18 EfficientNet backbone results](2026-09-18-efficientnet-backbone-results.md) |
+| Reviewing how macro AUC, gold-only AUC and BCE tracked the public leaderboard over the nineteen comparable submissions, with each metric's run-to-run noise: gold-only diagnostics carry no signal, and after 09-13 nothing ranks the submissions | [2026-09-18 local-public metric comparison](2026-09-18-local-public-metric-comparison.md) |
 | Reviewing the rejected count-normalised attention run (with random per-type allocation): a 0.0035 loss against the same recipe without it, worst on the menisci | [2026-09-17 count-normalised attention](2026-09-17-count-normalized-attention-result.md) |
 | Reviewing the 2026-09-18 overnight queue (seventeen runs, validation ×1, two controls): the rejected series-share and head changes, the clear backbone-eval and backbone-lr losses, and one indistinguishable cluster | [2026-09-18 overnight results](2026-09-18-overnight-results.md) |
 | Reviewing the attention temperature measured on frozen checkpoints (+0.0024 at tau 0.75, inference only) and the bag-size question: a real plateau, a spread penalty only at very large bags | [2026-09-17 attention temperature](2026-09-17-attention-temperature.md) |
@@ -31,7 +33,7 @@
 | Reviewing why Steven v4 labels were retained over Tonylin labels | [2026-09-13 Tonylin label comparison](2026-09-13-tonylin-label-comparison.md) |
 | Understanding how little attention per-plane regional fusion received | [2026-09-13 per-plane fusion usage diagnosis](2026-09-13-per-plane-fusion-usage-diagnosis.md) |
 | Comparing max pooling with average-pooling spatial fusion | [2026-09-13 max-pooling validation comparison](2026-09-13-max-pooling-validation-comparison.md) |
-| Checking how fold-0 AUC tracked the public leaderboard after the split change | [2026-09-13 local and public agreement](2026-09-13-local-and-public-agreement-after-the-split-change.md) |
+| Checking the original six-run local-public agreement measured right after the split change, superseded by the 2026-09-18 comparison | [2026-09-13 local and public agreement](2026-09-13-local-and-public-agreement-after-the-split-change.md) |
 | Reviewing why 27-query spatial fusion did not beat crop140mm | [2026-09-12 spatial-fusion validation comparison](2026-09-12-spatial-fusion-validation-comparison.md) |
 | Reviewing the rejected spatial-fusion engineering and runtime gate | [2026-09-12 spatial-fusion engineering result](2026-09-12-spatial-fusion-engineering-result.md) |
 | Reviewing the rejected geometric-center sampler and the frozen fusion control | [2026-09-12 accurate-centers result](2026-09-12-accurate-centers-result.md) |

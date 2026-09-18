@@ -7,7 +7,7 @@
 | Checking the default split, the development selection metric and the fold-0 iteration strategy | [Validation strategy](validation-strategy.md) |
 | Using the `all_5fold_v3` split, membership and leakage controls, frozen targets, scoring or the previous split | [Project validation protocol](project-validation-protocol.md) |
 | Checking the official macro ROC-AUC definition and public leaderboard evidence | [Official metric and public evidence](official-metric-and-public-evidence.md) |
-| Interpreting how local validation scores related to public scores in earlier stages | [Local-to-public score relationship](local-to-public-score-relationship.md) |
+| Deciding which local metric to trust against the public leaderboard, and how much a local difference is worth | [Local-to-public score relationship](local-to-public-score-relationship.md) |
 | Choosing per-target diagnostics beyond macro AUC, or weighing how much one ranking mistake costs per target | [Target-level diagnostics](target-level-diagnostics.md) |
 | Combining predictions with different scales or losses | [Ensemble interpretation](ensemble-interpretation.md) |
 | Understanding baseline1's historical twelve-study gold validation | [Why baseline1 had twelve validation studies](why-baseline1-had-twelve-validation-studies.md) |

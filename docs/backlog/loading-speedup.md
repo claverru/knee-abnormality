@@ -10,10 +10,11 @@ user; not yet implemented in production.
 uses 16 loader workers and FP16 with fixed 64-image channels-last backbone chunks
 ([submission](../inference/submissions/2026-09-15-fast-champion-submission.md), 0.936 public).
 
-**Where it stands:** changes 3 and 4 are measured and confirmed together, changes 7 and 8 are
-closed as measured regressions, change 5 was probed without a verdict, and changes 1, 2, 6, 9 and
-10 are unmeasured. Next: poll the three uncollected kernels (only indexing is informative), re-run
-frames with byte-matched blocks, then implement changes 1–4 in one retrain.
+**Where it stands:** changes 2, 3 and 4 are **implemented** (2026-09-18) and ship with the next
+retrain; changes 7 and 8 are closed as measured regressions, change 5 was probed without a verdict,
+and changes 1, 6, 9 and 10 remain open. Next: poll the three uncollected kernels (only indexing is
+informative), re-run frames with byte-matched blocks, and settle `INFERENCE_HEADER_THREADS` with a
+Kaggle sweep against 16 loader workers.
 
 ## How these are measured
 
@@ -125,9 +126,12 @@ records, selections and prepared tensors.
 2. **List each series directory once** (`build_series_index`, `index_series`; series listing 3.1 s
    cold). Without the image-count parquet, as on Kaggle, the index globs `*.dcm` only to order
    candidates, and `index_series` globs the same directory again. Take counts from one listing,
-   keeping the `(image_count, uid)` order and the `KNOWN_BAD_SERIES` adjustment. *Single-scandir
-   listings are audited identical locally; throughput unmeasured.*
-3. **Faster header parse** — *measured, see [above](#header-parse-and-threading--changes-3-and-4-confirmed-and-only-together)*
+   keeping the `(image_count, uid)` order and the `KNOWN_BAD_SERIES` adjustment. *Implemented
+   2026-09-18: `list_series` in `data/sources.py` does one `scandir`, and `SeriesCandidate.listing`
+   carries it to `index_series`, which reuses it instead of globbing again. The listing is populated
+   only when the image-count parquet is absent, so the saving is Kaggle-only; audited identical to
+   globbing over 115 local series, throughput unmeasured.*
+3. **Faster header parse** — *implemented 2026-09-18, see [above](#header-parse-and-threading--changes-3-and-4-confirmed-and-only-together)*
    (`read_header`; slice headers 146 s cold, 35 s warm, 19,191 files). Read one fixed 12 KiB prefix
    per file (extended only if the pixel-data element lies beyond it) and scan explicit-VR
    little-endian elements for the tags `DicomHeader` uses: image position and orientation, pixel
@@ -139,8 +143,11 @@ records, selections and prepared tensors.
    (about 65 µs per header through pydicom), which the parser covers too.
 4. **Threaded header reads within a series** (`index_series`). NFS latency is 111 s of the 146 s
    cold header cost: read the series' prefixes with a small thread pool, then parse in order. Raw
-   byte reads scaled from 96 to 872 files/s with 16 threads. *Confirmed with change 3; untested
-   against production's 16 loader worker processes on four vCPUs.*
+   byte reads scaled from 96 to 872 files/s with 16 threads. *Implemented 2026-09-18 behind
+   `KneeStudyDataset(header_threads=...)`, defaulting to 1 so training and validation stay serial
+   and only inference threads, at `INFERENCE_HEADER_THREADS = 4`. That default is a placeholder:
+   local cold measurement showed no gain, and the Kaggle sweep against 16 loader worker processes on
+   four vCPUs is still the open question.*
 5. **Threaded frame reads within a series** (`decode_series`, `read_frame`; frame reads 25.5 s
    cold, 12.5 s warm, 11,930 frames). Each selected slice reopens its file and reads the pixel
    payload serially; read the unique slices' payloads with the same thread pool (13 s of the cost
@@ -189,15 +196,48 @@ Headers are parsed once per worker per series and cached for the run (`_indexed`
 `persistent_workers: true`), local disk has no NFS round trip to hide, and loader wait was under
 0.06% of GPU step time
 ([threading profile](../data-preparation/threading-inside-dataset-loading.md#results-and-decision)) —
-measured on the older repeated-RGB recipe, so re-measure before ruling it out permanently. At local
-warm speeds the parser would save roughly 3–4 minutes of worker CPU across an entire run, all of it
-already overlapped with the GPU. The choice is not separable anyway: one `KneeStudyDataset` path
-serves training, validation and inference, so whatever ships for inference is what training runs.
+originally measured on the older repeated-RGB recipe. At local warm speeds the parser would save
+roughly 3–4 minutes of worker CPU across an entire run, all of it already overlapped with the GPU.
+The choice is not separable anyway: one `KneeStudyDataset` path serves training, validation and
+inference, so whatever ships for inference is what training runs.
+
+**Re-measured on the current recipe, 2026-09-18** (`compare-header-implementations` in
+[the catalog](../../scripts/adhoc/catalog.yaml), 256 studies, batch 8, 16 workers, two passes).
+Both arms ran on the same studies with the page cache dropped immediately before each, so pass 0
+includes real disk reads (`outputs/profiling/header-cold-pydicom-20260918/`,
+`header-cold-parser-20260918/`):
+
+| Arm | Pass 0, cold | Pass 1, warm |
+|---|---:|---:|
+| pydicom | 37.5 studies/s, 6.83 s | 99.0 studies/s, 2.58 s |
+| raw parser | 45.9 studies/s, 5.58 s | 109.3 studies/s, 2.34 s |
+| raw parser, 4 header threads | 45.5 studies/s, 5.63 s | 104.5 studies/s, 2.45 s |
+
+**1.22× on the first pass and nothing afterwards.** The parser saves 1.25 s of a 6.83 s cold pass.
+Against the pass-1 steady state the epoch-zero penalty is 4.25 s for pydicom and 3.24 s for the
+parser, so parsing is roughly a quarter of that penalty and cold disk plus index construction is the
+rest. A run pre-warmed into RAM instead reported 56.4 against 88.7 studies/s, a 1.57× that exists
+only because the I/O term had been removed
+(`outputs/profiling/header-loader-256-20260918/`); prefer the cold protocol for any question about
+where the bottleneck is, and the warm one only for isolating parser cost from I/O.
+
+**Threading adds nothing locally even on cold files** (`header-cold-threaded4-20260918/`), which
+extends the earlier warm-file result rather than contradicting it: prefetching each series'
+prefixes on four threads landed within noise of the serial parser. Local NVMe has no latency worth
+hiding, and 16 worker processes already keep the queue full. The Kaggle gain from change 4 stands on
+NFS latency alone, so it cannot be rehearsed here.
+
+The epoch-zero saving is paid once per worker per series and never again, because `_slice_index`
+caches it and `persistent_workers` keeps the workers alive. Median steady-state batch time was
+7.6–8.0 ms for a batch of eight in both arms, which is queue drain, not work: 16 workers stay far
+ahead of the consumer. Audit mode compared every collated field on eight studies: identical prepared
+batches, zero pydicom fallbacks, zero prefix extensions.
 
 ## Open questions
 
-- **Threads against workers.** Every thread measurement used one process on an idle machine, while
-  production runs 16 loader workers on four vCPUs. The CPU saving transfers; the threaded
+- **`INFERENCE_HEADER_THREADS` is unsettled.** It ships at 4 as a placeholder. Every thread
+  measurement used one process on an idle machine, while production runs 16 loader workers on four
+  vCPUs. The CPU saving transfers; the threaded
   wall-clock gain may not.
 - **Change 5** needs byte-matched blocks before it means anything.
 - **Changes 1 and 2** have a pushed, never-polled indexing kernel.

@@ -320,6 +320,29 @@ scripts:
       - Study order is a fixed seeded shuffle, so every probe and every session draw the same blocks in the same order.
     docs: [docs/backlog/loading-speedup.md]
 
+  - id: compare-header-implementations
+    path: scripts/adhoc/compare_header_implementations.py
+    summary: Compare the production header parser, its threaded variant and the retained pydicom reader end to end through the local training dataloader, and audit that all three produce identical prepared batches.
+    tags: [compare, dicom, header, parser, pydicom, threads, dataloader, throughput, studies-per-second, local, indexing, epoch-zero, audit]
+    commands:
+      - rtk proxy uv run --locked python -m scripts.adhoc.compare_header_implementations configs/training.yaml --mode audit --samples 8 --prewarm false --output-dir outputs/profiling/header-audit-new
+      - rtk proxy env OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 uv run --locked python -m scripts.adhoc.compare_header_implementations configs/training.yaml --mode loader --implementation pydicom --samples 256 --workers 16 --passes 2 --prewarm false --output-dir outputs/profiling/header-cold-pydicom-new
+      - rtk proxy env OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 uv run --locked python -m scripts.adhoc.compare_header_implementations configs/training.yaml --mode loader --samples 256 --workers 16 --passes 2 --output-dir outputs/profiling/header-loader-new
+    inputs: [Experiment config, Training DICOMs, Frozen fold and label sources]
+    outputs: [Per-arm per-pass studies/s and per-batch timings, first-pass speedup, pydicom fallback and prefix-extension counts, prepared-batch audit hashes]
+    notes:
+      - Local only and CPU only; no CUDA, no pinning and no model. The Kaggle NFS question is separate and belongs to probe-kaggle-loading.
+      - Since the parser landed in production on 2026-09-18 the arms are production itself. parser is header_threads=1, threaded is header_threads=--threads, and the pydicom arm subclasses the dataset to swap series.parse_prefix for the retained pydicom_read_header inside _indexed, so the patch applies in each worker under both fork and spawn.
+      - Use it as the regression check that the parser and its threaded path still prepare batches identical to pydicom.
+      - For any question about where the bottleneck is, run one arm per invocation with --implementation and --prewarm false, dropping the page cache between them (sync; echo 3 > /proc/sys/vm/drop_caches, which needs root); the manifest records Cached from /proc/meminfo so a warm run is recognisable afterwards.
+      - Prewarm removes the disk term so the arms differ only in parsing, which flatters the parser, since the same 256 studies gave 1.57x pre-warmed and 1.22x cold. Use it only to isolate parser cost, never to size the gain.
+      - Prewarm reads every selected file once; studies average about 121 MB, so keep samples within free memory or the later arm reads a colder cache than the earlier one.
+      - Audit mode checks all three arms against the pydicom reference and raises when any prepared field differs.
+      - Only pass 0 parses headers. _slice_index caches per worker and persistent_workers keeps them alive, so later passes measure the cached steady state and show no parser effect by design.
+      - Use more batches than workers or the measurement reports startup rather than throughput.
+      - Audit mode collates one study at a time and raises when any prepared field differs.
+    docs: [docs/backlog/loading-speedup.md]
+
   - id: kaggle-loading-probe-header
     path: scripts/adhoc/kaggle_loading_probes/header.py
     summary: Compare a minimal explicit-VR DICOM header parser with the production pydicom reader across thread counts on cold files.
@@ -390,3 +413,20 @@ scripts:
       - The double-glob baseline reproduces Kaggle behaviour, where the image-count parquet is absent so each series directory is globbed for counting and again for ordering.
       - Reports listing work only; it does not read headers, so it is independent of the header probe.
     docs: [docs/backlog/loading-speedup.md]
+
+  - id: compare-local-and-public-scores
+    path: scripts/adhoc/compare_local_and_public_scores.py
+    summary: Correlate saved fold-0 metrics (macro AUC, gold-only AUC, BCE) with Kaggle public scores over comparable submissions only.
+    tags: [validation, public, leaderboard, correlation, selection, metric, gold, bce, auc, noise, reliability, submissions]
+    commands:
+      - rtk proxy env CUDA_VISIBLE_DEVICES= uv run --locked python -m scripts.adhoc.compare_local_and_public_scores --output-dir outputs/analysis/local-public-metrics-new
+    inputs: [scripts/adhoc/submission_public_scores.json, Saved epoch metrics and validation predictions under outputs/training, Frozen split protocol and evaluation targets, data/raw/train.csv and the official series CSVs pinned by the split]
+    outputs: [submissions.csv with every submission and its recomputed metrics, summary.json with per-cohort correlations, replicate noise and the macro-AUC fit]
+    notes:
+      - Reads saved artifacts only; no training, inference, GPU access or tests. Refuses an existing output directory.
+      - The manifest marks each submission comparable or excluded; the cohort additionally requires the recorded split, label source and validation multiplier to match, so leaderboard rows differing in test density, attention temperature or label table never enter a correlation.
+      - Selects each run's checkpoint epoch by the highest saved macro AUC, matching training's own selection, and fails if the recomputed macro AUC differs from the saved metrics.
+      - Gold-only BCE is computed against the frozen hard gold targets; the saved soft-target BCE is comparable only within one label table.
+      - Replicate noise comes from the three recorded same-recipe groups (df=5), so the SD itself carries a wide interval.
+      - Public scores are rounded to three decimals and every run is one fold and one seed.
+    docs: [docs/validation/results/2026-09-18-local-public-metric-comparison.md, docs/validation/local-to-public-score-relationship.md]

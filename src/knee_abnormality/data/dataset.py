@@ -39,15 +39,19 @@ class KneeStudyDataset(Dataset):
         targets: tuple[str, ...],
         training_seed: int | None,
         image_limit_multiplier: int = 1,
+        header_threads: int = 1,
     ) -> None:
         if image_limit_multiplier < 1:
             raise ValueError("Image limit multiplier must be positive")
+        if header_threads < 1:
+            raise ValueError("Header threads must be positive")
         self.studies = studies
         self.series_index = series_index
         self.data = data
         self.targets = targets
         self.training_seed = training_seed
         self.image_limit_multiplier = image_limit_multiplier
+        self.header_threads = header_threads
         self.epoch = Value("q", 0)
         self._slice_index: dict[Path, IndexedSeries] = {}
         self._study_references: dict[str, StudyReference] = {}
@@ -67,7 +71,11 @@ class KneeStudyDataset(Dataset):
     def _indexed(self, candidate: SeriesCandidate) -> IndexedSeries:
         indexed = self._slice_index.get(candidate.directory)
         if indexed is None:
-            indexed = index_series(candidate.directory)
+            indexed = index_series(
+                candidate.directory,
+                self.header_threads,
+                list(candidate.listing) if candidate.listing is not None else None,
+            )
             self._slice_index[candidate.directory] = indexed
         return indexed
 

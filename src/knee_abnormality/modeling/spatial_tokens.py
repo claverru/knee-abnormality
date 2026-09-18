@@ -1,5 +1,11 @@
 import torch
 from timm.layers import to_2tuple
+from timm.models._efficientnet_blocks import (
+    ConvBnAct,
+    DepthwiseSeparableConv,
+    EdgeResidual,
+    InvertedResidual,
+)
 from timm.models.maxxvit import Downsample2d, MbConvBlock, TransformerBlock2d
 from torch import nn
 
@@ -7,6 +13,24 @@ COATNET_BACKBONE = "coatnet_rmlp_2_rw_224.sw_in12k_ft_in1k"
 
 BACKBONE_MAPPINGS = {
     "rexnet_200.nav_in1k": {
+        "layout": "NCHW",
+        "origin": [0.0, 0.0],
+        "stride": [32.0, 32.0],
+        "anchors": "convolution_centers",
+    },
+    "efficientnet_b3.ra2_in1k": {
+        "layout": "NCHW",
+        "origin": [0.0, 0.0],
+        "stride": [32.0, 32.0],
+        "anchors": "convolution_centers",
+    },
+    "efficientnet_b0.ra4_e3600_r224_in1k": {
+        "layout": "NCHW",
+        "origin": [0.0, 0.0],
+        "stride": [32.0, 32.0],
+        "anchors": "convolution_centers",
+    },
+    "efficientnet_b0.ra_in1k": {
         "layout": "NCHW",
         "origin": [0.0, 0.0],
         "stride": [32.0, 32.0],
@@ -87,6 +111,26 @@ def _rexnet_mapping(backbone: nn.Module) -> tuple[float, float, float, float]:
     return _spatial_mapping(convolutions)
 
 
+def _efficientnet_mapping(backbone: nn.Module) -> tuple[float, float, float, float]:
+    convolutions = [backbone.conv_stem]
+    for stage in backbone.blocks:
+        for block in stage:
+            if isinstance(block, DepthwiseSeparableConv):
+                convolutions.extend((block.conv_dw, block.conv_pw))
+            elif isinstance(block, InvertedResidual):
+                convolutions.extend((block.conv_pw, block.conv_dw, block.conv_pwl))
+            elif isinstance(block, ConvBnAct):
+                convolutions.append(block.conv)
+            elif isinstance(block, EdgeResidual):
+                convolutions.extend((block.conv_exp, block.conv_pwl))
+            else:
+                raise TypeError(
+                    f"Unsupported EfficientNet spatial block: {type(block).__name__}"
+                )
+    convolutions.append(backbone.conv_head)
+    return _spatial_mapping(convolutions)
+
+
 def _coatnet_mapping(backbone: nn.Module) -> tuple[float, float, float, float]:
     mapping = _spatial_mapping([backbone.stem.conv1, backbone.stem.conv2])
     for stage in backbone.stages:
@@ -131,15 +175,20 @@ def _coatnet_mapping(backbone: nn.Module) -> tuple[float, float, float, float]:
     return mapping
 
 
+_BACKBONE_MAPPING_FUNCTIONS = {
+    "rexnet_200.nav_in1k": _rexnet_mapping,
+    "efficientnet_b3.ra2_in1k": _efficientnet_mapping,
+    "efficientnet_b0.ra4_e3600_r224_in1k": _efficientnet_mapping,
+    "efficientnet_b0.ra_in1k": _efficientnet_mapping,
+    COATNET_BACKBONE: _coatnet_mapping,
+}
+
+
 def backbone_mapping(
     name: str, backbone: nn.Module
 ) -> tuple[float, float, float, float]:
     identity = backbone_mapping_identity(name)
-    mapping = (
-        _coatnet_mapping(backbone)
-        if name == COATNET_BACKBONE
-        else _rexnet_mapping(backbone)
-    )
+    mapping = _BACKBONE_MAPPING_FUNCTIONS[name](backbone)
     if mapping != (*identity["origin"], *identity["stride"]):
         raise ValueError(
             f"Backbone geometry differs from verified spatial anchors: {name} {mapping}"

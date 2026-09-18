@@ -7,6 +7,7 @@ import torch
 from torch.utils.data import DataLoader
 
 from knee_abnormality.config import (
+    INFERENCE_HEADER_THREADS,
     SLICES_PER_INPUT,
     TEST_IMAGE_MULTIPLIER,
     ExperimentConfig,
@@ -194,6 +195,7 @@ def prediction_dataset(
     studies: pl.DataFrame,
     metadata_split: str,
     image_multiplier: int,
+    header_threads: int = INFERENCE_HEADER_THREADS,
 ) -> KneeStudyDataset:
     return KneeStudyDataset(
         studies,
@@ -202,6 +204,7 @@ def prediction_dataset(
         targets,
         None,
         image_multiplier,
+        header_threads,
     )
 
 

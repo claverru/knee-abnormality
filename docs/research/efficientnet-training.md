@@ -4,7 +4,21 @@
 **Prepared:** 2026-09-16  
 **Scope:** Pretrained `timm` 2D EfficientNets used with adjacent-slice triplets and study-level multilabel aggregation. This is not a training recipe for a randomly initialized 3D EfficientNet.  
 **Objective:** Diagnose poor convergence and establish a reliable baseline before optimizing validation macro-AUC.  
-**Status:** Research and source-code inspection only. No training experiments were executed, no AUC improvements were measured, and no repository files were modified.
+**Status:** Research and source-code inspection only, **superseded on 2026-09-18 by executed runs**. No training experiments were executed for this report; the runs that tested it are in [EfficientNet backbone results](../validation/results/2026-09-18-efficientnet-backbone-results.md).
+
+## 0. Outcome, 2026-09-18 — the premise did not hold
+
+This report was written to diagnose **poor convergence**. Three executed runs show no convergence failure: EfficientNet-B3 and B0 train normally and reach 0.879449 and 0.880331 fold-0 macro AUC against 0.888476 for a matched ReXNet-200 control. They converge to a worse point, they do not fail to converge.
+
+Withdraw the following, which depended on the convergence premise:
+
+- **Section 6's proposed backbone LR comparison (2e-4 against 5e-5) and section 4's frozen-BN policy both point the wrong way.** EfficientNet **underfits** here: its training loss is worse than the control's at nearly every epoch while its generalization gap is *smaller*. Both proposals reduce backbone adaptation. Neither was run. Supporting evidence on ReXNet-200 from the same queue: `12-backbone-lr-1e-4` −0.0030, `16-backbone-eval` −0.0088 ([overnight results](../validation/results/2026-09-18-overnight-results.md)).
+- **Doubling the rate to 4e-4 instead gained +0.0029, below the 0.003 single-run threshold, and not through the predicted mechanism** — training loss barely moved, so the gain is not faster fitting.
+- **Sections 7's Phase 0 and Phase 1 (startup checks and the tiny-subset fitting test) were not needed.** Pretrained loading, normalization match and feature geometry were confirmed from the run artifacts, and the model fits.
+- **Section 2's "immediate integration blocker" is resolved.** `_efficientnet_mapping` is implemented and non-`tf_` EfficientNets share ReXNet-200's anchors exactly. The `Conv2dSame` warning in that section was correct and is now measured: `tf_efficientnet_b0.ns_jft_in1k` walks to origin 51.0.
+- **`backbone_eval` is exact, not a proxy, for these backbones.** Section 4 calls it a "broader proxy" and asks for a BN-only helper. `efficientnet_b3.ra2_in1k` contains 78 BatchNorm layers and **zero** Dropout or DropPath modules, so `.eval()` on the backbone changes BatchNorm behaviour and nothing else. The helper is unnecessary here; it would be needed for a backbone carrying drop-path.
+
+What survives: section 3 on matching checkpoint preprocessing (followed, and the runs confirm the recorded mean/std), section 5 on preserving the pretrained stem and the feature contract, and section 8's logging requirements.
 
 ## 1. Recommended direction
 

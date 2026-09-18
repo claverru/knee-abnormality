@@ -4,7 +4,10 @@ This page covers the cost and code requirements for replacing the backbone (`mod
 ReXNet-200) of the [full-slice model](current-model.md).
 
 - **Units:** costs are parameter and multiply-add (GMAC) counts, not timings. Time real
-  candidates on a Kaggle T4.
+  candidates on a Kaggle T4. Measured 2026-09-18: EfficientNet-B3 at −37% GMACs trained **7.2%
+  slower** than ReXNet-200 and B0 at −74% trained 33.6% faster, so the conversion is neither
+  reliable nor proportional for depthwise-heavy families
+  ([result](../validation/results/2026-09-18-efficientnet-backbone-results.md)).
 - **Related research:**
   - [Backbone MRI evidence](../research/backbone-mri-evidence.md) covers which families suit MRI.
   - [EfficientNet training](../research/efficientnet-training.md) covers EfficientNet
@@ -62,8 +65,13 @@ parameters, and 256 multiply-adds per token.
 In `KneeAbnormalityModel.__init__`:
 
 - **Mapping:** the name must have a `BACKBONE_MAPPINGS` entry, and `backbone_mapping` must
-  reproduce it. Only `_rexnet_mapping` and `_coatnet_mapping` exist, so any other family needs
-  its own mapping function.
+  reproduce it. `_rexnet_mapping`, `_coatnet_mapping` and `_efficientnet_mapping` exist, so any
+  other family needs its own mapping function. `_efficientnet_mapping` walks `conv_stem`, then
+  each block by type (`DepthwiseSeparableConv`, `InvertedResidual`, `ConvBnAct`, `EdgeResidual`),
+  then `conv_head`, naming the convolutions explicitly so squeeze-excite is excluded. Registered
+  EfficientNets: `efficientnet_b3.ra2_in1k`, `efficientnet_b0.ra_in1k` and
+  `efficientnet_b0.ra4_e3600_r224_in1k`, all at origin 0 and stride 32, the same anchors as
+  ReXNet-200 ([result](../validation/results/2026-09-18-efficientnet-backbone-results.md)).
 - **Features:** `forward_features` must return NCHW with `num_features` channels. Construction
   probes the backbone once at `data.image_size`.
 - **Input size:** the backbone must accept `data.image_size`.
@@ -91,7 +99,10 @@ convolution in module order is exact only for single-path networks with static p
     origin is 0.
   - *RegNet:* strided 1×1 shortcuts are counted twice. Origin 0 is expected but unverified.
   - *TensorFlow-ported `tf_` models:* "same" padding is dynamic and asymmetric, so a static walk
-    is unreliable.
+    is unreliable. Measured 2026-09-18: `tf_efficientnet_b0.ns_jft_in1k` walks to origin **51.0**
+    where its non-`tf_` sibling gives 0. Every AdvProp, AutoAugment and noisy-student/JFT
+    EfficientNet checkpoint is a `tf_` port, so all of them are out of reach without a
+    dynamic-padding-aware mapping verified per input resolution.
   - *Reparameterizable families (FastViT, MobileOne, EfficientFormer):* parallel branches break
     the walk.
 - **Fixed input size:** LeViT, EfficientViT-M and EfficientFormer/V2 run only at their native
