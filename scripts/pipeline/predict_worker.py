@@ -72,6 +72,7 @@ def predict_request(request: PredictionRequest) -> dict:
             request.batch_size,
             num_workers=request.num_workers,
         )
+        loader.in_order = False
         return loader, time.perf_counter() - indexing
 
     with ThreadPoolExecutor(1) as pool:

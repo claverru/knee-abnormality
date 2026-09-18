@@ -202,6 +202,7 @@ def build_pool(
         "no_valid_run_sources": 0,
     }
     axis = AXES[plane]
+    slice_normals: dict[tuple, np.ndarray] = {}
     for uid, indexed in sorted(sources, key=lambda item: item[0]):
         if uid in (failed_sources or set()):
             diagnostics["sources"][uid] = "preparation_failure"
@@ -234,11 +235,19 @@ def build_pool(
             offsets = []
             for record in run:
                 if use_physical:
-                    orientation = np.asarray(record.pose.layout.orientation).reshape(
-                        2, 3
-                    )
-                    n = np.cross(*orientation)
-                    n /= np.linalg.norm(n)
+                    layout = record.pose.layout.orientation
+                    n = slice_normals.get(layout)
+                    if n is None:
+                        row, column = np.asarray(layout).reshape(2, 3)
+                        n = np.array(
+                            [
+                                row[1] * column[2] - row[2] * column[1],
+                                row[2] * column[0] - row[0] * column[2],
+                                row[0] * column[1] - row[1] * column[0],
+                            ]
+                        )
+                        n /= np.linalg.norm(n)
+                        slice_normals[layout] = n
                     if n[axis] < 0:
                         n = -n
                     normals.append(tuple(n))
@@ -361,18 +370,16 @@ def geometry_groups(
     )
     groups = []
     for value in sorted(pool.candidates, key=key):
+        normal = np.asarray(value.normal)
+
+        def linked(other, value=value, normal=normal):
+            offset = abs(value.offset - other.offset)
+            return offset <= 0.1 and (
+                offset + radius * np.linalg.norm(normal - other.normal) <= 0.1
+            )
+
         group = next(
-            (
-                g
-                for g in groups
-                if pool.physical
-                and all(
-                    abs(value.offset - other.offset)
-                    + radius * np.linalg.norm(np.asarray(value.normal) - other.normal)
-                    <= 0.1
-                    for other in g
-                )
-            ),
+            (g for g in groups if pool.physical and all(linked(other) for other in g)),
             None,
         )
         if group is None:
@@ -480,22 +487,28 @@ def select_triplets(
         )
         preferred[row] = source
         assigned[source] += 1
+    ordered = [
+        [
+            (value, value.uid, value.support[0], value.support[1], value.depth, middle)
+            for value in group
+            for middle in (str(value.records[1].path),)
+        ]
+        for group in groups
+    ]
     alternatives, errors = {}, []
     for row, target in enumerate(targets):
-        for column, group in enumerate(groups):
-            candidates = [v for v in group if v.support[0] <= target <= v.support[1]]
-            if candidates:
-                value = min(
-                    candidates,
-                    key=lambda v: (
-                        v.uid != preferred[row],
-                        (v.depth - target) ** 2,
-                        v.uid,
-                        str(v.records[1].path),
-                    ),
-                )
-                error = (value.depth - target) ** 2
-                alternatives[row, column] = (value, error)
+        wanted = preferred[row]
+        for column, group in enumerate(ordered):
+            best = None
+            best_key = None
+            for value, uid, low, high, depth, middle in group:
+                if low <= target <= high:
+                    key = (uid != wanted, (depth - target) ** 2, uid, middle)
+                    if best_key is None or key < best_key:
+                        best, best_key = value, key
+            if best is not None:
+                error = (best.depth - target) ** 2
+                alternatives[row, column] = (best, error)
                 errors.append(error)
     scale = max(errors, default=0.0) or 1.0
     change_cost = count + 1.0

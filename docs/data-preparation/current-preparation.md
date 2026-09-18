@@ -17,7 +17,16 @@ Implemented 2026-09-17; the same `KneeStudyDataset` path runs in training,
 validation and Kaggle inference.
 
 - **Headers:** `index_series` (`data/preprocessing/series.py`) parses every
-  file's pre-pixel header once. Besides the pose and pixel descriptor it keeps
+  file's pre-pixel header once. Since 2026-09-18 `read_header` is a raw
+  explicit-VR little-endian parser over a fixed 12 KiB prefix, extended and
+  retried when the pixel-data element lies beyond it and falling back to pydicom
+  for any other encoding; it costs 0.306 ms per header on Kaggle against
+  pydicom's 7.6 ms. Prefix reads and frame payloads are fetched on a thread pool
+  behind `KneeStudyDataset(io_threads=...)`, defaulting to 1 so training and
+  validation stay serial, with inference at `INFERENCE_IO_THREADS = 16`. Prepared
+  batches are audited identical to the serial and pydicom paths
+  ([loading speedup](../backlog/loading-speedup/attribution.md#what-the-shipped-changes-bought)).
+  Besides the pose and pixel descriptor it keeps
   12 series tags (`SeriesTags` in `dicom.py`) and stores the most common tag set
   as a compact `SeriesSummary`: `SeriesNumber`, reformat flag, same-protocol
   signature, acquired in-plane resolution and `ReceiveCoilName`. No extra file
@@ -61,7 +70,7 @@ against 0.939 for the checkpoint it replaced. A rejected study centre again samp
 locally, which is also the flattest coverage in the dataset: local pools draw their targets
 uniformly across each slab rather than from the sigma-40 Gaussian, so the refit would have reduced
 peripheral coverage for exactly those studies
-([coverage](../ongoing.md#peripheral-coverage-of-the-gaussian-sampler-measured-2026-09-18)). After
+([coverage](../ongoing/peripheral-coverage.md)). After
 the exclusions above, 177 of 4,407 training studies are rejected (31 of 904 on fold 0). The
 analysis that produced it is kept in
 [big bets](../backlog/big-bets.md#robust-study-center-removed).

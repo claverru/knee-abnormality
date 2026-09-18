@@ -2,7 +2,6 @@ import math
 import os
 import re
 from collections import Counter
-from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -12,9 +11,11 @@ from knee_abnormality.data.preprocessing.dicom import (
     PREPARATION_ERRORS,
     NativePixelDescriptor,
     SeriesTags,
+    io_pool,
     parse_prefix,
     read_prefix,
 )
+from knee_abnormality.data.preprocessing.exclusions import KNOWN_BAD_INSTANCES
 from knee_abnormality.data.preprocessing.geometry import (
     RELIABILITY,
     NativePose,
@@ -22,7 +23,7 @@ from knee_abnormality.data.preprocessing.geometry import (
     SeriesGeometry,
     summarize_series,
 )
-from knee_abnormality.data.sources import KNOWN_BAD_INSTANCES, list_series
+from knee_abnormality.data.sources import list_series
 
 REFORMAT_IMAGE_TYPES = ("DERIVED", "SECONDARY", "PROJECTION")
 REFORMAT_DESCRIPTION = re.compile(r"\bmpr\b|reformat")
@@ -146,12 +147,11 @@ def index_series(
         candidates = list_series(series_dir)
     prefixes: dict[Path, tuple[bytes, os.stat_result]] = {}
     if threads > 1 and len(candidates) > 1:
-        with ThreadPoolExecutor(min(threads, len(candidates))) as pool:
-            for path, prefix in zip(
-                candidates, pool.map(_safe_prefix, candidates), strict=True
-            ):
-                if prefix is not None:
-                    prefixes[path] = prefix
+        for path, prefix in zip(
+            candidates, io_pool(threads).map(_safe_prefix, candidates), strict=True
+        ):
+            if prefix is not None:
+                prefixes[path] = prefix
     records = []
     layouts = {}
     for fallback, path in enumerate(candidates):

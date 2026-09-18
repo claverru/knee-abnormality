@@ -6,6 +6,7 @@
 | Reviewing retired baseline1's measured results, confirmed code defects, implemented corrections or historical limitations | [Baseline1 review](baseline1-review.md) |
 | Reviewing the retired 1A–1C medial/lateral sharing experiments, their generalization investigation or the OA/meniscus disagreement audit | [Sharing experiments](sharing/INDEX.md) |
 | Reviewing the dropped crop-selection and learned-zoom investigation: its runs, recipes, findings, rejected approaches and options never run | [Crop-selection investigation](crop-selection-investigation.md) |
+| Recovering the closed triplet-budget investigation: per-type contributions, why reallocation at a fixed total does nothing, what it rejected and the attention temperature it produced | [Triplet budget allocation](triplet-budget-allocation.md) |
 | Reading the original crop-selection design rationale, decisions, risks and evaluation plan | [Crop selection implementation plan](crop-selection-plan.md) |
 | Recovering crop-selection and learned-zoom documentation snapshots, the last crop-era ongoing work, run source archives and retired placement scripts | [Historical crop-selection sources](crop-selection-sources/README.md) |
 | Recovering the retired kNN token graph's module, model, config, optimizer, identity and diagnostic sources, forced-training config and plan | [Historical token-graph sources](token-graph-sources/README.md) |

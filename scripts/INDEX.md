@@ -42,7 +42,7 @@ Non-Python assets belong to the script that reads them and appear in its
 `inputs`, such as the bundle notebook template `pipeline/inference.ipynb`.
 Shared implementation modules and the config inspector remain described
 in the [architecture](../docs/architecture/code-organization.md#where-code-belongs). Proposed
-scripts belong in [ongoing work](../docs/ongoing.md) until implemented.
+scripts belong in [ongoing work](../docs/ongoing/INDEX.md) until implemented.
 
 ## Catalog format
 

@@ -154,6 +154,7 @@ class ProfileCLI(CLISettings):
     conditions: list[str] = Field(default_factory=list)
     notebook_suffix: str = "20260915"
     fold: int = Field(default=0, ge=0)
+    target_studies: int | None = Field(default=None, gt=0)
     split_dir: Path = Path("data/folds/all_5fold_v3")
     reference_predictions: Path = Path(
         "outputs/training/reflection-sigma40/fold_0/validation_predictions.csv"
@@ -162,6 +163,21 @@ class ProfileCLI(CLISettings):
     poll_seconds: int = Field(default=60, gt=0)
     accelerator: str = "NvidiaTeslaT4"
     notebook_timeout_seconds: int = Field(default=32400, gt=0, le=32400)
+
+
+def profile_studies(args: ProfileCLI) -> list[str]:
+    studies = fold_frame(args)[STUDY].to_list()
+    if args.target_studies is None:
+        return studies
+    if args.target_studies <= len(studies):
+        return studies[: args.target_studies]
+    extra = (
+        pl.read_csv(args.split_dir / "studies.csv")
+        .filter(pl.col("fold") != args.fold)
+        .sort(STUDY)[STUDY]
+        .to_list()
+    )
+    return studies + extra[: args.target_studies - len(studies)]
 
 
 def fold_frame(args: ProfileCLI) -> pl.DataFrame:
@@ -174,6 +190,8 @@ def fold_frame(args: ProfileCLI) -> pl.DataFrame:
 
 
 LOADING_CELL = """import random
+import resource
+import threading
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 
@@ -192,17 +210,39 @@ config = load_config(bundle / "config.json", data_root=data_root)
 manifest = json.loads((bundle / "manifest.json").read_text())
 read_header = dicom_module.read_header
 timings = defaultdict(float)
+processor_seconds = defaultdict(float)
 counts = defaultdict(int)
+thread_seconds = defaultdict(float)
+thread_counts = defaultdict(int)
+lock = threading.Lock()
 
 def timed(module, name):
+    original = getattr(module, name)
+    def wrapper(*arguments, **keywords):
+        started = time.perf_counter()
+        started_cpu = time.process_time()
+        try:
+            return original(*arguments, **keywords)
+        finally:
+            wall = time.perf_counter() - started
+            processor = time.process_time() - started_cpu
+            with lock:
+                timings[name] += wall
+                processor_seconds[name] += processor
+                counts[name] += 1
+    setattr(module, name, wrapper)
+
+def timed_on_threads(module, name):
     original = getattr(module, name)
     def wrapper(*arguments, **keywords):
         started = time.perf_counter()
         try:
             return original(*arguments, **keywords)
         finally:
-            timings[name] += time.perf_counter() - started
-            counts[name] += 1
+            elapsed = time.perf_counter() - started
+            with lock:
+                thread_seconds[name] += elapsed
+                thread_counts[name] += 1
     setattr(module, name, wrapper)
 
 for module, name in (
@@ -213,17 +253,30 @@ for module, name in (
     (dataset_module, "build_pool"),
     (dataset_module, "select_triplets"),
     (dataset_module, "prepare_series"),
-    (preparation_module, "read_frame"),
-    (dicom_module, "_read_pydicom_frame"),
+    (dataset_module, "decode_series"),
     (preparation_module, "resample_crop"),
     (preparation_module, "_linear_quantiles"),
     (preparation_module, "_normalize_pixels"),
 ):
     timed(module, name)
 
+for module, name in (
+    (preparation_module, "read_frame"),
+    (preparation_module, "read_payload"),
+    (preparation_module, "frame_from_payload"),
+    (dicom_module, "_read_pydicom_frame"),
+):
+    timed_on_threads(module, name)
+
 def run_pass():
     timings.clear()
+    processor_seconds.clear()
     counts.clear()
+    thread_seconds.clear()
+    thread_counts.clear()
+    usage = resource.getrusage(resource.RUSAGE_SELF)
+    pass_started = time.perf_counter()
+    pass_cpu = time.process_time()
     started = time.perf_counter()
     dataset, _, _ = engine_module.prediction_data(config, "test", 0, image_multiplier=manifest["runtime"]["image_multiplier"], study_ids=STUDIES)
     setup_seconds = time.perf_counter() - started
@@ -240,7 +293,20 @@ def run_pass():
             "images": int(batch["slice_mask"].sum()),
             "failures": len(item["failures"]),
         })
-    return {"setup_seconds": setup_seconds, "timings": dict(timings), "counts": dict(counts), "studies": studies}
+    finished = resource.getrusage(resource.RUSAGE_SELF)
+    return {
+        "setup_seconds": setup_seconds,
+        "pass_seconds": time.perf_counter() - pass_started,
+        "pass_cpu_seconds": time.process_time() - pass_cpu,
+        "minor_faults": finished.ru_minflt - usage.ru_minflt,
+        "major_faults": finished.ru_majflt - usage.ru_majflt,
+        "timings": dict(timings),
+        "cpu_seconds": dict(processor_seconds),
+        "counts": dict(counts),
+        "thread_seconds": dict(thread_seconds),
+        "thread_counts": dict(thread_counts),
+        "studies": studies,
+    }
 
 def read_one(operation, path):
     try:
@@ -442,8 +508,34 @@ def sample_cpu():
             stream.flush()
             stop.wait(1)
 
+def sample_processes():
+    ticks = os.sysconf("SC_CLK_TCK")
+    page = os.sysconf("SC_PAGE_SIZE")
+    with (profile_dir / "processes.csv").open("w") as stream:
+        stream.write("timestamp,pid,ppid,cpu_seconds,rss_mib,command\\n")
+        while not stop.is_set():
+            now = time.time()
+            for name in os.listdir("/proc"):
+                if not name.isdigit():
+                    continue
+                try:
+                    stat = Path("/proc", name, "stat").read_text().rsplit(") ", 1)[1].split()
+                    command = Path("/proc", name, "cmdline").read_bytes().decode("utf-8", "replace")
+                except (OSError, IndexError):
+                    continue
+                command = command.replace("\\x00", " ").strip()[:160].replace(",", " ")
+                if not command:
+                    continue
+                cpu = (int(stat[11]) + int(stat[12])) / ticks
+                rss = int(stat[21]) * page / 2**20
+                stream.write(f"{now},{name},{stat[1]},{cpu:.3f},{rss:.1f},{command}\\n")
+            stream.flush()
+            stop.wait(1)
+
 sampler = threading.Thread(target=sample_cpu, daemon=True)
 sampler.start()
+process_sampler = threading.Thread(target=sample_processes, daemon=True)
+process_sampler.start()
 gpu_log = (profile_dir / "gpu.csv").open("w")
 gpu_monitor = subprocess.Popen(["nvidia-smi", "--query-gpu=timestamp,index,utilization.gpu,memory.used", "--format=csv,noheader,nounits", "-lms", "1000"], stdout=gpu_log, stderr=subprocess.STDOUT) if shutil.which("nvidia-smi") else None
 command = [
@@ -546,6 +638,7 @@ if prefetcher is not None:
     prefetcher.join()
     record["prefetch"] = prefetch
 sampler.join()
+process_sampler.join()
 if gpu_monitor is not None:
     gpu_monitor.terminate()
     gpu_monitor.wait()
@@ -648,7 +741,7 @@ def launch(args: ProfileCLI) -> dict:
     status_path = output / "status.json"
     status = json.loads(status_path.read_text()) if status_path.exists() else {}
     status.setdefault("runs", {})
-    studies = fold_frame(args)[STUDY].to_list()
+    studies = profile_studies(args)
     api = KaggleApi()
     api.authenticate()
     status["dataset"] = ensure_dataset(api, bundle, args.dataset, args)
@@ -788,6 +881,52 @@ def cpu_usage(path: Path, start: float, end: float) -> dict:
     }
 
 
+def process_usage(path: Path, start: float, end: float) -> dict:
+    if not path.exists():
+        return {}
+    samples: dict[str, list] = {}
+    for line in path.read_text().splitlines()[1:]:
+        parts = line.split(",", 5)
+        if len(parts) != 6:
+            continue
+        stamp = float(parts[0])
+        if not start <= stamp <= end:
+            continue
+        samples.setdefault(parts[1], []).append(
+            (float(parts[3]), float(parts[4]), parts[2], parts[5])
+        )
+    predicting = {
+        pid for pid, rows in samples.items() if "predict_worker" in rows[0][3]
+    }
+    mains = {pid for pid in predicting if samples[pid][0][2] not in predicting}
+    roles: dict[str, dict] = {}
+    for pid, rows in samples.items():
+        command = rows[0][3]
+        if pid in mains:
+            role = "gpu_main"
+        elif pid in predicting:
+            role = "loader_worker"
+        elif "scripts.pipeline.predict" in command:
+            role = "coordinator"
+        else:
+            role = "other"
+        entry = roles.setdefault(
+            role, {"processes": 0, "cpu_seconds": 0.0, "peak_rss_mib": 0.0}
+        )
+        entry["processes"] += 1
+        entry["cpu_seconds"] += rows[-1][0] - rows[0][0]
+        entry["peak_rss_mib"] = max(entry["peak_rss_mib"], max(row[1] for row in rows))
+    total = sum(entry["cpu_seconds"] for entry in roles.values())
+    for entry in roles.values():
+        entry["cpu_share"] = entry["cpu_seconds"] / total if total else None
+    return {
+        "seconds": end - start,
+        "cpu_seconds": total,
+        "cores_in_use": total / (end - start),
+        "roles": roles,
+    }
+
+
 def gpu_usage(path: Path) -> dict:
     if not path.stat().st_size:
         return {"mean_utilization_while_loaded": None, "max_memory_mib": None}
@@ -812,27 +951,35 @@ def loading_summary(result: dict) -> dict:
     for name in ("cold", "warm"):
         value = result[name]
         timing = defaultdict(float, value["timings"])
+        processor = defaultdict(float, value["cpu_seconds"])
         count = defaultdict(int, value["counts"])
+        thread_timing = defaultdict(float, value["thread_seconds"])
+        thread_count = defaultdict(int, value["thread_counts"])
         studies = len(value["studies"])
         getitem = sum(item["getitem_seconds"] for item in value["studies"])
         sampling = (
             timing["estimate_reference"]
-            + timing["project_reference"]
             + timing["build_pool"]
             + timing["select_triplets"]
         )
+        sampling_cpu = (
+            processor["estimate_reference"]
+            + processor["build_pool"]
+            + processor["select_triplets"]
+        )
+        frames = thread_count["read_frame"] + thread_count["frame_from_payload"]
         stages = {
             "series_listing_index": timing["build_series_index"],
+            "setup_other": value["setup_seconds"] - timing["build_series_index"],
             "slice_headers": timing["parse_prefix"],
             "series_index_other": timing["index_series"] - timing["parse_prefix"],
             "geometry_and_sampling": sampling,
-            "frame_reads": timing["read_frame"],
+            "frame_reads": timing["decode_series"] - timing["resample_crop"],
             "resample_crop": timing["resample_crop"],
             "quantiles": timing["_linear_quantiles"],
             "normalize": timing["_normalize_pixels"],
             "prepare_other": timing["prepare_series"]
-            - timing["read_frame"]
-            - timing["resample_crop"]
+            - timing["decode_series"]
             - timing["_linear_quantiles"]
             - timing["_normalize_pixels"],
             "getitem_other": getitem
@@ -841,23 +988,50 @@ def loading_summary(result: dict) -> dict:
             - timing["prepare_series"],
             "collate": sum(item["collate_seconds"] for item in value["studies"]),
         }
+        stages_cpu = {
+            "series_listing_index": processor["build_series_index"],
+            "slice_headers": processor["parse_prefix"],
+            "series_index_other": processor["index_series"] - processor["parse_prefix"],
+            "geometry_and_sampling": sampling_cpu,
+            "frame_reads": processor["decode_series"] - processor["resample_crop"],
+            "resample_crop": processor["resample_crop"],
+            "quantiles": processor["_linear_quantiles"],
+            "normalize": processor["_normalize_pixels"],
+            "prepare_other": processor["prepare_series"]
+            - processor["decode_series"]
+            - processor["_linear_quantiles"]
+            - processor["_normalize_pixels"],
+        }
         total = value["setup_seconds"] + getitem + stages["collate"]
         passes[name] = {
             "studies": studies,
             "total_seconds": total,
             "seconds_per_study": total / studies,
+            "pass_seconds": value["pass_seconds"],
+            "pass_cpu_seconds": value["pass_cpu_seconds"],
+            "cpu_seconds_per_wall_second": value["pass_cpu_seconds"]
+            / value["pass_seconds"],
+            "minor_faults": value["minor_faults"],
+            "major_faults": value["major_faults"],
             "images": sum(item["images"] for item in value["studies"]),
             "slice_headers": count["parse_prefix"],
-            "frames": count["read_frame"],
-            "pydicom_frames": count["_read_pydicom_frame"],
+            "frames": frames,
+            "pydicom_frames": thread_count["_read_pydicom_frame"],
             "milliseconds_per_header": 1000
             * timing["parse_prefix"]
             / max(count["parse_prefix"], 1),
-            "milliseconds_per_frame": 1000
-            * timing["read_frame"]
-            / max(count["read_frame"], 1),
+            "thread_milliseconds_per_frame": 1000
+            * (
+                thread_timing["read_frame"]
+                + thread_timing["read_payload"]
+                + thread_timing["frame_from_payload"]
+            )
+            / max(frames, 1),
             "stages_seconds": stages,
             "stages_fraction": {key: item / total for key, item in stages.items()},
+            "stages_cpu_seconds": stages_cpu,
+            "thread_seconds": dict(thread_timing),
+            "thread_counts": dict(thread_count),
         }
     return {
         "passes": passes,
@@ -871,6 +1045,10 @@ def loading_summary(result: dict) -> dict:
 
 
 def analyze(args: ProfileCLI) -> dict:
+    if args.target_studies is not None:
+        raise ValueError(
+            "target_studies profiles timing over studies outside the fold; scoring needs the fold alone"
+        )
     output = args.output_dir.expanduser().resolve()
     truth_frame = fold_frame(args)
     targets = [
@@ -1007,6 +1185,9 @@ def analyze(args: ProfileCLI) -> dict:
             "worker_wall_seconds": runtime["worker_wall_seconds"],
             "studies_per_second": runtime["studies_per_second"],
             "cpu_during_prediction": cpu_usage(profile_dir / "cpu.csv", spawn, end),
+            "processes_during_prediction": process_usage(
+                profile_dir / "processes.csv", spawn, end
+            ),
             "gpu": gpu_usage(profile_dir / "gpu.csv"),
             "workers": workers,
         }

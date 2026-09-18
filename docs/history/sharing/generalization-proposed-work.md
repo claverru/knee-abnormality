@@ -44,7 +44,7 @@ no training, GPU diagnostics or submissions are scheduled by this record.
 ## Efficiency
 
 Deferred by user decision after this investigation, then resumed on 2026-09-15 as
-[loading speedup](../../backlog/loading-speedup.md).
+[loading speedup](../../backlog/loading-speedup/INDEX.md).
 
 Create one Kaggle profiling notebook with a fixed checkpoint and a representative
 set of training studies available on Kaggle, including expensive study/codec

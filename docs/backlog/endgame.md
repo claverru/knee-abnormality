@@ -3,7 +3,7 @@
 Final-phase work, deliberately deferred by the [fold-0 iteration
 strategy](../validation/validation-strategy.md); bigger images joined on 2026-09-16 and weight
 averaging on 2026-09-17. These entries wait for the final phase; when one starts, move it to
-[ongoing work](../ongoing.md) and remove it from this file in the same change. Fold-0 results that
+[ongoing work](../ongoing/INDEX.md) and remove it from this file in the same change. Fold-0 results that
 bear on them are recorded here as evidence. Each entry says whether its motivation is measured or a
 hypothesis.
 

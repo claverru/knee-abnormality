@@ -15,6 +15,7 @@ from pydantic_settings import SettingsError
 from knee_abnormality.cli import CLISettings
 from knee_abnormality.config import load_config
 from knee_abnormality.data.labels import STUDY
+from knee_abnormality.data.preprocessing.exclusions import KNOWN_BAD_INSTANCES
 from knee_abnormality.data.preprocessing.geometry import (
     NativePose,
     PoseLayout,
@@ -31,7 +32,7 @@ from knee_abnormality.data.preprocessing.series import (
     SeriesSummary,
     SliceRecord,
 )
-from knee_abnormality.data.sources import KNOWN_BAD_INSTANCES, SERIES
+from knee_abnormality.data.sources import SERIES
 from knee_abnormality.identity import preprocessing_identity
 from knee_abnormality.provenance import copy_sources, sha256_file
 

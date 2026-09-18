@@ -226,4 +226,4 @@ scores. Paired report-group bootstrap, 2,000 draws.
 - EMA minus the seed-42 control stays +0.00016 (+0.00016 before).
 - These checkpoints were trained with the old seeded order and with every series present, so the
   deltas measure a change of evaluation inputs, not the value of training on the new identity;
-  the seed-42 run on the new identity is pending ([ongoing work](../../ongoing.md)).
+  the seed-42 run on the new identity is pending ([ongoing work](../../ongoing/INDEX.md)).

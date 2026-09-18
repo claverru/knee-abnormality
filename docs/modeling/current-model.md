@@ -11,7 +11,7 @@ run, defined by [`configs/training.yaml`](../../configs/training.yaml).
 There is no additive 3D embedding and no token graph. The best submitted model is still the
 reflection/sigma-40 champion, which is this recipe plus the
 [3D embedding](../history/model-lineage.md#five-embedding-predecessor); submission status lives
-in [ongoing work](../ongoing.md) and the [inference overview](../inference/inference-overview.md).
+in [ongoing work](../ongoing/INDEX.md) and the [inference overview](../inference/inference-overview.md).
 The [model lineage](../history/model-lineage.md) records how the recipe came about and the
 retired variants. [Model shapes](model-shapes.md) traces the tensors, and
 [swapping a backbone](backbone-swaps.md#current-budget) gives the parameter and compute budget.

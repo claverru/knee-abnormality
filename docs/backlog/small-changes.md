@@ -33,6 +33,11 @@ so a study is never made worse, and it costs 5.5% compute
 ([recipe](../modeling/current-model.md)). `data.repeated_series_share` remains in the code from its
 rejected run.
 
+Left unresolved by the [closed investigation](../history/triplet-budget-allocation.md): whether
+splitting a slot's own budget more evenly between *its own* series helps. That is the part of the
+repeated-series evidence that does not starve other types, so the rejection above does not cover
+it. Untested, no design yet.
+
 ## Attention pooling
 
 Acquisition-count-normalised attention was implemented, trained and

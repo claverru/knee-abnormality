@@ -4,7 +4,7 @@ Working knowledge for the [RSNA Knee Abnormality Detection competition](https://
 
 | Read when | Document |
 |---|---|
-| Checking active work or tasks planned for the short term: the seed-42 run on filtered series with the deterministic ranking, per-type budgets and inference optimization | [Ongoing work](ongoing.md) |
+| Checking active work or tasks planned for the short term: the seed-42 run on filtered series with the deterministic ranking, per-type budgets and inference optimization | [Ongoing work](ongoing/INDEX.md) |
 | Recording, classifying or picking ideas not yet started: the next overnight hyperparameter queue, small code changes (contrast relabel, superseded retakes, per-type budgets, attention pooling, supervision and augmentation tweaks, per-plane spacing), big bets (position and knee side, medial/lateral transfer, study centers) and end-of-competition work (ensembling, bigger images, TTA, weight averaging, distillation) | [Backlog](backlog/INDEX.md) |
 | Deciding how far to trust unverified working notes and how to iterate from the baseline | [How to use these notes](#how-to-use-these-notes) |
 | Deciding where code belongs, setting up Python and matching dependencies or Lightning to Kaggle's GPU image, or following the geometry contract, data flow, config and experiment-artifact rules | [Architecture](architecture/INDEX.md) |

@@ -165,6 +165,30 @@ def describe_block(paths: list[Path]) -> list:
     return items
 
 
+def matched_blocks(cells: int, frames_per_cell: int, studies) -> list[list]:
+    buckets: list[dict[int, list]] = [{} for _ in range(cells)]
+    while min(sum(len(v) for v in bucket.values()) for bucket in buckets) < frames_per_cell:
+        items = describe_block(sorted(series_paths(next(studies))))
+        for item in items:
+            length = item[1].length
+            target = min(
+                range(cells),
+                key=lambda index: (len(buckets[index].get(length, ())), index),
+            )
+            buckets[target].setdefault(length, []).append(item)
+    lengths = set.intersection(*(set(bucket) for bucket in buckets))
+    shared = {
+        length: min(len(bucket[length]) for bucket in buckets) for length in lengths
+    }
+    blocks = []
+    for bucket in buckets:
+        block = []
+        for length in sorted(shared):
+            block.extend(bucket[length][: shared[length]])
+        blocks.append(block)
+    return blocks
+
+
 def audit(items: list) -> dict:
     serial = [read_frame(item) for item in items]
     with ThreadPoolExecutor(16) as pool:
@@ -183,16 +207,22 @@ def audit(items: list) -> dict:
 
 
 def main() -> None:
-    blocks = file_blocks(len(CELLS) + 1, FILES_PER_CELL)
-    result = {"audit": audit(describe_block(blocks[0][:AUDIT_FILES]))}
-    result["cells"] = (
-        []
-        if AUDIT_ONLY
-        else [
-            run_cell(threads, describe_block(block[:FILES_PER_CELL]))
-            for threads, block in zip(CELLS, blocks[1:])
+    studies = iter(series_directories())
+    audit_paths: list[Path] = []
+    while len(audit_paths) < AUDIT_FILES:
+        audit_paths.extend(sorted(series_paths(next(studies))))
+    result = {"audit": audit(describe_block(audit_paths[:AUDIT_FILES]))}
+    if AUDIT_ONLY:
+        result["cells"] = []
+    else:
+        blocks = matched_blocks(len(CELLS), FILES_PER_CELL, studies)
+        result["matched"] = {
+            "frames": [len(block) for block in blocks],
+            "bytes": [sum(d.length for _, d in block) for block in blocks],
+        }
+        result["cells"] = [
+            run_cell(threads, block) for threads, block in zip(CELLS, blocks)
         ]
-    )
     report("frames", result)
 
 

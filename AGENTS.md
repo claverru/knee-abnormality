@@ -18,11 +18,11 @@ Workspace for the [RSNA Knee Abnormality Detection competition on Kaggle](https:
 
 ## Work tracking
 
-- Keep a snapshot of the current state and active work in [docs/ongoing.md](docs/ongoing.md). Update it in the same change when something starts or finishes.
+- Keep a snapshot of the current state and active work in [docs/ongoing/](docs/ongoing/INDEX.md). Update it in the same change when something starts or finishes.
 - Classify every new idea into exactly one [backlog](docs/backlog/INDEX.md) document:
   - `docs/backlog/overnight.md`: hyperparameter-only runs on the current recipe, one change per run against a fresh control.
   - `docs/backlog/small-changes.md`: small code additions behind one new option. The user supervises them: implement one only when the user asks, then move its run to `overnight.md`.
-  - `docs/backlog/big-bets.md`: investigation-sized plans. Start one only in a session with the user, and move it to `docs/ongoing.md` when it starts.
+  - `docs/backlog/big-bets.md`: investigation-sized plans. Start one only in a session with the user, and move it to `docs/ongoing/` when it starts.
   - `docs/backlog/endgame.md`: final-phase work; it waits for the final phase.
 - The user launches training, detached from agent sessions.
 - Before deleting a finished entry, preserve its durable findings in the relevant topic documentation.

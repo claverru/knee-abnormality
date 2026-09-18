@@ -202,6 +202,6 @@ implemented. Existing frozen folds and source files are preserved. The
 earlier baselines, including the historical gold-only baseline1, are in the
 [model lineage](../history/model-lineage.md) and the
 [baseline1 review](../history/baseline1-review.md). Track the next runs in
-[ongoing work](../ongoing.md); remaining folds are deferred to the
+[ongoing work](../ongoing/INDEX.md); remaining folds are deferred to the
 [final phase](../backlog/endgame.md#ensembling). Use bounded real-data
 executions and inspect their artifacts.

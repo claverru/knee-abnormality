@@ -29,3 +29,5 @@ __pycache__/
 *.pth
 *.ckpt
 *.safetensors
+/notes.md
+/z_labels/

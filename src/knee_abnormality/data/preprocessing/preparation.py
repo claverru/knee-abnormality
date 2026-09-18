@@ -6,7 +6,13 @@ from pathlib import Path
 import numpy as np
 import torch
 
-from knee_abnormality.data.preprocessing.dicom import PREPARATION_ERRORS, read_frame
+from knee_abnormality.data.preprocessing.dicom import (
+    PREPARATION_ERRORS,
+    frame_from_payload,
+    io_pool,
+    read_frame,
+    read_payload,
+)
 from knee_abnormality.data.preprocessing.geometry import RELIABILITY
 from knee_abnormality.data.preprocessing.intensity import (
     _linear_quantiles,
@@ -47,13 +53,19 @@ SeriesDecoder = Callable[
 
 
 def decode_slice(
-    record: SliceRecord, spacing_mm: float, image_size: int
+    record: SliceRecord,
+    spacing_mm: float,
+    image_size: int,
+    payload: bytes | None = None,
 ) -> DecodedSlice:
     path = record.path
     try:
-        value = resample_crop(
-            read_frame(path, record.descriptor), spacing_mm, image_size
+        frame = (
+            frame_from_payload(payload, record.descriptor)
+            if payload is not None and record.descriptor is not None
+            else read_frame(path, record.descriptor)
         )
+        value = resample_crop(frame, spacing_mm, image_size)
     except PREPARATION_ERRORS as error:
         return f"{path}: {type(error).__name__}: {error}"
     top, left, rows, columns = value.rect
@@ -63,10 +75,29 @@ def decode_slice(
     return value
 
 
+def _prefetch_payload(record: SliceRecord) -> bytes | None:
+    if record.descriptor is None:
+        return None
+    try:
+        return read_payload(record.path, record.descriptor)
+    except PREPARATION_ERRORS:
+        return None
+
+
 def decode_series(
-    records: tuple[SliceRecord, ...], spacing_mm: float, image_size: int
+    records: tuple[SliceRecord, ...],
+    spacing_mm: float,
+    image_size: int,
+    threads: int = 1,
 ) -> tuple[DecodedSlice, ...]:
-    return tuple(decode_slice(record, spacing_mm, image_size) for record in records)
+    if threads > 1 and len(records) > 1:
+        payloads = tuple(io_pool(threads).map(_prefetch_payload, records))
+    else:
+        payloads = (None,) * len(records)
+    return tuple(
+        decode_slice(record, spacing_mm, image_size, payload)
+        for record, payload in zip(records, payloads, strict=True)
+    )
 
 
 def prepare_series(
@@ -144,7 +175,7 @@ def prepare_series(
     gather = np.asarray([lookup[r.path] for r in successful_records])
     values = [cache[r.path] for r in retained]
     rectangles = [v.rect for v in values]
-    pixels = np.stack([v.image for v in values]).astype(np.float32)
+    pixels = np.stack([v.image for v in values]).astype(np.float32, copy=False)
     rects = np.asarray(rectangles, dtype=np.int32)
     scratch = np.concatenate(
         [

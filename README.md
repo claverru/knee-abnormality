@@ -50,7 +50,7 @@ validates its output, and submits only that successful saved version. A bare
   boundaries, configuration, reusable caches, and fast experiment iteration.
 - [Documentation index](docs/INDEX.md): evidence, procedures, and decisions.
 - [Script index](scripts/INDEX.md): find existing commands and place new scripts.
-- [Ongoing work](docs/ongoing.md): the next implementation steps.
+- [Ongoing work](docs/ongoing/INDEX.md): the next implementation steps.
 - [Backlog](docs/backlog/INDEX.md): ideas not yet started, by experiment type.
 - [Environment](docs/architecture/environment.md): dependency pins and setup details.
 

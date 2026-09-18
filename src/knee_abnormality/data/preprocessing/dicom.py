@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import math
 import os
+import struct
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -70,7 +72,13 @@ def _physical_position(dataset: pydicom.Dataset) -> tuple[float | None, str]:
     ):
         row = np.asarray(orientation[:3], dtype=np.float64)
         column = np.asarray(orientation[3:], dtype=np.float64)
-        normal = np.cross(row, column)
+        normal = np.array(
+            [
+                row[1] * column[2] - row[2] * column[1],
+                row[2] * column[0] - row[0] * column[2],
+                row[0] * column[1] - row[1] * column[0],
+            ]
+        )
         position = float(np.dot(np.asarray(location, dtype=np.float64), normal))
         if math.isfinite(position) and np.linalg.norm(normal) > 0:
             return position, "patient"
@@ -221,6 +229,62 @@ def _native_descriptor(dataset, pixel_element, info) -> NativePixelDescriptor | 
 
 EXPLICIT_LE = "1.2.840.10008.1.2.1"
 LONG_VR = {b"OB", b"OW", b"OF", b"OD", b"OL", b"OV", b"SQ", b"UT", b"UN", b"OK"}
+SHORT_VR = frozenset(
+    {
+        b"AE",
+        b"AS",
+        b"AT",
+        b"CS",
+        b"DA",
+        b"DS",
+        b"DT",
+        b"FD",
+        b"FL",
+        b"IS",
+        b"LO",
+        b"LT",
+        b"PN",
+        b"SH",
+        b"SL",
+        b"SS",
+        b"ST",
+        b"TM",
+        b"UI",
+        b"UL",
+        b"US",
+    }
+)
+ELEMENT = struct.Struct("<HH2sH")
+LONG_LENGTH = struct.Struct("<I")
+TAGS_CACHE_LIMIT = 4096
+_TAGS_CACHE: dict[tuple, SeriesTags] = {}
+_POOL: ThreadPoolExecutor | None = None
+_POOL_IDENTITY: tuple[int, int] | None = None
+
+
+def io_pool(threads: int) -> ThreadPoolExecutor:
+    global _POOL, _POOL_IDENTITY
+    identity = (os.getpid(), threads)
+    if _POOL is None or _POOL_IDENTITY != identity:
+        _POOL = ThreadPoolExecutor(threads, thread_name_prefix="knee-io")
+        _POOL_IDENTITY = identity
+    return _POOL
+
+
+TAG_FIELDS = (
+    0x00200011,
+    0x00080008,
+    0x0008103E,
+    0x00180080,
+    0x00180081,
+    0x00180091,
+    0x00181314,
+    0x00180023,
+    0x00180021,
+    0x00180022,
+    0x00181310,
+    0x00181250,
+)
 WANTED = {
     0x00080008,
     0x0008103E,
@@ -270,17 +334,18 @@ def _floats(raw: bytes) -> tuple:
 def _scan(buffer: memoryview, start: int, limit: int, values: dict) -> int | None:
     offset = start
     while offset + 8 <= limit:
-        group = int.from_bytes(buffer[offset : offset + 2], "little")
-        element = int.from_bytes(buffer[offset + 2 : offset + 4], "little")
+        group, element, vr, short_length = ELEMENT.unpack_from(buffer, offset)
         tag = (group << 16) | element
-        vr = bytes(buffer[offset + 4 : offset + 6])
-        if vr in LONG_VR:
+        if vr in SHORT_VR:
+            length = short_length
+            body = offset + 8
+        elif vr in LONG_VR:
             if offset + 12 > limit:
                 return None
-            length = int.from_bytes(buffer[offset + 8 : offset + 12], "little")
+            length = LONG_LENGTH.unpack_from(buffer, offset + 8)[0]
             body = offset + 12
         elif vr.isalpha() and vr.isupper():
-            length = int.from_bytes(buffer[offset + 6 : offset + 8], "little")
+            length = short_length
             body = offset + 8
         else:
             raise Unsupported("implicit VR")
@@ -373,7 +438,13 @@ def parse_header(buffer: bytes, size: int, modified_ns: int) -> DicomHeader:
     if len(orientation) == 6 and len(location) == 3:
         row = np.asarray(orientation[:3], dtype=np.float64)
         column = np.asarray(orientation[3:], dtype=np.float64)
-        normal = np.cross(row, column)
+        normal = np.array(
+            [
+                row[1] * column[2] - row[2] * column[1],
+                row[2] * column[0] - row[0] * column[2],
+                row[0] * column[1] - row[1] * column[0],
+            ]
+        )
         candidate = float(np.dot(np.asarray(location, dtype=np.float64), normal))
         if math.isfinite(candidate) and np.linalg.norm(normal) > 0:
             physical, source = candidate, "patient"
@@ -449,27 +520,32 @@ def parse_header(buffer: bytes, size: int, modified_ns: int) -> DicomHeader:
                 0.0 if intercept is None else intercept,
             )
 
-    matrix = numbers(0x00181310)
-    if values.get(0x00181310) and values[0x00181310][0] == b"US":
-        payload = values[0x00181310][1]
-        matrix = tuple(
-            float(int.from_bytes(payload[index : index + 2], "little"))
-            for index in range(0, len(payload) - 1, 2)
+    signature = tuple(values.get(tag) for tag in TAG_FIELDS)
+    tags = _TAGS_CACHE.get(signature)
+    if tags is None:
+        matrix = numbers(0x00181310)
+        if values.get(0x00181310) and values[0x00181310][0] == b"US":
+            payload = values[0x00181310][1]
+            matrix = tuple(
+                float(int.from_bytes(payload[index : index + 2], "little"))
+                for index in range(0, len(payload) - 1, 2)
+            )
+        tags = SeriesTags(
+            one(0x00200011),
+            tuple(value.upper() for value in strings(0x00080008)),
+            text(0x0008103E),
+            one(0x00180080),
+            one(0x00180081),
+            one(0x00180091),
+            one(0x00181314),
+            text(0x00180023),
+            strings(0x00180021),
+            strings(0x00180022),
+            matrix,
+            text(0x00181250),
         )
-    tags = SeriesTags(
-        one(0x00200011),
-        tuple(value.upper() for value in strings(0x00080008)),
-        text(0x0008103E),
-        one(0x00180080),
-        one(0x00180081),
-        one(0x00180091),
-        one(0x00181314),
-        text(0x00180023),
-        strings(0x00180021),
-        strings(0x00180022),
-        matrix,
-        text(0x00181250),
-    )
+        if len(_TAGS_CACHE) < TAGS_CACHE_LIMIT:
+            _TAGS_CACHE[signature] = tags
     return DicomHeader(
         physical,
         instance,
@@ -512,8 +588,11 @@ def parse_prefix(
 
 
 def read_prefix(path: Path) -> tuple[bytes, os.stat_result]:
-    with path.open("rb") as stream:
-        return stream.read(PREFIX_BYTES), os.fstat(stream.fileno())
+    descriptor = os.open(path, os.O_RDONLY)
+    try:
+        return os.pread(descriptor, PREFIX_BYTES, 0), os.fstat(descriptor)
+    finally:
+        os.close(descriptor)
 
 
 def pydicom_read_header(path: Path) -> DicomHeader:
@@ -545,36 +624,52 @@ def pydicom_read_header(path: Path) -> DicomHeader:
     )
 
 
+def read_payload(path: Path, descriptor: NativePixelDescriptor) -> bytes | None:
+    stream = os.open(path, os.O_RDONLY)
+    try:
+        info = os.fstat(stream)
+        if (
+            (info.st_size, info.st_mtime_ns)
+            != (descriptor.file_size, descriptor.modified_ns)
+            or descriptor.offset < 0
+            or descriptor.length != descriptor.rows * descriptor.columns * 2
+            or descriptor.offset + descriptor.length != info.st_size
+        ):
+            return None
+        payload = os.pread(stream, descriptor.length, descriptor.offset)
+    finally:
+        os.close(stream)
+    return payload if len(payload) == descriptor.length else None
+
+
+def frame_from_payload(
+    payload: bytes, descriptor: NativePixelDescriptor
+) -> DecodedFrame:
+    pixels = np.frombuffer(payload, dtype="<i2" if descriptor.signed else "<u2")
+    shift = 16 - descriptor.bits_stored
+    if shift:
+        if descriptor.signed:
+            pixels = np.left_shift(pixels, shift)
+            np.right_shift(pixels, shift, out=pixels)
+        else:
+            pixels = np.bitwise_and(
+                pixels, np.uint16((1 << descriptor.bits_stored) - 1)
+            )
+    pixels = pixels.reshape(descriptor.rows, descriptor.columns).astype(np.float32)
+    return DecodedFrame(
+        pixels,
+        descriptor.row_spacing,
+        descriptor.column_spacing,
+        descriptor.slope,
+        descriptor.intercept,
+    )
+
+
 def read_frame(path: Path, descriptor: NativePixelDescriptor | None) -> DecodedFrame:
     if descriptor is not None:
-        payload = None
-        with path.open("rb") as stream:
-            info = os.fstat(stream.fileno())
-            if (
-                (info.st_size, info.st_mtime_ns)
-                == (descriptor.file_size, descriptor.modified_ns)
-                and descriptor.offset >= 0
-                and descriptor.length == descriptor.rows * descriptor.columns * 2
-                and descriptor.offset + descriptor.length == info.st_size
-            ):
-                stream.seek(descriptor.offset)
-                payload = stream.read(descriptor.length)
-        if payload is not None and len(payload) == descriptor.length:
-            pixels = np.frombuffer(payload, dtype="<i2" if descriptor.signed else "<u2")
-            shift = 16 - descriptor.bits_stored
-            if shift:
-                pixels = np.left_shift(pixels, shift)
-                np.right_shift(pixels, shift, out=pixels)
-            pixels = pixels.reshape(descriptor.rows, descriptor.columns).astype(
-                np.float32
-            )
-            return DecodedFrame(
-                pixels,
-                descriptor.row_spacing,
-                descriptor.column_spacing,
-                descriptor.slope,
-                descriptor.intercept,
-            )
+        payload = read_payload(path, descriptor)
+        if payload is not None:
+            return frame_from_payload(payload, descriptor)
     return _read_pydicom_frame(path)
 
 

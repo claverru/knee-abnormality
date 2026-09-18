@@ -29,7 +29,7 @@ contact sheets in `sheets/`).
   every series, one header (the middle file) with 43 tags, and the current evaluation and training
   selections (`select_triplets`, seed 42) for triplet shares. All 24,386 series have valid native
   geometry (`geometry.reason` is null everywhere).
-- **Study centre:** the 20 mm robust fit of the [robust study center](../backlog/big-bets.md#robust-study-center)
+- **Study centre:** the 20 mm robust fit of the [robust study center](../backlog/big-bets.md#robust-study-center-removed)
   analysis, reimplemented (identical drops). Per series: in-plane residual, whether the centre
   projects outside the acquired slab (`outside_range_mm`) or the field of view (`fov_outside_mm`),
   and the slab-centre offset from the study centre.

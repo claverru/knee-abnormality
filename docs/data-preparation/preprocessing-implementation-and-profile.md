@@ -42,7 +42,7 @@ and the final NumPy production audit and raw paired timings are under
 [`outputs/profiling/preprocessing-production-numpy-20260912T001501Z`](../../outputs/profiling/preprocessing-production-numpy-20260912T001501Z).
 The [production integration](production-dicom-integration.md) records the DICOM
 reader and preprocessing package changes. Later percentile and GPU work is planned in the
-[loading speedup](../backlog/loading-speedup.md#loading-code-changes-identity-changes-ship-with-a-retrain).
+[loading speedup](../backlog/loading-speedup/candidates.md).
 
 ## Earlier profile
 
