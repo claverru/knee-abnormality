@@ -25,11 +25,46 @@ live in the linked documents; follow the [work-tracking rules](../AGENTS.md#work
 - **Validation at ×1** since 2026-09-17 (user decision): fold-0 scores from then on sit about
   0.0035 below the earlier ×2 numbers and are comparable only with a ×1 control. Submissions are
   unaffected; the bundle's test multiplier is separate.
+- **Adopted 2026-09-18:** `data.study_triplet_total: 26`, a floor on a study's training triplets
+  that scales the types it has in proportion to their budgets. Fold 0 put it at +0.0033 over the
+  control mean, inside the control spread, so the case is structural: it only ever adds triplets,
+  for 5.5% more compute, and the studies missing two types stop being under-sampled. Fresh runs
+  only; it changes the preprocessing identity.
 - **Dropped:** learned crop selection ([record](history/crop-selection-investigation.md)).
 - **Strategy:** iterate on fold 0; folds, ensembling, bigger images, TTA and weight averaging wait
   for the [final phase](backlog/endgame.md)
   ([validation strategy](validation/validation-strategy.md)). Test-time risks are listed in
   [risks](backlog/risks.md).
+
+## Peripheral coverage of the Gaussian sampler (measured 2026-09-18)
+
+Triplets are placed along each plane's axis by a truncated Gaussian, `data.sampling_sigma_mm: 40`,
+so coverage falls with distance from the study centre. Several labels keep most of their evidence
+out there. Measured read-only from the fold-0 token cache and the depth profiles; scripts and
+tables in `outputs/analysis/peripheral-coverage-20260918/`.
+
+- **The sampler thins with depth.** Selected share ÷ candidate share beyond 40 mm is 0.45–0.59 for
+  every type, and beyond 50 mm it falls to 0.36 for coronal fluid and 0.14–0.16 for the sagittal
+  types. Selection probability drops from about 0.40 at the centre to 0.19 at 40 mm and beyond.
+- **14–31% of a series' slices are never sampled** at the default counts, worst for axial T1/PD
+  (mean 31%, p90 63%).
+- **Share of a label's depth-weighted evidence sitting beyond ±20 mm:** Baker's cyst in coronal
+  fluid 80%, lateral meniscus in sagittal fluid 74%, synovitis in axial fluid 67%, effusion in
+  axial fluid 65%, medial meniscus in sagittal fluid 59%, MCL in axial fluid 56%. Synovitis peaks
+  at 40–50 mm superior, where the selection probability is half the central value; effusion at
+  30–40 mm, at 0.28. The medial meniscus in coronal fluid sits close enough that sigma 40 covers
+  it.
+- **Not a fix that follows for free:** lifting axial fluid's density at 40–50 mm to the central
+  level implies a sigma of roughly 65–80 for that type, while global sigma 60, 80 and 120 were all
+  measured worse and 30 tied
+  ([overnight 2026-09-15](validation/results/2026-09-15-overnight-results.md)). Per-type sigma and
+  per-type centre offsets have never been tried, and both can be scored on the caches without the
+  GPU.
+- **Limits:** the separation metric behind the evidence shares is small-sample and noisy in tail
+  bins, fracture is too sparse to read at all, and geometry cannot recover in-plane tissue
+  clipping — the reference point is defined near each series' image centre, so the pixel-based
+  figures in [input resolution](research/input-resolution.md) remain the only source for the 140 mm
+  crop (sagittal tissue exceeds it in 34% of series, almost all posterior).
 
 ## Triplet budget allocation (closed 2026-09-18)
 
@@ -60,6 +95,12 @@ Still open from it: where the evaluation count turns over above ×4 and what it 
 and whether splitting a slot's own budget more evenly between its series helps, which is the part
 of the repeated-series evidence that does not starve other types.
 
+## Inference loading speedup
+
+Investigation started 2026-09-17 with the user. The candidate changes, every measurement, the
+closed regressions, the retrain constraint and the prior art now live in one document:
+[loading speedup](backlog/loading-speedup.md).
+
 ## Next
 
 Experiments run one by one against a control at the same validation multiplier, as one unseeded
@@ -72,10 +113,13 @@ Also pending:
   so where the count stops paying is unresolved, and its inference-time cost counts toward the
   efficiency prize
   ([submissions](inference/submissions/2026-09-18-temperature-and-count-submissions.md)).
-- **Robust study centre:** measured at three thresholds on 2026-09-18; 20 mm scored best at
-  +0.0037 over the control mean, inside the control spread, so it is unresolved rather than
-  adopted ([results](validation/results/2026-09-18-overnight-results.md)).
-- Data-loading speedups, shipped with the next retrain; state and open items in
-  [inference loading speedup](#inference-loading-speedup).
+- **Robust study centre: removed 2026-09-18.** Four runs at 10, 20 and 30 mm landed inside the
+  control spread, the 21 studies it changes showed neither harm nor benefit, the combined run
+  scored 0.938 publicly against 0.939 for the checkpoint it replaced, and it works against
+  peripheral coverage, since a rejected study currently samples uniformly across each slab rather
+  than from the Gaussian. The option is gone from the code
+  ([results](validation/results/2026-09-18-overnight-results.md)).
+- Data-loading speedups, shipped with the next retrain
+  ([loading speedup](backlog/loading-speedup.md)).
 - Submit the main-thread warm-up with the next submission; torch-free coordinator
-  ([runtime changes](inference/loading-speedup-plan.md#runtime-changes-outside-the-preprocessing-identity)).
+  ([runtime changes](backlog/loading-speedup.md#runtime-changes-outside-the-preprocessing-identity)).

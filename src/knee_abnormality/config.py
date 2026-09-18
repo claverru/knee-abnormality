@@ -113,7 +113,6 @@ class DataConfig(ConfigModel):
     series_types: Annotated[tuple[SeriesTypeConfig, ...], Field(min_length=1)]
     sampling_sigma_mm: PositiveFiniteFloat = 80.0
     validation_image_multiplier: Annotated[StrictInt, Field(gt=0)] = 1
-    robust_center_outlier_mm: PositiveFiniteFloat | None
     study_triplet_total: Annotated[StrictInt, Field(gt=0)] | None = None
     repeated_series_share: Annotated[float, Field(gt=0)] | None = None
     intensity_augmentation: IntensityAugmentationConfig = Field(

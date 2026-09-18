@@ -121,7 +121,7 @@ Hidden distribution shift cannot be proved from aggregate public scores and
 three visible test studies. These checks can establish a failure mechanism and
 its robustness locally; proving the hidden frequencies requires evidence we do
 not have. Current inference code remains unchanged. Kaggle GPU profiling was
-explicitly deferred; it resumed as [loading speedup plan](../../inference/loading-speedup-plan.md).
+explicitly deferred; it resumed as [loading speedup](../../backlog/loading-speedup.md).
 
 Artifacts: `outputs/analysis/sharing-case-mix-20260914/analysis.json`, archived
 command and helper source. The command and its CPU-only reproduction recipe are

@@ -93,9 +93,7 @@ class KneeStudyDataset(Dataset):
             if uid not in excluded and len(value.records) >= SLICES_PER_INPUT
         )
         self._excluded_series[study.uid] = excluded
-        self._study_references[study.uid] = estimate_reference(
-            eligible, self.data.robust_center_outlier_mm
-        )
+        self._study_references[study.uid] = estimate_reference(eligible)
 
     def _decode_series(self, records, spacing_mm, image_size):
         return decode_series(records, spacing_mm, image_size)

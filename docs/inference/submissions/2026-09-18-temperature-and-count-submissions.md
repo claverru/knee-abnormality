@@ -11,6 +11,7 @@ one recipe change submitted the same day, `series-share`, lost.
 | 06:19 | the same bundle as 06:11 (duplicate, see below) | 0.938 | 56322720 |
 | 06:11 | `ranked-filtered-seed42`, τ 0.75, ×3 images, batch 2 | 0.938 | 56322551 |
 | 06:22 | `07-series-share-1.0`, default inference (τ 1.0, ×2) | 0.929 | – |
+| 08:04 | `robust-center-20-topup-26` (fold-0 ×1 0.888021), τ 0.75, ×4, with the whitelisted `move_batch` and CUDA-event timing | 0.938 | 56325019 |
 | 2026-09-17 11:40 | `ranked-filtered-seed42`, τ 1.0, ×2 (the baseline for the rows above) | 0.933 | – |
 
 ## What the rows mean
@@ -40,6 +41,12 @@ one recipe change submitted the same day, `series-share`, lost.
   [efficiency prize](../submission-requirements-and-output-contract.md).
 - **The two changes are not separated.** Fold 0 attributes roughly +0.0023 to each, but no
   submission isolated them.
+- **The recipe change is publicly neutral.** `robust-center-20-topup-26` scored 0.938 at the same
+  τ and count as the 0.939 above, despite beating its own control by 0.003 on fold 0 — the third
+  time a sub-0.005 fold-0 difference has failed to carry. Its run also carried the uncommitted
+  inference changes (a whitelisted `move_batch` and CUDA-event timing), which cannot affect
+  accuracy; the visible-test worker time was 26.1 s against 29.9 s for the same settings before,
+  but three studies are dominated by startup, so that is not a speed measurement.
 - **`series-share` disagrees with fold 0.** It topped the overnight table (+0.0044 over the
   control mean) and then lost 0.004 publicly
   ([overnight results](../../validation/results/2026-09-18-overnight-results.md)). Between one

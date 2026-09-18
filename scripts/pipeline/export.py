@@ -310,7 +310,6 @@ def export_bundle(args: ExportCLI) -> dict:
         bundled_preprocessing = validate_preprocessing_identity(
             saved.get("preprocessing_identity"),
             saved_config.model.backbone,
-            saved_config.data.robust_center_outlier_mm,
             temporary / "code" / "knee_abnormality",
         )
         source_hash = _source_hash(temporary / "code")

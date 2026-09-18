@@ -57,7 +57,9 @@ def training_step(model, optimizer, batch: dict, config: ExperimentConfig) -> fl
     with torch.autocast("cuda", dtype=torch.bfloat16, cache_enabled=False):
         logits = model(batch)
     loss = masked_binary_cross_entropy_with_logits(
-        logits.float(), batch["target"], batch["target_observed"]
+        logits.float(),
+        batch["target"].to(logits.device),
+        batch["target_observed"].to(logits.device),
     )
     loss.backward()
     torch.nn.utils.clip_grad_norm_(model.parameters(), config.trainer.gradient_clip_val)

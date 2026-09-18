@@ -89,18 +89,27 @@ def resolve_precision(
     raise ValueError(f"Unsupported inference precision: {requested}")
 
 
+MODEL_BATCH_KEYS = frozenset(
+    {
+        "images",
+        "reflection_eligible",
+        "series_presence",
+        "series_study_index",
+        "series_type_index",
+        "slice_mask",
+        "slice_positions",
+        "valid_rects",
+    }
+)
+
+
 def move_batch(batch: dict, device: torch.device) -> dict:
     return {
         key: value.to(device, non_blocking=True)
-        if isinstance(value, torch.Tensor)
+        if key in MODEL_BATCH_KEYS and isinstance(value, torch.Tensor)
         else value
         for key, value in batch.items()
     }
-
-
-def synchronize(device: torch.device) -> None:
-    if device.type == "cuda":
-        torch.cuda.synchronize(device)
 
 
 def predict_loader(
@@ -134,9 +143,19 @@ def predict_loader(
                 "images": int(batch["slice_mask"].sum()),
                 "padded_images": int(batch["slice_mask"].numel()),
             }
+            copy_events = (
+                (
+                    torch.cuda.Event(enable_timing=True),
+                    torch.cuda.Event(enable_timing=True),
+                )
+                if device.type == "cuda"
+                else None
+            )
+            if copy_events is not None:
+                copy_events[0].record()
             batch = move_batch(batch, device)
-            synchronize(device)
-            transferred = time.perf_counter()
+            if copy_events is not None:
+                copy_events[1].record()
             with torch.autocast(
                 device_type=device.type,
                 dtype=autocast_dtype,
@@ -144,12 +163,17 @@ def predict_loader(
             ):
                 outputs.append(torch.sigmoid(model(batch).to(torch.float32)).cpu())
             finished = time.perf_counter()
+            transfer_seconds = (
+                copy_events[0].elapsed_time(copy_events[1]) / 1000
+                if copy_events is not None
+                else 0.0
+            )
             batches.append(
                 {
                     **counts,
                     "wait_seconds": received - requested,
-                    "transfer_seconds": transferred - received,
-                    "forward_seconds": finished - transferred,
+                    "transfer_seconds": transfer_seconds,
+                    "forward_seconds": finished - received - transfer_seconds,
                 }
             )
             requested = time.perf_counter()

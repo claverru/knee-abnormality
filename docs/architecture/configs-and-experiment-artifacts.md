@@ -125,8 +125,7 @@ identities require their archived source/bundle, even for prediction with the
 same config. Every new checkpoint and input identity records the preprocessing
 algorithm (`ranked_filtered_physical_gaussian_overlap_spatial_tokens_reflection_v10`), the
 reflection, sampling, series-filtering and spatial-token identities, fixed reliability values, the
-selected backbone's spatial mapping, a `robust_center` entry only when
-`data.robust_center_outlier_mm` is set, and a stable digest of the package-relative sources listed in
+selected backbone's spatial mapping, and a stable digest of the package-relative sources listed in
 `identity.PREPROCESSING_SOURCES`: `data/dataset.py`, the eight `data/preprocessing/` modules
 (including `filtering.py`), `modeling/augmentation.py`, `modeling/model.py` and
 `modeling/spatial_tokens.py`. The `v10` label marks the 2026-09-17 series exclusions and fixed
@@ -150,15 +149,20 @@ in `modeling/model.py`, which is in `identity.PREPROCESSING_SOURCES`, it changes
 source digest and is a fresh-runs-only change; earlier checkpoints keep validating against their
 archived sources.
 
-**Robust study centre** (`data.robust_center_outlier_mm`, required, `null` in
-`configs/training.yaml`) is a threshold in millimetres. When it is set, a rejected study centre is
-refitted without its outlier series; `null` keeps the plain fit. Behaviour, identity and
-verification are described in
-[current preparation](../data-preparation/current-preparation.md#robust-study-centre-option).
-Configs and checkpoints saved before 2026-09-17 lack the field and fail validation. Use their
-archived sources, or add `robust_center_outlier_mm: null` to a run config that has not been
-trained yet. Prediction and Kaggle bundles use the value saved in the checkpoint's config.
-Prediction rejects a config whose value differs from it, as for any other data field.
+**Study triplet total** (`data.study_triplet_total`, optional, **26 in `configs/training.yaml`
+since 2026-09-18**) raises a study whose per-type budgets sum below that many training triplets to
+it, scaling the slots it has in proportion to their configured budgets, largest-remainder rounded
+and capped by each slot's capacity; a study already at or above the floor is untouched. On fold 0
+it lifts the ~29% of studies missing two types from about 21 triplets to 26 and leaves the rest
+alone, so the mean rises from 25.4 to 26.7. It scales with the image multiplier, applies in
+training, validation and inference, and changes the preprocessing identity, so it takes effect for
+fresh runs only. **Repeated-series share** (`data.repeated_series_share`, optional, unset) is the
+rejected counterpart, kept only because its run exists
+([overnight](../backlog/overnight.md#already-measured)).
+
+**Robust study centre** was removed on 2026-09-18; `data.robust_center_outlier_mm` no longer
+exists. Configs and checkpoints that carry it fail validation and need their archived sources, as
+do the four runs that used it.
 
 **Weight averaging** (`optimizer.weight_averaging`, required, `null` by default) is a
 discriminated union: `null`, `{method: ema, decay}` or `{method: swa, epochs}`, one method per

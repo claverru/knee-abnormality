@@ -27,8 +27,11 @@ checkpoints ([test-time allocation](../validation/results/2026-09-17-test-time-a
 the fill scores worse than losing the budget, and the repeated-series share topped the 2026-09-18
 queue and then lost 0.004 publicly
 ([overnight](../validation/results/2026-09-18-overnight-results.md)). The study triplet total sits
-unresolved inside the control spread. `data.study_triplet_total` and `data.repeated_series_share`
-remain in the code from those runs.
+unresolved inside the control spread, and `data.study_triplet_total: 26` was adopted anyway on
+2026-09-18 for a structural reason rather than a measured gain: the floor only ever adds triplets,
+so a study is never made worse, and it costs 5.5% compute
+([recipe](../modeling/current-model.md)). `data.repeated_series_share` remains in the code from its
+rejected run.
 
 ## Attention pooling
 

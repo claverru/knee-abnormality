@@ -15,7 +15,6 @@ from knee_abnormality.data.preprocessing.geometry import (
     StudyReference,
     summarize_series,
     valid_pose,
-    within_acquired_range,
 )
 from knee_abnormality.data.preprocessing.series import IndexedSeries, SliceRecord
 
@@ -213,10 +212,7 @@ def build_pool(
         agrees = reliable and int(np.argmax(np.abs(normal))) == axis
         if reliable and not agrees:
             diagnostics["plane_disagreements"] += 1
-        inside = reference.outliers is None or within_acquired_range(
-            geometry, reference.point
-        )
-        use_physical = agrees and inside and reference.point is not None
+        use_physical = agrees and reference.point is not None
         local_ok = usable_local_order(indexed)
         if not local_ok or any(r.relative_position_mm is None for r in records):
             diagnostics["sources"][uid] = geometry.reason or "untrustworthy_local_order"
@@ -228,9 +224,7 @@ def build_pool(
         diagnostics["sources"][uid] = (
             "physical"
             if use_physical
-            else geometry.reason
-            or reference.reason
-            or ("plane_disagreement" if inside else "outside_acquired_range")
+            else geometry.reason or reference.reason or "plane_disagreement"
         )
         if not runs:
             diagnostics["sources"][uid] = "no_valid_runs"

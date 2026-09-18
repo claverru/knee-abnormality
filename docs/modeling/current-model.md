@@ -28,8 +28,8 @@ are:
 | Inputs | Three adjacent slices per input (`SLICES_PER_INPUT`, a constant) |
 | `data.image_size`, `data.spacing_mm` | 224, 0.625 (140 mm) |
 | `data.sampling_sigma_mm`, `data.validation_image_multiplier` | 40.0, 1 (×2 before 2026-09-17; scores differ by about 0.0035, and submissions set their own count) |
+| `data.study_triplet_total` | 26: a study whose per-type budgets sum below 26 training triplets is scaled up to it, proportionally over the types it has |
 | `data.reflection_augmentation.probability` | 0.5 |
-| `data.robust_center_outlier_mm` | `null`: plain study centre ([option](../data-preparation/current-preparation.md#robust-study-centre-option)) |
 | `model.backbone` | `rexnet_200.nav_in1k`, pretrained |
 | Projection and attention widths | 256 and 128 (`PROJECTION_WIDTH`, `MIL_ATTENTION_WIDTH`, constants) |
 | `model.dropout`, `model.series_dropout` | 0.0, 0.2 |

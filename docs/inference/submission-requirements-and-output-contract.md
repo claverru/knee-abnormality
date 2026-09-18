@@ -15,6 +15,18 @@ the Kaggle API on 2026-09-15 (see below); recheck it before final submission sel
   and GPU notebooks are listed, so **TPU notebooks cannot submit**; no page mentions
   TPUs or other hardware. Kaggle's TPU image also lacks kornia, polars,
   pydantic-settings, pydicom and Lightning.
+- **"Notebooks" is the product name, not the kernel type.** The page's wording
+  ("Submissions to this competition must be made through Notebooks", rechecked
+  2026-09-18) says nothing about notebook against script kernels, and Kaggle uses
+  "Notebooks" for both. Evidence that a script kernel can submit, none of it conclusive:
+  Kaggle's [notebook documentation](https://www.kaggle.com/docs/notebooks) calls Script
+  the type favoured for competition submissions; `kaggle competitions submit -k` takes a
+  kernel slug with no type constraint, its help reading "Name of kernel (notebook)"; and
+  our own `kernel_type: script` loading probes ran against this competition's data.
+  Only a test submission would settle it, and none has been made. It buys nothing anyway:
+  `scripts/pipeline/inference.ipynb` is a three-cell wrapper whose second cell already
+  runs `python -m scripts.pipeline.predict` as a subprocess, so a script kernel would save
+  one interpreter launch against the 34–56 s of package imports that dominate fixed cost.
 - The [rules](https://www.kaggle.com/competitions/rsna-knee-abnormality-detection/rules)
   allow five submissions per day and two final selections. External data/models
   must meet the competition's accessibility and licensing conditions. Retain
