@@ -19,7 +19,6 @@
 |---|---|
 | Choosing the inference image multiplier and batch size from public scores and measured VRAM | [Inference image count and memory](inference-image-count-and-memory.md) |
 | Choosing loader workers or precision on Kaggle's two T4s, or finding what slows inference: FP32/FP16, 4–24 workers, startup, indexing and per-stage DICOM loading costs over NFS | [2026-09-15 Kaggle inference profiling](2026-09-15-kaggle-inference-profiling.md) |
-| Planning the next inference-speed changes: main-thread warm-up, torch-free coordinator and the nine measured data-loading changes | [Loading speedup plan](loading-speedup-plan.md) |
 | Reviewing unverified submission timings, runtime leads, training-throughput anecdotes and open efficiency questions | [Unverified runtime evidence and efficiency leads](runtime-evidence-and-leads.md) |
 
 ## Submission records

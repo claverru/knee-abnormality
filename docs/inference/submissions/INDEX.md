@@ -4,6 +4,7 @@ All 27 Kaggle competition submissions, newest first, with submission times in UT
 
 | Submitted (UTC) | Submission | Public AUC | ID | Record |
 |---|---|---:|---:|---|
+| 2026-09-18 08:04 | `robust-center-20-topup-26` (fold-0 ×1 0.888021), temperature 0.75, 4x images | 0.938 | 56325019 | [Temperature and count](2026-09-18-temperature-and-count-submissions.md) |
 | 2026-09-18 06:28 | `ranked-filtered-seed42`, attention temperature 0.75 in the weights, 4x images, batch 2 | **0.939** | – | [Temperature and count](2026-09-18-temperature-and-count-submissions.md) |
 | 2026-09-18 06:22 | `07-series-share-1.0` (`repeated_series_share: 1.0`), default inference | 0.929 | – | [Temperature and count](2026-09-18-temperature-and-count-submissions.md) |
 | 2026-09-18 06:11 | `ranked-filtered-seed42`, attention temperature 0.75 in the weights, 3x images, batch 2 (submitted twice) | 0.938 | 56322551 | [Temperature and count](2026-09-18-temperature-and-count-submissions.md) |

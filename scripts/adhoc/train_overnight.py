@@ -42,18 +42,6 @@ SUMMARY_HEADER = [
 
 EXPERIMENTS = (
     ("00-control", {"seed": 3138278368}),
-    (
-        "01-robust-center-20",
-        {"seed": 3816779311, "data": {"robust_center_outlier_mm": 20.0}},
-    ),
-    (
-        "02-robust-center-10",
-        {"seed": 1704113267, "data": {"robust_center_outlier_mm": 10.0}},
-    ),
-    (
-        "03-robust-center-30",
-        {"seed": 3158414665, "data": {"robust_center_outlier_mm": 30.0}},
-    ),
     ("04-total-topup-26", {"seed": 597332668, "data": {"study_triplet_total": 26}}),
     ("05-total-topup-32", {"seed": 2220158862, "data": {"study_triplet_total": 32}}),
     (

@@ -18,7 +18,7 @@ data:
     probability: 0.5
   sampling_sigma_mm: 40.0
   validation_image_multiplier: 1
-  robust_center_outlier_mm: null
+  study_triplet_total: 26
   intensity_augmentation:
     probability: 0.5
     gamma_range: [0.85, 1.15]

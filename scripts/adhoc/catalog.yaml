@@ -284,3 +284,109 @@ scripts:
       - Contains synthetic checks; do not execute under the current repository rule against running tests.
       - Retained to explain the historical environment verification, not as evidence of MRI pipeline correctness.
     docs: [docs/architecture/environment.md#local-verification]
+
+  - id: probe-kaggle-loading
+    path: scripts/adhoc/probe_kaggle_loading.py
+    summary: Launch one self-contained Kaggle CPU script kernel per proposed loading speedup and collect its throughput and equality audit.
+    tags: [probe, loading, kaggle, script, kernel, cpu, dicom, header, parser, threads, nfs, throughput, dataloader, speedup]
+    commands:
+      - rtk proxy uv run --locked python -m scripts.adhoc.probe_kaggle_loading launch --output-dir outputs/profiling/kaggle-loading-probes-20260917
+      - rtk proxy uv run --locked python -m scripts.adhoc.probe_kaggle_loading launch --output-dir outputs/profiling/kaggle-loading-probes-new --probes '["header","frames"]'
+      - rtk proxy uv run --locked python -m scripts.adhoc.probe_kaggle_loading collect --output-dir outputs/profiling/kaggle-loading-probes-20260917
+    inputs: [Probe sources in scripts/adhoc/kaggle_loading_probes/, Competition DICOMs attached on Kaggle, Kaggle credentials]
+    outputs: [Private Kaggle script kernels, status.json with push and run states, Per-probe result JSON and kernel logs, summary.json]
+    notes:
+      - Each probe isolates one change from the loading speedup plan; it reproduces only the operation under test, not the dataloading pipeline, and needs no exported bundle.
+      - A probe is pushed as one file built by concatenating kaggle_loading_probes/common.py with the probe body, so the kernel has no repository dependency.
+      - Probes carry a copy of the production function as their baseline; the copy can drift from src/ and is not verified against it automatically.
+      - Every probe audits its candidate against that baseline and reports timings alongside the audit, so a candidate that changes outputs is visible.
+      - Kaggle allows five concurrent batch CPU sessions; concurrency is capped at five and a rejected push is recorded rather than queued.
+      - Cells use disjoint study blocks so each block is read cold once per session; a second session on a fresh machine reads them cold again.
+      - Pure-CPU probes (resample, quantiles) do not depend on NFS and can be answered locally; set KNEE_PROBE_DATA, KNEE_PROBE_OUT and KNEE_PROBE_AUDIT_ONLY to run a probe against local data.
+      - The quantiles probe measures real resampled pixels by default; its synthetic generator gave the opposite verdict and is kept only behind REAL_PIXELS.
+    docs: [docs/backlog/loading-speedup.md, docs/inference/2026-09-15-kaggle-inference-profiling.md]
+
+  - id: kaggle-loading-probe-common
+    path: scripts/adhoc/kaggle_loading_probes/common.py
+    summary: Shared prelude prepended to every Kaggle loading probe, providing the data root, seeded cold study blocks, the timer and the result writer.
+    tags: [probe, loading, kaggle, prelude, shared, blocks, timer, cold]
+    commands:
+      - cat scripts/adhoc/kaggle_loading_probes/common.py scripts/adhoc/kaggle_loading_probes/header.py > /tmp/probe.py
+    inputs: [Competition DICOM root]
+    outputs: [None; imported names only]
+    notes:
+      - Not runnable alone; probe-kaggle-loading concatenates it ahead of a probe body to build the single file a Kaggle script kernel runs.
+      - KNEE_PROBE_DATA, KNEE_PROBE_OUT and KNEE_PROBE_AUDIT_ONLY redirect a probe to local data and skip timing, so correctness can be checked off Kaggle.
+      - Study order is a fixed seeded shuffle, so every probe and every session draw the same blocks in the same order.
+    docs: [docs/backlog/loading-speedup.md]
+
+  - id: kaggle-loading-probe-header
+    path: scripts/adhoc/kaggle_loading_probes/header.py
+    summary: Compare a minimal explicit-VR DICOM header parser with the production pydicom reader across thread counts on cold files.
+    tags: [probe, dicom, header, parser, pydicom, explicit-vr, threads, gil, nfs, throughput, tags]
+    commands:
+      - cat scripts/adhoc/kaggle_loading_probes/common.py scripts/adhoc/kaggle_loading_probes/header.py > /tmp/header_probe.py && KNEE_PROBE_DATA=data/raw KNEE_PROBE_AUDIT_ONLY=1 rtk proxy uv run --locked python /tmp/header_probe.py
+    inputs: [Competition DICOMs]
+    outputs: [header.json with per-cell throughput, field-level audit, fallback and extension counts]
+    notes:
+      - Covers loading speedup plan items 3 and 4; the parser reproduces every DicomHeader field including the twelve series tags and the native pixel descriptor gate.
+      - Reads a fixed prefix and extends it up to three times before falling back to pydicom, so a long header costs an extra read rather than a reparse.
+      - Audited exactly against the production copy on 20,000 local files with no mismatches, no fallbacks and no extensions at the default prefix.
+      - Cells split read from parse only in the split variants; the others time the whole reader per file.
+    docs: [docs/backlog/loading-speedup.md]
+
+  - id: kaggle-loading-probe-frames
+    path: scripts/adhoc/kaggle_loading_probes/frames.py
+    summary: Measure threaded against serial DICOM pixel-payload reads using the production native descriptor fast path.
+    tags: [probe, dicom, frames, pixels, payload, threads, nfs, latency, decode, throughput]
+    commands:
+      - cat scripts/adhoc/kaggle_loading_probes/common.py scripts/adhoc/kaggle_loading_probes/frames.py > /tmp/frames_probe.py && KNEE_PROBE_DATA=data/raw KNEE_PROBE_AUDIT_ONLY=1 rtk proxy uv run --locked python /tmp/frames_probe.py
+    inputs: [Competition DICOMs]
+    outputs: [frames.json with per-thread frame and megabyte rates and a serial-versus-threaded pixel audit]
+    notes:
+      - Covers loading speedup plan item 5; descriptors are read before timing, matching production order where indexing precedes decoding.
+      - Only files that qualify for the native descriptor path are timed; pydicom fallbacks are excluded rather than counted as reads.
+      - Threaded reads fetch payloads in the pool and decode serially, keeping failure handling per path.
+    docs: [docs/backlog/loading-speedup.md]
+
+  - id: kaggle-loading-probe-resample
+    path: scripts/adhoc/kaggle_loading_probes/resample.py
+    summary: Compare per-slice crop-resampling with stacked-sparse and batched-dense whole-series formulations.
+    tags: [probe, resample, crop, spatial, sparse, batched, cpu, numerics, preprocessing]
+    commands:
+      - cat scripts/adhoc/kaggle_loading_probes/common.py scripts/adhoc/kaggle_loading_probes/resample.py > /tmp/resample_probe.py && KNEE_PROBE_DATA=data/raw rtk proxy uv run --locked python /tmp/resample_probe.py
+    inputs: [Competition DICOMs]
+    outputs: [resample.json with per-implementation milliseconds per slice and a bit-exactness audit against the per-slice baseline]
+    notes:
+      - Covers loading speedup plan item 6; pure CPU, so it needs no NFS and can be answered locally.
+      - Measured locally as a regression, stacked-sparse 4.8x and batched-dense 2.6x slower than per-slice; batched-dense is also not bit-exact.
+      - Groups slices by shape, spacing, slope and intercept so a group shares one pair of cached axis filters.
+    docs: [docs/backlog/loading-speedup.md]
+
+  - id: kaggle-loading-probe-quantiles
+    path: scripts/adhoc/kaggle_loading_probes/quantiles.py
+    summary: Compare exact quantile selection and pixel normalization variants on real resampled acquisition pixels.
+    tags: [probe, quantiles, percentile, partition, histogram, normalize, clip, intensity, cpu, preprocessing]
+    commands:
+      - cat scripts/adhoc/kaggle_loading_probes/common.py scripts/adhoc/kaggle_loading_probes/quantiles.py > /tmp/quantiles_probe.py && KNEE_PROBE_DATA=data/raw rtk proxy uv run --locked python /tmp/quantiles_probe.py
+    inputs: [Competition DICOMs]
+    outputs: [quantiles.json with per-implementation milliseconds per acquisition and bound and pixel exactness audits]
+    notes:
+      - Covers loading speedup plan item 7; pure CPU, so it needs no NFS and can be answered locally.
+      - Pixel source decides the verdict. On real resampled slices histogram selection is 1.67x slower than partition; the synthetic generator behind REAL_PIXELS made it look 1.87x faster.
+      - The fused normalization is neither faster nor bit-exact against production and is retained only as the measured negative.
+    docs: [docs/backlog/loading-speedup.md]
+
+  - id: kaggle-loading-probe-indexing
+    path: scripts/adhoc/kaggle_loading_probes/indexing.py
+    summary: Compare the production double directory glob with a single reused scandir across thread counts on cold study directories.
+    tags: [probe, indexing, listing, glob, scandir, directory, threads, nfs, series]
+    commands:
+      - cat scripts/adhoc/kaggle_loading_probes/common.py scripts/adhoc/kaggle_loading_probes/indexing.py > /tmp/indexing_probe.py && KNEE_PROBE_DATA=data/raw KNEE_PROBE_AUDIT_ONLY=1 rtk proxy uv run --locked python /tmp/indexing_probe.py
+    inputs: [Competition DICOMs]
+    outputs: [indexing.json with per-cell milliseconds per study and series rates and a listing equality audit]
+    notes:
+      - Covers loading speedup plan items 1 and 2; the per-study cost it reports is what item 1 avoids by indexing only a worker's own studies.
+      - The double-glob baseline reproduces Kaggle behaviour, where the image-count parquet is absent so each series directory is globbed for counting and again for ordering.
+      - Reports listing work only; it does not read headers, so it is independent of the header probe.
+    docs: [docs/backlog/loading-speedup.md]

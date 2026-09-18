@@ -180,9 +180,7 @@ class KneeModule(L.LightningModule):
                 "training_studies": training_studies,
                 "validation_studies": validation_studies,
                 "input_identity": input_identity,
-                "preprocessing_identity": preprocessing_identity(
-                    config.model.backbone, config.data.robust_center_outlier_mm
-                ),
+                "preprocessing_identity": preprocessing_identity(config.model.backbone),
             }
         )
 

@@ -60,7 +60,6 @@ def inspect(args: InspectCLI) -> dict:
                 for a in values
                 if len(a.records) >= SLICES_PER_INPUT
             ),
-            config.data.robust_center_outlier_mm,
         )
         (accepted if reference.point is not None else rejected).append(uid)
     uids = sorted(rejected + accepted[: args.accepted_studies])
@@ -78,9 +77,7 @@ def inspect(args: InspectCLI) -> dict:
         "settings": args.model_dump(mode="json"),
         "study_uids": uids,
         "rejected_center_uids": rejected,
-        "preprocessing_identity": preprocessing_identity(
-            config.model.backbone, config.data.robust_center_outlier_mm
-        ),
+        "preprocessing_identity": preprocessing_identity(config.model.backbone),
         "inputs": [
             {"path": str(p.resolve()), "sha256": sha256_file(p)}
             for p in [args.config, args.headers, args.inventory, *source_files]

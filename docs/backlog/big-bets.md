@@ -74,7 +74,7 @@ validation bag. The variability may also act as useful augmentation.
   population, not the levels or the estimator.
 - *Cost:* extra decoding, against the
   [select-before-decoding](../architecture/data-flow-and-iteration-speed.md#iteration-speed) rule
-  that the [loading speedups](../inference/loading-speedup-plan.md) rely on.
+  that the [loading speedups](loading-speedup.md) rely on.
 - *Stop if* the variability is negligible, the runtime cost is disproportionate, or a controlled
   run gains nothing.
 
@@ -103,13 +103,15 @@ evidence is object detection.
   second backbone.
 - *Order:* after the cheaper [attention and readout changes](small-changes.md#attention-pooling).
 
-## Robust study center
+## Robust study center (removed)
 
-**Robust study center with per-series sampling paths.** It is implemented behind
-`data.robust_center_outlier_mm`, and one seed-42 run is queued
-([implementation](#implementation-2026-09-17)). Rejection counts and the rescue analysis are
-measured on CPU, and an inference-only fold-0 re-score is below. The effect of training with it is
-untested.
+**Trained, measured and removed on 2026-09-18.** Four runs at 10, 20 and 30 mm all landed inside
+the control spread, the subgroup check on the 21 fold-0 studies it changes showed neither harm nor
+benefit, and it works against peripheral coverage: a rejected study currently samples uniformly
+across each slab, which the refit would replace with the sigma-40 Gaussian
+([results](../validation/results/2026-09-18-overnight-results.md)). The option is gone from the
+code; the rejection counts, rescue analysis and design below are kept because they describe the
+geometry, not the option.
 
 - *Problem:* 178 of 4,407 train centers are rejected (170 RMS above 10 mm, 8 with one series above
   20 mm), often because of one or two stray series, so the whole study falls back to local
@@ -169,7 +171,7 @@ Script: [`robust_rescore.py`](../history/series-and-sampling-sources/series-filt
 
 The option reproduces the 20 mm patch above. The implemented behaviour, the identity effects and
 the CPU verification (null against HEAD, 20 mm and 10 mm) are recorded in
-[current preparation](../data-preparation/current-preparation.md#robust-study-centre-option).
+[current preparation](../data-preparation/current-preparation.md#robust-study-centre-removed).
 One run is queued: `robust-center-seed42`, paired with `ranked-filtered-seed42` (0.889573)
 ([overnight queue](overnight.md#next-queue)).
 
