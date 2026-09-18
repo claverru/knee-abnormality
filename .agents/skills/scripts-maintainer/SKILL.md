@@ -72,7 +72,7 @@ catalog or script changes and resolve missing, duplicate, or misplaced entries.
 Perform the narrow static or actual development checks appropriate to the
 change, within project rules; do not write or run tests. Catalog checks never
 execute indexed scripts, and passing them does not prove runtime correctness.
-Review the diff and affected links. Keep work tracking in `docs/ongoing.md`
+Review the diff and affected links. Keep work tracking in `docs/ongoing/`
 and durable findings in the relevant topic docs.
 
 For a requested collection audit, first check catalog consistency, then review

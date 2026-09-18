@@ -171,6 +171,7 @@ scripts:
       - rtk proxy uv run --locked python -m scripts.adhoc.profile_threaded_loading configs/training.yaml --mode audit --samples 8 --output-dir outputs/profiling/threading-audit-new
       - rtk proxy uv run --locked python -m scripts.adhoc.profile_threaded_loading configs/training.yaml --mode gpu --workers 8 --decode-threads 1 --samples 256 --output-dir outputs/profiling/threading-gpu-new
       - rtk proxy env OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 uv run --locked python -m scripts.adhoc.profile_threaded_loading configs/training.yaml --mode loader --workers 4 --decode-threads 2 --samples 512 --warmup-batches 16 --output-dir outputs/profiling/threading-loader-new
+      - rtk proxy env OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 uv run --locked python -m scripts.adhoc.profile_threaded_loading configs/training.yaml --mode loader --workers 16 --decode-threads 1 --read-threads 4 --samples 256 --warmup-batches 1 --passes 2 --output-dir outputs/profiling/frames-cold-readthreads-new
     inputs: [Experiment config, Training DICOMs, Frozen fold and label sources]
     outputs: [Per-batch timings and losses, Prepared-input audit hashes, Configuration and recursive project-relative source snapshots]
     notes:
@@ -178,7 +179,8 @@ scripts:
       - Reuses bounded pools created lazily after worker startup; preserves serial indexing and sampling and ordered joint clipping.
       - Selects four maximum-load training studies plus a seeded random sample; two passes repeat epoch-zero slice choices with persistent workers.
       - GPU mode uses bounded optimization steps with seeded random weights, current augmentation and constant learning rates; saves no checkpoint or validation metric.
-      - Warmup batches are excluded from throughput; OS page cache is uncontrolled, so first passes are not cold-disk measurements.
+      - Warmup batches are excluded from studies_per_second; for a cold run drop the page cache first, pass --warmup-batches 1, and read all_studies_per_second and pass_wall_seconds, which cover the whole pass. The manifest records Cached from /proc/meminfo so a warm run is recognisable afterwards.
+      - --decode-threads threads whole decode_slice calls, which is more than loading speedup change 5, since decode and resample ride along with the payload read. --read-threads is change 5 as specified. it prefetches the selected slices' payloads on a thread pool with the same validation read_frame applies, then decodes serially.
       - Default loader mode consumes CPU batches immediately without pinning or GPU work and records wall-clock studies/s and selected slices/s.
       - Uses triplet sampling and complete-group failure handling; records triplets, channel appearances and unique source slices separately. Historical single-slice measurements use their source/config snapshots.
       - Uses shared production physical/local selection and retry preparation; decode threading only changes unique-path pixel loading.
@@ -218,16 +220,33 @@ scripts:
       - rtk proxy uv run --locked python -m scripts.adhoc.profile_kaggle_inference launch --bundle outputs/submission/exports/run-fold0 --dataset OWNER/knee-profile-run-fold0 --output-dir outputs/profiling/kaggle-loading-new --conditions '["loading"]'
       - rtk proxy env CUDA_VISIBLE_DEVICES= uv run --locked python -m scripts.adhoc.profile_kaggle_inference analyze --output-dir outputs/profiling/kaggle-inference-20260915
     inputs: [Exported inference bundle with instrumented runtime, Frozen fold membership and targets, Local BF16 validation predictions of the bundled checkpoint, Kaggle credentials]
-    outputs: [Private Kaggle dataset and notebooks, status.json with push and run states, Per-condition notebook outputs and logs, summary.json with AUC parity, timing and loading-stage breakdown]
+    outputs: [Private Kaggle dataset and notebooks, status.json with push and run states, Per-condition notebook outputs and logs, cpu.csv and processes.csv samples, summary.json with AUC parity, timing, per-role CPU and loading-stage breakdown]
     notes:
       - Each condition runs on a fresh Kaggle machine, so every run reads DICOMs cold like the hidden test; conditions are paired on the same fold-0 studies.
       - The notebook presents training studies through a symlinked test layout under /tmp and runs the bundle's unchanged predict entry point, so image counts are enumerated from disk as on the hidden test.
       - Launches at most two notebooks at once (the account's batch GPU session limit) and retries pushes rejected for that limit; a reused dataset must hold the same bundle manifest.
       - Prediction conditions vary precision, per-GPU batch size and total loader workers on both GPUs; add a condition only when a measured bottleneck justifies it.
       - The loading condition runs on a CPU notebook, times wrapped bundle preprocessing stages over 100 seeded studies cold then warm, and measures threaded header and full-file read throughput on separate cold studies.
-      - Samples /proc/stat and nvidia-smi once per second; AUC uses the training evaluation threshold and gold/report-derived split.
-      - The loading and precision cells import the bundle's knee_abnormality.data, data.preprocessing and inference.engine/checkpoint modules, so they need a bundle exported from the current package layout; bundles exported before 2026-09-16 (such as knee-reflection-sigma40-fast-20260915) only support prediction conditions. Analysis still sums project_reference timings recorded by those older loading runs.
-    docs: [docs/inference/2026-09-15-kaggle-inference-profiling.md]
+      - Samples /proc/stat, /proc/<pid> and nvidia-smi once per second; AUC uses the training evaluation threshold and gold/report-derived split.
+      - Prediction runs attribute CPU per role — coordinator, GPU main processes and loader workers — from processes.csv. Loader workers are forked and inherit the parent's cmdline, so the split is by parentage, never by command text.
+      - The loading cell reports wall and process CPU per stage, and keeps the pool-thread functions in a thread-seconds bucket that must never be added to a wall column. Analysis reads only this format; artifacts written before 2026-09-18 do not have it.
+      - The loading and precision cells import the bundle's knee_abnormality.data, data.preprocessing and inference.engine/checkpoint modules, so they need a bundle exported from the current package layout; bundles exported before 2026-09-16 (such as knee-reflection-sigma40-fast-20260915) only support prediction conditions.
+    docs: [docs/inference/2026-09-15-kaggle-inference-profiling.md, docs/inference/2026-09-18-kaggle-x4-profile-after-index-changes.md]
+
+  - id: make-timing-checkpoint
+    path: scripts/adhoc/make_timing_checkpoint.py
+    summary: Rebuild the random-weights timing checkpoint so a Kaggle timing bundle can be exported for the current preprocessing identity.
+    tags: [timing, profile, checkpoint, random, weights, identity, bundle, export, inference, kaggle]
+    commands:
+      - rtk proxy env CUDA_VISIBLE_DEVICES= uv run --locked python -m scripts.adhoc.make_timing_checkpoint --source outputs/submission/timing-profile-random-weights.ckpt --output outputs/submission/timing-profile-random-weights.ckpt
+    inputs: [A checkpoint whose saved configuration, targets and fold define the model to rebuild]
+    outputs: [Timing-only checkpoint with fresh random weights and the current preprocessing identity]
+    notes:
+      - Needed whenever a change inside PREPROCESSING_SOURCES bumps the identity and no trained checkpoint carries it, since validate_preprocessing_identity then refuses every existing checkpoint.
+      - Predictions from the result are meaningless; use it for runtime and loading measurements only, never for AUC or FP16 parity.
+      - Copies configuration, targets, fold and study counts from the source checkpoint, so the exported bundle stays comparable with the previous timing run.
+      - Writes torch.manual_seed(--seed) weights on CPU; reads no data and needs no GPU.
+    docs: [docs/inference/2026-09-18-kaggle-x4-profile-after-loading-changes.md]
 
   - id: audit-metadata
     path: scripts/adhoc/audit_metadata.py
@@ -296,7 +315,7 @@ scripts:
     inputs: [Probe sources in scripts/adhoc/kaggle_loading_probes/, Competition DICOMs attached on Kaggle, Kaggle credentials]
     outputs: [Private Kaggle script kernels, status.json with push and run states, Per-probe result JSON and kernel logs, summary.json]
     notes:
-      - Each probe isolates one change from the loading speedup plan; it reproduces only the operation under test, not the dataloading pipeline, and needs no exported bundle.
+      - Each probe isolates one candidate from the loading speedup plan; it reproduces only the operation under test, not the dataloading pipeline, and needs no exported bundle.
       - A probe is pushed as one file built by concatenating kaggle_loading_probes/common.py with the probe body, so the kernel has no repository dependency.
       - Probes carry a copy of the production function as their baseline; the copy can drift from src/ and is not verified against it automatically.
       - Every probe audits its candidate against that baseline and reports timings alongside the audit, so a candidate that changes outputs is visible.
@@ -304,7 +323,7 @@ scripts:
       - Cells use disjoint study blocks so each block is read cold once per session; a second session on a fresh machine reads them cold again.
       - Pure-CPU probes (resample, quantiles) do not depend on NFS and can be answered locally; set KNEE_PROBE_DATA, KNEE_PROBE_OUT and KNEE_PROBE_AUDIT_ONLY to run a probe against local data.
       - The quantiles probe measures real resampled pixels by default; its synthetic generator gave the opposite verdict and is kept only behind REAL_PIXELS.
-    docs: [docs/backlog/loading-speedup.md, docs/inference/2026-09-15-kaggle-inference-profiling.md]
+    docs: [docs/backlog/loading-speedup/measuring.md, docs/inference/2026-09-15-kaggle-inference-profiling.md]
 
   - id: kaggle-loading-probe-common
     path: scripts/adhoc/kaggle_loading_probes/common.py
@@ -318,7 +337,7 @@ scripts:
       - Not runnable alone; probe-kaggle-loading concatenates it ahead of a probe body to build the single file a Kaggle script kernel runs.
       - KNEE_PROBE_DATA, KNEE_PROBE_OUT and KNEE_PROBE_AUDIT_ONLY redirect a probe to local data and skip timing, so correctness can be checked off Kaggle.
       - Study order is a fixed seeded shuffle, so every probe and every session draw the same blocks in the same order.
-    docs: [docs/backlog/loading-speedup.md]
+    docs: [docs/backlog/loading-speedup/measuring.md]
 
   - id: compare-header-implementations
     path: scripts/adhoc/compare_header_implementations.py
@@ -341,7 +360,7 @@ scripts:
       - Only pass 0 parses headers. _slice_index caches per worker and persistent_workers keeps them alive, so later passes measure the cached steady state and show no parser effect by design.
       - Use more batches than workers or the measurement reports startup rather than throughput.
       - Audit mode collates one study at a time and raises when any prepared field differs.
-    docs: [docs/backlog/loading-speedup.md]
+    docs: [docs/backlog/loading-speedup/attribution.md#only-inference-benefits]
 
   - id: kaggle-loading-probe-header
     path: scripts/adhoc/kaggle_loading_probes/header.py
@@ -352,25 +371,26 @@ scripts:
     inputs: [Competition DICOMs]
     outputs: [header.json with per-cell throughput, field-level audit, fallback and extension counts]
     notes:
-      - Covers loading speedup plan items 3 and 4; the parser reproduces every DicomHeader field including the twelve series tags and the native pixel descriptor gate.
+      - Covers the raw header parser and the threaded prefix reads, both shipped 2026-09-18; the parser reproduces every DicomHeader field including the twelve series tags and the native pixel descriptor gate.
       - Reads a fixed prefix and extends it up to three times before falling back to pydicom, so a long header costs an extra read rather than a reparse.
       - Audited exactly against the production copy on 20,000 local files with no mismatches, no fallbacks and no extensions at the default prefix.
       - Cells split read from parse only in the split variants; the others time the whole reader per file.
-    docs: [docs/backlog/loading-speedup.md]
+    docs: [docs/backlog/loading-speedup/attribution.md]
 
   - id: kaggle-loading-probe-frames
     path: scripts/adhoc/kaggle_loading_probes/frames.py
-    summary: Measure threaded against serial DICOM pixel-payload reads using the production native descriptor fast path.
+    summary: Measure threaded against serial DICOM pixel-payload reads on byte-matched cells using the production native descriptor fast path.
     tags: [probe, dicom, frames, pixels, payload, threads, nfs, latency, decode, throughput]
     commands:
       - cat scripts/adhoc/kaggle_loading_probes/common.py scripts/adhoc/kaggle_loading_probes/frames.py > /tmp/frames_probe.py && KNEE_PROBE_DATA=data/raw KNEE_PROBE_AUDIT_ONLY=1 rtk proxy uv run --locked python /tmp/frames_probe.py
     inputs: [Competition DICOMs]
     outputs: [frames.json with per-thread frame and megabyte rates and a serial-versus-threaded pixel audit]
     notes:
-      - Covers loading speedup plan item 5; descriptors are read before timing, matching production order where indexing precedes decoding.
+      - matched_blocks deals whole studies into cells balanced per frame byte-length and truncates to the shared count, so every cell reads an identical frame count and byte total from disjoint studies. The 2026-09-18 Kaggle run measured 2.40x at 16 threads.
+      - Covers the threaded frame payload reads shipped 2026-09-18; descriptors are read before timing, matching production order where indexing precedes decoding.
       - Only files that qualify for the native descriptor path are timed; pydicom fallbacks are excluded rather than counted as reads.
       - Threaded reads fetch payloads in the pool and decode serially, keeping failure handling per path.
-    docs: [docs/backlog/loading-speedup.md]
+    docs: [docs/backlog/loading-speedup/attribution.md]
 
   - id: kaggle-loading-probe-resample
     path: scripts/adhoc/kaggle_loading_probes/resample.py
@@ -381,10 +401,10 @@ scripts:
     inputs: [Competition DICOMs]
     outputs: [resample.json with per-implementation milliseconds per slice and a bit-exactness audit against the per-slice baseline]
     notes:
-      - Covers loading speedup plan item 6; pure CPU, so it needs no NFS and can be answered locally.
+      - Covers the whole-series resample formulations, now closed as regressions; pure CPU, so it needs no NFS and can be answered locally.
       - Measured locally as a regression, stacked-sparse 4.8x and batched-dense 2.6x slower than per-slice; batched-dense is also not bit-exact.
       - Groups slices by shape, spacing, slope and intercept so a group shares one pair of cached axis filters.
-    docs: [docs/backlog/loading-speedup.md]
+    docs: [docs/backlog/loading-speedup/closed.md#closed-as-measured-regressions]
 
   - id: kaggle-loading-probe-quantiles
     path: scripts/adhoc/kaggle_loading_probes/quantiles.py
@@ -395,10 +415,10 @@ scripts:
     inputs: [Competition DICOMs]
     outputs: [quantiles.json with per-implementation milliseconds per acquisition and bound and pixel exactness audits]
     notes:
-      - Covers loading speedup plan item 7; pure CPU, so it needs no NFS and can be answered locally.
+      - Covers the cheaper exact intensity bounds and normalization, now closed as regressions; pure CPU, so it needs no NFS and can be answered locally.
       - Pixel source decides the verdict. On real resampled slices histogram selection is 1.67x slower than partition; the synthetic generator behind REAL_PIXELS made it look 1.87x faster.
       - The fused normalization is neither faster nor bit-exact against production and is retained only as the measured negative.
-    docs: [docs/backlog/loading-speedup.md]
+    docs: [docs/backlog/loading-speedup/closed.md#closed-as-measured-regressions]
 
   - id: kaggle-loading-probe-indexing
     path: scripts/adhoc/kaggle_loading_probes/indexing.py
@@ -409,10 +429,10 @@ scripts:
     inputs: [Competition DICOMs]
     outputs: [indexing.json with per-cell milliseconds per study and series rates and a listing equality audit]
     notes:
-      - Covers loading speedup plan items 1 and 2; the per-study cost it reports is what item 1 avoids by indexing only a worker's own studies.
+      - Covers the worker-filtered series index and the single series listing; the per-study cost it reports is what the worker filter avoids by indexing only a worker's own studies.
       - The double-glob baseline reproduces Kaggle behaviour, where the image-count parquet is absent so each series directory is globbed for counting and again for ordering.
       - Reports listing work only; it does not read headers, so it is independent of the header probe.
-    docs: [docs/backlog/loading-speedup.md]
+    docs: [docs/backlog/loading-speedup/candidates.md#ship-without-a-retrain]
 
   - id: compare-local-and-public-scores
     path: scripts/adhoc/compare_local_and_public_scores.py

@@ -46,5 +46,5 @@ simple pooling with series-aware sequence aggregation, a concrete path toward
 anatomy-guided pooling, and an MRI-specific robustness study. It also identifies
 reusable public code and the annotation mismatches that could invalidate reuse.
 
-The [backlog](../backlog/INDEX.md) is the canonical idea queue; [ongoing work](../ongoing.md)
+The [backlog](../backlog/INDEX.md) is the canonical idea queue; [ongoing work](../ongoing/INDEX.md)
 tracks tasks actually underway.

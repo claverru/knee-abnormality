@@ -151,7 +151,7 @@ of proportional. Depthwise convolutions and squeeze-excite blocks are bandwidth-
 convert multiply-add savings into wall time on the local 3090. This confirms the existing rule in
 [swapping a backbone](../../modeling/backbone-swaps.md) against substituting model-card figures for
 measured runtime. These are local training measurements; inference cost must be measured on Kaggle
-T4s, and the [loading speedup](../../backlog/loading-speedup.md) profile shows the loader, not the
+T4s, and the [loading speedup](../../backlog/loading-speedup/attribution.md) profile shows the loader, not the
 GPUs, currently sets inference throughput, so a cheaper backbone cannot be priced until that is
 fixed.
 

@@ -13,7 +13,7 @@ Two findings did hold on both halves:
   while extra triplets from it help at least as much as extra triplets from the top-ranked
   series.
 
-Part of the [triplet budget allocation investigation](../../ongoing.md#triplet-budget-allocation-closed-2026-09-18).
+Part of the [triplet budget allocation investigation](../../history/triplet-budget-allocation.md).
 
 ## Setup
 

@@ -40,42 +40,63 @@ SUMMARY_HEADER = [
     "peak_cuda_memory_gib",
 ]
 
+B0_BACKBONE = "efficientnet_b0.ra_in1k"
+
 EXPERIMENTS = (
-    ("00-control", {"seed": 3138278368}),
-    ("04-total-topup-26", {"seed": 597332668, "data": {"study_triplet_total": 26}}),
-    ("05-total-topup-32", {"seed": 2220158862, "data": {"study_triplet_total": 32}}),
     (
-        "06-series-share-0.5",
-        {"seed": 3282371002, "data": {"repeated_series_share": 0.5}},
-    ),
-    (
-        "07-series-share-1.0",
-        {"seed": 2949235318, "data": {"repeated_series_share": 1.0}},
-    ),
-    ("08-gated-attention", {"seed": 2689869777, "model": {"gated_attention": True}}),
-    ("09-residual-readout", {"seed": 3023200956, "model": {"residual_readout": True}}),
-    (
-        "10-epochs-15",
-        {"seed": 771844210, "trainer": {"max_epochs": 15, "patience": 15}},
-    ),
-    (
-        "11-affine-mild",
+        "00-control",
         {
-            "seed": 3751512834,
-            "data": {
-                "affine_augmentation": {
-                    "rotation_degrees": 7.0,
-                    "translation_fraction": 0.03,
-                    "scale_range": [0.97, 1.03],
-                }
-            },
+            "seed": 3192045323,
+            "model": {"backbone": B0_BACKBONE},
+            "optimizer": {"backbone_lr": 0.0004},
+            "trainer": {"batch_size": 16},
         },
     ),
-    ("12-backbone-lr-1e-4", {"seed": 668413129, "optimizer": {"backbone_lr": 0.0001}}),
-    ("13-dropout-0.1", {"seed": 3164955887, "model": {"dropout": 0.1}}),
-    ("14-series-dropout-0.15", {"seed": 2914916303, "model": {"series_dropout": 0.15}}),
-    ("15-warmup-2", {"seed": 3583329661, "optimizer": {"warmup_epochs": 2}}),
-    ("16-backbone-eval", {"seed": 542460559, "model": {"backbone_eval": True}}),
+    (
+        "01-epochs-20",
+        {
+            "seed": 2153440652,
+            "model": {"backbone": B0_BACKBONE},
+            "optimizer": {"backbone_lr": 0.0004},
+            "trainer": {"batch_size": 16, "max_epochs": 20, "patience": 20},
+        },
+    ),
+    (
+        "02-lr-sqrt2",
+        {
+            "seed": 2651922368,
+            "model": {"backbone": B0_BACKBONE},
+            "optimizer": {"backbone_lr": 0.0005657, "head_lr": 0.0008485},
+            "trainer": {"batch_size": 16},
+        },
+    ),
+    (
+        "03-lr-linear",
+        {
+            "seed": 1738295521,
+            "model": {"backbone": B0_BACKBONE},
+            "optimizer": {"backbone_lr": 0.0008, "head_lr": 0.0012},
+            "trainer": {"batch_size": 16},
+        },
+    ),
+    (
+        "04-warmup-2",
+        {
+            "seed": 2350805628,
+            "model": {"backbone": B0_BACKBONE},
+            "optimizer": {"backbone_lr": 0.0004, "warmup_epochs": 2},
+            "trainer": {"batch_size": 16},
+        },
+    ),
+    (
+        "05-wd-0.02",
+        {
+            "seed": 271435568,
+            "model": {"backbone": B0_BACKBONE},
+            "optimizer": {"backbone_lr": 0.0004, "weight_decay": 0.02},
+            "trainer": {"batch_size": 16},
+        },
+    ),
 )
 
 

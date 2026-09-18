@@ -3,6 +3,7 @@
 | Read when | Document |
 |---|---|
 | Reviewing the rejected EfficientNet backbones (B3, B0, B0 at a doubled backbone rate): the confirmed macro losses, the underfitting diagnosis that contradicts the EfficientNet training report, the per-label anatomy pattern, and the +0.0043 ensemble complementarity | [2026-09-18 EfficientNet backbone results](2026-09-18-efficientnet-backbone-results.md) |
+| Reviewing the b0 tuning queues: more epochs as the only axis that helps, batch size 16 buying no speed, learning rate scaling only when both groups move, and the void EMA run | [2026-09-18 b0 hyperparameter queues](2026-09-18-b0-hyperparameter-queues.md) |
 | Reviewing how macro AUC, gold-only AUC and BCE tracked the public leaderboard over the nineteen comparable submissions, with each metric's run-to-run noise: gold-only diagnostics carry no signal, and after 09-13 nothing ranks the submissions | [2026-09-18 local-public metric comparison](2026-09-18-local-public-metric-comparison.md) |
 | Reviewing the rejected count-normalised attention run (with random per-type allocation): a 0.0035 loss against the same recipe without it, worst on the menisci | [2026-09-17 count-normalised attention](2026-09-17-count-normalized-attention-result.md) |
 | Reviewing the 2026-09-18 overnight queue (seventeen runs, validation ×1, two controls): the rejected series-share and head changes, the clear backbone-eval and backbone-lr losses, and one indistinguishable cluster | [2026-09-18 overnight results](2026-09-18-overnight-results.md) |

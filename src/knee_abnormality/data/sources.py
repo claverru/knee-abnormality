@@ -1,22 +1,17 @@
 import logging
 import os
+from collections.abc import Collection
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 
 import polars as pl
 
-from knee_abnormality.config import DataConfig, ExperimentConfig
+from knee_abnormality.config import SERIES_LISTING_THREADS, DataConfig, ExperimentConfig
 from knee_abnormality.data.labels import STUDY, load_fold_labels
+from knee_abnormality.data.preprocessing.exclusions import KNOWN_BAD_SERIES
 
 SERIES = "SeriesInstanceUID"
-KNOWN_BAD_SERIES = {
-    "1.2.826.0.1.3680043.8.498.31160785238781353848727311763596115703",
-    "1.2.826.0.1.3680043.8.498.39396636671446532796538574315802928348",
-}
-KNOWN_BAD_INSTANCES = {
-    "1.2.826.0.1.3680043.8.498.66460523372602171398246641420761543626",
-    "1.2.826.0.1.3680043.8.498.41947538458330624797291612781685746320",
-}
 
 
 def list_series(series_dir: Path) -> list[Path]:
@@ -58,7 +53,10 @@ def resolve_raw_dir(data_root: Path, split: str) -> Path:
 
 
 def build_series_index(
-    data_root: Path, data: DataConfig, split: str
+    data_root: Path,
+    data: DataConfig,
+    split: str,
+    study_ids: Collection[str] | None = None,
 ) -> dict[str, StudySeries]:
     raw_dir = resolve_raw_dir(data_root, split)
     metadata_path = raw_dir / f"{split}_series.csv"
@@ -67,6 +65,8 @@ def build_series_index(
     required = {STUDY, SERIES, "Fluid_Sensitive", "Fat_Suppression", "Anatomical_Plane"}
     if set(frame.columns) != required:
         raise ValueError(f"Unexpected series metadata schema in {metadata_path}")
+    if study_ids is not None:
+        frame = frame.filter(pl.col(STUDY).is_in(list(study_ids)))
     type_to_slot = {
         (item.plane, item.fluid_sensitive, item.fat_suppression): slot
         for slot, item in enumerate(data.series_types)
@@ -110,16 +110,28 @@ def build_series_index(
     else:
         frame = frame.with_columns(pl.lit(None, dtype=pl.UInt32).alias("n_images"))
 
+    rows = list(frame.iter_rows(named=True))
+    directories = [image_root / row[STUDY] / row[SERIES] for row in rows]
+    unlisted = [index for index, row in enumerate(rows) if row["n_images"] is None]
+    listings: dict[int, tuple[Path, ...]] = {}
+    if unlisted:
+        with ThreadPoolExecutor(min(SERIES_LISTING_THREADS, len(unlisted))) as pool:
+            listings = {
+                index: tuple(listing)
+                for index, listing in zip(
+                    unlisted,
+                    pool.map(list_series, (directories[index] for index in unlisted)),
+                    strict=True,
+                )
+            }
+
     grouped: dict[str, list[list[SeriesCandidate]]] = {}
-    for row in frame.iter_rows(named=True):
+    for index, row in enumerate(rows):
         study_uid = row[STUDY]
         series_uid = row[SERIES]
-        directory = image_root / study_uid / series_uid
-        image_count = row["n_images"]
-        listing = None
-        if image_count is None:
-            listing = tuple(list_series(directory))
-            image_count = len(listing)
+        directory = directories[index]
+        listing = listings.get(index)
+        image_count = row["n_images"] if listing is None else len(listing)
         if series_uid in KNOWN_BAD_SERIES:
             image_count -= 1
         slot = type_to_slot[

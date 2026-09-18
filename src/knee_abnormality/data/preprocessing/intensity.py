@@ -33,7 +33,6 @@ def _normalize_pixels(
     np.subtract(pixels, low_value, out=pixels)
     np.multiply(pixels, gain, out=pixels)
     np.rint(pixels, out=pixels)
-    np.clip(pixels, np.float32(0.0), np.float32(255.0), out=pixels)
     output = pixels.astype(np.uint8)
     for index, (top, left, rows, columns) in enumerate(rects):
         output[index, :top] = 0

@@ -2,7 +2,7 @@
 
 Investigation-sized plans that need focus sessions with the user: diagnostics, a design, several
 runs or a new preprocessing identity. Start one only in a session with the user; when it starts,
-move its entry to [ongoing work](../ongoing.md) and remove it from this file in the same change.
+move its entry to [ongoing work](../ongoing/INDEX.md) and remove it from this file in the same change.
 Entries under [parked](#parked-until-a-specific-need) wait for a concrete need before they become
 candidates. Each entry says whether its motivation is measured or a hypothesis.
 
@@ -74,7 +74,7 @@ validation bag. The variability may also act as useful augmentation.
   population, not the levels or the estimator.
 - *Cost:* extra decoding, against the
   [select-before-decoding](../architecture/data-flow-and-iteration-speed.md#iteration-speed) rule
-  that the [loading speedups](loading-speedup.md) rely on.
+  that the [loading speedups](loading-speedup/INDEX.md) rely on.
 - *Stop if* the variability is negligible, the runtime cost is disproportionate, or a controlled
   run gains nothing.
 

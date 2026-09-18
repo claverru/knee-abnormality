@@ -7,12 +7,13 @@ import torch
 from torch.utils.data import DataLoader
 
 from knee_abnormality.config import (
-    INFERENCE_HEADER_THREADS,
+    INFERENCE_IO_THREADS,
     SLICES_PER_INPUT,
     TEST_IMAGE_MULTIPLIER,
     ExperimentConfig,
 )
 from knee_abnormality.data.dataset import KneeStudyDataset
+from knee_abnormality.data.labels import STUDY
 from knee_abnormality.data.sources import (
     build_series_index,
     prediction_studies,
@@ -195,16 +196,21 @@ def prediction_dataset(
     studies: pl.DataFrame,
     metadata_split: str,
     image_multiplier: int,
-    header_threads: int = INFERENCE_HEADER_THREADS,
+    io_threads: int = INFERENCE_IO_THREADS,
 ) -> KneeStudyDataset:
     return KneeStudyDataset(
         studies,
-        build_series_index(config.paths.data_root, config.data, metadata_split),
+        build_series_index(
+            config.paths.data_root,
+            config.data,
+            metadata_split,
+            studies[STUDY].to_list(),
+        ),
         config.data,
         targets,
         None,
         image_multiplier,
-        header_threads,
+        io_threads,
     )
 
 

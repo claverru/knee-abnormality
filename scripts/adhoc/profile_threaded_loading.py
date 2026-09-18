@@ -26,6 +26,11 @@ from knee_abnormality.data.dataset import (
     collate_studies,
 )
 from knee_abnormality.data.labels import STUDY
+from knee_abnormality.data.preprocessing import preparation as preparation_module
+from knee_abnormality.data.preprocessing.dicom import (
+    DecodedFrame,
+    read_frame,
+)
 from knee_abnormality.data.preprocessing.preparation import decode_slice
 from knee_abnormality.inference.engine import move_batch
 from knee_abnormality.modeling.model import KneeAbnormalityModel
@@ -47,9 +52,46 @@ class ProfileCLI(CLISettings):
     samples: int = Field(default=256, ge=8, le=1024)
     workers: int = Field(default=8, ge=1, le=16)
     decode_threads: int = Field(default=1, ge=1, le=4)
+    read_threads: int = Field(default=1, ge=1, le=16)
     passes: int = Field(default=2, ge=1, le=3)
     warmup_batches: int = Field(default=8, ge=1)
     main_threads: int = Field(default=16, ge=1, le=16)
+
+
+def read_payload(item):
+    path, descriptor = item
+    try:
+        with path.open("rb") as stream:
+            info = os.fstat(stream.fileno())
+            if (
+                (info.st_size, info.st_mtime_ns)
+                != (descriptor.file_size, descriptor.modified_ns)
+                or descriptor.offset < 0
+                or descriptor.length != descriptor.rows * descriptor.columns * 2
+                or descriptor.offset + descriptor.length != info.st_size
+            ):
+                return path, None
+            stream.seek(descriptor.offset)
+            payload = stream.read(descriptor.length)
+    except OSError:
+        return path, None
+    return path, payload if len(payload) == descriptor.length else None
+
+
+def frame_from_payload(payload, descriptor):
+    pixels = np.frombuffer(payload, dtype="<i2" if descriptor.signed else "<u2")
+    shift = 16 - descriptor.bits_stored
+    if shift:
+        pixels = np.left_shift(pixels, shift)
+        np.right_shift(pixels, shift, out=pixels)
+    pixels = pixels.reshape(descriptor.rows, descriptor.columns).astype(np.float32)
+    return DecodedFrame(
+        pixels,
+        descriptor.row_spacing,
+        descriptor.column_spacing,
+        descriptor.slope,
+        descriptor.intercept,
+    )
 
 
 class ThreadedStudyDataset(KneeStudyDataset):
@@ -64,6 +106,7 @@ class ThreadedStudyDataset(KneeStudyDataset):
         )
         self.set_epoch(source.epoch.value)
         self.decode_threads = decode_threads
+        self.read_threads = 1
         self._pool = None
         self._finalizer = None
 
@@ -79,7 +122,37 @@ class ThreadedStudyDataset(KneeStudyDataset):
         self._finalizer = None
         self._pool = None
 
+    def _read_threaded(self, records, spacing_mm, image_size):
+        wanted = {
+            record.path: record.descriptor
+            for record in records
+            if record.descriptor is not None
+        }
+        payloads = {}
+        if wanted:
+            with ThreadPoolExecutor(min(self.read_threads, len(wanted))) as pool:
+                for path, payload in pool.map(read_payload, wanted.items()):
+                    if payload is not None:
+                        payloads[path] = payload
+
+        def patched(path, descriptor):
+            payload = payloads.pop(path, None)
+            if payload is None or descriptor is None:
+                return read_frame(path, descriptor)
+            return frame_from_payload(payload, descriptor)
+
+        original = preparation_module.read_frame
+        preparation_module.read_frame = patched
+        try:
+            return KneeStudyDataset._decode_series(
+                self, records, spacing_mm, image_size
+            )
+        finally:
+            preparation_module.read_frame = original
+
     def _decode_series(self, records, spacing_mm, image_size):
+        if self.read_threads > 1:
+            return self._read_threaded(records, spacing_mm, image_size)
         if self.decode_threads == 1:
             return super()._decode_series(records, spacing_mm, image_size)
         if self._pool is None:
@@ -101,6 +174,16 @@ class ThreadedStudyDataset(KneeStudyDataset):
         )
 
 
+def page_cache_kb():
+    try:
+        for line in Path("/proc/meminfo").read_text().splitlines():
+            if line.startswith("Cached:"):
+                return int(line.split()[1])
+    except OSError:
+        return None
+    return None
+
+
 def batch_digest(batch):
     fields = {}
     for key, value in batch.items():
@@ -119,8 +202,9 @@ def audit(source, args):
     torch.set_num_threads(1)
     rows = []
     reference = None
-    for threads in (1, 2, 4):
-        dataset = ThreadedStudyDataset(source, threads)
+    for decode_threads, read_threads in ((1, 1), (2, 1), (4, 1), (1, 4), (1, 16)):
+        dataset = ThreadedStudyDataset(source, decode_threads)
+        dataset.read_threads = read_threads
         started = time.perf_counter()
         digests = []
         try:
@@ -131,7 +215,8 @@ def audit(source, args):
         if reference is None:
             reference = digests
         row = {
-            "decode_threads": threads,
+            "decode_threads": decode_threads,
+            "read_threads": read_threads,
             "seconds": time.perf_counter() - started,
             "matches_production": digests == reference,
             "studies": digests,
@@ -149,6 +234,7 @@ def profile(config, source, args):
     if args.samples % size or args.samples // size <= args.warmup_batches + 16:
         raise ValueError("Use whole batches and more than 16 measured batches")
     dataset = ThreadedStudyDataset(source, args.decode_threads)
+    dataset.read_threads = args.read_threads
     order = np.random.default_rng(config.seed).permutation(len(dataset)).tolist()
     loader = build_data_loader(
         Subset(dataset, order),
@@ -273,6 +359,7 @@ def run(args: ProfileCLI) -> None:
                 )
             },
             "epoch": 0,
+            "page_cache_kb": page_cache_kb(),
             "weights": "seeded random; no checkpoint saved"
             if args.mode == "gpu"
             else None,
