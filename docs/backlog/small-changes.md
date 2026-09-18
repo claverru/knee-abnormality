@@ -178,6 +178,59 @@ it needs one extra header per series and three decoded slices at Kaggle inferenc
 the preprocessing identity. Plane relabelling (one swapped study) stays out: it cost −0.21 ×1000
 on all three control checkpoints.
 
+## Per-plane sampler sigma
+
+`data.sampling_sigma_mm` is one width shared by every plane, but the three through-plane axes do
+not want the same width. On the [spatial importance
+map](../ongoing/peripheral-coverage.md#spatial-importance-map), expected utility per sampled slice
+across sigma 20-120 swings **0.677 on the axial axis, 0.310 coronal and 0.092 sagittal**: axial is
+about seven times as sensitive to width as sagittal. A shared sigma is therefore set almost
+entirely by the axial penalty, which is the mechanism behind the settled global results, where 30
+tied 40 (+0.000039) and 60, 80 and 120 all lost.
+
+- **Change:** move the width to a `sigma_mm` field on `SeriesTypeConfig`, defaulting to
+  `data.sampling_sigma_mm`, used by `target_depths` for that type only. No tensor shape, budget or
+  triplet count changes.
+- **First arm:** axial 30, coronal and sagittal 40. It differentiates the planes rather than moving
+  the global width again, which is the part the settled runs never tested.
+- **Sagittal width is close to free** (measured): 0.092 of utility across the whole sigma range, so
+  sagittal is where coverage can be spent differently at little cost.
+- **It contradicts the evidence shares above, deliberately.** The depth profiles put effusion and
+  synovitis evidence 30-50 mm superior in axial fluid, and narrowing axial starves that further.
+  The map measures where removing windows hurts the model we have; the profiles measure where the
+  labels' evidence is. The arm is a direct test of which one to sample for.
+- **Confounded in the narrowing direction:** the map is observational under the current sampler, so
+  it understates utility exactly where the sampler rarely goes and biases toward the centre. The
+  between-axis ratio is more trustworthy than the absolute optimum, which is why the arm
+  differentiates planes instead of narrowing all of them.
+
+## Per-type sampler centre offset (rejected)
+
+Triplet depths are drawn from a truncated normal centred on the study centre along each plane's
+through-plane axis (`target_depths` in `src/knee_abnormality/data/preprocessing/sampling.py`, width
+`data.sampling_sigma_mm`). The proposal was a `centre_offset_mm` field on `SeriesTypeConfig`,
+shifting that mean per type, motivated by the labels whose evidence sits beyond the sampler's reach
+([peripheral coverage](../ongoing/peripheral-coverage.md)).
+
+The [spatial importance map](../ongoing/peripheral-coverage.md#spatial-importance-map) rejects it
+without a run. One sampler serves all 12 targets, so the quantity it should place is total utility
+summed over targets, and that is already centred: the utility-weighted centroid is **+1.4 mm**
+superior on the axial through-plane axis, **-3.3 mm** on the coronal and **-0.9 mm** on the
+sagittal, against a 9 mm grid. Marginal total utility is flat within +/-30 mm of centre on all
+three axes and only falls outside it.
+
+Per-label pulls cannot overturn that, because the cross-target contrast is zero-sum by
+construction: standardizing each voxel across the 12 targets forces the mean pull on every axis to
+0.000, so effusion's superior preference (+1.23) is cancelled by the tibiofemoral OA pair's
+inferior one (-1.07, -1.05), and PF OA and synovitis anterior (+1.85, +1.13) by Baker's and MCL
+posterior (-1.23, -1.32). A shared sampler has no gradient to follow.
+
+**What this does not settle:** the map is observational, measured under the current sampler, so
+low-exposure regions carry few ablated windows and their utility is confounded with how often the
+sampler visits them. It shows no gradient toward moving the centre; it cannot show what a region
+the sampler rarely reaches would be worth if it were reached. Per-label sampling, as opposed to a
+per-type offset on one shared draw, is a different and much larger change that this does not cover.
+
 ## Per-plane spacing
 
 Every plane shares `data.spacing_mm` and `data.image_size`, but the in-plane axes differ

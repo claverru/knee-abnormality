@@ -94,7 +94,14 @@ had predicted the temperature and ×3 together at +0.0046 against +0.005 measure
   rounding step publicly and were tied on fold 0, while inference time grows with the count and
   counts toward the efficiency prize. The submit-to-scored times we have (9–11 minutes) mix
   different batch sizes and queueing noise, so a local profile at fixed batch is the way to
-  measure it.
+  measure it. The efficiency formula prices the trade: **0.001 of AUC is worth about 70 seconds**,
+  and ×3 removes roughly a quarter of the wall, so the two sides are within a factor of two of each
+  other ([the rate and the arithmetic](loading-speedup/candidates.md#reading-less-per-study-trades-score-for-wall)).
+- **External evidence points the same way** (unreplicated). On a public CoAtNet pipeline the same
+  weights read 0.924 at 42 evaluation windows and 0.927 at 62, and an 80-slice corpus reached
+  0.932 only at its full 78 windows, the author's point being that a checkpoint change and a
+  coverage change stop being separable once part of the volume goes unread
+  ([public research](../research/public-research.md#slice-density-and-the-board-2026-09-18-re-sweep)).
 - **Earlier contrary evidence is explained:** on 2026-09-11 baseline4 scored 0.912 at ×3 against
   0.913 at ×2 ([image count](../inference/inference-image-count-and-memory.md)). That was at
   τ 1.0, where extra triplets draw attention away from the good ones; sharper pooling is what
@@ -111,7 +118,9 @@ queue ([result](../validation/results/2026-09-17-overnight-results.md#weight-ave
 weights beat the live ones by about +0.00015 at the best epoch and +0.0005 at the last, and lower
 BCE; EMA costs +153 s per run and SWA +369 s. The EMA checkpoint scored 0.929 public, +0.001 over
 its own live weights (0.928). The gain is small against seed noise, so fold-0 experiments train
-without it until the final phase.
+without it until the final phase. A public CoAtNet pipeline reports the same null for SWA over six
+pairs: 0.9167 against 0.9150 on the 58 gold studies and 0.938 against 0.937 on the board
+([public research](../research/public-research.md#slice-density-and-the-board-2026-09-18-re-sweep)).
 
 - *Before adopting it:* validate the live weights only at the last epoch. The second validation
   pass is all of EMA's +153 s (about 17 s per epoch; training steps are unchanged), so this cuts

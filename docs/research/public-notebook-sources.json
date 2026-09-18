@@ -43,6 +43,14 @@
       "source_version_id": null,
       "source_filename": "rsna-knee-dinov2-at-meniscus-resolution.ipynb",
       "sha256": "387c8bedb0c87d8ca40f3d7b2bbe57ff1492681c37124f4aa05a5a8016f4c56b"
+    },
+    {
+      "url": "https://www.kaggle.com/code/jiweiliu/rsna-knee-fast-2xt4-inference",
+      "kernel_id": 134262775,
+      "source_version_id": null,
+      "source_filename": "rsna-knee-fast-2xt4-inference.ipynb",
+      "sha256": "f02ba20635ef3e68c859ddb17928c79d9971701ac42534bb094ea2a1ed4e79a3",
+      "checked_on": "2026-09-18"
     }
   ]
 }

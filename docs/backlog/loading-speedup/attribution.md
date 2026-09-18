@@ -18,8 +18,8 @@ Warm is 0.501 s per study. The four stages that matter, cold wall against cold C
 
 | Stage | Wall | CPU | Reading |
 |---|---:|---:|---|
-| Series indexing, less parsing | 30.98 s | 12.86 s | ~18 s of unhidden NFS wait over a 12–13 s CPU floor |
-| Frame reads (`decode_series` − resample) | 15.54 s | 17.38 s | CPU-bound: threads hide the reads, serial decode paces it |
+| Series indexing, less parsing | 30.98 s | 12.86 s | a 12–13 s CPU floor with the rest of the wall spent waiting |
+| Frame reads (`decode_series` − resample) | 15.54 s | 17.38 s | threads hide the reads; serial decode paces it |
 | Resample and crop | 8.02 s | 7.99 s | pure single-threaded CPU |
 | Header parsing (`parse_prefix`) | 5.16 s | 5.16 s | pure CPU, 0.289 ms per header |
 
@@ -28,7 +28,10 @@ Then sampling 5.46 s, quantiles 4.77 s, normalize 2.36 s, other preparation 2.72
 
 **CPU and wall are now separate measurements**, not a cold/warm split. CPU is `process_time`, so it
 counts the 16 io threads and legitimately exceeds wall on a threaded stage; read it against wall x
-cores. The pool threads' own `read_payload` total — 96.4 thread-seconds cold — is tracked apart and
+cores. **Wall minus CPU is therefore not a measurement of wait**: two threads can each burn 0.6 CPU
+seconds in one wall second while both also block, so the subtraction bounds nothing. The stage is
+latency-heavy because its wall collapses from 30.98 s to 7.96 s when the files are warm while its
+CPU barely moves — that comparison, not the subtraction, is the evidence. The pool threads' own `read_payload` total — 96.4 thread-seconds cold — is tracked apart and
 must never be added to a wall column, which is exactly the error the old instrument made.
 
 ## What the shipped changes bought
@@ -75,7 +78,12 @@ question the stage tables cannot:
 | Run | CPU busy | iowait | cgroup cores in use | GPU utilisation |
 |---|---:|---:|---:|---:|
 | Before the index changes | 88.3% | 2.5% | 3.12 of 4 | 21.4% |
-| After | **95.4%** | **1.5%** | 3.38 of 4 | 24.4% |
+| After | 95.4% | 1.5% | 3.38 of 4 | 24.4% |
+| After, **prediction window only** | **99.5%** | **0.3%** | **3.53 of 4** | 25.5% |
+
+The first two rows start at process spawn, so they dilute prediction with a 24 s setup window that
+runs at 55.7% busy on 2.15 cores. The analyzer now reports the two windows separately; the third
+row is the one to quote.
 
 **The two CPU columns have different scopes and must not be reconciled.** "CPU busy" and "iowait"
 come from `/proc/stat`, which counts the whole machine including anything outside our container;
@@ -91,6 +99,15 @@ of wall and 0.613 s of CPU. In production each GPU process has 8 loader workers 
 studies across a ~400 s prediction window, so a study costs about **4.9 loader-worker-seconds,
 6.3x the probe**. Nothing in the path got slower: 16 worker processes, each able to spawn 16 io
 threads per series, do not fit on four cores.
+
+### Measured again after the CPU cluster
+
+The [2026-09-18 cluster profile](../../inference/2026-09-18-kaggle-x4-profile-after-cpu-cluster.md)
+repeated the role measurement with trained weights: **loader-worker CPU 1,241.6 → 990.6 seconds,
+−20.2%**, worker wall 418.1 → 350.8 s, loader wait 197–213 → 135–138 s with forward unchanged. The
+box is still CPU-bound — 99.1% busy, 0.75% iowait, 3.47 of 4 cores — and the GPUs rose from 25.5%
+to 30.6%. The 3.5-cores model predicted ~75 s off the wall and the run gave 67 s, so the heuristic
+holds for a CPU saving of this size.
 
 ### The loader workers own 91% of it
 
@@ -111,17 +128,19 @@ deserialisation and kernel launches — the whole main-process block — cost 11
 and `pin_memory=False` and cutting loader-to-main bytes cannot be worth much. **Preparation CPU
 inside the loader workers is the bottleneck, and nothing else is close.**
 
-**Production costs 0.955 CPU-seconds per study against the probe's 0.613**, 1.56x, which is the
-price of 16 worker processes and their io threads contending for four cores. That overhead is
-itself a target: it is what a shared thread pool and a lower io-thread count attack, and it does
-not appear in any single-process measurement.
+**Production costs 0.955 CPU-seconds per study against the probe's 0.613**, a ratio of 1.56. The
+ratio is observed, not decomposed: contention between 16 worker processes and their io threads is
+the leading explanation, but different machines, batching, worker-side collation, instrumentation
+and allocator state all sit inside it. Treat it as the gap to explain, not as a constant to
+multiply by.
 
 ### The model that replaces the old ranking
 
-Wall is now predictable from CPU: 1,360 CPU-seconds over 4 cores would be 340 s, and prediction took
+Wall follows CPU while CPU binds: 1,360 CPU-seconds over 4 cores would be 340 s, and prediction took
 388 s, so the box converts CPU to wall at about **3.5 effective cores**. Removing `C` CPU-seconds
-from the run removes roughly `C / 3.5` seconds of wall, until the forward pass — 173–191 s — becomes
-the floor. A second saved on the 100-study cold probe is 13 probe-units per run, scaled by the 1.56x
+from the run should remove roughly `C / 3.5` seconds of wall, until the forward pass — 173–191 s —
+becomes the floor. This is a heuristic for ranking, and it applies to **CPU** savings: a wall second
+saved on overlapped I/O is a different quantity and does not convert the same way. A second saved on the 100-study cold probe is 13 probe-units per run, scaled by the 1.56x
 contention factor and divided by 3.5, so **one cold-100 second is worth about five seconds of run
 wall**, which is the translation the candidate list uses.
 
@@ -139,9 +158,11 @@ misleading.
   `list_series` whenever candidates are supplied. The listing is the separate 0.96 s row. What the
   bucket actually holds is the threaded 12 KiB prefix reads, record assembly, `modal_layout`, the
   sort, `summarize_series`, `summarize_tags` — and per-series thread-pool construction.
-- **Most of that row is NFS wait, and its CPU floor is what a shared pool can attack.** Measured
+- **Most of that row is latency, and its CPU floor is what a shared pool can attack.** Measured
   cold it is 30.98 s of wall for 12.86 s of CPU; warm the same work is 7.96 s of wall for 11.98 s
-  of CPU. So roughly 18 s is unhidden cold latency and 12–13 s is CPU. Within that CPU, `index_series`
+  of CPU. The CPU floor is 12–13 s either way and the cold wall is 23 s longer, which is latency
+  the threads did not hide — though with 16 threads running, wall minus CPU is not itself a
+  measurement of blocked time. Within that CPU, `index_series`
   builds a fresh `ThreadPoolExecutor(min(16, n_files))` **per series**: 6.60 ms per series at 16
   threads against 0.42 ms with one shared pool (local, 560 reps), ~553 pools per 100 studies, while
   the intrinsic non-parse CPU is roughly 3.1 s Kaggle-equivalent. That bounds the shared pool at
@@ -217,11 +238,12 @@ the fix keep the old shape, and `loading_summary` no longer reads them.
   reached **510.0 MB/s** on the same machine against the 271–318 MB/s the production run sustains,
   53–62% of ceiling, where the earlier 376.9 MB/s figure had put it at 72–84%. **Byte reduction no
   longer converts 1:1**, which demotes the row-trimmed payload read; CPU reduction is the lever.
-- **`INFERENCE_IO_THREADS` is unsettled, and reopened.** It ships at 16, but the 2026-09-18c header
-  probe put 64 threads 15% above 16 (1,128.4 against 977.7 files/s) where the previous run had them
-  within noise. Every thread measurement so far used one process on an idle kernel while production
-  runs 16 loader workers on four vCPUs. The sweep must come *after* the shared-pool change, or it
-  measures pool churn instead of thread count.
+- **`INFERENCE_IO_THREADS` is settled at 8, weakly.** The production sweep ran 1/2/4/8/16 threads at
+  16 workers after the shared pool landed: 1 thread is a clear loss at 457.9 s and 79.4% busy, and
+  2 through 16 sit within 2.6% of each other. io8 won both of its two pairs, so the constant moved
+  16 → 8, but the effect is 2–3% against a per-arm spread that reached 36 s
+  ([sweep](../../inference/2026-09-18-kaggle-x4-profile-after-cpu-cluster.md#the-io-thread-sweep-2026-09-18)).
+  The single-process header probe that favoured 64 threads does not describe production.
 - One constant covers header prefixes and frame payloads because nothing yet says they want
   different values; split it only if a sweep shows they do.
 

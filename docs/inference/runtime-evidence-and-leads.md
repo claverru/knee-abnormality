@@ -13,7 +13,11 @@ verified.
 | 2026-09-02 | Five small-model runs | 0.938 | About 40 minutes |
 | 2026-09-03 | Small-model five-fold ensemble | 0.944 | About 35 minutes |
 | 2026-09-03 | Small single model | 0.938 | About 20 minutes |
+| 2026-09-05 | Single-fold single model, top of both boards | 0.949 | About 5 minutes, submit to scored |
+| 2026-09-07 | CoAtNet-384 plus a five-fold DINO half, 94 windows per study | 0.937–0.938 | 9 hours, reported down to 29 minutes by 2026-09-07 |
 | 2026-09-08 | Best single-fold model | 0.944 | About 1 hour |
+| 2026-09-09 | Single fold | 0.941 | About 23 minutes |
+| 2026-09-11 | Preprocessing moved onto four CPU threads behind a queue | Not stated | Preprocessing about 1 hour to 15 minutes |
 
 Architecture identities, checkpoint versions, hardware, and inclusion of
 startup/data loading are incomplete. Do not equate the unnamed models across
@@ -62,6 +66,32 @@ The [official requirements above](submission-requirements-and-output-contract.md
 that uncertainty for final prize eligibility.
 
 TPU eligibility, hardware normalization, and medal eligibility were not resolved
-by the sources reviewed. An unverified claim that another entrant achieved
-0.948 in about five minutes lacks a linked run. Verify
-these details on the official competition pages before choosing a strategy.
+by the sources reviewed. Verify these details on the official competition pages
+before choosing a strategy.
+
+The five-minute claim recurred on 2026-09-17: the same competitor repeats it for
+a single-fold single model at 0.949, says read time is still 60–70% of that
+submission, and now leads both the score and the efficiency boards at 0.957. It
+is still a self-report without a linked run, but it is no longer isolated. Our
+own 0.936 submission holds efficiency rank 16 of 3,819 scored teams.
+
+## Techniques from the public two-T4 notebook (2026-09-18)
+
+Downloaded source of [jiweiliu's fast 2×T4 inference notebook](https://www.kaggle.com/code/jiweiliu/rsna-knee-fast-2xt4-inference)
+(kernel `134262775`, [manifest](../research/public-notebook-sources.json)), a
+re-engineering of the public 0.941 blend. Its timings are the author's, on a
+dual-V100 proxy over 58- and 144-study gates, for a blend of about 30 members,
+so they do not transfer to our single model; the mechanisms do.
+
+- **Cap the cuDNN workspace before importing torch.** `CUDNN_CONV_WSCAP_DBG=1024`
+  is set first, to keep eager convolution-search workspaces under the T4's
+  16 GiB.
+- **Scan DICOM headers once and reuse the order and spacing** across every arm
+  and pass rather than re-reading them per model: 206–209 s to 179 s on one stage
+  (13.5%) and 85.9 s to 78.3 s on another (8.8%), with identical predictions and
+  273 reused series matching the original file order and spacing exactly.
+- **Do not search the mounted competition directory for auxiliary files.** A
+  recursive manifest search there walks every test DICOM.
+- **Overlap decoding with scoring** (decode the next study block while the GPU
+  scores the current one) and share one decoded window tensor between two arms
+  that differ only by a flip, keeping both forwards.

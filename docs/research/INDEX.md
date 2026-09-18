@@ -3,7 +3,7 @@
 | Read when | Document |
 |---|---|
 | Getting the review's main recommendations, which competitions transfer and how they change the research direction | [Research overview](research-overview.md) |
-| Comparing public notebook implementations and discussion findings: reported successes, failures, uncertainties and report-derived supervision | [Public discussion and notebook findings](public-research.md) |
+| Comparing public notebook implementations and discussion findings: reported successes, failures, uncertainties, report-derived supervision, and the 2026-09-18 sweep of slice density, board standings and single-model scores | [Public discussion and notebook findings](public-research.md) |
 | Judging the review's date, coverage and evidence types before relying on a claim | [Evidence and coverage](evidence-and-coverage.md) |
 | Checking where project evidence came from: unverified working notes, public sources, label audits, research reviews, environment and metadata audits | [Provenance](provenance.md) |
 | Choosing input pixel spacing, field of view, crop placement and slice density from acquisition, image, crop-run, internal and external evidence | [Input resolution](input-resolution.md) |

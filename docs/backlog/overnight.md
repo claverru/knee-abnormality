@@ -42,6 +42,19 @@ any new run needs a control at the same multiplier.
 
 ## Candidates for later queues
 
+- **Denser per-type budgets** (hypothesis; the only untested side of a measured axis). Raise
+  `data.series_types[*].max_images` above today's 18/18/15/15/15/15 at a fixed sampler width and
+  crop. Only the cheaper side has been measured and it loses monotonically: 15/15/12/12/12/12
+  −0.0041 and 12/12/9/9/9/9 −0.0051, 20% and 37% faster
+  ([runs](../validation/results/2026-09-16-restored-code-hyperparameter-runs.md)). Public evidence
+  points the same way, with a CoAtNet pipeline gaining 0.917 → 0.926 → 0.928 → 0.932 as slice
+  density rose at a fixed reach
+  ([public research](../research/public-research.md#slice-density-and-the-board-2026-09-18-re-sweep)).
+  **Memory gates it:** the three measured steps peak at 12.6, 16.6 and 20.0 GiB, so
+  21/21/18/18/18/18 lands near 23.5 GiB and may not fit at batch size 8. Check the peak first; if
+  it does not fit, the arm needs a second change (batch size with accumulation, or
+  `model.checkpoint_backbone`) and stops being a one-change run. `data.study_triplet_total` is the
+  other knob on the same axis and 32 is already measured (+0.0036, inside the control spread).
 - **Other values of the existing augmentation families**, after `07-affine-off` (hypothesis):
   probabilities and strengths of the intensity, affine and noise families, one per run, such as
   the milder side of the strong affine that lost −0.0024, and reflection probabilities other than

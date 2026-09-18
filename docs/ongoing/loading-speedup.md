@@ -35,6 +35,22 @@ read and more io threads are all demoted, and wall now follows CPU at about 3.5 
 A repeat run also put run-to-run variance at ~2% of wall and ~15 s of loader wait, which is larger
 than the wait saving `in_order = False` appeared to give.
 
+**The bit-exact CPU cluster shipped in `041bd16`** — shared io pool, struct scan, `SeriesTags`
+memo, unsigned mask, `os.pread` for prefixes and payloads, both manual cross products, the
+`geometry_groups` prune, the `select_triplets` refactor, the resample column band, the dropped
+second clip and `astype(copy=False)`. Three deliverables, and only the first two are done: **code
+merged**; **audited** bit-exact over 800 studies — 4,422 series records, 13,266 header hashes, 800 collated
+batches, zero mismatches at 16 threads, after a 25-study pass at 1 and 16 threads — with 20.5–21.9%
+less preparation CPU per study locally; **measured in production** below. The audit covers 18% of
+the train split, which is where it stops. A control retrain on the new identity
+finished at 0.88477 macro AUC, inside the ×1 cohort spread, so the recipe is intact.
+
+**Measured on Kaggle with those trained weights: 418.1 → 350.8 s of worker wall, 3.109 → 3.705
+studies/s, loader-worker CPU 1,241.6 → 990.6 s** and the full command 440.5 → 371.4 s
+([profile](../inference/2026-09-18-kaggle-x4-profile-after-cpu-cluster.md)). Machine-adjusted, every
+changed stage improved except the resample column band, which looks like it bought nothing on
+Kaggle's vCPUs and needs re-measuring. The bundle `control-check-x4-tau075` is ready to submit.
+
 **The profiler was repaired the same day** and the loading cell re-run with it: CPU per stage,
 thread-safe accumulation, the pool-thread functions kept in a separate thread-seconds bucket, the
 frame stage taken from `decode_series`'s own wall, and the `build_series_index` double count gone
@@ -76,7 +92,12 @@ external sources. Two results change what to do next:
   shipped changes already require ([candidates](../backlog/loading-speedup/candidates.md), with the
   proposed experiment order).
 
-Still open: `INFERENCE_IO_THREADS` needs a Kaggle sweep against 16 loader workers on four vCPUs,
-after the shared-thread-pool change or it measures pool churn instead — and it is now more urgent,
-because 64 threads beat 16 by 15% on the latest header probe. Model load, at 15.5 s, is the new
-setup floor and nobody has profiled what inside it costs the time.
+**`INFERENCE_IO_THREADS` is now 8**, from a production sweep of 1/2/4/8/16 at 16 workers: 1 thread
+is a clear loss, 2 to 16 are flat within 2.6%, and io8 won both of its pairs
+([sweep](../inference/2026-09-18-kaggle-x4-profile-after-cpu-cluster.md#the-io-thread-sweep-2026-09-18)).
+The change is a constant in `config.py`, so it takes effect on the next bundle export; the
+submission bundle already exported carries 16.
+
+Still open: the loader **worker** count was never swept around the new thread setting — 8, 12 and 16
+at 8 threads. Model load, at 15.5–18.4 s, is the setup floor and nobody has profiled what inside it
+costs the time.

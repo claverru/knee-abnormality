@@ -61,8 +61,10 @@ Every thread number in this repository came from one process on an otherwise idl
 production runs 16 loader workers on four vCPUs. Per-worker throughput degrades with worker count
 through thread-pool contention and CPU oversubscription, and a CPU-time metric can hide what wall
 clock reveals. This is the open question behind
-[`INFERENCE_IO_THREADS`](attribution.md#structural-questions-still-open), and it is why the
-shared-pool change must land before the thread sweep.
+[`INFERENCE_IO_THREADS`](attribution.md#structural-questions-still-open). The shared pool that had
+to land first shipped on 2026-09-18, and the sweep itself needs `--io-threads`: the thread count is
+bound as a default argument of `prediction_dataset`, so assigning to the config constant after
+import changes nothing.
 
 ## Audit before shipping
 
@@ -72,8 +74,11 @@ series must produce identical `IndexedSeries` records, identical selections and 
 tensors, with zero pydicom fallbacks and zero prefix extensions. Compare every collated field, not
 just pixels.
 
-Audit scope has been the weak point. Existing audits cover 20,000 train files for the header parser,
-3,783 DICOMs for the pixel path and 3,200 synthetic cases for the sampler; none covers the full train
-split, and example-test files are usually missing. Widen the scope for anything that changes
-selection, since one seed change moves 44% of repeated-slot triplets
+Audit scope has been the weak point. The 2026-09-18 CPU cluster raised the bar: 800 studies, 4,422
+series records, 13,266 header hashes and 800 collated batches, compared against the pre-change
+sources run from an archived bundle in a separate process. That is the scope to match. Earlier
+audits cover 20,000 train files for the header parser, 3,783 DICOMs for the pixel path and 3,200
+synthetic cases for the sampler; none covers the full train split, and example-test files are
+usually missing. Widen the scope for anything that changes selection, since one seed change moves
+44% of repeated-slot triplets
 ([tie-break investigation](../../data-preparation/physical-sampling/evaluation-tie-break-investigation.md)).
