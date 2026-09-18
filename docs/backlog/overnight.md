@@ -11,23 +11,10 @@ from this file.
 
 ## Next queue
 
-One run, launched on its own rather than by the queue launcher. The 2026-09-17 queue finished
-([results](../validation/results/2026-09-17-overnight-results.md)); build the following queue from
-"Candidates for later queues" below.
-
-- **`robust-center-seed42`** (`data.robust_center_outlier_mm: 20.0`, the
-  [robust study centre](big-bets.md#implementation-2026-09-17); otherwise
-  `configs/training.yaml`, seed 42, fold 0). Config:
-  `outputs/training/configs/robust-center-seed42.yaml`. It is paired with
-  `outputs/training/ranked-filtered-seed42` (0.889573).
-
-  ```bash
-  rtk proxy uv run --locked just train robust-center-seed42 outputs/training/configs/robust-center-seed42.yaml 0
-  ```
-
-  Expectation: a tie. The inference-only check measured −0.0001 on fold 0 (mean of three
-  control checkpoints); on the `ranked-filtered-seed42` checkpoint it measured −0.00035. Seed
-  noise is 0.0015–0.0018, so one run cannot separate the two.
+Empty. The 2026-09-18 queue of seventeen runs finished
+([results](../validation/results/2026-09-18-overnight-results.md)); build the next one from
+"Candidates for later queues" below. Note that queue ran at `validation_image_multiplier: 1`, so
+any new run needs a control at the same multiplier.
 
 ## User decisions (2026-09-16)
 
@@ -55,11 +42,6 @@ One run, launched on its own rather than by the queue launcher. The 2026-09-17 q
 
 ## Candidates for later queues
 
-- **`optimizer.backbone_lr: 1e-4`, head `6e-4`** (research A1; weak). Backbone 1e-4 was part of
-  both losing 2026-09-12 configurations, the control (1e-4/3e-4) and the faster head (1e-4/1e-3,
-  −0.0012), while doubling both rates to 2e-4/6e-4 gained +0.0045
-  ([2026-09-12 results](../validation/results/2026-09-12-overnight-results.md)), and 3e-4/9e-4 now
-  ties. `08-slower-head` covers the ratio from the other side.
 - **Other values of the existing augmentation families**, after `07-affine-off` (hypothesis):
   probabilities and strengths of the intensity, affine and noise families, one per run, such as
   the milder side of the strong affine that lost −0.0024, and reflection probabilities other than
@@ -77,6 +59,17 @@ One run, launched on its own rather than by the queue launcher. The 2026-09-17 q
   MIL batches change every step.
 
 ## Already measured
+
+On the 2026-09-18 queue (fold 0, validation ×1, one unseeded run each, two controls spanning
+0.0026 with mean 0.885128; [results](../validation/results/2026-09-18-overnight-results.md)):
+`backbone_eval` −0.0100 and `backbone_lr 1e-4` −0.0030 lose clearly; gated attention +0.0010 and
+the per-target residual readout −0.0005 land at the control mean, so both are dropped; the
+repeated-series share topped the table at +0.0044 and then lost 0.004 publicly, so it is rejected;
+robust centre 20 mm +0.0037, 30 mm +0.0027 and 10 mm +0.0010, the study triplet total 26 +0.0033
+and 32 +0.0036, `model.dropout: 0.1` +0.0032, series dropout 0.15 +0.0030, 15 epochs +0.0023
+(peaks at epoch 11, 50% more time), milder affine +0.0015 and `warmup_epochs: 2` +0.0004 all sit
+inside one cluster narrower than the control spread.
+
 
 On the restored code, 2026-09-17 queue
 ([result](../validation/results/2026-09-17-overnight-results.md)), paired with its seed-42
