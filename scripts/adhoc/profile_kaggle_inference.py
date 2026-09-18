@@ -208,7 +208,7 @@ def timed(module, name):
 for module, name in (
     (engine_module, "build_series_index"),
     (dataset_module, "index_series"),
-    (series_module, "read_header"),
+    (series_module, "parse_prefix"),
     (dataset_module, "estimate_reference"),
     (dataset_module, "build_pool"),
     (dataset_module, "select_triplets"),
@@ -823,8 +823,8 @@ def loading_summary(result: dict) -> dict:
         )
         stages = {
             "series_listing_index": timing["build_series_index"],
-            "slice_headers": timing["read_header"],
-            "series_index_other": timing["index_series"] - timing["read_header"],
+            "slice_headers": timing["parse_prefix"],
+            "series_index_other": timing["index_series"] - timing["parse_prefix"],
             "geometry_and_sampling": sampling,
             "frame_reads": timing["read_frame"],
             "resample_crop": timing["resample_crop"],
@@ -847,12 +847,12 @@ def loading_summary(result: dict) -> dict:
             "total_seconds": total,
             "seconds_per_study": total / studies,
             "images": sum(item["images"] for item in value["studies"]),
-            "slice_headers": count["read_header"],
+            "slice_headers": count["parse_prefix"],
             "frames": count["read_frame"],
             "pydicom_frames": count["_read_pydicom_frame"],
             "milliseconds_per_header": 1000
-            * timing["read_header"]
-            / max(count["read_header"], 1),
+            * timing["parse_prefix"]
+            / max(count["parse_prefix"], 1),
             "milliseconds_per_frame": 1000
             * timing["read_frame"]
             / max(count["read_frame"], 1),

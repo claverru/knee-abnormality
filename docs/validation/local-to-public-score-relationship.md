@@ -1,5 +1,27 @@
 # Local-to-public score relationship
 
+Measured on this project's own submissions:
+[2026-09-18 local-public metric comparison](results/2026-09-18-local-public-metric-comparison.md).
+Over the nineteen submissions whose split, label table, validation multiplier and inference
+settings all match, fold-0 macro AUC correlates with the public score at Pearson +0.907 and
+soft-target BCE at +0.833, while **gold-only AUC and gold-only BCE carry no signal**. Since
+2026-09-13 the submitted models' local scores differ by less than one training run's noise, so no
+local metric ranks them.
+
+What follows from that:
+
+- Keep full-fold macro AUC as the selection metric; use BCE only as supporting evidence inside one
+  label table, and do not let eleven-study gold diagnostics influence a decision.
+- Treat a local difference below about 0.005 macro AUC in a single run as unresolved regardless of
+  which metric agrees, and prefer a leaderboard result over a sub-0.005 fold-0 difference when the
+  two disagree ([validation strategy](validation-strategy.md#what-a-comparison-can-resolve)).
+- Compare only submissions that differ in the trained model. Test density, attention temperature
+  and the label table each move the public score by more than recent recipe changes do.
+
+## Earlier working notes
+
+These predate the measurement above and are retained for context only.
+
 | Stage | Reported observation |
 |---|---|
 | 2026-08-28 | Label refinement using out-of-fold image predictions improved agreement with gold labels |

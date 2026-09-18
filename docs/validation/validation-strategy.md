@@ -8,9 +8,13 @@ every target in every fold. No study is forced into every fold's validation set.
 Earlier split artifacts remain available for reproducing historical runs.
 
 Use full held-out-fold macro AUC as the development selection metric, with
-gold-only and report-derived diagnostics kept separate. This mixed-label
+report-derived diagnostics kept separate. This mixed-label
 endpoint is not a public leaderboard score or an independently annotated
 4,407-study reference endpoint. Repeated tuning remains development selection.
+The eleven-study gold subset is recorded but decides nothing: across the comparable
+submissions gold-only AUC and gold-only BCE carry no public-score signal, and gold AUC has three
+times macro AUC's run-to-run noise
+([comparison](results/2026-09-18-local-public-metric-comparison.md)).
 
 The strategy selected on **2026-09-11** is to iterate on **fold 0** until near
 the end of the competition. Use its complete 904-study validation predictions
@@ -28,7 +32,7 @@ size, training budget, image dimensions, physical crop, slice budget and the con
 validation density (×1 since 2026-09-17) unless one of them is the factor. Training targets stay soft unless supervision
 is the factor; validation memberships and
 [frozen targets](project-validation-protocol.md#frozen-evaluation-targets-and-metrics)
-never change. Record full-fold and per-target AUC, gold diagnostics, BCE, runtime, peak
+never change. Record full-fold and per-target AUC, subgroup diagnostics, BCE, runtime, peak
 VRAM and the distinct slices and TTA passes used, and keep all 904 validation predictions
 with the run's [identities](../architecture/configs-and-experiment-artifacts.md). Export
 parity is not required for each run or submission.
@@ -52,6 +56,11 @@ parity is not required for each run or submission.
   `outputs/analysis/detection-floor-20260917/`.
 - **Validation multiplier:** scores at ×1 sit about 0.0035 below the same checkpoints at ×2, so
   runs are comparable only with a control at the same multiplier.
+- **Against the leaderboard**, macro AUC is the best available local predictor (Pearson +0.907
+  over nineteen comparable submissions) and BCE adds nothing on top of it, but neither resolves
+  the submissions made since 2026-09-13, whose local spread is below one run's noise
+  ([comparison](results/2026-09-18-local-public-metric-comparison.md)). Prefer a public result
+  over a sub-0.005 fold-0 difference.
 
 The user launches training and the
 [encoding diagnostic](manual-encoding-usage-diagnosis.md) manually; agents schedule no

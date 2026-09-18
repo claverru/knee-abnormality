@@ -1,6 +1,8 @@
 import math
+import os
 import re
 from collections import Counter
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -10,7 +12,8 @@ from knee_abnormality.data.preprocessing.dicom import (
     PREPARATION_ERRORS,
     NativePixelDescriptor,
     SeriesTags,
-    read_header,
+    parse_prefix,
+    read_prefix,
 )
 from knee_abnormality.data.preprocessing.geometry import (
     RELIABILITY,
@@ -19,7 +22,7 @@ from knee_abnormality.data.preprocessing.geometry import (
     SeriesGeometry,
     summarize_series,
 )
-from knee_abnormality.data.sources import KNOWN_BAD_INSTANCES
+from knee_abnormality.data.sources import KNOWN_BAD_INSTANCES, list_series
 
 REFORMAT_IMAGE_TYPES = ("DERIVED", "SECONDARY", "PROJECTION")
 REFORMAT_DESCRIPTION = re.compile(r"\bmpr\b|reformat")
@@ -127,15 +130,35 @@ def summarize_tags(
     )
 
 
-def index_series(series_dir: Path) -> IndexedSeries:
-    candidates = sorted(series_dir.glob("*.dcm"))
+def _safe_prefix(path: Path) -> tuple[bytes, os.stat_result] | None:
+    try:
+        return read_prefix(path)
+    except PREPARATION_ERRORS:
+        return None
+
+
+def index_series(
+    series_dir: Path,
+    threads: int = 1,
+    candidates: list[Path] | None = None,
+) -> IndexedSeries:
+    if candidates is None:
+        candidates = list_series(series_dir)
+    prefixes: dict[Path, tuple[bytes, os.stat_result]] = {}
+    if threads > 1 and len(candidates) > 1:
+        with ThreadPoolExecutor(min(threads, len(candidates))) as pool:
+            for path, prefix in zip(
+                candidates, pool.map(_safe_prefix, candidates), strict=True
+            ):
+                if prefix is not None:
+                    prefixes[path] = prefix
     records = []
     layouts = {}
     for fallback, path in enumerate(candidates):
         if path.stem in KNOWN_BAD_INSTANCES:
             continue
         try:
-            header = read_header(path)
+            header = parse_prefix(path, prefixes.get(path))
             physical = header.physical_position
             position = (
                 physical

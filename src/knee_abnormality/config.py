@@ -26,6 +26,7 @@ TEST_IMAGE_MULTIPLIER = 2
 ATTENTION_TEMPERATURE = 1.0
 INFERENCE_BATCH_SIZE = 4
 INFERENCE_NUM_WORKERS = 16
+INFERENCE_HEADER_THREADS = 4
 
 Identifier = Annotated[str, StringConstraints(pattern=r"^[A-Za-z0-9][A-Za-z0-9_.-]*$")]
 Fold = Annotated[StrictInt, Field(ge=0)]

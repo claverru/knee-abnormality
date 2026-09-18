@@ -32,6 +32,14 @@ gold studies.
 - **Top ranks:** ReXNet-200 1st of 40, DINOv3 ConvNeXt-T 2nd, CoAtNet 3rd, RegNetY-160 4th and
   ReXNet-300 7th.
 - **Low ranks:** EfficientNetV2-S 38th.
+- **EfficientNet tested directly and rejected, 2026-09-18.** B3 0.879449, B0 0.880331 and B0 at a
+  doubled backbone rate 0.883206 against 0.888476 for a matched ReXNet-200 control, all
+  bootstrap-confirmed losses. It underfits rather than overfits, and it trails specifically on
+  thin, localized anatomy (MCL, lateral meniscus, fracture) while matching or beating ReXNet-200
+  on diffuse findings (effusion, contusion, synovitis). It is a useful **ensemble partner**:
+  ReXNet + B3 + B0 averages +0.0043
+  ([result](../validation/results/2026-09-18-efficientnet-backbone-results.md)). This agrees with
+  the V2-S rank rather than contradicting it.
 - **Medical pretraining did not help:** RadImageNet ResNet-50 ranked 19th, MedDINOv3 25th,
   BiomedCLIP 35th, RadImageNet DenseNet-121 39th and RadiologyNet ResNet-50 40th.
 
@@ -104,7 +112,7 @@ solutions.
 |---|---|
 | ReXNet | Strong on this dataset at full size; `rexnetr_200` in lumbar 7th; small sizes untested |
 | ConvNeXt | Strong: lumbar classifiers (nano best in 3rd's comparison) and DINOv3 ConvNeXt-T 2nd here; atto to zepto untested |
-| EfficientNet (B0–B7, V2) | Consistent on other MRI tasks (lumbar localizers and ensembles, UW-Madison 1st); V2-S 38th here |
+| EfficientNet (B0–B7, V2) | Consistent on other MRI tasks (lumbar localizers and ensembles, UW-Madison 1st); **rejected on this dataset**: V2-S 38th, and B3/B0 measured 0.005–0.009 below ReXNet-200 in 2026-09-18 runs. Note the outside evidence is mostly the *localizer* role, not the classifier role this backbone fills |
 | CoAtNet, MaxViT, CAFormer, Swin | Lumbar classifiers; CoAtNet 3rd here, MaxViT-T 37th |
 | RegNetY/X | Some: `regnety_002` lumbar 5th localizer; RegNetY-160 4th here |
 | HGNetV2 | B5 only (lumbar 2nd localizer) |

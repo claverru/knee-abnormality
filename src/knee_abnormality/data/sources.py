@@ -1,4 +1,5 @@
 import logging
+import os
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -18,11 +19,20 @@ KNOWN_BAD_INSTANCES = {
 }
 
 
+def list_series(series_dir: Path) -> list[Path]:
+    return sorted(
+        Path(entry.path)
+        for entry in os.scandir(series_dir)
+        if entry.name.endswith(".dcm")
+    )
+
+
 @dataclass(frozen=True)
 class SeriesCandidate:
     uid: str
     directory: Path
     image_count: int
+    listing: tuple[Path, ...] | None = None
 
 
 @dataclass(frozen=True)
@@ -106,15 +116,19 @@ def build_series_index(
         series_uid = row[SERIES]
         directory = image_root / study_uid / series_uid
         image_count = row["n_images"]
+        listing = None
         if image_count is None:
-            image_count = sum(1 for _ in directory.glob("*.dcm"))
+            listing = tuple(list_series(directory))
+            image_count = len(listing)
         if series_uid in KNOWN_BAD_SERIES:
             image_count -= 1
         slot = type_to_slot[
             (row["Anatomical_Plane"], row["Fluid_Sensitive"], row["Fat_Suppression"])
         ]
         slots = grouped.setdefault(study_uid, [[] for _ in data.series_types])
-        slots[slot].append(SeriesCandidate(series_uid, directory, int(image_count)))
+        slots[slot].append(
+            SeriesCandidate(series_uid, directory, int(image_count), listing)
+        )
 
     result = {}
     for study_uid, slots in grouped.items():

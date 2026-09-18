@@ -12,6 +12,8 @@ from pydicom.multival import MultiValue
 
 from knee_abnormality.data.preprocessing.geometry import NativePose, PoseLayout
 
+PREFIX_BYTES = 12288
+EXTEND_ATTEMPTS = 3
 PREPARATION_ERRORS = (
     AttributeError,
     EOFError,
@@ -217,7 +219,304 @@ def _native_descriptor(dataset, pixel_element, info) -> NativePixelDescriptor | 
         return None
 
 
+EXPLICIT_LE = "1.2.840.10008.1.2.1"
+LONG_VR = {b"OB", b"OW", b"OF", b"OD", b"OL", b"OV", b"SQ", b"UT", b"UN", b"OK"}
+WANTED = {
+    0x00080008,
+    0x0008103E,
+    0x00180021,
+    0x00180022,
+    0x00180023,
+    0x00180080,
+    0x00180081,
+    0x00180091,
+    0x00181250,
+    0x00181310,
+    0x00181314,
+    0x00200011,
+    0x00200013,
+    0x00200032,
+    0x00200037,
+    0x00200052,
+    0x00201041,
+    0x00280002,
+    0x00280004,
+    0x00280008,
+    0x00280010,
+    0x00280011,
+    0x00280030,
+    0x00280100,
+    0x00280101,
+    0x00280102,
+    0x00280103,
+    0x00281052,
+    0x00281053,
+}
+PIXEL_TAGS = {0x7FE00008, 0x7FE00009, 0x7FE00010}
+
+
+def _strings(raw: bytes) -> tuple:
+    text = raw.decode("ascii", "replace").rstrip("\x00 ")
+    return tuple(part for item in text.split("\\") if (part := item.strip()))
+
+
+def _floats(raw: bytes) -> tuple:
+    try:
+        return tuple(float(value) for value in _strings(raw))
+    except ValueError:
+        return ()
+
+
+def _scan(buffer: memoryview, start: int, limit: int, values: dict) -> int | None:
+    offset = start
+    while offset + 8 <= limit:
+        group = int.from_bytes(buffer[offset : offset + 2], "little")
+        element = int.from_bytes(buffer[offset + 2 : offset + 4], "little")
+        tag = (group << 16) | element
+        vr = bytes(buffer[offset + 4 : offset + 6])
+        if vr in LONG_VR:
+            if offset + 12 > limit:
+                return None
+            length = int.from_bytes(buffer[offset + 8 : offset + 12], "little")
+            body = offset + 12
+        elif vr.isalpha() and vr.isupper():
+            length = int.from_bytes(buffer[offset + 6 : offset + 8], "little")
+            body = offset + 8
+        else:
+            raise Unsupported("implicit VR")
+        if tag in PIXEL_TAGS:
+            values["pixel"] = (tag, vr.decode(), length, body)
+            return body
+        if length == 0xFFFFFFFF:
+            raise Unsupported("undefined length")
+        if tag in WANTED:
+            if body + length > limit:
+                return None
+            values[tag] = (vr, bytes(buffer[body : body + length]))
+        offset = body + length
+        if group > 0x7FE0:
+            return offset
+    return None
+
+
+def _meta_end(buffer: memoryview, values: dict) -> int:
+    if bytes(buffer[128:132]) != b"DICM":
+        raise Unsupported("no preamble")
+    group = int.from_bytes(buffer[132:134], "little")
+    element = int.from_bytes(buffer[134:136], "little")
+    if (group, element) != (0x0002, 0x0000):
+        raise Unsupported("no group length")
+    length = int.from_bytes(buffer[140:144], "little")
+    end = 144 + length
+    offset = 144
+    while offset + 8 <= end:
+        group = int.from_bytes(buffer[offset : offset + 2], "little")
+        element = int.from_bytes(buffer[offset + 2 : offset + 4], "little")
+        vr = bytes(buffer[offset + 4 : offset + 6])
+        if vr in LONG_VR:
+            size = int.from_bytes(buffer[offset + 8 : offset + 12], "little")
+            body = offset + 12
+        else:
+            size = int.from_bytes(buffer[offset + 6 : offset + 8], "little")
+            body = offset + 8
+        if (group, element) == (0x0002, 0x0010):
+            values["syntax"] = (
+                bytes(buffer[body : body + size]).decode("ascii").rstrip("\x00 ")
+            )
+        offset = body + size
+    return end
+
+
+class Unsupported(Exception):
+    pass
+
+
+def parse_header(buffer: bytes, size: int, modified_ns: int) -> DicomHeader:
+    view = memoryview(buffer)
+    values: dict = {}
+    end = _meta_end(view, values)
+    if values.get("syntax") != EXPLICIT_LE:
+        raise Unsupported("transfer syntax")
+    if _scan(view, end, len(buffer), values) is None:
+        raise Unsupported("truncated prefix")
+
+    def numbers(tag):
+        item = values.get(tag)
+        return _floats(item[1]) if item else ()
+
+    def one(tag):
+        found = numbers(tag)
+        value = found[0] if len(found) == 1 else None
+        return value if value is not None and math.isfinite(value) else None
+
+    def strings(tag):
+        item = values.get(tag)
+        return _strings(item[1]) if item else ()
+
+    def text(tag):
+        found = strings(tag)
+        return "\\".join(found) if found else None
+
+    def integer(tag):
+        item = values.get(tag)
+        if not item:
+            return None
+        if item[0] == b"US":
+            return int.from_bytes(item[1][:2], "little")
+        found = numbers(tag)
+        return int(found[0]) if len(found) == 1 else None
+
+    orientation = numbers(0x00200037)
+    location = numbers(0x00200032)
+    physical = None
+    source = "filename"
+    if len(orientation) == 6 and len(location) == 3:
+        row = np.asarray(orientation[:3], dtype=np.float64)
+        column = np.asarray(orientation[3:], dtype=np.float64)
+        normal = np.cross(row, column)
+        candidate = float(np.dot(np.asarray(location, dtype=np.float64), normal))
+        if math.isfinite(candidate) and np.linalg.norm(normal) > 0:
+            physical, source = candidate, "patient"
+    if physical is None and 0x00201041 in values:
+        found = numbers(0x00201041)
+        if found and math.isfinite(found[0]):
+            physical, source = found[0], "slice_location"
+    instance = None
+    if physical is None and 0x00200013 in values:
+        found = numbers(0x00200013)
+        if len(found) == 1:
+            instance = found[0]
+
+    spacing = numbers(0x00280030)
+    rows = integer(0x00280010)
+    columns = integer(0x00280011)
+    pose = None
+    if len(location) == 3 and len(orientation) == 6 and len(spacing) == 2:
+        uid = values.get(0x00200052)
+        pose = NativePose(
+            location,
+            PoseLayout(
+                orientation,
+                spacing,
+                int(rows),
+                int(columns),
+                uid[1].decode("ascii").rstrip("\x00") if uid else None,
+            ),
+        )
+
+    descriptor = None
+    pixel = values.get("pixel")
+    if pixel is not None:
+        tag, vr, length, offset = pixel
+        bits_stored = integer(0x00280101)
+        representation = integer(0x00280103)
+        frames = integer(0x00280008)
+        photometric = strings(0x00280004)
+        if (
+            tag == 0x7FE00010
+            and vr in {"OB", "OW"}
+            and integer(0x00280002) == 1
+            and photometric
+            and photometric[0] == "MONOCHROME2"
+            and (frames if frames is not None else 1) == 1
+            and integer(0x00280100) == 16
+            and bits_stored is not None
+            and 1 <= bits_stored <= 16
+            and integer(0x00280102) == bits_stored - 1
+            and representation in {0, 1}
+            and rows is not None
+            and columns is not None
+            and rows >= 1
+            and columns >= 1
+            and length == rows * columns * 2
+            and offset + length == size
+            and len(spacing) == 2
+        ):
+            slope = one(0x00281053)
+            intercept = one(0x00281052)
+            descriptor = NativePixelDescriptor(
+                offset,
+                length,
+                size,
+                modified_ns,
+                rows,
+                columns,
+                bits_stored,
+                representation == 1,
+                float(spacing[0]),
+                float(spacing[1]),
+                1.0 if slope is None else slope,
+                0.0 if intercept is None else intercept,
+            )
+
+    matrix = numbers(0x00181310)
+    if values.get(0x00181310) and values[0x00181310][0] == b"US":
+        payload = values[0x00181310][1]
+        matrix = tuple(
+            float(int.from_bytes(payload[index : index + 2], "little"))
+            for index in range(0, len(payload) - 1, 2)
+        )
+    tags = SeriesTags(
+        one(0x00200011),
+        tuple(value.upper() for value in strings(0x00080008)),
+        text(0x0008103E),
+        one(0x00180080),
+        one(0x00180081),
+        one(0x00180091),
+        one(0x00181314),
+        text(0x00180023),
+        strings(0x00180021),
+        strings(0x00180022),
+        matrix,
+        text(0x00181250),
+    )
+    return DicomHeader(
+        physical,
+        instance,
+        descriptor,
+        "instance_number" if instance is not None else source,
+        pose,
+        tags,
+    )
+
+
 def read_header(path: Path) -> DicomHeader:
+    with path.open("rb") as stream:
+        buffer = stream.read(PREFIX_BYTES)
+        info = os.fstat(stream.fileno())
+        for _ in range(EXTEND_ATTEMPTS):
+            try:
+                return parse_header(buffer, info.st_size, info.st_mtime_ns)
+            except Unsupported as error:
+                if str(error) != "truncated prefix" or len(buffer) >= info.st_size:
+                    break
+                stream.seek(0)
+                buffer = stream.read(min(len(buffer) * 8, info.st_size))
+            except PREPARATION_ERRORS:
+                break
+    return pydicom_read_header(path)
+
+
+def parse_prefix(
+    path: Path, prefix: tuple[bytes, os.stat_result] | None
+) -> DicomHeader:
+    if prefix is None:
+        return read_header(path)
+    buffer, info = prefix
+    try:
+        return parse_header(buffer, info.st_size, info.st_mtime_ns)
+    except Unsupported:
+        return read_header(path)
+    except PREPARATION_ERRORS:
+        return pydicom_read_header(path)
+
+
+def read_prefix(path: Path) -> tuple[bytes, os.stat_result]:
+    with path.open("rb") as stream:
+        return stream.read(PREFIX_BYTES), os.fstat(stream.fileno())
+
+
+def pydicom_read_header(path: Path) -> DicomHeader:
     pixel_element = None
     with path.open("rb") as stream:
 

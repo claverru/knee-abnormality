@@ -1,5 +1,7 @@
 # 2026-09-13 local and public agreement after the split change
 
+Superseded by the [2026-09-18 comparison](2026-09-18-local-public-metric-comparison.md), which covers nineteen comparable submissions, adds gold-only AUC, BCE and per-metric run-to-run noise, and withdraws the gold-only diagnostic recommended below. The six-run cohort and its numbers remain valid as measured.
+
 Before the Tonylin experiment, local full-fold AUC tracked the public leaderboard strongly across the six
 distinct submitted checkpoints trained on `all_5fold_v3`. All use fold 0, seed 42,
 the same 904 validation studies, matching label/split/membership/input identities,

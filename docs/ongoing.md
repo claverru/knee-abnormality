@@ -18,10 +18,15 @@ live in the linked documents; follow the [work-tracking rules](../AGENTS.md#work
   ([submissions](inference/submissions/2026-09-18-temperature-and-count-submissions.md)). The
   temperature is free at inference and recipe-independent, so every later submission should carry
   it.
-- **Noise:** run-to-run noise comes from training (standard deviation about 0.0015–0.0018); a
-  single-run difference below about 0.003 carries no information, even at a matched seed. The
-  2026-09-18 controls span 0.0026 at ×1 validation
+- **Noise:** run-to-run noise comes from training (pooled standard deviation 0.00175 over eight
+  replicate runs); a single-run difference below about 0.003 carries no information, even at a
+  matched seed. The 2026-09-18 controls span 0.0026 at ×1 validation
   ([overnight results](validation/results/2026-09-18-overnight-results.md)).
+- **Local metrics against the leaderboard (measured 2026-09-18):** over the nineteen comparable
+  submissions macro AUC correlates at +0.907 and BCE at +0.833, gold-only AUC and gold-only BCE
+  at nothing, and since 09-13 the submissions differ locally by less than one run's noise, so no
+  local metric ranks them. Gold diagnostics decide nothing from here on
+  ([comparison](validation/results/2026-09-18-local-public-metric-comparison.md)).
 - **Validation at ×1** since 2026-09-17 (user decision): fold-0 scores from then on sit about
   0.0035 below the earlier ×2 numbers and are comparable only with a ×1 control. Submissions are
   unaffected; the bundle's test multiplier is separate.
@@ -30,6 +35,15 @@ live in the linked documents; follow the [work-tracking rules](../AGENTS.md#work
   control mean, inside the control spread, so the case is structural: it only ever adds triplets,
   for 5.5% more compute, and the studies missing two types stop being under-sampled. Fresh runs
   only; it changes the preprocessing identity.
+- **Rejected 2026-09-18:** EfficientNet backbones. B3 scored 0.879449, B0 0.880331 and B0 at
+  `backbone_lr` 4e-4 0.883206, against 0.888476 for the matched ReXNet-200 control; the macro
+  losses are bootstrap-confirmed. EfficientNet *underfits* here rather than overfitting, which
+  points the two hypotheses in
+  [EfficientNet training](research/efficientnet-training.md) the wrong way, and multiply-add
+  savings did not convert to wall time. The family is kept only as an ensemble partner: ReXNet +
+  B3 + B0-4e-4 scores 0.892798, +0.0043 with the interval excluding zero
+  ([result](validation/results/2026-09-18-efficientnet-backbone-results.md)). The mapping code and
+  the three registry entries stay in `modeling/spatial_tokens.py`.
 - **Dropped:** learned crop selection ([record](history/crop-selection-investigation.md)).
 - **Strategy:** iterate on fold 0; folds, ensembling, bigger images, TTA and weight averaging wait
   for the [final phase](backlog/endgame.md)
@@ -100,6 +114,20 @@ of the repeated-series evidence that does not starve other types.
 Investigation started 2026-09-17 with the user. The candidate changes, every measurement, the
 closed regressions, the retrain constraint and the prior art now live in one document:
 [loading speedup](backlog/loading-speedup.md).
+
+**Changes 2, 3 and 4 are implemented as of 2026-09-18 and ship with the next retrain.**
+`read_header` is now the raw explicit-VR parser with a pydicom fallback, `index_series` reuses the
+single `scandir` listing that `build_series_index` already made, and header reads thread behind
+`KneeStudyDataset(header_threads=...)`. The default is 1, so training and validation stay serial;
+only inference threads, at `INFERENCE_HEADER_THREADS = 4`. Prepared batches are identical to the
+pydicom path in every audit.
+
+Measured beforehand through the local dataloader with the page cache dropped before each arm
+(`compare-header-implementations`): 1.22× on the cold first pass, nothing afterwards, and threading
+flat locally, which
+[confirms that training does not benefit](backlog/loading-speedup.md#training-is-not-a-beneficiary).
+The gain is on Kaggle NFS. Open: the `INFERENCE_HEADER_THREADS` value needs a Kaggle sweep against
+16 loader workers on four vCPUs; 4 is a placeholder.
 
 ## Next
 
