@@ -3,6 +3,7 @@
 | Read when | Document |
 |---|---|
 | Reviewing the rejected count-normalised attention run (with random per-type allocation): a 0.0035 loss against the same recipe without it, worst on the menisci | [2026-09-17 count-normalised attention](2026-09-17-count-normalized-attention-result.md) |
+| Reviewing the 2026-09-18 overnight queue (seventeen runs, validation ×1, two controls): the rejected series-share and head changes, the clear backbone-eval and backbone-lr losses, and one indistinguishable cluster | [2026-09-18 overnight results](2026-09-18-overnight-results.md) |
 | Reviewing the attention temperature measured on frozen checkpoints (+0.0024 at tau 0.75, inference only) and the bag-size question: a real plateau, a spread penalty only at very large bags | [2026-09-17 attention temperature](2026-09-17-attention-temperature.md) |
 | Reviewing the random per-type allocation run (`allocation-concentration`, unseeded): a macro tie with the fixed budgets, per-target and family deltas, and what it unblocks | [2026-09-17 random per-type allocation](2026-09-17-allocation-concentration-result.md) |
 | Reviewing test-time triplet allocation on the fold-0 token cache: value curves, Neyman, search-theory and proportional rules that failed to confirm, missing-type substitution, repeated-series value and depth profiles | [2026-09-17 test-time allocation](2026-09-17-test-time-allocation.md) |

@@ -21,7 +21,11 @@ from knee_abnormality.data.preprocessing.preparation import (
     decode_series,
     prepare_series,
 )
-from knee_abnormality.data.preprocessing.sampling import build_pool, select_triplets
+from knee_abnormality.data.preprocessing.sampling import (
+    build_pool,
+    select_triplets,
+    study_budgets,
+)
 from knee_abnormality.data.preprocessing.series import IndexedSeries, index_series
 from knee_abnormality.data.sources import SeriesCandidate, StudySeries
 
@@ -135,7 +139,7 @@ class KneeStudyDataset(Dataset):
             failures.append(f"{candidate.uid}: {type(error).__name__}: {error}")
             return None
 
-    def _prepare_slot(self, study, slot, failures):
+    def _slot_sources(self, study, slot, failures):
         excluded = self._excluded_series[study.uid]
         candidates = {c.uid: c for c in study.slots[slot] if c.uid not in excluded}
         sources = []
@@ -144,6 +148,23 @@ class KneeStudyDataset(Dataset):
                 sources.append((uid, self._indexed(candidate)))
             except PREPARATION_ERRORS as error:
                 failures.append(f"{uid}: {type(error).__name__}: {error}")
+        return candidates, sources
+
+    def _study_budgets(self, slot_sources):
+        multiplier = self.image_limit_multiplier
+        base = tuple(
+            kind.max_images * multiplier // 3 for kind in self.data.series_types
+        )
+        total = self.data.study_triplet_total
+        return study_budgets(
+            base,
+            tuple(len(sources) for _, sources in slot_sources),
+            total * multiplier if total is not None else None,
+            self.data.repeated_series_share,
+        )
+
+    def _prepare_slot(self, study, slot, candidates, sources, budget, failures):
+        excluded = self._excluded_series[study.uid]
         kind = self.data.series_types[slot]
         radius = self.data.image_size * self.data.spacing_mm / 2
         failed_paths, failed_sources, cache = set(), set(), {}
@@ -160,7 +181,7 @@ class KneeStudyDataset(Dataset):
             )
             selection = select_triplets(
                 pool,
-                kind.max_images * self.image_limit_multiplier // 3,
+                budget,
                 self.data.sampling_sigma_mm,
                 radius,
                 study.uid,
@@ -212,8 +233,16 @@ class KneeStudyDataset(Dataset):
         prepared = []
         failures = []
         sampling = []
+        slot_sources = [
+            self._slot_sources(study, slot, failures)
+            for slot in range(len(study.slots))
+        ]
+        budgets = self._study_budgets(slot_sources)
         for slot in range(len(study.slots)):
-            values, metadata = self._prepare_slot(study, slot, failures)
+            candidates, sources = slot_sources[slot]
+            values, metadata = self._prepare_slot(
+                study, slot, candidates, sources, budgets[slot], failures
+            )
             prepared.append(values)
             sampling.append(metadata)
         if not any(prepared):

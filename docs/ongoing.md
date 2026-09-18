@@ -3,7 +3,7 @@
 A snapshot of where the project stands and what comes next, so the thread is not lost. Details
 live in the linked documents; follow the [work-tracking rules](../AGENTS.md#work-tracking).
 
-## State (2026-09-17)
+## State (2026-09-18)
 
 - **Code:** the full-slice recipe ([current model](modeling/current-model.md)) with series
   filtering and deterministic source ranking (preprocessing identity
@@ -12,10 +12,19 @@ live in the linked documents; follow the [work-tracking rules](../AGENTS.md#work
   Its seeds 42–44 scored 0.889573, 0.889650 and 0.892795 on fold 0 (mean 0.890673), a tie with
   the previous code's seed controls, and seed 42 scored 0.933 public
   ([result](validation/results/2026-09-17-ranked-filtered-result.md)).
-- **Best submission:** the reflection/sigma-40 champion, 0.936 public
-  ([fast runtime](inference/submissions/2026-09-15-fast-champion-submission.md)).
+- **Best submission:** `ranked-filtered-seed42` with attention temperature 0.75 in the weights and
+  ×4 evaluation images, **0.939 public** (×3 scored 0.938 twice), against 0.933 for the same
+  checkpoint at temperature 1.0 and ×2, and 0.936 for the previous reflection/sigma-40 champion
+  ([submissions](inference/submissions/2026-09-18-temperature-and-count-submissions.md)). The
+  temperature is free at inference and recipe-independent, so every later submission should carry
+  it.
 - **Noise:** run-to-run noise comes from training (standard deviation about 0.0015–0.0018); a
-  single-run difference below about 0.003 carries no information, even at a matched seed.
+  single-run difference below about 0.003 carries no information, even at a matched seed. The
+  2026-09-18 controls span 0.0026 at ×1 validation
+  ([overnight results](validation/results/2026-09-18-overnight-results.md)).
+- **Validation at ×1** since 2026-09-17 (user decision): fold-0 scores from then on sit about
+  0.0035 below the earlier ×2 numbers and are comparable only with a ×1 control. Submissions are
+  unaffected; the bundle's test multiplier is separate.
 - **Dropped:** learned crop selection ([record](history/crop-selection-investigation.md)).
 - **Strategy:** iterate on fold 0; folds, ensembling, bigger images, TTA and weight averaging wait
   for the [final phase](backlog/endgame.md)
@@ -164,6 +173,13 @@ Investigation started 2026-09-17 with the user.
   neutral-to-negative at inference
   ([result](validation/results/2026-09-17-count-normalized-attention-result.md)). The option was
   removed from the code.
+
+- **The 2026-09-18 overnight queue settled several things**
+  ([results](validation/results/2026-09-18-overnight-results.md)): `backbone_eval` (−0.0100) and
+  `backbone_lr 1e-4` (−0.0030) lose clearly; gated attention and the per-target residual readout
+  land at or below the control mean, so both head changes from the review document are dropped;
+  `series-share` topped fold 0 and then lost 0.004 publicly, so it is rejected; everything else
+  sits inside one cluster narrower than the control spread.
 
 **Open decisions (for the user):**
 1. **The missing-type fill (Next, item 1):** drop it. As specified it is worse than losing the
