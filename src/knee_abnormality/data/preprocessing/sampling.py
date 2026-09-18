@@ -390,6 +390,38 @@ def geometry_groups(
     )
 
 
+def largest_remainder(total: int, weights: np.ndarray) -> np.ndarray:
+    weights = np.asarray(weights, dtype=float)
+    if weights.sum() <= 0:
+        return np.zeros(len(weights), dtype=np.int64)
+    raw = weights / weights.sum() * total
+    counts = np.floor(raw).astype(np.int64)
+    order = np.argsort(-(raw - counts), kind="stable")
+    counts[order[: int(total) - int(counts.sum())]] += 1
+    return counts
+
+
+def study_budgets(
+    base: tuple[int, ...],
+    sources: tuple[int, ...],
+    total: int | None,
+    repeated_share: float | None,
+) -> tuple[int, ...]:
+    present = np.asarray(sources, dtype=np.int64) > 0
+    counts = np.asarray(base, dtype=np.int64) * present
+    if not present.any():
+        return tuple(int(value) for value in counts)
+    if repeated_share is not None:
+        weights = counts * (
+            1 + repeated_share * np.maximum(np.asarray(sources) - 1, 0) * present
+        )
+        counts = largest_remainder(int(counts.sum()), weights)
+    elif total is not None and counts.sum() < total:
+        counts = largest_remainder(total, counts.astype(float))
+    counts = np.where(present, counts, np.asarray(base, dtype=np.int64))
+    return tuple(int(value) for value in counts)
+
+
 def select_triplets(
     pool: CandidatePool,
     budget: int,

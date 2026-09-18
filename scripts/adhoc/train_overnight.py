@@ -41,30 +41,53 @@ SUMMARY_HEADER = [
 ]
 
 EXPERIMENTS = (
-    ("00-control", {}),
-    ("01-control-seed-43", {"seed": 43}),
-    ("02-control-seed-44", {"seed": 44}),
+    ("00-control", {"seed": 3138278368}),
     (
-        "03-ema-0.999",
-        {"optimizer": {"weight_averaging": {"method": "ema", "decay": 0.999}}},
+        "01-robust-center-20",
+        {"seed": 3816779311, "data": {"robust_center_outlier_mm": 20.0}},
     ),
     (
-        "04-swa-3",
-        {"optimizer": {"weight_averaging": {"method": "swa", "epochs": 3}}},
+        "02-robust-center-10",
+        {"seed": 1704113267, "data": {"robust_center_outlier_mm": 10.0}},
     ),
-    ("05-epochs-20", {"trainer": {"max_epochs": 20, "patience": 20}}),
-    ("06-beta2-0.99", {"optimizer": {"beta2": 0.99}}),
-    ("07-affine-off", {"data": {"affine_augmentation": {"probability": 0.0}}}),
-    ("08-slower-head", {"optimizer": {"head_lr": 0.0003}}),
-    ("09-warmup-0", {"optimizer": {"warmup_epochs": 0}}),
     (
-        "10-clip-0.001",
-        {"data": {"lower_quantile": 0.001, "upper_quantile": 0.999}},
+        "03-robust-center-30",
+        {"seed": 3158414665, "data": {"robust_center_outlier_mm": 30.0}},
     ),
-    ("11-clip-0.01", {"data": {"lower_quantile": 0.01, "upper_quantile": 0.99}}),
-    ("12-grad-clip-0.5", {"trainer": {"gradient_clip_val": 0.5}}),
-    ("13-grad-clip-5", {"trainer": {"gradient_clip_val": 5.0}}),
-    ("14-noise-0.3", {"data": {"noise_augmentation": {"probability": 0.3}}}),
+    ("04-total-topup-26", {"seed": 597332668, "data": {"study_triplet_total": 26}}),
+    ("05-total-topup-32", {"seed": 2220158862, "data": {"study_triplet_total": 32}}),
+    (
+        "06-series-share-0.5",
+        {"seed": 3282371002, "data": {"repeated_series_share": 0.5}},
+    ),
+    (
+        "07-series-share-1.0",
+        {"seed": 2949235318, "data": {"repeated_series_share": 1.0}},
+    ),
+    ("08-gated-attention", {"seed": 2689869777, "model": {"gated_attention": True}}),
+    ("09-residual-readout", {"seed": 3023200956, "model": {"residual_readout": True}}),
+    (
+        "10-epochs-15",
+        {"seed": 771844210, "trainer": {"max_epochs": 15, "patience": 15}},
+    ),
+    (
+        "11-affine-mild",
+        {
+            "seed": 3751512834,
+            "data": {
+                "affine_augmentation": {
+                    "rotation_degrees": 7.0,
+                    "translation_fraction": 0.03,
+                    "scale_range": [0.97, 1.03],
+                }
+            },
+        },
+    ),
+    ("12-backbone-lr-1e-4", {"seed": 668413129, "optimizer": {"backbone_lr": 0.0001}}),
+    ("13-dropout-0.1", {"seed": 3164955887, "model": {"dropout": 0.1}}),
+    ("14-series-dropout-0.15", {"seed": 2914916303, "model": {"series_dropout": 0.15}}),
+    ("15-warmup-2", {"seed": 3583329661, "optimizer": {"warmup_epochs": 2}}),
+    ("16-backbone-eval", {"seed": 542460559, "model": {"backbone_eval": True}}),
 )
 
 
@@ -136,6 +159,7 @@ def prepare_queue(
     base = load_config(config_path).model_dump(mode="json")
     base["seed"] = 42
     base["validation"] = {"split": "all_5fold_v3", "folds": [0]}
+    base["data"]["validation_image_multiplier"] = 1
     configs = []
     overrides = {}
     for name, changes in EXPERIMENTS:

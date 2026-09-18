@@ -4,6 +4,9 @@ All 27 Kaggle competition submissions, newest first, with submission times in UT
 
 | Submitted (UTC) | Submission | Public AUC | ID | Record |
 |---|---|---:|---:|---|
+| 2026-09-18 06:28 | `ranked-filtered-seed42`, attention temperature 0.75 in the weights, 4x images, batch 2 | **0.939** | – | [Temperature and count](2026-09-18-temperature-and-count-submissions.md) |
+| 2026-09-18 06:22 | `07-series-share-1.0` (`repeated_series_share: 1.0`), default inference | 0.929 | – | [Temperature and count](2026-09-18-temperature-and-count-submissions.md) |
+| 2026-09-18 06:11 | `ranked-filtered-seed42`, attention temperature 0.75 in the weights, 3x images, batch 2 (submitted twice) | 0.938 | 56322551 | [Temperature and count](2026-09-18-temperature-and-count-submissions.md) |
 | 2026-09-17 11:40 | Ranked-filtered seed 42 (series filtering and deterministic source ranking, fold-0 0.889573); 13m 16s launch to score | 0.933 | 56303522 | [Ranked-filtered](2026-09-17-ranked-filtered-submission.md) |
 | 2026-09-17 07:58 | Seed-44 control (`02-control-seed-44`, fold-0 0.891627) | 0.931 | 56299154 | [Seed controls](2026-09-17-seed-control-submissions.md) |
 | 2026-09-17 07:58 | Seed-43 control (`01-control-seed-43`, fold-0 0.889837) | 0.931 | 56299151 | [Seed controls](2026-09-17-seed-control-submissions.md) |
