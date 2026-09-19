@@ -89,6 +89,23 @@ code also completed ([submission](../inference/submissions/2026-09-17-ranked-fil
 - **Batch composition** (measured). Under BF16, the same study predicted at batch size 1 and 8
   differs by up to 0.006 in probability
   ([census inference check](../metadata/series-filtering-census.md#inference-effect-fold-0)).
+- **Ensemble members share one loader** (inferred from code). A multi-checkpoint bundle decodes
+  and samples each study once and runs every member on the same tensors, so the whole `data`
+  section belongs to the bundle rather than to the member. A member trained under a different
+  `sampling_sigma_fraction`, `spacing_mm`, `image_size`, `series_types` or `study_triplet_total`
+  would run under another model's preprocessing and degrade **silently** — no crash, just a lower
+  score indistinguishable from ordinary noise. Export validates that every member's `data` config
+  matches and refuses a mismatch, so the guard is the only thing between a mixed bundle and an
+  invisible regression; check it first if an ensemble scores below its members. Members may still
+  differ freely in their `model` section, including `backbone`, because the spatial token mapping
+  sits downstream of the CNN.
+- **Supporting mixed loading is affordable but unbuilt** (measured). Sampler-only differences
+  would need the union of the members' selected slices decoded once, and geometry differences one
+  resample per geometry over the same decoded frames: decoding costs 15.54 s per 100 studies
+  against 8.02 s for resample and crop
+  ([profile](../inference/2026-09-18-kaggle-x4-profile-after-index-changes.md#cold-loading-stages-100-studies-with-cpu)),
+  so a second geometry is about a third of a second pass, not a doubling. Neither is implemented,
+  which is why the guard above is a hard refusal rather than a fallback.
 - **Public score noise is not a bug** (measured). The same recipe trained four times scored
   0.928–0.934 publicly ([seed controls](../inference/submissions/2026-09-17-seed-control-submissions.md)),
   so a public drop below about 0.006 needs no failure explanation.

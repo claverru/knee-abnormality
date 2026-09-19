@@ -28,8 +28,10 @@ operations can use the RTX 3090 Tensor Cores.
 
 The shared [physical sampler](../data-preparation/physical-sampling/implemented-sampler.md) selects
 Gaussian target depths about the accepted study center, then chooses suppliers
-independently of slice count. `data.sampling_sigma_mm` (80.0 at the time; 40.0 in the
-current baseline) is the only variable sampling parameter. Deterministic validation uses midpoint quantiles; training
+independently of slice count. `data.sampling_sigma_mm` (80.0 at the time; 40.0 later) was
+the only variable sampling parameter and has since been replaced by
+`data.sampling_sigma_fraction` (0.76 in the current baseline), which scales the width with
+each candidate pool's own acquired reach instead of a fixed millimetre value. Deterministic validation uses midpoint quantiles; training
 uses stratified random quantiles. Both permit overlapping consecutive triplets
 and assign each distinct middle-plane geometry at most once per type.
 Study geometry, acquisition-midpoint 1D positions, crops, augmentations and model

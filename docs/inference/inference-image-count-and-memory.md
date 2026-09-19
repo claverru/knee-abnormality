@@ -17,8 +17,11 @@ SHA-256 `002778da78be2bb535618f8cb307ee631b94ca561a47e5f691964d879f0d276d`.
 The 2× and 3× submissions share batch size 2; the earlier 1× submission used
 batch size 8. These public scores favor 2× for current single-fold iteration.
 The intervals include queue and evaluation time plus up to one 30-second
-polling interval; they do not isolate model inference or establish that 3× is
-computationally faster.
+polling interval, so they do not isolate model inference. That 3× was the faster
+run is nonetheless established: the efficiency leaderboard selected the 3×
+submission over the higher-scoring 2× one, which requires Kaggle's measured
+runtime for 3× to be at least 71 s below the 2× run's
+([efficiency leaderboard](efficiency-leaderboard.md#each-pick-is-a-measurement-of-our-hidden-runtimes)).
 
 On 2026-09-11, a bounded FP32 forward profile on the local RTX 3090 used two
 studies selected for high available slice counts at 3×. No training was run.

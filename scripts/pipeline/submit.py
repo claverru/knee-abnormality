@@ -15,7 +15,13 @@ from pydantic_settings import SettingsError
 from requests import HTTPError
 
 from knee_abnormality.cli import CLISettings
-from knee_abnormality.inference.bundle import verify_bundle
+from knee_abnormality.inference.bundle import (
+    bundle_validation_multiplier,
+    submission_description,
+    submission_settings,
+    submission_validation,
+    verify_bundle,
+)
 from knee_abnormality.provenance import sha256_file
 
 KaggleId = Annotated[
@@ -29,8 +35,7 @@ class SubmitCLI(CLISettings):
     notebook: KaggleId
     record: Path
     competition: str = "rsna-knee-abnormality-detection"
-    message: str = "Fold 0 inference bundle"
-    dataset_title: str | None = None
+    label: str
     dataset_license: str = "other"
     accelerator: str = "NvidiaTeslaT4"
     notebook_timeout_seconds: int = Field(default=32400, gt=0, le=32400)
@@ -183,8 +188,31 @@ def _validate_submission(path: Path, targets: list[str]) -> dict:
     return {"path": str(path), "sha256": sha256_file(path), "rows": len(rows) - 1}
 
 
+def _notebook_reference(response: object, requested: str) -> str:
+    reference = str(getattr(response, "ref", "") or "")
+    slug = reference.rsplit("/code/", 1)[-1].strip("/")
+    return slug if slug.count("/") == 1 else requested
+
+
+def _submission_sequence(api: KaggleApi, competition: str) -> int:
+    references = set()
+    page = 1
+    while True:
+        rows = (
+            api.competition_submissions(competition, page_number=page, page_size=100)
+            or []
+        )
+        for row in rows:
+            values = _jsonable(row)
+            if isinstance(values, dict):
+                references.add(values.get("ref") or values.get("id"))
+        if len(rows) < 100:
+            return len(references) + 1
+        page += 1
+
+
 def _submission_match(
-    api: KaggleApi, args: SubmitCLI, response: object
+    api: KaggleApi, args: SubmitCLI, response: object, description: str
 ) -> object | None:
     submissions = api.competition_submissions(args.competition, page_size=50) or []
     response_values = _jsonable(response)
@@ -198,19 +226,19 @@ def _submission_match(
         candidate_id = values.get("ref") or values.get("id")
         if response_id is not None and candidate_id == response_id:
             return submission
-        description = values.get("description") or values.get("submissionDescription")
-        if response_id is None and description == args.message:
+        candidate = values.get("description") or values.get("submissionDescription")
+        if response_id is None and candidate == description:
             return submission
     return None
 
 
 def _poll_submission(
-    api: KaggleApi, args: SubmitCLI, response: object
+    api: KaggleApi, args: SubmitCLI, response: object, description: str
 ) -> object | None:
     deadline = time.monotonic() + args.max_wait_seconds
     last = None
     while True:
-        last = _submission_match(api, args, response)
+        last = _submission_match(api, args, response, description)
         if last is not None:
             values = _jsonable(last)
             status = (
@@ -230,14 +258,9 @@ def submit(args: SubmitCLI) -> dict:
     record_path = args.record.expanduser().resolve()
     if record_path.exists():
         raise FileExistsError(f"Submission record already exists: {record_path}")
-    dataset_title = (
-        args.dataset_title or args.dataset.split("/", 1)[1].replace("-", " ").title()
-    )
-    if not 6 <= len(dataset_title) <= 50:
-        raise ValueError("Kaggle dataset title must contain 6 to 50 characters")
-    notebook_title = args.notebook.split("/", 1)[1].replace("-", " ").title()
-    if not 5 <= len(notebook_title) <= 50:
-        raise ValueError("Kaggle notebook title must contain 5 to 50 characters")
+    label = args.label.strip()
+    if not 2 <= len(label) <= 45:
+        raise ValueError("Submission label must contain 2 to 45 characters")
     record_path.parent.mkdir(parents=True, exist_ok=True)
     manifest = verify_bundle(bundle)
     if not manifest.get("ready"):
@@ -259,6 +282,22 @@ def submit(args: SubmitCLI) -> dict:
     api = KaggleApi()
     try:
         api.authenticate()
+        sequence = _submission_sequence(api, args.competition)
+        title = f"S{sequence:02d} {label}"
+        description = submission_description(
+            sequence,
+            label,
+            submission_settings(manifest),
+            submission_validation(manifest, bundle_validation_multiplier(bundle)),
+            record["bundle_manifest_sha256"],
+        )
+        _update(
+            record_path,
+            record,
+            sequence=sequence,
+            title=title,
+            description=description,
+        )
         if _kernel_exists(api, args.notebook):
             current_status, current = _kernel_status(api, args.notebook)
             if not any(
@@ -276,9 +315,12 @@ def submit(args: SubmitCLI) -> dict:
             shutil.copytree(bundle, dataset_dir / "bundle")
             metadata = {
                 "id": args.dataset,
-                "title": dataset_title,
+                "title": title,
                 "licenses": [{"name": args.dataset_license}],
-                "description": f"Private inference bundle {record['bundle_manifest_sha256']}",
+                "description": (
+                    f"{description}\n"
+                    f"Private inference bundle {record['bundle_manifest_sha256']}"
+                ),
             }
             (dataset_dir / "dataset-metadata.json").write_text(
                 json.dumps(metadata, indent=2) + "\n", encoding="utf-8"
@@ -350,7 +392,7 @@ def submit(args: SubmitCLI) -> dict:
             shutil.copy2(bundle / "inference.ipynb", notebook_dir / "inference.ipynb")
             notebook_metadata = {
                 "id": args.notebook,
-                "title": notebook_title,
+                "title": title,
                 "code_file": "inference.ipynb",
                 "language": "python",
                 "kernel_type": "notebook",
@@ -377,18 +419,21 @@ def submit(args: SubmitCLI) -> dict:
                 raise RuntimeError(
                     f"Notebook push failed: {_jsonable(kernel_response)}"
                 )
+            notebook = _notebook_reference(kernel_response, args.notebook)
             _update(
                 record_path,
                 record,
                 state="notebook_running",
+                notebook=notebook,
+                requested_notebook=args.notebook,
                 notebook_version=version_number,
                 notebook_push_response=_jsonable(kernel_response),
             )
-            kernel_status = _poll_kernel(api, args.notebook, args)
+            kernel_status = _poll_kernel(api, notebook, args)
             log_path = record_path.parent / f"{record_path.stem}-notebook.log"
             if log_path.exists():
                 raise FileExistsError(f"Notebook log already exists: {log_path}")
-            log_path.write_text(api.kernels_logs(args.notebook), encoding="utf-8")
+            log_path.write_text(api.kernels_logs(notebook), encoding="utf-8")
             _update(
                 record_path,
                 record,
@@ -403,16 +448,17 @@ def submit(args: SubmitCLI) -> dict:
             if output_dir.exists():
                 raise FileExistsError(f"Notebook output directory exists: {output_dir}")
             output_dir.mkdir()
-            api.kernels_output(
-                args.notebook, path=str(output_dir), force=False, quiet=False
-            )
+            api.kernels_output(notebook, path=str(output_dir), force=False, quiet=False)
             matches = sorted(output_dir.rglob("submission.csv"))
             if len(matches) != 1:
                 raise ValueError(
                     f"Expected one notebook submission.csv, found {matches}"
                 )
             output_record = _validate_submission(
-                matches[0], manifest["checkpoint"]["targets"]
+                matches[0],
+                manifest["checkpoint"]["targets"]
+                if "checkpoint" in manifest
+                else manifest["checkpoints"][0]["targets"],
             )
             _update(
                 record_path,
@@ -422,9 +468,9 @@ def submit(args: SubmitCLI) -> dict:
             )
             submission_response = api.competition_submit_code(
                 "submission.csv",
-                args.message,
+                description,
                 args.competition,
-                args.notebook,
+                notebook,
                 int(version_number),
                 False,
             )
@@ -440,7 +486,7 @@ def submit(args: SubmitCLI) -> dict:
                 state="submitted",
                 submission_response=_jsonable(submission_response),
             )
-            submission = _poll_submission(api, args, submission_response)
+            submission = _poll_submission(api, args, submission_response, description)
             submission_values = _jsonable(submission)
             submission_status = (
                 _status(submission_values.get("status", ""))

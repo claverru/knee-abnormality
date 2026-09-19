@@ -26,9 +26,10 @@ Code: [prediction CLI](../../scripts/pipeline/predict.py),
 ## Model bundle and offline environment
 
 Freeze a selected fold checkpoint after reviewing its complete validation
-results. A five-fold ensemble is optional; it is not required for the first
-submission. Start with one checkpoint so the first submitted run measures a
-small, reproducible pipeline.
+results. Start with one checkpoint so the first submitted run measures a
+small, reproducible pipeline. `export.py` also accepts more than one
+checkpoint to build a multi-checkpoint ensemble bundle; see
+[below](#multi-checkpoint-ensemble-bundles).
 
 The generated bundle contains:
 
@@ -41,7 +42,11 @@ The generated bundle contains:
   `configs/training.yaml`. Freeze model/data settings; permit explicit path and
   runtime overrides with their values recorded. The bundle `config.json` must
   carry an `inference` section with the frozen image multiplier; configs without it
-  are rejected.
+  are rejected. Bundle-mode prediction applies this frozen multiplier to both
+  the test and validation splits (unlike direct `--checkpoint` prediction,
+  which uses the config's saved validation multiplier for the validation
+  split); export with `--image-multiplier 1` to reproduce a true x1
+  validation score through a bundle.
 - A versioned copy of the shared Python package and both prediction entry
   points (`predict.py`, `predict_worker.py`), plus the checked-in
   [`scripts/pipeline/inference.ipynb`](../../scripts/pipeline/inference.ipynb) as the
@@ -50,6 +55,133 @@ The generated bundle contains:
 - Offline wheels/requirements for dependencies missing from the selected
   Kaggle image, plus file hashes, dependency versions, source identity,
   checkpoint hash, label/split provenance and validation results.
+
+### Multi-checkpoint ensemble bundles
+
+`export.py --checkpoint` takes a comma-separated list of one or more
+checkpoints (the same list convention as `--folds`). One checkpoint keeps
+every current behavior exactly: `model.ckpt` at the bundle root and
+`manifest.json`'s singular `checkpoint` record. More than one checkpoint
+builds an ensemble bundle instead:
+
+- Member checkpoints are stored as `models/member-000.ckpt`,
+  `models/member-001.ckpt`, ... in export order, and `manifest.json` carries a
+  plural `checkpoints` list (one record per member: source path/hash, fold,
+  its own `model` config, its baked `attention_temperature` and
+  `preprocessing_identity`, results, provenance) instead of the singular
+  `checkpoint`/top-level `preprocessing_identity` keys. `config.json`'s
+  `experiment` section carries the first member's full config, since
+  `ExperimentConfig` has one `model` section; each member's own config lives
+  in its checkpoint and in the manifest.
+- Every member must agree on the whole `data` section (`spacing_mm`,
+  `image_size`, `series_types`, `study_triplet_total`,
+  `sampling_sigma_fraction` and the rest) because they share one data loader
+  and one decoded batch; export refuses a mismatch and names the differing
+  field. The `model` section, including `backbone`, may differ per member —
+  the spatial token mapping is backbone-specific and lives downstream of the
+  CNN, so mixed backbones share the decode correctly.
+- Members may come from different folds. This is expected for a real
+  ensemble: a five-fold bundle has one member per fold, each held out on a
+  different split, meant for test-time prediction rather than for scoring
+  against any single validation fold. Requesting `--split validation` against
+  an ensemble bundle validates every member against the requested fold and
+  fails loudly for any member not actually held out on it.
+- `predict_worker.py` loads every member once per worker (kept resident for
+  the worker's life) and runs all of them against the same decoded,
+  device-resident batch, averaging their per-label sigmoid probabilities
+  (mean of probabilities, not ranks or logits — measured 0.88269 vs 0.88244
+  macro AUC on this project's 5-fold OOF). Decoding stays single-pass, so
+  extra members cost close to their own forward time rather than a repeated
+  load; see the
+  [x4 loading profile](2026-09-18-kaggle-x4-profile-after-index-changes.md)
+  for the loader-wait/forward split this assumes. A one-member bundle is a
+  mean over one value, bit-identical to a plain forward pass.
+- `--attention-temperature` accepts one value (applied to every member) or
+  exactly one value per checkpoint, matched by position. A one-member bundle
+  applies it at load time exactly as before. An ensemble bundle bakes each
+  member's temperature into its exported weights at export time — the same
+  division of the attention scorer's weight and bias that load-time
+  application performs today, just applied once before saving — so
+  `manifest.json`'s `runtime.attention_temperature` is recorded as `1.0` (an
+  honest no-op at load time, since the scaling already happened); each
+  member's real baked value is in `manifest.checkpoints[i].attention_temperature`.
+- Verified locally (2026-09-19, `outputs/training/overnight-20260918T232636Z-mt7ouybk`):
+  exporting a 2-member bundle from `rexnet-fold0` (val 0.88367) and
+  `b0-fold0` (val 0.88635) at `--image-multiplier 1` and predicting fold 0's
+  904 validation studies reproduced the mean of the two members' own
+  single-checkpoint bundle predictions to within 7e-8 (float32 rounding,
+  not a real difference). Macro AUC (`roc_auc_score` against
+  `data/folds/all_5fold_v3/targets.csv` binarized at 0.5) was 0.8917 for the
+  mean against 0.8837 and 0.8863 for the two singles, which closely reproduce
+  their checkpoint filenames' recorded validation scores. A 1-member export
+  was confirmed to keep the pre-ensemble `manifest.json`/`config.json` schema
+  and to reproduce a plain forward pass bit for bit.
+
+### Reflection test-time augmentation (TTA2)
+
+`export.py --reflection-tta` (off by default) turns on mirror test-time
+augmentation for prediction. When on, each member also runs a second forward
+pass on the reflected view of the same decoded batch —
+`reflect_batch` mirrors the prepared batch, forcing reflection
+for every reflection-eligible study (the per-study `reflection_eligible` flag
+already carried in every inference batch, computed per series at load time,
+not sampled) and leaves reflection-ineligible studies unreflected, reusing
+`apply_reflection`/`reflection_positions`/`reflection_channels` exactly as
+training does. `predict_loader` (`src/knee_abnormality/inference/engine.py`)
+averages, in probability space after the sigmoid, each study's probabilities
+over whichever passes actually ran for it: one pass per member for an
+ineligible study, two per member for an eligible one — never a fixed
+division by 2, which would halve every ineligible study's prediction. The
+flag is recorded in `manifest.json`'s `runtime.reflection_tta` and the
+bundle's `config.json` `inference.reflection_tta` for both one-member and
+ensemble bundles, so `predict.py` in bundle mode applies it automatically
+with no extra CLI argument; `verify_bundle` (`inference/bundle.py`) rejects a
+config/manifest mismatch. With the flag off, export and prediction stay
+byte-identical to before, for both a single checkpoint and an ensemble.
+
+Reflection TTA is a pure transform on the prepared batch, `reflect_batch`
+(`src/knee_abnormality/inference/reflection.py`): for every reflection-eligible study
+it mirrors non-sagittal images in x and reverses sagittal channel order, mirrors the
+matching `valid_rects` (`left` becomes `width - columns - left`, sagittal rects
+reversed by channel) and negates sagittal `slice_positions`. `predict_loader` feeds the
+result to the unmodified model, which at eval draws no reflection of its own, so the
+second pass sees a genuinely mirrored study and nothing in the model changes.
+
+It is written this way because `modeling/model.py` is one of the files hashed into
+every checkpoint's `preprocessing_identity` (`identity.PREPROCESSING_SOURCES`), and
+that hash is byte-exact rather than semantic: adding even a no-op `force_reflection`
+argument there invalidates every existing checkpoint and makes `export.py` refuse it.
+`inference/` is not hashed, so `model.py` stays byte-identical and every checkpoint
+remains valid.
+
+Verified equal to forcing reflection inside the model: on two fold-0 studies the two
+routes agree to **exactly 0.0**, while both differ from the unreflected pass by 0.087.
+The transform mirrors rects directly where the in-model path mirrors the anchor grid
+through `reflection_inverse`; the two conventions must stay in step, which that
+equality check is what guards.
+
+Measured on 2026-09-19, loading `b0-fold0` directly and running the same
+averaging formula as `predict_loader` over fold 0's 904 validation studies at
+`--image-multiplier 1`:
+
+- Macro AUC 0.886348 with TTA off, reproducing the checkpoint's recorded
+  0.88635 validation score.
+- Macro AUC 0.886805 with TTA on (+0.00046).
+- Reflection-eligible share for this cohort was 904/904 (100%), read from
+  the batch flag, so no naturally ineligible study was available to prove
+  the divide-by-1 branch on real data. That branch was instead proven with a
+  synthetic batch (`reflection_eligible` forced to all-`False`): max
+  `|combined - primary|` was exactly `0.0`. The divide-by-2 branch was
+  confirmed the opposite way — all 904 real (eligible) studies' TTA-on
+  predictions differed from their TTA-off predictions.
+
+This confirms the averaging logic and the TTA-off no-op, but it is not a
+substitute for running the actual bundle: `export.py`'s new flag,
+`config.json`/`manifest.json` field placement, `bundle.py`'s
+`verify_bundle` consistency check, and the `PredictionRequest`/
+`predict_worker.py` plumbing that carries `reflection_tta` through bundle
+mode are verified only by code review, not by an executed export or Kaggle
+run.
 
 Test-mode prediction reads the submission template and test metadata; it does
 not call `load_fold_labels()`. Training CSVs, report-label sources, fold files,

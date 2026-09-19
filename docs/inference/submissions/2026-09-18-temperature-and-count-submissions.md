@@ -38,7 +38,7 @@ one recipe change submitted the same day, `series-share`, lost.
 - **×4 added one thousandth over ×3**, which is a single rounding step and inside public-score
   noise; fold 0 had the two tied (0.89539 against 0.89537). The count question is therefore open
   above ×3, and ×4 costs a third more inference time than ×3, which counts against the
-  [efficiency prize](../submission-requirements-and-output-contract.md).
+  [efficiency prize](../efficiency-leaderboard.md#the-exchange-rate).
 - **The two changes are not separated.** Fold 0 attributes roughly +0.0023 to each, but no
   submission isolated them.
 - **The recipe change is publicly neutral.** `robust-center-20-topup-26` scored 0.938 at the same

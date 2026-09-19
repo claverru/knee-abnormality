@@ -9,10 +9,24 @@ hypothesis.
 
 ## Ensembling
 
-**Remaining folds, seeds and diverse runs** (fold-0 averaging measured; the full-ensemble gain is
-extrapolated). Train the remaining folds under the
+**One round executed 2026-09-19, and it is now the best submission.** Five folds of each backbone
+were trained, the OOF ensemble gained **+0.0061** over ReXNet alone and was positive on all twelve
+labels, and the ten-member bundle scored **0.943 public** against 0.934–0.936 for its single members
+([folds and ensembles](../validation/results/2026-09-19-fold-ensembles-and-sigma-sweep.md),
+[submissions](../inference/submissions/2026-09-19-ensemble-submissions.md)). What remains is a
+**second round on the current recipe** — every member above trains with ordinary BCE, which
+class-balanced BCE beats by 0.0116 — plus seed ensembles and diverse runs, still untried. Train the
+remaining folds under the
 [validation strategy](../validation/validation-strategy.md), then combine models under the
 [ensemble interpretation](../validation/ensemble-interpretation.md) rules.
+
+- *Bundling mechanism (implemented 2026-09-19):* `export.py` and `predict.py` now support a
+  multi-checkpoint bundle that averages members' per-label probabilities on one shared decode
+  pass, so building the eventual fold/seed ensemble is a matter of exporting with the trained
+  checkpoints, not further engineering
+  ([bundle contract](../inference/model-bundle-and-offline-environment.md#multi-checkpoint-ensemble-bundles),
+  [risk guard](risks.md#numerics-and-scores)). What remains here is which folds/seeds/backbones to
+  train and combine and how to weight them, not the export/predict mechanism.
 
 - *Full-data fits:* one model trained on all training studies, with its epoch count fixed from
   cross-validation, is the single-model alternative to a fold ensemble. It is also the natural
@@ -71,11 +85,24 @@ and the sampler's 70 mm in-plane radius.
 
 ## Test-time augmentation
 
-**Limited test-time augmentation** (hypothesis; not evaluated). Evaluate a small number of
-transformations with consistent geometry and target handling, recording total inference cost.
-Training reflection is implemented;
-[reflection TTA](../modeling/schedule-and-augmentation.md#study-level-knee-reflection) has not been
-evaluated.
+**Mirror TTA evaluated 2026-09-19: +0.001 public for +181 s** on five b0 members at ×4 (0.941
+against 0.940), and +0.00046 on fold 0 locally. Both sit inside the ±0.006 public noise, so it is a
+marginal win on score and a clear loss on efficiency, where 181 s costs 0.0056 of the runtime term —
+on for the score bundle, off for the efficiency bundle
+([submissions](../inference/submissions/2026-09-19-ensemble-submissions.md)). Other transformations
+remain unevaluated, and the mirror gain should be remeasured once members train with class-balanced
+BCE. Evaluate any further transformation with consistent geometry and target handling, recording
+total inference cost.
+
+- *Mechanism (implemented 2026-09-19, not yet bundle-verified):* `export.py --reflection-tta`
+  (off by default) and `predict_loader` now support mirror TTA2 — each member also runs on the
+  reflected view of the same decoded batch, forced on for reflection-eligible studies and left
+  off for ineligible ones, averaged per study over whichever passes ran; see
+  [reflection TTA](../inference/model-bundle-and-offline-environment.md#reflection-test-time-augmentation-tta2)
+  for the mechanism, the checkpoint-identity blocker that stopped bundle-level verification this
+  session, and the direct (non-bundle) numeric check: 0.886348 macro AUC off vs. 0.886805 on for
+  `b0-fold0` over fold 0's 904 validation studies. Evaluating whether to turn it on for
+  submissions still waits for the final phase.
 
 **More evaluation triplets: measured publicly, adopted.** With the attention temperature at 0.75,
 `ranked-filtered-seed42` scored 0.938 at ×3 and 0.939 at ×4, against 0.933 at ×2
@@ -93,10 +120,11 @@ had predicted the temperature and ×3 together at +0.0046 against +0.005 measure
 - **Open:** where the count stops paying above ×4, and what it costs. ×3 and ×4 differ by one
   rounding step publicly and were tied on fold 0, while inference time grows with the count and
   counts toward the efficiency prize. The submit-to-scored times we have (9–11 minutes) mix
-  different batch sizes and queueing noise, so a local profile at fixed batch is the way to
-  measure it. The efficiency formula prices the trade: **0.001 of AUC is worth about 70 seconds**,
-  and ×3 removes roughly a quarter of the wall, so the two sides are within a factor of two of each
-  other ([the rate and the arithmetic](loading-speedup/candidates.md#reading-less-per-study-trades-score-for-wall)).
+  different batch sizes and at least 128 s of queueing noise
+  ([efficiency leaderboard](../inference/efficiency-leaderboard.md#each-pick-is-a-measurement-of-our-hidden-runtimes)),
+  so a local profile at fixed batch is the way to measure it. At 70 s per thousandth of AUC, ×3
+  removes roughly a quarter of the wall, so the two sides are within a factor of two of each
+  other ([the arithmetic](loading-speedup/candidates.md#reading-less-per-study-trades-score-for-wall)).
 - **External evidence points the same way** (unreplicated). On a public CoAtNet pipeline the same
   weights read 0.924 at 42 evaluation windows and 0.927 at 62, and an 80-slice corpus reached
   0.932 only at its full 78 windows, the author's point being that a checkpoint change and a

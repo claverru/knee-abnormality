@@ -51,8 +51,9 @@ the Kaggle API on 2026-09-15 (see below); recheck it before final submission sel
 
   Here `maxAUC` is the best private-leaderboard AUC and `Benchmark` is the
   sample-submission score. This is not an AUC-per-second ratio. The public
-  efficiency notebook updates daily and exposes ranks rather than full
-  efficiency scores during development.
+  efficiency notebook publishes ranks rather than scores during development;
+  what it shows, how far behind it runs and what the formula prices are in the
+  [efficiency leaderboard](efficiency-leaderboard.md).
 
 The tiny example-test run displayed on a public notebook page does not measure
 hidden-test runtime. Measure the full path: imports, input discovery, decoding,

@@ -52,7 +52,13 @@ def sample_dataset(
     return dataset, labels
 
 
-def training_step(model, optimizer, batch: dict, config: ExperimentConfig) -> float:
+def training_step(
+    model,
+    optimizer,
+    batch: dict,
+    config: ExperimentConfig,
+    class_balance_weights: torch.Tensor | None,
+) -> float:
     optimizer.zero_grad(set_to_none=True)
     with torch.autocast("cuda", dtype=torch.bfloat16, cache_enabled=False):
         logits = model(batch)
@@ -60,6 +66,7 @@ def training_step(model, optimizer, batch: dict, config: ExperimentConfig) -> fl
         logits.float(),
         batch["target"].to(logits.device),
         batch["target_observed"].to(logits.device),
+        class_balance_weights,
     )
     loss.backward()
     torch.nn.utils.clip_grad_norm_(model.parameters(), config.trainer.gradient_clip_val)

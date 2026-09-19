@@ -1,5 +1,25 @@
 version: 1
 scripts:
+  - id: analyze-study-center-extents
+    path: scripts/adhoc/analyze_study_center_extents.py
+    summary: Fit the study reference point for every training study and measure each plane's coverage on both sides of it.
+    tags: [geometry, center, reference, extents, coverage, planes, coronal, sagittal, axial, headers, metadata]
+    commands:
+      - rtk proxy uv run --locked python -m scripts.adhoc.analyze_study_center_extents --output-dir outputs/analysis/study-center-extents-new
+      - rtk proxy uv run --locked python -m scripts.adhoc.analyze_study_center_extents --output-dir outputs/analysis/study-center-extents-trial --studies 16 --workers 4
+    inputs: [configs/training.yaml, Official series CSV for the split, Series image-count inventory, Original DICOM headers]
+    outputs: [Per-study reference points and acceptance parquet, Per-series signed side distances parquet, Per-study union extents by plane and fluid sensitivity parquet, Summary JSON, Script and package snapshot under source/]
+    notes:
+      - Reads header prefixes with the production indexer, exclusions and instance guard; no pixels, models, training, tests or GPU access.
+      - Uses the production study reference fit, so rejected studies carry a reason and no point; their series keep no distances.
+      - Distances are signed along each plane's through-plane axis in LPS, oriented so negative is inferior, anterior or patient right and positive is superior, posterior or patient left.
+      - Distances span slice centres only; add half the recorded slice spacing for the outer faces.
+      - Sagittal right and left are patient laterality, mixing medial and lateral across knee sides.
+      - Truncation fractions compare each side against that group's own mean nearest-side reach times configs/training.yaml `data.sampling_sigma_fraction`.
+      - Reports each plane pooled and split by fluid sensitivity, plus the paired fluid-minus-T1/PD delta over studies carrying both types.
+      - Existing output directories are refused; the whole training split takes about 20 seconds at twelve workers and four IO threads.
+    docs: [docs/data-preparation/accurate-sampling-centers.md#cohort-wide-center-fit-and-plane-extents]
+
   - id: audit-knee-side-geometry
     path: scripts/adhoc/audit_knee_side_geometry.py
     summary: Measure coordinate-based knee-side agreement and unresolved coverage using physical DICOM geometry only.
@@ -173,12 +193,13 @@ scripts:
       - rtk proxy env OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 uv run --locked python -m scripts.adhoc.profile_threaded_loading configs/training.yaml --mode loader --workers 4 --decode-threads 2 --samples 512 --warmup-batches 16 --output-dir outputs/profiling/threading-loader-new
       - rtk proxy env OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 uv run --locked python -m scripts.adhoc.profile_threaded_loading configs/training.yaml --mode loader --workers 16 --decode-threads 1 --read-threads 4 --samples 256 --warmup-batches 1 --passes 2 --output-dir outputs/profiling/frames-cold-readthreads-new
     inputs: [Experiment config, Training DICOMs, Frozen fold and label sources]
-    outputs: [Per-batch timings and losses, Prepared-input audit hashes, Configuration and recursive project-relative source snapshots]
+    outputs: [Per-batch timings and losses, fixed class-balance statistics when enabled, Prepared-input audit hashes, Configuration and recursive project-relative source snapshots]
     notes:
       - Experimental subclass overrides the dataset's _decode_series injection point and leaves production loading unchanged; one thread calls the production preparation function.
       - Reuses bounded pools created lazily after worker startup; preserves serial indexing and sampling and ordered joint clipping.
       - Selects four maximum-load training studies plus a seeded random sample; two passes repeat epoch-zero slice choices with persistent workers.
       - GPU mode uses bounded optimization steps with seeded random weights, current augmentation and constant learning rates; saves no checkpoint or validation metric.
+      - GPU mode records fixed class-balanced BCE statistics from its selected profiling dataset when the training option is enabled.
       - Warmup batches are excluded from studies_per_second; for a cold run drop the page cache first, pass --warmup-batches 1, and read all_studies_per_second and pass_wall_seconds, which cover the whole pass. The manifest records Cached from /proc/meminfo so a warm run is recognisable afterwards.
       - --decode-threads threads whole decode_slice calls, which is more than loading speedup change 5, since decode and resample ride along with the payload read. --read-threads is change 5 as specified. it prefetches the selected slices' payloads on a thread pool with the same validation read_frame applies, then decodes serially.
       - Default loader mode consumes CPU batches immediately without pinning or GPU work and records wall-clock studies/s and selected slices/s.
@@ -196,13 +217,14 @@ scripts:
       - rtk proxy uv run --locked python -m scripts.adhoc.profile_training configs/training.yaml --output-dir outputs/profiling/loader-new --mode loader --batch-sizes 4 --workers 2,4,8 --samples 48 --warmup 2 --steps 6 --threads 16
       - rtk proxy uv run --locked python -m scripts.adhoc.profile_training configs/training.yaml --output-dir outputs/profiling/lightning-new --mode lightning --samples 64 --warmup 1 --steps 2 --threads 16
     inputs: [Experiment config, Training DICOMs, Frozen fold and label sources]
-    outputs: [JSON timings and input identities, Recursive project-relative source snapshot, CPU profiles, GPU memory and loader wait measurements, Backbone BatchNorm update counts]
+    outputs: [JSON timings and input identities, fixed class-balance statistics when enabled, Recursive project-relative source snapshot, CPU profiles, GPU memory and loader wait measurements, Backbone BatchNorm update counts]
     notes:
       - Samples fold-0 training studies only, retaining full configured slice limits.
       - Reports triplets, channel appearances and unique source slices separately in preprocessing mode.
       - Counts and hashes each selected acquisition separately while retaining the configured total budget per plane/contrast.
       - Uses a few development steps without running an epoch or reporting validation AUC; Lightning mode uses the training BF16 precision and the configured batch size.
       - GPU modes use seeded random weights and require CUDA; capacity profiling disables series dropout and accepts batch sizes up to eight.
+      - GPU modes use fixed class-balanced BCE weights from their selected profiling datasets when the training option is enabled.
       - The GPU training step disables the autocast weight cache, as Lightning does.
       - The shared sample starts with up to eight maximum-load training studies, then seeded random studies.
       - Capacity mode records BatchNorm counters to audit recomputation during activation checkpointing.
@@ -450,3 +472,23 @@ scripts:
       - Replicate noise comes from the three recorded same-recipe groups (df=5), so the SD itself carries a wide interval.
       - Public scores are rounded to three decimals and every run is one fold and one seed.
     docs: [docs/validation/results/2026-09-18-local-public-metric-comparison.md, docs/validation/local-to-public-score-relationship.md]
+
+  - id: relabel-kaggle-submission-datasets
+    path: scripts/adhoc/relabel_kaggle_submissions.py
+    summary: Number every Kaggle submission, retitle its notebook and rewrite its private bundle dataset title, subtitle and description into the unified submission format.
+    tags: [kaggle, submission, dataset, notebook, kernel, metadata, title, description, rename, ledger, relabel, naming, sequence]
+    commands:
+      - rtk proxy uv run --locked python -m scripts.adhoc.relabel_kaggle_submissions
+      - rtk proxy uv run --locked python -m scripts.adhoc.relabel_kaggle_submissions --apply
+    inputs: [Kaggle credentials and competition access, outputs/submission/records/*.json, Bundle manifests and config under outputs/submission/exports, Curated label table inside the script]
+    outputs: [outputs/submission/kaggle-ledger.json with one entry per submission, Updated private dataset metadata on Kaggle, Renamed notebooks with one extra unexecuted version each]
+    notes:
+      - Without --apply it only writes the ledger and prints the planned dataset and notebook titles.
+      - Kaggle submission descriptions cannot be edited after submission, so past submission rows keep their original description text; the notebook title beside each row is what the rename changes.
+      - Renaming pulls the current notebook source and metadata and saves it back with KernelExecutionType.QUICK_SAVE, which creates a version without executing it, so no GPU quota is spent and the submitted versions are untouched.
+      - Numbering comes from the live submission list sorted by date, so S numbers are stable while submissions only append.
+      - Refuses to touch a dataset that is not private, keeps the private bundle manifest line so the submit workflow can still detect an unchanged bundle, and skips datasets and notebooks that already match.
+      - Skips a notebook whose latest run has not finished, so it never disturbs an active submission.
+      - Retries HTTP 429 with exponential backoff and pauses between updates; a full pass without throttling is rate limited.
+      - Historical bundles predate recorded runtime fields, and the three ranked-filtered bundles carry the attention temperature folded into the scorer weights, so those temperatures come from the table in the script.
+    docs: [docs/inference/submissions/INDEX.md#naming]

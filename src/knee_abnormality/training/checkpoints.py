@@ -108,6 +108,7 @@ def validate_resume_checkpoint(
     fold: int,
     training_studies: int,
     input_identity: dict,
+    class_balance: dict | None,
 ) -> None:
     saved_config = validate_checkpoint(checkpoint, config, targets, fold)
     saved = checkpoint["hyper_parameters"]
@@ -119,6 +120,8 @@ def validate_resume_checkpoint(
         raise ValueError(
             "Resume checkpoint training study count differs from the requested run"
         )
+    if "class_balance" not in saved or saved["class_balance"] != class_balance:
+        raise ValueError("Resume checkpoint class-balance statistics differ")
     recorded_identity = saved.get("input_identity")
     if not isinstance(recorded_identity, dict) or recorded_identity.get("version") != 1:
         raise ValueError(

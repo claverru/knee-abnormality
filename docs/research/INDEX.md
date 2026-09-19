@@ -11,7 +11,7 @@
 | Deciding whether and how position can improve medial/lateral discrimination: evidence, model blockers, encodings, GNNs, unconventional ideas and diagnostics | [Position information](position-encoding.md) |
 | Using left/right knee identity to interpret spatial features and comparing side embeddings, coordinate transformations and anatomical modeling | [Knee side and anatomical location](knee-side-and-location.md) |
 | Choosing partial medial/lateral sharing after the local/public reversal, including independent readouts and experiments to distinguish bias from constraints | [Medial and lateral disease transfer](medial-lateral-transfer.md) |
-| Choosing a loss for mean per-label ROC-AUC: direct AUC and ranking, imbalance-aware, missing-label and representation-learning approaches | [Loss approaches for mean per-label ROC-AUC](auc_loss_approaches.md) |
+| Choosing training objectives for mean per-label ROC-AUC: BCE weighting, study sampling, batch composition and adaptive allocation, plus the earlier loss-only ranking and its evidence | [Training objectives, weighting and sampling for mean per-label ROC-AUC](auc_loss_approaches.md) |
 | Choosing optimizer experiments: AdamW learning-rate and beta2 tuning, EMA, SAM, AdamP and AUC-loss optimizers, with a proposed run order | [Optimizer research](optimizer-research.md) |
 | Comparing the closest RSNA MRI tasks and their successful and unsuccessful approaches | [RSNA MRI competitions](rsna-mri.md) |
 | Borrowing sequence modeling, crop supervision, or feature aggregation from volumetric CT competitions | [Transfer from RSNA CT](rsna-ct.md) |

@@ -119,3 +119,84 @@ def load_checkpoint_model(
     checkpoint = read_checkpoint(checkpoint_path)
     validate_checkpoint(checkpoint, config, targets, expected_fold)
     return checkpoint_model(checkpoint, config, targets, device, attention_temperature)
+
+
+def bake_attention_temperature(
+    checkpoint: dict,
+    config: ExperimentConfig,
+    targets: tuple[str, ...],
+    temperature: float,
+) -> dict:
+    model = checkpoint_model(
+        checkpoint, config, targets, torch.device("cpu"), temperature
+    )
+    baked = dict(checkpoint)
+    baked["state_dict"] = {
+        f"model.{name}": value for name, value in model.state_dict().items()
+    }
+    return baked
+
+
+ENSEMBLE_MEMBER_GLOB = "member-*.ckpt"
+
+
+def ensemble_member_path(directory: Path, index: int) -> Path:
+    return directory / f"member-{index:03d}.ckpt"
+
+
+def load_ensemble_models(
+    config: ExperimentConfig,
+    targets: tuple[str, ...],
+    checkpoint_dir: Path,
+    device: torch.device,
+    *,
+    expected_fold: int | None = None,
+) -> list[KneeAbnormalityModel]:
+    paths = sorted(checkpoint_dir.glob(ENSEMBLE_MEMBER_GLOB))
+    if not paths:
+        raise FileNotFoundError(
+            f"No ensemble member checkpoints found in {checkpoint_dir}"
+        )
+    models = []
+    for path in paths:
+        checkpoint = read_checkpoint(path)
+        saved = checkpoint.get("hyper_parameters")
+        if not isinstance(saved, dict) or not isinstance(saved.get("config"), dict):
+            raise TypeError(
+                f"Ensemble member {path.name} is missing saved configuration"
+            )
+        member_config = ExperimentConfig.model_validate(saved["config"])
+        if member_config.data.model_dump(mode="json") != config.data.model_dump(
+            mode="json"
+        ):
+            raise ValueError(
+                f"Ensemble member {path.name} data config differs from the bundle"
+            )
+        validate_checkpoint(checkpoint, member_config, targets, expected_fold)
+        models.append(checkpoint_model(checkpoint, member_config, targets, device, 1.0))
+    return models
+
+
+def load_models(
+    config: ExperimentConfig,
+    targets: tuple[str, ...],
+    checkpoint_path: Path,
+    device: torch.device,
+    *,
+    expected_fold: int | None = None,
+    attention_temperature: float = ATTENTION_TEMPERATURE,
+) -> list[KneeAbnormalityModel]:
+    if checkpoint_path.is_dir():
+        return load_ensemble_models(
+            config, targets, checkpoint_path, device, expected_fold=expected_fold
+        )
+    return [
+        load_checkpoint_model(
+            config,
+            targets,
+            checkpoint_path,
+            device,
+            expected_fold=expected_fold,
+            attention_temperature=attention_temperature,
+        )
+    ]

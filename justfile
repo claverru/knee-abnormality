@@ -47,11 +47,11 @@ infer bundle data_root="data" output="outputs/submission/submission.csv" device=
     cd "$bundle_path"; \
     rtk proxy env PYTHONPATH="$bundle_path/code" "$KNEE_PROJECT_ROOT/.venv/bin/python" -m scripts.pipeline.predict "$bundle_path/config.json" --bundle "$bundle_path" --data-root "$data_path" --output "$output_path" --device "$4" --precision "$5" "${args[@]}"
 
-submit bundle dataset notebook record message="Fold 0 inference bundle":
-    rtk proxy uv run --locked python -m scripts.tools.submission_job start --bundle "$1" --dataset "$2" --notebook "$3" --record "$4" --message "$5"
+submit bundle dataset notebook record label:
+    rtk proxy uv run --locked python -m scripts.tools.submission_job start --bundle "$1" --dataset "$2" --notebook "$3" --record "$4" --label "$5"
 
-submit-foreground bundle dataset notebook record message="Fold 0 inference bundle":
-    rtk proxy uv run --locked python -m scripts.pipeline.submit --bundle "$1" --dataset "$2" --notebook "$3" --record "$4" --message "$5"
+submit-foreground bundle dataset notebook record label:
+    rtk proxy uv run --locked python -m scripts.pipeline.submit --bundle "$1" --dataset "$2" --notebook "$3" --record "$4" --label "$5"
 
 submit-status record:
     rtk proxy uv run --locked python -m scripts.tools.submission_job status --record "$1"

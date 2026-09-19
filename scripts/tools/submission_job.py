@@ -21,7 +21,7 @@ class SubmissionJobCLI(CLISettings):
     bundle: Path | None = None
     dataset: str | None = Field(default=None, pattern=r"^[\w.-]+/[\w.-]+$")
     notebook: str | None = Field(default=None, pattern=r"^[\w.-]+/[\w.-]+$")
-    message: str = "Fold 0 inference bundle"
+    label: str | None = None
     lines: int = Field(default=60, gt=0)
     follow: CliImplicitFlag[bool] = False
 
@@ -36,8 +36,13 @@ def _log(record: Path) -> Path:
 
 
 def start(args: SubmissionJobCLI, record: Path) -> dict:
-    if args.bundle is None or args.dataset is None or args.notebook is None:
-        raise ValueError("start requires --bundle, --dataset and --notebook")
+    if (
+        args.bundle is None
+        or args.dataset is None
+        or args.notebook is None
+        or args.label is None
+    ):
+        raise ValueError("start requires --bundle, --dataset, --notebook and --label")
     bundle = args.bundle.expanduser().resolve()
     manifest = verify_bundle(bundle)
     if not manifest.get("ready"):
@@ -69,8 +74,8 @@ def start(args: SubmissionJobCLI, record: Path) -> dict:
             args.notebook,
             "--record",
             str(record),
-            "--message",
-            args.message,
+            "--label",
+            args.label,
         ],
         check=True,
         capture_output=True,
@@ -121,6 +126,7 @@ def status(record: Path) -> dict:
         "updated_at": value.get("updated_at"),
         "notebook": value.get("notebook"),
         "notebook_version": value.get("notebook_version"),
+        "description": value.get("description"),
         "public_score": submission.get("publicScore", submission.get("public_score")),
         "submission": submission,
         "stages": stages,

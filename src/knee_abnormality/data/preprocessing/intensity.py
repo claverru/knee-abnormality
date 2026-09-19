@@ -8,9 +8,22 @@ def _linear_quantiles(
     ranks = quantiles * np.float32(values.size - 1)
     lower = np.floor(ranks).astype(np.int64)
     upper = np.ceil(ranks).astype(np.int64)
-    values.partition(np.unique(np.concatenate((lower, upper))))
-    lower_values = values[lower]
-    upper_values = values[upper]
+    l0, h0 = int(lower[0]), int(lower[1])
+    l1, h1 = int(upper[0]), int(upper[1])
+    if l1 < h0:
+        values.partition(h0)
+        h_lo = values[h0]
+        h_hi = values[h0 + 1 :].min() if h1 == h0 + 1 else h_lo
+        prefix = values[:h0]
+        prefix.partition(l1)
+        l_hi = prefix[l1]
+        l_lo = prefix[:l1].max() if l0 == l1 - 1 else l_hi
+        lower_values = np.asarray([l_lo, h_lo], dtype=np.float32)
+        upper_values = np.asarray([l_hi, h_hi], dtype=np.float32)
+    else:
+        values.partition(np.unique(np.concatenate((lower, upper))))
+        lower_values = values[lower]
+        upper_values = values[upper]
     bounds = lower_values + (upper_values - lower_values) * (ranks - lower).astype(
         np.float32
     )

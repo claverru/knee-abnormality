@@ -76,17 +76,16 @@ def resample_crop(
     )
     vertical = _axis_filter(pixels.shape[0], target_height, source_top, rows)
     horizontal = _axis_filter(pixels.shape[1], target_width, source_left, columns)
-    band = (
-        (int(horizontal.indices.min()), int(horizontal.indices.max()) + 1)
-        if horizontal.nnz
-        else (0, pixels.shape[1])
-    )
-    if band != (0, pixels.shape[1]):
-        middle = vertical.dot(pixels[:, band[0] : band[1]])
-        horizontal = horizontal[:, band[0] : band[1]]
+    if vertical.nnz == 0 or horizontal.nnz == 0:
+        sub = pixels.astype(np.float32)
+        middle = vertical.dot(sub)
+        region = horizontal.dot(middle.T).T
     else:
-        middle = vertical.dot(pixels)
-    region = horizontal.dot(middle.T).T
+        r0, r1 = int(vertical.indices.min()), int(vertical.indices.max()) + 1
+        c0, c1 = int(horizontal.indices.min()), int(horizontal.indices.max()) + 1
+        sub = pixels[r0:r1, c0:c1].astype(np.float32)
+        middle = vertical[:, r0:r1].dot(sub)
+        region = horizontal[:, c0:c1].dot(middle.T).T
     if slope != 1.0 or intercept != 0.0:
         region *= np.float32(slope)
         region += np.float32(intercept)

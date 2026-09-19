@@ -48,6 +48,13 @@ code.
 
 - **Several attention heads per label** (hypothesis, no design yet). Listed during the
   [crop-selection investigation](../history/crop-selection-investigation.md#options-not-pursued).
+- **Nonlinear classifier after pooling** (hypothesis; no recorded comparison on the current
+  recipe). Replace each independent linear readout with its own small `256 → 128 → 1` MLP,
+  using GELU between layers and preserving the current attention pooling and supervision.
+  This isolates readout capacity; it adds no sharing between disease labels and is distinct
+  from the [compartment-transfer investigation](big-bets.md#medial-and-lateral-disease-transfer).
+  A cheap architecture ablation, with weaker project evidence than head-LR or supervision
+  comparisons. Implement only when requested, behind one option, against the linear-head control.
 - **Attention temperature is adopted at inference.** τ 0.75 gains +0.0024 [+0.0012, +0.0037] on
   fold 0 and carried the best submission, 0.939 public with ×4 images
   ([result](../validation/results/2026-09-17-attention-temperature.md),
@@ -178,37 +185,67 @@ it needs one extra header per series and three decoded slices at Kaggle inferenc
 the preprocessing identity. Plane relabelling (one swapped study) stays out: it cost −0.21 ×1000
 on all three control checkpoints.
 
-## Per-plane sampler sigma
+## Per-plane width ratios
 
-`data.sampling_sigma_mm` is one width shared by every plane, but the three through-plane axes do
-not want the same width. On the [spatial importance
-map](../ongoing/peripheral-coverage.md#spatial-importance-map), expected utility per sampled slice
-across sigma 20-120 swings **0.677 on the axial axis, 0.310 coronal and 0.092 sagittal**: axial is
-about seven times as sensitive to width as sagittal. A shared sigma is therefore set almost
-entirely by the axial penalty, which is the mechanism behind the settled global results, where 30
-tied 40 (+0.000039) and 60, 80 and 120 all lost.
+The relative rule gives every plane the same fraction of its own reach, so realized widths are axial
+45.1, coronal 35.8 and sagittal 39.0 mm. The
+[acquisition geometry](../ongoing/peripheral-coverage.md#acquisition-geometry) wants a different
+shape: usable half-reach is axial 61.5, coronal 45.6 and sagittal 51.0 mm, a ratio of
+1.35 : 1.00 : 1.12, because coronal is capped by its posterior side at 45.6 mm while axial spans
+123.3 mm.
 
-- **Change:** move the width to a `sigma_mm` field on `SeriesTypeConfig`, defaulting to
-  `data.sampling_sigma_mm`, used by `target_depths` for that type only. No tensor shape, budget or
-  triplet count changes.
-- **First arm:** axial 30, coronal and sagittal 40. It differentiates the planes rather than moving
-  the global width again, which is the part the settled runs never tested.
-- **Sagittal width is close to free** (measured): 0.092 of utility across the whole sigma range, so
-  sagittal is where coverage can be spent differently at little cost.
-- **It contradicts the evidence shares above, deliberately.** The depth profiles put effusion and
-  synovitis evidence 30-50 mm superior in axial fluid, and narrowing axial starves that further.
-  The map measures where removing windows hurts the model we have; the profiles measure where the
-  labels' evidence is. The arm is a direct test of which one to sample for.
-- **Confounded in the narrowing direction:** the map is observational under the current sampler, so
-  it understates utility exactly where the sampler rarely goes and biases toward the centre. The
-  between-axis ratio is more trustworthy than the absolute optimum, which is why the arm
-  differentiates planes instead of narrowing all of them.
+- **Not answered by the settled sweep.** That sweep multiplied all three planes by one factor, so it
+  measures scale, not ratios. If axial wants more and coronal less, a common factor cancels them —
+  which is what the flat result looks like.
+- **Change:** a per-plane multiplier on the computed width, so one plane can move while the others
+  keep theirs.
+- **Arms:** axial widened alone, then coronal narrowed alone, against one control. The
+  [cache measurement](../validation/results/2026-09-18-per-plane-sigma-cache.md) puts coronal-alone
+  at +0.00135 and axial-alone inside noise at every width, inference-only; the
+  [decomposition](../validation/results/2026-09-19-relative-sampler-width-result.md#training-versus-drawing)
+  showed the training side is where the effect lives, so the cache cannot stand in for the run.
+- **Bar to clear:** 0.008 on a single fold-0 run
+  ([what a comparison can resolve](../validation/validation-strategy.md#what-a-comparison-can-resolve)).
+
+## Asymmetric coronal draw
+
+Coronal is the only asymmetric plane: 59.0 ± 7.9 mm anterior against 45.6 ± 10.4 posterior, with the
+stack midpoint 6.7 mm anterior of the fitted centre, and **32.2% of studies reach less than 40 mm
+posteriorly against 0.9% anteriorly**
+([extents](../data-preparation/accurate-sampling-centers.md#cohort-wide-center-fit-and-plane-extents)).
+A symmetric Gaussian on the study centre therefore spends probability mass anteriorly, where slices
+are plentiful, and truncates posteriorly, where Baker's cyst keeps 80% of its coronal evidence
+beyond ±20 mm and the posterior horns sit.
+
+- **Change:** a per-side width for the coronal draw, each side a fraction of that side's own reach,
+  replacing one symmetric truncated normal.
+- **What it is not:** a centre offset. Those were rejected on the importance map, whose total-utility
+  centroid is already centred and flat within ±30 mm. This keeps the centre and changes the shape.
+- **Limit to state up front:** no draw reaches past 45.6 mm posteriorly, because the slices were
+  never acquired. The gain available is redistribution within the acquired extent, not more reach.
+- **Bar to clear:** 0.008 on a single fold-0 run.
+
+## Per-plane sampler sigma (superseded)
+
+Superseded by the implemented relative-width rule: `data.sampling_sigma_fraction` (0.76) times
+each candidate pool's own `limiting_reach` (`sampling.py`), replacing the old fixed
+`data.sampling_sigma_mm`. Per-plane constants fall out of this automatically, since each
+`SeriesTypeConfig` slot already gets its own pool and therefore its own realized width, without a
+new `sigma_mm` field on `SeriesTypeConfig`. Measured per-plane mean realized sigma at 0.76 on the
+fold-0 token cache (4,218 physical pools): axial 39.5 mm, coronal 31.4 mm, sagittal 34.2 mm —
+coronal lands inside the narrow band this entry's cache measurement scored as a gain
+([2026-09-18 per-plane sigma](../validation/results/2026-09-18-per-plane-sigma-cache.md)), while
+axial stays close to its old fixed 40 mm (matching that measurement's finding that axial width is
+inert) and sagittal sits between the old 40 and the non-durable 25 mm arm. That measurement was
+inference-only; see [overnight.md](overnight.md#candidates-for-later-queues) for the queued
+training-time run against a fresh control.
 
 ## Per-type sampler centre offset (rejected)
 
 Triplet depths are drawn from a truncated normal centred on the study centre along each plane's
 through-plane axis (`target_depths` in `src/knee_abnormality/data/preprocessing/sampling.py`, width
-`data.sampling_sigma_mm`). The proposal was a `centre_offset_mm` field on `SeriesTypeConfig`,
+`data.sampling_sigma_fraction` times the pool's own reach). The proposal was a `centre_offset_mm`
+field on `SeriesTypeConfig`,
 shifting that mean per type, motivated by the labels whose evidence sits beyond the sampler's reach
 ([peripheral coverage](../ongoing/peripheral-coverage.md)).
 
@@ -253,3 +290,33 @@ the smallest and spend pixels on background at the same scale. The gain is a hyp
   scanners and studies. Per-plane spacing keeps that within a plane but asks the backbone to
   represent features at two or three fixed scales; positions stay in millimetres, so only the
   convolutional features change meaning. Affine augmentation already jitters scale by ±5%.
+
+## Ranking-aware loss
+
+**Hypothesis; untested here.** Training minimises masked BCE
+(`masked_binary_cross_entropy_with_logits` in `src/knee_abnormality/training/lightning.py`) while
+the metric is mean per-label ROC-AUC. The
+[training-objective survey](../research/auc_loss_approaches.md) lists the candidates. One small
+arm is BCE plus a per-label pairwise ranking term behind one `training.rank_loss_weight` option,
+averaging pairs within a label and skipping labels with no positive-negative pair in the batch.
+The first comparison, [fixed class-balanced BCE](../validation/results/2026-09-19-balanced-bce-result.md),
+finished at 0.895282, +0.008796 over the closest same-seed historical reference. One public B0
+experiment reports asymmetric loss at 0.6526 against a 0.7914 BCE baseline
+([public research](../research/public-research.md)); that result does not reject other weighting
+or sampling methods.
+
+## BCE weighting and study sampling
+
+**Hypotheses; unimplemented.** Keep BCE while varying one of positive/negative
+term weights, fixed whole-target weights, study-resampling probabilities, or batch composition.
+The [research note](../research/auc_loss_approaches.md#weighting-and-sampling-design-space) owns
+the mechanisms and controls. Fixed class-balanced cell weighting is now
+[implemented](../modeling/supervision.md#fixed-class-balanced-bce), with its run in the
+[completed result](../validation/results/2026-09-19-balanced-bce-result.md); the separate cell-masking proposal
+remains under [report-label supervision](#report-label-supervision).
+
+The four positive-directed plus four random studies example illustrates one sampler, not an
+accepted ratio or next run. Choose one concrete arm with the user before implementation, keep the
+optimizer-step budget and validation fixed, and record per-label exposure and study repetition.
+Feedback-driven allocation is classified separately in
+[big bets](big-bets.md#adaptive-training-allocation).

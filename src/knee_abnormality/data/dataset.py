@@ -188,7 +188,7 @@ class KneeStudyDataset(Dataset):
             selection = select_triplets(
                 pool,
                 budget,
-                self.data.sampling_sigma_mm,
+                self.data.sampling_sigma_fraction,
                 radius,
                 study.uid,
                 (kind.plane, kind.fluid_sensitive, kind.fat_suppression),
@@ -316,6 +316,7 @@ def collate_studies(items: list[dict]) -> dict:
         (len(entries), max_slices, SLICES_PER_INPUT, image_size, image_size),
         dtype=torch.uint8,
     )
+    images.share_memory_()
     positions = torch.zeros((len(entries), max_slices), dtype=torch.float32)
     slice_mask = torch.zeros((len(entries), max_slices), dtype=torch.bool)
     valid_rects = torch.zeros((len(entries), max_slices, SLICES_PER_INPUT, 4))

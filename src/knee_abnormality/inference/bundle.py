@@ -42,11 +42,28 @@ def verify_bundle(root: Path) -> dict:
             f"Bundle file verification failed: missing={missing}, extra={extra}, changed={changed}"
         )
     config = json.loads((root / "config.json").read_text(encoding="utf-8"))
-    checkpoint = manifest.get("checkpoint", {})
+    checkpoint = manifest.get("checkpoint")
+    checkpoints = manifest.get("checkpoints")
+    if (checkpoint is None) == (checkpoints is None):
+        raise ValueError(
+            "Bundle manifest must report exactly one of checkpoint or checkpoints"
+        )
+    if checkpoint is not None:
+        reference_targets = checkpoint.get("targets")
+        reference_fold = checkpoint.get("fold")
+    else:
+        if not checkpoints:
+            raise ValueError("Bundle manifest has no ensemble member records")
+        reference_targets = checkpoints[0].get("targets")
+        reference_fold = checkpoints[0].get("fold")
+        if any(entry.get("targets") != reference_targets for entry in checkpoints):
+            raise ValueError(
+                "Bundle manifest members disagree on target names or order"
+            )
     if (
         config.get("schema_version") != BUNDLE_SCHEMA_VERSION
-        or config.get("targets") != checkpoint.get("targets")
-        or config.get("fold") != checkpoint.get("fold")
+        or config.get("targets") != reference_targets
+        or config.get("fold") != reference_fold
         or not isinstance(config.get("experiment"), dict)
     ):
         raise ValueError("Bundle config target order or fold differs from the manifest")
@@ -66,7 +83,56 @@ def verify_bundle(root: Path) -> dict:
         raise ValueError(
             "Bundle inference attention temperature differs from the manifest"
         )
+    reflection_tta = config["inference"]["reflection_tta"]
+    if (
+        type(reflection_tta) is not bool
+        or reflection_tta != manifest["runtime"]["reflection_tta"]
+    ):
+        raise ValueError("Bundle inference reflection TTA differs from the manifest")
     return manifest
+
+
+def bundle_checkpoints(manifest: dict) -> list[dict]:
+    return manifest.get("checkpoints") or [manifest["checkpoint"]]
+
+
+def bundle_validation_multiplier(root: Path) -> int:
+    config = json.loads((root / "config.json").read_text(encoding="utf-8"))
+    return int(config["experiment"]["data"]["validation_image_multiplier"])
+
+
+def submission_settings(manifest: dict) -> str:
+    runtime = manifest["runtime"]
+    baked = bundle_checkpoints(manifest)[0].get("attention_temperature") or 1.0
+    temperature = float(runtime.get("attention_temperature") or 1.0) * float(baked)
+    settings = [
+        f"x{runtime['image_multiplier']}",
+        f"tau{f'{temperature:.4f}'.rstrip('0').rstrip('.')}",
+        f"bs{runtime['batch_size']}",
+    ]
+    if runtime.get("reflection_tta"):
+        settings.append("+mirrorTTA")
+    return " ".join(settings)
+
+
+def submission_validation(manifest: dict, validation_multiplier: int) -> str:
+    scores = [
+        float(checkpoint["results"]["epoch_metrics"]["record"]["macro_auc"])
+        for checkpoint in bundle_checkpoints(manifest)
+    ]
+    mean = sum(scores) / len(scores)
+    if len(scores) > 1:
+        return f"val0(x{validation_multiplier}) {len(scores)}x mean {mean:.6f}"
+    return f"val0(x{validation_multiplier}) {mean:.6f}"
+
+
+def submission_description(
+    sequence: int, label: str, settings: str, validation: str, bundle_sha256: str
+) -> str:
+    return (
+        f"S{sequence:02d} | {label} | {settings} | {validation} | "
+        f"bundle {bundle_sha256[:8]}"
+    )
 
 
 def discover_kaggle_data_root(base: Path = Path("/kaggle/input")) -> Path:

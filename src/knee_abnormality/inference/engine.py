@@ -6,6 +6,7 @@ import polars as pl
 import torch
 from torch.utils.data import DataLoader
 
+from knee_abnormality.inference.reflection import reflect_batch, sagittal_types
 from knee_abnormality.config import (
     INFERENCE_IO_THREADS,
     SLICES_PER_INPUT,
@@ -115,15 +116,21 @@ def move_batch(batch: dict, device: torch.device) -> dict:
 
 
 def predict_loader(
-    model: KneeAbnormalityModel,
+    models: list[KneeAbnormalityModel],
     loader: DataLoader,
     device: torch.device,
     precision: RuntimePrecision = "auto",
+    reflection_tta: bool = False,
 ) -> tuple[list[str], torch.Tensor, list[dict]]:
     study_ids = []
     outputs = []
     batches = []
     actual_precision, autocast_dtype = resolve_precision(precision, device)
+    sagittal = (
+        sagittal_types(models[0].augmentation_settings.series_types)
+        if reflection_tta
+        else None
+    )
     logging.getLogger(__name__).info(
         "Inference runtime device=%s precision=%s", device, actual_precision
     )
@@ -163,7 +170,24 @@ def predict_loader(
                 dtype=autocast_dtype,
                 enabled=autocast_dtype is not None,
             ):
-                outputs.append(torch.sigmoid(model(batch).to(torch.float32)).cpu())
+                probabilities = torch.stack(
+                    [torch.sigmoid(model(batch).to(torch.float32)) for model in models]
+                ).mean(dim=0)
+                if reflection_tta:
+                    mirrored = reflect_batch(batch, sagittal)
+                    reflected_probabilities = torch.stack(
+                        [
+                            torch.sigmoid(model(mirrored).to(torch.float32))
+                            for model in models
+                        ]
+                    ).mean(dim=0)
+                    eligible = batch["reflection_eligible"][:, None]
+                    probabilities = torch.where(
+                        eligible,
+                        (probabilities + reflected_probabilities) / 2,
+                        probabilities,
+                    )
+                outputs.append(probabilities.cpu())
             finished = time.perf_counter()
             transfer_seconds = (
                 copy_events[0].elapsed_time(copy_events[1]) / 1000

@@ -44,57 +44,132 @@ B0_BACKBONE = "efficientnet_b0.ra_in1k"
 
 EXPERIMENTS = (
     (
-        "00-control",
+        "rexnet-fold0",
         {
-            "seed": 3192045323,
+            "seed": 471048644,
+            "validation": {"folds": [0]},
+        },
+    ),
+    (
+        "rexnet-fold1",
+        {
+            "seed": 98781672,
+            "validation": {"folds": [1]},
+        },
+    ),
+    (
+        "rexnet-fold2",
+        {
+            "seed": 991102686,
+            "validation": {"folds": [2]},
+        },
+    ),
+    (
+        "rexnet-fold3",
+        {
+            "seed": 645322570,
+            "validation": {"folds": [3]},
+        },
+    ),
+    (
+        "rexnet-fold4",
+        {
+            "seed": 934679689,
+            "validation": {"folds": [4]},
+        },
+    ),
+    (
+        "b0-fold0",
+        {
+            "seed": 886913563,
+            "validation": {"folds": [0]},
             "model": {"backbone": B0_BACKBONE},
             "optimizer": {"backbone_lr": 0.0004},
-            "trainer": {"batch_size": 16},
+            "trainer": {"max_epochs": 15, "patience": 15},
         },
     ),
     (
-        "01-epochs-20",
+        "b0-fold1",
         {
-            "seed": 2153440652,
+            "seed": 181761244,
+            "validation": {"folds": [1]},
             "model": {"backbone": B0_BACKBONE},
             "optimizer": {"backbone_lr": 0.0004},
-            "trainer": {"batch_size": 16, "max_epochs": 20, "patience": 20},
+            "trainer": {"max_epochs": 15, "patience": 15},
         },
     ),
     (
-        "02-lr-sqrt2",
+        "b0-fold2",
         {
-            "seed": 2651922368,
+            "seed": 121022023,
+            "validation": {"folds": [2]},
             "model": {"backbone": B0_BACKBONE},
-            "optimizer": {"backbone_lr": 0.0005657, "head_lr": 0.0008485},
-            "trainer": {"batch_size": 16},
+            "optimizer": {"backbone_lr": 0.0004},
+            "trainer": {"max_epochs": 15, "patience": 15},
         },
     ),
     (
-        "03-lr-linear",
+        "b0-fold3",
         {
-            "seed": 1738295521,
+            "seed": 844841562,
+            "validation": {"folds": [3]},
+            "model": {"backbone": B0_BACKBONE},
+            "optimizer": {"backbone_lr": 0.0004},
+            "trainer": {"max_epochs": 15, "patience": 15},
+        },
+    ),
+    (
+        "b0-fold4",
+        {
+            "seed": 2042043309,
+            "validation": {"folds": [4]},
+            "model": {"backbone": B0_BACKBONE},
+            "optimizer": {"backbone_lr": 0.0004},
+            "trainer": {"max_epochs": 15, "patience": 15},
+        },
+    ),
+    (
+        "sigma-060",
+        {
+            "seed": 325686070,
+            "data": {"sampling_sigma_fraction": 0.6},
+        },
+    ),
+    (
+        "sigma-076",
+        {
+            "seed": 1698145101,
+            "data": {"sampling_sigma_fraction": 0.76},
+        },
+    ),
+    (
+        "sigma-095",
+        {
+            "seed": 179866324,
+            "data": {"sampling_sigma_fraction": 0.95},
+        },
+    ),
+    (
+        "sigma-110",
+        {
+            "seed": 1397039844,
+            "data": {"sampling_sigma_fraction": 1.1},
+        },
+    ),
+    (
+        "rexnet-epochs-15",
+        {
+            "seed": 750194183,
+            "trainer": {"max_epochs": 15, "patience": 15},
+        },
+    ),
+    (
+        "b0-epochs15-lr2x",
+        {
+            "seed": 1039297197,
             "model": {"backbone": B0_BACKBONE},
             "optimizer": {"backbone_lr": 0.0008, "head_lr": 0.0012},
-            "trainer": {"batch_size": 16},
-        },
-    ),
-    (
-        "04-warmup-2",
-        {
-            "seed": 2350805628,
-            "model": {"backbone": B0_BACKBONE},
-            "optimizer": {"backbone_lr": 0.0004, "warmup_epochs": 2},
-            "trainer": {"batch_size": 16},
-        },
-    ),
-    (
-        "05-wd-0.02",
-        {
-            "seed": 271435568,
-            "model": {"backbone": B0_BACKBONE},
-            "optimizer": {"backbone_lr": 0.0004, "weight_decay": 0.02},
-            "trainer": {"batch_size": 16},
+            "trainer": {"max_epochs": 15, "patience": 15},
         },
     ),
 )
@@ -237,7 +312,10 @@ def read_epoch_metrics(fold_dir: Path, prefix: str) -> list[tuple[int, dict]]:
 
 
 def run_summary(run_dir: Path) -> dict | None:
-    fold_dir = run_dir / "fold_0"
+    folds = sorted(run_dir.glob("fold_*"))
+    if len(folds) != 1:
+        return None
+    fold_dir = folds[0]
     selected_path = fold_dir / "selected_checkpoint.json"
     timing_path = fold_dir / "timing.json"
     if not selected_path.is_file() or not timing_path.is_file():
@@ -317,24 +395,35 @@ def write_summary(queue: Path, configs: list[Path]) -> None:
             )
 
 
+def experiment_folds(name: str) -> list[int]:
+    for experiment, changes in EXPERIMENTS:
+        if experiment == name:
+            return changes.get("validation", {}).get("folds", [0])
+    return [0]
+
+
 def print_comparison_commands(
     queue: Path,
     configs: list[Path],
     completed: set[str],
     overrides: dict[str, list[str]],
 ) -> None:
-    if "00-control" not in completed:
-        print("Skipping comparison commands: 00-control did not complete", flush=True)
+    control = EXPERIMENTS[0][0]
+    if control not in completed:
+        print(f"Skipping comparison commands: {control} did not complete", flush=True)
         return
-    control_dir = queue / "runs" / "00-control"
+    control_folds = experiment_folds(control)
+    control_dir = queue / "runs" / control
     for config in configs:
         name = config.stem
-        if name == "00-control" or name not in completed:
+        if name == control or name not in completed:
+            continue
+        if experiment_folds(name) != control_folds:
             continue
         allowed = ",".join(["name", *overrides[name]])
         candidate_dir = queue / "runs" / name
         output_dir = (
-            ROOT / "outputs" / "analysis" / f"{queue.name}-{name}-vs-00-control"
+            ROOT / "outputs" / "analysis" / f"{queue.name}-{name}-vs-{control}"
         )
         print(
             "rtk proxy uv run --locked python -m scripts.tools.compare_fold_runs "

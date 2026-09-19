@@ -204,10 +204,23 @@ One run is queued: `robust-center-seed42`, paired with `ranked-filtered-seed42` 
   - The three control checkpoints above averaged −0.0001 (from −0.00004 to −0.00015), so this
     checkpoint loses more than any of them. The result comes from one checkpoint and 21 studies
     (`outputs/analysis/robust-center-implementation-20260917/rescore.json`).
-- *Expectation:* the run is expected to tie. Seed-to-seed noise is 0.0015–0.0018, so a single run
+- *Expectation:* the run is expected to tie. Seed-to-seed noise is 0.0029 ([strategy](../validation/validation-strategy.md#what-a-comparison-can-resolve)), so a single run
   cannot resolve a change of this size.
 
 ## Parked until a specific need
+
+### Adaptive training allocation
+
+**Hypothesis; unstarted, no chosen controller.** Investigate whether training history can usefully
+allocate target weights or study exposure toward learnable ranking errors. The
+[research note](../research/auc_loss_approaches.md#adaptive-allocation) owns the candidate signals,
+soft-BCE entropy floor, sampling feedback bias and distinction between error and expected gain.
+Define a training-only signal, smoothing, coverage and allocation limits before choosing an
+implementation. Compare against uniform exposure and a relevant static allocation at the same
+training budget. High raw loss alone is not the design. The static alternatives live only in
+[small changes](small-changes.md#bce-weighting-and-study-sampling).
+
+### Other parked work
 
 - **External knee data** (MRNet, fastMRI+, SKM-TEA): only for a concrete missing capability, under
   the

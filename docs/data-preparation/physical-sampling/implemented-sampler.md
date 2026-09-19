@@ -1,11 +1,31 @@
 # Implemented sampler
 
 The active baseline is `spatial-tokens-physical-sampling`, with positive finite
-`data.sampling_sigma_mm: 80.0`. It preserves the spatial-token model, accepted
+`data.sampling_sigma_fraction: 0.76`. It preserves the spatial-token model, accepted
 study-center estimator, reliability thresholds, 140-mm crop and acquisition-
 midpoint 1D encoding. The old allocator, triangular selection and their three
 configuration fields have been removed; old fields are rejected. Historical
 checkpoints require their matching archived source and configuration.
+
+The Gaussian width is relative to each candidate pool's own acquired reach, not a
+fixed millimetre constant: `sigma = sampling_sigma_fraction * limiting_reach(pool)`
+(`limiting_reach` in `sampling.py`). `limiting_reach` is the distance from the study
+centre (depth 0) to the nearer edge of the pool's union-support envelope — taking
+`lo`/`hi` as the min start and max end of `union_support(pool.candidates)`, it is
+`min(-lo, hi)`, floored at 1 mm. The floor guards the rare pool whose acquired
+coverage does not straddle the study centre at all, where `min(-lo, hi)` would
+otherwise be zero or negative; measured on the fold-0 token cache this hit 2 of
+4,218 physical pools (a `SeriesTypeConfig` slot's own reach can miss the centre even
+when the plane's combined coverage across both fluid-sensitivity slots does not).
+0.76 preserves the previous fixed sampler's average width; measured per-plane mean
+realized sigma at that fraction is axial 39.5 mm, coronal 31.4 mm, sagittal 34.2 mm
+(4,218 physical pools, fold-0 cache), each plane splitting into two independent
+slots (T1/PD and fluid-sensitive/fat-suppressed) that are sampled separately, so a
+slot's own reach is narrower than the plane's two slots combined. This applies only
+to physical pools; local (non-physical) pools stay uniform over their support union,
+unaffected by sigma. Evidence and rationale: [per-plane sampler sigma
+results](../../validation/results/2026-09-18-per-plane-sigma-cache.md) and
+[cohort-wide center fit and plane extents](../accurate-sampling-centers.md#cohort-wide-center-fit-and-plane-extents).
 
 Within each plane/contrast type, candidate triplets are every consecutive window
 in usable physical runs. Positions must be finite, strictly increasing in the

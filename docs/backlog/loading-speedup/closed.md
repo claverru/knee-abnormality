@@ -21,11 +21,17 @@ the 0.005 rank contains a large share of the values and the in-bin partition cos
 partition over everything. Exact bounds hid the regression entirely. See
 [how to measure](measuring.md#measure-intensity-work-on-real-pixels).
 
-A second reason the quantile line is closed: the baseline is already near memory bandwidth. The
-current `_linear_quantiles` makes **one** in-place multi-kth `partition` call, NumPy's multi-kth
-introselect reuses computed pivots so the floor/ceil neighbours are nearly free, and NumPy 2.0
-routes `partition` through Intel x86-simd-sort. `np.quantile` itself does strictly more work (a NaN
-scan and a float64 lerp), so switching to it cannot win either.
+**Correction, 2026-09-19 — the second reason once given here was wrong.** This paragraph used to
+argue that the baseline is already near memory bandwidth, on the grounds that `_linear_quantiles`
+makes one in-place multi-kth `partition` call whose introselect reuses pivots so the floor/ceil
+neighbours are nearly free, and that NumPy 2.0 routes `partition` through Intel x86-simd-sort.
+Replacing that one call with a partition at the high rank, a partition of its prefix at the low rank
+and two tail reductions measured **1.44–1.63x faster with bit-identical bounds on 24 real
+acquisitions** ([evidence](ranked-by-gain.md#measurement-behind-rank-5)), so the multi-kth
+call was not the floor that argument assumed. What still closes, and is unaffected: coarse-histogram
+selection is 1.67x slower on real pixels, and `np.quantile` does strictly more work than either
+formulation (a NaN scan and a float64 lerp), so neither of those can win. The exact single-rank
+reformulation is open in [candidates](candidates.md#bit-exact-batch-into-the-retrain).
 
 ## Threading loses when there is no latency to hide
 
@@ -86,7 +92,8 @@ which two Kaggle runs showed and a third did not reproduce.
 - **`list_series` sorting names before building `Path` objects** (4.51 → 0.67 µs/file, 0.3 s
   cold-100). Correct and measured, but it lands inside `build_series_index`, which since the
   2026-09-18 index changes is 7.1 s per worker hidden behind 15.5 s of model load. It buys nothing
-  at run scale, and the cold-100 probe is not what the efficiency prize measures.
+  at run scale, and the cold-100 probe is not what the
+  [efficiency prize](../../inference/efficiency-leaderboard.md#the-exchange-rate) measures.
 - **RAM or page-cache warm-up, and notebook pre-listing.** Measured: indexing fell from 27 s to
   6–9 s but worker wall rose to 355 s against 329–342 s. Setup holds no one-off mount penalty
   either — cold minus warm is per-directory dentry misses, so a warm-up thread would just do the

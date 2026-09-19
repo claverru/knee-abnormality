@@ -37,6 +37,8 @@ from knee_abnormality.training.lightning import (
     PRECISION,
     KneeModule,
     build_optimizer,
+    fixed_class_balance,
+    validated_class_balance_weights,
 )
 
 
@@ -115,6 +117,7 @@ def gpu_candidate(
     items: list[dict],
     size: int,
     args: ProfileCLI,
+    class_balance_weights: torch.Tensor | None,
 ) -> dict:
     model = (
         KneeAbnormalityModel(
@@ -132,7 +135,7 @@ def gpu_candidate(
     for step in range(args.warmup + args.steps):
         torch.cuda.synchronize()
         start = time.perf_counter()
-        loss = training_step(model, optimizer, batch, config)
+        loss = training_step(model, optimizer, batch, config, class_balance_weights)
         torch.cuda.synchronize()
         if step >= args.warmup:
             durations.append(time.perf_counter() - start)
@@ -160,7 +163,10 @@ def gpu_candidate(
 
 
 def gpu_profile(
-    config: ExperimentConfig, dataset: KneeStudyDataset, args: ProfileCLI
+    config: ExperimentConfig,
+    dataset: KneeStudyDataset,
+    args: ProfileCLI,
+    class_balance: dict | None,
 ) -> dict:
     sizes = sorted(set(args.batch_sizes))
     if min(sizes) < 1 or max(sizes) > min(8, len(dataset)):
@@ -168,11 +174,18 @@ def gpu_profile(
             "GPU profiling supports batch sizes 1 through 8 using distinct maximum-load studies"
         )
     items = [dataset[index] for index in range(max(sizes))]
+    class_balance_weights = validated_class_balance_weights(
+        config, dataset.targets, class_balance
+    )
+    if class_balance_weights is not None:
+        class_balance_weights = class_balance_weights.to("cuda")
     rows = []
     for size in sizes:
         torch.manual_seed(config.seed)
         try:
-            row = gpu_candidate(config, dataset, items, size, args)
+            row = gpu_candidate(
+                config, dataset, items, size, args, class_balance_weights
+            )
         except torch.OutOfMemoryError as error:
             row = {"batch_size": size, "status": "out_of_memory", "error": str(error)}
         gc.collect()
@@ -213,6 +226,14 @@ def loader_candidate(
         dataset,
         np.random.default_rng(config.seed).permutation(len(dataset))[:count].tolist(),
     )
+    class_balance = (
+        fixed_class_balance(
+            dataset.studies[sample.indices],
+            dataset.targets,
+        )
+        if config.trainer.class_balanced_bce
+        else None
+    )
     loader = build_data_loader(
         sample,
         config.trainer,
@@ -221,6 +242,11 @@ def loader_candidate(
         persistent_workers=False,
     )
     iterator = iter(loader)
+    class_balance_weights = validated_class_balance_weights(
+        config, dataset.targets, class_balance
+    )
+    if class_balance_weights is not None:
+        class_balance_weights = class_balance_weights.to("cuda")
     model = (
         KneeAbnormalityModel(
             config.model, config.data, len(dataset.targets), load_pretrained=False
@@ -240,7 +266,7 @@ def loader_candidate(
         batch = next(iterator)
         waited = time.perf_counter() - started
         batch = move_batch(batch, torch.device("cuda"))
-        training_step(model, optimizer, batch, config)
+        training_step(model, optimizer, batch, config, class_balance_weights)
         torch.cuda.synchronize()
         if step >= args.warmup:
             waits.append(waited)
@@ -258,6 +284,7 @@ def loader_candidate(
         "slices": slices,
         "inputs": inputs,
         "peak_allocated_gib": torch.cuda.max_memory_allocated() / 2**30,
+        "class_balance": class_balance,
     }
 
 
@@ -318,7 +345,10 @@ class BatchTimings(L.Callback):
 
 
 def lightning_profile(
-    config: ExperimentConfig, dataset: KneeStudyDataset, args: ProfileCLI
+    config: ExperimentConfig,
+    dataset: KneeStudyDataset,
+    args: ProfileCLI,
+    class_balance: dict | None,
 ) -> dict:
     settings = config.trainer
     steps = args.warmup + args.steps
@@ -340,6 +370,7 @@ def lightning_profile(
         len(dataset),
         0,
         args.output_dir,
+        class_balance,
         load_pretrained=False,
     )
     timing = BatchTimings(args.warmup * settings.accumulate_grad_batches)
@@ -383,6 +414,11 @@ def run(args: ProfileCLI) -> None:
     )
     started = time.perf_counter()
     dataset, labels = sample_dataset(config, args.samples)
+    class_balance = (
+        fixed_class_balance(dataset.studies, dataset.targets)
+        if config.trainer.class_balanced_bce and args.mode in ("gpu", "lightning")
+        else None
+    )
     result = profile_manifest(
         config,
         args.model_dump(mode="json"),
@@ -390,16 +426,17 @@ def run(args: ProfileCLI) -> None:
         source,
         labels,
         time.perf_counter() - started,
+        {"class_balance": class_balance},
     )
     write_profile_manifest(args.output_dir, result)
     if args.mode == "preprocessing":
         result.update(preprocessing_profile(dataset, args))
     elif args.mode == "gpu":
-        result.update(gpu_profile(config, dataset, args))
+        result.update(gpu_profile(config, dataset, args, class_balance))
     elif args.mode == "loader":
         result.update(loader_profile(config, dataset, args))
     else:
-        result.update(lightning_profile(config, dataset, args))
+        result.update(lightning_profile(config, dataset, args, class_balance))
     finish_profile(args.output_dir, result, started)
 
 

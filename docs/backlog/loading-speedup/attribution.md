@@ -138,8 +138,13 @@ multiply by.
 
 Wall follows CPU while CPU binds: 1,360 CPU-seconds over 4 cores would be 340 s, and prediction took
 388 s, so the box converts CPU to wall at about **3.5 effective cores**. Removing `C` CPU-seconds
-from the run should remove roughly `C / 3.5` seconds of wall, until the forward pass — 173–191 s —
-becomes the floor. This is a heuristic for ranking, and it applies to **CPU** savings: a wall second
+from the run should remove roughly `C / 3.5` seconds of wall, until the forward pass becomes the
+floor — and that floor is lower than the 173–191 s recorded beside the loader, because that number
+is wall around the forward call and contention inflates it. The same model work measured 102 s at
+io1, the one arm where the box was not saturated, against 182 s at io16
+([sweep](../../inference/2026-09-18-kaggle-x4-profile-after-cpu-cluster.md#the-io-thread-sweep-2026-09-18)),
+so **use ~100 s as the GPU floor** and read the rest as contention. This is a heuristic for
+ranking, and it applies to **CPU** savings: a wall second
 saved on overlapped I/O is a different quantity and does not convert the same way. A second saved on the 100-study cold probe is 13 probe-units per run, scaled by the 1.56x
 contention factor and divided by 3.5, so **one cold-100 second is worth about five seconds of run
 wall**, which is the translation the candidate list uses.

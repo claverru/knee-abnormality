@@ -26,7 +26,7 @@ differed.
   faster; 35% fewer lost 0.0051 and trained 37% faster. The losses are broad (ACL −0.016 and
   lateral meniscus −0.014 in `less_images`; ACL −0.017 and fracture −0.016 in
   `less_less_images`). Both still peaked at their last epoch. This is a runtime lever for the
-  [efficiency prize](../../inference/submission-requirements-and-output-contract.md), not an
+  [efficiency prize](../../inference/efficiency-leaderboard.md#the-exchange-rate), not an
   accuracy candidate.
 - **Series dropout 0.25–0.3 and `min_lr 0.1` are ties.** The dip at 0.25 sits between two ties
   and inside its interval, so it reads as noise rather than a trend.
