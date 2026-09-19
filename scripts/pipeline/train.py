@@ -36,7 +36,12 @@ from knee_abnormality.training.checkpoints import (
     validate_resume_checkpoint,
 )
 from knee_abnormality.training.cuda import configure_cuda_allocator
-from knee_abnormality.training.lightning import PRECISION, KneeDataModule, KneeModule
+from knee_abnormality.training.lightning import (
+    PRECISION,
+    KneeDataModule,
+    KneeModule,
+    fixed_class_balance,
+)
 
 
 class TrainCLI(CLISettings):
@@ -112,9 +117,16 @@ def _check_resume(
     targets: tuple[str, ...],
     training_studies: int,
     input_identity: dict,
+    class_balance: dict | None,
 ) -> None:
     validate_resume_checkpoint(
-        read_checkpoint(path), config, targets, fold, training_studies, input_identity
+        read_checkpoint(path),
+        config,
+        targets,
+        fold,
+        training_studies,
+        input_identity,
+        class_balance,
     )
 
 
@@ -131,6 +143,11 @@ def run_fold(
     data.setup("fit")
     labels = data.labels
     training_studies = len(data.train_dataset)
+    class_balance = (
+        fixed_class_balance(data.train_dataset.studies, labels.targets)
+        if config.trainer.class_balanced_bce
+        else None
+    )
     input_identity = training_input_identity(
         config, labels, data.train_dataset.studies, data.validation_dataset.studies
     )
@@ -140,7 +157,17 @@ def run_fold(
     )
     if resume is not None:
         _check_resume(
-            resume, config, fold, labels.targets, training_studies, input_identity
+            resume,
+            config,
+            fold,
+            labels.targets,
+            training_studies,
+            input_identity,
+            class_balance,
+        )
+    if class_balance is not None:
+        (fold_dir / "class_balance.json").write_text(
+            json.dumps(class_balance, indent=2) + "\n"
         )
     (fold_dir / "input_identity.json").write_text(
         json.dumps(input_identity, indent=2) + "\n"
@@ -152,6 +179,7 @@ def run_fold(
         training_studies,
         labels.validation.height,
         fold_dir / "epochs",
+        class_balance,
         load_pretrained=False if resume is not None else None,
         input_identity=input_identity,
     )
@@ -250,7 +278,7 @@ def run_fold(
         config, labels.targets, best_path, device, expected_fold=fold
     )
     prediction_started = time.perf_counter()
-    study_ids, predictions, _ = predict_loader(model, data.val_dataloader(), device)
+    study_ids, predictions, _ = predict_loader([model], data.val_dataloader(), device)
     prediction_seconds = time.perf_counter() - prediction_started
     make_prediction_frame(study_ids, predictions, labels.targets, fold).write_csv(
         fold_dir / "validation_predictions.csv"

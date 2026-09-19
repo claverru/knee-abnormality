@@ -25,7 +25,7 @@ SAMPLING_IDENTITY = {
     "plane_group_tolerance_mm": 0.1,
     "grouping": "complete_link_offset_plus_crop_radius_normal_distance",
     "support": "union_of_run_middle_extents_singleton_neighbor_cells",
-    "targets": "stratified_truncated_gaussian_patient_axis",
+    "targets": "stratified_truncated_gaussian_patient_axis_sigma_fraction_of_pool_limiting_reach",
     "suppliers": "uniform_random_or_exact_fractional_entitlement_before_assignment",
     "source_ranking": "original_then_newest_same_signature_then_crop_coverage_0.1_then_acquired_resolution_0.01_then_uid",
     "assignment": "maximum_cardinality_then_supplier_changes_then_squared_error",
@@ -323,6 +323,13 @@ def union_support(candidates: tuple[Triplet, ...]) -> np.ndarray:
     return np.asarray(intervals, dtype=float).reshape(-1, 2)
 
 
+def limiting_reach(pool: CandidatePool) -> float:
+    intervals = union_support(pool.candidates)
+    lo = float(intervals[:, 0].min())
+    hi = float(intervals[:, 1].max())
+    return max(min(-lo, hi), 1.0)
+
+
 def interval_log_mass(lo: float, hi: float) -> float:
     if lo >= 0:
         a, b = log_ndtr(-lo), log_ndtr(-hi)
@@ -332,7 +339,7 @@ def interval_log_mass(lo: float, hi: float) -> float:
 
 
 def target_depths(
-    pool: CandidatePool, percentiles: np.ndarray, sigma: float
+    pool: CandidatePool, percentiles: np.ndarray, sigma: float | None
 ) -> np.ndarray:
     intervals = union_support(pool.candidates)
     logs = (
@@ -426,16 +433,19 @@ def study_budgets(
 def select_triplets(
     pool: CandidatePool,
     budget: int,
-    sigma: float,
+    sigma_fraction: float,
     radius: float,
     study: str,
     kind: tuple,
     training_seed: int | None,
     epoch: int = 0,
 ) -> Selection:
-    if budget < 1 or not np.isfinite(sigma) or sigma <= 0:
+    if budget < 1:
+        raise ValueError("Sampling requires a positive budget")
+    sigma = sigma_fraction * limiting_reach(pool) if pool.physical else None
+    if pool.physical and (not np.isfinite(sigma) or sigma <= 0):
         raise ValueError(
-            "Sampling requires a positive budget and finite positive sigma"
+            "Sampling requires a finite positive sigma for a physical pool"
         )
     groups = geometry_groups(pool, radius)
     count = min(budget, len(groups))
@@ -443,6 +453,7 @@ def select_triplets(
         **pool.diagnostics,
         "requested_triplets": budget,
         "capacity": len(groups),
+        "sampling_sigma_fraction": sigma_fraction,
         "sampling_sigma_mm": sigma,
         "triplets": 0,
         "channel_appearances": 0,

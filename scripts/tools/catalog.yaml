@@ -42,11 +42,13 @@ scripts:
       - rtk proxy uv run --locked python -m scripts.tools.plot_validation_metrics baseline0 baseline1 baseline4
       - rtk proxy uv run --locked python -m scripts.tools.plot_validation_metrics outputs/training/baseline0 outputs/training/baseline4 --output outputs/analysis/baselines.png
     inputs: [Run folders under outputs/training/ containing fold epoch metric JSON files]
-    outputs: [PNG comparison plot of validation, gold, report-derived macro AUC and soft-target BCE]
+    outputs: [PNG comparison plot of validation macro AUC, gold macro AUC, per-target AUC at the best epoch and soft-target BCE]
     notes:
       - Each run name resolves relative to outputs/training/ unless it is an existing folder path.
       - Runs with several folds produce one line per fold.
-      - Undefined subgroup macro AUCs appear as gaps; full-validation AUC and BCE must be numeric.
+      - The per-target panel draws the 12 target AUCs at each series best macro-AUC epoch as grouped bars, with a dashed horizontal line at that epoch macro AUC.
+      - Per-target bars start at the 0.05 step below the lowest plotted AUC, stated in the axis label; one or two series also get value labels.
+      - Undefined gold macro AUCs appear as gaps; full-validation AUC, BCE and per-target AUCs must be numeric.
       - The default output is outputs/analysis/validation_metrics.png and is overwritten on every run.
     docs: [docs/validation/plot-validation-metrics.md]
 
@@ -55,7 +57,7 @@ scripts:
     summary: Launch a detached submission service or inspect its saved status, stage durations and runner logs.
     tags: [submit, background, systemd, progress, logs, timing, kaggle]
     commands:
-      - rtk proxy uv run --locked just submit outputs/submission/exports/run-fold0 OWNER/knee-fold0-bundle OWNER/knee-inference outputs/submission/records/run-fold0.json
+      - rtk proxy uv run --locked just submit outputs/submission/exports/run-fold0 OWNER/knee-fold0-bundle OWNER/knee-inference outputs/submission/records/run-fold0.json "ens-5xb0 + mirror TTA"
       - rtk proxy uv run --locked just submit-status outputs/submission/records/run-fold0.json
       - rtk proxy uv run --locked just submit-logs outputs/submission/records/run-fold0.json
       - rtk proxy uv run --locked python -m scripts.tools.submission_job --help
@@ -63,6 +65,7 @@ scripts:
     outputs: [Detached user systemd service for start, JSON status and stage durations, Runner log excerpt or explicit live follow]
     notes:
       - Start verifies bundle hashes and readiness without local inference, then returns after systemd accepts the service; execution and submission remain in scripts.pipeline.submit.
+      - Start requires --label and passes it through; the sequence number, titles and submission description are built in scripts.pipeline.submit and reported by status.
       - Requires Linux user systemd for start and the current project environment; quotes arguments through subprocess arrays and rejects existing records or logs.
       - Status and logs also read older manually launched runners using the matching record-stem-runner.log convention.
       - Logs return the last 60 lines by default; only explicit --follow waits for more output. Stage durations include polling delay and are not official hidden-test execution time.
@@ -84,6 +87,7 @@ scripts:
       - Preserves complete original validation batches selected across low and high input counts; samples=16 selects about 16 studies.
       - Compares saved predictions at their original density, then checks the requested inference density separately without reporting sample AUC.
       - Uses the existing checkpoint without training; source, checkpoint, multiplier and verified codec identities are recorded.
+      - Works against an ensemble bundle (a models/ directory of members) the same way as a single-checkpoint bundle (model.ckpt); it loads every member and compares the averaged prediction to the reference CSV.
     docs: [docs/inference/fast-submission-preparation.md]
 
   - id: script-catalog

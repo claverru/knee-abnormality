@@ -12,7 +12,7 @@ from knee_abnormality.cli import CLISettings
 from knee_abnormality.data.dataset import build_data_loader
 from knee_abnormality.data.sources import prediction_studies, select_studies
 from knee_abnormality.evaluation.predictions import make_prediction_frame
-from knee_abnormality.inference.checkpoint import load_checkpoint_model
+from knee_abnormality.inference.checkpoint import load_models
 from knee_abnormality.inference.engine import (
     BACKBONE_CHUNK_IMAGES,
     predict_loader,
@@ -45,7 +45,7 @@ def predict_request(request: PredictionRequest) -> dict:
 
     def load_model():
         loading = time.perf_counter()
-        model = load_checkpoint_model(
+        models = load_models(
             request.config,
             targets,
             request.checkpoint,
@@ -54,8 +54,9 @@ def predict_request(request: PredictionRequest) -> dict:
             attention_temperature=request.attention_temperature,
         )
         if actual_precision == "fp16":
-            use_fixed_backbone_chunks(model, request.config.data.image_size)
-        return model, time.perf_counter() - loading
+            for model in models:
+                use_fixed_backbone_chunks(model, request.config.data.image_size)
+        return models, time.perf_counter() - loading
 
     def prepare_data():
         indexing = time.perf_counter()
@@ -78,11 +79,11 @@ def predict_request(request: PredictionRequest) -> dict:
 
     with ThreadPoolExecutor(1) as pool:
         preparing = pool.submit(prepare_data)
-        model, model_load_seconds = load_model()
+        models, model_load_seconds = load_model()
         loader, data_setup_seconds = preparing.result()
     loaded = time.perf_counter()
     study_ids, predictions, batches = predict_loader(
-        model, loader, device, request.precision
+        models, loader, device, request.precision, request.reflection_tta
     )
     predicted = time.perf_counter()
     frame = make_prediction_frame(
@@ -97,6 +98,8 @@ def predict_request(request: PredictionRequest) -> dict:
     result = {
         "worker_index": request.worker_index,
         "attention_temperature": request.attention_temperature,
+        "reflection_tta": request.reflection_tta,
+        "member_count": len(models),
         "studies": frame.height,
         "device": str(device),
         "gpu_name": torch.cuda.get_device_name() if device.type == "cuda" else None,

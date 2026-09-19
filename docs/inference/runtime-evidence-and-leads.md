@@ -56,14 +56,11 @@ Reported training durations and backbone choices are in
 
 ## Remaining efficiency questions and historical context
 
-The [efficiency leaderboard notebook](https://www.kaggle.com/code/ryanholbrook/rsna-knee-abnormalities-efficiency-lb)
-combines score and execution time.
-
-Earlier notes did not establish the rules or whether efficiency eligibility
-depends on selected submissions. A fast model and ensemble were considered as
-a way to test that hypothesis, without a definitive result.
-The [official requirements above](submission-requirements-and-output-contract.md#verified-submission-requirements) supersede
-that uncertainty for final prize eligibility.
+Whether the public board depends on selected submissions was an open question in
+earlier notes; it is answered in the
+[efficiency leaderboard](efficiency-leaderboard.md), which also holds our standing
+and the rate the formula sets. Final prize eligibility follows the
+[official requirements above](submission-requirements-and-output-contract.md#verified-submission-requirements).
 
 TPU eligibility, hardware normalization, and medal eligibility were not resolved
 by the sources reviewed. Verify these details on the official competition pages
@@ -72,8 +69,7 @@ before choosing a strategy.
 The five-minute claim recurred on 2026-09-17: the same competitor repeats it for
 a single-fold single model at 0.949, says read time is still 60–70% of that
 submission, and now leads both the score and the efficiency boards at 0.957. It
-is still a self-report without a linked run, but it is no longer isolated. Our
-own 0.936 submission holds efficiency rank 16 of 3,819 scored teams.
+is still a self-report without a linked run, but it is no longer isolated.
 
 ## Techniques from the public two-T4 notebook (2026-09-18)
 

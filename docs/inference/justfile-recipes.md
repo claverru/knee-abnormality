@@ -2,7 +2,7 @@
 
 The root [justfile](../../justfile) covers the maintained path. Run recipes as
 `rtk proxy uv run --locked just RECIPE ...` from the repository; the table uses
-the shorter `just` spelling. Arguments are positional. Quote paths and messages
+the shorter `just` spelling. Arguments are positional. Quote paths and labels
 containing spaces. After training, routine submissions need only export and
 submit; `validate` and `infer` are optional.
 
@@ -17,12 +17,12 @@ submit; `validate` and `infer` are optional.
 | Export with the default 2× images, four studies per GPU and sixteen loader workers | `just export CHECKPOINT BUNDLE` |
 | Export at 2× or 3× | `just export CHECKPOINT BUNDLE MULTIPLIER [BATCH_SIZE]` |
 | Optional local test prediction | `just infer BUNDLE [DATA_ROOT] [OUTPUT_CSV]` |
-| Launch automatic submission and return | `just submit BUNDLE DATASET_ID NOTEBOOK_ID RECORD_JSON [MESSAGE]` |
+| Launch automatic submission and return | `just submit BUNDLE DATASET_ID NOTEBOOK_ID RECORD_JSON LABEL` |
 | Inspect saved progress and stage durations | `just submit-status RECORD_JSON` |
 | Read recent runner output and return | `just submit-logs RECORD_JSON [LINES]` |
 | Explicitly follow live runner output | `just submit-follow RECORD_JSON [LINES]` |
 | Query current Kaggle submission statuses/scores | `just submissions` |
-| Submit in the foreground for debugging | `just submit-foreground BUNDLE DATASET_ID NOTEBOOK_ID RECORD_JSON [MESSAGE]` |
+| Submit in the foreground for debugging | `just submit-foreground BUNDLE DATASET_ID NOTEBOOK_ID RECORD_JSON LABEL` |
 
 For example, after selecting an actual checkpoint:
 
@@ -33,7 +33,7 @@ rtk proxy uv run --locked just export \
 rtk proxy uv run --locked just submit \
   outputs/submission/exports/00-baseline-next-2x \
   claverru/knee-00-baseline-next-2x claverru/knee-00-baseline-next-2x-inference \
-  outputs/submission/records/00-baseline-next-2x.json "00-baseline, 2x images"
+  outputs/submission/records/00-baseline-next-2x.json "00-baseline"
 rtk proxy uv run --locked just submit-status outputs/submission/records/00-baseline-next-2x.json
 ```
 
@@ -49,6 +49,11 @@ the checkpoint into a fresh directory, preserving existing run artifacts.
 paths before changing directory, and runs from the bundle so both the prediction
 entry point and package come from frozen source. Validation prediction is never
 a dependency of export or submission.
+
+`LABEL` is the only submission text chosen by hand: 2 to 45 characters naming the run and its one
+change. Everything Kaggle shows is built from it and the bundle, in the
+[unified submission format](submissions/INDEX.md#naming), and a submission description cannot be
+edited afterwards.
 
 The [submission job utility](../../scripts/tools/submission_job.py) performs cheap
 bundle integrity checks and starts the existing submission pipeline with a

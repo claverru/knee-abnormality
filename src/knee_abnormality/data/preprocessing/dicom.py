@@ -655,7 +655,7 @@ def frame_from_payload(
             pixels = np.bitwise_and(
                 pixels, np.uint16((1 << descriptor.bits_stored) - 1)
             )
-    pixels = pixels.reshape(descriptor.rows, descriptor.columns).astype(np.float32)
+    pixels = pixels.reshape(descriptor.rows, descriptor.columns)
     return DecodedFrame(
         pixels,
         descriptor.row_spacing,
@@ -675,7 +675,7 @@ def read_frame(path: Path, descriptor: NativePixelDescriptor | None) -> DecodedF
 
 def _read_pydicom_frame(path: Path) -> DecodedFrame:
     dataset = pydicom.dcmread(path)
-    pixels = np.asarray(dataset.pixel_array, dtype=np.float32)
+    pixels = np.asarray(dataset.pixel_array)
     if pixels.ndim != 2:
         raise ValueError(f"Expected one two-dimensional frame, got {pixels.shape}")
     slope = float(getattr(dataset, "RescaleSlope", 1.0))

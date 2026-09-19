@@ -28,8 +28,15 @@ The commands below follow the installed 2.0.2 interface. Prefix each with
 | Attach data and request an offline GPU run | Set notebook metadata, then `kaggle kernels push -p NOTEBOOK_DIR -t 32400 --accelerator NvidiaTeslaT4` |
 | Monitor the saved notebook run | `kaggle kernels status OWNER/NOTEBOOK_SLUG` and `kaggle kernels logs OWNER/NOTEBOOK_SLUG --follow` |
 | Download ordinary run outputs/logs | `kaggle kernels output OWNER/NOTEBOOK_SLUG -p OUTPUT_DIR` |
-| Submit a particular notebook version | `kaggle competitions submit COMPETITION -k OWNER/NOTEBOOK_SLUG -v VERSION -f submission.csv -m "Fold 0"` |
+| Submit a particular notebook version | `kaggle competitions submit COMPETITION -k OWNER/NOTEBOOK_SLUG -v VERSION -f submission.csv -m DESCRIPTION` |
 | Poll scoring status and available scores | `kaggle competitions submissions rsna-knee-abnormality-detection -v` |
+
+`-m` is the submission description, the only text Kaggle keeps for a submission row, and it is
+write-once: the API exposes submit, status, list and download but no update, and the site offers
+no edit control either. `just submit` composes it in the
+[unified submission format](submissions/INDEX.md#naming) from one `--label`, so use the recipe
+rather than a hand-written message. The notebook title shown beside a submission can only be
+changed by renaming the notebook in the Kaggle UI, because `kernels push` re-runs the notebook.
 
 See the official [dataset commands](https://github.com/Kaggle/kaggle-cli/blob/main/docs/datasets.md),
 [notebook commands](https://github.com/Kaggle/kaggle-cli/blob/main/docs/kernels.md)

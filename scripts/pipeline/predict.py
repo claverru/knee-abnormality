@@ -88,7 +88,15 @@ def main() -> None:
         if bundle is None and args.checkpoint is None:
             raise ValueError("Repository inference requires --checkpoint")
         checkpoint_path = (
-            (args.checkpoint if args.checkpoint is not None else bundle / "model.ckpt")
+            (
+                args.checkpoint
+                if args.checkpoint is not None
+                else (
+                    bundle / "models"
+                    if "checkpoints" in manifest
+                    else bundle / "model.ckpt"
+                )
+            )
             .expanduser()
             .resolve()
         )
@@ -108,6 +116,7 @@ def main() -> None:
                 "attention_temperature": ATTENTION_TEMPERATURE
                 if args.attention_temperature is None
                 else args.attention_temperature,
+                "reflection_tta": False,
                 "batch_size": INFERENCE_BATCH_SIZE,
                 "num_workers": INFERENCE_NUM_WORKERS,
             }
@@ -177,6 +186,7 @@ def main() -> None:
                     fold=fold,
                     image_multiplier=image_multiplier,
                     attention_temperature=runtime["attention_temperature"],
+                    reflection_tta=runtime["reflection_tta"],
                     batch_size=batch_size,
                     num_workers=num_workers // worker_count
                     + int(index < num_workers % worker_count),
@@ -237,6 +247,7 @@ def main() -> None:
                 else "mixed",
                 "image_multiplier": image_multiplier,
                 "attention_temperature": runtime["attention_temperature"],
+                "reflection_tta": runtime["reflection_tta"],
                 "batch_size": batch_size,
                 "batch_size_scope": "per_device",
                 "num_workers": num_workers,

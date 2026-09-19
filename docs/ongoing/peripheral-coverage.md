@@ -3,10 +3,18 @@
 Where each label's evidence sits relative to the sampler's reach, complementing the
 [realized coverage fractions](../data-preparation/physical-sampling/sampling-analysis-coverage-and-exposure.md).
 
-Triplets are placed along each plane's axis by a truncated Gaussian, `data.sampling_sigma_mm: 40`,
-so coverage falls with distance from the study centre. Several labels keep most of their evidence
-out there. Measured read-only from the fold-0 token cache and the depth profiles; scripts and
-tables in `outputs/analysis/peripheral-coverage-20260918/`.
+Triplets are placed along each plane's axis by a truncated Gaussian; at the time of this analysis
+the width was a fixed `data.sampling_sigma_mm: 40`, so coverage fell with distance from the study
+centre. The sampler has since moved to `data.sampling_sigma_fraction` (0.76), a per-pool width
+relative to each pool's own acquired reach (see the [implemented
+sampler](../data-preparation/physical-sampling/implemented-sampler.md)); the measurements below are
+against the retired fixed-40 sampler and are not automatically valid at the new per-plane widths
+(measured means axial 39.5, coronal 31.4, sagittal 34.2 mm), though axial and sagittal land close
+to 40 and coronal narrows toward the width
+[per-plane sampler sigma](../validation/results/2026-09-18-per-plane-sigma-cache.md) already scored
+as a gain. Several labels keep most of their evidence out there. Measured read-only
+from the fold-0 token cache and the depth profiles; scripts and tables in
+`outputs/analysis/peripheral-coverage-20260918/`.
 
 - **The sampler thins with depth.** Selected share ÷ candidate share beyond 40 mm is 0.45–0.59 for
   every type, and beyond 50 mm it falls to 0.36 for coronal fluid and 0.14–0.16 for the sagittal
@@ -22,9 +30,11 @@ tables in `outputs/analysis/peripheral-coverage-20260918/`.
 - **Not a fix that follows for free:** lifting axial fluid's density at 40–50 mm to the central
   level implies a sigma of roughly 65–80 for that type, while global sigma 60, 80 and 120 were all
   measured worse and 30 tied
-  ([overnight 2026-09-15](../validation/results/2026-09-15-overnight-results.md)). Per-type sigma and
-  per-type centre offsets have never been tried, and both can be scored on the caches without the
-  GPU.
+  ([overnight 2026-09-15](../validation/results/2026-09-15-overnight-results.md)). Both follow-ups
+  have since been scored on the caches without the GPU: centre offsets are closed on the map below,
+  and per-plane sigma on the token cache makes the axial width itself inert, so widening axial to
+  reach this evidence costs nothing measurable and buys nothing measurable
+  ([2026-09-18 per-plane sigma](../validation/results/2026-09-18-per-plane-sigma-cache.md)).
 - **Limits:** the separation metric behind the evidence shares is small-sample and noisy in tail
   bins, fracture is too sparse to read at all, and geometry cannot recover in-plane tissue
   clipping — the reference point is defined near each series' image centre, so the pixel-based
@@ -78,12 +88,14 @@ Support averages 135 studies per voxel but ranges 25-761, highest at the centre.
   OA +0.041, medial OA +0.021) while the midline ones prefer the centre (PF OA -0.082, effusion
   -0.082, contusion -0.061, MCL -0.055, ACL -0.038). Support falls off centre on all three axes
   identically, so the trough is not an exposure artifact.
-- **Sigma is a per-plane quantity, and the map reproduces the sigma history.** Expected utility per
+- **Sigma is a per-plane quantity, but the map's axis ranking is wrong.** Expected utility per
   sampled slice under a truncated normal falls monotonically with sigma on every axis, matching the
   measured ordering in which 30 tied 40 and 60, 80 and 120 lost. The swing across sigma 20-120 is
-  **0.092 sagittal, 0.310 coronal, 0.677 axial**: the axial draw is about seven times as sensitive
-  to width as the sagittal one. A single shared sigma is therefore set by the axial penalty, which
-  is why global moves came out near-neutral.
+  **0.092 sagittal, 0.310 coronal, 0.677 axial**, which made the axial draw look about seven times
+  as width-sensitive as the sagittal one. Scoring the real selections on the fold-0 token cache
+  reverses that: coronal carries the whole effect and axial is flat from 20 to 120 mm
+  ([2026-09-18 per-plane sigma](../validation/results/2026-09-18-per-plane-sigma-cache.md)). Read
+  the map for where evidence sits, not for how much a plane's width is worth.
 - **Limits:** the generating code and the per-study utilities are not in this repository, so only
   the extracted field can be re-derived; Fracture has the largest field spread (sd 0.15) on the
   sparsest labels and should not be read; and the profiles' synovitis peak at 40-50 mm superior
@@ -91,10 +103,76 @@ Support averages 135 studies per voxel but ranges 25-761, highest at the centre.
 
 Measured 2026-09-18. Per-type centre offsets are
 [rejected](../backlog/small-changes.md#per-type-sampler-centre-offset-rejected) on the map above,
-with no GPU spent. Per-plane sigma survives it and gains a mechanism, queued as a
-[small change](../backlog/small-changes.md#per-plane-sampler-sigma).
+with no GPU spent. Per-plane sigma was then scored directly on the fold-0 token cache, also with no
+GPU: coronal 30 mm is worth +0.00135 macro AUC at the ×1 count, confirmed on both halves and
+keeping its sign to ×4, while axial sigma does nothing at matched prediction movement and a
+sagittal gain does not survive higher counts
+([result](../validation/results/2026-09-18-per-plane-sigma-cache.md)). That measurement, not the
+map, now sets the sampler change described below.
 
 The whole map is observational, measured under the current sampler, so rarely-visited depths carry
 few ablated windows and their utility is understated. That bias points toward the centre on every
 axis, so read the differences between axes, which share the bias, rather than the absolute optimum,
 which does not survive it.
+
+## Acquisition geometry
+
+Distance from the study centre to each side, per study, union over that type's series, mean ± sd.
+T1/PD is fluid 0 / fat 0, fluid is 1/1.
+
+| Plane | Negative side | Positive side | Span | Midpoint offset |
+|---|---|---|---:|---:|
+| Axial | inferior 61.8 ± 11.5 | superior 61.5 ± 11.9 | 123.3 | −0.2 |
+| Coronal | anterior 59.0 ± 7.9 | **posterior 45.6 ± 10.4** | 104.6 | **−6.7** |
+| Sagittal | right 51.3 ± 7.0 | left 51.0 ± 7.2 | 102.2 | −0.1 |
+
+- **Coronal is the only asymmetric axis**, reaching 13 mm further anterior than posterior. A
+  Gaussian centred on the study centre is capped by the *shorter* side, so the usable half-reach is
+  axial 61.5, coronal 45.6 and sagittal 51.0 — a ratio of 1.35 : 1.00 : 1.12, not the 1.21 : 1.02 :
+  1.00 the spans suggest. Sigma in that ratio, with today's average reach preserved, is **axial 47,
+  coronal 35, sagittal 39**.
+- **That reconciles the geometry with the scores.** On spans alone coronal and sagittal look
+  identical, which contradicts the cache preferring a narrower coronal. On limiting reach coronal is
+  the shortest axis by 26%, and coronal 35 lands inside the measured-good plateau of 10–35 mm.
+- **Contrast does not change the extent.** Within a plane the two contrasts differ by 1.2 mm or
+  less (`ax_t1pd` 55.1 against `ax_fluid` 56.3, coronal 47.8/47.6, sagittal 47.3/46.1), against a
+  p25–p75 spread across series of about 13 mm. The width is a per-plane quantity, not a per-type
+  one.
+- **The posterior cap is an acquisition limit, not a sampler one.** Baker's cyst is posteroinferior
+  and keeps 80% of its coronal evidence beyond ±20 mm, but no sigma reaches past 45.6 mm because
+  the slices were never acquired. Widening coronal buys anterior slices only.
+- **The study centre needs no correction.** The coronal acquisition midpoint sits 6.7 mm anterior
+  of it, well inside the ±30 mm band over which total utility is flat, consistent with the −3.3 mm
+  coronal centroid that already closed the centre-offset follow-up.
+
+## What is settled, and what is not
+
+**Settled.** The *overall scale* of the Gaussian is inert. `sampling_sigma_fraction: 0.867` replaced
+the fixed 40 mm and landed at the mean of its two controls, +0.00016 at ×4
+([result](../validation/results/2026-09-19-relative-sampler-width-result.md)); a five-point sweep
+from 0.60 to 1.10 then came out non-monotone with the control at the bottom, spanning 0.00674, which
+is seed noise ([sweep](../validation/results/2026-09-19-fold-ensembles-and-sigma-sweep.md)).
+Per-type centre offsets were rejected earlier on the importance map.
+
+**Not settled, and not addressed by any of that.** The sweep multiplies all three planes by one
+factor, so it measures scale and says nothing about *shape*. Everything below changes the ratios or
+the symmetry and remains untested:
+
+- **Per-plane widths.** The geometry wants axial wider and coronal narrower — usable half-reach is
+  axial 61.5, coronal 45.6, sagittal 51.0 mm, a ratio of 1.35 : 1.00 : 1.12, against the relative
+  rule's realized 45.1 / 35.8 / 39.0. A common-factor sweep cannot see this: if one plane wants more
+  and another less, scaling both together cancels. Queued as a
+  [small change](../backlog/small-changes.md#per-plane-width-ratios).
+- **An asymmetric draw on the coronal axis.** Coronal is the only asymmetric plane, reaching
+  59.0 mm anterior against 45.6 posterior, so a symmetric Gaussian centred on the study centre
+  spends mass anteriorly where slices are plentiful and truncates posteriorly where Baker's cyst and
+  the posterior horns live. A per-side width would match the acquisition. Queued as a
+  [small change](../backlog/small-changes.md#asymmetric-coronal-draw).
+- **Re-exporting the slice-importance map with left knees mirrored**, a user action outside this
+  repository, which gates
+  [side-conditioned sagittal sampling](../backlog/big-bets.md#position-and-knee-side) and is listed
+  in [next](next.md).
+
+The [acquisition geometry](#acquisition-geometry) above is the input to all three, and is preserved
+independently in
+[accurate sampling centers](../data-preparation/accurate-sampling-centers.md#cohort-wide-center-fit-and-plane-extents).

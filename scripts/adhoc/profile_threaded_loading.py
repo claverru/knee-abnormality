@@ -42,7 +42,11 @@ from knee_abnormality.profiling import (
     training_step,
     write_profile_manifest,
 )
-from knee_abnormality.training.lightning import build_optimizer
+from knee_abnormality.training.lightning import (
+    build_optimizer,
+    fixed_class_balance,
+    validated_class_balance_weights,
+)
 
 
 class ProfileCLI(CLISettings):
@@ -229,7 +233,7 @@ def audit(source, args):
     return {"audit": rows}
 
 
-def profile(config, source, args):
+def profile(config, source, args, class_balance: dict | None):
     size = config.trainer.batch_size
     if args.samples % size or args.samples // size <= args.warmup_batches + 16:
         raise ValueError("Use whole batches and more than 16 measured batches")
@@ -249,6 +253,11 @@ def profile(config, source, args):
     iterator = iter(loader)
     iterator_seconds = time.perf_counter() - started
     if args.mode == "gpu":
+        class_balance_weights = validated_class_balance_weights(
+            config, dataset.targets, class_balance
+        )
+        if class_balance_weights is not None:
+            class_balance_weights = class_balance_weights.to("cuda")
         model = (
             KneeAbnormalityModel(
                 config.model, config.data, len(dataset.targets), load_pretrained=False
@@ -276,7 +285,9 @@ def profile(config, source, args):
             wait = time.perf_counter() - started
             if args.mode == "gpu":
                 batch = move_batch(batch, torch.device("cuda"))
-                loss = training_step(model, optimizer, batch, config)
+                loss = training_step(
+                    model, optimizer, batch, config, class_balance_weights
+                )
                 torch.cuda.synchronize()
                 if not math.isfinite(loss):
                     raise RuntimeError("Non-finite profiling loss")
@@ -322,7 +333,12 @@ def profile(config, source, args):
         print(json.dumps(summary), flush=True)
         passes.append({**summary, "batches": rows})
         (args.output_dir / "progress.json").write_text(json.dumps(passes, indent=2))
-    return {"passes": passes, "iterator_seconds": iterator_seconds, "order": order}
+    return {
+        "passes": passes,
+        "iterator_seconds": iterator_seconds,
+        "order": order,
+        "class_balance": class_balance,
+    }
 
 
 def run(args: ProfileCLI) -> None:
@@ -339,6 +355,11 @@ def run(args: ProfileCLI) -> None:
     )
     started = time.perf_counter()
     dataset, labels = sample_dataset(config, args.samples)
+    class_balance = (
+        fixed_class_balance(dataset.studies, dataset.targets)
+        if config.trainer.class_balanced_bce and args.mode == "gpu"
+        else None
+    )
     result = profile_manifest(
         config,
         args.model_dump(mode="json"),
@@ -360,6 +381,7 @@ def run(args: ProfileCLI) -> None:
             },
             "epoch": 0,
             "page_cache_kb": page_cache_kb(),
+            "class_balance": class_balance,
             "weights": "seeded random; no checkpoint saved"
             if args.mode == "gpu"
             else None,
@@ -367,7 +389,9 @@ def run(args: ProfileCLI) -> None:
     )
     write_profile_manifest(args.output_dir, result)
     result.update(
-        audit(dataset, args) if args.mode == "audit" else profile(config, dataset, args)
+        audit(dataset, args)
+        if args.mode == "audit"
+        else profile(config, dataset, args, class_balance)
     )
     finish_profile(args.output_dir, result, started)
 

@@ -101,3 +101,28 @@ submission bundle already exported carries 16.
 Still open: the loader **worker** count was never swept around the new thread setting — 8, 12 and 16
 at 8 threads. Model load, at 15.5–18.4 s, is the setup floor and nobody has profiled what inside it
 costs the time.
+
+**An external optimization review of `f4c340b` was assessed 2026-09-19** and the remaining
+candidates are now ranked by what each is worth against the whole 371.4 s command
+([ranked by gain](../backlog/loading-speedup/ranked-by-gain.md)). It added three candidates to the
+bit-exact batch — exact quantiles by single-rank partitions, support-limited native-to-float32
+conversion, and direct shared-storage collation — and corrected two claims: the quantile line's
+stated reason for closing, contradicted by a local **1.44–1.63x bit-identical** measurement, and the
+173–191 s forward "floor", which is contention-inflated wall against ~100 s of GPU compute, so the
+candidate list has roughly 80 s more headroom than it claimed.
+
+**The conversion candidate measured 2.01x bit-exact locally** on 120 real frames, which makes it the
+largest row on that ranking. The mechanism is not the row trim the review proposed but the
+full-frame float32 buffer `frame_from_payload` allocates and `resample_crop` discards, and its price
+is largely allocator behaviour — the same cast measured 33 µs in isolation against 87 µs in situ. So
+it **overlaps the allocator environment variables and is not additive with them**.
+
+**The allocator tunables were implemented 2026-09-19 and have not been run.**
+`run_prediction_processes` now sets `MALLOC_MMAP_THRESHOLD_` and `MALLOC_TRIM_THRESHOLD_` to 256 MiB
+and `MALLOC_ARENA_MAX` to 2 in each prediction worker's environment, which is where glibc can still
+read them — they are consumed
+at malloc init, so a running process cannot apply them to itself, and the forked loader workers
+inherit them. `processes.py` is outside `PREPROCESSING_SOURCES`, so this needs no retrain. Next
+action: run that A/B and price what the identity-bumping conversion change has left to win. **Watch
+per-worker RSS** — raising the trim threshold is an instruction to retain heap, on a box that also
+needs shared memory, pinned buffers and NFS page cache.

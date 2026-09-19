@@ -1,8 +1,11 @@
 # Next
 
-Experiments run one by one against a control at the same validation multiplier, as one unseeded
-run each (random seed, recorded). The [overnight queue](../backlog/overnight.md) holds the
-hyperparameter candidates; nothing is queued for tonight. The b0 line's open leads are in
+The user-launched [fixed class-balanced BCE run](../validation/results/2026-09-19-balanced-bce-result.md)
+finished at 0.895282, +0.008796 over the closest same-seed historical reference. An exact
+same-source ordinary-BCE control has not been run; no further run is scheduled. Other experiments
+run one by one against a control as one unseeded run each (random seed, recorded). The
+[overnight queue](../backlog/overnight.md) holds the remaining hyperparameter candidates.
+The b0 line's open leads are in
 the [b0 queue result](../validation/results/2026-09-18-b0-hyperparameter-queues.md#open).
 
 Also pending:

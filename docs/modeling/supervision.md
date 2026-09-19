@@ -30,6 +30,42 @@ All cover the 4,349 report-only studies. Pilkwang omits one reference study,
 so its extraction score uses 57 rather than 58 studies. Their uncertainty
 encodings differ; consult the audit before constructing training targets.
 
+## Fixed class-balanced BCE
+
+**Measured 2026-09-19:** `balanced-bce` reached 0.895282, +0.008796 over the closest same-seed
+historical reference ([result and attribution limits](../validation/results/2026-09-19-balanced-bce-result.md)).
+Enable with `trainer.class_balanced_bce: true`.
+The schema defaults to `false`,
+which retains ordinary masked soft-target BCE. The
+[research note](../research/auc_loss_approaches.md#weighting-and-sampling-design-space) explains
+the hypothesis and alternative weighting/sampling methods.
+
+For each label, compute its positive fraction `r_c` once from observed targets in the actual
+training subset, after official-label overrides and any training-study limit. Count `y >= 0.5`
+as positive and `y < 0.5` as negative; require both groups. Set
+`w_pos_c = 1 / (2 * r_c)` and `w_neg_c = 1 / (2 * (1 - r_c))`.
+Only training rows enter these counts, and the weights remain fixed throughout the run.
+
+Multiply the entire unreduced BCE cell by its group's weight and retain the mean over observed
+cells. Targets remain soft and every observed cell remains active. There is no per-batch weight
+estimation or normalization by the batch's sum of weights. Over the training subset, each label
+has mean weight one and equal total weight in the thresholded positive and negative groups.
+This differs from `pos_weight`, which scales only the positive term inside BCE, including the
+positive component of soft negative targets such as 0.25.
+
+Enabled runs save `fold_<N>/class_balance.json` alongside their effective run configuration.
+Its version-1 table records each target's observed, positive and negative counts, positive
+fraction and the two fixed weights, in model target order. Checkpoints retain the same table in
+`hyper_parameters.class_balance`; resume checks it and the selected training-input identity
+before writing the new weighting artifact. Checkpoints without that metadata require their
+archived training implementation for resume. Device weights are nonpersistent buffers, so they
+add no inference model-state entries.
+
+The option changes training loss only. Study exposure, validation BCE/AUC and inference scoring
+retain their existing behavior. Weighting can amplify rare-label errors; the first run improved
+ten of twelve label AUCs against its historical reference. The separate [cell-masking proposal](../backlog/small-changes.md#report-label-supervision)
+drops selected majority cells and remains unimplemented.
+
 ## Training-label masking
 
 **Rejected on 2026-09-13:** the completed `masked-labels` run reduced full-fold

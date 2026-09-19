@@ -13,6 +13,7 @@ the efficiency prize. Active status lives in [ongoing work](../../ongoing/loadin
 |---|---|
 | Reading the cold-start profile, checking what the shipped changes bought, finding what a stage really contains, or before trusting any number the profiler reports | [Where the cold-start time goes](attribution.md) |
 | Picking the next change, checking whether one needs a retrain or a validation run, or following the proposed experiment order | [Open candidates](candidates.md) |
+| Choosing what to do next by what it is worth against the whole 371.4 s command, or checking why two candidates cannot be added together | [Ranked by gain](ranked-by-gain.md) |
 | Before proposing anything: the measured regressions, the approaches ruled out by arithmetic or by Kaggle's environment, and why | [Closed and rejected](closed.md) |
 | Designing a probe or a benchmark for a loading change, or deciding whether a local result means anything | [How to measure](measuring.md) |
 | Checking what past RSNA DICOM solutions did, and how published medical-imaging dataloader profiles compare | [Prior art](prior-art.md) |

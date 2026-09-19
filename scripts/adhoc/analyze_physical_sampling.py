@@ -24,6 +24,7 @@ from knee_abnormality.data.preprocessing.geometry import (
 )
 from knee_abnormality.data.preprocessing.sampling import (
     build_pool,
+    limiting_reach,
     select_triplets,
     target_depths,
 )
@@ -227,8 +228,13 @@ def analyze(settings: AnalyzeCLI) -> None:
             )
             intended = defaultdict(float)
             if pool.candidates:
+                pool_sigma = (
+                    config.data.sampling_sigma_fraction * limiting_reach(pool)
+                    if pool.physical
+                    else None
+                )
                 for t in target_depths(
-                    pool, (np.arange(2048) + 0.5) / 2048, config.data.sampling_sigma_mm
+                    pool, (np.arange(2048) + 0.5) / 2048, pool_sigma
                 ):
                     suppliers = {
                         v.uid
@@ -245,7 +251,7 @@ def analyze(settings: AnalyzeCLI) -> None:
                     selection = select_triplets(
                         pool,
                         kinds[kind].max_images // 3 * multiplier,
-                        config.data.sampling_sigma_mm,
+                        config.data.sampling_sigma_fraction,
                         config.data.image_size * config.data.spacing_mm / 2,
                         study,
                         kind,

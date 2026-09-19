@@ -15,6 +15,7 @@ Workspace for the [RSNA Knee Abnormality Detection competition on Kaggle](https:
 - Do not write or run tests.
 - Treat accepted implementation decisions as fixed behavior, not configurable alternatives. Replace superseded implementations and remove their branches, flags, and configuration fields; update affected callers and documentation. Do not retain legacy behavior, compatibility fallbacks, or aliases for old configs, checkpoints, or APIs. Keep options only for parameters or alternatives we actually intend to vary, never for rejected approaches or speculative future use.
 - Check GPU usage before launching anything in GPU.
+- 0.001 is important in a 3 decimal competition.
 
 ## Work tracking
 

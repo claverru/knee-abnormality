@@ -45,8 +45,12 @@ runs.
   0.32–0.61 s and batches waiting under 50 ms fell from 119–121 of 163 to 65–73, which is the
   signature of work spreading across batches instead of collecting in a few stalls. The seconds are
   within machine variance; the distribution change is not.
-- **The loader still binds**, at 56–58% of prediction time. Prediction cannot fall below the
-  166–174 s forward pass, so about 230 s per worker remains addressable by loading work.
+- **The loader still binds**, at 56–58% of prediction time, with 166–174 s of that spent inside the
+  forward call. This entry originally read the 166–174 s as a floor and concluded that only ~230 s
+  per worker was addressable; **that conclusion is withdrawn**. The later io sweep measured the same
+  forward work at 102 s when the box was not saturated
+  ([sweep](2026-09-18-kaggle-x4-profile-after-cpu-cluster.md#the-io-thread-sweep-2026-09-18)), so
+  most of the gap above ~100 s is contention and is addressable by removing loader CPU.
 
 ## Where the CPU goes, and how much a repeat run moves
 

@@ -1,4 +1,5 @@
 import json
+import math
 import re
 import sys
 from collections.abc import Iterable
@@ -13,6 +14,7 @@ from knee_abnormality.cli import CLISettings
 
 matplotlib.use("Agg")
 from matplotlib import pyplot as plt
+from matplotlib.axes import Axes
 
 ROOT = Path(__file__).resolve().parents[2]
 EPOCH_PATTERN = re.compile(r"metrics_epoch_(\d+)\.json$")
@@ -29,8 +31,8 @@ class MetricSeries:
     epochs: list[int]
     macro_auc: list[float]
     gold_macro_auc: list[float]
-    report_macro_auc: list[float]
     soft_target_bce: list[float]
+    per_target_auc: list[dict[str, float]]
 
 
 def resolve_run(value: str) -> Path:
@@ -71,16 +73,21 @@ def load_metric_series(run: Path) -> list[MetricSeries]:
                 metric["macro_auc"],
                 metric["soft_target_bce"],
             )
-            subgroup_values = (
-                metric["gold"]["macro_auc"],
-                metric["report_derived"]["macro_auc"],
-            )
+            subgroup_values = (metric["gold"]["macro_auc"],)
+            per_target = metric["per_target_auc"]
         except (KeyError, TypeError, json.JSONDecodeError) as error:
             raise ValueError(f"Invalid metric file {path}: {error}") from error
-        if not all(
-            isinstance(value, int | float) for value in required_values
-        ) or not all(
-            value is None or isinstance(value, int | float) for value in subgroup_values
+        if (
+            not all(isinstance(value, int | float) for value in required_values)
+            or not all(
+                value is None or isinstance(value, int | float)
+                for value in subgroup_values
+            )
+            or not isinstance(per_target, dict)
+            or not all(
+                value is None or isinstance(value, int | float)
+                for value in per_target.values()
+            )
         ):
             raise ValueError(f"Invalid metric values in {path}")
         by_fold.setdefault(fold, []).append((int(match.group(1)), metric))
@@ -98,38 +105,108 @@ def load_metric_series(run: Path) -> list[MetricSeries]:
                     else float("nan")
                     for _, metric in records
                 ],
-                report_macro_auc=[
-                    float(metric["report_derived"]["macro_auc"])
-                    if metric["report_derived"]["macro_auc"] is not None
-                    else float("nan")
-                    for _, metric in records
-                ],
                 soft_target_bce=[
                     float(metric["soft_target_bce"]) for _, metric in records
+                ],
+                per_target_auc=[
+                    {
+                        target: float(value) if value is not None else float("nan")
+                        for target, value in metric["per_target_auc"].items()
+                    }
+                    for _, metric in records
                 ],
             )
         )
     return series
 
 
+def ordered_targets(series: list[MetricSeries]) -> list[str]:
+    targets: list[str] = []
+    for item in series:
+        for record in item.per_target_auc:
+            for target in record:
+                if target not in targets:
+                    targets.append(target)
+    return targets
+
+
+def best_epoch_index(item: MetricSeries) -> int:
+    return max(range(len(item.epochs)), key=lambda index: item.macro_auc[index])
+
+
+def plot_per_target(axis: Axes, series: list[MetricSeries], palette: list[str]) -> None:
+    targets = ordered_targets(series)
+    positions = list(range(len(targets)))
+    width = 0.8 / len(series)
+    best_values = [
+        [
+            item.per_target_auc[best_epoch_index(item)].get(target, float("nan"))
+            for target in targets
+        ]
+        for item in series
+    ]
+    defined = [
+        value for values in best_values for value in values if not math.isnan(value)
+    ]
+    floor = math.floor(min(defined) * 20) / 20 if defined else 0.5
+    ceiling = math.ceil(max([*defined, floor + 0.05]) * 20) / 20
+    for index, (item, color, values) in enumerate(
+        zip(series, palette, best_values, strict=True)
+    ):
+        offset = (index - (len(series) - 1) / 2) * width
+        bars = axis.bar(
+            [position + offset for position in positions],
+            [value - floor for value in values],
+            width=width * 0.9,
+            bottom=floor,
+            color=color,
+            zorder=2,
+        )
+        axis.axhline(
+            item.macro_auc[best_epoch_index(item)],
+            color=color,
+            linestyle="--",
+            alpha=0.5,
+            zorder=3,
+        )
+        if len(series) <= 2:
+            axis.bar_label(bars, fmt="%.3f", fontsize=7, rotation=90, padding=2)
+    axis.set_xticks(positions, targets, rotation=30, ha="right")
+    axis.set_ylim(floor, ceiling)
+    axis.set_title("Per-target AUC at best macro-AUC epoch (dashed: macro AUC)")
+    axis.set_ylabel(f"ROC-AUC (bars from {floor:.2f})")
+    axis.grid(axis="y", alpha=0.3)
+    axis.set_axisbelow(True)
+
+
 def plot(series: list[MetricSeries], output: Path) -> None:
     figure, axes = plt.subplots(2, 2, figsize=(13, 9), constrained_layout=True)
+    cycle = plt.rcParams["axes.prop_cycle"].by_key()["color"]
+    palette = [cycle[index % len(cycle)] for index in range(len(series))]
+    labels = [
+        f"{item.label} (best epoch {item.epochs[best_epoch_index(item)]})"
+        for item in series
+    ]
     panels = (
-        ("Validation macro AUC", "macro_auc", "ROC-AUC"),
-        ("Gold macro AUC", "gold_macro_auc", "ROC-AUC"),
-        ("Report-derived macro AUC", "report_macro_auc", "ROC-AUC"),
-        ("Soft-target BCE", "soft_target_bce", "BCE"),
+        (axes[0, 0], "Validation macro AUC", "macro_auc", "ROC-AUC"),
+        (axes[0, 1], "Gold macro AUC", "gold_macro_auc", "ROC-AUC"),
+        (axes[1, 1], "Soft-target BCE", "soft_target_bce", "BCE"),
     )
-    for axis, (title, attribute, ylabel) in zip(axes.flat, panels, strict=True):
-        for item in series:
+    for axis, title, attribute, ylabel in panels:
+        for item, color, label in zip(series, palette, labels, strict=True):
             axis.plot(
-                item.epochs, getattr(item, attribute), marker="o", label=item.label
+                item.epochs,
+                getattr(item, attribute),
+                marker="o",
+                color=color,
+                label=label,
             )
         axis.set_title(title)
         axis.set_xlabel("Epoch")
         axis.set_ylabel(ylabel)
         axis.grid(alpha=0.3)
-    axes[0, 0].legend(loc="best")
+    plot_per_target(axes[1, 0], series, palette)
+    axes[0, 0].legend(loc="best", fontsize=9)
     output.parent.mkdir(parents=True, exist_ok=True)
     figure.savefig(output, dpi=180)
     plt.close(figure)

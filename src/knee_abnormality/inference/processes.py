@@ -11,7 +11,13 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from knee_abnormality.config import ExperimentConfig, Fold, PositiveFiniteFloat
+from knee_abnormality.config import (
+    INFERENCE_MALLOC_ARENA_MAX,
+    INFERENCE_MALLOC_THRESHOLD_BYTES,
+    ExperimentConfig,
+    Fold,
+    PositiveFiniteFloat,
+)
 
 
 class PredictionRequest(BaseModel):
@@ -23,6 +29,7 @@ class PredictionRequest(BaseModel):
     fold: Fold
     image_multiplier: int = Field(gt=0)
     attention_temperature: PositiveFiniteFloat
+    reflection_tta: bool
     batch_size: int = Field(gt=0)
     num_workers: int = Field(ge=0)
     io_threads: int = Field(gt=0)
@@ -65,6 +72,11 @@ def run_prediction_processes(
                 log = stack.enter_context(log_path.open("w", encoding="utf-8"))
                 environment = os.environ.copy()
                 environment["CUDA_VISIBLE_DEVICES"] = "" if gpu_id is None else gpu_id
+                environment.update(
+                    MALLOC_MMAP_THRESHOLD_=str(INFERENCE_MALLOC_THRESHOLD_BYTES),
+                    MALLOC_TRIM_THRESHOLD_=str(INFERENCE_MALLOC_THRESHOLD_BYTES),
+                    MALLOC_ARENA_MAX=str(INFERENCE_MALLOC_ARENA_MAX),
+                )
                 if gpu_id is not None:
                     environment.update(
                         OMP_NUM_THREADS="1",

@@ -11,10 +11,12 @@ from this file.
 
 ## Next queue
 
-Empty. The 2026-09-18 queue of seventeen runs finished
-([results](../validation/results/2026-09-18-overnight-results.md)); build the next one from
-"Candidates for later queues" below. Note that queue ran at `validation_image_multiplier: 1`, so
-any new run needs a control at the same multiplier.
+The user-launched [fixed class-balanced BCE run](../validation/results/2026-09-19-balanced-bce-result.md)
+finished at 0.895282, +0.008796 over the closest same-seed historical reference.
+No further run is scheduled here; the candidates below await selection. The
+2026-09-18 queue of seventeen runs finished
+([results](../validation/results/2026-09-18-overnight-results.md)); its executable launcher has
+not been replaced by a new executable queue. Keep `validation_image_multiplier: 1` in comparisons.
 
 ## User decisions (2026-09-16)
 
@@ -42,6 +44,13 @@ any new run needs a control at the same multiplier.
 
 ## Candidates for later queues
 
+- **Raise only `optimizer.head_lr` to `0.0012`** (hypothesis; untested independently). Keep the
+  current ReXNet backbone LR at `0.0002`; change only the head LR from `0.0006`. The projection,
+  embeddings, pooling and readouts start without pretrained weights. The
+  [recorded head-LR gap](../validation/results/2026-09-18-b0-hyperparameter-queues.md#open)
+  includes one lower-rate comparison and coupled increases on B0, but no isolated increase.
+  Keep loss weighting fixed between control and candidate; do not combine this with the ongoing
+  balanced-BCE change. `0.0012` is a starting proposal, not an established optimum.
 - **Denser per-type budgets** (hypothesis; the only untested side of a measured axis). Raise
   `data.series_types[*].max_images` above today's 18/18/15/15/15/15 at a fixed sampler width and
   crop. Only the cheaper side has been measured and it loses monotonically: 15/15/12/12/12/12
@@ -60,8 +69,15 @@ any new run needs a control at the same multiplier.
   the milder side of the strong affine that lost −0.0024, and reflection probabilities other than
   0.5. Ordering, interactions and new families are
   [small changes](small-changes.md#augmentation-families).
-- **Low value:** `data.sampling_sigma_mm: 50`, since 30 tied with 40 (+0.000039) and 60, 80 and 120
-  were settled worse; `optimizer.weight_decay: 0.001`, since 0.003 and 0.03 are settled, 0.05 lost
+- **The shared sigma scale is settled, so no further fraction arm.** The 2026-09-19 sweep ran 0.60,
+  0.76, 0.95 and 1.10 against the adopted 0.867 on fold 0 and came out non-monotone with the control
+  at the bottom, spanning 0.00674 — seed noise, not a response
+  ([sweep](../validation/results/2026-09-19-fold-ensembles-and-sigma-sweep.md)). The queued 0.76 arm
+  is retired with it. This settles the *scale* only: the sweep moves all three planes by one factor,
+  so per-plane ratios and an asymmetric coronal draw are untouched by it and are queued as
+  [small changes](small-changes.md#per-plane-width-ratios).
+- **Low value:** `data.sampling_sigma_mm: 50` is retired with the fixed-width sampler;
+  `optimizer.weight_decay: 0.001`, since 0.003 and 0.03 are settled, 0.05 lost
   −0.0008 and 0.003 gained only +0.0002 on the 2026-09-12 recipe.
 - **Out of scope:** `model.channels_last` is a speed question for a bounded, user-launched
   `profile_training.py` measurement, not an overnight slot. NHWC kernels change bf16 outputs only

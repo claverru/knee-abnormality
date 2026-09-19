@@ -84,3 +84,5 @@ worth 72 seconds and +0.006 is worth 432 seconds. This example does not assume
 the final private maximum is known. Optimizing runtime while sacrificing several
 AUC decimals may lose the efficiency prize as well as leaderboard position.
 [Official efficiency formula](https://www.kaggle.com/competitions/rsna-knee-abnormality-detection/overview/evaluation).
+Superseded by the [efficiency leaderboard](../../inference/efficiency-leaderboard.md#the-exchange-rate),
+which measures D rather than assuming it.

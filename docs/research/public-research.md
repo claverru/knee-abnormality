@@ -108,8 +108,9 @@ the alternative unverified recipe.
 ## Slice density and the board (2026-09-18 re-sweep)
 
 Public LB top is **0.957**, 21 teams stand above 0.950 and 124 above 0.941 — the
-plateau of the forked public notebook. Our best is 0.939, and our 0.936
-submission holds efficiency rank 16 of the 3,819 scored teams.
+plateau of the forked public notebook. Our best is 0.939; our standing on the
+efficiency board is in the
+[efficiency leaderboard](../inference/efficiency-leaderboard.md#our-appearances).
 
 ### Slice density, not span
 

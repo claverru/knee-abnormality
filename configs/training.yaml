@@ -16,7 +16,7 @@ validation:
 data:
   reflection_augmentation:
     probability: 0.5
-  sampling_sigma_mm: 40.0
+  sampling_sigma_fraction: 0.867
   validation_image_multiplier: 1
   study_triplet_total: 26
   intensity_augmentation:
@@ -76,3 +76,4 @@ trainer:
   patience: 10
   min_delta: 0.0001
   deterministic: false
+  class_balanced_bce: true

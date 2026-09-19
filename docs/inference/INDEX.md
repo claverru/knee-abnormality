@@ -6,7 +6,8 @@
 |---|---|
 | Getting the current submission state, best public score and the 2026-09-14 inference timing summary | [Inference and efficiency overview](inference-overview.md) |
 | Checking official notebook, submission-limit, timeline, evaluation and efficiency-prize rules, or the submission CSV contract | [Submission requirements and output contract](submission-requirements-and-output-contract.md) |
-| Building a frozen checkpoint/code/wheel bundle, choosing offline codecs and precision, or attaching verification evidence | [Repository readiness and model bundle](model-bundle-and-offline-environment.md) |
+| Working out which submission holds our efficiency row, what a thousandth of AUC is worth in runtime, or how the board bounds hidden-test runtimes we cannot measure | [Efficiency leaderboard](efficiency-leaderboard.md) |
+| Building a frozen checkpoint/code/wheel bundle (single-checkpoint or multi-checkpoint ensemble), choosing offline codecs and precision, or attaching verification evidence | [Repository readiness and model bundle](model-bundle-and-offline-environment.md) |
 | Exporting a selected checkpoint without local prediction and launching detached submissions within Kaggle's GPU session limit | [Fast submission preparation](fast-submission-preparation.md) |
 | Running training-to-submission recipes: setup, train, resume, export, infer, submit and status | [Justfile recipes](justfile-recipes.md) |
 | Driving uploads, notebook runs, submissions and score polling from the Kaggle CLI, or assembling the notebook workflow | [Kaggle submission workflow](kaggle-submission-workflow.md) |
@@ -28,4 +29,4 @@
 
 | Read when | Document |
 |---|---|
-| Finding any of the 22 Kaggle submissions by date, public score or submission ID, and the dated record with its bundle, runtime and workflow details | [Submission ledger](submissions/INDEX.md) |
+| Finding any of the 37 Kaggle submissions by date, sequence number, public score or submission ID, reading the unified naming format every submission uses, or opening the dated record with its bundle, runtime and workflow details | [Submission ledger](submissions/INDEX.md) |

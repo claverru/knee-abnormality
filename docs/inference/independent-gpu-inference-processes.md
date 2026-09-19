@@ -23,8 +23,12 @@ A later change adds a main-thread warm-up
 
 The prediction coordinator partitions study IDs across all visible CUDA devices
 before dataset collation. Each child process sees one GPU through
-`CUDA_VISIBLE_DEVICES`, loads its own complete model and predicts its assigned
-studies. With two T4s, the default is **four studies per GPU batch**, with eight
+`CUDA_VISIBLE_DEVICES`, loads its own complete model — every member, for an
+ensemble bundle — and predicts its assigned studies. Ensemble members run
+forward on the same decoded, device-resident batch and their per-label sigmoid
+probabilities are averaged before the batch is recorded; see
+[model bundle and offline environment](model-bundle-and-offline-environment.md#multi-checkpoint-ensemble-bundles)
+for the bundle-side contract. With two T4s, the default is **four studies per GPU batch**, with eight
 DataLoader workers per process: eight studies can be in flight across the GPUs,
 with 16 loader workers total. `--batch-size` controls each device's batch;
 `--num-workers` is divided across processes. A single visible GPU receives the

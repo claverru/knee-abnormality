@@ -28,6 +28,8 @@ INFERENCE_BATCH_SIZE = 4
 INFERENCE_NUM_WORKERS = 16
 INFERENCE_IO_THREADS = 8
 SERIES_LISTING_THREADS = 16
+INFERENCE_MALLOC_THRESHOLD_BYTES = 268435456
+INFERENCE_MALLOC_ARENA_MAX = 2
 
 Identifier = Annotated[str, StringConstraints(pattern=r"^[A-Za-z0-9][A-Za-z0-9_.-]*$")]
 Fold = Annotated[StrictInt, Field(ge=0)]
@@ -113,7 +115,7 @@ class DataConfig(ConfigModel):
         default_factory=ReflectionAugmentationConfig
     )
     series_types: Annotated[tuple[SeriesTypeConfig, ...], Field(min_length=1)]
-    sampling_sigma_mm: PositiveFiniteFloat = 80.0
+    sampling_sigma_fraction: PositiveFiniteFloat = 0.867
     validation_image_multiplier: Annotated[StrictInt, Field(gt=0)] = 1
     study_triplet_total: Annotated[StrictInt, Field(gt=0)] | None = None
     repeated_series_share: Annotated[float, Field(gt=0)] | None = None
@@ -229,6 +231,7 @@ class TrainerConfig(ConfigModel):
     patience: Annotated[StrictInt, Field(ge=0)]
     min_delta: Annotated[float, Field(ge=0)]
     deterministic: bool
+    class_balanced_bce: bool = False
 
 
 class ValidationConfig(ConfigModel):

@@ -6,7 +6,7 @@
 | Following tensor shapes from prepared triplets through the backbone, spatial-token embeddings and target-specific attention pooling | [Model shape diagram](model-shapes.md) |
 | Using the 224-pixel CoAtNet backbone, its spatial anchors, pretrained normalization and the ReXNet noninterference review | [CoAtNet 224 spatial backbone](coatnet-224-spatial-backbone.md) |
 | Checking three-channel triplet input semantics, normalization and per-plane channel-appearance limits | [Triplet inputs and sampling](triplet-inputs-and-sampling.md) |
-| Checking reference-label coverage, official labeling context, choosing inferred labels, training-label masking, refining supervision or reproducing the Tonylin training setup | [Supervision](supervision.md) |
+| Checking reference-label coverage, official labeling context, choosing inferred labels, fixed class-balanced BCE, training-label masking, refining supervision or reproducing the Tonylin training setup | [Supervision](supervision.md) |
 | Diagnosing training batch memory, host RAM and loader prefetch with larger inputs, validation loader waves, dynamic-shape runtime, or the sampler settings recorded with the ReXNet runtime | [Training runtime and memory](training-runtime-and-memory.md) |
 | Checking the ten-epoch learning-rate schedule, augmentation strengths or study-level knee reflection | [Training schedule and augmentation](schedule-and-augmentation.md) |
 | Recovering the retired knee-side embedding, meniscus classifier coupling or 1A–1C disease-sharing heads | [Retired side and compartment variants](retired-side-and-compartment-variants.md) |

@@ -15,7 +15,7 @@ from knee_abnormality.config import SLICES_PER_INPUT, ExperimentConfig
 from knee_abnormality.data.dataset import build_data_loader
 from knee_abnormality.data.labels import STUDY
 from knee_abnormality.evaluation.predictions import make_prediction_frame
-from knee_abnormality.inference.checkpoint import load_checkpoint_model
+from knee_abnormality.inference.checkpoint import load_models
 from knee_abnormality.inference.engine import (
     predict_loader,
     prediction_data,
@@ -85,11 +85,12 @@ def verify_inference(bundle: Path, request: dict) -> None:
     dataset, targets, _ = prediction_data(config, "validation", fold)
     indices = _sample_batches(dataset, request["samples"], config.trainer.batch_size)
     dataset.studies = dataset.studies[indices]
-    model = load_checkpoint_model(
-        config, targets, bundle / "model.ckpt", device, expected_fold=fold
-    )
+    checkpoint_path = bundle / "model.ckpt"
+    if not checkpoint_path.exists():
+        checkpoint_path = bundle / "models"
+    models = load_models(config, targets, checkpoint_path, device, expected_fold=fold)
     ids, values, _ = predict_loader(
-        model,
+        models,
         build_data_loader(
             dataset, config.trainer, config.trainer.batch_size, num_workers=4
         ),
@@ -135,7 +136,7 @@ def verify_inference(bundle: Path, request: dict) -> None:
     torch.cuda.empty_cache()
     torch.cuda.reset_peak_memory_stats()
     predict_loader(
-        model,
+        models,
         build_data_loader(
             dataset, config.trainer, request["batch_size"], num_workers=2
         ),
@@ -165,7 +166,7 @@ def verify_inference(bundle: Path, request: dict) -> None:
     if example_targets != targets:
         raise ValueError("Example target order differs from the checkpoint")
     example_ids, example_values, _ = predict_loader(
-        model,
+        models,
         build_data_loader(
             dataset, config.trainer, request["batch_size"], num_workers=2
         ),

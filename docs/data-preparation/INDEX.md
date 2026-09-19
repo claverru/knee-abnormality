@@ -13,6 +13,6 @@
 | Checking the native DICOM reader's layout limits, fallback, equivalence evidence, memory bounds and performance gate | [Production DICOM integration](production-dicom-integration.md) |
 | Measuring standalone loader throughput or deciding whether to thread slice decoding inside workers | [Threading inside Dataset loading](threading-inside-dataset-loading.md) |
 | Understanding the implemented physical sampler, its verification and the metadata analysis behind it | [Physical sampling](physical-sampling/INDEX.md) |
-| Reviewing the study reference fit, its screening thresholds and the rejected geometric-center sampler audit | [Accurate sampling centers](accurate-sampling-centers.md) |
+| Reviewing the study reference fit, its screening thresholds, the cohort-wide acceptance and per-plane extents, and the rejected geometric-center sampler audit | [Accurate sampling centers](accurate-sampling-centers.md) |
 | Understanding spatial-token visual validity and anchors, the retired token geometry validity, or the historical spatial-fusion mapping audit | [Spatial-token geometry and mapping audit](spatial-token-geometry-and-mapping-audit.md) |
 | Checking study-reflection eligibility, its coordinate algebra, preview options and augmentation-only CUDA costs | [Reflection geometry and previews](reflection-geometry-and-previews.md) |

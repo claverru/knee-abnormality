@@ -5,6 +5,7 @@ import time
 from pathlib import Path
 
 import numpy as np
+import polars as pl
 import pytorch_lightning as L
 import torch
 from torch.nn import functional as F
@@ -51,12 +52,69 @@ def build_optimizer(model: KneeAbnormalityModel, settings: OptimizerConfig) -> A
     )
 
 
+def fixed_class_balance(training: pl.DataFrame, targets: tuple[str, ...]) -> dict:
+    rows = []
+    for target in targets:
+        observed = training.filter(pl.col(f"observed_{target}"))
+        positive = observed.filter(pl.col(f"target_{target}") >= 0.5).height
+        negative = observed.height - positive
+        if positive == 0 or negative == 0:
+            raise ValueError(
+                f"Fixed class-balanced BCE requires both target groups for {target}"
+            )
+        fraction = positive / observed.height
+        rows.append(
+            {
+                "target": target,
+                "observed": observed.height,
+                "positive": positive,
+                "negative": negative,
+                "positive_fraction": fraction,
+                "positive_weight": 1 / (2 * fraction),
+                "negative_weight": 1 / (2 * (1 - fraction)),
+            }
+        )
+    return {"version": 1, "targets": rows}
+
+
+def class_balance_weight_tensor(class_balance: dict) -> torch.Tensor:
+    return torch.tensor(
+        [
+            [row["positive_weight"] for row in class_balance["targets"]],
+            [row["negative_weight"] for row in class_balance["targets"]],
+        ],
+        dtype=torch.float32,
+    )
+
+
+def validated_class_balance_weights(
+    config: ExperimentConfig, targets: tuple[str, ...], class_balance: dict | None
+) -> torch.Tensor | None:
+    if config.trainer.class_balanced_bce != (class_balance is not None):
+        raise ValueError("Class-balanced BCE settings and statistics disagree")
+    if class_balance is None:
+        return None
+    if class_balance.get("version") != 1 or [
+        row.get("target") for row in class_balance.get("targets", [])
+    ] != list(targets):
+        raise ValueError("Class-balanced BCE statistics targets differ from the model")
+    return class_balance_weight_tensor(class_balance)
+
+
 def masked_binary_cross_entropy_with_logits(
-    logits: torch.Tensor, targets: torch.Tensor, observed: torch.Tensor
+    logits: torch.Tensor,
+    targets: torch.Tensor,
+    observed: torch.Tensor,
+    class_balance_weights: torch.Tensor | None = None,
 ) -> torch.Tensor:
     if not observed.any():
         raise RuntimeError("Training batch has no observed targets")
     losses = F.binary_cross_entropy_with_logits(logits, targets, reduction="none")
+    if class_balance_weights is not None:
+        weights = torch.where(
+            targets >= 0.5, class_balance_weights[0], class_balance_weights[1]
+        )
+        losses = losses * weights
     return losses[observed].mean()
 
 
@@ -149,6 +207,7 @@ class KneeModule(L.LightningModule):
         training_studies: int,
         validation_studies: int,
         prediction_dir: Path,
+        class_balance: dict | None,
         load_pretrained: bool | None = None,
         input_identity: dict | None = None,
     ) -> None:
@@ -158,6 +217,17 @@ class KneeModule(L.LightningModule):
         self.targets = targets
         self.validation_studies = validation_studies
         self.prediction_dir = prediction_dir
+        self.class_balance = class_balance
+        class_balance_weights = validated_class_balance_weights(
+            config, targets, class_balance
+        )
+        self.register_buffer(
+            "class_balance_weights",
+            class_balance_weights
+            if class_balance_weights is not None
+            else torch.empty(0),
+            persistent=False,
+        )
         self.model = KneeAbnormalityModel(
             config.model, config.data, len(targets), load_pretrained=load_pretrained
         )
@@ -179,6 +249,7 @@ class KneeModule(L.LightningModule):
                 "fold": fold,
                 "training_studies": training_studies,
                 "validation_studies": validation_studies,
+                "class_balance": class_balance,
                 "input_identity": input_identity,
                 "preprocessing_identity": preprocessing_identity(config.model.backbone),
             }
@@ -234,7 +305,10 @@ class KneeModule(L.LightningModule):
     def training_step(self, batch: dict, batch_index: int) -> torch.Tensor:
         logits = self(batch).to(torch.float32)
         loss = masked_binary_cross_entropy_with_logits(
-            logits, batch["target"], batch["target_observed"]
+            logits,
+            batch["target"],
+            batch["target_observed"],
+            self.class_balance_weights if self.class_balance is not None else None,
         )
         self.log(
             "train_loss",
