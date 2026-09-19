@@ -320,3 +320,39 @@ accepted ratio or next run. Choose one concrete arm with the user before impleme
 optimizer-step budget and validation fixed, and record per-label exposure and study repetition.
 Feedback-driven allocation is classified separately in
 [big bets](big-bets.md#adaptive-training-allocation).
+
+### Weighting strength: exponent and prevalence definition
+
+**Hypotheses; untested.** The implemented weights set the ratio `w_pos/w_neg` to exactly
+`(1 - r_c) / r_c` on the thresholded positive fraction. Only the on/off comparison has been run,
+so nothing measures whether full rebalancing is the right strength: it reaches 12.9:1 on Fracture
+and 6.8:1 on Synovitis, the two labels whose report-derived targets are least reliable. An
+external recipe seen on 2026-09-19 uses the square root of that ratio, computed on soft
+prevalence, as a `pos_weight`; these two entries isolate the two knobs separately, keeping our
+cell weighting and mean-weight-one normalisation. One change per run against a fresh control.
+
+- **Damping exponent** (one new option, default reproduces today's run). Set
+  `rho_c = ((1 - r_c) / r_c) ** k`, then `w_neg_c = 1 / (r_c * rho_c + 1 - r_c)` and
+  `w_pos_c = rho_c * w_neg_c`, which keeps each label's mean weight at one for any `k`. `k = 1`
+  returns the current `1 / (2 * r_c)` and `1 / (2 * (1 - r_c))` exactly, so the default is
+  bit-identical; `k = 0.5` is the arm to run, halving the emphasis ratio on the tail (Fracture
+  12.9:1 to 3.6:1, Synovitis 6.8:1 to 2.6:1) while barely moving PF OA or Effusion. `k = 0` is
+  unweighted BCE, already measured as the losing side of the
+  [balanced-BCE result](../validation/results/2026-09-19-balanced-bce-result.md).
+- **Soft instead of thresholded prevalence** (one new option, off by default). Compute `p_c` as
+  the mean of the observed soft targets rather than the `y >= 0.5` fraction, leaving the weight
+  formula untouched. This is not a small refinement: the report-derived values sit at 0.25 and
+  0.355, so soft prevalence is far above the thresholded fraction on exactly the rare labels
+  (Synovitis 0.341 against 0.126, Fracture 0.187 against 0.073, Baker's 0.358 against 0.249,
+  Lateral Meniscus 0.228 against 0.158), and it damps their weights accordingly. It confounds
+  with the exponent, so run it only against the same control, never in the same arm.
+
+Per-label figures above come from `outputs/training/balanced-bce/fold_0/class_balance.json` for
+the thresholded fractions, and from the Steven v4 blend restricted to the fold-0 training rows of
+`all_5fold_v3` for the soft means (without gold overrides, which move 47 of 3,503 studies).
+
+The external recipe also leaves negative weights at one and skips renormalisation, so its
+per-label total loss mass rises with rarity (1.01 to 1.20 across our labels) and the global loss
+scale with it. That is a third difference, deliberately not adopted here: our normalisation is
+what keeps the comparison to the control a change of emphasis rather than of effective learning
+rate.

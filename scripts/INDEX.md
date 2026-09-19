@@ -105,7 +105,7 @@ The [historical sharing sources](../docs/history/sharing-sources/README.md)
 preserve the 1C compartment diagnostic, CPU generalization/case-mixture audits,
 blinded disagreement audit and eleven-run overnight launcher. They are text
 records outside the executable catalog and require their original runtimes.
-The current sixteen-run launcher does not reproduce that historical queue.
+The current five-run launcher does not reproduce that historical queue.
 
 The crop-selection scripts `analyze_crop_diversity.py`, `evaluate_crop_placement.py` and
 `probe_glimpses.py` were removed with the crop-selection code on 2026-09-16; the

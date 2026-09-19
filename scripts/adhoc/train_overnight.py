@@ -40,136 +40,39 @@ SUMMARY_HEADER = [
     "peak_cuda_memory_gib",
 ]
 
-B0_BACKBONE = "efficientnet_b0.ra_in1k"
-
 EXPERIMENTS = (
     (
-        "rexnet-fold0",
+        "00-control",
         {
-            "seed": 471048644,
-            "validation": {"folds": [0]},
+            "seed": 927831896,
         },
     ),
     (
-        "rexnet-fold1",
+        "01-eps-1e-6",
         {
-            "seed": 98781672,
-            "validation": {"folds": [1]},
+            "seed": 1491446251,
+            "optimizer": {"epsilon": 0.000001},
         },
     ),
     (
-        "rexnet-fold2",
+        "02-intensity-p-0.25",
         {
-            "seed": 991102686,
-            "validation": {"folds": [2]},
+            "seed": 788474613,
+            "data": {"intensity_augmentation": {"probability": 0.25}},
         },
     ),
     (
-        "rexnet-fold3",
+        "03-beta1-0.95",
         {
-            "seed": 645322570,
-            "validation": {"folds": [3]},
+            "seed": 663550682,
+            "optimizer": {"beta1": 0.95},
         },
     ),
     (
-        "rexnet-fold4",
+        "04-noise-std-0.01-0.04",
         {
-            "seed": 934679689,
-            "validation": {"folds": [4]},
-        },
-    ),
-    (
-        "b0-fold0",
-        {
-            "seed": 886913563,
-            "validation": {"folds": [0]},
-            "model": {"backbone": B0_BACKBONE},
-            "optimizer": {"backbone_lr": 0.0004},
-            "trainer": {"max_epochs": 15, "patience": 15},
-        },
-    ),
-    (
-        "b0-fold1",
-        {
-            "seed": 181761244,
-            "validation": {"folds": [1]},
-            "model": {"backbone": B0_BACKBONE},
-            "optimizer": {"backbone_lr": 0.0004},
-            "trainer": {"max_epochs": 15, "patience": 15},
-        },
-    ),
-    (
-        "b0-fold2",
-        {
-            "seed": 121022023,
-            "validation": {"folds": [2]},
-            "model": {"backbone": B0_BACKBONE},
-            "optimizer": {"backbone_lr": 0.0004},
-            "trainer": {"max_epochs": 15, "patience": 15},
-        },
-    ),
-    (
-        "b0-fold3",
-        {
-            "seed": 844841562,
-            "validation": {"folds": [3]},
-            "model": {"backbone": B0_BACKBONE},
-            "optimizer": {"backbone_lr": 0.0004},
-            "trainer": {"max_epochs": 15, "patience": 15},
-        },
-    ),
-    (
-        "b0-fold4",
-        {
-            "seed": 2042043309,
-            "validation": {"folds": [4]},
-            "model": {"backbone": B0_BACKBONE},
-            "optimizer": {"backbone_lr": 0.0004},
-            "trainer": {"max_epochs": 15, "patience": 15},
-        },
-    ),
-    (
-        "sigma-060",
-        {
-            "seed": 325686070,
-            "data": {"sampling_sigma_fraction": 0.6},
-        },
-    ),
-    (
-        "sigma-076",
-        {
-            "seed": 1698145101,
-            "data": {"sampling_sigma_fraction": 0.76},
-        },
-    ),
-    (
-        "sigma-095",
-        {
-            "seed": 179866324,
-            "data": {"sampling_sigma_fraction": 0.95},
-        },
-    ),
-    (
-        "sigma-110",
-        {
-            "seed": 1397039844,
-            "data": {"sampling_sigma_fraction": 1.1},
-        },
-    ),
-    (
-        "rexnet-epochs-15",
-        {
-            "seed": 750194183,
-            "trainer": {"max_epochs": 15, "patience": 15},
-        },
-    ),
-    (
-        "b0-epochs15-lr2x",
-        {
-            "seed": 1039297197,
-            "model": {"backbone": B0_BACKBONE},
-            "optimizer": {"backbone_lr": 0.0008, "head_lr": 0.0012},
-            "trainer": {"max_epochs": 15, "patience": 15},
+            "seed": 10764577,
+            "data": {"noise_augmentation": {"std_range": [0.01, 0.04]}},
         },
     ),
 )

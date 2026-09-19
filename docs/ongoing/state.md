@@ -68,6 +68,9 @@ Active lines of development have their own documents in [this folder](INDEX.md).
   concentrated on the rarest ones. Historical source differences limit exact attribution.
   **`configs/training.yaml` now enables it**, so it is the recipe in force; no public result yet,
   because the day's submission limit was reached with the bundle exported and ready.
+  **Replicated 2026-09-19:** the untried-hyperparameter queue's control reached 0.894037 at a
+  different seed, 0.00125 from `balanced-bce` and about 0.008 above every ordinary-BCE run on the
+  same sampler ([queue results](../validation/results/2026-09-19-untried-hyperparameter-queue.md)).
 - **Strategy:** iterate on fold 0. Folds, ensembling and mirror TTA were executed on 2026-09-19
   and are no longer waiting; bigger images and weight averaging still wait
   for the [final phase](../backlog/endgame.md)

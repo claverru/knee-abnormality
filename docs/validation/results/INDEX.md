@@ -2,6 +2,7 @@
 
 | Read when | Document |
 |---|---|
+| Reviewing the five-run queue of never-tried hyperparameter values on the balanced-BCE recipe: no arm cleared the floor, the control replicated the loss change, and a spread comparison | [2026-09-19 untried-hyperparameter queue](2026-09-19-untried-hyperparameter-queue.md) |
 | Reviewing the 2026-09-19 fold queue: the first 5-fold OOF for both backbones, the +0.0061 ensemble that transferred to the leaderboard, the unreadable sigma sweep that settles the width, and the b0 arm that shows its two gains do not combine | [2026-09-19 fold ensembles and sigma sweep](2026-09-19-fold-ensembles-and-sigma-sweep.md) |
 | Reviewing fixed class-balanced BCE: 0.895282 fold-0 AUC, +0.008796 against the closest same-seed historical reference, per-label gains and control limitations | [2026-09-19 balanced BCE](2026-09-19-balanced-bce-result.md) |
 | Reviewing the relative sampler width kept on 2026-09-19 (`sampling_sigma_fraction: 0.867`): the ×1-only gap, the four-cell decomposition showing the effect sits on the training side, the two surviving per-label moves and the control missing at ×4 | [2026-09-19 relative sampler width](2026-09-19-relative-sampler-width-result.md) |

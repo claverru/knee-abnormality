@@ -4,13 +4,13 @@ The candidates for the next queue are tracked in the [overnight queue](../backlo
 
 ## Launcher
 
-Run the fifteen prepared experiments sequentially with:
+Run the five prepared experiments sequentially with:
 
 ```bash
 nohup rtk proxy uv run --locked python -m scripts.adhoc.train_overnight > outputs/training/overnight.out 2>&1 &
 ```
 
-Use `--prepare-only` to write the fifteen configurations without starting training, or
+Use `--prepare-only` to write the five configurations without starting training, or
 `--config PATH` to select another training YAML (default `configs/training.yaml`). Every
 invocation creates a new queue; preparation does not reserve a queue for a later command.
 
@@ -37,33 +37,32 @@ Codex resume was interrupted. Failed outputs were deleted at the user's request,
 hook was removed in favor of manual launching. The 2026-09-15 queue completed seven of sixteen
 runs before the machine or WSL stopped; the run list below replaces it.
 
-The launcher snapshots the current training config into fifteen validated YAML files under a
+The launcher snapshots the current training config into five validated YAML files under a
 unique `outputs/training/overnight-<UTC timestamp>-<suffix>/configs/` directory. It fixes
-`all_5fold_v3` and fold 0; seed 42 unless a run overrides it. All other settings come from the
-training config at launch. Each run starts fresh with exactly the listed overrides from
+`all_5fold_v3` and fold 0; every run carries its own recorded random seed. All other settings come
+from the training config at launch, which since 2026-09-19 means
+`trainer.class_balanced_bce: true`, `data.sampling_sigma_fraction: 0.867` and
+`data.study_triplet_total: 26`. Each run starts fresh with exactly the listed overrides from
 `00-control`, its comparison control.
 
-| Run | Overrides |
-|---|---|
-| `00-control` | none |
-| `01-control-seed-43` | `seed: 43` |
-| `02-control-seed-44` | `seed: 44` |
-| `03-ema-0.999` | `optimizer.weight_averaging: {method: ema, decay: 0.999}` |
-| `04-swa-3` | `optimizer.weight_averaging: {method: swa, epochs: 3}` |
-| `05-epochs-20` | `trainer.max_epochs: 20`, `trainer.patience: 20` |
-| `06-beta2-0.99` | `optimizer.beta2: 0.99` |
-| `07-affine-off` | `data.affine_augmentation.probability: 0` |
-| `08-slower-head` | `optimizer.head_lr: 0.0003` |
-| `09-warmup-0` | `optimizer.warmup_epochs: 0` |
-| `10-clip-0.001` | `data.lower_quantile: 0.001`, `data.upper_quantile: 0.999` |
-| `11-clip-0.01` | `data.lower_quantile: 0.01`, `data.upper_quantile: 0.99` |
-| `12-grad-clip-0.5` | `trainer.gradient_clip_val: 0.5` |
-| `13-grad-clip-5` | `trainer.gradient_clip_val: 5.0` |
-| `14-noise-0.3` | `data.noise_augmentation.probability: 0.3` |
+| Run | Overrides | Seed |
+|---|---|---|
+| `00-control` | none | 927831896 |
+| `01-eps-1e-6` | `optimizer.epsilon: 0.000001` | 1491446251 |
+| `02-intensity-p-0.25` | `data.intensity_augmentation.probability: 0.25` | 788474613 |
+| `03-beta1-0.95` | `optimizer.beta1: 0.95` | 663550682 |
+| `04-noise-std-0.01-0.04` | `data.noise_augmentation.std_range: [0.01, 0.04]` | 10764577 |
 
-See the [results](results/2026-09-17-overnight-results.md) of this list, the [backlog](../backlog/overnight.md#already-measured) for why
-each run was chosen and the [user's decisions](../backlog/overnight.md#user-decisions-2026-09-16)
-about what was dropped from this list.
+Every arm is a value no run has ever used: a scan of the 143 saved `effective_config.json` files on
+2026-09-19 found `optimizer.epsilon` at 1e-8 in 143 of 143, `optimizer.beta1` at 0.9 in 143 of 143,
+`data.intensity_augmentation.probability` at 0.5 in 143 of 143 and
+`data.noise_augmentation.std_range` at `[0.005, 0.02]` in 142 of 142. A fresh control is mandatory
+because only one run on disk (`balanced-bce`) carries the loss now in force, so every delta
+recorded before 2026-09-19 was measured under ordinary BCE.
+
+See the [backlog](../backlog/overnight.md#already-measured) for why each run was chosen and the
+[user's decisions](../backlog/overnight.md#user-decisions-2026-09-16) about what was dropped.
+The previous list's results are in [2026-09-17](results/2026-09-17-overnight-results.md).
 
 Each queue has `runs/<name>/` for normal training artifacts, `logs/<name>.log` for training
 output, `status.tsv` for per-run timing and exit codes, and `summary.tsv` for per-run metrics,
@@ -96,17 +95,17 @@ directories and never resumes an earlier queue.
 At the end of the queue (and again if you re-read `status.tsv`/`summary.tsv` later), the launcher
 prints one `compare_fold_runs` command per completed non-control run against `00-control`, each
 with `--allowed-config-differences name,<changed keys>` set from that run's own overrides — for
-example `04-swa-3` prints `--allowed-config-differences name,optimizer.weight_averaging`. Run
+example `03-beta1-0.95` prints `--allowed-config-differences name,seed,optimizer.beta1`. Run
 these manually once you want the paired saved-prediction bootstrap comparison; see the
 [fold-run comparison doc](fold-run-comparison.md).
 
-**Time estimate:** about 7.7 hours. Ten-epoch runs are about 28 minutes each (the 2026-09-15
-queue averaged 29.9 min); the EMA run (`03-ema-0.999`) is about 32 minutes for the extra
-validation forward; the SWA run (`04-swa-3`) is about 36 minutes for the extra forward plus three
-BatchNorm refreshes; the 20-epoch run (`05-epochs-20`) is about 55 minutes. This is an estimate,
-not a measurement.
+**Time estimate:** about 2.3 hours, inside a 3-hour budget. Every run is ten epochs on the
+current recipe and none changes the step count or the per-step cost, so each is about 27 minutes:
+`sigma-fraction-0867` measured 1565 s of training plus 21 s of validation prediction, and the
+2026-09-18 queue's ReXNet-200 runs averaged 1566 s of wall time. Peak memory is unchanged at about
+20.8 GiB.
 
-**Verification:** `--prepare-only` was run once to confirm all fifteen configs load through
-`ExperimentConfig` and differ from `configs/training.yaml` (seed 42, `all_5fold_v3`, fold 0)
-exactly by the overrides in the table above; the verification queue directory was deleted
+**Verification:** `--prepare-only` was run once to confirm all five configs load through
+`ExperimentConfig` and differ from `configs/training.yaml` (`all_5fold_v3`, fold 0) exactly by the
+seed and the overrides in the table above; the verification queue directory was deleted
 afterward.
