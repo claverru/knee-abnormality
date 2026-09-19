@@ -1,9 +1,9 @@
 # Overnight queue
 
 Hyperparameter-only runs: values of existing training options on the
-[current recipe](../modeling/current-model.md), one change per run against a fresh control (seed 42,
-`all_5fold_v3`, fold 0). A [small change](small-changes.md) enters this queue once it is
-implemented; other ideas belong to the other [backlog](INDEX.md) documents. The queue runs
+[current recipe](../modeling/current-model.md), one change per run against a fresh control
+(`all_5fold_v3`, fold 0, one recorded random seed per run). A [small change](small-changes.md)
+enters this queue once it is implemented; other ideas belong to the other [backlog](INDEX.md) documents. The queue runs
 unattended and the user launches it, detached from agent sessions; the
 [queue launcher](../validation/overnight-hyperparameter-queue.md) owns the procedure. Record
 results in [validation results](../validation/results/INDEX.md), then remove the finished entries
@@ -11,12 +11,14 @@ from this file.
 
 ## Next queue
 
-The user-launched [fixed class-balanced BCE run](../validation/results/2026-09-19-balanced-bce-result.md)
-finished at 0.895282, +0.008796 over the closest same-seed historical reference.
-No further run is scheduled here; the candidates below await selection. The
-2026-09-18 queue of seventeen runs finished
-([results](../validation/results/2026-09-18-overnight-results.md)); its executable launcher has
-not been replaced by a new executable queue. Keep `validation_image_multiplier: 1` in comparisons.
+Empty. The 2026-09-19 five-run queue of never-tried values finished
+([results](../validation/results/2026-09-19-untried-hyperparameter-queue.md)) and nothing from it
+was adopted. Candidates for the next one are below.
+
+**No delta recorded before 2026-09-19 is a prior for a new queue.** Everything in
+[already measured](#already-measured) was run under ordinary BCE, and the recipe in force uses
+class-balanced BCE, which by itself moves fold 0 by about 0.008. Keep
+`validation_image_multiplier: 1` in comparisons.
 
 ## User decisions (2026-09-16)
 
@@ -44,13 +46,24 @@ not been replaced by a new executable queue. Keep `validation_image_multiplier: 
 
 ## Candidates for later queues
 
+- **The stronger side of intensity augmentation** (measured direction, untested value). Weakening
+  it to `probability: 0.25` lost 0.00082 on 2026-09-19, the queue's only negative, so the family
+  carries signal and the untested side is upward: a higher probability, or wider `gamma_range` and
+  `contrast_range`, whose strengths were varied exactly once, together, in a single run.
+- **The epoch budget is reopened under this loss.** Three of the four arms on 2026-09-19 selected
+  epoch 10, the last one, and so did both positives; the control peaked at 9. The measurements
+  that closed the axis were all made under ordinary BCE, where the peak came earlier.
+- **The epoch budget under ordinary BCE is closed.** 15 epochs was measured three times, all the same sign and all
+  inside the single-run threshold: ReXNet +0.0023 (2026-09-18), ReXNet +0.0025 (2026-09-19) and b0
+  +0.0029 (2026-09-18 b0 queue), against 20 epochs at −0.0027. A fourth run at 50% more wall time
+  cannot separate it; adopting 15 epochs is a cost decision for the user, not a queue slot.
 - **Raise only `optimizer.head_lr` to `0.0012`** (hypothesis; untested independently). Keep the
   current ReXNet backbone LR at `0.0002`; change only the head LR from `0.0006`. The projection,
   embeddings, pooling and readouts start without pretrained weights. The
   [recorded head-LR gap](../validation/results/2026-09-18-b0-hyperparameter-queues.md#open)
   includes one lower-rate comparison and coupled increases on B0, but no isolated increase.
-  Keep loss weighting fixed between control and candidate; do not combine this with the ongoing
-  balanced-BCE change. `0.0012` is a starting proposal, not an established optimum.
+  Balanced BCE is now the recipe in force, so it is fixed between control and candidate rather
+  than a conflict. `0.0012` is a starting proposal, not an established optimum.
 - **Denser per-type budgets** (hypothesis; the only untested side of a measured axis). Raise
   `data.series_types[*].max_images` above today's 18/18/15/15/15/15 at a fixed sampler width and
   crop. Only the cheaper side has been measured and it loses monotonically: 15/15/12/12/12/12
@@ -59,10 +72,11 @@ not been replaced by a new executable queue. Keep `validation_image_multiplier: 
   points the same way, with a CoAtNet pipeline gaining 0.917 → 0.926 → 0.928 → 0.932 as slice
   density rose at a fixed reach
   ([public research](../research/public-research.md#slice-density-and-the-board-2026-09-18-re-sweep)).
-  **Memory gates it:** the three measured steps peak at 12.6, 16.6 and 20.0 GiB, so
-  21/21/18/18/18/18 lands near 23.5 GiB and may not fit at batch size 8. Check the peak first; if
-  it does not fit, the arm needs a second change (batch size with accumulation, or
-  `model.checkpoint_backbone`) and stops being a one-change run. `data.study_triplet_total` is the
+  **Memory rules it out as a one-change run:** `sigma-fraction-0867` already peaks at 20.8 GiB
+  with `study_triplet_total: 26`, well above the 18.9 GiB of the era that produced the 23.5 GiB
+  estimate, so 21/21/18/18/18/18 exceeds the card. It needs a second change (accumulation, or
+  `model.checkpoint_backbone`) to fit, and stops being a one-change run.
+  `data.study_triplet_total` is the
   other knob on the same axis and 32 is already measured (+0.0036, inside the control spread).
 - **Other values of the existing augmentation families**, after `07-affine-off` (hypothesis):
   probabilities and strengths of the intensity, affine and noise families, one per run, such as
@@ -76,6 +90,11 @@ not been replaced by a new executable queue. Keep `validation_image_multiplier: 
   is retired with it. This settles the *scale* only: the sweep moves all three planes by one factor,
   so per-plane ratios and an asymmetric coronal draw are untouched by it and are queued as
   [small changes](small-changes.md#per-plane-width-ratios).
+- **`trainer.accumulate_grad_batches: 2`** (untried; two-sided). It buys an effective batch of 16
+  at unchanged memory but halves optimizer steps to 2,190, the axis the b0 queue says helps.
+- **Dead config:** `trainer.min_delta` is 0.0001 in all 143 saved runs and its only consumer is
+  EarlyStopping at `scripts/pipeline/train.py:234`, where `patience` equals `max_epochs`, so it
+  never fires. It is a removal, not a candidate.
 - **Low value:** `data.sampling_sigma_mm: 50` is retired with the fixed-width sampler;
   `optimizer.weight_decay: 0.001`, since 0.003 and 0.03 are settled, 0.05 lost
   −0.0008 and 0.003 gained only +0.0002 on the 2026-09-12 recipe.
@@ -88,6 +107,15 @@ not been replaced by a new executable queue. Keep `validation_image_multiplier: 
   MIL batches change every step.
 
 ## Already measured
+
+On the balanced-BCE recipe, 2026-09-19 queue (fold 0, validation ×1, one unseeded run each,
+control 0.894037; [results](../validation/results/2026-09-19-untried-hyperparameter-queue.md)):
+`data.noise_augmentation.std_range: [0.01, 0.04]` +0.00105, `optimizer.beta1: 0.95` +0.00068,
+`optimizer.epsilon: 1e-6` −0.00005 and `data.intensity_augmentation.probability: 0.25` −0.00082.
+All four sit inside the run-to-run floor and none is adopted; every bootstrap interval spans zero.
+
+Everything below this line was measured under **ordinary BCE** and does not rank settings on the
+current recipe.
 
 On the 2026-09-18 queue (fold 0, validation ×1, one unseeded run each, two controls spanning
 0.0026 with mean 0.885128; [results](../validation/results/2026-09-18-overnight-results.md)):

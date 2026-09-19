@@ -2,9 +2,13 @@
 
 The user-launched [fixed class-balanced BCE run](../validation/results/2026-09-19-balanced-bce-result.md)
 finished at 0.895282, +0.008796 over the closest same-seed historical reference. An exact
-same-source ordinary-BCE control has not been run; no further run is scheduled. Other experiments
-run one by one against a control as one unseeded run each (random seed, recorded). The
-[overnight queue](../backlog/overnight.md) holds the remaining hyperparameter candidates.
+same-source ordinary-BCE control has not been run. Other experiments
+run one by one against a control as one unseeded run each (random seed, recorded).
+
+**The 2026-09-19 queue finished** ([results](../validation/results/2026-09-19-untried-hyperparameter-queue.md)):
+five runs, 2 h 11 m, nothing adopted. Its control replicated the class-balanced BCE result at a
+second seed, and three of four arms peaked at the final epoch, which reopens the epoch budget on
+this loss. The [overnight queue](../backlog/overnight.md) holds the remaining candidates.
 The b0 line's open leads are in
 the [b0 queue result](../validation/results/2026-09-18-b0-hyperparameter-queues.md#open).
 
