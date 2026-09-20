@@ -3,7 +3,7 @@
 | Read when | Document |
 |---|---|
 | Starting here or checking what is implemented | [Overview](README.md) |
-| Starting either provider, stopping, recovering, or understanding reconciliation | [Runtime operation](runtime.md) |
+| Starting either provider, inspecting metric progress and results, stopping, recovering, or understanding reconciliation | [Runtime operation](runtime.md) |
 | Applying the directory's agent and documentation ownership rules | [Agent guidance](AGENTS.md) |
 | Continuing the runner implementation or checking remaining work | [Implementation status](status.md) |
 | Following scheduling, ownership, acceptance, and memory rules | [Protocol](protocol.md) |

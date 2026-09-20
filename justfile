@@ -25,6 +25,9 @@ autoresearch-start provider campaign="triplet-sampling":
 autoresearch-status campaign="triplet-sampling":
     rtk proxy uv run --locked python -m scripts.tools.autoresearch status "$1"
 
+autoresearch-results campaign="triplet-sampling":
+    rtk proxy uv run --locked python -m scripts.tools.autoresearch results "$1"
+
 autoresearch-stop campaign="triplet-sampling":
     rtk proxy uv run --locked python -m scripts.tools.autoresearch stop "$1"
 

@@ -13,6 +13,12 @@ from pydantic_settings import CliImplicitFlag, CliPositionalArg, SettingsError
 from knee_abnormality.autoresearch.gates import initial_limits, validate_config
 from knee_abnormality.autoresearch.isolation import environment, sandbox
 from knee_abnormality.autoresearch.models import ResearchReport
+from knee_abnormality.autoresearch.progress import (
+    decision_text,
+    metric_line,
+    progress_lines,
+    results_summary,
+)
 from knee_abnormality.autoresearch.providers import auth_environment
 from knee_abnormality.autoresearch.storage import (
     alive,
@@ -33,6 +39,7 @@ class AutoresearchCLI(CLISettings):
             "start",
             "validate",
             "status",
+            "results",
             "usage",
             "stop",
             "resume",
@@ -224,8 +231,12 @@ def status_summary(supervisor: Supervisor):
     )
     if completed:
         latest = completed[-1]
-        lines.append(f"Latest decision: {latest['idea']} — {latest['decision']}")
-    lines.append(f"Incumbent: {state['incumbent']['id']}")
+        lines.append(f"Latest decision: {latest['idea']} — {decision_text(latest)}")
+        lines.append(
+            f"  Reference: {latest.get('reference', {}).get('id', 'unavailable')}"
+        )
+        lines.append(f"  {metric_line(latest)}")
+    lines.extend(progress_lines(state, supervisor.root, supervisor.output))
     usage = campaign_usage(state)
     completion_reporting = usage["completion_reporting"]
     if completion_reporting:
@@ -348,6 +359,13 @@ def main():
             return
         if args.action == "status":
             print(status_summary(supervisor))
+            return
+        if args.action == "results":
+            print(
+                results_summary(
+                    supervisor.state, supervisor.root, supervisor.output, args.campaign
+                )
+            )
             return
         if args.action == "usage":
             print(
