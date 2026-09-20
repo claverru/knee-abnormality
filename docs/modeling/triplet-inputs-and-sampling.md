@@ -31,6 +31,12 @@ need their archived sources; their exact prediction reproduction is recorded in 
 
 ## Adjacent triplet sampling
 
+The current recipe draws independently inside each Gaussian probability band
+at every training epoch, and uses deterministic midpoints during validation.
+See the [implemented sampler](../data-preparation/physical-sampling/implemented-sampler.md).
+The table below records historical validation x2 budgets; current training
+comparisons use x1, so validation counts match the training-density column.
+
 Updated on 2026-09-13. `max_images` counts **channel appearances**, including
 slices reused by overlapping triplets.
 Training limits round the previous half-median budgets up to multiples of

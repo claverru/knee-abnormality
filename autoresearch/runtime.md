@@ -1,0 +1,211 @@
+# Runtime operation
+
+Start from the repository root, choosing one subscription provider:
+
+```bash
+rtk proxy uv run --locked just autoresearch-start codex
+```
+
+```bash
+rtk proxy uv run --locked just autoresearch-start claude
+```
+
+These default to `triplet-sampling`. Select another configured campaign explicitly:
+
+```bash
+rtk proxy uv run --locked python -m scripts.tools.autoresearch validate losses
+rtk proxy uv run --locked just autoresearch-start claude losses
+```
+
+The validation command checks configuration and saved control artifacts without
+launching anything. See [campaign setup](campaign-setup.md) to add a topic through
+its YAML policy and contract. The first successful start seals
+the provider, role profiles, source, recipe, campaign policy, GPU, and resource limits. The launcher
+returns immediately; closing the terminal or interactive agent session does not
+stop the supervisor or its jobs. No interactive model selection is needed.
+[agents.yaml](agents.yaml) determines the role assignments, including the restricted
+completion reporter. Both CLIs must
+use subscription authentication; API credentials and provider overrides are removed
+from child environments. There is no API fallback.
+
+Claude explicitly uses `CLAUDE_CONFIG_DIR=~/.claude` so both its credentials and
+atomically updated CLI state live under a writable CLI directory, while the home
+directory remains read-only. This follows its documented
+[configuration-file locations](https://code.claude.com/docs/en/mcp-quickstart#find-your-configuration-on-disk).
+
+The public entry point is
+[scripts/tools/autoresearch.py](../scripts/tools/autoresearch.py). Its maintained
+implementation lives in
+[src/knee_abnormality/autoresearch/](../src/knee_abnormality/autoresearch/).
+The CLI also accepts an explicit campaign and GPU:
+
+```bash
+rtk proxy uv run --locked python -m scripts.tools.autoresearch start triplet-sampling --provider codex --gpu 0
+```
+
+## Inspect, stop, and resume
+
+```bash
+rtk proxy uv run --locked just autoresearch-status
+rtk proxy uv run --locked just autoresearch-stop
+rtk proxy uv run --locked just autoresearch-resume
+```
+
+Append the campaign ID to each command for another line, for example
+`rtk proxy uv run --locked just autoresearch-status losses`. Commands act on one
+campaign; starting or stopping losses does not start or stop sampling. Campaigns
+share the GPU lease, so they cannot train simultaneously on the same device.
+
+Status reads persisted state and process identity without calling a model. Stop
+prevents new work, cancels agent jobs, and lets an already launched training finish.
+Its comparison/decision can be completed after resume. To terminate training too:
+
+```bash
+rtk proxy uv run --locked python -m scripts.tools.autoresearch stop triplet-sampling --abort
+```
+
+Status shows a compact summary of calibration passes, active jobs and elapsed time,
+the ranked backlog, the next candidate, training progress, recent results, budget,
+and recorded agent usage by role/event. It includes failed calls and explicitly
+marks partial or unavailable usage. For complete machine-readable usage details:
+
+```bash
+rtk proxy uv run --locked python -m scripts.tools.autoresearch usage
+```
+
+This command is read-only, needs no provider login or GPU, and includes per-job
+model/effort, prompt/report bytes, direct per-experiment usage, completion-reporter
+routing and escalation, repairs, compute
+time, and campaign cost per valid completed experiment. Reported dollar values
+are API equivalents, not subscription-quota percentages.
+
+Calibration progress updates after each complete pass, not after each study. For a
+live terminal display, with no model calls:
+
+```bash
+rtk proxy watch -n 5 'rtk proxy uv run --locked python -m scripts.tools.autoresearch status'
+```
+
+There is no overall experiment-count limit, total-runtime limit, or automatic stop
+on a performance plateau. The campaign continues until stopped. Quota and unexpected
+failures pause it; an exhausted research backlog leaves it idle without repeated
+model calls. Each experiment still has its fixed compute ceiling; exceeding it
+invalidates that attempt and does not itself stop the entire campaign.
+
+Resume uses the recorded provider and profiles. It adopts live owned workers and
+consumes their completion receipts. A lost training attempt becomes invalid; it is
+never automatically launched again. This command resumes campaign orchestration,
+not an interrupted model checkpoint. Quota, authentication, malformed reports, and
+unexpected orchestration failures pause scheduling, retain artifacts, and require
+fixing the reported cause followed by resume. Waiting consumes no model turns.
+
+State, supervisor logs, per-job prompts, structured reports, usage, process identities,
+and receipts live under `outputs/autoresearch/<campaign-id>/`. The state file is
+authoritative; YAML backlog/registry files and campaign findings are atomic projections
+of serialized orchestrator decisions. Reopening the supervisor regenerates these
+projections after an interrupted write. Do not edit them while a campaign runs.
+
+The operational supervisor, worker wrapper and role briefs use the maintained
+main-tree runtime. Update them only while the campaign is stopped; the next
+supervisor launch uses those changes. Candidate and training source, campaign
+contract, policy, profiles, data identities and sealed numerical limits remain frozen.
+Each new agent job saves its exact brief/context/schema and evidence packet, so
+operational prompt changes remain attributable without changing old artifacts.
+
+## Initial sealing and fixed budget
+
+When present, `autoresearch/campaigns/<campaign>/seed-ideas.yaml` supplies existing
+ideas in the structured researcher-report format. Startup queues these for
+orchestrator review before requesting new research; blocked, rejected and out-of-topic
+work does not become executable just because it appears in the general backlog.
+The triplet campaign imported the asymmetric coronal draw and per-plane width policy;
+its prior work records their outcomes. The loss campaign proposes shared BCE plus
+ranking, focal loss, tempered class weighting, and delayed ranking. Per-label losses
+are excluded by its contract.
+
+To import proposals into an existing campaign, stop it and wait until status is
+`STOPPED`, then import and resume:
+
+```bash
+rtk proxy uv run --locked python -m scripts.tools.autoresearch import-ideas --ideas-file autoresearch/campaigns/triplet-sampling/seed-ideas.yaml
+rtk proxy uv run --locked just autoresearch-resume
+```
+
+Import preserves an immutable proposal artifact and adds a review event under the
+supervisor lock. It rejects duplicate IDs in the registry or pending events and
+does not overwrite the live queue. The orchestrator admits and ranks proposals;
+research fills only the remaining places. Calibration and sealed limits are retained.
+
+Start checks the subscription login, Linux bubblewrap isolation, local GPU identity,
+control artifacts, and current recipe. A CPU-only replay then traverses the complete
+fold-0 training cohort for the existing ten-epoch schedule and deterministic validation
+twice. It measures actual prepared triplets, including decoding/retry shortfalls,
+without fitting another model. This one-time accounting pass can take substantial
+CPU and disk time. Research and candidate training wait for it to finish.
+
+The training budget is the measured total divided by the unchanged study-visit count.
+Tolerance is zero. Redistribution is allowed; increasing or decreasing the aggregate
+average is invalid. Validation remains x1, with its measured aggregate count preserved.
+Counts come from valid three-slice inputs in the batch mask, before model series
+dropout, excluding padding. Training selections must vary across epochs; validation
+selections must remain identical, and its dataset receives no training seed.
+
+The runtime limit is **115% of the initial historical control's recorded setup,
+training, and final validation-prediction time**, rounded up: **1,785 seconds** for
+the sampling campaign's original control and **1,797 seconds** for the losses
+campaign's control B. Config preparation, the complete training process including
+sampling setup and validation, and CPU bootstrap comparison consume that same fixed
+per-experiment allowance. Agent deliberation, queue waiting, source housekeeping, and
+the one-time baseline replay are outside it. Auxiliary policy preparation must run
+inside the measured training process; persistent precomputation outside it is forbidden.
+Epochs and optimizer steps are fixed as well. Accepted candidates never raise limits.
+
+Each fresh model gets a new recorded random seed. The bootstrap resampling seed is
+separate and fixed. The evaluator uses the saved paired report-group bootstrap;
+the orchestrator records the resulting acceptance decision and interpretation.
+Partial evidence, scope violations, and budget violations cannot produce acceptance.
+
+## Keeping development ahead of training
+
+Each idea gets an independent workspace and a frozen source copy. This avoids branch
+switches in a live training checkout and works with the repository's uncommitted
+source. The shared Python environment is reused, with `PYTHONPATH` explicitly pointing
+to the candidate source. Experiment code is never silently imported from the main
+checkout. Main-checkout experiment code is not automatically replaced by a winner.
+
+After training creates its execution record, the reserved head is removed from the
+queue. The developer takes the next ranked idea while that training runs; a researcher
+refills concurrently below four entries, toward five. At most one next candidate is
+developing or prepared. A failed launch leaves the head reserved for explicit handling.
+
+If the incumbent changes while the next candidate is being developed, the runner
+waits for its developer to finish. Before launch, it creates a new recorded attempt
+and performs a three-way merge of the candidate's changes onto the new incumbent.
+The old parent, old candidate, new parent, and conflicts remain recorded. Clean merges
+go through configuration validation and orchestrator review again; conflicts return
+to the developer. No worker edits a running training snapshot. If the incumbent did
+not change, the prepared candidate can launch without reconciliation. Completion
+evaluation and unresolved conflicts can still leave the GPU temporarily idle.
+
+## Boundaries and prerequisites
+
+Only local training and local validation are authorized. No Kaggle submissions,
+uploads, publication, or remote jobs. Candidate configuration, baseline replay,
+training, and comparison processes have networking disabled. Cache the existing
+pretrained weights before starting; training uses offline model loading. Research
+agents may read public sources through their CLI tools.
+
+This runtime requires Linux, bubblewrap/user namespaces, the repository's locked
+Python environment, cached model weights, the saved fold data and acquisition headers,
+and the selected authenticated CLI. Startup refuses missing isolation or API-only
+authentication. Ordinary code checks GPU availability and holds a GPU lease shared
+by local campaigns before launching. External processes can still compete for the
+GPU; their interference cannot increase the sealed budget.
+
+Researchers and orchestrators receive read-only repository views. Developers edit
+isolated source; documentation, scripts, and harness code are read-only mounts.
+A source allowlist, syntax check, configuration gate, and orchestrator review precede
+training. Topic relevance, meaningful novelty, coverage/exploitation, and absence of
+label leakage still require semantic review; they are not mathematical guarantees.
+Only the orchestrator authors canonical research text, with the supervisor applying
+its structured operations. All research documentation stays inside `autoresearch/`.

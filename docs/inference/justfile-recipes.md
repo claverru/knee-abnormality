@@ -6,6 +6,8 @@ the shorter `just` spelling. Arguments are positional. Quote paths and labels
 containing spaces. After training, routine submissions need only export and
 submit; `validate` and `infer` are optional.
 
+## Recipe reference
+
 | Operation | Recipe |
 |---|---|
 | Install the locked environment | `just setup` |
@@ -24,6 +26,8 @@ submit; `validate` and `infer` are optional.
 | Query current Kaggle submission statuses/scores | `just submissions` |
 | Submit in the foreground for debugging | `just submit-foreground BUNDLE DATASET_ID NOTEBOOK_ID RECORD_JSON LABEL` |
 
+## Export and submit a checkpoint
+
 For example, after selecting an actual checkpoint:
 
 ```bash
@@ -36,6 +40,8 @@ rtk proxy uv run --locked just submit \
   outputs/submission/records/00-baseline-next-2x.json "00-baseline"
 rtk proxy uv run --locked just submit-status outputs/submission/records/00-baseline-next-2x.json
 ```
+
+## Runtime and resume behavior
 
 Export uses `outputs/submission/dependencies/kaggle-v170`, Python 3.12 and Linux x86-64 by
 default; later positional arguments override those values. `prepare-codecs`
@@ -50,10 +56,14 @@ paths before changing directory, and runs from the bundle so both the prediction
 entry point and package come from frozen source. Validation prediction is never
 a dependency of export or submission.
 
+## Submission labels
+
 `LABEL` is the only submission text chosen by hand: 2 to 45 characters naming the run and its one
 change. Everything Kaggle shows is built from it and the bundle, in the
-[unified submission format](submissions/INDEX.md#naming), and a submission description cannot be
+[unified submission format](submissions/ledger.md#naming), and a submission description cannot be
 edited afterwards.
+
+## Detached submission status and logs
 
 The [submission job utility](../../scripts/tools/submission_job.py) performs cheap
 bundle integrity checks and starts the existing submission pipeline with a
@@ -63,6 +73,8 @@ from the absolute record path, and rejects existing records/logs. The matching
 work for earlier manually launched runners. Saved status reflects the runner's
 latest update; use `just submissions` for a fresh Kaggle query. Only
 `submit-follow` and `submit-foreground` intentionally wait.
+
+## Verification record
 
 Recipe syntax, lint, catalog consistency, and actual read-only status/log
 commands were checked on 2026-09-11. The new launcher was not used to create

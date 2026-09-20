@@ -1,8 +1,11 @@
 # Training objectives, weighting and sampling for mean per-label ROC-AUC
 
 The search space includes the loss, the weight of each study–target contribution, which studies
-reach the model, and which examples share a batch. Uniform study exposure and unweighted BCE
-are the current baseline, not requirements imposed by the metric. Calibration is not an endpoint.
+reach the model, and which examples share a batch. The current recipe retains uniform study
+exposure and uses [fixed class-balanced soft BCE](../modeling/supervision.md#fixed-class-balanced-bce).
+Neither choice is imposed by the metric. Calibration is not an endpoint. For different loss
+families within each label, shared-feature comparisons and learned mixtures, see
+[per-label loss specialization](per-label-losses.md).
 
 **Default per-label reduction:** $\mathcal L = \frac{1}{C}\sum_{c=1}^{C}\mathcal L_c$.
 For pairwise objectives, average pairs within each label before averaging labels; do not pool

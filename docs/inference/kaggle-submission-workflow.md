@@ -34,7 +34,7 @@ The commands below follow the installed 2.0.2 interface. Prefix each with
 `-m` is the submission description, the only text Kaggle keeps for a submission row, and it is
 write-once: the API exposes submit, status, list and download but no update, and the site offers
 no edit control either. `just submit` composes it in the
-[unified submission format](submissions/INDEX.md#naming) from one `--label`, so use the recipe
+[unified submission format](submissions/ledger.md#naming) from one `--label`, so use the recipe
 rather than a hand-written message. The notebook title shown beside a submission can only be
 changed by renaming the notebook in the Kaggle UI, because `kernels push` re-runs the notebook.
 

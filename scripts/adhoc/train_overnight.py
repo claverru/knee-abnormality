@@ -4,6 +4,8 @@ import json
 import os
 import re
 import resource
+import secrets
+import shlex
 import signal
 import subprocess
 import sys
@@ -40,41 +42,36 @@ SUMMARY_HEADER = [
     "peak_cuda_memory_gib",
 ]
 
+QUEUE_SECONDS = 8 * 60 * 60
+RUN_ALLOWANCE_SECONDS = 30 * 60
+
 EXPERIMENTS = (
+    ("00-control", {}),
+    ("01-head-lr-0.0012", {"optimizer": {"head_lr": 0.0012}}),
     (
-        "00-control",
-        {
-            "seed": 927831896,
-        },
+        "02-intensity-p-0.75",
+        {"data": {"intensity_augmentation": {"probability": 0.75}}},
+    ),
+    ("03-backbone-lr-0.0003", {"optimizer": {"backbone_lr": 0.0003}}),
+    ("04-dropout-0.1", {"model": {"dropout": 0.1}}),
+    (
+        "05-gamma-0.70-1.30",
+        {"data": {"intensity_augmentation": {"gamma_range": [0.70, 1.30]}}},
     ),
     (
-        "01-eps-1e-6",
-        {
-            "seed": 1491446251,
-            "optimizer": {"epsilon": 0.000001},
-        },
+        "06-contrast-0.80-1.20",
+        {"data": {"intensity_augmentation": {"contrast_range": [0.80, 1.20]}}},
     ),
+    ("07-affine-p-0.5", {"data": {"affine_augmentation": {"probability": 0.5}}}),
+    ("08-head-lr-0.0024", {"optimizer": {"head_lr": 0.0024}}),
+    ("09-rotation-7", {"data": {"affine_augmentation": {"rotation_degrees": 7}}}),
     (
-        "02-intensity-p-0.25",
-        {
-            "seed": 788474613,
-            "data": {"intensity_augmentation": {"probability": 0.25}},
-        },
+        "10-scale-0.97-1.03",
+        {"data": {"affine_augmentation": {"scale_range": [0.97, 1.03]}}},
     ),
-    (
-        "03-beta1-0.95",
-        {
-            "seed": 663550682,
-            "optimizer": {"beta1": 0.95},
-        },
-    ),
-    (
-        "04-noise-std-0.01-0.04",
-        {
-            "seed": 10764577,
-            "data": {"noise_augmentation": {"std_range": [0.01, 0.04]}},
-        },
-    ),
+    ("11-weight-decay-0.03", {"optimizer": {"weight_decay": 0.03}}),
+    ("12-warmup-2", {"optimizer": {"warmup_epochs": 2}}),
+    ("13-control-repeat", {}),
 )
 
 
@@ -144,16 +141,23 @@ def prepare_queue(
     config_path: Path,
 ) -> tuple[Path, list[Path], dict[str, list[str]]]:
     base = load_config(config_path).model_dump(mode="json")
-    base["seed"] = 42
     base["validation"] = {"split": "all_5fold_v3", "folds": [0]}
     base["data"]["validation_image_multiplier"] = 1
+    base["trainer"]["max_epochs"] = 10
+    base["trainer"]["patience"] = 10
     configs = []
     overrides = {}
+    seeds = set()
     for name, changes in EXPERIMENTS:
         values = deepcopy(base)
         values["name"] = name
         merge(values, changes)
-        overrides[name] = override_keys(base, changes)
+        seed = secrets.randbits(32)
+        while seed in seeds:
+            seed = secrets.randbits(32)
+        seeds.add(seed)
+        values["seed"] = seed
+        overrides[name] = ["seed", *override_keys(base, changes)]
         config = ExperimentConfig.model_validate(values)
         if not (config.split_dir / "protocol.json").is_file():
             raise FileNotFoundError(f"Missing prepared split: {config.split_dir}")
@@ -171,10 +175,14 @@ def prepare_queue(
         path = queue / "configs" / f"{config.name}.yaml"
         path.write_text(yaml.safe_dump(values, sort_keys=False), encoding="utf-8")
         paths.append(path)
+        print(f"Prepared {config.name}: seed={config.seed}", flush=True)
     return queue, paths, overrides
 
 
-def run_command(command: list[str], log_path: Path) -> int:
+def run_command(command: list[str], log_path: Path, deadline: float) -> int:
+    remaining = deadline - time.monotonic() - 15
+    if remaining <= 0:
+        return 124
     with (
         log_path.open("w", encoding="utf-8") as log,
         subprocess.Popen(
@@ -187,8 +195,8 @@ def run_command(command: list[str], log_path: Path) -> int:
         ) as process,
     ):
         try:
-            return process.wait()
-        except BaseException:
+            return process.wait(timeout=remaining)
+        except BaseException as error:
             try:
                 os.killpg(process.pid, signal.SIGTERM)
             except ProcessLookupError:
@@ -201,6 +209,11 @@ def run_command(command: list[str], log_path: Path) -> int:
                 except ProcessLookupError:
                     pass
                 process.wait()
+            if isinstance(error, subprocess.TimeoutExpired):
+                print(
+                    "Eight-hour queue deadline reached; subprocess stopped.", flush=True
+                )
+                return 124
             raise
 
 
@@ -298,42 +311,48 @@ def write_summary(queue: Path, configs: list[Path]) -> None:
             )
 
 
-def experiment_folds(name: str) -> list[int]:
-    for experiment, changes in EXPERIMENTS:
-        if experiment == name:
-            return changes.get("validation", {}).get("folds", [0])
-    return [0]
-
-
 def print_comparison_commands(
     queue: Path,
     configs: list[Path],
     completed: set[str],
     overrides: dict[str, list[str]],
 ) -> None:
-    control = EXPERIMENTS[0][0]
-    if control not in completed:
-        print(f"Skipping comparison commands: {control} did not complete", flush=True)
-        return
-    control_folds = experiment_folds(control)
-    control_dir = queue / "runs" / control
-    for config in configs:
-        name = config.stem
-        if name == control or name not in completed:
+    for control in ("00-control", "13-control-repeat"):
+        if control not in completed:
+            print(
+                f"Skipping comparisons against {control}: it did not complete",
+                flush=True,
+            )
             continue
-        if experiment_folds(name) != control_folds:
-            continue
-        allowed = ",".join(["name", *overrides[name]])
-        candidate_dir = queue / "runs" / name
-        output_dir = (
-            ROOT / "outputs" / "analysis" / f"{queue.name}-{name}-vs-{control}"
-        )
-        print(
-            "rtk proxy uv run --locked python -m scripts.tools.compare_fold_runs "
-            f"{control_dir} {candidate_dir} --output-dir {output_dir} "
-            f"--allowed-config-differences {allowed}",
-            flush=True,
-        )
+        for config in configs:
+            name = config.stem
+            if name in {control, "00-control"} or name not in completed:
+                continue
+            allowed = ",".join(["name", *overrides[name]])
+            output_dir = ROOT / "outputs/analysis" / f"{queue.name}-{name}-vs-{control}"
+            print(
+                shlex.join(
+                    [
+                        "rtk",
+                        "proxy",
+                        "uv",
+                        "run",
+                        "--locked",
+                        "python",
+                        "-m",
+                        "scripts.tools.compare_fold_runs",
+                        "--reference",
+                        str(queue / "runs" / control),
+                        "--candidate",
+                        str(queue / "runs" / name),
+                        "--output-dir",
+                        str(output_dir),
+                        "--allowed-config-differences",
+                        allowed,
+                    ]
+                ),
+                flush=True,
+            )
 
 
 def run_queue(
@@ -341,6 +360,7 @@ def run_queue(
     configs: list[Path],
     overrides: dict[str, list[str]],
     fingerprint: str,
+    deadline: float,
 ) -> int:
     failed = False
     stopped = False
@@ -361,6 +381,13 @@ def run_queue(
         )
         stream.flush()
         for config in configs:
+            if deadline - time.monotonic() < RUN_ALLOWANCE_SECONDS:
+                print(
+                    "Less than 30 minutes remain; leaving remaining runs unstarted.",
+                    flush=True,
+                )
+                stopped = True
+                break
             if source_fingerprint() != fingerprint:
                 print(
                     "Source under src/, scripts/ or configs/ changed since queue "
@@ -390,6 +417,7 @@ def run_queue(
                     name,
                 ],
                 log_path,
+                deadline,
             )
             wall_seconds = time.perf_counter() - wall_started
             finished = datetime.now(UTC)
@@ -412,7 +440,10 @@ def run_queue(
             else:
                 failed = True
             write_summary(queue, configs)
-    if completed_dirs:
+            if status == 124:
+                stopped = True
+                break
+    if completed_dirs and deadline - time.monotonic() > 15:
         status = run_command(
             [
                 sys.executable,
@@ -424,6 +455,7 @@ def run_queue(
                 str(queue / "validation_metrics.png"),
             ],
             queue / "logs" / "plot.log",
+            deadline,
         )
         if status != 0:
             print(f"Comparison plot failed; see {queue / 'logs/plot.log'}", flush=True)
@@ -443,6 +475,7 @@ def stop_queue(signum: int, frame: object) -> None:
 def main() -> None:
     try:
         args = OvernightCLI()
+        deadline = time.monotonic() + QUEUE_SECONDS
         signal.signal(signal.SIGINT, stop_queue)
         signal.signal(signal.SIGTERM, stop_queue)
         limits_before = resource.getrlimit(resource.RLIMIT_NOFILE)
@@ -469,6 +502,8 @@ def main() -> None:
                     "open_file_limits_before": limits_before,
                     "open_file_limits": limits_after,
                     "source_fingerprint": fingerprint,
+                    "queue_budget_seconds": QUEUE_SECONDS,
+                    "run_start_allowance_seconds": RUN_ALLOWANCE_SECONDS,
                 },
                 indent=2,
             )
@@ -478,7 +513,7 @@ def main() -> None:
         print(
             f"Open-file limit: {limits_after[0]} (was {limits_before[0]})", flush=True
         )
-        status = run_queue(queue, configs, overrides, fingerprint)
+        status = run_queue(queue, configs, overrides, fingerprint, deadline)
     except (
         OSError,
         ValueError,

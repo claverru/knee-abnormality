@@ -1,0 +1,177 @@
+ideas:
+  - id: shared-bce-ranking
+    mechanism_id: shared-pointwise-ranking-hybrid
+    parent_idea_id: null
+    title: Shared balanced BCE plus pairwise logistic ranking
+    opportunity: >-
+      The current objective supervises each observed cell independently while the
+      metric evaluates ordering within each target. A shared ranking term may
+      change useful gradients without giving up soft pointwise supervision.
+    mechanism: >-
+      Add pairwise logistic ranking to the current class-balanced soft BCE.
+      Apply the same pair-eligibility rule, temperature, and mixture coefficient
+      to all labels. Average pairs within each label before combining labels;
+      retain BCE and define the ranking contribution when no pairs exist.
+    precedents:
+      - docs/backlog/small-changes.md#ranking-aware-loss
+      - docs/research/auc_loss_approaches.md
+      - docs/research/per-label-losses.md#ranking-needs-usable-study-pairs
+    novelty: >-
+      Adopts the existing untrained ranking-hybrid proposal into this campaign.
+      The campaign owns its execution; the general backlog remains read-only
+      provenance. Unlike the per-label proposal, one formula and scalar mixture
+      apply to all twelve targets.
+    coverage: >-
+      Keep all observed soft BCE cells. Mask missing targets and self-pairs;
+      record usable positive/negative pairs and zero-pair batches per target.
+    exploitation: >-
+      Emphasize incorrectly ordered training-study pairs while retaining
+      pointwise gradients for rare targets and batches without usable pairs.
+    budget: >-
+      Use current-batch logits and targets only, with no additional model pass,
+      changed batch composition, extra steps, or precomputation. Preserve the
+      fixed recipe, ten epochs, 4380 steps and sealed runtime ceiling.
+    implementation: >-
+      Add the objective under training/losses and connect it through training_step.
+      Put shared settings under trainer.loss. Compute stable float32 softplus
+      pair differences. Record the exact treatment of uncertain soft targets,
+      reduction, zero-pair case, and component scales.
+    open_choices: >-
+      Choose one defensible shared scale and pair rule using training data and
+      existing research. Do not sweep coefficients or choose them per label.
+      If pair coverage is inadequate, record that limitation rather than changing
+      the data loader or silently importing validation predictions.
+    dependencies: []
+    priority_rationale: >-
+      Recommend first: an existing concrete proposal directly tied to ordering,
+      cheap with current logits, and conservative about retaining supervision.
+  - id: shared-balanced-focal
+    mechanism_id: shared-pointwise-focusing
+    parent_idea_id: null
+    title: Shared balanced focal objective with soft targets
+    opportunity: >-
+      A shared focal objective changes how easy and difficult training cells
+      contribute. External MCL results motivate the family but do not establish
+      a macro-AUC gain on this recipe or justify a label-specific choice.
+    mechanism: >-
+      Replace BCE's pointwise term with one soft-target focal formula using a
+      single shared focusing exponent. Retain the baseline class-balancing rule
+      initially, and make the exact positive/negative soft-target extension explicit.
+    precedents:
+      - docs/research/auc_loss_approaches.md
+      - docs/research/per-label-losses.md#trusted-motivation
+      - docs/research/per-label-losses.md#candidate-losses-and-extensions
+    novelty: >-
+      A shared objective experiment, not the excluded per-label focal/ranking
+      selection plan. The current main recipe uses BCE, with no focusing term.
+    coverage: >-
+      Preserve all observed soft targets and class groups with unchanged study
+      exposure. Do not turn uncertain labels into hard targets or drop them.
+    exploitation: >-
+      Reduce the contribution of easy cells under the same rule for every label;
+      inspect whether persistent difficult or noisy cells dominate the gradient.
+    budget: >-
+      Elementwise operations on existing logits only. Keep the model, optimizer,
+      visits, batch size, steps, epochs and fixed runtime ceiling unchanged.
+    implementation: >-
+      Implement a numerically stable float32 focal term using logits and explicit
+      soft positive/negative contributions. Record reduction, class-weight
+      placement, one shared exponent and the resulting loss scale.
+    open_choices: >-
+      Select one shared focusing strength from a reasoned mechanism, not a sweep.
+      Do not assume focusing is robust to label noise or rescale predictions at inference.
+    dependencies: []
+    priority_rationale: >-
+      Recommend second: distinct pointwise mechanism, low compute overhead,
+      and relevant external evidence whose transfer still needs a macro comparison.
+  - id: shared-tempered-balance
+    mechanism_id: shared-class-weight-tempering
+    parent_idea_id: null
+    title: Temper class weights with a shared normalization rule
+    opportunity: >-
+      Full inverse-frequency weighting helped the current model, but its strength
+      and reduction can alter gradient variance and the contribution of rare labels.
+      This does not establish that full weighting is optimal.
+    mechanism: >-
+      Apply one shared tempering exponent to training-fold positive/negative
+      weights and normalize expected weight within each label using the same
+      rule. Keep targets soft and study exposure uniform. Choose one justified
+      shared rule rather than a vector of label-specific coefficients.
+    precedents:
+      - docs/backlog/small-changes.md#bce-weighting-and-study-sampling
+      - docs/research/auc_loss_approaches.md#weighting-and-sampling-design-space
+      - docs/validation/results/2026-09-19-balanced-bce-result.md
+    novelty: >-
+      Imports only the unimplemented loss-weighting proposal, not the study or
+      batch sampling alternatives. Different weights arise from the same formula
+      and training counts, not from per-label objective selection.
+    coverage: >-
+      Preserve masks, all observed targets, positive/negative groups, and every
+      study visit. Do not use majority-cell masking as an implicit sampling change.
+    exploitation: >-
+      Investigate a less extreme allocation of gradients between class groups
+      while retaining explicit balancing motivated by the measured baseline.
+    budget: >-
+      Reuse existing training class counts and current logits. No additional
+      passes, model updates, batch changes, or preprocessing; fixed campaign limits.
+    implementation: >-
+      Keep count provenance intact. Derive candidate weights in the objective
+      helper with one shared exponent and normalization rule. Record effective
+      weights, mean loss scale and component/gradient diagnostics for interpretation.
+    open_choices: >-
+      Use the existing research to choose one tempering and normalization policy.
+      Do not run an exponent grid, infer weights from validation, or claim the
+      bundled normalization and tempering comparison isolates either factor.
+    dependencies: []
+    priority_rationale: >-
+      Recommend third: grounded in a measured strong baseline and inexpensive,
+      but the already successful weighting leaves its incremental benefit uncertain.
+  - id: shared-delayed-ranking
+    mechanism_id: shared-objective-schedule
+    parent_idea_id: null
+    title: Introduce a shared ranking hybrid after BCE feature learning
+    opportunity: >-
+      Useful objective gradients may depend on representation maturity. Ranking
+      from the first update need not behave like introducing it after BCE learning.
+    mechanism: >-
+      Start a fresh run with balanced BCE, then introduce the same BCE-plus-ranking
+      combination for all labels on a shared epoch or step schedule. Fit the whole
+      schedule inside the original ten epochs; do not append a continuation.
+    precedents:
+      - docs/research/per-label-losses.md#candidate-losses-and-extensions
+      - docs/research/auc_loss_approaches.md
+      - autoresearch/campaigns/losses/seed-ideas.yaml
+    novelty: >-
+      Changes when the shared ranking term contributes, not which labels receive
+      it. Distinct from the always-on hybrid and from compositional AUC training
+      with a different optimizer. A trained always-on result informs ranking of
+      this idea but is not required as an accepted parent.
+    coverage: >-
+      Retain BCE and all observed cells throughout. Use the same pair rule and
+      missing/zero-pair handling for every label during the ranking phase.
+    exploitation: >-
+      Establish features with pointwise supervision before allocating some
+      gradient to study ordering, without adding model capacity or inference cost.
+    budget: >-
+      Same fresh initialization policy, ten epochs, 4380 optimizer steps, study
+      visits, optimizer schedule and runtime ceiling. No external checkpoint fit,
+      second training stage, cached-feature extraction or extra updates.
+    implementation: >-
+      Reuse or implement the shared ranking helper and compute the objective mix
+      from the recorded global training step. Keep learning-rate scheduling and
+      sampling epoch behavior unchanged. Record the full loss-weight trajectory.
+    open_choices: >-
+      Choose one shared transition and schedule from a concrete rationale. Reconcile
+      with the always-on hybrid outcome before launch; avoid timing sweeps and
+      preserve any newly accepted incumbent changes unless explicitly replaced.
+    dependencies: []
+    priority_rationale: >-
+      Recommend fourth: a distinct temporal mechanism, most informative after
+      observing the simpler shared hybrid, without extending the training budget.
+exhausted_directions: >-
+  Per-label choices, coefficients, schedules, classifier banks and learned mixtures
+  are explicitly excluded. Keep the original per-label big bet outside this campaign.
+  Study resampling, altered batch composition, dedicated AUC optimizers and cached-head
+  fits violate the fixed surrounding recipe. Shared memory-pool or adaptive-combination
+  proposals need a concrete training-only design and budget argument; do not queue
+  them as placeholders or pad the backlog with coefficient grids.

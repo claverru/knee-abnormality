@@ -3,7 +3,8 @@
 Small code additions an agent can implement in one sitting, each behind one new option on the
 [current recipe](../modeling/current-model.md) (read-only diagnostics need none). The user
 supervises them: implement one only when the user asks. Once it is implemented, queue its run in the
-[overnight queue](overnight.md) (one change against a fresh control, seed 42, fold 0) and
+[overnight queue](overnight.md) (one change against a fresh control, fold 0, one recorded random
+seed per run) and
 remove the entry from this file. Runs follow the
 [controlled-comparison rules](../validation/validation-strategy.md#controlled-comparisons). Each
 entry says whether its motivation is measured or a hypothesis.
@@ -19,32 +20,28 @@ changes realized triplet quality rather than just determinism. The implemented s
 already prefers the newest retake when entitlements tie, but a superseded series still supplies its
 entitlement share of the targets.
 
-## Per-type budget reallocation (rejected)
+## Per-slot budget split between its own series
 
-Budgets A and B, the missing-type fill and the repeated-series share were all measured and none
-survived: reallocation at a fixed total does nothing above the detection floor on frozen
-checkpoints ([test-time allocation](../validation/results/2026-09-17-test-time-allocation.md)),
-the fill scores worse than losing the budget, and the repeated-series share topped the 2026-09-18
-queue and then lost 0.004 publicly
-([overnight](../validation/results/2026-09-18-overnight-results.md)). The study triplet total sits
-unresolved inside the control spread, and `data.study_triplet_total: 26` was adopted anyway on
-2026-09-18 for a structural reason rather than a measured gain: the floor only ever adds triplets,
-so a study is never made worse, and it costs 5.5% compute
-([recipe](../modeling/current-model.md)). `data.repeated_series_share` remains in the code from its
-rejected run.
-
-Left unresolved by the [closed investigation](../history/triplet-budget-allocation.md): whether
-splitting a slot's own budget more evenly between *its own* series helps. That is the part of the
-repeated-series evidence that does not starve other types, so the rejection above does not cover
-it. Untested, no design yet.
+**Hypothesis; untested, no design yet.** Whether splitting a slot's own budget more evenly between
+*its own* series helps. It is the part of the repeated-series evidence that does not starve other
+types, so the reallocation rejection does not cover it. Every other question on this axis is closed
+in the [triplet-budget investigation](../history/triplet-budget-allocation.md), which owns the
+evidence: fixed-total reallocation, the missing-type fill, budgets A/B and the repeated-series
+share were all measured and none survived. `data.repeated_series_share` is still in the code from
+its rejected run and is a removal.
 
 ## Attention pooling
 
-Acquisition-count-normalised attention was implemented, trained and
-[rejected](../validation/results/2026-09-17-count-normalized-attention-result.md): equalising each
-series' attention mass lost 0.0035 [−0.0069, −0.0001] against the same recipe without it, with the
-menisci worst hit, and it was neutral-to-negative at inference. The option was removed from the
-code.
+Two live hypotheses; the rest of this axis is closed. Acquisition-count-normalised attention was
+trained and [rejected](../validation/results/2026-09-17-count-normalized-attention-result.md)
+(−0.0035 [−0.0069, −0.0001], menisci worst hit) and its option is gone from the code. Gated
+attention and the per-target residual readout were measured at +0.0010 and −0.0005 on 2026-09-18,
+at or below the control mean
+([overnight](../validation/results/2026-09-18-overnight-results.md)); they are rejected, and
+`model.gated_attention` and `model.residual_readout` are removals rather than candidates. The
+attention temperature τ 0.75 is adopted at inference and carries the best submission
+([result](../validation/results/2026-09-17-attention-temperature.md),
+[state](../ongoing/state.md)).
 
 - **Several attention heads per label** (hypothesis, no design yet). Listed during the
   [crop-selection investigation](../history/crop-selection-investigation.md#options-not-pursued).
@@ -55,27 +52,9 @@ code.
   from the [compartment-transfer investigation](big-bets.md#medial-and-lateral-disease-transfer).
   A cheap architecture ablation, with weaker project evidence than head-LR or supervision
   comparisons. Implement only when requested, behind one option, against the linear-head control.
-- **Attention temperature is adopted at inference.** τ 0.75 gains +0.0024 [+0.0012, +0.0037] on
-  fold 0 and carried the best submission, 0.939 public with ×4 images
-  ([result](../validation/results/2026-09-17-attention-temperature.md),
-  [submissions](../inference/submissions/2026-09-18-temperature-and-count-submissions.md)). It is
-  an inference-time override through prediction, export and the bundle; whether training should
-  use it is untested, and a shared temperature can be absorbed into the scorer's last layer.
-- **Gated attention and the per-target residual readout are rejected.** Both are implemented
-  behind `model.gated_attention` and `model.residual_readout`, off by default, and both landed at
-  or below the control mean on 2026-09-18 (+0.0010 and −0.0005)
-  ([overnight](../validation/results/2026-09-18-overnight-results.md)).
-
-## Gradient-norm logging
-
-**Implemented (2026-09-16), shipped with the weight-averaging change.** `KneeModule` logs the
-pre-clip total gradient norm as the `grad_norm` step metric (diagnostic; no option, always on) from
-`on_before_optimizer_step`, where Lightning 2.x still sees unclipped gradients
-(`torch.nn.utils.get_total_norm` over `self.model.parameters()`, which only reads `.grad`; it draws
-no randomness and does not clip, so numerics are unchanged — verified bit-identical against the
-pre-change code with the gate off). Nobody yet knows whether `trainer.gradient_clip_val: 1.0` ever
-binds; that reading comes from the first run that logs it. It unblocks the
-[clipping candidates](overnight.md#candidates-for-later-queues).
+- **Training with the attention temperature** (hypothesis; untested). τ 0.75 is an inference-time
+  override through prediction, export and the bundle; whether training should use it has never been
+  tested, and a shared temperature can be absorbed into the scorer's last layer.
 
 ## 3D embedding: training-time effect
 
@@ -117,7 +96,7 @@ explanation is a lucky run; a training-time effect is possible but unproven.
   - *Definition:* positives are target values `>= 0.5` and negatives `< 0.5` for counting;
     retained cells keep their original soft values. Keep all minority cells and sample the same
     number of majority cells across the full training fold, with reproducible masks refreshed
-    each epoch using seed 42 and the epoch. Mask individual study–target cells, preserving
+    each epoch from the run's own recorded seed and the epoch. Mask individual study–target cells, preserving
     supervision for other labels on the same study.
   - *Run:* keep study membership, image workload, model and training budget fixed, and leave
     validation targets and masks unchanged. Compare with full supervision, recording retained
@@ -184,89 +163,6 @@ rule](../metadata/series-filtering-census.md#proposed-rule-series-filtering-and-
 it needs one extra header per series and three decoded slices at Kaggle inference, and it changes
 the preprocessing identity. Plane relabelling (one swapped study) stays out: it cost −0.21 ×1000
 on all three control checkpoints.
-
-## Per-plane width ratios
-
-The relative rule gives every plane the same fraction of its own reach, so realized widths are axial
-45.1, coronal 35.8 and sagittal 39.0 mm. The
-[acquisition geometry](../ongoing/peripheral-coverage.md#acquisition-geometry) wants a different
-shape: usable half-reach is axial 61.5, coronal 45.6 and sagittal 51.0 mm, a ratio of
-1.35 : 1.00 : 1.12, because coronal is capped by its posterior side at 45.6 mm while axial spans
-123.3 mm.
-
-- **Not answered by the settled sweep.** That sweep multiplied all three planes by one factor, so it
-  measures scale, not ratios. If axial wants more and coronal less, a common factor cancels them —
-  which is what the flat result looks like.
-- **Change:** a per-plane multiplier on the computed width, so one plane can move while the others
-  keep theirs.
-- **Arms:** axial widened alone, then coronal narrowed alone, against one control. The
-  [cache measurement](../validation/results/2026-09-18-per-plane-sigma-cache.md) puts coronal-alone
-  at +0.00135 and axial-alone inside noise at every width, inference-only; the
-  [decomposition](../validation/results/2026-09-19-relative-sampler-width-result.md#training-versus-drawing)
-  showed the training side is where the effect lives, so the cache cannot stand in for the run.
-- **Bar to clear:** 0.008 on a single fold-0 run
-  ([what a comparison can resolve](../validation/validation-strategy.md#what-a-comparison-can-resolve)).
-
-## Asymmetric coronal draw
-
-Coronal is the only asymmetric plane: 59.0 ± 7.9 mm anterior against 45.6 ± 10.4 posterior, with the
-stack midpoint 6.7 mm anterior of the fitted centre, and **32.2% of studies reach less than 40 mm
-posteriorly against 0.9% anteriorly**
-([extents](../data-preparation/accurate-sampling-centers.md#cohort-wide-center-fit-and-plane-extents)).
-A symmetric Gaussian on the study centre therefore spends probability mass anteriorly, where slices
-are plentiful, and truncates posteriorly, where Baker's cyst keeps 80% of its coronal evidence
-beyond ±20 mm and the posterior horns sit.
-
-- **Change:** a per-side width for the coronal draw, each side a fraction of that side's own reach,
-  replacing one symmetric truncated normal.
-- **What it is not:** a centre offset. Those were rejected on the importance map, whose total-utility
-  centroid is already centred and flat within ±30 mm. This keeps the centre and changes the shape.
-- **Limit to state up front:** no draw reaches past 45.6 mm posteriorly, because the slices were
-  never acquired. The gain available is redistribution within the acquired extent, not more reach.
-- **Bar to clear:** 0.008 on a single fold-0 run.
-
-## Per-plane sampler sigma (superseded)
-
-Superseded by the implemented relative-width rule: `data.sampling_sigma_fraction` (0.76) times
-each candidate pool's own `limiting_reach` (`sampling.py`), replacing the old fixed
-`data.sampling_sigma_mm`. Per-plane constants fall out of this automatically, since each
-`SeriesTypeConfig` slot already gets its own pool and therefore its own realized width, without a
-new `sigma_mm` field on `SeriesTypeConfig`. Measured per-plane mean realized sigma at 0.76 on the
-fold-0 token cache (4,218 physical pools): axial 39.5 mm, coronal 31.4 mm, sagittal 34.2 mm —
-coronal lands inside the narrow band this entry's cache measurement scored as a gain
-([2026-09-18 per-plane sigma](../validation/results/2026-09-18-per-plane-sigma-cache.md)), while
-axial stays close to its old fixed 40 mm (matching that measurement's finding that axial width is
-inert) and sagittal sits between the old 40 and the non-durable 25 mm arm. That measurement was
-inference-only; see [overnight.md](overnight.md#candidates-for-later-queues) for the queued
-training-time run against a fresh control.
-
-## Per-type sampler centre offset (rejected)
-
-Triplet depths are drawn from a truncated normal centred on the study centre along each plane's
-through-plane axis (`target_depths` in `src/knee_abnormality/data/preprocessing/sampling.py`, width
-`data.sampling_sigma_fraction` times the pool's own reach). The proposal was a `centre_offset_mm`
-field on `SeriesTypeConfig`,
-shifting that mean per type, motivated by the labels whose evidence sits beyond the sampler's reach
-([peripheral coverage](../ongoing/peripheral-coverage.md)).
-
-The [spatial importance map](../ongoing/peripheral-coverage.md#spatial-importance-map) rejects it
-without a run. One sampler serves all 12 targets, so the quantity it should place is total utility
-summed over targets, and that is already centred: the utility-weighted centroid is **+1.4 mm**
-superior on the axial through-plane axis, **-3.3 mm** on the coronal and **-0.9 mm** on the
-sagittal, against a 9 mm grid. Marginal total utility is flat within +/-30 mm of centre on all
-three axes and only falls outside it.
-
-Per-label pulls cannot overturn that, because the cross-target contrast is zero-sum by
-construction: standardizing each voxel across the 12 targets forces the mean pull on every axis to
-0.000, so effusion's superior preference (+1.23) is cancelled by the tibiofemoral OA pair's
-inferior one (-1.07, -1.05), and PF OA and synovitis anterior (+1.85, +1.13) by Baker's and MCL
-posterior (-1.23, -1.32). A shared sampler has no gradient to follow.
-
-**What this does not settle:** the map is observational, measured under the current sampler, so
-low-exposure regions carry few ablated windows and their utility is confounded with how often the
-sampler visits them. It shows no gradient toward moving the centre; it cannot show what a region
-the sampler rarely reaches would be worth if it were reached. Per-label sampling, as opposed to a
-per-type offset on one shared draw, is a different and much larger change that this does not cover.
 
 ## Per-plane spacing
 

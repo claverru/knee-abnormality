@@ -12,6 +12,7 @@ scripts:
     inputs: [Experiment YAML, Raw training DICOMs and metadata, Pinned public labels, Saved fold protocol]
     outputs: [Run directory with effective config, provenance, checkpoints, logs, epoch metrics, validation predictions, and enabled class-balance statistics]
     notes:
+      - Autoresearch supplies KNEE_AUTORESEARCH_LIMITS to enable trusted valid-triplet accounting and fixed-budget enforcement; ordinary training does not enable this callback.
       - just train uses configs/training.yaml, the 00-baseline recipe - ReXNet-200 on every 224 px triplet at 0.625 mm, reflection, sigma 40, four additive embeddings (1D position, 2D anchor, plane, contrast) and one attention softmax per label over all visually valid spatial tokens - on fold 0. Resume requires a new run ID and the saved configuration.
       - Creates a fresh timestamped run unless --run-id is supplied; existing run directories are never overwritten.
       - Records the preprocessing source identity and selected backbone spatial mapping in checkpoints and run/input provenance; prediction, validation, resume and export reject missing or mismatched identities. Historical checkpoints, including token-graph and crop-selection runs, require archived code or bundles.
@@ -125,4 +126,4 @@ scripts:
       - Records each remote response before advancing; notebook failure or invalid submission.csv prevents competition submission.
       - Records timestamped stage transitions in history and prints them for detached runner logs; queue and scoring intervals include polling delay.
       - Downloads and validates the saved notebook output before submitting that exact notebook version, then records available status and scores.
-    docs: [docs/inference/kaggle-submission-workflow.md#control-the-workflow-from-the-local-cli, docs/inference/submissions/INDEX.md#naming]
+    docs: [docs/inference/kaggle-submission-workflow.md#control-the-workflow-from-the-local-cli, docs/inference/submissions/ledger.md#naming]

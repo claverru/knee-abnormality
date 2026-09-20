@@ -18,6 +18,7 @@ from pydantic_settings import CliPositionalArg, SettingsError
 from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
 from pytorch_lightning.loggers import CSVLogger
 
+from knee_abnormality.autoresearch.accounting import TripletAccounting
 from knee_abnormality.cli import CLISettings
 from knee_abnormality.config import ExperimentConfig, Fold, load_config
 from knee_abnormality.data.labels import STUDY
@@ -111,7 +112,7 @@ def _state_sha256(state: dict[str, torch.Tensor]) -> str:
 
 
 def _check_resume(
-    path: Path,
+    checkpoint: dict,
     config: ExperimentConfig,
     fold: int,
     targets: tuple[str, ...],
@@ -120,7 +121,7 @@ def _check_resume(
     class_balance: dict | None,
 ) -> None:
     validate_resume_checkpoint(
-        read_checkpoint(path),
+        checkpoint,
         config,
         targets,
         fold,
@@ -135,6 +136,7 @@ def run_fold(
     fold: int,
     fold_dir: Path,
     resume: Path | None,
+    resume_checkpoint: dict | None,
     limit_train: int | None,
 ) -> None:
     L.seed_everything(config.seed, workers=True)
@@ -155,9 +157,9 @@ def run_fold(
     (fold_dir / "label_provenance.json").write_text(
         json.dumps(labels.provenance, indent=2) + "\n"
     )
-    if resume is not None:
+    if resume_checkpoint is not None:
         _check_resume(
-            resume,
+            resume_checkpoint,
             config,
             fold,
             labels.targets,
@@ -244,6 +246,11 @@ def run_fold(
         gradient_clip_val=config.trainer.gradient_clip_val,
         deterministic=config.trainer.deterministic,
         callbacks=[
+            *(
+                [TripletAccounting(fold_dir / "triplet_accounting.json")]
+                if os.environ.get("KNEE_AUTORESEARCH_LIMITS")
+                else []
+            ),
             CheckpointRelocation(fold_dir),
             early_stopping,
             checkpoint,
@@ -317,6 +324,13 @@ def main() -> None:
         torch.set_float32_matmul_precision("high")
         if args.resume is not None and len(config.validation.folds) != 1:
             raise ValueError("--resume requires exactly one selected fold")
+        resume_checkpoint = (
+            read_checkpoint(args.resume) if args.resume is not None else None
+        )
+        if resume_checkpoint is not None:
+            config = config.model_copy(
+                update={"seed": resume_checkpoint["hyper_parameters"]["config"]["seed"]}
+            )
         run_id = (
             args.run_id
             or f"{datetime.now(UTC).strftime('%Y%m%d-%H%M%S')}-{config.name}"
@@ -340,7 +354,14 @@ def main() -> None:
         for fold in config.validation.folds:
             fold_dir = run_dir / f"fold_{fold}"
             fold_dir.mkdir()
-            run_fold(config, fold, fold_dir, args.resume, args.limit_train)
+            run_fold(
+                config,
+                fold,
+                fold_dir,
+                args.resume,
+                resume_checkpoint,
+                args.limit_train,
+            )
         predictions = pl.concat(
             [
                 pl.read_csv(run_dir / f"fold_{fold}" / "validation_predictions.csv")

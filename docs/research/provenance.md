@@ -57,3 +57,20 @@ a Polars audit of five official competition CSVs downloaded on 2026-09-09.
 [Competition metadata](../metadata/INDEX.md) records file fingerprints, reproduction
 instructions, and limits; pixel and experiment claims were not verified by
 that audit.
+
+## How to use these notes
+
+Use unverified working notes to propose experiments. Their settings are candidates to reproduce
+and improve; results can change with the backbone, labels, sampling or implementation.
+
+Start from the [current model](../modeling/current-model.md), the
+[validation strategy](../validation/validation-strategy.md) and the fixed
+[validation protocol](../validation/project-validation-protocol.md). Use the
+[preprocessing notes](../data-preparation/unverified-preprocessing-notes.md) and
+[modeling evidence](../modeling/INDEX.md) to identify comparisons, recording throughput and
+inference cost alongside validation results. The [endgame backlog](../backlog/endgame.md)
+records work still deferred to the final phase.
+
+Retain useful negative results to avoid repeating unsuccessful experiments without a reason to
+expect a different outcome. Record validated findings in their canonical topic documents and
+keep them distinct from unverified working notes.

@@ -5,22 +5,27 @@ description: Find, create, update, organize, and index scripts in this competiti
 
 # Scripts Maintainer
 
-Read [scripts/INDEX.md](../../../scripts/INDEX.md) from the repository root for
-discovery commands, catalog fields, role routing, and growth conventions. The
-Markdown link is relative to this skill; command paths are repository-relative.
+Use [scripts/INDEX.md](../../../scripts/INDEX.md) when the destination is unclear.
+The script catalog guide has sections for [discovery commands](../../../docs/architecture/script-catalog.md#find-a-script),
+[role routing](../../../docs/architecture/script-catalog.md#choose-a-location),
+[catalog fields](../../../docs/architecture/script-catalog.md#catalog-format) and
+[maintenance](../../../docs/architecture/script-catalog.md#maintenance-and-growth).
+Read only the relevant section. Markdown links are relative to this skill;
+command paths are repository-relative.
 Apply the repository's `AGENTS.md` instructions throughout.
 
 ## Find and reuse
 
-Start with a focused catalog search for the operation and its inputs or
-outputs. Prefer `--role tools --status active` for reusable commands; include
+Open an explicitly named script directly and look up its catalog entry as needed.
+For a specific symbol or filename, use targeted `rg` or `rg --files`.
+For an operation, search the catalog by its inputs or outputs.
+Prefer `--role tools --status active` for reusable commands; include
 `adhoc` when looking for previous investigations or evidence. Read short search
 results, then `show --id` for the strongest candidates. Open only the relevant
 source and linked procedure before deciding whether it fits.
 
 An empty search is not proof that code is absent. Try synonyms or fewer terms,
-then use targeted `rg --files` and `rg -n` in the likely topic or role. For an
-explicitly named path, inspect it directly and look up its entry as needed.
+then use targeted `rg --files` and `rg -n` in the likely topic or role.
 Do not read every catalog or Python file into context for an ordinary lookup.
 If an existing script fits, reuse it; extend a close match when that preserves
 its purpose and existing callers. Report the path, appropriate invocation, and
@@ -28,8 +33,8 @@ relevant assumptions. Finding a command does not require executing it.
 
 ## Create or change
 
-Search before introducing a new entry point. Use the role routing in the
-index: pipeline for the maintained prepare/train/predict workflow, tools for
+Search before introducing a new entry point. Use the guide's role routing:
+pipeline for the maintained prepare/train/predict workflow, tools for
 repeated supporting operations, adhoc for focused investigations. Keep shared
 logic in the location defined by the project architecture when several callers
 need it. Give scripts descriptive
@@ -48,6 +53,8 @@ Record a concise purpose, useful search tags, realistic commands, inputs,
 outputs, and assumptions that affect execution or reuse. Link canonical
 procedures and findings rather than copying them into the catalog. When the
 interface changes, update commands and affected callers too.
+Update `INDEX.md` only when its destinations or descriptions need to change;
+ordinary script changes belong in the owning catalog and procedure.
 
 ## Move, promote, or retire
 

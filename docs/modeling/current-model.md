@@ -18,16 +18,19 @@ retired variants. [Model shapes](model-shapes.md) traces the tensors, and
 
 ## Recipe
 
-`configs/training.yaml` equals `00-baseline`'s saved `effective_config.json` except for its name,
-its paths and the fields that have since become code constants or were removed with the token
-graph (`model.graph_layers`, `model.graph_geometry_dropout`). The settings that define the model
-are:
+`configs/training.yaml` retains the full-slice architecture of `00-baseline`, with
+later recipe changes including class-balanced BCE, relative Gaussian width, the
+study-total floor. The sampler uses independent per-epoch draws within probability
+bands; the experimental ten-epoch schedule was reverted. Historical
+`00-baseline` results below describe its archived recipe. Current settings include:
 
 | Setting | Value |
 |---|---|
 | Inputs | Three adjacent slices per input (`SLICES_PER_INPUT`, a constant) |
 | `data.image_size`, `data.spacing_mm` | 224, 0.625 (140 mm) |
-| `data.sampling_sigma_fraction`, `data.validation_image_multiplier` | 0.76, 1 (×2 before 2026-09-17; scores differ by about 0.0035, and submissions set their own count) |
+| `data.sampling_sigma_fraction`, `data.validation_image_multiplier` | 0.867, 1 (×2 before 2026-09-17; scores differ by about 0.0035, and submissions set their own count) |
+| Training targets | One independent random draw per probability band at each epoch; [implemented sampler](../data-preparation/physical-sampling/implemented-sampler.md) |
+| `trainer.class_balanced_bce` | `true` |
 | `data.study_triplet_total` | 26: a study whose per-type budgets sum below 26 training triplets is scaled up to it, proportionally over the types it has |
 | `data.reflection_augmentation.probability` | 0.5 |
 | `model.backbone` | `rexnet_200.nav_in1k`, pretrained |

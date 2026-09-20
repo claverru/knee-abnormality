@@ -29,4 +29,4 @@ What the investigation produced instead is the attention temperature, now the be
 Two questions outlived it and are tracked elsewhere: where the evaluation count turns over above
 ×4 and what it costs in runtime ([next](../ongoing/next.md)), and whether splitting a slot's own
 budget more evenly between its own series helps
-([small changes](../backlog/small-changes.md#per-type-budget-reallocation-rejected)).
+([small changes](../backlog/small-changes.md#per-slot-budget-split-between-its-own-series)).

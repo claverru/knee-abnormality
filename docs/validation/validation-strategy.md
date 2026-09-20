@@ -27,7 +27,9 @@ rerun the baseline on this split before comparing new experiments.
 ## Controlled comparisons
 
 Change one factor against a matched control, and predefine the principal comparison and
-checkpoint rule; never search seeds for an apparent improvement. Preserve seed 42, model
+checkpoint rule; never search seeds for an apparent improvement. **Every run draws its own
+recorded random seed, the control included**, so no comparison is made at a matched seed and a
+single-run difference is read against the run-to-run spread below. Preserve model
 size, training budget, image dimensions, physical crop, slice budget and the configured
 validation density (×1 since 2026-09-17) unless one of them is the factor. Training targets stay soft unless supervision
 is the factor; validation memberships and

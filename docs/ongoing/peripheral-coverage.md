@@ -5,14 +5,17 @@ Where each label's evidence sits relative to the sampler's reach, complementing 
 
 Triplets are placed along each plane's axis by a truncated Gaussian; at the time of this analysis
 the width was a fixed `data.sampling_sigma_mm: 40`, so coverage fell with distance from the study
-centre. The sampler has since moved to `data.sampling_sigma_fraction` (0.76), a per-pool width
-relative to each pool's own acquired reach (see the [implemented
+centre. The sampler has since moved to `data.sampling_sigma_fraction`, a per-pool width relative
+to each pool's own acquired reach (see the [implemented
 sampler](../data-preparation/physical-sampling/implemented-sampler.md)); the measurements below are
-against the retired fixed-40 sampler and are not automatically valid at the new per-plane widths
-(measured means axial 39.5, coronal 31.4, sagittal 34.2 mm), though axial and sagittal land close
-to 40 and coronal narrows toward the width
-[per-plane sampler sigma](../validation/results/2026-09-18-per-plane-sigma-cache.md) already scored
-as a gain. Several labels keep most of their evidence out there. Measured read-only
+against the retired fixed-40 sampler and are not automatically valid at the current per-plane
+widths. The fraction was 0.76 when this analysis was written and is **0.867 since 2026-09-19**,
+for realized means of axial 45.1, coronal 35.9 and sagittal 39.0 mm
+([result](../validation/results/2026-09-19-relative-sampler-width-result.md)). Axial now sits above
+the old fixed 40 and sagittal close to it, while coronal at 35.9 sits just outside the 12–35 mm
+plateau that [per-plane sampler sigma](../validation/results/2026-09-18-per-plane-sigma-cache.md)
+scored as a gain on the cache — at 0.76 its 31.4 mm was inside it. Several labels keep most of
+their evidence out there. Measured read-only
 from the fold-0 token cache and the depth profiles; scripts and tables in
 `outputs/analysis/peripheral-coverage-20260918/`.
 
@@ -101,9 +104,17 @@ Support averages 135 studies per voxel but ranges 25-761, highest at the centre.
   sparsest labels and should not be read; and the profiles' synovitis peak at 40-50 mm superior
   does not reproduce as a superior contrast here (+0.16), which is unresolved.
 
-Measured 2026-09-18. Per-type centre offsets are
-[rejected](../backlog/small-changes.md#per-type-sampler-centre-offset-rejected) on the map above,
-with no GPU spent. Per-plane sigma was then scored directly on the fold-0 token cache, also with no
+Measured 2026-09-18. **Per-type centre offsets are rejected on the map above, with no GPU spent.**
+The proposal was a `centre_offset_mm` field on `SeriesTypeConfig`, shifting the mean of the
+truncated normal per type (`target_depths` in
+`src/knee_abnormality/data/preprocessing/sampling.py`). One sampler serves all 12 targets, so the
+quantity it should place is total utility summed over targets, and that is already centred: the
+utility-weighted centroid is +1.4 mm superior on the axial through-plane axis, −3.3 mm coronal and
+−0.9 mm sagittal against a 9 mm grid, and marginal total utility is flat within ±30 mm on all three
+axes. Per-label pulls cannot overturn it, because the cross-target contrast is zero-sum by
+construction. What this does *not* settle: the map is observational, so it cannot show what a
+region the sampler rarely reaches would be worth if it were reached, and per-label sampling — as
+opposed to a per-type offset on one shared draw — is a different and much larger change. Per-plane sigma was then scored directly on the fold-0 token cache, also with no
 GPU: coronal 30 mm is worth +0.00135 macro AUC at the ×1 count, confirmed on both halves and
 keeping its sign to ×4, while axial sigma does nothing at matched prediction movement and a
 sagittal gain does not survive higher counts
@@ -154,25 +165,39 @@ from 0.60 to 1.10 then came out non-monotone with the control at the bottom, spa
 is seed noise ([sweep](../validation/results/2026-09-19-fold-ensembles-and-sigma-sweep.md)).
 Per-type centre offsets were rejected earlier on the importance map.
 
-**Not settled, and not addressed by any of that.** The sweep multiplies all three planes by one
-factor, so it measures scale and says nothing about *shape*. Everything below changes the ratios or
-the symmetry and remains untested:
+**Shape was tried once, and neither arm resolved.** The sweep multiplies all three planes by one
+factor, so it measures scale and says nothing about *shape*. Both shape proposals were trained by
+the stopped autoresearch campaign on 2026-09-19 — fold 0, validation ×1, ten epochs, 2,000-draw
+paired bootstrap — and both came back inconclusive against the historical control at 0.894037:
 
-- **Per-plane widths.** The geometry wants axial wider and coronal narrower — usable half-reach is
-  axial 61.5, coronal 45.6, sagittal 51.0 mm, a ratio of 1.35 : 1.00 : 1.12, against the relative
-  rule's realized 45.1 / 35.8 / 39.0. A common-factor sweep cannot see this: if one plane wants more
-  and another less, scaling both together cancels. Queued as a
-  [small change](../backlog/small-changes.md#per-plane-width-ratios).
-- **An asymmetric draw on the coronal axis.** Coronal is the only asymmetric plane, reaching
-  59.0 mm anterior against 45.6 posterior, so a symmetric Gaussian centred on the study centre
-  spends mass anteriorly where slices are plentiful and truncates posteriorly where Baker's cyst and
-  the posterior horns live. A per-side width would match the acquisition. Queued as a
-  [small change](../backlog/small-changes.md#asymmetric-coronal-draw).
+| Arm | Campaign idea | Macro AUC | Delta (95% paired) |
+|---|---|---:|---|
+| Per-plane widths | `geometry-informed-plane-widths` | 0.894390 | +0.00041 [−0.0033, +0.0041] |
+| Asymmetric coronal draw | `coronal-side-relative-draw` | 0.892728 | −0.00130 [−0.0051, +0.0023] |
+
+These were the two entries this document used to queue as small changes; the campaign took
+ownership of them and the general backlog no longer carries them. Neither result establishes harm,
+and neither clears the run-to-run floor, so the geometry argument below still stands unanswered —
+but **a rerun of the same mechanism is a repeat, not a new experiment**. The campaign owns the
+implementations, decisions and limits
+([prior work](../../autoresearch/campaigns/triplet-sampling/prior-work.md)); it also supersedes
+this document's old 0.008 single-run bar with its paired bootstrap, so the two decision rules
+should not be mixed.
+
+The geometry they were testing, unchanged: usable half-reach is axial 61.5, coronal 45.6, sagittal
+51.0 mm, a ratio of 1.35 : 1.00 : 1.12, against the relative rule's realized 45.1 / 35.9 / 39.0;
+and coronal is the only asymmetric plane, reaching 59.0 mm anterior against 45.6 posterior, so a
+symmetric Gaussian centred on the study centre spends mass anteriorly where slices are plentiful
+and truncates posteriorly where Baker's cyst and the posterior horns live. A common-factor sweep
+cannot see either: if one plane wants more and another less, scaling both together cancels.
+
+**Still open, and the only item here that is not tried:**
+
 - **Re-exporting the slice-importance map with left knees mirrored**, a user action outside this
   repository, which gates
   [side-conditioned sagittal sampling](../backlog/big-bets.md#position-and-knee-side) and is listed
   in [next](next.md).
 
-The [acquisition geometry](#acquisition-geometry) above is the input to all three, and is preserved
-independently in
+The [acquisition geometry](#acquisition-geometry) above is the input to all of these, and is
+preserved independently in
 [accurate sampling centers](../data-preparation/accurate-sampling-centers.md#cohort-wide-center-fit-and-plane-extents).

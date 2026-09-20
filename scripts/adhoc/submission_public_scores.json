@@ -1,7 +1,7 @@
 {
   "version": 1,
   "recorded": "2026-09-18",
-  "ledger": "docs/inference/submissions/INDEX.md",
+  "ledger": "docs/inference/submissions/ledger.md",
   "comparable_cohort": {
     "split": "all_5fold_v3",
     "labels": "steven_v4",

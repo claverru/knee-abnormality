@@ -8,6 +8,13 @@ of the ~0.003 noise floor. Close that gap and the cheap backbone becomes usable;
 leaderboard combines score and execution time
 ([requirements](../inference/submission-requirements-and-output-contract.md)).
 
+**Every number on this page predates class-balanced BCE.** The b0/ReXNet comparison and both
+hyperparameter queues ran on 2026-09-18 under ordinary BCE; the loss adopted on 2026-09-19 moves
+fold 0 by about 0.008, more than twice the gap this line is trying to close
+([state](state.md)). The same rule the overnight queue applies to its own history applies here:
+none of these deltas is a prior for a run on the current recipe, and the −0.0032 gap has to be
+re-measured before the efficiency case can be priced.
+
 Measured evidence lives in two records, not here:
 
 - [EfficientNet backbone results](../validation/results/2026-09-18-efficientnet-backbone-results.md)

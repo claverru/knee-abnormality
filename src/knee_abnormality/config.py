@@ -1,5 +1,6 @@
 import json
 import math
+import secrets
 import sys
 from pathlib import Path
 from typing import Annotated, Literal
@@ -248,7 +249,7 @@ class ValidationConfig(ConfigModel):
 
 class ExperimentConfig(ConfigModel):
     name: Identifier
-    seed: Annotated[StrictInt, Field(ge=0, lt=2**32)]
+    seed: Annotated[StrictInt, Field(ge=0, lt=2**32)] | None = None
     paths: PathsConfig
     labels: LabelsConfig
     validation: ValidationConfig
@@ -316,6 +317,8 @@ def load_config(
         if folds is not None:
             effective["validation"]["folds"] = folds
         config = ExperimentConfig.model_validate(effective)
+    if config.seed is None:
+        config = config.model_copy(update={"seed": secrets.randbits(32)})
     return config
 
 

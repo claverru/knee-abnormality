@@ -108,6 +108,9 @@ Baker's is worth watching if the width moves again: it keeps 80% of its coronal 
 
 ## Follow-ups
 
-The training side carrying the effect is what makes the remaining arms worth a GPU night rather
-than a cache query: [fraction 0.76](../../backlog/overnight.md#candidates-for-later-queues) and
-[splitting the widening from the narrowing](../../backlog/small-changes.md#per-plane-width-ratios).
+The training side carrying the effect is what made the remaining arms worth a GPU night rather
+than a cache query. Both are now closed: the fraction sweep settled the scale
+([sweep](2026-09-19-fold-ensembles-and-sigma-sweep.md)), and splitting the widening from the
+narrowing was trained once by the autoresearch campaign as `geometry-informed-plane-widths`,
+inconclusive at +0.00041
+([what is settled](../../ongoing/peripheral-coverage.md#what-is-settled-and-what-is-not)).

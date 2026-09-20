@@ -90,7 +90,7 @@ def spearman(values: np.ndarray) -> np.ndarray:
     order = values.argsort()
     ranks = np.empty(len(values))
     ranks[order] = np.arange(len(values), dtype=float)
-    unique, inverse = np.unique(values, return_inverse=True)
+    _, inverse = np.unique(values, return_inverse=True)
     return np.array([ranks[inverse == index].mean() for index in inverse])
 
 

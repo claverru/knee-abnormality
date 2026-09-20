@@ -1,0 +1,40 @@
+id: triplet-sampling
+status: ready-to-seal
+recipe: configs/training.yaml
+reference_run: outputs/training/overnight-20260919T120130Z-i2oqlnls/runs/00-control
+additional_evidence_runs:
+  - outputs/training/balanced-bce
+  - outputs/training/overnight-20260919T235434Z-8ol_1c30/runs/00-control
+  - outputs/training/overnight-20260919T235434Z-8ol_1c30/runs/13-control-repeat
+backlog:
+  refill_below: 4
+  refill_to: 5
+artifacts_root: outputs/autoresearch/triplet-sampling
+policy:
+  editable_files:
+    - configs/training.yaml
+    - src/knee_abnormality/config.py
+    - src/knee_abnormality/data/dataset.py
+    - src/knee_abnormality/data/preprocessing/sampling.py
+  editable_directories:
+    - src/knee_abnormality/data/triplet_sampling
+  config_keys:
+    - data.sampling_sigma_fraction
+    - data.study_triplet_total
+    - data.repeated_series_share
+  config_prefixes:
+    - data.triplet_sampling
+  list_item_fields:
+    data.series_types: [max_images]
+  input_identity_keys: [preprocessing_identity]
+  require_source_change: true
+  developer_instructions: >-
+    Implement the sampling mechanism and update configs/training.yaml only if
+    needed. New sampler settings belong under data.triplet_sampling. Return
+    prepared or blocked. Do not produce external precomputation artifacts; all
+    policy setup must execute inside the measured training process. Change only
+    the declared editable files and helpers. Do not touch callback/accounting or
+    other code. Use the existing Python environment for static checks. No tests.
+  researcher_instructions: >-
+    Return distinct creative sampling mechanisms, not hyperparameter sweeps.
+    Keep coverage and exploitation explicit and respect the fixed triplet budget.

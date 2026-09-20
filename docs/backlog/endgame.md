@@ -9,15 +9,16 @@ hypothesis.
 
 ## Ensembling
 
-**One round executed 2026-09-19, and it is now the best submission.** Five folds of each backbone
-were trained, the OOF ensemble gained **+0.0061** over ReXNet alone and was positive on all twelve
-labels, and the ten-member bundle scored **0.943 public** against 0.934–0.936 for its single members
-([folds and ensembles](../validation/results/2026-09-19-fold-ensembles-and-sigma-sweep.md),
-[submissions](../inference/submissions/2026-09-19-ensemble-submissions.md)). What remains is a
-**second round on the current recipe** — every member above trains with ordinary BCE, which
-class-balanced BCE beats by 0.0116 — plus seed ensembles and diverse runs, still untried. Train the
-remaining folds under the
-[validation strategy](../validation/validation-strategy.md), then combine models under the
+**Round one is executed and is no longer backlog:** ten members, +0.0061 OOF over ReXNet alone,
+**0.943 public**, recorded in the
+[fold and ensemble results](../validation/results/2026-09-19-fold-ensembles-and-sigma-sweep.md),
+the [submissions](../inference/submissions/2026-09-19-ensemble-submissions.md) and the
+[project state](../ongoing/state.md).
+
+**What remains here is a second round on the current recipe.** Every member of round one trains
+with ordinary BCE, which class-balanced BCE beats by 0.0116, so the whole bundle is built on the
+superseded loss; seed ensembles and diverse runs are still untried. Train the remaining folds under
+the [validation strategy](../validation/validation-strategy.md), then combine models under the
 [ensemble interpretation](../validation/ensemble-interpretation.md) rules.
 
 - *Bundling mechanism (implemented 2026-09-19):* `export.py` and `predict.py` now support a
@@ -104,38 +105,13 @@ total inference cost.
   `b0-fold0` over fold 0's 904 validation studies. Evaluating whether to turn it on for
   submissions still waits for the final phase.
 
-**More evaluation triplets: measured publicly, adopted.** With the attention temperature at 0.75,
-`ranked-filtered-seed42` scored 0.938 at ×3 and 0.939 at ×4, against 0.933 at ×2
-([submissions](../inference/submissions/2026-09-18-temperature-and-count-submissions.md)). Fold 0
-had predicted the temperature and ×3 together at +0.0046 against +0.005 measured.
-
-| Evaluation scale | Mean triplets | Fold-0 macro AUC, τ 1.0 | τ 0.75 | Public, τ 0.75 |
-|---|---:|---:|---:|---:|
-| ×1 | 25.4 | 0.8873 | 0.8889 | – |
-| ×2 | 50.7 | 0.8907 | 0.8930 | 0.933 at τ 1.0 |
-| ×3 | 75.9 | 0.8922 | 0.8954 | **0.938** |
-| ×4 | 99.3 | 0.8922 | 0.8954 | **0.939** |
-| Every candidate | 165.1 | 0.8896 | 0.8942 | – |
-
-- **Open:** where the count stops paying above ×4, and what it costs. ×3 and ×4 differ by one
-  rounding step publicly and were tied on fold 0, while inference time grows with the count and
-  counts toward the efficiency prize. The submit-to-scored times we have (9–11 minutes) mix
-  different batch sizes and at least 128 s of queueing noise
-  ([efficiency leaderboard](../inference/efficiency-leaderboard.md#each-pick-is-a-measurement-of-our-hidden-runtimes)),
-  so a local profile at fixed batch is the way to measure it. At 70 s per thousandth of AUC, ×3
-  removes roughly a quarter of the wall, so the two sides are within a factor of two of each
-  other ([the arithmetic](loading-speedup/candidates.md#reading-less-per-study-trades-score-for-wall)).
-- **External evidence points the same way** (unreplicated). On a public CoAtNet pipeline the same
-  weights read 0.924 at 42 evaluation windows and 0.927 at 62, and an 80-slice corpus reached
-  0.932 only at its full 78 windows, the author's point being that a checkpoint change and a
-  coverage change stop being separable once part of the volume goes unread
-  ([public research](../research/public-research.md#slice-density-and-the-board-2026-09-18-re-sweep)).
-- **Earlier contrary evidence is explained:** on 2026-09-11 baseline4 scored 0.912 at ×3 against
-  0.913 at ×2 ([image count](../inference/inference-image-count-and-memory.md)). That was at
-  τ 1.0, where extra triplets draw attention away from the good ones; sharper pooling is what
-  makes the larger counts pay.
-- `validation_image_multiplier` is an integer and separate from the bundle's test multiplier,
-  which is what the submissions above set.
+**More evaluation triplets are adopted, not pending.** ×4 at τ 0.75 scores 0.939 public against
+0.938 at ×3 and 0.933 at ×2; the per-count fold-0 and public table, and the reason sharper pooling
+is what makes larger counts pay, are in the
+[submissions record](../inference/submissions/2026-09-18-temperature-and-count-submissions.md).
+Where the count stops paying above ×4, and what it costs against the efficiency prize, is tracked
+in [next](../ongoing/next.md); external evidence points the same way
+([public research](../research/public-research.md#slice-density-and-the-board-2026-09-18-re-sweep)).
 
 ## Weight averaging
 
