@@ -9,7 +9,6 @@ import polars as pl
 
 from knee_abnormality.config import SERIES_LISTING_THREADS, DataConfig, ExperimentConfig
 from knee_abnormality.data.labels import STUDY, load_fold_labels
-from knee_abnormality.data.preprocessing.exclusions import KNOWN_BAD_SERIES
 
 SERIES = "SeriesInstanceUID"
 
@@ -132,8 +131,6 @@ def build_series_index(
         directory = directories[index]
         listing = listings.get(index)
         image_count = row["n_images"] if listing is None else len(listing)
-        if series_uid in KNOWN_BAD_SERIES:
-            image_count -= 1
         slot = type_to_slot[
             (row["Anatomical_Plane"], row["Fluid_Sensitive"], row["Fat_Suppression"])
         ]

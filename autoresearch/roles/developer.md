@@ -21,9 +21,10 @@ Return the immutable source snapshot, resolved configuration proposal, explanati
 of the implementation, constraint evidence, and any concrete blocker. The supervisor
 chooses and records the fresh training seed before launch. Do not copy a historical
 training seed as the campaign default. Return a structured implementation report;
-the orchestrator writes the durable findings and documentation. Keep `summary`
-within 1,800 characters, `constraint_evidence` within 2,400, and `blocker` within
-1,200. Give source locations and artifact references rather than repeating the
+the orchestrator writes the durable findings and documentation. Aim below 1,800
+characters for `summary`, 2,400 for `constraint_evidence`, and 1,200 for `blocker`.
+These are concision targets, not schema limits; preserve the complete blocker and
+material evidence. Give source locations and artifact references rather than repeating the
 campaign contract or unrelated history. Do not edit docs,
 the idea registry, or backlog, inside or outside `autoresearch/`.
 

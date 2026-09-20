@@ -1,6 +1,7 @@
 import math
 from pathlib import Path
 
+from knee_abnormality.autoresearch.diagnostics import read_diagnostics
 from knee_abnormality.autoresearch.gates import evaluate, verdict
 from knee_abnormality.autoresearch.storage import read_json
 
@@ -70,6 +71,26 @@ def completion_blockers(state, event):
             for row in report["per_target"]
         ):
             return ["Per-target results are incomplete or invalid"]
+        diagnostics = read_diagnostics(comparison)
+        if diagnostics is None or len(diagnostics["per_target"]) != len(
+            report["targets"]
+        ):
+            return ["Per-label bootstrap diagnostics are missing or incomplete"]
+        for row, original in zip(
+            diagnostics["per_target"], report["per_target"], strict=True
+        ):
+            interval = row["bootstrap"]
+            bounds = interval["delta_percentile_95"]
+            if (
+                any(row[key] != value for key, value in original.items())
+                or interval["valid_draws"] != bootstrap["valid_draws"]
+                or not isinstance(bounds, list)
+                or len(bounds) != 2
+                or not all(math.isfinite(value) for value in bounds)
+            ):
+                return [
+                    "Per-label bootstrap diagnostics are inconsistent or incomplete"
+                ]
         required = (
             "changes.diff",
             "manifest.json",

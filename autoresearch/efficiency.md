@@ -45,8 +45,13 @@ orchestration cost, with new-input cost particularly prominent.
   narratives and the last twelve complete reports.
 - Code assembles candidate evidence packets with exact metrics, accounting,
   configuration differences, timings and original artifact references.
-- Bounded reports retain new findings, unresolved concerns and evidence paths;
+- Concise reports retain new findings, unresolved concerns and evidence paths;
   unchanged rankings use `null`. Opus still inspects the real candidate source.
+- Prose lengths and concern/reference counts are advisory targets. Hard prose
+  limits caused five failed shortening attempts on an otherwise structurally valid
+  losses report, ending just two characters over the rationale limit. Full report
+  text is now preserved without formatting-only retries or truncation; schema
+  structure and campaign gates stay strict. Actual report bytes remain in usage.
 - Code applies the fixed numerical verdict after orchestrator interpretation.
   Scheduling stays in the supervisor. Empty research refills create no review call.
 - Usage capture is independent of report acceptance. Claude streams events for
@@ -65,10 +70,10 @@ orchestration cost, with new-input cost particularly prominent.
   reporter attempt per completion, including across stop/resume.
 
 The maintained runner and role briefs take effect on the next supervisor launch.
-Frozen experiment source and sealed acceptance limits are unchanged. No campaign
-was resumed and no model or training was launched to make these changes. Static
-lint, catalog consistency, CLI help and read-only status/usage inspection passed;
-repository policy prohibits writing or running tests.
+Frozen experiment source and sealed acceptance limits are unchanged. The original
+context/usage changes were checked without starting a campaign; subsequent losses
+recovery and its verification are recorded in [implementation status](status.md).
+Repository policy prohibits writing or running tests.
 
 No new-run token savings or unchanged research quality have been measured yet.
 The historical $14.93 completion-interpretation total is an opportunity to measure,

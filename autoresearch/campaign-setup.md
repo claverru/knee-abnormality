@@ -74,9 +74,11 @@ config prefixes or identity exceptions merely to bypass a failed gate.
 
 The runner seals the full policy in runtime state at initialization and includes
 its operative permissions in role assignments. A later YAML/state mismatch is an
-error; changing scope requires a new campaign. A candidate cannot edit its policy,
-contract, role briefs or acceptance machinery. All topic decisions live in these
-declarations; adding an ID does not require a Python dispatch branch.
+error. Campaign agents must use a new campaign for a different scope; they cannot
+amend a seal. The user explicitly authorized the stopped sampling amendment
+recorded below. A candidate cannot edit its policy, contract, role briefs or
+acceptance machinery. All topic decisions live in these declarations; adding an
+ID does not require a Python dispatch branch.
 
 ## Shared invariants and limits
 
@@ -97,3 +99,12 @@ its original state and equivalent policy are preserved in the
 [migration record](../outputs/autoresearch/triplet-sampling/decisions/campaign-policy-migration-20260920T100729Z-22dfb2d4/decision.json).
 Its incumbent, queue, experiment history and sealed numerical limits did not change.
 The runtime does not retain a legacy hardcoded-policy fallback.
+
+At revision 180, the user explicitly authorized a narrow stopped-campaign
+amendment for `physical-span-standardized-triplets`: permit `preparation.py`
+changes for nonconsecutive-triplet validation. The
+[amendment record](../outputs/autoresearch/triplet-sampling/decisions/user-authorize-triplet-preparation-20260920T192746Z-e03bfe70/decision.json)
+preserves the previous state, definition and projections. It updates the live
+definition and saved policy together, retaining all numerical limits, incumbent,
+experiments and blocked follow-ups. This is a recorded user instruction; it grants
+no policy-editing authority to campaign agents and adds no automatic migration.

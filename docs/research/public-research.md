@@ -176,6 +176,81 @@ stored at 336 px.
   is that single models in the 0.94–0.95 range exist on several backbones, not how
   they were obtained.
 
+## The 2026-09-20 re-sweep
+
+Screened all 122 forum topics, read in full the twelve active since 2026-09-18,
+listed notebooks by date and by votes, listed the competition's datasets by
+date, pulled the public leaderboard, and downloaded five notebook snapshots
+([manifest](public-notebook-sources.json)). Public top is **0.957**, unchanged
+since 09-18; our best is 0.943.
+
+### Density did not transfer to a slot-pooling pipeline
+
+A second team answered the Raptor density curve in the
+[same thread](https://www.kaggle.com/competitions/rsna-knee-abnormality-detection/discussion/737696)
+on 2026-09-19 with a one-variable test of its own: 8 → 10 slices per slot on a
+0.12–0.88 band, i.e. 1.58% → 1.27% of the stack per slice, into the range the
+Raptor author measured as best. It came back **−0.0045** (plateau −0.0046)
+against their stated 0.003 threshold, with a 140 → 110 mm crop at the denser
+sampling inside noise (+0.0005). Their explanation is structural: Raptor scores
+every window position over whole-series resamplings, so extra slices buy
+coverage, while their six per-series slots feed a masked attention head that
+already sees the whole span, so extra slices mostly dilute the pooling. Our
+sampler is the second kind. The [denser per-type budget candidate](../backlog/overnight.md#candidates-for-later-queues)
+keeps its priority from our own monotone cheaper-side losses, not from the
+public density curve, which now has a same-competition counter-report.
+
+Two more one-variable results from that post, unreplicated and not ours:
+swapping **RadImageNet for ImageNet ResNet-50** at identical architecture and
+per-corpus normalization cost **−0.063**, and replacing their attention head
+with masked mean pooling cost **−0.014**. The first is the largest in-competition
+number we have on medical pretraining and disagrees with the
+[benchmark ranking](backbone-mri-evidence.md) that put RadImageNet ResNet-50
+19th; it is filed as a [small change](../backlog/small-changes.md#radimagenet-pretrained-backbone).
+The public 0.942 stack also carries RadImageNet heads as one of five families.
+
+### Labels are the reported lever at the top, and extractor tuning is not
+
+- Two participants in the [single-model thread](https://www.kaggle.com/competitions/rsna-knee-abnormality-detection/discussion/735304)
+  report label handling as their main axis: one went 0.938 → 0.940 → 0.943 on
+  "still label" work (pseudo-labeling and blending sources); the other reports
+  that **mixing image-model predictions into the extracted label beat both
+  replacing and masking**, that **rounding soft labels to 0/1 hurt**, and that
+  calibration on the 58 (labels near 0.3 positive about 30% of the time) is what
+  stopped their extraction work. Synovitis resisted every masking policy either
+  tried; the reported belief is that reports omit it rather than misstate it.
+- A public [labelling deathmatch](https://www.kaggle.com/code/joshuaziel/rsna-slightly-overexhaustive-labeling-deathmatch)
+  benchmarked Anthropic and OpenAI models and three DSPy programs against the 58
+  gold studies: macro performance was **flat across models, prompts, criteria and
+  abstention policies**, and a two-model ensemble did not pay for itself. What
+  survived is that silence should resolve to ABSENT (recovered abstentions were
+  70% gold-negative) and that confidence defined as report explicitness is
+  miscalibrated. Its [output table](https://www.kaggle.com/datasets/joshuaziel/rsna-knee-mri-report-labels-gpt-5-6-luna)
+  is published.
+- **New public label tables were screened, not audited:** two gpt-luna releases
+  on 09-18 and smaller tables since 09-13. Our
+  [last audit](../public-labels/2026-09-13-new-public-label-comparison.md)
+  measured the best candidate at +0.010 gold over Steven v4, and training on it
+  cost 0.008 publicly; gold-only AUC also correlates with nothing across our
+  nineteen comparable submissions ([correlations](val-test-correlations.md)).
+  A table's gold score is therefore not a reason to spend a run.
+
+### The 0.941 block, and what the public notebooks now are
+
+About 200 teams sit at exactly **0.941** running forks of one notebook; a
+[diff of the forks](https://www.kaggle.com/competitions/rsna-knee-abnormality-detection/discussion/742050)
+shows three blend edits and one no-op against the 0.940 parent, all tuned on the
+public split. That parent's `.ipynb` metadata carries an `rsna_optimization`
+entry per version naming the version's single predictive change — the closest
+thing to a public ablation log, readable with `kaggle kernels pull <ref> -m`.
+The stack has since reached **0.942–0.943** by adding CoAtNet readers (depth
+zones inside each anatomical slot, a 96-slice global variant) to the same
+five-family blend, and one derivative normalizes laterality so every knee
+presents as left — the public precedent for the
+[common knee orientation](knee-side-and-location.md) we have not tried. Nothing
+in this block is a controlled comparison; its members share models, labels and
+preprocessing.
+
 ## Validation and ensembling
 
 | Evidence | Result or warning | Project implication |

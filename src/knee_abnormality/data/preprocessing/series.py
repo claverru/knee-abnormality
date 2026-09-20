@@ -15,7 +15,6 @@ from knee_abnormality.data.preprocessing.dicom import (
     parse_prefix,
     read_prefix,
 )
-from knee_abnormality.data.preprocessing.exclusions import KNOWN_BAD_INSTANCES
 from knee_abnormality.data.preprocessing.geometry import (
     RELIABILITY,
     NativePose,
@@ -155,8 +154,6 @@ def index_series(
     records = []
     layouts = {}
     for fallback, path in enumerate(candidates):
-        if path.stem in KNOWN_BAD_INSTANCES:
-            continue
         try:
             header = parse_prefix(path, prefixes.get(path))
             physical = header.physical_position

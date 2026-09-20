@@ -8,7 +8,7 @@ and their retrain cost, the closed regressions, the measurement protocol and the
 explicit-VR parser with a pydicom fallback, `index_series` reuses the single `scandir` listing that
 `build_series_index` already made, and both header prefixes and frame payloads are read on a thread
 pool behind `KneeStudyDataset(io_threads=...)`. The default is 1, so training and validation stay
-serial; only inference threads, at `INFERENCE_IO_THREADS = 16`. Prepared batches are identical to
+serial; inference now uses `INFERENCE_IO_THREADS = 8` after the sweep below. Prepared batches are identical to
 the serial and pydicom paths in every audit, at 2, 4 and 16 threads. The main-thread warm-up is
 implemented too and still awaits a submission.
 
@@ -38,7 +38,7 @@ than the wait saving `in_order = False` appeared to give.
 **The bit-exact CPU cluster shipped in `041bd16`** — shared io pool, struct scan, `SeriesTags`
 memo, unsigned mask, `os.pread` for prefixes and payloads, both manual cross products, the
 `geometry_groups` prune, the `select_triplets` refactor, the resample column band, the dropped
-second clip and `astype(copy=False)`. Three deliverables, and only the first two are done: **code
+second clip and `astype(copy=False)`. All three deliverables are complete: **code
 merged**; **audited** bit-exact over 800 studies — 4,422 series records, 13,266 header hashes, 800 collated
 batches, zero mismatches at 16 threads, after a 25-study pass at 1 and 16 threads — with 20.5–21.9%
 less preparation CPU per study locally; **measured in production** below. The audit covers 18% of
@@ -60,15 +60,12 @@ structural questions fell out of the first honest table:
 - **The frame stage is CPU-bound, not bandwidth-bound**, at 53–62% of a measured 510 MB/s ceiling
   with CPU above wall in both passes. Byte reduction no longer converts, which demotes the
   row-trimmed payload read.
-- **The 31 s indexing bucket is mostly NFS wait** — 30.98 s of wall over 12.86 s of CPU cold — so a
-  shared thread pool can attack about 10 s of CPU and none of the 18 s of wait.
+- **The old indexing bucket does not identify NFS wait.** Its 30.98 s wall and 12.86 s CPU
+  combine several operations and pool construction; subtracting CPU from wall does not isolate
+  I/O. Use the corrected stage attribution before assigning a mechanism.
 
-Still to ship without a retrain: the [allocator env vars](../backlog/loading-speedup/candidates.md),
-which need no code change at all, only two variables in the notebook's environment, and which
-should be A/B'd on the old bundle so the three changes above do not confound them.
-
-**Profiled on Kaggle at x4 and 1,300 studies** (random weights, timing only, since no checkpoint
-carries the new identity): **cold loading is 2.47x faster**, 2.03 s to 0.821 s per study, while
+**Historical profile, before the control retrain:** at x4 and 1,300 studies with random
+weights for timing only, **cold loading is 2.47x faster**, 2.03 s to 0.821 s per study, while
 decoding about 25% more frames. Header and indexing cost fell from 146.1 s to 36.7 s per 100
 studies. End to end the two T4s took 470.5 s of worker wall, with the loader still 57–59% of
 prediction time, so the balance moved without reversing
@@ -77,7 +74,7 @@ changes are worth 1.22x on a cold first pass and nothing afterwards, which
 [confirms that training does not benefit](../backlog/loading-speedup/attribution.md#only-inference-benefits).
 
 **Reviewed 2026-09-18** across eight read-only research lanes over the profile, the code and
-external sources. Two results change what to do next:
+external sources. The findings below motivated the profiler repair and the shipped first phase:
 
 - **The profile's CPU and NFS columns are not CPU and NFS.** The profiler is wall-clock only, so the
   "CPU" column is the warm pass and "NFS" is cold minus warm, and they sum to cold by construction.
@@ -87,10 +84,9 @@ external sources. Two results change what to do next:
   further work ([attribution](../backlog/loading-speedup/attribution.md)).
 - **Four of the five best candidates need no retrain**, because `data/sources.py` and
   `inference/engine.py` are outside `PREPROCESSING_SOURCES`. Three shipped and were measured the
-  same day (above); the allocator environment variables are the one left. The bit-exact cluster,
-  worth 17–34 s of the cold probe and roughly five times that at run scale, rides the retrain the
-  shipped changes already require ([candidates](../backlog/loading-speedup/candidates.md), with the
-  proposed experiment order).
+  same day (above). The allocator implementation now awaits its A/B measurement; the bit-exact
+  cluster subsequently shipped and was measured above. Its original 17–34 s cold-probe projection
+  is historical, not a remaining saving ([candidates](../backlog/loading-speedup/candidates.md)).
 
 **`INFERENCE_IO_THREADS` is now 8**, from a production sweep of 1/2/4/8/16 at 16 workers: 1 thread
 is a clear loss, 2 to 16 are flat within 2.6%, and io8 won both of its pairs

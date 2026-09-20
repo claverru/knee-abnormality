@@ -1,6 +1,6 @@
 {
   "checked_on": "2026-09-09",
-  "method": "Kaggle CLI 2.0.2 kernels pull with metadata; source read without executing. Kernel IDs are not source-version IDs. Attached data, weights and their provenance were not audited. Hashes identify downloaded source bytes; later pulls may differ.",
+  "method": "Kaggle CLI 2.0.2 kernels pull with metadata; source read without executing. Kernel IDs are not source-version IDs. Attached data, weights and their provenance were not audited. Hashes identify downloaded source bytes; later pulls may differ. The 2026-09-20 entries were re-pulled the same way; a source whose URL already appears carries the newest pull's hash, replacing the earlier one.",
   "sources": [
     {
       "url": "https://www.kaggle.com/code/dreaddevelopment/knee-mri-training-the-twelve-finding-model",
@@ -49,8 +49,50 @@
       "kernel_id": 134262775,
       "source_version_id": null,
       "source_filename": "rsna-knee-fast-2xt4-inference.ipynb",
-      "sha256": "f02ba20635ef3e68c859ddb17928c79d9971701ac42534bb094ea2a1ed4e79a3",
-      "checked_on": "2026-09-18"
+      "sha256": "0bac1fcc62a9bf60f88a4eea966f76fdf716d7147be1ab8595c4161e299c5449",
+      "checked_on": "2026-09-20",
+      "previous_sha256": "f02ba20635ef3e68c859ddb17928c79d9971701ac42534bb094ea2a1ed4e79a3",
+      "previous_checked_on": "2026-09-18"
+    },
+    {
+      "url": "https://www.kaggle.com/code/mattiaangeli/bend-the-knee-to-speedy-raptors-the-original",
+      "kernel_id": 134595227,
+      "source_version_id": null,
+      "source_filename": "bend-the-knee-to-speedy-raptors-the-original.ipynb",
+      "sha256": "23e7005af5b5b03a10cfc89402f873417b3b600d92edd768781c99137e48883b",
+      "checked_on": "2026-09-20"
+    },
+    {
+      "url": "https://www.kaggle.com/code/romantamrazov/rsna-knee-dinosaur-v5",
+      "kernel_id": 134871202,
+      "source_version_id": null,
+      "source_filename": "rsna-knee-dinosaur-v5.ipynb",
+      "sha256": "9a84e47bad8f8356ced3cb541477b3a8515c1c0a8bd996a94b256ef4f7948fee",
+      "checked_on": "2026-09-20"
+    },
+    {
+      "url": "https://www.kaggle.com/code/starkhushi/rsna-knee-why-public-forks-stop-at-0-941",
+      "kernel_id": 133950544,
+      "source_version_id": null,
+      "source_filename": "rsna-knee-why-public-forks-stop-at-0-941.ipynb",
+      "sha256": "4d85fcd5729869f87722912c7a88eedac903098eaafa57f377cb0fa04a4ae0c7",
+      "checked_on": "2026-09-20"
+    },
+    {
+      "url": "https://www.kaggle.com/code/joshuaziel/rsna-slightly-overexhaustive-labeling-deathmatch",
+      "kernel_id": 134539951,
+      "source_version_id": null,
+      "source_filename": "rsna-slightly-overexhaustive-labeling-deathmatch.ipynb",
+      "sha256": "22f6cdd6fef1f81d2c29fae77ad5d2eb417efd9805a8ede04dac78207d15b345",
+      "checked_on": "2026-09-20"
+    },
+    {
+      "url": "https://www.kaggle.com/code/mattiaangeli/bend-the-knee-to-the-dinosaurs",
+      "kernel_id": 133147282,
+      "source_version_id": null,
+      "source_filename": "bend-the-knee-to-the-dinosaurs.ipynb",
+      "sha256": "5e03fc9f7799b2e46bcf67395d1ad5177d1e9f19b58cc93825c9fc02da6d0155",
+      "checked_on": "2026-09-20"
     }
   ]
 }

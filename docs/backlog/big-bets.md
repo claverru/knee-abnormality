@@ -6,6 +6,37 @@ move its entry to [ongoing work](../ongoing/INDEX.md) and remove it from this fi
 Entries under [parked](#parked-until-a-specific-need) wait for a concrete need before they become
 candidates. Each entry says whether its motivation is measured or a hypothesis.
 
+## OA-only rubric-aligned label repair
+
+**Defect observed; repair and image-model benefit untested.** Prioritized in the 2026-09-20 agenda
+review. The [blinded report audit](../history/sharing/oa-and-meniscus-disagreement-audit.md) found
+19 report-derived OA cells from 16 studies with explicitly below-threshold report findings but
+frozen targets of 0.80–0.93. The sample was deliberately selected: it does not estimate population
+error prevalence or establish image-adjudicated truth. No labels were changed. The full-table
+[Tonylin swap](../validation/results/2026-09-13-tonylin-label-comparison.md) and
+[unmentioned-cell mask](../history/sharing/2026-09-13-label-masking-result.md) were different,
+measured interventions and are not candidates for repetition here.
+
+1. **Bounded training-only pilot:** review medial, lateral and patellofemoral OA reports, including
+   high-confidence positives. Keep a random panel separate from severity-term enrichment; do not
+   restrict review to probabilities in `[0.3, 0.8]`, which misses most known conflicts.
+2. **Lock the extraction policy:** distinguish qualifying disease, explicitly below-threshold
+   disease, explicit negative, uncertain and unmentioned. Version the mapping to revised soft
+   targets and preserve gold labels, the other nine targets and insufficiently supported cells.
+   Keep an untouched report panel to assess the fixed rule; do not tune it to flip the known cases.
+3. **Compare supervision only:** revised versus original OA targets with identical imaging,
+   sampling and the normal training budget, using frozen validation targets. Record the label
+   manifest, revision, split, seed, per-label AUC and changed class counts/weights. If weights move
+   materially, an original-weight sensitivity separates target repair from altered emphasis.
+
+Use report terms for initial triage. Model-disagreement triage is optional only with a predictor
+whose supervised learning excludes outer validation studies; do not train a new triage model.
+Advance after independent report review supports the policy and a controlled image-model result
+supports adoption. A more faithful report extraction alone is not a score gain. Record disagreement
+between frozen-target AUC and rubric diagnostics without rewriting evaluation targets. Stop after
+an uninformative bounded pilot; no broad label rewrite, auxiliary severity head or extra epochs.
+This entry owns the investigation; training remains user-launched when the user starts it.
+
 ## Position and knee side
 
 Already measured: the
@@ -28,7 +59,7 @@ patient points. Remaining (hypotheses), from the
 - **Side-conditioned sagittal sampling centre** (measured premise, unmeasured payoff). Sagittal
   slices step along patient L, and the compartment labels sit about 31 mm off the study centre
   while the sagittal draw is centred on it. The [spatial importance
-  map](../ongoing/peripheral-coverage.md#spatial-importance-map) shows a central trough on that
+  map](../data-preparation/peripheral-coverage.md#spatial-importance-map) shows a central trough on that
   axis alone, flanks minus centre +0.126 against -0.634 coronal and -1.099 axial, carried by the
   compartment labels and symmetric about zero. The symmetry is the problem: pooled left and right
   knees make "medial and lateral matter equally" and "only medial matters, seen twice" produce the
@@ -107,6 +138,13 @@ to develop the principle independently of the contact's implementation. The
 [research note](../research/per-label-losses.md) owns the results, primary sources, candidate
 formulas, model fit, pair-coverage calculation and evaluation design.
 
+**Deferred after the 2026-09-20 agenda review.** The shared ranking and focal ingredients have now
+been trained: ranking was inconclusive and focal trended negative
+([ranking record](../../autoresearch/campaigns/losses/findings.md#completion-20260920t121537z-5b39b418),
+[focal record](../../autoresearch/campaigns/losses/findings.md#completion-20260920t124339z-2948d523)).
+These results do not settle per-label selection, but lower its priority below OA repair and the
+new pooling comparisons. Reconsider a bounded frozen-feature screen before a full training program.
+
 1. **Compare independent heads:** cache the current model's per-label pooled features and train
    balanced soft BCE, focal and ranking classifiers for all twelve labels. Share expensive
    feature extraction, allow larger ranking pools and repeat classifier seeds. Use current
@@ -131,8 +169,8 @@ gains. Training remains user-launched. Move this entry to ongoing work when expe
 
 This entry owns loss selection within each label. The parked
 [adaptive allocation](#adaptive-training-allocation) proposal concerns weights between targets
-and study exposure; [static ranking loss](small-changes.md#ranking-aware-loss) remains a separate
-small change.
+and study exposure; [static ranking loss](../../autoresearch/campaigns/losses/findings.md#completion-20260920t121537z-5b39b418) remains a separate
+completed comparison.
 
 ## Intermediate stride-16 feature fusion
 
@@ -160,6 +198,56 @@ evidence is object detection.
 - *Order:* after the cheaper [attention and readout changes](small-changes.md#attention-pooling).
 
 ## Parked until a specific need
+
+### External pretrained image encoders
+
+**Survey completed 2026-09-20; implementation and training unstarted.** The
+[checkpoint review](../research/huggingface-image-encoders.md) owns sources, loading contracts,
+revision pins and unresolved terms. Investigate only when a backbone-diversity experiment is
+prioritized: DINOv3 ConvNeXt-T first for practical integration, then RadioDINO-S against the
+same architecture's general-image weights. OmniRad-S is an alternative after its conflicting
+license metadata is resolved. These require spatial mappings or patch-token adapters; they are
+not hyperparameter-only runs. Hold the current balanced-BCE recipe and data contract fixed,
+compare fresh controls, and record per-label AUC, ensemble contribution, time and memory.
+
+OrthoFoundation-L is the strongest direct 2D knee-pretraining lead; MRI-CORE and the released
+three-plane OrthoDiffusion weights are higher-cost alternatives within this investigation.
+Establish loading, source/competition eligibility and input semantics before allocating runs.
+The 3D option needs a separate volume pipeline. Existing historical ranks do not settle transfer
+under the current recipe. Training remains user-launched; move this entry to ongoing work if
+implementation or experiments start.
+
+### 3D embedding: training-time effect
+
+**Hypothesis; needs multiple seeds.** The retired additive 3D embedding is ignored at inference:
+replacing it with the `unknown_3d` vector changed fold-0 macro AUC by +0.000037 [−0.00011,
++0.00017] on the knee-side checkpoint
+([result](../validation/results/2026-09-14-knee-side-embedding-result.md)), and the champion scored
+0.936 publicly both with and without it
+([submission](../inference/submissions/2026-09-15-champion-without-3d-at-inference.md)). Yet the
+champion (with 3D, one training) scored 0.936, above all four no-3D trainings of the same recipe
+(0.928–0.934, mean 0.931, standard deviation about 0.0025;
+[seed controls](../inference/submissions/2026-09-17-seed-control-submissions.md)). The simplest
+explanation is a lucky run; a training-time effect is possible but unproven.
+
+- **Possible mechanisms:** scaffolding (position helps attention and the backbone learn
+  position-aware features early, after which visual features carry the information and 3D is
+  ignored); regularisation (per-study embeddings that flip with reflection change token norms,
+  normalisation statistics and attention temperature); a different random stream (adding a
+  module changes initialisation draws, so a 3D and a no-3D model at the same seed are effectively
+  different seeds, which alone could explain the public gap).
+- **Change:** restore the embedding from the champion's source snapshot
+  (`outputs/training/reflection-sigma40/source_snapshot.zip`) behind a three-way option: real 3D,
+  placebo (same module, every token gets `unknown_3d`, so random-number use and capacity match)
+  and none (today's model).
+- **Test:** three arms × about three seeds (nine runs, about 4.5 hours, one overnight queue). Real
+  versus placebo isolates the information at an equal random stream; placebo versus none isolates
+  the module. Fold 0 probably shows a tie again, so the evidence would come mostly from public
+  scores (three submissions per arm). To check scaffolding directly, save a checkpoint every epoch
+  in the real-3D arm and run the 3D removal on each: removal should hurt early and not at the end;
+  logging the gradient norm reaching the embedding shows the same.
+- **Priority:** low; do it only to settle the question. Seed-to-seed spread (fold 0 0.0032,
+  public up to 0.006) is the context for any result.
 
 ### Study overlap and anatomical matching
 

@@ -208,6 +208,27 @@ historical gold-only split's shared silver training pool cannot supply OOF
 predictions. See [validation](../validation/INDEX.md) and
 [the label audit](../public-labels/INDEX.md) for the full protocol.
 
+### Checkpoint pruning
+
+On 2026-09-20, user-authorized cleanup removed **249 obsolete `.ckpt` files (33.412 GiB)**
+from completed superseded/rejected experiments, unused resume checkpoints and stale submission
+exports. The [cleanup manifest](../../outputs/archive/maintenance/checkpoint-pruning-20260920T191234Z/manifest.json)
+lists every removed and retained path, reason, size and file identity. It records 48 retained
+checkpoints (4.381 GiB); all other artifacts, including predictions, metrics, configs, source
+snapshots and submission manifests, were preserved.
+
+Retained weights cover the current control B, supporting control A and sealed historical baseline;
+the best score/efficiency bundles and their selected source models; pending submissions/loading
+benchmarks; attention-temperature cache parents; and the held unevaluated plane-coupling candidate
+with its parent. Retaining that parent's weights does not restore the withdrawn stratified-sampler
+acceptance. Both campaign states were stopped and unchanged by cleanup.
+
+Historical `selected_checkpoint.json` and bundle manifests retain their original provenance paths;
+they do not establish that pruned weights are still available. Consult the cleanup manifest before
+attempting to resume, re-export or rerun inference on a historical experiment. Its saved predictions
+and metrics remain available for comparisons. Linux free space increased by 33.412 GiB; Windows C:
+free space remained about 52 GiB because the WSL virtual disk was not compacted.
+
 ## Current scope and next execution
 
 The config, fold-aware labels, on-the-fly image preparation, study dataset,

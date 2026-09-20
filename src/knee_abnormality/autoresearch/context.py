@@ -1,7 +1,15 @@
 import json
 from pathlib import Path
 
-from knee_abnormality.autoresearch.gates import config_differences, flatten
+from knee_abnormality.autoresearch.diagnostics import (
+    INTERPRETATION,
+    experiment_diagnostics,
+)
+from knee_abnormality.autoresearch.gates import (
+    config_differences,
+    dependency_blockers,
+    flatten,
+)
 from knee_abnormality.autoresearch.models import REPORTS
 from knee_abnormality.autoresearch.storage import read_json, sha256, write_json
 
@@ -70,6 +78,7 @@ def experiment_evidence(state, exp):
                 "config.yaml",
                 "evaluation.json",
                 "comparison/comparison.json",
+                "comparison/per_label.json",
                 "training/effective_config.json",
                 "training/fold_0/triplet_accounting.json",
                 "training/fold_0/timing.json",
@@ -129,6 +138,9 @@ def experiment_evidence(state, exp):
     evaluation_path = directory / "evaluation.json"
     if evaluation_path.is_file():
         packet["evaluation"] = read_json(evaluation_path)
+    if diagnostics := experiment_diagnostics(exp):
+        packet["per_label"] = diagnostics["per_target"]
+        packet["per_label_interpretation"] = INTERPRETATION
     packet["jobs"] = [
         {
             "id": job["id"],
@@ -169,7 +181,8 @@ def build_context(state, role, assignment, directory, docs, state_path):
                 "facts": {
                     **event["evidence"],
                     "macro_auc_delta": scores["candidate"] - scores["reference"],
-                    "per_target": comparison["per_target"],
+                    "per_target": evidence["per_label"],
+                    "per_label_interpretation": INTERPRETATION,
                     "timing": evidence["timing"],
                     "measured_compute_seconds": exp["measured_compute_seconds"],
                     "max_run_seconds": state["limits"]["max_run_seconds"],
@@ -182,7 +195,16 @@ def build_context(state, role, assignment, directory, docs, state_path):
     exp_id = event.get("experiment") or assignment.get("experiment", {}).get("id")
     exp = state["experiments"].get(exp_id)
     ideas = state["ideas"]
+    proposals = {
+        key: value for key, value in ideas.items() if value["status"] == "proposed"
+    } | {idea["id"]: idea for idea in event.get("report", {}).get("ideas", [])}
     relevant = set()
+    if role == "orchestrator":
+        relevant.update(
+            dependency
+            for proposal in proposals.values()
+            for dependency in proposal["dependencies"]
+        )
     if exp:
         idea = ideas[exp["idea"]]
         relevant.update([idea["id"], *idea["dependencies"]])
@@ -218,7 +240,13 @@ def build_context(state, role, assignment, directory, docs, state_path):
         {
             "ideas": [idea_card(idea) for idea in ideas.values()],
             "experiments": [
-                experiment_card(value) for value in state["experiments"].values()
+                {
+                    **experiment_card(value),
+                    "per_label_path": str(
+                        Path(value["directory"]) / "comparison/per_label.json"
+                    ),
+                }
+                for value in state["experiments"].values()
             ],
             "reports": history,
             "full_registry": str(docs / "ideas.yaml"),
@@ -241,9 +269,15 @@ def build_context(state, role, assignment, directory, docs, state_path):
             idea_card(ideas[key]) for key in sorted(relevant) if key in ideas
         ],
         "recent_results": [
-            {**experiment_card(value), "evidence": value.get("evidence", {})}
+            {
+                **experiment_card(value),
+                "evidence": value.get("evidence", {}),
+                "per_label": diagnostics["per_target"] if diagnostics else None,
+            }
             for value in results[-6:]
+            for diagnostics in [experiment_diagnostics(value)]
         ],
+        "per_label_interpretation": INTERPRETATION,
         "earlier_results": max(0, len(results) - 6),
         "research_reports": [item for item in history if item["role"] == "researcher"][
             -3:
@@ -269,6 +303,16 @@ def build_context(state, role, assignment, directory, docs, state_path):
         ]
     if role == "researcher":
         context["mechanism_registry"] = [idea_card(idea) for idea in ideas.values()]
+    if role == "orchestrator":
+        context["proposal_admission"] = [
+            {
+                "id": idea["id"],
+                "dependencies_satisfied": not blockers,
+                "unresolved_dependencies": blockers,
+            }
+            for idea in proposals.values()
+            for blockers in [dependency_blockers(idea, ideas)]
+        ]
     if "idea" in assignment:
         context["assignment"]["idea"] = select(
             assignment["idea"],

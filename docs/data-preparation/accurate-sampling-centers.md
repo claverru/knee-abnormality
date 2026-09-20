@@ -110,7 +110,7 @@ describe what the sampler actually sees.
   34.8% fluid, which makes it acquisition geometry rather than a sequence effect. Axial and
   sagittal midpoints are centered within 0.2 mm, with 2.8-4.2% of sides shorter than sigma.
   This is the geometric counterpart of the coronal flank deficit in the [spatial importance
-  map](../ongoing/peripheral-coverage.md#spatial-importance-map), which measured coronal
+  map](peripheral-coverage.md#spatial-importance-map), which measured coronal
   flanks minus center at -0.634, so it argues for no widening.
 - **Axial T1/PD is the one type-specific truncation.** Its stack sits 1.7 mm superior of the
   point and falls under sigma inferiorly in 8.4% of its 790 studies against 1.8% superiorly;

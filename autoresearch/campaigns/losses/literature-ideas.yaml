@@ -1,0 +1,257 @@
+ideas:
+  - id: shared-rocstar-buffered-hinge
+    mechanism_id: shared-cross-batch-ranking-memory
+    parent_idea_id: shared-ranking-memory-bank
+    title: Shared BCE plus ROC-star-style buffered squared-hinge ranking
+    opportunity: >-
+      The user requested coverage of the existing objective survey after thirteen
+      completed loss experiments produced no accepted improvement. The logistic
+      BCE-ranking hybrid was inconclusive at +0.000709 macro AUC, with about ten
+      of twelve labels supplying usable within-batch pairs. Its result does not
+      measure a historical comparison pool or a squared-hinge ranking penalty.
+      Investigate those together as a distinct shared objective, without claiming
+      to isolate their separate contributions or predicting a numerical gain.
+    mechanism: >-
+      Retain the incumbent balanced soft BCE unchanged. During the first epoch,
+      collect detached training predictions, targets, observed masks and study
+      identities from the existing forward passes. From the second epoch, compare
+      current anchors with opposite-group predictions saved from the preceding
+      epoch, using y>=0.5 only for ranking eligibility. Penalize
+      max(0, margin - (p_positive - p_negative))^2, where p=sigmoid(logit).
+      Gradients flow only through current predictions. Exclude the anchor's own
+      study; cap sampled reference entries at 128 per class per label, or all
+      available entries for a smaller pool. Average usable pairs within each
+      label, then average all twelve labels with zero for absent comparisons.
+      Use one common mixture coefficient and one common margin across labels.
+      Estimate that shared margin once per epoch from an equally label-weighted,
+      bounded sample of preceding-epoch training pairs, following ROC-star's
+      relative count of misordered and near-correct pairs. Keep delta=1 shared;
+      define finite margin bounds, zero-error and empty-pool behavior before launch.
+    precedents:
+      - docs/research/auc_loss_approaches.md#5-roc-star
+      - docs/research/auc_loss_approaches.md#3-pairwise-squared-hinge-ranking
+      - https://github.com/iridiumblue/roc-star/blob/master/rocstar.py
+      - autoresearch/campaigns/losses/ideas.yaml (shared-ranking-memory-bank)
+      - outputs/autoresearch/losses/experiments/shared-bce-ranking-20260920T112958Z-a2e23db7/comparison/comparison.json
+      - outputs/autoresearch/losses/experiments/shared-bernoulli-pair-ranking-20260920T121717Z-fd69b263/comparison/comparison.json
+      - outputs/autoresearch/losses/experiments/shared-centroid-margin-20260920T144634Z-e0e80c5b/comparison/comparison.json
+    novelty: >-
+      Same memory-pool mechanism family as shared-ranking-memory-bank, with an
+      explicit parent link for deduplication. That older proposal retains logistic
+      pairs in an age-capped FIFO; this uses squared hinge and preceding-epoch
+      predictions. It is also distinct from a single EMA centroid. Review them
+      together and do not queue both as duplicates. This proposal is independently
+      implemented on the incumbent BCE source; it neither inherits an accepted
+      ranking candidate nor requires its acceptance. The older proposal's genuine
+      dependency remains unchanged. Shared margin estimation and retained soft
+      BCE make this a ROC-star adaptation, not an exact published replication.
+    coverage: >-
+      Every observed soft BCE cell remains supervised. Historical pools use only
+      the training cohort and preserve masks; a single-class current microbatch
+      can still compare with the opposite class in memory. Log per-label eligible
+      anchors, usable pairs, empty pools, saved-prediction ages and self exclusions.
+      Use a dedicated recorded RNG for pool subsampling and preserve model/data RNG.
+    exploitation: >-
+      Allocate the auxiliary gradient to misordered or insufficiently separated
+      study pairs. A larger historical pool addresses a different limitation from
+      the failed soft-pair semantics experiment. Stale predictions and false
+      negative pairs remain risks, not established benefits of the method.
+    budget: >-
+      Store detached outputs from the existing training passes only, with no
+      feature extraction, replay or extra forward pass. At most 8*128*12 comparisons
+      per anchor direction per step plus a bounded once-per-epoch margin estimate.
+      All buffer and margin work counts inside the original 1,797 seconds, ten
+      epochs, 4,380 steps and fixed visits/triplets. Memory is score/label/identity
+      metadata, not embeddings. Runtime feasibility must be reviewed; previous
+      within-batch pair overhead does not prove that this larger pool is free.
+    implementation: >-
+      Implement under training/losses with shared settings under trainer.loss and
+      a training_step integration only. Build the previous/current epoch buffers
+      from existing batch study IDs; swap at epoch boundaries and never consume
+      validation outputs. Keep the incumbent BCE helper, class weights, reduction,
+      optimizer, scheduler, model and inference unchanged. Handle empty classes,
+      all-correct pairs, duplicated identities and non-finite margins explicitly.
+      The reference implementation's all-one-class batch shortcut is unsuitable
+      here because historical opposite-class pairs may exist. Record raw and
+      weighted component magnitudes, margin history, coverage, buffer state policy
+      and full source/config provenance. Check actual tensor costs in review;
+      agents must not launch tests, GPU probes or additional training.
+    open_choices: >-
+      Choose one shared mixture coefficient, finite margin bounds and a bounded
+      margin-sampling size with a written training-only scale rationale before
+      launch; no coefficient grid or per-label margin. Define state restoration
+      and epoch-buffer handling explicitly. The orchestrator must reconcile the
+      overlap with the older memory-bank proposal before admitting this one.
+    dependencies: []
+    priority_rationale: >-
+      First of this imported set: covers the survey's untested buffered-ranking
+      direction with a clear difference from the measured logistic and centroid
+      variants. Preserve the reserved head; rank only after substantive review
+      and within the five-entry queue cap. This is a recommendation, not a forced
+      acceptance or a requirement to displace already-claimed work.
+  - id: shared-hill-negative-bce
+    mechanism_id: shared-hill-negative-robustness
+    parent_idea_id: null
+    title: Hill negative branch with soft targets and BCE-matched initial gradient scale
+    opportunity: >-
+      The survey's Hill loss has not been evaluated locally. Focal reduced easy
+      cell pressure and scored -0.002629 versus the control, but it did not test
+      a bounded negative branch that attenuates highly positive-scored negative
+      contributions. Report-derived targets make false negatives a plausible
+      hypothesis, not a measured explanation. This experiment asks whether that
+      robustness helps while keeping positive BCE and initial gradient scale.
+    mechanism: >-
+      For p=sigmoid(z), use the shared soft-target cell loss
+      y*softplus(-z) + (1-y)*(8/3)*(1.5-p)*p^2. Multiply the entire cell by the
+      incumbent class weight selected by y>=0.5 and keep the existing observed-cell
+      mask and pooled reduction. Lambda=1.5 is the authors' Hill negative shape;
+      8/3 matches the negative BCE derivative with respect to z at z=0.
+      Keep positive BCE unchanged, without the authors' additional positive focal
+      factor or logit margin. The original fractional y is used directly; there
+      is no pseudo-label correction or hardening. Apply this exact formula to
+      every label for the existing full training schedule.
+    precedents:
+      - docs/research/auc_loss_approaches.md#11-hill-loss
+      - docs/research/per-label-losses.md#candidate-losses-and-extensions
+      - https://arxiv.org/abs/2112.07368
+      - https://github.com/xinyu1205/robust-loss-mlml/blob/master/src/loss_functions/losses.py
+      - outputs/autoresearch/losses/experiments/shared-balanced-focal-20260920T113454Z-c1fe7f53/comparison/comparison.json
+      - outputs/autoresearch/losses/experiments/shared-balanced-brier-20260920T131336Z-3dfa7fa5/comparison/comparison.json
+      - outputs/autoresearch/losses/experiments/shared-evidence-margin-bce-20260920T154409Z-239c3836/comparison/comparison.json
+    novelty: >-
+      An explicit Hill-negative adaptation, not a claim to reproduce the full
+      published Hill objective. Unlike focal, positive BCE remains unchanged;
+      unlike Brier, only the negative branch is replaced and its initial gradient
+      is matched analytically to BCE. Unlike the one-sided evidence margin, the
+      negative penalty remains smooth and does not create an exactly free region
+      at a target-dependent boundary. No previous candidate measured this shape.
+    coverage: >-
+      Preserve every study visit, observed mask and soft target. Fractional labels
+      contribute continuously through both branches. Use the current training-fold
+      class-balance statistics unchanged, not per-label tuning. Log branch values
+      and negative-gradient attenuation by target group and probability band.
+    exploitation: >-
+      The Hill negative gradient peaks away from confident extremes and weakens
+      near p=1, limiting pressure from suspected false negatives. It can also
+      neglect genuinely difficult negatives and change the soft-target optimum;
+      those risks must be retained in the review and interpreted through AUC.
+    budget: >-
+      Elementwise float32 operations on the existing 8x12 logits, with no extra
+      model pass, data pass, buffer or optimizer step. Keep the original ten epochs,
+      4,380 steps, study visits, triplets and 1,797-second measured ceiling. Log
+      diagnostics from existing tensors inside training, without separate probes.
+    implementation: >-
+      Add the explicit shared objective under training/losses and identify it in
+      trainer.loss. Reuse the baseline mask, whole-cell class-weight lookup and
+      reduction exactly. Compute softplus and the Hill polynomial in float32.
+      Preserve validation scoring, checkpoint selection, architecture and all
+      optimization settings. Record the fixed 1.5 shape and 8/3 normalization,
+      raw positive/negative loss contributions and attenuation diagnostics so
+      a negative result is not explained solely by an unobserved scale change.
+    open_choices: >-
+      The objective, shape and normalization are specified; do not sweep or add
+      per-label strengths. Choose compact probability-band diagnostics and their
+      aggregation frequency without changing exposure or RNG. Review the positive
+      and negative signs against the authors' code, which negates log-likelihood
+      contributions at the end. Missing-binary-label results do not establish
+      effectiveness for our fractional report targets. Initial gradient matching
+      is only local: the modified soft-target objective can have different or
+      boundary optima, so review stationary behavior and logit drift explicitly.
+    dependencies: []
+    priority_rationale: >-
+      Second of this imported set: cheap and scientifically distinct from the
+      already-tried focal and Brier arms, with an explicit soft-target extension
+      and initial-gradient normalization. Its false-negative hypothesis remains
+      unverified. Rank after the reserved head; do not interpret literature
+      coverage as evidence of a likely numerical win.
+  - id: shared-distribution-balanced-soft
+    mechanism_id: shared-cooccurrence-negative-tolerant-loss
+    parent_idea_id: null
+    title: Soft-target distribution-balanced loss with training-fold co-occurrence weights
+    opportunity: >-
+      The objective survey's distribution-balanced loss has not been evaluated.
+      It combines co-occurrence-aware weights with negative-tolerant regularization,
+      which differs from fitting positive/negative totals independently. However,
+      biproportional weighting was rejected at -0.004337 and additive prior-offset
+      BCE was rejected at -0.011854, so another combined weighting/link change
+      has weaker local support. Preserve this as a lower-priority reserve.
+    mechanism: >-
+      Adapt the authors' distribution-balanced objective to the unchanged soft
+      targets: combine y times its positive softplus branch with (1-y) times its
+      negatively scaled softplus branch, then apply co-occurrence-aware cell
+      weights. Use observed training labels thresholded at 0.5 only to compute
+      the frequency/co-occurrence statistics, never as substituted supervision.
+      Derive the relative inverse-frequency contribution of each label within
+      each study and apply the shared bounded sigmoid reweighting rule. Use one
+      shared alpha, beta, mu, negative scale and prior-offset coefficient across
+      all labels. Replace the incumbent class-weight table rather than stacking
+      both balancing rules. Preserve uniform study exposure; explicitly identify
+      this as an adaptation of a method motivated by class-aware resampling.
+    precedents:
+      - docs/research/auc_loss_approaches.md#10-distribution-balanced-loss
+      - docs/backlog/small-changes.md#bce-weighting-and-study-sampling
+      - https://arxiv.org/abs/2007.09654
+      - https://github.com/wutong16/DistributionBalancedLoss
+      - outputs/autoresearch/losses/experiments/shared-biproportional-weights-20260920T141757Z-d567131d/comparison/comparison.json
+      - outputs/autoresearch/losses/experiments/shared-soft-mass-balance-20260920T151517Z-d10564bb/comparison/comparison.json
+      - outputs/autoresearch/losses/experiments/shared-prior-offset-bce-20260920T171555Z-7de7d85a/comparison/comparison.json
+    novelty: >-
+      Not the earlier biproportional balancing fit or a plain prior offset: this
+      combines the published co-occurrence reweighting with negative-tolerant
+      regularization. The combination is the experimental unit; its result cannot
+      isolate which component helped or hurt. Our fractional targets, masks and
+      uniform exposure differ from the published binary-label setting. It has
+      no dependency on accepting a previous weighting implementation.
+    coverage: >-
+      Preserve all observed cells, original soft values and fixed study visits.
+      Compute all statistics from the training fold, respecting observed masks.
+      Specify finite behavior for an all-negative study, absent training class
+      and missing cells; record counts, weight ranges and effective class mass.
+      No validation statistics, relabeling, study resampling or per-label tuning.
+    exploitation: >-
+      Explore whether co-occurrence adjustment and limiting negative suppression
+      together preserve useful rare-finding gradients. Published gains on VOC/COCO
+      do not establish a knee-AUC benefit. Prior local weighting failures make
+      this a reserve hypothesis rather than a reason to repeat their settings.
+    budget: >-
+      Compute training-label statistics once inside measured preparation or
+      training, without decoding additional images or making another model pass.
+      Thereafter use metadata lookup and elementwise logit operations. Keep the
+      original ten epochs, 4,380 steps, visits, triplets and 1,797-second ceiling.
+      Record the statistics-preparation cost and preserve the sealed optimizer,
+      scheduler, validation and inference behavior.
+    implementation: >-
+      Implement the paper/code's rebalancing and negative-tolerant terms under
+      training/losses with explicit shared trainer.loss settings. Derive prior
+      offsets and co-occurrence statistics from training metadata using the same
+      rule for every target. Preserve fractional y in both supervised branches,
+      the observed-cell mask and pooled reduction. Record the exact offset sign,
+      negative scaling, normalization and departures from the authors' binary
+      formulation. Review source rather than transplanting their training system.
+    open_choices: >-
+      Before admission as an executable idea, justify one shared parameter set
+      and normalization under our uniform exposure, define all-negative/zero-count
+      handling, and explain why the combined mechanism remains worth its cost
+      after the prior-offset and biproportional failures. No parameter grid,
+      dedicated optimizer, extra stage or new sampling policy is authorized.
+    dependencies: []
+    priority_rationale: >-
+      Reserve after the two priority literature proposals and current substantive
+      work. Keep proposed outside the live queue unless the orchestrator resolves
+      the design questions and finds a stronger reason to promote it. Do not pad
+      the queue or displace the reserved head merely to cover the survey.
+exhausted_directions: >-
+  Imported at the user's request on 2026-09-20 after reviewing the existing loss
+  survey. Recommend ROC-star-style buffered hinge first and Hill-negative soft BCE
+  second, with distribution-balanced loss retained as a lower-priority reserve.
+  These are hypotheses, not measured gains or instructions to override review.
+  The losses campaign owns these ideas; the general docs remain source provenance,
+  not another execution queue. Preserve the claimed head and five-entry queue cap;
+  consider parking weaker unclaimed entries with a recorded rationale when making
+  room for actionable priority proposals, and leave surplus or unresolved ideas
+  proposed. Reconcile the ROC-star adaptation
+  with the existing memory-bank family and retain its historical dependency record;
+  do not execute both as duplicate buffer experiments. AUCM/CompAUC optimizer changes,
+  SPLC relabeling, extra pretraining, per-label loss choices and validation-driven
+  tuning remain outside this sealed campaign. Existing negative findings remain
+  valid evidence about their tested implementations, not proofs against all losses.

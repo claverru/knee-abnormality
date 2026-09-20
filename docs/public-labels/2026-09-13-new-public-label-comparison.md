@@ -9,6 +9,15 @@ reference agreement over Steven v4. Rayan's original release offers a narrower
 Fracture-source experiment, but its newer release cannot be justified using the
 older 0.8991 score. Those alternative sources have not been adopted or scheduled.
 
+**Screened on 2026-09-20, not audited:** newer public tables keep appearing — two
+gpt-luna releases on 09-18 among them — and none was scored here. The reason is
+the follow-up above plus the [local-to-public correlations](../research/val-test-correlations.md):
+the best gold candidate of 09-13 beat Steven v4 by 0.010 on the 58 studies and
+lost 0.008 publicly when trained on, and gold-only AUC correlates with nothing
+across our nineteen comparable submissions. A table's gold score does not
+justify a run. The public label work worth reading is summarized in the
+[2026-09-20 sweep](../research/public-research.md#the-2026-09-20-re-sweep).
+
 ## Published claims and reproduced scores
 
 Scores below are label-table macro ROC-AUC against the original official

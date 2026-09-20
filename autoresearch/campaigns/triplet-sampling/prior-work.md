@@ -24,11 +24,11 @@ for the starting implementation; retain older measurements under their actual se
 | Direction | Evidence status and implication | Source |
 |---|---|---|
 | Relative width and common-factor sigma sweeps | Implemented and trained; another scalar sweep needs a new reason. This does not settle distribution shape. | [Relative width](../../../docs/validation/results/2026-09-19-relative-sampler-width-result.md), [sweep](../../../docs/validation/results/2026-09-19-fold-ensembles-and-sigma-sweep.md) |
-| Peripheral evidence and acquisition asymmetry | Diagnostic evidence; tied to historical samplers and observational caches. | [Peripheral coverage](../../../docs/ongoing/peripheral-coverage.md) |
-| Per-type centre offsets | Rejected from the importance-map analysis without a training run; do not describe as a trained negative. | [Spatial importance map](../../../docs/ongoing/peripheral-coverage.md#spatial-importance-map) |
+| Peripheral evidence and acquisition asymmetry | Diagnostic evidence; tied to historical samplers and observational caches. | [Peripheral coverage](../../../docs/data-preparation/peripheral-coverage.md) |
+| Per-type centre offsets | Rejected from the importance-map analysis without a training run; do not describe as a trained negative. | [Spatial importance map](../../../docs/data-preparation/peripheral-coverage.md#spatial-importance-map) |
 | Per-plane width effects | Cache-only inference results; these did not predict the training-versus-drawing decomposition. | [Cache result](../../../docs/validation/results/2026-09-18-per-plane-sigma-cache.md) |
 | Fixed-total reallocations, random type allocation, repeated-series share | Previous negative or tied implementations; inspect the exact allocation and recipe before revisiting. | [Closed allocation investigation](../../../docs/history/triplet-budget-allocation.md) |
-| Per-plane ratios and asymmetric coronal draw | Imported into this campaign as `geometry-informed-plane-widths` and `coronal-side-relative-draw`; both trained 2026-09-19 and inconclusive (+0.00041 and −0.00130). This campaign owns their execution. The general backlog no longer carries them, and the repository now records the outcome in the sampler-shape document. Use one justified plane policy, not a multiplier sweep. | [Sampler shape](../../../docs/ongoing/peripheral-coverage.md#what-is-settled-and-what-is-not), [geometry](../../../docs/ongoing/peripheral-coverage.md#acquisition-geometry) |
+| Per-plane ratios and asymmetric coronal draw | Imported into this campaign as `geometry-informed-plane-widths` and `coronal-side-relative-draw`; both trained 2026-09-19 and inconclusive (+0.00041 and −0.00130). This campaign owns their execution. The general backlog no longer carries them, and the repository now records the outcome in the sampler-shape document. Use one justified plane policy, not a multiplier sweep. | [Sampler shape](../../../docs/data-preparation/peripheral-coverage.md#what-is-settled-and-what-is-not), [geometry](../../../docs/data-preparation/peripheral-coverage.md#acquisition-geometry) |
 | Side-conditioned sagittal sampling | Existing blocked proposal: the importance map needs a mirrored re-export and laterality plumbing. | [Position and knee side](../../../docs/backlog/big-bets.md#position-and-knee-side) |
 | Run-level stratified jitter | Rejected for adoption on 2026-09-20 after inconclusive confirmation; original provisional acceptance withdrawn. Do not repeat unchanged. | [Decision and evidence below](#run-level-stratified-jitter-rejected-for-adoption) |
 
@@ -82,6 +82,18 @@ state snapshot and the parked follow-ups. The corresponding entry in
 supersedes earlier adoption guidance without deleting it. Full model and bootstrap
 evidence remains in the
 [experiment result](../../../docs/validation/results/2026-09-20-stratified-sampling-promotion.md).
+
+## Preparation scope amendment
+
+The user authorized the queued `physical-span-standardized-triplets` scope repair
+on 2026-09-20. Revision 180 adds `preparation.py` to both the campaign definition
+and saved policy, limited to nonconsecutive-triplet validation and its immediate
+callers within the editable source. Historical prose approval had not granted the
+executable permission. The [decision and recovery snapshots](../../../outputs/autoresearch/triplet-sampling/decisions/user-authorize-triplet-preparation-20260920T192746Z-e03bfe70/decision.json)
+record the amendment; the [developer instructions](campaign.yaml) define its
+constraints. The queued idea still needs implementation, measurement and normal
+review. The campaign remains stopped with the same numerical seal, incumbent,
+experiment history and blocked follow-ups.
 
 ## Reference evidence
 

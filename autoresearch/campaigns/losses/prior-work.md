@@ -36,7 +36,7 @@ campaign's original 1,785-second ceiling or its state.
 | Direction | Evidence and campaign treatment | Repository source |
 |---|---|---|
 | Fixed class-balanced BCE | Already adopted; start here. Its measured gain does not establish that stronger weighting is always better. | [Balanced-BCE result](../../../docs/validation/results/2026-09-19-balanced-bce-result.md) |
-| Shared BCE plus ranking | Untried proposal imported as `shared-bce-ranking`. This campaign owns its execution; the general backlog is provenance, not a second queue. | [Ranking-aware loss](../../../docs/backlog/small-changes.md#ranking-aware-loss) |
+| Shared BCE plus ranking | Imported as `shared-bce-ranking`; the completed comparison was inconclusive. This campaign owns its execution and result. | [Ranking-aware loss](findings.md#completion-20260920t121537z-5b39b418) |
 | Shared focal objective | Proposed here as `shared-balanced-focal`. External ACL/MCL results motivate objective exploration but do not establish a macro gain or the winning shared loss. | [Per-label research motivation](../../../docs/research/per-label-losses.md#trusted-motivation) |
 | Tempered class weights | Import only the objective-weighting portion as `shared-tempered-balance`. Study sampling and batch composition remain outside this campaign. | [Weighting and sampling](../../../docs/backlog/small-changes.md#bce-weighting-and-study-sampling) |
 | Loss schedule | `shared-delayed-ranking` applies the same within-run schedule to all labels. It is not the proposed frozen-head screen, checkpoint continuation, or compositional AUC algorithm. | [Loss extensions](../../../docs/research/per-label-losses.md#candidate-losses-and-extensions) |

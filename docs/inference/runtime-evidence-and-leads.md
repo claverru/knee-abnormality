@@ -91,3 +91,32 @@ so they do not transfer to our single model; the mechanisms do.
 - **Overlap decoding with scoring** (decode the next study block while the GPU
   scores the current one) and share one decoded window tensor between two arms
   that differ only by a flip, keeping both forwards.
+
+## Another team's T4 profile, and two negative results (2026-09-20)
+
+A participant who took a single-CoAtNet submission from about 38 to 20 minutes
+reports that [nearly all of the saving came from the CPU side](https://www.kaggle.com/competitions/rsna-knee-abnormality-detection/discussion/742206):
+making the forward pass 2× faster moved total runtime by **2%**. They measure
+about **80 MB/s** of DICOM reading that does not improve with 2, 4 or 6 decode
+workers per GPU, on ~76 MB studies, and read it as a bandwidth ceiling.
+
+Our own measurements agree on the conclusion and disagree on the cause: the
+frame stage runs at 53–62% of a measured **510 MB/s** ceiling on Kaggle and the
+box is 98.2% busy at 0.7% iowait with 91.3% of CPU in the loader workers
+([attribution](../backlog/loading-speedup/attribution.md#the-model-that-replaces-the-old-ranking)).
+Their plateau across worker counts is consistent with CPU saturation rather than
+storage bandwidth. Either way the lever is reading fewer bytes per study, not
+reading them faster.
+
+Two negative results from the same post, on the same T4 generation we submit on:
+
+- **`torch.compile` with max-autotune was 2.75× slower than eager** on sm_75,
+  plus about two minutes of compile time.
+- **`allow_tf32` does nothing on a T4** — TF32 needs Ampere. We do not set it.
+
+The [public fast 2×T4 notebook](https://www.kaggle.com/code/jiweiliu/rsna-knee-fast-2xt4-inference)
+added one more mechanism since the 09-18 snapshot: running two independent
+readers concurrently on both T4s at unchanged checkpoints, windows, precision
+and weights, which the author times at **155.2 s → 69.4 s** over 30 studies.
+Our two GPU processes already run one bundle each, so this applies only if we
+ever submit two differently shaped arms.

@@ -38,16 +38,32 @@ Log decode failures by UID, distinguish missing codecs from malformed payloads,
 and explicitly handle missing slices/series while preserving one prediction row
 per test study.
 
-**The host tried to replace these files on 2026-09-17** and the attempt may have
-failed: every competition file now carries a 2026-09-17 22:14 UTC creation date,
-several download links broke, and the host answered on 2026-09-18 that "we
-attempted to update the dataset recently to fix the corrupted DICOMs, but it
-looks like the update may have failed"
+**Both files are repaired upstream, verified on 2026-09-20.** The host tried to
+replace them on 2026-09-17, several download links broke, and the host said on
+2026-09-18 that the update "may have failed"
 ([thread](https://www.kaggle.com/competitions/rsna-knee-abnormality-detection/discussion/741916)).
-Our copy predates that upload. Once downloads work again, re-fetch these two
-studies and recheck them: `KNOWN_BAD_SERIES` and `KNOWN_BAD_INSTANCES` in
-`src/knee_abnormality/data/preprocessing/exclusions.py` name exactly these files,
-and a successful repair would make those exclusions discard usable slices.
+Single-file downloads work again, and re-fetching the two instances returns
+complete payloads: 173,056 → **346,112** bytes against 346,112 declared, and
+409,600 → **819,200** against 819,200. Both now decode with pydicom 3.0.2, to
+(416, 416) and (640, 640) `uint16`. The re-uploaded files carry 2026-09-19
+timestamps; a seeded eight-file random sample from elsewhere in the train split
+came back **byte-identical** to our 2026-09-10 copy, which is evidence that the
+re-upload changed only the repaired files, not proof over 819,640 files.
+
+**Taken on 2026-09-20.** Both repaired instances replaced the truncated files in
+`data/raw`, and the guard that skipped them is gone: `exclusions.py` and its two
+call sites are deleted, so `index_series` no longer drops the instance by UID and
+`build_series_index` no longer subtracts one from those series' image counts.
+The two series now index 38 and 36 slices against 38 and 36 on disk, matching
+`train_series_image_counts.parquet`, and every slice of both decodes through the
+production reader, the repaired ones into finite (224, 224) images. Two slices
+return to training out of 819,078, so the effect on a model is not measurable;
+the point is that the data and the code now say the same thing.
+
+Removing `exclusions.py` bumps the preprocessing identity — `sources_sha256`
+`f9d05ad2` → `65a6123d` — so it applies to fresh runs only. A truncated file in
+the hidden test set is still handled, by the generic decode-failure path that
+drops the candidate series and records the failure, not by a UID list.
 
 For physical ordering, adjacent-triplet selection and cache tradeoffs, see the
 [public geometry evidence](../research/public-research.md#geometry-sampling-encoders-and-losses)

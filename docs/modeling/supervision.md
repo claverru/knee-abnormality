@@ -30,6 +30,11 @@ All cover the 4,349 report-only studies. Pilkwang omits one reference study,
 so its extraction score uses 57 rather than 58 studies. Their uncertainty
 encodings differ; consult the audit before constructing training targets.
 
+The [report-state audit](../public-labels/uncertainty-and-confidence-encoding.md#report-state-audit-and-implications-for-supervision)
+measures disease despite report silence, information lost by collapsing soft scores and
+reporting-status associations in saved image predictions. Auxiliary report-state supervision
+is proposed but unimplemented; the current disease targets and loss remain in force.
+
 ## Fixed class-balanced BCE
 
 **Measured 2026-09-19:** `balanced-bce` reached 0.895282, +0.008796 over the closest same-seed

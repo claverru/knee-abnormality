@@ -17,3 +17,4 @@
 | Checking random seeds, explicit seeds and resume behavior | [Training seeds and fold selection](configs-and-experiment-artifacts.md#training-seeds-and-fold-selection) |
 | Resolving config, CLI and label-manifest paths | [Path resolution](configs-and-experiment-artifacts.md#path-resolution) |
 | Locating saved configs, checkpoints and run provenance | [Experiment artifacts](configs-and-experiment-artifacts.md#experiment-artifacts-and-reproducibility) |
+| Checking which historical weights were removed and which remain usable | [Checkpoint pruning](configs-and-experiment-artifacts.md#checkpoint-pruning) |

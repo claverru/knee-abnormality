@@ -18,10 +18,10 @@ intensity, affine, dropout, decay and warm-up arms are recorded under already me
 The earlier [five-run queue](../validation/results/2026-09-19-untried-hyperparameter-queue.md)
 also yielded no adoption.
 
-**No delta recorded before 2026-09-19 is a prior for a new queue.** Everything in
-[already measured](#already-measured) was run under ordinary BCE, and the recipe in force uses
-class-balanced BCE, which by itself moves fold 0 by about 0.008. Keep
-`validation_image_multiplier: 1` in comparisons.
+**No delta recorded before 2026-09-19 is a prior for a new queue.** Those historical runs used
+ordinary BCE; the recipe in force uses class-balanced BCE, which by itself moves fold 0 by about
+0.008. The [result links](#already-measured) also include the newer balanced-BCE comparisons.
+Keep `validation_image_multiplier: 1` in comparisons.
 
 ## User decisions (2026-09-16)
 
@@ -49,19 +49,9 @@ class-balanced BCE, which by itself moves fold 0 by about 0.008. Keep
 
 ## Candidates for later queues
 
-- **Stronger intensity augmentation has now been screened under balanced BCE.**
-  Probability 0.75, gamma `[0.70, 1.30]` and contrast `[0.80, 1.20]` were isolated
-  in the 2026-09-20 queue. None is adopted; the first two sit below the control
-  mean and contrast is the worst candidate. Do not repeat these values as untried.
 - **The epoch budget is reopened under this loss.** Three of the four arms on 2026-09-19 selected
   epoch 10, the last one, and so did both positives; the control peaked at 9. The measurements
   that closed the axis were all made under ordinary BCE, where the peak came earlier.
-- **The epoch budget under ordinary BCE is closed.** 15 epochs was measured three times, all the same sign and all
-  inside the single-run threshold: ReXNet +0.0023 (2026-09-18), ReXNet +0.0025 (2026-09-19) and b0
-  +0.0029 (2026-09-18 b0 queue), against 20 epochs at −0.0027. A fourth run at 50% more wall time
-  cannot separate it; adopting 15 epochs is a cost decision for the user, not a queue slot.
-- **Higher head learning rates are measured.** The 2026-09-20 isolated 0.0012 and
-  0.0024 arms scored below both controls. Keep 0.0006; neither is an untried lead.
 - **Denser per-type budgets** (hypothesis; the only untested side of a measured axis). Raise
   `data.series_types[*].max_images` above today's 18/18/15/15/15/15 at a fixed sampler width and
   crop. Only the cheaper side has been measured and it loses monotonically: 15/15/12/12/12/12
@@ -69,7 +59,11 @@ class-balanced BCE, which by itself moves fold 0 by about 0.008. Keep
   ([runs](../validation/results/2026-09-16-restored-code-hyperparameter-runs.md)). Public evidence
   points the same way, with a CoAtNet pipeline gaining 0.917 → 0.926 → 0.928 → 0.932 as slice
   density rose at a fixed reach
-  ([public research](../research/public-research.md#slice-density-and-the-board-2026-09-18-re-sweep)).
+  ([public research](../research/public-research.md#slice-density-and-the-board-2026-09-18-re-sweep)),
+  but a second team whose pipeline pools per-series slots through masked attention — our structure,
+  not the window-scoring one — measured **−0.0045** going denser on the same axis
+  ([counter-report](../research/public-research.md#the-2026-09-20-re-sweep)), so the public evidence
+  no longer points one way and our own cheaper-side losses carry this candidate on their own.
   **Memory rules it out as a one-change run:** `sigma-fraction-0867` already peaks at 20.8 GiB
   with `study_triplet_total: 26`, well above the 18.9 GiB of the era that produced the 23.5 GiB
   estimate, so 21/21/18/18/18/18 exceeds the card. It needs a second change (accumulation, or
@@ -81,20 +75,8 @@ class-balanced BCE, which by itself moves fold 0 by about 0.008. Keep
   the milder side of the strong affine that lost −0.0024, and reflection probabilities other than
   0.5. Ordering, interactions and new families are
   [small changes](small-changes.md#augmentation-families).
-- **The shared sigma scale is settled, so no further fraction arm.** The 2026-09-19 sweep ran 0.60,
-  0.76, 0.95 and 1.10 against the adopted 0.867 on fold 0 and came out non-monotone with the control
-  at the bottom, spanning 0.00674 — seed noise, not a response
-  ([sweep](../validation/results/2026-09-19-fold-ensembles-and-sigma-sweep.md)). The queued 0.76 arm
-  is retired with it. This settles the *scale* only: the sweep moves all three planes by one factor,
-  so per-plane ratios and an asymmetric coronal draw are untouched by it. Both have since been
-  trained once by the stopped autoresearch campaign and came back inconclusive, so neither is a
-  queue candidate here
-  ([what is settled](../ongoing/peripheral-coverage.md#what-is-settled-and-what-is-not)).
 - **`trainer.accumulate_grad_batches: 2`** (untried; two-sided). It buys an effective batch of 16
   at unchanged memory but halves optimizer steps to 2,190, the axis the b0 queue says helps.
-- **Dead config:** `trainer.min_delta` is 0.0001 in all 143 saved runs and its only consumer is
-  EarlyStopping at `scripts/pipeline/train.py:234`, where `patience` equals `max_epochs`, so it
-  never fires. It is a removal, not a candidate.
 - **Low value:** `data.sampling_sigma_mm: 50` is retired with the fixed-width sampler;
   `optimizer.weight_decay: 0.001`, since 0.003 and 0.03 are settled, 0.05 lost
   −0.0008 and 0.003 gained only +0.0002 on the 2026-09-12 recipe.
@@ -108,58 +90,26 @@ class-balanced BCE, which by itself moves fold 0 by about 0.008. Keep
 
 ## Already measured
 
-On the balanced-BCE recipe, [2026-09-20 fourteen-run queue](../validation/results/2026-09-20-overnight-hyperparameter-results.md):
-controls 0.893222 and 0.896582, mean 0.894902. No adoption. Milder scale
-`[0.97, 1.03]` was best at 0.895868, with both bootstrap intervals spanning zero.
-Stronger contrast `[0.80, 1.20]` was worst at 0.889906. Head LR 0.0012/0.0024,
-backbone LR 0.0003, dropout 0.1, intensity probability 0.75, gamma `[0.70, 1.30]`,
-affine probability 0.5, rotation 7 degrees, weight decay 0.03 and warm-up 2 were
-also measured. All were below the control mean; their individual bootstrap
-intervals were not calculated. These are completed arms, not pending proposals.
+Completed runs belong to their result records. These exclusions prevent them being queued again
+as untried settings:
 
+- The September 20 queue's twelve candidate arms completed with no adoption, including
+  balanced-BCE head LR 0.0012/0.0024 and stronger intensity probability/gamma/contrast.
+- Shared sampler scale 0.60–1.10 and the two sampler-shape proposals have been measured; no
+  fraction or shape repeat is queued here.
+- More epochs under ordinary BCE, fixed-width sigma 50, and rejected attention/readout variants
+  are not fresh queue candidates. The epoch question under balanced BCE remains open above.
+- Explicit user decisions above remain in force; the result history does not reopen them.
 
-On the balanced-BCE recipe, 2026-09-19 queue (fold 0, validation ×1, one unseeded run each,
-control 0.894037; [results](../validation/results/2026-09-19-untried-hyperparameter-queue.md)):
-`data.noise_augmentation.std_range: [0.01, 0.04]` +0.00105, `optimizer.beta1: 0.95` +0.00068,
-`optimizer.epsilon: 1e-6` −0.00005 and `data.intensity_augmentation.probability: 0.25` −0.00082.
-All four sit inside the run-to-run floor and none is adopted; every bootstrap interval spans zero.
+| Recipe | Completed comparisons |
+|---|---|
+| Balanced BCE | [September 20 fourteen-run queue](../validation/results/2026-09-20-overnight-hyperparameter-results.md) |
+| Balanced BCE | [September 19 five-run queue](../validation/results/2026-09-19-untried-hyperparameter-queue.md) |
+| Ordinary BCE | [September 19 folds, epoch arms and sigma sweep](../validation/results/2026-09-19-fold-ensembles-and-sigma-sweep.md) |
+| Ordinary BCE | [September 18 queue](../validation/results/2026-09-18-overnight-results.md) and [B0 queues](../validation/results/2026-09-18-b0-hyperparameter-queues.md) |
+| Ordinary BCE | [September 17 queue and EMA/SWA](../validation/results/2026-09-17-overnight-results.md) |
+| Ordinary BCE | [September 16 restored-code runs](../validation/results/2026-09-16-restored-code-hyperparameter-runs.md) |
+| Ordinary BCE | [September 15 queue](../validation/results/2026-09-15-overnight-results.md) |
+| Sampling campaign | [Sampler-shape outcomes](../data-preparation/peripheral-coverage.md#what-is-settled-and-what-is-not) |
 
-Everything below this line was measured under **ordinary BCE** and does not rank settings on the
-current recipe.
-
-On the 2026-09-18 queue (fold 0, validation ×1, one unseeded run each, two controls spanning
-0.0026 with mean 0.885128; [results](../validation/results/2026-09-18-overnight-results.md)):
-`backbone_eval` −0.0100 and `backbone_lr 1e-4` −0.0030 lose clearly; gated attention +0.0010 and
-the per-target residual readout −0.0005 land at the control mean, so both are dropped; the
-repeated-series share topped the table at +0.0044 and then lost 0.004 publicly, so it is rejected;
-robust centre 20 mm +0.0037, 30 mm +0.0027 and 10 mm +0.0010, the study triplet total 26 +0.0033
-and 32 +0.0036, `model.dropout: 0.1` +0.0032, series dropout 0.15 +0.0030, 15 epochs +0.0023
-(peaks at epoch 11, 50% more time), milder affine +0.0015 and `warmup_epochs: 2` +0.0004 all sit
-inside one cluster narrower than the control spread.
-
-
-On the restored code, 2026-09-17 queue
-([result](../validation/results/2026-09-17-overnight-results.md)), paired with its seed-42
-control (0.892995): three control seeds span 0.0032 (0.889837–0.892995, standard deviation
-0.0016), so a bootstrap interval that clears zero can still be seed luck. EMA 0.999 +0.0002 and
-SWA over 3 epochs +0.0001 at the best epoch (+0.0005 at the last); `clip 0.001` −0.0003,
-`gradient_clip_val 5` −0.0003, warm-up 0 −0.0015, `gradient_clip_val 0.5` −0.0016, head LR 3e-4
-−0.0017, noise 0.3 −0.0019, `clip 0.01` −0.0021, `beta2 0.99` −0.0025, 20 epochs −0.0027 (peaks at
-epoch 12, then overfits), affine off −0.0041 (interval excludes zero).
-
-On the restored code (2026-09-16, user-launched, no fresh control yet;
-[result](../validation/results/2026-09-16-restored-code-hyperparameter-runs.md)): `min_lr 0.1`
-+0.0001, series dropout 0.3 +0.0001 and 0.25 −0.0025, 20% fewer slices −0.0041 (20% faster
-training) and 35% fewer slices −0.0051 (37% faster). Replicates of the same setting differed by
-0.0003–0.0007, but the 2026-09-17 seed controls spread by 0.0032, so single-run deltas of this
-size are noise.
-
-On `00-baseline` (2026-09-15):
-
-`01-sigma30` +0.000039, `02-higher-lr` −0.000222, `03-min-lr-0.1` +0.000408,
-`04-series-dropout-0.3` −0.000492, `05-wd-0.05` −0.000837, `06-affine-strong` −0.002389, and
-the `crop130` rerun −0.000263
-([overnight results](../validation/results/2026-09-15-overnight-results.md)). That queue completed
-seven of sixteen runs: `07-crop130` stopped during epoch 8 when the machine or WSL stopped, and
-runs `08-clip-0.01` through `15-backbone-eval` never started. Earlier settled searches are listed
-in the [launcher doc](../validation/overnight-hyperparameter-queue.md).
+Earlier settled searches are linked from the [launcher guide](../validation/overnight-hyperparameter-queue.md).

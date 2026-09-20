@@ -15,6 +15,7 @@ policy:
     - configs/training.yaml
     - src/knee_abnormality/config.py
     - src/knee_abnormality/data/dataset.py
+    - src/knee_abnormality/data/preprocessing/preparation.py
     - src/knee_abnormality/data/preprocessing/sampling.py
   editable_directories:
     - src/knee_abnormality/data/triplet_sampling
@@ -35,6 +36,12 @@ policy:
     policy setup must execute inside the measured training process. Change only
     the declared editable files and helpers. Do not touch callback/accounting or
     other code. Use the existing Python environment for static checks. No tests.
+    In preparation.py, changes are limited to prepare_series validation of
+    nonconsecutive triplets for physical-span-standardized-triplets and its
+    immediate callers within the existing editable files. Preserve three
+    distinct slices per triplet, distinct middles, original acquisition
+    indices, geometry checks, decoding, augmentation, and accounting. All
+    other preparation behavior stays fixed.
   researcher_instructions: >-
     Return distinct creative sampling mechanisms, not hyperparameter sweeps.
     Keep coverage and exploitation explicit and respect the fixed triplet budget.

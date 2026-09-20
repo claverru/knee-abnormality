@@ -10,6 +10,8 @@ ReXNet-200) of the [full-slice model](current-model.md).
   ([result](../validation/results/2026-09-18-efficientnet-backbone-results.md)).
 - **Related research:**
   - [Backbone MRI evidence](../research/backbone-mri-evidence.md) covers which families suit MRI.
+  - [Reusable image and MRI encoders](../research/huggingface-image-encoders.md) covers Hub
+    checkpoints, patch-token adapters and the knee-specific 3D alternatives.
   - [EfficientNet training](../research/efficientnet-training.md) covers EfficientNet
     preprocessing and BatchNorm handling.
 - **History:** the crop-era budget, with the MobileNetV3 scout, its delta formula and its code
@@ -108,6 +110,8 @@ convolution in module order is exact only for single-path networks with static p
 - **Fixed input size:** LeViT, EfficientViT-M and EfficientFormer/V2 run only at their native
   size, so `data.image_size` must match it.
 - **ViT-like:**
-  - *Stride:* stride 16 only, so a stride-32 map would need 2×2 pooling.
-  - *Origin:* a 7.5 px patch origin.
+  - *Stride:* depends on the patch embedding; patch-16 and patch-14 encoders produce different
+    grids. Our head can retain either grid after adaptation and verified geometry.
+  - *Origin:* for unpadded patchification, 7.5 px at patch size 16 and 6.5 px at patch size 14.
+  - *Output:* remove non-spatial prefix tokens and reshape patch tokens to NCHW.
   - *Position embeddings:* interpolated, and `img_size` or `dynamic_img_size` must be set.

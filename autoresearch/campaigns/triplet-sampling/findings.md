@@ -1383,3 +1383,12 @@ Explicit user-authorized addition to the frozen role profiles. Existing role ass
 
 Evidence:
 - outputs/autoresearch/triplet-sampling/decisions/completion-reporter-profiles-20260920T104935Z-92c8a5fa/decision.json
+
+## user-authorize-triplet-preparation-20260920T192746Z-e03bfe70
+
+Resolved the sole queued idea's edit-scope blocker by explicitly adding src/knee_abnormality/data/preprocessing/preparation.py to the campaign definition and stopped runtime policy. Permission is limited to nonconsecutive-triplet validation for physical-span-standardized-triplets, preserving preparation and accounting invariants. The campaign remains stopped with that idea queued.
+
+The user requested this repair after the read-only readiness audit found that historical approval prose had never updated the executable policy. This is a recorded user-authorized amendment at a stopped boundary, not candidate authority to change scope. The previous state and campaign projections are saved with the decision. Control B, the frozen development source, recipe, all experiment and job history, the queue, both blocked follow-ups, the numerical seal and acceptance machinery remain unchanged. Candidate implementation and normal review still follow after an authorized resume. The old researcher failure was a Claude session-quota HTTP 429; the historical reason remains until resume clears it.
+
+Evidence:
+- outputs/autoresearch/triplet-sampling/decisions/user-authorize-triplet-preparation-20260920T192746Z-e03bfe70/decision.json

@@ -36,10 +36,11 @@ Implemented on 2026-09-16, gated by `optimizer.weight_averaging` (`null` by defa
 per run: `{method: ema, decay}` or `{method: swa, epochs}`; mutually exclusive by construction).
 `KneeModule` keeps a hand-written averaged copy of the model, updated after every optimizer step,
 never a second constructed model — constructing one would draw from the global CPU RNG and shift
-the DataLoader shuffle. The design and its rejection of Lightning's `StochasticWeightAveraging`,
-`AveragedModel` and timm's `ModelEmaV3` are recorded in the
-[weight-averaging endgame entry](../backlog/endgame.md#weight-averaging); this section is the
-semantics as shipped.
+the DataLoader shuffle. `EMAConfig`, `SWAConfig` and `WeightAveragingConfig` in
+`src/knee_abnormality/config.py` define the settings; the experiment validator rejects an SWA
+window longer than `max_epochs - warmup_epochs`. This section owns the shipped semantics and
+design rationale; pending comparisons live in the
+[weight-averaging endgame entry](../backlog/endgame.md#weight-averaging).
 
 - **EMA:** the averaged copy tracks the live model exactly (an exact copy, not a decay-1 lerp)
   until the warm-up steps end, then every step lerps it toward the live weights with weight
@@ -69,6 +70,41 @@ semantics as shipped.
   no randomness and does not clip, so numerics are unchanged. Whether
   `trainer.gradient_clip_val: 1.0` ever binds is read from the logged values.
 
+### Design rationale and original budget
+
+The 2026-09-16 implementation uses `deepcopy` and a stateless per-step interpolation weight.
+The alternatives were rejected for specific integration reasons: `AveragedModel` passed integer
+buffers through floating-point arithmetic; timm `ModelEmaV3` did not provide uniform SWA weights;
+and a callback could not swap weights before the strict checkpoint load. Lightning's
+`StochasticWeightAveraging` also changed the schedule to epoch-level `SWALR`, flattened the
+3:1 backbone/head LR ratio, omitted the final epoch, added a pseudo-epoch eligible for selection,
+kept the average outside the saved `model.*` weights and reset BatchNorm statistics that
+`backbone_eval` would not re-estimate. These are the recorded implementation decisions, not an
+assessment of later library versions.
+
+For the original ten-epoch, 4,380-step run, warm-up ended at step 438. EMA decay 0.999 gave a
+1,000-step (2.3-epoch) horizon matching the flat cosine tail: `00-baseline` live AUC was
+0.89269, 0.89269, 0.89205 and 0.89276 at epochs 7–10. Decay 0.99 would track roughly 100 steps;
+0.9995 would retain substantial weight from epochs 5–7. SWA's three-epoch window started at
+step 3,066. Where the averaged copy equals the live model (EMA epoch 1, SWA epochs 1–7), their
+metrics must match. Only the averaged score selects checkpoints, preserving ten candidates;
+export drops the auxiliary `live_state_dict`.
+
+Pre-run estimates were 58 MB extra GPU memory (0.3% of a 20.0 GiB peak), checkpoints growing
+from 175 to about 233 MB, a few seconds for updates, about three minutes for duplicate validation,
+and 1–1.5 minutes per SWA BatchNorm refresh. The completed
+[comparison](../validation/results/2026-09-17-overnight-results.md#weight-averaging) measured
+153 s extra for EMA and 369 s for SWA; the live-only-at-last-epoch optimization remains in
+endgame rather than being treated as shipped.
+
+The [optimizer research](../research/optimizer-research.md#4-ema-first-additional-training-feature)
+records background. A public B0 ablation reported 0.7914 to 0.7940 with EMA, considered noise by
+its author ([public findings](../research/public-research.md#geometry-sampling-encoders-and-losses));
+a [public notebook](../research/public-research.md#public-code-worth-inspecting) averages top-epoch
+weights. The historical baseline1 epoch-7–9 probability average gained 0.004267 on twelve reused
+validation studies, which is not an independent gain
+([review](../history/baseline1-review.md#follow-up-experiments)).
+
 ## Study-level knee reflection
 
 Implemented on 2026-09-13. The candidate `spatial-tokens-reflection` adds
@@ -76,8 +112,9 @@ Implemented on 2026-09-13. The candidate `spatial-tokens-reflection` adds
 A training forward draws one seeded device-RNG value per study, masks it by
 [acquisition eligibility](../data-preparation/reflection-geometry-and-previews.md#reflection-geometry-and-eligibility),
 and broadcasts it across retained acquisitions and triplets. Eligibility is
-computed before series dropout. Evaluation consumes no reflection draws and
-uses original inputs; reflection TTA is absent.
+computed before series dropout. Evaluation consumes no stochastic reflection draws;
+optional deterministic [reflection TTA](../inference/model-bundle-and-offline-environment.md#reflection-test-time-augmentation-tta2)
+is applied separately during prediction.
 
 Axial and coronal triplets reverse columns exactly. Sagittal triplets reverse
 channels without changing the pixels within a slice, and negate the signed
@@ -94,7 +131,7 @@ consulted on 2026-09-13. The completed run selected epoch 9 at **0.890976**
 validation macro AUC and **0.931 public AUC**, the best public result at that
 time. The later [sigma-40 run](../validation/results/2026-09-14-reflection-sigma-40-result.md)
 selected epoch 7 at **0.892360 validation AUC and 0.936 public AUC**, making
-it the best submitted model. Its recipe without the 3D embedding is the maintained
+it the best submitted model at that time. Its recipe without the 3D embedding underlies the maintained
 [training config](../../configs/training.yaml)
 ([current model](current-model.md)).
 The run's saved effective configuration remains the historical source of truth.

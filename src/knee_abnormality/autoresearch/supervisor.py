@@ -18,8 +18,10 @@ from knee_abnormality.autoresearch import providers
 from knee_abnormality.autoresearch.campaigns import CampaignPolicy, load_campaign
 from knee_abnormality.autoresearch.completion import completion_blockers
 from knee_abnormality.autoresearch.context import build_context, prompt_sizes
+from knee_abnormality.autoresearch.diagnostics import diagnostics_path
 from knee_abnormality.autoresearch.gates import (
     config_differences,
+    dependency_blockers,
     evaluate,
     initial_limits,
     validate_config,
@@ -378,7 +380,9 @@ class Supervisor:
             "All canonical docs are read-only to this invocation: return the requested structured report; "
             "the supervisor serializes authorized decisions and restricted factual completion records. "
             "Never change limits, evaluator, labels, folds, harness, or unrelated recipe. "
-            "Shell commands must start with rtk. Return only the requested structured report and new evidence, within the schema's length limits. "
+            "Shell commands must start with rtk. Return only the requested structured report and new evidence. "
+            "Narrative length and evidence/concern counts are concision targets, not validation limits. Aim comfortably below the targets; link detailed analysis. "
+            "Preserve complete concerns and evidence rather than truncating them or changing decisions to fit a target. "
             "Do not restate standing constraints, unchanged rankings, scheduling, or historical conclusions. "
             f"{evidence_guidance}"
             "The supervisor owns scheduling, reservations, numerical verdicts, and mechanical transitions. "
@@ -735,12 +739,30 @@ class Supervisor:
             self.save()
             return
         exp["stage"] = "comparing"
+        command_file = directory / "comparison-command.json"
+        write_json(
+            command_file,
+            {
+                "source": str(base),
+                "command": command,
+                "comparison": str(directory / "comparison/comparison.json"),
+            },
+        )
         self.submit(
             "comparison",
-            base,
+            self.root,
             sandbox(
-                command,
-                base,
+                [
+                    sys.executable,
+                    "-m",
+                    "scripts.tools.autoresearch",
+                    "compare",
+                    "--config",
+                    str(command_file),
+                    "--root",
+                    str(self.root),
+                ],
+                self.root,
                 [directory],
                 readonly=[directory / "source", directory / "training"],
             ),
@@ -840,6 +862,11 @@ class Supervisor:
                             Path(exp["directory"]) / "comparison/comparison.json"
                         ),
                         "macro_auc": report["family_means"]["all"],
+                        "per_label": str(
+                            diagnostics_path(
+                                Path(exp["directory"]) / "comparison/comparison.json"
+                            )
+                        ),
                         "bootstrap": report["paired_report_group_bootstrap"][
                             "intervals"
                         ]["all"],
@@ -1030,15 +1057,13 @@ class Supervisor:
                 raise ValueError(
                     "A proposal needs precedent references and a material difference"
                 )
-            if any(
-                parent not in self.state["ideas"] for parent in idea["dependencies"]
-            ):
-                raise ValueError("Unknown proposal dependency")
-            if any(
-                self.state["ideas"][parent].get("decision") != "provisional_accept"
-                for parent in idea["dependencies"]
-            ):
-                raise ValueError("A queued proposal has unresolved dependencies")
+            blockers = dependency_blockers(idea, self.state["ideas"])
+            if blockers:
+                raise ValueError(
+                    f"Cannot queue {idea_id}: dependencies require a recorded provisional_accept: "
+                    f"{'; '.join(blockers)}. Omit this ID from accepted_proposal_ids and ranked_ids; "
+                    "it will remain proposed. Queue position does not resolve dependencies."
+                )
         exp = self.state["experiments"].get(event.get("experiment"))
         if event["kind"] == "review":
             if report["review"] not in {"approve", "repair", "block"}:
@@ -1261,6 +1286,8 @@ class Supervisor:
                     "Review evidence and interpret only this event. Use ranked_ids=null when the live queue order and membership stay unchanged. "
                     "When evidence requires a queue change, return a complete ranking of the LIVE queue plus accepted proposals minus explicitly parked IDs. "
                     "Keep any reserved head first. Target at most five. accepted_proposal_ids may contain IDs in this proposals event or existing proposed registry entries. "
+                    "Consult proposal_admission: every dependency must already have decision=provisional_accept. Queued, launched or undecided is insufficient. "
+                    "Leave unresolved proposals out of accepted_proposal_ids and ranked_ids; they remain proposed automatically. Ranking them last does not make them eligible. "
                     "Retain surplus proposals without queueing weak ideas. Use review only for review events; otherwise none. "
                     "For completion interpret the fixed eligible_decision; the supervisor records it directly. Do not recompute it or return a verdict. "
                     "For review inspect changes.diff and source, including validation independence from training seed, coverage/exploitation, "
@@ -1346,7 +1373,7 @@ class Supervisor:
                         "Use the compact mechanism registry, then retrieve relevant prior work and original reports through history_index before proposing. "
                         f"{self.policy.researcher_instructions} "
                         "Reference historic/general-backlog ownership and identify overlaps with ongoing work. Use unique stable lowercase-hyphen IDs. "
-                        "Fewer ideas is fine; this refill will not immediately retrigger itself. Dependencies must be IDs of accepted campaign ideas. "
+                        "Fewer ideas is fine; this refill will not immediately retrigger itself. Dependencies must be IDs of campaign ideas with a recorded decision=provisional_accept, not merely queued or launched ideas. "
                         "Investigate primary sources as useful. Keep each proposal concise and put supporting evidence in referenced artifacts."
                     ),
                 },

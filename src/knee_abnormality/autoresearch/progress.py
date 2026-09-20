@@ -2,6 +2,7 @@ import math
 import re
 from pathlib import Path
 
+from knee_abnormality.autoresearch.diagnostics import experiment_diagnostics
 from knee_abnormality.autoresearch.storage import read_json
 
 
@@ -100,22 +101,45 @@ def decision_text(exp):
     return decision
 
 
-def metric_line(exp):
-    evidence = exp.get("evidence", {})
-    scores = evidence.get("macro_auc", {})
-    reference, candidate = scores.get("reference"), scores.get("candidate")
-    bounds = evidence.get("bootstrap", {}).get("delta_percentile_95")
-    interval = (
+def interval_text(bounds):
+    return (
         f"[{score_text(bounds[0], True)}, {score_text(bounds[1], True)}]"
         if isinstance(bounds, list)
         and len(bounds) == 2
         and all(number(v) is not None for v in bounds)
         else "unavailable"
     )
+
+
+def metric_line(exp):
+    evidence = exp.get("evidence", {})
+    scores = evidence.get("macro_auc", {})
+    reference, candidate = scores.get("reference"), scores.get("candidate")
+    bounds = evidence.get("bootstrap", {}).get("delta_percentile_95")
     return (
         f"AUC: {score_text(reference)} -> {score_text(candidate)}; "
-        f"delta {score_text(difference(candidate, reference), True)}; 95% CI {interval}"
+        f"delta {score_text(difference(candidate, reference), True)}; 95% CI {interval_text(bounds)}"
     )
+
+
+def per_label_lines(exp):
+    diagnostics = experiment_diagnostics(exp)
+    if diagnostics is None:
+        return ["   Per-label diagnostics: unavailable"]
+    lines = [
+        "   Per-label AUC (exploratory; unadjusted paired 95% CI for delta):",
+        f"   {'Label':<22} {'Reference':>9} {'Candidate':>9} {'Delta':>10}  {'95% CI':<24} {'Pos/Neg':>9} {'Draws':>10}",
+    ]
+    for row in diagnostics["per_target"]:
+        bootstrap = row["bootstrap"]
+        lines.append(
+            f"   {row['target']:<22} {score_text(row['reference']):>9} "
+            f"{score_text(row['candidate']):>9} {score_text(row['delta'], True):>10}  "
+            f"{interval_text(bootstrap['delta_percentile_95']):<24} "
+            f"{row['positives']:>4}/{row['negatives']:<4} "
+            f"{bootstrap['valid_draws']:>4}/{diagnostics['bootstrap']['draws']:<4}"
+        )
+    return lines
 
 
 def progress_lines(state, root, output):
@@ -189,11 +213,13 @@ def results_summary(state, root, output, campaign):
                     f"   {metric_line(exp)}",
                 ]
             )
+            lines.extend(per_label_lines(exp))
         lines.extend(
             [
                 "",
                 "Delta is candidate minus its recorded reference, not the bootstrap mean.",
                 "Intervals are paired bootstrap 95% intervals; positive inconclusive deltas are not retained gains.",
+                "Per-label intervals are unadjusted diagnostics, not simultaneous intervals or acceptance criteria.",
                 "Withdrawn acceptances keep their original scores and intervals; the displayed decision is current.",
             ]
         )

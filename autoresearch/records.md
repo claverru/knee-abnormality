@@ -69,6 +69,21 @@ the candidate score minus the reference score, not the bootstrap mean. An origin
 withdrawn, preserving the original interval. See [metric progress and result
 history](runtime.md#inspect-stop-and-resume) for commands and interpretation.
 
+`comparison/per_label.json` is the authoritative label diagnostic artifact. Each
+row records reference/candidate AUC, their exact delta, positive/negative counts
+and paired bootstrap delta mean, percentile 95% interval and valid draw count.
+Shared metadata records requested draws, seed, report-group unit, invalid-resample
+rule and the exploratory, unadjusted interpretation. The artifact pins the original
+comparison, predictions and data by SHA256 and retains diagnostic source copies.
+The label bootstrap must reproduce the original macro bootstrap before saving
+the diagnostics. It adds no acceptance decision or label-specific objective.
+
+The results view and newly created agent contexts read this artifact directly,
+including backfilled historical results. History indexes link its path for older
+attempts beyond the compact recent-results window. Backfill appends missing
+diagnostics without rewriting historical comparisons, evaluations, reports, state
+or decisions; source hashes and elapsed diagnostic time distinguish that work.
+
 Starting/current reference scores come from the saved metrics for the epoch named
 in `selected_checkpoint.json`, without loading model weights. Retained experimental
 gain follows accepted experiments through their recorded references; explicit
@@ -108,9 +123,13 @@ logs remain available for substantive review.
 
 Orchestrator `ranked_ids: null` preserves the queue; an explicit list changes it.
 The supervisor owns the numerical completion verdict, so reports do not repeat it
-as an agent-controlled field. Reports contain bounded `rationale`, `finding`,
-`concerns`, and `evidence_refs`. Concerns and new findings are retained with the
-experiment and canonical findings. Historical reports remain untouched.
+as an agent-controlled field. Reports contain concise `rationale`, `finding`,
+`concerns`, and `evidence_refs`, with advisory length/count targets in the schema
+descriptions. Full text and every concern/reference are retained even when those
+targets are exceeded; narrative size cannot reject an otherwise valid report.
+Required fields, types, decision enums and campaign gates remain strict. Concerns
+and new findings are retained with the experiment and canonical findings.
+Historical reports remain untouched; `usage.json` records actual report bytes.
 
 `usage.json` is captured independently of report validation and process success.
 It records provider/model/effort, role/event/experiment, token categories, any

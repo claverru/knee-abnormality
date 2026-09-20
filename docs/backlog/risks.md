@@ -64,22 +64,9 @@ code also completed ([submission](../inference/submissions/2026-09-17-ranked-fil
 - **Rejected study centres** (measured: 4% of training studies). They fall back to local
   sampling; expect a similar share in the test. A robust centre did not score better
   ([history](../history/robust-study-centre.md)).
-- **Robust centre drops knee series** (inferred from code; applies only when
-  `data.robust_center_outlier_mm` is set). A rejected test centre is refitted without its outlier
-  series. In a refitted study, a series whose slab does not contain the new centre leaves the
-  input whenever another series in its slot contains it.
-  - If most of a study's series lie off the knee, the centre could settle on the wrong anatomy,
-    and knee series would then be the ones dropped.
-  - Training shows the scale (measured, 20 mm): 58 series leave the input in 130 rescued studies.
-    This census did not check their anatomy. In an earlier review, 16% of the series the fit
-    excluded were not the target knee
-    ([census](../metadata/series-filtering-census.md#flag-precision-and-recall)).
 - **Unusual patient positioning** (measured: one training study). Plane labels follow scanner
   axes, so a patient positioned sideways gets anatomical sagittals in the coronal slot and
   mirrored along the wrong axis under reflection (training only).
-- **Training-only exclusions** (code). `KNOWN_BAD_SERIES` and `KNOWN_BAD_INSTANCES` in
-  `src/knee_abnormality/data/preprocessing/exclusions.py` list training UIDs only; similar test files are handled
-  by the decode-failure path above.
 
 ## Numerics and scores
 

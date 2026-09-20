@@ -8,7 +8,7 @@
 | Understanding triplet channels, normalization and sampling | [Triplet inputs and sampling](triplet-inputs-and-sampling.md) |
 | Checking reference labels, class-balanced BCE, masking and Tonylin supervision | [Supervision](supervision.md) |
 | Diagnosing GPU batches, host RAM, prefetch and validation loader waves | [Training runtime and memory](training-runtime-and-memory.md) |
-| Checking learning-rate schedules and augmentation | [Training schedule and augmentation](schedule-and-augmentation.md) |
+| Checking training schedules, augmentation and weight averaging | [Training schedule and augmentation](schedule-and-augmentation.md) |
 | Recovering retired side embeddings and classifier-sharing variants | [Retired side and compartment variants](retired-side-and-compartment-variants.md) |
 | Reviewing the historical regional fusion model | [Historical regional fusion](historical-regional-fusion.md) |
 | Changing backbones and checking spatial mapping | [Swapping a backbone](backbone-swaps.md) |

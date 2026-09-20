@@ -9,6 +9,13 @@ remove the entry from this file. Runs follow the
 [controlled-comparison rules](../validation/validation-strategy.md#controlled-comparisons). Each
 entry says whether its motivation is measured or a hypothesis.
 
+## Retired configuration cleanup
+
+Remove the unused `trainer.min_delta` option: its only consumer is EarlyStopping, whose patience
+covers the complete fixed training budget. This is implementation cleanup, not a hyperparameter
+experiment. The rejected `repeated_series_share`, `gated_attention` and `residual_readout` branches
+also remain in code; their removal is recorded with the corresponding findings below.
+
 ## Superseded same-protocol retakes
 
 **Hypothesis (measured composition, untested as a change).** Drop the superseded series when a
@@ -32,7 +39,7 @@ its rejected run and is a removal.
 
 ## Attention pooling
 
-Two live hypotheses; the rest of this axis is closed. Acquisition-count-normalised attention was
+The hypotheses below remain untested. Acquisition-count-normalised attention was
 trained and [rejected](../validation/results/2026-09-17-count-normalized-attention-result.md)
 (−0.0035 [−0.0069, −0.0001], menisci worst hit) and its option is gone from the code. Gated
 attention and the per-target residual readout were measured at +0.0010 and −0.0005 on 2026-09-18,
@@ -56,37 +63,43 @@ attention temperature τ 0.75 is adopted at inference and carries the best submi
   override through prediction, export and the bundle; whether training should use it has never been
   tested, and a shared temperature can be absorbed into the scorer's last layer.
 
-## 3D embedding: training-time effect
+### Per-label attention temperatures
 
-**Hypothesis; needs multiple seeds.** The retired additive 3D embedding is ignored at inference:
-replacing it with the `unknown_3d` vector changed fold-0 macro AUC by +0.000037 [−0.00011,
-+0.00017] on the knee-side checkpoint
-([result](../validation/results/2026-09-14-knee-side-embedding-result.md)), and the champion scored
-0.936 publicly both with and without it
-([submission](../inference/submissions/2026-09-15-champion-without-3d-at-inference.md)). Yet the
-champion (with 3D, one training) scored 0.936, above all four no-3D trainings of the same recipe
-(0.928–0.934, mean 0.931, standard deviation about 0.0025;
-[seed controls](../inference/submissions/2026-09-17-seed-control-submissions.md)). The simplest
-explanation is a lucky run; a training-time effect is possible but unproven.
+**Untried; first inexpensive investigation from the 2026-09-20 agenda review.** Global τ 0.75
+already gained about 0.0020–0.0026 across four frozen checkpoints
+([result](../validation/results/2026-09-17-attention-temperature.md)); that gain is already adopted.
+Compare twelve static attention temperatures against the global 0.75 control, initially choosing
+only between 0.75 and 1.0 per label and retaining 0.75 when the difference is unresolved.
 
-- **Possible mechanisms:** scaffolding (position helps attention and the backbone learn
-  position-aware features early, after which visual features carry the information and 3D is
-  ignored); regularisation (per-study embeddings that flip with reflection change token norms,
-  normalisation statistics and attention temperature); a different random stream (adding a
-  module changes initialisation draws, so a 3D and a no-3D model at the same seed are effectively
-  different seeds, which alone could explain the public gap).
-- **Change:** restore the embedding from the champion's source snapshot
-  (`outputs/training/reflection-sigma40/source_snapshot.zip`) behind a three-way option: real 3D,
-  placebo (same module, every token gets `unknown_3d`, so random-number use and capacity match)
-  and none (today's model).
-- **Test:** three arms × about three seeds (nine runs, about 4.5 hours, one overnight queue). Real
-  versus placebo isolates the information at an equal random stream; placebo versus none isolates
-  the module. Fold 0 probably shows a tie again, so the evidence would come mostly from public
-  scores (three submissions per arm). To check scaffolding directly, save a checkpoint every epoch
-  in the real-3D arm and run the 3D removal on each: removal should hurt early and not at the end;
-  logging the gradient norm reaching the embedding shows the same.
-- **Priority:** low; do it only to settle the question. Seed-to-seed spread (fold 0 0.0032,
-  public up to 0.006) is the context for any result.
+- Screen with cached attention scores and scalar token contributions, keeping the checkpoint,
+  sampled images and valid tokens fixed. Existing caches cover older checkpoints and approximate
+  intensity windows; confirm a locked candidate with the chosen checkpoint's exact preprocessing.
+  A new export has a bounded cost; no retraining is needed.
+- Separate selection from confirmation; do not report twelve validation maxima as a combined gain.
+  Measure macro and per-label AUC against global 0.75. Stop if specialization does not confirm.
+- These are pooling temperatures, not final-logit calibration. Fold static scales into the scorer
+  rows; if scores already include τ_old, multiply by τ_old / τ_new. No extra image pass or learned
+  temperature network. Implement only when requested, through one per-label temperature option.
+
+### Plane/contrast-specific readouts
+
+**Untried; preferred small architecture comparison from the 2026-09-20 agenda review.** Current
+[pooling](../../src/knee_abnormality/modeling/model.py) collapses all acquisition types before the
+linear classifier. Retain six partial vectors per label: `u_cq = sum_{i:type(i)=q} alpha_ci * h_i`.
+Compare `z_c = sum_q w_cq · u_cq + b_c` with the current shared `w_c`, keeping the same global
+attention denominator. Initialize every `w_cq` from `w_c`, reproducing the original predictions
+apart from summation order; missing types contribute zero. Keep image and token budgets unchanged.
+
+- Screen shared and type-specific heads on identical cached partial vectors with a refitted
+  shared-head control. Record parent weights, input view, preprocessing and split identities;
+  supervised feature learning must exclude confirmation studies. Stop if retaining type identity
+  does not improve held-out ranking beyond refitting the original head.
+- Confirm a useful screen in a normal-budget run behind one option. Compute type-specific token
+  contributions without a large six-way pooling tensor; profile actual overhead before adoption.
+- Check per-label AUC, missing-type studies and vendor strata, including a presence/attention-mass
+  diagnostic: [acquisition availability tracks prevalence](../validation/results/2026-09-17-plane-contrast-importance.md#availability-and-prevalence-shift).
+  Count normalization, gated attention and residual readouts above are different, measured changes;
+  do not add separate within-type normalization or a nonlinear stack to this comparison.
 
 ## Report-label supervision
 
@@ -111,6 +124,31 @@ explanation is a lucky run; a training-time effect is possible but unproven.
   [binary mask was rejected](../history/sharing/2026-09-13-label-masking-result.md); partial
   weighting remains unimplemented. Preserve gold labels and original evidence indicators; Steven
   v4 probabilities are not calibrated confidence.
+
+### Auxiliary report-state prediction
+
+**Hypothesis; unimplemented and untested.** Add a reporting head alongside the disease head
+to learn `{not reported, negative, positive}` without removing existing disease supervision.
+The [report-state audit](../public-labels/uncertainty-and-confidence-encoding.md#report-state-audit-and-implications-for-supervision)
+owns the measured motivation, missingness semantics and limits of the three-state alternative.
+
+- **Head and targets:** reuse each label's pooled features for three additional logits, with
+  a separate softmax per label. In the order above, use `(1, 0, 0)` when the original Steven
+  v1 score is exactly `0.5`; otherwise use `(0, 1 - v1, v1)`. This preserves soft polarity
+  within addressed findings. Pin v1 through the source manifest; v4 cannot recover coverage.
+- **Disease supervision:** retain current class-balanced v4 BCE, all nonmissing disease
+  targets and official gold overrides. Reporting targets continue to describe v1 even on
+  eligible gold training studies: a gold-positive finding can be unreported. Use only the
+  original twelve disease outputs for validation scoring and submission.
+- **Loss:** add soft-target reporting cross-entropy averaged over training cells, with one
+  fixed auxiliary coefficient specified before launch. That coefficient remains to be chosen;
+  do not automatically transfer binary disease class weights to the reporting states. Record
+  per-label state counts and both loss components to expose unreported-state dominance.
+- **Comparison:** implement behind one option only when requested, then compare with a fresh
+  current-recipe control on fold 0, preserving membership, frozen validation targets, image
+  workload and training budget. Record seeds and source/config identities. Select by frozen
+  disease macro ROC-AUC and inspect all twelve label AUCs; reporting accuracy is diagnostic.
+  Repeat a promising result under the existing controlled-comparison rules before adoption.
 
 ## Augmentation families
 
@@ -187,19 +225,23 @@ the smallest and spend pixels on background at the same scale. The gain is a hyp
   represent features at two or three fixed scales; positions stay in millimetres, so only the
   convolutional features change meaning. Affine augmentation already jitters scale by ±5%.
 
-## Ranking-aware loss
+## RadImageNet-pretrained backbone
 
-**Hypothesis; untested here.** Training minimises masked BCE
-(`masked_binary_cross_entropy_with_logits` in `src/knee_abnormality/training/lightning.py`) while
-the metric is mean per-label ROC-AUC. The
-[training-objective survey](../research/auc_loss_approaches.md) lists the candidates. One small
-arm is BCE plus a per-label pairwise ranking term behind one `training.rank_loss_weight` option,
-averaging pairs within a label and skipping labels with no positive-negative pair in the batch.
-The first comparison, [fixed class-balanced BCE](../validation/results/2026-09-19-balanced-bce-result.md),
-finished at 0.895282, +0.008796 over the closest same-seed historical reference. One public B0
-experiment reports asymmetric loss at 0.6526 against a 0.7914 BCE baseline
-([public research](../research/public-research.md)); that result does not reject other weighting
-or sampling methods.
+**Evidence-backed (one external report), untested here.** Load a RadImageNet-pretrained
+ResNet-50 in place of its ImageNet weights, behind one option naming the pretraining source, and
+compare the two at identical architecture, normalization and recipe. A participant reports that
+going the other way — RadImageNet to ImageNet ResNet-50, same architecture, per-corpus
+normalization corrected — cost them **−0.063**, the largest in-competition number anyone has
+published on medical pretraining ([sweep](../research/public-research.md#the-2026-09-20-re-sweep));
+the public 0.942 stack also carries RadImageNet heads as one of five families. It disagrees with
+the [benchmark ranking](../research/backbone-mri-evidence.md) that put RadImageNet ResNet-50 19th
+and MedDINOv3 25th, which is what makes it worth one measurement rather than an adoption.
+
+Two caveats price the work. RadImageNet publishes ResNet-50, DenseNet-121, InceptionV3 and
+IRV2 only, so neither of our backbones (EfficientNet-B0, ReXNet-200) can take these weights; the
+comparison needs a ResNet-50 pair that is off the current recipe, and a win would then have to be
+re-measured on a backbone we would actually submit. The weights are a third-party download, so
+they need a pinned source, hash and licence check before any run.
 
 ## BCE weighting and study sampling
 
@@ -219,10 +261,10 @@ Feedback-driven allocation is classified separately in
 
 ### Weighting strength: exponent and prevalence definition
 
-**Hypotheses; untested.** The implemented weights set the ratio `w_pos/w_neg` to exactly
-`(1 - r_c) / r_c` on the thresholded positive fraction. Only the on/off comparison has been run,
-so nothing measures whether full rebalancing is the right strength: it reaches 12.9:1 on Fracture
-and 6.8:1 on Synovitis, the two labels whose report-derived targets are least reliable. An
+**Exact comparisons untested; damping is secondary priority.** The implemented weights set
+`w_pos/w_neg = (1 - r_c) / r_c` on the thresholded positive fraction. No exponent comparison
+has been run: full balancing reaches 12.9:1 on Fracture and 6.8:1 on Synovitis, whose
+report-derived targets are among the least reliable. An
 external recipe seen on 2026-09-19 uses the square root of that ratio, computed on soft
 prevalence, as a `pos_weight`; these two entries isolate the two knobs separately, keeping our
 cell weighting and mean-weight-one normalisation. One change per run against a fresh control.
@@ -230,8 +272,8 @@ cell weighting and mean-weight-one normalisation. One change per run against a f
 - **Damping exponent** (one new option, default reproduces today's run). Set
   `rho_c = ((1 - r_c) / r_c) ** k`, then `w_neg_c = 1 / (r_c * rho_c + 1 - r_c)` and
   `w_pos_c = rho_c * w_neg_c`, which keeps each label's mean weight at one for any `k`. `k = 1`
-  returns the current `1 / (2 * r_c)` and `1 / (2 * (1 - r_c))` exactly, so the default is
-  bit-identical; `k = 0.5` is the arm to run, halving the emphasis ratio on the tail (Fracture
+  algebraically returns the current `1 / (2 * r_c)` and `1 / (2 * (1 - r_c))`;
+  `k = 0.5` is the arm to run, taking the square root of the emphasis ratio (Fracture
   12.9:1 to 3.6:1, Synovitis 6.8:1 to 2.6:1) while barely moving PF OA or Effusion. `k = 0` is
   unweighted BCE, already measured as the losing side of the
   [balanced-BCE result](../validation/results/2026-09-19-balanced-bce-result.md).
@@ -242,6 +284,15 @@ cell weighting and mean-weight-one normalisation. One change per run against a f
   (Synovitis 0.341 against 0.126, Fracture 0.187 against 0.073, Baker's 0.358 against 0.249,
   Lateral Meniscus 0.228 against 0.158), and it damps their weights accordingly. It confounds
   with the exponent, so run it only against the same control, never in the same arm.
+
+The [loss campaign queue](../../autoresearch/campaigns/losses/backlog.yaml) already owns damping
+as `shared-tempered-balance`; this entry records the design, not a second execution queue.
+Later [soft-mass weighting](../../autoresearch/campaigns/losses/findings.md#completion-20260920t161203z-14ae6e65)
+and [prior-offset](../../autoresearch/campaigns/losses/findings.md#completion-20260920t181036z-45163c52)
+runs lost about 0.0092 and 0.0119 macro AUC.
+They changed other loss semantics, so neither settles this exponent or the whole-cell
+soft-prevalence alternative. They lower priority: retain one isolated damping comparison, with
+original soft targets, fixed training-fold counts and observed-cell reduction, rather than a sweep.
 
 Per-label figures above come from `outputs/training/balanced-bce/fold_0/class_balance.json` for
 the thresholded fractions, and from the Steven v4 blend restricted to the fold-0 training rows of

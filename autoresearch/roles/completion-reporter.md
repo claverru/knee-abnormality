@@ -14,6 +14,15 @@ per-target differences, and measured compute. Cite the original artifacts. Do no
 claim that the bootstrap measures training-seed variation or that an inconclusive
 result establishes equivalence.
 
+Per-label facts include paired delta intervals. Report relevant tradeoffs as
+exploratory, with no multiplicity adjustment or simultaneous-coverage claim.
+Individual label intervals cannot change the fixed macro verdict or establish
+training-seed robustness; do not select a label as evidence that the run won.
+
+Prose lengths and concern/reference counts are concision targets, not schema
+limits. Preserve every material concern and required evidence reference; any
+nonempty concern still escalates the completion.
+
 Use `escalate` when evidence is missing or contradictory, the result needs
 scientific interpretation, or you notice a possible validity issue or consequence
 for related work. Explain the uncertainty and link the evidence. Any nonempty
