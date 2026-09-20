@@ -62,6 +62,20 @@ comparison, and reconciliation. A reconciled candidate has a new attempt ID, an
 explicit old/new parent record, and retained merge inputs/conflicts. Superseded
 attempts remain addressable; they are not counted as trained failures.
 
+The read-only `results` view uses each attempt's recorded `evidence.macro_auc`
+and `evidence.bootstrap` alongside its current `decision`. Its displayed delta is
+the candidate score minus the reference score, not the bootstrap mean. An original
+`eligible_decision` of `provisional_accept` with a later non-acceptance is shown as
+withdrawn, preserving the original interval. See [metric progress and result
+history](runtime.md#inspect-stop-and-resume) for commands and interpretation.
+
+Starting/current reference scores come from the saved metrics for the epoch named
+in `selected_checkpoint.json`, without loading model weights. Retained experimental
+gain follows accepted experiments through their recorded references; explicit
+incumbent replacements in applied user decision records start a new gain reference.
+Manual replacement and rollback records remain separate history. These views do
+not rewrite decisions, reseal limits or migrate state.
+
 ## Completion report
 
 The orchestrator receives identifiers and artifact paths, execution status, exact

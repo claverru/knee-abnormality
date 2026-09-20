@@ -1,5 +1,18 @@
 # Implementation status
 
+Progress reporting is implemented. `status` shows starting/current AUC, raw change,
+retained experimental gain and the latest result's scores and interval. The
+read-only `results` command and `autoresearch-results` shortcut show every decided
+attempt against its actual reference, preserving withdrawn acceptances and listing
+manual reference changes and training attempts awaiting a decision separately.
+See [runtime operation](runtime.md#inspect-stop-and-resume).
+
+Lint/format, catalog consistency, whitespace checks and read-only CLI inspection
+passed for the existing sampling history and unstarted losses campaign. Sampling
+shows AUC 0.894037 to 0.896582 but zero retained experimental gain, one withdrawn
+acceptance and two manual reference changes. No tests, campaign agents or training
+were launched, and no campaign state was changed.
+
 Restricted completion reporting is implemented: Haiku 4.5 without an effort
 override for Claude, and GPT-5.6 Luna at low effort for Codex. Code selects clean
 rejected/inconclusive completions with complete evidence and no pending related

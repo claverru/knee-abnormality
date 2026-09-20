@@ -47,6 +47,7 @@ rtk proxy uv run --locked python -m scripts.tools.autoresearch start triplet-sam
 
 ```bash
 rtk proxy uv run --locked just autoresearch-status
+rtk proxy uv run --locked just autoresearch-results
 rtk proxy uv run --locked just autoresearch-stop
 rtk proxy uv run --locked just autoresearch-resume
 ```
@@ -67,7 +68,37 @@ rtk proxy uv run --locked python -m scripts.tools.autoresearch stop triplet-samp
 Status shows a compact summary of calibration passes, active jobs and elapsed time,
 the ranked backlog, the next candidate, training progress, recent results, budget,
 and recorded agent usage by role/event. It includes failed calls and explicitly
-marks partial or unavailable usage. For complete machine-readable usage details:
+marks partial or unavailable usage. The metric summary shows the original reference
+AUC, current incumbent AUC, raw change since the start, retained experimental gain,
+and the latest decided experiment's scores, delta and paired 95% interval.
+
+For the complete experiment history, use either command:
+
+```bash
+rtk proxy uv run --locked python -m scripts.tools.autoresearch results triplet-sampling
+rtk proxy uv run --locked just autoresearch-results triplet-sampling
+```
+
+Each decided attempt keeps its own launch-time reference, reference/candidate AUC,
+candidate-minus-reference delta, paired 95% interval and current decision. Scores
+use six decimals. Withdrawn acceptances retain their original numerical evidence
+and are explicitly marked. Training attempts awaiting a final decision appear
+separately, including blocked attempts; missing metrics appear as unavailable.
+
+Retained gain follows the current incumbent's accepted reference chain back to
+its starting reference or a manually selected replacement. Manual reference
+changes are listed separately and excluded from that gain. Positive inconclusive
+deltas and withdrawn acceptances do not count as retained improvements. Raw change
+since the original campaign start can therefore differ from retained gain. These
+are descriptive fold-0 score changes, not independent confirmation or a new
+bootstrap interval for cumulative improvement.
+
+Both metric views read saved state and selected-epoch metrics without loading
+checkpoints, recomputing predictions, calling a model or launching training.
+They preserve campaign state. Append `losses` instead of `triplet-sampling` to
+inspect the loss campaign; an unstarted campaign reports no results.
+
+For complete machine-readable usage details:
 
 ```bash
 rtk proxy uv run --locked python -m scripts.tools.autoresearch usage

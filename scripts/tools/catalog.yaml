@@ -2,8 +2,8 @@ version: 1
 scripts:
   - id: autoresearch
     path: scripts/tools/autoresearch.py
-    summary: Validate, start, inspect, account for usage, stop, or resume declarative local autoresearch campaigns through Codex or Claude subscriptions.
-    tags: [autoresearch, campaigns, losses, sampling, triplets, background, train, validation, bootstrap, codex, claude, usage, tokens, cost]
+    summary: Validate, start, inspect metric progress and results, account for usage, stop, or resume declarative local autoresearch campaigns through Codex or Claude subscriptions.
+    tags: [autoresearch, campaigns, losses, sampling, triplets, background, train, validation, bootstrap, codex, claude, progress, results, auc, usage, tokens, cost]
     commands:
       - rtk proxy uv run --locked just autoresearch-start codex
       - rtk proxy uv run --locked just autoresearch-start claude
@@ -11,12 +11,14 @@ scripts:
       - rtk proxy uv run --locked just autoresearch-start claude losses
       - rtk proxy uv run --locked just autoresearch-status losses
       - rtk proxy uv run --locked just autoresearch-status
+      - rtk proxy uv run --locked just autoresearch-results triplet-sampling
+      - rtk proxy uv run --locked python -m scripts.tools.autoresearch results losses
       - rtk proxy uv run --locked python -m scripts.tools.autoresearch usage
       - rtk proxy uv run --locked just autoresearch-stop
       - rtk proxy uv run --locked just autoresearch-resume
       - rtk proxy uv run --locked python -m scripts.tools.autoresearch import-ideas --ideas-file autoresearch/campaigns/triplet-sampling/seed-ideas.yaml
     inputs: [autoresearch campaign contract and role profiles, Existing fold-0 control, Local data and cached pretrained weights, Subscription-authenticated CLI, Linux bubblewrap and NVIDIA GPU]
-    outputs: [Durable campaign state and detached job receipts, Frozen candidate sources and local training artifacts, Ranked backlog and attributed findings, Focused evidence packets and usage by role event and experiment]
+    outputs: [Durable campaign state and detached job receipts, Frozen candidate sources and local training artifacts, Ranked backlog and attributed findings, Read-only metric progress and complete experiment results, Focused evidence packets and usage by role event and experiment]
     notes:
       - Start authorizes ongoing local training and validation only; submissions and publication are prohibited.
       - Reuses only scripts.pipeline.train and scripts.tools.compare_fold_runs; includes a one-time CPU replay to seal realized triplet counts without another trained model.
@@ -24,6 +26,7 @@ scripts:
       - Stop drains active training; --abort terminates it. Resume adopts owned live jobs and never automatically repeats a lost training attempt.
       - Quota and unexpected role failures pause the campaign without model polling; resolve the cause and resume.
       - Status prints a human-readable progress summary without model calls; the campaign has no overall run-count, elapsed-time, or plateau stop condition.
+      - Status includes starting and incumbent AUC, retained experimental gain and latest scores; results lists every decided experiment with its actual reference, exact score delta and paired interval, preserving withdrawals and separating manual reference changes.
       - Usage is read-only and includes failed calls with explicit partial or unavailable coverage; cost equivalents do not measure subscription quota.
       - Startup reviews seed-ideas.yaml before fresh research; import-ideas requires a stopped campaign and submits existing proposals for orchestrator ranking without replacing the queue.
       - New topics declare source/configuration permissions and role instructions in campaign.yaml; the policy is validated and sealed, without runner edits or legacy hardcoded fallbacks.

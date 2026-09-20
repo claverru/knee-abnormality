@@ -16,8 +16,10 @@ rtk proxy uv run --locked just autoresearch-start codex
 
 Or use `autoresearch-start claude`. These default to `triplet-sampling`; start the
 loss line with `autoresearch-start claude losses` or `autoresearch-start codex losses`.
-Inspect with `autoresearch-status`, stop with
-`autoresearch-stop`, and continue a stopped or paused campaign with
+Inspect progress with `autoresearch-status` and every experiment's scores,
+paired interval and decision with `autoresearch-results`. Manual reference
+changes and withdrawn acceptances are recorded separately from retained gains.
+Stop with `autoresearch-stop`, and continue a stopped or paused campaign with
 `autoresearch-resume`. See [runtime operation](runtime.md) before the first launch.
 
 **Only local training and validation are authorized. No submissions, uploads,
