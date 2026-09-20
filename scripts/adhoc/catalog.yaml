@@ -27,7 +27,7 @@ scripts:
     inputs: [configs/training.yaml, Official series CSV for the split, Series image-count inventory, Original DICOM headers]
     outputs: [Per-study reference points and acceptance parquet, Per-series signed side distances parquet, Per-study union extents by plane and fluid sensitivity parquet, Summary JSON, Script and package snapshot under source/]
     notes:
-      - Reads header prefixes with the production indexer, exclusions and instance guard; no pixels, models, training, tests or GPU access.
+      - Reads header prefixes with the production indexer and instance guard; no pixels, models, training, tests or GPU access.
       - Uses the production study reference fit, so rejected studies carry a reason and no point; their series keep no distances.
       - Distances are signed along each plane's through-plane axis in LPS, oriented so negative is inferior, anterior or patient right and positive is superior, posterior or patient left.
       - Distances span slice centres only; add half the recorded slice spacing for the outer faces.
@@ -82,7 +82,8 @@ scripts:
       - Reads saved metadata only; no pixels, models, training or tests.
       - The source manifest records the configured backbone's spatial mapping identity; the script and every package module are copied to source/<repo-relative path>.
       - Calls the production sampler for both dataset modes, including rejected-center local fallback; retains the original comparison as an archived summary.
-      - Saved headers carry no series tags and bypass the loader's series exclusions and instance guard, so the source ranking sees only crop coverage and UID.
+      - Saved headers carry no series tags and bypass the loader's instance guard, so the source ranking sees only crop coverage and UID.
+      - The known-bad-instance filter was removed on 2026-09-20 with the repaired DICOMs, so the pinned cohort now contributes those two slices; runs before that date skipped them.
       - Default seed 20260913 and 32 randomized epochs; validation uses the configured multiplier.
       - Records target and realized coverage, intended and realized source shares, gap splits, plane disagreements, singletons and shortfalls.
       - Existing output directories are refused. Historical prototype source remains in outputs/analysis/physical-sampling-20260913/geometry-v3/source/.

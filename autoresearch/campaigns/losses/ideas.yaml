@@ -1,2 +1,2573 @@
-revision: 0
-ideas: []
+revision: 258
+ideas:
+- id: shared-bce-ranking
+  mechanism_id: shared-pointwise-ranking-hybrid
+  parent_idea_id: null
+  title: Shared balanced BCE plus pairwise logistic ranking
+  opportunity: The current objective supervises each observed cell independently while
+    the metric evaluates ordering within each target. A shared ranking term may change
+    useful gradients without giving up soft pointwise supervision.
+  mechanism: Add pairwise logistic ranking to the current class-balanced soft BCE.
+    Apply the same pair-eligibility rule, temperature, and mixture coefficient to
+    all labels. Average pairs within each label before combining labels; retain BCE
+    and define the ranking contribution when no pairs exist.
+  precedents:
+  - docs/backlog/small-changes.md#ranking-aware-loss
+  - docs/research/auc_loss_approaches.md
+  - docs/research/per-label-losses.md#ranking-needs-usable-study-pairs
+  novelty: Adopts the existing untrained ranking-hybrid proposal into this campaign.
+    The campaign owns its execution; the general backlog remains read-only provenance.
+    Unlike the per-label proposal, one formula and scalar mixture apply to all twelve
+    targets.
+  coverage: Keep all observed soft BCE cells. Mask missing targets and self-pairs;
+    record usable positive/negative pairs and zero-pair batches per target.
+  exploitation: Emphasize incorrectly ordered training-study pairs while retaining
+    pointwise gradients for rare targets and batches without usable pairs.
+  budget: Use current-batch logits and targets only, with no additional model pass,
+    changed batch composition, extra steps, or precomputation. Preserve the fixed
+    recipe, ten epochs, 4380 steps and sealed runtime ceiling.
+  implementation: Add the objective under training/losses and connect it through training_step.
+    Put shared settings under trainer.loss. Compute stable float32 softplus pair differences.
+    Record the exact treatment of uncertain soft targets, reduction, zero-pair case,
+    and component scales.
+  open_choices: Choose one defensible shared scale and pair rule using training data
+    and existing research. Do not sweep coefficients or choose them per label. If
+    pair coverage is inadequate, record that limitation rather than changing the data
+    loader or silently importing validation predictions.
+  dependencies: []
+  priority_rationale: 'Recommend first: an existing concrete proposal directly tied
+    to ordering, cheap with current logits, and conservative about retaining supervision.'
+  status: completed
+  created_revision: 4
+  ranking_rationale: "All four proposals stay inside the shared-loss boundary: one\
+    \ formula and scalar parameters for all twelve targets, current-batch logits only,\
+    \ no data/optimizer/inference change, and edits confined to the allowlisted loss\
+    \ files. None revives per-label selection, classifier banks, learned mixtures,\
+    \ study resampling, or a dedicated AUC optimizer. I accept three and open the\
+    \ queue with them.\n\nshared-bce-ranking first: the metric is per-target ordering\
+    \ while the incumbent supervises cells independently, so this is the mechanism\
+    \ with the most direct alignment to the objective gap, and retaining BCE covers\
+    \ the batches with no usable pair. It is implementable on existing logits (lightning.py:305-320)\
+    \ with no added pass.\n\nshared-balanced-focal second: an independent pointwise\
+    \ mechanism changing the easy/hard cell allocation, elementwise on the same logits,\
+    \ with external ACL/MCL motivation whose transfer to macro AUC here is untested.\n\
+    \nshared-tempered-balance third: grounded in a locally measured baseline and the\
+    \ cheapest to implement (reuses stored training counts, lightning.py:60-87), but\
+    \ the incumbent full inverse-frequency weighting already succeeded, so the incremental\
+    \ headroom is the least certain of the three. Its tempering and normalization\
+    \ are bundled; the result attributes to the combined rule, not to either factor.\n\
+    \nshared-delayed-ranking is contract-compliant and not rejected, but I retain\
+    \ it as a surplus proposal rather than queueing it. It reuses the same ranking\
+    \ helper and pair rule as shared-bce-ranking, and its only new degree of freedom\
+    \ is the transition point. Choosing that transition without the always-on hybrid's\
+    \ measured behavior \u2014 particularly observed pair coverage and the ranking\
+    \ component's realized scale \u2014 would be an unmotivated timing guess, and\
+    \ its own priority note concedes it is most informative afterwards. It should\
+    \ be reconsidered once shared-bce-ranking reports.\n\nOne scale interaction the\
+    \ first implementation must resolve explicitly: the incumbent reduces BCE as a\
+    \ single pooled mean over all observed cells (lightning.py:117), so labels contribute\
+    \ in proportion to observation counts. A ranking term averaged within each label\
+    \ and then across labels implies uniform label weighting instead. The mixture\
+    \ coefficient therefore cannot be read as a plain component ratio; the effective\
+    \ per-label weighting of both components must be recorded."
+  experiments:
+  - shared-bce-ranking-20260920T112958Z-a2e23db7
+  decision: inconclusive
+- id: shared-balanced-focal
+  mechanism_id: shared-pointwise-focusing
+  parent_idea_id: null
+  title: Shared balanced focal objective with soft targets
+  opportunity: A shared focal objective changes how easy and difficult training cells
+    contribute. External MCL results motivate the family but do not establish a macro-AUC
+    gain on this recipe or justify a label-specific choice.
+  mechanism: Replace BCE's pointwise term with one soft-target focal formula using
+    a single shared focusing exponent. Retain the baseline class-balancing rule initially,
+    and make the exact positive/negative soft-target extension explicit.
+  precedents:
+  - docs/research/auc_loss_approaches.md
+  - docs/research/per-label-losses.md#trusted-motivation
+  - docs/research/per-label-losses.md#candidate-losses-and-extensions
+  novelty: A shared objective experiment, not the excluded per-label focal/ranking
+    selection plan. The current main recipe uses BCE, with no focusing term.
+  coverage: Preserve all observed soft targets and class groups with unchanged study
+    exposure. Do not turn uncertain labels into hard targets or drop them.
+  exploitation: Reduce the contribution of easy cells under the same rule for every
+    label; inspect whether persistent difficult or noisy cells dominate the gradient.
+  budget: Elementwise operations on existing logits only. Keep the model, optimizer,
+    visits, batch size, steps, epochs and fixed runtime ceiling unchanged.
+  implementation: Implement a numerically stable float32 focal term using logits and
+    explicit soft positive/negative contributions. Record reduction, class-weight
+    placement, one shared exponent and the resulting loss scale.
+  open_choices: Select one shared focusing strength from a reasoned mechanism, not
+    a sweep. Do not assume focusing is robust to label noise or rescale predictions
+    at inference.
+  dependencies: []
+  priority_rationale: 'Recommend second: distinct pointwise mechanism, low compute
+    overhead, and relevant external evidence whose transfer still needs a macro comparison.'
+  status: completed
+  created_revision: 4
+  ranking_rationale: "Admitted two of the three new proposals; both have satisfied\
+    \ dependencies and distinct mechanisms.\n\nshared-bernoulli-pair-ranking ranks\
+    \ second, ahead of the queued tempering idea. I verified its core claim independently:\
+    \ d/dd [a\xB7softplus(-d) + b\xB7softplus(d)] = (a+b)\xB7sigmoid(d) - a, so the\
+    \ optimum is sigmoid(d) = a/(a+b) and s_i - s_j = logit(y_i) - logit(y_j), the\
+    \ same population optimum as soft BCE, unlike a hard >= 0.5 pair term. It is therefore\
+    \ not a pair-rule variant of shared-bce-ranking but a different objective with\
+    \ different coverage and a different optimum, so running both is informative rather\
+    \ than duplicative. Its coverage claim is supported by the researcher's Monte-Carlo,\
+    \ whose hard-rule column reproduces the documented analytical zero-pair rates\
+    \ (15.1/25.9/54.7% vs 15.2/26.3/55.0% for ACL/MCL/Fracture), giving confidence\
+    \ in the Bernoulli-mass column that removes the zero-pair case. The mechanism\
+    \ is shared: one tau, one lambda, twelve diagnostic readouts.\n\nshared-soft-mass-balance\
+    \ ranks last of the four: independent and near-free, but the imbalance it corrects\
+    \ is small (positive/negative term-mass ratios 0.89-1.46 under the current rule),\
+    \ so the expected effect is the weakest. It stays in the queue because it is cheap\
+    \ and mechanistically distinct from shared-tempered-balance, which keeps the thresholded\
+    \ group lookup and changes weight magnitude.\n\nshared-ranking-memory-bank is\
+    \ left as proposed: its dependency shared-bce-ranking is launched and undecided,\
+    \ which does not satisfy the admission gate. I did not park it and did not clear\
+    \ the dependency, which is also substantively correct: launching the bank before\
+    \ the within-batch hybrid reports observed pair coverage and component scale would\
+    \ confound the two.\n\nshared-delayed-ranking is retained as a surplus proposal\
+    \ rather than queued: it schedules the same within-batch hybrid that is currently\
+    \ running undecided, so its value depends on that result.\n\nSection 1 of the\
+    \ evidence note resolves the startup concern about label reduction algebraically\
+    \ (each label's cell-weight mass is exactly n_obs = 3503), so a per-label-averaged\
+    \ pair term does not reweight labels here. I accept that a macro-aligned-reduction\
+    \ candidate would be a numerical no-op."
+  experiments:
+  - shared-balanced-focal-20260920T113454Z-c1fe7f53
+  decision: inconclusive
+- id: shared-tempered-balance
+  mechanism_id: shared-class-weight-tempering
+  parent_idea_id: null
+  title: Temper class weights with a shared normalization rule
+  opportunity: Full inverse-frequency weighting helped the current model, but its
+    strength and reduction can alter gradient variance and the contribution of rare
+    labels. This does not establish that full weighting is optimal.
+  mechanism: Apply one shared tempering exponent to training-fold positive/negative
+    weights and normalize expected weight within each label using the same rule. Keep
+    targets soft and study exposure uniform. Choose one justified shared rule rather
+    than a vector of label-specific coefficients.
+  precedents:
+  - docs/backlog/small-changes.md#bce-weighting-and-study-sampling
+  - docs/research/auc_loss_approaches.md#weighting-and-sampling-design-space
+  - docs/validation/results/2026-09-19-balanced-bce-result.md
+  novelty: Imports only the unimplemented loss-weighting proposal, not the study or
+    batch sampling alternatives. Different weights arise from the same formula and
+    training counts, not from per-label objective selection.
+  coverage: Preserve masks, all observed targets, positive/negative groups, and every
+    study visit. Do not use majority-cell masking as an implicit sampling change.
+  exploitation: Investigate a less extreme allocation of gradients between class groups
+    while retaining explicit balancing motivated by the measured baseline.
+  budget: Reuse existing training class counts and current logits. No additional passes,
+    model updates, batch changes, or preprocessing; fixed campaign limits.
+  implementation: Keep count provenance intact. Derive candidate weights in the objective
+    helper with one shared exponent and normalization rule. Record effective weights,
+    mean loss scale and component/gradient diagnostics for interpretation.
+  open_choices: Use the existing research to choose one tempering and normalization
+    policy. Do not run an exponent grid, infer weights from validation, or claim the
+    bundled normalization and tempering comparison isolates either factor.
+  dependencies: []
+  priority_rationale: 'Recommend third: grounded in a measured strong baseline and
+    inexpensive, but the already successful weighting leaves its incremental benefit
+    uncertain.'
+  status: queued
+  created_revision: 4
+  ranking_rationale: "Scope ruling (mine to make, both proposals asked): a second\
+    \ pooling of tokens already produced by one encode_batch call is allowed supporting\
+    \ loss computation. Verified in modeling/model.py:322-323 that forward is exactly\
+    \ pool_encoded(encode_batch(batch)), both public, so a candidate can split the\
+    \ primary forward inside lightning.py without touching modeling code (not candidate-editable).\
+    \ Encoder, attention module, classifiers, data preparation, triplet selection,\
+    \ augmentation, study exposure, batch composition, optimizer, schedule and inference\
+    \ stay fixed; no extra data pass, no extra optimizer update, validation path untouched.\
+    \ Conditions for review: exactly one encode_batch call per step, primary logits\
+    \ bit-identical, extra views built only by masking visual_valid, and the split\
+    \ RNG drawn from a dedicated generator so the augmentation and series-dropout\
+    \ streams are unchanged.\n\nBoth admitted (dependencies empty; admission table\
+    \ confirms). Ranking changed only to place them; reserved head unchanged.\n\n\
+    shared-split-view-consistency ranked third rather than second: it targets the\
+    \ same headroom as the reserved head via a lag-free estimate, and the anchor run's\
+    \ logged per-label deviation/variance traces will say whether a draw-invariance\
+    \ term moves anything at all and at what effective scale. Sequencing it after\
+    \ that evidence avoids committing two full-budget runs to one mechanism family\
+    \ with zero measurements, and its coefficient/floor choices are exactly what the\
+    \ anchor traces inform. shared-group-variance-compression is independent of that\
+    \ evidence and already supplies the reviewed detached-normaliser pattern both\
+    \ ideas reuse.\n\nshared-subview-supervision fourth: independent lever, no adaptive\
+    \ state and no collapse mode, but it imposes a stronger assumption (each half\
+    \ carries the label) that series_dropout=0.2 already stresses.\n\nshared-tempered-balance\
+    \ stays last. The researcher's analysis (exhausted_directions item 2) shows per-label-constant\
+    \ reweighting leaves the within-label minimiser monotone, so it cannot change\
+    \ population AUC and acts only through finite-sample optimisation. Not parked\
+    \ \u2014 that finite-sample channel is the stated rationale and is untested \u2014\
+    \ but it does not outrank a measured-headroom mechanism.\n\nClosed directions\
+    \ recorded from this report: cross-label decorrelation/severity-factor terms,\
+    \ per-study logit normalisation, and the GCE/symmetric-CE/Huberised-BCE/forward-noise-correction\
+    \ gradient-profile family. No further treatment of the 0.25 unaddressed block\
+    \ beyond the queued bounded-target-instruction."
+- id: shared-delayed-ranking
+  mechanism_id: shared-objective-schedule
+  parent_idea_id: null
+  title: Introduce a shared ranking hybrid after BCE feature learning
+  opportunity: Useful objective gradients may depend on representation maturity. Ranking
+    from the first update need not behave like introducing it after BCE learning.
+  mechanism: Start a fresh run with balanced BCE, then introduce the same BCE-plus-ranking
+    combination for all labels on a shared epoch or step schedule. Fit the whole schedule
+    inside the original ten epochs; do not append a continuation.
+  precedents:
+  - docs/research/per-label-losses.md#candidate-losses-and-extensions
+  - docs/research/auc_loss_approaches.md
+  - autoresearch/campaigns/losses/seed-ideas.yaml
+  novelty: Changes when the shared ranking term contributes, not which labels receive
+    it. Distinct from the always-on hybrid and from compositional AUC training with
+    a different optimizer. A trained always-on result informs ranking of this idea
+    but is not required as an accepted parent.
+  coverage: Retain BCE and all observed cells throughout. Use the same pair rule and
+    missing/zero-pair handling for every label during the ranking phase.
+  exploitation: Establish features with pointwise supervision before allocating some
+    gradient to study ordering, without adding model capacity or inference cost.
+  budget: Same fresh initialization policy, ten epochs, 4380 optimizer steps, study
+    visits, optimizer schedule and runtime ceiling. No external checkpoint fit, second
+    training stage, cached-feature extraction or extra updates.
+  implementation: Reuse or implement the shared ranking helper and compute the objective
+    mix from the recorded global training step. Keep learning-rate scheduling and
+    sampling epoch behavior unchanged. Record the full loss-weight trajectory.
+  open_choices: Choose one shared transition and schedule from a concrete rationale.
+    Reconcile with the always-on hybrid outcome before launch; avoid timing sweeps
+    and preserve any newly accepted incumbent changes unless explicitly replaced.
+  dependencies: []
+  priority_rationale: 'Recommend fourth: a distinct temporal mechanism, most informative
+    after observing the simpler shared hybrid, without extending the training budget.'
+  status: proposed
+  created_revision: 4
+- id: shared-bernoulli-pair-ranking
+  mechanism_id: shared-probabilistic-pair-semantics
+  parent_idea_id: null
+  title: Confidence-weighted pairwise ranking with Bernoulli soft-pair targets
+  opportunity: 'The incumbent''s pointwise term pins each cell to s = logit(y), which
+    supplies a level but no ordering signal among studies whose soft target sits near
+    the evaluated 0.5 cutoff. In control B, studies with effective target in (0.25,
+    0.75) carry 1.5-2.4x their pair share of the discordant (1-AUC) mass in all twelve
+    labels: Synovitis 52.8% of positive-negative pairs but 83.0% of the error, with
+    confident-only AUC 0.9638 against 0.8996 overall; Medial Meniscus 27.6% to 58.4%.
+    A hard >= 0.5 pair rule cannot address that region safely, because it demands
+    large separation between near-identical targets, and it also has no usable pair
+    in 54.7% of Fracture and 33.9% of Synovitis microbatches. Reading the soft target
+    as the Bernoulli probability that BCE already assumes gives a pair rule that is
+    both fully covered and semantically correct. Measurements: scratch/loss-evidence-20260920.md
+    sections 3, 4, 6.'
+  mechanism: For every observed within-label pair (i, j) with i < j in the microbatch,
+    set a = y_i(1-y_j), b = y_j(1-y_i), d = (s_i - s_j)/tau, and accumulate a*softplus(-d)
+    + b*softplus(d). Divide each label's sum by its pair mass sum(a+b), average the
+    twelve labels, and add lambda times that to the unchanged class-balanced soft
+    BCE. One tau, one lambda, one rule for all labels. The weight a+b is exactly the
+    probability that the pair straddles the positive/negative boundary under the Bernoulli
+    reading of soft targets, and the implied target a/(a+b) is the probability that
+    i is the positive member, so no target is binarized and no cell is dropped. The
+    stationary point is s_i - s_j = logit(y_i) - logit(y_j), the same optimum as soft
+    BCE, so the two components agree at the population optimum and differ only in
+    how finite-sample gradient is split between level and ordering. A hard >= 0.5
+    pair term instead drives |s_i - s_j| to infinity across the threshold, so mixing
+    that with BCE trades one bias against another.
+  precedents:
+  - 'Burges et al., ICML 2005 (RankNet): pairwise cross-entropy against a target ordering
+    probability P_ij, the exact form used here'
+  - 'Gao and Zhou, IJCAI 2015 (arxiv.org/abs/1208.0645): AUC consistency of pairwise
+    logistic loss; cited in docs/research/auc_loss_approaches.md#1-pairwise-logistic-ranking'
+  - docs/research/per-label-losses.md#candidate-losses-and-extensions extension 4
+    names probabilistic pair targets as an explicitly different objective, never run
+    here
+  - 'campaign idea shared-bce-ranking: contrasting arm whose recorded rule is binary
+    membership at y >= 0.5'
+  - outputs/autoresearch/losses/jobs/researcher-20260920T112958Z-9a7e4a21/scratch/loss-evidence-20260920.md
+    sections 3, 4, 6 (with loss_evidence.py to reproduce)
+  novelty: 'Not a pair-rule tuning choice inside shared-bce-ranking: it is a different
+    objective with a different optimum, different coverage and different treatment
+    of uncertainty, flagged as a separate objective in per-label-losses.md extension
+    4 and never run locally. Distinct from focal (pointwise difficulty), tempering
+    (weight magnitude) and schedules (timing). One shared formula and two shared scalars
+    for all twelve labels; nothing is selected per label.'
+  coverage: Every observed BCE cell keeps its term unchanged. Pairs use i < j, so
+    self-pairs are excluded; a pair is skipped only when either target is unobserved,
+    which never occurs on the fold-0 training table. Over 20,000 simulated microbatches
+    of eight studies, effective pair mass is 8.3-14.0 per label per batch and never
+    fell below 0.5 for any label, against 0.9-54.7% zero-pair batches under the hard
+    rule. Fracture rises from 3.8 usable hard pairs to 8.5 effective pairs, Synovitis
+    6.3 to 12.6. Log realized pair mass, zero-mass batch counts and both component
+    values for every label as diagnostics only.
+  exploitation: Gives ambiguous studies an ordering gradient proportional to the probability
+    that they genuinely straddle the boundary, instead of the central logit that pointwise
+    BCE prescribes for them, while leaving confident cells essentially as they are.
+    Because the two components share a stationary point, lambda allocates effort between
+    level and ordering rather than introducing a competing target.
+  budget: 8x8x12 pair terms per optimizer step, elementwise on logits already materialized
+    in float32 at lightning.py:305. No extra forward pass, no change to batch composition,
+    data loading, optimizer or inference, no persistent state, no precomputation.
+    Total added cost is well under a second against the 1797 s ceiling and control
+    B's recorded 1562 s. Ten epochs and 4,380 steps unchanged.
+  implementation: 'Create training/losses with a shared pair helper and call it from
+    training_step next to the existing masked BCE. Use the a*softplus(-d) + b*softplus(d)
+    form so no division by a per-pair weight is needed; guard only the label denominator
+    (clamp to eps, count and log zero-mass labels, contribute zero). Compute d and
+    both softplus terms in float32 under bf16-mixed. New settings tau and lambda under
+    trainer.loss; leave trainer.class_balanced_bce untouched. At initialization s
+    = 0 and d = 0, so both components equal log 2 and lambda is a literal component
+    ratio at step 0; still record measured component scales on training-only reference
+    batches before launch. Label reduction is already consistent: each label''s BCE
+    cell-weight mass is exactly n_obs = 3503 and all twelve labels are fully observed,
+    so the pooled-cell mean weights labels equally and the startup concern about a
+    mismatch against a per-label-averaged pair term does not apply (evidence note
+    section 1).'
+  open_choices: 'One defensible (tau, lambda) pair, no sweep and nothing per label;
+    tau = 1.0 keeps the logit scale and matches the Gao-Zhou consistency setting.
+    One variant to settle before launch: keep the Bernoulli weight a+b but use the
+    hard target 1{y_i >= 0.5}, which matches the evaluated binarization while retaining
+    full coverage; the fully soft form is the default because it shares BCE''s optimum.
+    Whether the denominator is the per-batch pair mass or a running training-only
+    mean. Do not let inconclusive per-label deltas reopen per-label selection.'
+  dependencies: []
+  priority_rationale: 'Highest of the three new ideas: it attacks a weakness measured
+    on the incumbent''s own predictions (ambiguous studies over-represented in discordant
+    mass in 12/12 labels), it removes the zero-pair failure mode outright, it is independently
+    interpretable against the incumbent, and it is near-free. Its main uncertainty
+    is whether ordering pressure on ambiguous pairs is signal or label noise.'
+  status: completed
+  created_revision: 30
+  ranking_rationale: 'Both new proposals are contract-compliant shared objectives
+    (one formula, one tau/lambda or one fixed constant, all twelve labels, soft targets
+    preserved, no per-label switch) and have no unresolved dependencies; both are
+    admitted.
+
+
+    shared-label-contrast-ranking is ranked above the two weighting-rule ideas because
+    it is the only candidate aimed at a deficiency measured on the incumbent''s own
+    predictions in a direction the objective never supervises: prediction off-diagonal
+    correlation 0.384 vs 0.202 for soft targets, PC1 0.447 vs 0.278, with the training
+    fold agreeing (0.180 / 0.261), so it is a model property (evidence sections 1-2,
+    verified in the scratch note). Coverage is established rather than assumed: per-study
+    Bernoulli straddle mass min 1.41 over 3,503 training studies, 528 pair terms per
+    microbatch, so there is no zero-mass regime to design around (section 3). It opens
+    a new comparison axis (labels within a study) distinct from every prior study-axis
+    ranking idea, and it is cheap enough to fit the ~182 s of headroom the prior pair
+    candidate left.
+
+
+    shared-balanced-brier is ranked third: it replaces the pointwise function itself
+    with a strongly proper member of the AUC-regret-bounded family, keeping mask,
+    class weights, reduction and soft-target optimum at p=y, and its factor 2 is fixed
+    by the initialization identity rather than tuned, so it starts gradient-identical
+    to the control cell by cell (section 8). It is cheaper than the log-loss path.
+    Its local evidence is weaker than the contrast proposal''s: the redistribution
+    on the confidently-wrong tail is 23.7% -> 20.3% of gradient mass, a modest shift.
+
+
+    shared-delayed-ranking and shared-ranking-memory-bank are retained as surplus
+    rather than queued: the completed hybrid''s traces show the study-axis ranking
+    term was active and a substantial share of the objective throughout, so scheduling
+    or widening that same inert-free mechanism has low expected value, and the memory
+    bank''s dependency is unresolved.
+
+
+    shared-tempered-balance and shared-soft-mass-balance keep their relative order
+    at the tail; section 6 (class-weighted per-label BCE spans only 0.414-0.522 on
+    identical per-label weight mass) weakens, without eliminating, the motivation
+    for reweighting-rule variants.'
+  experiments:
+  - shared-bernoulli-pair-ranking-20260920T121717Z-fd69b263
+  decision: reject
+- id: shared-ranking-memory-bank
+  mechanism_id: shared-cross-batch-ranking-memory
+  parent_idea_id: null
+  title: Cross-batch detached score memory to widen the shared ranking pair pool
+  opportunity: A microbatch of eight studies yields at most 28 pairs per label, and
+    gradient accumulation is 1, so the pair pool cannot grow without changing batch
+    composition, which the separate triplet-sampling campaign owns. Under the hard
+    rule this leaves 54.7% of Fracture and 33.9% of Synovitis batches with no pair
+    at all; even with full coverage, eight studies give a very local view of an ordering
+    the metric evaluates over the whole fold. A training-only queue of recently computed,
+    detached scores supplies per-label comparison partners at every step without touching
+    sampling, batch composition or the number of forward passes. Fracture, the label
+    with the worst hard-pair coverage, also has control B's most compressed validation
+    logit spread (IQR 1.45 against 1.77-3.61 elsewhere), consistent with a weak ordering
+    signal rather than saturation (evidence note sections 3, 5).
+  mechanism: 'Maintain a FIFO queue of K training studies holding detached float32
+    per-label logits, their soft targets, their observed masks and their insertion
+    step. After each training step, enqueue the current eight studies and dequeue
+    the oldest. The shared ranking term pairs current-batch anchors against queue
+    entries, with gradient flowing only through the anchors, and retains within-batch
+    pairs under the same rule, one shared temperature and one shared mixture coefficient
+    for all labels. Queue entries are constants: no extra forward pass, no parameter
+    update, no additional data pass, no external feature extraction. Because drift
+    is largest early, the term uses within-batch pairs only until the queue is full,
+    then enables bank pairs; entries older than a shared age cap are ignored. Validation
+    never writes to or reads the queue, so no fold-0 validation label or score can
+    enter the objective.'
+  precedents:
+  - 'Wang et al., CVPR 2020, XBM (arxiv.org/abs/1912.06798): queue of past embeddings
+    with enqueue/dequeue, justified by a measured slow-drift property; reports large
+    gains at negligible extra memory'
+  - 'docs/research/auc_loss_approaches.md#5-roc-star: margin-based pairwise ranking
+    using sampled predictions from the previous epoch as comparison examples'
+  - 'autoresearch/campaigns/losses/prior-work.md: ''training-only memory pools'' named
+    as a future direction when evidence justifies them'
+  - 'docs/research/per-label-losses.md#ranking-needs-usable-study-pairs: gradient
+    accumulation does not create cross-microbatch pairs; end-to-end ranking needs
+    an explicit pair-coverage design'
+  - outputs/autoresearch/losses/jobs/researcher-20260920T112958Z-9a7e4a21/scratch/loss-evidence-20260920.md
+    sections 3, 5
+  novelty: Changes the comparison pool and adds training-only state; it does not change
+    the pair surrogate, the labels, the sampler or the batch. Distinct from shared-bce-ranking
+    (within-batch pairs only), from shared-delayed-ranking (which changes when the
+    same within-batch term applies) and from the sampling campaign (which changes
+    which studies share a batch). ROC-star uses whole-previous-epoch predictions;
+    this is a bounded, age-capped queue inside the sealed run.
+  coverage: All observed BCE cells keep their terms. Bank pairs exclude any entry
+    whose target is unobserved and, by construction, cannot pair a study with itself
+    within a step. With K = 1024 the expected number of Fracture positives in the
+    queue is about 75 and of Synovitis positives about 130, so every label has partners
+    at every step after warm-up. Maximum entry age is K/8 steps (128 of 4,380 at K
+    = 1024). Record queue occupancy, realized mean and maximum entry age, per-label
+    bank pair counts and the batch-pair versus bank-pair contribution split.
+  exploitation: Turns each step's eight anchors into comparisons against a wider,
+    more representative slice of the training score distribution, which is what a
+    fold-wide ranking metric rewards, and keeps rare-label positives continuously
+    present instead of appearing in one batch out of two.
+  budget: 'Buffers are 2 x K x 12 float32 plus a mask and a step index: about 100
+    KB at K = 1024, against XBM''s reported 0.2 GB for image embeddings. Pair computation
+    is 8 x K x 12 terms per step, roughly 10^5 float32 operations, negligible against
+    a 224 px encoder forward. No extra pass, no extra optimizer step, no preprocessing
+    or validation change. Fits the 1797 s ceiling with wide margin; ten epochs and
+    4,380 steps unchanged.'
+  implementation: Register the queue as a non-persistent buffer on the Lightning module
+    so it never enters checkpoints or inference state, and update it inside training_step
+    after the loss, from detached float32 logits. Reuse the shared pair helper from
+    the accepted ranking idea; combine batch pairs and bank pairs into one per-label
+    average, then average labels, then apply the single shared coefficient. Keep data
+    loading, model construction, optimizer, scheduler, forward prediction, validation,
+    checkpoint selection and triplet accounting untouched. Settings K, warm-up condition,
+    age cap, tau and lambda under trainer.loss.
+  open_choices: 'Queue size K and whether the age cap is implied by K alone; whether
+    to hold the queue across epoch boundaries or reset it; whether bank pairs and
+    batch pairs share one denominator or are averaged separately before mixing. Staleness
+    is the real risk: entries are scored by older parameters, so the gradient on the
+    anchor is measured against a shifted reference. Record drift rather than assuming
+    XBM''s slow-drift result transfers to twelve scalar logits. Choose one configuration
+    from a stated rationale; no grid.'
+  dependencies:
+  - shared-bce-ranking
+  priority_rationale: 'Second: it is the natural and cheap way to remove the batch-size-8
+    pair limit without touching sampling, but it extends an existing pair term, so
+    it should be launched once shared-bce-ranking reports observed pair coverage and
+    component scale. Launching it first would confound the bank with the hybrid itself.'
+  status: proposed
+  created_revision: 30
+- id: shared-soft-mass-balance
+  mechanism_id: shared-soft-mass-class-balance
+  parent_idea_id: null
+  title: Threshold-free class balancing from training-fold soft positive mass
+  opportunity: The incumbent picks a whole-cell weight by y >= 0.5, a step function
+    of a target that is soft for 41.7% of training cells. For Synovitis, where 88%
+    of cells lie in (0.05, 0.95), a cell at y = 0.45 receives weight 0.574 and one
+    at y = 0.55 receives 3.875, a 6.75x jump across a cutoff the label source never
+    intended as a decision boundary; 11.5% of that label's cells sit in (0.35, 0.65).
+    The same discontinuity affects Medial Meniscus (14.0% of cells near the cutoff)
+    and Contusion (9.7%). Aggregate imbalance under the current rule is modest, with
+    positive/negative term-mass ratios of 0.89-1.46 and Synovitis worst at 1.46, so
+    this targets the discontinuity and the arbitrary weight assigned to individual
+    soft cells rather than a gross imbalance (evidence note section 2).
+  mechanism: 'Weight each BCE term by its own class rather than weighting the whole
+    cell by its thresholded group: loss = -[w_pos * y * logsigmoid(s) + w_neg * (1-y)
+    * logsigmoid(-s)], with w_pos = 1/(2*m_c), w_neg = 1/(2*(1-m_c)) and m_c the mean
+    soft target over the label''s observed training-fold cells. One formula, one statistic
+    per label drawn from training data only, exactly as the incumbent already derives
+    its weights from training-fold counts. The rule is continuous in y, equalizes
+    each label''s positive and negative term mass by construction, keeps every observed
+    cell and every soft value intact, and reduces to the current rule when targets
+    are hard.'
+  precedents:
+  - 'docs/modeling/supervision.md#fixed-class-balanced-bce explicitly contrasts whole-cell
+    weighting with term-wise weighting: ''This differs from pos_weight, which scales
+    only the positive term inside BCE, including the positive component of soft negative
+    targets such as 0.25'''
+  - 'docs/research/auc_loss_approaches.md#9-positive-weighted-bce and #weighting-and-sampling-design-space
+    (study-target cell weights row)'
+  - 'docs/validation/results/2026-09-19-balanced-bce-result.md: the measured baseline
+    this replaces'
+  - outputs/autoresearch/losses/jobs/researcher-20260920T112958Z-9a7e4a21/scratch/loss-evidence-20260920.md
+    section 2
+  novelty: 'Distinct from shared-tempered-balance, which keeps the >= 0.5 group lookup
+    and changes weight magnitude through an exponent and a normalization rule. Here
+    the magnitude rule is unchanged (still 1/(2 * rate)) and the assignment rule changes
+    from thresholded-cell to per-term soft mass. The two cannot be combined in one
+    run and should not be read as variants of each other. It is also not pos_weight
+    added to unweighted BCE, the form the survey ranked: both classes keep a weight
+    and the reference statistic becomes the soft mass, not the thresholded rate.'
+  coverage: All observed cells keep a strictly positive weight on both terms; nothing
+    is dropped, hardened or masked, which matters given the rejected 2026-09-13 masking
+    run. m_c uses training-fold observed cells only, after gold overrides and any
+    training-study limit, exactly as the current count path does. Report per-label
+    m_c, the thresholded rate for comparison, the resulting weights and the realized
+    positive/negative term mass.
+  exploitation: Removes a 6.75x weight discontinuity that currently falls on the cells
+    the model orders worst, and reallocates gradient toward the positive mass carried
+    by soft negatives (Fracture mean y 0.187 against a 0.073 thresholded rate; Synovitis
+    0.341 against 0.126) without changing any target.
+  budget: Elementwise on existing logits, plus one extra scalar per label computed
+    once from frames already loaded in fixed_class_balance. No extra pass, no state,
+    no preprocessing, sampling, optimizer or inference change. Cost is immaterial
+    against the 1797 s ceiling; ten epochs and 4,380 steps unchanged.
+  implementation: Extend fixed_class_balance to record the soft positive mass alongside
+    the existing counts, bump the class_balance schema version, and keep the config/statistics
+    agreement check at lightning.py:93 and the checkpoint hyper_parameters.class_balance
+    path consistent. Replace the torch.where whole-cell weighting in masked_binary_cross_entropy_with_logits
+    with the term-wise form built from logsigmoid(s) and logsigmoid(-s) in float32,
+    preserving the pooled mean over observed cells and the missing-target mask. trainer.class_balanced_bce
+    is the allowlisted key for this replacement; per the campaign's no-legacy rule
+    the superseded thresholded-weight branch is removed rather than kept behind a
+    flag.
+  open_choices: Whether m_c is the plain observed mean soft target or clipped away
+    from 0 and 1 for safety; both give the same weights to three decimals on this
+    table. Whether to keep the pooled-cell reduction unchanged, which the evidence
+    supports since every label's weight mass stays n_obs. No exponent, no sweep, no
+    per-label statistic beyond the single shared formula.
+  dependencies: []
+  priority_rationale: 'Third: the cheapest to implement and fully independent, but
+    the aggregate imbalance it corrects is small, so its expected effect is the smallest
+    of the three. It is worth a slot mainly because it makes the pointwise term consistent
+    with the Bernoulli reading of soft targets that the pair idea uses.'
+  status: completed
+  created_revision: 30
+  ranking_rationale: "Queue change driven by the second consecutive null-or-negative\
+    \ auxiliary score-geometry term. shared-bce-ranking was neutral with a demonstrably\
+    \ active term; shared-centroid-margin is negative-leaning (delta mean \u22120.00293,\
+    \ interval upper bound +0.00119) with its margin component also demonstrably active\
+    \ early (20.2% of the objective in epoch 0). Two distinct always-on logit-geometry\
+    \ auxiliaries have now failed to produce gain, so shared-group-variance-compression\
+    \ \u2014 a third class-conditional logit-geometry auxiliary of the same family\
+    \ \u2014 drops to last; it is not parked, since its mechanism (compressing within-group\
+    \ spread rather than pushing cells across an opposite-class anchor) remains distinct\
+    \ and the evidence is suggestive rather than decisive.\n\nAdmitting shared-target-logit-margin\
+    \ (dependencies empty, satisfied): it is a pointwise target-shaping change with\
+    \ no batch statistics, no state, and negligible runtime, in the weighting/target-shaping\
+    \ family that has not yet been tested this campaign and where the remaining queue\
+    \ is concentrated. It is ranked below shared-evidence-margin-bce because the two\
+    \ overlap on the target-shaping axis and the one-sided variant is the cleaner\
+    \ first probe of it; running the one-sided candidate first makes the symmetric-shift\
+    \ result interpretable against it.\n\nshared-delayed-ranking is retained as a\
+    \ surplus proposal rather than queued: it is a schedule over the ranking term\
+    \ whose always-on version was neutral, and the centroid-margin traces show an\
+    \ auxiliary term that was early-heavy by construction still did not help, which\
+    \ weakens but does not refute the representation-maturity premise. It is worth\
+    \ keeping for the case where target-shaping also fails."
+  experiments:
+  - shared-soft-mass-balance-20260920T151517Z-d10564bb
+  decision: reject
+- id: shared-label-contrast-ranking
+  mechanism_id: shared-within-study-label-contrast
+  parent_idea_id: null
+  title: Shared within-study cross-label contrast term beside balanced BCE
+  opportunity: 'Control B''s predicted logits are twice as cross-label correlated
+    as its labels: mean off-diagonal correlation 0.384 against 0.202 for soft targets
+    (0.145 binarized), PC1 44.7% of prediction variance against 27.8% of target variance.
+    The training fold''s targets agree with validation (0.180, 26.1%), so this is
+    a model property, not a fold property. The excess concentrates on anatomically
+    confusable pairs and appears as weak within-study contrasts. Contrast AUC (which
+    of two labels is present, scored by s_c - s_c'') is 0.793 Lateral OA vs PF OA,
+    0.802 Contusion vs Fracture, 0.840 Medial OA vs PF OA, 0.866 Medial OA vs Lateral
+    OA, against a 0.937 mean over the 64 scoreable pairs; within-study profile Spearman
+    is 0.424 mean and negative for 12.3% of studies. Across the twelve labels, Spearman(own
+    AUC, mean contrast AUC) = 0.783: labels ranked worst across studies are separated
+    worst from other labels inside a study. Nothing in the objective supervises that
+    direction. Measurements: scratch/contrast-evidence-20260920.md sections 1-3.'
+  mechanism: Keep the class-balanced soft BCE unchanged and add one shared term over
+    label pairs inside each study. For study i and labels c < c' both observed, set
+    a = y_ic(1-y_ic'), b = y_ic'(1-y_ic), d = (s_ic - s_ic')/tau, and accumulate a*softplus(-d)
+    + b*softplus(d). Divide each study's sum by its pair mass sum(a+b), average over
+    studies, and add lambda times that to BCE. One tau, one lambda, one rule for all
+    66 pairs; no pair, label or family receives its own coefficient, and no target
+    is binarized. The weight a+b is the probability that the pair straddles the positive/negative
+    boundary under the Bernoulli reading the soft targets already carry in BCE, and
+    the implied target a/(a+b) is the probability that c is the present label. The
+    stationary point is s_ic - s_ic' = logit(y_ic) - logit(y_ic'), the same optimum
+    as soft BCE, so the term does not compete with the pointwise objective; it reallocates
+    finite-sample gradient into the contrast direction, which a study-level common
+    factor cannot satisfy. Because the logistic term is near-flat on already-correct
+    contrasts, gradient concentrates on the violated confusable pairs without any
+    per-pair selection. Log per-pair realized mass, per-pair mean term value, the
+    component share of the total loss, and the batch cross-label correlation as diagnostics
+    only.
+  precedents:
+  - 'Kobayashi, CVPR 2023, Two-Way Multi-Label Loss: within-example positive/negative
+    label discrimination plus the per-label direction; catalogued locally as docs/research/auc_loss_approaches.md#14-two-way-multi-label-loss
+    and ranked out there on the opinion that ''macro AUC never scores'' cross-label
+    ordering, with no local measurement'
+  - 'Burges et al., ICML 2005 (RankNet): pairwise cross-entropy against an ordering
+    probability, the surrogate reused here on the label axis'
+  - 'docs/research/medial-lateral-transfer.md: the medial/lateral similarity and transfer
+    hypothesis, its six experiments and the attention-contrast analysis'
+  - 'docs/modeling/retired-side-and-compartment-variants.md and docs/validation/results/2026-09-14-meniscus-soft-coupling-result.md:
+    loss.meniscus_coupling_weight 0.1 penalized classifier-weight distance for one
+    label pair and scored 0.890869 against 0.892360; cautionary precedent in parameter
+    space and label-specific, unlike this output-space shared rule'
+  - 'campaign idea shared-bernoulli-pair-ranking: identical pair surrogate on the
+    study axis; informs interpretation, not a prerequisite'
+  - outputs/autoresearch/losses/jobs/researcher-20260920T121718Z-2ea25138/scratch/contrast-evidence-20260920.md
+    sections 1-4 (reproduce with structure.py, contrast.py, decouple.py)
+  novelty: 'New comparison axis for this campaign and this repository: every prior
+    ranking idea compares studies within a label; this compares labels within a study,
+    so its pair pool, coverage and failure mode are different. Distinct from focal
+    (pointwise curvature), tempering and soft-mass (weight rule), schedules (timing)
+    and the memory bank (wider study pool). It is not the retired compartment architecture
+    or the retired meniscus weight-coupling penalty: no parameter is tied, no classifier
+    is shared, and the rule is identical for all 66 pairs.'
+  coverage: All observed BCE cells keep their terms unchanged. Pairs use c < c', so
+    self-pairs are excluded, and a pair is skipped only if either target is unobserved,
+    which never occurs on the fold-0 table. Per-study Bernoulli pair mass over the
+    3,503 training studies is mean 26.8, 1st percentile 3.20, minimum 1.41, so no
+    study falls below mass 1 and there is no zero-mass case at microbatch eight; 528
+    pair terms per step. Still clamp the denominator with eps, count zero-mass studies
+    and let them contribute zero. Report every label's per-pair mass and mean term
+    as diagnostics; no label selects its own objective.
+  exploitation: 'Supervises exactly the direction the incumbent leaves loose: the
+    within-study label profile, which a shared ''this knee looks abnormal'' factor
+    cannot fit. If cross-label confusion limits per-label evidence, as the 0.783 rank
+    association suggests, strengthening label-specific evidence should raise the scored
+    per-label ranking, while BCE continues to supply the scored direction and all
+    levels.'
+  budget: One B x 12 x 12 outer difference per step on logits already materialized
+    in float32, fully vectorized with no python label loop, about 10^4 elementwise
+    operations. No extra forward pass, no persistent state, no change to batch composition,
+    data loading, optimizer, schedule or inference. The earlier 12-label per-step
+    ranking loop cost ~52 s of the 235 s ceiling headroom; a fused 12 x 12 form should
+    cost less. Ten epochs and 4,380 steps unchanged.
+  implementation: Add a shared pair helper under src/knee_abnormality/training/losses/
+    and call it from training_step beside the existing masked BCE; keep trainer.class_balanced_bce
+    untouched. Build the pair tensors with broadcasting over the label axis, compute
+    d and both softplus branches in float32 under bf16-mixed, and use the a*softplus(-d)
+    + b*softplus(d) form so no division by a per-pair weight is needed. New settings
+    tau and lambda under trainer.loss. At initialization s = 0 gives d = 0 and a normalized
+    term of log 2 = 0.6931 against the control's recorded BCE start 1.2057, so lambda
+    = 1.0 makes the contrast about 36% of the objective at step 0, comparable to the
+    45% the study-axis ranking run started at; tau = 1.0 keeps the logit scale. Record
+    measured component scales on training-only reference batches before launch. Leave
+    data loading, model construction, optimizer/scheduler, forward prediction, validation,
+    checkpoint selection and triplet accounting untouched.
+  open_choices: Per-study normalization then study average (default) against one pooled
+    batch denominator. Whether to keep the pure Bernoulli straddle weight or the alternative
+    translation-invariant form, penalizing (s_ic - s_ic' - logit y_ic + logit y_ic')^2,
+    which supervises the profile shape directly but re-introduces level regression;
+    the logistic form is the default because it shares BCE's optimum and bounds each
+    pair's pressure. One defensible (tau, lambda) = (1.0, 1.0), no sweep, nothing
+    per label or per pair. Mixed per-label deltas must not reopen per-label selection.
+  dependencies: []
+  priority_rationale: 'First: it is the only proposal here aimed at a weakness measured
+    on the incumbent''s own predictions in a direction the objective never supervises,
+    it is near-free, and it is interpretable against the incumbent whatever the in-flight
+    study-axis run reports. Main uncertainties: the local survey ranked the cross-label
+    direction out on the argument that macro AUC does not score it, and removing the
+    common factor post hoc was harmful (evidence note section 4), so the bet is that
+    training-time contrast pressure strengthens label-specific evidence rather than
+    merely decorrelating outputs.'
+  status: completed
+  created_revision: 47
+  ranking_rationale: 'Both new proposals are contract-compliant shared objectives
+    (one formula, one tau/lambda or one fixed constant, all twelve labels, soft targets
+    preserved, no per-label switch) and have no unresolved dependencies; both are
+    admitted.
+
+
+    shared-label-contrast-ranking is ranked above the two weighting-rule ideas because
+    it is the only candidate aimed at a deficiency measured on the incumbent''s own
+    predictions in a direction the objective never supervises: prediction off-diagonal
+    correlation 0.384 vs 0.202 for soft targets, PC1 0.447 vs 0.278, with the training
+    fold agreeing (0.180 / 0.261), so it is a model property (evidence sections 1-2,
+    verified in the scratch note). Coverage is established rather than assumed: per-study
+    Bernoulli straddle mass min 1.41 over 3,503 training studies, 528 pair terms per
+    microbatch, so there is no zero-mass regime to design around (section 3). It opens
+    a new comparison axis (labels within a study) distinct from every prior study-axis
+    ranking idea, and it is cheap enough to fit the ~182 s of headroom the prior pair
+    candidate left.
+
+
+    shared-balanced-brier is ranked third: it replaces the pointwise function itself
+    with a strongly proper member of the AUC-regret-bounded family, keeping mask,
+    class weights, reduction and soft-target optimum at p=y, and its factor 2 is fixed
+    by the initialization identity rather than tuned, so it starts gradient-identical
+    to the control cell by cell (section 8). It is cheaper than the log-loss path.
+    Its local evidence is weaker than the contrast proposal''s: the redistribution
+    on the confidently-wrong tail is 23.7% -> 20.3% of gradient mass, a modest shift.
+
+
+    shared-delayed-ranking and shared-ranking-memory-bank are retained as surplus
+    rather than queued: the completed hybrid''s traces show the study-axis ranking
+    term was active and a substantial share of the objective throughout, so scheduling
+    or widening that same inert-free mechanism has low expected value, and the memory
+    bank''s dependency is unresolved.
+
+
+    shared-tempered-balance and shared-soft-mass-balance keep their relative order
+    at the tail; section 6 (class-weighted per-label BCE spans only 0.414-0.522 on
+    identical per-label weight mass) weakens, without eliminating, the motivation
+    for reweighting-rule variants.'
+  experiments:
+  - shared-label-contrast-ranking-20260920T124509Z-e94c32f9
+  decision: reject
+- id: shared-balanced-brier
+  mechanism_id: shared-strongly-proper-pointwise
+  parent_idea_id: null
+  title: Balanced squared-error (Brier) objective as a strongly proper AUC surrogate
+  opportunity: 'The campaign''s pointwise axis has so far tested weighting rules and
+    one improper focusing variant; the pointwise loss function itself has never been
+    replaced by another member of the family that provably bounds bipartite-ranking
+    regret. Log loss is the unbounded extreme of that family: its per-cell gradient
+    does not decay when the model is confidently wrong, and the repository has documented
+    confidently-wrong supervision (nineteen report-derived OA cells with explicit
+    low-grade findings carrying confident positive training labels, docs/research/medial-lateral-transfer.md).
+    On control B''s epoch-8 predictions the 5.99% of cells with |p - y| > 0.6 carry
+    23.7% of the balanced BCE gradient mass against 20.3% under the scaled Brier form,
+    and the median per-cell gradient falls from 0.1019 to 0.0542 while the two are
+    identical cell by cell at initialization. So this is a measured, bounded change
+    in how gradient is distributed across the probability range, not a rescaling.
+    Unlike focal, the squared loss is strictly proper: its per-cell optimum stays
+    at p = y, which is what the contract asks pointwise terms to preserve. Measurements:
+    scratch/contrast-evidence-20260920.md section 8.'
+  mechanism: 'Replace the masked class-balanced log loss with the masked class-balanced
+    squared loss on probabilities: L = mean over observed cells of 2 * w_ic * (sigmoid(s_ic)
+    - y_ic)^2, with w_ic the existing whole-cell class weight from the training-fold
+    counts and the same missing-target mask and pooled-cell reduction. One formula
+    and one fixed constant for all twelve labels; no label-specific parameter, no
+    target change, no schedule. The factor 2 is fixed by an identity rather than tuned:
+    d/ds [2w(sigmoid(s) - y)^2] = 2w(sigmoid - y)*2*sigmoid*(1 - sigmoid), which at
+    the initialization point s = 0 equals w(0.5 - y), exactly the balanced BCE gradient
+    for every cell. The two objectives therefore start gradient-identical and differ
+    only in shape as training proceeds, which is the confound recorded against the
+    focal candidate at its review. Squared loss is a strongly proper composite loss,
+    so its regret bounds bipartite-ranking regret; the class-balanced form is the
+    variant for which univariate AUC regret bounds are stated. Its Savage weight function
+    is constant over thresholds where log loss uses 1/(c(1-c)), so saturated cells
+    lose influence and mid-range cells gain it, with per-cell gradient bounded by
+    w/2.'
+  precedents:
+  - 'Agarwal, JMLR 15 (2014), ''Surrogate Regret Bounds for Bipartite Ranking via
+    Strongly Proper Losses'' (arxiv.org/abs/1207.0268): explicit ranking regret bounds
+    for logistic, exponential, squared and squared-hinge losses as members of one
+    family'
+  - 'Kotlowski, Dembczynski and Huellermeier, ICML 2011, ''Bipartite Ranking through
+    Minimization of Univariate Loss'' (icml.cc/2011/papers/567_icmlpaper.pdf): AUC
+    regret bounds for balanced univariate losses, the theoretical warrant for the
+    incumbent''s balancing and for this replacement'
+  - 'Brier 1950; Reid and Williamson on composite binary losses: proper losses are
+    characterized by a weight function over thresholds, constant for squared and 1/(c(1-c))
+    for log loss'
+  - 'docs/research/auc_loss_approaches.md: the local survey lists squared hinge only
+    as a pairwise ranking option and never lists a pointwise proper-loss replacement,
+    so this family is unclaimed by the general backlog'
+  - 'docs/validation/results/2026-09-19-balanced-bce-result.md: the measured control
+    this replaces'
+  - 'campaign idea shared-balanced-focal: contrasting arm, improper and hard-cell-emphasizing,
+    whose recorded review concern is exactly the fixed-LR gradient-scale confound
+    this candidate removes by construction'
+  - outputs/autoresearch/losses/jobs/researcher-20260920T121718Z-2ea25138/scratch/contrast-evidence-20260920.md
+    section 8
+  novelty: 'A different loss family, not a parameter of the incumbent: the pointwise
+    function changes while the weighting rule, mask, reduction and soft targets stay
+    identical. Distinct from focal, which multiplies log loss by a focusing factor,
+    moves the per-cell optimum away from p = y and emphasizes the opposite end of
+    the confidence range. Distinct from tempering and soft-mass, which change w and
+    keep log loss. No local run has replaced the pointwise function itself, and the
+    survey does not list this family.'
+  coverage: Every observed cell keeps a strictly positive weight and its exact soft
+    target; nothing is dropped, hardened or masked, and the optimum stays at sigmoid(s)
+    = y for every cell including the 41.7% that are soft. The class weights, the y
+    >= 0.5 group rule, the missing-target mask and the pooled mean over observed cells
+    are byte-for-byte the incumbent's. Report per-label loss values, per-label AUC
+    and the realized gradient norm as diagnostics; the train_loss trace is a squared
+    quantity and is not comparable to the control's BCE trace, so only macro AUC and
+    the paired bootstrap are comparable.
+  exploitation: Redistributes gradient away from saturated cells, where log loss puts
+    unbounded weight on supervision that the repository has documented to be sometimes
+    confidently wrong, and toward the mid-range region where the discordant validation
+    mass concentrates, while keeping soft-target semantics exactly. If the incumbent's
+    residual error is partly the cost of chasing confident label noise, a bounded
+    strongly proper member of the same AUC-bounded family should rank better at equal
+    budget.
+  budget: Elementwise on the logits already materialized in float32; strictly cheaper
+    than the log-loss path (one sigmoid and one square, no logsigmoid branches). No
+    extra pass, no state, no preprocessing, sampling, optimizer or inference change,
+    no schedule. Cost is immaterial against the 1,797 s ceiling and control B's 1,562
+    s. Ten epochs and 4,380 steps unchanged.
+  implementation: Add the objective under src/knee_abnormality/training/losses/ and
+    call it from training_step in place of masked_binary_cross_entropy_with_logits,
+    preserving the observed-mask guard, the torch.where class weighting and the pooled
+    mean. Compute sigmoid and the square in float32 under bf16-mixed; no clamping
+    is needed because the loss is bounded. Keep trainer.class_balanced_bce and its
+    statistics path untouched, since the weighting rule is unchanged, and put the
+    objective selection under trainer.loss. Per the campaign's no-legacy rule the
+    superseded pointwise branch is replaced, not kept behind a flag. Before launch,
+    verify on training-only reference batches that per-cell gradients match the control
+    at s = 0 and record the measured ratio at a mid-training reference point.
+  open_choices: 'Whether to keep the analytic factor 2 (default, gradient-matched
+    at initialization) or no factor at all; a factor is not a tuned scale and must
+    not become a sweep. Whether to also record the exponential balanced loss as the
+    alternative family member: it has the same univariate AUC bound but an unbounded
+    gradient under noisy labels, so it is not the default. Whether validation logging
+    keeps the soft-target BCE for comparability, which it should.'
+  dependencies: []
+  priority_rationale: 'Second: cheap, self-contained and theoretically warranted,
+    and it removes by construction the gradient-scale confound recorded against the
+    running focal arm, so a null result is interpretable as a statement about loss
+    shape. Local evidence is weaker than the contrast proposal''s: the redistribution
+    at convergence is modest (23.7% to 20.3% of gradient mass on the confidently-wrong
+    tail), and the halved late-training gradient acts as an implicit step-size cut
+    under the fixed schedule. It should not run concurrently with the focal arm''s
+    comparison.'
+  status: completed
+  created_revision: 47
+  ranking_rationale: "Both new proposals are admitted; their supporting measurements\
+    \ reproduce from existing artifacts with no GPU or validation-fitted quantity.\n\
+    \nshared-shift-projected-bce ranked above the two standing class-weight ideas.\
+    \ It is the only candidate so far aimed at a component of the incumbent's own\
+    \ gradient that provably cannot move the scored metric (per-label shift direction),\
+    \ it carries no coefficient, temperature or pair pool, so a null result indicts\
+    \ the mechanism rather than an unswept scale \u2014 the exact confound that made\
+    \ shared-bce-ranking uninformative about magnitude \u2014 and its cost (one masked\
+    \ mean per label per step) is below every prior candidate's overhead, well inside\
+    \ the ~182 s of ceiling headroom. Its uncertainty is honest and stated: output-space\
+    \ energy is not parameter-space progress.\n\nshared-biproportional-weights ranked\
+    \ third, above shared-tempered-balance and shared-soft-mass-balance, because it\
+    \ is parameter-free (nothing to sweep, unlike tempering's exponent), it provably\
+    \ preserves the per-label positive/negative mass property the measured balanced-BCE\
+    \ gain rests on (fitted ratio 1.000 for all twelve labels), and it corrects a\
+    \ measured, never-chosen 2.2x influence advantage for abnormal studies that pushes\
+    \ in the same direction as control B's already over-expressed common abnormality\
+    \ factor. It ranks below the projection because equal study influence is a design\
+    \ preference rather than a metric invariance, and a 27.9% mean change in cell\
+    \ weights is a materially larger perturbation of a validated rule, so a loss is\
+    \ a plausible outcome.\n\nScope ruling on the question the researcher raised:\
+    \ the biproportional fit reads the joint training-fold label table rather than\
+    \ per-label counts alone, but it yields one shared 2x12 table plus one shared\
+    \ study-normalization rule applied identically to every label. That is shared\
+    \ loss weighting, explicitly in scope; it is not per-label loss selection. No\
+    \ validation or gold label enters the fit.\n\nshared-delayed-ranking stays proposed\
+    \ as surplus: three study-axis pair results (one inconclusive, one reject, one\
+    \ awaiting comparison) make another scheduled ranking hybrid low expected value\
+    \ for a queue slot. shared-ranking-memory-bank remains blocked by its unresolved\
+    \ dependency.\n\nQueue head and the two standing class-weight ideas are otherwise\
+    \ unchanged."
+  experiments:
+  - shared-balanced-brier-20260920T131336Z-3dfa7fa5
+  decision: inconclusive
+- id: shared-shift-projected-bce
+  mechanism_id: shared-auc-invariant-gradient-projection
+  parent_idea_id: null
+  title: Project the AUC-irrelevant per-label level component out of the balanced
+    BCE gradient
+  opportunity: 'Adding a constant to every study''s logit for one label changes that
+    label''s ROC-AUC by exactly zero, yet a measured 23.4% (at initialization) and
+    16.7% (converged proxy) of the microbatch squared gradient norm of balanced BCE
+    lies in exactly that direction, against a 12.5% random floor at batch eight. The
+    excess tracks rarity, because a batch holding no positive produces same-signed
+    residuals: Fracture 52.8% at init (53.4% of batches hold no Fracture positive),
+    Synovitis 36.3%, MCL 30.1%, Lateral Meniscus 27.6%. The systematic part is tiny
+    (per-label mean/rms of the weighted residual -0.147..+0.051 at init, -0.117..+0.018
+    converged), because class balancing already zeroes the population level gradient;
+    so this energy is eight-sample noise in a direction the metric cannot see. Measurements:
+    scratch/gradient-geometry-20260920.md section 1.'
+  mechanism: 'Keep the objective, mask, class weights, soft targets and pooled-cell
+    reduction exactly as they are, and remove one component of the gradient they produce.
+    Per microbatch and label, compute the weighted residual g_ic = w_ic(sigmoid(s_ic)
+    - y_ic) over observed cells and its mean gbar_c, then optimize the objective whose
+    gradient wrt s_ic is (g_ic - gbar_c)/N_obs. Implement it as balanced BCE minus
+    the detached linear correction sum_c gbar_c * sum_i s_ic / N_obs, so the forward
+    value stays near BCE while the backward gradient is exactly the projected one.
+    One rule; no per-label parameter, temperature, mixture coefficient or pair pool.
+    The projection is linear and the batch is exchangeable, so E[Pg] = P E[g]: the
+    update remains an unbiased estimate of the ordering-relevant part of the population
+    gradient and only the level is discarded. This is the study-axis analogue of the
+    identity that an all-pairs squared-difference loss equals the batch-centered pointwise
+    loss, applied to the existing residual instead of adding a second term. Batches
+    whose residuals differ still supervise ordering, including all-negative batches
+    whose soft targets differ; only a batch with identical residuals contributes nothing.'
+  precedents:
+  - 'Identity: for L = sum_{i<j}((s_i-s_j)-(t_i-t_j))^2, dL/ds_i = n(r_i - rbar) with
+    r = s - t, so the translation-invariant pairwise objective is the batch-centered
+    pointwise one. Named as an unrun alternative form on the label axis in shared-label-contrast-ranking''s
+    open choices.'
+  - 'Burges et al., ICML 2005 (RankNet): pairwise surrogates on score differences,
+    the family whose additive study-axis members this campaign has already measured.'
+  - 'Kotlowski, Dembczynski and Huellermeier, ICML 2011: AUC regret bounds for balanced
+    univariate losses; the per-label level is a nuisance for bipartite ranking.'
+  - 'Control-variate / baseline subtraction: removing a component of a stochastic
+    gradient whose expectation is (near) zero reduces variance without introducing
+    bias.'
+  - 'campaign results shared-bce-ranking (inconclusive) and shared-bernoulli-pair-ranking
+    (reject): additive study-axis pair terms at weight 1.0. Contrasting arms, not
+    prerequisites.'
+  - 'docs/research/auc_loss_approaches.md: lists pointwise and pairwise surrogates;
+    no entry projects a component out of the existing pointwise gradient.'
+  - outputs/autoresearch/losses/jobs/researcher-20260920T131338Z-3dc7e308/scratch/gradient-geometry-20260920.md
+    sections 1 and 4 (shift.py, gradscale.py).
+  novelty: 'Subtractive rather than additive. The campaign''s ranking and focusing
+    candidates each added a term or reshaped the per-cell loss and each carried an
+    unswept scale. This introduces no component, no coefficient and no temperature,
+    so there is nothing to sweep, and it cannot suffer the measured failure modes
+    of the pair candidates (a term competing at the optimum, ambiguous-pair mass,
+    zero-pair batches). It is not the running label-axis contrast term: different
+    axis, and a projection of the existing gradient rather than a second objective.'
+  coverage: Every observed cell keeps its exact soft target, class weight, mask and
+    place in the pooled mean; nothing is dropped, hardened or rescaled. Centering
+    runs over each label's observed cells in the microbatch, so masked cells neither
+    donate nor receive gbar_c; a label with one observed cell contributes exactly
+    zero, which is correct because one cell carries no ordering information. Log per-label
+    removed-energy share, per-label mean logit and logit IQR per epoch, and the underlying
+    balanced BCE value so the training trace stays comparable with control B.
+  exploitation: Removes 17-23% of the output-space gradient energy that provably cannot
+    move the scored metric, and up to 53% of it for the rarest label, which is also
+    the label with the worst pair coverage. What remains is the relative part of the
+    pointwise residual, which is exactly what per-label AUC scores, so the same 4,380
+    steps buy a less noisy estimate of the ordering-relevant gradient.
+  budget: One extra masked mean per label per step (12 values from a 12x8 residual
+    already materialized in float32) plus one linear correction term. No extra forward
+    pass, no persistent state, no change to preprocessing, sampling, optimizer, schedule
+    or inference. Cheaper than the focal candidate's +1.1% and far below the pair
+    candidates' +3.3% and +4.0%; immaterial against the 1,797 s ceiling and control
+    B's 1,562 s. Ten epochs and 4,380 optimizer steps unchanged.
+  implementation: 'Add a helper under src/knee_abnormality/training/losses/ and call
+    it from training_step in place of masked_binary_cross_entropy_with_logits, reusing
+    the class weighting, mask and pooled mean unchanged. Compute sigmoid, residual,
+    the per-label masked mean and the correction in float32 under bf16-mixed; detach
+    gbar_c and verify numerically against an explicit projected-gradient reference
+    on a training-only batch before launch. Keep trainer.class_balanced_bce and its
+    statistics path untouched; objective selection under trainer.loss; the superseded
+    call is replaced, not kept behind a flag. Leave data loading, model construction,
+    optimizer/scheduler, forward prediction, validation, checkpoint selection and
+    triplet accounting untouched. For review: the head bias gradient is exactly the
+    batch residual sum, so it goes to ~0, and biases take no weight decay (the ndim<2
+    group), leaving the per-label level unanchored. That is AUC-irrelevant and checkpoint
+    selection is on macro AUC (selected_checkpoint.json), but record per-label mean
+    logit per epoch to confirm no drift into sigmoid saturation.'
+  open_choices: 'Whether to also project out the per-label scale direction (the centered-score
+    vector), making the objective invariant to per-label affine maps rather than shifts
+    alone; shift-only is the default because it needs no normalization and cannot
+    collapse the spread. Whether the correction is the detached linear term (keeps
+    the forward value near BCE) or a detached-coefficient surrogate; gradients are
+    identical. Whether to retain a fraction of the shift component as a level anchor:
+    default is full projection, which keeps the candidate hyperparameter-free; adopt
+    an anchor only if the logged level drifts into saturation.'
+  dependencies: []
+  priority_rationale: 'First. It is the only proposal aimed at a component measured
+    on the incumbent''s own objective that provably cannot affect the metric; it has
+    no tunable scale, so a null result is unambiguous about the mechanism rather than
+    about a coefficient; and it costs less than any candidate run so far. Main uncertainties:
+    output-space energy is not parameter-space progress, so removing 17-23% of gradient
+    noise may not move macro AUC, and the unanchored per-label level is a new degree
+    of freedom even though the metric ignores it.'
+  status: completed
+  created_revision: 85
+  ranking_rationale: "Both new proposals are admitted; their supporting measurements\
+    \ reproduce from existing artifacts with no GPU or validation-fitted quantity.\n\
+    \nshared-shift-projected-bce ranked above the two standing class-weight ideas.\
+    \ It is the only candidate so far aimed at a component of the incumbent's own\
+    \ gradient that provably cannot move the scored metric (per-label shift direction),\
+    \ it carries no coefficient, temperature or pair pool, so a null result indicts\
+    \ the mechanism rather than an unswept scale \u2014 the exact confound that made\
+    \ shared-bce-ranking uninformative about magnitude \u2014 and its cost (one masked\
+    \ mean per label per step) is below every prior candidate's overhead, well inside\
+    \ the ~182 s of ceiling headroom. Its uncertainty is honest and stated: output-space\
+    \ energy is not parameter-space progress.\n\nshared-biproportional-weights ranked\
+    \ third, above shared-tempered-balance and shared-soft-mass-balance, because it\
+    \ is parameter-free (nothing to sweep, unlike tempering's exponent), it provably\
+    \ preserves the per-label positive/negative mass property the measured balanced-BCE\
+    \ gain rests on (fitted ratio 1.000 for all twelve labels), and it corrects a\
+    \ measured, never-chosen 2.2x influence advantage for abnormal studies that pushes\
+    \ in the same direction as control B's already over-expressed common abnormality\
+    \ factor. It ranks below the projection because equal study influence is a design\
+    \ preference rather than a metric invariance, and a 27.9% mean change in cell\
+    \ weights is a materially larger perturbation of a validated rule, so a loss is\
+    \ a plausible outcome.\n\nScope ruling on the question the researcher raised:\
+    \ the biproportional fit reads the joint training-fold label table rather than\
+    \ per-label counts alone, but it yields one shared 2x12 table plus one shared\
+    \ study-normalization rule applied identically to every label. That is shared\
+    \ loss weighting, explicitly in scope; it is not per-label loss selection. No\
+    \ validation or gold label enters the fit.\n\nshared-delayed-ranking stays proposed\
+    \ as surplus: three study-axis pair results (one inconclusive, one reject, one\
+    \ awaiting comparison) make another scheduled ranking hybrid low expected value\
+    \ for a queue slot. shared-ranking-memory-bank remains blocked by its unresolved\
+    \ dependency.\n\nQueue head and the two standing class-weight ideas are otherwise\
+    \ unchanged."
+  experiments:
+  - shared-shift-projected-bce-20260920T135020Z-231a530c
+  decision: inconclusive
+- id: shared-biproportional-weights
+  mechanism_id: shared-biproportional-study-class-weighting
+  parent_idea_id: null
+  title: Balance class mass and study influence together with one biproportional weight
+    fit
+  opportunity: 'The incumbent balances each label''s positive and negative weight
+    mass but leaves study influence uncontrolled, because the reduction is a pooled
+    cell mean. On the fold-0 training table, per-study total weight mass has cv 0.295
+    and max/min 3.72, rises monotonically with the number of positive labels (0 positives
+    0.72x mean influence, 4 positives 1.04x, 8 positives 1.60x; correlation 0.788),
+    and the top decile of studies carries 16.5% of all weight mass against 7.1% for
+    the bottom decile. Abnormal studies therefore receive about 2.2x the gradient
+    influence of normal ones purely as a side effect of class balancing. Control B
+    already over-expresses a shared abnormality factor: its mean standardized logit
+    alone scores 0.694-0.835 AUC per label, and PC1 holds 44.7% of prediction variance
+    against 27.8% of target variance. Measurements: scratch/gradient-geometry-20260920.md
+    section 2.'
+  mechanism: 'Replace the 2x12 class-weight table with the biproportional fit of the
+    same table: alternate (i) rescaling each training study''s weights so its observed
+    cells sum to its observed cell count and (ii) rescaling each label''s positive
+    and negative groups so their masses are equal, until both hold. On the fold-0
+    table 200 sweeps converge exactly: per-study mass equal for all 3,503 studies
+    and per-label positive/negative mass ratio 1.000 for all twelve labels, with cell
+    weights 0.132-8.785 against the current 0.539-6.950 and correlation 0.898 with
+    the current weights. At the fixed point the weights factor as w_ic = a_i * beta_{c,class(y_ic)}
+    with a_i = n_obs(i) / sum_c beta_{c,class(y_ic)}, so training stores only the
+    fitted 2x12 beta and recomputes the study factor from the batch''s own targets:
+    no per-study table, no lookup, no state. One algorithm, zero tuned parameters,
+    the same y >= 0.5 group rule and the same soft targets. Plain per-study normalization
+    without the refit is a different and worse rule, rejected here: it drags per-label
+    positive/negative ratios to 0.569-0.911 and per-label totals to 3,041-3,812 against
+    a uniform 3,503.'
+  precedents:
+  - 'Deming and Stephan 1940 (iterative proportional fitting); Sinkhorn 1964: biproportional
+    scaling of a matrix to prescribed row and column sums, which converges here to
+    a study-factor times class-factor form.'
+  - 'docs/modeling/supervision.md#fixed-class-balanced-bce: the whole-cell class weighting
+    rule this generalizes.'
+  - 'docs/validation/results/2026-09-19-balanced-bce-result.md: the measured gain
+    of the current class balancing, whose defining property this fit preserves exactly.'
+  - 'docs/research/auc_loss_approaches.md#weighting-and-sampling-design-space: enumerates
+    class-axis weighting choices; study-axis influence under a pooled-cell reduction
+    is absent from it.'
+  - 'campaign ideas shared-tempered-balance and shared-soft-mass-balance: both act
+    on the class axis (magnitude, assignment). This acts on the study axis and lets
+    class magnitudes move only as far as the same balance constraint requires.'
+  - 'researcher-20260920T121718Z-2ea25138/scratch/contrast-evidence-20260920.md section
+    1: PC1 and common-factor excess on control B.'
+  - outputs/autoresearch/losses/jobs/researcher-20260920T131338Z-3dc7e308/scratch/gradient-geometry-20260920.md
+    section 2 (study_mass.py, sinkhorn.py).
+  novelty: 'A second constraint on the same weighting rule rather than a different
+    magnitude or a different assignment rule: the class-mass property that the measured
+    baseline established is retained exactly (ratio 1.000 per label) while study influence
+    is equalized in addition. Distinct from shared-tempered-balance (one exponent
+    on the same per-label counts) and from shared-soft-mass-balance (threshold-free
+    per-term assignment); either could later be composed with this fit, but neither
+    is a variant of it. No per-label formula and nothing tuned.'
+  coverage: Every observed cell keeps a strictly positive weight, its exact soft target
+    and its mask. The study factor uses each study's observed cells only, so masked
+    cells neither donate nor receive weight; on the fully observed fold-0 table the
+    factor runs over all twelve. The fit uses training-fold labels only, exactly as
+    the current counts do, and no validation or gold label enters it. Report the fitted
+    beta table, the realized per-label positive/negative mass and per-study mass on
+    the training fold, and per-label AUC as diagnostics.
+  exploitation: Removes a 2.2x influence gradient between abnormal and normal studies
+    that nobody chose and that pushes in the same direction as the model's already
+    excessive shared abnormality factor, while keeping the one weighting property
+    that was measured to help. Equal study influence is also the weighting under which
+    each study's twelve cells compete on equal terms, which is what a per-label metric
+    averaged over labels rewards.
+  budget: One alternating fit over a 3,503x12 table at setup (200 sweeps, well under
+    a second, on the frame fixed_class_balance already loads) plus one per-study row
+    normalization per step on weights already materialized in float32. No extra pass,
+    no persistent state, no change to preprocessing, sampling, optimizer, schedule
+    or inference. Immaterial against the 1,797 s ceiling and control B's 1,562 s;
+    ten epochs and 4,380 optimizer steps unchanged.
+  implementation: Extend fixed_class_balance in lightning.py to run the alternating
+    fit and emit the fitted 2x12 table as class_balance version 2, keeping count provenance,
+    the config/statistics agreement check at lightning.py:93 and the checkpoint hyper_parameters.class_balance
+    path consistent. In the objective helper, build cell weights with the existing
+    torch.where group lookup against the fitted table, then divide each study's weights
+    by their observed mean; keep the mask and the pooled mean over observed cells,
+    in float32 under bf16-mixed. trainer.class_balanced_bce is the allowlisted key
+    for the replacement, and the superseded table is replaced rather than kept behind
+    a flag. Before launch, verify on the training fold that the shipped weights reproduce
+    per-study equality and per-label ratio 1.000, and record the resulting weight
+    range. Leave data loading, model construction, optimizer/scheduler, forward prediction,
+    validation, checkpoint selection and triplet accounting untouched.
+  open_choices: 'Whether the study factor normalizes to the study''s observed cell
+    count (default; keeps the overall loss scale and train_loss comparability) or
+    to a global constant. Whether the fit targets the exact fixed point or a partial
+    move toward equal study mass; exact is the default because it is parameter-free.
+    Whether class_balance retains the existing count fields for provenance alongside
+    the fitted table, which it should. One question for the orchestrator: the contract
+    permits a formula using each label''s training-fold class counts, and this fit
+    uses the training-fold label table, though it still yields one shared 2x12 table
+    and no per-label rule.'
+  dependencies: []
+  priority_rationale: 'Second. Parameter-free, near-free to run, and it corrects a
+    measured 2.2x study-influence gradient that was never chosen while provably preserving
+    the class-mass property the measured baseline established. Weaker than the projection
+    proposal on two counts: equal study influence is a design preference rather than
+    a metric invariance, and a 27.9% mean change in cell weights is a larger perturbation
+    of an already validated weighting rule, so a loss is a plausible outcome.'
+  status: completed
+  created_revision: 85
+  ranking_rationale: "Queue change (one demotion): shared-group-variance-compression\
+    \ moves from second to last. It rests on the same premise this run tested for\
+    \ the first time \u2014 that score structure invisible to AUC (here the per-label\
+    \ level, there the within-group spread) can be suppressed without cost. The premise\
+    \ did not hold: the projection removed 15\u201370% of per-label gradient energy,\
+    \ not the 1\u201312% expected at review, and the per-label damage tracks that\
+    \ share (Spearman \u22120.63). A class-conditional variance term suppresses a\
+    \ second gradient direction under the same batch-8 estimation noise, so its prior\
+    \ drops relative to the three weighting ideas, which are untested by this evidence\
+    \ and cheap. Not parked: the mechanism is distinct enough that one full-budget\
+    \ test remains worthwhile if the weighting line exhausts.\n\nshared-delayed-ranking\
+    \ is admissible (no unresolved dependency) but stays unqueued as retained surplus\
+    \ rather than displacing a weighting idea: shared-bce-ranking already showed an\
+    \ active, non-degenerate ranking component is neutral at full-run scale, and a\
+    \ schedule variant of that same term has lower expected value than the untested\
+    \ weighting formulas. shared-ranking-memory-bank remains blocked by its unresolved\
+    \ dependency on shared-bce-ranking (inconclusive, not provisional_accept).\n\n\
+    shared-centroid-margin is unaffected by today's result and keeps its place as\
+    \ the one ranking-pressure idea with a mechanism (dense per-cell pressure) the\
+    \ sampled-pair run did not test."
+  experiments:
+  - shared-biproportional-weights-20260920T141757Z-d567131d
+  decision: reject
+- id: shared-group-variance-compression
+  mechanism_id: shared-class-conditional-variance
+  parent_idea_id: null
+  title: Compress the metric-irrelevant within-group score spread with one shared
+    class-conditional variance term
+  opportunity: 'Inside each metric-defined group the incumbent turns label grade into
+    score spread that macro AUC never rewards, and the resulting tails are what it
+    does penalise. On control B, within-group corr(soft target, logit) is +0.17..+0.50
+    for negatives and +0.20..+0.55 for positives; top-decile negatives carry higher
+    grades than their group (Medial Meniscus 0.237 vs 0.120), because the v4 blend
+    puts report-unaddressed metric-negatives at 0.25. Discordance is tail-concentrated:
+    bottom-decile positives take 40-60% and top-decile negatives 37-57% of each label''s
+    discordant pairs, union 0.78-0.996 against 0.19 at chance. Macro AUC implied by
+    the class-conditional first two moments is 0.9058 against the realized 0.8966,
+    so the deficit sits in non-Gaussian group tails. No weighting rule reaches this:
+    the soft target, not the weight, fixes a cell''s equilibrium score. Evidence:
+    jobs/researcher-20260920T141757Z-27ab0eb1/scratch/group-geometry-20260920.md,
+    sections 1-3.'
+  mechanism: 'Keep balanced soft BCE bit-identical and add one shared class-conditional
+    variance term. Group each observed cell by the same y>=0.5 rule the class weights
+    already use. Maintain detached EMA centroids mu[c,g] (24 scalars, momentum 0.9)
+    of each label''s per-group mean logit, updated once per optimizer step from the
+    microbatch''s observed cells in float32; a group absent from a step is not updated.
+    Per label, term_c = sum_i w_ic (s_ic - mu[c,g(i,c)])^2 / sum_i w_ic over observed
+    cells, with w the existing class weights, so the term cannot dilute class balancing
+    (the inferred failure mode of shared-label-contrast-ranking). Divide term_c by
+    max((mu[c,pos]-mu[c,neg])^2, 1.0), detached: that ratio is the inverse squared
+    separation index, so the term is scale-free and cannot be satisfied by shrinking
+    the logit scale, which would be AUC-neutral. Loss = balanced_bce + 0.15 * mean_c
+    term_c. At control B''s geometry the per-label ratio is 0.39-0.84, so the component
+    takes ~12-17% of the objective, deliberately below the 26-48% share at which both
+    measured pair terms were neutral or harmful. The term adds no separation pressure;
+    BCE keeps the class gap. Soft targets, masks, per-cell BCE and the pooled reduction
+    are untouched.'
+  precedents:
+  - 'Ying, Wen & Lyu, Stochastic Online AUC Maximization, NeurIPS 2016: the square-loss
+    AUC risk admits an exact saddle-point reformulation in class-conditional first
+    and second moments, with the auxiliary variables equal to the class-conditional
+    mean scores at the optimum. https://proceedings.neurips.cc/paper/2016/hash/c52f1bd66cc19d05628bd8bf27af3ad6-Abstract.html'
+  - 'Yuan et al., Large-scale Robust Deep AUC Maximization (AUC-M), arXiv:2012.03173
+    and docs/research/auc_loss_approaches.md section 4: within-class variance terms
+    plus a margin. AUC-M needs PESG for its min-max; detaching the centroids removes
+    the dual variable so the contract''s fixed optimizer is preserved.'
+  - 'Campaign results: shared-bce-ranking (inconclusive, pairs covered ~10/12 labels),
+    shared-bernoulli-pair-ranking (reject), shared-label-contrast-ranking (reject).
+    All three enumerate sampled pairs; none tested a moment-form term.'
+  - 'Campaign results shared-balanced-focal (inconclusive, negative point estimate)
+    and shared-balanced-brier (inconclusive, negative point estimate): both reshaped
+    each cell''s own curve, leaving group-relative geometry untested.'
+  - docs/research/per-label-losses.md#ranking-needs-usable-study-pairs for the microbatch
+    pair-coverage calculation this mechanism bypasses.
+  - 'jobs/researcher-20260920T141757Z-27ab0eb1/scratch/group-geometry-20260920.md
+    with geometry.py, tails.py, tail_composition.py, sizing.py: tail concentration,
+    target/score coupling, d'' and moment-implied AUC, coverage arithmetic.'
+  novelty: 'This is the class-conditional second-moment half of the exact moment reformulation
+    of the square-loss AUC risk, not another sampled-pair surrogate: the campaign''s
+    three measured ranking experiments all enumerate pairs and this enumerates none.
+    It is also not pointwise reshaping; focal and Brier changed each cell''s own curve,
+    while this compares a cell only with its group''s running centroid. Distinct from
+    the three queued weighting ideas, which change weight magnitude or assignment
+    and therefore cannot move within-group equilibria. No margin, no dual variable,
+    no optimizer change, so it stays inside the contract that excludes PESG-style
+    AUCM.'
+  coverage: 'Every observed cell contributes at every step: a cell needs only its
+    own group''s centroid, which the EMA supplies even when the microbatch holds no
+    other member of that group. At batch 8, P(>=2 same-group positives) is 0.108 for
+    Fracture and 0.276 for Synovitis, so a batch-only variance would starve exactly
+    the rare labels; the EMA removes that. Masks are honored (fold 0 observes all
+    cells), soft targets stay in the BCE term, self-comparison cannot arise. Log per-label
+    term value, both centroids, the EMA gap, the realized component share, and the
+    number of steps in which a group was absent.'
+  exploitation: The gradient 2*w*(s-mu)/gap^2 grows linearly with the deviation, so
+    pressure concentrates on the group outliers that carry ~87% of discordance and
+    is near zero on the confident bulk. It reaches the rare labels' small, heavily
+    weighted positive tails at every step rather than in the minority of steps that
+    contain a usable pair.
+  budget: '24 scalars plus elementwise operations on the 8x12 logit tensor per step:
+    no pair loop, no extra forward pass, no data pass, no precomputation. Measured
+    comparisons on this recipe: focal +17 s (+1.1%), the 12-label pair loops +52 s
+    (+3.3%) and +62 s (+4.0%), leaving ~172-182 s under the 1,797 s ceiling; this
+    mechanism should cost at or below the focal figure. Ten epochs, 4,380 steps, training
+    cohort, triplet accounting and validation identity unchanged. EMA state is training-only
+    and non-persistent, so checkpoint contents, checkpoint selection and inference
+    stay identical.'
+  implementation: 'Add the term under src/knee_abnormality/training/losses/ and call
+    it from training_step (lightning.py:305-320) after the existing balanced BCE;
+    keep the BCE formula bit-identical so train_balanced_bce stays comparable with
+    control, and log components separately. Register the centroids as a non-persistent
+    buffer on the LightningModule so state_dict, checkpoint selection and inference
+    state are unchanged; initialize from the first step''s observed group means (or
+    zeros with debiasing) and record which. Update after computing the loss from detached
+    float32 logits, inside training_step only; validation and sanity-check passes
+    must never write it. Compute in float32 under bf16-mixed, floor the denominator,
+    and guard empty groups. New keys trainer.loss.{variance_weight, centroid_momentum,
+    denominator_floor}; no per-label field and no coefficient vector. Leave data loading,
+    model construction, optimizer/scheduler, forward prediction, validation, checkpoint
+    selection and triplet accounting untouched. Review points: the group rule matches
+    the class-weight rule, no gradient flows through the centroid, the EMA is training-only,
+    and the component share is logged per epoch.'
+  open_choices: 'Squared deviation (default, stronger on outliers) versus an absolute
+    or standard-deviation form. EMA momentum 0.9 (~10-step window) and whether it
+    resets at epoch boundaries (default no). Denominator: detached EMA gap squared
+    with a floor at 1.0 (default) versus a constant, which would make the term scale-sensitive.
+    Whether class weights multiply the term (default yes). lambda = 0.15 chosen from
+    the measured 0.39-0.84 ratio; pick one value, do not sweep. Recorded risk: a uniform
+    scale reduction is AUC-neutral, so only differential tail compression can help;
+    the logged gap and d'' traces separate the two after the run.'
+  dependencies: []
+  priority_rationale: 'Recommend first. It targets the structure the artifacts actually
+    show - tail-dominated discordance and grade-driven within-group spread - through
+    the one route left open once soft targets are preserved, it covers every label
+    at every step where pair terms did not, it is near free against the ceiling, and
+    no measured campaign result argues against it: the three negatives so far are
+    pair enumerations and pointwise reshapings, neither of which this repeats.'
+  status: developing
+  created_revision: 116
+  ranking_rationale: "Scope ruling (mine to make, both proposals asked): a second\
+    \ pooling of tokens already produced by one encode_batch call is allowed supporting\
+    \ loss computation. Verified in modeling/model.py:322-323 that forward is exactly\
+    \ pool_encoded(encode_batch(batch)), both public, so a candidate can split the\
+    \ primary forward inside lightning.py without touching modeling code (not candidate-editable).\
+    \ Encoder, attention module, classifiers, data preparation, triplet selection,\
+    \ augmentation, study exposure, batch composition, optimizer, schedule and inference\
+    \ stay fixed; no extra data pass, no extra optimizer update, validation path untouched.\
+    \ Conditions for review: exactly one encode_batch call per step, primary logits\
+    \ bit-identical, extra views built only by masking visual_valid, and the split\
+    \ RNG drawn from a dedicated generator so the augmentation and series-dropout\
+    \ streams are unchanged.\n\nBoth admitted (dependencies empty; admission table\
+    \ confirms). Ranking changed only to place them; reserved head unchanged.\n\n\
+    shared-split-view-consistency ranked third rather than second: it targets the\
+    \ same headroom as the reserved head via a lag-free estimate, and the anchor run's\
+    \ logged per-label deviation/variance traces will say whether a draw-invariance\
+    \ term moves anything at all and at what effective scale. Sequencing it after\
+    \ that evidence avoids committing two full-budget runs to one mechanism family\
+    \ with zero measurements, and its coefficient/floor choices are exactly what the\
+    \ anchor traces inform. shared-group-variance-compression is independent of that\
+    \ evidence and already supplies the reviewed detached-normaliser pattern both\
+    \ ideas reuse.\n\nshared-subview-supervision fourth: independent lever, no adaptive\
+    \ state and no collapse mode, but it imposes a stronger assumption (each half\
+    \ carries the label) that series_dropout=0.2 already stresses.\n\nshared-tempered-balance\
+    \ stays last. The researcher's analysis (exhausted_directions item 2) shows per-label-constant\
+    \ reweighting leaves the within-label minimiser monotone, so it cannot change\
+    \ population AUC and acts only through finite-sample optimisation. Not parked\
+    \ \u2014 that finite-sample channel is the stated rationale and is untested \u2014\
+    \ but it does not outrank a measured-headroom mechanism.\n\nClosed directions\
+    \ recorded from this report: cross-label decorrelation/severity-factor terms,\
+    \ per-study logit normalisation, and the GCE/symmetric-CE/Huberised-BCE/forward-noise-correction\
+    \ gradient-profile family. No further treatment of the 0.25 unaddressed block\
+    \ beyond the queued bounded-target-instruction."
+  experiments:
+  - shared-group-variance-compression-20260920T181146Z-04a138a1
+- id: shared-centroid-margin
+  mechanism_id: shared-class-centroid-margin
+  parent_idea_id: null
+  title: Replace sampled pairs with a shared margin against the opposite class centroid
+    so every cell gets ranking pressure
+  opportunity: 'The separation signal has only been tested through sampled pairs,
+    and pair sampling is both sparse and noisy here. At batch 8 the probability that
+    a label has any usable positive/negative pair is 0.450 for Fracture, 0.669 for
+    Synovitis and 0.737 for MCL, and which partners a cell draws determines the gradient
+    it gets; the measured hybrid covered only ~10 of 12 labels per step and was neutral.
+    The moment reformulation of the square-loss AUC risk shows the separation signal
+    does not need pair enumeration: it is a mean-gap term against class-conditional
+    statistics. A margin against the opposite class''s running centroid gives every
+    observed cell a ranking gradient at every step with far lower variance, and at
+    margin 1.0 logits it is active on only ~13.5% of cells, which is where discordance
+    lives (bottom-decile positives and top-decile negatives carry 78-99.6% of discordant
+    pairs). Evidence: scratch/group-geometry-20260920.md sections 1 and 4.'
+  mechanism: 'Keep balanced soft BCE bit-identical and add one shared centroid-margin
+    term. Reuse detached EMA class centroids mu[c,pos], mu[c,neg] (24 scalars, momentum
+    0.9) built from observed training cells only. For each observed cell, with the
+    same y>=0.5 grouping the class weights use: positives pay max(0, m - (s - mu[c,neg]))^2
+    and negatives pay max(0, m - (mu[c,pos] - s))^2, with m = 1.0 in logit units.
+    Average per label over observed cells weighted by the existing class weights,
+    then average labels, then multiply by lambda = 0.25, targeting roughly a 10% objective
+    share; both measured pair runs sat at 26-48% share and were neutral or harmful,
+    so a minority share is the defensible single choice. Gradient flows only through
+    the cell''s own score: the centroids are detached, so the term cannot be minimized
+    by moving the anchors. Soft targets stay untouched in the BCE term; the hard grouping
+    is only the pair-eligibility analogue the contract already permits for ranking
+    terms, and it does not rewrite labels.'
+  precedents:
+  - 'Ying, Wen & Lyu, NeurIPS 2016: the square-loss AUC risk equals class-conditional
+    variances plus a mean-gap term, so the separation signal is available without
+    pair enumeration. https://proceedings.neurips.cc/paper/2016/hash/c52f1bd66cc19d05628bd8bf27af3ad6-Abstract.html'
+  - 'Kim et al., Proxy Anchor Loss for Deep Metric Learning, CVPR 2020: proxies let
+    every example interact with a whole class rather than with sampled partners, which
+    is the coverage and variance argument transferred here. https://arxiv.org/abs/2003.13911'
+  - 'Yuan et al., AUC-M, arXiv:2012.03173: margin between class-conditional means;
+    its min-max needs PESG, which detaching the anchors avoids.'
+  - Campaign result shared-bce-ranking (inconclusive, +0.00073 [-0.00329, +0.00479],
+    ~118 pairs/step, ~10/12 labels covered, +3.3% runtime) - the sampled-pair route
+    at full weight.
+  - 'Campaign results shared-bernoulli-pair-ranking and shared-label-contrast-ranking
+    (both reject): soft-pair mass and an unweighted cross-label contrast; the latter''s
+    harm was attributed to diluting class balancing, which this term avoids by carrying
+    the class weights.'
+  - docs/research/auc_loss_approaches.md sections 1-4 for the pairwise and AUCM families
+    and their ranking in this project.
+  - 'jobs/researcher-20260920T141757Z-27ab0eb1/scratch/group-geometry-20260920.md,
+    sizing.py: active-band shares 8.1% / 13.5% / 30.3% at margins 0.5 / 1.0 / 2.0
+    and the microbatch coverage arithmetic.'
+  novelty: 'Proxy-based rather than pair-based: no pair enumeration, no O(pairs) loop,
+    and no dependence on batch composition, so it is not a reweighting of the neutral
+    hybrid. It is not shared-ranking-memory-bank either - no queue of individual stale
+    scores, no pair formation, and no dependency on that undecided idea; the only
+    state is two scalars per label. Unlike shared-label-contrast-ranking it compares
+    within a label, not across labels, and it carries the class weights so it cannot
+    offset class balancing. Unlike shared-group-variance-compression it pushes the
+    gap rather than compressing spread; the two are the separate halves of the same
+    moment form and must not be run together.'
+  coverage: Every observed cell gets a term at every step, including labels with no
+    positive in the microbatch, which is the coverage the pair experiments could not
+    reach (Fracture 0.450 of steps, Synovitis 0.669). Masks are honored, soft targets
+    remain in the BCE term, and self-comparison cannot arise because the anchor is
+    a detached statistic. Log per-label active-band share, term value, centroids and
+    gap, the realized component share, and steps where a group was absent from the
+    EMA update.
+  exploitation: The squared hinge is silent on confident, well-separated cells and
+    grows quadratically for cells inside the band, i.e. the bottom-decile positives
+    and top-decile negatives that carry 78-99.6% of discordant pairs. Compared with
+    sampled pairs, each cell is measured against the whole opposite class, which removes
+    partner-draw variance.
+  budget: 'Two scalars per label plus elementwise operations on the 8x12 logit tensor:
+    no pair loop, no extra pass, no precomputation. The measured pair loops cost +52
+    s (+3.3%) and +62 s (+4.0%) of the 1,797 s ceiling; this avoids the loop, so expect
+    an overhead near focal''s +17 s (+1.1%). Ten epochs, 4,380 steps, cohort, triplets
+    and validation identity unchanged; state is training-only and non-persistent so
+    checkpoints and inference are untouched.'
+  implementation: 'Share the centroid helper under src/knee_abnormality/training/losses/
+    with the variance idea, but run one mechanism per experiment. Call the term from
+    training_step (lightning.py:305-320) beside the unchanged balanced BCE and log
+    the components separately. Register the centroids as a non-persistent buffer,
+    initialize from the first step''s observed group means, update after the loss
+    from detached float32 logits in training_step only, and never from validation
+    or sanity-check batches. Compute softplus-free squared hinges in float32 under
+    bf16-mixed; define the term as zero for a label whose opposite-group centroid
+    has not been initialized yet, and log how many steps that affects. New keys trainer.loss.{margin_weight,
+    margin, centroid_momentum}; one scalar each, no per-label vector. Leave data loading,
+    model construction, optimizer/scheduler, forward prediction, validation, checkpoint
+    selection and triplet accounting untouched. Review points: no gradient through
+    the anchors, class weights applied, hard grouping used only for term eligibility,
+    realized active-band share logged per epoch.'
+  open_choices: 'Squared hinge (default) versus a logistic form against the centroid.
+    Margin m = 1.0 logits from the measured 13.5% active-band share; do not sweep.
+    Whether the warm-up uses the first step''s group means (default) or a fixed number
+    of BCE-only steps before the term activates. Whether the anchor is the EMA centroid
+    (default) or the current batch''s group mean, which would reintroduce the coverage
+    gap. Recorded risk: this is the closest non-pair analogue of an already-measured
+    neutral direction, so a null result would mostly retire the separation axis rather
+    than the implementation.'
+  dependencies: []
+  priority_rationale: Recommend second. It supplies the separation signal with full
+    coverage and much lower variance than the measured pair terms, and it reuses the
+    variance idea's centroid state, so implementation is cheap. It ranks below the
+    variance term because its pressure direction is the one the campaign has already
+    probed twice with neutral and negative outcomes, while within-group compression
+    is untested.
+  status: completed
+  created_revision: 116
+  ranking_rationale: 'Queue reordered on new evidence: shared-tempered-balance drops
+    from second to last. Biproportional weighting''s realized effect on fold 0 was,
+    in part, exactly a tempering of the control weights toward 1 (positive weight
+    for the rarest label 6.95 -> 4.73; for the most prevalent 0.837 -> 0.926, class_balance.json),
+    combined with study normalization, and it lost 0.0044 macro AUC with an interval
+    strictly below zero. That is direct negative evidence for the compressing direction
+    of shared-tempered-balance; only the sharpening direction remains untested, so
+    it is now the weakest of the weighting ideas. shared-soft-mass-balance (threshold-free
+    recount of positive mass, no deliberate emphasis compression) and shared-group-variance-compression
+    (different mechanism family) move ahead of it. Reserved head unchanged.
+
+
+    shared-delayed-ranking is admissible (no unresolved dependencies) but stays proposed
+    rather than queued: the always-on hybrid''s logged traces already showed an actively
+    trained ranking term holding ~26-45% of the objective with ~118 usable pairs/step
+    and a neutral outcome, so re-timing the same term has lower expected value than
+    the three untested weighting/variance mechanisms already queued. Retained for
+    later, not rejected. shared-ranking-memory-bank remains blocked by its unresolved
+    dependency on shared-bce-ranking (inconclusive).'
+  experiments:
+  - shared-centroid-margin-20260920T144634Z-e0e80c5b
+  decision: inconclusive
+- id: shared-evidence-margin-bce
+  mechanism_id: shared-one-sided-target-margin
+  parent_idea_id: null
+  title: 'Treat each soft target as a one-sided margin: keep the full penalty toward
+    the decision boundary, remove it on the metric-neutral side'
+  opportunity: 'The v4 target table is quasi-discrete evidence states, not graded
+    probabilities: 19.1% of all 52,884 cells are exactly 0.25 (report-silent for Steven,
+    negative for lixin), 26.5% are 0.025, 12.3% are 0.015, and only 0.54% lie in (0.45,0.55).
+    The incumbent instructs the model to hold the 0.25 cells 2.56 logits above the
+    0.025 cells, and 0.75 cells 1.2 logits below 0.91 cells. Both instructions park
+    the weakest-labelled cells inside the decision region, and the control''s fold-0
+    predictions show the cost: 35.7% of validation negatives are 0.15<=y<0.5 and score
+    higher than explicit negatives in all 12 labels (positives vs those negatives:
+    macro 0.852; vs explicit negatives: 0.921); weak positives (0.5<=y<0.85, 11.4%
+    of positives) reach macro 0.800 against 0.909 for strong positives. The pull is
+    also cross-label: after conditioning on a study''s positive count, its unaddressed-cell
+    count still predicts a higher mean score (partial r 0.30; per-label r 0.075-0.214
+    on that label''s negatives), i.e. report terseness leaks into every label''s cross-study
+    ranking.'
+  mechanism: 'One shared rule, no new tunable. Per observed cell take t = logit(clamp(y,
+    eps, 1-eps)) and evaluate the existing class-weighted soft BCE at a clamped score:
+    s_eff = min(s, t) when y >= 0.5, max(s, t) when y < 0.5. Loss = mean over observed
+    cells of w * BCE(s_eff, y), with w, the y>=0.5 grouping, the mask and the pooled-cell
+    reduction bit-identical to the incumbent. The target y enters unchanged and nothing
+    is binarized or dropped; the soft value now sets where the cell''s free region
+    begins instead of where the score must sit. Gradient is exactly the incumbent''s
+    (sigma(s)-y)*w whenever the cell is on the boundary side of its own target, and
+    exactly zero once it has passed it: for y=0.25 at s=-3 the incumbent applies +0.203
+    of up-pull, this applies 0. At s=0 every cell is on the active side, so the objective
+    starts gradient-identical to the control and diverges only as cells are satisfied,
+    the same clean-start property the Brier candidate used. Measured on the control''s
+    fold-0 predictions (a lower bound; training-fold fit is tighter): 19.3% of negative
+    cells and 11.2% of positive cells would be free, and 4.7% of total |gradient|
+    energy is wrong-direction up-pull on group negatives, 98% of it from unaddressed-type
+    cells. Unlike focal, no cell''s gradient is damped; only metric-neutral motion
+    is released.'
+  precedents:
+  - 'Repository label audit: v4 = 0.5*Steven_v2 + 0.5*lixin73, 10,085 originally unaddressed
+    cells become 0.25, and ''neither v4 == 0.5 nor distance from 0.5 recovers original
+    report coverage'' - docs/public-labels/uncertainty-and-confidence-encoding.md'
+  - Training-label masking (drop Steven v1 == 0.5 cells) rejected 2026-09-13, full-fold
+    AUC -0.011455 - docs/modeling/supervision.md#training-label-masking. The cruder
+    ways of handling these cells (weight 0, or the criticized 2|p-0.5| weight) discard
+    the metric-relevant half of their signal; the one-sided form keeps it.
+  - 'Campaign result shared-balanced-focal (inconclusive, -0.00260): damping every
+    cell''s gradient at fixed LR plateaued from epoch 6. This proposal removes gradient
+    only where it points away from the boundary and logs the realized free fraction
+    per label so the same failure mode is measurable.'
+  - 'Campaign result shared-balanced-brier (inconclusive, -0.00240): establishes the
+    ''gradient-identical at s=0, differs only in shape'' review pattern reused here.'
+  - Asymmetric loss (ASL, arxiv 2009.14119) shifts negatives by one global constant
+    m and adds separate focal exponents; the repository survey records a measurement
+    against that arm. Here the free boundary is the cell's own soft target, there
+    is no focusing term and no shared probability shift.
+  - Truncated/clipped robust losses with exact zero-gradient regions (GCE, arxiv 1805.07836)
+    and Vapnik's eps-insensitive loss are the closest general forms; both use a fixed
+    global threshold rather than a per-cell label-derived one.
+  - 'Control artifacts used for every number above: outputs/training/overnight-20260919T235434Z-8ol_1c30/runs/13-control-repeat/fold_0
+    (validation_predictions.csv, class_balance.json, logs/version_0/metrics.csv) joined
+    to data/labels/public/stevenleehans/version-6/llm_labels_v4_blend.csv and data/folds/all_5fold_v3/studies.csv.'
+  novelty: 'No campaign candidate has touched how the soft level is enforced; all
+    six completed attempts changed weights, pointwise curvature, pair terms or gradient
+    projection while leaving the per-cell level target intact. The free boundary is
+    the cell''s own soft target rather than a global constant (ASL), a model-predicted
+    threshold (SPLC) or a class anchor (the launched centroid-margin, which adds a
+    hinge on top of an unchanged BCE pull). It is the contract-compatible part of
+    binarization: the model may move a cell to the extreme of its own side, while
+    the soft value still decides how far it must go before it is free and still sets
+    the penalty on the other side.'
+  coverage: Every observed cell of every label uses the identical rule; the only label-dependent
+    quantity is the existing class weight. Per-label free fractions are diagnostics,
+    never a selector. Microbatch composition, pair pools and batch statistics are
+    irrelevant because the rule is per-cell, so the batch-size-8 estimator problem
+    that sank shared-shift-projected-bce cannot arise here.
+  exploitation: 'Targets the largest measured structure in the campaign: 36% of validation
+    negatives and 11% of positives carry report-silent labels and account for the
+    bulk of the ranking deficit (0.852 vs 0.921; 0.800 vs 0.909). It also removes
+    the instruction that creates the measured report-terseness factor (partial r 0.30).
+    Because free cells stop contributing, the remaining gradient concentrates on wrong-side
+    cells, which is exactly the population that decides AUC.'
+  budget: Elementwise ops on an [8,12] float32 tensor plus one clamp; no state, no
+    extra pass, no pair enumeration. Expect well under +5 s against the reference
+    1,562.3 s, i.e. far inside the 1,797 s ceiling (focal, the cheapest measured change,
+    cost +17 s). Ten epochs, 4,380 steps, fold 0, fresh recorded seed, unchanged cohort
+    hashes and triplet accounting. Note the forward value gains a per-cell floor w*H(y)
+    (training-fold weighted mean 0.2611 nats), so log the floor-subtracted value as
+    well to keep train-loss traces comparable with the control's 0.6438 -> 0.4413.
+  implementation: 'Follow the shared-balanced-brier precedent exactly: add src/knee_abnormality/training/losses/evidence_margin.py
+    exporting one function, re-export it from losses/__init__.py, and swap the single
+    call in lightning.py training_step. No config key is required (the constant eps
+    belongs in the module, as GRADIENT_MATCHING_FACTOR did); if the gate prefers one,
+    put it under trainer.loss. Compute in float32 on the already-cast logits, build
+    t once per batch, and select the side with torch.where on targets >= 0.5 plus
+    torch.minimum/torch.maximum so the clamped branch carries no gradient. Leave validation_step,
+    the evaluation helper, checkpoint selection and accounting untouched - the change
+    must be confined to training_step, so val_soft_target_bce and val_macro_auc stay
+    computed against the original targets. Log per epoch, per label: free fraction
+    among positives and among negatives, the floor-subtracted objective, and the incumbent-equivalent
+    balanced BCE value (computable in the same call at no cost) so the candidate and
+    control curves remain comparable. Review points: mask handling unchanged, class
+    weights still derived from the untouched targets, no change to the pooled-cell
+    reduction, eps small enough that exact-0/1 cells (0.043% of cells) keep essentially
+    full pressure.'
+  open_choices: 'Symmetric (both groups) versus negatives-only: symmetric is proposed
+    because the weak-positive deficit is measured too, but negatives-only is the conservative
+    fallback. Whether to leak a small fraction of the two-sided pull (e.g. 0.05 *
+    ordinary balanced BCE) as insurance against the masking-style loss of within-group
+    gradation; I propose no leak, since a leak adds a tuned coefficient. Value of
+    eps (1e-6 proposed). Whether to report the objective in clamped-BCE or KL-excess
+    form (identical gradients).'
+  dependencies: []
+  priority_rationale: Rank first. It is the only proposal grounded in a measured,
+    large and previously unexploited structure of the label table, it is parameter-free,
+    effectively free against the ceiling, and it cannot fail through the batch-8 estimator
+    or objective-share mechanisms that explain the campaign's five negative results.
+    Its main risk - losing the within-group gradation whose wholesale removal (masking)
+    cost 0.0115 - is bounded, because the gradation is retained on the active side.
+  status: completed
+  created_revision: 148
+  ranking_rationale: 'Contract checks on the completed run pass, so the recorded numbers
+    are interpretable: accounting complete (938460 triplets / 35030 visits, cohort
+    hashes equal to the limits), validation selection hash identical in all ten epochs,
+    fresh seed 788737321, 1594.5 s of measured setup+training+prediction against the
+    1797 s ceiling, diff confined to lightning.py. The review-time worry about reduced-precision
+    logsigmoid is resolved: logits are cast to float32 before the loss (lightning.py:309),
+    and the hard-target limit of the per-term formula reduces exactly to the control''s
+    weighted BCE, so the loss for y in {0,1} is unchanged.
+
+
+    Queue change: shared-tempered-balance moves below shared-target-logit-margin.
+    Its axis (magnitude of inverse-frequency weighting) has now been partially exercised
+    in the shrink direction and coincided with a clear macro loss, so its expected
+    value at the current exponent choice is lower than the untouched additive-margin
+    axis. It stays queued rather than parked because the evidence is confounded (below)
+    and the tempering exponent can also sharpen. If it runs, its implementation should
+    keep the control''s thresholded per-cell weight assignment and vary only the shared
+    exponent/normalization, so it does not repeat this run''s two-change confound.
+
+
+    shared-delayed-ranking remains a surplus proposal. It was held pending shared-bce-ranking,
+    which has now reported: the traces showed the ranking term active and well covered
+    throughout (not early-noise dominated) yet macro-neutral, so scheduling its onset
+    has no evidence base and I do not queue it. shared-ranking-memory-bank stays unadmitted
+    on its unresolved dependency.'
+  experiments:
+  - shared-evidence-margin-bce-20260920T154409Z-239c3836
+  decision: inconclusive
+- id: shared-target-logit-margin
+  mechanism_id: shared-additive-target-margin
+  parent_idea_id: null
+  title: Shift every soft target one logit away from the decision boundary, preserving
+    all spacing between targets
+  opportunity: 'Same measured defect as the one-sided proposal, attacked from the
+    opposite side: instead of releasing cells that have passed their target, pull
+    every target further from the boundary. The evaluation ranks against 1[y >= 0.5],
+    whose optimal ranker is P(y >= 0.5 | x), while soft BCE fits E[y | x]; the two
+    differ exactly on the cells that are far from 0 and 1, which is where the control
+    loses its AUC (unaddressed negatives 0.852 vs explicit 0.921; weak positives 0.800
+    vs strong 0.909). The control is under-fit rather than over-fit - training weighted
+    entropy floor 0.2611 against a final train loss of 0.4413, and validation still
+    rising at epoch 8-9 - so adding pressure on the ambiguous cells is better matched
+    to the budget than removing pressure. A shared additive shift in logit space is
+    the one transform that moves targets away from the boundary without inflating
+    the logit scale multiplicatively or changing any within-group spacing.'
+  mechanism: 'One shared scalar, delta = 1.0 logit. Per observed cell: t = logit(clamp(y,
+    eps, 1-eps)); t'' = t + delta if y >= 0.5 else t - delta; y'' = sigmoid(t'').
+    The loss is the existing class-weighted soft BCE against y'', with weights, grouping,
+    mask and reduction unchanged. Verified mappings: 0.25 -> 0.1092, 0.75 -> 0.8908,
+    0.025 -> 0.00934, 0.91 -> 0.9649, 0.995 -> 0.9982, exact 0/1 stay at 0/1. Because
+    the shift is additive and its direction follows the same y >= 0.5 grouping the
+    class weights use, (i) the grouping is invariant, so the weight table is untouched,
+    (ii) every within-group spacing is preserved exactly (0.25 vs 0.025 stays 2.565
+    logits), so the metric-irrelevant within-group ordering instruction is not amplified,
+    and (iii) the required logit scale grows by delta rather than by a factor, unlike
+    multiplicative sharpening sigma(k*logit y), which would multiply both the spacing
+    and the scale. delta = 0 is the incumbent and delta -> infinity approaches the
+    thresholded label the evaluation uses, so one finite shared delta interpolates
+    toward the metric''s own functional while every target stays soft, strictly monotone
+    in y and order-preserving. For y = 0.25 the up-pull threshold moves from -1.10
+    to -2.10 and the down-push at s = -1.0 rises from 0.019 to 0.160.'
+  precedents:
+  - Same label-structure and control-prediction evidence as shared-evidence-margin-bce
+    (docs/public-labels/uncertainty-and-confidence-encoding.md; control fold_0 predictions
+    joined to the v4 table).
+  - Campaign contract requires preserving soft targets in pointwise terms; this keeps
+    them soft, monotone and equally spaced within each group, but it is a target transform,
+    so the orchestrator should rule on the tension before a run is prepared.
+  - 'shared-soft-mass-balance (developing) addresses the same soft-versus-hard mass
+    mismatch from the weighting side: pooled training soft mass 0.3397 against a thresholded
+    positive rate 0.2724. The two mechanisms overlap in motivation and would interact
+    if both were adopted; they should not be combined in one run.'
+  - 'Multiplicative sharpening sigma(k * logit y) was worked out and set aside: no
+    finite k matches pooled soft mass to the hard rate (the mean approaches it only
+    asymptotically), it multiplies within-group spacing, and it demands a k-fold logit
+    scale. The additive form dominates it on all three points.'
+  - Hard-label training is excluded by the contract; this is the bounded interpolation
+    toward it, with delta measured in logits rather than an opaque temperature.
+  novelty: 'No campaign candidate has changed the pointwise target level, and the
+    additive-in-logit form is distinct from label smoothing/sharpening (multiplicative),
+    from ASL''s probability shift on negatives only, and from the one-sided proposal,
+    which leaves targets untouched and changes the penalized domain instead. Permit
+    versus pull: run separately, the two bracket the question of whether the soft
+    levels themselves cost AUC, and each remains interpretable if the other fails.'
+  coverage: Identical rule for all twelve labels and every observed cell; the only
+    label-dependent quantity remains the existing class weight, and the grouping is
+    provably invariant under the shift. No batch statistics, no pair pools, no state.
+  exploitation: 'Uses the measured position of the ambiguous clusters (|logit| about
+    1.1) relative to the boundary and the measured under-fit (entropy floor 0.2611
+    vs train loss 0.4413): it lowers the floor to 0.345 nats for a 0.25 cell, converting
+    irreducible objective value into reducible pressure exactly on the cells that
+    decide the metric, without removing gradient anywhere.'
+  budget: One clamp, one log, one add, one sigmoid on an [8,12] tensor, computable
+    once per batch. Expect a few seconds at most against the 1,562.3 s reference and
+    the 1,797 s ceiling. Fold 0, ten epochs, 4,380 steps, fresh recorded seed, unchanged
+    cohorts and accounting.
+  implementation: 'Same shape as the Brier and one-sided candidates: a module under
+    training/losses/ holding TARGET_MARGIN_LOGITS = 1.0 and eps, one re-export, one
+    call swap in training_step. Derive the shifted target from batch[''target''] inside
+    the loss in float32 and pass the original targets to the weight selection (or
+    note the proven equivalence). The change must stay inside training_step so validation
+    BCE, AUC, checkpoint selection and the saved predictions continue to use the untouched
+    targets - this is the critical review point, since a leak of y'' into validation
+    would move the reported metric. Log per epoch, per label: mean shifted target,
+    weighted entropy floor, and the incumbent-equivalent balanced BCE against the
+    original targets for cross-run comparability; also log the mean absolute logit
+    of the head outputs so the delta-sized scale growth is visible.'
+  open_choices: delta = 1.0 is proposed as the single natural choice in the campaign's
+    existing logit-margin unit (centroid-margin uses m = 1.0); it is not swept. Whether
+    to apply the shift to all cells or only to cells inside a shared ambiguity band
+    (adds a second constant; not proposed). eps and whether exact-0/1 cells should
+    be clamped before shifting. Whether the orchestrator judges a monotone, spacing-preserving
+    target shift compatible with 'preserve soft targets in pointwise terms'.
+  dependencies: []
+  priority_rationale: 'Rank second, behind the one-sided proposal: same evidence base,
+    but it adds a chosen constant, raises the logit-scale demand, and carries a contract-interpretation
+    question the parameter-free proposal avoids. It is worth queuing because it adds
+    pressure rather than removing it, so it fails differently from everything measured
+    so far, and because it is decision-relevant whichever way the one-sided run lands.'
+  status: completed
+  created_revision: 148
+  ranking_rationale: 'Admitted two of three new proposals; queue stays at five with
+    the reserved head unchanged.
+
+
+    shared-boundary-proximity-weighting ranked second. It is the only weighting proposal
+    that leaves every (label, group) weight mass bit-identical, so the attribution
+    recorded for the two rejected weighting candidates (changed group magnitudes:
+    Fracture positive weight 6.95 -> 2.71 / 4.73) does not transfer. It also leaves
+    the per-cell optimum at logit(y), so it is a separable channel from the two in-flight
+    target-margin runs rather than a duplicate: those move the optimum, this moves
+    only allocation. Pinned variant, not a developer choice: k=1, factor from |2y-1|,
+    normalizer per (label, group), no cap. No sweep.
+
+
+    shared-prior-offset-bce ranked third. It is the only untested channel for imbalance
+    (additive link offset replacing the multiplicative table), zero cost, and AUC-neutral
+    at the population optimum by construction. Pinned variant: a_c = log(pi_c/(1-pi_c))
+    from the stored thresholded rate, tau=1, no class weights retained. I am choosing
+    the externally prescribed statistic over the soft-mean alternative because the
+    point of the run is to bound the additive channel against the multiplicative one;
+    the researcher''s measured initialization diagnostic (Fracture pos/neg gradient-mass
+    ratio 0.58 vs control 0.86-1.78) must be recorded pre-launch as the known risk,
+    since it points the same direction as the rejected shared-soft-mass-balance.
+
+
+    shared-tempered-balance demoted to fifth: it re-derives multiplicative group magnitudes,
+    the exact channel bounded by two recorded rejections (-0.00918, -0.00441), so
+    its expected value is now the lowest in the queue.
+
+
+    shared-bounded-target-instruction retained as a surplus proposal, not queued.
+    Its premise overlaps the already-queued shared-group-variance-compression (same
+    within-group-spread hypothesis, different channel) and is directly weakened or
+    strengthened by the two in-flight target-margin results; it also confounds content
+    with schedule. Running it before those report would spend budget on a correlated
+    bet.
+
+
+    shared-delayed-ranking stays proposed: the completed shared-bce-ranking traces
+    show the ranking term was active and non-degenerate (~45% -> ~26% of total loss,
+    ~118 usable pairs/step) and still neutral, so the marginal value of further ranking
+    variants is low even with a schedule.'
+  experiments:
+  - shared-target-logit-margin-20260920T161944Z-c1f07123
+  decision: inconclusive
+- id: shared-boundary-proximity-weighting
+  mechanism_id: shared-label-confidence-weighting
+  parent_idea_id: null
+  title: Reallocate gradient inside each class group toward near-boundary soft targets,
+    keeping every group's weight mass bit-identical
+  opportunity: 'Decomposing the incumbent''s fold-0 validation AUC by target confidence
+    (strong = y<=0.2 or y>=0.8, weak = the 0.2-0.8 band) shows pairs with at least
+    one weak member are 43.0% of scored pairs but carry 58.5% of the macro deficit:
+    sub-AUC strong/strong 0.928 (57.1% of pairs), strong-pos/weak-neg 0.867 (31.0%),
+    weak-pos/strong-neg 0.855 (8.7%), weak/weak 0.748 (3.3%). The band is 28.3% of
+    observed cells yet receives only 21.5% of the incumbent''s weighted gradient mass
+    at the selected checkpoint (11.9% at s=0), because the class weight is constant
+    inside a group and BCE residuals are smallest where the target already sits near
+    the model''s output. The shortfall is largest exactly where the band is biggest:
+    Synovitis 55.3% of cells -> 36.9% of gradient, Baker''s 50.7% -> 27.6%, Fracture
+    42.7% -> 26.5%. Gradient allocation is anti-correlated with where the metric is
+    lost. (Computed from the control run''s oof_predictions.csv, fold-0 targets and
+    fold_0/class_balance.json.)'
+  mechanism: 'Keep soft targets, observed mask, class weights, y>=0.5 grouping and
+    the pooled-cell mean exactly as they are, and multiply each observed cell by one
+    shared confidence factor b_ic = (1 + k*(1 - |2*y_ic - 1|)) / Z[c, g(i,c)] with
+    k = 1, where Z[c,g] is the mean of (1 + k*(1 - |2y-1|)) over that label''s training-fold
+    cells in the same y>=0.5 group. Normalizing inside (label, group) keeps each group''s
+    total weight mass bit-identical to the incumbent, so the measured class balance,
+    each label''s objective scale and the reduction are unchanged; only the allocation
+    inside a group moves. Targets are untouched, so the per-cell optimum stays at
+    logit(y) and the objective remains the incumbent''s proper loss, re-weighted.
+    k = 1 is pinned by a measurement rather than chosen: a boundary cell gets exactly
+    twice the weight of an exact 0/1 cell in the same group, and on the incumbent''s
+    own fitted predictions this lifts the 0.2-0.8 band''s gradient share from 21.5%
+    to 27.6% against its 28.3% cell share, i.e. it aligns gradient mass with cell
+    (and per-cell pair) share without overshooting; k = 2 overshoots to 31.9%. Z is
+    24 constants derived once from training-fold targets, the same kind of object
+    as the existing weight table.'
+  precedents:
+  - 'shared-balanced-focal (inconclusive, -0.00260): weights by *model* confidence,
+    is adaptive and shrinks total gradient mass. This weight is a fixed function of
+    the *label*, known before training and mass-preserving, so focal''s under-convergence
+    reading does not transfer.'
+  - 'shared-soft-mass-balance (reject, -0.00918) and shared-biproportional-weights
+    (reject, -0.00441): both altered per-group weight *magnitudes* (Fracture positive
+    weight 6.95 -> 2.71 and -> 4.73). The recorded attribution in both findings is
+    broad damage from changed magnitudes; this proposal leaves every (label, group)
+    mass identical by construction.'
+  - In-flight shared-evidence-margin-bce and shared-target-logit-margin attack the
+    same boundary weakness through the *target* (moving the per-cell optimum). This
+    candidate leaves the optimum at logit(y) and changes only allocation, so the two
+    channels are separable evidence on one hypothesis.
+  - 'External hardness-weighting family: Lin et al. 2017 (focal), Fan et al. NeurIPS
+    2017 (average top-k). Both emphasise hard examples by model state; label-confidence
+    weighting is the static, leakage-free analogue available here because the metric''s
+    label is a deterministic threshold of the same soft target.'
+  - 'Evidence artifacts: /home/claudio/src/knee-abnormality/outputs/training/overnight-20260919T235434Z-8ol_1c30/runs/13-control-repeat/{oof_predictions.csv,fold_0/class_balance.json}.'
+  novelty: First candidate whose per-cell weight depends on the soft target's distance
+    from 0.5 rather than on its y>=0.5 group, and the first weighting change that
+    preserves each (label, group) weight mass exactly. Every prior weighting experiment
+    re-derived the group magnitudes; none reallocated inside a group.
+  coverage: Per epoch and per label, log the band (0.2-0.8) cell share and its share
+    of weighted gradient mass, plus weighted BCE per label so the unchanged group
+    mass is observable. Record realized max/min cell weight (expected 6.95 -> 11.08
+    and 0.539 -> 0.38) and assert each (label, group) weight sum equals the incumbent's
+    to float tolerance. Report all twelve labels as diagnostics only.
+  exploitation: A positive result confirms the boundary axis through a channel that
+    preserves the optimum and calibration, and the successor is the combination with
+    whichever in-flight target-margin variant is positive. If both in-flight margin
+    runs return clearly negative, this becomes the decisive third channel test on
+    that hypothesis rather than a fourth bet, and should be deprioritised if the orchestrator
+    prefers to close the axis.
+  budget: One extra elementwise multiply per step and 24 constants computed once during
+    setup. The cheapest measured pointwise change (focal) cost +1.1% / ~17 s against
+    the 1,797 s ceiling, so runtime is effectively free and the ~190-235 s of recorded
+    headroom is untouched. No extra state, passes, or per-step reductions.
+  implementation: 'In the class-balance setup path, extend the persisted statistics
+    with the two normalizers Z[c,pos], Z[c,neg] computed from training-fold targets
+    (new artifact version, targets list unchanged and still validated against the
+    model''s targets). In the masked BCE, form b from the batch''s own targets and
+    the persisted normalizers and multiply it into the existing class-weight tensor
+    before the observed-cell mean; compute in float32 under autocast as the existing
+    loss does. Everything else in lightning.py is untouched: data loading, model construction,
+    optimizer/scheduler, forward prediction, validation, checkpoint selection and
+    accounting. New config under trainer.loss (boundary weighting enable plus the
+    shared k); trainer.class_balanced_bce stays true because the weight table is retained
+    unchanged. Validation loss and saved predictions must keep the untouched targets
+    and the untouched weights, so the factor is applied only in training_step.'
+  open_choices: k = 1 (aligns band gradient share with cell share) versus k = 2 (overshoots
+    to 31.9%); whether to build the factor from |2y-1| or from binary entropy H(y)/ln
+    2, which has a very similar shape but is flatter near the extremes; whether to
+    cap the resulting cell weight (max rises 6.95 -> 11.08); whether the normalizer
+    should be per (label, group) as proposed or per label, which would shift pos/neg
+    mass because the weak band is 26.2% negative versus 2.4% positive cells.
+  dependencies: []
+  priority_rationale: Strongest measured motivation in this refill (43.0% of pairs
+    carrying 58.5% of the deficit, with a 21.5% vs 28.3% allocation gap), the safest
+    perturbation on record (targets, class balance, mask and reduction all bit-identical;
+    group mass preserved), a non-arbitrary shared constant, and zero runtime. Main
+    caveat is hypothesis overlap with the two in-flight target-margin runs, which
+    the orchestrator can resolve by sequencing.
+  status: completed
+  created_revision: 185
+  ranking_rationale: 'Reranking: shared-group-variance-compression drops below shared-tempered-balance.
+    The margin run gives the first direct evidence about score-geometry manipulation
+    in this campaign: training pushed the mean absolute head logit from 0.551 (epoch
+    0) to 1.899 (epoch 9), i.e. a large, deliberate change in score scale and spread,
+    while validation macro AUC moved +0.00005. That does not refute a within-group
+    variance penalty (which is not a monotone rescale and can reorder studies), but
+    it weakens the premise that reshaping the score distribution in a metric-irrelevant
+    direction buys ranking quality, so the two untested class-imbalance-handling mechanisms
+    (prior offset, tempering) now rank ahead of it. Queue membership and the reserved
+    head are unchanged.
+
+
+    Proposals: neither admissible proposal is queued. shared-bounded-target-instruction
+    is another shared monotone target map; the concurrently running shared-boundary-proximity-weighting
+    tests the same label-confidence premise from the opposite direction, and its outcome
+    should determine whether a third target-space variant is worth a full budget.
+    shared-delayed-ranking stays surplus because the always-on hybrid was active (confirmed
+    traces) yet neutral, so the ranking channel has not earned a second slot ahead
+    of untested mechanisms. Both remain proposed with their records intact. shared-ranking-memory-bank
+    remains blocked by its dependency on the inconclusive shared-bce-ranking; I did
+    not alter that dependency.'
+  experiments:
+  - shared-boundary-proximity-weighting-20260920T164732Z-1a061454
+  decision: inconclusive
+- id: shared-prior-offset-bce
+  mechanism_id: shared-additive-prior-logit-offset
+  parent_idea_id: null
+  title: Handle class imbalance through an additive per-label prior offset in the
+    link instead of a multiplicative weight table
+  opportunity: 'Every imbalance candidate so far changed the magnitude of a multiplicative
+    weight and lost (soft-mass -0.00918, biproportional -0.00441), so the multiplicative
+    channel looks locally optimal and further magnitude edits have low value. The
+    additive channel is untested here. Logit adjustment corrects imbalance by shifting
+    the link by the class prior rather than scaling the loss, is Fisher-consistent
+    for balanced error, and is the standard alternative to reweighting, whose effect
+    is known to decay as training separates the data. A measured trace of the price
+    the incumbent pays: on fold-0 validation the control over-predicts the mean probability
+    of 11 of 12 labels (ACL 0.317 vs target mean 0.228, MCL 0.291 vs 0.172, Contusion
+    0.354 vs 0.254; only Effusion under-predicts, 0.495 vs 0.573), so the weight table
+    buys its balance with a systematic per-label level shift that AUC cannot use.'
+  mechanism: 'Loss = mean over observed cells of BCE(s_ic + a_c, y_ic) with a_c =
+    log(pi_c / (1 - pi_c)), pi_c the training-fold thresholded positive rate already
+    stored in class_balance.json, and no multiplicative class weight (trainer.class_balanced_bce
+    set false, replaced as the policy anticipates). Soft targets, observed mask, the
+    y>=0.5 grouping used for diagnostics, and the pooled-cell reduction are unchanged;
+    nothing is binarized or dropped. Because a_c is one constant per label, the population
+    optimum moves from logit(y) to logit(y) - a_c, a strictly per-label monotone shift,
+    so the optimum''s within-label ordering and therefore its AUC are exactly unchanged:
+    the mechanism cannot damage the well-specified solution and can only change which
+    cells dominate the finite-sample gradient. At s = 0 each label starts at its own
+    prior instead of 0.5, so positives immediately carry residual about 1 - pi_c and
+    negatives about pi_c, the same rebalancing the weight table performs, obtained
+    through the link rather than a multiplier. Offsets are a_c from -2.557 (Fracture)
+    to +0.395 (Effusion); they are applied only in the training objective, so validation
+    logits, saved predictions and checkpoint selection keep the model''s own scores.'
+  precedents:
+  - 'Menon et al., ICLR 2021, logit adjustment for long-tail learning: additive prior
+    offset in the loss is Fisher-consistent for balanced error and generally dominates
+    loss reweighting on long-tailed benchmarks. tau = 1 is the prescribed, tuning-free
+    setting.'
+  - 'Byrd & Lipton, ICML 2019: importance weighting''s effect on the learned function
+    diminishes during training on separable data; the incumbent''s grad_norm rising
+    late (0.641 at epoch 4 -> 0.884 at epoch 8, recorded in the shared-balanced-brier
+    finding) is consistent with a persistent tug-of-war that an additive reparameterization
+    avoids.'
+  - Lin et al. 2017 initialise the final bias to the prior log-odds for exactly this
+    reason; here the head bias is measured tiny (max 0.103 in the shift-projected
+    comparison), so the level is carried by learned weights rather than by a constant.
+  - shared-soft-mass-balance (reject) and shared-biproportional-weights (reject) bound
+    the multiplicative channel; their recorded attributions are about weight magnitude,
+    not about the statistic itself, so neither rejection transfers to an additive
+    offset.
+  - shared-shift-projected-bce (inconclusive, -0.00406) removed the per-label level
+    from the gradient with a batch-8 estimator that discarded 15-68% of gradient energy.
+    Supplying the level analytically is the zero-variance version of that premise,
+    though the per-label heads can in principle absorb the level themselves, which
+    weakens the capacity argument.
+  - 'Evidence artifacts: control fold_0/class_balance.json (rates 0.0719-0.5975) and
+    oof_predictions.csv.'
+  novelty: 'The only proposal that removes the multiplicative weight table rather
+    than re-deriving it, and the first use of the additive channel in this campaign.
+    It is not a target change: it is a per-label reparameterization of the link that
+    is provably AUC-neutral at the optimum.'
+  coverage: Per epoch and per label, log positive-group and negative-group gradient
+    mass, mean training logit, and weighted-free BCE, so the known risk is directly
+    observable. Verify that the offset is applied only in training_step and that validation
+    BCE, validation AUC, checkpoint selection and saved predictions use unoffset logits.
+  exploitation: If positive, the whole imbalance treatment moves to the additive channel
+    and the natural successors are the offset statistic (thresholded rate vs soft
+    mean) and a schedule on the offset. If negative, the campaign has bounded both
+    channels for imbalance handling and weighting can be closed as an axis.
+  budget: One broadcast add per step, zero extra state, zero extra passes. Runtime
+    indistinguishable from the control; the ~190-235 s of recorded ceiling headroom
+    is untouched.
+  implementation: Persist a_c alongside the existing per-label statistics in the class-balance
+    artifact (new version; targets list still validated against the model). In lightning.py
+    add the per-label offset tensor to the float32 logits inside the training objective
+    only, and pass no class-weight tensor. Set trainer.class_balanced_bce false with
+    a new trainer.loss key recording the offset statistic, so the effective config
+    distinguishes the run from an unweighted control. Numerically the offset is added
+    before binary_cross_entropy_with_logits, so stability is unchanged. Data loading,
+    model construction, optimizer/scheduler, forward prediction, validation, checkpoint
+    selection and accounting stay untouched.
+  open_choices: 'Main measured risk, to be recorded before launch: on fold-0 training
+    targets the offset-only objective at s = 0 gives per-label positive/negative gradient-mass
+    ratios 0.58 (Fracture) to 2.58 (Baker''s) against the control''s 0.86-1.78, and
+    widens the across-label mean-|gradient| spread from 1.23x to 2.55x, i.e. it de-emphasises
+    rare-label positives, the same direction as the rejected soft-mass candidate.
+    Alternative statistic a_c = logit(mean soft target) reproduces the control''s
+    realized per-label mean logit (corr 0.970, RMSE 0.232 logits, versus 0.739 for
+    logit pi_c) and makes the signed gradient exactly zero at initialization, at pos/neg
+    ratios 0.47-1.00. Retaining the class weights alongside the offset is measured
+    to be worse (Fracture init pos/neg mass ratio 6.25) and is not recommended. tau
+    stays fixed at 1; no sweep.'
+  dependencies: []
+  priority_rationale: Most novel channel left, zero cost, strong external precedent,
+    and a theoretically clean AUC-neutrality at the optimum. Ranked second because
+    the measured initialization diagnostics show it shifts positive/negative mass
+    in the same direction as an already-rejected candidate, and because the per-label
+    heads can absorb the level, which weakens its second motivation.
+  status: completed
+  created_revision: 185
+  ranking_rationale: "Admit shared-draw-consistency-anchor and rank it second, behind\
+    \ the reserved head. It is the first candidate on an axis with a quantified, measured\
+    \ headroom rather than a hypothesis (+0.0052 to +0.0075 at multiplier 1 from the\
+    \ binormal fit, draw-noise/draw-noise-20260920.md \xA71), it is cheap (~168 KB\
+    \ training-only buffers, elementwise [8,12] work, expected ~1% of the 1,562.3\
+    \ s reference), and it reaches every observed cell of every label at every step\
+    \ from epoch 1, so it is not exposed to the microbatch-8 pair sparsity that limited\
+    \ shared-bce-ranking. Its design also answers shared-shift-projected-bce's recorded\
+    \ failure with a running drift EMA instead of a per-step microbatch mean, and\
+    \ the variance-ratio normaliser blocks the trivial logit-shrink solution that\
+    \ shared-target-logit-margin showed to be AUC-neutral in the opposite direction.\n\
+    \nHold shared-draw-reliability-weighting as a surplus proposal rather than queueing\
+    \ it. It reads the same v statistic that the anchor run will log for the first\
+    \ time on the current recipe; until that run reports the realized deviation and\
+    \ drift traces, its expected effect is indirect and its statistic is confounded\
+    \ with genuine label difficulty (the researcher records this and itself ranks\
+    \ it second). Queueing it now would spend a full-budget slot on a weaker variant\
+    \ of a measurement we are about to take.\n\nDemote shared-tempered-balance below\
+    \ shared-group-variance-compression. Tempering sits on the class-frequency axis\
+    \ that has now been measured negative twice (soft-mass \u22120.00918, biproportional\
+    \ \u22120.00441) and is being probed again from the link side by the prepared\
+    \ shared-prior-offset-bce run; its result will inform the tempering strength question,\
+    \ so running tempering before that lands is wasteful. shared-group-variance-compression\
+    \ stays ahead of it: shared-evidence-margin-bce (\u22120.00003 while leaving 17%/24%\
+    \ of cells gradient-free) shows that releasing within-group placement is neutral,\
+    \ which does not refute a term that changes relative spacing.\n\nNo other queue\
+    \ changes; shared-ranking-memory-bank remains unresolved on shared-bce-ranking\
+    \ (inconclusive) and stays proposed."
+  experiments:
+  - shared-prior-offset-bce-20260920T171555Z-7de7d85a
+  decision: reject
+- id: shared-bounded-target-instruction
+  mechanism_id: shared-target-logit-bound-schedule
+  parent_idea_id: null
+  title: Bound the metric-irrelevant within-group target spacing early and relax exactly
+    to the incumbent objective before checkpoint selection
+  opportunity: 'Inside a class group the soft targets demand a logit range the metric
+    cannot use and the model never realizes: Fracture''s negative cells alone span
+    logit(0.005) = -5.3 to logit(0.49) = -0.04, 64% of ACL cells sit in (0, 0.05),
+    and 1.4% of all cells are exactly 0 or 1 (unbounded demand). The incumbent''s
+    fitted per-label score SD is only 1.33-2.07 logits. At initialization the strong
+    tail (y<=0.2 or y>=0.8) takes 88.1% of weighted gradient mass for 71.4% of cells,
+    and the strong-positive tail alone takes 49.8% for 24.7% of cells. Ordering cells
+    inside a group is exactly the instruction AUC ignores, and it is also what shared-group-variance-compression
+    targets from the score side. No scheduled objective has been run in this campaign,
+    so the interaction between objective shape and the sealed ten-epoch budget is
+    entirely unmeasured.'
+  mechanism: One shared monotone target map with one shared schedule. Per observed
+    cell take t = logit(clamp(y, eps, 1-eps)) and y'(lambda) = sigmoid((1 - lambda)
+    * t + lambda * clip(t, -L0, +L0)), with L0 = 2.0 and lambda falling linearly from
+    1.0 at the first optimizer step to 0.0 at the end of epoch 6, so epochs 7-9 use
+    y' = y returned exactly (not reconstructed through sigmoid), making the final
+    objective bit-identical to the incumbent's, including the epoch from which the
+    incumbent's checkpoint is selected (the 9th of ten). Class weights, the y>=0.5
+    grouping, the mask and the pooled-cell reduction are unchanged; clipping is monotone
+    and never crosses 0.5, so no cell changes group and the weight table stays valid
+    throughout. At L0 = 2.0, 68.2% of cells are clipped and targets live in [0.119,
+    0.881], compressing the far tail while preserving order weakly (ties at the bound).
+    Direction is deliberately opposite to the two in-flight target-margin candidates,
+    which expand spacing away from the boundary; this compresses spacing the metric
+    cannot use, and unlike shared-group-variance-compression it adds no term, no state
+    and no coefficient.
+  precedents:
+  - 'shared-group-variance-compression (queued, unrun) penalizes within-group score
+    spread with an added class-conditional variance term. Same premise, different
+    channel: this removes the instruction at its source instead of penalizing its
+    consequence, so the two are correlated bets and should not both be run before
+    the first reports.'
+  - shared-evidence-margin-bce (launched) and shared-target-logit-margin (developing)
+    move targets away from the boundary; this compresses the far tail. If either returns
+    positive, this candidate's premise is directly weakened, which makes it a cheap
+    decisive follow-up either way.
+  - shared-delayed-ranking (proposed, unqueued) is the only other schedule in the
+    registry and schedules a ranking hybrid, not a target map. No schedule has been
+    measured in this campaign.
+  - shared-centroid-margin (inconclusive, -0.00293) recorded that its auxiliary was
+    early-heavy by construction (20.2% share at epoch 0 decaying to 3.0%) and its
+    concern explicitly notes the run says little about late-applied objective changes;
+    an annealed candidate that ends at the control objective is the complementary
+    design.
+  - 'External: Szegedy et al. 2016 label smoothing and Mueller et al. NeurIPS 2019
+    on when smoothing helps or hurts representation geometry; Bengio et al. ICML 2009
+    curriculum learning. Bounded targets are label smoothing applied in logit space
+    with the soft ordering retained.'
+  - 'Evidence artifacts: fold-0 training targets (band and tail cell shares) and the
+    control''s oof_predictions.csv (fitted per-label score SD 1.33-2.07).'
+  novelty: First scheduled objective in the campaign and the only candidate whose
+    final-epoch objective is bit-identical to the incumbent's, so checkpoint selection
+    and the last epochs optimize the control loss from a possibly different basin
+    rather than a perturbed one.
+  coverage: Log lambda, the realized clipped-cell fraction and the effective target
+    bound per epoch; log per-label training BCE against the *unclipped* targets every
+    epoch so the trajectory is directly comparable to the control's recorded curve;
+    assert y' equals y exactly once lambda reaches 0 and that group membership never
+    changes.
+  exploitation: A positive result separates content from schedule only partially,
+    so the immediate successor is the static-bound variant at the same L0 to attribute
+    the gain. A negative result closes both the bounded-instruction channel and, together
+    with shared-group-variance-compression, the within-group-spread premise.
+  budget: One clamp, one interpolation and one sigmoid over the target tensor per
+    step; no state, no extra passes, no added reductions. Runtime is effectively identical
+    to the control, comparable with the focal candidate's +1.1%.
+  implementation: Add the map to the losses package and call it in training_step only,
+    deriving y' from batch targets before the existing masked class-weighted BCE;
+    validation BCE, validation AUC, checkpoint selection and saved predictions must
+    keep the untouched targets, which is the review point already recorded against
+    shared-target-logit-margin. Read the schedule position from the trainer's current
+    epoch and global step, never from validation state. Compute in float32 with the
+    existing eps convention; return the original targets unchanged when lambda is
+    0 so no reconstruction error is introduced. New keys under trainer.loss for the
+    bound, the end epoch and the schedule shape; trainer.class_balanced_bce stays
+    true.
+  open_choices: L0 = 2.0 (68.2% of cells clipped) versus 2.5 (61.6%) or 1.5 (71.1%);
+    end epoch 6 versus 5 or 7, trading early effect against the number of bit-identical
+    final epochs; linear versus cosine lambda; whether to run the static-bound variant
+    first for cleaner attribution, accepting that it duplicates the shared monotone
+    target-map family already occupied by two in-flight runs.
+  dependencies: []
+  priority_rationale: 'Ranked third: the premise is real and the design is uniquely
+    safe at the end of the run, but it is a correlated bet with the queued shared-group-variance-compression
+    and it confounds content with schedule. Worth running only after at least one
+    of the in-flight target-margin results and, ideally, the variance-compression
+    result are known.'
+  status: proposed
+  created_revision: 185
+- id: shared-draw-consistency-anchor
+  mechanism_id: shared-cross-epoch-draw-invariance
+  parent_idea_id: null
+  title: Penalise how much a study's score changes between its own triplet draws,
+    using a per-study cross-epoch anchor
+  opportunity: 'Two saved checkpoints were scored at validation multipliers x1..x4
+    through the production path: control-check 0.88472/0.88846/0.88994/0.89010, sigma-fraction-0867
+    0.88648/0.88849/0.89033/0.89027. A binormal fit of score = signal + draw-noise/m
+    reproduces all eight cells to <=0.0003 and puts irreproducible draw noise at 4.7-6.7%
+    of between-study score variance; full draw-invariance would be worth +0.0052 to
+    +0.0075 macro AUC at the pinned multiplier 1 (scratch/draw-noise-20260920.md section
+    1). Triplet selection is seeded by (study uid, training_seed, epoch) (dataset.py:195-196),
+    so every epoch shows a different draw of the same study, yet the objective never
+    asks for agreement between them. No campaign candidate has touched this axis;
+    the only adjacent measurement, shared-target-logit-margin, shows that saturating
+    the score scale (mean|logit| 0.551 -> 1.899) is AUC-neutral (+0.00005), so robustness
+    has to be requested explicitly. Caveats: neither multiplier profile is the current
+    class-balanced control, the m->inf row is an extrapolation, and a loss can only
+    make the function less draw-sensitive, not average draws.'
+  mechanism: 'Keep balanced soft BCE bit-identical and add one shared consistency
+    term. Register two non-persistent buffers on KneeModule (precedent lightning.py:222-228):
+    draw_anchor [training_studies, 12] float32 and draw_anchor_seen [training_studies]
+    bool; map batch["study_uid"] to slots through a dict filled on first sight. In
+    training_step, for observed cells of studies already seen, form the deviation
+    d_ic = s_ic - anchor_ic - drift_c, where drift_c is a detached EMA over optimizer
+    steps of the per-label mean (s - anchor). The drift term answers shared-shift-projected-bce''s
+    recorded diagnosis directly: it is a running, low-variance estimate of the common
+    level shift rather than a per-step microbatch mean, which that run measured as
+    destructive at batch 8. Per label take the class-weighted mean of d^2 over active
+    cells using the same weights and the same y>=0.5 grouping as the BCE, so the term
+    cannot dilute class balancing, then divide by max(V_c, 0.25) where V_c is a detached
+    EMA of the label''s between-study logit variance. That ratio is a noise-to-signal
+    ratio, so a uniform shrink of the logit scale cannot satisfy the term. Loss =
+    balanced_bce + 0.1 * mean over labels. After the loss, update anchors from detached
+    float32 logits with momentum 0.5 (one sample per epoch, so ~2-epoch window); epoch
+    0 only initialises and the term is inactive. Targets, masks, per-cell BCE and
+    the pooled reduction are untouched.'
+  precedents:
+  - 'scratch/draw-noise-20260920.md (this job) sections 1-2: multiplier profiles,
+    binormal noise fit, buffer feasibility'
+  - 'docs/validation/results/2026-09-19-relative-sampler-width-result.md#count-multipliers:
+    the recorded x1..x4 fold-0 table for both checkpoints'
+  - 'shared-target-logit-margin finding: logit-scale change of ~1.35 in mean|logit|
+    gave +0.00005, so saturation is not a route to draw-invariance'
+  - 'shared-shift-projected-bce finding: per-step per-label mean subtraction removed
+    15-68% of gradient energy at batch 8; the recorded successor condition is an accumulated
+    or running level estimate, which the drift EMA supplies'
+  - 'Laine & Aila, Temporal Ensembling for Semi-Supervised Learning, ICLR 2017 (openreview
+    BJ6oOfqge): per-example EMA of predictions across epochs as a free second view,
+    with the recorded limitation that each example updates only once per epoch'
+  - 'Regularising for invariance to data augmentation improves supervised learning,
+    arXiv:2203.03304: objectives that build invariance into the network generalise
+    better than averaging predictions of non-invariant models; it uses multiple views
+    per step, which this recipe cannot afford'
+  - src/knee_abnormality/training/lightning.py:222-228 (non-persistent buffer precedent),
+    :305-320 (training_step already receives study_uid and float32 logits); src/knee_abnormality/data/dataset.py:195-196
+    (per-epoch draw seed)
+  - 'jobs/researcher-20260920T141757Z-27ab0eb1/scratch/group-geometry-20260920.md
+    sections 1, 4: tail-concentrated discordance and the batch-8 coverage argument
+    for running statistics'
+  novelty: 'First candidate to use the study identity across epochs; every prior mechanism
+    reads only the current microbatch or a class-level running summary. Distinct from
+    shared-group-variance-compression, which pulls a cell toward its class centroid
+    and so also compresses genuine between-study signal: this anchor contains no between-study
+    information at all, so the term penalises only irreproducibility. Distinct from
+    shared-centroid-margin (class anchors, separation pressure) and from all pair
+    terms (no pairs are formed). Distinct from shared-boundary-proximity-weighting,
+    which reweights by a static target property rather than adding a term.'
+  coverage: 'No pairs, so microbatch-8 pair sparsity is irrelevant: from epoch 1 every
+    observed cell of every study contributes at every step, including Fracture, whose
+    hard positive/negative pair coverage is only 45% of batches. Masks are honoured
+    cell-by-cell (fold 0 observes all twelve, but the mask still gates the term),
+    self-comparison cannot arise, and a study contributes only after its own first
+    visit. Log per label: mean normalised deviation, the drift EMA, V_c, the realized
+    component share of the objective, and the count of inactive cells per epoch.'
+  exploitation: The gradient 2*w*d/V is linear in the deviation, so pressure lands
+    on studies whose score swings between draws and is near zero on reproducible ones.
+    If the current recipe carries the 5-7% noise fraction measured on the two older
+    checkpoints, removing part of it acts directly on the quantity the pinned multiplier-1
+    metric is most sensitive to, with no inference cost and no change to which images
+    are drawn.
+  budget: One gather, one scatter and elementwise arithmetic on an [8, 12] tensor
+    per step, plus 168 KB of buffers (3,503 studies x 12 float32). Cheaper than the
+    12-label pair loop that cost shared-bce-ranking ~52 s (+3.3%) and comparable to
+    focal's ~17 s (+1.1%); expect ~1% over the 1,562.3 s reference against the 1,797
+    s ceiling. No extra forward or backward pass, no extra data pass, no precomputation,
+    no change to batch composition, epochs (10), steps (4,380), cohorts or validation
+    selection. Buffers are non-persistent, so state_dict, checkpoint selection and
+    inference state are unchanged, and validation never writes them.
+  implementation: 'Add the term under src/knee_abnormality/training/losses/ and call
+    it from training_step after the existing balanced BCE, keeping the BCE formula
+    bit-identical so train_balanced_bce stays comparable with control and logging
+    the two components separately. Compute in float32 under bf16-mixed; detach anchors,
+    drift and V_c so no gradient flows through them. Update anchors, drift and V after
+    the loss, inside training_step only, from detached logits. Allocate the buffers
+    from the training_studies constructor argument; assign slots lazily from batch["study_uid"]
+    and assert no slot overflow. New keys trainer.loss.{consistency_weight, anchor_momentum,
+    variance_floor, drift_momentum}; no per-label field, no coefficient vector, trainer.class_balanced_bce
+    stays true. Leave data loading, model construction, optimizer/scheduler, forward
+    prediction, validation, checkpoint selection and triplet accounting untouched.
+    Review points: the grouping rule matches the class-weight rule; buffers are non-persistent
+    and training-only; the term is inactive in epoch 0 and for unseen studies; the
+    denominator floor is applied before division; the drift EMA is a running statistic,
+    not a per-step microbatch mean.'
+  open_choices: 'Anchor momentum 0.5 (~2-epoch window) versus 0.0 (previous epoch
+    only, no extra state) versus 0.9 (long window, more drift contamination). Normaliser:
+    EMA between-study logit variance (default) versus the detached squared class gap
+    used by shared-group-variance-compression. Drift centring on (default) versus
+    off, which would leave the term measuring drift plus noise. lambda = 0.1 chosen
+    to target roughly 5-15% component share from the campaign''s measured shares (45-48%
+    neutral or harmful, 20%->3% negative); pin one value, do not sweep. Recorded risk:
+    the deviation cannot separate draw noise from model drift, so a null could mean
+    either that the term chased drift or that draw noise is smaller on this recipe
+    than on the two older checkpoints.'
+  dependencies: []
+  priority_rationale: 'Highest of the two: the only unexploited axis in this campaign
+    with a quantified headroom (+0.005 to +0.0075 at multiplier 1) rather than a hypothesis,
+    it is nearly free, it reaches every cell of every label at every step, and its
+    diagnostics measure the draw-noise fraction on the current recipe for the first
+    time. Eleven candidates have now reshaped weights, targets, curvature or pairs
+    and none cleared zero, so a mechanism on a genuinely different axis has the better
+    prior.'
+  status: completed
+  created_revision: 217
+  ranking_rationale: "Scope ruling (mine to make, both proposals asked): a second\
+    \ pooling of tokens already produced by one encode_batch call is allowed supporting\
+    \ loss computation. Verified in modeling/model.py:322-323 that forward is exactly\
+    \ pool_encoded(encode_batch(batch)), both public, so a candidate can split the\
+    \ primary forward inside lightning.py without touching modeling code (not candidate-editable).\
+    \ Encoder, attention module, classifiers, data preparation, triplet selection,\
+    \ augmentation, study exposure, batch composition, optimizer, schedule and inference\
+    \ stay fixed; no extra data pass, no extra optimizer update, validation path untouched.\
+    \ Conditions for review: exactly one encode_batch call per step, primary logits\
+    \ bit-identical, extra views built only by masking visual_valid, and the split\
+    \ RNG drawn from a dedicated generator so the augmentation and series-dropout\
+    \ streams are unchanged.\n\nBoth admitted (dependencies empty; admission table\
+    \ confirms). Ranking changed only to place them; reserved head unchanged.\n\n\
+    shared-split-view-consistency ranked third rather than second: it targets the\
+    \ same headroom as the reserved head via a lag-free estimate, and the anchor run's\
+    \ logged per-label deviation/variance traces will say whether a draw-invariance\
+    \ term moves anything at all and at what effective scale. Sequencing it after\
+    \ that evidence avoids committing two full-budget runs to one mechanism family\
+    \ with zero measurements, and its coefficient/floor choices are exactly what the\
+    \ anchor traces inform. shared-group-variance-compression is independent of that\
+    \ evidence and already supplies the reviewed detached-normaliser pattern both\
+    \ ideas reuse.\n\nshared-subview-supervision fourth: independent lever, no adaptive\
+    \ state and no collapse mode, but it imposes a stronger assumption (each half\
+    \ carries the label) that series_dropout=0.2 already stresses.\n\nshared-tempered-balance\
+    \ stays last. The researcher's analysis (exhausted_directions item 2) shows per-label-constant\
+    \ reweighting leaves the within-label minimiser monotone, so it cannot change\
+    \ population AUC and acts only through finite-sample optimisation. Not parked\
+    \ \u2014 that finite-sample channel is the stated rationale and is untested \u2014\
+    \ but it does not outrank a measured-headroom mechanism.\n\nClosed directions\
+    \ recorded from this report: cross-label decorrelation/severity-factor terms,\
+    \ per-study logit normalisation, and the GCE/symmetric-CE/Huberised-BCE/forward-noise-correction\
+    \ gradient-profile family. No further treatment of the 0.25 unaddressed block\
+    \ beyond the queued bounded-target-instruction."
+  experiments:
+  - shared-draw-consistency-anchor-20260920T174358Z-295d5924
+  decision: inconclusive
+- id: shared-draw-reliability-weighting
+  mechanism_id: shared-inverse-draw-variance-weighting
+  parent_idea_id: null
+  title: Weight each cell by the inverse of its measured across-draw score variance
+    instead of adding a consistency term
+  opportunity: 'The same measurement motivates a second, non-overlapping treatment.
+    If 4.7-6.7% of score variance is draw noise (scratch/draw-noise-20260920.md section
+    1), that noise is in the inputs, not the labels: the study''s evidence changes
+    with which triplets were drawn, so a fixed fraction of each cell''s gradient direction
+    is drawn from a nuisance distribution, and the fraction is not uniform across
+    studies. Studies whose score swings between draws are the ones whose supervision
+    is least informative about the reproducible signal. Inverse-variance weighting
+    is the standard response under heteroscedastic observation noise (Gauss-Markov),
+    and unlike the four weighting rules already measured here it uses a statistic
+    that has nothing to do with class frequency or label confidence. Both class-frequency
+    reweightings tried (soft-mass, biproportional) and the two curvature changes (focal,
+    Brier) failed; a weighting keyed to measured reproducibility has not been tried.'
+  mechanism: 'Keep the loss shape, targets and class weights exactly as the incumbent
+    and multiply each observed cell by one shared reliability factor. Maintain, in
+    non-persistent buffers keyed by study slot, the cross-epoch anchor and a per-cell
+    EMA of the drift-centred squared deviation v_ic (the same statistic shared-draw-consistency-anchor
+    penalises, here only read). Factor f_ic = 1 / (1 + v_ic / r_c), with r_c a detached
+    running mean of v over the training fold for label c, so f lies in (0, 1] and
+    equals 0.5 when a cell is exactly average-noisy. Normalise f by a detached running
+    mean of f within each (label, y>=0.5 group), mirroring the normaliser already
+    reviewed for shared-boundary-proximity-weighting, so each group''s weight mass
+    is preserved in the fold-level sense and class balancing is untouched. Loss =
+    mean over observed cells of w * f * bce, with no added term and no pull toward
+    the anchor: only the relative influence of cells changes, never a cell''s gradient
+    direction or its equilibrium score. f = 1 until a cell has at least two visits,
+    so the rule is inactive in epochs 0-1 and fully active from epoch 2.'
+  precedents:
+  - 'scratch/draw-noise-20260920.md (this job) section 1: the draw-noise fraction
+    and its per-checkpoint fit'
+  - 'Batch Inverse-Variance Weighting: Deep Heteroscedastic Regression, arXiv:2107.04497:
+    inverse-variance weights from Gauss-Markov with batch normalisation of the weights
+    to control the effective learning rate; that work weights by label-noise variance,
+    this weights by input-draw variance'
+  - 'shared-boundary-proximity-weighting (launched): the group-mean normaliser that
+    preserves weight mass, and its recorded caveat that mass is preserved only in
+    the fold-level, uniform-exposure sense'
+  - 'shared-soft-mass-balance finding (-0.00918) and shared-biproportional-weights
+    finding (-0.00441): both class-frequency reweightings; neither tests a reproducibility
+    statistic'
+  - 'shared-balanced-focal finding (-0.00260): up-weighting hard cells lost, which
+    is the direction this rule reverses'
+  - src/knee_abnormality/training/lightning.py:104-118 (weighted masked BCE), :222-228
+    (non-persistent buffer precedent)
+  novelty: 'A weighting keyed to a dynamic, training-only measurement of score reproducibility
+    rather than to class counts (tempering, soft-mass, biproportional, prior offset)
+    or to a static target property (boundary proximity). It is also mechanically distinct
+    from shared-draw-consistency-anchor: that adds a term whose gradient pulls the
+    score toward the anchor, while this adds no term and never changes a cell''s target
+    or equilibrium, only how much the step listens to it. Reusing the same buffer
+    is shared infrastructure, not a shared mechanism.'
+  coverage: Every observed cell keeps its BCE term at every step; the factor only
+    rescales it, and is exactly 1 before a cell's second visit, so nothing is dropped.
+    Masks gate the factor and the loss identically. No pairs, so microbatch-8 pair
+    sparsity does not apply. Log per label the realized mean and p10/p50/p90 of f
+    within each group, the group normalisers, r_c, and the fraction of cells still
+    at f = 1, so the strength of the reweighting is reconstructible rather than inferred.
+  exploitation: Concentrates the fixed step budget on the cells whose evidence reproduces
+    across draws, which is the part of the signal the deterministic multiplier-1 validation
+    pass will actually see, and reduces the attenuation that input noise imposes on
+    the fitted function. Because the factor is normalised within each class group,
+    rare-positive emphasis is preserved exactly.
+  budget: One extra EMA buffer of 168 KB and elementwise arithmetic on [8, 12]; no
+    added loss term, no extra pass, no change to batch composition, epochs, steps,
+    cohorts or validation selection. Expect well under 1% over the 1,562.3 s reference
+    against the 1,797 s ceiling. Buffers are non-persistent, so checkpoints, checkpoint
+    selection and inference state are unchanged.
+  implementation: 'Add the factor under src/knee_abnormality/training/losses/ and
+    apply it inside the existing masked weighted BCE in training_step; log an unweighted
+    balanced BCE alongside it so the fit trajectory stays comparable with the control,
+    since train_loss now measures a reweighted objective. Compute in float32 under
+    bf16-mixed; f, r_c and the group normalisers are detached. Update the anchor and
+    v after the loss, inside training_step only, from detached logits; validation
+    and any sanity pass must never write them. New keys trainer.loss.{reliability_weighting,
+    variance_momentum, drift_momentum}; no per-label field. Review points: the group
+    rule matches the class-weight rule, no gradient flows through f, the factor is
+    exactly 1 before the second visit, and the normaliser divides by a running mean
+    rather than a per-step microbatch mean.'
+  open_choices: 'Factor shape 1/(1 + v/r) (default, bounded in (0,1], halves at average
+    noise) versus r/(r + v) scaled differently or a clipped inverse. Whether the normaliser
+    is a running mean (default) or the current batch''s group mean. Whether v is drift-centred
+    (default, otherwise early epochs measure drift). An alternative use of the same
+    v that I am not proposing on this evidence: marginalising the BCE over the measured
+    noise adds 0.5 * v * p(1-p), which pushes noisy cells toward saturation in whichever
+    direction they already lean and so risks entrenching errors. Recorded risk: v
+    is also elevated for genuinely ambiguous studies, so this rule partly down-weights
+    hard cells, and shared-balanced-focal only establishes that the opposite direction
+    lost.'
+  dependencies: []
+  priority_rationale: Second. Same measured opportunity, cheaper still, and it fails
+    differently from the consistency term, but its statistic is confounded with genuine
+    difficulty and its expected effect is indirect. It is executable standalone, yet
+    shared-draw-consistency-anchor's logged per-label deviation and drift traces would
+    settle, before this run, whether draw noise is material on the current recipe
+    and how much of the deviation is model drift; running it first de-risks this one
+    at no extra cost.
+  status: proposed
+  created_revision: 217
+- id: shared-split-view-consistency
+  mechanism_id: shared-within-step-subview-invariance
+  parent_idea_id: null
+  title: Penalise a study's split-half triplet disagreement inside the same step,
+    using a second pooling of tokens the forward pass has already computed
+  opportunity: 'Triplet-draw noise is the largest measured headroom in this campaign:
+    the saved multiplier x1-x4 profiles imply 5-7% of each label''s score variance
+    at the pinned multiplier 1 is irreproducible draw noise, worth about +0.005 to
+    +0.0075 macro AUC, five to seven times the practical scale (draw-noise-20260920.md
+    section 1). Both existing attacks estimate that noise from per-study cross-epoch
+    state: shared-draw-consistency-anchor (developing) and shared-draw-reliability-weighting
+    (proposed) both lag the model by roughly one epoch and conflate weight drift with
+    draw noise, which that note names as the mechanism''s main risk. A lag-free estimate
+    is available at no meaningful cost. KneeAbnormalityModel.forward is exactly pool_encoded(encode_batch(batch))
+    and both halves are public, so the loss can pool a subset of the ~26.8 triplet
+    images already encoded for a study without a second backbone pass (this job''s
+    scratch note, section 6).'
+  mechanism: Keep the primary class-balanced soft-target BCE bit-identical on the
+    full pooling. Each step, split every study's valid acquisitions into two complementary
+    halves, pool each half through the unchanged attention and head, and obtain s_A,
+    s_B per study and label. Per label take the class-weighted mean over observed
+    cells of (s_A - s_B)^2, using the existing weight table and the same y>=0.5 grouping,
+    so the term cannot dilute class balancing (the inferred failure of shared-label-contrast-ranking).
+    Divide by max(V_c, 0.25) where V_c is a detached EMA (momentum 0.9) of that label's
+    between-study variance of the full-pool logits; the ratio is a noise-to-signal
+    ratio, so a uniform logit shrink cannot satisfy the term, which matters because
+    shared-target-logit-margin measured scale changes as AUC-neutral. Loss = balanced_bce
+    + 0.1 * mean over labels. One formula, one coefficient, one grouping rule for
+    all twelve labels. Studies with fewer than two valid acquisitions contribute nothing
+    and are dropped from that label's average; a label with no active study contributes
+    exactly zero. View logits and the term are computed in float32, as the existing
+    pooling already forces.
+  precedents:
+  - 'R-Drop (Liang et al., NeurIPS 2021, arXiv:2106.14448): bidirectional KL between
+    two dropout sub-models of the same input. Same consistency principle, but R-Drop
+    pays two full forwards; here the perturbation is the sampler''s own unit and the
+    encoder pass is shared.'
+  - 'Multi-sample dropout (Inoue, arXiv:1905.09788): duplicates only the post-dropout
+    head and makes exactly the cost argument used here, that the convolutional stack
+    before the split is not duplicated.'
+  - 'Pi-model and temporal ensembling (Laine & Aila, ICLR 2017): consistency under
+    perturbation as a training-only regulariser.'
+  - 'Attention-based deep MIL (Ilse, Tomczak & Welling, ICML 2018): pooling over an
+    instance sub-bag is the same well-defined readout, which is what a half-view is
+    here.'
+  - 'Campaign, shared-draw-consistency-anchor (developing): same target quantity through
+    cross-epoch per-study state. This is the lag-free alternative, not a re-run; neither
+    result decides the other.'
+  - 'Campaign, shared-group-variance-compression (queued): supplies the reviewed detached-normaliser
+    and class-weight patterns reused verbatim here.'
+  - 'draw-noise-20260920.md sections 1-2: the +0.005 to +0.0075 estimate, its caveats
+    (neither fitted checkpoint is the current control; the m->infinity row is an extrapolation),
+    and the ~1-epoch anchor lag.'
+  - 'This job''s scratch note, section 6: cost arithmetic, RNG neutrality (model.dropout
+    is 0.0), and the bit-identical primary forward.'
+  novelty: No campaign candidate has read the model twice within a step; every training-only
+    structure proposed so far is cross-epoch or cross-batch. The perturbation here
+    is exactly what the measured noise is about, which triplets were drawn, rather
+    than a proxy through elapsed weight updates, and the estimate is available at
+    the same optimizer step as the gradient that consumes it.
+  coverage: 'Log per label: mean |s_A - s_B|, the normaliser V_c, the realised component
+    share of the objective, and the count of studies excluded for fewer than two valid
+    acquisitions. The disagreement trace is a direct in-training measurement of the
+    quantity the +0.005-0.0075 figure only extrapolates from saved validation multipliers,
+    so the run yields new mechanism evidence even under a neutral macro result.'
+  exploitation: If split-half disagreement falls substantially with no macro gain,
+    the draw-noise headroom is not capturable by a training-time invariance constraint,
+    which would retire the anchor and reliability-weighting lines together rather
+    than one at a time. If disagreement barely moves, the coefficient or split granularity
+    is implicated rather than the mechanism, and the logged normaliser says which.
+  budget: 'Two extra poolings and their backward: LayerNorm plus Linear(256->128)
+    and Linear(128->12) over ~10.5k spatial tokens, and a btn,nf->btf einsum with
+    b=8, t=12, n=~10.5k, f=256. Under 1 GFLOP against roughly 300 GFLOP for the rexnet_200
+    pass over ~214 triplet images. The backbone forward and backward are unchanged:
+    extra views add gradient into the same features tensor and there is still one
+    backward over the summed loss. Expect 1-2% on the measured 0.355 s/step (1,553.3
+    s over 4,380 steps), inside the 235 s of ceiling headroom. Memory adds two attention
+    maps of [8, 12, ~10.5k], about 4 MB each.'
+  implementation: In training_step replace self(batch) with encoded = self.model.encode_batch(batch)
+    and logits = self.model.pool_encoded(encoded); this is the same computation and
+    RNG-neutral, because model.dropout is 0.0 (ATen dropout short-circuits at p=0)
+    and _attention_pool draws nothing, so the primary path stays bit-identical. Build
+    a view as dict(encoded) with visual_valid = encoded['visual_valid'] & keep[:,
+    None], where keep is a per-acquisition bool over acquisitions that carry any valid
+    token, grouped by encoded['study']; pool_encoded raises if a study has no valid
+    token, so the keep mask must guarantee at least one per study per view. Draw the
+    complementary split from a dedicated torch.Generator seeded from the run seed,
+    so the model's augmentation stream is untouched. Put the split helper, the term
+    and the EMA state under src/knee_abnormality/training/losses/, with non-persistent
+    buffers (precedent lightning.py:224). New settings under trainer.loss. Data loading,
+    model construction, optimizer and scheduler, validation forward, checkpoint selection,
+    saved predictions and accounting are untouched.
+  open_choices: 'Symmetric gradient through both halves or detach one. Coefficient
+    0.1 and the variance floor 0.25. Split at acquisition level or at series level,
+    the latter closer to the sampler''s budget allocation but coarser. Random complementary
+    split or a deterministic rotating parity split needing no generator. Half-versus-half
+    or full-versus-half. And the scope call the orchestrator owns: whether a second
+    pooling of already-encoded tokens is allowed supporting loss computation, which
+    is my reading since the encoder, attention module, classifiers and the primary
+    forward are unchanged and no data pass or optimizer update is added, or a forward
+    change outside the contract.'
+  dependencies: []
+  priority_rationale: The only queued or proposed mechanism aimed at the single largest
+    measured headroom without a one-epoch lag, at 1-2% compute, and it keeps the supervised
+    objective bit-identical so a macro move is attributable to the invariance term
+    alone. Its principal risk is a scope ruling rather than feasibility or budget,
+    and either outcome produces the campaign's first direct in-training measurement
+    of draw sensitivity.
+  status: queued
+  created_revision: 235
+  ranking_rationale: "Scope ruling (mine to make, both proposals asked): a second\
+    \ pooling of tokens already produced by one encode_batch call is allowed supporting\
+    \ loss computation. Verified in modeling/model.py:322-323 that forward is exactly\
+    \ pool_encoded(encode_batch(batch)), both public, so a candidate can split the\
+    \ primary forward inside lightning.py without touching modeling code (not candidate-editable).\
+    \ Encoder, attention module, classifiers, data preparation, triplet selection,\
+    \ augmentation, study exposure, batch composition, optimizer, schedule and inference\
+    \ stay fixed; no extra data pass, no extra optimizer update, validation path untouched.\
+    \ Conditions for review: exactly one encode_batch call per step, primary logits\
+    \ bit-identical, extra views built only by masking visual_valid, and the split\
+    \ RNG drawn from a dedicated generator so the augmentation and series-dropout\
+    \ streams are unchanged.\n\nBoth admitted (dependencies empty; admission table\
+    \ confirms). Ranking changed only to place them; reserved head unchanged.\n\n\
+    shared-split-view-consistency ranked third rather than second: it targets the\
+    \ same headroom as the reserved head via a lag-free estimate, and the anchor run's\
+    \ logged per-label deviation/variance traces will say whether a draw-invariance\
+    \ term moves anything at all and at what effective scale. Sequencing it after\
+    \ that evidence avoids committing two full-budget runs to one mechanism family\
+    \ with zero measurements, and its coefficient/floor choices are exactly what the\
+    \ anchor traces inform. shared-group-variance-compression is independent of that\
+    \ evidence and already supplies the reviewed detached-normaliser pattern both\
+    \ ideas reuse.\n\nshared-subview-supervision fourth: independent lever, no adaptive\
+    \ state and no collapse mode, but it imposes a stronger assumption (each half\
+    \ carries the label) that series_dropout=0.2 already stresses.\n\nshared-tempered-balance\
+    \ stays last. The researcher's analysis (exhausted_directions item 2) shows per-label-constant\
+    \ reweighting leaves the within-label minimiser monotone, so it cannot change\
+    \ population AUC and acts only through finite-sample optimisation. Not parked\
+    \ \u2014 that finite-sample channel is the stated rationale and is untested \u2014\
+    \ but it does not outrank a measured-headroom mechanism.\n\nClosed directions\
+    \ recorded from this report: cross-label decorrelation/severity-factor terms,\
+    \ per-study logit normalisation, and the GCE/symmetric-CE/Huberised-BCE/forward-noise-correction\
+    \ gradient-profile family. No further treatment of the 0.25 unaddressed block\
+    \ beyond the queued bounded-target-instruction."
+- id: shared-subview-supervision
+  mechanism_id: shared-subview-bagging-supervision
+  parent_idea_id: null
+  title: Supervise each half of a study's triplet evidence with the same shared objective,
+    so the readout must be right from either half rather than merely agree with itself
+  opportunity: 'Same measured headroom as the split-view consistency idea (5-7% of
+    score variance is draw noise, +0.005 to +0.0075), attacked by a different lever.
+    A second observation motivates the specific form: control B''s last two epochs
+    buy no ranking (macro 0.8934, 0.8925, 0.89658, 0.8965) while train_loss_epoch
+    keeps falling 0.4464 -> 0.4413, so late capacity goes into fitting targets from
+    the full evidence rather than into anything the metric reads. Averaging the loss
+    over sub-bags of the same encoded evidence is the standard remedy in the multi-sample
+    dropout line and triples the number of supervised readouts per encoder pass at
+    almost no cost, because the expensive stack before the split is not duplicated.'
+  mechanism: 'Loss = bce(full) + alpha * 0.5 * (bce(half A) + bce(half B)), where
+    every term is the identical masked class-balanced soft-target BCE with the identical
+    weight table, the identical y>=0.5 grouping and the identical pooled-cell reduction;
+    alpha is one shared scalar for all twelve labels, 0.25 to start. Halves are the
+    same complementary split of a study''s valid acquisitions used by the consistency
+    idea, pooled through the unchanged attention and head. No normaliser, no EMA state
+    and no collapse mode: shrinking score variance raises every term rather than lowering
+    one. A study with fewer than two valid acquisitions contributes only its full-pool
+    term. The distinction from the consistency term is agreement without accuracy
+    versus accuracy per view: that term is minimised by any function insensitive to
+    which triplets are present, including a degenerate one, whereas this one requires
+    each half to carry the label. Its mirror-image failure mode is that a focal finding
+    visible in only a few triplets is unattainable from the half that lacks them,
+    so the term pushes the model to answer from global appearance. Which of the two
+    costs more is the thing worth measuring, and neither idea''s outcome settles it
+    alone.'
+  precedents:
+  - 'Multi-sample dropout (Inoue, arXiv:1905.09788): average the loss over several
+    samples of the post-dropout head with shared weights; reports both faster training
+    and lower error, and states the cost argument relied on here.'
+  - Sub-bagging and instance-dropout in multiple-instance learning; attention-based
+    deep MIL (Ilse et al., ICML 2018) gives the pooled sub-bag readout used for each
+    half.
+  - 'R-Drop (Liang et al., NeurIPS 2021, arXiv:2106.14448): the consistency counterpart,
+    included as the contrast rather than the template.'
+  - 'Campaign, shared-draw-consistency-anchor (developing) and shared-draw-reliability-weighting
+    (proposed): same target quantity through cross-epoch per-study state; this idea
+    needs no memory and no lag.'
+  - 'draw-noise-20260920.md sections 1 and 4: the headroom estimate with its caveats,
+    and control B''s per-epoch macro AUC against the still-falling train loss.'
+  - 'This job''s scratch note, section 6: pooling cost, RNG neutrality and the unchanged
+    backbone backward.'
+  novelty: Every campaign candidate so far has changed the formula applied to one
+    logit vector per study. This changes what is supervised, three readouts of the
+    same encoded evidence, while keeping one shared formula, one shared weight table
+    and one shared coefficient across all twelve labels. It is not a consistency penalty,
+    carries no adaptive state, and has no scale-shrinking solution.
+  coverage: 'Log the full-pool balanced BCE, each half-view balanced BCE, their per-label
+    gap, and the realised component share. Also log, per label, the fraction of metric-positive
+    cells whose half-view probability falls below the full-pool probability by more
+    than a fixed margin: that is a direct measurement of the hallucination pressure
+    this term creates, which is the concern that would otherwise stay speculative.'
+  exploitation: Paired with the consistency idea, the two separate whether draw robustness
+    has to come with per-view accuracy. A win here with a neutral consistency result
+    would say the gain is extra supervision rather than invariance, pointing at readout-level
+    regularisation in general; the reverse would say the label simply is not recoverable
+    from half the triplets, which also bounds how far any sub-view mechanism can go.
+  budget: 'Two extra poolings and their backward, identical in cost to the consistency
+    idea: under 1 GFLOP against roughly 300 GFLOP for the encoder pass over ~214 triplet
+    images, so 1-2% of the measured 0.355 s/step, well inside the 235 s of ceiling
+    headroom. One backward over the summed loss; backbone forward and backward unchanged.
+    A single random half per step instead of both halves halves the added cost again.'
+  implementation: 'Same encode/pool split and same view construction as shared-split-view-consistency:
+    encoded = self.model.encode_batch(batch), logits = self.model.pool_encoded(encoded),
+    views built by ANDing visual_valid with a per-acquisition keep mask that leaves
+    each study at least one valid acquisition, split drawn from a dedicated generator
+    so the augmentation stream is untouched. The loss helper reuses masked_binary_cross_entropy_with_logits
+    unchanged for all three terms, so mask handling, soft targets, class weights and
+    the pooled reduction are shared by construction. One new coefficient under trainer.loss.
+    Validation forward, checkpoint selection, saved predictions, optimizer, scheduler
+    and accounting unchanged. Technically independent of the consistency idea: neither
+    needs the other''s state or result.'
+  open_choices: Both halves or one random half per step. Alpha, and whether the two
+    half terms should be averaged or summed. Split granularity, acquisition versus
+    series. Whether to exclude studies whose halves are very unequal in acquisition
+    count. Whether the half-view terms should use the class weights (yes by default,
+    to keep one shared rule) and whether a short warmup before the term activates
+    is warranted, given that early epochs have the largest full-pool error already.
+  dependencies: []
+  priority_rationale: 'Second: it forces per-view accuracy the labels may not support,
+    whereas the consistency idea leaves the supervised objective untouched and measures
+    the noise directly. It is simpler, has no collapse mode and no adaptive state,
+    so it is the better fallback if the consistency term proves hard to tune. Both
+    rest on the same second-pooling capability, so a scope ruling against it removes
+    both; I flag that shared risk rather than hedging with a low-value ranking variant.'
+  status: queued
+  created_revision: 235
+  ranking_rationale: "Scope ruling (mine to make, both proposals asked): a second\
+    \ pooling of tokens already produced by one encode_batch call is allowed supporting\
+    \ loss computation. Verified in modeling/model.py:322-323 that forward is exactly\
+    \ pool_encoded(encode_batch(batch)), both public, so a candidate can split the\
+    \ primary forward inside lightning.py without touching modeling code (not candidate-editable).\
+    \ Encoder, attention module, classifiers, data preparation, triplet selection,\
+    \ augmentation, study exposure, batch composition, optimizer, schedule and inference\
+    \ stay fixed; no extra data pass, no extra optimizer update, validation path untouched.\
+    \ Conditions for review: exactly one encode_batch call per step, primary logits\
+    \ bit-identical, extra views built only by masking visual_valid, and the split\
+    \ RNG drawn from a dedicated generator so the augmentation and series-dropout\
+    \ streams are unchanged.\n\nBoth admitted (dependencies empty; admission table\
+    \ confirms). Ranking changed only to place them; reserved head unchanged.\n\n\
+    shared-split-view-consistency ranked third rather than second: it targets the\
+    \ same headroom as the reserved head via a lag-free estimate, and the anchor run's\
+    \ logged per-label deviation/variance traces will say whether a draw-invariance\
+    \ term moves anything at all and at what effective scale. Sequencing it after\
+    \ that evidence avoids committing two full-budget runs to one mechanism family\
+    \ with zero measurements, and its coefficient/floor choices are exactly what the\
+    \ anchor traces inform. shared-group-variance-compression is independent of that\
+    \ evidence and already supplies the reviewed detached-normaliser pattern both\
+    \ ideas reuse.\n\nshared-subview-supervision fourth: independent lever, no adaptive\
+    \ state and no collapse mode, but it imposes a stronger assumption (each half\
+    \ carries the label) that series_dropout=0.2 already stresses.\n\nshared-tempered-balance\
+    \ stays last. The researcher's analysis (exhausted_directions item 2) shows per-label-constant\
+    \ reweighting leaves the within-label minimiser monotone, so it cannot change\
+    \ population AUC and acts only through finite-sample optimisation. Not parked\
+    \ \u2014 that finite-sample channel is the stated rationale and is untested \u2014\
+    \ but it does not outrank a measured-headroom mechanism.\n\nClosed directions\
+    \ recorded from this report: cross-label decorrelation/severity-factor terms,\
+    \ per-study logit normalisation, and the GCE/symmetric-CE/Huberised-BCE/forward-noise-correction\
+    \ gradient-profile family. No further treatment of the 0.25 unaddressed block\
+    \ beyond the queued bounded-target-instruction."

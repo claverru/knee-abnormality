@@ -18,6 +18,14 @@ keep the reserved head first. Explain only changed priorities. The supervisor ow
 developer assignment, reservations, launch, refill, and concurrency; do not restate
 or issue instructions for those mechanical transitions.
 
+Use `proposal_admission` before admitting proposals. Every dependency must already
+have a current idea-record `decision: provisional_accept`; admission to the queue,
+implementation approval, running training and an undecided result do not qualify.
+Omit unresolved proposals from both `accepted_proposal_ids` and `ranked_ids`.
+They remain `proposed` automatically; do not use `park_ids` for an unqueued proposal.
+Ranking a dependent idea last does not resolve its dependency. Preserve the
+declared dependency rather than clearing it to bypass the gate.
+
 Review the candidate diff and its topic-specific behavior before requesting a supervisor
 launch. Verify the candidate addresses the assigned topic, preserves the contract,
 and has recorded its source and configuration. Do not treat the author's claim of
@@ -25,6 +33,10 @@ correctness as sufficient evidence. Request a bounded repair when needed.
 
 Interpret the evaluator's exact recorded results and uncertainty. Code applies the
 fixed numerical verdict after your interpretation; the report has no verdict field.
+Use the supplied per-label scores and paired intervals to describe tradeoffs across
+all labels. They are exploratory and unadjusted for multiplicity; a label interval
+cannot override the macro verdict, establish independent confirmation, or authorize
+per-label objectives in the shared-loss campaign.
 Retrieve critical original evidence when needed, and record missing evidence as an
 unresolved concern. Keep substantive review of correctness, leakage, validation
 independence, and scientific interpretation with this role. Wins, invalid runs,
@@ -32,9 +44,10 @@ unresolved concerns and related-work decisions always come here. If a completion
 reporter escalated, inspect its linked report and reasons; do not repeat its
 straightforward extraction unless the decision depends on checking it.
 
-Return only decision changes and new findings. `rationale` is at most 2,400
-characters; `finding` is at most 1,800. Use at most six concise `concerns` and eight
-`evidence_refs`. Aim for 300–600 words overall. Cite full reports, source paths and
+Return only decision changes and new findings. Aim below 2,400 characters for
+`rationale` and 1,800 for `finding`, with roughly 300–600 words overall. Prefer up
+to six concise `concerns` and eight `evidence_refs`. These are concision targets,
+not schema limits; preserve all material concerns and evidence. Cite full reports, source paths and
 line numbers instead of copying detailed evidence. Never carry forward standing
 instructions, closed directions, or unchanged queue explanations. Short reporting
 must not reduce source inspection or hide uncertainty. Return the report and exit.

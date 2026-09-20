@@ -6,7 +6,7 @@ and widening it to 120 mm costs -0.0015, with the sign holding at every count mu
 ×4. Axial sigma does nothing anywhere between 20 and 120 mm, at matched prediction movement. A
 sagittal gain at ×1 (+0.0011) does not survive higher counts and is withdrawn.
 
-This reverses the arm the [spatial importance map](../../ongoing/peripheral-coverage.md#spatial-importance-map)
+This reverses the arm the [spatial importance map](../../data-preparation/peripheral-coverage.md#spatial-importance-map)
 proposed, which ranked axial as about seven times as sigma-sensitive as sagittal and led to the
 `axial 30, coronal and sagittal 40` first arm of the since-superseded per-plane sigma proposal
 ([implemented sampler](../../data-preparation/physical-sampling/implemented-sampler.md)). The map's
@@ -129,7 +129,7 @@ PF OA -0.0002.
 
 The gainers are the compartment and collateral labels, which is where narrowing concentrates the
 coronal and sagittal draws. Synovitis and effusion sit where the
-[depth profiles](../../ongoing/peripheral-coverage.md) put their evidence, 30–50 mm off centre in
+[depth profiles](../../data-preparation/peripheral-coverage.md) put their evidence, 30–50 mm off centre in
 axial fluid, and the axial draw is untouched here.
 
 ## Limits

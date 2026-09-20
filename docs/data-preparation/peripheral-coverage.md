@@ -1,13 +1,13 @@
 # Peripheral coverage of the Gaussian sampler
 
-Where each label's evidence sits relative to the sampler's reach, complementing the
-[realized coverage fractions](../data-preparation/physical-sampling/sampling-analysis-coverage-and-exposure.md).
+Completed diagnostics on where each label's evidence sits relative to the sampler's reach, complementing the
+[realized coverage fractions](physical-sampling/sampling-analysis-coverage-and-exposure.md).
 
 Triplets are placed along each plane's axis by a truncated Gaussian; at the time of this analysis
 the width was a fixed `data.sampling_sigma_mm: 40`, so coverage fell with distance from the study
 centre. The sampler has since moved to `data.sampling_sigma_fraction`, a per-pool width relative
 to each pool's own acquired reach (see the [implemented
-sampler](../data-preparation/physical-sampling/implemented-sampler.md)); the measurements below are
+sampler](physical-sampling/implemented-sampler.md)); the measurements below are
 against the retired fixed-40 sampler and are not automatically valid at the current per-plane
 widths. The fraction was 0.76 when this analysis was written and is **0.867 since 2026-09-19**,
 for realized means of axial 45.1, coronal 35.9 and sagittal 39.0 mm
@@ -196,8 +196,8 @@ cannot see either: if one plane wants more and another less, scaling both togeth
 - **Re-exporting the slice-importance map with left knees mirrored**, a user action outside this
   repository, which gates
   [side-conditioned sagittal sampling](../backlog/big-bets.md#position-and-knee-side) and is listed
-  in [next](next.md).
+  in [next](../ongoing/next.md).
 
 The [acquisition geometry](#acquisition-geometry) above is the input to all of these, and is
 preserved independently in
-[accurate sampling centers](../data-preparation/accurate-sampling-centers.md#cohort-wide-center-fit-and-plane-extents).
+[accurate sampling centers](accurate-sampling-centers.md#cohort-wide-center-fit-and-plane-extents).

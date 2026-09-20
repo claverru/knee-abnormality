@@ -85,6 +85,34 @@ use six decimals. Withdrawn acceptances retain their original numerical evidence
 and are explicitly marked. Training attempts awaiting a final decision appear
 separately, including blocked attempts; missing metrics appear as unavailable.
 
+Every completed comparison also reports all twelve labels: reference/candidate
+AUC, exact delta, positive/negative counts, paired report-group bootstrap 95%
+interval for that delta, and valid/requested draw counts. These are unadjusted
+exploratory intervals, not simultaneous coverage or per-label acceptance rules.
+Macro AUC remains the only numerical acceptance criterion. The researcher and
+orchestrator receive these diagnostics automatically with result evidence.
+
+The maintained comparison wrapper runs the campaign's frozen evaluator, then
+computes label diagnostics from saved predictions using the same group draws,
+seed and invalid-resample rule. Both steps share the existing comparison job's
+CPU time budget. Diagnostics are saved in `comparison/per_label.json`; the
+original `comparison.json`, checkpoints and decisions remain unchanged.
+
+To fill historical comparisons that predate label diagnostics:
+
+```bash
+rtk proxy uv run --locked python -m scripts.tools.autoresearch backfill-labels losses
+```
+
+This CPU-only operation verifies saved input/prediction hashes, reproduces the
+original macro bootstrap, and writes only missing diagnostics. It takes no GPU,
+training or model calls and can run while a campaign is active. Existing diagnostic
+files are retained; attempts without a completed comparison are listed separately.
+In-flight comparisons are deferred to their automatic reporting step so the
+backfill cannot contend with a live evaluator for the same artifact.
+Historical diagnostic time is recorded separately and never rewrites old run
+budgets or decisions. New comparisons include diagnostic time in their fixed budget.
+
 Retained gain follows the current incumbent's accepted reference chain back to
 its starting reference or a manually selected replacement. Manual reference
 changes are listed separately and excluded from that gain. Positive inconclusive
@@ -129,6 +157,20 @@ never automatically launched again. This command resumes campaign orchestration,
 not an interrupted model checkpoint. Quota, authentication, malformed reports, and
 unexpected orchestration failures pause scheduling, retain artifacts, and require
 fixing the reported cause followed by resume. Waiting consumes no model turns.
+
+Report prose lengths and concern/reference counts are advisory targets, so
+exceeding them cannot exhaust structured-output retries or pause the campaign.
+Full text is preserved. Invalid fields, types, decisions or campaign operations
+still fail validation; authentication, quota and process failures still pause.
+
+A proposal dependency rejection preserves the pending event and the existing
+queue. On resume, the orchestrator receives the rejection and explicit dependency
+eligibility, then returns a corrected admission/ranking. Unresolved proposals stay
+outside the queue until their prerequisites have recorded provisional acceptance.
+Completed training and prepared candidates are retained; this recovery does not
+repeat training or change the acceptance rule. If runtime code or role guidance
+needs updating, stop first and wait for `STOPPED`, apply the repair, then resume so
+the new supervisor loads it.
 
 State, supervisor logs, per-job prompts, structured reports, usage, process identities,
 and receipts live under `outputs/autoresearch/<campaign-id>/`. The state file is

@@ -1,7 +1,23 @@
 # Project state (2026-09-20)
 
 The recipe in force, the best submission, and the measurement rules every comparison depends on.
-Active lines of development have their own documents in [this folder](INDEX.md).
+Active lines of development have their own documents in [this folder](INDEX.md). Completed
+coverage diagnostics live in [data preparation](../data-preparation/peripheral-coverage.md);
+pending experiments are classified in the [backlog](../backlog/INDEX.md).
+
+- **Hugging Face backbone survey completed, 2026-09-20:** the
+  [checkpoint review](../research/huggingface-image-encoders.md) identifies DINOv3 ConvNeXt-T and
+  RadioDINO-S as practical candidates, and OrthoFoundation/MRI-CORE/OrthoDiffusion as larger
+  MRI investigations. Current spatial mappings prevent config-only swaps; OmniRad also has
+  conflicting license metadata. Implementation and training remain unstarted in
+  [Big bets](../backlog/big-bets.md#external-pretrained-image-encoders); the recipe is unchanged.
+  A parameter/FLOP comparison against the current ReXNet-200 is being added; no training started.
+
+- **Checkpoint cleanup completed, 2026-09-20:** removed 249 obsolete checkpoint files, freeing
+  33.412 GiB inside WSL. Current references, useful submission/diagnostic weights and held work
+  remain, along with all prediction/configuration/metric records. The
+  [retention record](../architecture/configs-and-experiment-artifacts.md#checkpoint-pruning)
+  identifies removed weights; no training or campaign state changed.
 
 - **Code:** the full-slice recipe ([current model](../modeling/current-model.md)) with series
   filtering and deterministic source ranking (preprocessing identity
@@ -10,12 +26,6 @@ Active lines of development have their own documents in [this folder](INDEX.md).
   Its seeds 42–44 scored 0.889573, 0.889650 and 0.892795 on fold 0 (mean 0.890673), a tie with
   the previous code's seed controls, and seed 42 scored 0.933 public
   ([result](../validation/results/2026-09-17-ranked-filtered-result.md)).
-- **Best submission:** `ranked-filtered-seed42` with attention temperature 0.75 in the weights and
-  ×4 evaluation images, **0.939 public** (×3 scored 0.938 twice), against 0.933 for the same
-  checkpoint at temperature 1.0 and ×2, and 0.936 for the previous reflection/sigma-40 champion
-  ([submissions](../inference/submissions/2026-09-18-temperature-and-count-submissions.md)). The
-  temperature is free at inference and recipe-independent, so every later submission should carry
-  it.
 - **Noise:** run-to-run noise comes from training (pooled standard deviation 0.00175 over eight
   replicate runs); a single-run difference below about 0.003 carries no information, even at a
   matched seed. The 2026-09-18 controls span 0.0026 at ×1 validation
@@ -28,8 +38,8 @@ Active lines of development have their own documents in [this folder](INDEX.md).
 - **Validation at ×1** since 2026-09-17 (user decision): fold-0 scores from then on sit about
   0.0035 below the earlier ×2 numbers and are comparable only with a ×1 control. Submissions are
   unaffected; the bundle's test multiplier is separate.
-- **Current checkpoint, 2026-09-18:** `control-check` fold 0, best epoch 6, validation macro AUC
-  **0.88477**, preprocessing identity `b8b6c639`. It is the first checkpoint carrying the loading
+- **Historical loading reference, 2026-09-18:** `control-check` fold 0, best epoch 6, validation
+  macro AUC **0.88477**, preprocessing identity `b8b6c639`. It is the first checkpoint carrying the loading
   changes, it sits inside the ×1 cohort spread (median 0.88707, sd 0.00331, and the cohort's own two
   controls are 0.88380 and 0.88645), and `outputs/submission/exports/control-check-x4-tau075` is
   exported from it at ×4 and temperature 0.75.
@@ -37,7 +47,8 @@ Active lines of development have their own documents in [this folder](INDEX.md).
   five ReXNet-200 fold models with mirror TTA, at ×4 and temperature 0.75. The five-b0 bundle
   without TTA scores 0.940 at 27% of the runtime and is the efficiency entry
   ([submissions](../inference/submissions/2026-09-19-ensemble-submissions.md)). Every member
-  trains with ordinary BCE.
+  trains with ordinary BCE. Keep attention temperature 0.75 in later submission bundles; its
+  [inference gain](../inference/submissions/2026-09-18-temperature-and-count-submissions.md) is already adopted.
 - **Adopted 2026-09-19:** `data.sampling_sigma_fraction: 0.867` replaces the fixed
   `data.sampling_sigma_mm: 40`. Each candidate pool's Gaussian width is now a fraction of its own
   limiting reach, giving realized widths of axial 45.1 mm, coronal 35.9 and sagittal 39.0 at the
@@ -51,10 +62,10 @@ Active lines of development have their own documents in [this folder](INDEX.md).
   control mean, inside the control spread, so the case is structural: it only ever adds triplets,
   for 5.5% more compute, and the studies missing two types stop being under-sampled. Fresh runs
   only; it changes the preprocessing identity.
-- **EfficientNet-B0 is an open efficiency line**, not a replacement backbone today: −0.0032 from
-  ReXNet-200 at a third of the training time and half the memory. That gap, and every b0 queue
-  delta, was measured under ordinary BCE and has to be re-measured on the current loss
-  ([EfficientNet backbones](efficientnet-backbones.md)).
+- **EfficientNet-B0 is an open efficiency line:** its ordinary-BCE fold models already form the
+  0.940 efficiency entry. Re-measure the backbone tradeoff under balanced BCE before changing
+  the next recipe ([EfficientNet backbones](efficientnet-backbones.md)); the retained fifteen-epoch
+  B0 and ten-epoch ReXNet recipes have similar training wall time.
 - **Dropped:** learned crop selection ([record](../history/crop-selection-investigation.md)).
 - **AUC training research, 2026-09-19:** the
   [objective survey](../research/auc_loss_approaches.md) now includes BCE weighting, study sampling,
@@ -72,7 +83,7 @@ Active lines of development have their own documents in [this folder](INDEX.md).
   **Replicated 2026-09-19:** the untried-hyperparameter queue's control reached 0.894037 at a
   different seed, 0.00125 from `balanced-bce` and about 0.008 above every ordinary-BCE run on the
   same sampler ([queue results](../validation/results/2026-09-19-untried-hyperparameter-queue.md)).
-- **Nothing was adopted on 2026-09-20.** The
+- **No candidate was adopted from the 2026-09-20 run comparisons.** The
   [fourteen-run queue](../validation/results/2026-09-20-overnight-hyperparameter-results.md)
   completed in 6 h 8 m with two controls spanning 0.003360 and no candidate clearing them; milder
   scaling `[0.97, 1.03]` was the best arm at 0.895868 and inconclusive against both, and stronger
@@ -87,7 +98,7 @@ Active lines of development have their own documents in [this folder](INDEX.md).
   [−0.0033, +0.0041] and the asymmetric coronal draw (`coronal-side-relative-draw`) at −0.00130
   [−0.0051, +0.0023], both inconclusive against the 0.894037 control. With the overall scale
   already settled, the sampler has no open training-side lead left except the mirrored
-  importance-map re-export ([peripheral coverage](peripheral-coverage.md#what-is-settled-and-what-is-not)).
+  importance-map re-export ([peripheral coverage](../data-preparation/peripheral-coverage.md#what-is-settled-and-what-is-not)).
 - **No confirmed duplicate studies, 2026-09-20.** The bounded
   [study-overlap audit](../metadata/study-overlap-investigation.md) found 885 near-report candidate
   pairs, but forty shortlisted pairs shared no identical slice across 1,202 decoded images. Fold
@@ -98,21 +109,31 @@ Active lines of development have their own documents in [this folder](INDEX.md).
   observation into a shared-feature classifier comparison, per-label selection, joint
   continuation and learned mixtures. Implementation and experiments remain unstarted in
   [Big bets](../backlog/big-bets.md#per-label-loss-selection-and-learned-mixtures).
+- **Research-agenda review completed, 2026-09-20:** the retained unstarted priorities are
+  [per-label attention temperatures](../backlog/small-changes.md#per-label-attention-temperatures),
+  [OA-only label repair](../backlog/big-bets.md#oa-only-rubric-aligned-label-repair) and
+  [plane/contrast-specific readouts](../backlog/small-changes.md#planecontrast-specific-readouts).
+  [Balance damping](../backlog/small-changes.md#weighting-strength-exponent-and-prevalence-definition)
+  stays secondary and already belongs to the loss campaign queue. Per-label loss selection and
+  canonical knee orientation remain deferred. This records backlog priorities; no experiment was
+  started by the review.
+- **Report-state audit completed, 2026-09-20:** the
+  [evidence](../public-labels/uncertainty-and-confidence-encoding.md#report-state-audit-and-implications-for-supervision)
+  motivates auxiliary reporting supervision while retaining current disease targets.
+  The [proposal](../backlog/small-changes.md#auxiliary-report-state-prediction) is unimplemented
+  and untested; no training recipe change was adopted.
 - **Strategy:** iterate on fold 0. Folds, ensembling and mirror TTA were executed on 2026-09-19
   and are no longer waiting; bigger images and weight averaging still wait
   for the [final phase](../backlog/endgame.md)
   ([validation strategy](../validation/validation-strategy.md)). Test-time risks are listed in
   [risks](../backlog/risks.md).
 
-- **Documentation navigation, 2026-09-20:** repository indexes contain navigation only.
-  Script procedures live in the [catalog guide](../architecture/script-catalog.md), submission
-  records in the [ledger](../inference/submissions/ledger.md), and notes guidance in
-  [provenance](../research/provenance.md#how-to-use-these-notes).
-  [Project guidance](../../AGENTS.md) and the maintenance skills now choose direct lookup,
-  search or indexes by task. Index entries retain distinguishing terms and link common questions
-  to sections; result-only edits do not require index updates.
-
-- **Documentation retrieval pilot completed, 2026-09-20:** both agents located all twelve
-  canonical documents; the revised version used fewer lookups, but the old-policy agent skipped
-  required index traversal, so the efficiency effect remains unproven
-  ([measurement and limitations](../architecture/documentation-navigation-measurement.md)).
+- **Preprocessing identity bumped 2026-09-20, `f9d05ad2` → `65a6123d`:** the host repaired the two
+  truncated training DICOMs, both were re-fetched into `data/raw`, and `exclusions.py` with its two
+  call sites is deleted. Two slices return to training out of 819,078, so nothing measurable
+  changes; the identity bump is the cost, and it applies to fresh runs only, alongside the
+  sigma-fraction and triplet-total bumps already in force
+  ([data contract](../data-preparation/public-data-contract-and-decoding.md)). Already-exported
+  bundles carry their own sources and still submit, but a **new** export or local prediction from a
+  checkpoint trained before this change is refused by `validate_preprocessing_identity` and needs
+  that checkpoint's archived sources.

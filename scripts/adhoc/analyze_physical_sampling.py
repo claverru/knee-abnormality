@@ -15,7 +15,6 @@ from pydantic_settings import SettingsError
 from knee_abnormality.cli import CLISettings
 from knee_abnormality.config import load_config
 from knee_abnormality.data.labels import STUDY
-from knee_abnormality.data.preprocessing.exclusions import KNOWN_BAD_INSTANCES
 from knee_abnormality.data.preprocessing.geometry import (
     NativePose,
     PoseLayout,
@@ -82,8 +81,6 @@ def read_acquisitions(settings):
         first = part.row(0, named=True)
         records = []
         for row in part.iter_rows(named=True):
-            if Path(row["path"]).stem in KNOWN_BAD_INSTANCES:
-                continue
             orientation = row["ImageOrientationPatient"]
             normal = np.cross(orientation[:3], orientation[3:])
             position = float(np.dot(normal, row["ImagePositionPatient"]))

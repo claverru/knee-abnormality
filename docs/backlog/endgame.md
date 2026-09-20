@@ -40,9 +40,6 @@ the [validation strategy](../validation/validation-strategy.md), then combine mo
   [per-label ensembles](../validation/results/2026-09-16-per-label-crops-result.md#ensembles-with-the-full-triplet-models)).
 - *Logit averages:* champion + `00-baseline` scored 0.896032, and champion + `00-baseline` +
   per-label crops scored 0.897562.
-- *Expected gain:* the
-  [crop-selection research](../research/learned-crop-selection.md#ranked-options) ranks ensembles
-  first, at an extrapolated +0.003 to +0.008.
 
 ## Bigger images
 
@@ -95,15 +92,8 @@ remain unevaluated, and the mirror gain should be remeasured once members train 
 BCE. Evaluate any further transformation with consistent geometry and target handling, recording
 total inference cost.
 
-- *Mechanism (implemented 2026-09-19, not yet bundle-verified):* `export.py --reflection-tta`
-  (off by default) and `predict_loader` now support mirror TTA2 — each member also runs on the
-  reflected view of the same decoded batch, forced on for reflection-eligible studies and left
-  off for ineligible ones, averaged per study over whichever passes ran; see
-  [reflection TTA](../inference/model-bundle-and-offline-environment.md#reflection-test-time-augmentation-tta2)
-  for the mechanism, the checkpoint-identity blocker that stopped bundle-level verification this
-  session, and the direct (non-bundle) numeric check: 0.886348 macro AUC off vs. 0.886805 on for
-  `b0-fold0` over fold 0's 904 validation studies. Evaluating whether to turn it on for
-  submissions still waits for the final phase.
+The implemented [reflection TTA mechanism](../inference/model-bundle-and-offline-environment.md#reflection-test-time-augmentation-tta2)
+is already used by the submitted bundles; the pending work is its value under the next recipe.
 
 **More evaluation triplets are adopted, not pending.** ×4 at τ 0.75 scores 0.939 public against
 0.938 at ×3 and 0.933 at ×2; the per-count fold-0 and public table, and the reason sharper pooling
@@ -131,58 +121,8 @@ pairs: 0.9167 against 0.9150 on the 58 gold studies and 0.938 against 0.937 on t
   the overhead to about 17 s.
 - *Follow-ups:* EMA decays 0.998 and 0.9995, EMA with `minimum_lr_ratio: 0.1`, and SWA paired with
   a non-vanishing tail learning rate (`minimum_lr_ratio: 0.1`), which `04-swa-3` does not test.
-- *Implementation:* EMA and SWA share one hand-written averager in `KneeModule`
-  (`src/knee_abnormality/training/lightning.py`); `optimizer.weight_averaging` takes
-  `{method: ema, decay}` or `{method: swa, epochs}` (`src/knee_abnormality/config.py`,
-  `EMAConfig`/`SWAConfig`/`WeightAveragingConfig`), and an `ExperimentConfig` validator rejects SWA
-  `epochs` greater than `trainer.max_epochs` minus `optimizer.warmup_epochs`. The
-  [optimizer research](../research/optimizer-research.md#4-ema-first-additional-training-feature)
-  gives the background, the
-  ["Weight averaging" schedule section](../modeling/schedule-and-augmentation.md#weight-averaging)
-  the semantics as shipped, and
-  [configs and experiment artifacts](../architecture/configs-and-experiment-artifacts.md#experiment-artifacts-and-reproducibility)
-  the `live_state_dict` checkpoint key, `val_live_*` metrics and `epochs/live_*` files that appear
-  only when `weight_averaging` is set. The design choices:
-
-- *Averager:* a hand-written `deepcopy` of the live model inside the Lightning module, updated
-  after each optimizer step with a stateless per-step weight. Floating tensors (parameters and
-  BatchNorm statistics) are interpolated, integer buffers copied, and the copy is exact while the
-  weight is 1. A second constructed model would draw from the global RNG and shift the DataLoader
-  shuffle. `AveragedModel` pushes int64 buffers through float arithmetic, timm `ModelEmaV3` cannot
-  weight uniformly for SWA, and a callback cannot swap weights before the strict checkpoint load.
-- *EMA:* copy the live weights until warm-up ends (step 438), then average with decay 0.999 per
-  update. Its 1,000-step (2.3-epoch) horizon matches the cosine tail, where `00-baseline`'s live
-  AUC was flat (0.89269, 0.89269, 0.89205, 0.89276 at epochs 7–10). Decay 0.99 (100 steps) would
-  stay close to the live weights, and 0.9995 puts half its weight on epochs 5–7. BatchNorm
-  statistics are averaged with the weights.
-- *SWA:* a uniform per-step average over the last K = 3 epochs (from step 3,066) with the schedule
-  unchanged. Lightning's `StochasticWeightAveraging` is unsuitable: it swaps in an epoch-level
-  `SWALR`, flattens the 3:1 backbone:head learning-rate ratio, leaves out the final epoch, adds a
-  pseudo-epoch that becomes a selection candidate, keeps the average out of the saved `model.*`
-  weights, and resets BatchNorm statistics that `backbone_eval` never re-estimates.
-- *SWA BatchNorm refresh:* at the end of each window epoch, re-estimate the BatchNorm layers that
-  are in training mode (none under `backbone_eval`) with a forward-only pass over an unshuffled
-  training loader, under the training precision and a forked RNG so the training random streams
-  stay untouched.
-- *Saved and validated weights:* checkpoints store the averaged weights as `model.*`, so
-  prediction, export and fold-run comparisons use them unchanged, and the live weights alongside
-  in `live_state_dict`, which export drops.
-  - Both models are validated on the same batches every epoch: `val_macro_auc` scores the averaged
-    weights, while `val_live_*` metrics and `live_*` epoch files record the live ones.
-  - Checkpoint selection and early stopping use only the averaged score, keeping the control's 10
-    candidates.
-  - Where the copy equals the live model (EMA epoch 1, SWA epochs 1–7), both metric sets must
-    match.
-- *Costs (estimated before the runs):* +58 MB of GPU memory (0.3% of the 20.0 GiB peak), checkpoints from 175 to
-  about 233 MB, a few seconds of updates, about 3 min per run for the second validation forward,
-  and 1–1.5 min per SWA refresh (3–4.5 min for K = 3).
-- *External evidence:* one public EfficientNet-B0 fold-0 ablation reported 0.7914 → 0.7940 with
-  EMA, judged noise by its author
-  ([public findings](../research/public-research.md#geometry-sampling-encoders-and-losses)), and a
-  public training notebook averages its top epochs' weights
-  ([public code](../research/public-research.md#public-code-worth-inspecting)). Averaging
-  baseline1's epoch 7–9 probabilities gained +0.004267 on 12 reused validation studies, which is
-  not a validated gain ([baseline1 review](../history/baseline1-review.md#follow-up-experiments)).
+Implementation, original design choices and measured costs live in
+[the modeling guide](../modeling/schedule-and-augmentation.md#weight-averaging).
 
 ## Distillation
 

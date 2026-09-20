@@ -1,4 +1,4 @@
-revision: 179
+revision: 180
 ideas:
 - id: coronal-side-relative-draw
   mechanism_id: coronal-side-relative-distribution
@@ -732,13 +732,18 @@ ideas:
     (measured 0.12% redundant channel appearances), so unique-decode counts barely
     move; this must be confirmed in the CPU replay because decoding is the runtime-sensitive
     part.
-  implementation: 'Candidate construction in `build_pool` (sampling.py:273-284) and
-    the support definition (sampling.py:266-272). Blocker to resolve before assignment:
-    `prepare_series` asserts that triplet slices are consecutive in the indexed series
-    (preparation.py:125-130), and `preparation.py` is outside the developer''s stated
-    edit set (config.py, data/dataset.py, data/preprocessing/sampling.py, data/triplet_sampling/).
-    The campaign contract allows supporting code to change where necessary, but the
-    orchestrator must widen that scope for this idea or it is blocked.'
+  implementation: Candidate construction in build_pool (sampling.py:273-284) and support
+    definition (sampling.py:266-272). The user-authorized scope amendment on 2026-09-20
+    permits prepare_series to validate nonconsecutive triplets; preparation.py is
+    now in both the campaign definition and saved policy. Limit that change to the
+    consecutiveness check and immediately necessary callers within the editable source.
+    Preserve three distinct slices, distinct middles, original acquisition indices,
+    geometry checks, decoding, augmentation and accounting. Inspect the p1 0.03 mm
+    position cases before treating them as recoverable dense acquisitions, confirm
+    unique-decode counts and exact realized triplet counts under the measured process
+    budget, and record the changed deterministic validation identity. The scope amendment
+    does not approve an implementation or training launch; normal development, gates
+    and orchestrator review remain required.
   open_choices: Whether the anchor is the cohort median span or each plane's own median;
     how k is clamped on short runs and on pools whose positions are degenerate (the
     p1 0.03 mm cases may be broken position fields rather than fine acquisitions -

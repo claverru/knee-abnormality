@@ -95,6 +95,14 @@ DICOM headers matched their study, series and instance paths; this sample used
 Explicit VR Little Endian transfer syntax. The two targeted malformed slices
 failed pixel decoding despite matching the archive CRCs.
 
+**Updated on 2026-09-20:** the two malformed slices were re-downloaded singly
+after the host's repair and now carry complete payloads, which makes the local
+train split 582,656 bytes larger than the `569,763,893,144` recorded above and
+leaves `download-health.json`'s byte totals and those two pixel errors describing
+the 2026-09-10 state only. Everything else in that snapshot still holds; a seeded
+eight-file resample came back byte-identical
+([data contract](public-data-contract-and-decoding.md)).
+
 `data/metadata/download-health.json` records the source identity, sample paths,
 counts, checksums, coverage, and exact pixel errors. This verifies acquisition
 completeness and sampled pixel health, not every DICOM's decodability. The audit

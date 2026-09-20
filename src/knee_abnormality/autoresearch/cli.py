@@ -40,6 +40,7 @@ class AutoresearchCLI(CLISettings):
             "validate",
             "status",
             "results",
+            "backfill-labels",
             "usage",
             "stop",
             "resume",
@@ -47,6 +48,7 @@ class AutoresearchCLI(CLISettings):
             "supervise",
             "job",
             "calibrate",
+            "compare",
         ]
     ]
     campaign: CliPositionalArg[str] = Field(
@@ -350,6 +352,15 @@ def main():
                 raise ValueError("calibrate requires --config and --destination")
             calibrate(args.config, args.destination)
             return
+        if args.action == "compare":
+            from knee_abnormality.autoresearch.diagnostics import compare
+
+            if args.config is None:
+                raise ValueError(
+                    "compare requires --config with the frozen comparison command"
+                )
+            compare(args.config, args.root.resolve())
+            return
         supervisor = Supervisor(args.root.resolve(), args.campaign)
         if args.action == "validate":
             validate_campaign(supervisor)
@@ -366,6 +377,13 @@ def main():
                     supervisor.state, supervisor.root, supervisor.output, args.campaign
                 )
             )
+            return
+        if args.action == "backfill-labels":
+            from knee_abnormality.autoresearch.diagnostics import backfill
+
+            if supervisor.state is None:
+                raise ValueError("Campaign has not been started")
+            print(json.dumps(backfill(supervisor.state, supervisor.root), indent=2))
             return
         if args.action == "usage":
             print(

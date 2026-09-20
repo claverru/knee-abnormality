@@ -70,7 +70,7 @@ against 0.939 for the checkpoint it replaced. A rejected study centre again samp
 locally, which is also the flattest coverage in the dataset: local pools draw their targets
 uniformly across each slab rather than from the sigma-40 Gaussian, so the refit would have reduced
 peripheral coverage for exactly those studies
-([coverage](../ongoing/peripheral-coverage.md)). After
+([coverage](peripheral-coverage.md)). After
 the exclusions above, 177 of 4,407 training studies are rejected (31 of 904 on fold 0). The
 analysis that produced it is kept in
 [history](../history/robust-study-centre.md).

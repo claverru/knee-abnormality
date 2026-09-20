@@ -116,6 +116,13 @@ sets the ranking, and records decisions. The supervisor serializes its changes a
 applies the defined mechanical launch/status transitions. Use operations against live
 state, not whole-file replacements of an old queue snapshot. Recheck dependencies
 and duplicate identities before accepting a researcher's proposals.
+Each dependency must already have a current idea-record decision of
+`provisional_accept`. Queue admission and implementation approval do not satisfy
+this requirement. The orchestrator receives `proposal_admission` with dependency
+status and decision from the same gate that checks its response. Unresolved
+proposals stay `proposed` outside both admission and ranking lists, even when they
+would be last in the queue. A rejected report leaves the queue/event intact and
+pauses; resume requests a corrected orchestrator decision with the rejection reason.
 Agents share artifact references and compact findings, not complete transcripts.
 The supervisor handles scheduling and mechanical transitions. Unchanged rankings
 are represented by `ranked_ids: null`; a changed ranking contains the complete
@@ -178,9 +185,22 @@ and predictions addressable by path and hash outside git. Summaries preserve exa
 metrics, status, and provenance; missing evidence stays missing. Retrieve originals
 when a decision depends on details. Structured results are extracted by code.
 
+Every numerical comparison includes per-label reference/candidate AUC and paired
+report-group bootstrap intervals for their differences, using the macro
+comparison's exact draws, seed and invalid-resample rule. The runtime supplies
+these diagnostics to completion interpretation and recent research context. Use
+all labels to describe tradeoffs and motivate shared mechanisms, not to cherry-pick
+a label as a win. Intervals are exploratory and unadjusted for multiplicity; they
+exclude training-seed, checkpoint-selection and repeated validation-selection
+uncertainty. Only the fixed macro criterion can produce provisional acceptance.
+
 Orchestrator reports contain decision changes, new findings, unresolved concerns,
-and original-evidence references. The schema bounds prose; it does not bound the
-depth of substantive review. Opus remains the Claude reviewer. The supervisor
+and original-evidence references. Prose lengths and concern/reference counts are
+advisory concision targets. The schema still enforces types, required fields,
+decision enums, identifier constraints and the research proposal-count limit;
+campaign gates enforce actionable decisions. Overlong prose is retained in full
+without truncation, rejection or another model call solely to shorten it. The depth
+of substantive review remains unchanged. Opus remains the Claude reviewer. The supervisor
 assembles exact configuration differences, accounting, timings, evaluation facts,
 artifact hashes, and report/log paths into `evidence.json`. Missing artifacts are
 marked unavailable and remain grounds for the existing gates to reject a run.

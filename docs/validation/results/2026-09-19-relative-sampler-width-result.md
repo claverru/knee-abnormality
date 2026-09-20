@@ -25,7 +25,7 @@ what the [cache measurement](2026-09-18-per-plane-sigma-cache.md) predicted.
   everywhere. The fraction was anchored to hold the mean at the validated 40, so the arm changes
   the distribution across planes and series, not the overall reach.
 - **Geometry behind it:** usable half-reach is axial 61.5, coronal 45.6 and sagittal 51.0 mm, a
-  ratio of 1.35 : 1.00 : 1.12 ([acquisition geometry](../../ongoing/peripheral-coverage.md#acquisition-geometry)).
+  ratio of 1.35 : 1.00 : 1.12 ([acquisition geometry](../../data-preparation/peripheral-coverage.md#acquisition-geometry)).
 - **Scripts:** `outputs/analysis/per-plane-sigma-20260918/`, plus the scratch cell harness described
   under [decomposition](#training-versus-drawing).
 
@@ -113,4 +113,4 @@ than a cache query. Both are now closed: the fraction sweep settled the scale
 ([sweep](2026-09-19-fold-ensembles-and-sigma-sweep.md)), and splitting the widening from the
 narrowing was trained once by the autoresearch campaign as `geometry-informed-plane-widths`,
 inconclusive at +0.00041
-([what is settled](../../ongoing/peripheral-coverage.md#what-is-settled-and-what-is-not)).
+([what is settled](../../data-preparation/peripheral-coverage.md#what-is-settled-and-what-is-not)).

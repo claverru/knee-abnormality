@@ -2,8 +2,8 @@ version: 1
 scripts:
   - id: autoresearch
     path: scripts/tools/autoresearch.py
-    summary: Validate, start, inspect metric progress and results, account for usage, stop, or resume declarative local autoresearch campaigns through Codex or Claude subscriptions.
-    tags: [autoresearch, campaigns, losses, sampling, triplets, background, train, validation, bootstrap, codex, claude, progress, results, auc, usage, tokens, cost]
+    summary: Validate, run, inspect macro and per-label results, backfill label diagnostics, and account for local autoresearch campaigns through Codex or Claude subscriptions.
+    tags: [autoresearch, campaigns, losses, sampling, triplets, background, train, validation, bootstrap, per-label, codex, claude, progress, results, auc, usage, tokens, cost]
     commands:
       - rtk proxy uv run --locked just autoresearch-start codex
       - rtk proxy uv run --locked just autoresearch-start claude
@@ -13,6 +13,7 @@ scripts:
       - rtk proxy uv run --locked just autoresearch-status
       - rtk proxy uv run --locked just autoresearch-results triplet-sampling
       - rtk proxy uv run --locked python -m scripts.tools.autoresearch results losses
+      - rtk proxy uv run --locked python -m scripts.tools.autoresearch backfill-labels losses
       - rtk proxy uv run --locked python -m scripts.tools.autoresearch usage
       - rtk proxy uv run --locked just autoresearch-stop
       - rtk proxy uv run --locked just autoresearch-resume
@@ -25,8 +26,12 @@ scripts:
       - Runtime is capped at 115 percent of the initial historical control total, with fixed epochs, optimizer steps, and zero triplet-count tolerance.
       - Stop drains active training; --abort terminates it. Resume adopts owned live jobs and never automatically repeats a lost training attempt.
       - Quota and unexpected role failures pause the campaign without model polling; resolve the cause and resume.
+      - Report prose lengths and concern/reference counts are advisory targets; full content is retained without formatting-only retries, while structured actions and campaign gates remain strict.
+      - Proposal admission requires recorded provisional acceptance of every dependency; orchestrator context exposes unresolved prerequisites, and resume requests a corrected report without losing completed training or prepared candidates.
       - Status prints a human-readable progress summary without model calls; the campaign has no overall run-count, elapsed-time, or plateau stop condition.
       - Status includes starting and incumbent AUC, retained experimental gain and latest scores; results lists every decided experiment with its actual reference, exact score delta and paired interval, preserving withdrawals and separating manual reference changes.
+      - Results and agent context include per-label AUC and paired report-group bootstrap intervals as unadjusted exploratory diagnostics; only macro AUC determines acceptance.
+      - Backfill-labels verifies saved data and predictions and appends missing comparison/per_label.json artifacts without retraining or changing historical decisions. New comparison jobs include diagnostic CPU time in the original budget.
       - Usage is read-only and includes failed calls with explicit partial or unavailable coverage; cost equivalents do not measure subscription quota.
       - Startup reviews seed-ideas.yaml before fresh research; import-ideas requires a stopped campaign and submits existing proposals for orchestrator ranking without replacing the queue.
       - New topics declare source/configuration permissions and role instructions in campaign.yaml; the policy is validated and sealed, without runner edits or legacy hardcoded fallbacks.

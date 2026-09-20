@@ -8,6 +8,15 @@ LOGISTICAL_KEYS = {"name", "seed", "paths.output_root"}
 RUNTIME_FACTOR = 1.15
 
 
+def dependency_blockers(idea, ideas):
+    return [
+        f"{dependency} (status={ideas.get(dependency, {}).get('status', 'unknown')}, "
+        f"decision={ideas.get(dependency, {}).get('decision') or 'undecided'})"
+        for dependency in idea["dependencies"]
+        if ideas.get(dependency, {}).get("decision") != "provisional_accept"
+    ]
+
+
 def flatten(value, prefix=""):
     if isinstance(value, dict):
         return {

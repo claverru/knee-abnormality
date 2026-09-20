@@ -42,9 +42,11 @@ would do the same. That gives three classes:
 - **No retrain.** The file is outside `PREPROCESSING_SOURCES`. That includes `data/sources.py`,
   `inference/engine.py`, `scripts/pipeline/predict_worker.py`, the profiler and the notebook
   environment. These ship on their own, against existing checkpoints. The known bad series and
-  instances used to live in `data/sources.py`, where editing them changed the model's inputs without
-  bumping the identity; they moved to `data/preprocessing/exclusions.py` on 2026-09-18 so the hash
-  covers them, and they must not move back.
+  instances were the worked example: they lived in `data/sources.py`, where editing them changed the
+  model's inputs without bumping the identity, moved to `data/preprocessing/exclusions.py` on
+  2026-09-18 so the hash covered them, and were deleted on 2026-09-20 once the host repaired both
+  files ([data contract](../../data-preparation/public-data-contract-and-decoding.md)). The rule
+  outlives them: input-affecting constants belong where the hash reaches.
 - **Bit-exact, identity-changing.** The file is in `PREPROCESSING_SOURCES` — `data/dataset.py` and
   `data/preprocessing/{dicom,filtering,geometry,intensity,preparation,sampling,series,spatial}.py`.
   The images are unchanged and audits prove it, but the identity bumps, so existing checkpoints keep
@@ -73,19 +75,11 @@ listed here.
 
 ## Bit-exact, batch into the retrain
 
-**Twelve of these shipped in `041bd16`** — the shared io pool, the struct scan, the `SeriesTags`
-memo, the unsigned mask, `os.pread` for prefixes and payloads, both manual cross products, the
-`geometry_groups` prune, the `select_triplets` refactor, the resample column band, the dropped
-second clip and `astype(copy=False)`. All three deliverables are now in: code merged; audited bit-exact against the pre-change sources over **800 studies** — 4,422 series records,
-13,266 header hashes and 800 collated batches, zero mismatches, at 16 threads, plus an earlier
-25-study pass at 1 and 16 threads;
-and measured in production at **418.1 → 350.8 s of worker wall with loader CPU 1,241.6 → 990.6 s**
-([profile](../../inference/2026-09-18-kaggle-x4-profile-after-cpu-cluster.md)). The audit covers 18%
-of the train split, not all of it.
-
-What is left, with the audit scope given per row. Several scopes are narrower than a retrain needs —
-train files only, synthetic cases, or a single shape — so widen them first
-([audit before shipping](measuring.md#audit-before-shipping)).
+The CPU cluster in `041bd16` is shipped, audited and production-measured; its
+[status and audit scope](../../ongoing/loading-speedup.md) and
+[Kaggle result](../../inference/2026-09-18-kaggle-x4-profile-after-cpu-cluster.md) are recorded
+outside this candidate list. The rows below remain open. Widen any narrow local audit before
+shipping ([audit requirements](measuring.md#audit-before-shipping)).
 
 | Change | Est. saved (cold-100) | Conf | Effort | Audit and notes |
 |---|---:|---|---|---|
@@ -93,22 +87,18 @@ train files only, synthetic cases, or a single shape — so widen them first
 | Vectorise `summarize_series` (16.1 µs/file serial, 15% of serial `index_series`) | 1–1.5 s | low-med | M | Float-order risk; audit poses and bounds |
 | `PREFIX_BYTES` 12288 → 2048–4096 | 0–2 s, lands in the indexing row | low | XS | The pre-payload header is p50 1,482, p99 1,738, **max 1,758 bytes over 20,000 files**, and a 2,048-byte prefix truncated 0 of 1,200. The win is 219 MiB → 37 MiB over NFS and 6x less prefix RAM. Only extend-and-retry protects a longer hidden-test header; confirm before shrinking |
 | `truncnorm.ppf` → `truncnorm._ppf` | 0.15 s | med | S | Bit-identical on 2,000 random (q, a, b); scipy distributions spend ~90% of a call in parameter checking. Private API — pin the scipy version in the offline bundle |
-| Bounded prefetch window in `decode_series`, 16–32 slices instead of the whole series | 0–2 s, −80% transient RAM per worker | low | S | Today all of a series' payloads are materialised before any is decoded: ~83 MB transient per worker at x4, ~1.3 GB across 16. Output bit-exact |
 | Skip the quantile `np.concatenate` when every rect is full-frame | 0.1–0.3 s | low | S | Saves Python overhead only; the bytes copied are identical |
 | **One file access per selected frame.** Indexing already records the payload offset, yet `read_frame` opens the file again and `fstat`s it to revalidate size and mtime | unquantified | low | M | The `fstat` is 1.6 µs/frame locally, 24 ms per 14,882 frames, so only the NFS round trip could justify it, and the attribute cache may already absorb it. Minimising reopens is the sanctioned small-file lever on network filesystems. A payload read must still fail closed when the file changed. No probe exists |
 
-**The old 17–34 s projection is spent, not a remaining budget.** It covered the twelve rows that
-shipped, and what they actually bought is the 20.5–21.9% local CPU figure above, pending the Kaggle
-run. Re-measure the residual before choosing the next large change.
-
-Two candidates were added by the 2026-09-18 review of `041bd16`, both inside the hashed sources and
-therefore both waiting for the next identity bump:
+The resampling follow-ups from the 2026-09-18 review touch hashed sources. Schedule them
+with the next combined implementation and training snapshot: any further source edits create a
+new identity, even though the unrelated DICOM repair already bumped the current one.
 
 | Change | Est. saved | Conf | Effort | Notes |
 |---|---:|---|---|---|
 | **Re-measure the resample column band** on Kaggle, and drop it if it does not pay (`spatial.py`) | it may be costing ~0.1x of the stage | med | S | Machine-adjusted, the band came in at 1.03x where 0.92x was expected, so it looks inert or slightly negative on Kaggle's vCPUs against 8.7% faster locally ([profile](../../inference/2026-09-18-kaggle-x4-profile-after-cpu-cluster.md)). Pair the re-measurement with the resampling-plan cache below, since both touch the same derived objects |
 | **Cache the derived resampling plan** — the band bounds and the trimmed horizontal CSR, keyed by the same geometry as `_axis_filter` (`spatial.py`) | unmeasured | med | S | `_axis_filter` is `lru_cache`d, but every `resample_crop` still recomputes `horizontal.indices.min()/max()` and rebuilds `horizontal[:, band]`, which depend only on geometry. Never mutate a cached sparse matrix; time support discovery and CSR slicing separately on the real shape distribution first |
-| **Bounded ordered payload window** in `decode_series` — submit a window of reads, decode in record order, release consumed bytes (`preparation.py`) | unmeasured; −80% transient RAM | low-med | M | Supersedes the prefetch-window row above with a concrete objection: `pool.map` submits eagerly and the tuple retains every payload through the decode loop, so peak live memory holds raw payloads and resampled outputs at once. `buffersize` is not available on the bundled Python, so the window must be explicit. May trade memory for waiting — measure throughput, not just RSS |
+| **Bounded ordered payload window** in `decode_series` — submit a window of reads, decode in record order, release consumed bytes (`preparation.py`) | unmeasured; −80% transient RAM | low-med | M | Refines the earlier prefetch-window proposal: `pool.map` submits eagerly and the tuple retains every payload through the decode loop, so peak live memory holds raw payloads and resampled outputs at once (~83 MB of payloads per worker at x4, ~1.3 GB across 16). `buffersize` is not available on the bundled Python, so the window must be explicit. May trade memory for waiting — measure throughput, not just RSS |
 
 Three more were added by the 2026-09-19 review of `f4c340b`, all three inside the hashed sources
 and ranked against the whole command in [ranked by gain](ranked-by-gain.md):
@@ -204,49 +194,37 @@ the same investigation and compete for the same submission slot.
 **Ordered by what each is worth end to end in [ranked by gain](ranked-by-gain.md).** The phases below
 remain the record of what each experiment must measure.
 
-### Phase 0 — fix the instrument
+The [profiler repair](attribution.md#the-profilers-defects-fixed-2026-09-18), worker-filtered
+index, threaded listing, `in_order=False`, shared-pool CPU cluster and I/O-thread sweep are
+completed. Their result records own the measurements; they are not pending phases.
 
-The profiler fixes [landed 2026-09-18](attribution.md#the-profilers-defects-fixed-2026-09-18). One
-instrumentation job is left, and it is what decides the largest remaining row:
+### Phase 1 — allocator A/B
 
-| Experiment | Metric to check |
-|---|---|
-| Instrument the 31.2 s bucket into prefix reads, assembly, `modal_layout`, sort and `summarize_series`, and time pool creation separately | Pool-churn share of the 16.4 s — it decides whether the shared pool or a CPU change owns the largest row |
+Compare the three implemented allocator tunables on otherwise identical runs of the existing
+timing bundle. Keep the archived loading code fixed so the shipped index and CPU-cluster changes
+do not confound the measurement. Measure loader wait, worker wall and per-worker peak RSS.
+The tunables must be set before worker startup; this needs no retrain. Run it before the
+support-limited conversion so the two overlapping savings are not added together.
 
-### Phase 1 — retrain-free, run-scale
+### Phase 2 — remaining bit-exact changes
 
-The worker-filtered index, the threaded listing and `in_order = False` shipped 2026-09-18 and are
-waiting on a Kaggle run; their metrics are in
-[ongoing work](../../ongoing/loading-speedup.md). What is left here:
+Use the [gain ranking](ranked-by-gain.md), updated with the allocator result, to choose the next
+combined source snapshot. The conversion and resampling-plan cache overlap; exact quantiles and
+shared-storage collation have separate costs. Follow the audit scope in each candidate row and
+measure the residual on Kaggle after the required training. The resample column band is shipped;
+only its re-measurement or removal remains open.
 
-| Experiment | Metric to check |
-|---|---|
-| Allocator env vars, A/B on the existing random-weights bundle | Loader wait and worker wall; **per-worker peak RSS must stay within the box** |
+The demoted row-trimmed read and other lower-priority rows above remain alternatives, not a repeat
+of the shipped cluster. Deeper indexing breakdown is deferred until model loading stops hiding
+indexing cost.
 
-The allocator A/B is the cheapest real experiment available: two env vars, no code change, no
-retrain, and the timing bundle already exists. Run it on the **old** bundle, because a new bundle
-also carries the three shipped changes and would confound the timing.
-
-### Phase 2 — the bit-exact cluster, into the retrain
-
-Ordered by (confidence x seconds) / effort.
-
-| Experiment | Metric to check |
-|---|---|
-| Shared thread pool per worker | `index_series` CPU per series; `IndexedSeries` records bit-identical |
-| Struct scan, `SeriesTags` memo, manual cross product | Kaggle ms/header, 0.306 → about 0.11 expected; field-for-field equality on 20,000 files plus example-test |
-| Resample column band, drop the redundant clip, `astype(copy=False)` | Resample stage against 8.25 s; uint8 equality on the 3,783-DICOM audit |
-| `geometry_groups` prune, normal cache, alternatives refactor | `select_triplets` 7.59 ms → about 2 ms; **selection equality over the full train split, every study, all six slots, both pool paths** — the review's 3,200 cases were synthetic |
-| Shift → mask | µs/frame; bit-equality, with the signed share re-measured per frame |
-| Row-trimmed payload read | Bytes read, −13.4%, and sustained MB/s; bit-equality on a wider frame sample |
-
-### Phase 3 — the structural questions
+### Phase 3 — structural measurements
 
 | Experiment | Metric to check |
 |---|---|
-| ~~`INFERENCE_IO_THREADS` sweep~~ — **done 2026-09-18**, constant moved 16 → 8 | Flat from 2 to 16, 1 thread a clear loss; io8 won both pairs by 2–3% ([sweep](../../inference/2026-09-18-kaggle-x4-profile-after-cpu-cluster.md#the-io-thread-sweep-2026-09-18)). Worker count around the winner — 8, 12, 16 — was not swept and remains open |
-| GPU resample, quantiles and normalize | CPU limits, so this is live: loader-to-main byte volume first, then a retrain and a full validation run |
-| Cut model load, now the 15.5 s setup floor | Setup wall against 15.7 s; it gates every remaining indexing idea |
+| Loader worker count 8, 12 and 16 at `INFERENCE_IO_THREADS = 8` | Worker wall, loader wait and memory; the [completed I/O-thread sweep](../../inference/2026-09-18-kaggle-x4-profile-after-cpu-cluster.md#the-io-thread-sweep-2026-09-18) varied threads, not workers |
+| GPU resample, quantiles and normalize | Loader-to-main byte volume first, then a retrain and a full validation run |
+| Cut model load, now the 15.5 s setup floor | Profile construction, checkpoint loading and warm-up before choosing a change; it gates further indexing work |
 
-The bandwidth question that used to sit here is
-[answered](attribution.md#structural-questions-still-open): the frame stage is CPU-bound.
+The [corrected attribution](attribution.md#structural-questions-still-open) identifies the frame
+stage as CPU-bound; cold-minus-warm and wall-minus-CPU are not measurements of NFS wait.

@@ -12,12 +12,14 @@
 | Researching knee-side information and anatomical modeling | [Knee side and anatomical location](knee-side-and-location.md) |
 | Researching medial/lateral parameter sharing | [Medial and lateral disease transfer](medial-lateral-transfer.md) |
 | Choosing AUC objectives, weighting and study sampling | [Training objectives, weighting and sampling for mean per-label ROC-AUC](auc_loss_approaches.md) |
+| Investigating validation–Kaggle disagreement, label coverage and hard-study performance | [Validation–Kaggle correlations and dataset diagnostics](val-test-correlations.md) |
 | Researching per-label loss specialization | [Per-label loss specialization](per-label-losses.md) |
 | Choosing optimizer experiments | [Optimizer research](optimizer-research.md) |
 | Comparing approaches from RSNA MRI competitions | [RSNA MRI competitions](rsna-mri.md) |
 | Considering methods from RSNA CT competitions | [Transfer from RSNA CT](rsna-ct.md) |
 | Reviewing other MRI benchmarks | [Other MRI benchmarks](mri-benchmarks.md) |
 | Comparing backbone evidence from MRI tasks | [Backbone MRI evidence](backbone-mri-evidence.md) |
+| Choosing reusable Hugging Face, radiology and knee-MRI checkpoints and checking integration costs | [Image and MRI encoders](huggingface-image-encoders.md#practical-2d-shortlist) |
 | Investigating volumetric CNNs | [Volumetric CNNs](volumetric-cnns.md) |
 | Researching pretrained EfficientNet training | [EfficientNet training](efficientnet-training.md) |
 | Revisiting scout backbone candidates | [Scout backbone candidates](scout-backbones.md) |

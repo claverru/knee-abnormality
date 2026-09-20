@@ -47,6 +47,93 @@ using v4. Excluding originally unaddressed non-gold training targets was
 [tried and rejected](../history/sharing/2026-09-13-label-masking-result.md): full-fold AUC
 fell by 0.011455. The baseline again supervises all nonmissing soft targets.
 
+## Report-state audit and implications for supervision
+
+**Measured 2026-09-20; the proposed training change is untested.** Reporting status
+is available as auxiliary supervision, but the evidence does not establish that
+replacing disease targets with three hard states improves image-model AUC. The
+[backlog proposal](../backlog/small-changes.md#auxiliary-report-state-prediction)
+retains balanced v4 BCE and adds a separate reporting head.
+
+The [audit artifact](../../outputs/analysis/report-state-audit-20260920/audit.json)
+records input SHA-256 hashes, methods and all twelve labels' results. It joins
+Steven v1/v2/v4 and official labels by `StudyInstanceUID` across 4,407 studies.
+The diagnostic groups are `v1 < 0.5`, `v1 == 0.5` and `v1 > 0.5`: negative-score,
+unreported and positive-score groups. These are extractor-derived states, not
+verified report annotations. No models were trained or inference rerun.
+
+### Disease despite report silence
+
+Among the 58 gold studies, 41 have unreported Synovitis in v1; **14 of those 41
+are gold-positive**, accounting for 14 of all 27 gold-positive Synovitis studies.
+Across the complete dataset, Synovitis has only 150 negative-score and 568
+positive-score cells against 3,689 unreported cells. This makes reporting status
+a particularly different task from disease prediction for this label. The
+[official target](../metadata/official-label-criteria.md#labels-versus-report-text-discussion-733826-host-reply-2026-08-08)
+is image-adjudicated presence or absence, including findings omitted from reports.
+
+A three-state head's positive output estimates the positive report-state
+probability. Renormalizing it as `P(positive) / (P(positive) + P(negative))`
+conditions on the finding being addressed; it does not establish disease
+probability when reporting depends on disease or other study characteristics.
+The small, selected gold set demonstrates disagreement, not population prevalence.
+
+### Information lost by collapsing the soft scores
+
+For this diagnostic only, score the three v1 groups as `0`, `0.5` and `1` and
+compute unweighted mean per-label ROC-AUC against the same 58 official gold rows:
+
+| Label-table scores | Gold macro AUC |
+|---|---:|
+| Original v1 soft scores | 0.877991 |
+| v1 collapsed to three ordered states | 0.809238 |
+| v2 soft scores | 0.887349 |
+| v4 soft scores | 0.892707 |
+
+The collapse removes useful within-group ordering from the label table. It is
+**neither an upper bound nor a forecast for a trained three-class image model**,
+whose predicted probabilities could rank images within those groups. These gold
+rows have already informed label development; the table is descriptive and cannot
+select a new model or establish an independent gain.
+
+### What the existing image scores already encode
+
+The saved `balanced-bce` predictions, seed 42, fold 0 of `all_5fold_v3`, selected
+epoch 7 (zero-based), were restricted to 893 non-gold validation studies. Across
+all twelve labels, mean predicted disease score is higher in the v1-unreported
+group than in the negative-score group. For Synovitis the means are **0.406 versus
+0.265**; for Medial Meniscus, **0.360 versus 0.210**. Using the disease score to
+distinguish these two report-state groups gives AUCs of **0.622–0.723** across
+labels. These are reporting-status diagnostics, not disease AUCs or evidence of
+improved calibration.
+
+The audit pins the prediction bytes; the run's
+[configuration](../../outputs/training/balanced-bce/effective_config.json),
+[provenance](../../outputs/training/balanced-bce/provenance.json) and
+[source snapshot](../../outputs/training/balanced-bce/source_snapshot.zip)
+retain its settings and implementation. Its base commit is
+`f4c340bab4518aa743acb7a6e4649e9d3719b9b3` with recorded working-tree changes.
+
+### Implications and untested alternatives
+
+The hypothesis is that an auxiliary reporting head could represent coverage
+separately while preserving the existing disease signal, including the 10,085
+unreported cells mapped to v4 `0.25`. The saved scores show an association; they
+do not prove that separating it improves disease ranking or that the model uses
+reporting-style shortcuts.
+
+The [masking experiment](../history/sharing/2026-09-13-label-masking-result.md)
+reduced full-fold AUC from 0.890976 to 0.879520, with eleven labels declining and
+Synovitis losing 0.022340. That cautions against removing disease supervision from
+unreported cells. It does not reject three-state training, which would still
+train the representation on those cells.
+
+A pure three-state replacement remains an untested alternative, not a rejected
+experiment. It would need a defined mapping back to the twelve disease scores,
+explicit treatment of gold labels and soft polarity, and comparison on the frozen
+disease endpoint. Reporting states also do not repair the
+[known OA severity conflicts](../history/sharing/oa-and-meniscus-disagreement-audit.md#source-lineage-and-prediction-effects).
+
 ## Pilkwang: graded scores with explicit verdicts
 
 The downloaded table contains exactly these observed combinations:

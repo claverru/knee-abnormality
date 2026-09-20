@@ -16,3 +16,4 @@
 | Reviewing study-reference fitting and sampling centers | [Accurate sampling centers](accurate-sampling-centers.md) |
 | Checking spatial-token validity and coordinate mapping | [Spatial-token geometry and mapping audit](spatial-token-geometry-and-mapping-audit.md) |
 | Understanding reflection geometry and previews | [Reflection geometry and previews](reflection-geometry-and-previews.md) |
+| Reviewing peripheral evidence, acquisition geometry and spatial importance maps | [Peripheral coverage](peripheral-coverage.md) |
