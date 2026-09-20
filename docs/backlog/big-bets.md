@@ -64,20 +64,27 @@ indexed by training series UID would not generalize to unseen acquisitions. Othe
 levels lost: 0.001/0.999 by 0.0003 and 0.01/0.99 by 0.0021
 ([result](../validation/results/2026-09-17-overnight-results.md)).
 
+- *Rejected source:* the DICOM `WindowCenter`/`WindowWidth` tags (measured 2026-09-20, 30 series):
+  median 1.43× wider than the 0.005/0.995 bounds, vendor-dependent (Toshiba 1.77 against Philips
+  1.20) and varying slice to slice in 23 of 30 series, so they are neither a tighter nor a
+  sampling-independent bound.
+
 ## Sampling-independent intensity bounds
 
-**Code observation; size and harm of the effect unmeasured.** `prepare_series`
+**Code observation; size measured, harm on the metric unmeasured.** `prepare_series`
 (`src/knee_abnormality/data/preprocessing/preparation.py`) takes the intensity quantiles over the
 unique slices of the selected triplets, so the same source slice gets different normalized pixels
 when its companion slices change: between training epochs, and between training and the 2×
 validation bag. The variability may also act as useful augmentation.
 
-1. **Measure first:** on a fixed training-fold subset, compare several training-epoch selections
-   and the deterministic 1× and 2× bags: per-acquisition bounds, gain variation, normalized-pixel
-   and clipping differences on source slices shared between bags, decoded-slice count and
-   preprocessing time (`PreparedSeries` already exposes `intensity_bounds`, `unique_slice_count`
-   and `intensity_pixel_count`). Separate changes within one acquisition from changes of supplier
-   series; disjoint samples are not a pixel-level comparison.
+1. **Measured 2026-09-20** on 40 studies over six epochs
+   ([bound stability](../data-preparation/preprocessing-implementation-and-profile.md#clipping-bound-stability-across-draws)):
+   the high bound moves 0.072 at the median and 0.245 at p90 between draws of one series, against
+   the 0.2 relative range of the contrast augmentation, and 14.2% of series exceed it. The spread
+   is a small-sample effect concentrated in series with few triplets (0.150 at two or fewer, 0.025
+   above six), not a property of the estimator: robust estimators calibrated to the same clip level
+   gain about one point, and per-triplet bounds are four times worse. Not measured: normalized-pixel
+   and clipping differences on shared source slices, the 1× versus 2× bags, or any effect on AUC.
 2. **Only if material:** estimate the bounds from a deterministic sparse reference sample of each
    acquisition, independent of epoch, bag size and selected windows, identical in training,
    validation and inference, at the current quantile levels. Define short-series and
@@ -91,6 +98,41 @@ validation bag. The variability may also act as useful augmentation.
   that the [loading speedups](loading-speedup/INDEX.md) rely on.
 - *Stop if* the variability is negligible, the runtime cost is disproportionate, or a controlled
   run gains nothing.
+
+## Per-label loss selection and learned mixtures
+
+**Research completed 2026-09-20; implementation and experiments unstarted.** Exploit the trusted
+external observation that ranking improves ACL while focal works better for MCL. The user wants
+to develop the principle independently of the contact's implementation. The
+[research note](../research/per-label-losses.md) owns the results, primary sources, candidate
+formulas, model fit, pair-coverage calculation and evaluation design.
+
+1. **Compare independent heads:** cache the current model's per-label pooled features and train
+   balanced soft BCE, focal and ranking classifiers for all twelve labels. Share expensive
+   feature extraction, allow larger ranking pools and repeat classifier seeds. Use current
+   class-balanced BCE as the control.
+2. **Assemble per-label winners:** compare stable selections against the original model and
+   refitted-BCE controls. Selected linear rows preserve inference cost. Retain the current loss
+   when differences are unresolved.
+3. **Evaluate joint continuation:** introduce the selected losses after feature learning,
+   comparing with an equally long current-loss continuation. Check every label because shared
+   features couple their gradients.
+4. **Investigate mixtures:** compare fixed BCE-plus-ranking hybrids with a small per-label
+   bilevel controller, first on frozen features. Nonnegative coefficients sum to one per label;
+   learn them from a fixed tuning objective after virtual training updates, not by minimizing
+   the same weighted training loss. Evaluate warmup, slower coefficient updates and shrinkage
+   toward a common prior only as needed. Noise-aware ranking follows only if diagnostics justify it.
+
+Preserve soft-label semantics explicitly, define loss scales and usable pairs, and separate
+tuning from evaluation according to the research note. Record configuration, revision, parent,
+split/label/feature identities, seeds, coefficients, AUCs and compute. Advance when evidence
+justifies the extra complexity; a failed frozen-head screen does not rule out representation
+gains. Training remains user-launched. Move this entry to ongoing work when experiments start.
+
+This entry owns loss selection within each label. The parked
+[adaptive allocation](#adaptive-training-allocation) proposal concerns weights between targets
+and study exposure; [static ranking loss](small-changes.md#ranking-aware-loss) remains a separate
+small change.
 
 ## Intermediate stride-16 feature fusion
 
@@ -117,97 +159,23 @@ evidence is object detection.
   second backbone.
 - *Order:* after the cheaper [attention and readout changes](small-changes.md#attention-pooling).
 
-## Robust study center (removed)
-
-**Trained, measured and removed on 2026-09-18.** Four runs at 10, 20 and 30 mm all landed inside
-the control spread, the subgroup check on the 21 fold-0 studies it changes showed neither harm nor
-benefit, and it works against peripheral coverage: a rejected study currently samples uniformly
-across each slab, which the refit would replace with the sigma-40 Gaussian
-([results](../validation/results/2026-09-18-overnight-results.md)). The option is gone from the
-code; the rejection counts, rescue analysis and design below are kept because they describe the
-geometry, not the option.
-
-- *Problem:* 178 of 4,407 train centers are rejected (170 RMS above 10 mm, 8 with one series above
-  20 mm), often because of one or two stray series, so the whole study falls back to local
-  sampling. An in-plane residual does not affect depth sampling.
-- *Proposal:* iteratively drop the worst series while it lies more than 20 mm from the center and
-  refit, keeping the RMS, condition and two-plane checks. Each series then samples physically when
-  the center projects inside its acquired range, and locally otherwise. The model no longer reads
-  3D geometry, so only the previews' `geometry_valid` still depends on `& physical` in
-  `src/knee_abnormality/data/dataset.py`.
-- *CPU analysis* ([summary](../../outputs/analysis/study-center-robust-20260915/summary.txt)):
-  it rescues 131 studies (21 of 31 on fold 0), dropping 159 series, mostly small-FOV axials. Of
-  the 47 still rejected, 44 have no series above 20 mm. Centers of accepted studies do not move,
-  by construction. Of 24,371 series, 350 would sample locally (75 on fold 0).
-- *Gate on range rather than retention:* retained series from the other knee in bilateral
-  studies, or from an ankle series filed in a knee slot, project up to 184 mm outside their range
-  (see the [series-filtering census](../metadata/series-filtering-census.md#implemented-rule-2026-09-17); the ankle and stray other-knee series are now dropped before the fit).
-- *Cost:* setting the option adds a `robust_center` entry to the preprocessing identity, so the
-  run starts fresh on fold 0.
-
-### Robust-centre re-score (2026-09-17)
-
-Measured, inference only. The three fold-0 control checkpoints of
-`overnight-20260916T214520Z-t8k_kw2z` (runs 00–02) re-scored the rescued fold-0 studies at batch
-size 1 with bf16 autocast; the rest of fold 0 keeps its saved predictions. The comparison uses a
-paired report-group bootstrap (2,000 draws), with Δ macro AUC ×1000 averaged over the three
-checkpoints. Tables: [macro](../../outputs/analysis/series-filtering-20260917/robust-centre-rescore/macro_deltas.csv),
-[per target](../../outputs/analysis/series-filtering-20260917/robust-centre-rescore/per_target_deltas.csv),
-[series paths](../../outputs/analysis/series-filtering-20260917/robust-centre-rescore/series_sampling.parquet),
-[sanity](../../outputs/analysis/series-filtering-20260917/robust-centre-rescore/sanity_slots.csv).
-Script: [`robust_rescore.py`](../history/series-and-sampling-sources/series-filtering/robust_rescore.py.txt).
-
-- *Patch:* a `KneeStudyDataset` subclass replaces a rejected reference with the robust fit. Series
-  dropped from the fit remain model inputs. A wrapper around `build_pool` passes the robust centre
-  only to series whose acquired slice range contains it. Every other series gets a reference with
-  no centre, so it samples locally.
-- *Paths:* none of the rescued series sample locally. When any series in a slot samples
-  physically, `build_pool` keeps only the physical triplets. Each of the 12 out-of-range series
-  (all in the 10 range-gated studies, 8 of them axial fluid) shares its slot with an in-range
-  series, so it leaves the input. The other 129 of 141 series sample physically. Triplets stay at
-  1,102 with no shortfall, no preparation failures and valid geometry.
-
-| Rescued studies | n | Δ ×1000 (95% CI) | Per checkpoint |
-|---|---:|---:|---|
-| 20 mm robust fit | 21 | −0.107 (−0.256, +0.036) | −0.126, −0.044, −0.150 |
-| Range-gated fit | 10 | −0.001 (−0.114, +0.110) | −0.057, +0.060, −0.006 |
-| 20 mm fit only | 11 | −0.105 (−0.202, −0.024) | −0.069, −0.104, −0.143 |
-
-- On their 10 shared studies, the two fits give identical predictions. The whole loss therefore
-  comes from the 11 studies that only the 20 mm fit rescues. There, the far series project inside
-  their range, so all 73 series switch from local to physical sampling. The range-gated rescue,
-  which also removes the out-of-range series, is neutral.
-- Per target (20 mm fit, 21 studies): medial and lateral OA fall by 0.56 ×1000 each and effusion
-  rises by 0.56, with the same sign on all three checkpoints. These studies contain only 1–4
-  positives for each of these targets.
-
-### Implementation (2026-09-17)
-
-The option reproduces the 20 mm patch above. The implemented behaviour, the identity effects and
-the CPU verification (null against HEAD, 20 mm and 10 mm) are recorded in
-[current preparation](../data-preparation/current-preparation.md#robust-study-centre-removed).
-One run is queued: `robust-center-seed42`, paired with `ranked-filtered-seed42` (0.889573)
-([overnight queue](overnight.md#next-queue)).
-
-- *Counts:* after the ankle exclusion, 177 training studies are rejected, and 20 mm rescues 130 of
-  them (21 of 31 on fold 0). The 10 mm threshold rescues all 177 and excludes 256 series from the
-  fits, against 155 at 20 mm. No inference check has been run at 10 mm.
-- *Re-score (measured, inference only):* the `ranked-filtered-seed42` epoch-9 checkpoint was run
-  with the option at 20 mm, with the identity check bypassed.
-  - The 21 rescued fold-0 studies were re-scored at batch size 1 with bf16 autocast; the other
-    883 studies keep their saved predictions.
-  - Macro AUC moves from 0.889573 to 0.889228 (−0.00035).
-  - A batch-1 recompute without the option gives 0.889574, with a maximum probability difference
-    of 0.0019 from the saved predictions.
-  - All 105 non-empty slots of these studies switch from local to physical sampling, and the mean
-    absolute probability change is 0.028.
-  - The three control checkpoints above averaged −0.0001 (from −0.00004 to −0.00015), so this
-    checkpoint loses more than any of them. The result comes from one checkpoint and 21 studies
-    (`outputs/analysis/robust-center-implementation-20260917/rescore.json`).
-- *Expectation:* the run is expected to tie. Seed-to-seed noise is 0.0029 ([strategy](../validation/validation-strategy.md#what-a-comparison-can-resolve)), so a single run
-  cannot resolve a change of this size.
-
 ## Parked until a specific need
+
+### Study overlap and anatomical matching
+
+**Follow-up investigation; unstarted.** The user-requested bounded
+[study-overlap audit](../metadata/study-overlap-investigation.md) found no confirmed
+repeat among its shortlisted report/geometry candidates. To look for separate
+examinations of the same knee, retrieve neighbors using stable bone anatomy and
+verify with physical registration across multiple slices and another plane.
+Use existing prepared data where possible; calibrate against unrelated studies
+from the same scanner and protocol. Distinctive trabecular patterns or surgical
+features should corroborate shape similarity. For potential split-bilateral
+sessions, combine sequence inventories, frequency, coil and numbering evidence;
+mirrored anatomy or a shared report template alone cannot establish identity.
+Keep candidate, likely acquisition overlap and confirmed duplicate evidence
+separate. Change fold groups only with convincing evidence and rerun a baseline
+on any revised split; never silently rewrite the existing membership.
 
 ### Adaptive training allocation
 

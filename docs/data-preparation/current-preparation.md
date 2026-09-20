@@ -73,7 +73,7 @@ peripheral coverage for exactly those studies
 ([coverage](../ongoing/peripheral-coverage.md)). After
 the exclusions above, 177 of 4,407 training studies are rejected (31 of 904 on fold 0). The
 analysis that produced it is kept in
-[big bets](../backlog/big-bets.md#robust-study-center-removed).
+[history](../history/robust-study-centre.md).
 
 ## Overlapping triplet preparation
 

@@ -1,5 +1,22 @@
 version: 1
 scripts:
+  - id: audit-study-overlap
+    path: scripts/adhoc/audit_study_overlap.py
+    summary: Retrieve possible repeated studies using representative geometry and near-duplicate reports, then compare decoded slices in shortlisted acquisitions.
+    tags: [duplicates, patient, leakage, split, reports, geometry, pixels, overlap]
+    commands:
+      - rtk proxy env CUDA_VISIBLE_DEVICES= OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 uv run --locked python -m scripts.adhoc.audit_study_overlap --output-dir outputs/analysis/study-overlap-new
+    inputs: [Saved representative DICOM paths, Saved normalized reports, Frozen fold membership, Original DICOMs]
+    outputs: [Input and source manifest, Representative geometry parquet, Ranked candidate pairs, Decoded pixel fingerprint inventory, Exact and approximate pixel comparisons, Summary JSON, Source snapshot]
+    notes:
+      - CPU only; no training, GPU, tests, fold changes or submissions. Requires a fresh output directory.
+      - Reads one representative header per study; report retrieval checks six nearest neighbors with cosine at least 0.94 and at least 200 normalized characters, excluding existing exact report groups.
+      - By default checks one complete representative series for each study in the top forty pairs; cross-fold pairs have priority within each evidence tier.
+      - Exact hashes use nonconstant decoded two-dimensional integer pixel arrays and dimensions, ignoring identifiers and compression containers.
+      - Unregistered 32x32 thumbnail cosine is uncalibrated candidate evidence. No match does not exclude follow-ups, altered exports or overlap in unexamined series.
+      - Report templates and shared scanner protocols are not evidence of patient equivalence.
+    docs: [docs/metadata/study-overlap-investigation.md]
+
   - id: analyze-study-center-extents
     path: scripts/adhoc/analyze_study_center_extents.py
     summary: Fit the study reference point for every training study and measure each plane's coverage on both sides of it.
@@ -140,23 +157,24 @@ scripts:
     docs: [docs/metadata/report-normalization.md]
   - id: train-overnight
     path: scripts/adhoc/train_overnight.py
-    summary: Run the five prepared hyperparameter experiments sequentially on fold 0.
+    summary: Run fourteen hyperparameter experiments with fresh distinct seeds on fold 0 within an eight-hour queue budget.
     tags: [train, overnight, queue, hyperparameters, adam-epsilon, beta1, augmentation, intensity, noise, experiments]
     commands:
       - nohup rtk proxy uv run --locked python -m scripts.adhoc.train_overnight > outputs/training/overnight.out 2>&1 &
       - rtk proxy uv run --locked python -m scripts.adhoc.train_overnight --prepare-only
     inputs: [configs/training.yaml, Prepared all_5fold_v3 split, Training DICOMs, Pinned labels and pretrained backbone]
-    outputs: [Unique outputs/training/overnight-* directory with five YAML configs, Per-run artifacts and logs, status.tsv start/finish/wall time and exit codes, summary.tsv per-run metrics rewritten after every run, runtime.json open-file limits and source fingerprint, Validation comparison PNG for successful runs]
+    outputs: [Unique outputs/training/overnight-* directory with fourteen YAML configs, Per-run artifacts and logs, status.tsv start/finish/wall time and exit codes, summary.tsv per-run metrics rewritten after every run, runtime.json open-file limits and source fingerprint, Validation comparison PNG for successful runs]
     notes:
-      - Snapshots all five configs before training and fixes split v3 and fold 0; every run carries its own recorded random seed, and other settings come from --config (default configs/training.yaml).
+      - Snapshots all fourteen configs before training and fixes split v3, fold 0, validation x1 and ten epochs; each invocation draws fourteen distinct random seeds, records them in YAML and prints them, and other settings come from --config (default configs/training.yaml).
       - Starts fresh runs in order from 00-control, each with exactly its listed overrides; see docs/backlog/overnight.md for the run list.
       - Refuses to start if nvidia-smi reports an active GPU compute process (skipped only if nvidia-smi is missing), and refuses to continue if a content-hash fingerprint of tracked and untracked src/, scripts/ or configs/ files changes mid-queue.
       - Continues after individual training failures and returns nonzero if training, plotting or the source-fingerprint check fails. SIGINT or SIGTERM stops the queue and terminates its active process group.
-      - Prints one scripts.tools.compare_fold_runs command per completed non-control run against 00-control, with --allowed-config-differences set from that run's own overrides.
+      - Prints scripts.tools.compare_fold_runs commands using --reference and --candidate for completed candidates against both completed controls, plus the control-to-control comparison, with --allowed-config-differences set from that run's own overrides.
       - Uses pydantic-settings for --config and --prepare-only; preparation never starts training or checks the GPU.
       - Raises the process soft open-file limit to its inherited hard limit before training and records both limits and the starting source fingerprint in runtime.json.
       - Runs training and comparison plotting without invoking Codex or submitting to Kaggle.
-      - Every invocation creates a new queue.
+      - Every invocation creates a new queue and fresh seeds; prepare-only never reserves seeds for the next invocation.
+      - Eight-hour elapsed-time budget includes preparation, training and plotting; no new training starts with less than thirty minutes left. Deadline termination records exit code 124; budget or source-change stops return 3.
     docs: [docs/validation/overnight-hyperparameter-queue.md, docs/backlog/overnight.md]
   - id: benchmark-dataloader-optimizations
     status: historical
@@ -491,4 +509,20 @@ scripts:
       - Skips a notebook whose latest run has not finished, so it never disturbs an active submission.
       - Retries HTTP 429 with exponential backoff and pauses between updates; a full pass without throttling is rate limited.
       - Historical bundles predate recorded runtime fields, and the three ranked-filtered bundles carry the attention temperature folded into the scorer weights, so those temperatures come from the table in the script.
-    docs: [docs/inference/submissions/INDEX.md#naming]
+    docs: [docs/inference/submissions/ledger.md#naming]
+
+  - id: measure-intensity-bound-stability
+    path: scripts/adhoc/measure_intensity_bound_stability.py
+    summary: Measure how far the per-series intensity clipping bounds move between training draws, and how far per-triplet bounds move within one acquisition.
+    tags: [intensity, normalization, quantile, clipping, bounds, sampling, stability, draw, epoch, augmentation, preparation, cpu]
+    commands:
+      - rtk proxy uv run --locked python -m scripts.adhoc.measure_intensity_bound_stability --output-dir outputs/analysis/intensity-bound-stability-20260920 --studies 40 --epochs 6
+    inputs: [configs/training.yaml, Frozen split and label source named by the config, Original training DICOMs]
+    outputs: [series_bounds.parquet with one row per series and draw, triplet_bounds.parquet with one row per triplet, report.json with relative spreads against the configured contrast range, Source and input manifest]
+    notes:
+      - CPU only; no model, GPU, training or tests. Refuses an existing output directory.
+      - Replays the real dataset path with the configured training seed and one epoch per draw, so the selection differences are the ones training sees.
+      - Records the pipeline's own intensity_bounds and independently recomputes pooled quantiles from the decode cache; the recomputed 0.995 level reproduces the recorded high bound.
+      - Spreads are (max - min) / median over the draws of one series, compared against the configured intensity augmentation's contrast range.
+      - The triplet rows answer what per-triplet bounds would cost, since a triplet's three consecutive slices are fixed by its middle index.
+    docs: [docs/backlog/big-bets.md]

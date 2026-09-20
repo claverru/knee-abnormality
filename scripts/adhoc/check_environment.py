@@ -1,13 +1,13 @@
-from io import BytesIO
 import platform
+from io import BytesIO
 
 import numpy as np
 import polars as pl
+import timm
+import torch
 from pydicom.dataset import Dataset, FileMetaDataset
 from pydicom.uid import ExplicitVRLittleEndian
 from sklearn.metrics import roc_auc_score
-import timm
-import torch
 from torchvision.ops import nms
 
 

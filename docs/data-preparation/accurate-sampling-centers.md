@@ -122,7 +122,7 @@ describe what the sampler actually sees.
 - **This evidence now drives the sampler width directly.** The sigma-40-mm truncation
   fractions above describe the retired fixed-width sampler; the
   [implemented sampler](physical-sampling/implemented-sampler.md) instead sets each candidate
-  pool's own Gaussian width to `data.sampling_sigma_fraction` (0.76) times that pool's own
+  pool's own Gaussian width to `data.sampling_sigma_fraction` (0.867) times that pool's own
   `limiting_reach`, so the coronal deficit found here no longer needs a fixed threshold to
   show up as truncation risk.
 - **Limits.** Distances run slice center to slice center, so the outer faces sit half a

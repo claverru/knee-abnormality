@@ -1,0 +1,40 @@
+id: losses
+status: ready-to-seal
+recipe: configs/training.yaml
+reference_run: outputs/training/overnight-20260919T235434Z-8ol_1c30/runs/13-control-repeat
+additional_evidence_runs:
+  - outputs/training/overnight-20260919T235434Z-8ol_1c30/runs/00-control
+  - outputs/training/balanced-bce
+backlog:
+  refill_below: 4
+  refill_to: 5
+artifacts_root: outputs/autoresearch/losses
+policy:
+  editable_files:
+    - configs/training.yaml
+    - src/knee_abnormality/config.py
+    - src/knee_abnormality/training/lightning.py
+  editable_directories:
+    - src/knee_abnormality/training/losses
+  config_keys:
+    - trainer.class_balanced_bce
+  config_prefixes:
+    - trainer.loss
+  list_item_fields: {}
+  input_identity_keys: []
+  require_source_change: true
+  developer_instructions: >-
+    Implement the shared loss mechanism and update configs/training.yaml only if
+    needed. New objective settings belong under trainer.loss. Use one formula,
+    shared coefficients and schedule across all labels; no per-label selection
+    or mixtures. Change only loss configuration in config.py, objective computation
+    and state in training/lightning.py, or helpers under training/losses/. Preserve
+    data loading, model construction, optimizer/scheduler, forward/validation,
+    checkpoint behavior and accounting. All objective preparation must run inside
+    measured training using training data only. Return prepared or blocked. Use
+    the existing Python environment for static checks. No tests.
+  researcher_instructions: >-
+    Return distinct shared-loss mechanisms, not hyperparameter sweeps. Use one
+    objective or one shared combination for all labels. Exclude per-label loss
+    selection, coefficients and schedules. Keep soft-label semantics, pair coverage,
+    component scales and training-only feedback explicit.

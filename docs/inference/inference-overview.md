@@ -17,7 +17,7 @@ as the best public result from 2026-09-14 (`reflection-sigma40`, submission `562
 [validation comparison](../validation/results/2026-09-14-reflection-sigma-40-result.md) and
 [submission artifact](submissions/2026-09-14-reflection-sigma-40-submission.md)) until the
 attention temperature and larger evaluation counts took it to 0.939 on 2026-09-18. The
-[submission ledger](submissions/INDEX.md) carries the current best and every scored submission;
+[submission ledger](submissions/ledger.md) carries the current best and every scored submission;
 the older commands in this branch still describe the original batch-2 exporter, so reproduce a
 later submission from its recorded runtime or frozen bundle.
 

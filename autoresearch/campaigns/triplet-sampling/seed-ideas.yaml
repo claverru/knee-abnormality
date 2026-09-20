@@ -1,0 +1,112 @@
+ideas:
+  - id: coronal-side-relative-draw
+    mechanism_id: coronal-side-relative-distribution
+    parent_idea_id: null
+    title: Asymmetric coronal draw matched to acquired side extents
+    opportunity: >-
+      Coronal acquisition reaches about 59.0 mm anteriorly but 45.6 mm posteriorly.
+      Peripheral Baker's-cyst and posterior-horn evidence motivates a distribution
+      that handles the two acquired sides explicitly. Evidence is observational;
+      neither a training gain nor an optimal side allocation has been established.
+    mechanism: >-
+      Replace the symmetric coronal truncated Gaussian with a draw whose two
+      side widths are derived from each side's physical reach. Preserve the
+      fitted physical centre. Make the allocation of probability across the
+      two sides explicit so acquisition asymmetry does not accidentally dictate
+      all exposure. Other planes retain the incumbent policy.
+    precedents:
+      - docs/backlog/small-changes.md#asymmetric-coronal-draw
+      - docs/ongoing/peripheral-coverage.md#acquisition-geometry
+      - docs/data-preparation/accurate-sampling-centers.md#cohort-wide-center-fit-and-plane-extents
+      - docs/validation/results/2026-09-19-relative-sampler-width-result.md
+    novelty: >-
+      Existing untried proposal adopted into the triplet-sampling campaign at the
+      user's request. Ownership of this experiment is now this campaign; the
+      general-backlog entry remains a read-only provenance link, not a second
+      scheduling location. Changes distribution shape rather than repeating a
+      common-width sweep or the rejected per-type centre-offset proposal.
+    coverage: >-
+      Retain exposure on both acquired sides, including peripheral support;
+      handle pools with missing or very short sides without inventing slices.
+    exploitation: >-
+      Preserve substantial central coverage while redistributing existing
+      coronal draws toward underexposed acquired regions.
+    budget: >-
+      Change selected triplet locations only. Preserve the realized training
+      average and validation total, validation x1, all ten epochs and optimizer
+      steps, fold 0, and the sealed 115% runtime ceiling. No extra decoding pass,
+      model, triplet budget, or persistent precomputation.
+    implementation: >-
+      Work in the existing physical-pool depth draw and sampler helpers. Keep
+      stochastic training and deterministic validation independent of training
+      seed. Inspect anterior/posterior coordinate signs and discrete matching
+      before asserting which side gains exposure.
+    open_choices: >-
+      Choose one defensible side-mass normalization and treatment of degenerate
+      pools, explaining the expected coverage effect. No parameter sweep.
+      Compare using the campaign paired bootstrap; the old backlog's 0.008
+      heuristic is superseded by the sealed campaign acceptance rule.
+    dependencies: []
+    priority_rationale: >-
+      Recommend first: directly addresses an observed acquisition asymmetry
+      with a new distribution shape, low implementation cost and no new data.
+  - id: geometry-informed-plane-widths
+    mechanism_id: plane-specific-sampling-shape
+    parent_idea_id: null
+    title: Geometry-informed per-plane sampling widths
+    opportunity: >-
+      A common width fraction cannot isolate opposing plane-specific exposure
+      needs. Cache-only results favored a narrower coronal draw, but did not
+      establish a training effect; previous common-factor sweeps do not settle
+      relative widths across planes.
+    mechanism: >-
+      Adopt a single geometry- and evidence-informed policy for relative plane
+      widths, rather than tying every plane to the same reach fraction. Select
+      and justify one policy from the existing acquisition evidence; do not
+      enumerate axial/coronal multipliers as a hyperparameter search.
+    precedents:
+      - docs/backlog/small-changes.md#per-plane-width-ratios
+      - docs/ongoing/peripheral-coverage.md#what-is-settled-and-what-is-not
+      - docs/validation/results/2026-09-18-per-plane-sigma-cache.md
+      - docs/validation/results/2026-09-19-relative-sampler-width-result.md#training-versus-drawing
+      - docs/validation/results/2026-09-19-fold-ensembles-and-sigma-sweep.md
+    novelty: >-
+      Existing untried proposal adopted by this campaign, with its original
+      general-backlog entry retained as read-only provenance. Relative plane
+      shape is distinct from the trained common-factor sigma sweep. The
+      campaign owns its execution; do not launch duplicate general-backlog arms.
+    coverage: >-
+      Keep all existing plane/type pools and their valid triplet counts. Retain
+      peripheral support rather than collapsing a plane onto the centre.
+    exploitation: >-
+      Match the concentration of each plane's existing draws to its acquisition
+      geometry and evidence, retaining central anatomical exposure.
+    budget: >-
+      No triplet, plane-budget or visit increases. Preserve realized training
+      average, validation total and x1, fold 0, epochs, optimizer steps and the
+      fixed 115% runtime ceiling. Use existing pool geometry.
+    implementation: >-
+      Limit changes to the physical sampling policy and necessary sampler
+      configuration. Use the current 0.867 recipe as the incumbent reference,
+      not the superseded 0.76 prose. Train stochastically with a fresh recorded
+      seed and retain seed-independent deterministic validation.
+    open_choices: >-
+      Decide whether the available geometry justifies a useful policy beyond
+      arbitrary multipliers. Park the idea if it reduces to a scalar sweep.
+      Use campaign bootstrap acceptance, not the old backlog's 0.008 heuristic.
+      Reconcile with the coronal-shape result before combining their effects.
+    dependencies: []
+    priority_rationale: >-
+      Recommend second: it is already motivated and cheap, but its upside is
+      less clear and its risk of degenerating into hyperparameter tuning is
+      higher than the asymmetric distribution change.
+exhausted_directions: >-
+  These are the two actionable, untried triplet-sampling leads in the existing
+  general backlog, not a complete research refill. Side-conditioned sagittal
+  sampling remains blocked: it requires a knee-side-mirrored importance-map
+  re-export whose per-study utilities are outside this repository, followed
+  by laterality plumbing. Keep that lead in prior-work.md rather than the
+  executable queue until those blockers are resolved. Per-type centre offsets
+  were rejected by analysis; common-width sweeps, fixed-total reallocations
+  and repeated-series share have prior outcomes and must not be renamed as
+  new ideas. The researcher can fill remaining slots with distinct mechanisms.

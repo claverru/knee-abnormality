@@ -1,4 +1,4 @@
-# Project state (2026-09-18)
+# Project state (2026-09-20)
 
 The recipe in force, the best submission, and the measurement rules every comparison depends on.
 Active lines of development have their own documents in [this folder](INDEX.md).
@@ -52,7 +52,8 @@ Active lines of development have their own documents in [this folder](INDEX.md).
   for 5.5% more compute, and the studies missing two types stop being under-sampled. Fresh runs
   only; it changes the preprocessing identity.
 - **EfficientNet-B0 is an open efficiency line**, not a replacement backbone today: −0.0032 from
-  ReXNet-200 at a third of the training time and half the memory
+  ReXNet-200 at a third of the training time and half the memory. That gap, and every b0 queue
+  delta, was measured under ordinary BCE and has to be re-measured on the current loss
   ([EfficientNet backbones](efficientnet-backbones.md)).
 - **Dropped:** learned crop selection ([record](../history/crop-selection-investigation.md)).
 - **AUC training research, 2026-09-19:** the
@@ -71,8 +72,47 @@ Active lines of development have their own documents in [this folder](INDEX.md).
   **Replicated 2026-09-19:** the untried-hyperparameter queue's control reached 0.894037 at a
   different seed, 0.00125 from `balanced-bce` and about 0.008 above every ordinary-BCE run on the
   same sampler ([queue results](../validation/results/2026-09-19-untried-hyperparameter-queue.md)).
+- **Nothing was adopted on 2026-09-20.** The
+  [fourteen-run queue](../validation/results/2026-09-20-overnight-hyperparameter-results.md)
+  completed in 6 h 8 m with two controls spanning 0.003360 and no candidate clearing them; milder
+  scaling `[0.97, 1.03]` was the best arm at 0.895868 and inconclusive against both, and stronger
+  contrast was the worst at 0.889906. The
+  [run-level stratified sampler](../validation/results/2026-09-20-stratified-sampling-promotion.md)
+  was promoted, reverted and rejected for adoption: its second run scored 0.895177 at seed 42
+  against 0.897515 for the original, −0.002338 with a paired interval of [−0.006064, +0.001371],
+  and it sits between the two controls. Training again uses independent per-epoch draws within
+  Gaussian probability bands. The autoresearch campaign remains stopped.
+- **The sampler's shape was tried and did not resolve, 2026-09-19.** The campaign trained both
+  shape arms on fold 0: per-plane widths (`geometry-informed-plane-widths`) at +0.00041
+  [−0.0033, +0.0041] and the asymmetric coronal draw (`coronal-side-relative-draw`) at −0.00130
+  [−0.0051, +0.0023], both inconclusive against the 0.894037 control. With the overall scale
+  already settled, the sampler has no open training-side lead left except the mirrored
+  importance-map re-export ([peripheral coverage](peripheral-coverage.md#what-is-settled-and-what-is-not)).
+- **No confirmed duplicate studies, 2026-09-20.** The bounded
+  [study-overlap audit](../metadata/study-overlap-investigation.md) found 885 near-report candidate
+  pairs, but forty shortlisted pairs shared no identical slice across 1,202 decoded images. Fold
+  membership is unchanged; anatomical matching is
+  [parked](../backlog/big-bets.md#study-overlap-and-anatomical-matching).
+- **Per-label loss research completed, 2026-09-20:** the
+  [research note](../research/per-label-losses.md) develops the trusted ACL-ranking/MCL-focal
+  observation into a shared-feature classifier comparison, per-label selection, joint
+  continuation and learned mixtures. Implementation and experiments remain unstarted in
+  [Big bets](../backlog/big-bets.md#per-label-loss-selection-and-learned-mixtures).
 - **Strategy:** iterate on fold 0. Folds, ensembling and mirror TTA were executed on 2026-09-19
   and are no longer waiting; bigger images and weight averaging still wait
   for the [final phase](../backlog/endgame.md)
   ([validation strategy](../validation/validation-strategy.md)). Test-time risks are listed in
   [risks](../backlog/risks.md).
+
+- **Documentation navigation, 2026-09-20:** repository indexes contain navigation only.
+  Script procedures live in the [catalog guide](../architecture/script-catalog.md), submission
+  records in the [ledger](../inference/submissions/ledger.md), and notes guidance in
+  [provenance](../research/provenance.md#how-to-use-these-notes).
+  [Project guidance](../../AGENTS.md) and the maintenance skills now choose direct lookup,
+  search or indexes by task. Index entries retain distinguishing terms and link common questions
+  to sections; result-only edits do not require index updates.
+
+- **Documentation retrieval pilot completed, 2026-09-20:** both agents located all twelve
+  canonical documents; the revised version used fewer lookups, but the old-policy agent skipped
+  required index traversal, so the efficiency effect remains unproven
+  ([measurement and limitations](../architecture/documentation-navigation-measurement.md)).

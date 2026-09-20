@@ -6,7 +6,6 @@ import polars as pl
 import torch
 from torch.utils.data import DataLoader
 
-from knee_abnormality.inference.reflection import reflect_batch, sagittal_types
 from knee_abnormality.config import (
     INFERENCE_IO_THREADS,
     SLICES_PER_INPUT,
@@ -20,6 +19,7 @@ from knee_abnormality.data.sources import (
     prediction_studies,
     select_studies,
 )
+from knee_abnormality.inference.reflection import reflect_batch, sagittal_types
 from knee_abnormality.modeling.model import KneeAbnormalityModel
 
 BACKBONE_CHUNK_IMAGES = 64

@@ -4,29 +4,37 @@
 
 | Read when | Document |
 |---|---|
-| Getting the current submission state, best public score and the 2026-09-14 inference timing summary | [Inference and efficiency overview](inference-overview.md) |
-| Checking official notebook, submission-limit, timeline, evaluation and efficiency-prize rules, or the submission CSV contract | [Submission requirements and output contract](submission-requirements-and-output-contract.md) |
-| Working out which submission holds our efficiency row, what a thousandth of AUC is worth in runtime, or how the board bounds hidden-test runtimes we cannot measure | [Efficiency leaderboard](efficiency-leaderboard.md) |
-| Building a frozen checkpoint/code/wheel bundle (single-checkpoint or multi-checkpoint ensemble), choosing offline codecs and precision, or attaching verification evidence | [Repository readiness and model bundle](model-bundle-and-offline-environment.md) |
-| Exporting a selected checkpoint without local prediction and launching detached submissions within Kaggle's GPU session limit | [Fast submission preparation](fast-submission-preparation.md) |
-| Running training-to-submission recipes: setup, train, resume, export, infer, submit and status | [Justfile recipes](justfile-recipes.md) |
-| Driving uploads, notebook runs, submissions and score polling from the Kaggle CLI, or assembling the notebook workflow | [Kaggle submission workflow](kaggle-submission-workflow.md) |
-| Running or exporting dual-GPU inference: one process per visible GPU, four studies per GPU, 16 total workers, automatic FP16 backbone chunks on T4 and main-thread warm-up | [Independent GPU inference processes](independent-gpu-inference-processes.md) |
-| Checking the physical-sampling preprocessing identity, seed compatibility and realized input counts | [Physical-sampling runtime identity](physical-sampling-runtime-identity.md) |
+| Checking submission state and inference context | [Inference and efficiency overview](inference-overview.md) |
+| Checking submission rules and the output contract | [Submission requirements and output contract](submission-requirements-and-output-contract.md) |
+| Interpreting the efficiency leaderboard | [Efficiency leaderboard](efficiency-leaderboard.md) |
+| Building frozen inference bundles and offline environments | [Repository readiness and model bundle](model-bundle-and-offline-environment.md) |
+| Preparing exports and detached submissions | [Fast submission preparation](fast-submission-preparation.md) |
+| Running training-to-submission commands | [Justfile recipes](justfile-recipes.md) |
+| Operating the Kaggle submission workflow | [Kaggle submission workflow](kaggle-submission-workflow.md) |
+| Configuring GPU processes, loader workers, backbone precision and warm-up | [Independent GPU inference processes](independent-gpu-inference-processes.md) |
+| Checking physical-sampling identity and seed compatibility | [Physical-sampling runtime identity](physical-sampling-runtime-identity.md) |
 
 ## Runtime and memory
 
 | Read when | Document |
 |---|---|
-| Choosing the inference image multiplier and batch size from public scores and measured VRAM | [Inference image count and memory](inference-image-count-and-memory.md) |
-| Choosing loader workers or precision on Kaggle's two T4s, or finding what slows inference: FP32/FP16, 4–24 workers, startup, indexing and per-stage DICOM loading costs over NFS | [2026-09-15 Kaggle inference profiling](2026-09-15-kaggle-inference-profiling.md) |
-| What the loading speedups bought end to end: x4 at 1,300 studies on two T4s, the cold stage breakdown against the 2026-09-15 baseline, and the header thread sweep behind `INFERENCE_IO_THREADS` | [2026-09-18 Kaggle x4 profile after the loading changes](2026-09-18-kaggle-x4-profile-after-loading-changes.md) |
-| What the index changes bought end to end, and the first loading stage table with a real CPU column: why the frame stage is CPU-bound and the indexing bucket is NFS latency | [2026-09-18 Kaggle x4 profile after the index changes](2026-09-18-kaggle-x4-profile-after-index-changes.md) |
-| What the bit-exact CPU cluster bought with trained weights — 350.8 s worker wall, 3.705 studies/s, loader CPU down a fifth — and the machine-adjusted stage table that flags the resample band | [2026-09-18 Kaggle x4 profile after the CPU cluster](2026-09-18-kaggle-x4-profile-after-cpu-cluster.md) |
-| Reviewing unverified submission timings, runtime leads, training-throughput anecdotes, the public two-T4 notebook's techniques and open efficiency questions | [Unverified runtime evidence and efficiency leads](runtime-evidence-and-leads.md) |
+| Choosing inference image counts and batch size | [Inference image count and memory](inference-image-count-and-memory.md) |
+| Reviewing loader, precision and startup profiles | [2026-09-15 Kaggle inference profiling](2026-09-15-kaggle-inference-profiling.md) |
+| Inspecting threaded DICOM headers, frame loading and cold-start stages | [2026-09-18 Kaggle x4 profile after the loading changes](2026-09-18-kaggle-x4-profile-after-loading-changes.md) |
+| Inspecting series filtering, threaded listings, loader ordering and CPU attribution | [2026-09-18 Kaggle x4 profile after the index changes](2026-09-18-kaggle-x4-profile-after-index-changes.md) |
+| Inspecting preparation CPU changes, resampling and the I/O-thread sweep | [2026-09-18 Kaggle x4 profile after the CPU cluster](2026-09-18-kaggle-x4-profile-after-cpu-cluster.md) |
+| Reviewing unverified runtime evidence and efficiency ideas | [Unverified runtime evidence and efficiency leads](runtime-evidence-and-leads.md) |
 
 ## Submission records
 
 | Read when | Document |
 |---|---|
-| Finding any of the 37 Kaggle submissions by date, sequence number, public score or submission ID, reading the unified naming format every submission uses, or opening the dated record with its bundle, runtime and workflow details | [Submission ledger](submissions/INDEX.md) |
+| Finding submission records and the ledger | [Submission records](submissions/INDEX.md) |
+
+## Common lookups
+
+| Read when | Section |
+|---|---|
+| Finding train, resume, export and submit command syntax | [Recipe reference](justfile-recipes.md#recipe-reference) |
+| Following a checkpoint export and submission example | [Export and submit](justfile-recipes.md#export-and-submit-a-checkpoint) |
+| Inspecting detached submission progress and runner logs | [Submission status and logs](justfile-recipes.md#detached-submission-status-and-logs) |

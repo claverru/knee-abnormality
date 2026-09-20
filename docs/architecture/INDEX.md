@@ -2,8 +2,18 @@
 
 | Read when | Document |
 |---|---|
-| Deciding where code belongs, what each module owns, or how maintained, reusable and ad-hoc scripts differ | [Competition repository architecture](code-organization.md) |
-| Setting up Python, matching dependencies or Lightning to Kaggle's GPU image, or confirming the selected Kaggle notebook and local verification | [Environment and dependency versions](environment.md) |
-| Working with slice records, native poses, study references, prepared-triplet geometry or the historical fusion comparison order | [Shared geometry contract](shared-geometry-contract.md) |
-| Tracing labels and pixels through training and prediction, or keeping iteration fast before adding infrastructure | [Data flow and iteration speed](data-flow-and-iteration-speed.md) |
-| Writing experiment configs, deciding what stays a constant, resolving label-manifest paths, running config commands, laying out run artifacts and checkpoint identities, or checking current scope | [Configs and experiment artifacts](configs-and-experiment-artifacts.md) |
+| Deciding where code belongs | [Competition repository architecture](code-organization.md) |
+| Setting up Python and matching Kaggle dependencies | [Environment and dependency versions](environment.md) |
+| Working with slice records and prepared-triplet geometry | [Shared geometry contract](shared-geometry-contract.md) |
+| Tracing data through training and prediction | [Data flow and iteration speed](data-flow-and-iteration-speed.md) |
+| Writing configs and identifying experiment artifacts | [Configs and experiment artifacts](configs-and-experiment-artifacts.md) |
+| Finding script commands, catalog fields and maintenance procedures | [Script discovery and catalog maintenance](script-catalog.md) |
+| Reviewing documentation retrieval measurements and their limitations | [Documentation navigation measurement](documentation-navigation-measurement.md) |
+
+## Common lookups
+
+| Read when | Section |
+|---|---|
+| Checking random seeds, explicit seeds and resume behavior | [Training seeds and fold selection](configs-and-experiment-artifacts.md#training-seeds-and-fold-selection) |
+| Resolving config, CLI and label-manifest paths | [Path resolution](configs-and-experiment-artifacts.md#path-resolution) |
+| Locating saved configs, checkpoints and run provenance | [Experiment artifacts](configs-and-experiment-artifacts.md#experiment-artifacts-and-reproducibility) |

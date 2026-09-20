@@ -19,6 +19,18 @@ prepare-folds config="configs/training.yaml":
 train run_id config="configs/training.yaml" folds="0":
     rtk proxy uv run --locked python -m scripts.pipeline.train "$2" --folds "$3" --run-id "$1"
 
+autoresearch-start provider campaign="triplet-sampling":
+    rtk proxy uv run --locked python -m scripts.tools.autoresearch start "$2" --provider "$1"
+
+autoresearch-status campaign="triplet-sampling":
+    rtk proxy uv run --locked python -m scripts.tools.autoresearch status "$1"
+
+autoresearch-stop campaign="triplet-sampling":
+    rtk proxy uv run --locked python -m scripts.tools.autoresearch stop "$1"
+
+autoresearch-resume campaign="triplet-sampling":
+    rtk proxy uv run --locked python -m scripts.tools.autoresearch resume "$1"
+
 resume run_id checkpoint config fold="0":
     rtk proxy uv run --locked python -m scripts.pipeline.train "$3" --folds "$4" --run-id "$1" --resume "$2"
 

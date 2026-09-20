@@ -11,9 +11,12 @@ from this file.
 
 ## Next queue
 
-Empty. The 2026-09-19 five-run queue of never-tried values finished
-([results](../validation/results/2026-09-19-untried-hyperparameter-queue.md)) and nothing from it
-was adopted. Candidates for the next one are below.
+Empty. The [2026-09-20 fourteen-run queue](../validation/results/2026-09-20-overnight-hyperparameter-results.md)
+completed in 6 h 8 m. No change is adopted: milder scaling was the best candidate
+but inconclusive against both controls; control B beat every candidate. The head-LR,
+intensity, affine, dropout, decay and warm-up arms are recorded under already measured.
+The earlier [five-run queue](../validation/results/2026-09-19-untried-hyperparameter-queue.md)
+also yielded no adoption.
 
 **No delta recorded before 2026-09-19 is a prior for a new queue.** Everything in
 [already measured](#already-measured) was run under ordinary BCE, and the recipe in force uses
@@ -46,10 +49,10 @@ class-balanced BCE, which by itself moves fold 0 by about 0.008. Keep
 
 ## Candidates for later queues
 
-- **The stronger side of intensity augmentation** (measured direction, untested value). Weakening
-  it to `probability: 0.25` lost 0.00082 on 2026-09-19, the queue's only negative, so the family
-  carries signal and the untested side is upward: a higher probability, or wider `gamma_range` and
-  `contrast_range`, whose strengths were varied exactly once, together, in a single run.
+- **Stronger intensity augmentation has now been screened under balanced BCE.**
+  Probability 0.75, gamma `[0.70, 1.30]` and contrast `[0.80, 1.20]` were isolated
+  in the 2026-09-20 queue. None is adopted; the first two sit below the control
+  mean and contrast is the worst candidate. Do not repeat these values as untried.
 - **The epoch budget is reopened under this loss.** Three of the four arms on 2026-09-19 selected
   epoch 10, the last one, and so did both positives; the control peaked at 9. The measurements
   that closed the axis were all made under ordinary BCE, where the peak came earlier.
@@ -57,13 +60,8 @@ class-balanced BCE, which by itself moves fold 0 by about 0.008. Keep
   inside the single-run threshold: ReXNet +0.0023 (2026-09-18), ReXNet +0.0025 (2026-09-19) and b0
   +0.0029 (2026-09-18 b0 queue), against 20 epochs at −0.0027. A fourth run at 50% more wall time
   cannot separate it; adopting 15 epochs is a cost decision for the user, not a queue slot.
-- **Raise only `optimizer.head_lr` to `0.0012`** (hypothesis; untested independently). Keep the
-  current ReXNet backbone LR at `0.0002`; change only the head LR from `0.0006`. The projection,
-  embeddings, pooling and readouts start without pretrained weights. The
-  [recorded head-LR gap](../validation/results/2026-09-18-b0-hyperparameter-queues.md#open)
-  includes one lower-rate comparison and coupled increases on B0, but no isolated increase.
-  Balanced BCE is now the recipe in force, so it is fixed between control and candidate rather
-  than a conflict. `0.0012` is a starting proposal, not an established optimum.
+- **Higher head learning rates are measured.** The 2026-09-20 isolated 0.0012 and
+  0.0024 arms scored below both controls. Keep 0.0006; neither is an untried lead.
 - **Denser per-type budgets** (hypothesis; the only untested side of a measured axis). Raise
   `data.series_types[*].max_images` above today's 18/18/15/15/15/15 at a fixed sampler width and
   crop. Only the cheaper side has been measured and it loses monotonically: 15/15/12/12/12/12
@@ -88,8 +86,10 @@ class-balanced BCE, which by itself moves fold 0 by about 0.008. Keep
   at the bottom, spanning 0.00674 — seed noise, not a response
   ([sweep](../validation/results/2026-09-19-fold-ensembles-and-sigma-sweep.md)). The queued 0.76 arm
   is retired with it. This settles the *scale* only: the sweep moves all three planes by one factor,
-  so per-plane ratios and an asymmetric coronal draw are untouched by it and are queued as
-  [small changes](small-changes.md#per-plane-width-ratios).
+  so per-plane ratios and an asymmetric coronal draw are untouched by it. Both have since been
+  trained once by the stopped autoresearch campaign and came back inconclusive, so neither is a
+  queue candidate here
+  ([what is settled](../ongoing/peripheral-coverage.md#what-is-settled-and-what-is-not)).
 - **`trainer.accumulate_grad_batches: 2`** (untried; two-sided). It buys an effective batch of 16
   at unchanged memory but halves optimizer steps to 2,190, the axis the b0 queue says helps.
 - **Dead config:** `trainer.min_delta` is 0.0001 in all 143 saved runs and its only consumer is
@@ -107,6 +107,16 @@ class-balanced BCE, which by itself moves fold 0 by about 0.008. Keep
   MIL batches change every step.
 
 ## Already measured
+
+On the balanced-BCE recipe, [2026-09-20 fourteen-run queue](../validation/results/2026-09-20-overnight-hyperparameter-results.md):
+controls 0.893222 and 0.896582, mean 0.894902. No adoption. Milder scale
+`[0.97, 1.03]` was best at 0.895868, with both bootstrap intervals spanning zero.
+Stronger contrast `[0.80, 1.20]` was worst at 0.889906. Head LR 0.0012/0.0024,
+backbone LR 0.0003, dropout 0.1, intensity probability 0.75, gamma `[0.70, 1.30]`,
+affine probability 0.5, rotation 7 degrees, weight decay 0.03 and warm-up 2 were
+also measured. All were below the control mean; their individual bootstrap
+intervals were not calculated. These are completed arms, not pending proposals.
+
 
 On the balanced-BCE recipe, 2026-09-19 queue (fold 0, validation ×1, one unseeded run each,
 control 0.894037; [results](../validation/results/2026-09-19-untried-hyperparameter-queue.md)):

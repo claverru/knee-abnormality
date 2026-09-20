@@ -8,9 +8,9 @@ sagittal gain at ×1 (+0.0011) does not survive higher counts and is withdrawn.
 
 This reverses the arm the [spatial importance map](../../ongoing/peripheral-coverage.md#spatial-importance-map)
 proposed, which ranked axial as about seven times as sigma-sensitive as sagittal and led to the
-`axial 30, coronal and sagittal 40` first arm in
-[per-plane sampler sigma](../../backlog/small-changes.md#per-plane-sampler-sigma-superseded). The map's axis
-ranking does not survive a direct test.
+`axial 30, coronal and sagittal 40` first arm of the since-superseded per-plane sigma proposal
+([implemented sampler](../../data-preparation/physical-sampling/implemented-sampler.md)). The map's
+axis ranking does not survive a direct test.
 
 Measured at inference only. Training-time sigma is a different quantity and still needs its run.
 

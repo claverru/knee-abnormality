@@ -10,7 +10,9 @@ manufacturer/model, field strength, sex and representative acquisition settings.
 All reads succeeded; manufacturer/model are present throughout, with 238 missing
 field-strength and sex values each. One header per study does not establish
 within-study scanner consistency or identify hospital sites. The linked audit
-owns its label-association and validation-stratum results.
+owns its label-association and validation-stratum results;
+[vendor label associations](vendor-label-associations.md) owns the corpus-level
+label rates by vendor.
 
 ## Series profiles
 

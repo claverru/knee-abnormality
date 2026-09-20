@@ -63,7 +63,7 @@ code also completed ([submission](../inference/submissions/2026-09-17-ranked-fil
   only scouts inside a series are guarded.
 - **Rejected study centres** (measured: 4% of training studies). They fall back to local
   sampling; expect a similar share in the test. A robust centre did not score better
-  ([big bets](big-bets.md#robust-study-center-removed)).
+  ([history](../history/robust-study-centre.md)).
 - **Robust centre drops knee series** (inferred from code; applies only when
   `data.robust_center_outlier_mm` is set). A rejected test centre is refitted without its outlier
   series. In a refitted study, a series whose slab does not contain the new centre leaves the

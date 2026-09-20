@@ -30,8 +30,9 @@ evaluation-mode BatchNorm and timm activation checkpointing.
 
 ## Where code belongs
 
-Start with the [script index](../../scripts/INDEX.md) to find existing commands
-before adding code. The repository's
+Open known script paths directly or search the [catalog](script-catalog.md#find-a-script)
+for the operation before adding code. Use the [script index](../../scripts/INDEX.md)
+when the destination is unclear. The repository's
 [scripts-maintainer skill](../../.agents/skills/scripts-maintainer/SKILL.md)
 defines discovery and catalog maintenance. Each runnable script has one
 catalog entry; detailed usage and findings stay in their topic docs.

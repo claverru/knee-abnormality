@@ -2,46 +2,48 @@
 
 | Read when | Document |
 |---|---|
-| Reviewing the five-run queue of never-tried hyperparameter values on the balanced-BCE recipe: no arm cleared the floor, the control replicated the loss change, and a spread comparison | [2026-09-19 untried-hyperparameter queue](2026-09-19-untried-hyperparameter-queue.md) |
-| Reviewing the 2026-09-19 fold queue: the first 5-fold OOF for both backbones, the +0.0061 ensemble that transferred to the leaderboard, the unreadable sigma sweep that settles the width, and the b0 arm that shows its two gains do not combine | [2026-09-19 fold ensembles and sigma sweep](2026-09-19-fold-ensembles-and-sigma-sweep.md) |
-| Reviewing fixed class-balanced BCE: 0.895282 fold-0 AUC, +0.008796 against the closest same-seed historical reference, per-label gains and control limitations | [2026-09-19 balanced BCE](2026-09-19-balanced-bce-result.md) |
-| Reviewing the relative sampler width kept on 2026-09-19 (`sampling_sigma_fraction: 0.867`): the ×1-only gap, the four-cell decomposition showing the effect sits on the training side, the two surviving per-label moves and the control missing at ×4 | [2026-09-19 relative sampler width](2026-09-19-relative-sampler-width-result.md) |
-| Reviewing per-plane sampler sigma scored on the fold-0 token cache: the coronal gain and its decay with the count multiplier, the flat axial axis at matched prediction movement, and the reversal of the spatial importance map's axis ranking | [2026-09-18 per-plane sigma on the cache](2026-09-18-per-plane-sigma-cache.md) |
-| Reviewing the rejected EfficientNet backbones (B3, B0, B0 at a doubled backbone rate): the confirmed macro losses, the underfitting diagnosis that contradicts the EfficientNet training report, the per-label anatomy pattern, and the +0.0043 ensemble complementarity | [2026-09-18 EfficientNet backbone results](2026-09-18-efficientnet-backbone-results.md) |
-| Reviewing the b0 tuning queues: more epochs as the only axis that helps, batch size 16 buying no speed, learning rate scaling only when both groups move, and the void EMA run | [2026-09-18 b0 hyperparameter queues](2026-09-18-b0-hyperparameter-queues.md) |
-| Reviewing how macro AUC, gold-only AUC and BCE tracked the public leaderboard over the nineteen comparable submissions, with each metric's run-to-run noise: gold-only diagnostics carry no signal, and after 09-13 nothing ranks the submissions | [2026-09-18 local-public metric comparison](2026-09-18-local-public-metric-comparison.md) |
-| Reviewing the rejected count-normalised attention run (with random per-type allocation): a 0.0035 loss against the same recipe without it, worst on the menisci | [2026-09-17 count-normalised attention](2026-09-17-count-normalized-attention-result.md) |
-| Reviewing the 2026-09-18 overnight queue (seventeen runs, validation ×1, two controls): the rejected series-share and head changes, the clear backbone-eval and backbone-lr losses, and one indistinguishable cluster | [2026-09-18 overnight results](2026-09-18-overnight-results.md) |
-| Reviewing the attention temperature measured on frozen checkpoints (+0.0024 at tau 0.75, inference only) and the bag-size question: a real plateau, a spread penalty only at very large bags | [2026-09-17 attention temperature](2026-09-17-attention-temperature.md) |
-| Reviewing the random per-type allocation run (`allocation-concentration`, unseeded): a macro tie with the fixed budgets, per-target and family deltas, and what it unblocks | [2026-09-17 random per-type allocation](2026-09-17-allocation-concentration-result.md) |
-| Reviewing test-time triplet allocation on the fold-0 token cache: value curves, Neyman, search-theory and proportional rules that failed to confirm, missing-type substitution, repeated-series value and depth profiles | [2026-09-17 test-time allocation](2026-09-17-test-time-allocation.md) |
-| Reviewing exact per-type logit contributions (separation, variance and attention shares, per-token efficiency) on the ranked-filtered checkpoints, per label and availability group | [2026-09-17 per-type contribution](2026-09-17-type-contribution.md) |
-| Reviewing the series filtering and deterministic source ranking runs (seeds 42–44, mean 0.8907, public 0.933): a tie with the seed controls, prediction agreement between runs, and why run-to-run noise comes from training | [2026-09-17 ranked-filtered result](2026-09-17-ranked-filtered-result.md) |
-| Reviewing per-type removal and attention-share evidence, proposed per-type budgets and availability-driven prevalence shifts | [2026-09-17 plane/contrast importance](2026-09-17-plane-contrast-importance.md) |
-| Reviewing the 2026-09-17 overnight queue: three control seeds (0.0032 spread), EMA/SWA gains, affine-off and 20-epoch losses, and ties for the other hyperparameters | [2026-09-17 overnight results](2026-09-17-overnight-results.md) |
-| Reviewing the user-launched runs on the restored code (min_lr 0.1, series dropout 0.25/0.3, fewer slices): ties, a speed–accuracy trade-off and run-to-run noise | [2026-09-16 restored-code hyperparameter runs](2026-09-16-restored-code-hyperparameter-runs.md) |
-| Reviewing learned zoom (context on every slice plus learned detail glimpses), the last run of the dropped crop-selection investigation: unused detail, a 0.022 regression against per-label, and the resolution pattern | [2026-09-16 learned-zoom result](2026-09-16-learned-zoom-result.md) |
-| Reviewing shared crops (2 per label, shared pooling): a 0.012 regression against per-label explained by slice coverage, with inference probes | [2026-09-16 shared crops result](2026-09-16-shared-crops-result.md) |
-| Reviewing label-private crops (2 per label, private gated pooling, label FiLM): a 0.047 regression with study-specific placement and inference probes | [2026-09-16 label-private crops result](2026-09-16-label-private-crops-result.md) |
-| Reviewing per-label round-robin crop selection: a macro tie that recovered peripheral targets at the cost of effusion and contusion, with placement measurements | [2026-09-16 per-label crops result](2026-09-16-per-label-crops-result.md) |
-| Reviewing the 224-pixel (112 mm) crop run: a tie with the full-triplet baseline, with central targets gaining and peripheral targets losing | [2026-09-16 crop224 result](2026-09-16-crop224-result.md) |
-| Reviewing two crops per canvas: per-target gains and losses against the champion, their complementarity and the draft-uncertainty check | [2026-09-15 two-crops result](2026-09-15-two-crops-result.md) |
-| Reviewing the first scout crop-selection run, its 15-epoch extension and the learned-versus-random-versus-center placement ablation | [2026-09-15 crop-selection result](2026-09-15-crop-selection-result.md) |
-| Reviewing the per-target 1D/2D/3D attention prior's regression against the graph-off control | [2026-09-15 attention-prior result](2026-09-15-attention-prior-result.md) |
-| Reviewing the graph-off, no-3D hyperparameter runs 00–06, including the restored `00-baseline` control and `03-min-lr-0.1`, and the crop130 rerun | [2026-09-15 overnight results](2026-09-15-overnight-results.md) |
-| Reviewing the retired token graph's tie, its interventions and the unused forced-training follow-up | [2026-09-14 token-graph result](2026-09-14-token-graph-result.md) |
-| Reviewing the retired knee-side embedding and its side interventions | [2026-09-14 knee-side embedding result](2026-09-14-knee-side-embedding-result.md) |
-| Reviewing the meniscus soft-coupling regression and subgroup diagnostics | [2026-09-14 meniscus soft-coupling result](2026-09-14-meniscus-soft-coupling-result.md) |
-| Reviewing the reflection/sigma-40 champion (0.936 public) against both 1C controls | [2026-09-14 reflection sigma-40 result](2026-09-14-reflection-sigma-40-result.md) |
-| Comparing spatial-token reflection with 3dsampling | [2026-09-13 reflection validation comparison](2026-09-13-reflection-validation-comparison.md) |
-| Comparing 3dsampling with the five-embedding spatial-token run | [2026-09-13 3dsampling validation comparison](2026-09-13-3dsampling-validation-comparison.md) |
-| Reviewing the five-embedding spatial-token run, target gains and uncertainty | [2026-09-13 spatial-token validation comparison](2026-09-13-spatial-token-validation-comparison.md) |
-| Reviewing why Steven v4 labels were retained over Tonylin labels | [2026-09-13 Tonylin label comparison](2026-09-13-tonylin-label-comparison.md) |
-| Understanding how little attention per-plane regional fusion received | [2026-09-13 per-plane fusion usage diagnosis](2026-09-13-per-plane-fusion-usage-diagnosis.md) |
-| Comparing max pooling with average-pooling spatial fusion | [2026-09-13 max-pooling validation comparison](2026-09-13-max-pooling-validation-comparison.md) |
-| Checking the original six-run local-public agreement measured right after the split change, superseded by the 2026-09-18 comparison | [2026-09-13 local and public agreement](2026-09-13-local-and-public-agreement-after-the-split-change.md) |
-| Reviewing why 27-query spatial fusion did not beat crop140mm | [2026-09-12 spatial-fusion validation comparison](2026-09-12-spatial-fusion-validation-comparison.md) |
-| Reviewing the rejected spatial-fusion engineering and runtime gate | [2026-09-12 spatial-fusion engineering result](2026-09-12-spatial-fusion-engineering-result.md) |
-| Reviewing the rejected geometric-center sampler and the frozen fusion control | [2026-09-12 accurate-centers result](2026-09-12-accurate-centers-result.md) |
-| Reviewing the crop140mm model's 0.925 public score | [2026-09-12 140-mm crop result](2026-09-12-140-mm-crop-result.md) |
-| Reviewing the seven-run learning-rate, decay and duration queue that selected 04-higher-lr | [2026-09-12 overnight results](2026-09-12-overnight-results.md) |
+| Reviewing stratified sampling and its replication | [2026-09-20 stratified sampling experiment](2026-09-20-stratified-sampling-promotion.md) |
+| Comparing class-balanced-BCE augmentation and optimizer runs against two controls | [2026-09-20 overnight results](2026-09-20-overnight-hyperparameter-results.md) |
+| Comparing first-use optimizer and augmentation values on class-balanced BCE | [2026-09-19 untried-hyperparameter queue](2026-09-19-untried-hyperparameter-queue.md) |
+| Reviewing fold ensembles and the sampler-width sweep | [2026-09-19 fold ensembles and sigma sweep](2026-09-19-fold-ensembles-and-sigma-sweep.md) |
+| Reviewing fixed class-balanced BCE | [2026-09-19 balanced BCE](2026-09-19-balanced-bce-result.md) |
+| Reviewing relative sampler width | [2026-09-19 relative sampler width](2026-09-19-relative-sampler-width-result.md) |
+| Reviewing per-plane sampler widths on cached tokens | [2026-09-18 per-plane sigma on the cache](2026-09-18-per-plane-sigma-cache.md) |
+| Comparing EfficientNet backbones | [2026-09-18 EfficientNet backbone results](2026-09-18-efficientnet-backbone-results.md) |
+| Comparing EfficientNet-B0 batch-size and learning-rate queues | [2026-09-18 b0 hyperparameter queues](2026-09-18-b0-hyperparameter-queues.md) |
+| Comparing local metrics with public scores | [2026-09-18 local-public metric comparison](2026-09-18-local-public-metric-comparison.md) |
+| Reviewing count-normalized attention | [2026-09-17 count-normalised attention](2026-09-17-count-normalized-attention-result.md) |
+| Comparing validation-x1 controls and unseeded sampler and hyperparameter runs | [2026-09-18 overnight results](2026-09-18-overnight-results.md) |
+| Reviewing attention temperature and bag size | [2026-09-17 attention temperature](2026-09-17-attention-temperature.md) |
+| Reviewing random per-type triplet allocation | [2026-09-17 random per-type allocation](2026-09-17-allocation-concentration-result.md) |
+| Reviewing test-time triplet allocation | [2026-09-17 test-time allocation](2026-09-17-test-time-allocation.md) |
+| Reviewing per-type logit contributions | [2026-09-17 per-type contribution](2026-09-17-type-contribution.md) |
+| Reviewing series filtering and deterministic source ranking | [2026-09-17 ranked-filtered result](2026-09-17-ranked-filtered-result.md) |
+| Reviewing plane and contrast importance | [2026-09-17 plane/contrast importance](2026-09-17-plane-contrast-importance.md) |
+| Comparing EMA, SWA, control seeds and one-change hyperparameter runs | [2026-09-17 overnight results](2026-09-17-overnight-results.md) |
+| Reviewing restored-code hyperparameter runs | [2026-09-16 restored-code hyperparameter runs](2026-09-16-restored-code-hyperparameter-runs.md) |
+| Reviewing learned zoom | [2026-09-16 learned-zoom result](2026-09-16-learned-zoom-result.md) |
+| Reviewing shared crops | [2026-09-16 shared crops result](2026-09-16-shared-crops-result.md) |
+| Reviewing label-private crops | [2026-09-16 label-private crops result](2026-09-16-label-private-crops-result.md) |
+| Reviewing per-label crop selection | [2026-09-16 per-label crops result](2026-09-16-per-label-crops-result.md) |
+| Reviewing fixed-size crops | [2026-09-16 crop224 result](2026-09-16-crop224-result.md) |
+| Reviewing two crops per canvas | [2026-09-15 two-crops result](2026-09-15-two-crops-result.md) |
+| Reviewing the scout crop-selection experiments | [2026-09-15 crop-selection result](2026-09-15-crop-selection-result.md) |
+| Reviewing the attention prior | [2026-09-15 attention-prior result](2026-09-15-attention-prior-result.md) |
+| Reviewing the September 15 overnight queue | [2026-09-15 overnight results](2026-09-15-overnight-results.md) |
+| Reviewing the token graph | [2026-09-14 token-graph result](2026-09-14-token-graph-result.md) |
+| Reviewing knee-side embeddings | [2026-09-14 knee-side embedding result](2026-09-14-knee-side-embedding-result.md) |
+| Reviewing meniscus soft coupling | [2026-09-14 meniscus soft-coupling result](2026-09-14-meniscus-soft-coupling-result.md) |
+| Reviewing reflection and sigma-40 sampling | [2026-09-14 reflection sigma-40 result](2026-09-14-reflection-sigma-40-result.md) |
+| Comparing reflection with physical sampling | [2026-09-13 reflection validation comparison](2026-09-13-reflection-validation-comparison.md) |
+| Comparing physical sampling with spatial tokens | [2026-09-13 3dsampling validation comparison](2026-09-13-3dsampling-validation-comparison.md) |
+| Reviewing spatial-token validation | [2026-09-13 spatial-token validation comparison](2026-09-13-spatial-token-validation-comparison.md) |
+| Comparing Tonylin and Steven labels | [2026-09-13 Tonylin label comparison](2026-09-13-tonylin-label-comparison.md) |
+| Diagnosing per-plane fusion usage | [2026-09-13 per-plane fusion usage diagnosis](2026-09-13-per-plane-fusion-usage-diagnosis.md) |
+| Comparing max and average pooling | [2026-09-13 max-pooling validation comparison](2026-09-13-max-pooling-validation-comparison.md) |
+| Reviewing the initial local/public score comparison | [2026-09-13 local and public agreement](2026-09-13-local-and-public-agreement-after-the-split-change.md) |
+| Comparing spatial fusion with crop140mm | [2026-09-12 spatial-fusion validation comparison](2026-09-12-spatial-fusion-validation-comparison.md) |
+| Reviewing spatial-fusion runtime and memory | [2026-09-12 spatial-fusion engineering result](2026-09-12-spatial-fusion-engineering-result.md) |
+| Reviewing geometric sampling centers | [2026-09-12 accurate-centers result](2026-09-12-accurate-centers-result.md) |
+| Reviewing the crop140mm model | [2026-09-12 140-mm crop result](2026-09-12-140-mm-crop-result.md) |
+| Reviewing the September 12 overnight queue | [2026-09-12 overnight results](2026-09-12-overnight-results.md) |

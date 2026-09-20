@@ -1,19 +1,11 @@
 # Loading speedup
 
-Everything about accelerating DICOM loading over Kaggle's NFS mount: where the cold-start time
-actually goes, what is left to try, what is closed, and how to measure any of it. Started 2026-09-17
-with the user; four identity-changing changes and three retrain-free ones shipped 2026-09-18 and
-the rest is open.
-
-**Why it matters:** the loader is 57–59% of prediction time on the two T4s even after the shipped
-changes, so loading and not the GPUs sets inference throughput, and inference runtime counts toward
-the efficiency prize. Active status lives in [ongoing work](../../ongoing/loading-speedup.md).
-
 | Read when | Document |
 |---|---|
-| Reading the cold-start profile, checking what the shipped changes bought, finding what a stage really contains, or before trusting any number the profiler reports | [Where the cold-start time goes](attribution.md) |
-| Picking the next change, checking whether one needs a retrain or a validation run, or following the proposed experiment order | [Open candidates](candidates.md) |
-| Choosing what to do next by what it is worth against the whole 371.4 s command, or checking why two candidates cannot be added together | [Ranked by gain](ranked-by-gain.md) |
-| Before proposing anything: the measured regressions, the approaches ruled out by arithmetic or by Kaggle's environment, and why | [Closed and rejected](closed.md) |
-| Designing a probe or a benchmark for a loading change, or deciding whether a local result means anything | [How to measure](measuring.md) |
-| Checking what past RSNA DICOM solutions did, and how published medical-imaging dataloader profiles compare | [Prior art](prior-art.md) |
+| Interpreting loading profiles and profiler limitations | [Where the cold-start time goes](attribution.md) |
+| Choosing loading changes and their validation requirements | [Open candidates](candidates.md) |
+| Comparing candidate gains and overlapping costs | [Ranked by gain](ranked-by-gain.md) |
+| Checking previously rejected loading approaches | [Closed and rejected](closed.md) |
+| Designing loading benchmarks | [How to measure](measuring.md) |
+| Reviewing prior DICOM loading work | [Prior art](prior-art.md) |
+| Checking implementation progress | [Loading speedup status](../../ongoing/loading-speedup.md) |

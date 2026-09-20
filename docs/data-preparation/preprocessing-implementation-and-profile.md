@@ -44,6 +44,37 @@ The [production integration](production-dicom-integration.md) records the DICOM
 reader and preprocessing package changes. Later percentile and GPU work is planned in the
 [loading speedup](../backlog/loading-speedup/candidates.md).
 
+## Clipping-bound stability across draws
+
+**Measured 2026-09-20** with
+[`measure-intensity-bound-stability`](../../scripts/adhoc/measure_intensity_bound_stability.py)
+on 40 random fold-0 training studies replayed over six training epochs at the current recipe
+(1,338 series draws, 6,432 triplets); artifacts under
+[`outputs/analysis/intensity-bound-stability-20260920`](../../outputs/analysis/intensity-bound-stability-20260920).
+Spread is `(max - min) / median` of an estimator over the draws of one series.
+
+| Estimator of the high bound | Median spread | p90 | Series above the 0.2 contrast range |
+|---|---:|---:|---:|
+| `q995`, the production bound | 0.072 | 0.245 | 14.2% |
+| `q50 + 2(q95 - q50)`, calibrated to ×1.12 of `q995` | 0.062 | 0.214 | 10.6% |
+| `q50 + 2·IQR`, calibrated to ×1.06 | 0.097 | 0.331 | 19.9% |
+| `q95` alone, clipping 5% of pixels | 0.045 | 0.170 | 8.4% |
+
+The low bound is exactly zero in 40.1% of draws, so it is not a constant that could be pinned.
+
+Three conclusions. Robust estimators of the same clip level do not fix the variation: calibrated
+to clip where `q995` clips, they move the median spread by about one point. The variation is a
+function of how many triplets the series receives — median spread 0.150 at two triplets or fewer,
+0.066 at five to six, 0.025 above six, correlation −0.39 — so it is a small-sample effect in the
+tail quantile, not a property of the estimator. And per-triplet bounds, which would be draw
+independent by construction because a triplet's three slices are fixed by its middle index, vary
+0.291 at the median and 0.701 at p90 between the triplets of one series, four times the variation
+they would remove.
+
+For scale, the configured intensity augmentation deliberately applies a contrast factor over a
+0.2 relative range, so the median series' draw-to-draw wobble sits inside an augmentation the
+recipe already applies, while the 14.2% tail exceeds it.
+
 ## Earlier profile
 
 On 2026-09-10, a bounded profile used eight fold-0 training studies with seed 42:

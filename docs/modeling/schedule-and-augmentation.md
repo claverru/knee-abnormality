@@ -64,8 +64,10 @@ semantics as shipped.
   [configs and experiment artifacts](../architecture/configs-and-experiment-artifacts.md#experiment-artifacts-and-reproducibility)
   for the full artifact list.
 - **Gradient-norm logging** ships alongside weight averaging, independent of the gate: the
-  pre-clip total gradient norm is always logged as `grad_norm`
-  ([small change](../backlog/small-changes.md#gradient-norm-logging)).
+  pre-clip total gradient norm is always logged as `grad_norm` from `on_before_optimizer_step`,
+  where Lightning 2.x still sees unclipped gradients. It is a diagnostic with no option; it draws
+  no randomness and does not clip, so numerics are unchanged. Whether
+  `trainer.gradient_clip_val: 1.0` ever binds is read from the logged values.
 
 ## Study-level knee reflection
 

@@ -1,5 +1,5 @@
 name: training
-seed: 42
+seed: null
 
 paths:
   data_root: ../data

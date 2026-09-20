@@ -2,9 +2,18 @@
 
 | Read when | Document |
 |---|---|
-| Understanding the production Gaussian sampler: candidate runs, union support, budgets, supplier choice, the fixed source ranking, geometry groups, local fallback and seeds | [Implemented sampler](implemented-sampler.md) |
-| Checking the production sampler's metadata verification, realized triplet counts, placement error and CPU preparation audit | [Implementation verification](implementation-verification.md) |
-| Reproducing the 128-study metadata analysis or understanding its nearest and balanced sampling rules | [Physical sampling analysis](sampling-analysis-cohort-and-rules.md) |
-| Comparing realized coverage across Gaussian widths and acquisition-share deviations by source-selection rule | [Realized coverage and acquisition exposure](sampling-analysis-coverage-and-exposure.md) |
-| Checking repeated-acquisition protocol differences, center sensitivity, the analysis recommendations or the earlier subsampling inventory | [Repeats, center sensitivity and implications](sampling-analysis-repeats-and-implications.md) |
-| Checking why evaluation tie-breaking between repeated same-type series depended on the training seed, the deterministic ranking that replaced it and its verification and re-scoring | [Evaluation tie-break investigation](evaluation-tie-break-investigation.md) |
+| Checking Gaussian sampling, triplet budgets, source ranking and evaluation seeds | [Implemented sampler](implemented-sampler.md) |
+| Checking realized triplet counts, placement error and CPU preparation audits | [Implementation verification](implementation-verification.md) |
+| Reproducing nearest and balanced sampling on the metadata cohort | [Physical sampling analysis](sampling-analysis-cohort-and-rules.md) |
+| Comparing sampling coverage and acquisition exposure | [Realized coverage and acquisition exposure](sampling-analysis-coverage-and-exposure.md) |
+| Investigating repeated acquisitions and center sensitivity | [Repeats, center sensitivity and implications](sampling-analysis-repeats-and-implications.md) |
+| Reviewing evaluation tie-breaking and deterministic source ranking | [Evaluation tie-break investigation](evaluation-tie-break-investigation.md) |
+
+## Common lookups
+
+| Read when | Section |
+|---|---|
+| Interpreting sampling_sigma_fraction and acquired reach | [Gaussian width](implemented-sampler.md#gaussian-width) |
+| Checking max_images, multipliers and within-band training draws | [Triplet budgets and target draws](implemented-sampler.md#triplet-budgets-and-target-draws) |
+| Checking original versus reformat, retake and resolution ordering | [Source ranking](implemented-sampler.md#source-ranking) |
+| Checking training randomness and seed-independent validation | [Seeds and deterministic evaluation](implemented-sampler.md#seeds-and-deterministic-evaluation) |

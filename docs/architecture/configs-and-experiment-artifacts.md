@@ -42,10 +42,23 @@ rtk proxy uv run --locked python -m knee_abnormality.config configs/training.yam
 These print resolved settings as JSON, retaining the YAML's nested sections
 and adding `config_file` and `split_dir`. They do not create run artifacts,
 train or check dataset availability.
-The current config selects `steven_v4`, split `all_5fold_v3`, seed 42 and
+
+### Training seeds and fold selection
+
+The current config selects `steven_v4`, split `all_5fold_v3` and
 **fold 0 for quick development**. Selecting one fold does not change the
-saved five-fold assignments. Preparation/training must check requested fold
+saved five-fold assignments.
+
+**No configuration pins a training seed.** `configs/training.yaml` sets `seed: null`
+explicitly, and `load_config` draws a fresh 32-bit seed from `secrets.randbits` whenever
+the value is null or missing, so two loads of the same YAML are two different runs. The drawn value is recorded in the run's `effective_config.json` and in
+the checkpoint's hyperparameters, which is what makes a run reproducible after the fact.
+A `--resume` adopts the seed stored in its checkpoint, so the resumed run continues
+under the seed it started with. Setting `seed` explicitly in a YAML still overrides the
+draw; the overnight queue does this per run. Preparation/training must check requested fold
 IDs against `protocol.json` and verify the selected label-source fingerprint.
+
+### Path resolution
 
 Configured paths are relative to the YAML file, so moving the checkout does
 not require absolute paths in version control. `--data-root` and `--output-root`
@@ -59,6 +72,8 @@ configured `paths.data_root` and rejects any other relative path, so the resolut
 depend on where the manifest itself lives and follows a relocated or mounted data root.
 Each table's SHA-256 is checked before use. The audit scripts resolve their
 documented data and output arguments from the repository root.
+
+### Training and prediction entry points
 
 `scripts/pipeline/train.py` and `scripts/pipeline/predict.py` use the same config
 loader, with explicit CLI overrides for development limits, fold selection,

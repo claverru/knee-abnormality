@@ -1,11 +1,14 @@
 # Implemented sampler
 
-The active baseline is `spatial-tokens-physical-sampling`, with positive finite
-`data.sampling_sigma_fraction: 0.76`. It preserves the spatial-token model, accepted
+The current recipe in `configs/training.yaml` uses positive finite
+`data.sampling_sigma_fraction: 0.867` and independent epoch-specific random
+targets within each probability band. It preserves the spatial-token model, accepted
 study-center estimator, reliability thresholds, 140-mm crop and acquisition-
 midpoint 1D encoding. The old allocator, triangular selection and their three
 configuration fields have been removed; old fields are rejected. Historical
 checkpoints require their matching archived source and configuration.
+
+## Gaussian width
 
 The Gaussian width is relative to each candidate pool's own acquired reach, not a
 fixed millimetre constant: `sigma = sampling_sigma_fraction * limiting_reach(pool)`
@@ -17,15 +20,20 @@ coverage does not straddle the study centre at all, where `min(-lo, hi)` would
 otherwise be zero or negative; measured on the fold-0 token cache this hit 2 of
 4,218 physical pools (a `SeriesTypeConfig` slot's own reach can miss the centre even
 when the plane's combined coverage across both fluid-sensitivity slots does not).
-0.76 preserves the previous fixed sampler's average width; measured per-plane mean
-realized sigma at that fraction is axial 39.5 mm, coronal 31.4 mm, sagittal 34.2 mm
-(4,218 physical pools, fold-0 cache), each plane splitting into two independent
+At the adopted 0.867 the realized per-plane mean widths are axial 45.1 mm, coronal 35.9 mm and
+sagittal 39.0 mm
+([result](../../validation/results/2026-09-19-relative-sampler-width-result.md)); at the historical
+0.76, which preserved the previous fixed sampler's average width, they measured
+axial 39.5 mm, coronal 31.4 mm, sagittal 34.2 mm
+(4,218 physical pools, fold-0 cache). Each plane splits into two independent
 slots (T1/PD and fluid-sensitive/fat-suppressed) that are sampled separately, so a
 slot's own reach is narrower than the plane's two slots combined. This applies only
 to physical pools; local (non-physical) pools stay uniform over their support union,
 unaffected by sigma. Evidence and rationale: [per-plane sampler sigma
 results](../../validation/results/2026-09-18-per-plane-sigma-cache.md) and
 [cohort-wide center fit and plane extents](../accurate-sampling-centers.md#cohort-wide-center-fit-and-plane-extents).
+
+## Candidate runs and physical support
 
 Within each plane/contrast type, candidate triplets are every consecutive window
 in usable physical runs. Positions must be finite, strictly increasing in the
@@ -43,15 +51,26 @@ Support is the union across runs and acquisitions, so overlapping acquisitions
 do not multiply target probability. Centers outside coverage are allowed:
 Gaussian masses and inverse quantiles use stable truncated-tail arithmetic.
 
+## Triplet budgets and target draws
+
 The per-type triplet budget is `max_images / 3` times the image multiplier:
-6 axial or 5 coronal/sagittal inputs per contrast at training density and twice
-that for validation/inference. Gaussian probability over the union is divided
-into equal bands. Training draws within each band; evaluation uses midpoints.
+6 axial or 5 coronal/sagittal inputs per contrast before the study-total floor
+and capacity limits. The current recipe uses validation multiplier 1; prediction
+uses its separately selected multiplier. Gaussian probability over the union is
+divided into equal bands. Evaluation uses each band's midpoint.
+
+Training draws one uniform percentile inside each probability band, independently
+at each epoch. All main bands remain represented each epoch. Assignment snaps
+targets to available geometry groups, so actual triplets can repeat across epochs.
+The experimental ten-epoch subregion schedule was
+[reverted after inconclusive confirmation](../../validation/results/2026-09-20-stratified-sampling-promotion.md).
 Training chooses a covering acquisition uniformly. Evaluation allocates each
 target's fractional supplier entitlement (exact fractions) to the largest
 outstanding deficit and breaks exact ties by the pool's source ranking.
 Source preference precedes nearest-slice placement, and a target can only use
 candidates from a run whose own support contains it.
+
+## Source ranking
 
 Each candidate pool stores one fixed source ranking (`CandidatePool.ranking`,
 `source_ranking` in `sampling.py`) over the series that contributed candidates;
@@ -76,6 +95,8 @@ matrix) ties that step for the whole slot; a series without TR/TE or
 indexer already parses ([series summary](../current-preparation.md#series-indexing-guards-and-exclusions)).
 Design and evidence: [tie-break investigation](evaluation-tie-break-investigation.md).
 
+## Geometry assignment and local sampling
+
 Alternative middle planes are grouped by deterministic complete-link geometry:
 every pair must satisfy `abs(offset_a-offset_b) + R*norm(normal_a-normal_b) <= 0.1`
 mm, with positively oriented normals and `R=image_size*spacing_mm/2` (70 mm).
@@ -96,10 +117,12 @@ are distinct within each acquisition; no cross-series physical deduplication is
 claimed. All local inputs are unknown for XYZ embedding. Types without usable
 complete inputs remain masked; a completely unusable study fails explicitly.
 
+## Seeds and deterministic evaluation
+
 Only training draws random numbers. SHA-256 seeds include the configured seed,
 study UID, type, operation and epoch; separate streams govern target
-percentiles, supplier choices and band order, and retries reuse them against
-rebuilt support. Evaluation uses midpoints, target order and the ranking, so it
+within-band jitter, supplier choices and band order. Retries reuse these streams
+against rebuilt support. Evaluation uses midpoints, target order and the ranking, so it
 does not depend on the seed: evaluation and prediction datasets receive no seed
 (`training_seed=None`). Dataset order and decode completion order do not select
 inputs.
@@ -108,10 +131,15 @@ and support fixed. Copies still change supplier alternatives, and the unchanged
 reference estimator or changed grids can affect results; full duplicate
 invariance and exact final source shares are not claimed.
 
+## Preparation and checkpoint identity
+
 [Preparation](../current-preparation.md#overlapping-triplet-preparation) normalizes each
 unique retained source slice once and gathers overlapping appearances. Item-local
 resample/failure caches allow fresh clipping populations after retry selection.
 The strict identity is
 `ranked_filtered_physical_gaussian_overlap_spatial_tokens_reflection_v10` and
 records fixed rules as well as recursive source hashes. Model fitting and checkpoint
-execution are outside this implementation.
+execution for existing checkpoints requires their archived source and configuration.
+The ten-epoch sampler rollback restores the original target-rule metadata and
+sampler source. Its experimental checkpoints retain their archived runtimes;
+validation midpoint selection was unchanged throughout.
