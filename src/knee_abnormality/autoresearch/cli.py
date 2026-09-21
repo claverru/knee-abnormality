@@ -183,7 +183,9 @@ def status_summary(supervisor: Supervisor):
         receipt = directory / "receipt.json"
         owner = directory / "owner.json"
         job_status = (
-            "finished, awaiting processing"
+            "result application failed; fix the cause and resume"
+            if job.get("application_error")
+            else "finished, awaiting processing"
             if receipt.exists()
             else (
                 "running"
