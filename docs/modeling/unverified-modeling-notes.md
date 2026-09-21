@@ -79,7 +79,8 @@ also need not mean 72 distinct slices if windows overlap.
 Focal loss improved some target-level diagnostics but worsened others, and
 standalone models were described as slightly worse overall. Mixing loss
 functions was proposed to improve ensemble diversity; no isolated ensemble
-gain was reported. See [validation](../validation/target-level-diagnostics.md)
+gain was reported. A later local measurement found only a small gain over seed
+diversity ([loss ensemble simulation](../validation/results/2026-09-21-loss-ensemble-simulation.md)). See [validation](../validation/target-level-diagnostics.md)
 for the AUC/F1 distinction and ensembling uncertainty.
 
 Architectural diversity, decorrelating small models, and distilling ensembles

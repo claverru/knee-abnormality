@@ -1,11 +1,15 @@
 # Validation strategy
 
-The default split is **`all_5fold_v3`**, protocol version 2: five stratified folds
-across **all 4,407 studies**, with roughly 20% held out for validation in each
-fold. Prepared on **2026-09-12**, it stratifies gold positive/negative targets
-alongside effective labels and `is_gold`, and requires both gold classes for
-every target in every fold. No study is forced into every fold's validation set.
-Earlier split artifacts remain available for reproducing historical runs.
+The default split is **`all_5fold_scanner_v1`**, protocol version 2, prepared on **2026-09-21**.
+It has five stratified folds across **all 4,407 studies**, with roughly 20% held out for validation
+in each fold. Report groups stay intact. Stratification balances the effective labels, gold
+positives and negatives, `is_gold` and eight MRI scanner groups. Its evaluation targets are the
+[combined labels](../public-labels/combined-labels.md), with gold labels where available. The
+[protocol](project-validation-protocol.md#all_5fold_scanner_v1) gives the membership and scanner
+counts. Only 209 of its 905 fold-0 validation studies were in `all_5fold_v3`'s fold 0, and four
+evaluation targets changed. **No fold-0 score recorded before 2026-09-21 is comparable** with a run
+on this split. `all_5fold_v3` and earlier split artifacts remain available for reproducing
+historical runs.
 
 Use full held-out-fold macro AUC as the development selection metric, with
 report-derived diagnostics kept separate. This mixed-label
@@ -17,7 +21,7 @@ times macro AUC's run-to-run noise
 ([comparison](results/2026-09-18-local-public-metric-comparison.md)).
 
 The strategy selected on **2026-09-11** is to iterate on **fold 0** until near
-the end of the competition. Use its complete 904-study validation predictions
+the end of the competition. Use its complete 905-study validation predictions
 for routine comparisons. Additional-fold training, full OOF scoring,
 ensembling and, since 2026-09-16, bigger images are deferred to that
 [later phase](../backlog/endgame.md); they are not

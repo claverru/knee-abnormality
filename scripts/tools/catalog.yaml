@@ -77,6 +77,22 @@ scripts:
       - Tonylin scored 0.921 publicly versus Steven v4's 0.929; the baseline returned to Steven and this utility is retained for reproduction.
     docs: [docs/modeling/supervision.md#training-with-tonylin-soft-labels]
 
+  - id: prepare-combined-labels
+    path: scripts/tools/prepare_combined_labels.py
+    summary: Build the combined_v1 label table (Steven v4 plus a nine-source consensus mean for ACL, MCL, PF OA and Fracture) and its pinned manifest.
+    tags: [labels, combined, consensus, ensemble, steven, public, preparation, training, provenance, mcl, fracture, acl, pf-oa]
+    commands:
+      - rtk proxy uv run --locked python -m scripts.tools.prepare_combined_labels
+      - rtk proxy uv run --locked python -m scripts.tools.prepare_combined_labels --output-dir /tmp/combined-check --output-manifest /tmp/combined-check.json
+    inputs: [configs/labels/public-label-sources.json for Steven v4, configs/labels/public-label-comparison-sources.json for Pilkwang, Laymond and Zhen, 2026-09-21 label snapshots under data/labels/public/<owner>/<slug>/downloaded-20260921, Official training IDs]
+    outputs: [data/labels/prepared/combined-v1/labels.csv, data/labels/prepared/combined-v1/preparation.json, configs/labels/combined-label-sources.json]
+    notes:
+      - Deterministic; the prepared table's SHA-256 is 1e586b574511fa1c67434e174681eee9a3aafe0d6db8f84cb829fdae5be215fb.
+      - The manifest lists steven_v4 and combined_v1, so labels.source can select either with one manifest.
+      - Requires fresh output paths; gold labels override the table in training and evaluation.
+      - consensus_sources is shared with the adhoc selection analysis.
+    docs: [docs/public-labels/combined-labels.md]
+
   - id: compare-fold-runs
     path: scripts/tools/compare_fold_runs.py
     summary: Compare a candidate fold run with a reference run from saved predictions and checkpoint tensors, with paired report-group bootstrap intervals.
@@ -180,17 +196,20 @@ scripts:
 
   - id: validation
     path: scripts/tools/validation.py
-    summary: Create report-group folds with full and gold target coverage and score complete OOF predictions with separate gold diagnostics.
-    tags: [validation, folds, split, gold, silver, reference, oof, auc, score, leakage]
+    summary: Create scanner-stratified report-group folds with full and gold target coverage and score complete OOF predictions with separate gold diagnostics.
+    tags: [validation, folds, split, gold, silver, reference, oof, auc, score, leakage, scanner, vendor, field-strength, stratification]
     commands:
       - rtk proxy uv run --locked python -m scripts.tools.validation --help
-      - rtk proxy uv run --locked python -m scripts.tools.validation prepare
+      - rtk proxy uv run --locked python -m scripts.tools.validation prepare --label-source combined_v1
       - rtk proxy uv run --locked python -m scripts.tools.validation score --predictions outputs/training/run/oof_predictions.csv
-    inputs: [Experiment config, Official training and submission CSVs, Pinned public labels for preparation, Saved split and OOF CSV for scoring]
-    outputs: [data/folds/all_5fold_v3/ with studies.csv and frozen targets.csv plus full and gold label_counts.csv for prepare, JSON metrics on stdout for score]
+    inputs: [Experiment config, Official training and submission CSVs, Pinned label source from the config manifest, Per-study scanner header table for preparation, Saved split and OOF CSV for scoring]
+    outputs: [data/folds/all_5fold_scanner_v1/ with studies.csv and frozen targets.csv plus full and gold label_counts.csv for prepare, JSON metrics on stdout for score]
     notes:
       - Preparation refuses conflicting existing artifacts; use a new --split-dir for a revised protocol.
-      - Preparation stratifies report groups using positive and negative effective-label and gold-only target indicators plus is_gold. Duplicate reports remain in one fold.
+      - Preparation stratifies report groups using positive and negative effective-label and gold-only target indicators, one indicator per scanner group, plus is_gold. Duplicate reports remain in one fold.
+      - Scanner groups split Siemens, Philips and GE into 3T, 1.5T and unknown field strength and pool the other vendors as minor; --scanner-table defaults to the sharing-disagreement study_headers.parquet, whose hash the protocol records.
+      - --label-source picks the evaluation and stratification labels (default the config's training source); the current split uses combined_v1.
+      - The folder name is chosen by the config's validation.split or --split-dir; all_5fold_v3 was produced before scanner stratification and remains for historical runs.
       - Preparation rejects insufficient report-group support and any assignment missing a positive or negative class for a full-fold or gold target before saving artifacts.
       - Training retains soft labels; AUC binarizes frozen evaluation targets at 0.5 and reports gold and report-derived diagnostics separately. A gold macro AUC is null if any target lacks both classes.
       - Scoring requires every assigned study exactly once with saved fold IDs and twelve prediction columns and accepts only split protocol version 2; the scorer and its protocol checks live in knee_abnormality.evaluation.scoring and knee_abnormality.data.labels, shared with training's OOF scoring.

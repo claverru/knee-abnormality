@@ -23,10 +23,28 @@ from knee_abnormality.data.labels import (
 from knee_abnormality.evaluation.scoring import score
 from knee_abnormality.provenance import sha256_file
 
+MAJOR_VENDORS = ("Siemens", "Philips", "GE")
+
+
+def scanner_groups(headers: pl.DataFrame) -> pl.DataFrame:
+    field = pl.col("MagneticFieldStrength").cast(pl.Float64, strict=False)
+    return headers.select(
+        STUDY,
+        pl.when(~pl.col("vendor").is_in(MAJOR_VENDORS))
+        .then(pl.lit("minor"))
+        .when(field.is_null())
+        .then(pl.col("vendor") + "/unknown")
+        .when(field >= 2)
+        .then(pl.col("vendor") + "/3T")
+        .otherwise(pl.col("vendor") + "/1.5T")
+        .alias("scanner_group"),
+    ).sort(STUDY)
+
 
 def make_folds(
     train: pl.DataFrame,
     source: pl.DataFrame,
+    scanners: pl.DataFrame,
     targets: list[str],
     n_splits: int = 5,
     seed: int = 42,
@@ -72,7 +90,11 @@ def make_folds(
             .alias(target)
             for target in targets
         )
+        .join(scanners, on=STUDY, how="left", validate="1:1")
     )
+    if studies["scanner_group"].null_count():
+        raise ValueError("Every study needs a scanner group")
+    groups_present = sorted(studies["scanner_group"].unique().to_list())
     effective = studies.select(targets).to_numpy()
     if not np.isfinite(effective).all() or ((effective < 0) | (effective > 1)).any():
         raise ValueError(
@@ -92,6 +114,10 @@ def make_folds(
                 .alias(f"gold_negative_{target}"),
             ]
         )
+    indicators.extend(
+        (pl.col("scanner_group") == group).max().alias(f"scanner_{group}")
+        for group in groups_present
+    )
     groups = (
         studies.group_by("report_group")
         .agg(*indicators, pl.col("is_gold").any())
@@ -153,7 +179,18 @@ def make_folds(
                     "gold_negative": gold_negative,
                 }
             )
-    return manifest, pl.DataFrame(counts), studies.select(STUDY, *targets).sort(STUDY)
+    scanner_counts = (
+        manifest.join(studies.select(STUDY, "scanner_group"), on=STUDY)
+        .group_by("fold", "scanner_group")
+        .len()
+        .sort("fold", "scanner_group")
+    )
+    return (
+        manifest,
+        pl.DataFrame(counts),
+        studies.select(STUDY, *targets).sort(STUDY),
+        scanner_counts,
+    )
 
 
 def prepare(
@@ -162,6 +199,8 @@ def prepare(
     n_splits: int,
     seed: int,
     config: ExperimentConfig,
+    scanner_table: Path,
+    label_source: str,
 ) -> dict:
     train = pl.read_csv(data_dir / "train.csv", infer_schema_length=None)
     sample = pl.read_csv(data_dir / "sample_submission.csv")
@@ -171,10 +210,13 @@ def prepare(
     source, source_provenance = load_source(
         config,
         json.loads(config.paths.label_manifest.read_text()),
-        config.labels.source,
+        label_source,
         tuple(targets),
     )
-    manifest, counts, evaluation = make_folds(train, source, targets, n_splits, seed)
+    scanners = scanner_groups(pl.read_parquet(scanner_table))
+    manifest, counts, evaluation, scanner_counts = make_folds(
+        train, source, scanners, targets, n_splits, seed
+    )
     csv = manifest.write_csv()
     evaluation_csv = evaluation.write_csv()
     metadata = {
@@ -182,7 +224,12 @@ def prepare(
         "n_splits": n_splits,
         "seed": seed,
         "targets": targets,
-        "stratification": "iterative multilabel over all report groups; positive and negative effective-label and gold-only target indicators plus is_gold; both classes required per target in every full and gold validation fold",
+        "stratification": "iterative multilabel over all report groups; positive and negative effective-label and gold-only target indicators, scanner-group indicators plus is_gold; both classes required per target in every full and gold validation fold",
+        "scanner_groups": {
+            "table": str(scanner_table),
+            "sha256": sha256_file(scanner_table),
+            "rule": "Siemens, Philips and GE split by MagneticFieldStrength into 3T (>= 2), 1.5T (< 2) and unknown; every other vendor pooled as minor",
+        },
         "grouping": "SHA-256 of whitespace-collapsed, casefolded Report",
         "validation_scope": "all_studies",
         "validation_target_threshold": TARGET_THRESHOLD,
@@ -227,6 +274,11 @@ def prepare(
                 "training_report_only": manifest.filter(
                     (pl.col("fold") != fold) & ~pl.col("is_gold")
                 ).height,
+                "validation_scanner_groups": dict(
+                    scanner_counts.filter(pl.col("fold") == fold)
+                    .select("scanner_group", "len")
+                    .iter_rows()
+                ),
             }
             for fold in range(n_splits)
         ],
@@ -260,6 +312,10 @@ class ValidationCLI(CLISettings):
     n_splits: int = Field(default=5, ge=2)
     seed: int | None = Field(default=None, ge=0, lt=2**32)
     predictions: Path | None = None
+    scanner_table: Path = Path(
+        "outputs/analysis/sharing-disagreement-20260914/study_headers.parquet"
+    )
+    label_source: str | None = None
 
 
 def main() -> None:
@@ -288,6 +344,10 @@ def main() -> None:
                 args.n_splits,
                 config.seed if args.seed is None else args.seed,
                 config,
+                args.scanner_table,
+                config.labels.source
+                if args.label_source is None
+                else args.label_source,
             )
         else:
             if args.predictions is None:

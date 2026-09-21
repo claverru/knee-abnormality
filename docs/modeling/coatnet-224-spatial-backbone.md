@@ -8,11 +8,12 @@ context glimpses did not fit its fixed input size.
 
 The supported alternative is `coatnet_rmlp_2_rw_224.sw_in12k_ft_in1k` with
 224-pixel inputs and per-channel mean/std `[0.5, 0.5, 0.5]`, matching its
-pretrained normalization. Select it in a separate experiment configuration by
-changing `model.backbone`, `data.mean` and `data.std` from the
-ReXNet [training config](../../configs/training.yaml). Keep the saved effective configuration
-for reproduction; a run name does not select a backbone. There is no maintained
-CoAtNet-specific YAML or new launch scheduled by this documentation.
+pretrained normalization. [`configs/coatnet.yaml`](../../configs/coatnet.yaml) is the ReXNet
+[training config](../../configs/training.yaml) with `model.backbone`, `data.mean` and `data.std`
+changed, and `trainer.batch_size: 2` with `accumulate_grad_batches: 4` to keep the effective batch
+of eight. The batch split rests on an estimate, not a measurement: per image, CoAtNet's leaf-module
+outputs are about 2.9× ReXNet-200's, whose batch-8 peak is 20.02 GB. Keep the saved effective
+configuration for reproduction; a run name does not select a backbone.
 
 The model passes `data.image_size` explicitly to CoAtNet so timm builds its
 relative-position geometry for the actual input size. The adapter requires a

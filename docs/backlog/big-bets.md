@@ -37,6 +37,11 @@ between frozen-target AUC and rubric diagnostics without rewriting evaluation ta
 an uninformative bounded pilot; no broad label rewrite, auxiliary severity head or extra epochs.
 This entry owns the investigation; training remains user-launched when the user starts it.
 
+Since 2026-09-21, PF OA in both training and evaluation comes from the
+[combined labels'](../public-labels/combined-labels.md) consensus, which is stricter than Steven v4.
+The split's evaluation targets were rewritten by user decision. Medial and lateral OA are still
+Steven v4.
+
 ## Position and knee side
 
 **The supervised anatomical-attention sequence is closed:** learned family strengths
@@ -200,6 +205,31 @@ evidence is object detection.
 - *Keep fixed:* 224 px, 0.625 mm, the 140 mm field and slice budgets; no scout, learned crop or
   second backbone.
 - *Order:* after the cheaper [attention and readout changes](small-changes.md#attention-pooling).
+
+## Image-model predictions as a label source
+
+**Hypothesis (evidence from chest X-ray only).** Report extractors share each report's gap from
+the image reading, so aggregating them cannot fix report-omitted findings. Synovitis is the clearest
+case: every text source misses at least 14 of its 27 gold positives
+([combined labels](../public-labels/combined-labels.md#literature-behind-the-design)).
+VisualCheXbert and Dunnmon 2020 improved report labels by adding an image-side signal. The
+knee equivalent is out-of-fold image-model predictions as one more source in the consensus, one
+target group per run.
+
+- *Precondition:* every study's image prediction must come from a model that never trained on it.
+  That needs all five folds of `all_5fold_scanner_v1`, so the idea waits for fold training.
+- *Public signal:* one participant reports that mixing image-model predictions into the extracted
+  label beat both replacing and masking
+  ([re-sweep](../research/public-research.md#labels-are-the-reported-lever-at-the-top-and-extractor-tuning-is-not)).
+
+## Leave-one-scanner-out diagnostic
+
+**Diagnostic, unmeasured.** `all_5fold_scanner_v1` balances scanners across folds, which is right
+if the test set shares the training scanners. A split that holds out whole scanner groups would
+measure how much the model leans on scanner or site shortcuts. The gap between the two splits is
+the estimate. An unverified competitor README claims a random split inflates AUC by about 0.05
+through scanner memorization. Run it once, never as a development split, and only if a
+scanner-specific failure is suspected.
 
 ## Parked until a specific need
 

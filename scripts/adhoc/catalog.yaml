@@ -528,3 +528,74 @@ scripts:
       - Spreads are (max - min) / median over the draws of one series, compared against the configured intensity augmentation's contrast range.
       - The triplet rows answer what per-triplet bounds would cost, since a triplet's three consecutive slices are fixed by its middle index.
     docs: [docs/backlog/big-bets.md]
+
+  - id: simulate-loss-ensembles
+    path: scripts/adhoc/simulate_loss_ensembles.py
+    summary: Score every probability-mean ensemble of the losses-campaign runs and control seeds from saved fold predictions, with size-matched seed comparisons and split-half selection optimism.
+    tags: [ensemble, blend, subsets, losses, autoresearch, seeds, diversity, complementarity, greedy, bootstrap, macro-auc, saved-predictions]
+    commands:
+      - rtk proxy env CUDA_VISIBLE_DEVICES= OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 uv run --locked python -m scripts.adhoc.simulate_loss_ensembles --output-dir outputs/analysis/loss-ensembles-new
+    inputs: [Losses campaign experiment validation predictions and evaluation decisions, Control-seed run predictions, Effective configs and input identities, all_5fold_v3 targets and report groups]
+    outputs: [members.csv, subsets.parquet with every subset's macro and per-target AUC, pairs.csv with correlations, marginal.csv, best_by_size.csv, top_frequency.csv, greedy.csv, selection_splits.csv, summary.json with matched-size cohorts, split-half strategies and paired report-group bootstrap intervals, Source snapshot]
+    notes:
+      - CPU only and reads saved predictions; no checkpoints, training, tests or GPU. About 90 seconds at 16 workers; refuses an existing output directory.
+      - The first control is the anchor; configs may differ from it only in name, seed, output path and trainer.loss, and input-identity differences are recorded, not enforced.
+      - Ensembles are unweighted probability means, matching exported bundles; AUC uses hard labels at 0.5 and is checked against the metric implementation.
+      - Same-fold best subsets are selection-biased; the split-half check estimates that optimism for the search strategies, but the non-rejected set inherits fold-0 campaign decisions.
+    docs: [docs/validation/results/2026-09-21-loss-ensemble-simulation.md]
+
+  - id: screen-public-label-tables
+    path: scripts/adhoc/screen_public_label_tables.py
+    summary: Screen the 2026-09-21 public label snapshots against Steven v4 on the 58 gold studies, flag copied or in-sample gold rows, and build the strict-MCL consensus with a fold-0 rescore.
+    tags: [labels, public, kaggle, gold, steven, screen, mcl, sprain, rubric, consensus, leakage]
+    commands:
+      - rtk proxy uv run --locked python -m scripts.adhoc.screen_public_label_tables --output-dir outputs/analysis/public-label-screen-new
+    inputs: [Label snapshots under data/labels/public/<owner>/<slug>/downloaded-20260921, Audited Steven v4 / Pilkwang v2 / Tonylin tables, Official train.csv and sample_submission.csv, all_5fold_v3 targets and studies, Saved fold-0 predictions of control B and learned strength]
+    outputs: [screen.csv with gold and silver metrics per table, per_label.csv with gold AUC / false positives / misses and silver rate per table and label, strict_mcl.json, strict_mcl_majority.csv, manifest.json with input hashes, Source snapshot]
+    notes:
+      - CPU only; reads saved tables and predictions; no training, tests or downloads. Refuses an existing output directory.
+      - Kaggle's API did not expose version numbers on 2026-09-21; snapshots are identified by download date and the hashes in manifest.json.
+      - Gold AUC is label-table agreement on 58 studies (9 MCL positives); tables that copy or fit the gold rows are flagged, not ranked.
+      - The Josh gpt-5.6-luna score is annotation times confidence, an ordering assumption of this screen.
+    docs: [docs/public-labels/2026-09-21-public-label-rescreen.md]
+
+  - id: analyze-label-combination
+    path: scripts/adhoc/analyze_label_combination.py
+    summary: Record the evidence behind combined_v1 — silver agreement between label tables, per-target gold AUC of Steven v4 versus the nine-source consensus with bootstrap, leave-one-source-out and gold-tuned checks, and a Dawid-Skene comparison.
+    tags: [labels, combined, consensus, ensemble, aggregation, dawid-skene, gold, bootstrap, families, duplicates, selection]
+    commands:
+      - rtk proxy uv run --locked python -m scripts.adhoc.analyze_label_combination --output-dir outputs/analysis/label-combination-new
+    inputs: [Consensus sources via scripts.tools.prepare_combined_labels, All 2026-09-21 and audited public label tables, Official train.csv]
+    outputs: [silver_agreement.csv, per_target.csv, summary.json, Source snapshot]
+    notes:
+      - CPU only; no training. Refuses an existing output directory. About a minute.
+      - Fails if the rule's selection differs from the prepared table's consensus targets.
+      - The selection rule was fixed after seeing per-target results; gold has 9-35 positives per target.
+    docs: [docs/public-labels/combined-labels.md#how-the-targets-were-chosen]
+
+
+  - id: compare-across-splits
+    path: scripts/adhoc/compare_across_splits.py
+    summary: Compare a run on a new split with runs on an older split, per label, on each run's own fold and on the studies both folds hold out, under both splits' evaluation targets with paired report-group bootstrap.
+    tags: [comparison, split, cross-split, shared-held-out, per-label, auc, bootstrap, combined, steven, scanner]
+    commands:
+      - rtk proxy env CUDA_VISIBLE_DEVICES= uv run --locked python -m scripts.adhoc.compare_across_splits --candidate outputs/training/fold0-combined-scanner --references '{"learned_strength":"outputs/training/anatomical-attention/learned-strength","control_repeat":"outputs/training/anatomical-attention/control-repeat"}' --output-dir outputs/analysis/combined-scanner-vs-learned-strength-new
+    inputs: [Saved fold validation predictions of every run, Both splits' studies.csv and targets.csv]
+    outputs: [per_target.csv, summary.json with shared-study counts and bootstrap intervals, Source snapshot]
+    notes:
+      - CPU only; saved predictions only. Refuses an existing output directory.
+      - Only the shared held-out studies (209 for all_5fold_scanner_v1 against all_5fold_v3 fold 0) are held out for every run; own-fold scores use different studies and targets and are not comparable.
+    docs: [docs/validation/results/2026-09-21-combined-labels-first-run.md]
+
+  - id: score-temperature-sweep
+    path: scripts/adhoc/score_temperature_sweep.py
+    summary: Score validation predictions made at several attention temperatures and image multipliers, per label, with paired report-group bootstrap against a reference temperature.
+    tags: [temperature, tau, attention, pooling, inference, multiplier, sweep, validation, bootstrap]
+    commands:
+      - rtk proxy env CUDA_VISIBLE_DEVICES= uv run --locked python -m scripts.adhoc.score_temperature_sweep --sweep-dir outputs/analysis/tau-sweep-fold0-combined-scanner
+    inputs: [Validation prediction CSVs named x<multiplier>-tau<value>.csv from scripts.pipeline.predict --split validation, The split's studies.csv and targets.csv]
+    outputs: [scores.csv, summary.json]
+    notes:
+      - CPU only; the predictions come from repository inference with --image-multiplier and --attention-temperature, as in the sweep directory's run_sweep.sh.
+      - Picking the best temperature on the same fold is selection; the intervals ignore it.
+    docs: [docs/validation/results/2026-09-21-combined-labels-first-run.md]

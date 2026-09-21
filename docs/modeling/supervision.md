@@ -102,8 +102,9 @@ and recorded identities remain unchanged.
 
 **Historical reproduction:** prepared on 2026-09-13 for the
 [completed fold-0 comparison](../validation/results/2026-09-13-tonylin-label-comparison.md),
-which scored 0.921 publicly versus Steven v4's 0.929. The active baseline has
-returned to Steven v4; the procedure below preserves the Tonylin experiment.
+which scored 0.921 publicly versus Steven v4's 0.929. The active labels are now the
+[combined labels](../public-labels/combined-labels.md); the procedure below preserves the Tonylin
+experiment.
 The exact historical run needs its archived source; the procedure below trains the same label
 setup with the current code.
 The [label audit](../public-labels/2026-09-13-new-public-label-comparison.md)
