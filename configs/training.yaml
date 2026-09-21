@@ -4,13 +4,13 @@ seed: 2263738815
 paths:
   data_root: ../data
   output_root: ../outputs/training
-  label_manifest: labels/public-label-sources.json
+  label_manifest: labels/combined-label-sources.json
 
 labels:
-  source: steven_v4
+  source: combined_v1
 
 validation:
-  split: all_5fold_v3
+  split: all_5fold_scanner_v1
   folds: [0]
 
 data:

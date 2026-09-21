@@ -11,6 +11,7 @@
 | Planning a bounded OA report audit and supervision repair | [OA-only label repair](big-bets.md#oa-only-rubric-aligned-label-repair) |
 | Finding inference loading investigations and candidates | [Loading speedup](loading-speedup/INDEX.md) |
 | Planning final-phase experiments | [Endgame](endgame.md) |
+| Retraining folds on labels blended with out-of-fold predictions (teacher–student, noisy labels) | [Out-of-fold self-distillation](endgame.md#out-of-fold-self-distillation) |
 | Investigating hidden-test and submission risks | [Test-time risks](risks.md) |
 | Checking work-tracking rules | [Project guidance](../../AGENTS.md#work-tracking) |
 | Finding work already in progress | [Ongoing work](../ongoing/INDEX.md) |

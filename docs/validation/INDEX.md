@@ -5,7 +5,7 @@
 | Read when | Document |
 |---|---|
 | Choosing a split and development metric | [Validation strategy](validation-strategy.md) |
-| Checking all_5fold_v3 membership, report leakage, frozen targets and scoring | [Project validation protocol](project-validation-protocol.md) |
+| Checking split membership (all_5fold_scanner_v1 scanner strata, all_5fold_v3), report leakage, frozen targets and scoring | [Project validation protocol](project-validation-protocol.md) |
 | Checking the official metric and leaderboard evidence | [Official metric and public evidence](official-metric-and-public-evidence.md) |
 | Interpreting local scores against public results | [Local-to-public score relationship](local-to-public-score-relationship.md) |
 | Inspecting per-label AUC and the cost of individual ranking errors | [Target-level diagnostics](target-level-diagnostics.md) |

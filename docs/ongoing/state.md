@@ -5,6 +5,18 @@ Active lines of development have their own documents in [this folder](INDEX.md).
 coverage diagnostics live in [data preparation](../data-preparation/peripheral-coverage.md);
 pending experiments are classified in the [backlog](../backlog/INDEX.md).
 
+- **New labels and split, 2026-09-21 (user decision):** training and evaluation use the
+  [combined labels](../public-labels/combined-labels.md). These are Steven v4 plus a nine-source
+  consensus for ACL, MCL, PF OA and Fracture, scoring 0.9075 against 0.8927 on gold. The split is the
+  scanner-stratified [`all_5fold_scanner_v1`](../validation/validation-strategy.md).
+  `configs/training.yaml` carries both; the rest of the recipe is unchanged. Fold-0 results before
+  this date are not comparable with runs on the new split. The first run on it,
+  `fold0-combined-scanner`, is the new fold-0 reference: 0.9020 at ×1 and τ 1, and 0.9079 at ×4 and
+  τ 0.75. On the 209 studies both splits hold out, it ties learned strength. τ 0.75 remains best.
+  **Its submission S40 scores 0.940 public**, against 0.933 for the last two single fold-0 models
+  on Steven v4 labels ([result](../validation/results/2026-09-21-combined-labels-first-run.md)).
+  `scripts/adhoc/train_overnight.py` and the autoresearch gate still require `all_5fold_v3`.
+
 - **Hugging Face backbone survey completed, 2026-09-20:** the
   [checkpoint review](../research/huggingface-image-encoders.md) identifies DINOv3 ConvNeXt-T and
   RadioDINO-S as practical candidates, and OrthoFoundation/MRI-CORE/OrthoDiffusion as larger

@@ -9,6 +9,10 @@ reference agreement over Steven v4. Rayan's original release offers a narrower
 Fracture-source experiment, but its newer release cannot be justified using the
 older 0.8991 score. Those alternative sources have not been adopted or scheduled.
 
+**Re-screened on 2026-09-21:** the newer tables were scored in the
+[2026-09-21 re-screen](2026-09-21-public-label-rescreen.md); none beats Steven v4 outside
+Fracture, and stricter sources expose Steven v4's over-broad MCL.
+
 **Screened on 2026-09-20, not audited:** newer public tables keep appearing — two
 gpt-luna releases on 09-18 among them — and none was scored here. The reason is
 the follow-up above plus the [local-to-public correlations](../research/val-test-correlations.md):

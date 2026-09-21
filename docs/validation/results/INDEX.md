@@ -2,6 +2,8 @@
 
 | Read when | Document |
 |---|---|
+| Reviewing the first run on combined labels and the scanner split: per-label AUC, the tie with learned strength on shared studies, attention-temperature sweep | [2026-09-21 combined-labels first run](2026-09-21-combined-labels-first-run.md) |
+| Choosing loss variants or seeds for an ensemble; loss-campaign subset search and selection optimism | [2026-09-21 loss ensemble simulation](2026-09-21-loss-ensemble-simulation.md) |
 | Reviewing the shared meniscus compartment adapter | [2026-09-20 compartment adapter](2026-09-20-compartment-adapter-result.md) |
 | Reviewing stratified sampling and its replication | [2026-09-20 stratified sampling experiment](2026-09-20-stratified-sampling-promotion.md) |
 | Comparing class-balanced-BCE augmentation and optimizer runs against two controls | [2026-09-20 overnight results](2026-09-20-overnight-hyperparameter-results.md) |

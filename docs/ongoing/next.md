@@ -17,6 +17,11 @@ A future campaign resume is a separate user action.
 
 Pending:
 
+- **Combined labels scored 0.940 public (S40)** against 0.933 for the last single models on
+  Steven v4 labels ([result](../validation/results/2026-09-21-combined-labels-first-run.md)). A
+  Steven-v4-trained control on the same split (`labels.source: steven_v4`) would separate the
+  label change from the new training fold. Before the next queue or campaign, move the overnight launcher and
+  the autoresearch gate to `all_5fold_scanner_v1`.
 - **Evaluation count above ×4:** ×3 scored 0.938 and ×4 0.939 publicly, one rounding step apart,
   so where the count stops paying is unresolved, and its inference-time cost counts toward the
   efficiency prize

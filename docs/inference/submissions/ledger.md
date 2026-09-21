@@ -45,6 +45,9 @@ comes from the table in the relabel script rather than from the manifest.
 
 | S | Submitted (UTC) | Label | Inference | Fold 0 | Public | ID | Record |
 |---|---|---|---|---|---:|---:|---|
+| S40 | 2026-09-21 18:47 | combined-labels scanner-split fold0 | x4 tau0.75 bs4 | (x1, scanner split) 0.902049 | **0.940** | – | [First run](../../validation/results/2026-09-21-combined-labels-first-run.md) |
+| S39 | 2026-09-20 08:18 | stratified-sampling fold0 | x4 tau0.75 bs4 | (x1) 0.897515 | 0.933 | – | – |
+| S38 | 2026-09-20 08:07 | control-B fold0 | x4 tau0.75 bs4 | (x1) 0.896582 | 0.933 | – | – |
 | S37 | 2026-09-19 10:29 | ens-10x mixed + mirror TTA | x4 tau0.75 bs4 +mirrorTTA | (x1) 10x mean 0.877121 | no score | 56356227 | – |
 | S36 | 2026-09-19 10:12 | ens-5xb0 + mirror TTA | x4 tau0.75 bs4 +mirrorTTA | (x1) 5x mean 0.877023 | **0.941** | 56355850 | – |
 | S35 | 2026-09-19 09:59 | ens-5xb0 | x4 tau0.75 bs4 | (x1) 5x mean 0.877023 | 0.940 | 56355572 | – |

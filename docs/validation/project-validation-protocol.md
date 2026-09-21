@@ -1,5 +1,34 @@
 # Project validation protocol
 
+## all_5fold_scanner_v1
+
+The default split since 2026-09-21. It is produced by `scripts.tools.validation prepare
+--label-source combined_v1` with the recipe config, so the stratification seed is **2263738815**. It
+follows the `all_5fold_v3` design below with three differences:
+
+- **Effective labels:** gold on the 58 gold studies, [`combined_v1`](../public-labels/combined-labels.md)
+  on the rest. These are also the frozen evaluation targets.
+- **Scanner indicators:** each report group also receives one presence indicator per scanner group.
+  Siemens, Philips and GE are split by `MagneticFieldStrength` into 3T (≥ 2), 1.5T (< 2) and
+  unknown. Toshiba, Canon, Fujifilm and Hitachi are pooled as `minor`, one English-reporting site
+  ([vendor associations](../metadata/vendor-label-associations.md)). The groups come from
+  `outputs/analysis/sharing-disagreement-20260914/study_headers.parquet`, whose hash
+  `protocol.json` records.
+- **Fold sizes** differ from `all_5fold_v3`:
+
+| Fold | Training | Validation | Gold in validation | Siemens 1.5T / 3T | Philips 1.5T / 3T | GE 1.5T / 3T / unknown | Minor |
+|---:|---:|---:|---:|---|---|---|---:|
+| 0 | 3,502 | 905 | 13 | 245 / 159 | 126 / 133 | 145 / 27 / 21 | 49 |
+| 1 | 3,533 | 874 | 11 | 229 / 159 | 121 / 133 | 144 / 16 / 22 | 50 |
+| 2 | 3,520 | 887 | 11 | 231 / 158 | 128 / 136 | 145 / 15 / 22 | 52 |
+| 3 | 3,535 | 872 | 11 | 228 / 158 | 123 / 139 | 137 / 15 / 22 | 50 |
+| 4 | 3,538 | 869 | 12 | 226 / 158 | 127 / 135 | 137 / 15 / 22 | 49 |
+
+Stratification balances the large groups closely. The smallest group, GE 3T (88 studies), lands
+unevenly: 27 in fold 0 against 15–16 elsewhere. No seed search was used.
+
+## all_5fold_v3
+
 The split uses `MultilabelStratifiedKFold` from
 [iterative-stratification 0.1.9](https://github.com/trent-b/iterative-stratification),
 with five folds and seed **42**. Effective labels use the official binary
@@ -99,26 +128,24 @@ the full-fold metric.
 ## Reproduce and score
 
 ```bash
-rtk proxy uv run --locked python -m scripts.tools.validation prepare
+rtk proxy uv run --locked python -m scripts.tools.validation prepare --label-source combined_v1
 rtk proxy uv run --locked python -m scripts.tools.validation score --predictions outputs/training/run/oof_predictions.csv
 ```
 
 [`scripts/tools/validation.py`](../../scripts/tools/validation.py) saves `studies.csv`,
 `label_counts.csv`, `targets.csv`, and `protocol.json` under the configured
-split directory, currently `data/folds/all_5fold_v3/`. `label_counts.csv` records
+split directory, currently `data/folds/all_5fold_scanner_v1/`. `label_counts.csv` records
 full-fold `positive`/`negative` and `gold_positive`/`gold_negative` counts for
 every target and fold. The explicit
 `pydantic-settings` CLI accepts `--config`, `--data-dir`, `--split-dir`,
-`--n-splits` and `--seed`; without a seed override it uses the config seed.
+`--n-splits`, `--seed`, `--scanner-table` and `--label-source`; without a seed override it uses
+the config seed, and without a label-source override the config's training source.
 The protocol records official input hashes, label source/version/hash,
 label-manifest hash, target-table hash, generator source hashes, dependency
-versions and fold counts. Identical regeneration is allowed; conflicting artifacts
+versions, scanner-group table hash and rule, and per-fold study and scanner counts. Identical regeneration is allowed; conflicting artifacts
 require a new `--split-dir`. Never change folds midway through a comparison.
-The current study-manifest SHA-256 is:
-
-```text
-c709cd27ff54dd10d833abfa966622f9a5ecadef5d37670da658d81c26f7b3ed
-```
+The current study-manifest SHA-256 is `2ed3ad16b5d34d2547b5b0d202543d24d386c6f96275ee2f44d488dcee4fdf74`;
+`all_5fold_v3`'s was `c709cd27ff54dd10d833abfa966622f9a5ecadef5d37670da658d81c26f7b3ed`.
 
 The OOF CSV must contain exactly all 4,407 study IDs, their producing
 integer `fold`, and the twelve named target probabilities. The shared scorer,

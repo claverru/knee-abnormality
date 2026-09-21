@@ -45,7 +45,8 @@ train or check dataset availability.
 
 ### Training seeds and fold selection
 
-The current config selects `steven_v4`, split `all_5fold_v3` and
+The current config selects [`combined_v1`](../public-labels/combined-labels.md), split
+[`all_5fold_scanner_v1`](../validation/validation-strategy.md) and
 **fold 0 for quick development**. Selecting one fold does not change the
 saved five-fold assignments.
 
@@ -64,7 +65,8 @@ Configured paths are relative to the YAML file, so moving the checkout does
 not require absolute paths in version control. `--data-root` and `--output-root`
 override machine-specific storage locations; relative CLI overrides use the
 current working directory. `label_manifest` points to a pinned source
-manifest in `configs/labels/` (`public-label-sources.json` for training).
+manifest in `configs/labels/` (`combined-label-sources.json` for training; it lists both
+`combined_v1` and `steven_v4`).
 
 Paths recorded inside a label manifest are written relative to the project root and must
 lie under `data/`, or be absolute. The label loader maps the leading `data/` to the
