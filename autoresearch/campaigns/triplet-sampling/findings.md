@@ -1392,3 +1392,14 @@ The user requested this repair after the read-only readiness audit found that hi
 
 Evidence:
 - outputs/autoresearch/triplet-sampling/decisions/user-authorize-triplet-preparation-20260920T192746Z-e03bfe70/decision.json
+
+## user-adopt-learned-strength-20260921T115849Z-b19e375d
+
+User adopted learned anatomical strength as the reference and cleaned source for future experiments; campaign remains stopped.
+
+Matched-seed control gain +0.0023308413 with positive 80% interval. This is an explicit reference replacement, not a retroactive campaign verdict. Original limits, baseline snapshots, historical run references and decisions are preserved. Pending old-reference events are archived; no jobs launched.
+
+Evidence:
+- /home/claudio/src/knee-abnormality/outputs/autoresearch/adopted/user-adopt-learned-strength-20260921T115849Z-b19e375d/adoption.json
+- /home/claudio/src/knee-abnormality/outputs/analysis/anatomical-strength-vs-control-repeat-ci-levels/adoption_assessment.json
+- /home/claudio/src/knee-abnormality/outputs/autoresearch/triplet-sampling/decisions/user-adopt-learned-strength-20260921T115849Z-b19e375d/pending-events.json

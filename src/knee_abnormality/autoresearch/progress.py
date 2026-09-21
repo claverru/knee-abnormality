@@ -116,9 +116,17 @@ def metric_line(exp):
     scores = evidence.get("macro_auc", {})
     reference, candidate = scores.get("reference"), scores.get("candidate")
     bounds = evidence.get("bootstrap", {}).get("delta_percentile_95")
+    adoption_bounds = (evidence.get("adoption_bootstrap") or {}).get(
+        "delta_percentile_80"
+    )
     return (
         f"AUC: {score_text(reference)} -> {score_text(candidate)}; "
         f"delta {score_text(difference(candidate, reference), True)}; 95% CI {interval_text(bounds)}"
+        + (
+            f"; adoption 80% CI {interval_text(adoption_bounds)}"
+            if adoption_bounds is not None
+            else ""
+        )
     )
 
 

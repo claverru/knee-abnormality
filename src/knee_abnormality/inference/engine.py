@@ -102,6 +102,10 @@ MODEL_BATCH_KEYS = frozenset(
         "slice_mask",
         "slice_positions",
         "valid_rects",
+        "patient_maps",
+        "geometry_valid",
+        "knee_side_sign",
+        "knee_center_x_mm",
     }
 )
 

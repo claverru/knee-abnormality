@@ -39,6 +39,54 @@ without changing it. This user-directed boundary replaces the general docs/ongoi
 and general-backlog writing workflow for campaign work. Scoped experiment-code
 changes and generated runtime artifacts are separate from this documentation boundary.
 
+## Adoption policy
+
+For each valid new experiment, adopt the implementation when its unrounded macro
+AUC exceeds the pinned incumbent's by at least 0.001 **and** the central 80% paired
+report-group bootstrap interval has a strictly positive lower bound; otherwise
+discard it. Both conditions are required, using unrounded values. The
+recorded adoption decision remains `provisional_accept` because it is a practical
+working-recipe choice, not statistical confirmation. `reject` means not retained
+under these engineering thresholds, not proof of harm. New evaluations do not emit
+`inconclusive`. Invalid evidence, leakage, seed mismatch, contract or resource
+breaches still prevent adoption.
+
+Keep one working incumbent. Do not leave pending implementation branches or
+schedule automatic confirmation runs after each experiment. Preserve findings,
+configs and provenance for discarded attempts without keeping their rejected
+implementations in the active recipe. Revisit a mechanism only with a materially
+new proposal. The 80% macro interval uses the 10th and 90th percentiles of the same paired
+report-group draws as the retained 95% interval. Per-label and 95% intervals inform
+interpretation; they add no further adoption gate. Missing 80% evidence prevents
+adoption. The 0.001 threshold and 80% level are fixed engineering choices, not
+independent confirmation. Repeated selection can still overfit fold 0.
+
+This user-directed rule replaces the old positive-95%-lower-bound gate and the
+briefly implemented gain-only rule. New review
+approvals bind the adoption rule, and evaluation records carry it explicitly.
+Previously completed decisions stay historical; do not recompute or relabel them.
+Role prompts override old gates in frozen campaign contracts without modifying
+archived source. Adopted methods become the next reference for both additions and
+replacements; ordinary reconciliation and validity gates still apply.
+
+## Training seed policy
+
+Every new candidate uses the seed recorded in the current incumbent run's
+`effective_config.json`. The supervisor owns this value; candidate source configs
+and experiment metadata cannot select a different seed. It normalizes the prepared
+configuration before review, binds the seed into approval, and rechecks it at
+launch and against the completed run's effective configuration. An incumbent
+change requires reconciliation and review with that incumbent's seed. Existing
+prepared approvals are refreshed under this policy before launch. Missing or
+malformed incumbent seeds block preparation/review rather than drawing a fallback.
+
+This policy replaces fresh random seeds for candidate screening. Already launched
+attempts keep their historical seed and evaluation record; no completed experiment
+is relabeled as matched. Genuine checkpoint resumes retain the original run seed.
+The bootstrap seed is independent and unchanged. Matched seeds reduce one source
+of comparison noise; they do not guarantee deterministic training or measure
+robustness across training seeds. No automatic control rerun is required.
+
 ## Event-driven operation
 
 The supervisor is ordinary code and outlives agent sessions. It owns process
@@ -72,8 +120,32 @@ Record a candidate's implementation parent separately from the incumbent used fo
 comparison, which is pinned at launch. Preparing during another run may leave it
 based on an older parent. Before launch, reconcile its changes onto a newly accepted
 incumbent in a new recorded attempt. Preserve all three sources; clean merges need
-renewed gates/review, and conflicts return to the developer. Never modify the running
-source or silently claim the old candidate already contained later wins.
+renewed developer integration assessment, configuration gates and review just as
+conflicted merges do. Never modify the running source or silently claim the old
+candidate already contained later wins.
+
+Every prepared candidate declares an integration plan: add or replace, the
+components retained/added/removed, and the accepted idea IDs explicitly removed.
+Adding preserves the incumbent's existing methods. Replacing may remove named
+methods while preserving unrelated improvements. Pure ablations are replacements
+with no added component. The developer states the intended behavior; the
+orchestrator inspects the diff and records an explicit integration review.
+
+Approval is bound to the implementation parent, source/configuration fingerprints,
+reference predictions and input identity, integration plan, fixed limits, headers
+and watched external evidence. Before launch, code checks the same binding and
+that no training, comparison or decision remains outstanding. An older approval
+cannot authorize a changed candidate. A parent change produces a new attempt;
+external evidence changes require renewed review. The previous records remain
+addressable. Source drift under an unchanged parent identity pauses rather than
+being treated as an accepted improvement.
+
+The incumbent carries an inventory of active accepted idea IDs through its
+accepted experiment. Code retains every active ID except declared removals and
+adds the new idea on acceptance. Historical acceptance records remain intact when
+their behavior is replaced; they no longer satisfy active behavioral dependencies.
+An external starting reference has no campaign-owned idea IDs: name its components
+in the integration plan, without inventing historical acceptance decisions.
 
 Agents exit when their assignment is complete. They never poll training, sleep
 through a run, or repeatedly invoke tools to discover whether another agent is done.
@@ -117,8 +189,10 @@ applies the defined mechanical launch/status transitions. Use operations against
 state, not whole-file replacements of an old queue snapshot. Recheck dependencies
 and duplicate identities before accepting a researcher's proposals.
 Each dependency must already have a current idea-record decision of
-`provisional_accept`. Queue admission and implementation approval do not satisfy
-this requirement. The orchestrator receives `proposal_admission` with dependency
+`provisional_accept` and remain active in the incumbent. Queue admission,
+implementation approval and historical acceptance of superseded behavior do not
+satisfy this requirement. Evidence-only links belong in precedents, not dependencies.
+The orchestrator receives `proposal_admission` with dependency
 status and decision from the same gate that checks its response. Unresolved
 proposals stay `proposed` outside both admission and ranking lists, even when they
 would be last in the queue. A rejected report leaves the queue/event intact and

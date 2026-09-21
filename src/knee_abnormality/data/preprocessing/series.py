@@ -22,6 +22,7 @@ from knee_abnormality.data.preprocessing.geometry import (
     SeriesGeometry,
     summarize_series,
 )
+from knee_abnormality.data.preprocessing.laterality import SeriesSide, series_side
 from knee_abnormality.data.sources import list_series
 
 REFORMAT_IMAGE_TYPES = ("DERIVED", "SECONDARY", "PROJECTION")
@@ -54,6 +55,7 @@ class IndexedSeries:
     records: tuple[SliceRecord, ...]
     geometry: SeriesGeometry
     summary: SeriesSummary
+    side: SeriesSide
 
 
 def modal_layout(layouts: Counter) -> tuple[PoseLayout | None, set[PoseLayout]]:
@@ -152,10 +154,12 @@ def index_series(
             if prefix is not None:
                 prefixes[path] = prefix
     records = []
+    side_headers = []
     layouts = {}
     for fallback, path in enumerate(candidates):
         try:
             header = parse_prefix(path, prefixes.get(path))
+            side_headers.append(header.side)
             physical = header.physical_position
             position = (
                 physical
@@ -216,4 +220,5 @@ def index_series(
         slices,
         summarize_series(slices),
         summarize_tags(tags[0][0] if tags else None, reference, removed),
+        series_side(slices, tuple(side_headers)),
     )

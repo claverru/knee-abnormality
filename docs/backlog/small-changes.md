@@ -3,8 +3,8 @@
 Small code additions an agent can implement in one sitting, each behind one new option on the
 [current recipe](../modeling/current-model.md) (read-only diagnostics need none). The user
 supervises them: implement one only when the user asks. Once it is implemented, queue its run in the
-[overnight queue](overnight.md) (one change against a fresh control, fold 0, one recorded random
-seed per run) and
+[overnight queue](overnight.md) (one change against the incumbent, fold 0, the incumbent's recorded
+training seed) and
 remove the entry from this file. Runs follow the
 [controlled-comparison rules](../validation/validation-strategy.md#controlled-comparisons). Each
 entry says whether its motivation is measured or a hypothesis.
@@ -13,8 +13,10 @@ entry says whether its motivation is measured or a hypothesis.
 
 Remove the unused `trainer.min_delta` option: its only consumer is EarlyStopping, whose patience
 covers the complete fixed training budget. This is implementation cleanup, not a hyperparameter
-experiment. The rejected `repeated_series_share`, `gated_attention` and `residual_readout` branches
-also remain in code; their removal is recorded with the corresponding findings below.
+experiment. The rejected `repeated_series_share`, `gated_attention` and `residual_readout`
+branches remain cleanup candidates with their findings below. The compartment adapter
+has been removed; its [result](../validation/results/2026-09-20-compartment-adapter-result.md)
+is historical evidence, not pending implementation work.
 
 ## Superseded same-protocol retakes
 
@@ -56,7 +58,7 @@ attention temperature τ 0.75 is adopted at inference and carries the best submi
   recipe). Replace each independent linear readout with its own small `256 → 128 → 1` MLP,
   using GELU between layers and preserving the current attention pooling and supervision.
   This isolates readout capacity; it adds no sharing between disease labels and is distinct
-  from the [compartment-transfer investigation](big-bets.md#medial-and-lateral-disease-transfer).
+  from the [rejected compartment adapter](../validation/results/2026-09-20-compartment-adapter-result.md).
   A cheap architecture ablation, with weaker project evidence than head-LR or supervision
   comparisons. Implement only when requested, behind one option, against the linear-head control.
 - **Training with the attention temperature** (hypothesis; untested). τ 0.75 is an inference-time

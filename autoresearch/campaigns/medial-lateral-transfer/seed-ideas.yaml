@@ -1,0 +1,109 @@
+ideas:
+  - id: shared-disease-auxiliary
+    mechanism_id: training-only-compartment-transfer
+    parent_idea_id: null
+    title: Encourage transferable disease features with a shared auxiliary detector
+    opportunity: >-
+      Hard and softly coupled final classifiers did not establish reliable transfer.
+      A shared training signal can encourage compatible disease features while
+      retaining independent final compartment decisions.
+    mechanism: >-
+      Attach a disease-family auxiliary decoder to the separately pooled medial
+      and lateral features. Train it against each compartment's own observed soft
+      target while retaining the twelve-output main balanced BCE. Final predictions
+      use the independent main heads. Start with a justified family, not a sweep.
+    precedents:
+      - docs/research/medial-lateral-transfer.md#candidate-3-training-only-shared-disease-supervision
+      - docs/validation/results/2026-09-14-meniscus-soft-coupling-result.md
+      - docs/validation/results/2026-09-20-compartment-adapter-result.md
+      - autoresearch/campaigns/medial-lateral-transfer/prior-work.md
+    novelty: >-
+      Changes training supervision rather than tying final classifier weights or
+      adding only a pooled inference adapter. Start from the current incumbent,
+      without restoring the rejected pooled adapter; retain unrelated accepted
+      changes and explicitly declare any method this candidate replaces.
+    coverage: >-
+      Retain all main targets and masks. The shared decoder receives each location's
+      own label; never force paired predictions to match or infer a probabilistic
+      disease-OR target from soft marginals without justified joint information.
+    exploitation: >-
+      Let examples from either compartment train a common disease recognizer while
+      allowing each main classifier to use additional compartment-specific evidence.
+    budget: >-
+      Reuse features from the ordinary forward pass. Auxiliary computation and
+      diagnostics stay inside the fixed training schedule; no teacher fitting,
+      external feature cache, additional encoder pass, or inference ensemble.
+    implementation: >-
+      Add an optional training-only feature/auxiliary path in the model and its
+      objective in Lightning or transfer helpers. Use compartment_transfer config
+      subtrees, stable float32 masked loss, and recorded component scales. Keep the
+      ordinary inference interface and main BCE unchanged.
+    open_choices: >-
+      Choose family, auxiliary scale and any within-run schedule from a stated
+      rationale. A gain needs an equivalent independent-auxiliary control before
+      claiming transfer rather than increased disease-task weight. Do not prequeue
+      such a dependent follow-up or launch a coefficient sweep.
+    dependencies: []
+    priority_rationale: >-
+      A concrete untrained proposal that tests a different route to transfer and
+      keeps independent final decisions; informed by, but not dependent on, an
+      accepted pooled-adapter result.
+  - id: disease-evidence-compartment-routing
+    mechanism_id: token-disease-evidence-with-compartment-routing
+    parent_idea_id: null
+    title: Learn shared local disease evidence with separate compartment routing
+    opportunity: >-
+      The rejected pooled adapter acted only after separate attention compressed the
+      study. Transferable disease evidence may need to be learned and assigned to
+      anatomy before that compression, while localization remains compartment-specific.
+    mechanism: >-
+      Learn a small nonlinear disease-family feature transform on existing tokens
+      and let distinct medial/lateral attention routes select from those shared
+      features. Retain independent output heads and access to the existing token
+      representation. Explicitly distinguish appearance used for classification
+      from location/context used for assignment when the design calls for it.
+    precedents:
+      - docs/research/medial-lateral-transfer.md#candidate-2-shared-disease-features-independent-decisions
+      - docs/research/knee-side-and-location.md#5-separate-attention-inputs-from-pooled-appearance
+      - docs/history/sharing/2026-09-13-compartment-attention-diagnosis.md
+    novelty: >-
+      Shares disease features before pooling rather than only adapting pooled
+      vectors. Unlike 1C, it need not force meniscus and OA to share the same
+      medial/lateral attention-score contrast. Exact design remains subject to review.
+    coverage: >-
+      Retain the existing visually valid token set, sampled images and independent
+      binary targets. Separate routes must allow either or both compartments to
+      contain disease; broad receptive fields are not isolated anatomical patches.
+    exploitation: >-
+      Learn reusable visual patterns from both compartments while letting anatomy
+      and surrounding context determine which prediction receives the evidence.
+    budget: >-
+      Use a small transform over existing backbone tokens, with no second encoder,
+      external localizer, extra images or training steps. Per-token work can be
+      materially larger than pooled adapters; block if it cannot fit the sealed
+      wall-clock and device-memory budget.
+    implementation: >-
+      Modify model/spatial-token paths or transfer helpers, keeping scoring outputs,
+      data selection and accounting unchanged. Record exactly what is shared,
+      what is compartment-specific, and whether coordinates enter attention,
+      pooled features or both. Include deterministic inference and identity evidence.
+    open_choices: >-
+      Choose one family scope, transform, and routing design with a budget argument.
+      Anatomical metadata may support routing within policy but is not a prerequisite
+      for every design. A gain still needs capacity and localization interpretation;
+      attention maps alone cannot prove correct disease attribution.
+    dependencies: []
+    priority_rationale: >-
+      A distinct earlier-stage sharing mechanism with broader scope and higher
+      implementation cost. Rank against the completed adapter evidence and new
+      research rather than treating architectural complexity as expected gain.
+exhausted_directions: >-
+  The completed shared pooled adapter is rejected. Its initial adapter-off and
+  independent-arm proposals were withdrawn before admission after the external
+  result; do not repeat the shared arm or restore retired modes. Review the
+  completed result and any later external evidence before admission. Historical hard sharing, the 1C common compartment contrast,
+  weak classifier coupling, side embeddings, token graphs and attention priors
+  are precedents requiring a material new distinction, not a globally closed
+  hypothesis. Do not fill the queue with coefficient/width grids, generic loss
+  changes or unrelated sampling. Meniscus and medial/lateral OA both remain open
+  within the user's stated scope; no particular sharing architecture is mandatory.

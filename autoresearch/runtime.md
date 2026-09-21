@@ -233,9 +233,21 @@ the one-time baseline replay are outside it. Auxiliary policy preparation must r
 inside the measured training process; persistent precomputation outside it is forbidden.
 Epochs and optimizer steps are fixed as well. Accepted candidates never raise limits.
 
-Each fresh model gets a new recorded random seed. The bootstrap resampling seed is
-separate and fixed. The evaluator uses the saved paired report-group bootstrap;
-the orchestrator records the resulting acceptance decision and interpretation.
+Each candidate inherits the current incumbent run's recorded training seed. The
+supervisor reads `effective_config.json`, binds that seed into implementation review,
+and records it in the experiment and launch config. A different preparation seed
+is overridden before review; old approvals require renewed review. Reconciliation
+uses the replacement incumbent's seed. Genuine checkpoint resumes keep their original
+seed, and already launched historical attempts retain their original evaluation
+policy. The bootstrap resampling seed is separate and fixed. The evaluator uses the saved paired report-group bootstrap;
+the orchestrator records the resulting adoption decision and interpretation. Valid
+macro gains >= 0.001 replace the incumbent only if the central 80% paired-bootstrap
+lower bound is strictly positive; otherwise discard the candidate. The existing
+95% and per-label intervals remain diagnostic. The runtime derives the macro 80%
+interval from the same resamples used for per-label diagnostics, verifies their
+macro 95% summary against the frozen evaluator, and stores both in `per_label.json`.
+Status/results show the 80% adoption interval alongside the 95% reporting interval. See the
+[adoption policy](protocol.md#adoption-policy).
 Partial evidence, scope violations, and budget violations cannot produce acceptance.
 
 ## Keeping development ahead of training
@@ -254,11 +266,35 @@ developing or prepared. A failed launch leaves the head reserved for explicit ha
 If the incumbent changes while the next candidate is being developed, the runner
 waits for its developer to finish. Before launch, it creates a new recorded attempt
 and performs a three-way merge of the candidate's changes onto the new incumbent.
-The old parent, old candidate, new parent, and conflicts remain recorded. Clean merges
-go through configuration validation and orchestrator review again; conflicts return
-to the developer. No worker edits a running training snapshot. If the incumbent did
-not change, the prepared candidate can launch without reconciliation. Completion
-evaluation and unresolved conflicts can still leave the GPU temporarily idle.
+The old parent, old candidate, new parent, and conflicts remain recorded. Every
+merge returns to the developer to verify the intended addition or replacement,
+including conflict-free merges. The result receives fresh configuration checks
+and orchestrator review. No worker edits a running training snapshot.
+
+Approval pins the exact incumbent identity/source/predictions, candidate source
+and configuration, integration plan, active-idea inventory, limits, headers and
+external-evidence snapshot. It is checked when the review returns and immediately
+before launch. Source drift under the same incumbent identity pauses; an accepted
+new incumbent triggers reconciliation. Missing or outdated approvals trigger
+renewed review. Outstanding training, comparison and decision work blocks launch
+even when the GPU is idle. Completion cannot replace an incumbent different from
+the run's pinned reference.
+
+Previously prepared but unlaunched attempts without these integration records are
+preserved and reassessed in a new attempt on resume. Historical completed reports
+are not rewritten or treated as newly approved. An accepted campaign incumbent
+without an integration inventory requires explicit recovery rather than guessing
+which methods its source contains; external starting references have no
+campaign-owned accepted idea IDs.
+
+Role assignments and reviews include hashes of the runs listed in
+`additional_evidence_runs`, plus other initialized campaigns' incumbents and
+recorded decisions. A change detected before launch invalidates the old approval
+and sends the candidate back to review. Results are evidence, not automatic
+cross-campaign adoptions. Unlisted manual runs are not discovered; add relevant
+paths to the evidence inventory while stopped. Unknown future results cannot be
+anticipated, and separate campaigns retain their own decisions and budgets.
+Completion evaluation, renewed review and reconciliation can leave the GPU idle.
 
 ## Boundaries and prerequisites
 
@@ -282,3 +318,17 @@ training. Topic relevance, meaningful novelty, coverage/exploitation, and absenc
 label leakage still require semantic review; they are not mathematical guarantees.
 Only the orchestrator authors canonical research text, with the supervisor applying
 its structured operations. All research documentation stays inside `autoresearch/`.
+
+
+## Adopted reference source transition
+
+The [learned-strength closure](checkpoint-closure.md) records the user-authorized
+reference transition for all stopped campaigns. Current state pins the measured
+run and cleaned development source separately. No trained metadata or predictions
+are rewritten to disguise the cleanup. For a policy that forbids preprocessing
+changes, the supervisor permits the recorded cleaned preprocessing identity only
+against the exact external adopted reference and only after verifying its pinned
+input-identity hash. Other identities remain strict; the exception stops applying
+when that reference is replaced. The transition is part of review approval binding.
+Original `reference_run`, baseline artifacts and sealed budgets retain startup
+provenance; status and live state select the current incumbent.

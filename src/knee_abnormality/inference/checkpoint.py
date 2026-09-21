@@ -83,6 +83,7 @@ def apply_attention_temperature(
     with torch.no_grad():
         scorer.weight.div_(temperature)
         scorer.bias.div_(temperature)
+        model.compartment_signs.div_(temperature)
     return temperature
 
 
@@ -99,7 +100,7 @@ def checkpoint_model(
         if key.startswith("model.")
     }
     model = KneeAbnormalityModel(
-        config.model, config.data, len(targets), load_pretrained=False
+        config.model, config.data, targets, load_pretrained=False
     )
     model.load_state_dict(state, strict=True)
     apply_attention_temperature(model, attention_temperature)

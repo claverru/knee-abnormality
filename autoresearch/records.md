@@ -19,6 +19,9 @@ orchestrator from agent reports. Each entry records:
 - Closest prior attempts and evidence references, with the material difference.
 - How coverage and exploitation coexist, and how the fixed limits are preserved.
 - An implementation direction, unresolved choices, and dependencies.
+- Whether the proposal adds to or replaces behavior and how it handles a new
+  incumbent. Dependencies name accepted methods still active in the incumbent;
+  historical evidence links remain precedents.
 - Creation state revision and any claimed experiment identifier.
 - The researcher's priority recommendation and the orchestrator's ranking rationale.
 
@@ -43,7 +46,7 @@ can change order. Launch removal never deletes the permanent idea record.
 Use one immutable directory per attempt in
 `outputs/autoresearch/<campaign-id>/experiments/<experiment-id>/`.
 An attempt records its idea, implementation parent, launch-time reference incumbent,
-source snapshot and hash, effective configuration, data/split/label identities, fresh training seed,
+source snapshot and hash, effective configuration, data/split/label identities, incumbent-matched training seed,
 agent assignments, and artifact paths. Pin these before launch.
 
 After completion, append observed triplet totals and study-visit counts, coverage
@@ -53,14 +56,34 @@ checks, and the decision with its rationale. Record the reference predictions an
 their hash as well as the candidate's. Never overwrite an earlier attempt.
 
 Execution states are `prepared`, `running`, `completed`, `failed`, and `cancelled`.
-Evaluation decisions are `provisional_accept`, `reject`, `inconclusive`, and `invalid`.
-Keep execution status separate from the statistical decision. Incomplete evidence,
+New evaluation decisions are `provisional_accept` (valid macro gain >= 0.001 and
+central 80% macro interval lower bound > 0), `reject` (either adoption condition
+fails), and `invalid`. `adoption_bootstrap` in evaluation
+evidence records that interval; the original 95% summary remains in `bootstrap`. Historical `inconclusive` records
+remain unchanged. Evaluation evidence and launch review bindings record the adoption
+rule explicitly. Keep execution status separate from the adoption decision. Incomplete evidence,
 changed evaluation identities, or breached limits cannot produce acceptance.
 
 The runtime also records intermediate `stage` values for development, gates, review,
 comparison, and reconciliation. A reconciled candidate has a new attempt ID, an
 explicit old/new parent record, and retained merge inputs/conflicts. Superseded
 attempts remain addressable; they are not counted as trained failures.
+
+`implementation_reference` records the parent ID, source tree digest, saved recipe,
+input identity and prediction hash. Prepared developer reports require
+`integration`: `mode` (`add` or `replace`), `retained_components`, `added_components`,
+`removed_components`, `removed_idea_ids`, and `rationale`. Blocked reports use null.
+Replacement includes pure ablations; it must name removed behavior. Accepted idea
+IDs may be removed only if they are active. Required dependencies of both the
+candidate and every retained accepted method must remain.
+
+Approval requires a nonempty `integration_review`; other orchestrator responses
+use null. Each review writes `review-<event-id>.json` in the attempt directory.
+`implementation_review.binding` fixes its exact parent, candidate source/config,
+integration, resulting `active_idea_ids`, external evidence and frozen evaluation
+inputs. `launch_binding` records what authorized the launch. Evidence changes
+invalidate approval without changing past reports. An accepted replacement updates
+the active inventory without erasing any earlier experimental acceptance or result.
 
 The read-only `results` view uses each attempt's recorded `evidence.macro_auc`
 and `evidence.bootstrap` alongside its current `decision`. Its displayed delta is

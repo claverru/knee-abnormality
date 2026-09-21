@@ -131,7 +131,8 @@ scripts:
     outputs: [Per-variant study predictions, Per-target and compartment metrics, Paired bootstrap intervals, Selected input identities, Source snapshot and hashed results]
     notes:
       - Manual evaluation only; no weights are modified and training does not launch this diagnostic. Requires a checkpoint whose preprocessing identity matches the current sources; earlier checkpoints, including token-graph, 00-baseline and crop-selection runs, need their archived sources.
-      - Reuses one backbone pass per batch for six full-fold variants (intact; without 1D, 2D, plane, contrast or all position, which drops the 1D and 2D embeddings) plus axial-, coronal- and sagittal-only pooling of the intact tokens.
+      - Reuses one backbone pass per batch for seven full-fold variants (intact; without 1D, 2D, plane, contrast, anatomical bias or all position) plus axial-, coronal- and sagittal-only pooling of the intact tokens. All-position removal drops both positional embeddings and the anatomical bias.
+      - "Embedding interventions affect both attention and position-rich pooled values. Anatomical-bias interventions zero the medial axis; independent heads and learned family strengths are retained."
       - Token-graph edge variants and graph statistics were removed with the token graph; the archived token-graph source keeps them.
       - Plane-only variants cover only studies with visually valid tokens of that plane; their prediction files, per-target AUCs, metrics and bootstrap intervals compare against intact on the same studies, with study counts.
       - Every variant reports medial/lateral meniscus and OA exclusive-positive logit-margin AUCs and lateral cross-talk at the prevalence threshold, with counts and the medial-positive base rate.

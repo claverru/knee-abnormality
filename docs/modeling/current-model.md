@@ -1,17 +1,19 @@
 # Current model
 
-The code carries one model: the full-slice spatial-token recipe of the overnight `00-baseline`
-run, defined by [`configs/training.yaml`](../../configs/training.yaml).
+The code carries one model: the full-slice spatial-token recipe with learned anatomical
+family strengths, defined by [`configs/training.yaml`](../../configs/training.yaml).
+The [adoption evidence](../../autoresearch/anatomical-attention.md) records the closed
+position/knee-side experiments and the current research reference, 0.897443 macro AUC.
 
 - **Inputs:** ReXNet-200 reads every sampled triplet at 224 px, 0.625 mm spacing and a 140 mm
   field.
 - **Tokens:** every visually valid backbone location is a token with four additive embeddings.
-- **Pooling:** target-specific attention MIL pools the tokens.
+- **Pooling:** target-specific attention MIL pools position-rich tokens, with side-aware
+  anatomical bias and two learned positive strengths for meniscus and OA.
 
-There is no additive 3D embedding and no token graph. The best submitted model is still the
-reflection/sigma-40 champion, which is this recipe plus the
-[3D embedding](../history/model-lineage.md#five-embedding-predecessor); submission status lives
-in [ongoing work](../ongoing/INDEX.md) and the [inference overview](../inference/inference-overview.md).
+There is no additive 3D embedding or token graph. The best submitted bundle is distinct
+from the local research incumbent; submission status lives in
+[project state](../ongoing/state.md) and the [inference overview](../inference/inference-overview.md).
 The [model lineage](../history/model-lineage.md) records how the recipe came about and the
 retired variants. [Model shapes](model-shapes.md) traces the tensors, and
 [swapping a backbone](backbone-swaps.md#current-budget) gives the parameter and compute budget.
@@ -20,7 +22,7 @@ retired variants. [Model shapes](model-shapes.md) traces the tensors, and
 
 `configs/training.yaml` retains the full-slice architecture of `00-baseline`, with
 later recipe changes including class-balanced BCE, relative Gaussian width, the
-study-total floor. The sampler uses independent per-epoch draws within probability
+study-total floor, and anatomical attention with learned family strengths. The sampler uses independent per-epoch draws within probability
 bands; the experimental ten-epoch schedule was reverted. Historical
 `00-baseline` results below describe its archived recipe. Current settings include:
 
@@ -36,7 +38,8 @@ bands; the experimental ten-epoch schedule was reverted. Historical
 | `model.backbone` | `rexnet_200.nav_in1k`, pretrained |
 | Projection and attention widths | 256 and 128 (`PROJECTION_WIDTH`, `MIL_ATTENTION_WIDTH`, constants) |
 | `model.dropout`, `model.series_dropout` | 0.0, 0.2 |
-| `model.count_normalized_attention` | `false`: a series' attention mass grows with its triplet count; `true` subtracts `log(that acquisition's valid tokens)` from each token's score in `_attention_pool` ([entry](../backlog/small-changes.md#attention-pooling)) |
+| Anatomical attention | Fixed `sign * exp(log_strength) * tanh(medial_mm / 20)` for medial/lateral meniscus and OA; two trainable strengths start at 1 |
+| Training seed | 2263738815, inherited by new research candidates from the incumbent |
 | Precision | BF16 mixed on one automatically selected device (`PRECISION`, a constant) |
 
 The optimizer, schedule and trainer settings are described in
@@ -91,7 +94,8 @@ Tokens receive four additive embeddings:
 
 - **Tokens:** add the embeddings to the projected features and apply the shared `mil_norm`
   LayerNorm.
-- **Attention:** score every token and run one float32 masked softmax per study and target over
+- **Attention:** add the anatomical term to the four compartment-label scores, then run one
+  float32 masked softmax per study and target over
   the study's visually valid tokens. A study without valid tokens fails before the softmax.
 - **Heads:** pool the weighted features, apply twelve independent classifier vectors and biases,
   and train with the masked soft-target BCE alone.
@@ -101,14 +105,18 @@ The ReXNet adapter derives stride 32 and origin 0 from its convolutions. The
 [CoAtNet adapter](coatnet-224-spatial-backbone.md) derives stride 32 and origin 12, and any
 other backbone mapping fails explicitly. Grid dimensions may vary independently.
 
-Tokens carry no patient-coordinate geometry. The model reads neither LPS points nor the study
-center, and visual validity alone decides token membership.
+Patient-coordinate geometry supplies the anatomical bias, not another additive embedding.
+The audited side resolver uses DICOM laterality and conservative coordinate consensus;
+unknown side and invalid geometry contribute zero bias. The medial axis is knee-side sign
+(-1 left, +1 right) times patient LPS X minus study-center X. The middle-slice patient map
+and inverse augmentation locate each token. Reflection keeps coordinates consistent.
 
-- **Geometry output:** `feature_geometry(valid_rects, inverse_affine, grid_shape, input_shape,
-  mapping, source_channels)` returns only `(xy, visual_valid)`.
-- **Batches:** they carry no `patient_maps` or `geometry_valid`.
-- **Prepared series:** they keep both for reflection eligibility and for the preview and
-  inspection tools.
+- **Geometry output:** `feature_geometry` returns `(xy, visual_valid, prepared_xy)`.
+- **Batches:** include `patient_maps`, `geometry_valid`, `knee_side_sign` and
+  `knee_center_x_mm`. All three channels still determine visual validity.
+- **Parameters:** meniscus and OA each learn one positive `exp(log_strength)`;
+  the spatial width is fixed at 20 mm. No appearance-only, learned-width or pooled-adapter
+  branches remain. Twelve independent classifier heads are retained.
 
 The model lives in `src/knee_abnormality/modeling/` (`model.py`, `spatial_tokens.py`,
 `augmentation.py`). The spatial-token identity is

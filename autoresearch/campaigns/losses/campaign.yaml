@@ -1,5 +1,5 @@
 id: losses
-status: ready-to-seal
+status: stopped
 recipe: configs/training.yaml
 reference_run: outputs/training/overnight-20260919T235434Z-8ol_1c30/runs/13-control-repeat
 additional_evidence_runs:

@@ -188,7 +188,7 @@ class ModelConfig(ConfigModel):
     residual_readout: bool = False
 
     @model_validator(mode="after")
-    def checkpointing_requires_backbone_eval(self) -> "ModelConfig":
+    def validate_model_options(self) -> "ModelConfig":
         if self.checkpoint_backbone and not self.backbone_eval:
             raise ValueError(
                 "checkpoint_backbone requires backbone_eval=true to preserve training-mode BatchNorm"

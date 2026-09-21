@@ -19,6 +19,7 @@ PREPROCESSING_SOURCES = (
     "data/preprocessing/filtering.py",
     "data/preprocessing/geometry.py",
     "data/preprocessing/intensity.py",
+    "data/preprocessing/laterality.py",
     "data/preprocessing/preparation.py",
     "data/preprocessing/sampling.py",
     "data/preprocessing/series.py",
@@ -26,6 +27,7 @@ PREPROCESSING_SOURCES = (
     "modeling/augmentation.py",
     "modeling/model.py",
     "modeling/spatial_tokens.py",
+    "inference/reflection.py",
 )
 
 

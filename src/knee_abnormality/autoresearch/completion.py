@@ -21,7 +21,7 @@ def completion_blockers(state, event):
         exp["stage"] != "awaiting_decision"
         or state["running"] != exp["id"]
         or exp.get("eligible_decision") != event["eligible_decision"]
-        or exp.get("reference", {}).get("id") != state["incumbent"]["id"]
+        or exp.get("reference") != state["incumbent"]
     ):
         return ["Completion or incumbent state changed"]
     if any(other["id"] != event["id"] for other in state["events"]):
@@ -52,10 +52,13 @@ def completion_blockers(state, event):
         if Path(evidence["comparison"]) != comparison:
             return ["Comparison artifact path does not match the attempt"]
         report = read_json(comparison)
+        diagnostics = read_diagnostics(comparison)
+        macro_bootstrap = (diagnostics or {}).get("macro_bootstrap")
         scores = report["family_means"]["all"]
         bootstrap = report["paired_report_group_bootstrap"]["intervals"]["all"]
         if (
-            verdict(report) != event["eligible_decision"]
+            verdict(report, macro_bootstrap) != event["eligible_decision"]
+            or macro_bootstrap != evidence.get("adoption_bootstrap")
             or scores != evidence["macro_auc"]
             or bootstrap != evidence["bootstrap"]
             or bootstrap["valid_draws"] != state["limits"]["bootstrap_draws"]
@@ -71,7 +74,6 @@ def completion_blockers(state, event):
             for row in report["per_target"]
         ):
             return ["Per-target results are incomplete or invalid"]
-        diagnostics = read_diagnostics(comparison)
         if diagnostics is None or len(diagnostics["per_target"]) != len(
             report["targets"]
         ):

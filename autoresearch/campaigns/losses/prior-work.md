@@ -1,5 +1,9 @@
 # Shared-loss prior work
 
+Current reference: learned-strength-20260921, selected by the user on 2026-09-21;
+the campaign remains stopped. See [checkpoint closure](../../checkpoint-closure.md)
+for source pins and state. Reference selections below retain historical provenance.
+
 Campaign prepared on 2026-09-20; no loss candidate has been implemented or trained
 by this campaign. The [contract](contract.md) excludes per-label loss selection,
 coefficients and schedules by explicit user decision. The

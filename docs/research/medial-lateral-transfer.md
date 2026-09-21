@@ -2,15 +2,22 @@
 
 ## Recommendation
 
+Current status, 2026-09-21: the original proposals below are historical design
+notes owned by the [stopped autoresearch campaign](../../autoresearch/campaigns/medial-lateral-transfer/INDEX.md),
+not an active queue. Learned anatomical family strength with independent heads
+is now adopted, while the pooled adapter and other rejected implementations are
+removed. [The current result record](../../autoresearch/anatomical-attention.md)
+supersedes the next-experiment recommendations below. No confirmation branch is pending.
+
 The medial/lateral similarity hypothesis remains useful. The completed experiments reject treating stronger parameter sharing as a reliable improvement; they do not establish that the model should learn the two compartments independently at every level. The successful reflection model already shares its image backbone, token projection and part of its attention network across all targets. Additional sharing must improve on that existing transfer.
 
 The first experiment was **weak meniscus classifier coupling at sigma 40, preserving independent attention, independent classifier vectors and independent biases**. The [completed coefficient-0.1 comparison](../validation/results/2026-09-14-meniscus-soft-coupling-result.md) reduced classifier distance by 20.5% relative to the champion, but lowered macro AUC by 0.001492 and meniscus-pair AUC by 0.004085. Retain reflection/sigma 40; this run does not justify adding OA or an immediate coefficient sweep. It tests a finite sharing constraint without adding inference computation; it does not rule out every coupling strength.
 
-The most promising subsequent architectural alternative is **a small shared nonlinear disease feature module with independent compartment classifiers**. It makes a weaker assumption about the final decision rule than 1A/1B. A training-only shared auxiliary detector is another way to encourage transferable features without sharing the final classifiers. Neither approach automatically removes label or acquisition bias.
+Candidate 2, **a small shared nonlinear disease feature module with independent compartment classifiers**, was implemented and [rejected on 2026-09-20](../validation/results/2026-09-20-compartment-adapter-result.md): macro AUC landed inside the control spread while the intended meniscus family fell −0.0114 [−0.0200, −0.0030] and the meniscus margin −0.0191 [−0.0392, −0.0034] against `13-control-repeat`. Two different sharing mechanisms have now regressed the same family, and the margin diagnostic says the cost is exactly the loss of medial/lateral distinguishability that unequal prevalence predicts. **A training-only shared auxiliary detector (candidate 3) is the remaining distinct proposal**; it encourages transferable features without sharing anything at inference. Neither approach automatically removes label or acquisition bias.
 
 Any candidate needs two assessments: does it improve recognition of the intended disease, and does that gain survive the existing acquisition and disease-combination diagnostics? An increase in aggregate local AUC alone did not distinguish the sharing experiments correctly. Conversely, an isolated unfavorable public result does not identify the hidden causal mechanism.
 
-Candidate 1 was [implemented, evaluated and retired](../modeling/retired-side-and-compartment-variants.md#meniscus-classifier-coupling) on `meniscus-soft-coupling`, using coefficient 0.1; its public score is unknown. Its training code was removed after the regression; archived sources and the completed analysis remain available. The other candidates remain proposals, with no new run scheduled. Reflection/sigma 40 remains the submitted champion. The recommendations concern the archived ReXNet comparison and should not be combined with a backbone change.
+Candidate 2's `model.compartment_adapter` option is a removal; its `"independent"` arm was never run because it is a reparametrization of the already-rejected `model.residual_readout`. Candidate 1 was [implemented, evaluated and retired](../modeling/retired-side-and-compartment-variants.md#meniscus-classifier-coupling) on `meniscus-soft-coupling`, using coefficient 0.1; its public score is unknown. Its training code was removed after the regression; archived sources and the completed analysis remain available. The other candidates remain proposals, with no new run scheduled. Reflection/sigma 40 remains the submitted champion. The recommendations concern the archived ReXNet comparison and should not be combined with a backbone change.
 
 ## The six relevant experiments
 
@@ -118,6 +125,8 @@ Do not implement an unconstrained shared vector plus two unconstrained private v
 Meniscus-only hard sharing at 40 mm is a useful later comparison if the weakly coupled model improves: it distinguishes a benefit of partial coupling from an interaction between meniscus sharing and sigma 40. It is an untested control, not a known inferior model.
 
 ## Candidate 2: shared disease features, independent decisions
+
+**Measured and rejected 2026-09-20** ([result](../validation/results/2026-09-20-compartment-adapter-result.md)). The design below is retained to explain what was built and why the stopping rule closed it; it is not a candidate for a width or coefficient sweep.
 
 A more substantial alternative preserves the independent output classifiers and inserts a small shared nonlinear module into the separately pooled representations of one disease family:
 

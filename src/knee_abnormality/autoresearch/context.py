@@ -6,6 +6,7 @@ from knee_abnormality.autoresearch.diagnostics import (
     experiment_diagnostics,
 )
 from knee_abnormality.autoresearch.gates import (
+    active_incumbent_ideas,
     config_differences,
     dependency_blockers,
     flatten,
@@ -50,6 +51,9 @@ def experiment_card(exp):
             "idea",
             "stage",
             "implementation_parent",
+            "implementation_reference",
+            "integration",
+            "active_idea_ids",
             "repair_of",
             "repair_count",
             "decision",
@@ -263,6 +267,7 @@ def build_context(state, role, assignment, directory, docs, state_path):
         "role": role,
         "limits": state["limits"],
         "incumbent": state["incumbent"],
+        "active_incumbent_ideas": active_incumbent_ideas(state),
         "history_index": str(index_path),
         "prior_work": str(docs / "prior-work.md"),
         "relevant_ideas": [
@@ -311,7 +316,9 @@ def build_context(state, role, assignment, directory, docs, state_path):
                 "unresolved_dependencies": blockers,
             }
             for idea in proposals.values()
-            for blockers in [dependency_blockers(idea, ideas)]
+            for blockers in [
+                dependency_blockers(idea, ideas, active_incumbent_ideas(state))
+            ]
         ]
     if "idea" in assignment:
         context["assignment"]["idea"] = select(

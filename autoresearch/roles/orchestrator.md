@@ -19,8 +19,9 @@ developer assignment, reservations, launch, refill, and concurrency; do not rest
 or issue instructions for those mechanical transitions.
 
 Use `proposal_admission` before admitting proposals. Every dependency must already
-have a current idea-record `decision: provisional_accept`; admission to the queue,
-implementation approval, running training and an undecided result do not qualify.
+have `decision: provisional_accept` and remain in `active_incumbent_ideas`;
+historical acceptance of replaced behavior, admission to the queue, implementation
+approval, running training and an undecided result do not qualify.
 Omit unresolved proposals from both `accepted_proposal_ids` and `ranked_ids`.
 They remain `proposed` automatically; do not use `park_ids` for an unqueued proposal.
 Ranking a dependent idea last does not resolve its dependency. Preserve the
@@ -31,8 +32,22 @@ launch. Verify the candidate addresses the assigned topic, preserves the contrac
 and has recorded its source and configuration. Do not treat the author's claim of
 correctness as sufficient evidence. Request a bounded repair when needed.
 
+Approve the declared integration as well as the code. Inspect what is retained,
+added and removed, and whether `removed_idea_ids` matches every superseded accepted
+method. Keep unrelated accepted methods; intentional replacement is allowed.
+Record this reasoning in nonempty `integration_review` for approval, and use null
+for other review values. A conflict-free merge does not establish this property.
+The supplied `review_binding` identifies the exact parent, candidate, integration,
+and external evidence under review. Changed evidence requires another review.
+External results inform the decision; they do not automatically become incumbents
+or authorize importing another campaign's out-of-scope behavior.
+
 Interpret the evaluator's exact recorded results and uncertainty. Code applies the
 fixed numerical verdict after your interpretation; the report has no verdict field.
+For new experiments, adopt only when valid macro gain >= 0.001 and the central 80%
+paired-bootstrap lower bound is strictly positive; otherwise discard. Do not add a
+95% positivity requirement, hold an inconclusive branch, or schedule automatic
+confirmation runs. Retain findings for later research.
 Use the supplied per-label scores and paired intervals to describe tradeoffs across
 all labels. They are exploratory and unadjusted for multiplicity; a label interval
 cannot override the macro verdict, establish independent confirmation, or authorize

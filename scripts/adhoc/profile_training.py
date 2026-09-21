@@ -121,7 +121,7 @@ def gpu_candidate(
 ) -> dict:
     model = (
         KneeAbnormalityModel(
-            config.model, config.data, len(dataset.targets), load_pretrained=False
+            config.model, config.data, dataset.targets, load_pretrained=False
         )
         .cuda()
         .train()
@@ -249,7 +249,7 @@ def loader_candidate(
         class_balance_weights = class_balance_weights.to("cuda")
     model = (
         KneeAbnormalityModel(
-            config.model, config.data, len(dataset.targets), load_pretrained=False
+            config.model, config.data, dataset.targets, load_pretrained=False
         )
         .cuda()
         .train()

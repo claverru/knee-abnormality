@@ -22,14 +22,19 @@ for routine comparisons. Additional-fold training, full OOF scoring,
 ensembling and, since 2026-09-16, bigger images are deferred to that
 [later phase](../backlog/endgame.md); they are not
 prerequisites for each experiment. Keep the revised five-fold membership fixed within comparisons;
-rerun the baseline on this split before comparing new experiments.
+compare against a recorded incumbent trained on this split; no automatic baseline
+rerun is required for each experiment.
 
 ## Controlled comparisons
 
 Change one factor against a matched control, and predefine the principal comparison and
-checkpoint rule; never search seeds for an apparent improvement. **Every run draws its own
-recorded random seed, the control included**, so no comparison is made at a matched seed and a
-single-run difference is read against the run-to-run spread below. Preserve model
+checkpoint rule; never search seeds for an apparent improvement. **Candidates use the
+current incumbent's recorded training seed.** Adopt a valid implementation only when
+macro gain >= 0.001 and the central 80% paired-report-group bootstrap lower bound
+is strictly positive; otherwise discard it. Keep the 95% interval as diagnostic
+evidence. No automatic confirmation branches or control reruns follow a result.
+This engineering policy does not establish cross-seed robustness; see the
+[adoption protocol](../../autoresearch/protocol.md#adoption-policy). Preserve model
 size, training budget, image dimensions, physical crop, slice budget and the configured
 validation density (×1 since 2026-09-17) unless one of them is the factor. Training targets stay soft unless supervision
 is the factor; validation memberships and
@@ -41,20 +46,14 @@ parity is not required for each run or submission.
 
 ### What a comparison can resolve
 
-- **Training runs** carry run-to-run noise with a standard deviation of about **0.0029**, so a
-  single-run difference below about **0.008** carries no information even at a matched seed. The
-  earlier figure of 0.0015–0.0018 came from seed controls alone — the 2026-09-17 controls spanned
-  0.0032 at ×2 and the 2026-09-18 pair 0.0026 at ×1
-  ([overnight results](results/2026-09-18-overnight-results.md)) — and understated it. The
-  2026-09-19 sigma sweep gives the better estimate: five fold-0 runs of a recipe whose only
-  difference is a `sampling_sigma_fraction` between 0.60 and 1.10, which that sweep shows is inert,
-  spanned 0.00674 with sd 0.00285
-  ([fold ensembles and sigma sweep](results/2026-09-19-fold-ensembles-and-sigma-sweep.md)).
-  Fold-0 ReXNet at the current recipe has now produced 0.88367–0.88848 across four seeds.
-  **Most single-run deltas this project has recorded, in the 0.002–0.004 band, were never
-  resolvable**; only the ensemble gain (+0.006) and class-balanced BCE (+0.0116) clear the bar. A
-  queue of many runs against one control will produce an apparent winner by luck: `series-share`
-  topped seventeen runs at +0.0044 over the control mean and then lost 0.004 publicly.
+- **Training runs** carry variability not captured by validation resampling. Historical
+  seed controls and sigma sweeps showed spreads of several thousandths, under different
+  recipes ([overnight results](results/2026-09-18-overnight-results.md),
+  [sigma sweep](results/2026-09-19-fold-ensembles-and-sigma-sweep.md)). These observations
+  motivate caution, not a universal 0.003 or 0.008 minimum meaningful gain. Matching
+  seeds reduces one source of noise but does not make runs deterministic. The adopted
+  rule above deliberately allows practical progression without claiming independently
+  confirmed gains. Repeated selection against one control can still produce lucky winners.
 - **Test-time variants of one frozen checkpoint** are far cheaper to resolve, because the paired
   bootstrap over studies removes training variability. Measured over 36 pairs, the standard error
   of Δ macro AUC scales with how much the variant moves the predictions: SE ≈ 0.067 × p^1.05,

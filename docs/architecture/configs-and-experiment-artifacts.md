@@ -49,14 +49,14 @@ The current config selects `steven_v4`, split `all_5fold_v3` and
 **fold 0 for quick development**. Selecting one fold does not change the
 saved five-fold assignments.
 
-**No configuration pins a training seed.** `configs/training.yaml` sets `seed: null`
-explicitly, and `load_config` draws a fresh 32-bit seed from `secrets.randbits` whenever
-the value is null or missing, so two loads of the same YAML are two different runs. The drawn value is recorded in the run's `effective_config.json` and in
-the checkpoint's hyperparameters, which is what makes a run reproducible after the fact.
-A `--resume` adopts the seed stored in its checkpoint, so the resumed run continues
-under the seed it started with. Setting `seed` explicitly in a YAML still overrides the
-draw; the overnight queue does this per run. Preparation/training must check requested fold
-IDs against `protocol.json` and verify the selected label-source fingerprint.
+`configs/training.yaml` pins **2263738815**, matching the adopted learned-strength
+reference. Autoresearch candidates inherit their current incumbent's saved training
+seed; preparation, review and launch cannot select a different seed. A null or
+missing seed in an explicitly supplied manual config still draws a fresh 32-bit
+seed, but this is not the current research comparison policy. Effective configs
+and checkpoint hyperparameters retain the actual seed. A `--resume` adopts its
+checkpoint's original seed. Matched seeds do not guarantee deterministic training.
+Preparation/training verifies requested folds and the label-source fingerprint.
 
 ### Path resolution
 

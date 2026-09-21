@@ -1,5 +1,11 @@
 # Shared-loss campaign
 
+Current state, 2026-09-21: stopped on the user-adopted learned-strength incumbent
+(seed 2263738815, fold-0 AUC 0.897443). The source/reference transition is recorded
+in [the shared closure record](../../checkpoint-closure.md). Original reference,
+budget and startup sections below describe the historical seal; they do not select
+the current incumbent. Historical attempts retain their original references.
+
 ## Objective and scope
 
 Improve mean per-label ROC-AUC by changing the training objective. Use **one loss,
@@ -36,7 +42,7 @@ it; the user starts the detached supervisor using [runtime operation](../../runt
   hard positive/negative grouping for a pair term does not rewrite the source labels.
 - Start from current class-balanced BCE and the control pinned in
   [campaign.yaml](campaign.yaml). Record the source snapshot, effective configuration,
-  input identities, fresh training seed, and exact loss formula for every attempt.
+  input identities, incumbent-matched training seed, and exact loss formula for every attempt.
 - Keep the same training cohort and study visits, average realized valid triplets,
   ten epochs, and 4,380 optimizer steps. Keep stochastic training selection and
   deterministic unaugmented validation at image multiplier 1. Losses may not change
@@ -54,7 +60,7 @@ it; the user starts the detached supervisor using [runtime operation](../../runt
   handling; their construction runs inside measured training, with no external
   feature extraction or hidden precomputation. Extra model updates or data passes
   are outside the fixed schedule.
-- A fresh run receives a fresh recorded seed; never retry seeds to recover a win.
+- Every new candidate inherits the incumbent's recorded seed; never retry seeds to recover a win.
   A genuine checkpoint resume retains its original seed. Bootstrap draws use the
   separate fixed resampling seed.
 
@@ -92,15 +98,14 @@ Compute candidate-minus-reference macro AUC with a 95% interval.
 
 | Result after contract checks | Decision |
 |---|---|
-| Interval strictly above zero | Eligible for provisional acceptance |
-| Interval includes zero | Inconclusive; retain the incumbent |
-| Interval strictly below zero | Reject this implementation as an improvement |
+| Valid macro AUC gain >= 0.001 and 80% interval lower bound > 0 | Adopt as the working incumbent (`provisional_accept`) |
+| Valid result failing either adoption condition | Discard this implementation (`reject`); retain the incumbent |
 | Missing evidence or contract breach | Invalid; no acceptance |
 
 Retain the original control as evidence when the incumbent changes. Per-label
 results explain tradeoffs but do not replace the fixed macro criterion or authorize
 per-label objectives. Bootstrap uncertainty is conditional on the fitted models;
 it excludes training-seed variation and repeated selection on fold 0. Acceptance
-is provisional. Do not automatically repeat inconclusive runs or stop an otherwise
+is provisional. Do not automatically repeat discarded runs or stop an otherwise
 valid full-budget run for weak early AUC. Exceptional confirmations require a
 recorded reason under the [protocol](../../protocol.md).
