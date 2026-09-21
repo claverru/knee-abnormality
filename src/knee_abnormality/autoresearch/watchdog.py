@@ -51,6 +51,7 @@ class Watchdog:
         self.output = supervisor.output
         self.directory = self.output / "watchdog"
         self.record = optional_json(self.directory / "state.json") or {}
+        self.record.setdefault("incidents", [])
 
     def save(self, **fields):
         self.record.update(fields, updated_at=time.time())
