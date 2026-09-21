@@ -1,0 +1,61 @@
+ideas:
+- id: active-gradient-attribution-exclusivity
+  mechanism_id: linear-zero-margin-attribution-exclusivity
+  parent_idea_id: anatomical-attention-attribution-exclusivity
+  title: Correct inactive attribution exclusivity with an active linear zero-margin penalty
+  opportunity: The anatomical-attention exclusivity run repeated every label AUC and BCE exactly for its
+    first three epochs because its added loss was zero. Its later epoch-mean weighted penalty was at most
+    about 1.35e-6 against BCE about 0.47. A margin of 1.0 suppressed virtually all positive logit drops.
+    This is an inactive-mechanism result, not evidence that effective exclusivity cannot help. The user
+    explicitly requested a corrected future attempt.
+  mechanism: 'Retain the post-anatomical-attention sibling erasure, but replace the dormant squared hinge
+    y * relu(z_own - z_erased - 1)^2 with the linear zero-margin penalty y * relu(z_own - z_erased).
+    The zero deadband makes every harmful positive-logit drop eligible, and the linear form avoids another
+    vanishing gradient when those drops are small. Keep detached sibling masks, observed-cell reduction,
+    both families and unchanged main BCE. Use the archived coefficient 0.05 as one fixed attempt, not a
+    validation-tuned sweep. Log positive-drop activation, raw and weighted penalty for interpretation only;
+    run through the ordinary full-budget path with no monitor or special early stop. A zero remaining
+    attention mass must be handled explicitly and excluded from spurious activation. No extra data passes
+    or optimizer updates.'
+  precedents:
+  - autoresearch/campaigns/medial-lateral-transfer/prior-work.md#revisit-queue-on-learned-strength
+  - autoresearch/anatomical-attention.md
+  - autoresearch/checkpoint-closure.md
+  - /home/claudio/src/knee-abnormality/outputs/autoresearch/medial-lateral-transfer/experiments/cross-compartment-attribution-exclusivity-20260921T001439Z-46286939/source
+  - /home/claudio/src/knee-abnormality/outputs/autoresearch/medial-lateral-transfer/experiments/cross-compartment-attribution-exclusivity-20260921T001439Z-46286939/comparison
+  - 'Historical parent: cross-compartment-attribution-exclusivity'
+  - autoresearch/campaigns/medial-lateral-transfer/prior-work.md#corrected-exclusivity-follow-up
+  - outputs/autoresearch/medial-lateral-transfer/experiments/anatomical-attention-attribution-exclusivity-20260921T141236Z-855ccb19/training/fold_0/logs/version_0/metrics.csv
+  novelty: Explicit user-authorized correction of a diagnosed dormant hinge on the anatomical incumbent.
+    Removing the deadband and using a linear positive-drop penalty distinguishes it from unchanged replay.
+    This single correction is authorized despite historical findings calling margin changes inadmissible sweeps.
+  coverage: Both meniscus and medial/lateral OA pairs; report activation per family, observed-positive
+    coverage, mask degeneracy, margins, collateral labels and the unchanged macro adoption criterion.
+  exploitation: >-
+    Log activation fractions and raw/weighted loss from ordinary training batches so a later result states
+    whether the correction engaged. These are diagnostics only; no monitoring, adaptive changes,
+    validation-based tuning or extra stopping rule. The fixed macro rule still decides adoption.
+  budget: Reuse the same backbone forward and existing erasure readout. Scalar activation/loss logging stays
+    inside the ordinary measured steps and the 1797-second limit. No extra data passes, epochs, gradient probes
+    or independent diagnostic training runs.
+  implementation: >-
+    Mode add on the current incumbent, preserving learned anatomical strength, fixed width,
+    position-rich pooling, main BCE, sampling and unrelated accepted improvements. Adapt the archived
+    exclusivity source, not its trained checkpoint. Make margin zero fixed behavior for this successor;
+    remove the failed positive-margin and squared-penalty branches instead of keeping them as tunable options.
+    Log raw positive-drop summaries, activation fractions and weighted loss at the existing logging cadence.
+    Non-finite or degenerate implementations are invalid. If the incumbent changes, reconcile
+    and review overlap with its attention/readout implementation before launch. Same incumbent seed, no
+    extra epochs, updates or GPU probes by agents.
+    The integration report is relative only to the learned-strength implementation parent: use mode add
+    and removed_components []. The rejected exclusivity source is a precedent, not the parent; its margin
+    field and squared hinge therefore are not parent components being removed.
+  open_choices: Use the linear zero-margin penalty and archived 0.05 coefficient as fixed behavior. Do not
+    keep margin, exponent or coefficient alternatives, add a monitor, automatically sweep coefficients or
+    silently rerun. Diagnostics come from the ordinary supervisor-launched training only.
+  dependencies: []
+  priority_rationale: 'User-mandated corrected follow-up, ranked first before the fresh local-lesion retry.
+    Do not discard it as a forbidden margin sweep: this specific correction is explicitly authorized. All
+    numerical adoption and resource gates remain unchanged.'
+exhausted_directions: One explicitly authorized correction. Preserve the old reject verdict; do not generalize
+  the dormant-mechanism result to active exclusivity. No blanket permission for sweeps.

@@ -1,6 +1,6 @@
-revision: 351
+revision: 431
 queue:
+- anatomical-attention-local-lesion-evidence-retry
+- unbiased-credit-compartment-attention
+- explicit-knee-side-coordinate-encoding
 - anatomy-supervised-compartment-evidence-split
-- within-knee-exclusive-differential-ranking
-- sibling-conditional-attention-adversary
-- discordant-sibling-gradient-projection

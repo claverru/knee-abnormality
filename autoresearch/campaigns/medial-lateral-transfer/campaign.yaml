@@ -3,69 +3,77 @@ status: stopped
 recipe: outputs/training/overnight-20260919T235434Z-8ol_1c30/runs/13-control-repeat/effective_config.json
 reference_run: outputs/training/overnight-20260919T235434Z-8ol_1c30/runs/13-control-repeat
 additional_evidence_runs:
-  - outputs/training/meniscus-classifier
-  - outputs/training/meniscus-oa-classifiers
-  - outputs/training/disease-compartment-attention
-  - outputs/training/meniscus-soft-coupling
-  - outputs/training/compartment-control
+- outputs/training/meniscus-classifier
+- outputs/training/meniscus-oa-classifiers
+- outputs/training/disease-compartment-attention
+- outputs/training/meniscus-soft-coupling
+- outputs/training/compartment-control
+- outputs/training/anatomical-attention/learned-strength
+- outputs/training/anatomical-attention/control-repeat
+- outputs/training/anatomical-attention/candidate
+- outputs/training/anatomical-attention/learned-width
 backlog:
   refill_below: 4
   refill_to: 5
 artifacts_root: outputs/autoresearch/medial-lateral-transfer
 policy:
   editable_files:
-    - configs/training.yaml
-    - src/knee_abnormality/config.py
-    - src/knee_abnormality/modeling/model.py
-    - src/knee_abnormality/modeling/spatial_tokens.py
-    - src/knee_abnormality/modeling/augmentation.py
-    - src/knee_abnormality/data/dataset.py
-    - src/knee_abnormality/data/preprocessing/preparation.py
-    - src/knee_abnormality/training/lightning.py
+  - configs/training.yaml
+  - src/knee_abnormality/config.py
+  - src/knee_abnormality/modeling/model.py
+  - src/knee_abnormality/modeling/spatial_tokens.py
+  - src/knee_abnormality/modeling/augmentation.py
+  - src/knee_abnormality/data/dataset.py
+  - src/knee_abnormality/data/preprocessing/preparation.py
+  - src/knee_abnormality/training/lightning.py
   editable_directories:
-    - src/knee_abnormality/modeling/compartment_transfer
-    - src/knee_abnormality/training/compartment_transfer
+  - src/knee_abnormality/modeling/compartment_transfer
+  - src/knee_abnormality/training/compartment_transfer
   config_keys: []
   config_prefixes:
-    - model.compartment_transfer
-    - trainer.compartment_transfer
-    - data.compartment_transfer
+  - model.compartment_transfer
+  - trainer.compartment_transfer
+  - data.compartment_transfer
   list_item_fields: {}
   input_identity_keys:
-    - preprocessing_identity
+  - preprocessing_identity
   require_source_change: false
-  developer_instructions: >-
-    Implement a mechanism for exploiting disease patterns shared between medial
-    and lateral compartments, or an assigned attribution control. Both meniscus
-    and medial/lateral OA are in scope; do not impose identical classifiers or
-    restrict the campaign to meniscus. The adopted reference is learned anatomical
-    family strength with fixed 20 mm width and independent heads. Preserve it when
-    stacking; explicitly justify replacement when substituting. The misnamed
-    compartment-control run is rejected shared-adapter evidence. Do not restore its adapter modes
-    or queue the retired independent arm. Configuration-only candidates require
-    a concrete mechanism or ablation, not a generic sweep. New settings belong under the compartment_transfer
-    subtrees. Keep the backbone, sampling, image budget, main balanced BCE,
-    optimizer, schedule, labels, prediction interface, and evaluation fixed.
-    Model and spatial-token edits may implement disease features, attention,
-    routing, shared/private components, or auxiliary feature access. Dataset,
-    preparation, and augmentation edits are limited to supporting anatomical
-    metadata and consistent coordinate/orientation plumbing for the assigned
-    mechanism; preserve decoding, filtering, selected slices, valid-region
-    accounting, augmentation distributions, and study exposure. Lightning edits
-    may connect training-only transfer objectives and diagnostics; preserve main
-    BCE, validation, optimizer/scheduler, checkpoint selection, and accounting.
-    All preparation and auxiliary computation must run inside measured training
-    on training data only. Record source/configuration, changed identity members,
-    mechanism diagnostics, and parameter/compute costs. Return prepared or blocked.
-    Use the existing environment for static checks. No tests or GPU work by agents.
-  researcher_instructions: >-
-    The user's scope is: some diseases appear lateral and medial so they should
-    share some patterns that the model should be able to exploit. Explore distinct
-    mechanisms across feature learning, anatomical assignment, attention, flexible
-    sharing, and training supervision, within the fixed recipe. Read prior-work.md
-    and the latest compartment-control and related adapter artifacts before
-    ranking or proposing work; never duplicate an externally completed or active
-    adapter arm. Distinguish shared morphology from co-occurrence, added capacity,
-    and additional task weight. Historical failures concern specific mechanisms,
-    not the whole hypothesis. Both disease families remain in scope. Do not pad
-    the queue with coefficient sweeps or rename rejected implementations.
+  developer_instructions: Improve meniscus and medial/lateral OA compartment predictions through disease-pattern
+    sharing, anatomical assignment, knee-side/position encoding, or an assigned attribution control. Both
+    meniscus and medial/lateral OA are in scope. Classifier tying is allowed for an assigned proposal,
+    but is not required across the campaign; meniscus-only experiments do not restrict the broader scope.
+    The adopted reference is learned anatomical family strength with fixed 20 mm width and independent
+    heads. Preserve it when stacking; explicitly justify replacement when substituting. The misnamed compartment-control
+    run is rejected shared-adapter evidence. Do not restore its adapter modes or queue the retired independent
+    arm. Configuration-only candidates require a concrete mechanism or ablation, not a generic sweep.
+    New settings belong under the compartment_transfer subtrees. Keep the backbone, sampling, image budget,
+    main balanced BCE, optimizer, schedule, labels, prediction interface, and evaluation fixed. Model
+    and spatial-token edits may implement disease features, attention, routing, shared/private components,
+    or auxiliary feature access. Dataset, preparation, and augmentation edits are limited to supporting
+    anatomical metadata and consistent coordinate/orientation plumbing for the assigned mechanism; preserve
+    decoding, filtering, selected slices, valid-region accounting, augmentation distributions, and study
+    exposure. Lightning edits may connect training-only transfer objectives and diagnostics; preserve
+    main BCE, validation, optimizer/scheduler, checkpoint selection, and accounting. All preparation and
+    auxiliary computation must run inside measured training on training data only. Record source/configuration,
+    changed identity members, mechanism diagnostics, and parameter/compute costs. Return prepared or blocked.
+    Use the existing environment for static checks. No tests or GPU work by agents. User scope amendment
+    2026-09-21 explicitly includes side encoding and anatomy-supervised compartment assignment; earlier
+    deferrals of image-based side inference do not block these scoped proposals. Reuse the adopted trusted
+    knee_side_sign, knee_center_x_mm, patient_maps and geometry validity. Unknown side must remain explicit;
+    do not guess from disease labels, report text, study identifiers or validation outcomes. Preserve
+    the audited resolver and existing decoding/filtering. Follow prior-work.md#revisit-queue-on-learned-strength
+    for the user-selected revisits. Retain learned anatomical strengths, fixed 20 mm width and position-rich
+    pooling unless a reviewed proposal explicitly replaces named behavior. Do not restore appearance-only
+    pooling or the rejected pooled adapter. Historical source is evidence to adapt, never the new implementation
+    parent.
+  researcher_instructions: The current user objective is to improve compartment-specific meniscus and
+    medial/lateral OA predictions. Disease-pattern sharing, knee-side and anatomical-position encoding,
+    and anatomy-supervised assignment are all in scope. Side encoding does not have to introduce additional
+    disease sharing. Read prior-work.md#revisit-queue-on-learned-strength and the latest manual anatomical-attention
+    results before proposing or reranking. Prioritize the user-selected historical adaptations and side-encoding
+    proposal; reconsider them only on concrete new evidence and preserve provenance. Historical failures
+    are implementation-specific, not bans on a whole direction. The adopted learned-strength run is the
+    comparison incumbent, with its recorded seed. Distinguish shared morphology, spatial assignment, co-occurrence,
+    added capacity and additional supervision. Do not repeat the dormant zero-gated family channel, removed
+    appearance-only pooling, or rejected adapter unchanged. No coefficient sweeps or renamed failed implementations.
+    Respect the fixed recipe, budget and adoption rule.

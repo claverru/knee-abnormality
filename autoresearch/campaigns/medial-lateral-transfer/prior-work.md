@@ -3,9 +3,82 @@
 Current status: stopped on learned-strength-20260921 after the campaign and manual
 follow-ups completed. The cancelled extra run is finalized invalid. See the
 [closure record](../../checkpoint-closure.md) for current reference/source and
-state; the startup details below preserve original provenance.
+state; the startup details below preserve original provenance. The user refreshed
+the queue and broadened the objective on 2026-09-21 as recorded below.
+
+## Revisit queue on learned strength
+
+The objective is now to improve compartment-specific meniscus and medial/lateral
+OA predictions. Shared disease features, anatomical assignment, knee-side and
+position encoding are all eligible; an encoding proposal need not add disease
+sharing. The user explicitly authorized side-encoding solutions and anatomy-based
+assignment, superseding the old scope deferral for the queued anatomy gate.
+
+The current control remains `outputs/training/anatomical-attention/learned-strength`
+(macro AUC 0.8974429314502609), seed 2263738815, with the cleaned frozen source in
+the closure record. The recent `control-repeat` without anatomical attention is
+supporting evidence, not the incumbent. Original startup recipe/reference fields
+and sealed resource limits remain historical budget provenance.
+
+| Order | Queued implementation | Reason to revisit or investigate |
+|---|---|---|
+| 1 | Position-rich shared meniscus readout | Older 1A improved both meniscus labels by about 0.003 on a different recipe. Test classifier sharing with the adopted anatomical separation, keeping position-rich values. The later appearance-only tied classifier harmed meniscus and is not restored. |
+| 2 | Anatomical-attention attribution exclusivity | Historical medial-OA gain was +0.005466 versus B, but macro fell 0.000710 and other compartment labels regressed. Anatomically separated attention changes which evidence its erasure penalty removes. |
+| 3 | Anatomical-attention local lesion evidence | The stride-16 shared-detector attempt was cancelled and invalid, not a measured failure. Its ungated local evidence can now be read by anatomical attention. |
+| 4 | Explicit knee-side/coordinate encoding | Give attention a learned side-location interaction, retaining the accepted bias and position-rich values. This differs from the retired standalone side embedding. |
+| 5 | Anatomy-supervised compartment evidence split | Reuse the working geometry to supervise assignment; retain the anatomical incumbent and review overlap with any newly accepted evidence branch. |
+
+Each historical adaptation has a new ID and links to its original source and
+results. No historical decision is relabeled, no cancelled checkpoint is resumed,
+and no old source becomes the implementation parent. Incumbent changes require
+renewed integration review. The other three formerly queued proposals remain
+`proposed`, available for later admission rather than scientifically rejected.
+
+The old `shared-family-level-channel` is deliberately not queued unchanged: its
+four selected-checkpoint scales had norm about 0.0092 and its targeted family AUCs
+barely moved. The +0.000893 macro difference mainly came from other labels. That
+is weak evidence for the proposed sharing mechanism, despite the favorable macro
+ranking. Self-oriented hemifield gating also substantially overlaps the now-adopted
+anatomical solution. Neither deserves an automatic replay or coefficient sweep.
+
+The historical candidates used different seeds and older data/source states;
+their scores prioritize hypotheses, not proven gains on learned strength. New runs
+inherit the incumbent seed and use the fixed gain >= 0.001 plus positive central
+80% interval rule. Per-label diagnostics do not override it. Only this campaign's
+queue/guidance changed; all three campaigns remain stopped.
+
+The append-only [decision and before-state](../../../outputs/autoresearch/medial-lateral-transfer/decisions/user-compartment-revisit-20260921-1789998712642067442/decision.json)
+record the user authorization, queue, scope amendment and unchanged reference.
 
 ## Active run and launch readiness
+
+Historical startup information follows. Current user-requested follow-up:
+
+### Corrected exclusivity follow-up
+
+On 2026-09-21 the user explicitly requested another attribution-exclusivity attempt,
+with the inactive mechanism fixed. The completed anatomical-attention attempt had
+zero auxiliary loss for the first three epochs and exactly reproduced all control
+label AUCs and BCE. Later weighted epoch-mean penalty peaked near 1.35e-6 versus
+main loss around 0.47. Its margin of 1.0 left almost all positive logit drops
+unpenalized. Preserve its `reject` verdict, but do not interpret it as evidence
+against an active exclusivity objective or as a clean estimate of seed variance.
+
+The [corrected proposal](corrected-exclusivity.yaml) replaces the dormant squared
+hinge with a linear zero-margin positive-drop penalty. That removes both the 1.0
+deadband and the tiny-gradient behavior for small violations. Activity and weighted
+loss are logged for interpretation during the ordinary full run; there is no
+monitor, adaptive setting or special early stop. Use the current incumbent and its
+seed; all accounting and adoption gates remain unchanged. This specific user
+authorization supersedes the historical finding that a margin correction is
+inadmissible. It does not authorize coefficient sweeps, validation-based tuning or
+extra training passes.
+
+After the user explicitly stopped the campaign, the corrected proposal and a fresh
+retry of the interrupted local-lesion implementation were inserted at the front of
+the live queue. The corrected exclusivity run is first and the local-lesion retry is
+second. Neither has launched. The aborted two-epoch local-lesion attempt remains an
+invalid operational record and carries no scientific verdict.
 
 Historical startup record: the campaign was prepared and unstarted at this point. Its draft was written while the external
 `outputs/training/compartment-control` run was active on 2026-09-20. That run has
