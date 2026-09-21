@@ -25,6 +25,12 @@ describe their removal in `removed_components`. A blocked report uses
 `integration: null`. Do not infer a replacement from incompatible code alone.
 Do not remove prerequisites of a retained accepted method; explicitly replace
 the dependent method too if the assigned mechanism requires that composition.
+Historical or rejected implementations used as design precedents are not the
+implementation parent. Do not list their omitted fields, branches, losses or
+parameters in `removed_components` unless those components actually exist in the
+supplied parent source. For example, adapting a rejected loss onto a baseline that
+never contained that loss is `mode: add` with `removed_components: []`, even when
+the adapted design deliberately omits settings from the rejected implementation.
 
 Inspect the diff, configuration, sampling-count accounting, training randomness,
 validation determinism, topic-specific coverage, and added computation. Follow the repository

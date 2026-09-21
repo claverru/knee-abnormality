@@ -1,5 +1,21 @@
 # Implementation status
 
+User-requested follow-up, 2026-09-21: [corrected attribution exclusivity](campaigns/medial-lateral-transfer/prior-work.md#corrected-exclusivity-follow-up)
+is first in the stopped campaign's queue, followed by a fresh retry of the
+user-aborted local-lesion run. The correction replaces the inactive squared hinge
+with a linear zero-margin penalty. It uses ordinary full-budget training and logs
+activity without a monitor or adaptive stop. Original results, reference, seed and
+resource limits remain unchanged.
+
+Operational recovery, 2026-09-21: Claude returned null `output_tokens_details`
+during a developer OAuth refresh failure. Usage accounting now handles that null
+as absent thinking-token details, so status and failure harvesting no longer
+crash. The original failed receipt is preserved; the campaign was resumed once
+to retry the same untrained candidate. The retry passed authentication: supervisor
+and developer are live, and the developer is issuing tools on the first candidate.
+The campaign is running; the stopped-state notes below describe earlier preparation.
+Authentication failures remain blockers, not grounds for repeated automatic retries.
+
 [Checkpoint closure](checkpoint-closure.md) is complete: triplet-sampling, losses
 and medial-lateral-transfer all point to learned-strength-20260921 and remain
 stopped, with no running/claimed attempts or pending events. The cancelled extra
@@ -7,6 +23,13 @@ run is finalized invalid; the old loss preparation is archived. Frozen source,
 reference hashes, exact cleaned-input identity allowance, prior states and decisions
 are recorded. The rejected adapter is removed and current-state project docs are
 aligned. Original numerical limits and historical results remain unchanged.
+
+Medial/lateral transfer now targets compartment-specific disease improvement,
+including knee-side/position encoding. Its [refreshed queue](campaigns/medial-lateral-transfer/prior-work.md#revisit-queue-on-learned-strength)
+contains three historical adaptations followed by explicit side-location encoding
+and anatomy-supervised assignment. Learned strength remains the control; the recent
+unbiased control-repeat is supporting evidence. Old experiments and limits are
+unchanged; displaced proposals remain available. The campaign is prepared but stopped.
 
 
 The anatomical-attention investigation is closed by user-directed adoption of

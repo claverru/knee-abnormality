@@ -1,4 +1,4 @@
-revision: 351
+revision: 431
 ideas:
 - id: shared-disease-auxiliary
   mechanism_id: training-only-compartment-transfer
@@ -2283,33 +2283,25 @@ ideas:
   title: Split a family-shared token disease detector between compartments with one
     anatomical gate trained only on geometry-derived medial/lateral token labels and
     detached from the disease loss
-  opportunity: "The conserved split is the one tested design whose shared part is\
-    \ prevalence-symmetric by construction. Its per-pair gate, however, learned assignment\
-    \ only from study labels, and the compartment margins degraded (meniscus \u2212\
-    0.0145 [\u22120.0283, \u22120.0034]; OA \u22120.0272, wide interval). The most\
-    \ plausible cause is weak, co-occurrence-exposed assignment, which is also the\
-    \ reference's measured OA deficit. Geometry can provide dense assignment labels\
-    \ for free: patient maps, reflection-corrected prepared anchors and a coordinate\
-    \ side rule already exist in the anatomical-medial-axis arm. New estimate: re-applying\
-    \ that rule (\u22652 series agreeing in sign, 40 mm qualification) to the 128-study\
-    \ header sample resolves 124/128 (96.9%; 62 left, 62 right). That is approximate;\
-    \ it uses header image centres, not the arm's selected records. The axis arm fed\
-    \ geometry into inference and failed on the prediction path. Here geometry is\
-    \ only a training target."
-  mechanism: "One per-token gate g(t)=\u03C3(MLP(token)), shared by both families,\
-    \ is trained with a small auxiliary token BCE to predict 'medial of the knee midline'.\
-    \ The label is sign(side\xB7(patient_x \u2212 knee_centre_x)). Side-unknown studies,\
-    \ invalid-pose triplets and a \xB1\u03B4 mm midline band are masked out. Labels\
-    \ follow the tissue under reflection and affine augmentation. For each family\
-    \ f, a shared evidence head e_f (zero-initialised output) and a saliency \u03C0\
-    _f (softmax over study tokens) give \u0394z_medial = \u03A3\u03C0_f\xB7sg(g)\xB7\
-    e_f and \u0394z_lateral = \u03A3\u03C0_f\xB7(1\u2212sg(g))\xB7e_f. The stop-gradient\
-    \ means disease labels cannot pull assignment toward a co-occurrence shortcut.\
-    \ e_f is trained by both compartments' positives (shared morphology), with attribution\
-    \ fixed by anatomy. At inference the gate is predicted from image content, so\
-    \ no metadata is needed. The four private pathways stay unchanged, and neither,\
-    \ medial-only, lateral-only and both remain representable."
+  opportunity: The historical conserved evidence split degraded compartment margins
+    while learning assignment only from disease labels. The adopted model now provides
+    reliable geometry plumbing and a soft anatomical bias. A separately anatomy-supervised
+    assignment gate tests whether learning a spatial representation improves shared
+    disease evidence beyond that bias. Earlier header-sample coverage estimates and
+    invalid axis-arm failures are historical, not current measurements.
+  mechanism: Train a small per-token medial/lateral gate with trusted training geometry
+    labels from side * (patient_x - knee_center_x), masking unknown side, invalid
+    geometry and a fixed midline band. Share the gate across meniscus and OA. Add
+    one family-shared evidence path split by the detached gate into medial and lateral
+    contributions. Disease loss trains the shared evidence but not its assignment
+    gate through the split. Retain the current private pathways, anatomical attention
+    bias and position-rich pooling. At inference the auxiliary gate is predicted from
+    tokens; the existing incumbent path still uses its trusted geometry and unknown-side
+    fallback.
   precedents:
+  - autoresearch/campaigns/medial-lateral-transfer/prior-work.md#revisit-queue-on-learned-strength
+  - autoresearch/anatomical-attention.md
+  - autoresearch/checkpoint-closure.md
   - "conserved-evidence-compartment-assignment (inconclusive: macro \u22120.00332,\
     \ margins degraded, below the reference at every epoch). Identical split structure;\
     \ its gate was per pair, learned from disease labels, and not detached."
@@ -2323,90 +2315,64 @@ ideas:
     \ and per-target Gaussian coordinate attention priors (\u22120.002177, retired).\
     \ This design supervises anatomy instead of injecting it, and imposes no fixed\
     \ prior on target attention."
-  novelty: 'This is the first campaign arm whose compartment assignment is supervised
-    by anatomy rather than inferred from disease labels. It differs from the conserved
-    split only in the gate: shared across families, supervised by geometry, and detached
-    from disease gradients. That gives a sharp test of whether assignment was that
-    design''s failure. Because the supervision is disease-free, it does not reinforce
-    the already over-coupled cross-family lateralization (0.787 versus 0.305 for the
-    labels).'
-  coverage: All four compartment targets in both families, and all three planes; sagittal
-    tokens get their label from the slice's patient X. Estimated gate supervision
-    is about 97% of studies. Fold-0 side coverage, and the fractions of midline-band
-    and invalid-pose tokens, must be recorded as run artifacts. If abstention is large,
-    the gate is weakly trained.
-  exploitation: Log gate accuracy and supervised-token coverage every epoch; an unlearned
-    gate makes a null result uninterpretable. Read compartment margins, lateral-OA
-    AUC within medial-positive studies, and family means alongside the macro verdict.
-    If the arm wins, the matched control keeps the same module and weight but supervises
-    the gate on an anterior/posterior (patient-Y) sign. That separates mediolateral
-    grounding from generic geometric regularisation. The conserved arm is a different-seed
-    comparison, not a matched one.
-  budget: "Gate 256\u219232\u21921, plus per family a 256\u21921 saliency and a 256\u2192\
-    32\u21921 evidence head, over about 10.2k tokens; one token BCE; about 25k parameters.\
-    \ Collation adds per-triplet 3\xD73 middle patient maps and two study scalars.\
-    \ Side resolution is deterministic, RNG-free per-study work and cannot alter sampling\
-    \ or the sealed triplets. The conserved split measured 1,596.6 s with three comparable\
-    \ heads; one extra small MLP and a BCE should stay well under 1,797 s. Timing\
-    \ still needs measurement."
-  implementation: "Pure addition to historical-control; removes nothing. dataset.py:\
-    \ reuse the axis arm's _resolve_knee_side and its collation of patient_maps, knee_side_sign\
-    \ and knee_center_x_mm. model.py: compute prepared anchors in a separate helper\
-    \ and return them in the encoded dict; do not change feature_geometry's return\
-    \ arity, because out-of-tree callers break. Put the split module in the float32\
-    \ block. forward must never read the new batch keys. lightning.py training_step:\
-    \ build the token labels from the Lightning-transferred batch and the anchors,\
-    \ add weight \xD7 masked BCE, and log gate accuracy and coverage. Config goes\
-    \ under model.compartment_transfer and trainer.compartment_transfer; parameters\
-    \ live under model.* and are rebuilt from config. If shared-family-level-channel\
-    \ is accepted, re-express this as its replacement, since both add family-shared\
-    \ evidence and stacking confounds attribution, then re-review. If contralateral-mirror-token-comparison\
-    \ is accepted, stack."
-  open_choices: "Gate weight, fixed before launch and well below BCE (e.g. 0.05).\
-    \ Midline band \u03B4 (e.g. 10 mm). Gate input (normalised tokens by default)\
-    \ and linear versus 32-wide MLP. Conserved split (default) versus zero-initialised\
-    \ per-compartment scales. Whether to keep the 40 mm side qualification. Scope\
-    \ flag for the orchestrator: knee-side-and-location.md records image-based side\
-    \ inference as deferred by the user. The gate learns image-based medial anatomy;\
-    \ the campaign authorises anatomical assignment and metadata plumbing, but the\
-    \ orchestrator should confirm this fits."
+  novelty: Tests anatomy-supervised learned assignment on top of learned anatomical
+    attention. The old disease-supervised conserved split and retired side embedding
+    are adverse precedents, not the current parent. The user has explicitly admitted
+    anatomy-based side-encoding/assignment solutions.
+  coverage: Both families and all planes. Historical coverage estimates are not current
+    measurements; log actual trusted-side and valid-token coverage. The incumbent
+    already consumes geometry at inference; preserve its fallback.
+  exploitation: Log supervised-token coverage, gate accuracy and evidence activity
+    during the run. Inspect compartment margins and family/collateral AUCs; the fixed
+    macro rule alone determines adoption. No automatic attribution-control training.
+  budget: Small token MLP plus two family evidence/saliency heads and masked auxiliary
+    BCE; reuse the existing batch geometry and same backbone pass. No extra images
+    or updates. Measure all overhead against the original 1797-second ceiling.
+  implementation: Mode add on the current anatomical incumbent. Reuse existing patient
+    maps, prepared anchors, knee-side sign and validity; do not restore the invalid
+    historical geometry plumbing. Supervise the learned compartment gate only from
+    trusted training geometry; mask unknown side, invalid pose and a fixed midline
+    band. Preserve the incumbent anatomical bias and position-rich values. If another
+    family evidence branch has become accepted, explicitly review redundancy and name
+    any replaced component rather than silently stacking it. Implement against the
+    live incumbent frozen source; preserve learned anatomical strengths, fixed 20
+    mm width, position-rich pooling, sampling, main BCE and unrelated accepted components.
+    Use the incumbent seed. If it changes during preparation, reconcile and renew
+    integration review. Resolve labels by name, preserve all twelve public logits
+    and strict checkpoint loading. No historical checkpoint warm start.
+  open_choices: Choose one small gate architecture, auxiliary weight and midline exclusion
+    before training using training-only reasoning. User scope amendment explicitly
+    authorizes anatomy-supervised compartment assignment. Do not alter side-resolution
+    thresholds or tune from validation.
   dependencies: []
-  priority_rationale: Rank second. It directly tests the most plausible cause of the
-    only prevalence-symmetric sharing arm's failure, and targets the measured OA assignment
-    deficit with dense, disease-free supervision. It sits below the mirror comparison
-    because of its heavier plumbing (dataset, anchors, training-step loss), the axis
-    arm's prediction-path failure history, the scope flag, and an unmeasured risk
-    that the auxiliary reshapes the shared backbone.
+  priority_rationale: 'Fifth: permitted anatomy-supervised assignment alternative
+    with more implementation and auxiliary-loss risk; compare with the current geometric
+    bias instead of treating it as absent.'
   status: queued
   created_revision: 209
-  ranking_rationale: "Completion of attention-owned-compartment-gradient-routing:\
-    \ the fixed rule gives reject. Macro \u0394 is \u22120.00392, 95% CI [\u22120.00769,\
-    \ \u22120.00027]. The gates the developer flagged as pending are now measured\
-    \ and pass. Compute was 1,617 s against a 1,797 s ceiling. Triplets, visits and\
-    \ cohort hashes match exactly, and validation selection is identical in every\
-    \ epoch.\n\nThe escalation concern was the confound with gradient mass, and the\
-    \ logged kept share resolves it against the mechanism:\n- Kept share starts at\
-    \ about 0.51 in both families. Meniscus rises to 0.80 by epoch 9, but OA reaches\
-    \ only 0.60.\n- So for most of training the four compartment labels sent roughly\
-    \ half of their trunk gradient. In the early epochs the intervention was close\
-    \ to a uniform 0.5 scale on compartment trunk credit.\n- Medial and lateral kept\
-    \ shares are identical by construction, since \u03A3a_m\xB2/(a_m+a_l) \u2212 \u03A3\
-    a_l\xB2/(a_m+a_l) = \u03A3a_m \u2212 \u03A3a_l = 0. This is not a logging bug.\n\
-    \nRouting did not buy specificity:\n- Meniscus compartment margin AUC fell from\
-    \ 0.9712 to 0.9615, and OA's was flat (0.8661 to 0.8650).\n- Lateral cross-talk\
-    \ did not improve (meniscus 0.636 to 0.638, OA 0.622 to 0.638).\n- Both family\
-    \ means fell (meniscus \u22120.0069, OA \u22120.0036), and so did the other eight\
-    \ (\u22120.0033).\n\nQueue change: I admitted the anatomy-supervised split. Its\
-    \ dependencies are satisfied. It adds a shared evidence path with disease-free,\
-    \ geometry-supervised assignment, so it targets the measured assignment weakness\
-    \ without removing any compartment credit. I ranked it right after the reserved\
-    \ head.\n\nWithin-knee ranking is additive supervision, so it moves above the\
-    \ two subtractive trunk or attention-gradient interventions. Those two (the sibling\
-    \ adversary and the discordant projection) share the direction this run weakened,\
-    \ withholding or reversing compartment gradient on the shared trunk. They stay\
-    \ queued, because each acts more narrowly than uniform-scale routing: the adversary\
-    \ is confined to attention rows, and the projection to discordant studies and\
-    \ conflicting components."
+  ranking_rationale: "I admitted unbiased-credit-compartment-attention. It has no\
+    \ dependencies, adds no parameters and no knob, and leaves the incumbent's forward\
+    \ pass unchanged. It uses no RNG draws, so under the seed policy its data and\
+    \ augmentation stream matches the incumbent's exactly, which makes attribution\
+    \ unusually clean. It targets a newly measured weakness (evidence-summary.md):\
+    \ before the anatomical bias, the incumbent's medial and lateral attention rows\
+    \ are 6.2/0.6 mm apart (meniscus/OA), against 32.0/11.8 mm in the same-seed no-bias\
+    \ control. The OA margin is also -0.0117 versus that control. This fits the scope:\
+    \ shared evidence must be read by the correct compartment, and making the assignment\
+    \ redundant (appearance plus geometry) serves that. I ranked it second, behind\
+    \ the reserved head. It goes ahead of explicit-knee-side-coordinate-encoding because\
+    \ that idea puts geometry into the raw scores, which would muddy the proposal's\
+    \ definition of \"raw\" if it landed first. The proposal itself flags this.\n\n\
+    I left anatomical-bias-study-dropout as proposed rather than queuing it. It tests\
+    \ the same diagnosis in a more conventional way. It adds a fixed knob (p = 0.25)\
+    \ and a train/inference regime mismatch. Its extra selling point, side-unknown\
+    \ robustness, has little support on fold 0: 42 studies and 9\u201318 positives.\
+    \ Queuing both would use two slots on one hypothesis that rests on a 57-study,\
+    \ single-seed probe. If unbiased-credit is accepted, the proposal already describes\
+    \ how dropout would become an A+B stacking candidate.\n\nOpen choice to settle\
+    \ during implementation: the proposal's default, \"trunk tokens receive the rerouted\
+    \ score gradient\", matches the incumbent graph, so that should be the fixed behaviour.\
+    \ No switch between the two options should be kept."
 - id: permutation-invariant-half-knee-mil
   mechanism_id: side-agnostic-image-half-bag-mil-with-permutation-invariant-compartment-labels
   parent_idea_id: null
@@ -3077,36 +3043,11 @@ ideas:
     population, so removing it can trade easy-pair AUC for hard-pair AUC. Adversarial
     dynamics are noisier at batch size 8. The exclusivity precedent reduced cross-talk
     without any margin gain.'
-  status: queued
+  status: proposed
   created_revision: 294
-  ranking_rationale: "Completion of attention-owned-compartment-gradient-routing:\
-    \ the fixed rule gives reject. Macro \u0394 is \u22120.00392, 95% CI [\u22120.00769,\
-    \ \u22120.00027]. The gates the developer flagged as pending are now measured\
-    \ and pass. Compute was 1,617 s against a 1,797 s ceiling. Triplets, visits and\
-    \ cohort hashes match exactly, and validation selection is identical in every\
-    \ epoch.\n\nThe escalation concern was the confound with gradient mass, and the\
-    \ logged kept share resolves it against the mechanism:\n- Kept share starts at\
-    \ about 0.51 in both families. Meniscus rises to 0.80 by epoch 9, but OA reaches\
-    \ only 0.60.\n- So for most of training the four compartment labels sent roughly\
-    \ half of their trunk gradient. In the early epochs the intervention was close\
-    \ to a uniform 0.5 scale on compartment trunk credit.\n- Medial and lateral kept\
-    \ shares are identical by construction, since \u03A3a_m\xB2/(a_m+a_l) \u2212 \u03A3\
-    a_l\xB2/(a_m+a_l) = \u03A3a_m \u2212 \u03A3a_l = 0. This is not a logging bug.\n\
-    \nRouting did not buy specificity:\n- Meniscus compartment margin AUC fell from\
-    \ 0.9712 to 0.9615, and OA's was flat (0.8661 to 0.8650).\n- Lateral cross-talk\
-    \ did not improve (meniscus 0.636 to 0.638, OA 0.622 to 0.638).\n- Both family\
-    \ means fell (meniscus \u22120.0069, OA \u22120.0036), and so did the other eight\
-    \ (\u22120.0033).\n\nQueue change: I admitted the anatomy-supervised split. Its\
-    \ dependencies are satisfied. It adds a shared evidence path with disease-free,\
-    \ geometry-supervised assignment, so it targets the measured assignment weakness\
-    \ without removing any compartment credit. I ranked it right after the reserved\
-    \ head.\n\nWithin-knee ranking is additive supervision, so it moves above the\
-    \ two subtractive trunk or attention-gradient interventions. Those two (the sibling\
-    \ adversary and the discordant projection) share the direction this run weakened,\
-    \ withholding or reversing compartment gradient on the shared trunk. They stay\
-    \ queued, because each acts more narrowly than uniform-scale routing: the adversary\
-    \ is confined to attention rows, and the projection to discordant studies and\
-    \ conflicting components."
+  ranking_rationale: 'Deferred, not scientifically rejected: user prioritizes historical
+    adaptations and side encoding on learned strength. Remains eligible for later
+    orchestrator admission.'
 - id: attention-owned-compartment-gradient-routing
   mechanism_id: pair-attention-ownership-gradient-routing-of-compartment-value-credit
   parent_idea_id: null
@@ -3339,36 +3280,11 @@ ideas:
     lacks. It ranks below routing because auxiliary arms have a poor record in this
     campaign, because blocking the identity shortcut depends on the balancing rule,
     and because it partly overlaps PIT's slot.
-  status: queued
+  status: proposed
   created_revision: 307
-  ranking_rationale: "Completion of attention-owned-compartment-gradient-routing:\
-    \ the fixed rule gives reject. Macro \u0394 is \u22120.00392, 95% CI [\u22120.00769,\
-    \ \u22120.00027]. The gates the developer flagged as pending are now measured\
-    \ and pass. Compute was 1,617 s against a 1,797 s ceiling. Triplets, visits and\
-    \ cohort hashes match exactly, and validation selection is identical in every\
-    \ epoch.\n\nThe escalation concern was the confound with gradient mass, and the\
-    \ logged kept share resolves it against the mechanism:\n- Kept share starts at\
-    \ about 0.51 in both families. Meniscus rises to 0.80 by epoch 9, but OA reaches\
-    \ only 0.60.\n- So for most of training the four compartment labels sent roughly\
-    \ half of their trunk gradient. In the early epochs the intervention was close\
-    \ to a uniform 0.5 scale on compartment trunk credit.\n- Medial and lateral kept\
-    \ shares are identical by construction, since \u03A3a_m\xB2/(a_m+a_l) \u2212 \u03A3\
-    a_l\xB2/(a_m+a_l) = \u03A3a_m \u2212 \u03A3a_l = 0. This is not a logging bug.\n\
-    \nRouting did not buy specificity:\n- Meniscus compartment margin AUC fell from\
-    \ 0.9712 to 0.9615, and OA's was flat (0.8661 to 0.8650).\n- Lateral cross-talk\
-    \ did not improve (meniscus 0.636 to 0.638, OA 0.622 to 0.638).\n- Both family\
-    \ means fell (meniscus \u22120.0069, OA \u22120.0036), and so did the other eight\
-    \ (\u22120.0033).\n\nQueue change: I admitted the anatomy-supervised split. Its\
-    \ dependencies are satisfied. It adds a shared evidence path with disease-free,\
-    \ geometry-supervised assignment, so it targets the measured assignment weakness\
-    \ without removing any compartment credit. I ranked it right after the reserved\
-    \ head.\n\nWithin-knee ranking is additive supervision, so it moves above the\
-    \ two subtractive trunk or attention-gradient interventions. Those two (the sibling\
-    \ adversary and the discordant projection) share the direction this run weakened,\
-    \ withholding or reversing compartment gradient on the shared trunk. They stay\
-    \ queued, because each acts more narrowly than uniform-scale routing: the adversary\
-    \ is confined to attention rows, and the projection to discordant studies and\
-    \ conflicting components."
+  ranking_rationale: 'Deferred, not scientifically rejected: user prioritizes historical
+    adaptations and side encoding on learned strength. Remains eligible for later
+    orchestrator admission.'
 - id: discordant-sibling-gradient-projection
   mechanism_id: residual-sign-prioritized-asymmetric-sibling-token-gradient-projection
   parent_idea_id: null
@@ -3484,33 +3400,709 @@ ideas:
     \ 5\u201312% removed energy at convergence may be too small, although early training\
     \ is probably larger and is unmeasured, and Adam normalisation may damp the effect.\
     \ Implementation cost is small: two autograd Functions."
-  status: queued
+  status: proposed
   created_revision: 339
-  ranking_rationale: "Completion of attention-owned-compartment-gradient-routing:\
-    \ the fixed rule gives reject. Macro \u0394 is \u22120.00392, 95% CI [\u22120.00769,\
-    \ \u22120.00027]. The gates the developer flagged as pending are now measured\
-    \ and pass. Compute was 1,617 s against a 1,797 s ceiling. Triplets, visits and\
-    \ cohort hashes match exactly, and validation selection is identical in every\
-    \ epoch.\n\nThe escalation concern was the confound with gradient mass, and the\
-    \ logged kept share resolves it against the mechanism:\n- Kept share starts at\
-    \ about 0.51 in both families. Meniscus rises to 0.80 by epoch 9, but OA reaches\
-    \ only 0.60.\n- So for most of training the four compartment labels sent roughly\
-    \ half of their trunk gradient. In the early epochs the intervention was close\
-    \ to a uniform 0.5 scale on compartment trunk credit.\n- Medial and lateral kept\
-    \ shares are identical by construction, since \u03A3a_m\xB2/(a_m+a_l) \u2212 \u03A3\
-    a_l\xB2/(a_m+a_l) = \u03A3a_m \u2212 \u03A3a_l = 0. This is not a logging bug.\n\
-    \nRouting did not buy specificity:\n- Meniscus compartment margin AUC fell from\
-    \ 0.9712 to 0.9615, and OA's was flat (0.8661 to 0.8650).\n- Lateral cross-talk\
-    \ did not improve (meniscus 0.636 to 0.638, OA 0.622 to 0.638).\n- Both family\
-    \ means fell (meniscus \u22120.0069, OA \u22120.0036), and so did the other eight\
-    \ (\u22120.0033).\n\nQueue change: I admitted the anatomy-supervised split. Its\
-    \ dependencies are satisfied. It adds a shared evidence path with disease-free,\
-    \ geometry-supervised assignment, so it targets the measured assignment weakness\
-    \ without removing any compartment credit. I ranked it right after the reserved\
-    \ head.\n\nWithin-knee ranking is additive supervision, so it moves above the\
-    \ two subtractive trunk or attention-gradient interventions. Those two (the sibling\
-    \ adversary and the discordant projection) share the direction this run weakened,\
-    \ withholding or reversing compartment gradient on the shared trunk. They stay\
-    \ queued, because each acts more narrowly than uniform-scale routing: the adversary\
-    \ is confined to attention rows, and the projection to discordant studies and\
-    \ conflicting components."
+  ranking_rationale: 'Deferred, not scientifically rejected: user prioritizes historical
+    adaptations and side encoding on learned strength. Remains eligible for later
+    orchestrator admission.'
+- id: anatomical-position-rich-shared-meniscus-readout
+  mechanism_id: anatomical-attention-position-rich-shared-meniscus-classifier
+  parent_idea_id: appearance-value-tied-meniscus-classifier
+  title: Share the meniscus classifier while retaining learned anatomical attention
+    and position-rich values
+  opportunity: Historical 1A improved both meniscus labels by about 0.003 on an older
+    recipe. The later appearance-value tied classifier harmed meniscus (-0.00920 medial,
+    -0.00572 lateral versus B) and confounded sharing with removal of positional values.
+    Learned anatomical attention supplies a new separation mechanism; isolate classifier
+    sharing while retaining the accepted pooling.
+  mechanism: Replace the two independent meniscus weight vectors with one shared vector
+    and retain separate compartment biases. Pool the unchanged position-rich tokens
+    through the two separate attention distributions, including the learned anatomical
+    family strength. Keep OA and other target heads independent. All four meniscus
+    outcomes remain representable through different attended evidence and biases.
+  precedents:
+  - autoresearch/campaigns/medial-lateral-transfer/prior-work.md#revisit-queue-on-learned-strength
+  - autoresearch/anatomical-attention.md
+  - autoresearch/checkpoint-closure.md
+  - /home/claudio/src/knee-abnormality/outputs/autoresearch/medial-lateral-transfer/experiments/appearance-value-tied-meniscus-classifier-20260921T042159Z-88812751/source
+  - /home/claudio/src/knee-abnormality/outputs/autoresearch/medial-lateral-transfer/experiments/appearance-value-tied-meniscus-classifier-20260921T042159Z-88812751/comparison
+  - 'Historical parent: appearance-value-tied-meniscus-classifier'
+  novelty: Tests classifier sharing conditional on learned anatomical separation without
+    restoring the rejected appearance-only value path. Historical 1A is supporting
+    evidence on a different recipe, not a matched positive result.
+  coverage: Meniscus pair directly; report both OA targets and the other eight targets
+    for collateral effects. Preserve side-unknown fallback and valid-token masking.
+  exploitation: Both compartments train one lesion readout while anatomically biased
+    attention chooses their evidence. Inspect meniscus family AUC, within-knee margins
+    and cross-talk without adding adoption gates.
+  budget: One fewer 256-dimensional classifier vector; no additional image passes,
+    tokens or updates. Verify exact dimensions from incumbent source and account for
+    the fixed original runtime budget.
+  implementation: 'Mode replace: replace only the two meniscus classifier weight vectors
+    with one shared vector; retain their individual biases and all attention/geometry
+    behavior. Implement against the live incumbent frozen source; preserve learned
+    anatomical strengths, fixed 20 mm width, position-rich pooling, sampling, main
+    BCE and unrelated accepted components. Use the incumbent seed. If it changes during
+    preparation, reconcile and renew integration review. Resolve labels by name, preserve
+    all twelve public logits and strict checkpoint loading. No historical checkpoint
+    warm start.'
+  open_choices: One fixed meniscus-only tie. No position removal, OA tying, coupling
+    coefficient sweep or automatic follow-up control.
+  dependencies: []
+  priority_rationale: 'First historical adaptation: direct transfer, minimal cost,
+    and a concrete reason the new anatomical attention could make sharing viable.
+    The adverse appearance-only result remains a warning.'
+  status: completed
+  created_revision: 352
+  ranking_rationale: 'First historical adaptation: direct transfer, minimal cost,
+    and a concrete reason the new anatomical attention could make sharing viable.
+    The adverse appearance-only result remains a warning.'
+  experiments:
+  - anatomical-position-rich-shared-meniscus-readout-20260921T135727Z-cf9db461
+  decision: reject
+- id: anatomical-attention-attribution-exclusivity
+  mechanism_id: attribution-exclusivity-on-learned-anatomical-attention
+  parent_idea_id: cross-compartment-attribution-exclusivity
+  title: Apply sibling-attribution exclusivity to the learned anatomical attention
+    distributions
+  opportunity: The historical penalty improved medial OA by 0.005466 versus B and
+    reduced a cross-talk diagnostic, but macro fell 0.000710 and meniscus/lateral
+    OA regressed. Anatomical attention changes the overlap defining erasure, providing
+    a concrete interaction to measure rather than evidence of an old win.
+  mechanism: 'Training-only, no parameters. In the training step, reuse the attention
+    weights and pooled vectors already computed for the batch. For each family pair
+    (m, l) and study, form a detached mask from the other compartment''s in-study
+    attention, mhat_l = pi_l / max_n pi_l, build w_m proportional to pi_m * (1 - mhat_l)
+    renormalised over that study''s valid tokens, re-pool pooled_m'' = sum_n w_m tokens_n
+    and evaluate the same head: z_m'' = head_m . pooled_m'' + b_m. Penalise only a
+    drop: y_m * relu(z_m - z_m'' - margin)^2, and symmetrically for the lateral compartment
+    with pi_m as the mask source. Average over observed cells and add lambda times
+    that term to the unchanged class-balanced BCE; main targets, weights, mask and
+    reduction are untouched. Weighting uses the compartment''s own soft marginal only,
+    so no joint or independence assumption is introduced, unlike a probabilistic-OR
+    family label. The penalty is one-sided and has a margin, so genuinely co-located
+    evidence in both-positive studies is not forced apart; it only forbids a compartment
+    from depending on the other''s peak evidence. Nothing changes at inference and
+    the exported checkpoint is structurally identical to the reference.'
+  precedents:
+  - autoresearch/campaigns/medial-lateral-transfer/prior-work.md#revisit-queue-on-learned-strength
+  - autoresearch/anatomical-attention.md
+  - autoresearch/checkpoint-closure.md
+  - /home/claudio/src/knee-abnormality/outputs/autoresearch/medial-lateral-transfer/experiments/cross-compartment-attribution-exclusivity-20260921T001439Z-46286939/source
+  - /home/claudio/src/knee-abnormality/outputs/autoresearch/medial-lateral-transfer/experiments/cross-compartment-attribution-exclusivity-20260921T001439Z-46286939/comparison
+  - 'Historical parent: cross-compartment-attribution-exclusivity'
+  novelty: Adds the archived training-only attribution penalty to anatomically separated
+    attention; the new parent changes the mask semantics. Original different-seed
+    results remain inconclusive historical evidence.
+  coverage: 'All four joint configurations remain representable; the penalty is one-sided
+    with a margin and uses each compartment''s own observed soft marginal, so both-positive
+    studies with genuinely overlapping evidence pay nothing beyond the margin and
+    no independence assumption enters. Main twelve logits, target order, BCE targets
+    and weights, cohort, sampling, augmentation and decoded pixels unchanged; absent
+    at inference. Real risk to record: stride-32 tokens are broad receptive fields,
+    not isolated compartments, so an exclusivity constraint can be anatomically wrong
+    for small joints; lambda and the margin bound how hard it pushes.'
+  exploitation: It does not add transfer; it removes the penalty for transfer. If
+    each compartment must stand on its own evidence, the shared backbone and any shared
+    detector can encode one morphology usable in both places without the two predictions
+    collapsing into one study-level factor, which is the failure mode every previous
+    sharing mechanism produced. That makes it a natural stacking partner for a shared-detector
+    or shared-routing winner as well as a standalone candidate.
+  budget: Four extra weighted pools per step (two families x two compartments), about
+    8e7 MACs against roughly 1.5e11 backbone MACs, plus one extra head application
+    on vectors that already exist; no new parameters, no extra images, no extra encoder
+    pass, no extra optimizer steps, nothing at inference. Extra activations are on
+    the order of a few hundred KB against the recorded 21.4 GB peak. Estimated well
+    under 0.1% of step time against the 1,562.283 s reference and the 1,797 s ceiling;
+    still to be measured, not asserted.
+  implementation: 'Mode add: compute sibling erasure from the final attention after
+    anatomical bias, not the pre-bias scores. Preserve the archived loss normalization,
+    masking and coefficient; inspect the archived implementation for zero remaining
+    mass and numerical stability. Implement against the live incumbent frozen source;
+    preserve learned anatomical strengths, fixed 20 mm width, position-rich pooling,
+    sampling, main BCE and unrelated accepted components. Use the incumbent seed.
+    If it changes during preparation, reconcile and renew integration review. Resolve
+    labels by name, preserve all twelve public logits and strict checkpoint loading.
+    No historical checkpoint warm start.'
+  open_choices: Reuse the actual archived prepared coefficient and margin after reading
+    its effective config; no coefficient sweep. Record the zero-mass fallback before
+    launch. Do not introduce extra attribution-control training automatically.
+  dependencies: []
+  priority_rationale: 'Second: the old result showed a targeted OA signal and an active
+    mechanism, but also collateral regressions. Test whether anatomical separation
+    changes that tradeoff.'
+  status: completed
+  created_revision: 352
+  ranking_rationale: 'Second: the old result showed a targeted OA signal and an active
+    mechanism, but also collateral regressions. Test whether anatomical separation
+    changes that tradeoff.'
+  experiments:
+  - anatomical-attention-attribution-exclusivity-20260921T141236Z-855ccb19
+  decision: reject
+- id: anatomical-attention-local-lesion-evidence
+  mechanism_id: stride16-family-shared-evidence-read-by-anatomical-attention
+  parent_idea_id: family-shared-local-lesion-evidence
+  title: Read shared local lesion evidence through the adopted anatomical attention
+  opportunity: The original local-lesion run was cancelled and finalized invalid;
+    it provides no scientific negative result. The dormant zero-gated shared-family
+    channel did not test transfer. This ungated local detector supplies a different
+    shared-evidence path, now read through anatomically grounded compartment attention.
+  mechanism: "For each family f (meniscus, OA), one detector is shared by both compartments:\
+    \ e_f(u) = v_f \xB7 LN(P h16(u)). Here h16 is ReXNet features.10 (257 channels,\
+    \ 14\xD714 at 224 px), taken from the same forward pass. P is a 257\u219264 projection\
+    \ and v_f is one 64-d vector per family.\n\nThe 14\xD714 evidence map is pooled\
+    \ onto the existing stride-32 anchors with a fixed, anchor-aligned tent kernel.\
+    \ ReXNet's origin is 0, so stride-16 cell 2k is the centre of stride-32 token\
+    \ k. This gives \u0113_f(T) per existing token.\n\nEach compartment reads the\
+    \ shared map through its own existing attention: z_c = z_c(current incumbent)\
+    \ + \u03A3_T a_c(T) \u0113_f(T). There is no gate or scale, so both compartments\
+    \ use the identical local detector. All compartment specificity stays in the private\
+    \ attention rows, head rows and biases.\n\nBoth compartments' labels train v_f\
+    \ and P. That is shared morphology, and the lateral side gets the medial side's\
+    \ positives. Gradient reaches the stage \u226410 features through a short path\
+    \ localised by compartment attention. All four joint outcomes (neither, medial-only,\
+    \ lateral-only, both) stay representable because the private path is unchanged.\
+    \ The other eight targets keep their forward path, and the output stays 12 logits."
+  precedents:
+  - autoresearch/campaigns/medial-lateral-transfer/prior-work.md#revisit-queue-on-learned-strength
+  - autoresearch/anatomical-attention.md
+  - autoresearch/checkpoint-closure.md
+  - /home/claudio/src/knee-abnormality/outputs/autoresearch/medial-lateral-transfer/experiments/family-shared-local-lesion-evidence-20260921T062026Z-5c2f5c21/source
+  - /home/claudio/src/knee-abnormality/outputs/autoresearch/medial-lateral-transfer/experiments/family-shared-local-lesion-evidence-20260921T062026Z-5c2f5c21/comparison
+  - 'Historical parent: family-shared-local-lesion-evidence'
+  novelty: Rebuilds the unfinished stride-16 shared detector on the adopted anatomical
+    parent. This is a fresh adapted attempt, not continuation of the cancelled checkpoint
+    or replay of the unused global gate.
+  coverage: "Covers both families, all four compartment labels and all planes. Coronal\
+    \ and axial images carry about 60% of compartment attention for both families.\
+    \ Sagittal slices are compartment-pure, so there locality mostly sharpens in-slice\
+    \ evidence.\n\nThe effect should be larger for meniscus, whose attention is already\
+    \ separated (medial/lateral overlap 0.27\u20130.30), than for OA (0.64\u20130.70),\
+    \ where attention overlap caps the gain. Interpret with the family means, both\
+    \ margins and cross-talk. Also rerun scratch/token_scores.py on the candidate\
+    \ to measure the lower-half detector shift."
+  exploitation: "The additive, ungated form is active from step 0, so it cannot stay\
+    \ dormant the way the family channel did. It also tests the locality premise directly.\n\
+    \nTwo controls are pre-registered, to run only if there is a gain:\n1. Private\
+    \ per-compartment detectors at the same width, to isolate sharing.\n2. The same\
+    \ path on the final stride-32 map, to isolate locality.\n\nA null result bounds\
+    \ stride-16 locality, given that the measured drop in opposite-half sensitivity\
+    \ is only 0.31\u21920.23. It would not refute sharing."
+  budget: "Everything runs inside the ordinary forward pass. The stride-16 activation\
+    \ is already computed and kept for backward.\n\nPer image, the added work is 196\xD7\
+    257\xD764 multiply-adds (about 6.4 MFLOP, roughly 0.4% of the ReXNet-200 forward),\
+    \ a LayerNorm, one fixed 3\xD73 stride-2 convolution, and one einsum over four\
+    \ attention rows in the float32 block. That is about 16.6k parameters and a small\
+    \ activation (~40k cells \xD7 64 per batch).\n\nThere are no new batch keys, no\
+    \ preparation change, no second pass and no extra updates. Recent valid arms ran\
+    \ 1,585\u20131,595 s against the 1,797 s ceiling. Expected overhead is under 1%\
+    \ but unmeasured; the runtime check decides."
+  implementation: 'Mode add: use the archived same-pass stride-16 local-evidence design,
+    with compartment pooling from the final anatomically biased attention. Verify
+    backbone stage, anchor alignment and feature validity from the actual incumbent;
+    do not introduce a second encoder pass or new inference batch keys. Log local-term
+    magnitudes and gradient/evidence norms to detect disuse. Implement against the
+    live incumbent frozen source; preserve learned anatomical strengths, fixed 20
+    mm width, position-rich pooling, sampling, main BCE and unrelated accepted components.
+    Use the incumbent seed. If it changes during preparation, reconcile and renew
+    integration review. Resolve labels by name, preserve all twelve public logits
+    and strict checkpoint loading. No historical checkpoint warm start.'
+  open_choices: Use projection width 64 and anchor-aligned tent pooling from the archived
+    design. Validate coordinate alignment statically and preserve masks. No dormant
+    multiplicative output gate and no automatic follow-up training.
+  dependencies: []
+  priority_rationale: 'Third: unfinished plausible shared morphology mechanism with
+    a now-improved assignment path. It has no completed gain evidence and must fit
+    the original measured budget.'
+  status: completed
+  created_revision: 352
+  ranking_rationale: "I admitted unbiased-credit-compartment-attention. It has no\
+    \ dependencies, adds no parameters and no knob, and leaves the incumbent's forward\
+    \ pass unchanged. It uses no RNG draws, so under the seed policy its data and\
+    \ augmentation stream matches the incumbent's exactly, which makes attribution\
+    \ unusually clean. It targets a newly measured weakness (evidence-summary.md):\
+    \ before the anatomical bias, the incumbent's medial and lateral attention rows\
+    \ are 6.2/0.6 mm apart (meniscus/OA), against 32.0/11.8 mm in the same-seed no-bias\
+    \ control. The OA margin is also -0.0117 versus that control. This fits the scope:\
+    \ shared evidence must be read by the correct compartment, and making the assignment\
+    \ redundant (appearance plus geometry) serves that. I ranked it second, behind\
+    \ the reserved head. It goes ahead of explicit-knee-side-coordinate-encoding because\
+    \ that idea puts geometry into the raw scores, which would muddy the proposal's\
+    \ definition of \"raw\" if it landed first. The proposal itself flags this.\n\n\
+    I left anatomical-bias-study-dropout as proposed rather than queuing it. It tests\
+    \ the same diagnosis in a more conventional way. It adds a fixed knob (p = 0.25)\
+    \ and a train/inference regime mismatch. Its extra selling point, side-unknown\
+    \ robustness, has little support on fold 0: 42 studies and 9\u201318 positives.\
+    \ Queuing both would use two slots on one hypothesis that rests on a 57-study,\
+    \ single-seed probe. If unbiased-credit is accepted, the proposal already describes\
+    \ how dropout would become an A+B stacking candidate.\n\nOpen choice to settle\
+    \ during implementation: the proposal's default, \"trunk tokens receive the rerouted\
+    \ score gradient\", matches the incumbent graph, so that should be the fixed behaviour.\
+    \ No switch between the two options should be kept."
+  experiments:
+  - anatomical-attention-local-lesion-evidence-20260921T144002Z-147e1390
+  decision: invalid
+- id: explicit-knee-side-coordinate-encoding
+  mechanism_id: learned-side-conditioned-patient-coordinate-token-encoding
+  parent_idea_id: null
+  title: Encode trusted knee side and signed patient-space location into attention
+    tokens
+  opportunity: The adopted bias uses a fixed tanh spatial shape and learned family
+    strengths; it does not provide the attention scorer a learned joint representation
+    of side and location. Historical isolated side embeddings were ignored, which
+    argues for testing a side-location interaction rather than repeating a side-only
+    lookup.
+  mechanism: Add a small learned encoding of trusted knee-side sign, side-known indicator,
+    geometry-valid indicator and compartment-signed patient-X displacement to attention
+    inputs. Include a side-by-location interaction so the score can learn different
+    spatial responses from data. Keep position-rich classification values unchanged.
+    Use the existing patient maps and reflection-consistent coordinates; unknown side
+    or invalid geometry contributes no signed displacement and stays explicitly marked.
+    Retain the adopted anatomical bias for this first additive candidate.
+  precedents:
+  - autoresearch/campaigns/medial-lateral-transfer/prior-work.md#revisit-queue-on-learned-strength
+  - autoresearch/anatomical-attention.md
+  - autoresearch/checkpoint-closure.md
+  - docs/modeling/retired-side-and-compartment-variants.md
+  - docs/research/knee-side-and-location.md
+  novelty: Explicit learned side-location interaction on the anatomical incumbent,
+    not the retired standalone side embedding or another fixed bias-width sweep. Side
+    encoding is now explicitly authorized as a compartment-improvement mechanism.
+  coverage: Both meniscus and OA pairs; report other-target changes and known/unknown-side
+    coverage. Reflection preserves disease labels and coordinates must continue tracking
+    tissue.
+  exploitation: The attention scorer can learn nonlinear side-dependent location preferences
+    rather than receiving side only through the fixed anatomical bias. Log encoding
+    activity to distinguish an unused feature from an effective mechanism.
+  budget: Small token-level projection or MLP, no additional encoder pass or data
+    exposure; all computation inside the original timing limit.
+  implementation: Mode add. Use existing batch metadata and coordinate transforms;
+    keep the audited side resolver and the inference batch interface. Encode only
+    into attention scoring, leaving classified values unchanged. Fix one small architecture
+    before training; no encoder/width sweep. Implement against the live incumbent
+    frozen source; preserve learned anatomical strengths, fixed 20 mm width, position-rich
+    pooling, sampling, main BCE and unrelated accepted components. Use the incumbent
+    seed. If it changes during preparation, reconcile and renew integration review.
+    Resolve labels by name, preserve all twelve public logits and strict checkpoint
+    loading. No historical checkpoint warm start.
+  open_choices: Developer selects one small encoding architecture and coordinate normalization
+    using training-only reasoning before review. No fitted validation statistics,
+    report text, disease-derived side labels or patient/study IDs.
+  dependencies: []
+  priority_rationale: 'Fourth: directly tests the newly broadened side-encoding scope.
+    Learned strength is evidence that anatomy can help, but does not prove this encoding
+    will add value.'
+  status: queued
+  created_revision: 352
+  ranking_rationale: "I admitted unbiased-credit-compartment-attention. It has no\
+    \ dependencies, adds no parameters and no knob, and leaves the incumbent's forward\
+    \ pass unchanged. It uses no RNG draws, so under the seed policy its data and\
+    \ augmentation stream matches the incumbent's exactly, which makes attribution\
+    \ unusually clean. It targets a newly measured weakness (evidence-summary.md):\
+    \ before the anatomical bias, the incumbent's medial and lateral attention rows\
+    \ are 6.2/0.6 mm apart (meniscus/OA), against 32.0/11.8 mm in the same-seed no-bias\
+    \ control. The OA margin is also -0.0117 versus that control. This fits the scope:\
+    \ shared evidence must be read by the correct compartment, and making the assignment\
+    \ redundant (appearance plus geometry) serves that. I ranked it second, behind\
+    \ the reserved head. It goes ahead of explicit-knee-side-coordinate-encoding because\
+    \ that idea puts geometry into the raw scores, which would muddy the proposal's\
+    \ definition of \"raw\" if it landed first. The proposal itself flags this.\n\n\
+    I left anatomical-bias-study-dropout as proposed rather than queuing it. It tests\
+    \ the same diagnosis in a more conventional way. It adds a fixed knob (p = 0.25)\
+    \ and a train/inference regime mismatch. Its extra selling point, side-unknown\
+    \ robustness, has little support on fold 0: 42 studies and 9\u201318 positives.\
+    \ Queuing both would use two slots on one hypothesis that rests on a 57-study,\
+    \ single-seed probe. If unbiased-credit is accepted, the proposal already describes\
+    \ how dropout would become an A+B stacking candidate.\n\nOpen choice to settle\
+    \ during implementation: the proposal's default, \"trunk tokens receive the rerouted\
+    \ score gradient\", matches the incumbent graph, so that should be the fixed behaviour.\
+    \ No switch between the two options should be kept."
+- id: unbiased-credit-compartment-attention
+  mechanism_id: straight-through-unbiased-softmax-credit-for-anatomically-biased-compartment-attention
+  parent_idea_id: null
+  title: Keep the incumbent's biased attention in the forward pass, but credit the
+    four compartment attention-score rows through the unbiased softmax, so the anatomical
+    prior stops starving appearance-based lateralization
+  opportunity: 'New CPU probe on 57 validation studies (scratch/evidence-summary.md).
+    Before the anatomical bias, the incumbent''s medial and lateral attention rows
+    are separated by 6.2 mm for meniscus and 0.6 mm for OA. The same-seed no-bias
+    control-repeat separates them by 32.0 mm and 11.8 mm. With the bias added, the
+    incumbent reaches 52 mm and 40 mm, so the bias now does all the lateralization.
+    Yet within-knee assignment did not improve: against control-repeat the OA margin
+    is -0.0117 and the meniscus margin -0.0012. The earlier bias-off ablation shows
+    the co-adaptation: Lateral Meniscus -0.027 and OA margin -0.054. Hypothesis: this
+    is gradient starvation. Wrong-side tokens get little attention under the bias,
+    so the softmax Jacobian gives a lateral row almost no signal to reject medial
+    lesions by appearance (condyle, fibula, meniscal shape). The knee-specific appearance
+    cues the control learned are lost.'
+  mechanism: 'Training only, inside the existing autocast-disabled attention block.
+    Compute two attentions:
+
+    - a_b = masked softmax(raw.detach() + s_c*alpha_f*tanh(m/20))
+
+    - a_u = masked softmax(raw)
+
+
+    Use a = a_b + (a_u - a_u.detach()). The forward value is exactly the incumbent''s
+    attention, so pooling, heads, BCE and strengths are unchanged.
+
+
+    Gradients:
+
+    - Values, heads and trunk-through-values receive the incumbent''s gradients.
+
+    - The strengths alpha get the correct biased-point gradient.
+
+    - Raw scores (attention MLP, and trunk tokens through the scores) get the same
+    upstream dL/da, pushed through the unbiased Jacobian.
+
+
+    The eight unbiased targets have a_b = a_u, so their gradients are identical to
+    the incumbent''s.
+
+
+    Each compartment row thus learns where evidence helps as if it had to lateralize
+    alone. At inference, appearance lateralization stacks with the prior. If the combination
+    over-separates, alpha can shrink. All four joint states remain representable.
+
+
+    This adds no sharing. It makes assignment redundant (appearance plus geometry),
+    so shared lesion evidence is read by the correct compartment.'
+  precedents:
+  - 'Evidence: outputs/autoresearch/medial-lateral-transfer/jobs/researcher-20260921T144003Z-99678cca/scratch/evidence-summary.md
+    (raw vs biased separation, row cosines, leak); probe scripts center_probe_any.py
+    and center_summary.py in the same folder'
+  - 'autoresearch/anatomical-attention.md#bias-off-inference-ablation (co-adaptation)
+    and #repeated-control-on-current-data (margins versus control-repeat)'
+  - 'attention-owned-compartment-gradient-routing (reject, -0.0039): a backward-only
+    change that withheld compartment trunk credit. This proposal withholds nothing
+    through values; it only reroutes raw-score credit.'
+  - 'Learned width (-0.0031) and pair-oriented-hemifield-attention (inconclusive):
+    sharper or self-oriented geometry-only assignment did not help'
+  - Pezeshki et al. 2021, Gradient Starvation, NeurIPS (arXiv 2011.09468)
+  - Bengio, Leonard, Courville 2013, straight-through estimator (arXiv 1308.3432)
+  novelty: This is the first mechanism aimed at the newly measured substitution between
+    the adopted prior and appearance scoring. It is not a strength or width variant
+    and adds no module. Unlike dropout or auxiliary losses, the forward pass is identical
+    to the incumbent's at every step.
+  coverage: 'Covers the MM/LM/MO/LO rows, all planes and known-side studies. Unknown-side
+    and invalid-geometry tokens have zero bias, so a_b = a_u. The other eight targets
+    receive identical gradients.
+
+
+    Report the family means, both margins, lateral false positives and cross-talk.
+    Rerun center_probe_any.py on the candidate to test whether raw separation recovers
+    toward 32 mm and 12 mm.'
+  exploitation: Log the per-epoch mean total-variation distance between a_b and a_u
+    for the four rows, which measures how much credit is rerouted, alongside the strengths.
+    If raw separation stays near zero after training, the mechanism was ineffective.
+    Read the margins and family AUCs as mechanism diagnostics only; the fixed macro
+    rule decides adoption.
+  budget: Adds one extra masked softmax over four rows (about 8x4x10k fp32) plus two
+    small tensors. No parameters, encoder work or RNG draws. Recent arms measured
+    1,585-1,598 s against the 1,797 s ceiling; the expected overhead is below 0.1%
+    and the recorded timing decides. Because there are no RNG draws, the data and
+    augmentation stream matches the incumbent seed exactly.
+  implementation: 'Mode add on learned-strength-20260921; removes nothing and has
+    no removed_idea_ids.
+
+    - model.py _attention_pool: when training, grad is enabled and the switch is on,
+    form a as above inside the fp32 block. Eval and predict stay on the unchanged
+    a_b path.
+
+    - config.py: model.compartment_transfer.unbiased_score_credit (bool, no numeric
+    knobs).
+
+    - lightning.py: total-variation diagnostic only, accumulated without per-step
+    host syncs.
+
+    - Retain learned strengths, the fixed 20 mm width, position-rich values, private
+    heads, BCE and sampling. Resolve targets by name; keep 12 logits and strict loading.
+
+    - Add no parameters, so the RNG order is untouched.
+
+
+    If a new incumbent lands during development:
+
+    - Exclusivity or local evidence: apply the same credit rule to every use of compartment
+    attention, then renew review.
+
+    - Explicit side-coordinate encoding: it puts geometry inside the raw scores, which
+    breaks this definition of raw. Treat that as a redesign, not a stack.'
+  open_choices: Whether trunk tokens receive the rerouted score gradient (default
+    yes, matching the incumbent graph) or only the attention MLP does (detach tokens
+    in a_u). Fix this before launch. No annealing, no mixing coefficient and no automatic
+    control run.
+  dependencies: []
+  priority_rationale: 'Rank 1 of 2. It directly tests a freshly measured weakness
+    with zero parameters, no knob and no RNG change, giving the cleanest same-seed
+    attribution. Uncertainty: the biased gradient may over-separate or destabilize
+    training, although alpha can compensate. The only backward-only precedent (routing)
+    was negative but removed credit rather than rerouting it.'
+  status: queued
+  created_revision: 391
+  ranking_rationale: "I admitted unbiased-credit-compartment-attention. It has no\
+    \ dependencies, adds no parameters and no knob, and leaves the incumbent's forward\
+    \ pass unchanged. It uses no RNG draws, so under the seed policy its data and\
+    \ augmentation stream matches the incumbent's exactly, which makes attribution\
+    \ unusually clean. It targets a newly measured weakness (evidence-summary.md):\
+    \ before the anatomical bias, the incumbent's medial and lateral attention rows\
+    \ are 6.2/0.6 mm apart (meniscus/OA), against 32.0/11.8 mm in the same-seed no-bias\
+    \ control. The OA margin is also -0.0117 versus that control. This fits the scope:\
+    \ shared evidence must be read by the correct compartment, and making the assignment\
+    \ redundant (appearance plus geometry) serves that. I ranked it second, behind\
+    \ the reserved head. It goes ahead of explicit-knee-side-coordinate-encoding because\
+    \ that idea puts geometry into the raw scores, which would muddy the proposal's\
+    \ definition of \"raw\" if it landed first. The proposal itself flags this.\n\n\
+    I left anatomical-bias-study-dropout as proposed rather than queuing it. It tests\
+    \ the same diagnosis in a more conventional way. It adds a fixed knob (p = 0.25)\
+    \ and a train/inference regime mismatch. Its extra selling point, side-unknown\
+    \ robustness, has little support on fold 0: 42 studies and 9\u201318 positives.\
+    \ Queuing both would use two slots on one hypothesis that rests on a 57-study,\
+    \ single-seed probe. If unbiased-credit is accepted, the proposal already describes\
+    \ how dropout would become an A+B stacking candidate.\n\nOpen choice to settle\
+    \ during implementation: the proposal's default, \"trunk tokens receive the rerouted\
+    \ score gradient\", matches the incumbent graph, so that should be the fixed behaviour.\
+    \ No switch between the two options should be kept."
+  experiments:
+  - unbiased-credit-compartment-attention-20260921T150802Z-d883b56a
+- id: anatomical-bias-study-dropout
+  mechanism_id: training-only-per-study-anatomical-bias-dropout
+  parent_idea_id: null
+  title: Drop the learned anatomical attention bias for a random quarter of training
+    studies, so compartment attention must also lateralize from appearance and the
+    side-unknown path is trained
+  opportunity: 'This is the same measured substitution: raw separation is 6.2/0.6
+    mm in the incumbent against 32.0/11.8 mm in the control, and the OA margin is
+    -0.0117 against control-repeat. There is also a robustness gap. 42 of 904 fold-0
+    studies (4.6%) have unknown side and get zero bias, and hidden-test coverage is
+    unmeasured. Without its bias, the co-adapted fixed-bias checkpoint lost Lateral
+    Meniscus -0.027 and OA margin -0.054. The natural 3.9% unknown-side training rate
+    did not preserve appearance lateralization. On fold 0, AUC on pairs involving
+    unknown-side studies is mixed (9-18 positives), so the robustness benefit is a
+    hypothesis, not a measured loss.'
+  mechanism: 'In training only, draw keep ~ Bernoulli(0.75) per study and multiply
+    that study''s medial axis by keep. A dropped study takes exactly the existing
+    side-unknown path, with zero anatomical term for both families. BCE targets, weights
+    and masks are unchanged, and validation and prediction always keep the bias.
+
+
+    In dropped studies, compartment rows must separate compartments from appearance,
+    as the control did. In kept studies, the learned strengths continue to fit. At
+    inference, assignment then combines appearance lateralization with the geometric
+    prior.
+
+
+    A per-study draw matches the real unknown-side regime, and dropping both families
+    together keeps the regime coherent. This adds no sharing; it makes assignment
+    redundant and trains the fallback path.'
+  precedents:
+  - 'Evidence: outputs/autoresearch/medial-lateral-transfer/jobs/researcher-20260921T144003Z-99678cca/scratch/evidence-summary.md'
+  - autoresearch/anatomical-attention.md#bias-off-inference-ablation
+  - 'Neverova et al. 2016, ModDrop, IEEE TPAMI (arXiv 1501.00102): randomly dropping
+    a modality preserves the other modality''s unique representation'
+  - The recipe's series_dropout 0.2 is the same idea at series level
+  - 'Retired knee-side embedding (input ignored): the opposite failure, over-reliance
+    rather than disuse'
+  - Pezeshki et al. 2021, Gradient Starvation (arXiv 2011.09468)
+  novelty: This is the first mechanism that regularizes reliance on the adopted prior.
+    Unlike the unbiased-credit idea, it changes the forward regime for some studies
+    and explicitly trains the side-unknown fallback. It is not a strength or width
+    change and adds no parameters.
+  coverage: Covers all four compartment targets and both families, including side-unknown
+    studies. The other eight targets are untouched in the forward pass because they
+    never receive bias. Report family means, margins, cross-talk and the unknown-side
+    pair AUCs (small support). Rerun center_probe_any.py to measure raw separation.
+  exploitation: Log the realized dropped fraction and the strengths per epoch. After
+    training, confirm with the probe that raw separation increased. A bias-off inference
+    ablation should now cost much less than -0.027 on Lateral Meniscus; that is a
+    diagnostic only, and the macro rule decides.
+  budget: One Bernoulli draw per study plus an elementwise mask. No parameters and
+    no measurable compute. The runtime ceiling is unaffected, and the recorded timing
+    decides.
+  implementation: 'Mode add on learned-strength-20260921; removes nothing.
+
+    - model.py encode_batch: when training, mask medial_axis by keep[token_study].
+    Draw keep from a dedicated CPU torch.Generator seeded from the training seed,
+    so the global RNG and augmentation stream stay identical to the incumbent''s.
+
+    - config.py: model.compartment_transfer.anatomical_bias_dropout: 0.25 (one fixed
+    value).
+
+    - lightning.py: log the dropped fraction.
+
+    - Retain strengths, 20 mm width, position-rich values, heads, BCE and sampling.
+    Keep 12 logits and strict loading.
+
+
+    If a new incumbent lands during development:
+
+    - Explicit side-coordinate encoding: drop it together with the bias, treating
+    the study as side-unknown.
+
+    - Exclusivity or local evidence: stack, since they read the unbiased attention
+    in dropped studies. Renew review.
+
+
+    This idea and unbiased-credit are alternative tests of one diagnosis. If one is
+    accepted, the other becomes an A+B stacking candidate.'
+  open_choices: 'p = 0.25 is fixed before training: about 7x the natural unknown-side
+    rate that failed to preserve lateralization, while keeping 75% of studies in the
+    inference regime. The draw is per study, with both families dropped together.
+    No sweep of p and no annealing.'
+  dependencies: []
+  priority_rationale: Rank 2 of 2. It is the conventional form of the same fix and
+    adds side-unknown robustness that fold-0 macro barely measures. It carries a train/inference
+    regime mismatch and one fixed knob, and its unmeasured robustness benefit only
+    matters for hidden-test coverage.
+  status: proposed
+  created_revision: 391
+- id: active-gradient-attribution-exclusivity
+  mechanism_id: linear-zero-margin-attribution-exclusivity
+  parent_idea_id: anatomical-attention-attribution-exclusivity
+  title: Correct inactive attribution exclusivity with an active linear zero-margin
+    penalty
+  opportunity: The anatomical-attention exclusivity run repeated every label AUC and
+    BCE exactly for its first three epochs because its added loss was zero. Its later
+    epoch-mean weighted penalty was at most about 1.35e-6 against BCE about 0.47.
+    A margin of 1.0 suppressed virtually all positive logit drops. This is an inactive-mechanism
+    result, not evidence that effective exclusivity cannot help. The user explicitly
+    requested a corrected future attempt.
+  mechanism: Retain the post-anatomical-attention sibling erasure, but replace the
+    dormant squared hinge y * relu(z_own - z_erased - 1)^2 with the linear zero-margin
+    penalty y * relu(z_own - z_erased). The zero deadband makes every harmful positive-logit
+    drop eligible, and the linear form avoids another vanishing gradient when those
+    drops are small. Keep detached sibling masks, observed-cell reduction, both families
+    and unchanged main BCE. Use the archived coefficient 0.05 as one fixed attempt,
+    not a validation-tuned sweep. Log positive-drop activation, raw and weighted penalty
+    for interpretation only; run through the ordinary full-budget path with no monitor
+    or special early stop. A zero remaining attention mass must be handled explicitly
+    and excluded from spurious activation. No extra data passes or optimizer updates.
+  precedents:
+  - autoresearch/campaigns/medial-lateral-transfer/prior-work.md#revisit-queue-on-learned-strength
+  - autoresearch/anatomical-attention.md
+  - autoresearch/checkpoint-closure.md
+  - /home/claudio/src/knee-abnormality/outputs/autoresearch/medial-lateral-transfer/experiments/cross-compartment-attribution-exclusivity-20260921T001439Z-46286939/source
+  - /home/claudio/src/knee-abnormality/outputs/autoresearch/medial-lateral-transfer/experiments/cross-compartment-attribution-exclusivity-20260921T001439Z-46286939/comparison
+  - 'Historical parent: cross-compartment-attribution-exclusivity'
+  - autoresearch/campaigns/medial-lateral-transfer/prior-work.md#corrected-exclusivity-follow-up
+  - outputs/autoresearch/medial-lateral-transfer/experiments/anatomical-attention-attribution-exclusivity-20260921T141236Z-855ccb19/training/fold_0/logs/version_0/metrics.csv
+  novelty: Explicit user-authorized correction of a diagnosed dormant hinge on the
+    anatomical incumbent. Removing the deadband and using a linear positive-drop penalty
+    distinguishes it from unchanged replay. This single correction is authorized despite
+    historical findings calling margin changes inadmissible sweeps.
+  coverage: Both meniscus and medial/lateral OA pairs; report activation per family,
+    observed-positive coverage, mask degeneracy, margins, collateral labels and the
+    unchanged macro adoption criterion.
+  exploitation: Log activation fractions and raw/weighted loss from ordinary training
+    batches so a later result states whether the correction engaged. These are diagnostics
+    only; no monitoring, adaptive changes, validation-based tuning or extra stopping
+    rule. The fixed macro rule still decides adoption.
+  budget: Reuse the same backbone forward and existing erasure readout. Scalar activation/loss
+    logging stays inside the ordinary measured steps and the 1797-second limit. No
+    extra data passes, epochs, gradient probes or independent diagnostic training
+    runs.
+  implementation: Mode add on the current incumbent, preserving learned anatomical
+    strength, fixed width, position-rich pooling, main BCE, sampling and unrelated
+    accepted improvements. Adapt the archived exclusivity source, not its trained
+    checkpoint. Make margin zero fixed behavior for this successor; remove the failed
+    positive-margin and squared-penalty branches instead of keeping them as tunable
+    options. Log raw positive-drop summaries, activation fractions and weighted loss
+    at the existing logging cadence. Non-finite or degenerate implementations are
+    invalid. If the incumbent changes, reconcile and review overlap with its attention/readout
+    implementation before launch. Same incumbent seed, no extra epochs, updates or
+    GPU probes by agents.
+  open_choices: Use the linear zero-margin penalty and archived 0.05 coefficient as
+    fixed behavior. Do not keep margin, exponent or coefficient alternatives, add
+    a monitor, automatically sweep coefficients or silently rerun. Diagnostics come
+    from the ordinary supervisor-launched training only.
+  dependencies: []
+  priority_rationale: 'User-mandated corrected follow-up, ranked first before the
+    fresh local-lesion retry. Do not discard it as a forbidden margin sweep: this
+    specific correction is explicitly authorized. All numerical adoption and resource
+    gates remain unchanged.'
+  status: launched
+  created_revision: 414
+  ranking_rationale: 'First by explicit user instruction: replace the dormant hinge
+    with a fixed active linear zero-margin penalty.'
+  experiments:
+  - active-gradient-attribution-exclusivity-20260921T152136Z-476463c0
+- id: anatomical-attention-local-lesion-evidence-retry
+  mechanism_id: stride16-family-shared-evidence-read-by-anatomical-attention-retry-after-user-abort
+  parent_idea_id: anatomical-attention-local-lesion-evidence
+  title: Retry the reviewed anatomical-attention local-lesion evidence run after its
+    user-requested abort
+  opportunity: The reviewed local-lesion implementation was stopped by explicit user
+    request after about 372 seconds and two epochs. It has no completed predictions,
+    timing or scientific verdict. The user explicitly requested that this same implementation
+    receive a fresh full run after corrected exclusivity.
+  mechanism: "For each family f (meniscus, OA), one detector is shared by both compartments:\
+    \ e_f(u) = v_f \xB7 LN(P h16(u)). Here h16 is ReXNet features.10 (257 channels,\
+    \ 14\xD714 at 224 px), taken from the same forward pass. P is a 257\u219264 projection\
+    \ and v_f is one 64-d vector per family.\n\nThe 14\xD714 evidence map is pooled\
+    \ onto the existing stride-32 anchors with a fixed, anchor-aligned tent kernel.\
+    \ ReXNet's origin is 0, so stride-16 cell 2k is the centre of stride-32 token\
+    \ k. This gives \u0113_f(T) per existing token.\n\nEach compartment reads the\
+    \ shared map through its own existing attention: z_c = z_c(current incumbent)\
+    \ + \u03A3_T a_c(T) \u0113_f(T). There is no gate or scale, so both compartments\
+    \ use the identical local detector. All compartment specificity stays in the private\
+    \ attention rows, head rows and biases.\n\nBoth compartments' labels train v_f\
+    \ and P. That is shared morphology, and the lateral side gets the medial side's\
+    \ positives. Gradient reaches the stage \u226410 features through a short path\
+    \ localised by compartment attention. All four joint outcomes (neither, medial-only,\
+    \ lateral-only, both) stay representable because the private path is unchanged.\
+    \ The other eight targets keep their forward path, and the output stays 12 logits."
+  precedents:
+  - autoresearch/campaigns/medial-lateral-transfer/prior-work.md#revisit-queue-on-learned-strength
+  - autoresearch/anatomical-attention.md
+  - autoresearch/checkpoint-closure.md
+  - /home/claudio/src/knee-abnormality/outputs/autoresearch/medial-lateral-transfer/experiments/family-shared-local-lesion-evidence-20260921T062026Z-5c2f5c21/source
+  - /home/claudio/src/knee-abnormality/outputs/autoresearch/medial-lateral-transfer/experiments/family-shared-local-lesion-evidence-20260921T062026Z-5c2f5c21/comparison
+  - 'Historical parent: family-shared-local-lesion-evidence'
+  - outputs/autoresearch/medial-lateral-transfer/experiments/anatomical-attention-local-lesion-evidence-20260921T144002Z-147e1390/changes.diff
+  - outputs/autoresearch/medial-lateral-transfer/experiments/anatomical-attention-local-lesion-evidence-20260921T144002Z-147e1390/evaluation.json
+  novelty: Operational retry of an invalid user-aborted attempt, not a new scientific
+    mechanism. This does not reinterpret partial metrics or authorize implementation
+    changes.
+  coverage: "Covers both families, all four compartment labels and all planes. Coronal\
+    \ and axial images carry about 60% of compartment attention for both families.\
+    \ Sagittal slices are compartment-pure, so there locality mostly sharpens in-slice\
+    \ evidence.\n\nThe effect should be larger for meniscus, whose attention is already\
+    \ separated (medial/lateral overlap 0.27\u20130.30), than for OA (0.64\u20130.70),\
+    \ where attention overlap caps the gain. Interpret with the family means, both\
+    \ margins and cross-talk. Also rerun scratch/token_scores.py on the candidate\
+    \ to measure the lower-half detector shift."
+  exploitation: "The additive, ungated form is active from step 0, so it cannot stay\
+    \ dormant the way the family channel did. It also tests the locality premise directly.\n\
+    \nTwo controls are pre-registered, to run only if there is a gain:\n1. Private\
+    \ per-compartment detectors at the same width, to isolate sharing.\n2. The same\
+    \ path on the final stride-32 map, to isolate locality.\n\nA null result bounds\
+    \ stride-16 locality, given that the measured drop in opposite-half sensitivity\
+    \ is only 0.31\u21920.23. It would not refute sharing."
+  budget: "Everything runs inside the ordinary forward pass. The stride-16 activation\
+    \ is already computed and kept for backward.\n\nPer image, the added work is 196\xD7\
+    257\xD764 multiply-adds (about 6.4 MFLOP, roughly 0.4% of the ReXNet-200 forward),\
+    \ a LayerNorm, one fixed 3\xD73 stride-2 convolution, and one einsum over four\
+    \ attention rows in the float32 block. That is about 16.6k parameters and a small\
+    \ activation (~40k cells \xD7 64 per batch).\n\nThere are no new batch keys, no\
+    \ preparation change, no second pass and no extra updates. Recent valid arms ran\
+    \ 1,585\u20131,595 s against the 1,797 s ceiling. Expected overhead is under 1%\
+    \ but unmeasured; the runtime check decides."
+  implementation: 'Mode add on the current incumbent. Reuse the exact reviewed behavior
+    and source delta from anatomical-attention-local-lesion-evidence-20260921T144002Z-147e1390:
+    shared stride-16 family evidence, width 64, anchor-aligned tent pooling, and final
+    anatomically biased attention. Start a fresh training directory from epoch 0 with
+    the incumbent seed; do not resume the partial checkpoint. Preserve all fixed recipe
+    behavior. If the incumbent changes after corrected exclusivity, reconcile the
+    implementation onto it and obtain renewed integration review before launch.'
+  open_choices: No scientific or numeric choices are reopened. Fresh run from epoch
+    0 only; no checkpoint resume, width change, scaling change or automatic controls.
+  dependencies: []
+  priority_rationale: Second by explicit user instruction, immediately after corrected
+    exclusivity. The previous attempt was operationally invalid and supplies no result.
+  status: developing
+  created_revision: 414
+  ranking_rationale: Second by explicit user instruction, immediately after corrected
+    exclusivity. The previous attempt was operationally invalid and supplies no result.
+  experiments:
+  - anatomical-attention-local-lesion-evidence-retry-20260921T155029Z-45a91318

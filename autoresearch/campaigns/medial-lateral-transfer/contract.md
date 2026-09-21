@@ -5,12 +5,33 @@ Current state, 2026-09-21: stopped on the user-adopted learned-strength incumben
 in [the shared closure record](../../checkpoint-closure.md). Original reference,
 budget and startup sections below describe the historical seal; they do not select
 the current incumbent. Historical attempts retain their original references.
+The [2026-09-21 queue refresh](prior-work.md#revisit-queue-on-learned-strength)
+prioritizes three historical adaptations, explicit side-location encoding and an
+anatomy-supervised gate. The campaign remains stopped.
 
 ## Objective and scope
 
-The user's scope, verbatim:
+The user explicitly authorized the [corrected exclusivity follow-up](prior-work.md#corrected-exclusivity-follow-up)
+on 2026-09-21. This single correction of the inactive hinge is eligible despite
+older findings describing margin changes as inadmissible sweeps. Require measured
+training-only activation and gradient contribution; preserve all fixed numerical
+and resource gates and do not relabel the old completed result.
+The exact `active-gradient-attribution-exclusivity` proposal from
+`corrected-exclusivity.yaml` is now first in the stopped campaign's live queue,
+followed by a fresh local-lesion retry. Retain normal implementation, review and
+resource checks. The corrected run uses no separate monitor or adaptive stopping.
+
+The user's original scope, verbatim:
 
 > some diseases appear lateral and medial so they should share some patterns that the model should be able to exploit.
+
+On 2026-09-21 the user broadened the objective to improving compartment-specific
+diseases, explicitly including side-encoding solutions. Knee-side and anatomical
+position encoding, and anatomy-supervised compartment assignment, are eligible
+even without additional disease-pattern sharing. This supersedes older scope
+deferrals for those mechanisms. Preserve trusted-side provenance, explicit unknown
+side/invalid-geometry handling and reflection consistency; do not derive side from
+disease labels, report text, identifiers or validation outcomes.
 
 Explore how the model can exploit those shared patterns while making the correct
 prediction for each compartment. Both the meniscus pair and medial/lateral OA
@@ -46,7 +67,7 @@ user starts this campaign when ready. Writing these files does not launch it.
 
 ## Starting reference and launch boundary
 
-The pinned reference is control B,
+At original startup the pinned reference was control B,
 `outputs/training/overnight-20260919T235434Z-8ol_1c30/runs/13-control-repeat`,
 seed 2263738815, fold 0, without the pooled meniscus adapter. The draft initially
 pointed to the active `compartment-control` run, which actually used the shared
@@ -58,8 +79,9 @@ The recipe reads that run's saved `effective_config.json`, which the existing
 configuration loader accepts. This avoids inheriting later edits to the user's
 `configs/training.yaml`. At initialization the runner writes the resolved recipe
 into the isolated baseline's `configs/training.yaml`; candidate configuration
-edits remain confined to that isolated file. Fresh campaign runs receive fresh
-seeds, not the reference's recorded seed.
+edits remain confined to that isolated file. New candidates now inherit the live
+incumbent's recorded seed under the current protocol; the original fresh-seed
+policy is superseded.
 
 The reference has completed timing, selected-checkpoint metadata and final
 validation predictions. Run campaign validation before starting. Preserve

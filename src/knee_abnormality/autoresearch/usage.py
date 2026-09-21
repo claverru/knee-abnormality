@@ -43,7 +43,7 @@ def claude_tokens(usage, model=False):
         field: usage.get(key, 0) for field, key in zip(TOKEN_FIELDS, keys, strict=True)
     }
     if not model:
-        result["thinking"] = usage.get("output_tokens_details", {}).get(
+        result["thinking"] = (usage.get("output_tokens_details") or {}).get(
             "thinking_tokens", 0
         )
     return result
