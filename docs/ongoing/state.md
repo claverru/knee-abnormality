@@ -34,6 +34,8 @@ pending experiments are classified in the [backlog](../backlog/INDEX.md).
 - **Autoresearch:** all three campaigns are stopped on the learned-
   strength reference with their historical limits/results preserved. Current state and
   transition evidence are owned by [autoresearch](../../autoresearch/status.md).
+  The watchdog initializes its incident history on load, so direct `watch` can recover
+  without a preceding `start`; existing incident history is preserved.
 - **Local metrics against the leaderboard (measured 2026-09-18):** over the nineteen comparable
   submissions macro AUC correlates at +0.907 and BCE at +0.833, gold-only AUC and gold-only BCE
   at nothing, and since 09-13 the submissions differ locally by less than one run's noise, so no
