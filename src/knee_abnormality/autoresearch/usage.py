@@ -6,6 +6,7 @@ from knee_abnormality.autoresearch.models import REPORTS
 from knee_abnormality.autoresearch.storage import read_json, write_json
 
 TOKEN_FIELDS = ("input", "cache_write", "cache_read", "output", "thinking")
+USAGE_ERRORS = (OSError, ValueError, KeyError, TypeError, AttributeError)
 
 
 def events(path):
@@ -132,7 +133,14 @@ def job_usage(provider, job):
 
 
 def capture_usage(provider, job):
-    value = job_usage(provider, job)
+    try:
+        value = job_usage(provider, job)
+    except USAGE_ERRORS as error:
+        value = {
+            "provider": provider,
+            "measurement": "unavailable",
+            "error": f"{type(error).__name__}: {error}",
+        }
     write_json(job / "usage.json", value)
     return value
 
@@ -148,7 +156,19 @@ def campaign_usage(state):
         directory = Path(job["path"])
         if not (directory / "assignment.json").is_file():
             continue
-        value = job_usage(state["provider"], directory)
+        try:
+            value = job_usage(state["provider"], directory)
+        except USAGE_ERRORS as error:
+            total.update({"jobs": 1, "unavailable_jobs": 1, "usage_errors": 1})
+            records.append(
+                {
+                    "job": job["id"],
+                    "role": job["kind"],
+                    "measurement": "unavailable",
+                    "error": f"{type(error).__name__}: {error}",
+                }
+            )
+            continue
         receipt_path = directory / "receipt.json"
         receipt = read_json(receipt_path) if receipt_path.is_file() else {}
         failed = bool(

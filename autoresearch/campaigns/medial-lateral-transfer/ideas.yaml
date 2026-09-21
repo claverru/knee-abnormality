@@ -1,4 +1,4 @@
-revision: 431
+revision: 467
 ideas:
 - id: shared-disease-auxiliary
   mechanism_id: training-only-compartment-transfer
@@ -2350,29 +2350,29 @@ ideas:
     bias instead of treating it as absent.'
   status: queued
   created_revision: 209
-  ranking_rationale: "I admitted unbiased-credit-compartment-attention. It has no\
-    \ dependencies, adds no parameters and no knob, and leaves the incumbent's forward\
-    \ pass unchanged. It uses no RNG draws, so under the seed policy its data and\
-    \ augmentation stream matches the incumbent's exactly, which makes attribution\
-    \ unusually clean. It targets a newly measured weakness (evidence-summary.md):\
-    \ before the anatomical bias, the incumbent's medial and lateral attention rows\
-    \ are 6.2/0.6 mm apart (meniscus/OA), against 32.0/11.8 mm in the same-seed no-bias\
-    \ control. The OA margin is also -0.0117 versus that control. This fits the scope:\
-    \ shared evidence must be read by the correct compartment, and making the assignment\
-    \ redundant (appearance plus geometry) serves that. I ranked it second, behind\
-    \ the reserved head. It goes ahead of explicit-knee-side-coordinate-encoding because\
-    \ that idea puts geometry into the raw scores, which would muddy the proposal's\
-    \ definition of \"raw\" if it landed first. The proposal itself flags this.\n\n\
-    I left anatomical-bias-study-dropout as proposed rather than queuing it. It tests\
-    \ the same diagnosis in a more conventional way. It adds a fixed knob (p = 0.25)\
-    \ and a train/inference regime mismatch. Its extra selling point, side-unknown\
-    \ robustness, has little support on fold 0: 42 studies and 9\u201318 positives.\
-    \ Queuing both would use two slots on one hypothesis that rests on a 57-study,\
-    \ single-seed probe. If unbiased-credit is accepted, the proposal already describes\
-    \ how dropout would become an A+B stacking candidate.\n\nOpen choice to settle\
-    \ during implementation: the proposal's default, \"trunk tokens receive the rerouted\
-    \ score gradient\", matches the incumbent graph, so that should be the fixed behaviour.\
-    \ No switch between the two options should be kept."
+  ranking_rationale: "Both proposals have satisfied admission (no dependencies) and\
+    \ are distinct from closed directions. I checked their key premises against the\
+    \ incumbent source.\n\n- Values carry no side-resolved coordinate: `_pooling_tokens`\
+    \ (model.py:347-356) sums the features with augmented-grid position_2d, position_1d,\
+    \ plane and contrast. medial_axis is used only as an additive score bias (model.py:232-235).\
+    \ It is zero for unknown-side or invalid-geometry tokens (model.py:329-333).\n\
+    - The signed readout is therefore a new information channel on the readout side.\
+    \ It is not a tie, a penalty or a strength/width variant. u_r starts at zero,\
+    \ so at initialisation it reproduces the incumbent exactly, with no extra RNG\
+    \ draws. It still gets gradient from step 0. Unknown-side studies stay unchanged.\n\
+    - I rank it directly behind the reserved head, ahead of side encoding. Both supply\
+    \ medial-lateral provenance, but the readout variant is cheaper and more contained,\
+    \ with 1,024 parameters and no change to attention inputs. It also tests the label-dependent\
+    \ centroid evidence most directly. Side encoding stays queued: acting at attention\
+    \ input is a different lever, and neither result settles the other.\n- Sibling\
+    \ coupling is exactly the incumbent at \u03BA=0, and its gradient is nonzero at\
+    \ \u03BA=0. The learned sign makes it a direct test of the scope's sharing-versus-assignment\
+    \ question. It differs from the conserved-evidence split (a forced conservation\
+    \ constraint with a new detector) and from the exclusivity penalties (training-only,\
+    \ forced separation). The adverse precedents in the same family put it below the\
+    \ two provenance ideas. It ranks above the anatomy-supervised split, which is\
+    \ larger to build and closer to the inconclusive conserved-split lineage.\n\n\
+    The queue is now five."
 - id: permutation-invariant-half-knee-mil
   mechanism_id: side-agnostic-image-half-bag-mil-with-permutation-invariant-compartment-labels
   parent_idea_id: null
@@ -3694,29 +3694,29 @@ ideas:
     will add value.'
   status: queued
   created_revision: 352
-  ranking_rationale: "I admitted unbiased-credit-compartment-attention. It has no\
-    \ dependencies, adds no parameters and no knob, and leaves the incumbent's forward\
-    \ pass unchanged. It uses no RNG draws, so under the seed policy its data and\
-    \ augmentation stream matches the incumbent's exactly, which makes attribution\
-    \ unusually clean. It targets a newly measured weakness (evidence-summary.md):\
-    \ before the anatomical bias, the incumbent's medial and lateral attention rows\
-    \ are 6.2/0.6 mm apart (meniscus/OA), against 32.0/11.8 mm in the same-seed no-bias\
-    \ control. The OA margin is also -0.0117 versus that control. This fits the scope:\
-    \ shared evidence must be read by the correct compartment, and making the assignment\
-    \ redundant (appearance plus geometry) serves that. I ranked it second, behind\
-    \ the reserved head. It goes ahead of explicit-knee-side-coordinate-encoding because\
-    \ that idea puts geometry into the raw scores, which would muddy the proposal's\
-    \ definition of \"raw\" if it landed first. The proposal itself flags this.\n\n\
-    I left anatomical-bias-study-dropout as proposed rather than queuing it. It tests\
-    \ the same diagnosis in a more conventional way. It adds a fixed knob (p = 0.25)\
-    \ and a train/inference regime mismatch. Its extra selling point, side-unknown\
-    \ robustness, has little support on fold 0: 42 studies and 9\u201318 positives.\
-    \ Queuing both would use two slots on one hypothesis that rests on a 57-study,\
-    \ single-seed probe. If unbiased-credit is accepted, the proposal already describes\
-    \ how dropout would become an A+B stacking candidate.\n\nOpen choice to settle\
-    \ during implementation: the proposal's default, \"trunk tokens receive the rerouted\
-    \ score gradient\", matches the incumbent graph, so that should be the fixed behaviour.\
-    \ No switch between the two options should be kept."
+  ranking_rationale: "Both proposals have satisfied admission (no dependencies) and\
+    \ are distinct from closed directions. I checked their key premises against the\
+    \ incumbent source.\n\n- Values carry no side-resolved coordinate: `_pooling_tokens`\
+    \ (model.py:347-356) sums the features with augmented-grid position_2d, position_1d,\
+    \ plane and contrast. medial_axis is used only as an additive score bias (model.py:232-235).\
+    \ It is zero for unknown-side or invalid-geometry tokens (model.py:329-333).\n\
+    - The signed readout is therefore a new information channel on the readout side.\
+    \ It is not a tie, a penalty or a strength/width variant. u_r starts at zero,\
+    \ so at initialisation it reproduces the incumbent exactly, with no extra RNG\
+    \ draws. It still gets gradient from step 0. Unknown-side studies stay unchanged.\n\
+    - I rank it directly behind the reserved head, ahead of side encoding. Both supply\
+    \ medial-lateral provenance, but the readout variant is cheaper and more contained,\
+    \ with 1,024 parameters and no change to attention inputs. It also tests the label-dependent\
+    \ centroid evidence most directly. Side encoding stays queued: acting at attention\
+    \ input is a different lever, and neither result settles the other.\n- Sibling\
+    \ coupling is exactly the incumbent at \u03BA=0, and its gradient is nonzero at\
+    \ \u03BA=0. The learned sign makes it a direct test of the scope's sharing-versus-assignment\
+    \ question. It differs from the conserved-evidence split (a forced conservation\
+    \ constraint with a new detector) and from the exclusivity penalties (training-only,\
+    \ forced separation). The adverse precedents in the same family put it below the\
+    \ two provenance ideas. It ranks above the anatomy-supervised split, which is\
+    \ larger to build and closer to the inconclusive conserved-split lineage.\n\n\
+    The queue is now five."
 - id: unbiased-credit-compartment-attention
   mechanism_id: straight-through-unbiased-softmax-credit-for-anatomically-biased-compartment-attention
   parent_idea_id: null
@@ -3839,33 +3839,34 @@ ideas:
     attribution. Uncertainty: the biased gradient may over-separate or destabilize
     training, although alpha can compensate. The only backward-only precedent (routing)
     was negative but removed credit rather than rerouting it.'
-  status: queued
+  status: launched
   created_revision: 391
-  ranking_rationale: "I admitted unbiased-credit-compartment-attention. It has no\
-    \ dependencies, adds no parameters and no knob, and leaves the incumbent's forward\
-    \ pass unchanged. It uses no RNG draws, so under the seed policy its data and\
-    \ augmentation stream matches the incumbent's exactly, which makes attribution\
-    \ unusually clean. It targets a newly measured weakness (evidence-summary.md):\
-    \ before the anatomical bias, the incumbent's medial and lateral attention rows\
-    \ are 6.2/0.6 mm apart (meniscus/OA), against 32.0/11.8 mm in the same-seed no-bias\
-    \ control. The OA margin is also -0.0117 versus that control. This fits the scope:\
-    \ shared evidence must be read by the correct compartment, and making the assignment\
-    \ redundant (appearance plus geometry) serves that. I ranked it second, behind\
-    \ the reserved head. It goes ahead of explicit-knee-side-coordinate-encoding because\
-    \ that idea puts geometry into the raw scores, which would muddy the proposal's\
-    \ definition of \"raw\" if it landed first. The proposal itself flags this.\n\n\
-    I left anatomical-bias-study-dropout as proposed rather than queuing it. It tests\
-    \ the same diagnosis in a more conventional way. It adds a fixed knob (p = 0.25)\
-    \ and a train/inference regime mismatch. Its extra selling point, side-unknown\
-    \ robustness, has little support on fold 0: 42 studies and 9\u201318 positives.\
-    \ Queuing both would use two slots on one hypothesis that rests on a 57-study,\
-    \ single-seed probe. If unbiased-credit is accepted, the proposal already describes\
-    \ how dropout would become an A+B stacking candidate.\n\nOpen choice to settle\
-    \ during implementation: the proposal's default, \"trunk tokens receive the rerouted\
-    \ score gradient\", matches the incumbent graph, so that should be the fixed behaviour.\
-    \ No switch between the two options should be kept."
+  ranking_rationale: "Both proposals have satisfied admission (no dependencies) and\
+    \ are distinct from closed directions. I checked their key premises against the\
+    \ incumbent source.\n\n- Values carry no side-resolved coordinate: `_pooling_tokens`\
+    \ (model.py:347-356) sums the features with augmented-grid position_2d, position_1d,\
+    \ plane and contrast. medial_axis is used only as an additive score bias (model.py:232-235).\
+    \ It is zero for unknown-side or invalid-geometry tokens (model.py:329-333).\n\
+    - The signed readout is therefore a new information channel on the readout side.\
+    \ It is not a tie, a penalty or a strength/width variant. u_r starts at zero,\
+    \ so at initialisation it reproduces the incumbent exactly, with no extra RNG\
+    \ draws. It still gets gradient from step 0. Unknown-side studies stay unchanged.\n\
+    - I rank it directly behind the reserved head, ahead of side encoding. Both supply\
+    \ medial-lateral provenance, but the readout variant is cheaper and more contained,\
+    \ with 1,024 parameters and no change to attention inputs. It also tests the label-dependent\
+    \ centroid evidence most directly. Side encoding stays queued: acting at attention\
+    \ input is a different lever, and neither result settles the other.\n- Sibling\
+    \ coupling is exactly the incumbent at \u03BA=0, and its gradient is nonzero at\
+    \ \u03BA=0. The learned sign makes it a direct test of the scope's sharing-versus-assignment\
+    \ question. It differs from the conserved-evidence split (a forced conservation\
+    \ constraint with a new detector) and from the exclusivity penalties (training-only,\
+    \ forced separation). The adverse precedents in the same family put it below the\
+    \ two provenance ideas. It ranks above the anatomy-supervised split, which is\
+    \ larger to build and closer to the inconclusive conserved-split lineage.\n\n\
+    The queue is now five."
   experiments:
   - unbiased-credit-compartment-attention-20260921T150802Z-d883b56a
+  - unbiased-credit-compartment-attention-20260921T161823Z-e90e012e
 - id: anatomical-bias-study-dropout
   mechanism_id: training-only-per-study-anatomical-bias-dropout
   parent_idea_id: null
@@ -4021,12 +4022,13 @@ ideas:
     fresh local-lesion retry. Do not discard it as a forbidden margin sweep: this
     specific correction is explicitly authorized. All numerical adoption and resource
     gates remain unchanged.'
-  status: launched
+  status: completed
   created_revision: 414
   ranking_rationale: 'First by explicit user instruction: replace the dormant hinge
     with a fixed active linear zero-margin penalty.'
   experiments:
   - active-gradient-attribution-exclusivity-20260921T152136Z-476463c0
+  decision: reject
 - id: anatomical-attention-local-lesion-evidence-retry
   mechanism_id: stride16-family-shared-evidence-read-by-anatomical-attention-retry-after-user-abort
   parent_idea_id: anatomical-attention-local-lesion-evidence
@@ -4100,9 +4102,252 @@ ideas:
   dependencies: []
   priority_rationale: Second by explicit user instruction, immediately after corrected
     exclusivity. The previous attempt was operationally invalid and supplies no result.
-  status: developing
+  status: completed
   created_revision: 414
   ranking_rationale: Second by explicit user instruction, immediately after corrected
     exclusivity. The previous attempt was operationally invalid and supplies no result.
   experiments:
   - anatomical-attention-local-lesion-evidence-retry-20260921T155029Z-45a91318
+  decision: reject
+- id: anatomically-signed-compartment-readout
+  mechanism_id: side-resolved-medial-axis-weighted-second-pool-with-private-zero-init-readout
+  parent_idea_id: null
+  title: 'Let each compartment readout weigh evidence by its anatomical side: add
+    a second pool, weighted by the side-resolved medial axis, over each compartment''s
+    own attention, read by a private zero-initialised vector'
+  opportunity: "The four compartment heads cannot tell where along the medial-lateral\
+    \ axis their pooled evidence came from:\n- position_2d is the augmented-grid anchor,\
+    \ so reflection and knee side scramble its x-component.\n- Sagittal slice position\
+    \ is also side-ambiguous.\n- The anatomical term enters the scores only.\n\nYet\
+    \ in the 57-study probe, each row's attention centroid moves with the label, by\
+    \ roughly one SD. The lateral-meniscus row sits at -28.0\xB15.5 mm in LM-only\
+    \ studies and -22.9\xB13.6 mm in MM-only studies. The lateral-OA row (coronal)\
+    \ sits at -29.8 vs -24.4 mm. False positives are enriched 2-3x for sibling and\
+    \ degenerative labels; for example, 64% of LM false positives are MM-positive\
+    \ against a 37% base rate. See scratch/evidence-summary.md."
+  mechanism: "For each compartment row r (sign s_r = \xB11, resolved by name), compute\
+    \ p'_r = \u03A3_n a_r(n) \xB7 s_r \xB7 tanh(m_n / 20) \xB7 v_n. Here a_r is the\
+    \ incumbent's final biased attention, m_n the existing side-resolved medial axis,\
+    \ and v_n the existing position-rich value. Then add u_r \xB7 p'_r to logit r,\
+    \ with u_r \u2208 R^256 zero-initialised.\n\nThe result is equivalent to a head\
+    \ weight that varies with token location, w_r + s_r \xB7 tanh(m/20) \xB7 u_r.\
+    \ The readout can amplify lesion-like evidence on its own side and discount the\
+    \ same evidence arriving from the sibling side. Through the LayerNorm constant\
+    \ it can also read where its attention landed.\n\nNothing is tied and nothing\
+    \ is forced apart. The shared trunk and the near-shared raw scorer keep supplying\
+    \ common lesion evidence, and each compartment decides from data how side affects\
+    \ its reading. Unknown side or invalid geometry gives m = 0, which reproduces\
+    \ the incumbent readout exactly. All four joint states remain representable."
+  precedents:
+  - 'Evidence: outputs/autoresearch/medial-lateral-transfer/jobs/researcher-20260921T161824Z-40cbe63c/scratch/evidence-summary.md
+    (centroid_groups.txt, pf_crosstalk.txt), computed from researcher-20260921T144003Z-99678cca/scratch/center_probe.json.'
+  - 'Dai et al. 2016, R-FCN (arXiv 1605.06409): position-sensitive pooling makes class
+    evidence depend on relative location.'
+  - 'Liu et al. 2018, CoordConv (arXiv 1807.03247): explicit coordinates let a network
+    condition on location.'
+  - 'explicit-knee-side-coordinate-encoding (queued): adds encodings only to attention
+    inputs and explicitly leaves values unchanged. This proposal is readout-side and
+    complementary.'
+  - 'anatomical-position-rich-shared-meniscus-readout and appearance-value-tied-meniscus-classifier
+    (reject / inconclusive): tying the readout hurt the lateral compartment. This
+    proposal keeps every readout private.'
+  - "Retired knee-side embedding (docs/modeling/retired-side-and-compartment-variants.md):\
+    \ a study-constant side vector that the model ignored. This proposal uses a token-level\
+    \ side \xD7 position product."
+  - 'active-gradient-attribution-exclusivity (reject): forced separation cost Lateral
+    OA. This proposal imposes no constraint.'
+  novelty: This is the first mechanism in the campaign that gives the compartment
+    readouts anatomical provenance. Earlier arms changed attention, tied or recombined
+    readouts, or added penalties. It is not approach 3 or 5 in docs/research/knee-side-and-location.md,
+    and it is not a strength or width variant.
+  coverage: 'Covers all four compartment targets, all planes and known-side studies.
+    Unknown-side studies are exactly unchanged. The other eight targets keep an identical
+    forward function.
+
+
+    Report family means, both margins, lateral false positives and cross-talk, and
+    FP enrichment for degenerative labels. Also report within-sibling-stratum AUCs,
+    e.g. Lateral OA within Medial OA+ (0.779 on the incumbent).'
+  exploitation: "Log per epoch: ||u_r||, cos(u_r, head_r), and the mean |u_r \xB7\
+    \ p'_r| per compartment.\n\nIf ||u_r|| stays near zero, the readout did not use\
+    \ provenance. Rerun centroid_groups.py and pf_crosstalk.py on the candidate.\n\
+    \nAttribution control, not queued: the identical channel with the side-free augmented-grid\
+    \ x replacing m. Capacity and compute match, but it carries no anatomical information."
+  budget: "One einsum over 4 rows (8 \xD7 4 \xD7 ~10k \xD7 256), done inside the existing\
+    \ fp32 block, plus 1,024 parameters. Negligible against the 1,797 s ceiling; the\
+    \ incumbent recorded about 1,575 s.\n\nZeros initialisation draws no random numbers,\
+    \ so the data and augmentation stream matches the incumbent seed exactly. u_r\
+    \ receives gradient from step 0 because p'_r is nonzero, so it is not a dormant\
+    \ zero-times-zero start."
+  implementation: "Mode add on learned-strength-20260921; removes nothing and has\
+    \ no removed_idea_ids.\n- model.py _attention_pool: after the softmax, for rows\
+    \ with nonzero compartment_signs, form p'_r and add (p'_r \xB7 u).sum(-1) to those\
+    \ logits. Eval and predict use the same path.\n- u = nn.Parameter(zeros(4, 256))\
+    \ under model.*. It takes the head learning rate and weight decay by the existing\
+    \ ndim rule.\n- config.py: model.compartment_transfer.signed_readout (bool, no\
+    \ numeric knob).\n- lightning.py: diagnostics only, with no per-step host syncs.\n\
+    - Retain learned strengths, the 20 mm bias, position-rich values, private heads,\
+    \ BCE and sampling. No new batch keys, so MODEL_BATCH_KEYS is untouched. Keep\
+    \ 12 logits and strict loading.\n\nIf the incumbent changes:\n- unbiased-credit\
+    \ or side encoding: stack and renew review.\n- local-lesion retry: keep its term\
+    \ as accepted and do not sign-weight it without review."
+  open_choices: '- Weighting shape: fixed at the adopted tanh(m/20). A finer near-midline
+    scale (for meniscal roots) would be a later, separate idea, not a sweep.
+
+    - Scope: compartment rows only (default), not all 12 targets.
+
+    - u_r: private per compartment (default). A family-mirrored shared u is excluded
+    given the readout-tying rejects.'
+  dependencies: []
+  priority_rationale: 'Rank 1 of 2. It fills a verifiable information gap backed by
+    a label-dependent centroid shift. It adds no constraint, no random draws and no
+    batch keys, and it costs little.
+
+
+    Uncertainty: provenance may already be partly implicit in the appearance of attended
+    tokens. Only pooled-feature extraction, which needs the GPU, could settle that
+    before training. The expected effect is modest, most plausibly on Lateral Meniscus
+    and Lateral OA.'
+  status: developing
+  created_revision: 453
+  ranking_rationale: "Both proposals have satisfied admission (no dependencies) and\
+    \ are distinct from closed directions. I checked their key premises against the\
+    \ incumbent source.\n\n- Values carry no side-resolved coordinate: `_pooling_tokens`\
+    \ (model.py:347-356) sums the features with augmented-grid position_2d, position_1d,\
+    \ plane and contrast. medial_axis is used only as an additive score bias (model.py:232-235).\
+    \ It is zero for unknown-side or invalid-geometry tokens (model.py:329-333).\n\
+    - The signed readout is therefore a new information channel on the readout side.\
+    \ It is not a tie, a penalty or a strength/width variant. u_r starts at zero,\
+    \ so at initialisation it reproduces the incumbent exactly, with no extra RNG\
+    \ draws. It still gets gradient from step 0. Unknown-side studies stay unchanged.\n\
+    - I rank it directly behind the reserved head, ahead of side encoding. Both supply\
+    \ medial-lateral provenance, but the readout variant is cheaper and more contained,\
+    \ with 1,024 parameters and no change to attention inputs. It also tests the label-dependent\
+    \ centroid evidence most directly. Side encoding stays queued: acting at attention\
+    \ input is a different lever, and neither result settles the other.\n- Sibling\
+    \ coupling is exactly the incumbent at \u03BA=0, and its gradient is nonzero at\
+    \ \u03BA=0. The learned sign makes it a direct test of the scope's sharing-versus-assignment\
+    \ question. It differs from the conserved-evidence split (a forced conservation\
+    \ constraint with a new detector) and from the exclusivity penalties (training-only,\
+    \ forced separation). The adverse precedents in the same family put it below the\
+    \ two provenance ideas. It ranks above the anatomy-supervised split, which is\
+    \ larger to build and closer to the inconclusive conserved-split lineage.\n\n\
+    The queue is now five."
+  experiments:
+  - anatomically-signed-compartment-readout-20260921T164547Z-43333392
+- id: sibling-claimed-attention-coupling
+  mechanism_id: learned-signed-coupling-of-compartment-attention-to-detached-sibling-attention
+  parent_idea_id: null
+  title: 'Condition each compartment''s attention on what its sibling claims: subtract
+    a learned, signed multiple of the sibling''s max-normalised, detached attention
+    from the compartment''s scores, so the pair learns to share or to explain away'
+  opportunity: 'The incumbent''s sibling rows share almost the same raw scorer: before
+    the bias they are 6.2 mm apart for meniscus and 0.6 mm for OA. A static, bounded
+    bias separates them.
+
+
+    When the sibling holds a strong lesion, it pulls the other row across the midline.
+    The leak probe found +0.22 logit for Lateral Meniscus in MM-only studies, with
+    a sign that follows the sibling label. It found 8-13% wrong-side mass.
+
+
+    No mechanism lets one row respond to what its sibling has claimed. The bias cannot,
+    and log-space coupling to the sibling''s score collapses algebraically to rescaled
+    strengths.
+
+
+    Lateral OA inside Medial OA+ studies has AUC 0.779, against 0.875 overall.'
+  mechanism: "Compute the incumbent's biased attention a as now. For each compartment\
+    \ row c with sibling c', take \xE2_{c'}(n) = a_{c'}(n) / max_n a_{c'}(n), detached.\
+    \ It is computed per study and applies only to studies whose side is known.\n\n\
+    Rescore row c as s_c + bias_c \u2212 \u03BA_c \xB7 \xE2_{c'}, then re-softmax\
+    \ per study and pool with the unchanged value and head. \u03BA is 4 learned scalars,\
+    \ zero-initialised.\n\n- \u03BA > 0 explains away: tokens the sibling claims most\
+    \ lose up to \u03BA logits.\n- \u03BA < 0 cooperates: a row is drawn to where\
+    \ the sibling finds evidence, which is shared morphology location.\n\nThe data\
+    \ decides per compartment. Own-side bias and private heads remain, so all four\
+    \ joint states stay representable. At \u03BA = 0 the model is exactly the incumbent."
+  precedents:
+  - "Ye et al. 2024, Differential Transformer (arXiv 2410.05258): a learned \u03BB\
+    \ subtracts a second attention map to cancel common-mode attention noise."
+  - 'Sabour et al. 2017, dynamic routing (arXiv 1710.09829), and Locatello et al.
+    2020, Slot Attention (arXiv 2006.15055): competition over assignments that explains
+    away.'
+  - 'Leak and raw-separation probe: jobs/researcher-20260921T144003Z-99678cca/scratch/evidence-summary.md.'
+  - 'conserved-evidence-compartment-assignment (inconclusive; margins -0.0145 / -0.0275):
+    forced, conserved competition over a new shared detector. This proposal is soft,
+    signed and learned, and adds no detector.'
+  - 'cross-compartment-attribution-exclusivity and active-gradient-attribution-exclusivity:
+    used a similar max-normalised sibling mask only as a training penalty that forces
+    separation. Here it is an inference-path input whose sign is learned.'
+  - pair-oriented-hemifield-attention (inconclusive) and attention-owned-compartment-gradient-routing
+    (reject).
+  novelty: This is the first campaign mechanism in which a compartment's attention
+    depends on its sibling's evidence map at inference. It carries a learned signed
+    coefficient that can express either sharing or competition. It is not a penalty,
+    a gradient rule, a tie, or a fixed geometric gate.
+  coverage: 'Covers both pairs and all planes for known-side studies. Unknown-side
+    studies are unchanged, which avoids self-suppression when the rows coincide. The
+    other eight targets are untouched.
+
+
+    Report family means, both margins, wrong-side mass, cross-talk, within-sibling-stratum
+    AUCs, and the both-positive subsets.'
+  exploitation: "Log per epoch: \u03BA per compartment, the mean total-variation distance\
+    \ between coupled and incumbent attention, and the wrong-side mass.\n\nCo-occurrence\
+    \ counts predict \u03BA_LM > 0 (281 MM+/LM\u2212 vs 75 MM+/LM+) and \u03BA_LO\
+    \ \u2264 0 (143 vs 186). Those opposite signs would be informative.\n\nControl,\
+    \ not queued: couple each row instead to a non-sibling row (the PF OA or ACL attention)\
+    \ with the same parametrisation."
+  budget: "One max and one extra masked softmax over 4 rows inside the fp32 block,\
+    \ plus 4 parameters. Negligible against the 1,797 s ceiling. There are no random\
+    \ draws, so the seeded stream matches the incumbent. dL/d\u03BA is nonzero at\
+    \ initialisation."
+  implementation: "Mode add on learned-strength-20260921; removes nothing.\n- model.py\
+    \ _attention_pool: after the incumbent softmax, rescore and re-softmax the 4 compartment\
+    \ rows as above. A single round with \xE2 detached; known side is taken from nonzero\
+    \ medial axis within the study's membership. Eval and predict use the same path;\
+    \ no new batch keys.\n- config.py: model.compartment_transfer.sibling_attention_coupling\
+    \ (bool). \u03BA = nn.Parameter(zeros(4)); pairs are resolved by name through\
+    \ COMPARTMENT_PAIRS.\n- lightning.py: diagnostics only.\n- Retain strengths, the\
+    \ 20 mm bias, position-rich values, heads, BCE and sampling. Keep 12 logits and\
+    \ strict loading.\n\nIf the incumbent changes:\n- unbiased-credit accepted: its\
+    \ credit rule must decide whether the coupling term counts as prior. Treat that\
+    \ as a redesign review.\n- side encoding or the signed readout: stack and renew\
+    \ review.\n- local-lesion retry: its evidence is read through the coupled attention;\
+    \ declare this."
+  open_choices: "These are fixed before launch, not swept:\n- Sibling map normalisation:\
+    \ max-normalised (default).\n- \xE2 is detached (default).\n- One round, no iteration.\n\
+    - \u03BA per compartment (4, default) rather than per family."
+  dependencies: []
+  priority_rationale: "Rank 2 of 2. It gives a novel, learned-sign test of the scope's\
+    \ central tension, sharing versus the correct compartment, at almost no cost,\
+    \ and \u03BA = 0 is a safe fallback.\n\nRisks:\n- Training BCE may pick cooperation\
+    \ for OA and deepen over-coupling.\n- The adverse precedent of the conserved competitive\
+    \ split.\n- The rerouted forward may perturb the trajectory beyond the same-seed\
+    \ noise floor."
+  status: queued
+  created_revision: 453
+  ranking_rationale: "Both proposals have satisfied admission (no dependencies) and\
+    \ are distinct from closed directions. I checked their key premises against the\
+    \ incumbent source.\n\n- Values carry no side-resolved coordinate: `_pooling_tokens`\
+    \ (model.py:347-356) sums the features with augmented-grid position_2d, position_1d,\
+    \ plane and contrast. medial_axis is used only as an additive score bias (model.py:232-235).\
+    \ It is zero for unknown-side or invalid-geometry tokens (model.py:329-333).\n\
+    - The signed readout is therefore a new information channel on the readout side.\
+    \ It is not a tie, a penalty or a strength/width variant. u_r starts at zero,\
+    \ so at initialisation it reproduces the incumbent exactly, with no extra RNG\
+    \ draws. It still gets gradient from step 0. Unknown-side studies stay unchanged.\n\
+    - I rank it directly behind the reserved head, ahead of side encoding. Both supply\
+    \ medial-lateral provenance, but the readout variant is cheaper and more contained,\
+    \ with 1,024 parameters and no change to attention inputs. It also tests the label-dependent\
+    \ centroid evidence most directly. Side encoding stays queued: acting at attention\
+    \ input is a different lever, and neither result settles the other.\n- Sibling\
+    \ coupling is exactly the incumbent at \u03BA=0, and its gradient is nonzero at\
+    \ \u03BA=0. The learned sign makes it a direct test of the scope's sharing-versus-assignment\
+    \ question. It differs from the conserved-evidence split (a forced conservation\
+    \ constraint with a new detector) and from the exclusivity penalties (training-only,\
+    \ forced separation). The adverse precedents in the same family put it below the\
+    \ two provenance ideas. It ranks above the anatomy-supervised split, which is\
+    \ larger to build and closer to the inconclusive conserved-split lineage.\n\n\
+    The queue is now five."

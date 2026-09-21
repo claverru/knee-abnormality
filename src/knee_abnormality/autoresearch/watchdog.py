@@ -15,7 +15,7 @@ from pydantic_settings import CliPositionalArg
 
 from knee_abnormality.autoresearch.cli import launch, preflight
 from knee_abnormality.autoresearch.integration import digest
-from knee_abnormality.autoresearch.isolation import manifest
+from knee_abnormality.autoresearch.isolation import changed_files, manifest
 from knee_abnormality.autoresearch.providers import auth_environment
 from knee_abnormality.autoresearch.storage import (
     alive,
@@ -35,6 +35,37 @@ class WatchCLI(CLISettings):
     action: CliPositionalArg[Literal["start", "status", "stop", "watch"]]
     campaign: CliPositionalArg[str] = Field(pattern=r"^[a-z][a-z0-9-]*$")
     root: Path = Path(__file__).resolve().parents[3]
+
+
+PROTECTED_CODE = tuple(
+    f"src/knee_abnormality/autoresearch/{name}.py"
+    for name in (
+        "gates",
+        "diagnostics",
+        "integration",
+        "completion",
+        "accounting",
+        "campaigns",
+    )
+)
+REPAIRABLE_FILES = (
+    "autoresearch/runtime.md",
+    "autoresearch/watchdog.md",
+    "autoresearch/status.md",
+    "autoresearch/scripts.md",
+    "scripts/tools/autoresearch.py",
+    "scripts/tools/autoresearch_watch.py",
+)
+PROJECTIONS = ("backlog.yaml", "ideas.yaml", "findings.md")
+
+
+def repairable(path):
+    return path not in PROTECTED_CODE and (
+        path in REPAIRABLE_FILES
+        or path.startswith(
+            ("src/knee_abnormality/autoresearch/", "autoresearch/roles/")
+        )
+    )
 
 
 def optional_json(path):
@@ -72,6 +103,24 @@ class Watchdog:
             == {"abort": False, "watchdog": token}
             and not (self.output / "resume.json").exists()
         )
+
+    def workspace_manifest(self):
+        listed = subprocess.run(
+            ["git", "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
+            cwd=self.root,
+            capture_output=True,
+            check=True,
+            timeout=60,
+        ).stdout.decode()
+        return {
+            path: sha256(self.root / path) if (self.root / path).is_file() else None
+            for path in listed.split("\0")
+            if path
+            and not (
+                path.startswith("autoresearch/campaigns/")
+                and path.rsplit("/", 1)[-1] in PROJECTIONS
+            )
+        }
 
     def recovery_guard(self):
         state = read_json(self.output / "state.json")
@@ -177,7 +226,9 @@ class Watchdog:
             "Never loosen gates, limits, scope, sandboxing, acceptance criteria or dependencies. "
             "Never rewrite state, canonical decisions, predictions, identities, hashes, frozen sources, "
             "trained artifacts, policy seals or the campaign's reference. Do not change campaign proposals. "
-            "You may fix autoresearch runtime code, role briefs and operational documentation only. "
+            f"Only files under src/knee_abnormality/autoresearch/, autoresearch/roles/, and {', '.join(REPAIRABLE_FILES)} may change; "
+            f"never edit {', '.join(PROTECTED_CODE)}; return blocked if the fix needs any other file. "
+            "The watchdog verifies the actual changed files against this scope, and any other change blocks resume. "
             "Follow AGENTS.md and applicable skills. No tests. All shell commands use rtk. "
             "Other work is present: preserve unrelated edits, never reset, checkout or commit. "
             "Use the existing environment and no dependency installation. Keep the investigation narrow. "
@@ -224,6 +275,7 @@ class Watchdog:
             str(attempt / "report.json"),
             "-",
         ]
+        before = self.workspace_manifest()
         with (
             (attempt / "stdin.txt").open() as source,
             (attempt / "stdout.log").open("w") as stdout,
@@ -257,11 +309,21 @@ class Watchdog:
                         process.wait()
                 write_json(attempt / "receipt.json", {"exit_code": process.returncode})
                 capture_usage("codex", attempt)
+        changed = changed_files(before, self.workspace_manifest())
+        outside = [path for path in changed if not repairable(path)]
+        write_json(
+            attempt / "changes.json", {"actual": changed, "outside_scope": outside}
+        )
+        if outside:
+            raise ValueError(
+                f"Repair changed files outside its scope: {', '.join(outside)}"
+            )
         if process.returncode:
             raise ValueError(f"Repair agent failed; inspect {attempt}")
         result = read_json(attempt / "report.json")
         if result["status"] != "ready":
             raise ValueError(result["summary"])
+        result["actual_changed_files"] = changed
         return result
 
     def resume(self, token, guard):
@@ -310,7 +372,9 @@ class Watchdog:
                 self.save(campaign_status=state["status"], supervisor_alive=live)
                 if state["status"] == "paused" or not live:
                     outstanding = [
-                        job for job in state["jobs"].values() if not job["processed"]
+                        job
+                        for job in state["jobs"].values()
+                        if not job["processed"] and not job.get("application_error")
                     ]
                     busy = (
                         bool(outstanding)

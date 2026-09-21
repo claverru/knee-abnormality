@@ -32,9 +32,18 @@ process restart and avoids interfering with training. User stop/resume commands
 replace the marker and cancel recovery ownership.
 
 The repair agent can fix operational autoresearch code, briefs and documentation;
-it does not launch jobs or resume the campaign. It uses the workspace-write sandbox,
-subscription authentication and no additional agents. Existing repository rules
-apply, including no tests and preservation of unrelated edits. The watcher checks
+it does not launch jobs or resume the campaign. Its allowlist is the autoresearch
+runtime package, role briefs, and the listed operational docs and the two CLI
+wrappers (`runtime.md`, `watchdog.md`, `status.md`, `scripts.md`,
+`scripts/tools/autoresearch.py`, `scripts/tools/autoresearch_watch.py`); the gate,
+evaluation, binding, accounting and policy modules (`gates.py`, `diagnostics.py`,
+`integration.py`, `completion.py`, `accounting.py`, `campaigns.py`) are off-limits.
+It uses the workspace-write sandbox, subscription authentication and no additional
+agents. Existing repository rules apply, including no tests and preservation of
+unrelated edits. The watcher compares actual before/after file hashes of the
+checkout, excluding supervisor-projected campaign `backlog.yaml`, `ideas.yaml` and
+`findings.md`; any other change outside scope, including unrelated edits made in the
+checkout during the repair, blocks resume and leaves the campaign stopped. The watcher checks
 ownership again, performs the existing preflight, and resumes only after a ready
 report. Failure or uncertainty leaves a recorded blocker.
 
@@ -51,7 +60,8 @@ supervisor is not automatically diagnosed; worker timeouts remain the runner's j
 
 Artifacts are under `outputs/autoresearch/<campaign>/watchdog/`: `state.json`,
 `watch.log`, and one directory per incident containing the compact evidence,
-prompt, report, process identity, stdout/stderr, receipt and token usage.
+prompt, report, process identity, stdout/stderr, receipt, token usage, and
+`changes.json` recording the actual changed files and any outside its scope.
 Repair usage is separate from the normal campaign `usage` command.
 
 The command uses [Codex non-interactive execution](https://learn.chatgpt.com/docs/non-interactive-mode).

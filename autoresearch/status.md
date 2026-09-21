@@ -1,5 +1,21 @@
 # Implementation status
 
+Runtime hardening, 2026-09-21: Failed application of a finished training,
+comparison, calibration or configuration result now rolls the state back to
+before that job was marked processed and records `application_error` on the
+job instead of stranding the experiment; resume clears the marker and retries
+application from the saved receipt. A normal stop no longer invalidates a
+comparison that already started; only `--abort` terminates it, and a comparison
+cancelled before it started is retried after resume. Usage accounting failures
+during a job or a status/usage read are now caught and recorded as unavailable
+instead of raising, so they never block result processing or status. A ready
+comparison is dispatched as soon as training finishes, without waiting for
+unrelated orchestrator or completion-reporter work. The watchdog's repair scope
+is now enforced by comparing actual before/after file hashes of the checkout
+against an explicit allowlist, rather than trusting the repair agent's own
+account of what it touched. See [runtime operation](runtime.md#inspect-stop-and-resume)
+and [watchdog recovery](watchdog.md#recovery-and-limits).
+
 User-requested follow-up, 2026-09-21: [corrected attribution exclusivity](campaigns/medial-lateral-transfer/prior-work.md#corrected-exclusivity-follow-up)
 is first in the stopped campaign's queue, followed by a fresh retry of the
 user-aborted local-lesion run. The correction replaces the inactive squared hinge

@@ -1,4 +1,5 @@
 import ast
+import copy
 import difflib
 import json
 import math
@@ -62,7 +63,6 @@ from knee_abnormality.autoresearch.storage import (
     terminate,
     write_json,
 )
-from knee_abnormality.autoresearch.usage import capture_usage
 from knee_abnormality.config import load_config
 
 
@@ -274,6 +274,13 @@ class Supervisor:
             job["kind"] == kind and not job["processed"]
             for job in self.state["jobs"].values()
         )
+
+    def outstanding(self):
+        return [
+            job
+            for job in self.state["jobs"].values()
+            if not job["processed"] and not job.get("application_error")
+        ]
 
     def create_job(
         self,
@@ -875,8 +882,13 @@ class Supervisor:
         directory = Path(job["path"])
         exp = self.state["experiments"].get(job["payload"].get("experiment"))
         failed = receipt["exit_code"] != 0 or receipt.get("error")
-        if kind in REPORTS:
-            capture_usage(self.state["provider"], directory)
+        if (
+            kind == "comparison"
+            and receipt.get("cancelled")
+            and not (directory / "started.json").exists()
+        ):
+            exp["stage"] = "needs_comparison"
+            return
         if receipt.get("cancelled") and kind not in {"training", "comparison"}:
             if kind == "completion_reporter":
                 self.escalate_completion(
@@ -1294,6 +1306,8 @@ class Supervisor:
         for job in list(self.state["jobs"].values()):
             if job["processed"]:
                 continue
+            if job.get("application_error"):
+                continue
             directory = Path(job["path"])
             receipt_path = directory / "receipt.json"
             if job["kind"] == "training":
@@ -1301,6 +1315,7 @@ class Supervisor:
                     self.state["experiments"][job["payload"]["experiment"]]
                 )
             if receipt_path.exists():
+                rollback = copy.deepcopy(self.state)
                 job["processed"] = True
                 try:
                     self.process_result(job, read_json(receipt_path))
@@ -1312,20 +1327,31 @@ class Supervisor:
                     RuntimeError,
                     subprocess.SubprocessError,
                 ) as error:
-                    if job["kind"] == "developer":
-                        self.state["experiments"][job["payload"]["experiment"]][
-                            "stage"
-                        ] = "needs_developer"
-                    if job["kind"] == "completion_reporter":
-                        self.escalate_completion(
-                            job, f"Reporter result processing failed: {error}"
+                    if job["kind"] in REPORTS:
+                        if job["kind"] == "developer":
+                            self.state["experiments"][job["payload"]["experiment"]][
+                                "stage"
+                            ] = "needs_developer"
+                        if job["kind"] == "completion_reporter":
+                            self.escalate_completion(
+                                job, f"Reporter result processing failed: {error}"
+                            )
+                        elif job["kind"] == "orchestrator" and self.state["events"]:
+                            self.state["events"][0]["previous_rejection"] = str(error)
+                        self.state.update(
+                            status="paused",
+                            reason=f"Result processing failed for {job['id']}: {error}",
                         )
-                    elif job["kind"] == "orchestrator" and self.state["events"]:
-                        self.state["events"][0]["previous_rejection"] = str(error)
+                        self.save()
+                        continue
+                    self.state = rollback
+                    self.state["jobs"][job["id"]]["application_error"] = str(error)
                     self.state.update(
                         status="paused",
                         reason=f"Result processing failed for {job['id']}: {error}",
                     )
+                    self.save()
+                    return
                 self.save()
                 continue
             owner_path = directory / "owner.json"
@@ -1386,6 +1412,9 @@ class Supervisor:
                     timeout=14400,
                 )
             return
+        running = self.state["experiments"].get(self.state["running"])
+        if running and running["stage"] == "needs_comparison":
+            self.comparison(running)
         if self.active("orchestrator") or self.active("completion_reporter"):
             return
         if (
@@ -1453,8 +1482,6 @@ class Supervisor:
             )
             return
         running = self.state["experiments"].get(self.state["running"])
-        if running and running["stage"] == "needs_comparison":
-            self.comparison(running)
         claimed = self.state["experiments"].get(self.state["claimed"])
         if (
             claimed
@@ -1571,6 +1598,8 @@ class Supervisor:
                             reason=None,
                         )
                         self.state["last_refill_revision"] = -1
+                        for job in self.state["jobs"].values():
+                            job.pop("application_error", None)
                         self.save()
                         resume.unlink()
                     request = self.output / "stop.json"
@@ -1583,16 +1612,12 @@ class Supervisor:
                         if self.state["status"] != "stopping":
                             self.state["status"] = "stopping"
                             self.save()
-                        for job in self.state["jobs"].values():
-                            if not job["processed"] and (
-                                abort or job["kind"] != "training"
-                            ):
+                        for job in self.outstanding():
+                            if abort or job["kind"] not in {"training", "comparison"}:
                                 owner = Path(job["path"]) / "owner.json"
                                 if owner.exists():
                                     terminate(read_json(owner))
-                        if not any(
-                            not job["processed"] for job in self.state["jobs"].values()
-                        ):
+                        if not self.outstanding():
                             self.state["status"] = "stopped"
                             self.save()
                             return

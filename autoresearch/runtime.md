@@ -58,8 +58,9 @@ campaign; starting or stopping losses does not start or stop sampling. Campaigns
 share the GPU lease, so they cannot train simultaneously on the same device.
 
 Status reads persisted state and process identity without calling a model. Stop
-prevents new work, cancels agent jobs, and lets an already launched training finish.
-Its comparison/decision can be completed after resume. To terminate training too:
+prevents new work, cancels agent jobs, and lets an already launched training and
+its CPU comparison finish. A comparison cancelled before it started runs again
+after resume; its decision is completed after resume. To terminate training too:
 
 ```bash
 rtk proxy uv run --locked python -m scripts.tools.autoresearch stop triplet-sampling --abort
@@ -68,7 +69,8 @@ rtk proxy uv run --locked python -m scripts.tools.autoresearch stop triplet-samp
 Status shows a compact summary of calibration passes, active jobs and elapsed time,
 the ranked backlog, the next candidate, training progress, recent results, budget,
 and recorded agent usage by role/event. It includes failed calls and explicitly
-marks partial or unavailable usage. The metric summary shows the original reference
+marks partial or unavailable usage; unparseable usage counts as unavailable and
+never blocks result processing or status. The metric summary shows the original reference
 AUC, current incumbent AUC, raw change since the start, retained experimental gain,
 and the latest decided experiment's scores, delta and paired 95% interval.
 
@@ -156,7 +158,10 @@ consumes their completion receipts. A lost training attempt becomes invalid; it 
 never automatically launched again. This command resumes campaign orchestration,
 not an interrupted model checkpoint. Quota, authentication, malformed reports, and
 unexpected orchestration failures pause scheduling, retain artifacts, and require
-fixing the reported cause followed by resume. Waiting consumes no model turns.
+fixing the reported cause followed by resume. If applying a finished training,
+comparison, calibration or configuration result fails, the state is rolled back,
+the job keeps its receipt, and the campaign pauses; resume reapplies the saved
+result without rerunning the command. Waiting consumes no model turns.
 
 Report prose lengths and concern/reference counts are advisory targets, so
 exceeding them cannot exhaust structured-output retries or pause the campaign.

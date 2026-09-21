@@ -1,6 +1,6 @@
-revision: 431
+revision: 467
 queue:
-- anatomical-attention-local-lesion-evidence-retry
-- unbiased-credit-compartment-attention
+- anatomically-signed-compartment-readout
 - explicit-knee-side-coordinate-encoding
+- sibling-claimed-attention-coupling
 - anatomy-supervised-compartment-evidence-split
