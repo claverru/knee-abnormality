@@ -1,5 +1,9 @@
 # Triplet-sampling prior work
 
+Current reference: learned-strength-20260921, selected by the user on 2026-09-21;
+the campaign remains stopped. See [checkpoint closure](../../checkpoint-closure.md)
+for source pins and state. Reference selections below retain historical provenance.
+
 Read the relevant source before proposing a related experiment. This is an evidence
 map, not a second actionable backlog. The [initial ideas](seed-ideas.yaml) transfer
 the two eligible general-backlog proposals into this campaign for orchestrator
@@ -97,7 +101,7 @@ experiment history and blocked follow-ups.
 
 ## Reference evidence
 
-The current incumbent is **control B**, `control-b-20260919T235434Z`, selected by
+The incumbent selected on 2026-09-20 was **control B**, `control-b-20260919T235434Z`, selected by
 the user on 2026-09-20 at campaign revision 177. Its run is
 `outputs/training/overnight-20260919T235434Z-8ol_1c30/runs/13-control-repeat`:
 seed 2263738815, fold 0, validation ×1, selected epoch 9, macro AUC

@@ -20,12 +20,17 @@ For each proposal, supply the [idea record](../records.md#ideas): opportunity,
 mechanism, closest precedents, novelty, coverage and exploitation, budget argument,
 implementation direction, and unresolved choices. Diverse or combined mechanisms
 are welcome. A renamed old experiment or a list of parameter values is not a refill.
+State whether the mechanism adds to or replaces existing behavior, what it must
+retain or remove, and its intended relationship to a new incumbent accepted while
+development is underway. Replacements can remove earlier winners; keep unrelated
+improvements. Use the supplied external-evidence inventory to avoid duplicate work.
 Recommend a priority order and explain potential, uncertainty, novelty, and cost.
 The orchestrator determines the final backlog ranking.
 
-Dependencies are blocking prerequisites, not precedent references. An executable
-proposal may depend only on ideas with a recorded `decision: provisional_accept`;
-queued, prepared or launched ideas do not qualify. If a direction needs an
+Dependencies are active behavioral prerequisites, not precedent references. An
+executable proposal may depend only on ideas with `decision: provisional_accept`
+that remain in `active_incumbent_ideas`; replaced, queued, prepared or launched ideas
+do not qualify. If a direction needs an
 undecided result, record that missing evidence rather than treating the prerequisite
 as accepted. Do not remove a real dependency to make a proposal executable.
 

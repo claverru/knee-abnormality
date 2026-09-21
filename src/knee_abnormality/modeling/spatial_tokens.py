@@ -203,7 +203,7 @@ def feature_geometry(
     input_shape: tuple[int, int],
     mapping: tuple[float, float, float, float],
     source_channels: torch.Tensor,
-) -> tuple[torch.Tensor, torch.Tensor]:
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     with torch.autocast(device_type=valid_rects.device.type, enabled=False):
         height, width = grid_shape
         input_height, input_width = input_shape
@@ -244,7 +244,7 @@ def feature_geometry(
             & (py >= top[..., None])
             & (py <= (top + rows - 1)[..., None])
         ).all(1)
-    return xy, visual_valid
+    return xy, visual_valid, prepared[..., :2]
 
 
 class SpatialTokens(nn.Module):

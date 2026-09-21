@@ -69,7 +69,10 @@ FULL_VARIANTS = {
     "without_2d": frozenset(("position_2d",)),
     "without_plane": frozenset(("plane",)),
     "without_contrast": frozenset(("contrast",)),
-    "without_position_information": frozenset(("position_1d", "position_2d")),
+    "without_anatomical_bias": frozenset(("medial_axis",)),
+    "without_position_information": frozenset(
+        ("position_1d", "position_2d", "medial_axis")
+    ),
 }
 PLANE_VARIANTS = {f"{plane.lower()}_only": index for index, plane in enumerate(PLANES)}
 VARIANTS = (*FULL_VARIANTS, *PLANE_VARIANTS)
@@ -177,25 +180,33 @@ def paired_bootstrap(
     return {name: interval(measurements) for name, measurements in values.items()}
 
 
-def variant_tokens(model, encoded: dict, omitted: frozenset[str]) -> torch.Tensor:
-    terms = {
-        "position_1d": encoded["position_1d"][:, None],
-        "position_2d": encoded["position_2d"][None],
-        "plane": encoded["plane"][:, None],
-        "contrast": encoded["contrast"][:, None],
+def variant_tokens(
+    model, encoded: dict, omitted: frozenset[str]
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor | None]:
+    variant = {
+        **encoded,
+        **{
+            name: torch.zeros_like(encoded[name])
+            for name in omitted
+            if encoded[name] is not None
+        },
     }
-    tokens = encoded["features"]
-    for name in EMBEDDINGS:
-        if name not in omitted:
-            tokens = tokens + terms[name]
-    return model.mil_norm(tokens.flatten(0, 1)).unflatten(
-        0, encoded["visual_valid"].shape
+    tokens, values = model._pooling_tokens(variant)
+    shape = encoded["visual_valid"].shape
+    return (
+        tokens.unflatten(0, shape),
+        values.unflatten(0, shape),
+        variant["medial_axis"],
     )
 
 
 def pooled_logits(
-    model, encoded: dict, tokens: torch.Tensor, images: torch.Tensor
+    model,
+    encoded: dict,
+    tokens: tuple[torch.Tensor, torch.Tensor, torch.Tensor | None],
+    images: torch.Tensor,
 ) -> tuple[torch.Tensor | None, torch.Tensor]:
+    attention_tokens, value_tokens, medial_axis = tokens
     valid = encoded["visual_valid"][images]
     study = encoded["study"][images]
     studies = torch.arange(encoded["batch_size"], device=study.device)
@@ -204,10 +215,12 @@ def pooled_logits(
         return None, present
     remap = present.cumsum(0) - 1
     logits = model._attention_pool(
-        tokens[images].flatten(0, 1),
+        attention_tokens[images].flatten(0, 1),
+        value_tokens[images].flatten(0, 1),
         remap[study][:, None].expand_as(valid).flatten(),
         valid.flatten(),
         int(present.sum()),
+        medial_axis[images].flatten() if medial_axis is not None else None,
     )
     return logits, present
 

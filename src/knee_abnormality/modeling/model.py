@@ -5,6 +5,7 @@ import torch
 from torch import nn
 
 from knee_abnormality.config import SLICES_PER_INPUT, DataConfig, ModelConfig
+from knee_abnormality.evaluation.metrics import COMPARTMENT_PAIRS
 from knee_abnormality.modeling.augmentation import (
     ImageAugmentation,
     affine_matrices,
@@ -50,10 +51,11 @@ class KneeAbnormalityModel(nn.Module):
         self,
         model: ModelConfig,
         data: DataConfig,
-        target_count: int,
+        targets: tuple[str, ...],
         load_pretrained: bool | None = None,
     ) -> None:
         super().__init__()
+        target_count = len(targets)
         self.series_dropout = model.series_dropout
         self.augmentation_settings = data
         self.image_augmentation = ImageAugmentation()
@@ -108,6 +110,20 @@ class KneeAbnormalityModel(nn.Module):
         if self.channels_last:
             self.backbone.to(memory_format=torch.channels_last)
         self.mil_norm = nn.LayerNorm(PROJECTION_WIDTH)
+        compartment_signs = torch.zeros(target_count)
+        compartment_families = torch.zeros(target_count, dtype=torch.long)
+        for family, (medial, lateral) in enumerate(COMPARTMENT_PAIRS.values()):
+            if medial not in targets or lateral not in targets:
+                raise ValueError("Anatomical attention requires both compartment pairs")
+            compartment_signs[targets.index(medial)] = 1
+            compartment_signs[targets.index(lateral)] = -1
+            compartment_families[targets.index(medial)] = family
+            compartment_families[targets.index(lateral)] = family
+        self.register_buffer("compartment_signs", compartment_signs, persistent=False)
+        self.register_buffer(
+            "compartment_families", compartment_families, persistent=False
+        )
+        self.anatomical_log_strength = nn.Parameter(torch.zeros(len(COMPARTMENT_PAIRS)))
         self.attention = nn.Sequential(
             nn.Linear(PROJECTION_WIDTH, MIL_ATTENTION_WIDTH),
             nn.Tanh(),
@@ -204,11 +220,19 @@ class KneeAbnormalityModel(nn.Module):
     def _attention_pool(
         self,
         tokens: torch.Tensor,
+        values: torch.Tensor,
         token_study: torch.Tensor,
         token_valid: torch.Tensor,
         batch_size: int,
+        medial_axis: torch.Tensor | None,
     ) -> torch.Tensor:
         scores = self._attention_scores(tokens).transpose(0, 1)
+        if medial_axis is None:
+            raise ValueError("Anatomical attention requires token geometry")
+        strengths = self.anatomical_log_strength.float().exp()
+        signs = self.compartment_signs * strengths[self.compartment_families]
+        scaled_axis = medial_axis.float()[None] / 20.0
+        scores = scores.float() + signs[:, None] * torch.tanh(scaled_axis)
         membership = (
             torch.arange(batch_size, device=tokens.device)[:, None] == token_study[None]
         ) & token_valid[None]
@@ -219,7 +243,7 @@ class KneeAbnormalityModel(nn.Module):
             attention = attention.masked_fill(~membership[:, None], -torch.inf).softmax(
                 -1
             )
-            pooled = torch.einsum("btn,nf->btf", attention, tokens.float())
+            pooled = torch.einsum("btn,nf->btf", attention, values.float())
             logits = (pooled * self.head.weight.float()[None]).sum(
                 -1
             ) + self.head.bias.float()
@@ -284,7 +308,7 @@ class KneeAbnormalityModel(nn.Module):
             valid_images = valid_images.contiguous(memory_format=torch.channels_last)
         maps = self._encode_images(valid_images)
         features = self.projection(maps.flatten(2).transpose(1, 2))
-        xy, visual_valid = feature_geometry(
+        xy, visual_valid, prepared_xy = feature_geometry(
             batch["valid_rects"].flatten(0, 1)[flat_indices],
             inverse_affine,
             maps.shape[-2:],
@@ -292,6 +316,21 @@ class KneeAbnormalityModel(nn.Module):
             self.feature_mapping,
             channels,
         )
+        with torch.autocast(device_type=features.device.type, enabled=False):
+            middle_map = batch["patient_maps"].flatten(0, 1)[flat_indices, 1].float()
+            homogeneous = torch.cat(
+                (prepared_xy.float(), torch.ones_like(prepared_xy[..., :1])), -1
+            )
+            patient_x = torch.einsum("nj,nkj->nk", middle_map[:, 0], homogeneous)
+            side = batch["knee_side_sign"][token_study].float()
+            center = batch["knee_center_x_mm"][token_study].float()
+            valid_geometry = batch["geometry_valid"].flatten()[flat_indices]
+            valid_geometry = valid_geometry & torch.isfinite(middle_map).all((-1, -2))
+            medial_axis = torch.where(
+                valid_geometry[:, None] & (side[:, None] != 0),
+                side[:, None] * (patient_x - center[:, None]),
+                0.0,
+            )
         return {
             "features": features,
             "position_1d": sinusoidal_positions(
@@ -301,10 +340,11 @@ class KneeAbnormalityModel(nn.Module):
             "study": token_study,
             "image_plane": token_plane,
             "visual_valid": visual_valid,
+            "medial_axis": medial_axis,
             "batch_size": len(presence),
         }
 
-    def pool_encoded(self, encoded: dict) -> torch.Tensor:
+    def _pooling_tokens(self, encoded: dict) -> tuple[torch.Tensor, torch.Tensor]:
         tokens = (
             encoded["features"]
             + encoded["position_1d"][:, None]
@@ -312,11 +352,20 @@ class KneeAbnormalityModel(nn.Module):
             + encoded["plane"][:, None]
             + encoded["contrast"][:, None]
         ).flatten(0, 1)
+        tokens = self.mil_norm(tokens)
+        return tokens, tokens
+
+    def pool_encoded(self, encoded: dict) -> torch.Tensor:
+        tokens, values = self._pooling_tokens(encoded)
         return self._attention_pool(
-            self.mil_norm(tokens),
+            tokens,
+            values,
             encoded["study"][:, None].expand_as(encoded["visual_valid"]).flatten(),
             encoded["visual_valid"].flatten(),
             encoded["batch_size"],
+            encoded["medial_axis"].flatten()
+            if encoded["medial_axis"] is not None
+            else None,
         )
 
     def forward(self, batch: dict) -> torch.Tensor:

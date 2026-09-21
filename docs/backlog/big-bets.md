@@ -39,6 +39,12 @@ This entry owns the investigation; training remains user-launched when the user 
 
 ## Position and knee side
 
+**The supervised anatomical-attention sequence is closed:** learned family strengths
+with fixed 20 mm width were adopted; appearance-only pooling and learned widths
+were discarded. [Evidence](../../autoresearch/anatomical-attention.md) owns these
+results. The items below are unstarted independent proposals, not pending branches
+of that experiment sequence.
+
 Already measured: the
 [knee-side embedding](../validation/results/2026-09-14-knee-side-embedding-result.md) and the
 [token graph](../validation/results/2026-09-14-token-graph-result.md) tied and were retired, and
@@ -52,8 +58,6 @@ patient points. Remaining (hypotheses), from the
 - **Phase 0 diagnostics:** report laterality read for the persistent wrong-side studies,
   attention and token-position dumps, and frozen token probes. Plane-restricted inference on the
   champion was skipped by user decision.
-- **Untied position path** (knee-side approach 5): compute attention from appearance and position
-  while pooling appearance alone for the independent classifiers.
 - **Common knee orientation** (approach 4) and **learned landmarks or localization supervision**
   (approach 7, which depends on a rules-compatible knee segmenter).
 - **Side-conditioned sagittal sampling centre** (measured premise, unmeasured payoff). Sagittal
@@ -63,29 +67,29 @@ patient points. Remaining (hypotheses), from the
   axis alone, flanks minus centre +0.126 against -0.634 coronal and -1.099 axial, carried by the
   compartment labels and symmetric about zero. The symmetry is the problem: pooled left and right
   knees make "medial and lateral matter equally" and "only medial matters, seen twice" produce the
-  same picture. Two blockers, in order. First, the export centres and scales L but never mirrors by
+  same picture. The remaining export blocker is that it centres and scales L but never mirrors by
   knee side, so it must be re-exported with left knees mirrored before the lobes can be told apart;
-  the per-study utilities for that live outside this repository. Second, the offset must flip sign
-  per knee side, and knee side does not exist anywhere in `src/` since the embedding was retired,
-  so it would have to be derived from the [audited policy](../metadata/knee-side-policy-audit.md)
-  at 96.14% training coverage and plumbed into preprocessing, with the abstentions taking no
-  offset. That plumbing, not the offset, is the size of this bet.
+  the per-study utilities for that live outside this repository. The offset would have to flip sign
+  per knee side. The [audited side policy](../metadata/knee-side-policy-audit.md) is now
+  implemented in preprocessing for anatomical attention, so side plumbing is no longer
+  missing; abstentions must take no offset. The 96.14% coverage is the historical audit,
+  not a fresh coverage measurement.
 
 Approaches 2 and 3 act through the 3D coordinate branch that approach 1's checkpoint barely used;
 the user also declined approach 3 on 2026-09-14. Image-based side inference is deferred by user
 request. The [coordinate audit](../metadata/knee-side-coordinate-investigation.md) owns the side
 evidence.
 
-## Medial and lateral disease transfer
+## Medial and lateral disease transfer: training-only shared detector
 
-Measured: weak meniscus classifier coupling
-[regressed](../validation/results/2026-09-14-meniscus-soft-coupling-result.md). The
-[transfer research](../research/medial-lateral-transfer.md) owns the remaining proposals
-(hypotheses), their controls and stopping criteria: shared nonlinear disease features with
-independent final classifiers, or a training-only shared auxiliary detector with the
-corresponding independent-auxiliary control. Keep OA supervision alignment and
-disease-combination weighting as separate factors. Frozen-feature readout diagnostics require
-feature extraction.
+The original sharing proposals were transferred into the
+[medial/lateral autoresearch campaign](../../autoresearch/campaigns/medial-lateral-transfer/INDEX.md).
+That campaign's history owns attempted mechanisms, findings and dormant proposals;
+this is not a second executable queue. It is stopped on the adopted learned-strength
+baseline. Classifier coupling and the pooled adapter were rejected and removed;
+[their research history](../research/medial-lateral-transfer.md) remains evidence.
+Starting another transfer investigation requires a materially new mechanism and a
+session with the user; do not automatically revive the old training-only detector.
 
 ## Learned acquisition intensity bounds
 

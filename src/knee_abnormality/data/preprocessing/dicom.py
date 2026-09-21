@@ -9,10 +9,12 @@ from pathlib import Path
 
 import numpy as np
 import pydicom
+from pydicom.charset import convert_encodings, decode_bytes
 from pydicom.filereader import read_partial
 from pydicom.multival import MultiValue
 
 from knee_abnormality.data.preprocessing.geometry import NativePose, PoseLayout
+from knee_abnormality.data.preprocessing.laterality import HeaderSide, header_side
 
 PREFIX_BYTES = 12288
 EXTEND_ATTEMPTS = 3
@@ -50,6 +52,7 @@ class DicomHeader:
     position_source: str
     pose: NativePose | None
     tags: SeriesTags
+    side: HeaderSide
 
 
 @dataclass(frozen=True, slots=True)
@@ -285,7 +288,19 @@ TAG_FIELDS = (
     0x00181310,
     0x00181250,
 )
+SIDE_FIELDS = {
+    0x00200060: "Laterality",
+    0x00200062: "ImageLaterality",
+    0x00081030: "StudyDescription",
+    0x0008103E: "SeriesDescription",
+    0x00181030: "ProtocolName",
+    0x00180015: "BodyPartExamined",
+    0x00080070: "Manufacturer",
+    0x00081090: "ManufacturerModelName",
+}
 WANTED = {
+    0x00080005,
+    *SIDE_FIELDS,
     0x00080008,
     0x0008103E,
     0x00180021,
@@ -546,6 +561,12 @@ def parse_header(buffer: bytes, size: int, modified_ns: int) -> DicomHeader:
         )
         if len(_TAGS_CACHE) < TAGS_CACHE_LIMIT:
             _TAGS_CACHE[signature] = tags
+    encodings = convert_encodings(list(strings(0x00080005)) or None)
+    side_values = {
+        name: decode_bytes(values[tag][1], encodings, {92}).rstrip("\x00 ")
+        for tag, name in SIDE_FIELDS.items()
+        if tag in values
+    }
     return DicomHeader(
         physical,
         instance,
@@ -553,6 +574,7 @@ def parse_header(buffer: bytes, size: int, modified_ns: int) -> DicomHeader:
         "instance_number" if instance is not None else source,
         pose,
         tags,
+        header_side(side_values),
     )
 
 
@@ -621,6 +643,7 @@ def pydicom_read_header(path: Path) -> DicomHeader:
         "instance_number" if instance is not None else source,
         _native_pose(dataset),
         _series_tags(dataset),
+        header_side({name: _text(dataset, name) for name in SIDE_FIELDS.values()}),
     )
 
 

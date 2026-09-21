@@ -1,5 +1,11 @@
 # Triplet-sampling campaign
 
+Current state, 2026-09-21: stopped on the user-adopted learned-strength incumbent
+(seed 2263738815, fold-0 AUC 0.897443). The source/reference transition is recorded
+in [the shared closure record](../../checkpoint-closure.md). Original reference,
+budget and startup sections below describe the historical seal; they do not select
+the current incumbent. Historical attempts retain their original references.
+
 ## Objective and fixed constraints
 
 Select more useful triplets for training while retaining both coverage and
@@ -22,7 +28,7 @@ and documentation is allowed.
 - Training sampling is stochastic. Validation is deterministic, unaugmented, and
   uses image multiplier 1. Validation choices cannot depend on the training seed.
   If a candidate changes deterministic selection, record its identity explicitly.
-- Every fresh training run draws and records a fresh seed before launch. Do not
+- Every new candidate uses the current incumbent's recorded training seed. Do not
   optimize or retry seeds for a better score. A genuine resume retains its run's seed.
 - Freeze the initial epochs, optimizer steps, and end-to-end resource ceiling for
   the campaign. Preparation and any auxiliary sampling computation count toward
@@ -37,7 +43,7 @@ before launch. Use saved fold-0 predictions on the same studies for a paired
 report-group bootstrap: resample whole groups, using identical draws for candidate
 and reference, and compute candidate-minus-reference macro AUC. Start with the
 existing 2,000-draw, 95% interval procedure; record its resampling seed separately
-from the fresh training seed. Invalid resamples must follow one frozen rule.
+from the incumbent-matched training seed. Invalid resamples must follow one frozen rule.
 
 The user replaced the comparison incumbent with control B on 2026-09-20:
 `control-b-20260919T235434Z`, the `13-control-repeat` run under
@@ -52,9 +58,8 @@ incumbent selector. This replacement does not reseal or increase any limit.
 
 | Result after contract checks | Decision |
 |---|---|
-| Interval strictly above zero | Eligible for provisional acceptance |
-| Interval includes zero | Inconclusive; retain the incumbent |
-| Interval strictly below zero | Reject this implementation as an improvement |
+| Valid macro AUC gain >= 0.001 and 80% interval lower bound > 0 | Adopt as the working incumbent (`provisional_accept`) |
+| Valid result failing either adoption condition | Discard this implementation (`reject`); retain the incumbent |
 | Incomplete evidence or contract breach | Invalid; no acceptance |
 
 Per-label diagnostics inform interpretation but do not replace the fixed primary
@@ -64,8 +69,7 @@ reference even when the incumbent changes.
 
 Bootstrap uncertainty is conditional on the fitted models. It excludes training
 seed variation and does not correct repeated selection on fold 0. Acceptance is
-provisional, not independent confirmation. Reserve additional fresh-seed runs for
-exceptional, justified confirmations; do not automatically rerun inconclusive ideas.
+provisional, not independent confirmation. Separate confirmation seeds require an explicit user-directed protocol; do not automatically rerun discarded ideas or retain pending branches.
 Poor early-epoch scores alone do not justify terminating a model early.
 
 ## Initial sealing
@@ -80,7 +84,7 @@ change these limits or inherit a larger budget from the latest winner.
 
 Verify the historical control against the sealed recipe and source. If it cannot
 serve as a comparable reference, pause and resolve the control discrepancy before candidates.
-`configs/training.yaml` contains seed 42; the runner must replace it for fresh runs.
+The runner uses the current incumbent run's recorded seed for every new candidate.
 The runtime obtains realized counts from a one-time full-schedule CPU replay; no
 extra model is fitted to establish that count. See [runtime operation](../../runtime.md)
 for the measurement boundary and [implementation status](../../status.md) for verification.

@@ -142,7 +142,7 @@ class TripletAccounting(L.Callback):
         ):
             raise ValueError("Validation must be x1 with no training seed")
         if data.train_dataset.training_seed != pl_module.config.seed:
-            raise ValueError("Training dataset must use the recorded fresh run seed")
+            raise ValueError("Training dataset must use the recorded run seed")
 
     def on_train_epoch_start(self, trainer, pl_module):
         self.ledger.begin()

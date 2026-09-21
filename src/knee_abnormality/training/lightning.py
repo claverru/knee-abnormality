@@ -229,7 +229,7 @@ class KneeModule(L.LightningModule):
             persistent=False,
         )
         self.model = KneeAbnormalityModel(
-            config.model, config.data, len(targets), load_pretrained=load_pretrained
+            config.model, config.data, targets, load_pretrained=load_pretrained
         )
         self.weight_averaging = config.optimizer.weight_averaging
         self._last_averaged_step = -1
@@ -301,6 +301,17 @@ class KneeModule(L.LightningModule):
         dataset = getattr(self.trainer.train_dataloader, "dataset", None)
         if hasattr(dataset, "set_epoch"):
             dataset.set_epoch(self.current_epoch)
+
+    def on_train_epoch_end(self) -> None:
+        strengths = self.model.anatomical_log_strength.detach().float().exp()
+        for family, strength in zip(("meniscus", "oa"), strengths, strict=True):
+            self.log(
+                f"anatomical_strength_{family}",
+                strength,
+                on_step=False,
+                on_epoch=True,
+                batch_size=1,
+            )
 
     def training_step(self, batch: dict, batch_index: int) -> torch.Tensor:
         logits = self(batch).to(torch.float32)

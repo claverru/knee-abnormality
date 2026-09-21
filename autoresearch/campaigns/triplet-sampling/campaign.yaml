@@ -1,5 +1,5 @@
 id: triplet-sampling
-status: ready-to-seal
+status: stopped
 recipe: configs/training.yaml
 reference_run: outputs/training/overnight-20260919T120130Z-i2oqlnls/runs/00-control
 additional_evidence_runs:

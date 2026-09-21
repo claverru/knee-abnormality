@@ -37,12 +37,17 @@ flowchart TD
     Norm --> Hidden["Attention hidden features<br/>Linear 256→128 → Tanh → dropout"]
     Hidden --> Score["Twelve independent attention scorers<br/>Linear 128→12 in official target order"]
     Visual --> Mask["Study membership and visual mask<br/>Fail before softmax if any study has no valid tokens"]
-    Score --> Mask
+    Inverse --> Axis["Patient maps + knee side + study center<br/>Medial axis [N, 49]; unknown/invalid = 0"]
+    Axis --> Bias["Signed tanh(axis / 20 mm)<br/>Learned meniscus and OA strengths"]
+    Score --> Anatomical["Add anatomical bias to four compartment-label scores"]
+    Bias --> Anatomical
+    Anatomical --> Mask
     Mask --> MIL["Float32 softmax across valid tokens per study and target<br/>Weighted features [B, 12, 256]"]
     Norm --> MIL
     MIL --> Head["Twelve independent classifier vectors and biases<br/>12 study logits → masked soft-target BCE"]
 ```
 
 At 2× validation images, a study with all six series types has up to 64 triplets, which is 3,136
-tokens before masking. The model computes no patient points; batches carry only the valid
-rectangles for geometry.
+tokens before masking. Batches carry patient maps, geometry validity, knee side and
+study-center X as well as valid rectangles. Patient X supplies the compartment attention
+bias; visual validity still determines token membership.

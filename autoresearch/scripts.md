@@ -10,7 +10,7 @@ environment inside every snapshot. These equivalent manual templates use `uv`.
 
 Use [scripts/pipeline/train.py](../scripts/pipeline/train.py) for every training run.
 The supervisor launches it detached from an isolated, frozen candidate checkout.
-The candidate configuration must carry a fresh recorded training seed and satisfy
+The candidate configuration must carry the incumbent's recorded training seed and satisfy
 the campaign contract before launch.
 
 Invocation template, from that checkout's repository root:

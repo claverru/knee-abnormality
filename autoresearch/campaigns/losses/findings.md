@@ -1302,3 +1302,14 @@ Evidence:
 - triplet accounting in assignment facts (and training/fold_0/triplet_accounting.json): 93,846 triplets / 3,503 visits per training epoch with constant cohort hash b536b7e1..., validation 24,188 / 904 with identical selection hash 92f1341c... in all ten epochs
 - comparison/per_label.json: ACL -0.0177 [-0.0319,-0.0042], Lateral Meniscus -0.0213 [-0.0374,-0.0065], Effusion +0.0062, PF OA +0.0066, Medial OA +0.0038, Fracture +0.0058
 - Prior candidate for cross-experiment comparison: experiments/shared-bce-ranking-20260920T112958Z-a2e23db7/comparison/comparison.json (Effusion +0.0082, Medial OA +0.0084, Lateral Meniscus -0.0075, Synovitis -0.0079; +52 s runtime)
+
+## user-adopt-learned-strength-20260921T115849Z-b19e375d
+
+User adopted learned anatomical strength as the reference and cleaned source for future experiments; campaign remains stopped.
+
+Matched-seed control gain +0.0023308413 with positive 80% interval. This is an explicit reference replacement, not a retroactive campaign verdict. Original limits, baseline snapshots, historical run references and decisions are preserved. Pending old-reference events are archived; no jobs launched.
+
+Evidence:
+- /home/claudio/src/knee-abnormality/outputs/autoresearch/adopted/user-adopt-learned-strength-20260921T115849Z-b19e375d/adoption.json
+- /home/claudio/src/knee-abnormality/outputs/analysis/anatomical-strength-vs-control-repeat-ci-levels/adoption_assessment.json
+- /home/claudio/src/knee-abnormality/outputs/autoresearch/losses/decisions/user-adopt-learned-strength-20260921T115849Z-b19e375d/pending-events.json

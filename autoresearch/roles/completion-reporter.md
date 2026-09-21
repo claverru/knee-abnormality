@@ -3,7 +3,9 @@
 Record one routine experiment completion selected by code. Use the supplied facts,
 comparison and evidence packet. The implementation has already received a clean
 orchestrator review, resource/accounting gates have passed, and the numerical
-decision is fixed as reject or inconclusive. Code rechecks eligibility before
+decision is fixed as reject (or inconclusive in historical records). A current
+rejection means gain below 0.001 or an 80% macro interval lower bound <= 0, not
+statistically established harm. Code rechecks eligibility before
 recording your response.
 
 Return the completion-report schema: `status`, `summary`, `concerns` and

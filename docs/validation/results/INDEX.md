@@ -2,6 +2,7 @@
 
 | Read when | Document |
 |---|---|
+| Reviewing the shared meniscus compartment adapter | [2026-09-20 compartment adapter](2026-09-20-compartment-adapter-result.md) |
 | Reviewing stratified sampling and its replication | [2026-09-20 stratified sampling experiment](2026-09-20-stratified-sampling-promotion.md) |
 | Comparing class-balanced-BCE augmentation and optimizer runs against two controls | [2026-09-20 overnight results](2026-09-20-overnight-hyperparameter-results.md) |
 | Comparing first-use optimizer and augmentation values on class-balanced BCE | [2026-09-19 untried-hyperparameter queue](2026-09-19-untried-hyperparameter-queue.md) |

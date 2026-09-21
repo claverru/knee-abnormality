@@ -3,7 +3,6 @@ import difflib
 import json
 import math
 import os
-import secrets
 import signal
 import subprocess
 import sys
@@ -18,14 +17,26 @@ from knee_abnormality.autoresearch import providers
 from knee_abnormality.autoresearch.campaigns import CampaignPolicy, load_campaign
 from knee_abnormality.autoresearch.completion import completion_blockers
 from knee_abnormality.autoresearch.context import build_context, prompt_sizes
-from knee_abnormality.autoresearch.diagnostics import diagnostics_path
+from knee_abnormality.autoresearch.diagnostics import diagnostics_path, read_diagnostics
 from knee_abnormality.autoresearch.gates import (
+    ACCEPTANCE_RULE,
+    active_incumbent_ideas,
     config_differences,
     dependency_blockers,
     evaluate,
     initial_limits,
     validate_config,
     verdict,
+)
+from knee_abnormality.autoresearch.integration import (
+    candidate_binding,
+    comparison_identity_keys,
+    digest,
+    external_evidence,
+    launch_blockers,
+    parent_changed,
+    reference_seed,
+    reference_snapshot,
 )
 from knee_abnormality.autoresearch.isolation import (
     changed_files,
@@ -35,7 +46,12 @@ from knee_abnormality.autoresearch.isolation import (
     sandbox,
     snapshot,
 )
-from knee_abnormality.autoresearch.models import REPORTS, ResearchReport
+from knee_abnormality.autoresearch.models import (
+    REPORTS,
+    DeveloperReport,
+    OrchestratorReport,
+    ResearchReport,
+)
 from knee_abnormality.autoresearch.storage import (
     alive,
     atomic_write,
@@ -172,7 +188,7 @@ class Supervisor:
         if not headers.is_file():
             raise ValueError(f"Missing bootstrap acquisition metadata: {headers}")
         snapshot(self.root, base)
-        config["seed"] = secrets.randbits(32)
+        config["seed"] = reference_seed({"run": str(reference)})
         atomic_write(
             base / "configs/training.yaml", yaml.safe_dump(config, sort_keys=False)
         )
@@ -325,6 +341,11 @@ class Supervisor:
         return job_id, directory
 
     def role(self, role, source: Path, context, *, payload=None, repair=False):
+        if role != "completion_reporter":
+            context = {
+                **context,
+                "external_evidence": external_evidence(self.root, self.campaign),
+            }
         job_id, directory = self.create_job(role, source, [], payload=payload)
         if role == "completion_reporter":
             event = payload["event"]
@@ -356,6 +377,8 @@ class Supervisor:
             self.state, role, context, directory, self.docs, self.state_path
         )
         context["python_executable"] = sys.executable
+        context["incumbent_training_seed"] = reference_seed(self.state["incumbent"])
+        context["acceptance_rule"] = dict(ACCEPTANCE_RULE)
         if role != "completion_reporter":
             context["campaign_policy"] = self.policy.model_dump(
                 mode="json",
@@ -372,6 +395,14 @@ class Supervisor:
         )
         prompt = (
             f"{guidance}\n\n{brief}\n\n{contract}\n\n"
+            "User-directed seed policy supersedes fresh-seed instructions in archived contracts and findings: "
+            "every new candidate uses the current incumbent's recorded training seed, enforced by the supervisor. "
+            "Historical runs retain their actual seeds; do not relabel them as matched. "
+            "The live state's incumbent and recorded user reference transition supersede starting-reference instructions in archived contracts. "
+            "User-directed adoption policy supersedes interval-sign gates in archived contracts and findings: "
+            "adopt only when valid macro AUC improvement >= 0.001 AND the central 80% paired-bootstrap lower bound is strictly positive; otherwise discard. "
+            "The 95% and per-label intervals remain diagnostic; do not add other adoption thresholds. "
+            "Do not keep pending implementation branches or schedule automatic confirmation runs. "
             "Campaign authorization overrides ordinary user-only training guidance, but ONLY the supervisor launches training. "
             "Do not launch training, use GPUs, spawn subagents, write/run tests, or poll jobs. "
             "NO SUBMISSIONS OR PUBLICATION: only local training and local validation are authorized. "
@@ -421,6 +452,9 @@ class Supervisor:
             "implementation_parent": repair["implementation_parent"]
             if repair
             else incumbent["id"],
+            "implementation_reference": repair["implementation_reference"]
+            if repair
+            else reference_snapshot(incumbent),
             "parent_source": repair["parent_source"] if repair else incumbent["source"],
             "repair_of": repair["id"] if repair else None,
             "repair_count": repair["repair_count"] + 1 if repair else 0,
@@ -435,6 +469,9 @@ class Supervisor:
         self.save()
 
     def prepare(self, exp, report):
+        parsed = DeveloperReport.model_validate(report)
+        if parsed.status != "prepared":
+            raise ValueError("Cannot prepare a blocked developer report")
         workspace = Path(exp["workspace"])
         parent = Path(exp["parent_source"])
         after, changed = check_scope(workspace, manifest(parent), self.policy)
@@ -469,6 +506,7 @@ class Supervisor:
             )
         atomic_write(Path(exp["directory"]) / "changes.diff", "".join(diff))
         exp["developer_report"] = report
+        exp["integration"] = parsed.integration.model_dump(mode="json")
         self.config_gate(exp)
 
     def config_gate(self, exp):
@@ -492,6 +530,29 @@ class Supervisor:
         )
 
     def reconcile(self, previous):
+        parent = Path(previous["parent_source"])
+        if not parent.is_dir():
+            raise ValueError("Recorded old parent source is missing")
+        if previous.get("implementation_reference") and (
+            digest(manifest(parent))
+            != previous["implementation_reference"]["source_sha256"]
+        ):
+            raise ValueError(
+                "Recorded old parent source changed; cannot reconcile safely"
+            )
+        candidate = Path(previous["source"])
+        if candidate.exists() and manifest(candidate) != read_json(
+            Path(previous["directory"]) / "manifest.json"
+        ):
+            raise ValueError(
+                "Recorded candidate source changed; cannot reconcile safely"
+            )
+        if not candidate.exists():
+            candidate = Path(previous["workspace"])
+        if not candidate.is_dir():
+            raise ValueError("Candidate source and workspace are missing")
+        check_scope(candidate, manifest(parent), self.policy)
+        changes = changed_files(manifest(parent), manifest(candidate))
         incumbent = self.state["incumbent"]
         self.claim()
         exp = self.state["experiments"][self.state["claimed"]]
@@ -500,13 +561,11 @@ class Supervisor:
             "old_parent": previous["implementation_parent"],
             "new_parent": incumbent["id"],
             "conflicts": [],
+            "previous_integration": previous.get("integration"),
+            "reason": "Reassess integration against the current incumbent before renewed review",
         }
         previous["stage"] = "superseded_by_reconciliation"
-        parent = Path(previous["parent_source"])
-        candidate = Path(previous["source"])
         workspace = Path(exp["workspace"])
-        check_scope(candidate, manifest(parent), self.policy)
-        changes = changed_files(manifest(parent), manifest(candidate))
         merge_root = Path(exp["directory"]) / "reconciliation"
         merge_root.mkdir()
         for index, path in enumerate(changes):
@@ -554,20 +613,7 @@ class Supervisor:
             if result.returncode:
                 exp["reconciliation"]["conflicts"].append(path)
         write_json(merge_root / "record.json", exp["reconciliation"])
-        if exp["reconciliation"]["conflicts"]:
-            exp["stage"] = "needs_developer"
-        else:
-            try:
-                self.prepare(
-                    exp,
-                    {
-                        **previous["developer_report"],
-                        "reconciliation": exp["reconciliation"],
-                    },
-                )
-            except (OSError, ValueError, SyntaxError) as error:
-                exp["stage"] = "needs_developer"
-                exp["reconciliation"]["error"] = str(error)
+        exp["stage"] = "needs_developer"
         self.save()
 
     def seal(self):
@@ -613,7 +659,36 @@ class Supervisor:
         self.state["sealed_sha256"] = sha256(self.output / "limits.json")
         self.state["status"] = "running"
 
+    def review_binding(self, exp):
+        if parent_changed(self.state, exp):
+            raise ValueError(
+                "Candidate implementation parent differs from the incumbent"
+            )
+        seed = reference_seed(self.state["incumbent"])
+        exp["config"] = {**exp["config"], "seed": seed}
+        exp["seed"] = seed
+        return candidate_binding(
+            self.state, exp, external_evidence(self.root, self.campaign)
+        )
+
     def training(self, exp):
+        blockers = launch_blockers(self.state, exp)
+        if blockers:
+            raise ValueError("Cannot launch: " + "; ".join(blockers))
+        binding = self.review_binding(exp)
+        approval = exp.get("implementation_review", {})
+        if approval.get("decision") != "approve" or approval.get("binding") != binding:
+            exp["stage"] = "awaiting_review"
+            self.event(
+                "review",
+                {
+                    "experiment": exp["id"],
+                    "gate_error": None,
+                    "refresh_reason": "Approval changed before launch; inspect the updated evidence",
+                },
+            )
+            self.save()
+            return
         source = Path(exp["source"])
         if manifest(source) != read_json(Path(exp["directory"]) / "manifest.json"):
             raise ValueError("Reviewed candidate source changed")
@@ -626,12 +701,18 @@ class Supervisor:
         ):
             raise ValueError("Incumbent predictions changed")
         config = dict(exp["config"])
-        config["seed"] = exp.get("seed", secrets.randbits(32))
+        config["seed"] = binding["training_seed"]
         config["name"] = exp["id"]
         config["paths"] = {**config["paths"], "output_root": exp["directory"]}
         config_path = Path(exp["directory"]) / "config.yaml"
         atomic_write(config_path, yaml.safe_dump(config, sort_keys=False))
-        exp.update(reference=dict(reference), seed=config["seed"], stage="launching")
+        exp.update(
+            reference=dict(reference),
+            seed=config["seed"],
+            stage="launching",
+            launch_binding=binding,
+            active_idea_ids=binding["active_idea_ids"],
+        )
         exp["reference_predictions_sha256"] = sha256(
             Path(reference["run"]) / "fold_0/validation_predictions.csv"
         )
@@ -720,10 +801,11 @@ class Supervisor:
             "--allowed-config-differences",
             ",".join(exp["comparison_keys"]),
         ]
-        if self.policy.input_identity_keys:
+        identity_keys = comparison_identity_keys(self.state, exp, self.policy)
+        if identity_keys:
             command += [
                 "--allowed-input-identity-differences",
-                ",".join(self.policy.input_identity_keys),
+                ",".join(identity_keys),
             ]
         remaining = (
             self.state["limits"]["max_run_seconds"]
@@ -771,6 +853,7 @@ class Supervisor:
         )
 
     def completion(self, exp, decision, evidence):
+        evidence = {**evidence, "acceptance_rule": dict(ACCEPTANCE_RULE)}
         exp.update(
             stage="awaiting_decision", eligible_decision=decision, evidence=evidence
         )
@@ -821,6 +904,23 @@ class Supervisor:
                 else None,
             }
             reasons = evaluate(Path(exp["directory"]), self.state["limits"], measured)
+            if "training_seed" in exp.get("launch_binding", {}):
+                try:
+                    actual_seed = read_json(
+                        Path(exp["directory"]) / "training/effective_config.json"
+                    )["seed"]
+                    if (
+                        actual_seed != exp["launch_binding"]["training_seed"]
+                        or actual_seed != exp["seed"]
+                        or actual_seed != reference_seed(exp["reference"])
+                    ):
+                        reasons.append(
+                            "Training seed differs from the recorded incumbent"
+                        )
+                except (OSError, KeyError, ValueError) as error:
+                    reasons.append(
+                        f"Missing or malformed training seed evidence: {error}"
+                    )
             if not exp["launched"]:
                 self.state["running"] = None
                 exp["stage"] = "awaiting_review"
@@ -854,14 +954,19 @@ class Supervisor:
                 report = read_json(
                     Path(exp["directory"]) / "comparison/comparison.json"
                 )
+                diagnostics = read_diagnostics(
+                    Path(exp["directory"]) / "comparison/comparison.json"
+                )
+                macro_bootstrap = (diagnostics or {}).get("macro_bootstrap")
                 self.completion(
                     exp,
-                    verdict(report),
+                    verdict(report, macro_bootstrap),
                     {
                         "comparison": str(
                             Path(exp["directory"]) / "comparison/comparison.json"
                         ),
                         "macro_auc": report["family_means"]["all"],
+                        "adoption_bootstrap": macro_bootstrap,
                         "per_label": str(
                             diagnostics_path(
                                 Path(exp["directory"]) / "comparison/comparison.json"
@@ -903,6 +1008,8 @@ class Supervisor:
                 config.pop("split_dir")
                 validate_config(self.state["config"], config, self.policy)
                 exp["config"] = config
+                if not parent_changed(self.state, exp):
+                    self.review_binding(exp)
                 exp["stage"] = "awaiting_review"
                 self.event("review", {"experiment": exp["id"], "gate_error": None})
             except (ValueError, KeyError) as error:
@@ -921,6 +1028,7 @@ class Supervisor:
                     )
             elif kind == "developer":
                 exp["developer_report"] = report
+                exp["integration"] = report["integration"]
                 if report["status"] == "blocked":
                     exp["stage"] = "awaiting_review"
                     self.event(
@@ -986,6 +1094,7 @@ class Supervisor:
                 "ranked_ids": None,
                 "park_ids": [],
                 "review": "none",
+                "integration_review": None,
                 "rationale": "Code recorded the fixed numerical result after restricted completion reporting. The incumbent and queue are unchanged; no research direction was closed.",
                 "finding": report["summary"],
                 "concerns": [],
@@ -1002,6 +1111,7 @@ class Supervisor:
         }
 
     def apply_orchestrator(self, event, report):
+        OrchestratorReport.model_validate(report)
         if not self.state["events"] or self.state["events"][0]["id"] != event["id"]:
             raise ValueError("Orchestrator event is stale")
         proposed = {
@@ -1057,14 +1167,17 @@ class Supervisor:
                 raise ValueError(
                     "A proposal needs precedent references and a material difference"
                 )
-            blockers = dependency_blockers(idea, self.state["ideas"])
+            blockers = dependency_blockers(
+                idea, self.state["ideas"], active_incumbent_ideas(self.state)
+            )
             if blockers:
                 raise ValueError(
-                    f"Cannot queue {idea_id}: dependencies require a recorded provisional_accept: "
+                    f"Cannot queue {idea_id}: dependencies must be accepted and active in the incumbent: "
                     f"{'; '.join(blockers)}. Omit this ID from accepted_proposal_ids and ranked_ids; "
                     "it will remain proposed. Queue position does not resolve dependencies."
                 )
         exp = self.state["experiments"].get(event.get("experiment"))
+        binding = None
         if event["kind"] == "review":
             if report["review"] not in {"approve", "repair", "block"}:
                 raise ValueError("Candidate review needs approve, repair, or block")
@@ -1078,6 +1191,23 @@ class Supervisor:
                 raise ValueError("A repaired or approved head must remain reserved")
             if report["review"] == "block" and exp["idea"] not in parked:
                 raise ValueError("Blocked review must explicitly park its idea")
+            if report["review"] == "approve" or event.get("review_binding"):
+                binding = self.review_binding(exp)
+                if event.get("review_binding") != binding:
+                    current_event = self.state["events"][0]
+                    current_event.pop("review_binding", None)
+                    current_event["refresh_reason"] = (
+                        "Review inputs changed; inspect the updated evidence"
+                    )
+                    self.save()
+                    return
+        if event["kind"] == "completion" and (
+            self.state["running"] != exp["id"]
+            or exp["reference"] != self.state["incumbent"]
+        ):
+            raise ValueError(
+                "Completion reference differs from the current incumbent; explicit recovery is required"
+            )
         if event["kind"] != "review" and report["review"] != "none":
             raise ValueError(
                 "Only candidate review events can approve, repair, or block"
@@ -1114,9 +1244,16 @@ class Supervisor:
                 "event": event["id"],
                 "decision": report["review"],
                 "concerns": report["concerns"],
+                "integration_review": report["integration_review"],
+                "binding": binding,
             }
+            write_json(
+                Path(exp["directory"]) / f"review-{event['id']}.json",
+                exp["implementation_review"],
+            )
             if report["review"] == "approve":
                 exp["stage"] = "prepared"
+                exp["active_idea_ids"] = binding["active_idea_ids"]
                 self.state["ideas"][exp["idea"]]["status"] = "prepared"
             elif report["review"] == "repair":
                 exp["stage"] = "repair_requested"
@@ -1263,6 +1400,14 @@ class Supervisor:
                 ]
             )
             event = self.state["events"][0]
+            if event["kind"] == "review" and not event.get("gate_error"):
+                exp = self.state["experiments"][event["experiment"]]
+                if parent_changed(self.state, exp) or not exp.get("integration"):
+                    self.reconcile(exp)
+                    self.state["events"].pop(0)
+                    self.save()
+                    return
+                event["review_binding"] = self.review_binding(exp)
             if event["kind"] == "completion" and not event.get("completion_reporting"):
                 blockers = completion_blockers(self.state, event)
                 if not blockers and not event.get("previous_rejection"):
@@ -1286,12 +1431,13 @@ class Supervisor:
                     "Review evidence and interpret only this event. Use ranked_ids=null when the live queue order and membership stay unchanged. "
                     "When evidence requires a queue change, return a complete ranking of the LIVE queue plus accepted proposals minus explicitly parked IDs. "
                     "Keep any reserved head first. Target at most five. accepted_proposal_ids may contain IDs in this proposals event or existing proposed registry entries. "
-                    "Consult proposal_admission: every dependency must already have decision=provisional_accept. Queued, launched or undecided is insufficient. "
+                    "Consult proposal_admission: every dependency must be accepted and still present in active_incumbent_ideas. Historical acceptance of replaced behavior is insufficient. "
                     "Leave unresolved proposals out of accepted_proposal_ids and ranked_ids; they remain proposed automatically. Ranking them last does not make them eligible. "
                     "Retain surplus proposals without queueing weak ideas. Use review only for review events; otherwise none. "
                     "For completion interpret the fixed eligible_decision; the supervisor records it directly. Do not recompute it or return a verdict. "
                     "For review inspect changes.diff and source, including validation independence from training seed, coverage/exploitation, "
                     "leakage, actual mask accounting, preprocessing, and any added preparation cost. Failed gates cannot be approved. "
+                    "Review the integration plan: preserve unrelated active ideas, verify every declared removal, and explain the result in integration_review for approval. "
                     "One concrete repair is allowed; block requires adding the idea to park_ids. "
                     "Do not park a developing/prepared idea for unrelated reranking. Empty arrays are valid where inapplicable. "
                     "Return new findings, unresolved concerns and evidence references. No scheduling instructions, repeated standing conditions, or unchanged queue explanations."
@@ -1310,6 +1456,17 @@ class Supervisor:
         if running and running["stage"] == "needs_comparison":
             self.comparison(running)
         claimed = self.state["experiments"].get(self.state["claimed"])
+        if (
+            claimed
+            and claimed["stage"]
+            in {"needs_prepare", "needs_config", "repair_requested", "prepared"}
+            and (
+                parent_changed(self.state, claimed)
+                or (claimed["stage"] == "prepared" and not claimed.get("integration"))
+            )
+        ):
+            self.reconcile(claimed)
+            return
         if claimed and claimed["stage"] == "needs_prepare":
             self.prepare(claimed, claimed["developer_report"])
             return
@@ -1319,13 +1476,24 @@ class Supervisor:
         if claimed and claimed["stage"] == "repair_requested":
             self.claim(repair=claimed)
             claimed = self.state["experiments"][self.state["claimed"]]
-        if (
-            claimed
-            and claimed["stage"] == "prepared"
-            and claimed["implementation_parent"] != self.state["incumbent"]["id"]
-        ):
-            self.reconcile(claimed)
-            return
+        if claimed and claimed["stage"] == "prepared":
+            binding = self.review_binding(claimed)
+            approval = claimed.get("implementation_review", {})
+            if (
+                approval.get("decision") != "approve"
+                or approval.get("binding") != binding
+            ):
+                claimed["stage"] = "awaiting_review"
+                self.event(
+                    "review",
+                    {
+                        "experiment": claimed["id"],
+                        "gate_error": None,
+                        "refresh_reason": "Approval is absent or its parent, candidate or external evidence changed",
+                    },
+                )
+                self.save()
+                return
         if (
             claimed
             and claimed["stage"] == "prepared"
@@ -1373,7 +1541,8 @@ class Supervisor:
                         "Use the compact mechanism registry, then retrieve relevant prior work and original reports through history_index before proposing. "
                         f"{self.policy.researcher_instructions} "
                         "Reference historic/general-backlog ownership and identify overlaps with ongoing work. Use unique stable lowercase-hyphen IDs. "
-                        "Fewer ideas is fine; this refill will not immediately retrigger itself. Dependencies must be IDs of campaign ideas with a recorded decision=provisional_accept, not merely queued or launched ideas. "
+                        "Fewer ideas is fine; this refill will not immediately retrigger itself. Dependencies must name accepted ideas still active in the incumbent. Historical or replaced methods belong in precedents. "
+                        "State what the proposal retains, adds and replaces, including how to handle an incumbent change during development. "
                         "Investigate primary sources as useful. Keep each proposal concise and put supporting evidence in referenced artifacts."
                     ),
                 },

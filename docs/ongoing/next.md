@@ -4,14 +4,16 @@ Pending work only. Finished runs and decisions live in the
 [project state](state.md), the [validation results](../validation/results/INDEX.md) and the
 canonical topic documents; this file is not a log.
 
-**No queue is loaded.** The [overnight queue](../backlog/overnight.md) is empty: the
-[2026-09-20 fourteen-run queue](../validation/results/2026-09-20-overnight-hyperparameter-results.md)
-and the [2026-09-19 five-run queue](../validation/results/2026-09-19-untried-hyperparameter-queue.md)
-both completed with no adoption, and the 2026-09-19 controls replicated class-balanced BCE at a
-second seed. The autoresearch campaign is stopped, its run-level stratified sampler rejected for
-adoption and reverted out of main
-([result](../validation/results/2026-09-20-stratified-sampling-promotion.md)). Other experiments
-run one by one against a control as one unseeded run each (random seed, recorded).
+**The position/knee-side experiment sequence is closed.** Learned family strength is
+adopted; appearance-only pooling, learned widths and the pooled compartment adapter
+are removed. There is no pending confirmation run or adapter-removal task. See
+[adoption evidence](../../autoresearch/anatomical-attention.md).
+
+**No training is queued for automatic launch.** Autoresearch remains stopped; its
+historical queues and decisions live under [autoresearch](../../autoresearch/status.md).
+The general [overnight queue](../backlog/overnight.md) is empty. New candidates use
+the incumbent's seed and the [gain-plus-80%-interval rule](../../autoresearch/protocol.md#adoption-policy).
+A future campaign resume is a separate user action.
 
 Pending:
 

@@ -1,4 +1,4 @@
-revision: 258
+revision: 259
 ideas:
 - id: shared-bce-ranking
   mechanism_id: shared-pointwise-ranking-hybrid
@@ -1243,7 +1243,7 @@ ideas:
     at every step where pair terms did not, it is near free against the ceiling, and
     no measured campaign result argues against it: the three negatives so far are
     pair enumerations and pointwise reshapings, neither of which this repeats.'
-  status: developing
+  status: queued
   created_revision: 116
   ranking_rationale: "Scope ruling (mine to make, both proposals asked): a second\
     \ pooling of tokens already produced by one encode_batch call is allowed supporting\

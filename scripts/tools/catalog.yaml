@@ -27,17 +27,38 @@ scripts:
       - Stop drains active training; --abort terminates it. Resume adopts owned live jobs and never automatically repeats a lost training attempt.
       - Quota and unexpected role failures pause the campaign without model polling; resolve the cause and resume.
       - Report prose lengths and concern/reference counts are advisory targets; full content is retained without formatting-only retries, while structured actions and campaign gates remain strict.
-      - Proposal admission requires recorded provisional acceptance of every dependency; orchestrator context exposes unresolved prerequisites, and resume requests a corrected report without losing completed training or prepared candidates.
+      - Proposal admission requires every dependency to be provisionally accepted and still active in the incumbent; replaced methods remain historical evidence and do not satisfy behavioral prerequisites.
+      - Prepared candidates declare retained, added and removed components; acceptance tracks active idea IDs, and every incumbent change requires developer integration assessment plus renewed review, including clean merges.
+      - Approval binds parent, candidate, integration and evidence fingerprints; launch rechecks it and waits for outstanding comparison or decision work. Watched external results trigger renewed review, never automatic cross-campaign adoption.
       - Status prints a human-readable progress summary without model calls; the campaign has no overall run-count, elapsed-time, or plateau stop condition.
       - Status includes starting and incumbent AUC, retained experimental gain and latest scores; results lists every decided experiment with its actual reference, exact score delta and paired interval, preserving withdrawals and separating manual reference changes.
       - Results and agent context include per-label AUC and paired report-group bootstrap intervals as unadjusted exploratory diagnostics; only macro AUC determines acceptance.
-      - Backfill-labels verifies saved data and predictions and appends missing comparison/per_label.json artifacts without retraining or changing historical decisions. New comparison jobs include diagnostic CPU time in the original budget.
+      - Backfill-labels verifies saved data and predictions and appends missing comparison/per_label.json artifacts without retraining or changing historical decisions. New comparison jobs include diagnostic CPU time in the original budget and record the macro 80% interval used with the >=0.001 adoption threshold, alongside the 95% diagnostics.
       - Usage is read-only and includes failed calls with explicit partial or unavailable coverage; cost equivalents do not measure subscription quota.
       - Startup reviews seed-ideas.yaml before fresh research; import-ideas requires a stopped campaign and submits existing proposals for orchestrator ranking without replacing the queue.
       - New topics declare source/configuration permissions and role instructions in campaign.yaml; the policy is validated and sealed, without runner edits or legacy hardcoded fallbacks.
       - Validate checks campaign policy, initial proposals and saved-control recipe compatibility without model calls, GPU work, or training. Omitting a campaign ID defaults to triplet-sampling.
       - Routine rejected/inconclusive completions can use Haiku 4.5 or Luna low with code-owned eligibility and no decision authority; concerns escalate to the orchestrator, with both calls included in usage.
     docs: [autoresearch/README.md, autoresearch/runtime.md, autoresearch/campaign-setup.md, autoresearch/campaigns/triplet-sampling/contract.md, autoresearch/campaigns/losses/contract.md]
+
+  - id: autoresearch-watch
+    path: scripts/tools/autoresearch_watch.py
+    summary: Monitor an existing campaign without model polling and dispatch bounded Codex repairs only for operational failures.
+    tags: [autoresearch, watchdog, monitor, recovery, repair, background, tokens, codex]
+    commands:
+      - rtk proxy uv run --locked python -m scripts.tools.autoresearch_watch start medial-lateral-transfer
+      - rtk proxy uv run --locked python -m scripts.tools.autoresearch_watch status medial-lateral-transfer
+      - rtk proxy uv run --locked python -m scripts.tools.autoresearch_watch stop medial-lateral-transfer
+    inputs: [Existing campaign state and process identities, Codex subscription login, Existing Codex orchestrator profile]
+    outputs: [Detached watcher status, Incident-specific repair logs and usage, Verified supervisor resume or recorded blocker]
+    notes:
+      - Enabling the watcher authorizes bounded operational repairs and resume for that campaign; healthy minute checks use no model calls.
+      - Uses the existing Codex orchestrator profile with a workspace-write sandbox and no API fallback. Research still uses the campaign's configured provider.
+      - Pauses or supervisor loss trigger recovery after active jobs drain. Each incident gets one model call capped at fifteen minutes; repeated failures or three total repair attempts stop automatic recovery.
+      - Deliberate campaign stops are respected. Quota failures, scientific decisions and sealed-input changes require a blocker rather than automatic modification.
+      - Logs and token usage live under the campaign's watchdog directory, separately from normal campaign usage.
+      - Status checks operational liveness; it does not prove scientific validity or detect every hang inside a live worker.
+    docs: [autoresearch/watchdog.md]
 
   - id: prepare-tonylin-labels
     path: scripts/tools/prepare_tonylin_labels.py

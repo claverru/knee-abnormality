@@ -16,6 +16,12 @@ from knee_abnormality.data.preprocessing.geometry import (
     estimate_reference,
     reflection_eligibility,
 )
+from knee_abnormality.data.preprocessing.laterality import (
+    LEFT,
+    RIGHT,
+    KneeSide,
+    resolve_knee_side,
+)
 from knee_abnormality.data.preprocessing.preparation import (
     PreparedSeries,
     decode_series,
@@ -55,6 +61,7 @@ class KneeStudyDataset(Dataset):
         self.epoch = Value("q", 0)
         self._slice_index: dict[Path, IndexedSeries] = {}
         self._study_references: dict[str, StudyReference] = {}
+        self._study_sides: dict[str, KneeSide] = {}
         self._excluded_series: dict[str, frozenset[str]] = {}
         missing = set(studies[STUDY].to_list()) - set(series_index)
         if missing:
@@ -102,6 +109,9 @@ class KneeStudyDataset(Dataset):
         )
         self._excluded_series[study.uid] = excluded
         self._study_references[study.uid] = estimate_reference(eligible)
+        self._study_sides[study.uid] = resolve_knee_side(
+            tuple((uid, value.side) for uid, (value, _) in indexed.items())
+        )
 
     def _decode_series(self, records, spacing_mm, image_size):
         return decode_series(records, spacing_mm, image_size, self.io_threads)
@@ -283,6 +293,7 @@ class KneeStudyDataset(Dataset):
             "is_gold": bool(row.get("is_gold", False)),
             "series": tuple(prepared),
             "study_reference": self._study_references.get(study.uid),
+            "knee_side": self._study_sides[study.uid],
             "target": target,
             "target_observed": observed,
             "failures": tuple(failures),
@@ -320,6 +331,8 @@ def collate_studies(items: list[dict]) -> dict:
     positions = torch.zeros((len(entries), max_slices), dtype=torch.float32)
     slice_mask = torch.zeros((len(entries), max_slices), dtype=torch.bool)
     valid_rects = torch.zeros((len(entries), max_slices, SLICES_PER_INPUT, 4))
+    patient_maps = torch.zeros((len(entries), max_slices, SLICES_PER_INPUT, 3, 3))
+    geometry_valid = torch.zeros((len(entries), max_slices), dtype=torch.bool)
     reflection_eligible = torch.ones(batch_size, dtype=torch.bool)
     for index, item in enumerate(items):
         supplied = [
@@ -335,6 +348,8 @@ def collate_studies(items: list[dict]) -> dict:
         images[series_index, :count] = series.images
         positions[series_index, :count] = series.positions
         valid_rects[series_index, :count] = series.valid_rects
+        patient_maps[series_index, :count] = series.patient_maps
+        geometry_valid[series_index, :count] = series.geometry_valid
         slice_mask[series_index, :count] = True
         study_indices[series_index] = study_index
         type_indices[series_index] = type_index
@@ -344,6 +359,22 @@ def collate_studies(items: list[dict]) -> dict:
         "images": images,
         "slice_positions": positions,
         "valid_rects": valid_rects,
+        "patient_maps": patient_maps,
+        "geometry_valid": geometry_valid,
+        "knee_side_sign": torch.tensor(
+            [
+                {LEFT: -1.0, RIGHT: 1.0}.get(item["knee_side"].value, 0.0)
+                if item["knee_side"].center_x_mm is not None
+                else 0.0
+                for item in items
+            ],
+            dtype=torch.float32,
+        ),
+        "knee_center_x_mm": torch.tensor(
+            [item["knee_side"].center_x_mm or 0.0 for item in items],
+            dtype=torch.float32,
+        ),
+        "knee_side_reasons": [item["knee_side"].reason for item in items],
         "reflection_eligible": reflection_eligible,
         "reflection_reasons": [item["reflection_reasons"] for item in items],
         "selected_paths": [series.selected_paths for _, _, series in entries],

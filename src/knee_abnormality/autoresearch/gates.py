@@ -1,4 +1,5 @@
 import math
+from decimal import Decimal
 from pathlib import Path
 
 from knee_abnormality.autoresearch.campaigns import CampaignPolicy
@@ -6,14 +7,34 @@ from knee_abnormality.autoresearch.storage import read_json, sha256
 
 LOGISTICAL_KEYS = {"name", "seed", "paths.output_root"}
 RUNTIME_FACTOR = 1.15
+ACCEPTANCE_RULE = {
+    "metric": "candidate_minus_incumbent_macro_auc",
+    "minimum_gain": 0.001,
+    "bootstrap_confidence_level": 0.8,
+    "bootstrap_lower_bound_strictly_above": 0.0,
+    "reporting_confidence_level": 0.95,
+}
 
 
-def dependency_blockers(idea, ideas):
+def active_incumbent_ideas(state):
+    incumbent = state["experiments"].get(state["incumbent"]["id"])
+    if incumbent is None:
+        return []
+    if "active_idea_ids" not in incumbent:
+        raise ValueError(
+            "Incumbent has no recorded integration inventory; explicit recovery is required"
+        )
+    return incumbent["active_idea_ids"]
+
+
+def dependency_blockers(idea, ideas, active_idea_ids):
     return [
         f"{dependency} (status={ideas.get(dependency, {}).get('status', 'unknown')}, "
-        f"decision={ideas.get(dependency, {}).get('decision') or 'undecided'})"
+        f"decision={ideas.get(dependency, {}).get('decision') or 'undecided'}, "
+        f"active={dependency in active_idea_ids})"
         for dependency in idea["dependencies"]
         if ideas.get(dependency, {}).get("decision") != "provisional_accept"
+        or dependency not in active_idea_ids
     ]
 
 
@@ -136,16 +157,32 @@ def evaluate(experiment: Path, limits: dict, receipt: dict):
     return reasons
 
 
-def verdict(report):
+def verdict(report, macro_bootstrap):
     bootstrap = report["paired_report_group_bootstrap"]
     interval = bootstrap["intervals"]["all"]
     bounds = interval["delta_percentile_95"]
+    scores = report["family_means"]["all"]
+    adoption_bounds = (macro_bootstrap or {}).get("delta_percentile_80")
     if (
         not bounds
+        or len(bounds) != 2
         or interval["valid_draws"] < 1
         or not all(math.isfinite(value) for value in bounds)
+        or not adoption_bounds
+        or len(adoption_bounds) != 2
+        or not all(math.isfinite(value) for value in adoption_bounds)
+        or not bounds[0] <= adoption_bounds[0] <= adoption_bounds[1] <= bounds[1]
+        or macro_bootstrap["valid_draws"] != interval["valid_draws"]
+        or not all(
+            math.isfinite(scores[key]) and 0 <= scores[key] <= 1
+            for key in ("reference", "candidate")
+        )
     ):
         return "invalid"
-    if bounds[0] > 0:
+    gain = Decimal(str(scores["candidate"])) - Decimal(str(scores["reference"]))
+    if (
+        gain >= Decimal(str(ACCEPTANCE_RULE["minimum_gain"]))
+        and adoption_bounds[0] > ACCEPTANCE_RULE["bootstrap_lower_bound_strictly_above"]
+    ):
         return "provisional_accept"
-    return "reject" if bounds[1] < 0 else "inconclusive"
+    return "reject"

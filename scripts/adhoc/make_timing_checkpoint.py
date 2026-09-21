@@ -28,7 +28,7 @@ def main() -> None:
         targets = parameters["targets"]
         torch.manual_seed(args.seed)
         model = KneeAbnormalityModel(
-            config.model, config.data, len(targets), load_pretrained=False
+            config.model, config.data, targets, load_pretrained=False
         )
         identity = preprocessing_identity(config.model.backbone)
         checkpoint = {

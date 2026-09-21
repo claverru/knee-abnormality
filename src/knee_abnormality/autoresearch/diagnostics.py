@@ -11,8 +11,9 @@ INTERPRETATION = (
     "Per-label intervals are exploratory, unadjusted paired report-group bootstrap "
     "95% intervals for candidate minus reference. They do not provide simultaneous "
     "coverage across labels or account for training-seed, checkpoint-selection or "
-    "repeated validation-selection uncertainty. Only the macro interval determines "
-    "acceptance; label diagnostics do not authorize per-label losses."
+    "repeated validation-selection uncertainty. Adoption requires macro gain >= 0.001 "
+    "and a strictly positive central 80% macro interval; label diagnostics do not "
+    "authorize per-label losses."
 )
 
 
@@ -145,7 +146,13 @@ def write_diagnostics(comparison, root):
                     "bootstrap": interval(delta, valid_draws),
                 }
             )
-        macro = interval(np.mean(deltas, axis=0), valid_draws)
+        macro_deltas = np.mean(deltas, axis=0)
+        macro = {
+            **interval(macro_deltas, valid_draws),
+            "delta_percentile_80": np.percentile(macro_deltas, [10, 90]).tolist()
+            if valid_draws
+            else None,
+        }
         recorded = bootstrap["intervals"]["all"]
         if macro["valid_draws"] != recorded["valid_draws"] or any(
             not np.allclose(macro[key], recorded[key], rtol=0, atol=1e-12)
@@ -186,6 +193,8 @@ def write_diagnostics(comparison, root):
                 "multiplicity_adjustment": "none",
             },
             "per_target": rows,
+            "macro_bootstrap": macro,
+            "macro_adoption_confidence_level": 0.8,
             "interpretation": INTERPRETATION,
         }
         write_json(diagnostics_path(comparison), result)

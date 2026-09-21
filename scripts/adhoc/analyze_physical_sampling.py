@@ -21,6 +21,7 @@ from knee_abnormality.data.preprocessing.geometry import (
     estimate_reference,
     summarize_series,
 )
+from knee_abnormality.data.preprocessing.laterality import series_side
 from knee_abnormality.data.preprocessing.sampling import (
     build_pool,
     limiting_reach,
@@ -192,7 +193,15 @@ def analyze(settings: AnalyzeCLI) -> None:
                 continue
             pool = build_pool(
                 tuple(
-                    (a.uid, IndexedSeries(a.records, a.geometry, SeriesSummary()))
+                    (
+                        a.uid,
+                        IndexedSeries(
+                            a.records,
+                            a.geometry,
+                            SeriesSummary(),
+                            series_side(a.records, ()),
+                        ),
+                    )
                     for a in items
                 ),
                 kind[0],

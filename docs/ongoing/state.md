@@ -1,4 +1,4 @@
-# Project state (2026-09-20)
+# Project state (2026-09-21)
 
 The recipe in force, the best submission, and the measurement rules every comparison depends on.
 Active lines of development have their own documents in [this folder](INDEX.md). Completed
@@ -19,17 +19,21 @@ pending experiments are classified in the [backlog](../backlog/INDEX.md).
   [retention record](../architecture/configs-and-experiment-artifacts.md#checkpoint-pruning)
   identifies removed weights; no training or campaign state changed.
 
-- **Code:** the full-slice recipe ([current model](../modeling/current-model.md)) with series
-  filtering and deterministic source ranking (preprocessing identity
-  `ranked_filtered_physical_gaussian_overlap_spatial_tokens_reflection_v10`,
-  [preparation](../data-preparation/current-preparation.md#series-indexing-guards-and-exclusions)).
-  Its seeds 42–44 scored 0.889573, 0.889650 and 0.892795 on fold 0 (mean 0.890673), a tie with
-  the previous code's seed controls, and seed 42 scored 0.933 public
-  ([result](../validation/results/2026-09-17-ranked-filtered-result.md)).
-- **Noise:** run-to-run noise comes from training (pooled standard deviation 0.00175 over eight
-  replicate runs); a single-run difference below about 0.003 carries no information, even at a
-  matched seed. The 2026-09-18 controls span 0.0026 at ×1 validation
-  ([overnight results](../validation/results/2026-09-18-overnight-results.md)).
+- **Current research recipe:** learned anatomical family strength with fixed 20 mm width,
+  position-rich pooling and class-balanced BCE, seed 2263738815. The selected learned-strength
+  run scores 0.897443 versus 0.895112 for the current matched-seed control (+0.002331;
+  80% interval [+0.000103, +0.004518]). It is adopted; appearance-only pooling,
+  learned widths and the pooled compartment adapter are removed. See the
+  [current model](../modeling/current-model.md) and [durable experiment record](../../autoresearch/anatomical-attention.md).
+- **Research decisions:** valid candidates are adopted when macro gain >= 0.001 and the
+  central 80% paired-report-group interval has lower bound > 0; otherwise discarded.
+  The 95% interval remains diagnostic. Candidates inherit the incumbent seed. This is
+  a practical progression rule, not independent confirmation; training variability and
+  repeated fold-0 selection remain outside the interval. Older noise measurements are
+  historical evidence, not a blanket rule that all gains below 0.003 carry no information.
+- **Autoresearch:** all three campaigns are stopped on the learned-
+  strength reference with their historical limits/results preserved. Current state and
+  transition evidence are owned by [autoresearch](../../autoresearch/status.md).
 - **Local metrics against the leaderboard (measured 2026-09-18):** over the nineteen comparable
   submissions macro AUC correlates at +0.907 and BCE at +0.833, gold-only AUC and gold-only BCE
   at nothing, and since 09-13 the submissions differ locally by less than one run's noise, so no
