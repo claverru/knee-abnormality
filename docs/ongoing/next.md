@@ -22,12 +22,20 @@ Pending:
   Steven-v4-trained control on the same split (`labels.source: steven_v4`) would separate the
   label change from the new training fold. Before the next queue, move the overnight launcher
   to `all_5fold_scanner_v1`; the autoresearch gate already uses it.
-- **Sampling campaign:** defined with seven seed ideas against `k_05` and ready for the user
-  to start ([campaign](../../autoresearch/campaigns/sampling/INDEX.md)).
 - **Evaluation count above ×4:** ×3 scored 0.938 and ×4 0.939 publicly, one rounding step apart,
   so where the count stops paying is unresolved, and its inference-time cost counts toward the
   efficiency prize
   ([submissions](../inference/submissions/2026-09-18-temperature-and-count-submissions.md)).
+  Geometry caps the axis (fold-0 sampler replay of the `k_05` recipe, 2026-09-22): ×4 already
+  takes 80% of the triplet windows of a slot's only 2D series and decodes 94% of its slices; ×5
+  and ×6 reach 92% and 98% for +18% and +29% triplets but only +5% and +9% decoded slices per
+  study, and every step past ×6 adds triplets from 3D series alone. On the 2026-09-17 token caches
+  (older ordinary-BCE checkpoints) every candidate scored −0.0018 against 24 per type at τ 0.75
+  ([bag size](../validation/results/2026-09-17-attention-temperature.md#bag-size)), so ×5 is the
+  step to try if the count is tested again; ×6 and above approach that all-candidate bag
+  (`outputs/analysis/acquisition-geometry-20260922/capacity_*`). On `oblique`, ×5 at τ 0.70 then
+  scored 0.945 publicly against 0.944 at ×4 τ 0.75 (S47, S46), one rounding step, with +0.0003 on
+  fold 0 ([result](../validation/results/2026-09-22-oblique-groups-result.md#temperature-and-count)).
 - **Submit `control-check-x4-tau075`** when submissions reset: the first bundle carrying the
   main-thread warm-up, the index changes and the CPU cluster, profiled at 371.4 s of command wall
   against 440.5 s. Submit the main-thread warm-up with it.

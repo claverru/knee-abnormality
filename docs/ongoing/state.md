@@ -1,4 +1,4 @@
-# Project state (2026-09-21)
+# Project state (2026-09-22)
 
 The recipe in force, the best submission, and the measurement rules every comparison depends on.
 Active lines of development have their own documents in [this folder](INDEX.md). Completed
@@ -68,9 +68,10 @@ pending experiments are classified in the [backlog](../backlog/INDEX.md).
   [evaluation and adoption rule](../../autoresearch/protocol.md#shared-evaluation-and-adoption):
   fold 0 of `all_5fold_scanner_v1`, combined labels, validation ×1, gain ≥ 0.001 with a positive
   80% lower bound. The three earlier campaigns stay stopped as historical records; they were
-  sealed on `all_5fold_v3` and cannot resume. The new
-  [sampling campaign](../../autoresearch/campaigns/sampling/INDEX.md) is defined against the
-  exponent-0.5 champion `k_05` (0.899042) and not started. Current state and transition evidence are owned by
+  sealed on `all_5fold_v3` and cannot resume. The
+  [sampling campaign](../../autoresearch/campaigns/sampling/INDEX.md), defined against the
+  exponent-0.5 champion `k_05` (0.899042), ran six experiments on 2026-09-21/22, all rejected,
+  and is retired. Current state and transition evidence are owned by
   [autoresearch](../../autoresearch/status.md).
   The watchdog initializes its incident history on load, so direct `watch` can recover
   without a preceding `start`; existing incident history is preserved.
@@ -87,6 +88,9 @@ pending experiments are classified in the [backlog](../backlog/INDEX.md).
   changes, it sits inside the ×1 cohort spread (median 0.88707, sd 0.00331, and the cohort's own two
   controls are 0.88380 and 0.88645), and `outputs/submission/exports/control-check-x4-tau075` is
   exported from it at ×4 and temperature 0.75.
+- **Best public score since 2026-09-21: 0.945**, reached by two single fold-0 models: `k_05` at ×4 τ 0.75
+  (S41) and the `oblique` experiment at ×5 τ 0.70 (S47)
+  ([ledger](../inference/submissions/ledger.md)). The ensemble below was the best before them.
 - **Best submission 2026-09-19: 0.943 public**, a ten-member bundle of five EfficientNet-B0 and
   five ReXNet-200 fold models with mirror TTA, at ×4 and temperature 0.75. The five-b0 bundle
   without TTA scores 0.940 at 27% of the runtime and is the efficiency entry
