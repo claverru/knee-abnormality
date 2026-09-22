@@ -19,6 +19,7 @@ from knee_abnormality.cli import CLISettings
 from knee_abnormality.config import SLICES_PER_INPUT, load_config
 from knee_abnormality.data.dataset import collate_studies
 from knee_abnormality.data.labels import STUDY
+from knee_abnormality.data.preprocessing.device import prepare_images
 from knee_abnormality.identity import preprocessing_identity
 from knee_abnormality.inference.engine import prediction_data
 from knee_abnormality.modeling.augmentation import (
@@ -243,12 +244,11 @@ def overview(data: dict, output: Path) -> None:
     canvas.save(output)
 
 
-def anchor_record(series, center, eligible, sagittal, inverse=None):
-    count = len(series.images)
+def anchor_record(series, size, center, eligible, sagittal, inverse=None):
+    count = series.triplet_count
     reflected = torch.full((count,), eligible, dtype=torch.bool)
     planes = torch.full((count,), sagittal, dtype=torch.bool)
     association = reflection_channels(reflected, planes)
-    size = series.images.shape[-1]
     if inverse is None:
         inverse = torch.eye(3)[None].expand(count, -1, -1)
     inverse = reflection_inverse(inverse, reflected, planes, size)
@@ -407,20 +407,21 @@ def create_preview(args: PreviewCLI) -> dict:
     for index in indices:
         item = dataset[index]
         items.append(item)
-        batch = collate_studies([item])
+        batch = prepare_images(collate_studies([item]))
         study_eligible = bool(batch["reflection_eligible"][0])
+        entry = 0
         for slot, acquisitions in enumerate(item["series"]):
             for series in acquisitions:
-                stacks.append(series.images)
+                images = batch["images"][entry, : series.triplet_count]
+                entry += 1
+                stacks.append(images)
                 prepared.append(series)
                 centers.append(item["study_reference"])
-                reflected = torch.full(
-                    (len(series.images),), study_eligible, dtype=torch.bool
-                )
+                reflected = torch.full((len(images),), study_eligible, dtype=torch.bool)
                 sagittal = torch.full_like(
                     reflected, config.data.series_types[slot].plane == "Sagittal"
                 )
-                reflection = apply_reflection(series.images, reflected, sagittal)
+                reflection = apply_reflection(images, reflected, sagittal)
                 source_lateralities = []
                 if headers is not None:
                     source_lateralities = (
@@ -457,10 +458,15 @@ def create_preview(args: PreviewCLI) -> dict:
                         if item["study_reference"]
                         else "missing",
                         "original_anchors": anchor_record(
-                            series, item["study_reference"], False, bool(sagittal[0])
+                            series,
+                            config.data.image_size,
+                            item["study_reference"],
+                            False,
+                            bool(sagittal[0]),
                         ),
                         "reflected_anchors": anchor_record(
                             series,
+                            config.data.image_size,
                             item["study_reference"],
                             study_eligible,
                             bool(sagittal[0]),
@@ -469,7 +475,7 @@ def create_preview(args: PreviewCLI) -> dict:
                         "reflected_channels": encode_channels(reflection),
                         "series_uid": series.uid,
                         "slot": slot,
-                        "inputs": len(series.images),
+                        "inputs": len(images),
                         "slices": series.slice_count,
                         "unique_slices": series.unique_slice_count,
                         "sampling_path": series.sampling_path,
@@ -477,11 +483,11 @@ def create_preview(args: PreviewCLI) -> dict:
                         "sampling_metadata": item["sampling"][slot],
                         "positions": series.positions.tolist(),
                         "prepared_sha256": hashlib.sha256(
-                            series.images.numpy().tobytes()
+                            images.numpy().tobytes()
                         ).hexdigest(),
                         "failures": list(series.failures),
-                        "original": [encode_image(pixels) for pixels in series.images],
-                        "original_channels": encode_channels(series.images),
+                        "original": [encode_image(pixels) for pixels in images],
+                        "original_channels": encode_channels(images),
                         "variants": [],
                     }
                 )
@@ -559,6 +565,7 @@ def create_preview(args: PreviewCLI) -> dict:
                 )
                 record[f"{prefix}anchors"] = anchor_record(
                     prepared[index],
+                    config.data.image_size,
                     centers[index],
                     bool(reflected[0]),
                     bool(sagittal[0]),

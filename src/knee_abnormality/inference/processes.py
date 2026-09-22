@@ -1,3 +1,4 @@
+import ctypes
 import json
 import os
 import signal
@@ -11,13 +12,9 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from knee_abnormality.config import (
-    INFERENCE_MALLOC_ARENA_MAX,
-    INFERENCE_MALLOC_THRESHOLD_BYTES,
-    ExperimentConfig,
-    Fold,
-    PositiveFiniteFloat,
-)
+from knee_abnormality.config import ExperimentConfig, Fold, PositiveFiniteFloat
+
+CU_CTX_SCHED_BLOCKING_SYNC = 4
 
 
 class PredictionRequest(BaseModel):
@@ -38,6 +35,27 @@ class PredictionRequest(BaseModel):
     study_ids: list[str] = Field(min_length=1)
     worker_index: int = Field(ge=0)
     output: Path
+
+
+def cuda_device_count() -> int:
+    try:
+        driver = ctypes.CDLL("libcuda.so.1")
+    except OSError:
+        return 0
+    count = ctypes.c_int()
+    if driver.cuInit(0) != 0 or driver.cuDeviceGetCount(ctypes.byref(count)) != 0:
+        return 0
+    return count.value
+
+
+def use_blocking_sync() -> None:
+    driver = ctypes.CDLL("libcuda.so.1")
+    device = ctypes.c_int()
+    if driver.cuInit(0) != 0 or driver.cuDeviceGet(ctypes.byref(device), 0) != 0:
+        raise RuntimeError("CUDA driver initialization failed")
+    result = driver.cuDevicePrimaryCtxSetFlags_v2(device, CU_CTX_SCHED_BLOCKING_SYNC)
+    if result != 0:
+        raise RuntimeError(f"CUDA refused blocking synchronization with error {result}")
 
 
 def _terminate(signum: int, frame: FrameType | None) -> None:
@@ -72,11 +90,6 @@ def run_prediction_processes(
                 log = stack.enter_context(log_path.open("w", encoding="utf-8"))
                 environment = os.environ.copy()
                 environment["CUDA_VISIBLE_DEVICES"] = "" if gpu_id is None else gpu_id
-                environment.update(
-                    MALLOC_MMAP_THRESHOLD_=str(INFERENCE_MALLOC_THRESHOLD_BYTES),
-                    MALLOC_TRIM_THRESHOLD_=str(INFERENCE_MALLOC_THRESHOLD_BYTES),
-                    MALLOC_ARENA_MAX=str(INFERENCE_MALLOC_ARENA_MAX),
-                )
                 if gpu_id is not None:
                     environment.update(
                         OMP_NUM_THREADS="1",

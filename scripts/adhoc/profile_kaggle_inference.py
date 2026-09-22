@@ -52,6 +52,12 @@ CONDITIONS = {
         "batch_size": 4,
         "num_workers": 16,
     },
+    "fp16-b4-w12": {
+        "kind": "prediction",
+        "precision": "fp16",
+        "batch_size": 4,
+        "num_workers": 12,
+    },
     "fp32-b4-w16": {
         "kind": "prediction",
         "precision": "fp32",
@@ -151,6 +157,21 @@ CONDITIONS = {
             ["bytes", 16],
         ],
     },
+    "startup": {"kind": "startup"},
+    "cudnn": {"kind": "cudnn"},
+    "mainloop": {"kind": "mainloop", "studies": 64},
+    "parity": {"kind": "parity", "studies": 300},
+    **{
+        f"census-{part}": {"kind": "census", "part": part, "parts": 5}
+        for part in range(5)
+    },
+    "fp16-b4-w16-pyspy": {
+        "kind": "prediction",
+        "precision": "fp16",
+        "batch_size": 4,
+        "num_workers": 16,
+        "pyspy": True,
+    },
 }
 LOADING_SEED = 20260915
 TERMINAL = ("complete", "error", "fail", "cancel")
@@ -173,6 +194,7 @@ class ProfileCLI(CLISettings):
     poll_seconds: int = Field(default=60, gt=0)
     accelerator: str = "NvidiaTeslaT4"
     notebook_timeout_seconds: int = Field(default=32400, gt=0, le=32400)
+    reference_dataset: str | None = Field(default=None, pattern=r"^[\w.-]+/[\w.-]+$")
 
 
 def profile_studies(args: ProfileCLI) -> list[str]:
@@ -266,8 +288,6 @@ for module, name in (
     (dataset_module, "prepare_series"),
     (dataset_module, "decode_series"),
     (preparation_module, "resample_crop"),
-    (preparation_module, "_linear_quantiles"),
-    (preparation_module, "_normalize_pixels"),
 ):
     timed(module, name)
 
@@ -282,6 +302,7 @@ for module, name in (
 def reset_process_caches():
     dicom_module._TAGS_CACHE.clear()
     spatial_module._axis_filter.cache_clear()
+    spatial_module.resample_plan.cache_clear()
     if dicom_module._POOL is not None:
         dicom_module._POOL.shutdown(wait=True)
         dicom_module._POOL = None
@@ -376,6 +397,7 @@ torch.set_float32_matmul_precision("high")
 from knee_abnormality.config import load_config
 from knee_abnormality.data import dataset as dataset_module
 from knee_abnormality.inference.checkpoint import load_checkpoint_model
+from knee_abnormality.data.preprocessing.device import prepare_images
 from knee_abnormality.inference.engine import move_batch, prediction_data
 
 config = load_config(bundle / "config.json", data_root=data_root)
@@ -385,7 +407,7 @@ items = [dataset[index] for index in range(len(dataset))]
 batches = [dataset_module.collate_studies(items[index:index + 4]) for index in range(0, len(items), 4)]
 device = torch.device("cuda:0")
 model = load_checkpoint_model(config, targets, bundle / "model.ckpt", device)
-gpu_batches = [move_batch(batch, device) for batch in batches]
+gpu_batches = [prepare_images(move_batch(batch, device)) for batch in batches]
 images = [int(batch["slice_mask"].sum()) for batch in batches]
 total = sum(images)
 original_features = model.backbone.forward_features
@@ -454,14 +476,365 @@ print(json.dumps(differences, indent=1))
 """
 
 
+CENSUS_CELL = """sys.path.insert(0, str(bundle / "code"))
+import torch
+
+from knee_abnormality.config import load_config
+from knee_abnormality.data.dataset import build_data_loader
+from knee_abnormality.inference.engine import prediction_data
+
+config = load_config(bundle / "config.json", data_root=data_root)
+manifest = json.loads((bundle / "manifest.json").read_text())
+dataset, _, _ = prediction_data(config, "test", 0, image_multiplier=manifest["runtime"]["image_multiplier"], study_ids=STUDIES)
+loader = build_data_loader(dataset, config.trainer, 1, num_workers=4)
+census = {"studies": 0, "series": 0, "failures": []}
+started = time.perf_counter()
+for batch in loader:
+    census["studies"] += len(batch["study_uid"])
+    census["series"] += int(batch["slice_mask"].shape[0])
+    for uid, values in zip(batch["study_uid"], batch["failures"]):
+        census["failures"].extend(f"{uid} | {value}" for value in values)
+census["seconds"] = time.perf_counter() - started
+(profile_dir / "census.json").write_text(json.dumps(census, indent=1) + "\\n")
+print(json.dumps({key: value for key, value in census.items() if key != "failures"}), len(census["failures"]))
+"""
+
+
+BUNDLE_SELECTION = """import os
+from pathlib import Path
+
+_selected = sorted(path.parent for pattern in ("*/manifest.json", "*/*/manifest.json", "*/*/*/manifest.json", "*/*/*/*/manifest.json") for path in Path("/kaggle/input").glob(pattern) if "{slug}" in str(path))
+if len(_selected) == 1:
+    os.environ["KNEE_BUNDLE_DIR"] = str(_selected[0])
+"""
+
+
+PARITY_SCRIPT = """import hashlib, json, sys
+from pathlib import Path
+
+import numpy as np
+import torch
+
+bundle, data_root, output, studies_path = map(Path, sys.argv[1:5])
+from knee_abnormality.config import load_config
+from knee_abnormality.data.dataset import build_data_loader
+from knee_abnormality.inference.engine import move_batch, prediction_data
+
+config = load_config(bundle / "config.json", data_root=data_root)
+manifest = json.loads((bundle / "manifest.json").read_text())
+studies = json.loads(studies_path.read_text())
+dataset, _, _ = prediction_data(config, "test", 0, image_multiplier=manifest["runtime"]["image_multiplier"], study_ids=studies)
+loader = build_data_loader(dataset, config.trainer, 1, num_workers=4)
+records = {}
+saved = 0
+for batch in loader:
+    constant = None
+    if "images" not in batch:
+        from knee_abnormality.data.preprocessing.device import prepare_images
+        mask = batch["slice_mask"].clone()
+        batch = prepare_images(move_batch(batch, torch.device("cuda")))
+        constant = batch["constant_series"].cpu().tolist()
+    else:
+        mask = batch["slice_mask"]
+    images = batch["images"].cpu()
+    series = []
+    for index in range(images.shape[0]):
+        count = int(mask[index].sum())
+        values = images[index, :count].numpy()
+        series.append({
+            "images": hashlib.sha256(values.tobytes()).hexdigest(),
+            "count": count,
+            "sum": int(values.astype(np.int64).sum()),
+            "geometry": hashlib.sha256(b"".join(batch[key][index, :count].cpu().numpy().tobytes() for key in ("valid_rects", "slice_positions", "patient_maps", "geometry_valid"))).hexdigest(),
+        })
+        if saved < 6:
+            np.save(output.parent / f"{output.stem}-{batch['study_uid'][0]}-{index}.npy", values)
+            saved += 1
+    records[batch["study_uid"][0]] = {"series": series, "failures": list(batch["failures"][0]), "constant": constant}
+output.write_text(json.dumps(records))
+"""
+
+
+PARITY_CELL = f"""reference = sorted(path.parent for pattern in ("*/manifest.json", "*/*/manifest.json", "*/*/*/manifest.json", "*/*/*/*/manifest.json") for path in Path("/kaggle/input").glob(pattern) if path.parent != bundle)
+if len(reference) != 1:
+    raise RuntimeError(f"Expected one reference bundle, found {{reference}}")
+studies_path = profile_dir / "studies.json"
+studies_path.write_text(json.dumps(STUDIES))
+parity = {{}}
+for name, root in (("reference", reference[0]), ("candidate", bundle)):
+    environment_values = os.environ.copy()
+    environment_values["PYTHONPATH"] = str(root / "code")
+    started = time.perf_counter()
+    completed = subprocess.run([sys.executable, "-c", {PARITY_SCRIPT!r}, str(root), str(data_root), str(profile_dir / f"{{name}}.json"), str(studies_path)], env=environment_values, capture_output=True, text=True)
+    parity[name] = {{"seconds": time.perf_counter() - started, "returncode": completed.returncode, "stderr": completed.stderr[-6000:]}}
+    print(name, parity[name]["seconds"], completed.returncode, completed.stderr[-3000:])
+reference_records = json.loads((profile_dir / "reference.json").read_text())
+candidate_records = json.loads((profile_dir / "candidate.json").read_text())
+mismatches = []
+series_total = 0
+for study, expected in reference_records.items():
+    actual = candidate_records.get(study)
+    if actual is None or len(actual["series"]) != len(expected["series"]):
+        mismatches.append({{"study": study, "reason": "series_count"}})
+        continue
+    for index, (left, right) in enumerate(zip(expected["series"], actual["series"])):
+        series_total += 1
+        if left != right:
+            mismatches.append({{"study": study, "series": index, "reference": left, "candidate": right}})
+parity.update(studies=len(reference_records), series=series_total, mismatches=mismatches, constant=sum(sum(record["constant"] or []) for record in candidate_records.values()))
+(profile_dir / "parity.json").write_text(json.dumps(parity, indent=1) + "\\n")
+print(json.dumps({{key: value for key, value in parity.items() if key != "mismatches"}}, indent=1), len(mismatches))
+"""
+
+
+CUDNN_PROBE = """import json, os, sys, time
+import numpy as np
+import torch
+import timm
+torch.set_num_threads(1)
+if os.environ.get("KNEE_BENCHMARK") == "1":
+    torch.backends.cudnn.benchmark = True
+backbone = timm.create_model("rexnet_200", pretrained=False, in_chans=3, num_classes=0, global_pool="").cuda().eval().to(memory_format=torch.channels_last)
+torch.manual_seed(0)
+images = torch.randn((64, 3, 224, 224), generator=torch.Generator().manual_seed(0)).cuda().contiguous(memory_format=torch.channels_last)
+def forward():
+    with torch.inference_mode(), torch.autocast("cuda", dtype=torch.float16):
+        return backbone.forward_features(images).float().cpu().numpy()
+started = time.perf_counter(); cpu = time.process_time()
+first = forward()
+warmup = time.perf_counter() - started; warmup_cpu = time.process_time() - cpu
+torch.cuda.synchronize()
+started = time.perf_counter()
+for _ in range(20):
+    output = forward()
+steady = (time.perf_counter() - started) / 20
+np.save(sys.argv[1], output)
+print(json.dumps({"warmup_seconds": warmup, "warmup_cpu_seconds": warmup_cpu, "chunk_seconds": steady}))
+"""
+
+
+CUDNN_CELL = f"""results = {{}}
+for label, extra in (("default", {{}}), ("v8_disabled", {{"TORCH_CUDNN_V8_API_DISABLED": "1"}}), ("benchmark", {{"KNEE_BENCHMARK": "1"}}), ("default_repeat", {{}})):
+    values = os.environ.copy()
+    values.update(extra)
+    output = profile_dir / f"{{label}}.npy"
+    completed = subprocess.run([sys.executable, "-c", {CUDNN_PROBE!r}, str(output)], env=values, capture_output=True, text=True)
+    record = json.loads(completed.stdout.strip().splitlines()[-1]) if completed.returncode == 0 else {{"error": completed.stderr[-3000:]}}
+    results[label] = record
+    print(label, record)
+import numpy as np
+reference = np.load(profile_dir / "default.npy")
+for label in results:
+    if (profile_dir / f"{{label}}.npy").exists():
+        other = np.load(profile_dir / f"{{label}}.npy")
+        results[label]["max_abs_difference"] = float(np.abs(other - reference).max())
+        results[label]["identical"] = bool((other == reference).all())
+(profile_dir / "cudnn.json").write_text(json.dumps(results, indent=2) + "\\n")
+print(json.dumps(results, indent=1))
+"""
+
+
+MAINLOOP_CELL = """sys.path.insert(0, str(bundle / "code"))
+import torch
+from collections import defaultdict
+
+from knee_abnormality.config import load_config
+from knee_abnormality.data.dataset import build_data_loader
+from knee_abnormality.data.preprocessing import device as device_module
+from knee_abnormality.inference import engine
+from knee_abnormality.inference.checkpoint import load_models
+
+config = load_config(bundle / "config.json", data_root=data_root)
+manifest = json.loads((bundle / "manifest.json").read_text())
+dataset, targets, _ = engine.prediction_data(config, "test", 0, image_multiplier=manifest["runtime"]["image_multiplier"], study_ids=STUDIES)
+loader = build_data_loader(dataset, config.trainer, 4, num_workers=4, pin_memory=False)
+cuda = torch.device("cuda")
+models = load_models(config, targets, bundle / "model.ckpt", cuda, attention_temperature=manifest["runtime"]["attention_temperature"])
+engine.use_fixed_backbone_chunks(models[0], config.data.image_size)
+timings = defaultdict(float)
+sizes = defaultdict(int)
+original_sort = torch.Tensor.sort
+
+def timed(name, function, *arguments):
+    torch.cuda.synchronize()
+    started = time.perf_counter()
+    value = function(*arguments)
+    torch.cuda.synchronize()
+    timings[name] += time.perf_counter() - started
+    return value
+
+def sort(self, *arguments, **keywords):
+    return timed("prepare.sort", lambda: original_sort(self, *arguments, **keywords))
+
+batches = list(loader)
+with torch.inference_mode():
+    for repeat in range(2):
+        timings.clear()
+        for batch in batches:
+            sizes["values"] += sum(count for _, count, _ in batch["series_frames"])
+            locked = timed("page_lock", lambda: [buffer for buffer in batch["frame_buffers"] if engine._page_lock(buffer)])
+            moved = timed("transfer", engine.move_batch, batch, cuda)
+            torch.Tensor.sort = sort
+            prepared = timed("prepare_images", device_module.prepare_images, moved)
+            torch.Tensor.sort = original_sort
+            with torch.autocast("cuda", dtype=torch.float16):
+                timed("forward", lambda: torch.sigmoid(models[0](prepared).float()).cpu())
+            timed("unlock", lambda: [torch.cuda.cudart().cudaHostUnregister(buffer.data_ptr()) for buffer in locked])
+        print(repeat, {key: round(value, 3) for key, value in timings.items()})
+result = {"batches": len(batches), "per_batch_seconds": {key: value / len(batches) for key, value in timings.items()}, "bytes_per_batch": sum(buffer.numel() * buffer.element_size() for batch in batches for buffer in batch["frame_buffers"]) / len(batches)}
+(profile_dir / "mainloop.json").write_text(json.dumps(result, indent=2) + "\\n")
+print(json.dumps(result, indent=1))
+"""
+
+
+STARTUP_MODEL_LOAD = """import json, os, time
+marks = {}
+last = time.perf_counter()
+def mark(name):
+    global last
+    now = time.perf_counter()
+    marks[name] = now - last
+    last = now
+import torch
+mark("import_torch")
+import timm
+mark("import_timm")
+from pathlib import Path
+from knee_abnormality.config import load_config
+from knee_abnormality.inference.checkpoint import apply_attention_temperature, read_checkpoint, validate_checkpoint
+from knee_abnormality.inference.engine import use_fixed_backbone_chunks
+from knee_abnormality.modeling.model import KneeAbnormalityModel
+mark("import_package")
+torch.set_float32_matmul_precision("high")
+torch.set_num_threads(1)
+bundle = Path(os.environ["KNEE_BUNDLE"])
+data_root = Path(os.environ["KNEE_DATA"])
+config = load_config(bundle / "config.json", data_root=data_root)
+targets = tuple((data_root / "sample_submission.csv").read_text().splitlines()[0].split(",")[1:])
+mark("config")
+checkpoint = read_checkpoint(bundle / "model.ckpt")
+mark("read_checkpoint")
+validate_checkpoint(checkpoint, config, targets)
+mark("validate_checkpoint")
+backbone = timm.create_model(config.model.backbone, pretrained=False, in_chans=3, num_classes=0, global_pool="")
+mark("timm_create_only")
+del backbone
+model = KneeAbnormalityModel(config.model, config.data, targets, load_pretrained=False)
+mark("construct_model")
+state = {key.removeprefix("model."): value for key, value in checkpoint["state_dict"].items() if key.startswith("model.")}
+model.load_state_dict(state, strict=True)
+apply_attention_temperature(model, 0.75)
+mark("load_state")
+torch.cuda.init()
+torch.zeros(1, device="cuda")
+torch.cuda.synchronize()
+mark("cuda_init")
+model.to("cuda").eval()
+torch.cuda.synchronize()
+mark("to_device")
+use_fixed_backbone_chunks(model, config.data.image_size)
+mark("chunk_warmup")
+with torch.inference_mode(), torch.autocast("cuda", dtype=torch.float16):
+    model.backbone.forward_features(torch.zeros((64, 3, config.data.image_size, config.data.image_size), device="cuda"))
+torch.cuda.synchronize()
+mark("second_chunk")
+print(json.dumps({"marks": marks, "process_cpu_seconds": time.process_time(), "torch": torch.__version__, "timm": timm.__version__, "cudnn": torch.backends.cudnn.version(), "cuda_module_loading": os.environ.get("CUDA_MODULE_LOADING")}))
+"""
+
+
+STARTUP_SPIN = """import ctypes, json, os, time
+mode = os.environ["KNEE_SYNC"]
+driver = ctypes.CDLL("libcuda.so.1")
+if driver.cuInit(0) != 0:
+    raise RuntimeError("cuInit failed")
+device = ctypes.c_int()
+if driver.cuDeviceGet(ctypes.byref(device), 0) != 0:
+    raise RuntimeError("cuDeviceGet failed")
+if mode == "blocking":
+    result = driver.cuDevicePrimaryCtxSetFlags_v2(device, 4)
+    if result != 0:
+        raise RuntimeError(f"cuDevicePrimaryCtxSetFlags failed with {result}")
+import torch
+import timm
+torch.set_num_threads(1)
+backbone = timm.create_model("rexnet_200", pretrained=False, in_chans=3, num_classes=0, global_pool="").cuda().eval().to(memory_format=torch.channels_last)
+images = torch.zeros((448, 3, 224, 224), device="cuda").contiguous(memory_format=torch.channels_last)
+def step():
+    with torch.inference_mode(), torch.autocast("cuda", dtype=torch.float16):
+        return torch.cat([backbone.forward_features(images[start:start + 64]) for start in range(0, 448, 64)]).float().mean().cpu()
+for _ in range(3):
+    step()
+torch.cuda.synchronize()
+flags = ctypes.c_uint()
+active = ctypes.c_int()
+driver.cuDevicePrimaryCtxGetState(device, ctypes.byref(flags), ctypes.byref(active))
+wall = time.perf_counter()
+cpu = time.process_time()
+for _ in range(30):
+    step()
+wall = time.perf_counter() - wall
+cpu = time.process_time() - cpu
+print(json.dumps({"mode": mode, "flags": flags.value, "active": active.value, "wall_seconds": wall, "cpu_seconds": cpu, "cpu_per_wall": cpu / wall, "images": 30 * 448}))
+"""
+
+
+STARTUP_CELL = f"""import re
+code_dir = bundle / "code"
+child_environment = os.environ.copy()
+child_environment.update(PYTHONPATH=str(code_dir), KNEE_BUNDLE=str(bundle), KNEE_DATA=str(data_root))
+startup = {{"runs": []}}
+
+def run_child(label, arguments, extra=None):
+    values = dict(child_environment)
+    values.update(extra or {{}})
+    started = time.perf_counter()
+    completed = subprocess.run([sys.executable, *arguments], env=values, cwd=str(code_dir), capture_output=True, text=True)
+    record = {{"label": label, "seconds": time.perf_counter() - started, "returncode": completed.returncode, "stdout": completed.stdout[-20000:], "stderr_tail": completed.stderr[-3000:]}}
+    (profile_dir / f"{{label}}.stderr").write_text(completed.stderr)
+    startup["runs"].append(record)
+    print(label, round(record["seconds"], 2), completed.returncode, completed.stdout[-2000:])
+    return record
+
+def import_table(record):
+    rows = []
+    for line in (profile_dir / f"{{record['label']}}.stderr").read_text().splitlines():
+        match = re.match(r"import time:\\s+(\\d+) \\|\\s+(\\d+) \\| (\\s*)(\\S+)", line)
+        if match:
+            rows.append({{"self_us": int(match.group(1)), "cumulative_us": int(match.group(2)), "depth": len(match.group(3)) // 2, "module": match.group(4)}})
+    record["import_total_seconds"] = sum(row["cumulative_us"] for row in rows if row["depth"] == 0) / 1e6
+    record["import_top"] = sorted((row for row in rows if row["depth"] <= 1), key=lambda row: -row["cumulative_us"])[:40]
+    record["import_self_top"] = sorted(rows, key=lambda row: -row["self_us"])[:40]
+
+for label, module in (("coordinator-import-cold", "scripts.pipeline.predict"), ("coordinator-import-warm", "scripts.pipeline.predict"), ("worker-import-warm", "scripts.pipeline.predict_worker")):
+    import_table(run_child(label, ["-X", "importtime", "-c", f"import {{module}}"]))
+for label in ("model-load", "model-load-repeat"):
+    run_child(label, ["-c", {STARTUP_MODEL_LOAD!r}])
+for label, mode in (("spin-default", "default"), ("spin-blocking", "blocking")):
+    run_child(label, ["-c", {STARTUP_SPIN!r}], {{"KNEE_SYNC": mode}})
+burners = [subprocess.Popen([sys.executable, "-c", "while True: pass"]) for _ in range(4)]
+try:
+    for label, mode in (("spin-default-burners", "default"), ("spin-blocking-burners", "blocking")):
+        run_child(label, ["-c", {STARTUP_SPIN!r}], {{"KNEE_SYNC": mode}})
+finally:
+    for process in burners:
+        process.kill()
+(profile_dir / "startup.json").write_text(json.dumps(startup, indent=2) + "\\n")
+"""
+
+
 def notebook_source(
     bundle: Path,
     condition: dict,
     studies: list[str],
     throughput_studies: list[str],
+    dataset: str,
 ) -> dict:
-    setup = "import time\nnotebook_started_at = time.time()\n" + "".join(
-        json.loads((bundle / "inference.ipynb").read_text())["cells"][0]["source"]
+    setup = (
+        "import time\nnotebook_started_at = time.time()\n"
+        + BUNDLE_SELECTION.format(slug=dataset.split("/", 1)[1])
+        + "".join(
+            json.loads((bundle / "inference.ipynb").read_text())["cells"][0]["source"]
+        )
     )
     profile = f"""import csv
 import os
@@ -512,6 +885,7 @@ environment = {{
     "meminfo": Path("/proc/meminfo").read_text().splitlines()[:3],
     "gpus": read_command(["nvidia-smi", "-L"]),
     "mounts": [line for line in Path("/proc/mounts").read_text().splitlines() if "/kaggle" in line],
+    "shm_bytes": shutil.disk_usage("/dev/shm").total,
 }}
 (profile_dir / "environment.json").write_text(json.dumps(environment, indent=2) + "\\n")
 print(json.dumps(environment))
@@ -570,6 +944,9 @@ command = [
 ]
 if CONDITION.get("io_threads") is not None:
     command += ["--io-threads", str(CONDITION["io_threads"])]
+if CONDITION.get("pyspy"):
+    subprocess.run([sys.executable, "-m", "pip", "install", "--quiet", "py-spy"], check=True)
+    command = [shutil.which("py-spy"), "record", "--subprocesses", "--nonblocking", "--rate", "20", "--format", "raw", "--output", str(profile_dir / "pyspy.txt"), "--", *command]
 environment_variables = os.environ.copy()
 environment_variables["PYTHONPATH"] = str(bundle / "code")
 record = {"notebook_started_at": notebook_started_at, "cell_started_at": time.time()}
@@ -685,9 +1062,15 @@ if returncode:
             for source in (
                 setup,
                 profile,
-                {"loading": LOADING_CELL, "precision": PRECISION_CELL}.get(
-                    condition["kind"], prediction
-                ),
+                {
+                    "loading": LOADING_CELL,
+                    "precision": PRECISION_CELL,
+                    "startup": STARTUP_CELL,
+                    "cudnn": CUDNN_CELL,
+                    "mainloop": MAINLOOP_CELL,
+                    "parity": PARITY_CELL,
+                    "census": CENSUS_CELL,
+                }.get(condition["kind"], prediction),
             )
         ],
         "metadata": {"kernelspec": {"name": "python3", "display_name": "Python 3"}},
@@ -782,12 +1165,24 @@ def launch(args: ProfileCLI) -> dict:
             condition = CONDITIONS[name]
             accelerator = (
                 None
-                if condition["kind"] == "loading"
+                if condition["kind"] in {"loading", "census"}
                 else condition.get("accelerator", args.accelerator)
             )
             tpu = accelerator is not None and accelerator.startswith("Tpu")
             if condition["kind"] == "prediction":
                 selected, throughput_studies = studies, []
+            elif condition["kind"] in {"startup", "cudnn"}:
+                selected, throughput_studies = studies[:8], []
+            elif condition["kind"] in {"mainloop", "parity"}:
+                selected, throughput_studies = studies[: condition["studies"]], []
+            elif condition["kind"] == "census":
+                everything = (
+                    pl.read_csv(args.split_dir / "studies.csv")
+                    .sort(STUDY)[STUDY]
+                    .to_list()
+                )
+                selected = everything[condition["part"] :: condition["parts"]]
+                throughput_studies = []
             elif condition["kind"] == "precision":
                 selected = random.Random(LOADING_SEED).sample(
                     studies, condition["studies"]
@@ -803,7 +1198,9 @@ def launch(args: ProfileCLI) -> dict:
                 throughput_studies = sample[condition["timed_studies"] :]
             (directory / "profile.ipynb").write_text(
                 json.dumps(
-                    notebook_source(bundle, condition, selected, throughput_studies),
+                    notebook_source(
+                        bundle, condition, selected, throughput_studies, args.dataset
+                    ),
                     indent=1,
                 )
                 + "\n"
@@ -819,9 +1216,10 @@ def launch(args: ProfileCLI) -> dict:
                         "is_private": True,
                         "enable_gpu": accelerator is not None and not tpu,
                         "enable_tpu": tpu,
-                        "enable_internet": False,
+                        "enable_internet": bool(condition.get("pyspy")),
                         "competition_sources": ["rsna-knee-abnormality-detection"],
-                        "dataset_sources": [args.dataset],
+                        "dataset_sources": [args.dataset]
+                        + ([args.reference_dataset] if args.reference_dataset else []),
                     },
                     indent=2,
                 )

@@ -36,16 +36,10 @@ Pending:
   (`outputs/analysis/acquisition-geometry-20260922/capacity_*`). On `oblique`, ×5 at τ 0.70 then
   scored 0.945 publicly against 0.944 at ×4 τ 0.75 (S47, S46), one rounding step, with +0.0003 on
   fold 0 ([result](../validation/results/2026-09-22-oblique-groups-result.md#temperature-and-count)).
-- **Submit `control-check-x4-tau075`** when submissions reset: the first bundle carrying the
-  main-thread warm-up, the index changes and the CPU cluster, profiled at 371.4 s of command wall
-  against 440.5 s. Submit the main-thread warm-up with it.
-- **Run the allocator A/B.** The tunables were implemented on 2026-09-19 and have never been run;
-  A/B them on the old bundle so the shipped index, listing and CPU-cluster changes do not confound
-  them, and watch per-worker RSS. Batch the remaining changes to hashed loading sources into
-  one future implementation and training snapshot
-  ([status](loading-speedup.md), [candidates](../backlog/loading-speedup/candidates.md)).
-- **Sweep the loader worker count** around the new `INFERENCE_IO_THREADS = 8` — 8, 12 and 16 — and
-  profile what inside the 15.5–18.4 s model load costs the time ([status](loading-speedup.md)).
+- **Decide on the `inference-opt` branch.** It runs the Kaggle command in about 270 s against 429.5 s
+  with bit-identical prepared images, but its GPU preparation changes hashed sources, so the next
+  submission needs a checkpoint trained on it; check local training memory first
+  ([status](loading-speedup.md)).
 - **Re-export the slice-importance map with left knees mirrored**, a user action outside this
   repository: the current export centres and scales patient L but never mirrors by knee side, so
   the compartment lobes on the sagittal axis cannot be told apart from two superimposed mirrored

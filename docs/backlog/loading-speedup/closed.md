@@ -31,7 +31,8 @@ acquisitions** ([evidence](ranked-by-gain.md#measurement-behind-rank-5)), so the
 call was not the floor that argument assumed. What still closes, and is unaffected: coarse-histogram
 selection is 1.67x slower on real pixels, and `np.quantile` does strictly more work than either
 formulation (a NaN scan and a float64 lerp), so neither of those can win. The exact single-rank
-reformulation is open in [candidates](candidates.md#bit-exact-batch-into-the-retrain).
+reformulation shipped on 2026-09-19, and on 2026-09-22 quantiles moved to the GPU with the rest of
+the [image preparation](../../inference/2026-09-22-kaggle-x4-startup-and-gpu-preparation.md#gpu-preparation).
 
 ## Threading loses when there is no latency to hide
 
@@ -137,9 +138,9 @@ which two Kaggle runs showed and a third did not reproduce.
 - **`readinto` into a reused buffer, mmap, and contiguous-volume assembly.** `readinto` measured
   199–226 µs/frame against 154–189 for plain serial reads; mmap 203 µs/frame with no win, and over
   NFS it faults page-by-page instead of issuing one large read, with close-to-open coherence caveats
-  and `SIGBUS` if the file changes. Contiguous assembly measured no better. The
-  [allocator env vars](candidates.md#ship-without-a-retrain) capture the same benefit with no code
-  change.
+  and `SIGBUS` if the file changes. Contiguous assembly measured no better, and the allocator
+  env vars that were meant to capture the same benefit measured no production gain
+  ([closed 2026-09-22](#closed-2026-09-22)).
 - **Tiled or cache-blocked normalize, a manual tiled transpose, and a transpose-free tap loop.**
   Blocking one or four slices through all five ufuncs is no faster at N = 16/26/40/64; a manual
   tiled transpose does not beat `np.ascontiguousarray`; the tap-loop pass 2 is bit-exact but 1.85x
@@ -162,3 +163,22 @@ which two Kaggle runs showed and a third did not reproduce.
 - **Also closed earlier:** autocast FP16 with variable shapes, more than 16 loader workers,
   notebook pre-reading of DICOMs or packages, a local bytecode cache, and TPU notebooks (not allowed
   for submission).
+
+## Closed 2026-09-22
+
+Measured on Kaggle at ×4 over 1,300 studies, one run each, on hosts that vary by about ±15 s
+([profile](../../inference/2026-09-22-kaggle-x4-startup-and-gpu-preparation.md)).
+
+| Candidate | Result |
+|---|---|
+| glibc tunables (`MALLOC_MMAP_THRESHOLD_`, `MALLOC_TRIM_THRESHOLD_` at 256 MiB, `MALLOC_ARENA_MAX=2`), shipped 2026-09-19 unmeasured | 912 against 893 loader CPU-seconds with and without them, loader RSS 1,437 against 1,220 MiB; removed. They make `resample_crop` 2.5× faster in a local tight loop, which production does not reproduce |
+| Support-limited float32 conversion, shipped 2026-09-19 | no Kaggle gain: frame reads plus resample 23.6 against 23.4 CPU-seconds per 100 studies; superseded by GPU preparation |
+| `share_memory_()` on the zeroed collate tensor, shipped 2026-09-19 | Torch promotes a private tensor by allocating shared storage and copying, so it only moved the copy; collation now allocates shared storage directly |
+| Pinning raw batches in the DataLoader after GPU preparation | the pin thread keeps a pinned copy of every prefetched ~240 MB batch; each GPU process reached 8.8 GB RSS and the host killed a worker |
+| 16 io threads once the run is NFS-bound | 308.7 s against 283.5 s at 8 |
+| `prefetch_factor` 4 at inference | 330.3 s against 314.2 s at 2 |
+| Importing the whole model stack before forking the loaders, with niced loaders | 303.9 s against 283.5 s; model load stretched to 34 s |
+| 12 loader workers | 297.8 s against 303.9 s at 16 in the same arm, inside host variance |
+| Page-locked copy on a feeder thread | the copy fell 252 → 33 ms per batch, but the thread's GIL use stretched the GPU loop ~25 s per GPU; 278.7 and 264.3 s against 273.3 s inline |
+| `TORCH_CUDNN_V8_API_DISABLED=1` to skip the 9 s warm-up | warm-up 10.9 → 0.8 s, but each 64-image FP16 chunk 96 → 197 ms |
+| `torch.backends.cudnn.benchmark` | warm-up 19 s at the same chunk speed |

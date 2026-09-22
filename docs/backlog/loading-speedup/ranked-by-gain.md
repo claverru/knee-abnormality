@@ -1,5 +1,12 @@
 # Remaining candidates ranked by whole-pipeline gain
 
+**Superseded 2026-09-22.** Every ranked row has since been shipped, superseded or rejected on
+Kaggle: ranks 1, 5 and 6 shipped on 2026-09-19 and bought nothing measurable; rank 2 was rejected;
+rank 3 shipped bit-exactly as GPU preparation; rank 7 was profiled and rank 8 shipped as a CUDA
+graph ([profile](../../inference/2026-09-22-kaggle-x4-startup-and-gpu-preparation.md),
+[closed](closed.md#closed-2026-09-22)). The ranking below is kept for its reasoning, and the two
+measurement sections as the bit-exact evidence for ranks 1 and 5.
+
 What each open candidate is worth against the **371.4 s full inference command**, so the next change
 is chosen by end-to-end effect rather than by the size of the stage it touches. What each one costs
 to ship, and what it has to audit, stays in [candidates](candidates.md); this document only ranks
@@ -29,11 +36,11 @@ Stage CPU is the "CPU after" column of the
 |---|---|---|---|---:|---:|---|---|
 | 1 | [Support-limited native-to-float32 conversion](candidates.md#bit-exact-batch-into-the-retrain) | frame reads 12.23 + resample 11.21 | **2.01x, measured** | **6–12%** | 17% | med | M |
 | 2 | [glibc allocator config](candidates.md#ship-without-a-retrain) — size thresholds plus the arena cap, *implemented, awaiting a run* | the same allocation cost, with no retrain | — | **~8%** | 4.7–12.5% | med | **free** |
-| 3 | [GPU resample, quantiles and normalize](candidates.md#needs-a-validation-run-as-well) | resample 11.21 + quantiles 6.47 + normalize 1.90 = 19.6 s | most of it leaves the CPU | **~6%** | 24% | low | L |
+| 3 | [GPU resample, quantiles and normalize](../../inference/2026-09-22-kaggle-x4-startup-and-gpu-preparation.md#gpu-preparation) | resample 11.21 + quantiles 6.47 + normalize 1.90 = 19.6 s | most of it leaves the CPU | **~6%** | 24% | low | L |
 | 4 | Ahead-of-time kernel fusing conversion with interpolation | resample 11.21 + part of frame reads 12.23 s | 2–3x | **~4%** | 12–19% | low | XL |
 | 5 | [Exact quantiles by single-rank partitions](candidates.md#bit-exact-batch-into-the-retrain) | quantiles 6.47 s | **1.44–1.63x, measured** | **3.1–3.9%** | 3.9% | **high** | S |
 | 6 | [Direct shared-storage collation](candidates.md#bit-exact-batch-into-the-retrain) | absent from the probe — see below | 0.40 ms/MiB over 26.9 GiB | **1.3–2.1%** | 2.1% | med | S |
-| 7 | [Cut model load](candidates.md#runtime-changes-outside-the-loading-path) | 18.4 s of setup, floored by indexing at 7.6 s | — | **~1%** | 2.9% | — | ? |
+| 7 | [Cut model load](../../inference/2026-09-22-kaggle-x4-startup-and-gpu-preparation.md#startup) | 18.4 s of setup, floored by indexing at 7.6 s | — | **~1%** | 2.9% | — | ? |
 | 8 | CUDA Graph around the fixed 64-image backbone chunk | main-process CPU 122.3 s | part of the launch cost | **~1%** | 3% | low | L |
 | 9 | `gc.freeze()` before fork, with per-worker RSS tracking | — | — | **~0%** | — | — | free |
 
@@ -82,7 +89,7 @@ the combined arm comes back ambiguous or negative.
   transfers to four Kaggle vCPUs, not whether it exists.
 - **The corrected GPU floor is what lifts the large rows.** With the floor at ~100 s rather than the
   173–191 s once assumed, large CPU savings keep converting to wall instead of hitting a cap at
-  roughly half their value ([why](candidates.md#open-loading-speedup-candidates)).
+  roughly half their value.
 - **Both measurements below are local.** The resample column band is the standing precedent for a
   local win going inert on Kaggle's vCPUs: 8.7% faster locally, **1.03x** there.
 

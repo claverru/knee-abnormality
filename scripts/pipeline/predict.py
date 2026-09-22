@@ -8,7 +8,6 @@ from pathlib import Path
 from typing import Literal
 
 import polars as pl
-import torch
 import yaml
 from pydantic import Field
 from pydantic_settings import CliPositionalArg, SettingsError
@@ -24,14 +23,14 @@ from knee_abnormality.config import (
     load_config,
 )
 from knee_abnormality.data.labels import STUDY
-from knee_abnormality.data.sources import prediction_studies
-from knee_abnormality.inference.bundle import discover_kaggle_data_root, verify_bundle
-from knee_abnormality.inference.engine import (
+from knee_abnormality.data.sources import (
     prediction_image_multiplier,
-    resolve_device,
+    prediction_studies,
 )
+from knee_abnormality.inference.bundle import discover_kaggle_data_root, verify_bundle
 from knee_abnormality.inference.processes import (
     PredictionRequest,
+    cuda_device_count,
     run_prediction_processes,
 )
 
@@ -149,12 +148,12 @@ def main() -> None:
         io_threads = (
             INFERENCE_IO_THREADS if args.io_threads is None else args.io_threads
         )
-        device = resolve_device(args.device)
+        count = 0 if args.device == "cpu" else cuda_device_count()
+        if args.device == "cuda" and count < 1:
+            raise RuntimeError("CUDA was requested but is unavailable")
+        device = "cuda" if count else "cpu"
         gpu_ids: list[str | None] = [None]
-        if device.type == "cuda":
-            count = torch.cuda.device_count()
-            if count < 1:
-                raise RuntimeError("No CUDA device is available for inference")
+        if device == "cuda":
             visible = os.environ.get("CUDA_VISIBLE_DEVICES")
             gpu_ids = (
                 [value.strip() for value in visible.split(",")][:count]
@@ -191,7 +190,7 @@ def main() -> None:
                     num_workers=num_workers // worker_count
                     + int(index < num_workers % worker_count),
                     io_threads=io_threads,
-                    device=device.type,
+                    device=device,
                     precision=args.precision,
                     study_ids=study_ids[index::worker_count],
                     worker_index=index,
@@ -240,7 +239,7 @@ def main() -> None:
             result = {
                 "output": str(output),
                 "studies": frame.height,
-                "device": str(device),
+                "device": device,
                 "devices": worker_count,
                 "precision": next(iter(precisions))
                 if len(precisions) == 1

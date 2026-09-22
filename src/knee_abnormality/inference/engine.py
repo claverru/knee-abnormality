@@ -1,21 +1,22 @@
 import logging
 import time
+from collections.abc import Iterable
 from typing import Literal
 
 import polars as pl
 import torch
-from torch.utils.data import DataLoader
 
 from knee_abnormality.config import (
     INFERENCE_IO_THREADS,
     SLICES_PER_INPUT,
-    TEST_IMAGE_MULTIPLIER,
     ExperimentConfig,
 )
 from knee_abnormality.data.dataset import KneeStudyDataset
 from knee_abnormality.data.labels import STUDY
+from knee_abnormality.data.preprocessing.device import prepare_images
 from knee_abnormality.data.sources import (
     build_series_index,
+    prediction_image_multiplier,
     prediction_studies,
     select_studies,
 )
@@ -27,34 +28,42 @@ BACKBONE_CHUNK_IMAGES = 64
 
 def use_fixed_backbone_chunks(model: KneeAbnormalityModel, image_size: int) -> None:
     features = model.backbone.forward_features
-
-    def chunked_features(images: torch.Tensor) -> torch.Tensor:
-        count = images.shape[0]
-        padded = -(-count // BACKBONE_CHUNK_IMAGES) * BACKBONE_CHUNK_IMAGES
-        if padded != count:
-            images = torch.cat(
-                (images, images.new_zeros((padded - count, *images.shape[1:])))
-            )
-        images = images.contiguous(memory_format=torch.channels_last)
-        return torch.cat(
-            [
-                features(images[start : start + BACKBONE_CHUNK_IMAGES])
-                for start in range(0, padded, BACKBONE_CHUNK_IMAGES)
-            ]
-        )[:count]
-
     model.channels_last = True
     model.backbone.to(memory_format=torch.channels_last)
-    model.backbone.forward_features = chunked_features
     device = next(model.parameters()).device
-    with torch.inference_mode(), torch.autocast("cuda", dtype=torch.float16):
-        chunked_features(
-            torch.zeros(
-                (BACKBONE_CHUNK_IMAGES, SLICES_PER_INPUT, image_size, image_size),
-                device=device,
-            )
-        )
+    graph = torch.cuda.CUDAGraph()
+    stream = torch.cuda.Stream(device)
+    with torch.inference_mode():
+        static_input = torch.zeros(
+            (BACKBONE_CHUNK_IMAGES, SLICES_PER_INPUT, image_size, image_size),
+            device=device,
+        ).contiguous(memory_format=torch.channels_last)
+        stream.wait_stream(torch.cuda.current_stream(device))
+        with (
+            torch.cuda.stream(stream),
+            torch.autocast("cuda", dtype=torch.float16, cache_enabled=False),
+        ):
+            for _ in range(2):
+                features(static_input)
+        torch.cuda.current_stream(device).wait_stream(stream)
+        with (
+            torch.autocast("cuda", dtype=torch.float16, cache_enabled=False),
+            torch.cuda.graph(graph),
+        ):
+            static_output = features(static_input)
     torch.cuda.synchronize(device)
+
+    def chunked_features(images: torch.Tensor) -> torch.Tensor:
+        outputs = []
+        for start in range(0, images.shape[0], BACKBONE_CHUNK_IMAGES):
+            chunk = images[start : start + BACKBONE_CHUNK_IMAGES]
+            static_input[: len(chunk)].copy_(chunk)
+            static_input[len(chunk) :].zero_()
+            graph.replay()
+            outputs.append(static_output[: len(chunk)].clone())
+        return torch.cat(outputs)
+
+    model.backbone.forward_features = chunked_features
 
 
 RuntimePrecision = Literal["auto", "fp32", "fp16", "bf16"]
@@ -94,7 +103,9 @@ def resolve_precision(
 
 MODEL_BATCH_KEYS = frozenset(
     {
-        "images",
+        "frame_buffers",
+        "image_positions",
+        "image_sources",
         "reflection_eligible",
         "series_presence",
         "series_study_index",
@@ -110,18 +121,34 @@ MODEL_BATCH_KEYS = frozenset(
 )
 
 
+def _to_device(value, device: torch.device):
+    if isinstance(value, torch.Tensor):
+        return value.to(device, non_blocking=True)
+    return [item.to(device, non_blocking=True) for item in value]
+
+
 def move_batch(batch: dict, device: torch.device) -> dict:
     return {
-        key: value.to(device, non_blocking=True)
-        if key in MODEL_BATCH_KEYS and isinstance(value, torch.Tensor)
-        else value
+        key: _to_device(value, device) if key in MODEL_BATCH_KEYS else value
         for key, value in batch.items()
     }
 
 
+def _page_lock(tensor: torch.Tensor) -> bool:
+    runtime = torch.cuda.cudart()
+    return (
+        tensor.numel() > 0
+        and not tensor.is_pinned()
+        and runtime.cudaHostRegister(
+            tensor.data_ptr(), tensor.numel() * tensor.element_size(), 0
+        )
+        == runtime.cudaError.success
+    )
+
+
 def predict_loader(
     models: list[KneeAbnormalityModel],
-    loader: DataLoader,
+    loader: Iterable[dict],
     device: torch.device,
     precision: RuntimePrecision = "auto",
     reflection_tta: bool = False,
@@ -156,6 +183,11 @@ def predict_loader(
                 "images": int(batch["slice_mask"].sum()),
                 "padded_images": int(batch["slice_mask"].numel()),
             }
+            locked = (
+                [buffer for buffer in batch["frame_buffers"] if _page_lock(buffer)]
+                if device.type == "cuda"
+                else []
+            )
             copy_events = (
                 (
                     torch.cuda.Event(enable_timing=True),
@@ -169,6 +201,7 @@ def predict_loader(
             batch = move_batch(batch, device)
             if copy_events is not None:
                 copy_events[1].record()
+            batch = prepare_images(batch)
             with torch.autocast(
                 device_type=device.type,
                 dtype=autocast_dtype,
@@ -192,6 +225,8 @@ def predict_loader(
                         probabilities,
                     )
                 outputs.append(probabilities.cpu())
+            for value in locked:
+                torch.cuda.cudart().cudaHostUnregister(value.data_ptr())
             finished = time.perf_counter()
             transfer_seconds = (
                 copy_events[0].elapsed_time(copy_events[1]) / 1000
@@ -203,19 +238,12 @@ def predict_loader(
                     **counts,
                     "wait_seconds": received - requested,
                     "transfer_seconds": transfer_seconds,
-                    "forward_seconds": finished - received - transfer_seconds,
+                    "forward_seconds": finished - received,
+                    "constant_series": int(batch["constant_series"].sum()),
                 }
             )
             requested = time.perf_counter()
     return study_ids, torch.cat(outputs), batches
-
-
-def prediction_image_multiplier(config: ExperimentConfig, split: str) -> int:
-    return (
-        config.validation.prediction_image_multiplier
-        if split == "validation"
-        else TEST_IMAGE_MULTIPLIER
-    )
 
 
 def prediction_dataset(

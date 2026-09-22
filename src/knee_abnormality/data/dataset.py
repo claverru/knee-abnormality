@@ -150,9 +150,6 @@ class KneeStudyDataset(Dataset):
         try:
             value = self._prepare_candidate(selected, cache)
             failures.extend(value.failures)
-            if value.constant:
-                failures.append(f"{candidate.uid}: constant prepared series")
-                return None
             geometry = self._slice_index[candidate.directory].geometry
             eligible, reason = reflection_eligibility(geometry, plane)
             if not bool(value.geometry_valid.all()):
@@ -306,6 +303,7 @@ class KneeStudyDataset(Dataset):
         )
         return {
             "study_uid": study.uid,
+            "image_size": self.data.image_size,
             "is_gold": bool(row.get("is_gold", False)),
             "series": tuple(prepared),
             "study_reference": self._study_references.get(study.uid),
@@ -330,6 +328,7 @@ class KneeStudyDataset(Dataset):
 def collate_studies(items: list[dict]) -> dict:
     batch_size = len(items)
     type_count = len(items[0]["series"])
+    image_size = items[0]["image_size"]
     entries = []
     presence = torch.zeros((batch_size, type_count), dtype=torch.bool)
     for study_index, item in enumerate(items):
@@ -337,13 +336,7 @@ def collate_studies(items: list[dict]) -> dict:
             presence[study_index, type_index] = bool(acquisitions)
             for series in acquisitions:
                 entries.append((study_index, type_index, series))
-    max_slices = max(series.images.shape[0] for _, _, series in entries)
-    image_size = entries[0][2].images.shape[-1]
-    images = torch.zeros(
-        (len(entries), max_slices, SLICES_PER_INPUT, image_size, image_size),
-        dtype=torch.uint8,
-    )
-    images.share_memory_()
+    max_slices = max(series.triplet_count for _, _, series in entries)
     positions = torch.zeros((len(entries), max_slices), dtype=torch.float32)
     slice_mask = torch.zeros((len(entries), max_slices), dtype=torch.bool)
     valid_rects = torch.zeros((len(entries), max_slices, SLICES_PER_INPUT, 4))
@@ -359,9 +352,37 @@ def collate_studies(items: list[dict]) -> dict:
         )
     study_indices = torch.empty(len(entries), dtype=torch.int64)
     type_indices = torch.empty(len(entries), dtype=torch.int64)
+    frames = []
+    buffers = []
+    buffer_indices = {}
+    series_frames = []
+    image_positions = []
+    image_sources = []
     for series_index, (study_index, type_index, series) in enumerate(entries):
-        count = series.images.shape[0]
-        images[series_index, :count] = series.images
+        start = len(frames)
+        for frame in series.frames:
+            buffer = buffer_indices.setdefault(id(frame.pixels), len(buffers))
+            if buffer == len(buffers):
+                buffers.append(frame.pixels)
+            frames.append(
+                (frame.plan_key is not None, frame.signed, buffer, frame.offset)
+                + (*frame.shape, *frame.columns, frame.slope, frame.intercept)
+                + (frame.rect, frame.plan_key)
+            )
+        lower, upper, fraction = series.quantile_ranks
+        series_frames.append(
+            (
+                start,
+                len(series.frames),
+                (lower.tolist(), upper.tolist(), fraction.tolist()),
+            )
+        )
+        count = series.triplet_count
+        first = series_index * max_slices * SLICES_PER_INPUT
+        image_positions.append(
+            torch.arange(first, first + count * SLICES_PER_INPUT, dtype=torch.int64)
+        )
+        image_sources.append(torch.from_numpy(series.gather + start))
         positions[series_index, :count] = series.positions
         valid_rects[series_index, :count] = series.valid_rects
         patient_maps[series_index, :count] = series.patient_maps
@@ -372,7 +393,12 @@ def collate_studies(items: list[dict]) -> dict:
     return {
         "study_uid": [item["study_uid"] for item in items],
         "is_gold": torch.tensor([item["is_gold"] for item in items], dtype=torch.bool),
-        "images": images,
+        "image_size": image_size,
+        "frames": frames,
+        "frame_buffers": buffers,
+        "series_frames": series_frames,
+        "image_positions": torch.cat(image_positions),
+        "image_sources": torch.cat(image_sources),
         "slice_positions": positions,
         "valid_rects": valid_rects,
         "patient_maps": patient_maps,

@@ -36,8 +36,9 @@ separate from missing target labels.
 `data/preprocessing/sampling.py` owns metadata-only run indexing, union target
 sampling, supplier choice and distinct-plane assignment. `geometry.py` owns
 the unchanged reference fit. Dataset retries rebuild support after failures;
-`preparation.py` decodes and normalizes unique retained slices before gathering
-channels. Threaded loading injects decoding only. Fixed sampling rules and source
+`preparation.py` decodes the retained slices' raw support blocks, and
+`device.py` resamples, normalizes and gathers channels on the batch's device.
+Threaded loading injects decoding only. Fixed sampling rules and source
 hashes are part of the strict preprocessing identity; historical runtimes remain
 isolated. See [physical sampling](../data-preparation/physical-sampling/implemented-sampler.md).
 
@@ -68,10 +69,11 @@ whether loading keeps up with the GPU before adding further infrastructure.
   those slices; see the
   [preparation notes](../data-preparation/unverified-preprocessing-notes.md#intensity-and-geometry) for the
   normalization tradeoff.
-- **Prepare pixels in loader workers.** Use float32 for spatial/intensity
-  arithmetic and fixed percentile clipping, then produce uint8 images.
-  Prepare metadata and label arrays outside the batch loop. Tune worker count
-  and prefetching from measured study throughput and memory use.
+- **Read in loader workers, finish pixels on the device.** Workers read the
+  needed payload rows and ship raw blocks; float32 resampling, fixed percentile
+  clipping and the uint8 images happen on the GPU after transfer. Prepare
+  metadata and label arrays outside the batch loop. Tune worker count and
+  prefetching from measured study throughput and memory use.
 - **Profile before scaling.** Record data-loading time, studies/second, peak
   memory, GPU waiting and total runtime. Mixed precision and compact batches
   are first training candidates. Caching is a deferred option only if loading

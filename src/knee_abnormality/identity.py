@@ -15,6 +15,7 @@ from knee_abnormality.modeling.spatial_tokens import (
 PACKAGE_ROOT = Path(__file__).resolve().parent
 PREPROCESSING_SOURCES = (
     "data/dataset.py",
+    "data/preprocessing/device.py",
     "data/preprocessing/dicom.py",
     "data/preprocessing/filtering.py",
     "data/preprocessing/geometry.py",

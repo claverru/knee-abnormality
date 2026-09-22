@@ -7,7 +7,12 @@ from pathlib import Path
 
 import polars as pl
 
-from knee_abnormality.config import SERIES_LISTING_THREADS, DataConfig, ExperimentConfig
+from knee_abnormality.config import (
+    SERIES_LISTING_THREADS,
+    TEST_IMAGE_MULTIPLIER,
+    DataConfig,
+    ExperimentConfig,
+)
 from knee_abnormality.data.labels import STUDY, load_fold_labels
 
 SERIES = "SeriesInstanceUID"
@@ -181,6 +186,14 @@ def prediction_studies(
     ):
         raise ValueError("Prediction studies must be nonempty with unique study IDs")
     return targets, studies, metadata_split
+
+
+def prediction_image_multiplier(config: ExperimentConfig, split: str) -> int:
+    return (
+        config.validation.prediction_image_multiplier
+        if split == "validation"
+        else TEST_IMAGE_MULTIPLIER
+    )
 
 
 def select_studies(studies: pl.DataFrame, study_ids: list[str]) -> pl.DataFrame:

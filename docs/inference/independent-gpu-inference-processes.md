@@ -11,15 +11,27 @@ chunks (`use_fixed_backbone_chunks`). The `export` and `infer` recipes default t
 GPU and 16 total workers. The `main` branch and 1C's submission error handling in `submit.py` were
 not changed.
 
-A later change adds a main-thread warm-up
-([measurement](2026-09-15-kaggle-inference-profiling.md#warming-up-the-chunk-shape)):
+Start order and GPU-side work since 2026-09-22 on branch `inference-opt`
+([measurement](2026-09-22-kaggle-x4-startup-and-gpu-preparation.md)):
 
-- **Worker start:** `predict_worker.py` builds its data in a background thread while the main
-  thread loads the model and warms the FP16 chunk shape once, through
-  `use_fixed_backbone_chunks(model, image_size, channels)`.
+- **Coordinator:** `predict.py` does not import torch. It counts GPUs through the CUDA driver
+  (`cuda_device_count` in `inference/processes.py`) and spawns the workers about three seconds
+  after launch.
+- **Worker start:** `predict_worker.py` builds the series index in a background thread while the
+  main thread imports torch and the dataset code, then forks the loader workers at niceness 10
+  (`INFERENCE_LOADER_NICENESS`), then imports the model stack and loads the model while they
+  prepare the first batches. The optional `wandb` import that `timm` attempts is skipped.
+- **CUDA:** each worker sets blocking synchronization on the primary context before creating it,
+  so the main thread sleeps rather than spinning a core while the GPU works.
+- **Backbone:** under FP16, `use_fixed_backbone_chunks(model, image_size)` warms the 64-image
+  channels-last chunk on a side stream and captures it as a CUDA graph; each chunk copies into the
+  graph's fixed input, replays and copies out.
+- **Images:** loader batches carry the shared buffers of raw 16-bit rows, and `predict_loader`
+  page-locks them in place (`cudaHostRegister`), copies them asynchronously, builds the uint8 images
+  on the GPU with `prepare_images` and releases the lock after the batch. Inference loaders do not
+  pin memory; pinning every prefetched raw batch exhausted host memory.
 - **Precision:** `auto` resolves to native BF16 where supported, FP16 on other CUDA devices and
   FP32 on CPU.
-- **Status:** the warm-up survived the full-slice restoration but has not yet been submitted.
 
 The prediction coordinator partitions study IDs across all visible CUDA devices
 before dataset collation. Each child process sees one GPU through

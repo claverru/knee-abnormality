@@ -1,6 +1,5 @@
 import cProfile
 import gc
-import hashlib
 import json
 import pstats
 import sys
@@ -23,6 +22,7 @@ from knee_abnormality.data.dataset import (
     build_data_loader,
     collate_studies,
 )
+from knee_abnormality.data.preprocessing.device import prepare_images
 from knee_abnormality.inference.engine import move_batch
 from knee_abnormality.modeling.model import KneeAbnormalityModel
 from knee_abnormality.profiling import (
@@ -76,12 +76,8 @@ def preprocessing_profile(dataset: KneeStudyDataset, args: ProfileCLI) -> dict:
                     "unique_source_slices": sum(
                         value.unique_slice_count for value in prepared
                     ),
-                    "inputs": sum(len(value.images) for value in prepared),
+                    "inputs": sum(value.triplet_count for value in prepared),
                     "series": len(prepared),
-                    "sha256": [
-                        hashlib.sha256(value.images.numpy().tobytes()).hexdigest()
-                        for value in prepared
-                    ],
                 }
             )
         profiler.dump_stats(args.output_dir / f"preprocessing_{repeat}.pstats")
@@ -128,7 +124,9 @@ def gpu_candidate(
     )
     model.series_dropout = 0
     optimizer = build_optimizer(model, config.optimizer)
-    batch = move_batch(collate_studies(items[:size]), torch.device("cuda"))
+    batch = prepare_images(
+        move_batch(collate_studies(items[:size]), torch.device("cuda"))
+    )
     torch.cuda.reset_peak_memory_stats()
     durations = []
     losses = []
@@ -266,7 +264,7 @@ def loader_candidate(
         started = time.perf_counter()
         batch = next(iterator)
         waited = time.perf_counter() - started
-        batch = move_batch(batch, torch.device("cuda"))
+        batch = prepare_images(move_batch(batch, torch.device("cuda")))
         training_step(model, optimizer, batch, config, class_balance_weights)
         torch.cuda.synchronize()
         if step >= args.warmup:

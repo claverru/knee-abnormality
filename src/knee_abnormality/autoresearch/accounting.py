@@ -29,7 +29,7 @@ class TripletLedger:
         counts = batch["slice_mask"].sum(dim=1).cpu().tolist()
         indices = batch["series_study_index"].cpu().tolist()
         types = batch["series_type_index"].cpu().tolist()
-        if batch["images"].shape[2] != 3:
+        if batch["valid_rects"].shape[2] != 3:
             raise ValueError("A valid input must contain exactly three slices")
         for index, uid in enumerate(batch["study_uid"]):
             if uid in self.rows:

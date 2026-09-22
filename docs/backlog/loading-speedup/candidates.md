@@ -1,124 +1,58 @@
 # Open loading-speedup candidates
 
-What is left to do, grouped by what it costs to ship, then the order to try it in. Closed and
-rejected formulations are in [closed](closed.md); do not re-propose them. Every figure in an
-"Est. saved" column is an estimate, not a measurement of the change in production: read
-[how to measure](measuring.md) before trusting one, and [attribution](attribution.md) for why the
-profile's own columns need qualifying first.
+What is left to do after the
+[2026-09-22 profile](../../inference/2026-09-22-kaggle-x4-startup-and-gpu-preparation.md), grouped
+by what it costs to ship. Closed and rejected formulations are in [closed](closed.md); do not
+re-propose them. Every "Est. saved" figure is an estimate: read [how to measure](measuring.md)
+before trusting one.
 
-Two units appear and must not be added together:
-
-- **cold-100** — seconds off the single-process cold probe over 100 studies, now 77.65 s.
-- **run-scale** — seconds off the two-worker wall at 1,300 studies, now 427.5 s.
-
-**The four vCPUs are the binding constraint**: 95.4% busy at 1.5% iowait with the GPUs at 24%
-([measured](attribution.md#the-box-is-out-of-cpu-not-waiting-on-nfs)). A change that removes CPU per
-study converts to wall; one that removes bytes or hides latency does not.
-
-A cold-100 second translates to roughly **five run-scale seconds**: 13 probe-units per 1,300-study
-run, scaled by the 1.56x CPU contention production pays over the single-process probe, divided by
-the 3.5 effective cores the box converts CPU to wall at
-([the model](attribution.md#the-model-that-replaces-the-old-ranking)).
-
-**The forward pass is not the cap it was taken to be.** This section used to cap the list at about
-200 s on the grounds that prediction cannot fall below a 173–191 s forward pass. That figure is
-*wall around the forward call*, not GPU compute, and it moves with CPU contention: the io sweep
-recorded **102 s at io1 against 182 s at io16 for identical model work**
-([sweep](../../inference/2026-09-18-kaggle-x4-profile-after-cpu-cluster.md#the-io-thread-sweep-2026-09-18)).
-io1 is also the one arm where the box was not saturated, which is why its forward wall is the
-closest thing we have to the compute itself. Treat **roughly 100 s** as the GPU floor and everything
-above it as contention the CPU work on this list can still remove; the old cap understated the
-headroom by about 80 s. The loading side has its own floor, 204–269 s of pure bytes at ×4
-([per multiplier](#the-bandwidth-floor-at-each-multiplier)).
+**Where the time goes now.** The direct arm's 273.3 s is ~55 s of setup before the first forward
+pass, then ~210 s of prediction per GPU, of which only ~27 s is loader wait: the GPU process's own
+loop is the critical path at ~1.12 s per batch, ~0.59 s of it the model forward
+([breakdown](../../inference/2026-09-22-kaggle-x4-startup-and-gpu-preparation.md#direct-reads-and-page-locked-copies)). Kaggle hosts vary by about ±15 s on identical code, so anything smaller needs
+repeated runs.
 
 ## What a candidate costs to ship
 
-`preprocessing_identity` (`src/knee_abnormality/identity.py`) folds the raw bytes of the thirteen files in
-`PREPROCESSING_SOURCES` into `sources_sha256`, and `validate_preprocessing_identity` refuses any checkpoint whose
-recorded identity differs in any field. The hash cannot tell a provably equivalent parser swap from
-a silent change to the pixels, so it treats any byte change as a change; a reformatted comment
-would do the same. That gives three classes:
+`preprocessing_identity` (`src/knee_abnormality/identity.py`) folds the raw bytes of the files in
+`PREPROCESSING_SOURCES` into `sources_sha256`, and `validate_preprocessing_identity` refuses any
+checkpoint whose recorded identity differs in any field, so it treats any byte change as a change.
+That gives two classes:
 
-- **No retrain.** The file is outside `PREPROCESSING_SOURCES`. That includes `data/sources.py`,
-  `inference/engine.py`, `scripts/pipeline/predict_worker.py`, the profiler and the notebook
-  environment. These ship on their own, against existing checkpoints. The known bad series and
-  instances were the worked example: they lived in `data/sources.py`, where editing them changed the
-  model's inputs without bumping the identity, moved to `data/preprocessing/exclusions.py` on
-  2026-09-18 so the hash covered them, and were deleted on 2026-09-20 once the host repaired both
-  files ([data contract](../../data-preparation/public-data-contract-and-decoding.md)). The rule
-  outlives them: input-affecting constants belong where the hash reaches.
-- **Bit-exact, identity-changing.** The file is in `PREPROCESSING_SOURCES` — `data/dataset.py` and
-  `data/preprocessing/{dicom,filtering,geometry,intensity,preparation,sampling,series,spatial}.py`.
-  The images are unchanged and audits prove it, but the identity bumps, so existing checkpoints keep
-  running only against their archived sources and the saving arrives with the next trained
-  checkpoint. **Batch all of these into one retrain rather than paying several.**
-- **Numerics.** The images change. Needs the retrain *and* a fresh validation run, because a
-  single-run difference below about 0.003 macro AUC carries no information and anything above it
-  has to be attributed.
+- **No retrain.** The file is outside `PREPROCESSING_SOURCES`: `data/sources.py`,
+  `inference/engine.py`, `inference/processes.py`, `scripts/pipeline/predict*.py`, the profiler and
+  the notebook environment. These ship on their own, against existing checkpoints. Input-affecting
+  constants belong where the hash reaches.
+- **Identity-changing.** The file is in `PREPROCESSING_SOURCES` — `data/dataset.py`,
+  `data/preprocessing/*.py` and the model files. The user accepted such edits on 2026-09-22 when the
+  prepared images stay bit-identical or nearly so, audited on real studies; the saving then arrives
+  with the next trained checkpoint. Batch them into one retrain.
 
 ## Ship without a retrain
 
-| Change | Est. saved | Conf | Effort | Risk and notes |
+| Change | Est. saved | Conf | Effort | Notes |
 |---|---:|---|---|---|
-| **glibc allocator env vars** — *implemented 2026-09-19, awaiting a run*. `run_prediction_processes` sets `MALLOC_MMAP_THRESHOLD_` and `MALLOC_TRIM_THRESHOLD_` to `INFERENCE_MALLOC_THRESHOLD_BYTES` (256 MiB) in each worker's environment, which is where glibc reads them: the tunables are consumed at malloc init, so setting them inside a running process does nothing and the loader workers inherit them through the fork. `MALLOC_ARENA_MAX` is set to `INFERENCE_MALLOC_ARENA_MAX` (2) in the same block. It attacks a different mechanism — the io-pool threads create the payloads while the preparation thread frees them, so arena count and cross-thread frees may cost more than the size threshold does — and it also caps per-process retained heap, which partly offsets the trim threshold on a memory-tight box. 2 over 4 is a judgement call: the io threads mostly block on NFS rather than contend, so the memory side should dominate. **The cost of shipping both at once is attribution**: one run cannot say which half paid, and an ambiguous or negative result needs a third arm to untangle | 3–8 s cold-100 | med | S | **Run this before the support-limited conversion below**: the two attack the same cost from opposite ends — a whole-frame float32 buffer whose price is set by allocator behaviour — and this one is free, so it prices what the identity-bumping change has left to win ([why](ranked-by-gain.md#run-rank-2-first-even-though-rank-1-is-larger)). Payloads (~0.66 MB) and float32 frames (1.3 MB) exceed glibc's 128 KiB *starting* threshold, which glibc then adapts at runtime unless it is pinned — so "everything above 128 KiB uses mmap" is the starting state, not a standing rule. Local A/B cut the production-shaped decode path 294.6 → 180.3, 421.6 → 213.5 and 277.0 → 236.4 µs/frame, 3 of 3 pairs faster. **Watch per-worker RSS**: 16 workers of retained heap on a four-vCPU box. Testable today on the random-weights bundle |
-| Order each worker's studies by total image count, for homogeneous batches and less `max_slices` padding | 1–3 s | low-med | S | Numerically inert under eval BN and per-study attention. Also helps `in_order=False` |
-| `pin_memory=False` at the `predict_worker` call site | ~0 | low | S | **Demoted 2026-09-18**: the two main processes burn 113 CPU-seconds *in total*, 8.3% of the run, so the 14.8 GB of pinned memcpy it would free is not what the box is short of ([roles](attribution.md#the-loader-workers-own-91-of-it)) |
-
-**Indexing is spoken for: model load is the floor now.** `predict_worker` builds the index in a
-background thread while the main thread loads the model and runs the warm-up chunk, so setup wall
-is `max(indexing, model load)`. Measured after the
-[2026-09-18 index changes](attribution.md#what-the-shipped-changes-bought): `max(7.1, 15.5) = 15.7 s`
-per worker, down from 54.4 s. **Every further indexing change is worth zero** until model load is
-cut, which is why the `list_series` micro-optimisation moved to
-[closed](closed.md#ruled-out-by-arithmetic-or-by-the-environment) and nothing else in indexing is
-listed here.
+| **Overlap the copy without a thread** — fetch batch *i+1*, page-lock it and copy it on a side stream before launching batch *i*'s forward | up to ~36 ms per batch, ~6 s per GPU | med | S | A feeder thread achieved the overlap but its GIL use cost more than it saved ([closed](closed.md#closed-2026-09-22)) |
+| **Hide the model setup** — the model-stack import (~26 s cold after the fork) and the ~9 s CPU-bound first FP16 chunk | up to ~20 s | low | M | Importing everything before the fork and niceness were both tried and did not shorten it ([closed](closed.md#closed-2026-09-22)); hyperthread sharing with loaders is the likely cause. Warming cuDNN on a background thread during the import, or a targeted page-cache warm of the model-stack packages, are the untried forms |
+| **Order each worker's studies by total image count**, for homogeneous batches and less padding | 1–3 s | low-med | S | Numerically inert under eval BN and per-study attention |
 
 ## Bit-exact, batch into the retrain
 
-The CPU cluster in `041bd16` is shipped, audited and production-measured; its
-[status and audit scope](../../ongoing/loading-speedup.md) and
-[Kaggle result](../../inference/2026-09-18-kaggle-x4-profile-after-cpu-cluster.md) are recorded
-outside this candidate list. The rows below remain open. Widen any narrow local audit before
-shipping ([audit requirements](measuring.md#audit-before-shipping)).
+Widen any narrow local audit before shipping ([audit requirements](measuring.md#audit-before-shipping)).
 
 | Change | Est. saved (cold-100) | Conf | Effort | Audit and notes |
 |---|---:|---|---|---|
-| **Row-trimmed payload read** — read only the rows in the vertical filter's support, one contiguous byte range computable from the descriptor (`dicom.py`, `spatial.py`, `preparation.py`) | 1.2–2.0 s; the byte saving no longer converts | med | M | **Demoted 2026-09-18**: the frame stage is [CPU-bound, not bandwidth-bound](attribution.md#structural-questions-still-open), running at 53–62% of a measured 510 MB/s ceiling, so removing 13.4% of bytes buys latency and page cache, not wall. Out-of-band rows cannot affect the output because `resample_crop` zero-fills outside the rect; bit-identical on 120/120 frames. `_axis_filter` must keep the original `source` for boundary clipping and `output_to_native` the original shape; the pydicom fallback still reads whole frames |
+| **Order statistics by `topk` in `prepare_images`** — the four ranks per series from two `topk` calls on the padded values instead of a full sort, and fewer small launches | ~50–80 ms of the ~142 ms per batch | med | S | Exact: order statistics do not depend on the selection algorithm. The full sort alone measured 34 ms per batch |
+| **Cache the per-series header decoding** — side fields, character set and `header_side` are decoded per file with pydicom helpers | ~1–2% of loader CPU | med | S | Headers are now ~30% of loader CPU; key the cache on the raw bytes so it stays exact |
 | Vectorise `summarize_series` (16.1 µs/file serial, 15% of serial `index_series`) | 1–1.5 s | low-med | M | Float-order risk; audit poses and bounds |
 | `PREFIX_BYTES` 12288 → 2048–4096 | 0–2 s, lands in the indexing row | low | XS | The pre-payload header is p50 1,482, p99 1,738, **max 1,758 bytes over 20,000 files**, and a 2,048-byte prefix truncated 0 of 1,200. The win is 219 MiB → 37 MiB over NFS and 6x less prefix RAM. Only extend-and-retry protects a longer hidden-test header; confirm before shrinking |
 | `truncnorm.ppf` → `truncnorm._ppf` | 0.15 s | med | S | Bit-identical on 2,000 random (q, a, b); scipy distributions spend ~90% of a call in parameter checking. Private API — pin the scipy version in the offline bundle |
-| Skip the quantile `np.concatenate` when every rect is full-frame | 0.1–0.3 s | low | S | Saves Python overhead only; the bytes copied are identical |
-| **One file access per selected frame.** Indexing already records the payload offset, yet `read_frame` opens the file again and `fstat`s it to revalidate size and mtime | unquantified | low | M | The `fstat` is 1.6 µs/frame locally, 24 ms per 14,882 frames, so only the NFS round trip could justify it, and the attribute cache may already absorb it. Minimising reopens is the sanctioned small-file lever on network filesystems. A payload read must still fail closed when the file changed. No probe exists |
-
-The resampling follow-ups from the 2026-09-18 review touch hashed sources. Schedule them
-with the next combined implementation and training snapshot: any further source edits create a
-new identity, even though the unrelated DICOM repair already bumped the current one.
-
-| Change | Est. saved | Conf | Effort | Notes |
-|---|---:|---|---|---|
-| **Re-measure the resample column band** on Kaggle, and drop it if it does not pay (`spatial.py`) | it may be costing ~0.1x of the stage | med | S | Machine-adjusted, the band came in at 1.03x where 0.92x was expected, so it looks inert or slightly negative on Kaggle's vCPUs against 8.7% faster locally ([profile](../../inference/2026-09-18-kaggle-x4-profile-after-cpu-cluster.md)). Pair the re-measurement with the resampling-plan cache below, since both touch the same derived objects |
-| **Cache the derived resampling plan** — the band bounds and the trimmed horizontal CSR, keyed by the same geometry as `_axis_filter` (`spatial.py`) | unmeasured | med | S | `_axis_filter` is `lru_cache`d, but every `resample_crop` still recomputes `horizontal.indices.min()/max()` and rebuilds `horizontal[:, band]`, which depend only on geometry. Never mutate a cached sparse matrix; time support discovery and CSR slicing separately on the real shape distribution first |
+| **One file access per selected frame.** Indexing already records the payload offset, yet the payload read opens the file again and `fstat`s it to revalidate size and mtime | unquantified | low | M | The `fstat` is 1.6 µs/frame locally, 24 ms per 14,882 frames, so only the NFS round trip could justify it, and the attribute cache may already absorb it. Minimising reopens is the sanctioned small-file lever on network filesystems. A payload read must still fail closed when the file changed. No probe exists |
 | **Bounded ordered payload window** in `decode_series` — submit a window of reads, decode in record order, release consumed bytes (`preparation.py`) | unmeasured; −80% transient RAM | low-med | M | Refines the earlier prefetch-window proposal: `pool.map` submits eagerly and the tuple retains every payload through the decode loop, so peak live memory holds raw payloads and resampled outputs at once (~83 MB of payloads per worker at x4, ~1.3 GB across 16). `buffersize` is not available on the bundled Python, so the window must be explicit. May trade memory for waiting — measure throughput, not just RSS |
-
-Three more were added by the 2026-09-19 review of `f4c340b`, all three inside the hashed sources
-and ranked against the whole command in [ranked by gain](ranked-by-gain.md):
-
-| Change | Est. saved | Conf | Effort | Audit and notes |
-|---|---:|---|---|---|
-| **Exact quantiles by single-rank partitions** — replace the one four-`kth` `partition` with a partition at the high rank, a partition of its prefix at the low rank, and two tail reductions (`intensity.py`) | 2.0–2.5 s cold-100, **3.1–3.9% of the command** | high | S | **Measured 1.44–1.63x with bit-identical bounds on 24 real acquisitions** ([evidence](ranked-by-gain.md#measurement-behind-rank-5)); it and the conversion row below are the two backed by measurements rather than estimates. Local CPU only, so the column-band warning applies. Keep the current path for coincident or overlapping rank intervals and small arrays; audit integer ranks, constant images, signed data, duplicate plateaus and every image multiplier on **real** retained regions, never synthetic noise ([why](measuring.md#measure-intensity-work-on-real-pixels)) |
-| **Support-limited native-to-float32 conversion** — never materialise a full-frame float32 buffer: compute the source support of both resampling axes, then mask and cast only that region (`dicom.py`, `spatial.py`) | **6–12% of the command** | med | M | **Measured 2.01x with bit-identical output on 120 real frames across five source shapes** ([evidence](ranked-by-gain.md#measurement-behind-rank-1)); median retained source area 0.686. The mechanism is *not* the row trim and *not* operand contiguity — both measured flat or worse on their own — it is the full-frame float32 allocation that `frame_from_payload` makes and `resample_crop` then discards. **It therefore overlaps the allocator env vars above and is not additive with them: run that free A/B first** to price what is left. **Distinct from the demoted row-trimmed read**: that one removed NFS bytes, this removes CPU and allocation before interpolation. Keep the original full-image dimensions when building filter coefficients and mapping coordinates — trim only the operator and its input — and keep slope/intercept placement, signed interpretation and the padding rectangle. Pair with the resampling-plan cache above. May not pay on shapes whose crop uses nearly the whole source |
-| **Direct shared-storage collation** — allocate the padded `images` tensor in shared memory instead of letting Torch copy a finished private tensor into it (`dataset.py`) | 1.3–2.1% of the command | med | S | `collate_studies` uses plain `torch.zeros`, so Torch's reducer allocates shared storage and copies the bytes when the batch is queued — charged to the **loader worker's** feeder thread, outside anything the single-process probe measures. **Distinct from the closed packed-collation redesign**: padding, shape and the model contract are unchanged, only the allocation site moves. Try the public `.share_memory_()`-before-filling form before Torch's underscored `_new_shared`, which is not a stable contract. Calling `.share_memory_()` *after* filling only moves the copy earlier and is not the change. Keep `pin_memory` on; measure the real multiprocess lifecycle, not `collate_studies([item])` |
-
-## Needs a validation run as well
-
-| Change | Est. saved | Conf | Effort | Risk |
-|---|---:|---|---|---|
-| **Strided subsample of the quantile buffer** — build it as `region.reshape(-1)[::4]` and quantile the subsample | 3.4–3.8 s cold-100 plus 0.5–1 s of the concatenate | med | S | Sampling standard error is about 1.6e-4 in probability at n ≈ 188k, some 30x smaller than the 0.005 level shift that cost 0.0021 — implying roughly 1e-4 AUC, but **that is an extrapolation from sampling theory, not a measurement**. It survives the background-spike objection because subsampling is value-blind and the spike stabilises the low rank; the exposure is the sparse bright 0.995 tail. Prefer a stride coprime with 224. **Gate it on the label-free check first**: compare full against strided bounds and the resulting uint8 histograms on real acquisitions, before spending a training run |
-| **GPU resample, quantiles and normalize** — decode raw frames on CPU, then crop-resample, clip and normalize on the two T4s | up to 15.7 s cold-100 | low | L | Must take quantiles too, since the bounds come from resampled regions. GPU *compute* is not the constraint: an AA-bilinear T4 kernel extrapolates to roughly 6 s for all 193,700 x4 frames against ~240 s of idle GPU per worker. The real obstacles are ~10x the loader-to-main-process bytes (76 MB against 7.5 MB per x4 study) and the fact that loader workers cannot own a CUDA context, so preprocessing moves into the main process beside the forward pass. Batch per series to avoid ragged launches. The only CPU-side lever left once the bit-exact cluster lands |
 
 ## Reading less per study (trades score for wall)
 
-Every candidate above preserves the predictions. This one does not, and it is the largest lever on
+Every candidate above preserves the prepared images. This one does not, and it is the largest lever on
 the list, because the loader cost is per frame: the evaluation multiplier sets how many triplets
 each study contributes, so cutting it removes loader CPU, loader bytes and forward-pass work in the
 same proportion.
@@ -156,9 +90,10 @@ The bottom row reproduces the independently recorded 161 GB and 5.3 minutes
 ([closed](closed.md#ruled-out-by-arithmetic-or-by-the-environment)), which is the check that the
 accounting is right.
 
-- **At ×4 the loader is already close to the wall.** The 350.8 s of worker wall sits against a
-  204–269 s bandwidth floor, so the run sustains 300–390 MB/s of the 510 MB/s ceiling. No remaining
-  candidate above buys a factor; they buy tens of seconds, which is what the list says.
+- **At ×4 the loader is already close to the wall.** The 2026-09-22 trim arm read 104 GB in about
+  217 s of prediction, ~480 MB/s against the 510 MB/s ceiling, after trimming 6–19% of payload
+  rows ([profile](../../inference/2026-09-22-kaggle-x4-startup-and-gpu-preparation.md)). No
+  remaining candidate above buys a factor; they buy tens of seconds.
 - **The multiplier is the only large lever left.** ×4 → ×3 removes about 20 GB, 40–50 s of floor;
   ×4 → ×1 removes about 75 GB, 110–150 s. Against the ~70 s per 0.001 AUC rate, ×3 is the one worth
   measuring and ×1 buys less than its fold-0 cost.
@@ -178,53 +113,3 @@ accuracy side of the same knob is in [endgame](../endgame.md#test-time-augmentat
 missing for a decision is the wall at fixed batch for ×3 against ×4 on Kaggle, which the same
 profile run can produce.
 
-## Runtime changes outside the loading path
-
-These touch neither the loading path nor the identity. They are listed here because they came out of
-the same investigation and compete for the same submission slot.
-
-| Change | Est. saved | Conf | Effort | Risk and notes |
-|---|---:|---|---|---|
-| **Torch-free coordinator.** `predict.py` imports the model stack only to count GPUs and read study IDs. Count GPUs with `nvidia-smi -L` or `CUDA_VISIBLE_DEVICES`; the template and series CSVs are already readable without PyTorch through `knee_abnormality.data.sources` (`prediction_studies`, `resolve_raw_dir`), which the 2026-09-16 restructure moved out of the preprocessing identity | ~30 s of the 35–55 s of coordinator imports before `main` | high | S | At the efficiency formula's 32,400 s scale, 30 s is 0.00093 of the score and about 0.0004 of AUC, so this is a tidy-up rather than a lever |
-| **Main-thread warm-up** — *implemented, awaiting a submission* | first FP16 batch 26–34 s → 1.1–1.8 s | — | — | Ships with the next submission; see [what the shipped changes bought](attribution.md#what-the-shipped-changes-bought) |
-| **Cut model load.** It is now the setup floor at 15.5–15.6 s per worker and it rose from 12.9–13.4 s when indexing stopped hiding it | up to ~15 s/worker, run-scale | — | ? | Unscoped: nobody has profiled what inside `load_checkpoint_model` costs the time — timm construction, the state-dict load, the FP16 chunk warm-up. Measure before proposing a change |
-
-## Proposed order
-
-**Ordered by what each is worth end to end in [ranked by gain](ranked-by-gain.md).** The phases below
-remain the record of what each experiment must measure.
-
-The [profiler repair](attribution.md#the-profilers-defects-fixed-2026-09-18), worker-filtered
-index, threaded listing, `in_order=False`, shared-pool CPU cluster and I/O-thread sweep are
-completed. Their result records own the measurements; they are not pending phases.
-
-### Phase 1 — allocator A/B
-
-Compare the three implemented allocator tunables on otherwise identical runs of the existing
-timing bundle. Keep the archived loading code fixed so the shipped index and CPU-cluster changes
-do not confound the measurement. Measure loader wait, worker wall and per-worker peak RSS.
-The tunables must be set before worker startup; this needs no retrain. Run it before the
-support-limited conversion so the two overlapping savings are not added together.
-
-### Phase 2 — remaining bit-exact changes
-
-Use the [gain ranking](ranked-by-gain.md), updated with the allocator result, to choose the next
-combined source snapshot. The conversion and resampling-plan cache overlap; exact quantiles and
-shared-storage collation have separate costs. Follow the audit scope in each candidate row and
-measure the residual on Kaggle after the required training. The resample column band is shipped;
-only its re-measurement or removal remains open.
-
-The demoted row-trimmed read and other lower-priority rows above remain alternatives, not a repeat
-of the shipped cluster. Deeper indexing breakdown is deferred until model loading stops hiding
-indexing cost.
-
-### Phase 3 — structural measurements
-
-| Experiment | Metric to check |
-|---|---|
-| Loader worker count 8, 12 and 16 at `INFERENCE_IO_THREADS = 8` | Worker wall, loader wait and memory; the [completed I/O-thread sweep](../../inference/2026-09-18-kaggle-x4-profile-after-cpu-cluster.md#the-io-thread-sweep-2026-09-18) varied threads, not workers |
-| GPU resample, quantiles and normalize | Loader-to-main byte volume first, then a retrain and a full validation run |
-| Cut model load, now the 15.5 s setup floor | Profile construction, checkpoint loading and warm-up before choosing a change; it gates further indexing work |
-
-The [corrected attribution](attribution.md#structural-questions-still-open) identifies the frame
-stage as CPU-bound; cold-minus-warm and wall-minus-CPU are not measurements of NFS wait.

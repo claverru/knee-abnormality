@@ -27,6 +27,7 @@ from knee_abnormality.data.dataset import (
 )
 from knee_abnormality.data.labels import STUDY
 from knee_abnormality.data.preprocessing import preparation as preparation_module
+from knee_abnormality.data.preprocessing.device import prepare_images
 from knee_abnormality.data.preprocessing.dicom import (
     DecodedFrame,
     read_frame,
@@ -284,7 +285,7 @@ def profile(config, source, args, class_balance: dict | None):
             batch = next(iterator)
             wait = time.perf_counter() - started
             if args.mode == "gpu":
-                batch = move_batch(batch, torch.device("cuda"))
+                batch = prepare_images(move_batch(batch, torch.device("cuda")))
                 loss = training_step(
                     model, optimizer, batch, config, class_balance_weights
                 )

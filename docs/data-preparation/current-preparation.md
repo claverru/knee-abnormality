@@ -126,26 +126,35 @@ valid rectangles and paths in the selected channel order. The midpoint supplies
 the unchanged acquisition-relative millimetre position. Local-fallback inputs
 always have unknown 3D geometry, even if native poses are individually valid.
 
-Unnormalized resamples and failures are cached within the current item's type
+**Pixels are finished on the device.** Loader workers read only the rows the
+resampling filter touches, straight into one shared buffer per decode call, mask
+the stored bits in place, and ship those buffers with each frame's resampling
+plan key and the series' exact quantile ranks; collation does not copy them.
+`data/preprocessing/device.py` then resamples, takes the quantile bounds,
+normalizes and gathers the uint8 triplets on the batch's device, bit-identically
+to the former CPU path. Frames that are not 8/16-bit, or whose rescale exceeds
+1e30, are resampled on the CPU and shipped as float32 regions. See the
+[measurement and parity evidence](../inference/2026-09-22-kaggle-x4-startup-and-gpu-preparation.md#gpu-preparation).
+
+Decoded frames and failures are cached within the current item's type
 preparation attempts. A decoded frame with under 1% non-zero stored pixels
 (`NEAR_EMPTY_FRACTION` in `preparation.py`) fails like a decode error, so a
-near-empty edge slice is never used. A failed path excludes every containing
-triplet and splits the original runs; neither spacing nor the reference or 1D
-origin is refitted.
-Constant acquisitions and unidentified acquisition errors exclude that source.
-Every retry makes a new exclusion and rebuilds coverage and quantile bands.
+near-empty edge slice is never used. The count is over the whole frame: a
+trimmed read whose rows already hold enough non-zero pixels passes, and any
+other frame is read in full and counted exactly. A failed path excludes every
+containing triplet and splits the original runs; neither spacing nor the
+reference or 1D origin is refitted. Unidentified acquisition errors exclude that
+source, and every retry makes a new exclusion and rebuilds coverage. A constant
+acquisition is only known once the device computes its quantile bounds, so it is
+dropped from the batch there instead of excluded and re-sampled; no train study
+at ×4 contains one.
 Metadata separates triplets, channel appearances, unique files, distinct middle
 geometry, decode attempts, placement errors and missing capacity.
 
-The bounded CPU inspection command includes four accepted-center and all four
-rejected-center studies from the pinned metadata cohort, in both dataset modes:
-
-```bash
-rtk proxy uv run --locked python -m scripts.adhoc.inspect_physical_preparation --output-dir outputs/analysis/physical-sampling-new/preparation
-```
-
-It records serial/four-thread and row-order comparisons, independent clipping
-populations, channel metadata and masks without models or a test harness.
+The physical-preparation inspection (`scripts/adhoc/inspect_physical_preparation.py`)
+checked serial/four-thread and row-order agreement and independent clipping
+populations against the CPU preparation; it reads prepared images and bounds that
+the loader no longer produces and is historical.
 See [implementation evidence](physical-sampling/implementation-verification.md).
 The former dataloader optimization benchmark is historical and requires its
 original source/config runtime; it is no longer an active current-config caller.
