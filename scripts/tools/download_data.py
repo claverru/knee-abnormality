@@ -16,7 +16,7 @@ from pathlib import Path, PurePosixPath
 
 import requests
 from pydantic import Field
-from pydantic_settings import CliImplicitFlag
+from pydantic_settings import CliImplicitFlag, SettingsError
 
 from knee_abnormality.cli import CLISettings
 
@@ -75,7 +75,7 @@ class KaggleSource:
                             request
                         ).url
                     )
-            except Exception:
+            except (ImportError, OSError, ValueError, requests.RequestException):
                 raise requests.ConnectionError(
                     "Could not obtain the Kaggle archive URL"
                 ) from None
@@ -508,7 +508,17 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         LOG.warning("Interrupted. Rerun the same command to resume.")
         raise SystemExit(130)
-    except Exception as error:
+    except (
+        KeyError,
+        OSError,
+        RuntimeError,
+        TypeError,
+        ValueError,
+        sqlite3.Error,
+        zipfile.BadZipFile,
+        zlib.error,
+        SettingsError,
+    ) as error:
         if isinstance(error, requests.RequestException):
             LOG.error("Network operation failed; rerun to resume")
         else:
