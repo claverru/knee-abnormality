@@ -10,7 +10,7 @@ from torch.utils.data import DataLoader, Dataset
 from knee_abnormality.config import SLICES_PER_INPUT, DataConfig, TrainerConfig
 from knee_abnormality.data.labels import STUDY
 from knee_abnormality.data.preprocessing.dicom import PREPARATION_ERRORS
-from knee_abnormality.data.preprocessing.filtering import excluded_series
+from knee_abnormality.data.preprocessing.filtering import clean_series
 from knee_abnormality.data.preprocessing.geometry import (
     StudyReference,
     estimate_reference,
@@ -63,6 +63,7 @@ class KneeStudyDataset(Dataset):
         self._study_references: dict[str, StudyReference] = {}
         self._study_sides: dict[str, KneeSide] = {}
         self._excluded_series: dict[str, frozenset[str]] = {}
+        self._cleaned_studies: dict[str, StudySeries] = {}
         missing = set(studies[STUDY].to_list()) - set(series_index)
         if missing:
             raise ValueError(
@@ -86,22 +87,36 @@ class KneeStudyDataset(Dataset):
             self._slice_index[candidate.directory] = indexed
         return indexed
 
-    def _index_study_geometry(self, study: StudySeries) -> None:
-        if study.uid in self._study_references:
-            return
+    def _index_study_geometry(self, study: StudySeries) -> StudySeries:
+        if study.uid in self._cleaned_studies:
+            return self._cleaned_studies[study.uid]
         candidates = {}
+        slots = {}
         for slot, values in enumerate(study.slots):
             for candidate in values:
                 candidates.setdefault(
                     candidate.uid, (candidate, self.data.series_types[slot].plane)
                 )
+                slots.setdefault(candidate.uid, slot)
         indexed = {}
         for uid, (candidate, plane) in sorted(candidates.items()):
             try:
                 indexed[uid] = (self._indexed(candidate), plane)
             except PREPARATION_ERRORS:
                 continue
-        excluded = excluded_series({uid: value for uid, (value, _) in indexed.items()})
+        excluded, assigned = clean_series(
+            {uid: value for uid, (value, _) in indexed.items()},
+            slots,
+            tuple(
+                (kind.plane, kind.fluid_sensitive, kind.fat_suppression)
+                for kind in self.data.series_types
+            ),
+        )
+        regrouped = [[] for _ in study.slots]
+        for slot, values in enumerate(study.slots):
+            for candidate in values:
+                regrouped[assigned.get(candidate.uid, slot)].append(candidate)
+        study = StudySeries(study.uid, tuple(tuple(values) for values in regrouped))
         eligible = tuple(
             (uid, plane, value.geometry)
             for uid, (value, plane) in indexed.items()
@@ -112,6 +127,8 @@ class KneeStudyDataset(Dataset):
         self._study_sides[study.uid] = resolve_knee_side(
             tuple((uid, value.side) for uid, (value, _) in indexed.items())
         )
+        self._cleaned_studies[study.uid] = study
+        return study
 
     def _decode_series(self, records, spacing_mm, image_size):
         return decode_series(records, spacing_mm, image_size, self.io_threads)
@@ -244,8 +261,7 @@ class KneeStudyDataset(Dataset):
 
     def __getitem__(self, index: int) -> dict:
         row = self.studies.row(index, named=True)
-        study = self.series_index[row[STUDY]]
-        self._index_study_geometry(study)
+        study = self._index_study_geometry(self.series_index[row[STUDY]])
         prepared = []
         failures = []
         sampling = []

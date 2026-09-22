@@ -129,6 +129,47 @@ pairs: 0.9167 against 0.9150 on the 58 gold studies and 0.938 against 0.937 on t
 Implementation, original design choices and measured costs live in
 [the modeling guide](../modeling/schedule-and-augmentation.md#weight-averaging).
 
+## Training-label exclusions
+
+**Measured composition; untested as a change. Set aside on 2026-09-22 by user decision.** Three
+groups of training studies whose report-derived labels likely do not describe their images.
+Excluding them changes training only, not inference. They total about 19 studies (0.4%), so any
+fold-0 effect is expected to be below noise. Evidence:
+`outputs/analysis/label-hygiene-20260922/` (scripts, study lists and matched phrases).
+
+- **Cross-study copy (proven):** `…99725523560254732094432244556623376711` (fold 2). Its images
+  are a pixel copy of the right-knee study `…613209`, but its report describes the left knee
+  ([findings](../metadata/repeated-series.md#cross-study-repeat)).
+- **Empty or cut-off reports (6 studies; 2 in fold 0, none gold):** four Dutch reports end at or
+  before `Bevindingen:`, one reads `Bevindingen: aa`, and one Spanish report is
+  `Resultados: . Impresión:`. Their `combined_v1` labels stay between 0.25 and 0.35.
+- **Report and image on opposite knees:** the report states one side and the header the other
+  in 26 of the 1,715 studies where both are known.
+  - **13 at the Bulgarian site** (11.4% of its 114). Its template reads "the bones forming the
+    right knee joint", so these are probably unedited template text; keep them.
+  - **13 elsewhere** (0.4–2.2% by language), including the cross-study copy. They are typos or
+    swapped reports, which cannot be told apart without reading the images; review before
+    excluding.
+
+The reference is the production knee side: explicit tags, or coordinates when tags are absent.
+Where both exist, they agree 99.4% of the time
+([coordinate investigation](../metadata/knee-side-coordinate-investigation.md)).
+
+## Defensive guards for faults absent from training
+
+**Hypothesis; zero training hits, kept in case the hidden test differs.** Two header-only
+guards for faults the training data does not contain, so a fold-0 run cannot measure them. Decide
+with the final bundle.
+
+- **Localizers and scouts:** drop series whose `ImageType` holds `LOCALIZER`, or whose description
+  names a localizer, scout or survey. None exist in training
+  ([signals](../research/series-filtering-signals.md#localizers-scouts-and-calibration)).
+- **Within-series consistency:** keep the most common TE, TR and `ImageType` of a series, and drop
+  repeated-position instances, so that a dual-echo series cannot mix contrasts inside one triplet.
+  The 2026-09-22 check of all 24,371 training series found no series with more than one TE, TR or
+  `ImageType`, no repeated slice position and no spacing gap
+  ([audit data](../metadata/repeated-series.md#detection)).
+
 ## Distillation
 
 **Distilling an ensemble into one fast model** (hypothesis; no speedup or score measured). Train a

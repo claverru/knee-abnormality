@@ -11,7 +11,7 @@ are removed. There is no pending confirmation run or adapter-removal task. See
 
 **No training is queued for automatic launch.** No campaign is running; historical
 queues and decisions live under [autoresearch](../../autoresearch/status.md).
-The general [overnight queue](../backlog/overnight.md) is empty. New candidates use
+The general [overnight queue](../backlog/overnight.md) holds one run, the series-hygiene bundle (exact copies, superseded series, contrast relabel, near-empty frames). New candidates use
 the incumbent's seed and the [shared evaluation and adoption rule](../../autoresearch/protocol.md#shared-evaluation-and-adoption).
 Starting a campaign is a separate user action.
 

@@ -27,6 +27,16 @@ from knee_abnormality.data.sources import list_series
 
 REFORMAT_IMAGE_TYPES = ("DERIVED", "SECONDARY", "PROJECTION")
 REFORMAT_DESCRIPTION = re.compile(r"\bmpr\b|reformat")
+FAT_SUPPRESSION_DESCRIPTION = re.compile(
+    r"(\bfs\b|_fs|fs_|fs\+|\+fs|fat.?sat|fatsat|spir|spair|stir|tirm|(^|[^a-z])we([^a-z]|$)"
+    r"|water|dixon|\bsat\b|\bfs$|pdfs|t2fs|fsa|fse fs|ideal|wats|f/s)",
+    re.IGNORECASE,
+)
+FAT_SUPPRESSION_NEGATED = re.compile(
+    r"(non.?fat|non.?fs|no.?fs|no.?fat)", re.IGNORECASE
+)
+STEADY_STATE_NAME = re.compile(r"de3d|tfi", re.IGNORECASE)
+STEADY_STATE_DESCRIPTION = re.compile(r"dess|de3d|trufi", re.IGNORECASE)
 
 
 @dataclass(frozen=True, slots=True)
@@ -48,6 +58,7 @@ class SeriesSummary:
     acquired_resolution_mm: float | None = None
     receive_coil: str | None = None
     removed_instances: int = 0
+    contrast: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -99,6 +110,44 @@ def _acquired_resolution(
     return value if math.isfinite(value) and value > 0 else None
 
 
+def contrast_class(tags: SeriesTags) -> str | None:
+    description = tags.description or ""
+    inversion = (
+        "IR" in tags.scanning_sequence
+        or "IR" in tags.sequence_variant
+        or (tags.inversion_time is not None and 50 < tags.inversion_time < 300)
+    )
+    evidence = (
+        bool({"FS", "WE"} & set(tags.scan_options))
+        or inversion
+        or (
+            bool(FAT_SUPPRESSION_DESCRIPTION.search(description))
+            and not FAT_SUPPRESSION_NEGATED.search(description)
+        )
+    )
+    steady = bool(
+        STEADY_STATE_NAME.search(tags.sequence_name or "")
+        or STEADY_STATE_DESCRIPTION.search(description)
+    )
+    t1_timing = (
+        tags.echo_time is not None
+        and tags.repetition_time is not None
+        and tags.echo_time < 20
+        and tags.repetition_time < 1000
+        and not inversion
+        and not steady
+    )
+    if evidence:
+        return None if t1_timing else "fluid_fat_suppressed"
+    if (
+        tags.echo_time is not None
+        or tags.repetition_time is not None
+        or tags.scan_options
+    ):
+        return "not_fat_suppressed"
+    return None
+
+
 def summarize_tags(
     tags: SeriesTags | None, layout: PoseLayout | None, removed: int
 ) -> SeriesSummary:
@@ -129,6 +178,7 @@ def summarize_tags(
         _acquired_resolution(tags.acquisition_matrix, layout),
         tags.receive_coil,
         removed,
+        contrast_class(tags),
     )
 
 

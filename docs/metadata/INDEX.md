@@ -3,6 +3,7 @@
 | Read when | Document |
 |---|---|
 | Investigating possible overlap between studies | [Study overlap investigation](study-overlap-investigation.md) |
+| Finding pixel-identical duplicate series within or across studies | [Pixel-identical repeated series](repeated-series.md) |
 | Checking official target criteria and label interpretation | [Official label criteria](official-label-criteria.md) |
 | Checking official CSV schemas, hashes and joins | [Official CSV audit](official-csv-audit.md) |
 | Inspecting acquisition headers and series profiles | [Acquisition and series profiles](acquisition-and-series-profiles.md) |

@@ -39,26 +39,62 @@ validation and Kaggle inference.
   pose are kept; if no layout is self-consistent, nothing is removed. This is a
   hidden-test defence ([research](../research/series-filtering-signals.md#localizers-scouts-and-calibration));
   it removes no training or example-test instance.
-- **Study exclusions** (`data/preprocessing/filtering.py`), decided on all
-  indexed series of a study before `estimate_reference` and applied to every
-  slot:
-  - *Non-knee coil:* when a study uses more than one non-empty
-    `ReceiveCoilName` and at least one of them does not name a non-knee part,
-    series whose coil name contains ankle, foot, wrist, hand, elbow, shoulder,
-    hip, head, neck or breast, and not knee, are dropped. Body and spine coils
-    are not anatomy words.
-  - *Stray other knee:* when series volume centres spread more than 150 mm in
-    patient x, the study is split at the largest x gap, and a side with one
-    series is dropped if the other side has at least two. Bilateral exams keep
-    both sides.
-  - A rule never drops every series of a study; missing tags or geometry keep
-    the series. Thigh, calf, patellar, oblique and other far series are kept.
-    Slot metadata lists dropped series as `excluded_sources`.
-- **Effect (all 4,407 training and 3 example-test studies):** 6 series dropped,
-  exactly the 5 ankle series of `…93672103` and the stray sagittal of
+- **Study cleaning** (`clean_series` in `data/preprocessing/filtering.py`),
+  decided on all indexed series of a study before `estimate_reference` and
+  applied to every slot. Rules run cheapest first, so free header rules shrink
+  the work of the rules that read pixels:
+  1. *Non-knee coil:* when a study uses more than one non-empty
+     `ReceiveCoilName` and at least one of them does not name a non-knee part,
+     series whose coil name contains ankle, foot, wrist, hand, elbow, shoulder,
+     hip, head, neck or breast, and not knee, are dropped. Body and spine coils
+     are not anatomy words.
+  2. *Superseded series:* in one slot, series with the same sequence signature,
+     slice count, matrix and sorted positions (0.01 mm) keep one: a non-reformat
+     first, then the highest `SeriesNumber`, then the higher UID. These are
+     retakes, Philips second reconstructions and exact copies with full headers.
+     Headers only
+     ([result](../validation/results/2026-09-22-series-cleaning-rules.md#same-signature-groups)).
+  3. *Contrast relabel:* a header candidate is a series whose fat-suppression
+     evidence contradicts its slot. The evidence is `ScanOptions` FS/WE, an
+     inversion-recovery sequence, or a fat-suppression description without T1
+     timing in a T1/PD slot; or no such evidence, with TE, TR or scan options
+     present, in a fluid slot. Only studies with a candidate decode 3 slices
+     (25/50/75%) of each remaining series. For each slice they compute body-mask
+     intensity quantiles, bright fraction, and ring, inner and central medians
+     relative to the body's 99th percentile. A candidate moves to the same
+     plane's other slot when its nearest trusted series in the study belongs to
+     the other contrast. Same-plane series are used only when both contrasts
+     exist in that plane; otherwise series from every plane are used. Nothing
+     is trained.
+  4. *Exact copy:* series of one slot, after relabelling, with the same slice
+     count, matrix and sorted positions decode their middle-position frame. A
+     series whose frame equals an already kept one is dropped (reformats first,
+     then the higher UID). Only grouped series read a frame
+     ([repeated series](../metadata/repeated-series.md#online-detection-per-study)).
+  5. *Stray other knee:* when series volume centres spread more than 150 mm in
+     patient x, the study is split at the largest x gap. A side with one series
+     is dropped if the other side has at least two. Bilateral exams keep both
+     sides. This runs after the redundancy rules, so repeated series do not
+     inflate a side.
+  - Rules 1 and 5 never drop every remaining series of a study; missing tags or
+    geometry keep the series. Thigh, calf, patellar, oblique and other far series
+    are kept. Slot metadata lists dropped series as `excluded_sources`.
+- **Effect (all 4,407 training and 3 example-test studies):** rules 1 and 5 drop
+  6 series, exactly the 5 ankle series of `…93672103` and the stray sagittal of
   `…42012883`; the 5 body/spine-coil studies are untouched; one study centre
   changes (`…93672103`, RMS 42.05 → 0.48 mm, now accepted); the guard removes
   nothing ([census](../metadata/series-filtering-census.md#implemented-rule-2026-09-17)).
+  Rules 2 and 4 together drop 237 series. That is every pixel-identical copy (33 in 9
+  studies, one per pair, including the Siemens `DESS MPR` copy rather than its
+  original) plus 204 superseded series in 163 studies; 52 of those are in 42
+  fold-0 studies, the set measured at +0.00015 inference-only. Rule 3 moves
+  11 series, exactly 11 of the 12 census-confirmed contrast mislabels and to the
+  same slots; it misses one Siemens `pd_tse_fs_sag_np` whose visual verdict is
+  ambiguous. It evaluates 53 candidates in 41 studies. No example-test series is dropped or moved.
+  Cleaning takes 0.5 ms per study without a contrast candidate and 52 ms on
+  average (max 148 ms) with one, local CPU. The near-empty check catches all 61
+  frames found by the repeated-series scan, and also some frames that scan
+  missed because their central chunk was not exactly constant.
 
 ## Robust study centre (removed)
 
@@ -91,8 +127,11 @@ the unchanged acquisition-relative millimetre position. Local-fallback inputs
 always have unknown 3D geometry, even if native poses are individually valid.
 
 Unnormalized resamples and failures are cached within the current item's type
-preparation attempts. A failed path excludes every containing triplet and splits
-the original runs; neither spacing nor the reference or 1D origin is refitted.
+preparation attempts. A decoded frame with under 1% non-zero stored pixels
+(`NEAR_EMPTY_FRACTION` in `preparation.py`) fails like a decode error, so a
+near-empty edge slice is never used. A failed path excludes every containing
+triplet and splits the original runs; neither spacing nor the reference or 1D
+origin is refitted.
 Constant acquisitions and unidentified acquisition errors exclude that source.
 Every retry makes a new exclusion and rebuilds coverage and quantile bands.
 Metadata separates triplets, channel appearances, unique files, distinct middle
