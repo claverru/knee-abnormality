@@ -107,7 +107,23 @@ scripts:
       - Rejects configuration differences outside --allowed-config-differences (dotted keys or prefixes; default name) and input identity differences outside --allowed-input-identity-differences.
       - Reports selected epochs, full-fold and per-target AUC, BCE, gold and report-derived metrics, family means, exclusive-positive margins, lateral cross-talk, vendor strata with supports, prediction changes, epoch curves, timing and peak memory, parameters present in only one run and changed src/configs archive members.
       - Uses paired report-group bootstrap intervals for all targets, the meniscus and OA pairs, the other eight targets and both margins; intervals exclude training-seed and checkpoint-selection variability.
-      - Output directory must be fresh; selected predictions must reproduce their recorded epoch macro AUC.
+      - Output directory must be fresh; selected predictions must reproduce the recorded prediction_macro_auc in selected_checkpoint.json, or the selected epoch's macro AUC for runs that predicted at the validation multiplier and record none.
+      - Runs whose validation.prediction_image_multiplier differs are rejected unless that key is allowed; compare x4-predicted runs with x4-predicted references (see repredict-run).
+    docs: [docs/validation/fold-run-comparison.md]
+
+  - id: repredict-run
+    path: scripts/tools/repredict_run.py
+    summary: Derive a new run directory from a completed training run whose selected checkpoint's validation predictions are remade at another image multiplier at attention temperature 1, so older runs can be compared or sealed as references under x4 predictions.
+    tags: [predict, prediction, validation, multiplier, x4, rerun, reference, autoresearch, comparison, derived, run]
+    commands:
+      - rtk proxy uv run --locked python -m scripts.tools.repredict_run --run outputs/training/k_05 --output outputs/training/k_05-x4 --image-multiplier 4
+    inputs: [Completed run directory with effective_config.json, selected_checkpoint.json, timing.json and the selected checkpoint, Original DICOMs and the frozen split]
+    outputs: [New run directory with the source's files, the selected checkpoint hard-linked, validation.prediction_image_multiplier set in effective_config.json, new validation_predictions.csv, selected_checkpoint.json with prediction_image_multiplier and prediction_macro_auc, timing.json with the new prediction time, and repredicted.json recording the source]
+    notes:
+      - Uses the GPU for one validation pass (about 70 s at x4 on fold 0); check GPU usage first.
+      - Runs with the current sources, so the run's preprocessing identity must match them; older runs need their archived sources.
+      - Refuses an existing output; the source run is never modified. Epoch metrics, logs and the ×1 epoch score stay as trained.
+      - Predictions match what scripts.pipeline.train now writes at the same multiplier (same loader batch size and temperature 1).
     docs: [docs/validation/fold-run-comparison.md]
 
   - id: plot-validation-metrics

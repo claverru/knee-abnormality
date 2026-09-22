@@ -12,6 +12,7 @@ labels:
 validation:
   split: all_5fold_scanner_v1
   folds: [0]
+  prediction_image_multiplier: 4
 
 data:
   reflection_augmentation:

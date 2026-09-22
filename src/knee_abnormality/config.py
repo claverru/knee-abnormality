@@ -240,6 +240,7 @@ class TrainerConfig(ConfigModel):
 class ValidationConfig(ConfigModel):
     split: Identifier
     folds: Annotated[tuple[Fold, ...], Field(min_length=1)]
+    prediction_image_multiplier: Annotated[StrictInt, Field(gt=0)] = 1
 
     @field_validator("folds")
     @classmethod

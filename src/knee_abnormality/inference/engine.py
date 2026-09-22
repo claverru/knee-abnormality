@@ -212,7 +212,7 @@ def predict_loader(
 
 def prediction_image_multiplier(config: ExperimentConfig, split: str) -> int:
     return (
-        config.data.validation_image_multiplier
+        config.validation.prediction_image_multiplier
         if split == "validation"
         else TEST_IMAGE_MULTIPLIER
     )

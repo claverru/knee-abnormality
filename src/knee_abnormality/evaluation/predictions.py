@@ -1,8 +1,31 @@
+from pathlib import Path
+
 import numpy as np
 import polars as pl
 import torch
 
 from knee_abnormality.data.labels import STUDY
+from knee_abnormality.evaluation.metrics import validation_metrics
+
+
+def fold_prediction_macro_auc(
+    split_dir: Path, fold: int, targets: tuple[str, ...], path: Path
+) -> float:
+    frame = (
+        pl.read_csv(split_dir / "studies.csv")
+        .filter(pl.col("fold") == fold)
+        .join(pl.read_csv(split_dir / "targets.csv"), on=STUDY, validate="1:1")
+        .sort(STUDY)
+    )
+    prediction = pl.read_csv(path).sort(STUDY)
+    if prediction[STUDY].to_list() != frame[STUDY].to_list():
+        raise ValueError(f"Prediction membership differs from the fold: {path}")
+    return validation_metrics(
+        frame.select(targets).to_numpy().astype(float),
+        prediction.select(targets).to_numpy().astype(float),
+        targets,
+        frame["is_gold"].to_numpy(),
+    )["macro_auc"]
 
 
 def make_prediction_frame(
