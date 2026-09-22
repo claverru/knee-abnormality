@@ -1,7 +1,9 @@
 # Possible repeated studies across folds
 
 The bounded 2026-09-20 audit found no confirmed repeated patients or copied
-acquisitions. It investigated indirect links after finding that all 4,407 sampled
+acquisitions. The exhaustive 2026-09-22 pixel scan later found one copied study
+pair across folds 1 and 2; see [cross-study repeat](repeated-series.md#cross-study-repeat).
+The 2026-09-20 audit investigated indirect links after finding that all 4,407 sampled
 training-study headers had distinct PatientID and FrameOfReferenceUID values.
 Distinct anonymized identifiers do not establish longitudinal patient separation.
 No fold assignments, training settings or datasets were changed.
@@ -85,4 +87,5 @@ against unrelated studies from the same scanner and protocol is essential.
 
 Confirmed substantial image overlap would justify grouping the involved studies.
 Unresolved anatomical or metadata resemblance remains a review candidate. This
-audit provides no basis for changing the current fold membership.
+audit provides no basis for changing the current fold membership; the copied pair
+found later is handled in [repeated series](repeated-series.md#cross-study-repeat).

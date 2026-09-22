@@ -17,6 +17,51 @@ scripts:
       - Report templates and shared scanner protocols are not evidence of patient equivalence.
     docs: [docs/metadata/study-overlap-investigation.md]
 
+  - id: audit-repeated-series
+    path: scripts/adhoc/audit_repeated_series.py
+    summary: Find series whose slices repeat pixel-for-pixel within or across studies by hashing a central pixel chunk of every DICOM, then verify matches on full decoded frames.
+    tags: [duplicates, repeated, identical, series, pixels, hash, fingerprint, retakes, copies, headers]
+    commands:
+      - rtk proxy env CUDA_VISIBLE_DEVICES= uv run --locked python -m scripts.adhoc.audit_repeated_series --output-dir outputs/analysis/repeated-series-new
+      - rtk proxy env CUDA_VISIBLE_DEVICES= uv run --locked python -m scripts.adhoc.audit_repeated_series --output-dir outputs/analysis/repeated-series-trial --studies 30
+    inputs: [Official train and test series CSVs, Original DICOMs]
+    outputs: [Per-file header and chunk-hash parquet, Per-series summary parquet, Series pairs sharing chunks with full-pixel verification, Within-series repeated slices parquet, Summary JSON with a header-only rule check, Manifest and source snapshot]
+    notes:
+      - CPU only. Reads a 12 KB header prefix and one 8 KB chunk from the middle of the pixel payload per file (the file tail for non-native encodings); full frames are decoded only for files whose chunks match.
+      - Constant chunks are excluded from matching. Pair relation is identical, subset or partial over distinct informative chunks.
+      - The header rule pairs same-study series with equal sorted slice positions, file count, matrix, TR and TE; it is scored against pixel identity.
+      - Requires a fresh output directory; --studies limits the scan to the first sorted studies of each split.
+    docs: [docs/metadata/repeated-series.md]
+
+  - id: simulate-online-series-dedup
+    path: scripts/adhoc/simulate_online_series_dedup.py
+    summary: Simulate the per-study online duplicate-series filter on production series indexing and score it against the exhaustive repeated-series audit, including extra frame reads and near-copy correlations.
+    tags: [duplicates, repeated, identical, series, online, inference, filter, pixels, geometry, reconstruction, cost]
+    commands:
+      - rtk proxy env CUDA_VISIBLE_DEVICES= uv run --locked python -m scripts.adhoc.simulate_online_series_dedup --output-dir outputs/analysis/online-series-dedup-new
+    inputs: [Official series CSV for the split, Original DICOMs, Repeated-series audit pairs parquet]
+    outputs: [Per-study indexing, keying and frame-read cost parquet, Same-count-and-matrix series pairs with key membership, exact equality and middle-frame correlation, Summary JSON, Manifest and source snapshot]
+    notes:
+      - CPU only. Runs index_series per series with one thread, so its indexing time is not the threaded inference loader's.
+      - Header key is slot, slice count, matrix and sorted positions rounded to 0.01 mm; only bucketed series read their middle-position frame. Pairs sharing only count and matrix are also decoded, to check for copies outside the key.
+      - Accuracy is scored against same-study identical pairs from audit-repeated-series; frame-read timings are local, not Kaggle.
+    docs: [docs/metadata/repeated-series.md#online-detection-per-study]
+
+  - id: score-series-cleaning-rules
+    path: scripts/adhoc/score_series_cleaning_rules.py
+    summary: Re-predict the fold-0 studies touched by candidate series-cleaning rules (contrast-slot relabel, same-signature same-geometry reconstructions or retakes, near-empty frames) with a saved checkpoint on CPU, and score per-study prediction shifts and the full-fold AUC change against intact predictions.
+    tags: [series, cleaning, filter, relabel, contrast, retakes, reconstruction, blank, frames, inference, validation, bootstrap, cpu]
+    commands:
+      - rtk proxy env CUDA_VISIBLE_DEVICES= uv run --locked python -m scripts.adhoc.score_series_cleaning_rules --output-dir outputs/analysis/series-cleaning-rules-new
+    inputs: [Run directory with effective_config.json, selected checkpoint and saved validation predictions, Series-filtering census parquet, Repeated-series per-file parquet, Original DICOMs]
+    outputs: [Per-variant results in summary.json, Per-study prediction shifts parquet, Relabelled series and signature-group parquets, Near-empty frame usage parquet, Manifest and source snapshot]
+    notes:
+      - CPU only, about 3.5 s per study at x4 with 16 threads; the checkpoint must match the executing preprocessing identity. Attention temperature is the loader default.
+      - Variants edit only the affected studies' series index; intact predictions are remade in the same process, and the full-fold delta substitutes both into the saved fold predictions.
+      - Relabel uses the census confirmed fluid/fat-suppression flags. Signature groups share slot, slice count, sequence signature and positions rounded to 0.01 mm and exclude exact copies; keep_newest and keep_oldest keep the highest or lowest SeriesNumber.
+      - Near-empty frames have under 1% non-zero pixels among frames whose central chunk is constant; usage counts selected triplets touching one, over all training studies holding such frames.
+    docs: [docs/metadata/repeated-series.md]
+
   - id: analyze-study-center-extents
     path: scripts/adhoc/analyze_study_center_extents.py
     summary: Fit the study reference point for every training study and measure each plane's coverage on both sides of it.

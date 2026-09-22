@@ -42,6 +42,9 @@ class SeriesTags:
     scan_options: tuple[str, ...]
     acquisition_matrix: tuple[float, ...]
     receive_coil: str | None
+    scanning_sequence: tuple[str, ...] = ()
+    sequence_name: str | None = None
+    inversion_time: float | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -162,6 +165,9 @@ def _series_tags(dataset: pydicom.Dataset) -> SeriesTags:
         _values(dataset, "ScanOptions"),
         _numbers(dataset, "AcquisitionMatrix"),
         _text(dataset, "ReceiveCoilName"),
+        _values(dataset, "ScanningSequence"),
+        _text(dataset, "SequenceName"),
+        _number(dataset, "InversionTime"),
     )
 
 
@@ -287,6 +293,9 @@ TAG_FIELDS = (
     0x00180022,
     0x00181310,
     0x00181250,
+    0x00180020,
+    0x00180024,
+    0x00180082,
 )
 SIDE_FIELDS = {
     0x00200060: "Laterality",
@@ -303,11 +312,14 @@ WANTED = {
     *SIDE_FIELDS,
     0x00080008,
     0x0008103E,
+    0x00180020,
     0x00180021,
     0x00180022,
     0x00180023,
+    0x00180024,
     0x00180080,
     0x00180081,
+    0x00180082,
     0x00180091,
     0x00181250,
     0x00181310,
@@ -558,6 +570,9 @@ def parse_header(buffer: bytes, size: int, modified_ns: int) -> DicomHeader:
             strings(0x00180022),
             matrix,
             text(0x00181250),
+            strings(0x00180020),
+            text(0x00180024),
+            one(0x00180082),
         )
         if len(_TAGS_CACHE) < TAGS_CACHE_LIMIT:
             _TAGS_CACHE[signature] = tags

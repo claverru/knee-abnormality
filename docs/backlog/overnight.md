@@ -13,7 +13,40 @@ from this file.
 
 The class-balance exponent sweep is complete, run by hand on 2026-09-21–22 and judged on the
 public leaderboard: unweighted 0.943, k=0.25 0.944, k=0.5 0.945, k=0.75 0.942, k=1 0.940
-([result](../validation/results/2026-09-21-class-balance-exponent.md)). No run is queued.
+([result](../validation/results/2026-09-21-class-balance-exponent.md)).
+
+- **Series hygiene** (committed 2026-09-22): four rules run as one bundled change on the oblique
+  recipe. Run `just train <run_id>` from main's working tree, or from the worktree
+  `../knee-series-dedup`, which holds the same code. It is one fold-0 run at the incumbent seed,
+  compared with the `oblique` run.
+  - **Exact copies:** drops 33 same-study pixel copies in 9 training studies, 4 of them in fold 0
+    ([findings](../metadata/repeated-series.md#online-detection-per-study)).
+  - **Superseded series:** keeps the highest `SeriesNumber` per same-signature, same-geometry group
+    in a slot, dropping 204 series in 163 studies (42 in fold 0).
+  - **Contrast relabel:** moves a header-flagged series to the other contrast slot of its plane
+    when its intensity is nearest the study's other-contrast series. It moves 11 training series,
+    11 of the 12 census mislabels.
+  - **Near-empty frames:** frames under 1% non-zero fail like decode errors, so preparation re-picks
+    the triplet.
+  - **Scope:** the three series rules touch 183 training studies (4.2%), 48 of them in fold 0; rules
+    run cheapest first (coil, superseded, relabel, copies, other knee).
+
+  Inference-only, the superseded rule scored +0.00015 [−0.000003, +0.00037] and near-empty frames
+  −0.000009 ([result](../validation/results/2026-09-22-series-cleaning-rules.md)). Per-rule
+  attribution comes from those inference-only numbers; the run checks the trained effect and harm.
+
+The [2026-09-20 fourteen-run queue](../validation/results/2026-09-20-overnight-hyperparameter-results.md)
+completed in 6 h 8 m. No change is adopted: milder scaling was the best candidate
+but inconclusive against both controls; control B beat every candidate. The head-LR,
+intensity, affine, dropout, decay and warm-up arms are recorded under already measured.
+The earlier [five-run queue](../validation/results/2026-09-19-untried-hyperparameter-queue.md)
+also yielded no adoption.
+
+**No delta recorded before 2026-09-19 is a prior for a new queue.** Those historical runs used
+ordinary BCE; the recipe in force uses class-balanced BCE, which by itself moves fold 0 by about
+0.008. The [result links](#already-measured) also include the newer balanced-BCE comparisons.
+Keep `validation_image_multiplier: 1` in comparisons.
+
 
 The [2026-09-20 fourteen-run queue](../validation/results/2026-09-20-overnight-hyperparameter-results.md)
 completed in 6 h 8 m. No change is adopted: milder scaling was the best candidate

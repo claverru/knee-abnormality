@@ -38,17 +38,6 @@ per step and adds no inference work.
   current adoption rule. Implementation needs a separate user request; training remains
   user-launched. Move the run to the overnight queue only after implementation.
 
-## Superseded same-protocol retakes
-
-**Hypothesis (measured composition, untested as a change).** Drop the superseded series when a
-study has a true same-protocol retake with a later `SeriesNumber` (51 of 661 repeated-type slots
-in fold-0 validation, about 258 of 6,868 repeated-slot triplets, 0.6% of all validation triplets),
-instead of letting the tie-break arbitrate between them. This is the one lever in the [tie-break
-investigation](../data-preparation/physical-sampling/evaluation-tie-break-investigation.md) that
-changes realized triplet quality rather than just determinism. The implemented source ranking
-already prefers the newest retake when entitlements tie, but a superseded series still supplies its
-entitlement share of the targets.
-
 ## Per-slot budget split between its own series
 
 **Hypothesis; untested, no design yet.** Whether splitting a slot's own budget more evenly between
@@ -277,20 +266,6 @@ or evidence that scanner shift is currently our bottleneck.
   statistics also contain diagnostic signal: do not assume all variation is nuisance or claim
   scanner robustness from aggregate AUC alone. Implementation needs a separate user request;
   move its run to the overnight queue only after implementation.
-
-## Contrast slot relabel
-
-**Hypothesis (prevalence and inference-only effect measured; training effect untested).** Move
-contrast-mislabelled series to the same plane's other slot: fat-suppressed fluid series out of
-T1/PD slots and T2/T2* series without fat suppression out of fluid slots, only when headers and a
-cheap intensity check on three decoded slices agree (12 training series, 12/12 reviewed
-precision; relabelling the 4 fold-0 series moved macro AUC by +0.009 ×1000 on the control
-checkpoints). This is the part of the [series-filtering census
-rule](../metadata/series-filtering-census.md#proposed-rule-series-filtering-and-cleaning) that the
-[implemented drops](../metadata/series-filtering-census.md#implemented-rule-2026-09-17) left out;
-it needs one extra header per series and three decoded slices at Kaggle inference, and it changes
-the preprocessing identity. Plane relabelling (one swapped study) stays out: it cost −0.21 ×1000
-on all three control checkpoints.
 
 ## RadImageNet-pretrained backbone
 

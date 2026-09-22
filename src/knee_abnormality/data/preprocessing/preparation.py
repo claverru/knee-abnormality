@@ -21,6 +21,8 @@ from knee_abnormality.data.preprocessing.intensity import (
 from knee_abnormality.data.preprocessing.series import SliceRecord
 from knee_abnormality.data.preprocessing.spatial import ResampledSlice, resample_crop
 
+NEAR_EMPTY_FRACTION = 0.01
+
 
 @dataclass(frozen=True)
 class PreparedSeries:
@@ -65,6 +67,8 @@ def decode_slice(
             if payload is not None and record.descriptor is not None
             else read_frame(path, record.descriptor)
         )
+        if np.count_nonzero(frame.pixels) < NEAR_EMPTY_FRACTION * frame.pixels.size:
+            return f"{path}: near-empty frame"
         value = resample_crop(frame, spacing_mm, image_size)
     except PREPARATION_ERRORS as error:
         return f"{path}: {type(error).__name__}: {error}"

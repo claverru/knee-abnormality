@@ -16,7 +16,7 @@ from knee_abnormality.cli import CLISettings
 from knee_abnormality.config import SLICES_PER_INPUT, load_config
 from knee_abnormality.data.labels import STUDY
 from knee_abnormality.data.preprocessing.dicom import PREPARATION_ERRORS
-from knee_abnormality.data.preprocessing.filtering import excluded_series
+from knee_abnormality.data.preprocessing.filtering import clean_series
 from knee_abnormality.data.preprocessing.geometry import estimate_reference
 from knee_abnormality.data.preprocessing.series import index_series
 from knee_abnormality.data.sources import SERIES, StudySeries, build_series_index
@@ -55,9 +55,11 @@ def distribution(values: list[float]) -> dict:
 
 def measure_study(study: StudySeries, types: tuple, io_threads: int) -> tuple:
     candidates = {}
+    slots = {}
     for slot, values in enumerate(study.slots):
         for candidate in values:
             candidates.setdefault(candidate.uid, (candidate, types[slot]))
+            slots.setdefault(candidate.uid, slot)
     indexed = {}
     for uid, (candidate, kind) in sorted(candidates.items()):
         try:
@@ -72,7 +74,13 @@ def measure_study(study: StudySeries, types: tuple, io_threads: int) -> tuple:
         except PREPARATION_ERRORS as error:
             indexed[uid] = (None, kind, f"{type(error).__name__}: {error}")
     readable = {uid: value[0] for uid, value in indexed.items() if value[0] is not None}
-    excluded = excluded_series(readable)
+    excluded, _ = clean_series(
+        readable,
+        slots,
+        tuple(
+            (kind.plane, kind.fluid_sensitive, kind.fat_suppression) for kind in types
+        ),
+    )
     eligible = tuple(
         (uid, kind[0], value.geometry)
         for uid, (value, kind, *_) in indexed.items()

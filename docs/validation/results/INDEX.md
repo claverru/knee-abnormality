@@ -2,6 +2,7 @@
 
 | Read when | Document |
 |---|---|
+| Scoring series-cleaning rules at inference only: contrast-slot relabel, keep one series per same-signature group (retakes, Philips second reconstructions), near-empty frames | [2026-09-22 series-cleaning rules](2026-09-22-series-cleaning-rules.md) |
 | Reviewing oblique series with their own slot budget (`oblique_tilt_deg`): fold-0 and per-label localization, ×4/×5 τ sweep, S46–S47 | [2026-09-22 oblique groups](2026-09-22-oblique-groups-result.md) |
 | Choosing class-weighting strength; why fold-0 validation and the public leaderboard disagree on weighting (k=1, 0.5, unweighted; S40–S42) | [2026-09-21 class-balance exponent](2026-09-21-class-balance-exponent.md) |
 | Reviewing the first run on combined labels and the scanner split: per-label AUC, the tie with learned strength on shared studies, attention-temperature sweep | [2026-09-21 combined-labels first run](2026-09-21-combined-labels-first-run.md) |
