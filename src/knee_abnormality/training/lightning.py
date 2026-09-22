@@ -52,7 +52,9 @@ def build_optimizer(model: KneeAbnormalityModel, settings: OptimizerConfig) -> A
     )
 
 
-def fixed_class_balance(training: pl.DataFrame, targets: tuple[str, ...]) -> dict:
+def fixed_class_balance(
+    training: pl.DataFrame, targets: tuple[str, ...], exponent: float
+) -> dict:
     rows = []
     for target in targets:
         observed = training.filter(pl.col(f"observed_{target}"))
@@ -63,6 +65,9 @@ def fixed_class_balance(training: pl.DataFrame, targets: tuple[str, ...]) -> dic
                 f"Fixed class-balanced BCE requires both target groups for {target}"
             )
         fraction = positive / observed.height
+        rho = ((1 - fraction) / fraction) ** exponent
+        negative_weight = 1 / (fraction * rho + 1 - fraction)
+        positive_weight = rho * negative_weight
         rows.append(
             {
                 "target": target,
@@ -70,11 +75,11 @@ def fixed_class_balance(training: pl.DataFrame, targets: tuple[str, ...]) -> dic
                 "positive": positive,
                 "negative": negative,
                 "positive_fraction": fraction,
-                "positive_weight": 1 / (2 * fraction),
-                "negative_weight": 1 / (2 * (1 - fraction)),
+                "positive_weight": positive_weight,
+                "negative_weight": negative_weight,
             }
         )
-    return {"version": 1, "targets": rows}
+    return {"version": 1, "exponent": exponent, "targets": rows}
 
 
 def class_balance_weight_tensor(class_balance: dict) -> torch.Tensor:
@@ -93,6 +98,8 @@ def validated_class_balance_weights(
     if config.trainer.class_balanced_bce != (class_balance is not None):
         raise ValueError("Class-balanced BCE settings and statistics disagree")
     if class_balance is None:
+        if config.trainer.class_balance_exponent != 1.0:
+            raise ValueError("class_balance_exponent requires class-balanced BCE")
         return None
     if class_balance.get("version") != 1 or [
         row.get("target") for row in class_balance.get("targets", [])
@@ -509,7 +516,8 @@ class KneeModule(L.LightningModule):
 
         def schedule(step: int) -> float:
             if warmup_steps and step < warmup_steps:
-                return 0.1 + 0.9 * step / warmup_steps
+                start = settings.warmup_start_ratio
+                return start + (1 - start) * step / warmup_steps
             progress = (step - warmup_steps) / max(1, total_steps - warmup_steps)
             cosine = 0.5 * (1 + math.cos(math.pi * min(1.0, progress)))
             return settings.minimum_lr_ratio + (1 - settings.minimum_lr_ratio) * cosine

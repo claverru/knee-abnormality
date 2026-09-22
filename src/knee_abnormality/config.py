@@ -217,6 +217,7 @@ class OptimizerConfig(ConfigModel):
     beta2: Annotated[float, Field(gt=0, lt=1)]
     epsilon: Annotated[float, Field(gt=0)]
     warmup_epochs: Annotated[StrictInt, Field(ge=0)]
+    warmup_start_ratio: Annotated[float, Field(gt=0, le=1)]
     minimum_lr_ratio: Annotated[float, Field(gt=0, le=1)]
     weight_averaging: WeightAveragingConfig | None
 
@@ -233,6 +234,7 @@ class TrainerConfig(ConfigModel):
     min_delta: Annotated[float, Field(ge=0)]
     deterministic: bool
     class_balanced_bce: bool = False
+    class_balance_exponent: Annotated[float, Field(gt=0, le=1)] = 1.0
 
 
 class ValidationConfig(ConfigModel):

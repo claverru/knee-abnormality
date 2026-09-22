@@ -1,5 +1,26 @@
 # Implementation status
 
+Shared evaluation and sampling campaign, 2026-09-21 (user decision): the metric,
+split, labels, validation multiplier, bootstrap and adoption rule are one
+definition shared by every campaign, `EVALUATION` and `ACCEPTANCE_RULE` in
+`gates.py`, documented in the [protocol](protocol.md#shared-evaluation-and-adoption).
+Gates now require fold 0 of `all_5fold_scanner_v1` with `combined_v1` labels at
+validation x1; agent prompts and diagnostics derive the rule text from the same
+constants, and role briefs and records link to the protocol instead of restating it.
+Triplet-sampling, losses and medial-lateral-transfer remain stopped historical
+records; their seals use `all_5fold_v3` and Steven v4 labels, so they cannot resume.
+Campaign definitions gained `reference_equivalences` for recipe keys added after the
+control that reproduce its behavior. The new [sampling campaign](campaigns/sampling/INDEX.md)
+was first started against `fold0-combined-scanner`, sealed, and stopped by the user
+before any training when the champion recipe became `class_balance_exponent: 0.5`;
+that start is kept under `outputs/autoresearch/discarded/`. The campaign now passes
+`validate` against `outputs/training/k_05` (0.899042, ceiling 1,847 s, no
+equivalences) and is not sealed or started; its seven initial ideas are in
+`seed-ideas.yaml` and `seed-ideas-2.yaml`, and startup now imports every
+`seed-ideas*.yaml` file. Study visit frequency
+stays fixed at once per epoch, so the existing triplet accounting applies unchanged.
+Just recipes default to `sampling`. No training, GPU work or campaign start was performed.
+
 Runtime hardening, 2026-09-21: Failed application of a finished training,
 comparison, calibration or configuration result now rolls the state back to
 before that job was marked processed and records `application_error` on the

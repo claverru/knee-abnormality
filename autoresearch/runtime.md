@@ -10,11 +10,11 @@ rtk proxy uv run --locked just autoresearch-start codex
 rtk proxy uv run --locked just autoresearch-start claude
 ```
 
-These default to `triplet-sampling`. Select another configured campaign explicitly:
+These default to `sampling`. Select another configured campaign explicitly:
 
 ```bash
-rtk proxy uv run --locked python -m scripts.tools.autoresearch validate losses
-rtk proxy uv run --locked just autoresearch-start claude losses
+rtk proxy uv run --locked python -m scripts.tools.autoresearch validate sampling
+rtk proxy uv run --locked just autoresearch-start claude sampling
 ```
 
 The validation command checks configuration and saved control artifacts without
@@ -40,7 +40,7 @@ implementation lives in
 The CLI also accepts an explicit campaign and GPU:
 
 ```bash
-rtk proxy uv run --locked python -m scripts.tools.autoresearch start triplet-sampling --provider codex --gpu 0
+rtk proxy uv run --locked python -m scripts.tools.autoresearch start sampling --provider codex --gpu 0
 ```
 
 ## Inspect, stop, and resume
@@ -54,7 +54,7 @@ rtk proxy uv run --locked just autoresearch-resume
 
 Append the campaign ID to each command for another line, for example
 `rtk proxy uv run --locked just autoresearch-status losses`. Commands act on one
-campaign; starting or stopping losses does not start or stop sampling. Campaigns
+campaign; stopping one campaign does not stop another. Campaigns
 share the GPU lease, so they cannot train simultaneously on the same device.
 
 Status reads persisted state and process identity without calling a model. Stop
@@ -63,7 +63,7 @@ its CPU comparison finish. A comparison cancelled before it started runs again
 after resume; its decision is completed after resume. To terminate training too:
 
 ```bash
-rtk proxy uv run --locked python -m scripts.tools.autoresearch stop triplet-sampling --abort
+rtk proxy uv run --locked python -m scripts.tools.autoresearch stop sampling --abort
 ```
 
 Status shows a compact summary of calibration passes, active jobs and elapsed time,
@@ -245,10 +245,9 @@ is overridden before review; old approvals require renewed review. Reconciliatio
 uses the replacement incumbent's seed. Genuine checkpoint resumes keep their original
 seed, and already launched historical attempts retain their original evaluation
 policy. The bootstrap resampling seed is separate and fixed. The evaluator uses the saved paired report-group bootstrap;
-the orchestrator records the resulting adoption decision and interpretation. Valid
-macro gains >= 0.001 replace the incumbent only if the central 80% paired-bootstrap
-lower bound is strictly positive; otherwise discard the candidate. The existing
-95% and per-label intervals remain diagnostic. The runtime derives the macro 80%
+the orchestrator records the resulting adoption decision and interpretation under
+the [shared evaluation and adoption rule](protocol.md#shared-evaluation-and-adoption).
+The existing 95% and per-label intervals remain diagnostic. The runtime derives the macro 80%
 interval from the same resamples used for per-label diagnostics, verifies their
 macro 95% summary against the frozen evaluator, and stores both in `per_label.json`.
 Status/results show the 80% adoption interval alongside the 95% reporting interval. See the

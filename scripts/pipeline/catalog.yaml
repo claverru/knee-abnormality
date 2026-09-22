@@ -19,7 +19,7 @@ scripts:
       - Supports ReXNet-200 and CoAtNet RMLP-2 RW 224 spatial adapters; see the CoAtNet modeling notes for pooling anchors, checkpoint normalization and image-size constraints.
       - --limit-train is for small development executions and does not change complete validation.
       - The current all-study split validates the entire held-out fold and monitors macro AUC against frozen targets thresholded at 0.5, with separate gold diagnostics; training BCE keeps soft targets.
-      - When trainer.class_balanced_bce is enabled, writes fold_<N>/class_balance.json with observed, positive and negative counts and fixed whole-cell BCE weights derived from the actual selected training subset.
+      - When trainer.class_balanced_bce is enabled, writes fold_<N>/class_balance.json with observed, positive and negative counts and fixed whole-cell BCE weights derived from the actual selected training subset, damped by trainer.class_balance_exponent (default 1.0) and recorded as the table's exponent.
       - Defaults CUDA allocation to expandable segments unless PYTORCH_ALLOC_CONF or PYTORCH_CUDA_ALLOC_CONF is supplied; records the setting in provenance.
       - Saves the best checkpoint separately from last.ckpt, which is refreshed every epoch independently of validation improvement.
       - Honors model.pretrained for fresh runs; resume requires matching training settings and recorded input identities. Historical checkpoints require their archived implementation.

@@ -39,7 +39,30 @@ without changing it. This user-directed boundary replaces the general docs/ongoi
 and general-backlog writing workflow for campaign work. Scoped experiment-code
 changes and generated runtime artifacts are separate from this documentation boundary.
 
-## Adoption policy
+## Shared evaluation and adoption
+
+Every campaign uses one evaluation and one adoption rule. They are defined once in
+code, `EVALUATION` and `ACCEPTANCE_RULE` in
+[`gates.py`](../src/knee_abnormality/autoresearch/gates.py), and described only here.
+Campaign contracts link to this section instead of restating it and cannot override
+it. Changing either is a user decision that applies to all campaigns at once.
+
+- **Metric:** macro AUC over the twelve labels on fold 0 of `all_5fold_scanner_v1`,
+  with the `combined_v1` labels, from deterministic, unaugmented validation at
+  image multiplier 1.
+- **Uncertainty:** paired report-group bootstrap on saved fold-0 predictions,
+  2,000 draws with resampling seed 20260914, identical draws for candidate and
+  reference.
+- **Enforcement:** configuration gates reject any recipe whose split, folds, label
+  source or validation multiplier differs; the seal takes the bootstrap settings
+  from the same definition.
+
+Campaigns sealed under an earlier evaluation cannot resume. Triplet-sampling,
+losses and medial-lateral-transfer were sealed on `all_5fold_v3` with Steven v4
+labels; they remain historical records, and continuing one of their topics needs
+a new campaign sealed on the shared evaluation.
+
+### Adoption policy
 
 For each valid new experiment, adopt the implementation when its unrounded macro
 AUC exceeds the pinned incumbent's by at least 0.001 **and** the central 80% paired

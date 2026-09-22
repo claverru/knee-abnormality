@@ -80,10 +80,17 @@ class Campaign(BaseModel):
     status: str
     recipe: str
     reference_run: str
+    reference_equivalences: dict[str, bool | int | float | str]
     additional_evidence_runs: list[str]
     backlog: BacklogPolicy
     artifacts_root: str
     policy: CampaignPolicy
+
+    @field_validator("reference_equivalences")
+    @classmethod
+    def equivalence_paths(cls, values):
+        CampaignPolicy.field_paths(list(values))
+        return values
 
 
 def load_campaign(path: Path) -> Campaign:

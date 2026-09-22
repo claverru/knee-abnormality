@@ -47,9 +47,16 @@ the hypothesis and alternative weighting/sampling methods.
 
 For each label, compute its positive fraction `r_c` once from observed targets in the actual
 training subset, after official-label overrides and any training-study limit. Count `y >= 0.5`
-as positive and `y < 0.5` as negative; require both groups. Set
-`w_pos_c = 1 / (2 * r_c)` and `w_neg_c = 1 / (2 * (1 - r_c))`.
-Only training rows enter these counts, and the weights remain fixed throughout the run.
+as positive and `y < 0.5` as negative; require both groups. A damping exponent
+`trainer.class_balance_exponent` (default `1.0`, range `(0, 1]`) controls weighting strength:
+`rho_c = ((1 - r_c) / r_c) ** k`, `w_neg_c = 1 / (r_c * rho_c + 1 - r_c)`, `w_pos_c = rho_c * w_neg_c`.
+`k = 1.0` reproduces the previous fixed weights (`w_pos_c = 1 / (2 * r_c)`,
+`w_neg_c = 1 / (2 * (1 - r_c))`); smaller `k` damps the pos:neg ratio toward 1:1 (e.g. `k = 0.5`
+gives ratio `sqrt((1 - r_c) / r_c)`). Only training rows enter these counts, and the weights
+remain fixed throughout the run. For any exponent, each label's mean weight over the training
+subset is one. **Measured 2026-09-21:** on the public leaderboard, k=0.5 scored 0.945, unweighted
+0.943 and k=1 0.940. Fold-0 validation ranked them in the opposite order
+([result](../validation/results/2026-09-21-class-balance-exponent.md)).
 
 Multiply the entire unreduced BCE cell by its group's weight and retain the mean over observed
 cells. Targets remain soft and every observed cell remains active. There is no per-batch weight
@@ -59,12 +66,14 @@ This differs from `pos_weight`, which scales only the positive term inside BCE, 
 positive component of soft negative targets such as 0.25.
 
 Enabled runs save `fold_<N>/class_balance.json` alongside their effective run configuration.
-Its version-1 table records each target's observed, positive and negative counts, positive
-fraction and the two fixed weights, in model target order. Checkpoints retain the same table in
-`hyper_parameters.class_balance`; resume checks it and the selected training-input identity
-before writing the new weighting artifact. Checkpoints without that metadata require their
-archived training implementation for resume. Device weights are nonpersistent buffers, so they
-add no inference model-state entries.
+Its version-1 table also records a top-level `exponent`, alongside each target's observed,
+positive and negative counts, positive fraction and the two fixed weights, in model target order.
+Checkpoints retain the same table in `hyper_parameters.class_balance`; resume compares the full
+table against the current configuration and the selected training-input identity before writing
+the new weighting artifact, so checkpoints saved before the exponent existed cannot resume.
+Checkpoints without that metadata require their archived training implementation for resume.
+Device weights are nonpersistent buffers, so they add no inference
+model-state entries.
 
 The option changes training loss only. Study exposure, validation BCE/AUC and inference scoring
 retain their existing behavior. Weighting can amplify rare-label errors; the first run improved

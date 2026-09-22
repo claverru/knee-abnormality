@@ -27,7 +27,7 @@ from knee_abnormality.autoresearch.storage import (
     read_json,
     write_json,
 )
-from knee_abnormality.autoresearch.supervisor import Supervisor
+from knee_abnormality.autoresearch.supervisor import Supervisor, seed_files
 from knee_abnormality.autoresearch.usage import campaign_usage
 from knee_abnormality.cli import CLISettings
 from knee_abnormality.config import load_config
@@ -52,7 +52,7 @@ class AutoresearchCLI(CLISettings):
         ]
     ]
     campaign: CliPositionalArg[str] = Field(
-        default="triplet-sampling", pattern=r"^[a-z][a-z0-9-]*$"
+        default="sampling", pattern=r"^[a-z][a-z0-9-]*$"
     )
     provider: Literal["codex", "claude"] | None = None
     gpu: str = "0"
@@ -307,7 +307,9 @@ def validate_campaign(supervisor: Supervisor):
     recipe = load_config(supervisor.root / supervisor.campaign["recipe"], folds=[0])
     config = recipe.model_dump(mode="json")
     reference = supervisor.root / supervisor.campaign["reference_run"]
-    limits = initial_limits(reference, config)
+    limits = initial_limits(
+        reference, config, supervisor.campaign["reference_equivalences"]
+    )
     validate_config(config, config, supervisor.policy)
     for name in supervisor.policy.editable_files:
         if not (supervisor.root / name).is_file():
@@ -315,12 +317,13 @@ def validate_campaign(supervisor: Supervisor):
     contract = supervisor.docs / "contract.md"
     if not contract.read_text().strip():
         raise ValueError("Campaign contract is empty")
-    seeds = supervisor.docs / "seed-ideas.yaml"
-    ideas = (
-        ResearchReport.model_validate(yaml.safe_load(seeds.read_text())).ideas
-        if seeds.exists()
-        else []
-    )
+    ideas = [
+        idea
+        for path in seed_files(supervisor.docs)
+        for idea in ResearchReport.model_validate(
+            yaml.safe_load(path.read_text())
+        ).ideas
+    ]
     if len({idea.id for idea in ideas}) != len(ideas):
         raise ValueError("Seed idea IDs must be unique")
     print(

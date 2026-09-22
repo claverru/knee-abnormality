@@ -10,7 +10,8 @@
 | Continuing the runner implementation or checking remaining work | [Implementation status](status.md) |
 | Reviewing the discarded appearance-only pooling experiment | [Untied position path](untied-position.md) |
 | Understanding adopted learned anatomical strength and the closed experiment results | [Anatomical attention](anatomical-attention.md) |
-| Following scheduling, incumbent-matched seeds, ownership, acceptance, and memory rules | [Protocol](protocol.md) |
+| Checking the shared evaluation and adoption rule | [Shared evaluation](protocol.md#shared-evaluation-and-adoption) |
+| Following scheduling, incumbent-matched seeds, ownership, and memory rules | [Protocol](protocol.md) |
 | Selecting the agreed provider, model, and effort for each role | [Agent assignments](agents.yaml) |
 | Invoking a role with a bounded assignment | [Agent briefs](roles/INDEX.md) |
 | Recording an idea, experiment, or completion report | [Records](records.md) |

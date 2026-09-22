@@ -56,9 +56,9 @@ checks, and the decision with its rationale. Record the reference predictions an
 their hash as well as the candidate's. Never overwrite an earlier attempt.
 
 Execution states are `prepared`, `running`, `completed`, `failed`, and `cancelled`.
-New evaluation decisions are `provisional_accept` (valid macro gain >= 0.001 and
-central 80% macro interval lower bound > 0), `reject` (either adoption condition
-fails), and `invalid`. `adoption_bootstrap` in evaluation
+New evaluation decisions are `provisional_accept` (the
+[shared adoption rule](protocol.md#shared-evaluation-and-adoption) holds), `reject`
+(either adoption condition fails), and `invalid`. `adoption_bootstrap` in evaluation
 evidence records that interval; the original 95% summary remains in `bootstrap`. Historical `inconclusive` records
 remain unchanged. Evaluation evidence and launch review bindings record the adoption
 rule explicitly. Keep execution status separate from the adoption decision. Incomplete evidence,

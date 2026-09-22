@@ -8,10 +8,23 @@ context glimpses did not fit its fixed input size.
 
 The supported alternative is `coatnet_rmlp_2_rw_224.sw_in12k_ft_in1k` with
 224-pixel inputs and per-channel mean/std `[0.5, 0.5, 0.5]`, matching its
-pretrained normalization. [`configs/coatnet.yaml`](../../configs/coatnet.yaml) is the ReXNet
+pretrained normalization. [`configs/coatnet.yaml`](../../configs/coatnet.yaml) follows the ReXNet
 [training config](../../configs/training.yaml) with `model.backbone`, `data.mean` and `data.std`
 changed, and `trainer.batch_size: 2` with `accumulate_grad_batches: 4` to keep the effective batch
-of eight. The batch split rests on an estimate, not a measurement: per image, CoAtNet's leaf-module
+of eight. Since 2026-09-21 its optimizer uses transformer fine-tuning values:
+
+| Setting | Value | ReXNet value |
+|---|---|---|
+| `backbone_lr` | 7e-5 | 2e-4 |
+| `head_lr` | 6e-4 | 6e-4 |
+| `weight_decay` (norms and biases excluded) | 0.05 | 0.01 |
+| `warmup_epochs` | 2 | 1 |
+| `warmup_start_ratio` | 0.1 | 0.1 |
+| `minimum_lr_ratio` | 0.001 | 0.01 |
+
+These values follow common practice for fine-tuning attention models; none is measured on this
+data. Per-layer LR decay and stochastic depth would need code and are not available; the warm-up start
+is tunable through `warmup_start_ratio`. The batch split rests on an estimate, not a measurement: per image, CoAtNet's leaf-module
 outputs are about 2.9× ReXNet-200's, whose batch-8 peak is 20.02 GB. Keep the saved effective
 configuration for reproduction; a run name does not select a backbone.
 

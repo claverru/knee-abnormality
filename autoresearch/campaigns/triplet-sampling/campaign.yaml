@@ -2,6 +2,7 @@ id: triplet-sampling
 status: stopped
 recipe: configs/training.yaml
 reference_run: outputs/training/overnight-20260919T120130Z-i2oqlnls/runs/00-control
+reference_equivalences: {}
 additional_evidence_runs:
   - outputs/training/balanced-bce
   - outputs/training/overnight-20260919T235434Z-8ol_1c30/runs/00-control

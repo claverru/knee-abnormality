@@ -18,6 +18,26 @@ branches remain cleanup candidates with their findings below. The compartment ad
 has been removed; its [result](../validation/results/2026-09-20-compartment-adapter-result.md)
 is historical evidence, not pending implementation work.
 
+## AdamP for ReXNet
+
+**Accepted for the backlog on 2026-09-21; unimplemented and untested.** Compare AdamP with
+AdamW on the current ReXNet recipe. The [optimizer research](../research/optimizer-research.md#6-adamp-alternative-for-the-rexnet-branch)
+motivates projecting out norm-increasing updates on scale-invariant weights. Published gains
+are external evidence, not a measured knee-AUC improvement. AdamP uses one gradient evaluation
+per step and adds no inference work.
+
+- **Implementation:** one optimizer-choice option, retaining the backbone/head parameter groups,
+  no-decay exclusions, scheduler, clipping and checkpoint/resume behavior. The research proposes
+  `timm.optim.AdamP` with `delta=0.1` and `wd_ratio=0.1`; verify its installed implementation
+  before fixing the candidate. Do not expose an optimizer sweep or unrelated new settings.
+- **Comparison:** fresh AdamW control and AdamP candidate on the same current labels, split,
+  incumbent seed, image exposure and training budget. Keep learning rates and betas fixed for
+  the first comparison. AdamP's projected-weight decay is not numerically equivalent to AdamW's;
+  record the effective policy and treat any subsequent decay tuning as a separate comparison.
+- **Decision:** record macro/per-label AUC, paired uncertainty and training time, following the
+  current adoption rule. Implementation needs a separate user request; training remains
+  user-launched. Move the run to the overnight queue only after implementation.
+
 ## Superseded same-protocol retakes
 
 **Hypothesis (measured composition, untested as a change).** Drop the superseded series when a
@@ -65,6 +85,29 @@ attention temperature τ 0.75 is adopted at inference and carries the best submi
   override through prediction, export and the bundle; whether training should use it has never been
   tested, and a shared temperature can be absorbed into the scorer's last layer.
 
+### Attention-token dropout
+
+**Accepted for the backlog on 2026-09-21; unimplemented and untested.** Stochastically mask a
+small subset of dominant spatial tokens during training, separately for each study and disease.
+[ACMIL](https://arxiv.org/abs/2311.07125) supports this mechanism in histopathology MIL, not a
+measured knee-MRI gain. Concentrated attention is not inherently wrong; this is an incremental
+regularization experiment, not a missing architectural capability.
+
+- **Change:** after attention scoring and anatomical bias, exclude selected valid tokens from
+  that label's softmax and renormalize over the remainder. Always retain a valid token for every
+  study–label pair. Disable the masking at evaluation; keep the backbone pass, image budget,
+  anatomical bias and existing series dropout unchanged. Series dropout removes whole
+  plane/contrast slots; this changes evidence selection within retained acquisitions.
+- **Comparison:** one token-masking mode option for off, random masking and attention-challenging
+  masking. Compare a fresh current-recipe control with random valid-token masking and masking
+  drawn from the highest-scoring tokens, matching the number removed per study and label.
+  Fix a conservative candidate-pool size, masking rate and cap before implementation; no sweep.
+- **Decision:** follow the controlled-comparison rules with identical labels, split, incumbent
+  seed and training budget. Record macro/per-label AUC, paired uncertainty, masking counts and
+  runtime. Inspect focal findings explicitly: retaining a valid token does not guarantee that
+  lesion evidence remains. Require evidence of benefit beyond random masking before preferring
+  attention-challenging masking. Implementation requires a separate user request.
+
 ### Per-label attention temperatures
 
 **Untried; first inexpensive investigation from the 2026-09-20 agenda review.** Global τ 0.75
@@ -102,6 +145,28 @@ apart from summation order; missing types contribute zero. Keep image and token 
   diagnostic: [acquisition availability tracks prevalence](../validation/results/2026-09-17-plane-contrast-importance.md#availability-and-prevalence-shift).
   Count normalization, gated attention and residual readouts above are different, measured changes;
   do not add separate within-type normalization or a nonlinear stack to this comparison.
+
+### Plane/contrast-specific feature adapters
+
+**Accepted for the backlog on 2026-09-21; unimplemented and untested.** The
+[pretraining research](../research/pretraining-and-external-data.md#adapting-2d-foundation-models-to-volumes)
+describes AnyMC3D's view-specific LoRA adapters. A small residual feature adapter on our current
+trainable ReXNet is a project adaptation of that idea, not a reproduction or a measured knee gain.
+
+- **Change:** after the shared 256-dimensional projection, apply a small residual bottleneck
+  selected by the token's plane/contrast type, before adding embeddings and computing attention.
+  Use the adapted features for both scoring and pooling, and initialize the residual output at
+  zero. Keep one backbone pass, the existing type metadata, image/token budgets and disease heads.
+  These adapters can change which evidence is selected; the
+  [type-specific readouts](#planecontrast-specific-readouts) operate after pooling.
+- **Comparison:** one adapter-mode option for the current model, a shared-adapter control and
+  type-specific adapters. Match the shared control's total adapter parameter budget to separate
+  specialization from extra capacity, and record actual runtime because equal parameter counts
+  do not imply equal computation. Fix bottleneck sizes before the comparison; no width sweep.
+- **Decision:** hold labels, split, incumbent seed, optimizer and training budget fixed. Report
+  macro/per-label AUC, paired uncertainty, missing-type and vendor strata, time and memory.
+  Confirm that type specialization improves on the shared adapter as well as the current model.
+  Implementation and user-launched training remain pending.
 
 ## Report-label supervision
 
@@ -190,6 +255,29 @@ strength values of the existing families.
 Validation inputs stay unaugmented; inference augmentation belongs to the
 [endgame](endgame.md#test-time-augmentation).
 
+### Feature-space augmentation (DSU)
+
+**Accepted for the backlog on 2026-09-21; unimplemented and untested.** Add conservative
+feature-statistics augmentation alongside the existing image augmentations.
+[DSU](https://arxiv.org/abs/2202.03958) perturbs feature-channel means and standard deviations
+to model domain variation. Its vision results are external motivation, not a measured knee gain
+or evidence that scanner shift is currently our bottleneck.
+
+- **Change:** one training-only option at one early or intermediate ReXNet feature map, before
+  spatial MIL. Perturb per-channel spatial statistics rather than adding another pixel transform
+  or masking tokens. Draw the perturbation coherently across triplets from the same acquisition;
+  keep statistics plane/contrast-aware instead of mixing unlike MRI contrasts. Use training-only
+  statistics and define stable behavior for small acquisition groups. Fix the insertion point,
+  application probability and modest strength before the first comparison; no layer/strength sweep.
+- **Control:** disable feature augmentation entirely at evaluation. Preserve image augmentation,
+  series dropout, image/token budgets, labels, split, incumbent seed and training schedule.
+  Compare against a fresh current-recipe control without combining other pending experiments.
+- **Decision:** follow the controlled-comparison rules and record macro/per-label AUC, paired
+  uncertainty, runtime and scanner/vendor/contrast diagnostics with subgroup counts. MRI feature
+  statistics also contain diagnostic signal: do not assume all variation is nuisance or claim
+  scanner robustness from aggregate AUC alone. Implementation needs a separate user request;
+  move its run to the overnight queue only after implementation.
+
 ## Contrast slot relabel
 
 **Hypothesis (prevalence and inference-only effect measured; training effect untested).** Move
@@ -203,29 +291,6 @@ rule](../metadata/series-filtering-census.md#proposed-rule-series-filtering-and-
 it needs one extra header per series and three decoded slices at Kaggle inference, and it changes
 the preprocessing identity. Plane relabelling (one swapped study) stays out: it cost −0.21 ×1000
 on all three control checkpoints.
-
-## Per-plane spacing
-
-Every plane shares `data.spacing_mm` and `data.image_size`, but the in-plane axes differ
-(measured): sagittal spans patella to posterior capsule and needs the most millimetres (140 mm
-clips posterior tissue in 34% of sagittal series, 150 mm in 8%), while axial cross-sections are
-the smallest and spend pixels on background at the same scale. The gain is a hypothesis.
-
-1. **Measure first, from metadata only:** native in-plane pixel spacing per plane, to see where
-   0.625 mm or 0.5 mm already interpolates, and acquired field of view and body extent per plane,
-   to see how much of the 140 mm input is background. The
-   [input resolution research](../research/input-resolution.md) owns the existing evidence.
-2. **Then, if the measurement supports it, vary spacing only,** as a per-entry
-   `data.series_types` field, keeping `data.image_size` fixed so every tensor shape and batching
-   are unchanged. Keep the ratio between planes within about 25%.
-
-- **Per-plane pixel sizes are not worth it:** differing input shapes cannot share one batched
-  tensor, so the model would need per-plane batches or padding, with new stride and geometry
-  checks, for a second-order gain.
-- **Tradeoff:** a shared target spacing is what makes a structure the same pixel size across
-  scanners and studies. Per-plane spacing keeps that within a plane but asks the backbone to
-  represent features at two or three fixed scales; positions stay in millimetres, so only the
-  convolutional features change meaning. Affine augmentation already jitters scale by ±5%.
 
 ## RadImageNet-pretrained backbone
 
@@ -263,22 +328,17 @@ Feedback-driven allocation is classified separately in
 
 ### Weighting strength: exponent and prevalence definition
 
-**Exact comparisons untested; damping is secondary priority.** The implemented weights set
-`w_pos/w_neg = (1 - r_c) / r_c` on the thresholded positive fraction. No exponent comparison
-has been run: full balancing reaches 12.9:1 on Fracture and 6.8:1 on Synovitis, whose
-report-derived targets are among the least reliable. An
-external recipe seen on 2026-09-19 uses the square root of that ratio, computed on soft
-prevalence, as a `pos_weight`; these two entries isolate the two knobs separately, keeping our
-cell weighting and mean-weight-one normalisation. One change per run against a fresh control.
+**Damping exponent implemented, 2026-09-21; soft-prevalence comparison untested.** The
+implemented weights set `w_pos/w_neg = (1 - r_c) / r_c` at the default
+`trainer.class_balance_exponent = 1`, on the thresholded positive fraction; see
+[supervision](../modeling/supervision.md#fixed-class-balanced-bce) for the exact formula. Full
+balancing reaches 12.9:1 on Fracture and 6.8:1 on Synovitis, whose report-derived targets are
+among the least reliable. The [k=0.5 and unweighted runs](../validation/results/2026-09-21-class-balance-exponent.md)
+lost on fold-0 validation but beat k=1 on the public leaderboard. An external
+recipe seen on 2026-09-19 uses the square root of that ratio, computed on soft prevalence, as a
+`pos_weight`; the entry below isolates that remaining knob separately, keeping our cell weighting
+and mean-weight-one normalisation. One change per run against a fresh control.
 
-- **Damping exponent** (one new option, default reproduces today's run). Set
-  `rho_c = ((1 - r_c) / r_c) ** k`, then `w_neg_c = 1 / (r_c * rho_c + 1 - r_c)` and
-  `w_pos_c = rho_c * w_neg_c`, which keeps each label's mean weight at one for any `k`. `k = 1`
-  algebraically returns the current `1 / (2 * r_c)` and `1 / (2 * (1 - r_c))`;
-  `k = 0.5` is the arm to run, taking the square root of the emphasis ratio (Fracture
-  12.9:1 to 3.6:1, Synovitis 6.8:1 to 2.6:1) while barely moving PF OA or Effusion. `k = 0` is
-  unweighted BCE, already measured as the losing side of the
-  [balanced-BCE result](../validation/results/2026-09-19-balanced-bce-result.md).
 - **Soft instead of thresholded prevalence** (one new option, off by default). Compute `p_c` as
   the mean of the observed soft targets rather than the `y >= 0.5` fraction, leaving the weight
   formula untouched. This is not a small refinement: the report-derived values sit at 0.25 and
@@ -286,15 +346,19 @@ cell weighting and mean-weight-one normalisation. One change per run against a f
   (Synovitis 0.341 against 0.126, Fracture 0.187 against 0.073, Baker's 0.358 against 0.249,
   Lateral Meniscus 0.228 against 0.158), and it damps their weights accordingly. It confounds
   with the exponent, so run it only against the same control, never in the same arm.
+- **Ramped exponent** (one new option; hypothesis; judge it on the public leaderboard, not fold-0 validation). Increase
+  `class_balance_exponent` linearly from 0 to its configured value over the training steps, so
+  early epochs train near-uniform and late epochs fully balanced. Precedent: progressively-balanced
+  sampling was best in Kang et al. ICLR 2020 (ImageNet-LT 47.2 vs 45.1 class-balanced, 46.8
+  square-root), and deferred re-weighting (LDAM-DRW, BBN) beat always-on weighting; all were long
+  from-scratch runs, unlike our 10-epoch pretrained fine-tune.
 
-The [loss campaign queue](../../autoresearch/campaigns/losses/backlog.yaml) already owns damping
-as `shared-tempered-balance`; this entry records the design, not a second execution queue.
 Later [soft-mass weighting](../../autoresearch/campaigns/losses/findings.md#completion-20260920t161203z-14ae6e65)
 and [prior-offset](../../autoresearch/campaigns/losses/findings.md#completion-20260920t181036z-45163c52)
 runs lost about 0.0092 and 0.0119 macro AUC.
-They changed other loss semantics, so neither settles this exponent or the whole-cell
-soft-prevalence alternative. They lower priority: retain one isolated damping comparison, with
-original soft targets, fixed training-fold counts and observed-cell reduction, rather than a sweep.
+They changed other loss semantics, so neither settles the soft-prevalence alternative. It remains
+lower priority: retain one isolated comparison, with original soft targets, fixed training-fold
+counts and observed-cell reduction, rather than a sweep.
 
 Per-label figures above come from `outputs/training/balanced-bce/fold_0/class_balance.json` for
 the thresholded fractions, and from the Steven v4 blend restricted to the fold-0 training rows of

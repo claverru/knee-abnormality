@@ -1,0 +1,274 @@
+ideas:
+  - id: physical-span-standardized-triplets
+    mechanism_id: through-plane-triplet-composition
+    parent_idea_id: null
+    title: Standardize each triplet's through-plane span instead of its slice stride
+    opportunity: >-
+      A triplet is always three consecutive slices, so its physical through-plane
+      extent follows each series' spacing. On the old fold-0 cache the median
+      candidate gap was 3.32 mm (p1 0.03, p5 0.61, p95 5.07), so spans ranged from
+      about 0.06 to 18 mm; 6.0% of pools had median spacing below 1 mm and fed the
+      backbone three near-identical channels. In-plane geometry is standardized
+      (0.625 mm, 224 px); through-plane geometry is not.
+    mechanism: >-
+      Choose the channel offsets so each triplet spans a fixed physical thickness:
+      stride k = round(target_half_span / spacing), clamped to k >= 1 and to what the
+      run allows, with the middle slice unchanged. Anchor the target span to the
+      cohort's current median realized span (7.11 mm on the old cache; re-measure on
+      the sealed cohort) so it is a standardization, not a tunable. Most pools keep
+      k = 1; dense acquisitions gain real through-plane context at the same channel
+      count.
+    precedents:
+      - autoresearch/campaigns/triplet-sampling/ideas.yaml (physical-span-standardized-triplets, queued, never trained)
+      - docs/research/input-resolution.md#acquisition-all-24371-train-series
+      - docs/data-preparation/physical-sampling/implemented-sampler.md
+    novelty: >-
+      Re-queued by explicit user instruction on 2026-09-21 from the stopped
+      triplet-sampling campaign, where it was queued but never implemented or
+      trained. The only earlier sampling idea that changes pixel content rather
+      than which depths are drawn.
+    coverage: >-
+      Candidate windows per run fall from L-2 to L-2k, so reduce k until
+      min(budget, groups_k) equals min(budget, groups_1); k = 1 always satisfies it.
+      Peripheral reach is unaffected because the middle slice sets the depth.
+    exploitation: >-
+      Depth targets, widths, budgets and supplier rules are untouched; only channel
+      content at each selected location becomes comparable across acquisitions.
+    budget: >-
+      Still three decoded slices per triplet and the same triplet count. Selected
+      triplets share almost no slices, so unique decodes barely move; confirm in the
+      CPU replay against the sealed ceiling.
+    implementation: >-
+      Adds behavior. Candidate construction and support definition in
+      data/preprocessing/sampling.py build_pool; prepare_series in preparation.py
+      must accept the nonconsecutive stride. Preserve three distinct slices,
+      distinct middles and original acquisition indices. Record the changed
+      deterministic validation identity. Any new setting goes under data.sampling.
+    open_choices: >-
+      Cohort-wide or per-plane median span; clamping on short runs; handling of
+      degenerate positions (inspect the p1 0.03 mm cases before treating them as
+      dense acquisitions). Fixed, not jittered, stride for this idea.
+    dependencies: []
+    priority_rationale: >-
+      Never tested, measured premise, zero added compute, and it changes what the
+      backbone sees in every dense series.
+  - id: anatomy-anchored-crop-placement
+    mechanism_id: anatomical-in-plane-crop-anchor
+    parent_idea_id: null
+    title: Place the fixed 140 mm window from anatomy instead of the image centre
+    opportunity: >-
+      Every slice is cut to 224 px at 0.625 mm around the image centre, i.e. wherever
+      the technologist centred the field of view. On a 300-series sample the joint
+      line sits a median 12.8 mm (sagittal) and 17.5 mm (coronal) below the image
+      centre, beyond 24-26 mm in 10% of series, so the window covers about 85 mm
+      above the joint and 55 mm below; the coronal window reaches a median 53 mm
+      below against a 5-7 cm MCL tibial attachment. Tissue midpoints are within a
+      few mm of centre in the other direction.
+    mechanism: >-
+      Keep the window size and spacing fixed. Up-down in sagittal and coronal:
+      centre the window on a detected joint line plus one offset chosen from the
+      measured extent of the label anatomy above (suprapatellar recess, patella)
+      and below (tibial plateau, MCL attachment, fibular head). Other directions,
+      all planes: centre on the tissue extent; when tissue is wider than 140 mm,
+      keep the patella and give up posterior subcutaneous fat. Fall back to the
+      image centre whenever the landmark is not found. Placement is deterministic
+      per series in validation and inference.
+    precedents:
+      - docs/research/input-resolution.md#field-of-view-and-joint-position (joint offsets, tissue width, placement reopened 2026-09-21)
+      - outputs/analysis/input-resolution-research-20260915/images/common.py joint_line heuristic (cross-plane agreement within 10 mm in 96-98% of studies; not validated against ground truth)
+      - outputs/analysis/input-resolution-research-20260915/images/series_metrics_overhang.parquet (tissue width and offsets per plane)
+      - docs/history/crop-selection-investigation.md (learned crop selection dropped 2026-09-16; its anatomical-glimpse option was never run)
+      - docs/validation/results/2026-09-12-140-mm-crop-result.md
+    novelty: >-
+      Added by the user on 2026-09-21. Unlike the dropped crop-selection work it
+      learns nothing and changes neither resolution nor coverage of slices: one
+      window per slice, the same size, moved to anatomy. Tissue-centring alone was
+      rejected earlier because it moves the window only a few mm; the joint-line
+      anchor is the new part.
+    coverage: >-
+      Measure, without labels and before training, the share of windows that reach
+      the required anatomy above and below the joint under image-centred and
+      anchored placement. Report sagittal posterior clipping too; the anchor must
+      not move clipping into the patella.
+    exploitation: >-
+      The joint lands at a consistent row across studies, and edge structures (MCL
+      attachment, fibular head, tibial plateau) enter the window where they are cut
+      today.
+    budget: >-
+      One landmark estimate per series on image data already decoded, plus the tissue
+      mask; the crop itself costs the same. Time it in the CPU replay; it counts
+      toward the sealed ceiling and runs at inference too through the shared
+      dataset path.
+    implementation: >-
+      Replaces image-centred placement. Port the heuristic into data/preprocessing
+      (spatial.py or preparation.py, inside the preprocessing identity) and pass a
+      per-series offset into resample_crop so output_to_native keeps patient maps
+      exact. Axial slices use the tissue anchor only. No labels, no validation
+      predictions. Spacing, window size and augmentation stay fixed.
+    open_choices: >-
+      Whether the anchor comes from a fixed reference slice per series or from the
+      decoded selected slices; the up-down offset, set from measured anatomy
+      extent, never from AUC; whether training draws placement around the anchor
+      within the heuristic's uncertainty or uses the fixed anchor.
+    dependencies: []
+    priority_rationale: >-
+      Measured geometric premise with a direct link to edge labels that crop tests
+      showed are sensitive to the window; the label-free coverage check can stop it
+      cheaply before a run.
+  - id: plane-coupled-depth-targets
+    mechanism_id: cross-slot-depth-coupling
+    parent_idea_id: null
+    title: Draw a plane's two contrast series at the same depths in training, as validation already does
+    opportunity: >-
+      The deterministic validation bag pairs a plane's two contrast slots almost
+      exactly (share of middles within 5 mm of a partner 0.93/0.95/0.94 axial,
+      coronal, sagittal on the old source) while training pairs them by accident
+      (0.60/0.57/0.58), because the two slots use independent depth streams. About
+      72% of training triplets sit in a slot whose plane partner is present.
+    mechanism: >-
+      Key the depth-target random stream on the plane alone instead of the full
+      (plane, fluid_sensitive, fat_suppression) type, so a plane's two slots aim at
+      the same percentiles. Each slot still snaps to its own geometry through its
+      own groups and assignment, so pairs are co-located only where both series have
+      a slice. Supplier and band-order streams stay per slot.
+    precedents:
+      - autoresearch/campaigns/triplet-sampling/ideas.yaml (plane-coupled-depth-targets, blocked on the withdrawn stratified-jitter parent)
+      - outputs/autoresearch/triplet-sampling/experiments/plane-coupled-depth-targets-20260919T211410Z-c36f925a (0.89461, fresh seed 3759278001, built on the withdrawn sampler; uninformative)
+      - outputs/autoresearch/triplet-sampling/experiments/cross-slot-band-interleaving-20260919T181018Z-c008c6bb (opposite direction, -0.0017 with a fresh seed, inconclusive)
+    novelty: >-
+      Re-queued by explicit user instruction on 2026-09-21, rebuilt without the
+      stratified-jitter dependency. Its only run sat on a withdrawn sampler with a
+      fresh seed, so it was never tested on its own.
+    coverage: >-
+      Each slot's own per-epoch law is unchanged; only the correlation between the
+      two slots of a plane changes. Distinct middles per slot over the run should
+      stay equal; confirm in the replay.
+    exploitation: >-
+      Training bags gain registered cross-contrast pairs at the same depth, matching
+      the scored condition.
+    budget: >-
+      Only the random-stream key changes: no extra draws, decodes or state.
+      Validation selection must reproduce the incumbent's exactly.
+    implementation: >-
+      Adds behavior. In select_triplets, seed the "targets" stream with the plane
+      alone and keep the full type for "suppliers" and "band_order"; update the
+      SAMPLING_IDENTITY targets string. Demonstrate by execution that keying on the
+      full type reproduces the incumbent.
+    open_choices: >-
+      Behaviour when a plane's two slots realize different counts (capacity-limited
+      minority): establish by execution whether the shared jitter survives. Measure
+      realized co-location against the incumbent's training and validation figures.
+    dependencies: []
+    priority_rationale: >-
+      Removes a named train/validation mismatch at zero cost; expected effect small
+      and of uncertain sign.
+  - id: model-feedback-depth-targets
+    mechanism_id: training-feedback-depth-importance
+    parent_idea_id: null
+    title: Steer next epoch's depth targets with this epoch's training attention
+    opportunity: >-
+      Every depth draw today is a fixed Gaussian around the study centre; nothing
+      the model learns about where evidence lies feeds back into which slices it is
+      shown. Attention pooling already scores every training triplet, so a
+      per-study, per-type map of where attention concentrates is available at no
+      extra forward cost.
+    mechanism: >-
+      During epoch e, record training-time attention mass per (study, type, depth).
+      Before epoch e+1, turn it into a smoothed depth density and draw targets from
+      a fixed mixture of that density and the incumbent Gaussian, so every region
+      keeps a coverage floor. Epoch 0 uses the Gaussian. Validation and inference
+      stay on the incumbent deterministic selection.
+    precedents:
+      - docs/history/crop-selection-investigation.md#what-the-runs-established (attention-based selection beat random by only 0.004 there; normalized attention entropy 0.97-0.99)
+      - docs/research/auc_loss_approaches.md#adaptive-allocation
+      - docs/backlog/big-bets.md#adaptive-training-allocation
+    novelty: >-
+      Added by the user on 2026-09-21. The triplet-sampling campaign allowed
+      training feedback but proposed only static geometric mechanisms. Differs from
+      learned crop selection: no new model, no learned placement in validation or
+      inference, only a training-time exposure prior.
+    coverage: >-
+      The Gaussian mixture weight is a floor, fixed a priori, so no depth band loses
+      support; report realized depth histograms per epoch from the replay.
+    exploitation: >-
+      Later epochs spend more draws where the model's own attention says evidence
+      sits for that study.
+    budget: >-
+      Attention is already computed; cost is bookkeeping in the training loop and a
+      small per-epoch map read by persistent workers. No precomputation outside the
+      measured process. Validation unchanged.
+    implementation: >-
+      Adds behavior. model.py may only expose per-triplet attention for training
+      batches; lightning.py collects it and publishes a per-epoch map to the
+      dataset; sampling.py mixes it into target_depths. Training batches only; no
+      labels beyond what training already uses, no validation data. Losses,
+      optimizer and checkpointing unchanged.
+    open_choices: >-
+      Which attention (family, label, or pooled) forms the map; smoothing width and
+      mixture weight, fixed from geometry rather than swept; how persistent workers
+      pick up the new map each epoch.
+    dependencies: []
+    priority_rationale: >-
+      The most novel family available; speculative, with weak prior evidence that
+      attention is a strong placement signal, so it ranks behind the cheaper
+      evidence-backed ideas.
+  - id: run-level-stratified-jitter
+    mechanism_id: cross-epoch-stratification
+    parent_idea_id: null
+    title: Stratify each band's training draw across epochs, not only within an epoch
+    opportunity: >-
+      Each epoch draws its band jitter independently, so over ten epochs some
+      candidate middles are visited repeatedly and others never. Simulated on old
+      fold-0 pools, a without-replacement schedule raised distinct middles visited
+      per run from 24.29 to 27.87 (+14.7%) at identical counts.
+    mechanism: >-
+      For each (study, type, band), draw one permutation of E sub-strata from an
+      epoch-independent stream; epoch e uses sub-stratum perm[e], jittered inside
+      it. The per-epoch marginal is unchanged; sampling across the run becomes
+      without replacement.
+    precedents:
+      - autoresearch/campaigns/triplet-sampling/prior-work.md#run-level-stratified-jitter-rejected-for-adoption
+      - outputs/autoresearch/triplet-sampling/experiments/run-level-stratified-jitter-20260919T183826Z-f211c7ce (0.897515, seed 4061686476)
+      - outputs/training/another-stratified-sampling (0.895177, seed 42)
+    novelty: >-
+      Re-queued by explicit user instruction on 2026-09-21. Its adoption was
+      withdrawn after two fresh-seed runs; both sat at or above the four-control
+      average (0.8948), and later candidates were compared against its lucky run.
+      New evidence: the campaign now compares at the incumbent's seed on the new
+      split and labels, so this is its first matched-seed test. If it fails, close
+      the draw-coupling family (common offset, rotated lattice, prefix order,
+      supplier cycling).
+    coverage: >-
+      Increases distinct anatomy seen per pool over the run at identical counts; no
+      region loses support.
+    exploitation: >-
+      Per-epoch band masses are untouched; the extra coverage comes from avoided
+      duplicate visits.
+    budget: >-
+      One permutation per (study, type, band) per run; no extra decoding or state.
+      Validation selection must reproduce the incumbent's exactly.
+    implementation: >-
+      Adds behavior in the percentile construction of select_triplets plus one
+      epoch-independent stream. The stratification depth E goes under
+      data.sampling. Reimplement from the archived source rather than restoring the
+      reverted code blindly.
+    open_choices: >-
+      E relative to the ten-epoch schedule; wrap-around past E; permutation per band
+      or shared. Re-measure the distinct-middle gain in the replay.
+    dependencies: []
+    priority_rationale: >-
+      The only earlier mechanism with two runs, both non-negative against the
+      control average; cheap, and it settles a whole family either way.
+exhausted_directions: >-
+  Not re-queued from triplet-sampling: coronal-side-relative-draw (moved mass
+  anterior, opposite to its motivation), geometry-informed-plane-widths (sampler
+  shape has no open training-side lead), cross-slot-band-interleaving (opposite of
+  plane-coupled-depth-targets), and common-offset-lattice-jitter,
+  run-level-rotated-lattice, prefix-balanced-stratum-order,
+  run-level-balanced-supplier-cycling and entitlement-balanced-supplier-draw, which
+  only reorder draws at identical per-epoch marginals and are decided by
+  run-level-stratified-jitter. Excluded by user decision: series dropout, study
+  visit frequency (rare-positive oversampling), spacing and field-of-view changes.
+  Also out: superseded retakes (0.6% of triplets), the side-conditioned sagittal
+  depth centre (waits on the mirrored importance-map export), augmentation and
+  compute trades. The second seed file holds two lower-ranked ideas.

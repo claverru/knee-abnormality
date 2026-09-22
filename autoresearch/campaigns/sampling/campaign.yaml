@@ -1,0 +1,61 @@
+id: sampling
+status: ready-to-seal
+recipe: configs/training.yaml
+reference_run: outputs/training/k_05
+reference_equivalences: {}
+additional_evidence_runs: []
+backlog:
+  refill_below: 4
+  refill_to: 5
+artifacts_root: outputs/autoresearch/sampling
+policy:
+  editable_files:
+    - configs/training.yaml
+    - src/knee_abnormality/config.py
+    - src/knee_abnormality/data/dataset.py
+    - src/knee_abnormality/data/preprocessing/preparation.py
+    - src/knee_abnormality/data/preprocessing/sampling.py
+    - src/knee_abnormality/data/preprocessing/spatial.py
+    - src/knee_abnormality/training/lightning.py
+    - src/knee_abnormality/modeling/model.py
+  editable_directories: []
+  config_keys:
+    - data.sampling_sigma_fraction
+    - data.study_triplet_total
+  config_prefixes:
+    - data.sampling
+  list_item_fields:
+    data.series_types: [max_images]
+  input_identity_keys: [preprocessing_identity]
+  require_source_change: true
+  developer_instructions: >-
+    Implement the sampling mechanism and update configs/training.yaml only if
+    needed. New settings belong under data.sampling. Return prepared or blocked.
+    Sampler logic lives in data/preprocessing/sampling.py or dataset.py so it
+    stays inside the preprocessing identity. In preparation.py and spatial.py,
+    change only triplet composition, crop placement and their validation; the
+    224-pixel size, 0.625 mm spacing, antialiased resampling, geometry checks,
+    intensity normalization and augmentation stay fixed, and output_to_native
+    must keep patient maps exact. Crop placement comes from measured anatomy,
+    never from score sweeps; landmark estimates use images
+    only, fall back to the image centre, and must work at inference. In lightning.py, change only the
+    training data loader, study order and batch composition, and the training-only
+    feedback channel to the dataset; losses, class-balance weights, optimizer,
+    schedule, validation, checkpointing and accounting stay fixed. In model.py,
+    only expose training-time signals for sampling feedback; architecture,
+    readouts, pooling and series dropout stay fixed. Feedback uses training
+    batches only. All policy setup and feedback computation execute inside the
+    measured training process; no external precomputation artifacts. Preserve
+    three distinct slices per triplet, original acquisition indices, per-epoch
+    training visits and total training triplets exactly. Validation stays
+    deterministic and independent of the training seed. Use the existing Python
+    environment for static checks. No tests.
+  researcher_instructions: >-
+    Return distinct sampling mechanisms, not hyperparameter sweeps. The scope
+    covers slice depths, triplet composition, series supply within a slot, study
+    order and batch composition, in-plane crop placement at the fixed 140 mm
+    field of view, and training-time model feedback. Keep coverage
+    and exploitation explicit and respect the fixed per-epoch visits and total
+    training triplets. Every training study is visited exactly once per epoch.
+    Visit frequency, series dropout, augmentation, losses and loss weights are
+    out of scope.

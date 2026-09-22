@@ -26,5 +26,6 @@ Workspace for the [RSNA Knee Abnormality Detection competition on Kaggle](https:
   - `docs/backlog/small-changes.md`: small code additions behind one new option. The user supervises them: implement one only when the user asks, then move its run to `overnight.md`.
   - `docs/backlog/big-bets.md`: investigation-sized plans. Start one only in a session with the user, and move it to `docs/ongoing/` when it starts.
   - `docs/backlog/endgame.md`: final-phase work; it waits for the final phase.
+  - `docs/backlog/refactors/`: tooling and code-structure changes that leave training behavior unchanged, one document per refactor.
 - The user launches training, detached from agent sessions.
 - Before deleting a finished entry, preserve its durable findings in the relevant topic documentation.

@@ -4,6 +4,7 @@ import subprocess
 import time
 from pathlib import Path
 
+from knee_abnormality.autoresearch.gates import acceptance_text
 from knee_abnormality.autoresearch.isolation import environment
 from knee_abnormality.autoresearch.storage import lock, read_json, sha256, write_json
 
@@ -11,9 +12,8 @@ INTERPRETATION = (
     "Per-label intervals are exploratory, unadjusted paired report-group bootstrap "
     "95% intervals for candidate minus reference. They do not provide simultaneous "
     "coverage across labels or account for training-seed, checkpoint-selection or "
-    "repeated validation-selection uncertainty. Adoption requires macro gain >= 0.001 "
-    "and a strictly positive central 80% macro interval; label diagnostics do not "
-    "authorize per-label losses."
+    f"repeated validation-selection uncertainty. Macro rule: {acceptance_text()}; "
+    "label diagnostics do not authorize per-label losses."
 )
 
 

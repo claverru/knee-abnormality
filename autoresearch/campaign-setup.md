@@ -3,22 +3,29 @@
 Add a directory under `autoresearch/campaigns/<id>/` with a contract, configuration,
 initial proposals and empty runtime projections. **No runner changes are needed
 for a new topic using the existing local training and evaluation protocol.**
-The [shared-loss campaign](campaigns/losses/INDEX.md) is a complete example; the
-[sampling campaign](campaigns/triplet-sampling/INDEX.md) shows different permissions
-using the same runtime.
+The [sampling campaign](campaigns/sampling/INDEX.md) is the current example; the
+historical [shared-loss campaign](campaigns/losses/INDEX.md) shows different
+permissions using the same runtime.
 
 ## Files and startup
 
-1. Write `contract.md`: objective, exclusions, fixed recipe, permitted mechanisms,
-   evidence requirements, and the existing acceptance rule. Record prior evidence,
+1. Write `contract.md`: objective, exclusions, fixed recipe, permitted mechanisms
+   and evidence requirements. Link the
+   [shared evaluation and adoption rule](protocol.md#shared-evaluation-and-adoption)
+   instead of restating it. Record prior evidence,
    general-backlog ownership and blocked directions in `prior-work.md`.
 2. Write `campaign.yaml` with a unique `id`, recipe, saved control, evidence runs,
    refill thresholds, `artifacts_root: outputs/autoresearch/<id>`, and `policy`.
    The control must match the starting effective recipe apart from name, seed,
-   and output path. It supplies the fixed epochs, optimizer steps and 115% runtime
+   output path and `reference_equivalences`. An equivalence names a recipe key the
+   control's config lacks and the exact value that reproduces the control's
+   behavior; validation rejects it if the control records the key or the recipe
+   value differs. Use `{}` when there are none. It supplies the fixed epochs, optimizer steps and 115% runtime
    ceiling; the baseline CPU replay supplies realized triplet counts.
 3. Put actionable proposals in `seed-ideas.yaml` using the
-   [research-report schema](../src/knee_abnormality/autoresearch/models.py). Keep
+   [research-report schema](../src/knee_abnormality/autoresearch/models.py). A report
+   holds at most five ideas; put more in further `seed-ideas-*.yaml` files, which
+   startup imports after `seed-ideas.yaml` as separate proposal events. Keep
    `ideas.yaml` as `revision: 0` plus `ideas: []`, and `backlog.yaml` as
    `revision: 0` plus `queue: []`. Create `findings.md` with an explicit no-results
    status. Startup submits seeds for orchestrator ranking; they are not preapproved.
@@ -27,20 +34,20 @@ using the same runtime.
 5. Validate without a provider, model call, GPU work, or training:
 
    ```bash
-   rtk proxy uv run --locked python -m scripts.tools.autoresearch validate losses
+   rtk proxy uv run --locked python -m scripts.tools.autoresearch validate sampling
    ```
 
-   Replace `losses` with the new ID. This checks the definition, policy, contract
+   Replace `sampling` with the new ID. This checks the definition, policy, contract
    presence, seed schema/IDs, editable files and control/recipe compatibility. It
    does not establish scientific correctness or execute candidate code.
 6. The user starts the campaign:
 
    ```bash
-   rtk proxy uv run --locked just autoresearch-start claude losses
+   rtk proxy uv run --locked just autoresearch-start claude sampling
    ```
 
    Either configured subscription provider works. Use the campaign ID with status,
-   stop, resume, usage and import-ideas too. Omitting it selects `triplet-sampling`.
+   stop, resume, usage and import-ideas too. Omitting it selects `sampling`.
 
 ## Declarative policy
 
@@ -83,9 +90,9 @@ ID does not require a Python dispatch branch.
 ## Shared invariants and limits
 
 Every campaign still uses the existing training and saved-prediction comparison
-scripts, fold 0 of `all_5fold_v3`, deterministic x1 validation, the sealed epoch and
-optimizer-step budget, original runtime ceiling, fixed cohort/visit/triplet
-accounting, and the same paired-bootstrap verdict. GPU leases, frozen sources,
+scripts, the [shared evaluation and adoption rule](protocol.md#shared-evaluation-and-adoption),
+the sealed epoch and optimizer-step budget, original runtime ceiling, and fixed
+cohort/visit/triplet accounting. GPU leases, frozen sources,
 review, seed handling and detached scheduling remain shared runtime behavior.
 Those invariants are not policy switches. A fundamentally different training or
 evaluation protocol requires separate harness work, not a permissive topic policy.

@@ -112,6 +112,33 @@ Record sampling/weight definitions, seeds, per-label exposure, unique/repeated s
 and per-label/macro AUC. An epoch under resampling need not be one visit to every study, and equal
 steps need not cost equal wall time. Choose any pool or frequency estimates from the training fold.
 
+### Weighting strength evidence (2026-09-21)
+
+- Local: plain BCE lost ~0.009–0.012 to full balancing; soft-mass balancing (−0.0092) and
+  biproportional weighting (−0.0044) both compressed rare-label weights but each also changed
+  another factor, so neither isolates strength. The isolated exponent runs (2026-09-21) scored 0.945 on the
+  public leaderboard at k=0.5, 0.943 unweighted and 0.940 at k=1, the opposite order to fold-0
+  validation ([result](../validation/results/2026-09-21-class-balance-exponent.md)).
+- Focal loss α sweep, γ=0 ([Table 1a](https://arxiv.org/abs/1708.02002)): best positive weight
+  ≈0.75 (≈3:1) at ~1:1000 imbalance; α=0.999 far worse.
+- Kang et al. ([Table 5](https://arxiv.org/abs/1910.09217)): sampling ∝ n^q, square root 46.8 and
+  progressive 47.2 beat class-balanced 45.1.
+- LVIS repeat-factor sampling ([paper](https://arxiv.org/abs/1908.03195)): square-root with
+  threshold best (23.2 vs 21.0 none); full class-aware sampling 18.7.
+- Seesaw ([Table 5](https://arxiv.org/abs/2008.10032)): exponent p=0.8 best (25.7) vs 1.0 (25.5).
+- Class-balanced loss ([paper](https://arxiv.org/abs/1901.05555)): on CIFAR-100-LT β 0.99–0.999
+  helped, 0.9999 (≈inverse frequency) hurt.
+- Medical multi-label: Baltruschat 2019
+  ([study](https://pmc.ncbi.nlm.nih.gov/articles/PMC6476887/)) found no significant difference from
+  weighting on ChestX-ray14; CheXFusion ([paper](https://arxiv.org/html/2308.03968)) bounded weights
+  e^(1−r)/e^r moved macro AUC −0.002; no knee MRI ablation found.
+- Theory: at the population optimum weighting cannot change within-label AUC; effects come from
+  finite training ([Byrd & Lipton](https://arxiv.org/abs/1812.03372)) and large weights add SGD
+  gradient variance ([An et al.](https://arxiv.org/abs/2009.13447)).
+
+The exponent is implemented as `trainer.class_balance_exponent`; see
+[supervision](../modeling/supervision.md#fixed-class-balanced-bce).
+
 ## Ranking (2026-09-18)
 
 Historical ranking of the loss candidates only, excluding the expanded weighting/sampling space

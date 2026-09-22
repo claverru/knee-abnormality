@@ -9,19 +9,21 @@ adopted; appearance-only pooling, learned widths and the pooled compartment adap
 are removed. There is no pending confirmation run or adapter-removal task. See
 [adoption evidence](../../autoresearch/anatomical-attention.md).
 
-**No training is queued for automatic launch.** Autoresearch remains stopped; its
-historical queues and decisions live under [autoresearch](../../autoresearch/status.md).
+**No training is queued for automatic launch.** No campaign is running; historical
+queues and decisions live under [autoresearch](../../autoresearch/status.md).
 The general [overnight queue](../backlog/overnight.md) is empty. New candidates use
-the incumbent's seed and the [gain-plus-80%-interval rule](../../autoresearch/protocol.md#adoption-policy).
-A future campaign resume is a separate user action.
+the incumbent's seed and the [shared evaluation and adoption rule](../../autoresearch/protocol.md#shared-evaluation-and-adoption).
+Starting a campaign is a separate user action.
 
 Pending:
 
 - **Combined labels scored 0.940 public (S40)** against 0.933 for the last single models on
   Steven v4 labels ([result](../validation/results/2026-09-21-combined-labels-first-run.md)). A
   Steven-v4-trained control on the same split (`labels.source: steven_v4`) would separate the
-  label change from the new training fold. Before the next queue or campaign, move the overnight launcher and
-  the autoresearch gate to `all_5fold_scanner_v1`.
+  label change from the new training fold. Before the next queue, move the overnight launcher
+  to `all_5fold_scanner_v1`; the autoresearch gate already uses it.
+- **Sampling campaign:** defined with seven seed ideas against `k_05` and ready for the user
+  to start ([campaign](../../autoresearch/campaigns/sampling/INDEX.md)).
 - **Evaluation count above ×4:** ×3 scored 0.938 and ×4 0.939 publicly, one rounding step apart,
   so where the count stops paying is unresolved, and its inference-time cost counts toward the
   efficiency prize
