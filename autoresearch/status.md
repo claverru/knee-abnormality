@@ -1,5 +1,13 @@
 # Implementation status
 
+Shared evaluation on ×4 predictions, 2026-09-22 (user decision): `EVALUATION` in `gates.py`
+now carries `validation.prediction_image_multiplier: 4`. Training still selects the checkpoint
+by ×1 epoch validation, then writes that checkpoint's fold-0 predictions at ×4 and attention
+temperature 1 with their macro AUC in `selected_checkpoint.json`; `compare_fold_runs` checks the
+saved predictions against that value. A campaign needs a reference whose predictions are at ×4:
+`scripts/tools/repredict_run.py` derives one from a completed run. Campaigns sealed on ×1
+predictions cannot resume.
+
 Shared evaluation and sampling campaign, 2026-09-21 (user decision): the metric,
 split, labels, validation multiplier, bootstrap and adoption rule are one
 definition shared by every campaign, `EVALUATION` and `ACCEPTANCE_RULE` in

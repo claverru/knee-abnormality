@@ -38,6 +38,8 @@ def saved_auc(root, run):
     fold = root / run / "fold_0"
     try:
         selected = read_json(fold / "selected_checkpoint.json")
+        if "prediction_macro_auc" in selected:
+            return number(selected["prediction_macro_auc"])
         epoch = re.search(r"(?:^|-)epoch=(\d+)(?:-|$)", Path(selected["path"]).name)
         if epoch is None:
             return None

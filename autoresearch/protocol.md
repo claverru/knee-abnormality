@@ -48,14 +48,16 @@ Campaign contracts link to this section instead of restating it and cannot overr
 it. Changing either is a user decision that applies to all campaigns at once.
 
 - **Metric:** macro AUC over the twelve labels on fold 0 of `all_5fold_scanner_v1`,
-  with the `combined_v1` labels, from deterministic, unaugmented validation at
-  image multiplier 1.
-- **Uncertainty:** paired report-group bootstrap on saved fold-0 predictions,
+  with the `combined_v1` labels. Deterministic, unaugmented epoch validation at image
+  multiplier 1 selects the checkpoint; that checkpoint's saved fold-0 predictions at
+  image multiplier 4 and attention temperature 1 are scored (since 2026-09-22; campaigns
+  sealed before used the ×1 predictions).
+- **Uncertainty:** paired report-group bootstrap on those saved predictions,
   2,000 draws with resampling seed 20260914, identical draws for candidate and
   reference.
 - **Enforcement:** configuration gates reject any recipe whose split, folds, label
-  source or validation multiplier differs; the seal takes the bootstrap settings
-  from the same definition.
+  source, validation multiplier or prediction multiplier differs; the seal takes the
+  bootstrap settings from the same definition.
 
 Campaigns sealed under an earlier evaluation cannot resume. Triplet-sampling,
 losses and medial-lateral-transfer were sealed on `all_5fold_v3` with Steven v4

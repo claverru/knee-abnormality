@@ -40,7 +40,7 @@ evidence. No automatic confirmation branches or control reruns follow a result.
 This engineering policy does not establish cross-seed robustness; see the
 [adoption protocol](../../autoresearch/protocol.md#adoption-policy). Preserve model
 size, training budget, image dimensions, physical crop, slice budget and the configured
-validation density (×1 since 2026-09-17) unless one of them is the factor. Training targets stay soft unless supervision
+validation density (×1 since 2026-09-17) and prediction density (×4 since 2026-09-22) unless one of them is the factor. Training targets stay soft unless supervision
 is the factor; validation memberships and
 [frozen targets](project-validation-protocol.md#frozen-evaluation-targets-and-metrics)
 never change. Record full-fold and per-target AUC, subgroup diagnostics, BCE, runtime, peak
@@ -69,6 +69,12 @@ parity is not required for each run or submission.
   `outputs/analysis/detection-floor-20260917/`.
 - **Validation multiplier:** scores at ×1 sit about 0.0035 below the same checkpoints at ×2, so
   runs are comparable only with a control at the same multiplier.
+- **Prediction multiplier (since 2026-09-22):** each epoch is still validated at ×1 and the best
+  one selected there, but the saved predictions that comparisons score come from that checkpoint
+  at ×4 and attention temperature 1 (`validation.prediction_image_multiplier`). Models scale
+  differently with more triplets: `oblique` was −0.0015 against `k_05` at ×1 and +0.0003 at ×4
+  τ 0.75 ([result](results/2026-09-22-oblique-groups-result.md#temperature-and-count)). Compare
+  only runs predicted at the same multiplier.
 - **Against the leaderboard**, macro AUC is the best available local predictor (Pearson +0.907
   over nineteen comparable submissions) and BCE adds nothing on top of it, but neither resolves
   the submissions made since 2026-09-13, whose local spread is below one run's noise

@@ -9,7 +9,11 @@ LOGISTICAL_KEYS = {"name", "seed", "paths.output_root"}
 RUNTIME_FACTOR = 1.15
 EVALUATION = {
     "labels_source": "combined_v1",
-    "validation": {"split": "all_5fold_scanner_v1", "folds": [0]},
+    "validation": {
+        "split": "all_5fold_scanner_v1",
+        "folds": [0],
+        "prediction_image_multiplier": 4,
+    },
     "validation_image_multiplier": 1,
     "bootstrap_draws": 2000,
     "bootstrap_seed": 20260914,

@@ -20,9 +20,18 @@ from pytorch_lightning.loggers import CSVLogger
 
 from knee_abnormality.autoresearch.accounting import TripletAccounting
 from knee_abnormality.cli import CLISettings
-from knee_abnormality.config import ExperimentConfig, Fold, load_config
+from knee_abnormality.config import (
+    INFERENCE_BATCH_SIZE,
+    ExperimentConfig,
+    Fold,
+    load_config,
+)
+from knee_abnormality.data.dataset import KneeStudyDataset, build_data_loader
 from knee_abnormality.data.labels import STUDY
-from knee_abnormality.evaluation.predictions import make_prediction_frame
+from knee_abnormality.evaluation.predictions import (
+    fold_prediction_macro_auc,
+    make_prediction_frame,
+)
 from knee_abnormality.evaluation.scoring import score
 from knee_abnormality.identity import preprocessing_identity
 from knee_abnormality.inference.checkpoint import (
@@ -274,25 +283,42 @@ def run_fold(
     if not checkpoint.best_model_path or checkpoint.best_model_score is None:
         raise RuntimeError("Training did not produce or restore a scored checkpoint")
     best_path = Path(checkpoint.best_model_path)
+    device = resolve_device("auto")
+    model = load_checkpoint_model(
+        config, labels.targets, best_path, device, expected_fold=fold
+    )
+    prediction_loader = build_data_loader(
+        KneeStudyDataset(
+            data.validation_dataset.studies,
+            data.validation_dataset.series_index,
+            config.data,
+            labels.targets,
+            None,
+            config.validation.prediction_image_multiplier,
+        ),
+        config.trainer,
+        INFERENCE_BATCH_SIZE,
+    )
+    prediction_started = time.perf_counter()
+    study_ids, predictions, _ = predict_loader([model], prediction_loader, device)
+    prediction_seconds = time.perf_counter() - prediction_started
+    prediction_path = fold_dir / "validation_predictions.csv"
+    make_prediction_frame(study_ids, predictions, labels.targets, fold).write_csv(
+        prediction_path
+    )
     (fold_dir / "selected_checkpoint.json").write_text(
         json.dumps(
             {
                 "path": str(best_path),
                 "score": float(checkpoint.best_model_score),
+                "prediction_image_multiplier": config.validation.prediction_image_multiplier,
+                "prediction_macro_auc": fold_prediction_macro_auc(
+                    config.split_dir, fold, labels.targets, prediction_path
+                ),
             },
             indent=2,
         )
         + "\n"
-    )
-    device = resolve_device("auto")
-    model = load_checkpoint_model(
-        config, labels.targets, best_path, device, expected_fold=fold
-    )
-    prediction_started = time.perf_counter()
-    study_ids, predictions, _ = predict_loader([model], data.val_dataloader(), device)
-    prediction_seconds = time.perf_counter() - prediction_started
-    make_prediction_frame(study_ids, predictions, labels.targets, fold).write_csv(
-        fold_dir / "validation_predictions.csv"
     )
     (fold_dir / "timing.json").write_text(
         json.dumps(

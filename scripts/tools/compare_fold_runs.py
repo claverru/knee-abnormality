@@ -108,7 +108,8 @@ def load_run(root: Path, fold: int, frame: pl.DataFrame, targets: list[str]) -> 
     saved = json.loads(
         (fold_dir / "epochs" / f"metrics_epoch_{epoch:03d}.json").read_text()
     )
-    if abs(metrics["macro_auc"] - saved["macro_auc"]) > 1e-12:
+    recorded = selected.get("prediction_macro_auc", saved["macro_auc"])
+    if abs(metrics["macro_auc"] - recorded) > 1e-12:
         raise ValueError(f"Selected predictions do not reproduce recorded AUC: {root}")
     epoch_paths = sorted((fold_dir / "epochs").glob("metrics_epoch_*.json"))
     epochs = []

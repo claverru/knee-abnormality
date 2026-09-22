@@ -11,7 +11,12 @@ The example compares the `03-min-lr-0.1` candidate with its `00-baseline` contro
 `--allowed-input-identity-differences preprocessing_identity` when the runs come from different
 sources. Allowed configuration differences are dotted keys or prefixes (default `name`);
 allowed input-identity differences are top-level keys. Any other difference fails,
-as do selected predictions that do not reproduce their recorded epoch macro AUC.
+as do selected predictions that do not reproduce their recorded macro AUC: the
+`prediction_macro_auc` in `selected_checkpoint.json` for runs that predict at another
+multiplier than their epoch validation (×4 since 2026-09-22), otherwise the selected epoch's.
+Runs predicted at different multipliers differ in `validation.prediction_image_multiplier` and
+are rejected unless that key is allowed; re-predict the older run with
+[`repredict_run`](../../scripts/tools/repredict_run.py) instead.
 The output directory must be fresh. `comparison.json` records:
 - selected epochs, full-fold and per-target AUC, soft-target BCE, and gold and
   report-derived metrics;

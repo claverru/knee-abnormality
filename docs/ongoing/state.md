@@ -66,7 +66,8 @@ pending experiments are classified in the [backlog](../backlog/INDEX.md).
   historical evidence, not a blanket rule that all gains below 0.003 carry no information.
 - **Autoresearch:** every campaign now shares one
   [evaluation and adoption rule](../../autoresearch/protocol.md#shared-evaluation-and-adoption):
-  fold 0 of `all_5fold_scanner_v1`, combined labels, validation ×1, gain ≥ 0.001 with a positive
+  fold 0 of `all_5fold_scanner_v1`, combined labels, checkpoint selected at ×1 and scored on its
+  ×4 τ 1 predictions (since 2026-09-22), gain ≥ 0.001 with a positive
   80% lower bound. The three earlier campaigns stay stopped as historical records; they were
   sealed on `all_5fold_v3` and cannot resume. The
   [sampling campaign](../../autoresearch/campaigns/sampling/INDEX.md), defined against the
@@ -83,6 +84,11 @@ pending experiments are classified in the [backlog](../backlog/INDEX.md).
 - **Validation at ×1** since 2026-09-17 (user decision): fold-0 scores from then on sit about
   0.0035 below the earlier ×2 numbers and are comparable only with a ×1 control. Submissions are
   unaffected; the bundle's test multiplier is separate.
+- **Predictions at ×4 since 2026-09-22** (user decision): ×1 epoch validation still selects the
+  checkpoint, but `configs/training.yaml` sets `validation.prediction_image_multiplier: 4`, so the
+  saved fold-0 predictions, comparisons and the autoresearch adoption rule score that checkpoint at
+  ×4 and τ 1 (about 50 s more per run). Older runs are comparable after
+  [`repredict_run`](../../scripts/tools/repredict_run.py); `oblique` re-predicted scores 0.902373.
 - **Historical loading reference, 2026-09-18:** `control-check` fold 0, best epoch 6, validation
   macro AUC **0.88477**, preprocessing identity `b8b6c639`. It is the first checkpoint carrying the loading
   changes, it sits inside the ×1 cohort spread (median 0.88707, sd 0.00331, and the cohort's own two
