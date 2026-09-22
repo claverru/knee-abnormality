@@ -22,7 +22,7 @@ from knee_abnormality.config import (
 )
 from knee_abnormality.data.dataset import KneeStudyDataset, build_data_loader
 from knee_abnormality.data.labels import FoldLabels, load_fold_labels
-from knee_abnormality.data.preprocessing.device import prepare_images
+from knee_abnormality.data.preprocessing.device import with_images
 from knee_abnormality.data.sources import build_series_index
 from knee_abnormality.evaluation.metrics import validation_metrics
 from knee_abnormality.evaluation.predictions import make_prediction_frame
@@ -267,7 +267,7 @@ class KneeModule(L.LightningModule):
         return self.model(batch)
 
     def on_after_batch_transfer(self, batch: dict, dataloader_idx: int) -> dict:
-        return prepare_images(batch)
+        return with_images(batch)
 
     def on_load_checkpoint(self, checkpoint: dict) -> None:
         self.sampling_epoch = checkpoint_sampling_epoch(checkpoint)
@@ -387,7 +387,7 @@ class KneeModule(L.LightningModule):
             self.trainer.precision_plugin.forward_context(),
         ):
             for batch in self.trainer.datamodule.batch_norm_loader():
-                batch = prepare_images(self.transfer_batch_to_device(batch, device, 0))
+                batch = with_images(self.transfer_batch_to_device(batch, device, 0))
                 self.averaged(batch)
         self.batch_norm_refresh_seconds += time.perf_counter() - started
         for module, momentum in zip(modules, momentums):

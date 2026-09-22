@@ -509,7 +509,7 @@ if len(_selected) == 1:
 """
 
 
-PARITY_SCRIPT = """import hashlib, json, sys
+PARITY_SCRIPT = """import hashlib, inspect, json, os, sys
 from pathlib import Path
 
 import numpy as np
@@ -524,7 +524,8 @@ config = load_config(bundle / "config.json", data_root=data_root)
 manifest = json.loads((bundle / "manifest.json").read_text())
 studies = json.loads(studies_path.read_text())
 dataset, _, _ = prediction_data(config, "test", 0, image_multiplier=manifest["runtime"]["image_multiplier"], study_ids=studies)
-loader = build_data_loader(dataset, config.trainer, 1, num_workers=4)
+options = {"prepare_on_loader": False} if os.environ.get("KNEE_PARITY_GPU") and "prepare_on_loader" in inspect.signature(build_data_loader).parameters else {}
+loader = build_data_loader(dataset, config.trainer, 1, num_workers=4, **options)
 records = {}
 saved = 0
 for batch in loader:
@@ -561,29 +562,31 @@ if len(reference) != 1:
 studies_path = profile_dir / "studies.json"
 studies_path.write_text(json.dumps(STUDIES))
 parity = {{}}
-for name, root in (("reference", reference[0]), ("candidate", bundle)):
+for name, root, extra in (("reference", reference[0], {{}}), ("candidate", bundle, {{}}), ("candidate_gpu", bundle, {{"KNEE_PARITY_GPU": "1"}})):
     environment_values = os.environ.copy()
+    environment_values.update(extra)
     environment_values["PYTHONPATH"] = str(root / "code")
     started = time.perf_counter()
     completed = subprocess.run([sys.executable, "-c", {PARITY_SCRIPT!r}, str(root), str(data_root), str(profile_dir / f"{{name}}.json"), str(studies_path)], env=environment_values, capture_output=True, text=True)
     parity[name] = {{"seconds": time.perf_counter() - started, "returncode": completed.returncode, "stderr": completed.stderr[-6000:]}}
     print(name, parity[name]["seconds"], completed.returncode, completed.stderr[-3000:])
 reference_records = json.loads((profile_dir / "reference.json").read_text())
-candidate_records = json.loads((profile_dir / "candidate.json").read_text())
-mismatches = []
-series_total = 0
-for study, expected in reference_records.items():
-    actual = candidate_records.get(study)
-    if actual is None or len(actual["series"]) != len(expected["series"]):
-        mismatches.append({{"study": study, "reason": "series_count"}})
-        continue
-    for index, (left, right) in enumerate(zip(expected["series"], actual["series"])):
-        series_total += 1
-        if left != right:
-            mismatches.append({{"study": study, "series": index, "reference": left, "candidate": right}})
-parity.update(studies=len(reference_records), series=series_total, mismatches=mismatches, constant=sum(sum(record["constant"] or []) for record in candidate_records.values()))
+for candidate_name in ("candidate", "candidate_gpu"):
+    candidate_records = json.loads((profile_dir / f"{{candidate_name}}.json").read_text())
+    mismatches = []
+    series_total = 0
+    for study, expected in reference_records.items():
+        actual = candidate_records.get(study)
+        if actual is None or len(actual["series"]) != len(expected["series"]):
+            mismatches.append({{"study": study, "reason": "series_count"}})
+            continue
+        for index, (left, right) in enumerate(zip(expected["series"], actual["series"])):
+            series_total += 1
+            if left != right:
+                mismatches.append({{"study": study, "series": index, "reference": left, "candidate": right}})
+    parity[f"{{candidate_name}}_result"] = {{"studies": len(reference_records), "series": series_total, "mismatches": mismatches, "constant": sum(sum(record["constant"] or []) for record in candidate_records.values())}}
 (profile_dir / "parity.json").write_text(json.dumps(parity, indent=1) + "\\n")
-print(json.dumps({{key: value for key, value in parity.items() if key != "mismatches"}}, indent=1), len(mismatches))
+print(json.dumps({{name: {{key: (len(value) if key == "mismatches" else value) for key, value in parity[name].items()}} for name in ("candidate_result", "candidate_gpu_result")}}, indent=1))
 """
 
 
@@ -647,7 +650,7 @@ from knee_abnormality.inference.checkpoint import load_models
 config = load_config(bundle / "config.json", data_root=data_root)
 manifest = json.loads((bundle / "manifest.json").read_text())
 dataset, targets, _ = engine.prediction_data(config, "test", 0, image_multiplier=manifest["runtime"]["image_multiplier"], study_ids=STUDIES)
-loader = build_data_loader(dataset, config.trainer, 4, num_workers=4, pin_memory=False)
+loader = build_data_loader(dataset, config.trainer, 4, num_workers=4, pin_memory=False, prepare_on_loader=False)
 cuda = torch.device("cuda")
 models = load_models(config, targets, bundle / "model.ckpt", cuda, attention_temperature=manifest["runtime"]["attention_temperature"])
 engine.use_fixed_backbone_chunks(models[0], config.data.image_size)

@@ -15,7 +15,7 @@ from knee_abnormality.cli import CLISettings
 from knee_abnormality.config import INFERENCE_IO_THREADS, load_config
 from knee_abnormality.data.dataset import KneeStudyDataset, build_data_loader
 from knee_abnormality.data.labels import STUDY, TARGET_THRESHOLD, load_fold_labels
-from knee_abnormality.data.preprocessing.device import prepare_images
+from knee_abnormality.data.preprocessing.device import with_images
 from knee_abnormality.data.preprocessing.dicom import read_frame, read_header
 from knee_abnormality.data.preprocessing.series import index_series
 from knee_abnormality.data.sources import SERIES, StudySeries, build_series_index
@@ -76,7 +76,7 @@ def predict(model, config, frame, index, multiplier, settings, dropped=frozenset
     with torch.inference_mode():
         for batch in loader:
             outputs[batch["study_uid"][0]] = torch.sigmoid(
-                model(prepare_images(batch)).float()
+                model(with_images(batch)).float()
             ).numpy()[0]
     return outputs
 

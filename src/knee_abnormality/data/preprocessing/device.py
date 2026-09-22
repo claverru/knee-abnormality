@@ -1,8 +1,22 @@
 from collections import defaultdict
 
+import numpy as np
 import torch
 
-from knee_abnormality.data.preprocessing.spatial import resample_plan
+from knee_abnormality.data.preprocessing.intensity import (
+    normalize_pixels,
+    quantile_bounds,
+)
+from knee_abnormality.data.preprocessing.preparation import shared_empty
+from knee_abnormality.data.preprocessing.spatial import resample_block, resample_plan
+
+RAW_KEYS = (
+    "frames",
+    "frame_buffers",
+    "series_frames",
+    "image_positions",
+    "image_sources",
+)
 
 _PLANS: dict[tuple, tuple[torch.Tensor, ...]] = {}
 
@@ -76,7 +90,68 @@ def _region_values(canvas: torch.Tensor, frames: list, start: int, count: int):
     )
 
 
+def _region(frame: tuple, buffers: list[torch.Tensor]) -> np.ndarray:
+    native, signed, buffer, offset, height, width, first, last = frame[:8]
+    slope, intercept, (_, _, rows, columns), plan_key = frame[8:]
+    values = buffers[buffer].numpy()
+    if not native:
+        return values[offset : offset + rows * columns].reshape(rows, columns)
+    block = values[offset : offset + height * width]
+    block = block.view(np.int16 if signed else np.uint16).reshape(height, width)
+    region = resample_block(block[:, first:last], resample_plan(*plan_key))
+    if slope != 1.0 or intercept != 0.0:
+        region *= np.float32(slope)
+        region += np.float32(intercept)
+    return region
+
+
+def _prepare_on_cpu(batch: dict) -> dict:
+    buffers = batch["frame_buffers"]
+    frames = batch["frames"]
+    size = batch["image_size"]
+    normalized = np.zeros((len(frames), size, size), dtype=np.uint8)
+    constant = torch.zeros(len(batch["series_frames"]), dtype=torch.bool)
+    for row, (start, count, (lower, upper, fraction)) in enumerate(
+        batch["series_frames"]
+    ):
+        rects = np.asarray([frame[10] for frame in frames[start : start + count]])
+        canvas = np.zeros((count, size, size), dtype=np.float32)
+        for index, (top, left, rows, columns) in enumerate(rects):
+            canvas[index, top : top + rows, left : left + columns] = _region(
+                frames[start + index], buffers
+            )
+        low, high = quantile_bounds(
+            np.concatenate(
+                [
+                    canvas[index, top : top + rows, left : left + columns].reshape(-1)
+                    for index, (top, left, rows, columns) in enumerate(rects)
+                ]
+            ),
+            np.asarray(lower),
+            np.asarray(upper),
+            np.asarray(fraction, dtype=np.float32),
+        )
+        constant[row] = bool(
+            not np.isfinite(low) or not np.isfinite(high) or high <= low
+        )
+        normalized[start : start + count] = normalize_pixels(canvas, rects, low, high)
+    slice_mask = batch["slice_mask"]
+    images = shared_empty(slice_mask.numel() * 3 * size * size, torch.uint8)
+    images = images.view(*slice_mask.shape, 3, size, size)
+    images.view(-1, size, size)[batch["image_positions"]] = torch.from_numpy(
+        normalized
+    )[batch["image_sources"]]
+    return {
+        **{key: value for key, value in batch.items() if key not in RAW_KEYS},
+        "images": images,
+        "slice_mask": slice_mask & ~constant[:, None],
+        "constant_series": constant,
+    }
+
+
 def prepare_images(batch: dict) -> dict:
+    if batch["slice_mask"].device.type == "cpu":
+        return _prepare_on_cpu(batch)
     buffers = batch["frame_buffers"]
     device = batch["slice_mask"].device
     frames = batch["frames"]
@@ -161,8 +236,12 @@ def prepare_images(batch: dict) -> dict:
         batch["image_sources"]
     ]
     return {
-        **batch,
+        **{key: value for key, value in batch.items() if key not in RAW_KEYS},
         "images": images,
         "slice_mask": slice_mask & ~constant[:, None],
         "constant_series": constant,
     }
+
+
+def with_images(batch: dict) -> dict:
+    return batch if "images" in batch else prepare_images(batch)

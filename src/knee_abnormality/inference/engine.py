@@ -13,7 +13,7 @@ from knee_abnormality.config import (
 )
 from knee_abnormality.data.dataset import KneeStudyDataset
 from knee_abnormality.data.labels import STUDY
-from knee_abnormality.data.preprocessing.device import prepare_images
+from knee_abnormality.data.preprocessing.device import with_images
 from knee_abnormality.data.sources import (
     build_series_index,
     prediction_image_multiplier,
@@ -103,6 +103,7 @@ def resolve_precision(
 
 MODEL_BATCH_KEYS = frozenset(
     {
+        "images",
         "frame_buffers",
         "image_positions",
         "image_sources",
@@ -184,7 +185,11 @@ def predict_loader(
                 "padded_images": int(batch["slice_mask"].numel()),
             }
             locked = (
-                [buffer for buffer in batch["frame_buffers"] if _page_lock(buffer)]
+                [
+                    buffer
+                    for buffer in batch.get("frame_buffers", ())
+                    if _page_lock(buffer)
+                ]
                 if device.type == "cuda"
                 else []
             )
@@ -201,7 +206,7 @@ def predict_loader(
             batch = move_batch(batch, device)
             if copy_events is not None:
                 copy_events[1].record()
-            batch = prepare_images(batch)
+            batch = with_images(batch)
             with torch.autocast(
                 device_type=device.type,
                 dtype=autocast_dtype,

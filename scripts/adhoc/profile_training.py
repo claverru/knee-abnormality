@@ -20,9 +20,9 @@ from knee_abnormality.config import SLICES_PER_INPUT, ExperimentConfig, load_con
 from knee_abnormality.data.dataset import (
     KneeStudyDataset,
     build_data_loader,
-    collate_studies,
+    collate_prepared,
 )
-from knee_abnormality.data.preprocessing.device import prepare_images
+from knee_abnormality.data.preprocessing.device import with_images
 from knee_abnormality.inference.engine import move_batch
 from knee_abnormality.modeling.model import KneeAbnormalityModel
 from knee_abnormality.profiling import (
@@ -124,9 +124,7 @@ def gpu_candidate(
     )
     model.series_dropout = 0
     optimizer = build_optimizer(model, config.optimizer)
-    batch = prepare_images(
-        move_batch(collate_studies(items[:size]), torch.device("cuda"))
-    )
+    batch = move_batch(collate_prepared(items[:size]), torch.device("cuda"))
     torch.cuda.reset_peak_memory_stats()
     durations = []
     losses = []
@@ -264,7 +262,7 @@ def loader_candidate(
         started = time.perf_counter()
         batch = next(iterator)
         waited = time.perf_counter() - started
-        batch = prepare_images(move_batch(batch, torch.device("cuda")))
+        batch = with_images(move_batch(batch, torch.device("cuda")))
         training_step(model, optimizer, batch, config, class_balance_weights)
         torch.cuda.synchronize()
         if step >= args.warmup:

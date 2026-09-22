@@ -126,14 +126,19 @@ valid rectangles and paths in the selected channel order. The midpoint supplies
 the unchanged acquisition-relative millimetre position. Local-fallback inputs
 always have unknown 3D geometry, even if native poses are individually valid.
 
-**Pixels are finished on the device.** Loader workers read only the rows the
-resampling filter touches, straight into one shared buffer per decode call, mask
-the stored bits in place, and ship those buffers with each frame's resampling
-plan key and the series' exact quantile ranks; collation does not copy them.
-`data/preprocessing/device.py` then resamples, takes the quantile bounds,
-normalizes and gathers the uint8 triplets on the batch's device, bit-identically
-to the former CPU path. Frames that are not 8/16-bit, or whose rescale exceeds
-1e30, are resampled on the CPU and shipped as float32 regions. See the
+**Pixels are finished where the hardware has room.** Loader workers read only
+the rows the resampling filter touches, straight into one shared buffer per
+decode call, and mask the stored bits in place. `prepare_images` in
+`data/preprocessing/device.py` then resamples, takes the quantile bounds from the
+series' exact ranks, normalizes and gathers the uint8 triplets. On a CPU batch it
+uses the original scipy sparse products and numpy partitions; on a GPU batch it
+repeats them tap by tap in float32, bit-identically. Training, validation and
+local prediction loaders call it in their workers (`collate_prepared`) and ship
+uint8 images, because the local GPU is the bottleneck there; the Kaggle
+prediction worker ships the raw rows (`prepare_on_loader=False`) and prepares
+them on the T4s, because its four vCPUs are. Frames that are not 8/16-bit, or
+whose rescale exceeds 1e30, are resampled on the CPU and shipped as float32
+regions. See the
 [measurement and parity evidence](../inference/2026-09-22-kaggle-x4-startup-and-gpu-preparation.md#gpu-preparation).
 
 Decoded frames and failures are cached within the current item's type
@@ -145,9 +150,9 @@ other frame is read in full and counted exactly. A failed path excludes every
 containing triplet and splits the original runs; neither spacing nor the
 reference or 1D origin is refitted. Unidentified acquisition errors exclude that
 source, and every retry makes a new exclusion and rebuilds coverage. A constant
-acquisition is only known once the device computes its quantile bounds, so it is
-dropped from the batch there instead of excluded and re-sampled; no train study
-at ×4 contains one.
+acquisition is only known once `prepare_images` computes its quantile bounds, so
+it is dropped from the batch there instead of excluded and re-sampled; no train
+study at ×4 contains one.
 Metadata separates triplets, channel appearances, unique files, distinct middle
 geometry, decode attempts, placement errors and missing capacity.
 

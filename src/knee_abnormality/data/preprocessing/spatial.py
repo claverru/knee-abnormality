@@ -66,10 +66,12 @@ class ResamplePlan:
     row_stop: int
     vertical_index: np.ndarray
     vertical_weight: np.ndarray
+    vertical_matrix: csr_matrix
     column_start: int
     column_stop: int
     horizontal_index: np.ndarray
     horizontal_weight: np.ndarray
+    horizontal_matrix: csr_matrix
     rect: tuple[int, int, int, int]
     output_to_native: np.ndarray
 
@@ -109,8 +111,11 @@ def _output_to_native(
     )
 
 
-def _taps(matrix: csr_matrix) -> tuple[int, int, np.ndarray, np.ndarray]:
+def _taps(
+    matrix: csr_matrix,
+) -> tuple[int, int, np.ndarray, np.ndarray, csr_matrix]:
     start = int(matrix.indices.min())
+    stop = int(matrix.indices.max()) + 1
     counts = np.diff(matrix.indptr)
     rows = np.repeat(np.arange(matrix.shape[0]), counts)
     positions = np.arange(matrix.nnz) - np.repeat(matrix.indptr[:-1], counts)
@@ -118,7 +123,7 @@ def _taps(matrix: csr_matrix) -> tuple[int, int, np.ndarray, np.ndarray]:
     weight = np.zeros(index.shape, dtype=np.float32)
     index[rows, positions] = matrix.indices - start
     weight[rows, positions] = matrix.data
-    return start, int(matrix.indices.max()) + 1, index, weight
+    return start, stop, index, weight, matrix[:, start:stop]
 
 
 @lru_cache(maxsize=256)
@@ -147,6 +152,11 @@ def resample_plan(
     )
 
 
+def resample_block(block: np.ndarray, plan: ResamplePlan) -> np.ndarray:
+    middle = plan.vertical_matrix.dot(block.astype(np.float32))
+    return plan.horizontal_matrix.dot(middle.T).T
+
+
 def resample_crop(
     frame: DecodedFrame, spacing_mm: float, image_size: int
 ) -> ResampledSlice:
@@ -155,21 +165,26 @@ def resample_crop(
     target_height, target_width = resample_targets(
         *pixels.shape, frame.row_spacing, frame.column_spacing, spacing_mm
     )
+    plan = resample_plan(*pixels.shape, target_height, target_width, image_size)
     source_top, source_left, output_top, output_left, rows, columns = _crop_geometry(
         target_height, target_width, image_size
     )
-    vertical = _axis_filter(pixels.shape[0], target_height, source_top, rows)
-    horizontal = _axis_filter(pixels.shape[1], target_width, source_left, columns)
-    if vertical.nnz == 0 or horizontal.nnz == 0:
-        sub = pixels.astype(np.float32)
-        middle = vertical.dot(sub)
-        region = horizontal.dot(middle.T).T
+    if plan is None:
+        middle = _axis_filter(pixels.shape[0], target_height, source_top, rows).dot(
+            pixels.astype(np.float32)
+        )
+        region = (
+            _axis_filter(pixels.shape[1], target_width, source_left, columns)
+            .dot(middle.T)
+            .T
+        )
     else:
-        r0, r1 = int(vertical.indices.min()), int(vertical.indices.max()) + 1
-        c0, c1 = int(horizontal.indices.min()), int(horizontal.indices.max()) + 1
-        sub = pixels[r0:r1, c0:c1].astype(np.float32)
-        middle = vertical[:, r0:r1].dot(sub)
-        region = horizontal[:, c0:c1].dot(middle.T).T
+        region = resample_block(
+            pixels[
+                plan.row_start : plan.row_stop, plan.column_start : plan.column_stop
+            ],
+            plan,
+        )
     if slope != 1.0 or intercept != 0.0:
         region *= np.float32(slope)
         region += np.float32(intercept)
