@@ -9,6 +9,7 @@ from torch.utils.data import DataLoader, Dataset
 
 from knee_abnormality.config import SLICES_PER_INPUT, DataConfig, TrainerConfig
 from knee_abnormality.data.labels import STUDY
+from knee_abnormality.data.preprocessing.device import prepare_images
 from knee_abnormality.data.preprocessing.dicom import PREPARATION_ERRORS
 from knee_abnormality.data.preprocessing.filtering import clean_series
 from knee_abnormality.data.preprocessing.geometry import (
@@ -431,6 +432,10 @@ def collate_studies(items: list[dict]) -> dict:
     }
 
 
+def collate_prepared(items: list[dict]) -> dict:
+    return prepare_images(collate_studies(items))
+
+
 def build_data_loader(
     dataset: Dataset,
     settings: TrainerConfig,
@@ -441,6 +446,7 @@ def build_data_loader(
     pin_memory: bool = True,
     persistent_workers: bool | None = None,
     generator: torch.Generator | None = None,
+    prepare_on_loader: bool = True,
 ) -> DataLoader:
     workers = settings.num_workers if num_workers is None else num_workers
     persistent = (
@@ -453,7 +459,7 @@ def build_data_loader(
         "batch_size": batch_size,
         "shuffle": shuffle,
         "num_workers": workers,
-        "collate_fn": collate_studies,
+        "collate_fn": collate_prepared if prepare_on_loader else collate_studies,
         "pin_memory": pin_memory,
         "persistent_workers": persistent and workers > 0,
         "generator": generator,

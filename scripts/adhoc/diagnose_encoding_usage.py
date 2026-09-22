@@ -22,7 +22,7 @@ from knee_abnormality.cli import CLISettings
 from knee_abnormality.config import load_config
 from knee_abnormality.data.dataset import build_data_loader
 from knee_abnormality.data.labels import STUDY, TARGET_THRESHOLD, load_fold_labels
-from knee_abnormality.data.preprocessing.device import prepare_images
+from knee_abnormality.data.preprocessing.device import with_images
 from knee_abnormality.data.sources import prediction_image_multiplier
 from knee_abnormality.evaluation.metrics import (
     COMPARTMENT_PAIRS,
@@ -359,7 +359,7 @@ def diagnose(args: DiagnoseCLI) -> None:
             with torch.autocast(
                 device_type=device.type, dtype=dtype, enabled=dtype is not None
             ):
-                encoded = model.encode_batch(prepare_images(move_batch(batch, device)))
+                encoded = model.encode_batch(with_images(move_batch(batch, device)))
                 if encoded["batch_size"] != len(batch["study_uid"]):
                     raise ValueError("Encoded batch size differs from study membership")
                 every_image = torch.ones_like(encoded["study"], dtype=torch.bool)

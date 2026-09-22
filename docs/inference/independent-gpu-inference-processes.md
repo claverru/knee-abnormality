@@ -26,10 +26,11 @@ Start order and GPU-side work since 2026-09-22 on branch `inference-opt`
 - **Backbone:** under FP16, `use_fixed_backbone_chunks(model, image_size)` warms the 64-image
   channels-last chunk on a side stream and captures it as a CUDA graph; each chunk copies into the
   graph's fixed input, replays and copies out.
-- **Images:** loader batches carry the shared buffers of raw 16-bit rows, and `predict_loader`
-  page-locks them in place (`cudaHostRegister`), copies them asynchronously, builds the uint8 images
-  on the GPU with `prepare_images` and releases the lock after the batch. Inference loaders do not
-  pin memory; pinning every prefetched raw batch exhausted host memory.
+- **Images:** the prediction worker's loader skips loader-side preparation
+  (`prepare_on_loader=False`), so its batches carry the shared buffers of raw 16-bit rows.
+  `predict_loader` page-locks them in place (`cudaHostRegister`), copies them asynchronously,
+  builds the uint8 images on the GPU with `prepare_images` and releases the lock after the batch.
+  Inference loaders do not pin memory; pinning every prefetched raw batch exhausted host memory.
 - **Precision:** `auto` resolves to native BF16 where supported, FP16 on other CUDA devices and
   FP32 on CPU.
 

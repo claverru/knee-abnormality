@@ -76,6 +76,7 @@ def predict_request(request: PredictionRequest) -> dict:
         request.batch_size,
         num_workers=request.num_workers,
         pin_memory=False,
+        prepare_on_loader=False,
     )
     loader.in_order = False
     loader.worker_init_fn = lower_priority

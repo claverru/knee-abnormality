@@ -69,11 +69,12 @@ whether loading keeps up with the GPU before adding further infrastructure.
   those slices; see the
   [preparation notes](../data-preparation/unverified-preprocessing-notes.md#intensity-and-geometry) for the
   normalization tradeoff.
-- **Read in loader workers, finish pixels on the device.** Workers read the
-  needed payload rows and ship raw blocks; float32 resampling, fixed percentile
-  clipping and the uint8 images happen on the GPU after transfer. Prepare
-  metadata and label arrays outside the batch loop. Tune worker count and
-  prefetching from measured study throughput and memory use.
+- **Read in loader workers, finish pixels where there is headroom.** Workers
+  read the needed payload rows; float32 resampling, fixed percentile clipping
+  and the uint8 images happen in the workers for local training and prediction,
+  and on the GPU for Kaggle inference, with identical results. Prepare metadata
+  and label arrays outside the batch loop. Tune worker count and prefetching
+  from measured study throughput and memory use.
 - **Profile before scaling.** Record data-loading time, studies/second, peak
   memory, GPU waiting and total runtime. Mixed precision and compact batches
   are first training candidates. Caching is a deferred option only if loading
