@@ -1,6 +1,10 @@
 # Sampling campaign
 
-Defined 2026-09-21; not started. It succeeds the stopped
+Defined 2026-09-21 and run overnight into 2026-09-22 against `k_05`. **Retired by the user on
+2026-09-22**, a historical record like its predecessor. The supervisor stopped at revision 145
+after an orchestrator job failed on a transient provider error (API 529). Six experiments ran and
+all were rejected; four queued ideas were never trained
+([findings](findings.md), [ideas](ideas.yaml), [backlog](backlog.yaml)). It succeeded the stopped
 [triplet-sampling campaign](../triplet-sampling/INDEX.md) with a wider scope, the
 combined labels and the scanner-stratified split.
 

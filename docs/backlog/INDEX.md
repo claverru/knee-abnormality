@@ -16,6 +16,7 @@
 | Making class weights change during training, judged on the leaderboard | [Adaptive training allocation](big-bets.md#adaptive-training-allocation) |
 | Planning a bounded OA report audit and supervision repair | [OA-only label repair](big-bets.md#oa-only-rubric-aligned-label-repair) |
 | Using report-derived OA severity attributes for training-only image supervision | [Richer report supervision](big-bets.md#richer-report-supervision-oa-attributes) |
+| Filling empty sagittal/coronal fluid slots with reformats (MPR) of a study's 3D DESS or 3D PD FS series | [Reformatted fluid planes](big-bets.md#reformatted-fluid-planes-from-3d-series) |
 | Finding inference loading investigations and candidates | [Loading speedup](loading-speedup/INDEX.md) |
 | Finding tooling and code-structure changes that leave training behavior unchanged | [Refactors](refactors/INDEX.md) |
 | Planning final-phase experiments | [Endgame](endgame.md) |

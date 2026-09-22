@@ -414,6 +414,34 @@ Keep candidate, likely acquisition overlap and confirmed duplicate evidence
 separate. Change fold groups only with convincing evidence and rerun a baseline
 on any revised split; never silently rewrite the existing membership.
 
+### Reformatted fluid planes from 3D series
+
+**Measured premise; value unmeasured, estimated ceiling about +0.0004 macro.** 392 training
+studies (8.9%; 83 of fold 0's 905) have no 2D fluid series in one plane but hold an isotropic 3D
+fluid series that covers it, so the model leaves that slot empty where the radiologist reads a
+reformat. Two site protocols account for them:
+
+- *No sagittal fluid (245 studies):* an axial Siemens DESS water excitation (`T2 DE3D WE TRA
+  PATELLA FIT`, 0.6 mm slices, 144 slices, 86 mm slab) next to coronal fluid and two sagittal
+  T1/PD series.
+- *No coronal fluid (147 studies):* a sagittal 3D PD fat-suppressed series (Philips `SAG 3D VIEW
+  PD SPAIR HR`, 0.4 mm spacing and 0.8 mm slices; Siemens `PD SPC RST FS SAG ISO`, 0.89 mm
+  isotropic); some of these studies carry an axial reformat, none a coronal one.
+
+Filling the empty slot with a 3 mm thick-slab reformat at the plane's 2D step, resampled straight
+to the 0.625 mm grid, is the mechanism. It is parked because the ceiling is small: removing a
+present fluid type cost 0.004–0.005 macro after redistribution on the studies holding it
+([test-time allocation](../validation/results/2026-09-17-test-time-allocation.md#missing-types)),
+and 9% of studies regaining one plane scales that to about +0.0004. The affected fold-0 studies do
+not underperform either: `k_05` scores 0.906 on the 54 DESS studies against 0.9015 on the 822
+unaffected ones; the 29 coronal-gap studies have too few positives to read. DESS shows marrow
+oedema poorly, so its weakest label there, contusion (0.848 against 0.906, 14 positives), may not
+be recoverable from a reformat. Revisit only if those subsets turn out to fail on the leaderboard
+or a cheaper reformat path appears; the gate would be a frozen-checkpoint fill on fold 0 before
+any training. Counts, protocols and subset scores:
+`outputs/analysis/acquisition-geometry-20260922/` (`missing_slots`, `iso3d_profile`,
+`fill_composition`, `mpr_subset`).
+
 ### Other parked work
 
 - **External knee data** (MRNet, fastMRI+, SKM-TEA): only for a concrete missing capability, under
