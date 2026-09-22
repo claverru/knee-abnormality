@@ -5,6 +5,26 @@ Active lines of development have their own documents in [this folder](INDEX.md).
 coverage diagnostics live in [data preparation](../data-preparation/peripheral-coverage.md);
 pending experiments are classified in the [backlog](../backlog/INDEX.md).
 
+- **Research backlog review, 2026-09-21:** the user accepted
+  [AdamP for ReXNet](../backlog/small-changes.md#adamp-for-rexnet) and
+  [plane/contrast-specific feature adapters](../backlog/small-changes.md#planecontrast-specific-feature-adapters)
+  as unstarted small changes. Late-stage ReXNet trimming is merged into the existing
+  [stride-16 investigation](../backlog/big-bets.md#intermediate-stride-16-feature-fusion), which
+  compares the current model, stride-16 truncation and stride-16/stride-32 fusion. The
+  terminal-1×1-only proposal was rejected. Implementation and training remain pending.
+  Bias-field augmentation, layer-wise
+  CoAtNet learning-rate decay, standalone BatchNorm recalibration, ordered within-series
+  aggregation and SAM were not selected for the backlog in this review.
+
+- **Literature shortlist accepted, 2026-09-21:**
+  [richer report supervision through OA attributes](../backlog/big-bets.md#richer-report-supervision-oa-attributes)
+  is an unstarted big bet;
+  [attention-token dropout](../backlog/small-changes.md#attention-token-dropout) is an unstarted
+  small change, including a random-masking control with series dropout unchanged.
+  [Feature-space augmentation (DSU)](../backlog/small-changes.md#feature-space-augmentation-dsu)
+  was also accepted as an unstarted small change, with acquisition-coherent perturbations and
+  safeguards for diagnostic contrast. No implementation, extraction or training has started.
+
 - **New labels and split, 2026-09-21 (user decision):** training and evaluation use the
   [combined labels](../public-labels/combined-labels.md). These are Steven v4 plus a nine-source
   consensus for ACL, MCL, PF OA and Fracture, scoring 0.9075 against 0.8927 on gold. The split is the
@@ -15,7 +35,8 @@ pending experiments are classified in the [backlog](../backlog/INDEX.md).
   τ 0.75. On the 209 studies both splits hold out, it ties learned strength. τ 0.75 remains best.
   **Its submission S40 scores 0.940 public**, against 0.933 for the last two single fold-0 models
   on Steven v4 labels ([result](../validation/results/2026-09-21-combined-labels-first-run.md)).
-  `scripts/adhoc/train_overnight.py` and the autoresearch gate still require `all_5fold_v3`.
+  `scripts/adhoc/train_overnight.py` still requires `all_5fold_v3`; the autoresearch gate now
+  requires the new split and labels.
 
 - **Hugging Face backbone survey completed, 2026-09-20:** the
   [checkpoint review](../research/huggingface-image-encoders.md) identifies DINOv3 ConvNeXt-T and
@@ -43,9 +64,14 @@ pending experiments are classified in the [backlog](../backlog/INDEX.md).
   a practical progression rule, not independent confirmation; training variability and
   repeated fold-0 selection remain outside the interval. Older noise measurements are
   historical evidence, not a blanket rule that all gains below 0.003 carry no information.
-- **Autoresearch:** all three campaigns are stopped on the learned-
-  strength reference with their historical limits/results preserved. Current state and
-  transition evidence are owned by [autoresearch](../../autoresearch/status.md).
+- **Autoresearch:** every campaign now shares one
+  [evaluation and adoption rule](../../autoresearch/protocol.md#shared-evaluation-and-adoption):
+  fold 0 of `all_5fold_scanner_v1`, combined labels, validation ×1, gain ≥ 0.001 with a positive
+  80% lower bound. The three earlier campaigns stay stopped as historical records; they were
+  sealed on `all_5fold_v3` and cannot resume. The new
+  [sampling campaign](../../autoresearch/campaigns/sampling/INDEX.md) is defined against the
+  exponent-0.5 champion `k_05` (0.899042) and not started. Current state and transition evidence are owned by
+  [autoresearch](../../autoresearch/status.md).
   The watchdog initializes its incident history on load, so direct `watch` can recover
   without a preceding `start`; existing incident history is preserved.
 - **Local metrics against the leaderboard (measured 2026-09-18):** over the nineteen comparable
@@ -92,7 +118,10 @@ pending experiments are classified in the [backlog](../backlog/INDEX.md).
   [big bets](../backlog/big-bets.md#adaptive-training-allocation).
   [Fixed class-balanced BCE](../modeling/supervision.md#fixed-class-balanced-bce) is implemented
   as `trainer.class_balanced_bce: false` by default, with saved training-fold weights and strict
-  resume checks. The user completed [its comparison](../validation/results/2026-09-19-balanced-bce-result.md)
+  resume checks. The damping exponent is implemented as `trainer.class_balance_exponent` (default
+  1.0). On 2026-09-21–22 [the exponent curve](../validation/results/2026-09-21-class-balance-exponent.md)
+  scored unweighted 0.943, k=0.25 0.944, k=0.5 0.945, k=0.75 0.942 and k=1 0.940 on the public
+  leaderboard, peaking at k=0.5, while fold-0 validation rose monotonically with k. The user completed [its comparison](../validation/results/2026-09-19-balanced-bce-result.md)
   as `balanced-bce`, seed 42, fold 0: best 0.895282, and +0.01161 against `rexnet-fold0`, the
   same-sampler fold-0 run from the same day, with eleven of twelve labels improving and the gains
   concentrated on the rarest ones. Historical source differences limit exact attribution.
@@ -132,7 +161,8 @@ pending experiments are classified in the [backlog](../backlog/INDEX.md).
   [OA-only label repair](../backlog/big-bets.md#oa-only-rubric-aligned-label-repair) and
   [plane/contrast-specific readouts](../backlog/small-changes.md#planecontrast-specific-readouts).
   [Balance damping](../backlog/small-changes.md#weighting-strength-exponent-and-prevalence-definition)
-  stays secondary and already belongs to the loss campaign queue. Per-label loss selection and
+  is now implemented as `trainer.class_balance_exponent` (default 1.0) and
+  [measured](../validation/results/2026-09-21-class-balance-exponent.md). Per-label loss selection and
   canonical knee orientation remain deferred. This records backlog priorities; no experiment was
   started by the review.
 - **Report-state audit completed, 2026-09-20:** the

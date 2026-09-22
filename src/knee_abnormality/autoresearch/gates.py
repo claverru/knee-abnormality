@@ -7,6 +7,13 @@ from knee_abnormality.autoresearch.storage import read_json, sha256
 
 LOGISTICAL_KEYS = {"name", "seed", "paths.output_root"}
 RUNTIME_FACTOR = 1.15
+EVALUATION = {
+    "labels_source": "combined_v1",
+    "validation": {"split": "all_5fold_scanner_v1", "folds": [0]},
+    "validation_image_multiplier": 1,
+    "bootstrap_draws": 2000,
+    "bootstrap_seed": 20260914,
+}
 ACCEPTANCE_RULE = {
     "metric": "candidate_minus_incumbent_macro_auc",
     "minimum_gain": 0.001,
@@ -14,6 +21,15 @@ ACCEPTANCE_RULE = {
     "bootstrap_lower_bound_strictly_above": 0.0,
     "reporting_confidence_level": 0.95,
 }
+
+
+def acceptance_text():
+    return (
+        f"adopt only when valid macro AUC improvement >= {ACCEPTANCE_RULE['minimum_gain']} "
+        f"AND the central {ACCEPTANCE_RULE['bootstrap_confidence_level']:.0%} "
+        "paired-bootstrap lower bound is strictly above "
+        f"{ACCEPTANCE_RULE['bootstrap_lower_bound_strictly_above']:g}; otherwise discard"
+    )
 
 
 def active_incumbent_ideas(state):
@@ -79,16 +95,29 @@ def validate_config(reference, candidate, policy: CampaignPolicy):
             raise ValueError(f"Protected list-item fields changed: {key}")
     if candidate["trainer"]["max_epochs"] != reference["trainer"]["max_epochs"]:
         raise ValueError("Epoch budget must remain fixed")
-    if candidate["data"]["validation_image_multiplier"] != 1:
-        raise ValueError("Validation must remain x1")
-    if candidate["validation"] != {"split": "all_5fold_v3", "folds": [0]}:
-        raise ValueError("Only fold 0 of all_5fold_v3 is authorized")
+    if (
+        candidate["data"]["validation_image_multiplier"]
+        != EVALUATION["validation_image_multiplier"]
+    ):
+        raise ValueError("Validation multiplier differs from the shared evaluation")
+    if candidate["validation"] != EVALUATION["validation"]:
+        raise ValueError("Validation split differs from the shared evaluation")
+    if candidate["labels"]["source"] != EVALUATION["labels_source"]:
+        raise ValueError("Label source differs from the shared evaluation")
     return changed
 
 
-def initial_limits(reference: Path, config: dict):
+def initial_limits(reference: Path, config: dict, equivalences: dict):
     historical = read_json(reference / "effective_config.json")
-    unexpected = set(config_differences(historical, config)) - LOGISTICAL_KEYS
+    recorded, current = flatten(historical), flatten(config)
+    for key, value in equivalences.items():
+        if key in recorded or key not in current or current[key] != value:
+            raise ValueError(f"Invalid reference equivalence: {key}")
+    unexpected = (
+        set(config_differences(historical, config))
+        - LOGISTICAL_KEYS
+        - set(equivalences)
+    )
     if unexpected:
         raise ValueError(
             f"Historical control differs from the starting recipe: {sorted(unexpected)}"
@@ -112,8 +141,9 @@ def initial_limits(reference: Path, config: dict):
         "reference_predictions_sha256": sha256(
             reference / "fold_0/validation_predictions.csv"
         ),
-        "bootstrap_draws": 2000,
-        "bootstrap_seed": 20260914,
+        "reference_equivalences": dict(equivalences),
+        "bootstrap_draws": EVALUATION["bootstrap_draws"],
+        "bootstrap_seed": EVALUATION["bootstrap_seed"],
     }
 
 

@@ -10,7 +10,7 @@ controlled resolution test.
 ## Answer
 
 Today's 224 px / 0.625 mm / 140 mm input discards some real in-plane detail and clips
-posterior anatomy in a third of sagittal series. Finer than about 0.5 mm adds almost
+posterior soft tissue in a third of sagittal series. Finer than about 0.5 mm adds almost
 nothing, because the stored ~0.31 mm images are interpolated. Depth sampling, with triplets
 about 17 mm apart at 1×, is a larger gap than in-plane resolution.
 
@@ -55,6 +55,36 @@ the [end of the competition](../backlog/endgame.md#bigger-images).
   | Sagittal (almost all posterior) | 81% | 64% | 34% | 8% | 2% |
   | Coronal | 49% | 25% | 9% | 1% | 0% |
   | Axial | 59% | 29% | 16% | 10% | 6% |
+- **Sagittal clipping is width, not placement (re-read 2026-09-21).** Skin-to-skin AP tissue is
+  already centred: its midpoint sits a median 3.6 mm posterior of the image centre (p5–p95 −1.4
+  to +11.2 mm, 96 sagittal series, middle slice). The width is median 146 mm and exceeds 140 mm in
+  67 of them. None of the 32 series clipped more than 10 mm posteriorly fits in 140 mm, and their
+  median anterior margin is 0.4 mm, so a tissue-centred crop would move the clipping to the
+  patella rather than remove it. Only a wider field helps; 13 of the 32 fit in 150 mm. The tissue
+  mask includes the posterior soft tissue, so no rate of cysts leaving the 140 mm window is
+  measured. Source: `series_metrics_overhang.parquet` in the `images/` artifacts.
+- **Baker's cyst clipping was a 112 mm crop-era loss.** Its per-label evidence is the centred-crop
+  drop (−0.028) and the 128–130 mm losses. The three Baker's-positive fold-0 studies whose
+  prediction fell most under the centred 112 mm crop (0.95 → 0.22, 0.91 → 0.25, 0.92 → 0.32 in
+  `outputs/analysis/crop-placement-20260915/`) were reviewed on fluid-sensitive slices. In two of
+  them (…93267826, …11059491) the cyst lies just outside 112 mm and inside 140 mm; the third is
+  unclear.
+- **Placement reopened, 2026-09-21 (user decision):** anatomy-anchored crop placement (joint line
+  up–down, tissue in the other direction) at the fixed 140 mm / 0.625 mm window is in scope of the
+  [sampling campaign](../../autoresearch/campaigns/sampling/contract.md). Spacing stays shared and
+  unchanged; the field-of-view part of the decision below stands.
+- **Decision, 2026-09-21: no field-of-view change on the current recipe.** Neither a
+  tissue-centred crop nor a wider field, and no per-plane spacing, is pursued. Tissue centring
+  moves the window a few millimetres and never vertically, because the leg crosses the top and
+  bottom edges. Widening costs resolution, and the last field change, narrowing to 140 mm, was a
+  gain. Per-plane spacing would also give one structure a different pixel size in each plane, and
+  per-plane pixel sizes would break shared batching. The targets that could plausibly reach past
+  140 mm are anatomical guesses, not measurements: a Baker's cyst dissecting into the calf, a
+  distended suprapatellar recess (effusion), a low MCL tibial attachment (about 5–7 cm below the
+  joint line against the coronal window's median 53 mm) and fibular-head or metaphyseal
+  fractures. If the field is ever revisited, as part of
+  [bigger images](../backlog/endgame.md#bigger-images), choose its size from measured extent of
+  those structures rather than from an AUC sweep.
 - **Joint line:** a median 12.7 mm (sagittal) and 16.8 mm (coronal) below the native image
   centre, more than 25 mm off in 6% and 16%. The heuristic is cross-checked within 10 mm
   between planes in 96–98% of studies.

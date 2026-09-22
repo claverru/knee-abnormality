@@ -1,0 +1,93 @@
+ideas:
+  - id: epoch-paced-bag-size
+    mechanism_id: across-epoch-budget-pacing
+    parent_idea_id: null
+    title: Pace the per-visit bag size across the run at an unchanged run total
+    opportunity: >-
+      Every study gets the same budget in all ten epochs, but the harness fixes only
+      run totals and per-epoch visits, not per-epoch triplet counts. Frozen-model
+      count curves are steep between about 20 and 31 triplets per study, so a
+      plus-or-minus-one offset per slot moves bags along the steep part.
+    mechanism: >-
+      Apply a per-epoch integer offset to each slot's budget, summing to zero over
+      the run, only where the pool has slack to realize it: smaller bags early,
+      larger late, so the epochs that usually produce the selected checkpoint see
+      denser bags. Ineligible slots keep the incumbent budget, so the realized run
+      total is unchanged by construction.
+    precedents:
+      - autoresearch/campaigns/triplet-sampling/ideas.yaml (epoch-paced-bag-size)
+      - outputs/autoresearch/triplet-sampling/experiments/epoch-paced-bag-size-20260919T200307Z-0bdb46b8 (0.895606, fresh seed, against the lucky 0.897515 incumbent; above the 0.8948 control average)
+      - docs/history/triplet-budget-allocation.md
+    novelty: >-
+      Re-queued by explicit user instruction on 2026-09-21. Its only valid run used
+      a fresh seed and was compared against the withdrawn lucky incumbent, so its
+      verdict is not evidence against the mechanism.
+    coverage: >-
+      Union coverage over the run is at least the incumbent's; capacity-limited
+      slots are excluded from the offset.
+    exploitation: >-
+      Late epochs train on denser bags that resolve finer depth structure.
+    budget: >-
+      Run totals are unchanged, but peak activation memory rises in the large-bag
+      epochs (about +19% tokens per study at +1 on every slot); check memory and
+      wall clock in the replay. Validation unchanged.
+    implementation: >-
+      Adds behavior in select_triplets after groups are known, plus one schedule
+      field under data.sampling and the SAMPLING_IDENTITY string. The replay must
+      show per-epoch rows differing while the run total equals the sealed count at
+      zero tolerance.
+    open_choices: >-
+      Offset size and which slots carry it (memory decides); two-block or graded
+      schedule. By concavity of the count curve the average bag is slightly worse,
+      so the claim is about training dynamics; the reverse direction is a separate
+      idea, not a second arm.
+    dependencies: []
+    priority_rationale: >-
+      One run above the control average; lower priority than the seed file's ideas
+      because the effect is expected to be small.
+  - id: label-diverse-batch-composition
+    mechanism_id: study-batch-composition
+    parent_idea_id: null
+    title: Arrange each epoch's studies so rare-label positives spread across batches
+    opportunity: >-
+      Studies are shuffled uniformly into batches of eight, so rare labels
+      (Fracture, Synovitis, MCL) are absent from many batches and clumped in others,
+      making their gradient signal bursty. Class-balanced BCE gained +0.0116 with
+      most of it on the rarest labels, so rare-label learning is where training
+      responds.
+    mechanism: >-
+      Keep every training study visited exactly once per epoch. Replace the uniform
+      shuffle with a stratified random order that spreads studies positive for rare
+      labels evenly across the epoch's batches, drawn from the training seed and
+      epoch. Only batch membership and order change.
+    precedents:
+      - docs/validation/results/2026-09-19-balanced-bce-result.md
+      - docs/research/auc_loss_approaches.md#weighting-and-sampling-design-space
+      - docs/backlog/small-changes.md#bce-weighting-and-study-sampling
+    novelty: >-
+      Added by the user on 2026-09-21. Changes batch composition without changing
+      visit frequency or loss weights, so it does not overlap class-balanced BCE's
+      weighting.
+    coverage: >-
+      Every study still appears once per epoch; exposure per study is identical to
+      the incumbent.
+    exploitation: >-
+      More batches carry at least one positive for each rare label, smoothing their
+      gradient signal.
+    budget: >-
+      No extra decoding or compute; an ordering computed once per epoch from
+      training labels. Accounting unchanged.
+    implementation: >-
+      Adds behavior in the training data loader in lightning.py (a batch sampler or
+      ordered index); validation loader untouched. Uses training labels only.
+      Losses and class-balance weights stay fixed.
+    open_choices: >-
+      Which labels count as rare (a fixed prevalence threshold, not swept); how to
+      randomize within strata so batches still vary across epochs.
+    dependencies: []
+    priority_rationale: >-
+      Speculative and probably small; lowest cost of all ideas, so it fits late in
+      the queue.
+exhausted_directions: >-
+  See seed-ideas.yaml. This file holds the two lower-ranked ideas of the user's
+  2026-09-21 list.

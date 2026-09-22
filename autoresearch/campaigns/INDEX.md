@@ -2,6 +2,7 @@
 
 | Read when | Document |
 |---|---|
-| Researching better triplet selection at the existing average count and fixed compute | [Triplet sampling](triplet-sampling/INDEX.md) |
-| Researching one shared loss or shared combination across all labels at fixed training compute | [Shared losses](losses/INDEX.md) |
-| Investigating reusable disease patterns across medial and lateral compartments, using prior sharing and adapter results | [Medial and lateral disease transfer](medial-lateral-transfer/INDEX.md) |
+| Researching slice, triplet, series, batch-composition, crop and feedback-driven sampling on the shared evaluation | [Sampling](sampling/INDEX.md) |
+| Recovering the historical triplet-selection campaign on `all_5fold_v3` that sampling succeeds | [Triplet sampling](triplet-sampling/INDEX.md) |
+| Recovering the historical shared-loss campaign on `all_5fold_v3` | [Shared losses](losses/INDEX.md) |
+| Recovering the historical medial/lateral disease-transfer campaign on `all_5fold_v3` | [Medial and lateral disease transfer](medial-lateral-transfer/INDEX.md) |

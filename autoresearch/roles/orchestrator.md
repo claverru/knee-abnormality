@@ -44,8 +44,8 @@ or authorize importing another campaign's out-of-scope behavior.
 
 Interpret the evaluator's exact recorded results and uncertainty. Code applies the
 fixed numerical verdict after your interpretation; the report has no verdict field.
-For new experiments, adopt only when valid macro gain >= 0.001 and the central 80%
-paired-bootstrap lower bound is strictly positive; otherwise discard. Do not add a
+New experiments follow the supplied `acceptance_rule`, the
+[shared adoption rule](../protocol.md#shared-evaluation-and-adoption). Do not add a
 95% positivity requirement, hold an inconclusive branch, or schedule automatic
 confirmation runs. Retain findings for later research.
 Use the supplied per-label scores and paired intervals to describe tradeoffs across

@@ -1,0 +1,1130 @@
+revision: 145
+ideas:
+- id: physical-span-standardized-triplets
+  mechanism_id: through-plane-triplet-composition
+  parent_idea_id: null
+  title: Standardize each triplet's through-plane span instead of its slice stride
+  opportunity: A triplet is always three consecutive slices, so its physical through-plane
+    extent follows each series' spacing. On the old fold-0 cache the median candidate
+    gap was 3.32 mm (p1 0.03, p5 0.61, p95 5.07), so spans ranged from about 0.06
+    to 18 mm; 6.0% of pools had median spacing below 1 mm and fed the backbone three
+    near-identical channels. In-plane geometry is standardized (0.625 mm, 224 px);
+    through-plane geometry is not.
+  mechanism: 'Choose the channel offsets so each triplet spans a fixed physical thickness:
+    stride k = round(target_half_span / spacing), clamped to k >= 1 and to what the
+    run allows, with the middle slice unchanged. Anchor the target span to the cohort''s
+    current median realized span (7.11 mm on the old cache; re-measure on the sealed
+    cohort) so it is a standardization, not a tunable. Most pools keep k = 1; dense
+    acquisitions gain real through-plane context at the same channel count.'
+  precedents:
+  - autoresearch/campaigns/triplet-sampling/ideas.yaml (physical-span-standardized-triplets,
+    queued, never trained)
+  - docs/research/input-resolution.md#acquisition-all-24371-train-series
+  - docs/data-preparation/physical-sampling/implemented-sampler.md
+  novelty: Re-queued by explicit user instruction on 2026-09-21 from the stopped triplet-sampling
+    campaign, where it was queued but never implemented or trained. The only earlier
+    sampling idea that changes pixel content rather than which depths are drawn.
+  coverage: Candidate windows per run fall from L-2 to L-2k, so reduce k until min(budget,
+    groups_k) equals min(budget, groups_1); k = 1 always satisfies it. Peripheral
+    reach is unaffected because the middle slice sets the depth.
+  exploitation: Depth targets, widths, budgets and supplier rules are untouched; only
+    channel content at each selected location becomes comparable across acquisitions.
+  budget: Still three decoded slices per triplet and the same triplet count. Selected
+    triplets share almost no slices, so unique decodes barely move; confirm in the
+    CPU replay against the sealed ceiling.
+  implementation: Adds behavior. Candidate construction and support definition in
+    data/preprocessing/sampling.py build_pool; prepare_series in preparation.py must
+    accept the nonconsecutive stride. Preserve three distinct slices, distinct middles
+    and original acquisition indices. Record the changed deterministic validation
+    identity. Any new setting goes under data.sampling.
+  open_choices: Cohort-wide or per-plane median span; clamping on short runs; handling
+    of degenerate positions (inspect the p1 0.03 mm cases before treating them as
+    dense acquisitions). Fixed, not jittered, stride for this idea.
+  dependencies: []
+  priority_rationale: Never tested, measured premise, zero added compute, and it changes
+    what the backbone sees in every dense series.
+  status: completed
+  created_revision: 5
+  ranking_rationale: 'I admitted all five imported ideas. None has a dependency, and
+    all fit the sampling scope and the editable files. The queue was empty, so this
+    ranking builds it.
+
+
+    1. physical-span-standardized-triplets: It rests on measured spacing spread. It
+    adds no compute, is a fixed standardization rather than a tunable, and changes
+    channel content in every dense series. It is the cleanest test that has never
+    been run.
+
+    2. anatomy-anchored-crop-placement: This one has the largest potential effect.
+    The joint line sits a median 12.8 to 17.5 mm off centre, and edge labels are sensitive
+    to the crop. It ranks second because the joint-line heuristic has never been validated
+    against ground truth. It also changes the preprocessing identity and inference,
+    and the landmark cost counts against the 1,847 s ceiling. Its label-free coverage
+    check should come before any GPU run.
+
+    3. run-level-stratified-jitter: It is cheap. It gets its first test at the incumbent''s
+    seed, on the new split and labels, and the result decides the whole draw-coupling
+    family.
+
+    4. plane-coupled-depth-targets: The premise is confirmed in source. At baseline
+    `sampling.py:471-477`, the "targets" stream is seeded with the full `kind`, so
+    a plane''s two slots draw independent jitter. Validation uses the fixed 0.5 offset.
+    The expected effect is small and of unknown sign.
+
+    5. model-feedback-depth-targets: This is the most speculative idea. Earlier attention-based
+    selection gained only +0.004, and attention entropy was about 0.97. It also touches
+    the training loop and the persistent workers.'
+  experiments:
+  - physical-span-standardized-triplets-20260921T220140Z-dbfa1835
+  - physical-span-standardized-triplets-20260921T220931Z-71613a41
+  decision: reject
+- id: anatomy-anchored-crop-placement
+  mechanism_id: anatomical-in-plane-crop-anchor
+  parent_idea_id: null
+  title: Place the fixed 140 mm window from anatomy instead of the image centre
+  opportunity: Every slice is cut to 224 px at 0.625 mm around the image centre, i.e.
+    wherever the technologist centred the field of view. On a 300-series sample the
+    joint line sits a median 12.8 mm (sagittal) and 17.5 mm (coronal) below the image
+    centre, beyond 24-26 mm in 10% of series, so the window covers about 85 mm above
+    the joint and 55 mm below; the coronal window reaches a median 53 mm below against
+    a 5-7 cm MCL tibial attachment. Tissue midpoints are within a few mm of centre
+    in the other direction.
+  mechanism: 'Keep the window size and spacing fixed. Up-down in sagittal and coronal:
+    centre the window on a detected joint line plus one offset chosen from the measured
+    extent of the label anatomy above (suprapatellar recess, patella) and below (tibial
+    plateau, MCL attachment, fibular head). Other directions, all planes: centre on
+    the tissue extent; when tissue is wider than 140 mm, keep the patella and give
+    up posterior subcutaneous fat. Fall back to the image centre whenever the landmark
+    is not found. Placement is deterministic per series in validation and inference.'
+  precedents:
+  - docs/research/input-resolution.md#field-of-view-and-joint-position (joint offsets,
+    tissue width, placement reopened 2026-09-21)
+  - outputs/analysis/input-resolution-research-20260915/images/common.py joint_line
+    heuristic (cross-plane agreement within 10 mm in 96-98% of studies; not validated
+    against ground truth)
+  - outputs/analysis/input-resolution-research-20260915/images/series_metrics_overhang.parquet
+    (tissue width and offsets per plane)
+  - docs/history/crop-selection-investigation.md (learned crop selection dropped 2026-09-16;
+    its anatomical-glimpse option was never run)
+  - docs/validation/results/2026-09-12-140-mm-crop-result.md
+  novelty: 'Added by the user on 2026-09-21. Unlike the dropped crop-selection work
+    it learns nothing and changes neither resolution nor coverage of slices: one window
+    per slice, the same size, moved to anatomy. Tissue-centring alone was rejected
+    earlier because it moves the window only a few mm; the joint-line anchor is the
+    new part.'
+  coverage: Measure, without labels and before training, the share of windows that
+    reach the required anatomy above and below the joint under image-centred and anchored
+    placement. Report sagittal posterior clipping too; the anchor must not move clipping
+    into the patella.
+  exploitation: The joint lands at a consistent row across studies, and edge structures
+    (MCL attachment, fibular head, tibial plateau) enter the window where they are
+    cut today.
+  budget: One landmark estimate per series on image data already decoded, plus the
+    tissue mask; the crop itself costs the same. Time it in the CPU replay; it counts
+    toward the sealed ceiling and runs at inference too through the shared dataset
+    path.
+  implementation: Replaces image-centred placement. Port the heuristic into data/preprocessing
+    (spatial.py or preparation.py, inside the preprocessing identity) and pass a per-series
+    offset into resample_crop so output_to_native keeps patient maps exact. Axial
+    slices use the tissue anchor only. No labels, no validation predictions. Spacing,
+    window size and augmentation stay fixed.
+  open_choices: Whether the anchor comes from a fixed reference slice per series or
+    from the decoded selected slices; the up-down offset, set from measured anatomy
+    extent, never from AUC; whether training draws placement around the anchor within
+    the heuristic's uncertainty or uses the fixed anchor.
+  dependencies: []
+  priority_rationale: Measured geometric premise with a direct link to edge labels
+    that crop tests showed are sensitive to the window; the label-free coverage check
+    can stop it cheaply before a run.
+  status: completed
+  created_revision: 5
+  ranking_rationale: 'I admitted all five imported ideas. None has a dependency, and
+    all fit the sampling scope and the editable files. The queue was empty, so this
+    ranking builds it.
+
+
+    1. physical-span-standardized-triplets: It rests on measured spacing spread. It
+    adds no compute, is a fixed standardization rather than a tunable, and changes
+    channel content in every dense series. It is the cleanest test that has never
+    been run.
+
+    2. anatomy-anchored-crop-placement: This one has the largest potential effect.
+    The joint line sits a median 12.8 to 17.5 mm off centre, and edge labels are sensitive
+    to the crop. It ranks second because the joint-line heuristic has never been validated
+    against ground truth. It also changes the preprocessing identity and inference,
+    and the landmark cost counts against the 1,847 s ceiling. Its label-free coverage
+    check should come before any GPU run.
+
+    3. run-level-stratified-jitter: It is cheap. It gets its first test at the incumbent''s
+    seed, on the new split and labels, and the result decides the whole draw-coupling
+    family.
+
+    4. plane-coupled-depth-targets: The premise is confirmed in source. At baseline
+    `sampling.py:471-477`, the "targets" stream is seeded with the full `kind`, so
+    a plane''s two slots draw independent jitter. Validation uses the fixed 0.5 offset.
+    The expected effect is small and of unknown sign.
+
+    5. model-feedback-depth-targets: This is the most speculative idea. Earlier attention-based
+    selection gained only +0.004, and attention entropy was about 0.97. It also touches
+    the training loop and the persistent workers.'
+  experiments:
+  - anatomy-anchored-crop-placement-20260921T221837Z-3b5416fc
+  decision: reject
+- id: plane-coupled-depth-targets
+  mechanism_id: cross-slot-depth-coupling
+  parent_idea_id: null
+  title: Draw a plane's two contrast series at the same depths in training, as validation
+    already does
+  opportunity: The deterministic validation bag pairs a plane's two contrast slots
+    almost exactly (share of middles within 5 mm of a partner 0.93/0.95/0.94 axial,
+    coronal, sagittal on the old source) while training pairs them by accident (0.60/0.57/0.58),
+    because the two slots use independent depth streams. About 72% of training triplets
+    sit in a slot whose plane partner is present.
+  mechanism: Key the depth-target random stream on the plane alone instead of the
+    full (plane, fluid_sensitive, fat_suppression) type, so a plane's two slots aim
+    at the same percentiles. Each slot still snaps to its own geometry through its
+    own groups and assignment, so pairs are co-located only where both series have
+    a slice. Supplier and band-order streams stay per slot.
+  precedents:
+  - autoresearch/campaigns/triplet-sampling/ideas.yaml (plane-coupled-depth-targets,
+    blocked on the withdrawn stratified-jitter parent)
+  - outputs/autoresearch/triplet-sampling/experiments/plane-coupled-depth-targets-20260919T211410Z-c36f925a
+    (0.89461, fresh seed 3759278001, built on the withdrawn sampler; uninformative)
+  - outputs/autoresearch/triplet-sampling/experiments/cross-slot-band-interleaving-20260919T181018Z-c008c6bb
+    (opposite direction, -0.0017 with a fresh seed, inconclusive)
+  novelty: Re-queued by explicit user instruction on 2026-09-21, rebuilt without the
+    stratified-jitter dependency. Its only run sat on a withdrawn sampler with a fresh
+    seed, so it was never tested on its own.
+  coverage: Each slot's own per-epoch law is unchanged; only the correlation between
+    the two slots of a plane changes. Distinct middles per slot over the run should
+    stay equal; confirm in the replay.
+  exploitation: Training bags gain registered cross-contrast pairs at the same depth,
+    matching the scored condition.
+  budget: 'Only the random-stream key changes: no extra draws, decodes or state. Validation
+    selection must reproduce the incumbent''s exactly.'
+  implementation: Adds behavior. In select_triplets, seed the "targets" stream with
+    the plane alone and keep the full type for "suppliers" and "band_order"; update
+    the SAMPLING_IDENTITY targets string. Demonstrate by execution that keying on
+    the full type reproduces the incumbent.
+  open_choices: 'Behaviour when a plane''s two slots realize different counts (capacity-limited
+    minority): establish by execution whether the shared jitter survives. Measure
+    realized co-location against the incumbent''s training and validation figures.'
+  dependencies: []
+  priority_rationale: Removes a named train/validation mismatch at zero cost; expected
+    effect small and of uncertain sign.
+  status: completed
+  created_revision: 5
+  ranking_rationale: "Admitted complementary-window-bags. It has no dependencies.\
+    \ It works on \"where the in-plane window sits\", which the contract puts in scope,\
+    \ and it leaves the sealed 224 px / 0.625 mm / 140 mm per-triplet geometry alone.\
+    \ Placement is set by measured tissue extent from images only, with an image-centre\
+    \ fallback. The same logic runs in validation and inference through the shared\
+    \ dataset path. The only randomness is the training band phase, drawn from a new\
+    \ stream, so the existing targets, suppliers and band_order streams stay as they\
+    \ are. Counts do not change.\n\nOf the in-plane lever, this is the version the\
+    \ registry has not tested: coverage of the whole bag rather than moving a single\
+    \ window. The single-window anchor came out at \u22120.00095. That result limits\
+    \ the expected size of a placement effect, but it does not predict this idea's\
+    \ sign.\n\nI ranked it third, after misfit-steered density and ahead of model-feedback-depth-targets.\
+    \ The researcher measured model-feedback's per-triplet steering signal as near-uniform,\
+    \ so it has less reach. Complementary windows need more preprocessing plumbing\
+    \ than misfit steering, and their expected gain is modest.\n\nI did not admit\
+    \ the older epoch-paced-bag-size and label-diverse-batch-composition entries.\
+    \ This event adds no evidence for them, and the researcher's gradient-clip measurement\
+    \ weakens the case for batch composition. They stay proposed."
+  experiments:
+  - plane-coupled-depth-targets-20260921T231233Z-c682d9f5
+  decision: reject
+- id: model-feedback-depth-targets
+  mechanism_id: training-feedback-depth-importance
+  parent_idea_id: null
+  title: Steer next epoch's depth targets with this epoch's training attention
+  opportunity: Every depth draw today is a fixed Gaussian around the study centre;
+    nothing the model learns about where evidence lies feeds back into which slices
+    it is shown. Attention pooling already scores every training triplet, so a per-study,
+    per-type map of where attention concentrates is available at no extra forward
+    cost.
+  mechanism: During epoch e, record training-time attention mass per (study, type,
+    depth). Before epoch e+1, turn it into a smoothed depth density and draw targets
+    from a fixed mixture of that density and the incumbent Gaussian, so every region
+    keeps a coverage floor. Epoch 0 uses the Gaussian. Validation and inference stay
+    on the incumbent deterministic selection.
+  precedents:
+  - docs/history/crop-selection-investigation.md#what-the-runs-established (attention-based
+    selection beat random by only 0.004 there; normalized attention entropy 0.97-0.99)
+  - docs/research/auc_loss_approaches.md#adaptive-allocation
+  - docs/backlog/big-bets.md#adaptive-training-allocation
+  novelty: 'Added by the user on 2026-09-21. The triplet-sampling campaign allowed
+    training feedback but proposed only static geometric mechanisms. Differs from
+    learned crop selection: no new model, no learned placement in validation or inference,
+    only a training-time exposure prior.'
+  coverage: The Gaussian mixture weight is a floor, fixed a priori, so no depth band
+    loses support; report realized depth histograms per epoch from the replay.
+  exploitation: Later epochs spend more draws where the model's own attention says
+    evidence sits for that study.
+  budget: Attention is already computed; cost is bookkeeping in the training loop
+    and a small per-epoch map read by persistent workers. No precomputation outside
+    the measured process. Validation unchanged.
+  implementation: Adds behavior. model.py may only expose per-triplet attention for
+    training batches; lightning.py collects it and publishes a per-epoch map to the
+    dataset; sampling.py mixes it into target_depths. Training batches only; no labels
+    beyond what training already uses, no validation data. Losses, optimizer and checkpointing
+    unchanged.
+  open_choices: Which attention (family, label, or pooled) forms the map; smoothing
+    width and mixture weight, fixed from geometry rather than swept; how persistent
+    workers pick up the new map each epoch.
+  dependencies: []
+  priority_rationale: The most novel family available; speculative, with weak prior
+    evidence that attention is a strong placement signal, so it ranks behind the cheaper
+    evidence-backed ideas.
+  status: queued
+  created_revision: 5
+  ranking_rationale: "I admitted registered-fluid-context-t1pd-triplets. It has no\
+    \ dependencies (proposal_admission: satisfied). It falls within the contract's\
+    \ scope, which covers how each triplet's channels are composed. Selection, counts,\
+    \ visits and the fluid slots stay byte-identical, so the triplet and visit seals\
+    \ are untouched by construction. The model is unchanged.\n\nThe mechanism is new\
+    \ to the campaign: no earlier idea puts two contrasts into one token. It also\
+    \ addresses a gap recorded in triplet-sampling findings item 2: registered middles\
+    \ coincide across contrast slots, but late fusion cannot exploit them.\n\nI checked\
+    \ the premise in the baseline source. In `model.py:220-264`, tokens meet only\
+    \ through the softmax-weighted pool. The optional residual readout adds a non-linearity\
+    \ after pooling, but not a conjunction at a given location. So cross-contrast\
+    \ features at a location can only come from the channels, and the premise holds.\n\
+    \nIt ranks third: ahead of model-feedback-depth-targets and behind residual-balanced-study-batches.\
+    \ The CPU cost is net-zero in decodes, attribution is clean because selection\
+    \ hashes don't change, and 25\u201330% of triplets are reached. The sign is uncertain,\
+    \ as the proposer says: it loses T1/PD neighbour context, which matters for OA\
+    \ labels. It shares a composition-level code path with the running slab-context\
+    \ candidate and the developing complementary-window-bags candidate. So whichever\
+    \ of those is adopted first changes its implementation base; the proposal already\
+    \ describes how to rebase onto both.\n\nI did not admit epoch-paced-bag-size:\
+    \ the same mechanism was inconclusive in triplet-sampling. I did not admit label-diverse-batch-composition:\
+    \ it largely overlaps the queued residual-balanced batches, which use training\
+    \ feedback."
+- id: run-level-stratified-jitter
+  mechanism_id: cross-epoch-stratification
+  parent_idea_id: null
+  title: Stratify each band's training draw across epochs, not only within an epoch
+  opportunity: Each epoch draws its band jitter independently, so over ten epochs
+    some candidate middles are visited repeatedly and others never. Simulated on old
+    fold-0 pools, a without-replacement schedule raised distinct middles visited per
+    run from 24.29 to 27.87 (+14.7%) at identical counts.
+  mechanism: For each (study, type, band), draw one permutation of E sub-strata from
+    an epoch-independent stream; epoch e uses sub-stratum perm[e], jittered inside
+    it. The per-epoch marginal is unchanged; sampling across the run becomes without
+    replacement.
+  precedents:
+  - autoresearch/campaigns/triplet-sampling/prior-work.md#run-level-stratified-jitter-rejected-for-adoption
+  - outputs/autoresearch/triplet-sampling/experiments/run-level-stratified-jitter-20260919T183826Z-f211c7ce
+    (0.897515, seed 4061686476)
+  - outputs/training/another-stratified-sampling (0.895177, seed 42)
+  novelty: 'Re-queued by explicit user instruction on 2026-09-21. Its adoption was
+    withdrawn after two fresh-seed runs; both sat at or above the four-control average
+    (0.8948), and later candidates were compared against its lucky run. New evidence:
+    the campaign now compares at the incumbent''s seed on the new split and labels,
+    so this is its first matched-seed test. If it fails, close the draw-coupling family
+    (common offset, rotated lattice, prefix order, supplier cycling).'
+  coverage: Increases distinct anatomy seen per pool over the run at identical counts;
+    no region loses support.
+  exploitation: Per-epoch band masses are untouched; the extra coverage comes from
+    avoided duplicate visits.
+  budget: One permutation per (study, type, band) per run; no extra decoding or state.
+    Validation selection must reproduce the incumbent's exactly.
+  implementation: Adds behavior in the percentile construction of select_triplets
+    plus one epoch-independent stream. The stratification depth E goes under data.sampling.
+    Reimplement from the archived source rather than restoring the reverted code blindly.
+  open_choices: E relative to the ten-epoch schedule; wrap-around past E; permutation
+    per band or shared. Re-measure the distinct-middle gain in the replay.
+  dependencies: []
+  priority_rationale: The only earlier mechanism with two runs, both non-negative
+    against the control average; cheap, and it settles a whole family either way.
+  status: completed
+  created_revision: 5
+  ranking_rationale: "I'm admitting misfit-steered-study-bag-density. It has no dependencies,\
+    \ and proposal_admission shows it is satisfied. It is the only registry idea that\
+    \ uses the contract's between-study triplet redistribution, and it does so at\
+    \ exact per-epoch visit and triplet totals (3,502 visits and 93,781 triplets per\
+    \ epoch). Triplet count is also the only bag property with a measured training\
+    \ effect: 20% fewer slices cost \u22120.0041 and 35% fewer cost \u22120.0051.\
+    \ Its signal is a detached per-study scalar taken from training batches only.\
+    \ Validation is untouched, and the proposal commits to a validation selection\
+    \ hash equal to the incumbent's.\n\nI rank it third. It is ahead of model-feedback-depth-targets\
+    \ because the stopped campaign found per-triplet attention feedback near-uniform\
+    \ and falsified (triplet-sampling proposals-20260919T190312Z-3039dad1 item 4a).\
+    \ It stays behind the reserved head and plane-coupled-depth-targets because it\
+    \ needs more plumbing: a shared-memory allocation table, a batch-level memory\
+    \ guard and checkpointed EMA state. Its sign is also uncertain.\n\nI'm not admitting\
+    \ epoch-paced-bag-size or label-diverse-batch-composition this event. Neither\
+    \ has new evidence, and epoch-paced-bag-size was inconclusive in the stopped campaign.\n\
+    \nThe proposal leaves several choices open: the misfit signal, the EMA factor,\
+    \ thirds versus proportional allocation, donor cuts, capacity exclusions and the\
+    \ memory-guard value. The implementation must fix each one as a constant before\
+    \ launch. The review will require a single signal, with no variants behind options."
+  experiments:
+  - run-level-stratified-jitter-20260921T224525Z-4957db3c
+  - run-level-stratified-jitter-20260921T224831Z-d1fcb8e3
+  decision: reject
+- id: epoch-paced-bag-size
+  mechanism_id: across-epoch-budget-pacing
+  parent_idea_id: null
+  title: Pace the per-visit bag size across the run at an unchanged run total
+  opportunity: Every study gets the same budget in all ten epochs, but the harness
+    fixes only run totals and per-epoch visits, not per-epoch triplet counts. Frozen-model
+    count curves are steep between about 20 and 31 triplets per study, so a plus-or-minus-one
+    offset per slot moves bags along the steep part.
+  mechanism: 'Apply a per-epoch integer offset to each slot''s budget, summing to
+    zero over the run, only where the pool has slack to realize it: smaller bags early,
+    larger late, so the epochs that usually produce the selected checkpoint see denser
+    bags. Ineligible slots keep the incumbent budget, so the realized run total is
+    unchanged by construction.'
+  precedents:
+  - autoresearch/campaigns/triplet-sampling/ideas.yaml (epoch-paced-bag-size)
+  - outputs/autoresearch/triplet-sampling/experiments/epoch-paced-bag-size-20260919T200307Z-0bdb46b8
+    (0.895606, fresh seed, against the lucky 0.897515 incumbent; above the 0.8948
+    control average)
+  - docs/history/triplet-budget-allocation.md
+  novelty: Re-queued by explicit user instruction on 2026-09-21. Its only valid run
+    used a fresh seed and was compared against the withdrawn lucky incumbent, so its
+    verdict is not evidence against the mechanism.
+  coverage: Union coverage over the run is at least the incumbent's; capacity-limited
+    slots are excluded from the offset.
+  exploitation: Late epochs train on denser bags that resolve finer depth structure.
+  budget: Run totals are unchanged, but peak activation memory rises in the large-bag
+    epochs (about +19% tokens per study at +1 on every slot); check memory and wall
+    clock in the replay. Validation unchanged.
+  implementation: Adds behavior in select_triplets after groups are known, plus one
+    schedule field under data.sampling and the SAMPLING_IDENTITY string. The replay
+    must show per-epoch rows differing while the run total equals the sealed count
+    at zero tolerance.
+  open_choices: Offset size and which slots carry it (memory decides); two-block or
+    graded schedule. By concavity of the count curve the average bag is slightly worse,
+    so the claim is about training dynamics; the reverse direction is a separate idea,
+    not a second arm.
+  dependencies: []
+  priority_rationale: One run above the control average; lower priority than the seed
+    file's ideas because the effect is expected to be small.
+  status: proposed
+  created_revision: 7
+- id: label-diverse-batch-composition
+  mechanism_id: study-batch-composition
+  parent_idea_id: null
+  title: Arrange each epoch's studies so rare-label positives spread across batches
+  opportunity: Studies are shuffled uniformly into batches of eight, so rare labels
+    (Fracture, Synovitis, MCL) are absent from many batches and clumped in others,
+    making their gradient signal bursty. Class-balanced BCE gained +0.0116 with most
+    of it on the rarest labels, so rare-label learning is where training responds.
+  mechanism: Keep every training study visited exactly once per epoch. Replace the
+    uniform shuffle with a stratified random order that spreads studies positive for
+    rare labels evenly across the epoch's batches, drawn from the training seed and
+    epoch. Only batch membership and order change.
+  precedents:
+  - docs/validation/results/2026-09-19-balanced-bce-result.md
+  - docs/research/auc_loss_approaches.md#weighting-and-sampling-design-space
+  - docs/backlog/small-changes.md#bce-weighting-and-study-sampling
+  novelty: Added by the user on 2026-09-21. Changes batch composition without changing
+    visit frequency or loss weights, so it does not overlap class-balanced BCE's weighting.
+  coverage: Every study still appears once per epoch; exposure per study is identical
+    to the incumbent.
+  exploitation: More batches carry at least one positive for each rare label, smoothing
+    their gradient signal.
+  budget: No extra decoding or compute; an ordering computed once per epoch from training
+    labels. Accounting unchanged.
+  implementation: Adds behavior in the training data loader in lightning.py (a batch
+    sampler or ordered index); validation loader untouched. Uses training labels only.
+    Losses and class-balance weights stay fixed.
+  open_choices: Which labels count as rare (a fixed prevalence threshold, not swept);
+    how to randomize within strata so batches still vary across epochs.
+  dependencies: []
+  priority_rationale: Speculative and probably small; lowest cost of all ideas, so
+    it fits late in the queue.
+  status: proposed
+  created_revision: 7
+- id: misfit-steered-study-bag-density
+  mechanism_id: training-feedback-study-bag-density
+  parent_idea_id: null
+  title: Give the training studies the model currently misfits denser bags, paid for
+    by well-fit studies, at exact per-epoch counts
+  opportunity: "Every training study gets the same per-type budgets on every visit,\
+    \ however well the model already fits it. Triplet count is the one bag property\
+    \ with a measured training effect: 20% and 35% fewer slices cost \u22120.0041\
+    \ and \u22120.0051, while test-time counts barely move a frozen model. Denser\
+    \ budgets for everyone are memory-blocked; k_05 peaks at 19.6 GiB. The contract\
+    \ explicitly allows redistributing triplets between studies at exact visit and\
+    \ run totals, and no registry idea does this with feedback. The earlier between-study\
+    \ objection rested on a-priori rules and a missing capacity table (see precedents);\
+    \ epoch 0's own sampling metadata now supplies that table. Validation-only diagnostic\
+    \ on k_05: the top third of studies holds 53% of the per-study rank error, and\
+    \ no sampling-defined subgroup explains it, so misfit is study-specific."
+  mechanism: "During training, record each study's detached misfit from its own batch:\
+    \ the class-balance weight \xD7 (BCE \u2212 H(y)), averaged over observed labels.\
+    \ Subtracting H(y) removes the soft-label entropy floor (0.56 nats at y = 0.25),\
+    \ leaving the part a better prediction can reduce. Keep a per-study EMA. From\
+    \ epoch 1, rank studies by the EMA. Raise the top third toward 32 triplets, the\
+    \ incumbent's six-type bag, by up to k = 6 (the 26\u219232 gap), never above slot\
+    \ capacity \u2212 1. Lower the bottom third by the same exact total, with at least\
+    \ 1 triplet in every present slot. Spread changes over present slots in proportion\
+    \ to incumbent budgets, so the type mix is unchanged. Epoch 0 and validation stay\
+    \ on the incumbent. Hypothesis: a misfit positive often missed its focal evidence\
+    \ in the subsample, which is bag-level label noise; a denser bag lowers that miss\
+    \ rate. Exposure and loss weights are unchanged."
+  precedents:
+  - 'outputs/autoresearch/triplet-sampling/jobs/researcher-20260919T183826Z-62f4f17b/report.json
+    item 8: between-study reallocation not proposed. Reasons: fixed-total family,
+    no capacity table, test-time concavity. The test-time curve is not the training
+    effect.'
+  - 'docs/history/triplet-budget-allocation.md: training-time counts matter; test-time
+    counts barely do. A-priori type reallocations were rejected.'
+  - "docs/backlog/overnight.md#candidates-for-later-queues: fewer slices cost \u2212\
+    0.0041 and \u22120.0051; denser budgets are memory-blocked. outputs/training/k_05/fold_0/timing.json:\
+    \ peak 19.6 GiB."
+  - docs/backlog/big-bets.md#adaptive-training-allocation and docs/research/auc_loss_approaches.md#adaptive-allocation
+    own exposure and weight feedback, and the entropy-floor, smoothing and bounds
+    cautions. This idea changes neither exposure nor weights.
+  - 'triplet-sampling findings proposals-20260919T190312Z-3039dad1 item 4a: per-triplet
+    attention feedback was falsified, and per-study utility centroids have an sd of
+    6.2 mm. So use a study-level lever, not depth.'
+  - 'Katharopoulos & Fleuret 2018 (ICML): loss-based importance sampling. Mindermann
+    et al. 2022 (RHO-LOSS, ICML): high raw loss selects noisy points; here noisy studies
+    get more slices, not more weight.'
+  - 'Validation diagnostic (k_05 fold 0, computed this session): mean rank error 0.101.
+    Thin-series studies 0.093 vs 0.103, multi-series sagittal non-FS 0.105 vs 0.100,
+    six-type studies 0.108 vs 0.099 (site-confounded).'
+  novelty: No registry idea sets per-study bag size from feedback. model-feedback-depth-targets
+    moves depths within a slot. epoch-paced-bag-size shifts counts across epochs uniformly
+    for all studies. label-diverse-batch-composition changes only the order. The general
+    backlog's adaptive-allocation big bet targets visit frequency and target weights,
+    both excluded here. This idea uses the contract's explicit between-study redistribution
+    while visits and loss weights stay fixed.
+  coverage: Every present slot keeps at least one triplet, and donors lose at most
+    6 triplets per visit. Recipients' per-run distinct middles rise. Persistent donors
+    still see at least 20 triplets per visit. Report per-epoch realized per-study
+    counts, recipient and donor turnover, and distinct middles per study over the
+    run against the incumbent.
+  exploitation: Extra evidence goes to the studies whose predictions are furthest
+    from their targets. EMA smoothing keeps persistent misfits dense and damps oscillation.
+    The type mix and depth law are unchanged, so any density cue is weak. Validation
+    bags share one density, so a learned density offset would shift every study equally
+    and leave rankings unchanged.
+  budget: Visits (3,502) and triplets (93,781) per epoch are held exactly by construction,
+    so the run totals stay 35,020 and 937,810. Decoded slices per epoch are unchanged
+    in expectation. The signal is a detached per-study scalar from logits that are
+    already computed. Without a guard, P(all 8 studies in a batch at 32) rises from
+    about 2e-6 to about 2e-3. After the uniform shuffle, a swap pass therefore caps
+    every batch's planned total at the incumbent's largest per-batch total in the
+    replay. Validation is untouched, and its selection hash must equal the incumbent's.
+  implementation: "Adds behavior. It retains targets, groups, suppliers, crop and\
+    \ the validation path, and changes only training per-slot budgets from epoch 1.\
+    \ lightning.py: compute the misfit in training_step and keep the per-study EMA.\
+    \ Read per-slot capacity and realized triplets from epoch-0 batch['sampling'].\
+    \ At on_train_epoch_start (e \u2265 1), compute the allocation, assert that the\
+    \ per-epoch planned sum equals 93,781, and write it into a shared int16 table\
+    \ [studies \xD7 slots]. The table belongs to the training KneeStudyDataset and\
+    \ is allocated with share_memory_() before workers start. A batch sampler takes\
+    \ the uniform permutation and applies the swap pass. dataset.py: _study_budgets\
+    \ returns the table row only when training and populated. Save the EMA and table\
+    \ in checkpoints, and write per-epoch diagnostics. Use fixed constants, no config\
+    \ key. Before launch, a CPU replay with a synthetic random signal must reproduce\
+    \ the counts and the validation hash. On a new incumbent: rebase and apply the\
+    \ offsets to its budgets and capacities; with epoch pacing, keep its per-epoch\
+    \ totals."
+  open_choices: 'The misfit signal: entropy-corrected weighted BCE, or label-free
+    prediction volatility across visits. The EMA factor. Thirds versus proportional
+    allocation. Whether donors are cut equally or proportionally. Whether multi-source
+    slots near capacity are excluded from raises, to avoid assignment shortfall. The
+    exact memory-guard value from the replay. All of these are fixed before launch;
+    none is swept.'
+  dependencies: []
+  priority_rationale: It is the only proposal that uses the lever with a measured
+    training effect (count), through an unused contract freedom, with exact counts
+    and incumbent-bounded memory. It is more promising than attention-depth feedback,
+    whose signal was measured as near-uniform. The sign is uncertain and it needs
+    moderate loop plumbing. Recommend it after the cheap queued items (run-level-stratified-jitter,
+    plane-coupled-depth-targets) and ahead of model-feedback-depth-targets.
+  status: completed
+  created_revision: 60
+  ranking_rationale: "I admitted slab-context-triplet-channels. It has no dependencies\
+    \ (proposal_admission satisfied) and falls inside the contract's \"how each triplet's\
+    \ channels are composed\" scope. It leaves selection, counts, validation x1, the\
+    \ 224 px input, 0.625 mm spacing, 140 mm FOV and augmentation untouched. What\
+    \ changes is the preprocessing and pixel identity, in the same way for training,\
+    \ validation and inference. That is allowed if it is recorded under preprocessing_identity.\
+    \ It is also the only queued mechanism aimed at per-visit through-plane reach.\
+    \ That lever has the strongest measured evidence: 20% fewer slices cost \u2212\
+    0.0041. Selection stays identical and the validation selection hash is unchanged,\
+    \ so the result is easy to attribute.\n\nI ranked it second, right behind the\
+    \ reserved head (misfit, already prepared). It goes ahead of complementary-window-bags\
+    \ because it needs less plumbing and reaches every series. The researcher's new\
+    \ bound says between-study reallocation cannot gain through draw variance; the\
+    \ misfit ranking comes out neutral at 0.995\u20131.002. That lowers the prior\
+    \ for misfit density and suggests the same for model-feedback-depth-targets, whose\
+    \ steering signal is also noisy. So model-feedback-depth-targets stays last.\n\
+    \nepoch-paced-bag-size and label-diverse-batch-composition stay proposed and unqueued.\
+    \ For epoch-paced, the new probe says \xB11 per slot raises draw variance by about\
+    \ 10%, and the earlier campaign was inconclusive. Neither adds new evidence that\
+    \ would justify queueing it over the four ideas above."
+  experiments:
+  - misfit-steered-study-bag-density-20260921T233929Z-2f854803
+  decision: reject
+- id: complementary-window-bags
+  mechanism_id: bag-level-in-plane-window-coverage
+  parent_idea_id: null
+  title: Split each slot's triplets between two 140 mm windows at opposite ends of
+    the measured tissue extent, so the bag covers the full field while every triplet
+    keeps its size and spacing
+  opportunity: "Every triplet uses one image-centred 140 mm window, so every triplet\
+    \ drops the same measured tissue. The stored FOV has a median of 160 mm (p95 182\u2013\
+    190). The leg crosses the top and bottom edges in sagittal and coronal series,\
+    \ so about 10 mm is lost at each end at the median FOV. Sagittal AP tissue has\
+    \ a median of 146 mm and exceeds 140 mm in 67 of 96 series. Tissue overhang beyond\
+    \ 10 mm occurs in 34% of sagittal series (mostly posterior), 16% of axial and\
+    \ 9% of coronal. Placement alone cannot fix this: the joint-line anchor was null\
+    \ (\u22120.00095), tissue centring moves the window only a few mm, and 'only a\
+    \ wider field helps', but the field is sealed. The model scores the bag through\
+    \ softmax pooling over all of a study's tokens, so study-level coverage is the\
+    \ union over triplets. That union is currently no larger than one window. New\
+    \ evidence: the anchor run's 'patellofemoral/superior coverage cost' does not\
+    \ hold up. Its per-label deltas correlate at r=0.72 with those of the unrelated\
+    \ physical-span run and at r=0.59 with the k1\u2212k05 difference, so nothing\
+    \ measured shows that moving a window costs anything."
+  mechanism: "For each prepared series, measure the tissue extent along both in-plane\
+    \ axes from one coarse tissue mask on a reference slice. When the leg crosses\
+    \ both edges, the extent is the image extent. On an axis whose extent exceeds\
+    \ 140 mm, define two windows flush with its two ends, each shifted by s=(extent\u2212\
+    140)/2 and clipped to the image. On axes that fit, keep today's image-centred\
+    \ placement. Window A takes the superior/anterior ends and window B the inferior/posterior\
+    \ ends, in patient coordinates from IOP. The pairing therefore follows the importance\
+    \ map's measured hemisphere contrasts: patella, suprapatellar recess and effusion\
+    \ are anterosuperior; Baker's cyst and tibiofemoral OA are posteroinferior. Selection\
+    \ is unchanged. The slot's selected triplets alternate A/B over depth-sorted bands.\
+    \ Validation is deterministic (the lowest band takes A). Training draws a random\
+    \ phase per (study, slot, epoch) from a new 'windows' stream, so the targets,\
+    \ suppliers and band_order streams are untouched. Every triplet stays 224 px at\
+    \ 0.625 mm and 140 mm. A central core of width 140\u22122s is seen by every triplet,\
+    \ and the outer strips by half of them. output_to_native carries the shift, so\
+    \ the patient maps and medial axis stay exact. On failure, fall back to the image\
+    \ centre."
+  precedents:
+  - "outputs/autoresearch/sampling/experiments/anatomy-anchored-crop-placement-20260921T221837Z-3b5416fc:\
+    \ a single moved window, \u22120.00095, reject. Its tissue mask and IOP axis helpers\
+    \ are reusable; its joint-line estimator and draw-dependent reference slice are\
+    \ not."
+  - 'docs/research/input-resolution.md#field-of-view-and-joint-position: FOV median
+    160 mm; sagittal AP width 146 mm; overhang table; ''only a wider field helps'';
+    2026-09-21 decision to keep 140 mm/0.625 mm.'
+  - 'docs/validation/results/2026-09-15-two-crops-result.md and docs/history/crop-selection-investigation.md:
+    learned smaller crops at a changed size and resolution cost 0.003; coverage mattered
+    as much as resolution. That is a different mechanism.'
+  - "docs/data-preparation/peripheral-coverage.md#spatial-importance-map: surviving\
+    \ hemisphere contrasts. PF OA anterior +1.85; effusion superior +1.23; Baker's\
+    \ posterior \u22121.23 and inferior \u22120.90."
+  - "docs/research/input-resolution.md#field-of-view-and-joint-position: 150\u2192\
+    140 mm gave +0.003 local (confounded with resolution); 128\u2013130 mm crops lost\
+    \ MCL, Baker's, effusion and medial meniscus."
+  - "Per-label correlation computed this session from the assignment's per_label deltas\
+    \ and docs/validation/results/2026-09-21-class-balance-exponent.md: span vs anchor\
+    \ r=0.72; span and anchor vs k1\u2212k05 r=0.43 and 0.59."
+  novelty: 'This is the first mechanism in the registry to act on in-plane coverage
+    at bag level. anatomy-anchored-crop-placement moved one window per series and
+    traded regions against each other; this idea adds the discarded strips without
+    removing the core. It is not a field-of-view or spacing change: each triplet is
+    still 140 mm at 0.625 mm. It is not augmentation: placement is deterministic from
+    measured tissue and identical in validation and inference, and only the band phase
+    is random in training. It is not learned crop selection: nothing is learned and
+    no label or score steers placement.'
+  coverage: 'On each exceeding axis, bag-union coverage grows by 2s: about +20 mm
+    in SI for sagittal and coronal at the median FOV, and +6 mm in AP for the median
+    sagittal series, more for the 34% that overhang. The old window''s inner edge
+    strips drop from full to half density, and the new outer strips rise from zero
+    to half. Before any GPU run, a label-free CPU probe should report the distribution
+    of s per plane and axis, the share of series with two windows, and the tissue-mask
+    area covered by the bag union against the baseline.'
+  exploitation: "None by design. This is a coverage mechanism. The depth law, counts,\
+    \ suppliers and the central 140\u22122s mm core are identical to the incumbent's.\
+    \ Structures that are currently cut every time (the suprapatellar recess, popliteal\
+    \ fossa, MCL tibial attachment, fibular head and metaphyses) enter half the triplets."
+  budget: 'No added GPU work: same triplet count, same pixels per triplet. Selected
+    slice paths are unchanged. Two selected triplets share a slice only when they
+    overlap, so the per-window extra resamples are rare; decode frames once and resample
+    per window. One coarse tissue mask per series per visit. The anchor run''s estimator
+    measured 0.123 vs 0.124 s per study and ran in 1,591 s against the 1,847 s ceiling.
+    The estimate runs at inference through the shared KneeStudyDataset path. Validation
+    stays deterministic at x1. Its pixel and preprocessing identity change and must
+    be recorded.'
+  implementation: 'Adds behavior; it replaces image-centred placement only on exceeding
+    axes. spatial.py: shift parameters in _crop_geometry/resample_crop, output_to_native
+    including the shift, and a tissue-extent estimator (adapt the anchor source''s
+    coarse tissue mask; not its joint-line code). preparation.py: decode each unique
+    slice once, resample per required window, cache by (path, window), and compute
+    the extent once per series from a draw-independent reference slice. sampling.py:
+    emit a window label per selected triplet (validation parity over depth-sorted
+    bands; training phase from rng(''windows'')), and add a SAMPLING_IDENTITY entry.
+    dataset.py: thread labels through _prepare_slot. model.py is unchanged. Retain
+    every other component. If a new incumbent is accepted during development (e.g.
+    plane-coupled-depth-targets or misfit-steered density), rebase: windows attach
+    to whatever triplets it selects and read no depth or count stream.'
+  open_choices: 'The reference slice for the extent: the series'' middle-index slice
+    (at most 6 extra decodes per study) or the selected slice nearest it (no extra
+    decode, but slightly draw-dependent). A diagonal A/B pairing versus independent
+    per-axis parity. The minimum s that triggers two windows, fixed a priori on the
+    pixel grid (e.g. 2 px), never swept. Whether a plane''s two contrast slots share
+    parity per band (registered pairs if plane coupling is adopted). position_2d stays
+    window-relative, matching its augmented-input-anchor design; adding the window
+    offset would be a separate choice.'
+  dependencies: []
+  priority_rationale: 'It is the only untested lever that recovers tissue the sealed
+    window discards, and it adds no GPU compute. The anchor''s apparent regional cost
+    is shown to be a reference artifact. The expected gain is modest and the sign
+    uncertain: placement changes of about 10 mm were null, and half-density strips
+    may matter less than full ones. It needs moderate preprocessing plumbing and a
+    label-free coverage probe first. I''d rank it after the queued misfit-steered
+    density and ahead of model-feedback-depth-targets, whose per-triplet signal was
+    measured near-uniform.'
+  status: prepared
+  created_revision: 78
+  ranking_rationale: "I admitted registered-fluid-context-t1pd-triplets. It has no\
+    \ dependencies (proposal_admission: satisfied). It falls within the contract's\
+    \ scope, which covers how each triplet's channels are composed. Selection, counts,\
+    \ visits and the fluid slots stay byte-identical, so the triplet and visit seals\
+    \ are untouched by construction. The model is unchanged.\n\nThe mechanism is new\
+    \ to the campaign: no earlier idea puts two contrasts into one token. It also\
+    \ addresses a gap recorded in triplet-sampling findings item 2: registered middles\
+    \ coincide across contrast slots, but late fusion cannot exploit them.\n\nI checked\
+    \ the premise in the baseline source. In `model.py:220-264`, tokens meet only\
+    \ through the softmax-weighted pool. The optional residual readout adds a non-linearity\
+    \ after pooling, but not a conjunction at a given location. So cross-contrast\
+    \ features at a location can only come from the channels, and the premise holds.\n\
+    \nIt ranks third: ahead of model-feedback-depth-targets and behind residual-balanced-study-batches.\
+    \ The CPU cost is net-zero in decodes, attribution is clean because selection\
+    \ hashes don't change, and 25\u201330% of triplets are reached. The sign is uncertain,\
+    \ as the proposer says: it loses T1/PD neighbour context, which matters for OA\
+    \ labels. It shares a composition-level code path with the running slab-context\
+    \ candidate and the developing complementary-window-bags candidate. So whichever\
+    \ of those is adopted first changes its implementation base; the proposal already\
+    \ describes how to rebase onto both.\n\nI did not admit epoch-paced-bag-size:\
+    \ the same mechanism was inconclusive in triplet-sampling. I did not admit label-diverse-batch-composition:\
+    \ it largely overlaps the queued residual-balanced batches, which use training\
+    \ feedback."
+  experiments:
+  - complementary-window-bags-20260922T003339Z-8e49982f
+- id: slab-context-triplet-channels
+  mechanism_id: through-plane-slab-context-channels
+  parent_idea_id: null
+  title: Fill each triplet's two outer channels with the mean of the adjacent and
+    next slice, so a visit's triplets reach 70% instead of 49% of each series' slices
+    at unchanged selection, count and GPU cost
+  opportunity: "Seeing more slices per visit is the strongest measured sampling lever,\
+    \ but the triplet count is sealed and denser budgets are memory-bound (peak 19.6\
+    \ GiB). Measured evidence:\n- In training, 20% fewer slices cost \u22120.0041.\n\
+    - On frozen checkpoints, averaging 12 random draws beats one draw by +0.007 macro\
+    \ (0.8917/0.8915/0.8944 vs 0.8841/0.8844/0.8869).\n- A cache probe (300 studies\
+    \ \xD7 3 draws, training counts) shows that one visit's triplet channels reach\
+    \ only 49% of a series' candidate slices: 58% within \xB130 mm, 36% beyond.\n\
+    - Draw sensitivity concentrates in focal-lesion positives. The positive/negative\
+    \ ratio of per-study draw SD is Fracture 3.5\u20134.4, Lateral Meniscus 2.5\u2013\
+    3.0, MCL 2.5\u20132.8, ACL 2.3\u20132.7, Contusion 2.2\u20132.5 and Baker's 2.0\u2013\
+    2.2, against 0.6\u20131.0 for Effusion, PF OA and Medial Meniscus.\n- Training\
+    \ is GPU-bound (93% utilization, 2\u20137 of 16 loader workers busy), so extra\
+    \ decodes are almost free."
+  mechanism: "Selection (middles, groups, suppliers, assignment, counts) stays byte-identical.\
+    \ At preparation, for each selected triplet with middle s in run R:\n- channel\
+    \ 1 is s, unchanged;\n- channel 0 is the pixel mean of normalized s\u22121 and\
+    \ s\u22122;\n- channel 2 is the pixel mean of normalized s+1 and s+2.\n\nWhen\
+    \ s\xB12 is missing from the run or fails to decode, that channel stays s\xB1\
+    1 alone, the exact baseline. Intensity bounds are computed over the same retained\
+    \ triplet slices as today and then applied to the context slices, so normalization\
+    \ is unchanged. Averaging happens before uint8 quantization.\n\nThe rule is deterministic\
+    \ and label-free, and identical in training, validation and inference. Middle\
+    \ position, patient maps and tokens per triplet are unchanged. Per-visit channel\
+    \ reach rises from 49% to 70% (central 58% to 80%, peripheral 36% to 56%) at a\
+    \ median gap of 3.72 mm. Each triplet's context extends to about \xB17.4 mm instead\
+    \ of \xB13.7 mm, and the fine detail of the middle slice is kept.\n\nThe mean\
+    \ is chosen over a MIP because a MIP would erase dark menisci, ligaments and cortex."
+  precedents:
+  - "physical-span-standardized-triplets (this campaign, reject, \u22120.00047): it\
+    \ changed outer-channel spacing only in thin series, with selection unchanged.\
+    \ The earlier researcher showed its per-label pattern is a k_05 reference artifact\
+    \ (r=0.72 with the anchor run), so changing channel content is not known to hurt."
+  - "triplet-sampling researcher-20260919T204527Z-eeeaf8d6, exhausted item 1: spending\
+    \ budget on adjacent pairs as separate triplets cost \u22120.0081 on a frozen\
+    \ model. This idea puts adjacency inside the triplet at no budget cost."
+  - "researcher-20260921T224526Z-92a4b780, exhausted directions: thin-series slab\
+    \ averaging was dismissed for small reach (2\u20134% of triplets). This idea covers\
+    \ every series with 5 or more slices in a run and aims at coverage, not harmonization."
+  - "docs/validation/results/2026-09-16-restored-code-hyperparameter-runs.md and docs/backlog/overnight.md#candidates-for-later-queues:\
+    \ fewer slices cost \u22120.0041 and \u22120.0051; denser budgets are memory-blocked."
+  - "docs/validation/results/2026-09-17-test-time-allocation.md: \xD72 evaluation\
+    \ count \u2248 +0.0035 on frozen checkpoints (training counts \u22120.00346 against\
+    \ default)."
+  - "Probe: outputs/autoresearch/sampling/jobs/researcher-20260921T233929Z-cdc19f71/scratch/probe/SUMMARY.md\
+    \ (coverage.py reach 49\u219270%; headroom.py 12-draw mean +0.007; per-label draw-SD\
+    \ ratios). Cache-only and frozen, on the validation cohort; not a training result."
+  - "Zheng et al. 2019, IEEE TMI 39(3):797\u2013805 (arXiv 1904.05956) and Zheng et\
+    \ al. 2020, CMPB (PMID 32615493): slab projections of several thicknesses as extra\
+    \ 2D CNN inputs improved small-lesion sensitivity."
+  - "docs/modeling/training-runtime-and-memory.md#validation-loader-waves: training\
+    \ is GPU-bound at 93%, with 2\u20137 of 16 workers busy."
+  novelty: This is the first mechanism that raises the number of slices seen per visit
+    without changing counts, the depth law or selection. physical-span changed channel
+    spacing on thin series only. A search of docs for slab, MIP and 2.5D channels
+    finds no earlier composition experiment. It differs from the exhausted thin-series
+    slab averaging in reach (all series), in aim (coverage per visit) and in keeping
+    the middle slice exact.
+  coverage: "Per-visit channel reach rises from 49% to 70% of candidate slices, and\
+    \ from 58% to 80% within \xB130 mm, where total utility is flat. Run-level coverage\
+    \ of middles is unchanged because selection is identical. Report the realized\
+    \ reach per plane, the share of triplets with context on both sides, and fallback\
+    \ counts from the replay."
+  exploitation: None by design. Depth law, counts, suppliers and middle slices are
+    unchanged. Outer channels carry thicker context around the same middle, so focal
+    lesions one slice beyond today's reach contribute to the triplet at half contrast.
+  budget: "GPU work, tokens and activation memory are unchanged: three channels per\
+    \ input and the same triplets. Decodes rise from 3 to at most 5 per triplet; context\
+    \ slices shared with nearby triplets decode once through the per-slot cache. Expect\
+    \ roughly +50\u201365% decode CPU. Training is GPU-bound with idle workers, so\
+    \ the training epoch should hardly move. Validation passes may be loader-bound\
+    \ in waves and could lengthen. The full replay must be measured against 1,847\
+    \ s (reference 1,605.7 s; recent candidates 1,575\u20131,591 s). Validation stays\
+    \ deterministic at x1."
+  implementation: "Adds behavior, retains everything else.\n- sampling.py build_pool:\
+    \ attach to each Triplet a context pair (run[m\u22122] or None, run[m+2] or None).\
+    \ Groups, targets and assignment are untouched. Add a SAMPLING_IDENTITY composition\
+    \ entry.\n- dataset.py _prepare_slot: pass each selected triplet's context alongside\
+    \ its records.\n- preparation.py prepare_series:\n  - decode unique context paths\
+    \ through the same cache;\n  - exclude them from the intensity scratch and normalize\
+    \ them with the same bounds;\n  - average them into channels 0 and 2 over the\
+    \ intersection of the valid rects;\n  - on a context failure, fall back silently\
+    \ to s\xB11, with no retry, and count it in the metadata.\n- Keep selected_paths\
+    \ as the three triplet paths, so the validation selection hash stays f7ad4380\u2026\
+    \ Only the preprocessing and pixel identity change; record that.\n- Degeneration\
+    \ check by execution: with context disabled, prepared tensors equal the baseline's.\n\
+    \nIf plane-coupled-depth-targets or misfit density is accepted during development,\
+    \ rebase unchanged: composition acts after any selection. If complementary-window-bags\
+    \ is accepted, resample context slices in their triplet's window, with the cache\
+    \ keyed on (path, window)."
+  open_choices: "- Index-based \xB12 is recommended: it is uniform in acquisition\
+    \ sampling, reduces exactly to the baseline at run edges, and barely changes thin\
+    \ 3D series, so it does not repeat the physical-span test. The alternative is\
+    \ a physical cap that drops s\xB12 beyond a fixed distance derived from the measured\
+    \ spacing (e.g. twice the 3.72 mm median gap). Settle once; no sweep.\n- Equal\
+    \ 1:1 weights (recommended) or distance weighting.\n- Whether context failures\
+    \ should ever enter the retry loop (recommended: no)."
+  dependencies: []
+  priority_rationale: 'It is the only unexplored route to the strongest measured lever,
+    slices seen per visit, at sealed count and GPU. Its reach is large (every series),
+    its cost is loader CPU only, and it is cleanly interpretable because selection
+    and the validation selection hash are unchanged. The sign is uncertain: blurred
+    outer channels might dilute fine through-plane cues. I''d put it after the developing
+    misfit idea, ahead of complementary-window-bags (similar potential, less plumbing)
+    and ahead of model-feedback-depth-targets.'
+  status: launched
+  created_revision: 96
+  ranking_rationale: 'I admitted residual-balanced-study-batches. It has no dependencies,
+    and proposal_admission is satisfied. I placed it third: after the reserved head
+    and complementary-window-bags, and ahead of model-feedback-depth-targets.
+
+
+    Why admit it:
+
+    - It is the only in-scope lever that leaves every visit''s inputs unchanged. Only
+    batch membership and order change, so attribution is cleaner than for any idea
+    already in the registry.
+
+    - It costs almost nothing: CPU greedy packing, under a second per epoch.
+
+    - It is a feedback mechanism, which the campaign lacks apart from the running
+    misfit-density candidate.
+
+
+    I checked the two claims it rests on:
+
+    - Selection RNG is keyed per (seed, study, type, operation, epoch), not by loader
+    order (`sampling.py:471-474`). Per-study bags therefore stay byte-identical under
+    reordering.
+
+    - The accounting digests sort per-study rows (`accounting.py:28-78`). Training
+    selection_sha256 and triplet/visit counts must therefore equal the baseline replay''s.
+    That gives a hard pre-launch check.
+
+
+    Why third and not higher:
+
+    - How much a logit-space batch-variance reduction translates into macro AUC is
+    unmeasured.
+
+    - The expected effect is plausibly below the ~0.003 same-seed sampling noise.
+
+    - The complementary-window and slab ideas change what the model sees and carry
+    larger prior-backed upside.
+
+
+    It goes ahead of model-feedback-depth-targets because it cannot create a label
+    shortcut and it is cheaper to execute.
+
+
+    I left the other two proposals unadmitted:
+
+    - label-diverse-batch-composition: the researcher''s probe shows it strictly weaker
+    than residual balancing (0.51-0.69 against 0.24-0.53 of random batch error) and
+    fading late in training. It stays proposed. It is not queued, so parking does
+    not apply.
+
+    - epoch-paced-bag-size: no new evidence this event.'
+  experiments:
+  - slab-context-triplet-channels-20260922T000626Z-2a4a7330
+  - slab-context-triplet-channels-20260922T001723Z-f7832c5b
+- id: residual-balanced-study-batches
+  mechanism_id: training-feedback-batch-composition
+  parent_idea_id: null
+  title: Build each epoch's batches so the studies' stale per-label loss-gradient
+    residuals cancel within every batch, with identical per-study bags, visits and
+    steps
+  opportunity: 'The training loader shuffles studies uniformly into batches of 8 (lightning.py:184-189).
+    A per-study vector r = w(y)*(sigmoid(z)-y)*observed is that study''s logit gradient
+    under the loss, and it is persistent. On k_05''s per-epoch validation predictions,
+    R^2 from epoch e to e+1 is 0.82 at 0->1 and 0.95-1.00 from epoch 5. Random batches
+    therefore carry avoidable between-study noise. k_05 looks noise-floor limited:
+    validation AUC is 0.8990/0.8978/0.8987 at epochs 7-9 as the LR decays, and train
+    loss is 0.433 against validation soft BCE 0.445. Batch composition is the only
+    in-scope lever that leaves every visit''s inputs byte-identical. No registry idea
+    steers it with feedback.'
+  mechanism: 'Keep a per-study residual table. Initialise it from training labels
+    as w*(pi-y)*observed, with pi the training-fold prevalence; this is the residual
+    of a prior-only model. Overwrite each row with the detached residual from the
+    study''s own training_step. At each epoch''s iterator creation, centre the vectors.
+    Open 437 batches of 8 and one of 6 (3,502 studies, 438 steps). Visit studies in
+    a seeded random order and put each into the open batch that minimises ||batch
+    sum + r||, subject to a per-batch planned-triplet cap. Then shuffle batch order
+    and within-batch order. Every study still appears exactly once, and its bag is
+    unchanged: selection RNG is keyed on (seed, study, type, epoch), not order. Each
+    step now mixes over- and under-predicted studies per label, so the minibatch gradient
+    in logit space tracks the epoch mean. Lower Adam second moments are part of the
+    effect and cannot be separated.'
+  precedents:
+  - 'Probe (this job): scratch/probe/SUMMARY.md, order_probe.py, batch_probe.py, robustness_probe.py.
+    Batch-mean residual error vs random: stale greedy 0.24-0.53, oracle 0.29-0.35.
+    With per-visit noise: 0.51-0.56 at 80% clean share, 0.72-0.78 at 60%. Deterministic
+    validation inputs, not a training result.'
+  - 'label-diverse-batch-composition (proposed, static): the label-balanced analogue
+    in the probe reaches only 0.51-0.69, worsening as residuals decouple from labels.'
+  - 'Lu et al. NeurIPS 2022, GraB (arXiv 2205.10733): stale-gradient herding order.
+    Probed here: prefix discrepancy halves (22->14), but batch-of-8 error is still
+    0.79-0.82 even with an oracle.'
+  - 'Zhao & Zhang 2014 (arXiv 1405.3080): stratified minibatches reduce variance.
+    Zhang, Kjellstrom & Mandt, UAI 2017 (arXiv 1705.00607): DPP-diversified minibatches
+    lower gradient variance.'
+  - 'misfit-steered-study-bag-density (launched): its BagDensityBatchSampler and on_train_epoch_start
+    plumbing. Lightning fit_loop.py:435-452 and training_epoch_loop.py:239-246 create
+    the epoch iterator after on_train_epoch_start for epochs >0.'
+  - researcher-20260921T231233Z-92b631e0 exhausted batch composition acting through
+    gradient clipping (clip never binds). This mechanism acts through gradient variance
+    instead.
+  - 'src/knee_abnormality/autoresearch/accounting.py:28-78: the per-study selection
+    digest is order-independent, so the training selection hashes must equal the baseline
+    replay''s.'
+  novelty: This is the first feedback-steered batch composition, and the repo has
+    no stratified, diversified or herding minibatch work. label-diverse uses static
+    labels and measured clearly weaker late in training. misfit density and model-feedback
+    depth change inputs; this changes none. It targets the between-study gradient
+    mixture, not exposure, weights or depths.
+  coverage: 'Identical by construction: each study is visited once per epoch with
+    the incumbent''s exact bag. Every epoch''s training selection_sha256 must equal
+    the baseline replay''s (cd57bdc2..., c6319067..., ...), and validation stays f7ad4380....
+    Only batch membership, batch order and GPU-side random streams change. Record
+    each epoch''s batch sizes (437x8 + 1x6) and one visit per study.'
+  exploitation: 'The model''s own stale residuals steer the gradient mix, not the
+    inputs. The between-study batch residual variance is expected to fall to roughly
+    0.3-0.75x of random, depending on per-visit noise from augmentation and series
+    dropout, which is unmeasured. Misfit rare positives spread across batches: batches
+    with at least one positive rise for Synovitis 0.63->0.78 and Lateral Meniscus
+    0.72->0.81. Well-fit common positives spread less.'
+  budget: Main-process CPU only. The greedy build is 3,502 x <=438 x 13 dimensions
+    per epoch, well under a second. Per-step bookkeeping is one detached sigmoid on
+    8x12 logits. There are no extra decodes, tokens or GPU work. Peak memory is bounded
+    by the planned-total cap, set at the maximum per-batch total from epoch 0 inside
+    the process. Runtime should match recent candidates (1,575-1,591 s against the
+    1,847 s ceiling). Validation is unchanged.
+  implementation: 'Replaces only the training loader''s uniform shuffle; everything
+    else is retained and nothing removed. dataset.py: add a batch sampler with set_epoch
+    that seeds its RNG from (training seed, epoch) and builds batches from a main-process
+    residual table and bag-total table. Workers need no shared state. build_data_loader
+    uses it only for training; validation and batch_norm_loader stay unchanged. lightning.py:
+    initialise the table from training labels. In training_step, write detached residuals
+    by study index. Record each study''s bag total from epoch-0 batch[''sampling''].
+    Save and restore both tables in checkpoints and write per-epoch diagnostics. Use
+    constants, not config keys. Before launch, a CPU replay with synthetic residuals
+    must show 438 batches, one visit per study, and baseline-equal training selection
+    hashes. If misfit density is accepted meanwhile, replace its randperm and swap
+    pass with this build. Use its planned totals as the size input and its cap, and
+    keep its allocation. slab, window and depth-feedback ideas are orthogonal.'
+  open_choices: 'The residual source: the last visit (recommended, since residuals
+    are stable) or an EMA to damp augmentation and series-dropout noise. For bag size,
+    a hard cap only, or also a balancing coordinate scaled to the median residual
+    norm (recommended: both). Epoch 0: the prior-residual table (recommended) or a
+    uniform shuffle. Per-label scaling stays the loss''s own w. Fix all of these before
+    launch, with no sweep.'
+  dependencies: []
+  priority_rationale: 'Expected gain is modest and uncertain, and the translation
+    from logit-space variance to AUC is unmeasured. Cost is negligible, though, and
+    there is no shortcut risk. Attribution is the cleanest in the campaign: inputs
+    are hash-identical and only batch membership changes. Either outcome closes the
+    batch lever, including label-diverse. Rank it after slab-context and complementary-window-bags,
+    ahead of model-feedback-depth-targets. It supersedes label-diverse-batch-composition.'
+  status: queued
+  created_revision: 119
+  ranking_rationale: "I admitted registered-fluid-context-t1pd-triplets. It has no\
+    \ dependencies (proposal_admission: satisfied). It falls within the contract's\
+    \ scope, which covers how each triplet's channels are composed. Selection, counts,\
+    \ visits and the fluid slots stay byte-identical, so the triplet and visit seals\
+    \ are untouched by construction. The model is unchanged.\n\nThe mechanism is new\
+    \ to the campaign: no earlier idea puts two contrasts into one token. It also\
+    \ addresses a gap recorded in triplet-sampling findings item 2: registered middles\
+    \ coincide across contrast slots, but late fusion cannot exploit them.\n\nI checked\
+    \ the premise in the baseline source. In `model.py:220-264`, tokens meet only\
+    \ through the softmax-weighted pool. The optional residual readout adds a non-linearity\
+    \ after pooling, but not a conjunction at a given location. So cross-contrast\
+    \ features at a location can only come from the channels, and the premise holds.\n\
+    \nIt ranks third: ahead of model-feedback-depth-targets and behind residual-balanced-study-batches.\
+    \ The CPU cost is net-zero in decodes, attribution is clean because selection\
+    \ hashes don't change, and 25\u201330% of triplets are reached. The sign is uncertain,\
+    \ as the proposer says: it loses T1/PD neighbour context, which matters for OA\
+    \ labels. It shares a composition-level code path with the running slab-context\
+    \ candidate and the developing complementary-window-bags candidate. So whichever\
+    \ of those is adopted first changes its implementation base; the proposal already\
+    \ describes how to rebase onto both.\n\nI did not admit epoch-paced-bag-size:\
+    \ the same mechanism was inconclusive in triplet-sampling. I did not admit label-diverse-batch-composition:\
+    \ it largely overlaps the queued residual-balanced batches, which use training\
+    \ feedback."
+- id: registered-fluid-context-t1pd-triplets
+  mechanism_id: cross-contrast-registered-channel-composition
+  parent_idea_id: null
+  title: Fill each T1/PD triplet's two outer channels with the identically prescribed
+    fluid series' slices at the same two neighbouring positions, so about a quarter
+    of each bag's tokens see both contrasts registered at pixel level
+  opportunity: "The attention pool is linear in token values with no token interaction\
+    \ (model.py:220-264). The model therefore cannot form cross-contrast conjunctions\
+    \ at a location, such as fluid-bright with T1/PD-dark marrow for edema versus\
+    \ fat, or fluid inside a meniscal line. Header probe (128 studies, headers.parquet):\
+    \ coronal and sagittal fluid/T1/PD pairs are parallel in 83-92%. 71-73% of pairs\
+    \ have \u226590% of slices within 0.5 mm, and 83% share the in-plane centre within\
+    \ 1 mm. T1/PD middles whose two neighbour positions both match an aligned fluid\
+    \ slice: 0.68 axial, 0.73 coronal, 0.66 sagittal. Fluid types carry about 3/4\
+    \ of the separation at 1.07-1.64x per-token efficiency, against 0.39-0.86 for\
+    \ T1/PD. Removing a T1/PD type costs \u22640.002 (axial: 0)."
+  mechanism: "Selection stays byte-identical, including middles, bands, suppliers,\
+    \ counts and the fluid slots. For each selected triplet in a non-fluid slot, with\
+    \ middle s and neighbours s-1 and s+1, look in the same plane's fluid slot. Take\
+    \ the first source in its pool ranking with the same row and column orientation\
+    \ (dot \u22650.9995) and an image centre within 1 mm in-plane. It must have slices\
+    \ within 0.5 mm along the normal of both s-1 and s+1. When found, channels become\
+    \ [fluid@(s-1), T1/PD s, fluid@(s+1)]; otherwise the triplet keeps baseline composition.\
+    \ Both-or-neither keeps channels 0 and 2 exchangeable under sagittal reflection.\
+    \ Partner slices are resampled by their own geometry into the same 140 mm window.\
+    \ They are normalized with bounds from the partner slices used in the slot, at\
+    \ the same quantiles. The rule is deterministic, label-free and identical in training,\
+    \ validation and inference. In training, the independent contrast draws add fluid\
+    \ slices to each visit: roughly +45% fluid slices per coronal or sagittal plane,\
+    \ and fewer T1/PD neighbours. In validation the partner lattices coincide (median\
+    \ 0.00 mm), so the change there is conjunction, not coverage."
+  precedents:
+  - 'Probe this job: scratch/probe/contrast_registration.py, t1pd_partner_reach.py
+    on outputs/analysis/geometry-metadata-20260912/headers.parquet (128 studies; not
+    the sealed cohort). Figures are in the opportunity field.'
+  - 'triplet-sampling findings item 2: validation middles coincide across contrast
+    slots (0.91-0.97 within 5 mm, median 0.00 mm). Removing co-location was slightly
+    negative, suggesting registered pairs are complementary, but ''the model has no
+    cross-contrast registration to exploit them''.'
+  - 'plane-coupled-depth-targets (this campaign, reject, -0.0004): more depth co-location
+    without pixel-level fusion did nothing, consistent with late fusion being unable
+    to use registration.'
+  - "docs/validation/results/2026-09-17-type-contribution.md (fluid share and efficiency;\
+    \ coronal and sagittal T1/PD lead medial and lateral OA) and 2026-09-17-test-time-allocation.md\
+    \ (removal costs: T1/PD \u22640.002, fluid 0.006-0.007)."
+  - 'researcher-20260921T224526Z-92a4b780 exhausted note called cross-contrast registered
+    fusion a model redesign. Contested here: model.py is unchanged, the contract scopes
+    channel composition, and slab-context-triplet-channels was admitted for the same
+    kind of train/validation/inference composition change.'
+  - 'Isensee et al. 2021 Nat Methods (nnU-Net): co-registered sequences as input channels
+    is standard. arXiv 1908.01997 reports late fusion can beat pure early fusion;
+    this idea keeps the pure late-fused fluid tokens and adds early fusion only in
+    T1/PD tokens.'
+  novelty: This is the first campaign mechanism to put two contrasts into one token.
+    physical-span and slab-context change through-plane content within one series.
+    plane-coupling and interleaving change only which depths each contrast slot samples.
+    Selection and supplier rules are untouched; a partner series supplies channels,
+    not triplets.
+  coverage: 'Run-level coverage of middles is unchanged. Per-visit fluid slices touched
+    rise in training, while T1/PD neighbour slices fall for the ~2/3 of T1/PD triplets
+    that convert, about 25-30% of all triplets. Report per plane: conversion share,
+    fallback reasons (orientation, centre, position, decode), and distinct fluid and
+    T1/PD slices touched per visit, against the baseline replay.'
+  exploitation: None through selection. The backbone gains pixel-level cross-contrast
+    features in converted tokens and keeps the T1/PD middle slice. Pure fluid tokens
+    are unchanged. Even converting the near-useless axial T1/PD slot (removal costs
+    about 0) carries axial fluid context, the top type for Baker's cyst, effusion
+    and synovitis.
+  budget: GPU, tokens and memory are unchanged. Up to two own-neighbour decodes per
+    converted triplet are replaced by two partner decodes, so the net decode count
+    is about zero. The partner series are already indexed, because slot_sources covers
+    every slot before preparation. Matching is a per-triplet position lookup, plus
+    one extra quantile over the partner slices per slot. Expect a runtime close to
+    recent candidates (1,575-1,591 s, ceiling 1,847 s); confirm in the replay. Validation
+    stays x1 and deterministic. Selection hashes are unchanged, but the preprocessing
+    and composition identity change and must be recorded.
+  implementation: "Adds behavior and retains all baseline components. Fluid slots\
+    \ and unmatched T1/PD triplets keep baseline composition, and nothing is removed.\
+    \ dataset.py: pass the same plane's fluid slot sources, in pool ranking order,\
+    \ to _prepare_slot for non-fluid slots. sampling.py or preparation.py: a deterministic\
+    \ partner matcher that records partner records per triplet, plus a SAMPLING_IDENTITY\
+    \ composition entry. preparation.py prepare_series: accept an optional partner\
+    \ pair per triplet. Generalize the consecutive-slice check to own middles only.\
+    \ Decode partner paths through the slot cache, compute partner bounds, and take\
+    \ channel 0/2 pixels, valid rects and patient maps from the partner. If a partner\
+    \ decode fails, fall back to own s\xB11 with no retry-loop change. Keep own middle\
+    \ positions. Degeneration check: with matching disabled, tensors equal the baseline.\
+    \ Newly accepted incumbent: with slab-context, partner channels use its outer\
+    \ rule inside the partner series; with complementary-window-bags, resample partners\
+    \ in the triplet's window (cache keyed by path and window); batch or depth feedback\
+    \ is orthogonal."
+  open_choices: 'Tolerances are fixed a priori from the bimodal header distribution
+    (exact prescription versus different), never swept: 0.5 mm along the normal, 1
+    mm centre, 0.9995 orientation. Partner bounds come from the partner slices in
+    this slot (recommended); reusing the fluid slot''s bounds would couple slots.
+    Require both neighbours (recommended); single-side mixing breaks reflection symmetry.
+    Extending to same-geometry second sources within a slot (dual-echo) is out of
+    this idea. Inter-series motion is invisible to headers; image registration is
+    not proposed.'
+  dependencies: []
+  priority_rationale: 'It is the only untested in-scope way to give the model cross-contrast
+    conjunctions, and it costs no GPU. Reach is about 25-30% of triplets, it raises
+    per-visit fluid exposure in training, and attribution is clean because selection
+    hashes are unchanged. The sign is uncertain: early-fusion evidence is mixed, lost
+    T1/PD neighbours could cost OA labels, motion is unmeasured, and fluid redundancy
+    across slots weakens series dropout''s effect on fluid content. I''d rank it after
+    the slab-context result (rebase if adopted), alongside residual-balanced batches,
+    and ahead of model-feedback-depth-targets.'
+  status: queued
+  created_revision: 135
+  ranking_rationale: "I admitted registered-fluid-context-t1pd-triplets. It has no\
+    \ dependencies (proposal_admission: satisfied). It falls within the contract's\
+    \ scope, which covers how each triplet's channels are composed. Selection, counts,\
+    \ visits and the fluid slots stay byte-identical, so the triplet and visit seals\
+    \ are untouched by construction. The model is unchanged.\n\nThe mechanism is new\
+    \ to the campaign: no earlier idea puts two contrasts into one token. It also\
+    \ addresses a gap recorded in triplet-sampling findings item 2: registered middles\
+    \ coincide across contrast slots, but late fusion cannot exploit them.\n\nI checked\
+    \ the premise in the baseline source. In `model.py:220-264`, tokens meet only\
+    \ through the softmax-weighted pool. The optional residual readout adds a non-linearity\
+    \ after pooling, but not a conjunction at a given location. So cross-contrast\
+    \ features at a location can only come from the channels, and the premise holds.\n\
+    \nIt ranks third: ahead of model-feedback-depth-targets and behind residual-balanced-study-batches.\
+    \ The CPU cost is net-zero in decodes, attribution is clean because selection\
+    \ hashes don't change, and 25\u201330% of triplets are reached. The sign is uncertain,\
+    \ as the proposer says: it loses T1/PD neighbour context, which matters for OA\
+    \ labels. It shares a composition-level code path with the running slab-context\
+    \ candidate and the developing complementary-window-bags candidate. So whichever\
+    \ of those is adopted first changes its implementation base; the proposal already\
+    \ describes how to rebase onto both.\n\nI did not admit epoch-paced-bag-size:\
+    \ the same mechanism was inconclusive in triplet-sampling. I did not admit label-diverse-batch-composition:\
+    \ it largely overlaps the queued residual-balanced batches, which use training\
+    \ feedback."

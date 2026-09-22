@@ -31,6 +31,11 @@ parameters in `removed_components` unless those components actually exist in the
 supplied parent source. For example, adapting a rejected loss onto a baseline that
 never contained that loss is `mode: add` with `removed_components: []`, even when
 the adapted design deliberately omits settings from the rejected implementation.
+Before returning the report, compare the final diff with `parent_source` once more:
+if any parent component is absent from the candidate, include it in
+`removed_components` and set `mode` to `replace`; otherwise set `mode` to `add` and
+use `removed_components: []`. This is a schema consistency check, not a scientific
+judgment. Never return `mode: add` with a nonempty `removed_components` list.
 
 Inspect the diff, configuration, sampling-count accounting, training randomness,
 validation determinism, topic-specific coverage, and added computation. Follow the repository

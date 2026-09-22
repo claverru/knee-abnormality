@@ -42,6 +42,40 @@ Since 2026-09-21, PF OA in both training and evaluation comes from the
 The split's evaluation targets were rewritten by user decision. Medial and lateral OA are still
 Steven v4.
 
+## Richer report supervision: OA attributes
+
+**Accepted for the backlog on 2026-09-21; investigation, implementation and training unstarted.**
+Train image features to predict reliable anatomical/severity information from reports beyond
+the twelve disease targets. [MedKLIP](https://arxiv.org/abs/2301.02228) motivates structured
+report supervision in chest radiographs; the proposed small auxiliary heads are a knee-specific
+adaptation, not a reproduction or a measured gain.
+
+1. **Bounded extraction pilot:** start with compartment-specific OA severity attributes, not a
+   broad concept vocabulary. Define and audit an assertion-aware extraction policy on training
+   reports, with a separate report panel for confirmation. Version the policy, source text
+   identity, extracted values and observation masks; report coverage and class counts. Do not
+   invent severity from report silence, unresolved wording or the existing disease probability.
+   Any learned extractor must exclude the outer validation partition. Stop if reliable attribute
+   supervision is too sparse to justify training.
+2. **Training-only heads:** reuse the corresponding image-derived pooled features for small
+   auxiliary predictors; supervise only supported attributes. Compartment identity routes the
+   evidence to the correct target; do not add a constant compartment-classification task where
+   the disease head already fixes it. Keep all twelve disease targets, gold overrides and the
+   current disease loss unchanged. Fix the attribute encoding and auxiliary loss coefficient
+   before the comparison. Discard auxiliary heads at inference; reports are never model inputs.
+3. **Controlled comparison:** fresh current-recipe control versus auxiliary supervision only,
+   preserving the split, evaluation targets, incumbent seed, image workload and training budget.
+   Follow the [controlled-comparison rules](../validation/validation-strategy.md#controlled-comparisons),
+   recording macro/per-label AUC, paired uncertainty, auxiliary coverage/loss and runtime.
+   Attribute-prediction accuracy is diagnostic, not the adoption metric.
+
+This learns finding content, unlike the existing
+[report-state head](small-changes.md#auxiliary-report-state-prediction), which predicts whether
+a finding was reported. It is also separate from [OA label repair](#oa-only-rubric-aligned-label-repair):
+that investigation changes disease supervision and still excludes auxiliary heads from its own
+comparison. Do not combine the interventions. Finding-level text alignment is not part of this
+accepted pilot. Start only in a user session; training remains user-launched.
+
 ## Position and knee side
 
 **The supervised anatomical-attention sequence is closed:** learned family strengths
@@ -183,28 +217,47 @@ completed comparison.
 
 ## Intermediate stride-16 feature fusion
 
-**Hypothesis; external evidence only.** ReXNet-200 passes only its final stride-32 map (7×7 at
-224 px) to the MIL head. Fuse a stride-16 map from the same backbone,
-`F = P16(F16) + resample_to_F16_anchors(P32(F32))`, both projected to 256, and run the existing
-embeddings and MIL on the 14×14 grid. It tests whether spatial detail is lost inside the encoder,
-not whether the input needs more pixels ([bigger images](endgame.md#bigger-images) stays in the
-endgame). The pattern follows [feature pyramid networks](https://arxiv.org/abs/1612.03144), whose
-evidence is object detection.
+**Hypothesis; external evidence only, unimplemented and untested.** This investigation owns
+both late-stage ReXNet truncation and stride-16/stride-32 fusion, merged by user decision on
+2026-09-21. Compare the following arms in order, with each feature map projected to 256 channels:
 
-- *Geometry:* verify the intermediate module, channels, stride and anchor origin on the
-  instantiated ReXNet rather than assuming a stage name; resample by anchor coordinates, not
-  generic resizing; recompute positions and visual validity on the new grid with the affine and
-  reflection handling (`src/knee_abnormality/modeling/spatial_tokens.py`,
+| Arm | Features sent to the existing embeddings and MIL | Grid at 224 px | Deep stride-32 stage |
+|---|---|---|---|
+| Current-model control | `P32(F32)` | 7×7 | Retained |
+| Truncation | `P16(F16)` | 14×14 | Removed |
+| Fusion | `P16(F16) + resample_to_F16_anchors(P32(F32))` | 14×14 | Retained |
+
+Truncation tests the accuracy/compute tradeoff of using an earlier representation. Fusion asks
+whether adding the deeper features improves on that earlier output enough to justify their cost.
+The control-to-truncation comparison changes both representation depth and token resolution.
+Input-resolution changes remain in [bigger images](endgame.md#bigger-images).
+
+The [backbone research](../research/backbone-mri-evidence.md#answer) records CheXtransfer's
+evidence for trimming pretrained blocks without a significant chest-X-ray AUC loss. Fusion
+follows [feature pyramid networks](https://arxiv.org/abs/1612.03144), whose evidence is object
+detection. Neither establishes a knee-MRI gain.
+
+- *Cut point:* verify the final stride-16 stage boundary on the instantiated ReXNet. Retain
+  pretrained weights through it and rebuild the projection from its actual channel width.
+  Truncation removes all subsequent bottleneck blocks and the terminal expansion. Removing only
+  the terminal 1×1 expansion is excluded; preserving the 7×7 grid is not a requirement.
+- *Geometry:* verify module, channels, stride and anchor origin; resample fusion features by
+  anchor coordinates rather than generic resizing. Recompute positions and visual validity
+  with the affine and reflection handling (`src/knee_abnormality/modeling/spatial_tokens.py`,
   [geometry audit](../data-preparation/spatial-token-geometry-and-mapping-audit.md)). The retired
   crop-selection scout already resampled a stride-32 map at stride-16 anchors
   ([plan](../history/crop-selection-plan.md)).
-- *Cost:* 196 tokens per triplet instead of 49 (up to 12,544 per validation study), so projection,
-  embeddings, attention and activations grow. A user-launched memory and runtime check comes
-  first; do not silently shrink the batch or change BatchNorm behaviour. It changes the model
-  identity and the inference feature extraction.
-- *Keep fixed:* 224 px, 0.625 mm, the 140 mm field and slice budgets; no scout, learned crop or
-  second backbone.
+- *Cost:* both candidates use 196 tokens per triplet instead of 49. Measure whether additional
+  projection, embeddings, attention and activations offset the backbone work saved by truncation.
+  A user-launched memory/runtime check comes first; do not silently shrink the batch or change
+  BatchNorm behavior. Record the cut point and model identity in checkpoints and exports.
+- *Comparison:* fresh current-model control, identical labels, split, incumbent seed, optimizer,
+  training budget and attention-head architecture. Keep 224 px, 0.625 mm, the 140 mm field and
+  triplet budgets fixed, with no scout, learned crop or second backbone. Report macro/per-label
+  AUC, paired uncertainty, parameters, training time, memory and full inference time. Parameter
+  savings alone do not establish a runtime gain or preserved AUC.
 - *Order:* after the cheaper [attention and readout changes](small-changes.md#attention-pooling).
+  Implementation and user-launched training remain pending; this is the sole backlog owner.
 
 ## Image-model predictions as a label source
 
@@ -230,6 +283,68 @@ measure how much the model leans on scanner or site shortcuts. The gap between t
 the estimate. An unverified competitor README claims a random split inflates AUC by about 0.05
 through scanner memorization. Run it once, never as a development split, and only if a
 scanner-specific failure is suspected.
+
+## Adaptive training allocation
+
+**Investigation plan, accepted by the user on 2026-09-22; unstarted.** Let the per-label class
+weights change during training instead of fixing their strength. Judge every candidate on the
+public leaderboard.
+
+**Evidence that motivates it:**
+
+- **Static strength.** At the same seed on the scanner split, public scores are k=0.5 0.945,
+  k=0.25 0.944, unweighted 0.943 and k=1 0.940 (S40–S44), while fold-0 validation ranks them in
+  the reverse order; k=0.75 is training. The earlier S34→S38 pair moved validation +0.0129 and
+  public −0.003 ([result](../validation/results/2026-09-21-class-balance-exponent.md)).
+- **Likely mechanism (moderate confidence).** The weights sharpen the report extractor's decision
+  boundary on rare labels. The validation deficit against the training labeller is about twice
+  the deficit against nine independent extractors
+  ([rescoring](../validation/results/2026-09-21-class-balance-exponent.md#rescoring-against-other-label-sources)),
+  and on the 58 gold studies reports under-call Synovitis and over-call Effusion, Contusion, MCL
+  and ACL. The largest k=1 weights (MCL 17.4, Fracture 14.5) fall on the labels whose report
+  positives disagree most with official ones
+  ([positive rates](../validation/results/2026-09-21-class-balance-exponent.md#report-derived-and-official-positive-rates)).
+- **External.** Best weighting strengths sit below full balancing (focal α ≈ 0.75, square-root
+  sampling, seesaw p = 0.8, class-balanced β < 0.9999); progressive sampling beat class-balanced
+  sampling in Kang et al. Weighting cannot change population-optimal within-label AUC, so its
+  effects come from finite training and gradient variance
+  ([weighting evidence](../research/auc_loss_approaches.md#weighting-strength-evidence-2026-09-21)).
+- **Old loss-campaign verdicts do not transfer.** Focal (−0.0026), soft-mass balancing (−0.0092),
+  biproportional weights (−0.0043) and the prior offset (−0.0119) were judged on report-derived
+  fold-0 validation on `all_5fold_v3`, which is the judge the exponent result discredits for
+  weighting.
+
+**Design constraint.** The adaptive signal must not reward agreement with report labels:
+up-weighting high-loss or lagging rare positives would chase the labeller the leaderboard
+penalises. Candidates therefore relax the weights over training or down-weight persistent
+disagreements.
+
+**Candidates** (hypotheses; one run each):
+
+1. **Scheduled exponent.** k changes per epoch, balancing early so rare labels are learned and
+   relaxing late, e.g. 1 → 0. The reverse direction, deferred re-weighting
+   ([Cao et al. 2019](https://arxiv.org/abs/1906.07413)), won in long-tail vision, so the
+   direction is two-sided; run the evidence-motivated 1 → 0 first. Needs epoch-dependent weights
+   in the training loop and resume checks that record the schedule.
+2. **Noise-aware down-weighting.** Reduce the weight of rare-label cells the model confidently
+   contradicts over training: [self-paced loss correction](../research/auc_loss_approaches.md#12-self-paced-loss-correction--splc),
+   small-loss selection, or bootstrapped targets β·y + (1 − β)·p
+   ([Reed et al. 2014](https://arxiv.org/abs/1412.6596)). Aimed at the gold-versus-report
+   disagreement; the risk is suppressing genuinely hard positives.
+3. **Per-label task weighting.** One adaptive weight per label from training dynamics:
+   uncertainty weighting ([Kendall et al. 2018](https://arxiv.org/abs/1705.07115)), which
+   down-weights noisy labels, or [GradNorm](https://proceedings.mlr.press/v80/chen18a.html). No
+   knee evidence.
+
+**Excluded.** Meta-learning the weights on the gold studies: 58 studies, gold AUC does not track
+the leaderboard, and gold weighting is ruled out. Study-exposure allocation (visit frequency) was
+dropped from the sampling scope by user decision on 2026-09-21.
+
+**Protocol.** Reference: the current recipe at k=0.5 (`k_05`, S41, 0.945), seed 2263738815. Export
+each run at ×4 and τ 0.75 and submit; record fold-0 validation and the nine-extractor rescoring
+as secondary diagnostics. Three seeds of one earlier model spanned 0.003 public
+([seed controls](../inference/submissions/2026-09-17-seed-control-submissions.md)). An autoresearch
+campaign under the shared validation ×1 rule cannot judge this line.
 
 ## Parked until a specific need
 
@@ -298,17 +413,6 @@ mirrored anatomy or a shared report template alone cannot establish identity.
 Keep candidate, likely acquisition overlap and confirmed duplicate evidence
 separate. Change fold groups only with convincing evidence and rerun a baseline
 on any revised split; never silently rewrite the existing membership.
-
-### Adaptive training allocation
-
-**Hypothesis; unstarted, no chosen controller.** Investigate whether training history can usefully
-allocate target weights or study exposure toward learnable ranking errors. The
-[research note](../research/auc_loss_approaches.md#adaptive-allocation) owns the candidate signals,
-soft-BCE entropy floor, sampling feedback bias and distinction between error and expected gain.
-Define a training-only signal, smoothing, coverage and allocation limits before choosing an
-implementation. Compare against uniform exposure and a relevant static allocation at the same
-training budget. High raw loss alone is not the design. The static alternatives live only in
-[small changes](small-changes.md#bce-weighting-and-study-sampling).
 
 ### Other parked work
 

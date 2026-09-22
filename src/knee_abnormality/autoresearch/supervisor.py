@@ -21,6 +21,8 @@ from knee_abnormality.autoresearch.context import build_context, prompt_sizes
 from knee_abnormality.autoresearch.diagnostics import diagnostics_path, read_diagnostics
 from knee_abnormality.autoresearch.gates import (
     ACCEPTANCE_RULE,
+    EVALUATION,
+    acceptance_text,
     active_incumbent_ideas,
     config_differences,
     dependency_blockers,
@@ -64,6 +66,13 @@ from knee_abnormality.autoresearch.storage import (
     write_json,
 )
 from knee_abnormality.config import load_config
+
+
+def seed_files(docs: Path):
+    return sorted(
+        docs.glob("seed-ideas*.yaml"),
+        key=lambda path: (path.name != "seed-ideas.yaml", path.name),
+    )
 
 
 def identifier(prefix):
@@ -179,7 +188,9 @@ class Supervisor:
         recipe = load_config(self.root / self.campaign["recipe"], folds=[0])
         config = recipe.model_dump(mode="json")
         reference = (self.root / self.campaign["reference_run"]).resolve()
-        limits = initial_limits(reference, config)
+        limits = initial_limits(
+            reference, config, self.campaign["reference_equivalences"]
+        )
         validate_config(config, config, self.policy)
         headers = (
             self.root
@@ -232,10 +243,10 @@ class Supervisor:
             "refill_below": self.campaign["backlog"]["refill_below"],
             "refill_to": self.campaign["backlog"]["refill_to"],
         }
-        seeds = self.docs / "seed-ideas.yaml"
-        if seeds.exists():
-            self.import_ideas(seeds)
-        else:
+        seeds = seed_files(self.docs)
+        for path in seeds:
+            self.import_ideas(path)
+        if not seeds:
             self.save()
 
     def event(self, kind, payload):
@@ -386,6 +397,7 @@ class Supervisor:
         context["python_executable"] = sys.executable
         context["incumbent_training_seed"] = reference_seed(self.state["incumbent"])
         context["acceptance_rule"] = dict(ACCEPTANCE_RULE)
+        context["shared_evaluation"] = dict(EVALUATION)
         if role != "completion_reporter":
             context["campaign_policy"] = self.policy.model_dump(
                 mode="json",
@@ -406,8 +418,8 @@ class Supervisor:
             "every new candidate uses the current incumbent's recorded training seed, enforced by the supervisor. "
             "Historical runs retain their actual seeds; do not relabel them as matched. "
             "The live state's incumbent and recorded user reference transition supersede starting-reference instructions in archived contracts. "
-            "User-directed adoption policy supersedes interval-sign gates in archived contracts and findings: "
-            "adopt only when valid macro AUC improvement >= 0.001 AND the central 80% paired-bootstrap lower bound is strictly positive; otherwise discard. "
+            "The shared evaluation and adoption rule supersede any restatement in archived contracts and findings: "
+            f"{acceptance_text()}. "
             "The 95% and per-label intervals remain diagnostic; do not add other adoption thresholds. "
             "Do not keep pending implementation branches or schedule automatic confirmation runs. "
             "Campaign authorization overrides ordinary user-only training guidance, but ONLY the supervisor launches training. "

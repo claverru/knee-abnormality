@@ -2,6 +2,7 @@
 
 | Read when | Document |
 |---|---|
+| Choosing class-weighting strength; why fold-0 validation and the public leaderboard disagree on weighting (k=1, 0.5, unweighted; S40–S42) | [2026-09-21 class-balance exponent](2026-09-21-class-balance-exponent.md) |
 | Reviewing the first run on combined labels and the scanner split: per-label AUC, the tie with learned strength on shared studies, attention-temperature sweep | [2026-09-21 combined-labels first run](2026-09-21-combined-labels-first-run.md) |
 | Choosing loss variants or seeds for an ensemble; loss-campaign subset search and selection optimism | [2026-09-21 loss ensemble simulation](2026-09-21-loss-ensemble-simulation.md) |
 | Reviewing the shared meniscus compartment adapter | [2026-09-20 compartment adapter](2026-09-20-compartment-adapter-result.md) |

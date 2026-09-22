@@ -146,7 +146,11 @@ def run_fold(
     labels = data.labels
     training_studies = len(data.train_dataset)
     class_balance = (
-        fixed_class_balance(data.train_dataset.studies, labels.targets)
+        fixed_class_balance(
+            data.train_dataset.studies,
+            labels.targets,
+            config.trainer.class_balance_exponent,
+        )
         if config.trainer.class_balanced_bce
         else None
     )

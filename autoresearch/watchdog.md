@@ -2,7 +2,8 @@
 
 The optional watchdog checks an existing campaign once a minute using ordinary
 Python. Healthy checks make no model requests. A paused campaign or dead supervisor
-triggers one Codex repair session using the configured Codex orchestrator profile.
+triggers one Codex repair session using the Codex `watchdog` profile in
+[agents.yaml](agents.yaml), GPT-5.6 Luna at medium effort.
 The campaign keeps its own research provider; a Claude campaign remains Claude.
 
 Enable monitoring only when operational repairs and resume are authorized:

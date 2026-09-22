@@ -240,7 +240,7 @@ class Watchdog:
         atomic_write(attempt / "stdin.txt", prompt)
         profile = yaml.safe_load((self.root / "autoresearch/agents.yaml").read_text())[
             "codex"
-        ]["orchestrator"]
+        ]["watchdog"]
         write_json(
             attempt / "assignment.json",
             {

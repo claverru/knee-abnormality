@@ -11,7 +11,11 @@ from this file.
 
 ## Next queue
 
-Empty. The [2026-09-20 fourteen-run queue](../validation/results/2026-09-20-overnight-hyperparameter-results.md)
+The class-balance exponent sweep is complete, run by hand on 2026-09-21–22 and judged on the
+public leaderboard: unweighted 0.943, k=0.25 0.944, k=0.5 0.945, k=0.75 0.942, k=1 0.940
+([result](../validation/results/2026-09-21-class-balance-exponent.md)). No run is queued.
+
+The [2026-09-20 fourteen-run queue](../validation/results/2026-09-20-overnight-hyperparameter-results.md)
 completed in 6 h 8 m. No change is adopted: milder scaling was the best candidate
 but inconclusive against both controls; control B beat every candidate. The head-LR,
 intensity, affine, dropout, decay and warm-up arms are recorded under already measured.

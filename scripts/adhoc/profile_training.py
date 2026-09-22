@@ -230,6 +230,7 @@ def loader_candidate(
         fixed_class_balance(
             dataset.studies[sample.indices],
             dataset.targets,
+            config.trainer.class_balance_exponent,
         )
         if config.trainer.class_balanced_bce
         else None
@@ -415,7 +416,9 @@ def run(args: ProfileCLI) -> None:
     started = time.perf_counter()
     dataset, labels = sample_dataset(config, args.samples)
     class_balance = (
-        fixed_class_balance(dataset.studies, dataset.targets)
+        fixed_class_balance(
+            dataset.studies, dataset.targets, config.trainer.class_balance_exponent
+        )
         if config.trainer.class_balanced_bce and args.mode in ("gpu", "lightning")
         else None
     )
