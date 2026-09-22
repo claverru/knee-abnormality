@@ -19,6 +19,22 @@ sessions run at once.
   deals whole studies into cells balanced per frame byte-length and truncates to the shared count.
 - Pure-CPU probes (resample, quantiles, sampling) need no NFS and can be answered locally.
 
+## Separate host variance from the change
+
+Kaggle hosts differ mostly in NFS speed: on 2026-09-22 identical loader code spent 592–696 loader
+CPU-seconds, and one host's 36% iowait added ~120 s to a run
+([profile](../../inference/2026-09-22-kaggle-x4-startup-and-gpu-preparation.md)). Treat a single-run
+wall difference under ~15 s as noise; report CPU-seconds per role, busy and iowait, and setup
+timestamps with every arm, and repeat a run whose host is not CPU-saturated.
+
+## Profile in the production environment
+
+A stage probe that runs outside `run_prediction_processes` misses whatever the worker environment
+sets, which is how the 2026-09-15 loading cell overstated preprocessing once the glibc tunables were
+added. For whole-pipeline attribution the `fp16-b4-w16-pyspy` condition samples every process of a
+real prediction run; it lost the loader workers once they forked before model load, so check its
+sample count before reading it.
+
 ## Measure intensity work on real pixels
 
 Never on a generator. A coarse-histogram quantile selection measured **1.87x faster on synthetic

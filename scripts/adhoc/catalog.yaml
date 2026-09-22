@@ -135,6 +135,7 @@ scripts:
     docs: [docs/data-preparation/physical-sampling/INDEX.md]
 
   - id: inspect-physical-preparation
+    status: historical
     path: scripts/adhoc/inspect_physical_preparation.py
     summary: Inspect overlapping CPU preparation on real accepted and rejected-center studies without models or tests.
     tags: [sampling, preparation, overlap, intensity, geometry, threading, cpu]
@@ -148,6 +149,7 @@ scripts:
       - No synthetic fixtures, models, training, optimizer steps or test harness. Failure coverage depends on the real sample.
       - Refuses existing output directories and preserves source, configuration and input identities; sources are copied to source/<repo-relative path>.
       - The source manifest records the configured backbone's spatial mapping identity.
+      - Historical since the 2026-09-22 GPU image preparation, because it reads per-series prepared images and intensity bounds that loader workers no longer produce, so it needs the source of ab49830 or earlier.
     docs: [docs/data-preparation/current-preparation.md#overlapping-triplet-preparation, docs/data-preparation/physical-sampling/implementation-verification.md]
 
   - id: audit-sampling-protocols
@@ -249,6 +251,7 @@ scripts:
       - The suite measures input discovery, worker startup, preprocessing, collation, optional pinning and optional host-to-device delivery without model execution.
     docs: [docs/data-preparation/production-dicom-integration.md, docs/inference/INDEX.md]
   - id: profile-threaded-loading
+    status: historical
     path: scripts/adhoc/profile_threaded_loading.py
     summary: Compare worker-local slice threads against process-only loading on fixed real studies.
     tags: [profile, threading, parallel, dataloader, throughput, gpu, preprocessing]
@@ -271,6 +274,7 @@ scripts:
       - Uses triplet sampling and complete-group failure handling; records triplets, channel appearances and unique source slices separately. Historical single-slice measurements use their source/config snapshots.
       - Uses shared production physical/local selection and retry preparation; decode threading only changes unique-path pixel loading.
       - Audit mode compares all collated fields with production on real studies without using CUDA.
+      - Historical since the 2026-09-22 row-trimmed reads, because its threaded arm patches read_frame, which the native decode path no longer calls; run it against the source of ab49830 or earlier.
     docs: [docs/data-preparation/threading-inside-dataset-loading.md]
   - id: profile-training
     path: scripts/adhoc/profile_training.py
@@ -300,11 +304,13 @@ scripts:
 
   - id: profile-kaggle-inference
     path: scripts/adhoc/profile_kaggle_inference.py
-    summary: Run a frozen inference bundle over fold-0 training studies in one Kaggle notebook per runtime condition, then score FP16/FP32 parity and break down startup, loader, transfer, forward and per-stage DICOM loading time.
-    tags: [profile, inference, kaggle, notebook, t4, fp16, precision, runtime, efficiency, loader, workers, nfs, dicom, headers, throughput, parity, auc]
+    summary: Run a frozen inference bundle over fold-0 training studies in one Kaggle notebook per runtime condition, then score FP16/FP32 parity and break down startup, loader, transfer, forward and per-stage DICOM loading time; also probes startup, audits prepared-image parity against a reference bundle and censuses preparation failures.
+    tags: [profile, inference, kaggle, notebook, t4, fp16, precision, runtime, efficiency, loader, workers, nfs, dicom, headers, throughput, parity, auc, startup, import, cuda, spin, py-spy, census, bit-exact, audit]
     commands:
       - rtk proxy uv run --locked python -m scripts.adhoc.profile_kaggle_inference launch --bundle outputs/submission/exports/run-fold0 --dataset OWNER/knee-profile-run-fold0 --output-dir outputs/profiling/kaggle-inference-new --conditions '["fp16-b4-w8","fp16-b4-w16"]'
       - rtk proxy uv run --locked python -m scripts.adhoc.profile_kaggle_inference launch --bundle outputs/submission/exports/run-fold0 --dataset OWNER/knee-profile-run-fold0 --output-dir outputs/profiling/kaggle-loading-new --conditions '["loading"]'
+      - rtk proxy uv run --locked python -m scripts.adhoc.profile_kaggle_inference launch --bundle outputs/submission/exports/new-code --dataset OWNER/knee-profile-new-code --reference-dataset OWNER/knee-profile-old-code --output-dir outputs/profiling/kaggle-parity-new --conditions '["parity"]' --target-studies 1300 --split-dir data/folds/all_5fold_scanner_v1
+      - rtk proxy uv run --locked python -m scripts.adhoc.profile_kaggle_inference launch --bundle outputs/submission/exports/run-fold0 --dataset OWNER/knee-profile-run-fold0 --output-dir outputs/profiling/kaggle-census-new --conditions '["census-0","census-1","census-2","census-3","census-4"]' --concurrency 5 --target-studies 1300 --split-dir data/folds/all_5fold_scanner_v1
       - rtk proxy env CUDA_VISIBLE_DEVICES= uv run --locked python -m scripts.adhoc.profile_kaggle_inference analyze --output-dir outputs/profiling/kaggle-inference-20260915
     inputs: [Exported inference bundle with instrumented runtime, Frozen fold membership and targets, Local BF16 validation predictions of the bundled checkpoint, Kaggle credentials]
     outputs: [Private Kaggle dataset and notebooks, status.json with push and run states, Per-condition notebook outputs and logs, cpu.csv and processes.csv samples, summary.json with AUC parity, timing, per-role CPU and loading-stage breakdown]
@@ -318,7 +324,15 @@ scripts:
       - Prediction runs attribute CPU per role — coordinator, GPU main processes and loader workers — from processes.csv. Loader workers are forked and inherit the parent's cmdline, so the split is by parentage, never by command text.
       - The loading cell reports wall and process CPU per stage, and keeps the pool-thread functions in a thread-seconds bucket that must never be added to a wall column. Analysis reads only this format; artifacts written before 2026-09-18 do not have it.
       - The loading and precision cells import the bundle's knee_abnormality.data, data.preprocessing and inference.engine/checkpoint modules, so they need a bundle exported from the current package layout; bundles exported before 2026-09-16 (such as knee-reflection-sigma40-fast-20260915) only support prediction conditions.
-    docs: [docs/inference/2026-09-15-kaggle-inference-profiling.md, docs/inference/2026-09-18-kaggle-x4-profile-after-index-changes.md]
+      - The startup condition times cold and warm imports with -X importtime, each model-load step in a fresh process, and CPU against wall of a backbone loop with default and blocking CUDA synchronization, with and without four CPU burners.
+      - The parity condition attaches a second bundle through --reference-dataset and prepares the same studies with each bundle's code in its own process, comparing per-series digests of the uint8 images and geometry tensors; use it to prove a change to hashed preprocessing sources bit-exact.
+      - The census-0..4 conditions split every study of --split-dir across five CPU notebooks and record every preparation failure at the bundle's multiplier.
+      - The cudnn condition times the first FP16 chunk and steady chunks of a random-weight backbone under default, legacy (TORCH_CUDNN_V8_API_DISABLED) and benchmark cuDNN selection, and compares their outputs.
+      - The mainloop condition prepares 64 studies with the bundle's code and times page-locking, transfer, prepare_images (and its sort), forward and release per batch with synchronization, uncontended.
+      - The fp16-b4-w16-pyspy condition enables internet, installs py-spy and samples every process of a prediction run; check its sample count, since it lost the loader workers once they forked before model load.
+      - Every notebook selects its bundle by the dataset slug through KNEE_BUNDLE_DIR, so extra attached datasets do not confuse bundle discovery; environment.json records the /dev/shm size.
+      - Bundles that change hashed preprocessing sources need a timing checkpoint of the new identity (make-timing-checkpoint); their predictions are unscored.
+    docs: [docs/inference/2026-09-15-kaggle-inference-profiling.md, docs/inference/2026-09-18-kaggle-x4-profile-after-index-changes.md, docs/inference/2026-09-22-kaggle-x4-startup-and-gpu-preparation.md]
 
   - id: make-timing-checkpoint
     path: scripts/adhoc/make_timing_checkpoint.py
@@ -559,6 +573,7 @@ scripts:
     docs: [docs/inference/submissions/ledger.md#naming]
 
   - id: measure-intensity-bound-stability
+    status: historical
     path: scripts/adhoc/measure_intensity_bound_stability.py
     summary: Measure how far the per-series intensity clipping bounds move between training draws, and how far per-triplet bounds move within one acquisition.
     tags: [intensity, normalization, quantile, clipping, bounds, sampling, stability, draw, epoch, augmentation, preparation, cpu]
@@ -572,6 +587,7 @@ scripts:
       - Records the pipeline's own intensity_bounds and independently recomputes pooled quantiles from the decode cache; the recomputed 0.995 level reproduces the recorded high bound.
       - Spreads are (max - min) / median over the draws of one series, compared against the configured intensity augmentation's contrast range.
       - The triplet rows answer what per-triplet bounds would cost, since a triplet's three consecutive slices are fixed by its middle index.
+      - Historical since the 2026-09-22 GPU image preparation, because intensity bounds are now computed on the device, so it needs the source of ab49830 or earlier.
     docs: [docs/backlog/big-bets.md]
 
   - id: simulate-loss-ensembles

@@ -662,22 +662,60 @@ def pydicom_read_header(path: Path) -> DicomHeader:
     )
 
 
-def read_payload(path: Path, descriptor: NativePixelDescriptor) -> bytes | None:
+def _payload_matches(info: os.stat_result, descriptor: NativePixelDescriptor) -> bool:
+    return (
+        (info.st_size, info.st_mtime_ns)
+        == (descriptor.file_size, descriptor.modified_ns)
+        and descriptor.offset >= 0
+        and descriptor.length == descriptor.rows * descriptor.columns * 2
+        and descriptor.offset + descriptor.length == info.st_size
+    )
+
+
+def read_payload(
+    path: Path,
+    descriptor: NativePixelDescriptor,
+    first_row: int = 0,
+    stop_row: int | None = None,
+) -> bytes | None:
+    stop_row = descriptor.rows if stop_row is None else stop_row
+    length = (stop_row - first_row) * descriptor.columns * 2
     stream = os.open(path, os.O_RDONLY)
     try:
-        info = os.fstat(stream)
-        if (
-            (info.st_size, info.st_mtime_ns)
-            != (descriptor.file_size, descriptor.modified_ns)
-            or descriptor.offset < 0
-            or descriptor.length != descriptor.rows * descriptor.columns * 2
-            or descriptor.offset + descriptor.length != info.st_size
-        ):
+        if not _payload_matches(os.fstat(stream), descriptor):
             return None
-        payload = os.pread(stream, descriptor.length, descriptor.offset)
+        payload = os.pread(
+            stream, length, descriptor.offset + first_row * descriptor.columns * 2
+        )
     finally:
         os.close(stream)
-    return payload if len(payload) == descriptor.length else None
+    return payload if len(payload) == length else None
+
+
+def read_payload_into(
+    path: Path, descriptor: NativePixelDescriptor, first_row: int, target: np.ndarray
+) -> bool:
+    stream = os.open(path, os.O_RDONLY)
+    try:
+        if not _payload_matches(os.fstat(stream), descriptor):
+            return False
+        count = os.preadv(
+            stream, [target], descriptor.offset + first_row * descriptor.columns * 2
+        )
+    finally:
+        os.close(stream)
+    return count == target.nbytes
+
+
+def mask_stored_bits(pixels: np.ndarray, descriptor: NativePixelDescriptor) -> None:
+    shift = 16 - descriptor.bits_stored
+    if not shift:
+        return
+    if descriptor.signed:
+        np.left_shift(pixels, shift, out=pixels)
+        np.right_shift(pixels, shift, out=pixels)
+    else:
+        np.bitwise_and(pixels, np.uint16((1 << descriptor.bits_stored) - 1), out=pixels)
 
 
 def frame_from_payload(
@@ -693,7 +731,7 @@ def frame_from_payload(
             pixels = np.bitwise_and(
                 pixels, np.uint16((1 << descriptor.bits_stored) - 1)
             )
-    pixels = pixels.reshape(descriptor.rows, descriptor.columns)
+    pixels = pixels.reshape(-1, descriptor.columns)
     return DecodedFrame(
         pixels,
         descriptor.row_spacing,
