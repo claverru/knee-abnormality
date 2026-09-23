@@ -31,3 +31,4 @@ __pycache__/
 *.safetensors
 /notes.md
 /z_labels/
+/z_random_infographics/
