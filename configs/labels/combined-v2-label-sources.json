@@ -1,0 +1,102 @@
+{
+  "prepared_at": "2026-09-23T07:10:02.968469+00:00",
+  "competition": "rsna-knee-abnormality-detection",
+  "method": "combined_v1, except that every study-target cell Ramit's GPT-luna extraction calls a LOW-severity positive takes the per-study mean of the available probabilities from the nine consensus extractors, whatever its target, when at least 5 of them cover the cell. The consensus targets (ACL, MCL, PF OA, Fracture) already equal that mean and do not change. Official gold labels still override these values in training and evaluation.",
+  "preparer": {
+    "path": "/home/claudio/src/knee-label-grades/scripts/adhoc/prepare_grade_aware_labels.py",
+    "bytes": 9573,
+    "sha256": "f009b9eb322cffef463c9596f392b72a8f4b1e06e3a624cadd559365d9999353"
+  },
+  "base_label_table": "combined_v1",
+  "minimum_sources": 5,
+  "consensus_sources": [
+    "pilkwang_v2",
+    "laymond_filled",
+    "zhen_v7",
+    "yunus_llm",
+    "jev_text",
+    "dreaddev_soft",
+    "ramit_luna",
+    "josh_luna",
+    "vmohit_states"
+  ],
+  "inputs": {
+    "base_manifest": {
+      "path": "configs/labels/combined-label-sources.json",
+      "bytes": 5622,
+      "sha256": "1cbe97d262dae5950b81fcf188281776864163baa78963e36ac17ff675af6527"
+    },
+    "combined_v1": {
+      "path": "data/labels/prepared/combined-v1/labels.csv",
+      "bytes": 872602,
+      "sha256": "1e586b574511fa1c67434e174681eee9a3aafe0d6db8f84cb829fdae5be215fb",
+      "label_table": "combined_v1"
+    },
+    "ramit_calls": {
+      "path": "data/labels/public/ramitnandi/rsna-knee-labels-gpt-luna/downloaded-20260921/report_labels.csv",
+      "bytes": 8050551,
+      "sha256": "6e2d4eebb98671cf593a339e48ff11a4eaedce582e8a060b117470f7e4b255cf"
+    },
+    "pilkwang_v2": {
+      "path": "data/labels/public/pilkwang/version-1/report_labels_v2.csv",
+      "bytes": 1004839,
+      "sha256": "6f704a7bdb2f894cc49445b19ba7c4378c3f548d3449e00361e10044bee40920",
+      "label_table": "pilkwang_v2"
+    },
+    "laymond_filled": {
+      "path": "data/labels/public/laymond/version-4/weak_labels_v2_filled.csv",
+      "bytes": 11919995,
+      "sha256": "ed030920cb82d33d642610b2dfa4536d0f5b6f6d3e72d683735ff4495f186fcf"
+    },
+    "zhen_v7": {
+      "path": "data/labels/public/zhen931/version-1/report_labels_v7.csv",
+      "bytes": 1021642,
+      "sha256": "cca73170576c188d0269ecb321354bd70743f3b06f89767c727552ef252a785d"
+    },
+    "yunus_llm": {
+      "path": "data/labels/public/yunusgmsoy/rsna-knee-llm-report-labels/downloaded-20260921/yunus_llm_labels.csv",
+      "bytes": 522625,
+      "sha256": "77a8d8fd093f3648f34b561610ced424363c25fd3d8b667c5347a353f0310642"
+    },
+    "jev_text": {
+      "path": "data/labels/public/riadmohamed42/jev-knee-labels/downloaded-20260921/FINAL2_labels_scores.csv",
+      "bytes": 1389334,
+      "sha256": "6f70de34e75d89b153577b4e8f09aef9c7a51064a81a7b022d97840b7ffbb39f"
+    },
+    "dreaddev_soft": {
+      "path": "data/labels/public/dreaddevelopment/rsna-knee-labels/downloaded-20260921/labels_llm_soft.csv",
+      "bytes": 535909,
+      "sha256": "8cec477fb555e88bbb4196197fd3f806cbafed8cc2f6b2d48d26a8d49fbd86a1"
+    },
+    "ramit_luna": {
+      "path": "data/labels/public/ramitnandi/rsna-knee-labels-gpt-luna/downloaded-20260921/report_labels.csv",
+      "bytes": 8050551,
+      "sha256": "6e2d4eebb98671cf593a339e48ff11a4eaedce582e8a060b117470f7e4b255cf"
+    },
+    "josh_luna": {
+      "path": "data/labels/public/joshuaziel/rsna-knee-mri-report-labels-gpt-5-6-luna/downloaded-20260921/all_raw_predictions.json",
+      "bytes": 18613933,
+      "sha256": "3f666b92fb7b68bdc3e9ea4d34bbffb62f2f248e241517640d19b443b818e3c5"
+    },
+    "vmohit_states": {
+      "path": "data/labels/public/vmohitrao/rsna-knee-report-labels/downloaded-20260921/label_states.csv",
+      "bytes": 391542,
+      "sha256": "7b20796e52354702c429f16204f434d533586694b527a79e02fa34583d653a58"
+    }
+  },
+  "rows": 4407,
+  "sources": [
+    {
+      "dataset": "local/combined-labels",
+      "dataset_version": 2,
+      "files": [
+        {
+          "path": "data/labels/prepared/combined-v2/labels.csv",
+          "bytes": 898605,
+          "sha256": "e8dec30f36908b82462b6272708dc9baaedcf7076af57914830ac5f58fa04bb9",
+          "label_table": "combined_v2"
+        }
+      ]
+    }
+  ]
+}

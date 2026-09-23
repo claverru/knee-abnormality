@@ -50,6 +50,14 @@ the twelve disease targets. [MedKLIP](https://arxiv.org/abs/2301.02228) motivate
 report supervision in chest radiographs; the proposed small auxiliary heads are a knee-specific
 adaptation, not a reproduction or a measured gain.
 
+**Premise weakened, 2026-09-22.** Public tables already hold per-label severity, so step 1 needs no
+LLM run. But where two sources agree on severity (OA, Effusion, Baker's, ACL), the soft training
+targets already encode it (Spearman 0.66–0.79 among positives), and the incumbent's predictions
+already rise with it. The model ranks worst on low-grade positives, and only about half of those
+gold cells are positive: label noise that an auxiliary head cannot fix
+([report attributes](../public-labels/report-attributes.md)). Location attributes (horn,
+compartment, bruise site) are not in any public table.
+
 1. **Bounded extraction pilot:** start with compartment-specific OA severity attributes, not a
    broad concept vocabulary. Define and audit an assertion-aware extraction policy on training
    reports, with a separate report panel for confirmation. Version the policy, source text
@@ -214,22 +222,6 @@ This entry owns loss selection within each label. The parked
 [adaptive allocation](#adaptive-training-allocation) proposal concerns weights between targets
 and study exposure; [static ranking loss](../../autoresearch/campaigns/losses/findings.md#completion-20260920t121537z-5b39b418) remains a separate
 completed comparison.
-
-## Image-model predictions as a label source
-
-**Hypothesis (evidence from chest X-ray only).** Report extractors share each report's gap from
-the image reading, so aggregating them cannot fix report-omitted findings. Synovitis is the clearest
-case: every text source misses at least 14 of its 27 gold positives
-([combined labels](../public-labels/combined-labels.md#literature-behind-the-design)).
-VisualCheXbert and Dunnmon 2020 improved report labels by adding an image-side signal. The
-knee equivalent is out-of-fold image-model predictions as one more source in the consensus, one
-target group per run.
-
-- *Precondition:* every study's image prediction must come from a model that never trained on it.
-  That needs all five folds of `all_5fold_scanner_v1`, so the idea waits for fold training.
-- *Public signal:* one participant reports that mixing image-model predictions into the extracted
-  label beat both replacing and masking
-  ([re-sweep](../research/public-research.md#labels-are-the-reported-lever-at-the-top-and-extractor-tuning-is-not)).
 
 ## Leave-one-scanner-out diagnostic
 

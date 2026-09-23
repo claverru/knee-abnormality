@@ -93,6 +93,21 @@ scripts:
       - consensus_sources is shared with the adhoc selection analysis.
     docs: [docs/public-labels/combined-labels.md]
 
+  - id: prepare-image-blend-labels
+    path: scripts/tools/prepare_image_blend_labels.py
+    summary: Build the image_blend_v1 label table (half combined_v1, half the mean ReXNet-200 and EfficientNet-B0 out-of-fold predictions from the 2026-09-18 five-fold runs) with its pinned manifest, silver change counts and a gold check with a paired bootstrap.
+    tags: [labels, pseudo-labels, self-distillation, teacher, out-of-fold, oof, blend, image, combined, gold, preparation, training, provenance]
+    commands:
+      - rtk proxy uv run --locked python -m scripts.tools.prepare_image_blend_labels
+    inputs: [configs/labels/combined-label-sources.json and the combined_v1 table it pins, "Fold validation predictions and effective configs of outputs/training/overnight-20260918T232636Z-mt7ouybk/runs/{rexnet,b0}-fold{0..4}", data/folds/all_5fold_v3/studies.csv, Official train.csv and sample_submission.csv]
+    outputs: [data/labels/prepared/image-blend-v1/labels.csv, data/labels/prepared/image-blend-v1/preparation.json, configs/labels/image-blend-v1-label-sources.json]
+    notes:
+      - CPU only, about a minute; deterministic, labels.csv SHA-256 7bffba4195dfb85179d4a4d1b65ddcc349846133bde4b1febc7d098c70f11aff. Requires fresh output paths.
+      - Fails unless each teacher run is the matching all_5fold_v3 fold and its predictions hold exactly that fold's studies, so every teacher value is out of fold.
+      - The blend weight 0.5 was fixed before the gold check; gold labels still override the table in training and evaluation.
+      - The teachers trained on studies that all_5fold_scanner_v1 fold 0 holds out, so fold-0 metrics of a model trained on this table are optimistic; judge it on the leaderboard.
+    docs: [docs/validation/results/2026-09-23-image-blend-labels-result.md, docs/backlog/endgame.md#out-of-fold-self-distillation]
+
   - id: compare-fold-runs
     path: scripts/tools/compare_fold_runs.py
     summary: Compare a candidate fold run with a reference run from saved predictions and checkpoint tensors, with paired report-group bootstrap intervals.
