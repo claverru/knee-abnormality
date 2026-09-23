@@ -62,6 +62,80 @@ scripts:
       - Near-empty frames have under 1% non-zero pixels among frames whose central chunk is constant; usage counts selected triplets touching one, over all training studies holding such frames.
     docs: [docs/metadata/repeated-series.md]
 
+  - id: compare-soft-auc
+    path: scripts/adhoc/compare_soft_auc.py
+    summary: Compare two fold runs' saved validation predictions on macro hard AUC (frozen targets at 0.5) and macro soft AUC (study pairs weighted p_i(1 - p_j) by the frozen soft targets), with one paired report-group bootstrap for both deltas.
+    tags: [validation, comparison, soft-auc, expected-auc, bootstrap, report-group, fold, labels]
+    commands:
+      - rtk proxy uv run --locked python -m scripts.adhoc.compare_soft_auc --reference outputs/training/k05-clean --candidate outputs/training/image-blend --output-dir outputs/analysis/soft-auc-new
+    inputs: [Reference and candidate run directories with effective_config.json and fold validation_predictions.csv, The runs' split targets.csv, studies.csv and protocol.json]
+    outputs: [summary.json with both macro scores, deltas and 80%/95% intervals, per_target.csv, Source snapshot]
+    notes:
+      - CPU only, about 30 s. Refuses an existing output directory.
+      - The bootstrap mirrors compare_fold_runs (multinomial report-group counts, seed 20260914, 2,000 draws, draws dropped when a label loses a hard class), so the hard delta reproduces its macro interval.
+      - Soft AUC excludes same-study pairs; it still scores against report-derived targets, so it inherits their labeller bias.
+    docs: [docs/validation/results/2026-09-23-image-blend-labels-result.md#fold-0-result]
+
+  - id: prepare-grade-aware-labels
+    path: scripts/adhoc/prepare_grade_aware_labels.py
+    status: historical
+    summary: Build the rejected combined_v2 label table (combined_v1, except every cell Ramit calls a LOW-severity positive takes the nine-extractor consensus mean) with its manifest, silver change counts and the gold agreement of both tables.
+    tags: [labels, combined, consensus, severity, low-grade, ramit, gold, preparation, rejected]
+    commands:
+      - rtk proxy uv run --locked python -m scripts.adhoc.prepare_grade_aware_labels
+    inputs: [configs/labels/combined-label-sources.json and the combined_v1 table it pins, configs/labels/public-label-comparison-sources.json and the nine consensus sources via scripts.tools.prepare_combined_labels, Ramit GPT-luna report_labels.csv snapshot, Official train.csv]
+    outputs: [data/labels/prepared/combined-v2/labels.csv, data/labels/prepared/combined-v2/preparation.json, configs/labels/combined-v2-label-sources.json]
+    notes:
+      - CPU only, seconds; deterministic, labels.csv SHA-256 e8dec30f36908b82462b6272708dc9baaedcf7076af57914830ac5f58fa04bb9. Requires fresh output paths.
+      - Fails if any consensus target changes, since combined_v1 already holds the consensus mean there.
+      - Gold macro AUC of the table fell from 0.9075 to 0.9044 (Effusion -0.020), so it was not trained on; see the linked findings.
+    docs: [docs/public-labels/report-attributes.md#consensus-mean-rule-tested-on-gold]
+
+  - id: check-report-attributes
+    path: scripts/adhoc/check_report_attributes.py
+    summary: Check the report attributes already in public label tables (Ramit GPT-luna severity, hedging and report state, Zaid severity and mention, Pilkwang verdict) for coverage, cross-source agreement, redundancy with the training targets, agreement with saved fold-0 predictions and the gold rate of each report call.
+    tags: [labels, public, severity, grade, hedged, mentioned, report-state, auxiliary, supervision, gold, grounding, calibration, cpu]
+    commands:
+      - rtk proxy uv run --locked python -m scripts.adhoc.check_report_attributes --output-dir outputs/analysis/report-attributes-new
+    inputs: [Ramit, Zaid and Pilkwang snapshots under data/labels/public, all_5fold_scanner_v1 targets.csv, studies.csv and protocol.json, Prepared combined-v1 labels.csv (silver values before gold override), Saved fold-0 validation predictions (default k_05 at x4)]
+    outputs: [coverage_training.csv, severity_agreement_training.csv, state_agreement_training.csv, target_relation_training.csv, grounding_validation.csv, negatives_by_report_state_validation.csv, silver_by_ramit_call_non_gold.csv, gold_by_ramit_call.csv by consensus or Steven v4 target group, summary.json, manifest.json with input hashes, Source snapshot]
+    notes:
+      - CPU only, under a minute; no training or LLM calls. Refuses an existing output directory.
+      - Training tables use folds other than the validation fold; grounding uses the validation fold's evaluation targets thresholded at 0.5 and the saved predictions; gold rows use targets.csv on the 58 gold studies.
+      - Zaid severity is a mean over its models; values of 0 or below count as unrated, and levels are rounded to 1-3 for kappa. Zaid rows with n_models 0 are dropped.
+    docs: [docs/public-labels/report-attributes.md]
+
+  - id: screen-public-label-additions
+    path: scripts/adhoc/screen_public_label_additions.py
+    summary: Screen the label tables first downloaded on 2026-09-22 (Hosseini JEV v2, lvthanhxun teacher, Nekkon NLI, Pearse, Nartaa, Davidadekanmi, Achelijndiamantidis) for gold macro AUC against Steven v4 on the same rows, gold copying, and silver agreement with combined_v1 and Pilkwang v2.
+    tags: [labels, public, kaggle, gold, screen, steven, pilkwang, combined, copying, nli, teacher]
+    commands:
+      - rtk proxy uv run --locked python -m scripts.adhoc.screen_public_label_additions --output-dir outputs/analysis/public-label-additions-new
+    inputs: [Snapshots under data/labels/public/<owner>/<slug>/downloaded-20260922, Steven v4 and Pilkwang v2 tables, Prepared combined-v1 labels.csv, Official train.csv]
+    outputs: [screen.csv with one row per table, manifest.json with input hashes, Source snapshot]
+    notes:
+      - CPU only, seconds; no training or downloads. Refuses an existing output directory.
+      - A gold-equal share of 1.0 means the table carries the official labels on gold studies, so its gold AUC is not a benchmark; Nartaa's tables omit the gold studies.
+      - Hosseini is scored on its positive-class probability and lvthanhxun on its fused teacher target (__y).
+    docs: [docs/public-labels/2026-09-22-public-label-additions.md]
+
+  - id: validate-calibrated-judge
+    path: scripts/adhoc/validate_calibrated_judge.py
+    summary: Define and test a submission-free judge (fold-0 macro soft AUC against gold-calibrated expected truth from label sources outside label construction) on 32 past submissions against fold-0 macro AUC, with replicate noise, a shared-study cross-split check and an optional paired report-group comparison of two runs.
+    tags: [validation, judge, leaderboard, public, calibration, gold, expected-auc, soft-auc, labels, correlation, noise, bootstrap, submissions]
+    commands:
+      - rtk proxy uv run --locked python -m scripts.adhoc.validate_calibrated_judge --output-dir outputs/analysis/calibrated-judge-new
+      - rtk proxy uv run --locked python -m scripts.adhoc.validate_calibrated_judge --output-dir outputs/analysis/calibrated-judge-compare --reference outputs/training/k_05 --candidate outputs/training/<run>
+    inputs: [Judge-side label snapshots (Hosseini JEV v2, Pearse weak v2, lvthanhxun teacher states, Nekkon NLI) and reference sources (Ramit, Pilkwang), Nine consensus sources via scripts.tools.prepare_combined_labels plus Steven v4, scripts/adhoc/submission_public_scores.json, Saved fold-0 predictions of the listed submitted runs, Split targets and studies, Official train.csv]
+    outputs: [eligibility.csv, calibration.csv, history.csv, agreement.csv, cross_split_shared_studies.csv, replicate_noise.csv, frozen_expected_truth.csv, summary.json with the frozen judge definition and optional comparison, manifest.json, Source snapshot]
+    notes:
+      - CPU only, a few minutes; no training. Refuses an existing output directory.
+      - "Eligibility rules are constants fixed before the history was scored: not a construction source, all 58 gold studies covered, calibrated gold AUC >= 0.80, Cohen kappa < 0.90 with every construction source, and no state holding over 80% or under 2% of silver cells. The frozen judge averages the calibrated probabilities of every eligible source."
+      - Calibration pools labels and uses all 58 gold studies; fold-0 gold studies keep their gold labels.
+      - Prefers a run's validation_predictions.csv.x1 when present, so the history is scored at the multiplier its cohort shares.
+      - Ramit and Pilkwang variants are diagnostics only; they were explored before this script and are construction sources.
+    docs: [docs/validation/results/2026-09-22-calibrated-judge.md]
+
   - id: analyze-study-center-extents
     path: scripts/adhoc/analyze_study_center_extents.py
     summary: Fit the study reference point for every training study and measure each plane's coverage on both sides of it.

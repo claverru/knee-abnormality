@@ -186,10 +186,26 @@ the [runtime leads](../inference/runtime-evidence-and-leads.md#runtime-leads).
 ## Out-of-fold self-distillation
 
 **Train a second five-fold round on targets blended with the first round's out-of-fold
-predictions** (hypothesis; untested here, filed 2026-09-21). Every non-gold training cell becomes
-`0.7 · label + 0.3 · teacher`, where the teacher is that study's out-of-fold prediction. Gold labels
-and the evaluation targets stay unblended. The aim is robustness to report-label noise; speed is
-the [distillation](#distillation) entry above.
+predictions** (filed 2026-09-21; first test 2026-09-23, a public tie). Every non-gold training cell
+becomes `0.7 · label + 0.3 · teacher`, where the teacher is that study's out-of-fold prediction. Gold
+labels and the evaluation targets stay unblended. The aim is robustness to report-label noise; speed
+is the [distillation](#distillation) entry above.
+
+- *First test ([result](../validation/results/2026-09-23-image-blend-labels-result.md)):* one
+  fold-0 child at 0.5/0.5, with the on-hand teacher described below. It gave:
+  - gold agreement of the label table +0.020 [+0.006, +0.036];
+  - fold-0 hard AUC +0.0035 and soft AUC +0.0065, both leaky;
+  - S50 0.945 against 0.942 for the same-source control S48, a tie by the rule fixed in advance.
+
+  The gains sat on the eight Steven v4 targets. PF OA lost on every measure, because the teacher
+  learned Steven v4's looser definitions and ordinary BCE.
+- *When to resume:* once the final phase's fold training on the current recipe exists
+  (`combined_v1`, k = 0.5, `all_5fold_scanner_v1`). Its out-of-fold predictions are the matched
+  teacher. That removes the label-definition and loss mismatches and gives a clean fold-0 gate.
+  Build the table with
+  [`prepare_image_blend_labels`](../../scripts/tools/prepare_image_blend_labels.py), whose teacher
+  runs, split and blend weight are constants to point at the new folds. Fix the weight before the
+  first run: 0.7/0.3 per the precedent below, or the tested 0.5/0.5. Do not choose it on gold.
 
 - *External evidence:* the Plant Pathology 2020 first-place solution used this recipe: five-fold
   out-of-fold predictions and 0.7 truth + 0.3 prediction

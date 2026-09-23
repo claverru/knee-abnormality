@@ -1,0 +1,167 @@
+{
+  "prepared_at": "2026-09-23T08:35:14.130749+00:00",
+  "competition": "rsna-knee-abnormality-detection",
+  "method": "0.5 times combined_v1 plus 0.5 times an image teacher: the mean of ReXNet-200 and EfficientNet-B0 out-of-fold probabilities from the 2026-09-18 five-fold runs on all_5fold_v3 (ordinary BCE, Steven v4 labels, x1). Every study's teacher value comes from the two models that held it out. The teachers trained on studies that combined_v1's scanner split holds out, so fold-0 validation on that split is not clean for this table. Official gold labels still override these values in training and evaluation.",
+  "preparer": {
+    "path": "/home/claudio/src/knee-label-grades/scripts/tools/prepare_image_blend_labels.py",
+    "bytes": 11215,
+    "sha256": "a0c80dcffe263169cef7bf34fd78c9b18e39ee9cd569f47647a3dcc9e227673d"
+  },
+  "base_label_table": "combined_v1",
+  "blend_weight": 0.5,
+  "inputs": {
+    "base_manifest": {
+      "path": "configs/labels/combined-label-sources.json",
+      "bytes": 5622,
+      "sha256": "1cbe97d262dae5950b81fcf188281776864163baa78963e36ac17ff675af6527"
+    },
+    "combined_v1": {
+      "path": "data/labels/prepared/combined-v1/labels.csv",
+      "bytes": 872602,
+      "sha256": "1e586b574511fa1c67434e174681eee9a3aafe0d6db8f84cb829fdae5be215fb",
+      "label_table": "combined_v1"
+    },
+    "teacher_split": {
+      "path": "data/folds/all_5fold_v3/studies.csv",
+      "bytes": 608151,
+      "sha256": "c709cd27ff54dd10d833abfa966622f9a5ecadef5d37670da658d81c26f7b3ed"
+    },
+    "teachers": {
+      "rexnet_200_fold0": {
+        "run": "outputs/training/overnight-20260918T232636Z-mt7ouybk/runs/rexnet-fold0",
+        "predictions": {
+          "path": "outputs/training/overnight-20260918T232636Z-mt7ouybk/runs/rexnet-fold0/fold_0/validation_predictions.csv",
+          "bytes": 178321,
+          "sha256": "a0099790108dc37a42efdc18f78044193fcbace2a437e1d75116ef6c99e0a189"
+        },
+        "selected_checkpoint": {
+          "path": "/home/claudio/src/knee-abnormality/outputs/training/overnight-20260918T232636Z-mt7ouybk/runs/rexnet-fold0/fold_0/best-epoch=09-val_macro_auc=0.88367.ckpt",
+          "score": 0.8836709260940552
+        }
+      },
+      "rexnet_200_fold1": {
+        "run": "outputs/training/overnight-20260918T232636Z-mt7ouybk/runs/rexnet-fold1",
+        "predictions": {
+          "path": "outputs/training/overnight-20260918T232636Z-mt7ouybk/runs/rexnet-fold1/fold_1/validation_predictions.csv",
+          "bytes": 172053,
+          "sha256": "6fc99dc7cc74ecfcbd3d86919ba4b36a3deb4374f50ed3a58f981f3f988e6f1e"
+        },
+        "selected_checkpoint": {
+          "path": "/home/claudio/src/knee-abnormality/outputs/training/overnight-20260918T232636Z-mt7ouybk/runs/rexnet-fold1/fold_1/best-epoch=08-val_macro_auc=0.87297.ckpt",
+          "score": 0.8729674220085144
+        }
+      },
+      "rexnet_200_fold2": {
+        "run": "outputs/training/overnight-20260918T232636Z-mt7ouybk/runs/rexnet-fold2",
+        "predictions": {
+          "path": "outputs/training/overnight-20260918T232636Z-mt7ouybk/runs/rexnet-fold2/fold_2/validation_predictions.csv",
+          "bytes": 171899,
+          "sha256": "1eb9cbca224706cca6ecf2638d6673e1586d7646d1a659344ce35cddb844e475"
+        },
+        "selected_checkpoint": {
+          "path": "/home/claudio/src/knee-abnormality/outputs/training/overnight-20260918T232636Z-mt7ouybk/runs/rexnet-fold2/fold_2/best-epoch=09-val_macro_auc=0.87892.ckpt",
+          "score": 0.8789190053939819
+        }
+      },
+      "rexnet_200_fold3": {
+        "run": "outputs/training/overnight-20260918T232636Z-mt7ouybk/runs/rexnet-fold3",
+        "predictions": {
+          "path": "outputs/training/overnight-20260918T232636Z-mt7ouybk/runs/rexnet-fold3/fold_3/validation_predictions.csv",
+          "bytes": 174255,
+          "sha256": "a2ccd1322fc6da99536a5032f43aac62c9b46edf8a44aafd3e92d76a6d17e48a"
+        },
+        "selected_checkpoint": {
+          "path": "/home/claudio/src/knee-abnormality/outputs/training/overnight-20260918T232636Z-mt7ouybk/runs/rexnet-fold3/fold_3/best-epoch=07-val_macro_auc=0.87999.ckpt",
+          "score": 0.8799934387207031
+        }
+      },
+      "rexnet_200_fold4": {
+        "run": "outputs/training/overnight-20260918T232636Z-mt7ouybk/runs/rexnet-fold4",
+        "predictions": {
+          "path": "outputs/training/overnight-20260918T232636Z-mt7ouybk/runs/rexnet-fold4/fold_4/validation_predictions.csv",
+          "bytes": 172045,
+          "sha256": "89ba9fd80e5f6a9f9f1c5671d0e55e4e20a71db66df8c1ff5ba9abaa05135a37"
+        },
+        "selected_checkpoint": {
+          "path": "/home/claudio/src/knee-abnormality/outputs/training/overnight-20260918T232636Z-mt7ouybk/runs/rexnet-fold4/fold_4/best-epoch=07-val_macro_auc=0.87055.ckpt",
+          "score": 0.8705453276634216
+        }
+      },
+      "efficientnet_b0_fold0": {
+        "run": "outputs/training/overnight-20260918T232636Z-mt7ouybk/runs/b0-fold0",
+        "predictions": {
+          "path": "outputs/training/overnight-20260918T232636Z-mt7ouybk/runs/b0-fold0/fold_0/validation_predictions.csv",
+          "bytes": 178166,
+          "sha256": "419cc7f2838a80cf515c46b308c463df0b2ea91aeb7d9c29160bf89d6765e24b"
+        },
+        "selected_checkpoint": {
+          "path": "/home/claudio/src/knee-abnormality/outputs/training/overnight-20260918T232636Z-mt7ouybk/runs/b0-fold0/fold_0/best-epoch=10-val_macro_auc=0.88635.ckpt",
+          "score": 0.886353611946106
+        }
+      },
+      "efficientnet_b0_fold1": {
+        "run": "outputs/training/overnight-20260918T232636Z-mt7ouybk/runs/b0-fold1",
+        "predictions": {
+          "path": "outputs/training/overnight-20260918T232636Z-mt7ouybk/runs/b0-fold1/fold_1/validation_predictions.csv",
+          "bytes": 172370,
+          "sha256": "e7043f8b03d00654f79a0e3d296161ee9c38fd32d4e074ed0478858fb2539bad"
+        },
+        "selected_checkpoint": {
+          "path": "/home/claudio/src/knee-abnormality/outputs/training/overnight-20260918T232636Z-mt7ouybk/runs/b0-fold1/fold_1/best-epoch=13-val_macro_auc=0.86964.ckpt",
+          "score": 0.8696364760398865
+        }
+      },
+      "efficientnet_b0_fold2": {
+        "run": "outputs/training/overnight-20260918T232636Z-mt7ouybk/runs/b0-fold2",
+        "predictions": {
+          "path": "outputs/training/overnight-20260918T232636Z-mt7ouybk/runs/b0-fold2/fold_2/validation_predictions.csv",
+          "bytes": 171414,
+          "sha256": "78981ffe377cc97fb6f5c9512d219f25768138aa62af2ff4f6e546219411009c"
+        },
+        "selected_checkpoint": {
+          "path": "/home/claudio/src/knee-abnormality/outputs/training/overnight-20260918T232636Z-mt7ouybk/runs/b0-fold2/fold_2/best-epoch=11-val_macro_auc=0.87845.ckpt",
+          "score": 0.8784469962120056
+        }
+      },
+      "efficientnet_b0_fold3": {
+        "run": "outputs/training/overnight-20260918T232636Z-mt7ouybk/runs/b0-fold3",
+        "predictions": {
+          "path": "outputs/training/overnight-20260918T232636Z-mt7ouybk/runs/b0-fold3/fold_3/validation_predictions.csv",
+          "bytes": 174734,
+          "sha256": "94ee865b8476c9549e94e30f09551be2b7d09ed6d455ab50496d86cac7fe32a4"
+        },
+        "selected_checkpoint": {
+          "path": "/home/claudio/src/knee-abnormality/outputs/training/overnight-20260918T232636Z-mt7ouybk/runs/b0-fold3/fold_3/best-epoch=12-val_macro_auc=0.87523.ckpt",
+          "score": 0.8752335906028748
+        }
+      },
+      "efficientnet_b0_fold4": {
+        "run": "outputs/training/overnight-20260918T232636Z-mt7ouybk/runs/b0-fold4",
+        "predictions": {
+          "path": "outputs/training/overnight-20260918T232636Z-mt7ouybk/runs/b0-fold4/fold_4/validation_predictions.csv",
+          "bytes": 171916,
+          "sha256": "943c16c3e464c5075f8b636a2edff36835c559bf265dae1e08b215a8cdd92573"
+        },
+        "selected_checkpoint": {
+          "path": "/home/claudio/src/knee-abnormality/outputs/training/overnight-20260918T232636Z-mt7ouybk/runs/b0-fold4/fold_4/best-epoch=08-val_macro_auc=0.87544.ckpt",
+          "score": 0.8754433989524841
+        }
+      }
+    }
+  },
+  "rows": 4407,
+  "sources": [
+    {
+      "dataset": "local/image-blend-labels",
+      "dataset_version": 1,
+      "files": [
+        {
+          "path": "data/labels/prepared/image-blend-v1/labels.csv",
+          "bytes": 1136028,
+          "sha256": "7bffba4195dfb85179d4a4d1b65ddcc349846133bde4b1febc7d098c70f11aff",
+          "label_table": "image_blend_v1"
+        }
+      ]
+    }
+  ]
+}

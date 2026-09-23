@@ -181,6 +181,36 @@ trainable ReXNet is a project adaptation of that idea, not a reproduction or a m
   weighting remains unimplemented. Preserve gold labels and original evidence indicators; Steven
   v4 probabilities are not calibrated confidence.
 
+### Grade-aware targets for low-grade report positives
+
+**Implemented 2026-09-23 as `combined_v2`; failed its gold check, not trained on.** The table's
+gold macro AUC fell 0.9075 → 0.9044 (Effusion −0.020): the consensus mean puts low grades at the
+not-addressed level, breaking an order `combined_v1` already has right
+([result](../public-labels/report-attributes.md#consensus-mean-rule-tested-on-gold)). Drop it, or
+run it once on the leaderboard by explicit user decision. The original motivation follows.
+
+**Measured mismatch (corpus-wide, gold-confirmed on few cells).**
+On the eight targets that `combined_v1` still takes from Steven v4, cells that Ramit's GPT-luna
+extraction calls LOW-grade positive train at 0.85–0.91, while 32 of 59 such gold cells are positive
+(0.54). Effusion supplies 25 of the 59 cells. The four consensus targets already give LOW cells
+0.34–0.59, and on the fold-0 predictions LOW positives are where ranking loses most
+([report attributes](../public-labels/report-attributes.md#gold-rate-by-report-call)).
+
+- **Change:** a new label source equal to `combined_v1` except that every cell Ramit calls a
+  LOW-grade positive takes the nine-extractor consensus mean, whatever its label. The four
+  consensus targets already follow this rule, so in practice only the Steven v4 targets change. Keep
+  gold overrides. Do not fit values to the gold rates.
+- **Prediction first:** before submitting, record the
+  [calibrated judge's](../validation/results/2026-09-22-calibrated-judge.md#interpretation)
+  compare-mode delta against the reference. The judge's source, Hosseini's JEV v2, is not used to
+  build these labels.
+- **Run:** one fold-0 run on the incumbent recipe and seed, exported at ×4 τ 0.75 and judged on the
+  public leaderboard. Fold-0 validation is a secondary diagnostic: its targets carry the same
+  overcall, so it cannot judge this change, and autoresearch cannot run it.
+- **Relation:** [OA-only label repair](big-bets.md#oa-only-rubric-aligned-label-repair) reviews OA
+  reports by hand; this is a rule from an existing extraction across all eight targets. Do not
+  combine the two in one run.
+
 ### Auxiliary report-state prediction
 
 **Hypothesis; unimplemented and untested.** Add a reporting head alongside the disease head
@@ -205,6 +235,11 @@ owns the measured motivation, missingness semantics and limits of the three-stat
   workload and training budget. Record seeds and source/config identities. Select by frozen
   disease macro ROC-AUC and inspect all twelve label AUCs; reporting accuracy is diagnostic.
   Repeat a promising result under the existing controlled-comparison rules before adoption.
+- **Judge risk (measured 2026-09-22):** on fold 0, the negatives the model ranks worst are the
+  ones the report never addressed, and 14% of such gold cells are positive
+  ([report attributes](../public-labels/report-attributes.md#agreement-with-the-incumbents-predictions)).
+  A reporting head learns which reports stay silent, which fold-0 validation rewards and the
+  leaderboard need not; confirm any fold-0 gain publicly.
 
 ## Augmentation families
 
