@@ -145,6 +145,7 @@ def status(supervisor: Supervisor):
         "supervisor_alive": alive(owner),
         "provider": state["provider"] if state else None,
         "reason": state.get("reason") if state else None,
+        "retry_after": state.get("retry_after") if state else None,
         "queue": state["queue"] if state else [],
         "claimed": state["claimed"] if state else None,
         "running": state["running"] if state else None,
@@ -167,6 +168,13 @@ def status_summary(supervisor: Supervisor):
     state = supervisor.state
     if current["reason"]:
         lines.append(f"Reason: {current['reason']}")
+    retry_after = state.get("retry_after", 0)
+    if current["status"] == "running" and retry_after > time.time():
+        remaining = int(retry_after - time.time())
+        lines.append(
+            f"Provider wait: no agent jobs until {time.strftime('%Y-%m-%d %H:%M:%S %Z', time.localtime(retry_after))} "
+            f"({remaining // 60}m {remaining % 60:02d}s left); training and comparison continue."
+        )
     if (supervisor.output / "stop.json").exists() and current["status"] != "stopped":
         lines.append("Stop requested; waiting for the supervisor to finish stopping.")
     if current["status"] == "calibrating":

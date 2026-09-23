@@ -34,6 +34,14 @@ def write_json(path: Path, value) -> None:
     atomic_write(path, json.dumps(value, indent=2, allow_nan=False) + "\n")
 
 
+def tail(path: Path, size: int = 4000) -> str:
+    if not path.is_file():
+        return ""
+    with path.open("rb") as stream:
+        stream.seek(max(0, path.stat().st_size - size))
+        return stream.read().decode(errors="replace")
+
+
 def sha256(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as stream:
