@@ -1,0 +1,229 @@
+ideas:
+- id: oblique-standard-frame-depth
+  mechanism_id: oblique-token-depth-in-standard-series-frame
+  parent_idea_id: null
+  title: Give oblique-group tokens slice-depth codes in the frame of their slot's standard series
+  opportunity: 'The model relies on its 1D slice-depth code. Removing it cost −0.0007 to −0.0030 macro
+    on three checkpoints, and two of the intervals exclude 0. Removing the plane or contrast embedding
+    cost about 0. Label evidence also sits in 10-mm depth bins. The code is acquisition-relative: each
+    slice''s position along the series'' own normal, measured from that series'' midpoint, with one value
+    shared by all spatial tokens of the slice. In split slots the oblique group therefore uses a different
+    frame. New census measurement over 558 training split slots:
+
+    - The oblique normal is a median 35–39° from the standard normal.
+
+    - The oblique origin sits a median 11 mm from the standard origin on coronal slots, and more than
+    10 mm in 55–59% of coronal groups.
+
+    - Within one oblique slice, true depth changes by about ±23 mm over ±40 mm of in-plane extent, yet
+    every token gets the same code.
+
+
+    At ×4 τ 0.75, like-for-like, net of drift in the unchanged studies, the reference loses the depth-localized
+    labels on the split studies: lateral meniscus −0.029 and MCL −0.020. It gains ACL +0.007.'
+  mechanism: 'Each oblique-group acquisition in a split slot carries an anchor from its slot''s standard
+    series:
+
+    - n_s, the standard series'' unit normal (cross product of its orientation vectors, the same convention
+    as its physical positions);
+
+    - o_s, the standard series'' origin, equal to physical_position − relative_position_mm of any of its
+    slices.
+
+
+    In encode_batch, each oblique token''s patient coordinate p comes from its middle-slice patient map
+    and prepared_xy. The medial-axis term already computes the x row of p this way. The token''s 1D code
+    becomes sinusoidal(n_s·p − o_s), per token, instead of one acquisition-relative value per slice.
+
+
+    Applied to the standard series itself, the formula reproduces today''s code exactly, which gives the
+    developer an identity check. Standard tokens and every non-split study keep the current code, so their
+    forward pass is unchanged at any weights. No parameters are added. Oblique tokens then say how deep
+    they sit in the same frame as the standard tokens beside them. Depth-specific scoring (MCL at −10..0
+    mm and the meniscal horns at +10..+20 mm in coronal fluid) no longer matches oblique tokens to the
+    wrong anatomy.'
+  precedents:
+  - 'outputs/analysis/encoding-usage-{graph-forced,token-graph,attention-prior}/results.json: removing
+    the 1D code cost −0.0030 [−0.0043, −0.0018], −0.0012 [−0.0022, −0.0001] and −0.0007 macro. Removing
+    the 2D code cost −0.0001 to −0.0007; removing plane or contrast cost about 0.'
+  - 'docs/validation/results/2026-09-17-test-time-allocation.md#where-evidence-sits-along-the-slice-axis:
+    each label''s strongest single-triplet separation falls in one 10-mm depth bin: MCL and contusion
+    in coronal fluid at −10..0 mm, the medial meniscus at +10..+20 mm, ACL in sagittal fluid at −10..0
+    mm.'
+  - 'Code: series.py:199-210 (relative_position_mm = physical − (min+max)/2); dicom.py:67-86 (physical
+    = IPP·cross(IOP)); model.py:320-338 (per-token patient maps for the medial axis; position_1d is one
+    value per slice); preparation.py:220-228 (patient_maps rows give patient x, y, z of prepared pixels).'
+  - 'outputs/autoresearch/oblique-x4/jobs/researcher-20260922T142228Z-40754723/scratch/evidence/depth_frame.{py,txt},
+    a new census measurement over training split slots (26 axial fluid, 295 coronal T1/PD, 237 coronal
+    fluid):
+
+    - No sign flips between the oblique and standard normals; median angle 35–39°.
+
+    - Median offset of the oblique mid-slice from the standard origin, along the standard normal: 11 mm
+    on coronal slots (over 10 mm in 55–59%), 5 mm on axial.
+
+    - About ±23–25 mm of depth change across ±40 mm in-plane.'
+  - 'Same folder, split_x4.{py,txt}: k_05 intact vs the reference, both at ×4 τ 0.75 (no ×4 τ 1 k_05 run
+    exists).
+
+    - Split studies: +0.0042 [−0.0059, +0.0143], against +0.0103 at ×1.
+
+    - Reference net of unchanged-study drift: lateral meniscus −0.029, MCL −0.020, effusion −0.012, ACL
+    +0.007.
+
+    - The lateral meniscus loss sits in the 54 coronal-fluid split studies: 0.824 against 0.869, 13 positives.'
+  - 'label-view-attention-bias-20260922T134812Z-7b4fa495, ×4 reject: split studies +0.0035, with MCL +0.038,
+    lateral meniscus +0.029 and ACL −0.011. It is a routing repair; this proposal tests a competing cause,
+    oblique tokens'' depth codes being in the wrong frame, rather than dilution.'
+  - view-orientation-embedding (declined by the user; it adds a new orientation embedding to every acquisition)
+    and the big-bets additive 3D patient-position embedding, which went unused at inference. Both add
+    new codes; this one corrects the frame of a code the model already uses.
+  - 'docs/research/position-encoding.md (multi-view geometry references such as PETR: express tokens from
+    differently oriented views in one shared metric frame).'
+  novelty: 'Nothing in the registry changes an existing positional code. The identity ideas (embedding,
+    view bias and their combination) mark or reweight oblique tokens, and mixture pooling and the ACL
+    gate change pooling. All of them leave each oblique token''s depth code in its own acquisition frame.
+    This idea adds no embedding and no parameters, and touches only oblique-group tokens. It is a coordinate
+    correction: the model is given consistent geometry instead of having to learn per-protocol offsets
+    from about 12% of studies.'
+  coverage: 'Sampling, triplets, visits, validation selection and the input identity are all unchanged:
+    the anchor is attached after preparation, like the oblique flag. Only oblique-group tokens in split
+    studies get new codes: 103 fold-0 studies and about 545 training studies. The other 802 fold-0 studies
+    have the reference forward pass at any fixed weights and change only through shared training.'
+  exploitation: 'Expected signature on the split studies: lateral meniscus, MCL, medial meniscus and contusion
+    rise relative to the drift in the unchanged studies, and ACL holds. There is a within-model check:
+    re-predicting the trained candidate with acquisition-relative oblique depths changes only split-study
+    predictions. This isolates how much the trained model reads the corrected codes, apart from training
+    divergence. Completions report split and unchanged deltas against the reference, and against k_05
+    at ×4 where available.'
+  budget: No change to triplets, decoding or the backbone. The added work is per-token dot products on
+    patient coordinates that the medial-axis term already computes, plus one sinusoidal encoding for oblique
+    images. That is well under 1% of the 1,653 s reference, and memory adds one per-token encoding buffer
+    for oblique images only. Accounting is identical to the reference by construction.
+  implementation: 'Adds behavior; removes nothing.
+
+    - preparation.py: PreparedSeries gets depth_anchor: tuple[float, float, float, float] | None = None.
+
+    - dataset.py _prepare_slot: after both groups are prepared, choose the first standard uid in the standard
+    group''s source_ranking. Take its IndexedSeries from _slice_index to get the normalized geometry.normal
+    and origin = physical_position − relative_position_mm, then dataclasses.replace each oblique value
+    with that anchor. Call order and budgets stay unchanged.
+
+    - collate_studies emits series_depth_anchor [series, 4], NaN when absent.
+
+    - model.py: move the anchor to the device, because engine.move_batch leaves unlisted keys on the CPU.
+    Index it with keep_series and acquisition_index. Compute per-token depth and make position_1d per
+    token for anchored images, broadcasting the existing per-slice code elsewhere. Handle reflection the
+    way the medial-axis term does.
+
+    - Config: one setting under model.oblique. Remove it if the idea is discarded; make it unconditional
+    if adopted.
+
+    - If another oblique idea becomes the incumbent, rebase, keep it and reuse its flag plumbing; the
+    two act on different components.'
+  open_choices: '- Anchor series when the standard group holds several: first in the source ranking (recommended,
+    fixed across epochs) or the main supplier in each epoch.
+
+    - Scope of the fix: 1D depth only (recommended; the model''s reliance on 2D is 3–10× smaller), or
+    also re-project the 2D code onto the standard series'' in-plane axes.
+
+    - Neutrality: a parameter-free replacement (recommended; review precedent from mixture pooling), or
+    a zero-initialized scalar blend between the old and new codes if strict neutrality is required.
+
+    - Axial-fluid oblique groups (2 on fold 0): include them (recommended).'
+  dependencies: []
+  priority_rationale: 'It rests on two measured facts: the model relies on the 1D code, and the frame
+    mismatch is large (median 11 mm offset, ±23 mm within a slice). It acts only on split-study tokens,
+    costs nothing and opens a lever no other idea tests. Uncertainty: that miscoded depth causes the lateral
+    meniscus and MCL loss is a hypothesis, and the model may already compensate from appearance. The split-study
+    gain may also be too small for the macro rule. Rank it after the running mixture and the developing
+    combination, and ahead of the plain embedding.'
+- id: oblique-group-embedding
+  mechanism_id: oblique-group-token-embedding
+  parent_idea_id: null
+  title: Mark tokens from oblique groups with their own learned embedding
+  opportunity: 'The reference gives oblique groups their own budget but not an identity: their tokens
+    carry the slot''s plane and contrast embeddings, so a dedicated ACL-oblique slab and the standard
+    coronal beside it look alike to attention except by appearance. Fold 0 did not move (0.897527 against
+    0.899042 for k_05 at x1). Their studies are rich in the labels these views target: in coronal fluid
+    at 30-45 degrees, ACL 40% against 15%, MCL 15% against 5%, lateral meniscus 33% against 16%.'
+  mechanism: Add a learned vector to every token of an acquisition in an oblique group, next to the plane
+    and contrast embeddings and before mil_norm. The vector is zero-initialized, so the first forward
+    pass equals the reference. The group is known in _prepare_slot from oblique_split; carry it as one
+    PreparedSeries field through collate_studies to the model.
+  precedents:
+  - docs/validation/results/2026-09-22-oblique-groups-result.md (reference run; per-label localization)
+  - outputs/analysis/acquisition-geometry-20260922/protocol_prior.txt (an oblique flag added after training
+    gave -0.0003 to -0.0014, so the gain must come from routing inside the model, not new information)
+  - docs/validation/results/2026-09-14-knee-side-embedding-result.md (a knee-side embedding tied; it marked
+    patient geometry, not acquisition protocol)
+  - docs/backlog/small-changes.md#oblique-embedding (transferred general-backlog entry)
+  - outputs/autoresearch/oblique/experiments/oblique-group-embedding-20260922T115506Z-f5d616dd (retired
+    x1 campaign; 0.899287, +0.00176 against the x1 reference, adoption 80% interval [-0.0005, +0.0040],
+    rejected; +0.0052 on the 103 split studies)
+  novelty: The oblique groups exist since 2026-09-22 and no representation change has been tried for them.
+    Unlike the retired knee-side and 3D embeddings, it marks how a view was acquired, not where a token
+    sits in the patient.
+  coverage: Sampling, budgets and counts are identical to the reference; only tokens of oblique-group
+    acquisitions change, in 103 fold-0 studies.
+  exploitation: Attention and the pooled features can treat the dedicated views differently from the slot's
+    standard series. The effect should show on ACL, MCL and lateral meniscus in the split studies.
+  budget: One to three 256-d vectors and one boolean per acquisition; no extra decoding or backbone work.
+    Accounting identical to the reference.
+  implementation: 'Adds behavior. preparation.py: one PreparedSeries field (for example oblique: bool
+    = False) and nothing else. dataset.py sets it on the oblique group''s prepared values and collate_studies
+    emits a per-acquisition tensor. model.py and spatial_tokens.py add the embedding where the plane and
+    contrast embeddings are added, behind one setting under model.oblique. All other embeddings stay.
+    New parameters load only in fresh checkpoints. If accepted, later ideas reuse the flag plumbing.'
+  open_choices: One shared vector or one per splittable type (axial fluid, coronal T1/PD, coronal fluid);
+    whether the axial-labelled coronal ACL obliques share the coronal vector, their true protocol, or
+    get the axial one.
+  dependencies: []
+  priority_rationale: The most direct fix for the named gap, cheap and neutral at initialization, and
+    its plumbing serves the other representation ideas.
+- id: acl-gated-oblique-tokens
+  mechanism_id: oblique-tokens-gated-to-acl-attention
+  parent_idea_id: null
+  title: Let tokens from fluid-sensitive oblique groups enter the ACL attention only
+  opportunity: 'The reference''s loss sits in the studies it changes: on the 103 fold-0 split studies
+    its macro AUC is 0.8566 against 0.8667 for k_05 (paired bootstrap +0.0103 [-0.0027, +0.0234]), with
+    MCL -0.058 (11 positives) and lateral meniscus -0.028 (22), while the 802 unchanged studies score
+    the same (0.9017 against 0.9018). The dedicated fluid obliques are ACL views (COR ACL T2W FS), and
+    their extra tokens appear to dilute attention for other labels. On k_05 at x4, giving the oblique
+    group its own budget but letting its tokens vote only for ACL improved the 102 affected studies by
+    +0.0020, against -0.0001 for the same budget without the gate.'
+  mechanism: In _attention_pool, tokens of acquisitions in a fluid-sensitive oblique group (coronal fluid
+    and axial fluid) are masked out of every label's softmax except ACL, as a fixed prior with no learned
+    parameters. Standard series and non-split slots are unchanged, and split studies always keep their
+    standard tokens, so no label loses all its tokens.
+  precedents:
+  - outputs/analysis/tilted-slot-policies-v2-k05-20260922/results.csv (additive_acl +0.0020 and intact_acl
+    +0.0011 on the affected subset against additive -0.0001, k_05 at x4 tau 0.75)
+  - outputs/analysis/acquisition-geometry-20260922/localize_campaign.py (split-study and unchanged-study
+    macro AUC for the reference, k_05 and each candidate)
+  - autoresearch/campaigns/oblique/prior-work.md#what-the-oblique-groups-are (descriptions of the fluid
+    obliques)
+  - outputs/autoresearch/oblique/experiments/oblique-group-embedding-20260922T115506Z-f5d616dd/changes.diff
+    (flag plumbing to reuse)
+  novelty: 'A fixed routing prior instead of a learned one: label-view-attention-bias must learn 108 values
+    from about 12% of studies, while the gate encodes what the protocol was acquired for.'
+  coverage: Sampling and counts identical to the reference; only attention masks change, in split studies
+    with a fluid oblique group.
+  exploitation: ACL keeps the dedicated view's evidence; MCL, the menisci and the other labels stop paying
+    for the extra tokens.
+  budget: A boolean per acquisition and one mask; no parameters, no extra compute.
+  implementation: Adds behavior. Reuse the oblique flag plumbing of oblique-group-embedding (one PreparedSeries
+    field set in dataset.py, carried through collate_studies) and mask scores in _attention_pool behind
+    one setting under model.oblique naming the allowed labels. The embeddings, scorer, anatomical term
+    and heads stay. Report split-study and unchanged-study macro and per-label AUC against both the reference
+    and k_05.
+  open_choices: Whether coronal T1/PD oblique groups are gated too (their studies are OA-rich, so the
+    default leaves them ungated); a hard mask or a large fixed negative bias.
+  dependencies: []
+  priority_rationale: The only fix with a direct paired test on the affected studies, it targets the measured
+    MCL and lateral meniscus loss, and it costs nothing.
+exhausted_directions: 'On the oblique-x4 campaign (old source, reference oblique-x4 at 0.902373, x4 tau
+  1) three mechanisms were rejected: label-view-attention-bias +0.000610 (adoption 80% [-0.001142, +0.002319]),
+  split-slot-view-mixture-pooling +0.000054 ([-0.001854, +0.001890]) and oblique-identity-with-view-bias
+  -0.000615 ([-0.002386, +0.001046]; ACL -0.0086 and lateral meniscus -0.0080). The x1 campaign rejected
+  the embedding and the view bias alone. See autoresearch/campaigns/oblique-clean/prior-work.md.'

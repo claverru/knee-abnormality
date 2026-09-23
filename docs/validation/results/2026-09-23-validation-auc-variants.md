@@ -165,6 +165,13 @@ spread the public score by 0.003. The epochs where the two metrics disagree diff
 submissions. Checkpoint selection stays on hard AUC by default, not on evidence. Only `k_025`
 (S44) has its soft-AUC epoch saved for a second pair without retraining.
 
+## Later evidence (S51)
+
+S51, the oblique group embedding, is a data point against both metrics when comparing runs. At
+×4 it led `k05-clean` by +0.0024 hard and +0.0021 soft, but both scored 0.942 publicly
+([result](2026-09-22-oblique-groups-result.md#group-embedding-on-the-cleaned-source-s51)). Soft
+AUC did no better than hard AUC on this pair.
+
 ## Adopted use
 
 Since 2026-09-23, `validation_metrics` also records `soft_macro_auc` and `per_target_soft_auc`,

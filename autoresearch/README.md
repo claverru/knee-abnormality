@@ -2,9 +2,12 @@
 
 Topic-scoped, autonomous experimentation. A user starts one campaign; a detached
 supervisor then coordinates research, implementation, training, and evaluation
-within its fixed contract. The active definition is the `sampling` campaign;
-triplet sampling, shared losses and medial/lateral transfer are historical records
-sealed on an earlier evaluation. Every campaign uses the
+within its fixed contract. No campaign is active: the oblique line closed on 2026-09-23
+([history](../docs/history/oblique-groups.md)), retiring `oblique-clean`. The retired
+`oblique-x4` campaign ran on the source before series cleaning; the retired `oblique` and
+`sampling` campaigns scored ×1 predictions; triplet sampling,
+shared losses and medial/lateral transfer are historical records sealed on an earlier
+split and labels. Every campaign uses the
 [shared evaluation and adoption rule](protocol.md#shared-evaluation-and-adoption).
 
 The detached runner is implemented. Adding campaign files does not start training.
@@ -15,7 +18,7 @@ and effort automatically, independently of the model in an interactive chat.
 rtk proxy uv run --locked just autoresearch-start codex
 ```
 
-Or use `autoresearch-start claude`. These default to `sampling`; append another
+Or use `autoresearch-start claude`. These default to `oblique-clean`; append another
 campaign ID to inspect a historical campaign.
 Inspect progress with `autoresearch-status` and every experiment's scores,
 paired interval and decision with `autoresearch-results`. Manual reference

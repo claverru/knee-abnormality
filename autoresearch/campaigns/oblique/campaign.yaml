@@ -1,0 +1,68 @@
+id: oblique
+status: ready-to-seal
+recipe: configs/training.yaml
+reference_run: outputs/training/oblique
+reference_equivalences: {}
+additional_evidence_runs: []
+backlog:
+  refill_below: 4
+  refill_to: 5
+artifacts_root: outputs/autoresearch/oblique
+policy:
+  editable_files:
+    - configs/training.yaml
+    - src/knee_abnormality/config.py
+    - src/knee_abnormality/data/dataset.py
+    - src/knee_abnormality/data/preprocessing/preparation.py
+    - src/knee_abnormality/data/preprocessing/sampling.py
+    - src/knee_abnormality/modeling/model.py
+    - src/knee_abnormality/modeling/spatial_tokens.py
+  editable_directories: []
+  config_keys: []
+  config_prefixes:
+    - data.oblique
+    - model.oblique
+  list_item_fields:
+    data.series_types: [max_images]
+  input_identity_keys: [preprocessing_identity]
+  require_source_change: true
+  developer_instructions: >-
+    Implement the mechanism and update configs/training.yaml only to enable it.
+    New data settings belong under data.oblique and new model settings under
+    model.oblique. Build on the implemented oblique groups: oblique_split and the
+    series_types[*].oblique_tilt_deg thresholds (coronal 20, axial fluid 30, no
+    sagittal) stay exactly as they are. To expose an acquisition's group to the
+    model, add one field to PreparedSeries in preparation.py and change nothing
+    else there, set it in dataset.py, and carry it through collate_studies. New
+    model parameters start neutral (zero-initialized embeddings, biases and
+    residual outputs), so the first forward pass matches the reference model.
+    Keep the backbone, projection, existing embeddings, anatomical bias, scorer,
+    heads, series dropout, reflection and augmentation unless the idea
+    explicitly replaces one of them. Budget changes are redistributions only:
+    total training triplets over the run, training visits per epoch and
+    validation x1 triplets per epoch must equal the baseline replay's counts at
+    zero tolerance, so every triplet given to one group is taken from another
+    group or type of the same study at the same multiplier. Validation stays
+    deterministic and independent of the training seed. Learned components use
+    training batches only; all computation runs inside the measured training
+    process, with no external precomputation artifacts. Losses, class-balance
+    weights, optimizer, schedule, checkpointing and accounting stay fixed.
+    Return prepared or blocked. Use the existing Python environment for static
+    checks. No tests.
+  researcher_instructions: >-
+    Return distinct mechanisms that make the oblique groups useful to the model,
+    not threshold or hyperparameter sweeps. An oblique group is a coronal series
+    tilted more than 20 degrees, or an axial fluid series tilted more than 30,
+    sampled with its own budget because a standard series shares its slot; about
+    12% of studies, 103 on fold 0. In scope: how the model represents and weights
+    tokens from these groups (embeddings from group membership or acquisition
+    geometry, per-label attention biases, dedicated or residual readouts) and
+    zero-sum redistribution of triplets between an oblique group, its slot's
+    standard series and the study's other types. Out of scope: tilt thresholds,
+    sagittal obliques, backbone, losses and loss weights, labels, augmentation
+    and reflection, series dropout, crop size and spacing, and the shared
+    evaluation. Denser sampling of the same oblique series has little room: over
+    ten epochs the groups already see 85-93% of their triplet windows. Ground each
+    idea in a measured premise, and say how its effect should show in the fold-0
+    studies that hold a split slot, since per-label changes of 0.01-0.02 also
+    appear in studies whose inputs did not change.

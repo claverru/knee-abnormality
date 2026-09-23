@@ -765,3 +765,22 @@ scripts:
       - CPU only; the predictions come from repository inference with --image-multiplier and --attention-temperature, as in the sweep directory's run_sweep.sh.
       - Picking the best temperature on the same fold is selection; the intervals ignore it.
     docs: [docs/validation/results/2026-09-21-combined-labels-first-run.md]
+
+  - id: score-tilted-slot-policies
+    path: scripts/adhoc/score_tilted_slot_policies.py
+    status: historical
+    summary: Re-predict fold-0 validation with one or more checkpoints under alternative series policies, for slots holding a tilted and a standard series or for every multi-series slot, and score each against intact predictions on the full fold and on the affected studies.
+    tags: [oblique, tilted, obliquity, acl, series, slot, budget, policy, supplier, entitlement, coverage, attention, gate, ablation, additive, passes, ensemble, inference, validation, bootstrap, gpu]
+    commands:
+      - rtk proxy uv run --locked python -m scripts.adhoc.score_tilted_slot_policies --output-dir outputs/analysis/tilted-slot-policies-new --run-dirs '["outputs/training/k_05"]'
+      - rtk proxy uv run --locked python -m scripts.adhoc.score_tilted_slot_policies --output-dir outputs/analysis/tilted-slot-policies-gate --run-dirs '["outputs/training/k_05"]' --thresholds '[30]' --variants '["standard","additive_acl","intact_acl","intact_hidden"]'
+    inputs: [Run directories with effective_config.json and the fold's selected checkpoint, Series-filtering census parquet with obliquity_deg, Original DICOMs]
+    outputs: [slots_<run>_ge<threshold>.json slot plans, results.csv per run, setting, threshold and variant with per-label deltas, aggregate.csv over runs, predictions.parquet, summary.json]
+    notes:
+      - Uses the GPU; check usage and ask before launching. Refuses an existing output directory. One checkpoint with every variant at x4-tau0.75 takes about five minutes on one RTX 3090.
+      - Tilted variants act on coronal and sagittal slots holding both a series at or above the census obliquity threshold and another series; axial slots are never modified because axial-labelled tilted series are mostly coronal ACL obliques past 45 degrees. They cover standard only, tilted only, additive (each group sampled separately with the full slot budget), an ACL-only attention gate on tilted-series tokens, hiding tilted tokens from every label, and probability means or ACL routing of the single-group passes.
+      - General variants act on every slot with two or more usable series, ordered by the production source ranking; they cover per-series passes averaged, best-ranked series only, every series at the full budget in one bag, a copy of select_triplets whose evaluation entitlement is weighted by each series' depth coverage, and intact sampling at twice the multiplier as a compute control.
+      - The gate patches the model's attention scores to -1e4 for blocked label and token pairs; with additive sampling its non-ACL outputs reproduce standard-only within bf16 noise. Study reference, knee side and slot budgets come from all series.
+      - Full-fold scores replace only the affected studies; all predictions are recomputed at batch size 1 in bf16. Paired report-group bootstrap on the full fold and on the affected subset, which scores only labels with both classes.
+      - Measures inference-time behaviour of checkpoints trained with pooled slots, not the value of training under a policy. Choosing among variants on fold 0 is selection; the intervals ignore it.
+      - Historical since the oblique line closed on 2026-09-23 (docs/history/oblique-groups.md); it does not depend on the removed oblique-group code.

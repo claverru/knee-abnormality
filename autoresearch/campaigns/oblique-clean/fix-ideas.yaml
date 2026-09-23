@@ -1,0 +1,57 @@
+ideas:
+- id: acl-gated-oblique-tokens-token-mask
+  mechanism_id: oblique-tokens-gated-to-acl-attention
+  parent_idea_id: acl-gated-oblique-tokens
+  title: Let tokens from fluid-sensitive oblique groups enter the ACL attention only, with the gate expanded
+    to spatial tokens
+  opportunity: 'The reference''s loss sits in the studies it changes: on the 103 fold-0 split studies
+    its macro AUC is 0.8566 against 0.8667 for k_05 (paired bootstrap +0.0103 [-0.0027, +0.0234]), with
+    MCL -0.058 (11 positives) and lateral meniscus -0.028 (22), while the 802 unchanged studies score
+    the same (0.9017 against 0.9018). The dedicated fluid obliques are ACL views (COR ACL T2W FS), and
+    their extra tokens appear to dilute attention for other labels. On k_05 at x4, giving the oblique
+    group its own budget but letting its tokens vote only for ACL improved the 102 affected studies by
+    +0.0020, against -0.0001 for the same budget without the gate.'
+  mechanism: In _attention_pool, tokens of acquisitions in a fluid-sensitive oblique group (coronal fluid
+    and axial fluid) are masked out of every label's softmax except ACL, as a fixed prior with no learned
+    parameters. Standard series and non-split slots are unchanged, and split studies always keep their
+    standard tokens, so no label loses all its tokens.
+  precedents:
+  - 'outputs/autoresearch/oblique-clean/experiments/acl-gated-oblique-tokens-20260922T230650Z-8ff84619
+    (invalid: RuntimeError on the first training batch, tensor a (162) against tensor b (7938), because
+    the per-acquisition gate flag reached _attention_pool without expansion to the 49 spatial tokens per
+    acquisition)'
+  - outputs/autoresearch/oblique-clean/jobs/orchestrator-20260922T231642Z-a6d3184d/report.json (orchestrator
+    diagnosis and the one-line fix)
+  - outputs/analysis/tilted-slot-policies-v2-k05-20260922/results.csv (additive_acl +0.0020 and intact_acl
+    +0.0011 on the affected subset against additive -0.0001, k_05 at x4 tau 0.75)
+  - outputs/analysis/acquisition-geometry-20260922/localize_campaign.py (split-study and unchanged-study
+    macro AUC for the reference, k_05 and each candidate)
+  - autoresearch/campaigns/oblique/prior-work.md#what-the-oblique-groups-are (descriptions of the fluid
+    obliques)
+  - outputs/autoresearch/oblique/experiments/oblique-group-embedding-20260922T115506Z-f5d616dd/changes.diff
+    (flag plumbing to reuse)
+  novelty: 'Same mechanism as acl-gated-oblique-tokens, whose only attempt crashed before any training
+    and so gave no evidence. The material difference is a correct implementation: the gate flag is expanded
+    to token resolution the way pool_encoded expands the per-acquisition study index.'
+  coverage: Sampling and counts identical to the reference; only attention masks change, in split studies
+    with a fluid oblique group.
+  exploitation: ACL keeps the dedicated view's evidence; MCL, the menisci and the other labels stop paying
+    for the extra tokens.
+  budget: A boolean per acquisition and one mask; no parameters, no extra compute.
+  implementation: 'Adds behavior. Start from the invalid attempt''s diff and change only the gate''s resolution:
+    in pool_encoded, expand the per-acquisition flag with [:, None].expand_as(encoded["visual_valid"]).flatten(),
+    as done for study at model.py:385, before passing it to _attention_pool; pool_encoded serves training
+    and prediction. Keep the dataset flag, collate tensor, config setting and allowed-label buffer as
+    reviewed. Guarantee no label softmax is fully masked within a study: gate a token only where the study
+    keeps at least one visually valid ungated token for that label, so the output is never NaN. inference/engine.py
+    is not editable, so the model moves the flag to its device itself. Before returning prepared, run
+    one real training batch through encode_batch, pool_encoded and the loss on CPU and report the shapes.
+    Report split-study and unchanged-study macro and per-label AUC against the reference and k05-clean.'
+  open_choices: Whether coronal T1/PD oblique groups are gated too (their studies are OA-rich, so the
+    default leaves them ungated); a hard mask or a large fixed negative bias.
+  dependencies: []
+  priority_rationale: The only oblique idea with a same-direction paired prior (+0.0020 on the 102 affected
+    studies on k_05 at x4). Its first attempt never trained, so the idea is untested, and the fix is one
+    line.
+exhausted_directions: The first acl-gated-oblique-tokens attempt is invalid from an implementation bug,
+  not evidence against the gate; see its experiment directory.

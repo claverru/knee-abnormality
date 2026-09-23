@@ -19,19 +19,19 @@ prepare-folds config="configs/training.yaml":
 train run_id config="configs/training.yaml" folds="0":
     rtk proxy uv run --locked python -m scripts.pipeline.train "$2" --folds "$3" --run-id "$1"
 
-autoresearch-start provider campaign="sampling":
+autoresearch-start provider campaign="oblique-clean":
     rtk proxy uv run --locked python -m scripts.tools.autoresearch start "$2" --provider "$1"
 
-autoresearch-status campaign="sampling":
+autoresearch-status campaign="oblique-clean":
     rtk proxy uv run --locked python -m scripts.tools.autoresearch status "$1"
 
-autoresearch-results campaign="sampling":
+autoresearch-results campaign="oblique-clean":
     rtk proxy uv run --locked python -m scripts.tools.autoresearch results "$1"
 
-autoresearch-stop campaign="sampling":
+autoresearch-stop campaign="oblique-clean":
     rtk proxy uv run --locked python -m scripts.tools.autoresearch stop "$1"
 
-autoresearch-resume campaign="sampling":
+autoresearch-resume campaign="oblique-clean":
     rtk proxy uv run --locked python -m scripts.tools.autoresearch resume "$1"
 
 resume run_id checkpoint config fold="0":

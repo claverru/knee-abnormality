@@ -1,0 +1,235 @@
+ideas:
+  - id: oblique-group-embedding
+    mechanism_id: oblique-group-token-embedding
+    parent_idea_id: null
+    title: Mark tokens from oblique groups with their own learned embedding
+    opportunity: >-
+      The reference gives oblique groups their own budget but not an identity: their
+      tokens carry the slot's plane and contrast embeddings, so a dedicated ACL-oblique
+      slab and the standard coronal beside it look alike to attention except by
+      appearance. Fold 0 did not move (0.897527 against 0.899042 for k_05 at x1). Their
+      studies are rich in the labels these views target: in coronal fluid at 30-45
+      degrees, ACL 40% against 15%, MCL 15% against 5%, lateral meniscus 33% against 16%.
+    mechanism: >-
+      Add a learned vector to every token of an acquisition in an oblique group, next to
+      the plane and contrast embeddings and before mil_norm. The vector is zero-initialized,
+      so the first forward pass equals the reference. The group is known in _prepare_slot
+      from oblique_split; carry it as one PreparedSeries field through collate_studies to
+      the model.
+    precedents:
+      - docs/validation/results/2026-09-22-oblique-groups-result.md (reference run; per-label localization)
+      - outputs/analysis/acquisition-geometry-20260922/protocol_prior.txt (an oblique flag added after training gave -0.0003 to -0.0014, so the gain must come from routing inside the model, not new information)
+      - docs/validation/results/2026-09-14-knee-side-embedding-result.md (a knee-side embedding tied; it marked patient geometry, not acquisition protocol)
+      - docs/backlog/small-changes.md#oblique-embedding (transferred general-backlog entry)
+    novelty: >-
+      The oblique groups exist since 2026-09-22 and no representation change has been
+      tried for them. Unlike the retired knee-side and 3D embeddings, it marks how a view
+      was acquired, not where a token sits in the patient.
+    coverage: >-
+      Sampling, budgets and counts are identical to the reference; only tokens of
+      oblique-group acquisitions change, in 103 fold-0 studies.
+    exploitation: >-
+      Attention and the pooled features can treat the dedicated views differently from
+      the slot's standard series. The effect should show on ACL, MCL and lateral
+      meniscus in the split studies.
+    budget: >-
+      One to three 256-d vectors and one boolean per acquisition; no extra decoding or
+      backbone work. Accounting identical to the reference.
+    implementation: >-
+      Adds behavior. preparation.py: one PreparedSeries field (for example oblique: bool =
+      False) and nothing else. dataset.py sets it on the oblique group's prepared values
+      and collate_studies emits a per-acquisition tensor. model.py and spatial_tokens.py
+      add the embedding where the plane and contrast embeddings are added, behind one
+      setting under model.oblique. All other embeddings stay. New parameters load only in
+      fresh checkpoints. If accepted, later ideas reuse the flag plumbing.
+    open_choices: >-
+      One shared vector or one per splittable type (axial fluid, coronal T1/PD, coronal
+      fluid); whether the axial-labelled coronal ACL obliques share the coronal vector,
+      their true protocol, or get the axial one.
+    dependencies: []
+    priority_rationale: >-
+      The most direct fix for the named gap, cheap and neutral at initialization, and its
+      plumbing serves the other representation ideas.
+  - id: label-view-attention-bias
+    mechanism_id: per-label-view-group-attention-bias
+    parent_idea_id: null
+    title: Learn a per-label attention bias for each view group, including the three oblique groups
+    opportunity: >-
+      Attention chooses evidence per label over all study tokens, and view identity reaches
+      the scorer only through the shared nonlinear MLP. Labels depend on views very
+      unevenly: removing a fluid type costs 0.006-0.007 macro and removing axial fluid
+      costs Baker's cyst 0.026 on frozen models. In split studies the oblique tokens (about
+      245 at x1) compete in one softmax with over a thousand standard tokens. A direct
+      additive bias lets each label raise or lower a view's attention mass; the adopted
+      anatomical bias is the structural precedent.
+    mechanism: >-
+      A zero-initialized table of shape labels x view groups (six slot types plus the
+      three oblique groups) added to every token's attention score by its acquisition's
+      view group, before the softmax and alongside the anatomical term. It uses the same
+      oblique flag as oblique-group-embedding. The learned table is readable after
+      training: whether ACL moves attention mass to the oblique groups.
+    precedents:
+      - autoresearch/anatomical-attention.md (learned family strengths adopted, +0.002331)
+      - docs/validation/results/2026-09-17-plane-contrast-importance.md (label-specific type dependence)
+      - docs/validation/results/2026-09-17-test-time-allocation.md (removal costs and value curves by type)
+      - docs/validation/results/2026-09-15-attention-prior-result.md (a fixed spatial prior regressed -0.002177; this one is learned from zero)
+    novelty: >-
+      No view-level attention bias has been tried. The general backlog's plane/contrast
+      readouts and adapters act on features, not on attention mass.
+    coverage: >-
+      Sampling and counts unchanged; every token gets a view-group bias, and the oblique
+      groups become separable for the first time.
+    exploitation: >-
+      Labels can route attention to the views that carry them; the oblique groups can gain
+      or lose mass per label instead of being diluted in the slot's softmax share.
+    budget: >-
+      108 scalars; negligible compute.
+    implementation: >-
+      Adds behavior in model.py where the anatomical term is added in _attention_pool,
+      behind one setting under model.oblique; the flag plumbing is as in
+      oblique-group-embedding and can be shared with it if both are implemented. Scorer,
+      anatomical bias and heads stay.
+    open_choices: >-
+      Nine view groups or six slot types plus one shared oblique column; whether the bias
+      also applies at the inference temperature scaling (it adds to scores before tau
+      divides them).
+    dependencies: []
+    priority_rationale: >-
+      Directly addresses dilution and routing, with the adopted anatomical bias as a
+      working precedent of the same form, and interpretable either way.
+  - id: oblique-residual-readout
+    mechanism_id: oblique-dedicated-residual-readout
+    parent_idea_id: null
+    title: Add a residual readout that pools only oblique-group tokens for the labels those views serve
+    opportunity: >-
+      In a split study the oblique tokens are a minority of one softmax per label, so the
+      dedicated view's evidence is averaged with the standard series. At x1 the oblique
+      group contributes 5 of about 32 triplets. The views were acquired for specific
+      questions: ACL above all, and the MCL and lateral meniscus rates are doubled in these
+      studies.
+    mechanism: >-
+      A second attention pooling restricted to oblique-group tokens, with its own small
+      scorer, produces a residual logit per targeted label through a zero-initialized
+      output, added to the main logit. Studies without an oblique group get a zero
+      residual, so their predictions are unchanged at initialization and are affected only
+      through shared training.
+    precedents:
+      - docs/backlog/small-changes.md#planecontrast-specific-readouts (general per-type readouts, untested)
+      - docs/validation/results/2026-09-18-overnight-results.md (residual_readout, a per-target MLP on the same pooled vector, -0.0005; different mechanism)
+      - autoresearch/campaigns/oblique/prior-work.md#label-profile-of-their-studies
+    novelty: >-
+      A dedicated evidence path for one acquisition kind; the rejected residual readout
+      reused the shared pooled vector.
+    coverage: >-
+      Sampling and counts unchanged.
+    exploitation: >-
+      The dedicated ACL view can raise or lower ACL (and the chosen labels) on its own
+      evidence, without competing for softmax mass.
+    budget: >-
+      One small scorer and output vector; a second masked softmax over a subset of tokens.
+    implementation: >-
+      Adds behavior in model.py (_attention_pool or pool_encoded) behind one setting under
+      model.oblique, reusing the oblique flag plumbing. The main pooling, heads and
+      anatomical bias stay.
+    open_choices: >-
+      Targeted labels: all twelve or a fixed set chosen from the prior-work label profile
+      (ACL, MCL, lateral meniscus), fixed before training; shared or separate scorer.
+    dependencies: []
+    priority_rationale: >-
+      The strongest version of routing: if the dedicated views hold extra ACL information,
+      this path can use it even when the main softmax cannot.
+  - id: view-orientation-embedding
+    mechanism_id: continuous-acquisition-orientation-embedding
+    parent_idea_id: null
+    title: Embed each acquisition's slice-normal orientation instead of relying on the slot's plane label
+    opportunity: >-
+      Tilt is continuous: 23% of all series are tilted 10-20 degrees and the oblique
+      groups span 20-55. Coronal obliques rotate about the left-right axis and sagittal
+      obliques about the superior-inferior axis, so the same image row or column maps to
+      different anatomy. A binary oblique flag at fixed thresholds discards the angle, and
+      the 2D anchor embedding assumes the slot's canonical in-plane axes.
+    mechanism: >-
+      For each acquisition take the unit slice normal in patient coordinates with the x
+      component mirrored by knee side, map its three components through a small MLP like
+      the 2D embedding (3 -> 64 -> 256, GELU), zero-initialize the output layer and add
+      the result to that acquisition's tokens. Acquisitions without valid geometry get
+      zero.
+    precedents:
+      - outputs/analysis/acquisition-geometry-20260922/oblique_axes.txt (rotation axes of each oblique family)
+      - docs/backlog/big-bets.md#3d-embedding-training-time-effect (a patient-position 3D embedding was ignored at inference)
+      - docs/data-preparation/reflection-geometry-and-previews.md (normal and side conventions)
+    novelty: >-
+      Encodes how a view cuts the anatomy, not where a token is; it also reaches the 10-20
+      degree tilts inside standard slots.
+    coverage: >-
+      Sampling and counts unchanged; every acquisition gets an orientation vector.
+    exploitation: >-
+      The model can adapt the meaning of in-plane positions and appearance to the view
+      angle, which matters most for the oblique groups.
+    budget: >-
+      A small MLP per acquisition; negligible.
+    implementation: >-
+      Adds behavior. The series normal is available from IndexedSeries.geometry; carry it
+      per acquisition through a PreparedSeries field and collate_studies, and add the
+      embedding in spatial_tokens.py or model.py behind one setting under model.oblique.
+      Reflection must keep the mirrored normal consistent with the reflected tokens. If
+      oblique-group-embedding is already accepted, state whether this replaces it or adds
+      to it.
+    open_choices: >-
+      Raw normal components or angles to the three axes; whether to use the middle slice's
+      orientation or the series normal.
+    dependencies: []
+    priority_rationale: >-
+      A more general version of the identity idea; rank it after the binary flag, whose
+      result says whether view identity matters at all.
+  - id: coverage-matched-slot-split
+    mechanism_id: zero-sum-coverage-split-within-split-slots
+    parent_idea_id: null
+    title: Split each split slot's combined budget by the share of windows each group covers, at the reference's per-slot total
+    opportunity: >-
+      The reference gives both groups the full type budget. At x1 a thin coronal fluid
+      oblique sees 5 of about 16 windows per pass while the full-knee standard series
+      beside it sees 5 of 28, so the series that shows the whole joint, including MCL and
+      the meniscal body, is covered at a lower rate than the 45 mm slab. Equalizing
+      coverage moves triplets to the standard series without touching other slots.
+    mechanism: >-
+      In slots holding both groups, divide the combined count (standard budget plus oblique
+      budget, as in the reference) between the groups in proportion to each group's
+      distinct geometry-group capacity, by largest remainder, with at least one triplet
+      each and never above capacity, in training and validation alike. Per-slot, per-study
+      and run totals equal the reference exactly.
+    precedents:
+      - outputs/analysis/acquisition-geometry-20260922/oblique_reach.txt (windows and run coverage per group)
+      - docs/validation/results/2026-09-17-test-time-allocation.md#repeated-series-in-one-slot (second-series triplets help on frozen models)
+      - docs/validation/results/2026-09-18-overnight-results.md (repeated_series_share took triplets from other types and lost publicly; this split stays inside the slot)
+    novelty: >-
+      The first zero-sum split between the two groups of one slot; the reference and
+      repeated_series_share both changed slot totals.
+    coverage: >-
+      Standard series gain coverage and oblique groups lose some; run coverage of the
+      oblique groups stays high because they hold few windows.
+    exploitation: >-
+      Tests whether the reference's equal split over-weights the thin slab relative to the
+      full-knee series.
+    budget: >-
+      No extra triplets or decoding; accounting identical to the reference by construction.
+    implementation: >-
+      Adds behavior in dataset.py _prepare_slot (group budgets) behind one setting under
+      data.oblique; oblique_split stays. Record the changed deterministic validation
+      selection identity.
+    open_choices: >-
+      Capacity as distinct geometry groups or as physical support length; how to round when
+      the combined count exceeds total capacity.
+    dependencies: []
+    priority_rationale: >-
+      Cheap and exact, and it answers the budget question in the one direction the
+      reference did not test; lower priority than the representation ideas, because budget
+      alone already failed to move fold 0.
+exhausted_directions: >-
+  Not seeded: tilt-threshold changes (set from measured geometry, not swept), sagittal
+  obliques (they rarely share a slot), denser or re-centred sampling of the oblique series
+  (they already see 85-93% of their windows over a run), test-time policies such as the
+  standard-only and tilted-only two-pass average (endgame test-time augmentation),
+  the image count and attention temperature (inference settings, not the x1 metric),
+  budget increases (the shared accounting is exact) and ligament anatomical priors
+  (not specific to oblique groups). The second seed file holds one lower-ranked budget idea.
