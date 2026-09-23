@@ -12,6 +12,14 @@ pending experiments are classified in the [backlog](../backlog/INDEX.md).
   (`k_05` epoch 9, 0.944) against S41 (epoch 7, 0.945), is inconclusive
   ([result](../validation/results/2026-09-23-validation-auc-variants.md)).
 
+- **Noisy-labels line closed, 2026-09-23 (user decision):** six prediction-driven label-noise
+  objectives against `k05-clean` (S48), none adopted; the best was early-learning regularization
+  at +0.0013 hard. The model does not memorize its labels in ten fine-tuning epochs, so its own
+  predictions add no teacher; only an independent model does. The 1→0 class-balance schedule tied
+  locally and, with early-learning regularization, awaits a public submission
+  ([result](../validation/results/2026-09-23-noisy-labels-campaign.md)). The adaptive-allocation
+  big bet is retired with it.
+
 - **Oblique line closed, 2026-09-23 (user decision):** oblique groups (own slot budget for tilted
   axial-fluid and coronal series) and the group embedding are removed from `configs/training.yaml`
   and the code. Three paired submissions came out level or lower with them: S46 0.944 against S41
@@ -142,8 +150,8 @@ pending experiments are classified in the [backlog](../backlog/INDEX.md).
 - **AUC training research, 2026-09-19:** the
   [objective survey](../research/auc_loss_approaches.md) now includes BCE weighting, study sampling,
   batch composition and adaptive allocation. Static candidates are in
-  [small changes](../backlog/small-changes.md#bce-weighting-and-study-sampling), adaptive work in
-  [big bets](../backlog/big-bets.md#adaptive-training-allocation).
+  [small changes](../backlog/small-changes.md#bce-weighting-and-study-sampling), adaptive work ran in the
+  [noisy-labels campaign](../validation/results/2026-09-23-noisy-labels-campaign.md).
   [Fixed class-balanced BCE](../modeling/supervision.md#fixed-class-balanced-bce) is implemented
   as `trainer.class_balanced_bce: false` by default, with saved training-fold weights and strict
   resume checks. The damping exponent is implemented as `trainer.class_balance_exponent` (default

@@ -66,13 +66,15 @@ after resume; its decision is completed after resume. To terminate training too:
 rtk proxy uv run --locked python -m scripts.tools.autoresearch stop sampling --abort
 ```
 
-Status shows a compact summary of calibration passes, any provider wait and its
-end time, active jobs and elapsed time, the ranked backlog, the next candidate, training progress, recent results, budget,
-and recorded agent usage by role/event. It includes failed calls and explicitly
-marks partial or unavailable usage; unparseable usage counts as unavailable and
-never blocks result processing or status. The metric summary shows the original reference
-AUC, current incumbent AUC, raw change since the start, retained experimental gain,
-and the latest decided experiment's scores, delta and paired 95% interval.
+Status prints a header (campaign, provider, state, supervisor, budget), then any warnings
+(pause reason, provider wait, pending stop, idle backlog) and five sections. **Now** lists
+calibration progress and active jobs with elapsed time, and training jobs show their idea, epoch
+and latest validation AUC. **Backlog** lists the ranked queue and the next candidate. **Score**
+shows the original reference AUC, current incumbent AUC, raw change since the start and retained
+experimental gain. **Results** tabulates every decided experiment with its delta, adoption 80%
+interval and verdict. **Cost** gives recorded agent usage by role/event; it includes failed calls
+and explicitly marks partial or unavailable usage, and unparseable usage counts as unavailable and
+never blocks result processing or status.
 
 For the complete experiment history, use either command:
 

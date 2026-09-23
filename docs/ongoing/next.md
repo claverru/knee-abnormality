@@ -18,6 +18,15 @@ Starting a campaign is a separate user action.
 
 Pending:
 
+- **Noisy-labels campaign stopped 2026-09-23, nothing adopted.** Hard fold-0 AUC against
+  `k05-clean` (S48, 0.942): bootstrapped targets −0.0005, running-average targets +0.0002,
+  early-learning regularization +0.0013 (soft +0.0008), confident-contradiction down-weighting
+  −0.0060, class-balance schedule 1→0 −0.0000 (soft +0.0007), schedule plus early learning −0.0003.
+  Prediction-memory methods barely act: the model does not memorize its labels in ten fine-tuning
+  epochs. Next: export the schedule and early-learning checkpoints from their experiment sources
+  (×4, τ 0.75, batch 4, as S51) and submit them against S48, since class-weighting changes that tie
+  locally have moved the public score
+  ([campaign](../../autoresearch/campaigns/noisy-labels/INDEX.md)).
 - **Combined labels scored 0.940 public (S40)** against 0.933 for the last single models on
   Steven v4 labels ([result](../validation/results/2026-09-21-combined-labels-first-run.md)). A
   Steven-v4-trained control on the same split (`labels.source: steven_v4`) would separate the

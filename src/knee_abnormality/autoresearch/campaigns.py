@@ -81,6 +81,8 @@ class Campaign(BaseModel):
     recipe: str
     reference_run: str
     reference_equivalences: dict[str, bool | int | float | str]
+    reference_config_exceptions: list[str] = Field(default_factory=list)
+    reference_identity_exceptions: list[str] = Field(default_factory=list)
     additional_evidence_runs: list[str]
     backlog: BacklogPolicy
     artifacts_root: str
@@ -90,6 +92,17 @@ class Campaign(BaseModel):
     @classmethod
     def equivalence_paths(cls, values):
         CampaignPolicy.field_paths(list(values))
+        return values
+
+    @field_validator("reference_config_exceptions", "reference_identity_exceptions")
+    @classmethod
+    def exception_paths(cls, values):
+        for value in values:
+            parts = value.split(".")
+            if parts[-1].endswith("[]") or any(
+                not part.removesuffix("[]").isidentifier() for part in parts
+            ):
+                raise ValueError(f"Invalid reference exception path: {value}")
         return values
 
 

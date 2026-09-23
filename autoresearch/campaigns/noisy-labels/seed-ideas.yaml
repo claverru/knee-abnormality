@@ -1,0 +1,195 @@
+ideas:
+- id: bootstrapped-soft-targets
+  mechanism_id: prediction-bootstrapped-targets
+  parent_idea_id: null
+  title: Train on a blend of each cell's label and the model's own detached prediction after a warm-up
+  opportunity: >-
+    An offline blend of an image teacher into the labels raised their gold agreement by +0.020 and
+    tied publicly (S50 0.945 against 0.942), with its only loss on PF OA traced to a teacher trained
+    on looser labels. Soft bootstrapping gets a similar correction online, from the model being
+    trained, so the teacher always matches the current labels, loss and split.
+  mechanism: >-
+    For every observed training cell, replace the BCE target y with t = beta * y + (1 - beta) *
+    stopgrad(sigmoid(logit)), with beta = 0.8, from the start of epoch index 2 (zero-based) onward.
+    Epochs 0-1 train on y unchanged so that predictions carry image evidence before they feed back.
+    The class-balance weight of a cell keeps using its original y >= 0.5 group. Reduction, masking
+    and gold overrides are unchanged; gold cells follow the same rule as every other cell.
+  precedents:
+  - 'Reed et al. 2014, soft bootstrapping (arXiv 1412.6596): beta * y + (1 - beta) * p improved
+    robustness to label noise on MNIST and detection benchmarks.'
+  - 'docs/validation/results/2026-09-23-image-blend-labels-result.md: offline 0.5/0.5 blend, gold
+    agreement +0.020 [95% +0.006, +0.036], fold 0 +0.0035 hard and +0.0065 soft (leaky), public tie.'
+  - 'docs/research/public-research.md: a top participant reports mixing image predictions into
+    extracted labels beat replacing and masking.'
+  novelty: >-
+    No campaign has used the model's own predictions in the target. The losses campaign changed
+    loss shape and label-derived weights only.
+  coverage: Every observed cell of every label, one beta, one warm-up.
+  exploitation: >-
+    If it helps, the temporal-ensemble and ELR ideas test whether a steadier prediction signal does
+    better than the instantaneous one.
+  budget: One sigmoid and a blend per cell; no measurable runtime change.
+  implementation: >-
+    Adds to the current loss in training/lightning.py: build t inside training_step before
+    masked_binary_cross_entropy_with_logits, keeping the weight lookup on the original targets. New
+    settings under trainer.label_noise (mode, beta, start epoch). Log the mean absolute target change
+    per epoch. Validation is untouched.
+  open_choices: >-
+    beta 0.8 and start epoch 2 are fixed before launch; the offline precedent used 0.5 and 0.7.
+  dependencies: []
+  priority_rationale: >-
+    The simplest online form of the one label intervention with a gold gain and a public tie on a
+    mismatched teacher.
+- id: temporal-ensemble-targets
+  mechanism_id: temporal-ensemble-target-correction
+  parent_idea_id: null
+  title: Blend each cell's label with a per-study running average of the model's past training predictions
+  opportunity: >-
+    A single training-time prediction is noisy: each visit sees a different triplet draw, series
+    dropout and augmentation. Averaging a study's predictions across epochs gives an ensemble
+    teacher for free, closer to the out-of-fold teacher of the offline blend, and less
+    self-confirming than bootstrapping on the current step.
+  mechanism: >-
+    Keep a memory m[study, label] updated on every training visit as m <- 0.7 * m + 0.3 *
+    sigmoid(logit).detach(). From the third visit of a study on, train on t = 0.7 * y + 0.3 * m for
+    every observed cell; earlier visits use y. Class-balance weights keep the original y >= 0.5
+    groups. The memory is a tensor indexed by the training study list, saved and restored with the
+    checkpoint.
+  precedents:
+  - 'Laine and Aila 2017, temporal ensembling (arXiv 1610.02242): an exponential average of past
+    predictions as a target.'
+  - 'Plant Pathology 2020 first place: 0.7 truth + 0.3 out-of-fold prediction.'
+  - 'docs/validation/results/2026-09-23-image-blend-labels-result.md: the teacher alone did not beat
+    the labels on gold (-0.0015) while the blend did (+0.020), so a blend rather than a replacement.'
+  novelty: >-
+    Uses predictions averaged over draws and epochs, unlike the instantaneous bootstrap; no extra
+    forward passes, unlike an EMA-weight teacher.
+  coverage: Every observed cell of every label, one momentum and one blend weight.
+  exploitation: A gain here and not in bootstrapping says the prediction must be averaged to help.
+  budget: One 4,407 x 12 float tensor; no measurable runtime change.
+  implementation: >-
+    Adds to the current loss in training/lightning.py. Map study_uid to a row once from the training
+    dataset; register the memory and visit counts as buffers so the checkpoint carries them. Settings
+    under trainer.label_noise. Log the mean absolute target change and the share of cells in use per
+    epoch.
+  open_choices: Momentum 0.7, blend 0.7/0.3 and the three-visit start are fixed before launch.
+  dependencies: []
+  priority_rationale: >-
+    The closest online analogue of the offline teacher blend, at no compute cost.
+- id: early-learning-regularization
+  mechanism_id: early-learning-regularization
+  parent_idea_id: null
+  title: Add an early-learning regularizer that keeps predictions close to their own running average
+  opportunity: >-
+    Networks fit clean labels first and memorize noisy ones later. Our best epochs sit at 7-9 of
+    10, the phase where memorization would set in, and the low-rate tail is where the class-balance
+    weights sharpen the report extractor's boundary.
+  mechanism: >-
+    Keep the same per-study running average m as the temporal-ensemble idea (momentum 0.7). Add
+    lambda * mean over observed cells of log(1 - (m * p + (1 - m) * (1 - p))), with p =
+    sigmoid(logit) not detached and m detached, to the unchanged class-balanced BCE. The term rewards
+    agreement with the running average and so resists moving a cell's prediction toward a label it
+    has contradicted for several epochs. Fix lambda before launch so the term is about 20% of the
+    BCE at epoch 2 on the reference.
+  precedents:
+  - 'Liu et al. NeurIPS 2020, early-learning regularization (arXiv 2007.00151): state of the art on
+    CIFAR with synthetic noise and on Clothing1M and WebVision with real noise.'
+  - 'docs/validation/results/2026-09-21-class-balance-exponent.md: fold-0 hard AUC rises with
+    weighting strength while the public score falls past k=0.5.'
+  novelty: >-
+    A regularizer rather than a target change: the labels stay intact and the pull toward the
+    running average does the correction.
+  coverage: Every observed cell of every label, one lambda and one momentum.
+  exploitation: >-
+    Compared with the temporal-ensemble target on the same memory, it separates target replacement
+    from regularization.
+  budget: Same memory as the temporal-ensemble idea; no measurable runtime change.
+  implementation: >-
+    Adds a loss term in training/lightning.py. Log the BCE and the regularizer separately each epoch
+    to show the term is active; the losses campaign once shipped an auxiliary term six orders of
+    magnitude below the main loss.
+  open_choices: >-
+    The binary form of the inner product and the 20% calibration are fixed before launch; record the
+    resulting lambda.
+  dependencies: []
+  priority_rationale: >-
+    The strongest published method on real label noise among single-network, no-extra-pass methods.
+- id: confident-contradiction-downweighting
+  mechanism_id: persistent-disagreement-cell-weights
+  parent_idea_id: null
+  title: Down-weight training cells whose label the model has contradicted with confidence over several visits
+  opportunity: >-
+    The class-balance curve points at rare-label report positives that disagree with gold (MCL,
+    Fracture), and unaddressed negatives that are 14% gold-positive. Cells the model persistently
+    contradicts are the likeliest wrong labels; reducing their weight stops the model from being
+    pulled toward them.
+  mechanism: >-
+    Keep the per-study running average m (momentum 0.7). After a study's third visit, a cell is
+    contradicted when m and y fall on opposite sides of 0.5 and |m - y| > 0.5. Contradicted cells
+    get weight 0.25 on top of their class-balance weight; all other cells keep 1. Rescale the batch's
+    cell weights so their observed mean equals the mean without the mechanism, keeping the effective
+    learning rate unchanged.
+  precedents:
+  - 'Han et al. 2018, co-teaching (arXiv 1804.06872), and the small-loss selection literature:
+    high-loss samples are the likeliest mislabelled.'
+  - 'Zhang et al. 2021, SPLC and Hill (arXiv 2112.07368): down-weighting suspected false negatives
+    in multi-label learning with missing labels.'
+  - 'docs/public-labels/report-attributes.md: low-grade positives are ranked worst and only about
+    half are gold-positive.'
+  novelty: >-
+    The losses campaign weighted cells by label values; this weights them by the model's persistent
+    disagreement, a training-time signal.
+  coverage: >-
+    Every observed cell of every label under one threshold and one weight. Per-label contradicted
+    fractions are diagnostics only.
+  exploitation: >-
+    If it helps, a softer weight curve or a positive-only variant are follow-ups; if it hurts on
+    low-grade positives, the completion should show it.
+  budget: Same memory as the temporal-ensemble idea; no measurable runtime change.
+  implementation: >-
+    Adds a weight factor in training/lightning.py, applied before the observed-cell mean. Log the
+    contradicted fraction per epoch and per label, split by positive and negative original targets.
+  open_choices: Threshold 0.5, weight 0.25 and the three-visit start are fixed before launch.
+  dependencies: []
+  priority_rationale: >-
+    The noise-aware candidate from the adaptive-allocation big bet, aimed at the label-gold
+    disagreement its evidence identifies.
+- id: relaxing-class-balance-schedule
+  mechanism_id: scheduled-class-balance-strength
+  parent_idea_id: null
+  title: Relax the class-balance exponent from 1 to 0 linearly over the optimizer steps
+  opportunity: >-
+    Fixed strengths gave public 0.940 at k=1, 0.945 at 0.5 and 0.943 at 0. Full balancing may help
+    rare labels get learned early, while late in training the large weights mostly sharpen the report
+    extractor's boundary. A schedule keeps the early benefit and drops the late cost.
+  mechanism: >-
+    Compute the class-balance weights with exponent k(step) = 1 - step / total_steps instead of the
+    fixed 0.5, from the same saved training-fold prevalences and with the same mean-weight-one
+    normalization. The average exponent over the run is 0.5, matching the current recipe.
+  precedents:
+  - 'docs/validation/results/2026-09-21-class-balance-exponent.md: public 0.943, 0.944, 0.945, 0.942,
+    0.940 for k = 0, 0.25, 0.5, 0.75, 1.'
+  - 'Kang et al. 2020 (arXiv 1910.09217) and Cao et al. 2019 (arXiv 1906.07413): balance-strength
+    schedules beat fixed balancing in long-tail vision, though in the opposite direction (0 to 1).'
+  novelty: >-
+    The exponent has only been tested as a constant. The reverse ramp is the external precedent;
+    this direction follows the project's own evidence.
+  coverage: One schedule shared by all labels; per-label weights still come from the existing formula.
+  exploitation: A gain here motivates testing the reverse ramp as its own idea.
+  budget: No runtime change.
+  implementation: >-
+    Replaces the fixed exponent inside training/lightning.py with a step-dependent one, recomputed
+    from the stored class_balance counts; config.py gains trainer.label_noise settings for the
+    schedule while trainer.class_balance_exponent stays in the recipe. Log the exponent and the
+    largest weight ratio per epoch.
+  open_choices: The linear shape and the 1-to-0 endpoints are fixed before launch.
+  dependencies: []
+  priority_rationale: >-
+    Directly supported by the one public curve that varies label trust; expected to lose hard AUC
+    and gain soft AUC if the mechanism is right, which the completion must report.
+exhausted_directions: >-
+  Masking unaddressed cells (-0.0115) and the label-derived loss shapes and weights of the losses
+  campaign (focal, soft-mass, prior offset, biproportional, margins, rankings) are measured. GCE,
+  symmetric CE, Huberised BCE and forward correction were closed by analysis in that campaign, on
+  its older judge. New label tables, consensus rules and LLM extractors belong to label work outside
+  this campaign. Out-of-fold self-distillation with a five-fold teacher is endgame work.

@@ -1,0 +1,47 @@
+ideas:
+- id: schedule-plus-early-learning
+  mechanism_id: scheduled-class-balance-with-early-learning-regularization
+  parent_idea_id: null
+  title: Combine the linear 1-to-0 class-balance exponent schedule with the early-learning regularizer, both unchanged
+  opportunity: >-
+    User request, 2026-09-23. Both single runs are to be judged on the public leaderboard, where
+    class-weighting changes that tie locally have moved the score (fixed exponents 0 to 1 scored
+    0.943, 0.944, 0.945, 0.942, 0.940 while fold-0 ranked them in reverse). The combination gives a
+    third public candidate, to be submitted only if a single one scores well. Locally the schedule
+    tied (hard -0.000002, soft +0.0007) and early-learning regularization gained +0.0013 hard and
+    +0.0008 soft, both within noise.
+  mechanism: >-
+    Training loss = class-balanced BCE with the scheduled exponent k(step) = 1 - step / total_steps,
+    exactly as in relaxing-class-balance-schedule-20260923T133826Z-824ef437, plus the early-learning
+    term exactly as in early-learning-regularization-20260923T124737Z-7aba30fc: weight 0.075 times
+    the mean over observed cells of log(1 - (m p + (1 - m)(1 - p))), with p = sigmoid(logit) and m
+    the per-study running average of detached training predictions, momentum 0.7. The regularizer
+    is not class-weighted. No setting differs from the two single runs.
+  precedents:
+  - 'outputs/autoresearch/noisy-labels/experiments/relaxing-class-balance-schedule-20260923T133826Z-824ef437/changes.diff
+    (schedule; exponent logged from 0.95 to 0.05, maximum weight ratio 17.4 to 1.35).'
+  - 'outputs/autoresearch/noisy-labels/experiments/early-learning-regularization-20260923T124737Z-7aba30fc/changes.diff
+    (regularizer; term about -0.07 to -0.11 against a BCE of 0.61 to 0.43).'
+  - 'docs/validation/results/2026-09-21-class-balance-exponent.md: the public exponent curve.'
+  novelty: >-
+    The two mechanisms act on different terms: the schedule reweights the BCE, the regularizer adds
+    a separate prediction-anchored term. Neither single run tested them together.
+  coverage: One schedule and one regularizer shared by all labels and all observed cells.
+  exploitation: A public result at or above 0.945 against S48's 0.942 would justify keeping the pair.
+  budget: Both singles ran inside the ceiling with negligible overhead; the sum adds nothing measurable.
+  implementation: >-
+    Adds both mechanisms to the current training objective by merging the two existing diffs
+    without changing their logic or settings: the scheduled weight tensor from the schedule diff
+    and the running-average memory, regularizer and its logging from the early-learning diff. Keep
+    both sets of logged metrics (class_balance_exponent, class_balance_weight_ratio_max,
+    train_bce_loss, train_label_noise_loss). Both configuration switches live under
+    trainer.label_noise. The regularizer's memory is saved and restored with the checkpoint as in
+    the single run.
+  open_choices: None; every setting is copied from the single runs.
+  dependencies: []
+  priority_rationale: >-
+    User-requested combination of the campaign's two public-leaderboard candidates, run now so its
+    weights are ready to submit alongside the singles.
+exhausted_directions: >-
+  Self-memory targets and down-weighting are retired or rejected; the researcher's last report
+  found no new mechanism in this campaign's scope.

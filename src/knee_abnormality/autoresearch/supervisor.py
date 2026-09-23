@@ -30,6 +30,7 @@ from knee_abnormality.autoresearch.gates import (
     initial_limits,
     validate_config,
     verdict,
+    without_fields,
 )
 from knee_abnormality.autoresearch.integration import (
     candidate_binding,
@@ -207,7 +208,11 @@ class Supervisor:
         config = recipe.model_dump(mode="json")
         reference = (self.root / self.campaign["reference_run"]).resolve()
         limits = initial_limits(
-            reference, config, self.campaign["reference_equivalences"]
+            reference,
+            config,
+            self.campaign["reference_equivalences"],
+            self.campaign["reference_config_exceptions"],
+            self.campaign["reference_identity_exceptions"],
         )
         validate_config(config, config, self.policy)
         headers = (
@@ -660,10 +665,14 @@ class Supervisor:
             raise ValueError(
                 "Baseline accounting is incomplete or training selection never changes"
             )
-        expected = read_json(
-            Path(self.state["reference"]) / "fold_0/input_identity.json"
+        exceptions = self.state["limits"]["reference_identity_exceptions"]
+        expected = without_fields(
+            read_json(Path(self.state["reference"]) / "fold_0/input_identity.json"),
+            exceptions,
         )
-        actual = read_json(directory / "input_identity.json")
+        actual = without_fields(
+            read_json(directory / "input_identity.json"), exceptions, required=False
+        )
         if actual != expected:
             raise ValueError(
                 "Baseline data/preprocessing identity differs from historical control"
@@ -844,6 +853,12 @@ class Supervisor:
                 "--allowed-input-identity-differences",
                 ",".join(identity_keys),
             ]
+        exceptions = self.state["limits"]["reference_identity_exceptions"]
+        if (
+            exceptions
+            and reference.resolve() == Path(self.state["reference"]).resolve()
+        ):
+            command += ["--reference-identity-exceptions", ",".join(exceptions)]
         remaining = (
             self.state["limits"]["max_run_seconds"]
             - exp["preparation_seconds"]

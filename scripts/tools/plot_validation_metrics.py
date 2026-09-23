@@ -21,6 +21,7 @@ from matplotlib.axes import Axes
 
 ROOT = Path(__file__).resolve().parents[2]
 EPOCH_PATTERN = re.compile(r"metrics_epoch_(\d+)\.json$")
+EXPERIMENT_SUFFIX = re.compile(r"-\d{8}T\d{6}Z-[0-9a-f]{8}$")
 
 
 class PlotCLI(CLISettings):
@@ -144,7 +145,12 @@ def load_metric_series(run: Path) -> list[MetricSeries]:
     targets = evaluation_targets(run)
     series = []
     for fold, records in by_fold.items():
-        label = run.name if len(by_fold) == 1 else f"{run.name}/{fold}"
+        name = (
+            EXPERIMENT_SUFFIX.sub("", run.parent.name)
+            if run.name == "training"
+            else run.name
+        )
+        label = name if len(by_fold) == 1 else f"{name}/{fold}"
         epochs = [epoch for epoch, _ in records]
         series.append(
             MetricSeries(
@@ -279,6 +285,14 @@ def main() -> None:
         runs = [resolve_run(value) for value in args.runs]
         if len(runs) != len(set(runs)):
             raise ValueError("Run folders must be unique")
+        for run in runs:
+            if not any(run.glob("fold_*/epochs/metrics_epoch_*.json")):
+                print(f"Skipping {run}: no epoch metrics yet", file=sys.stderr)
+        runs = [
+            run for run in runs if any(run.glob("fold_*/epochs/metrics_epoch_*.json"))
+        ]
+        if not runs:
+            raise ValueError("No run has epoch metrics")
         series = [item for run in runs for item in load_metric_series(run)]
         output = args.output.expanduser()
         if not output.is_absolute():

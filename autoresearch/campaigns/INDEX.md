@@ -2,6 +2,7 @@
 
 | Read when | Document |
 |---|---|
+| Recovering the stopped noisy-labels campaign (prediction-memory target correction and down-weighting, early-learning regularization, class-balance schedule; nothing adopted) | [Noisy labels](noisy-labels/INDEX.md) |
 | Recovering the retired cleaned-source oblique campaign (ACL gate, coverage split, frame depth and training-only views rejected; group embedding compared by hand and closed with the oblique line) | [Oblique (cleaned source)](oblique-clean/INDEX.md) |
 | Recovering the retired x4 oblique campaign on the source before series cleaning (view bias, mixture pooling and combined identity rejected; ACL gate trained but uncompared) | [Oblique (x4 predictions)](oblique-x4/INDEX.md) |
 | Recovering the retired first oblique campaign scored on x1 predictions (embedding, view bias and residual readout results) | [Oblique](oblique/INDEX.md) |

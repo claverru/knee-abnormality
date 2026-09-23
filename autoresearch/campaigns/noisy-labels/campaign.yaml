@@ -1,0 +1,64 @@
+id: noisy-labels
+status: stopped
+recipe: configs/training.yaml
+reference_run: outputs/training/k05-clean
+reference_equivalences: {}
+reference_config_exceptions:
+  - data.series_types[].oblique_tilt_deg
+reference_identity_exceptions:
+  - preprocessing_identity.sampling.oblique_split
+  - preprocessing_identity.sources_sha256
+additional_evidence_runs:
+  - outputs/training/image-blend
+backlog:
+  refill_below: 4
+  refill_to: 5
+artifacts_root: outputs/autoresearch/noisy-labels
+policy:
+  editable_files:
+    - configs/training.yaml
+    - src/knee_abnormality/config.py
+    - src/knee_abnormality/training/lightning.py
+  editable_directories: []
+  config_keys: []
+  config_prefixes:
+    - trainer.label_noise
+  list_item_fields: {}
+  input_identity_keys: []
+  require_source_change: true
+  developer_instructions: >-
+    Implement the label-noise mechanism and update configs/training.yaml only to
+    enable it. New settings belong under trainer.label_noise in config.py; the
+    existing trainer.class_balanced_bce and trainer.class_balance_exponent stay
+    fixed. Change only the training objective and its state in
+    training/lightning.py: how each observed training cell's target, weight or
+    loss is formed from its label and from the model's own training-time
+    predictions. One rule and one set of coefficients for every label and every
+    observed cell, with no branch on the label, the knee side or is_gold. Any
+    memory of past predictions is keyed by study_uid, filled only from training
+    batches of the current run, kept on the module, saved and restored with the
+    checkpoint, and never reads validation labels, validation predictions or
+    files outside the run. Validation, prediction, checkpoint selection, data
+    loading, model construction, optimizer, scheduler and accounting stay
+    unchanged; the validation targets are never modified. Log every new loss
+    component and the realized per-epoch fraction of cells whose target or
+    weight the mechanism changed, so the mechanism is shown to be active.
+    Return prepared or blocked. Use the existing Python environment for static
+    checks. No tests.
+  researcher_instructions: >-
+    Return distinct mechanisms from learning with noisy labels, not coefficient
+    sweeps: target correction (bootstrapping, temporal-ensemble or teacher
+    targets), confident-disagreement down-weighting or selection, early-learning
+    regularization, and schedules that relax label trust or class balancing over
+    training. Training labels are report-derived and measurably noisy: on the 58
+    gold studies about a third of cells with targets in [0.3, 0.5) are positive
+    and about a quarter above 0.9 are not. The shared evaluation scores fold 0
+    against the same kind of labels, so a mechanism that correctly ignores
+    wrong labels can lose on hard macro AUC; say for each idea how its effect
+    should show in soft macro AUC and in per-label deltas. Every mechanism is
+    shared across labels and uses training-time signals only: no per-label
+    selection or coefficients, no gold weighting, no new label tables or
+    external sources, no validation-driven adaptation, no second network
+    trained alongside (the runtime ceiling is 115%). Out of scope: data,
+    sampling, augmentation, model architecture, backbone, optimizer and the
+    shared evaluation.

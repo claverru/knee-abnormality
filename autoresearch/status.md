@@ -1,5 +1,23 @@
 # Implementation status
 
+Noisy-labels campaign stopped, 2026-09-23 (user decision): six experiments decided, none adopted
+(see [findings](campaigns/noisy-labels/findings.md)). The user retired two queued memory-based
+ideas mid-campaign, then imported the schedule plus early-learning combination (rejected, −0.0003).
+The researcher's last refill, `full-to-half-bag-distillation`, was aborted seconds into training
+and stays undecided. The watchdog is stopped.
+
+Noisy-labels campaign defined, 2026-09-23 (user request): [`noisy-labels`](campaigns/noisy-labels/INDEX.md)
+covers training-objective mechanisms that use the model's own training-time predictions to correct
+or down-weight report labels, plus a class-balance schedule, with five seed ideas. Its reference is
+`k05-clean` (S48), trained while the disabled oblique code still existed. Instead of retraining it,
+the user authorized reference exceptions: `reference_config_exceptions` and
+`reference_identity_exceptions` in `campaign.yaml` name recorded fields removed from both sides of
+the start, sealing and comparison checks (`without_fields` in `gates.py`; the supervisor passes
+them to `compare_fold_runs --reference-identity-exceptions`). The contract records why the removed
+code never ran. `validate noisy-labels` passes (ceiling 1,846 s), and the current preprocessing
+identity equals `k05-clean`'s after the exceptions. The contract keeps the shared evaluation and requires every completion to report soft
+macro AUC beside hard, because hard AUC against report labels penalizes this family. Not started.
+
 Oblique line closed, 2026-09-23 (user decision): oblique groups and the group embedding are removed
 from the recipe and the code, and `oblique-clean` is retired alongside `oblique` and `oblique-x4`.
 No campaign is active. `oblique-group-embedding`, trained but never compared by the supervisor,
