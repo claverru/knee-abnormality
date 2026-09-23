@@ -373,7 +373,7 @@ class Supervisor:
             )
         profile = dict(self.state["profiles"][self.state["provider"]][role])
         if repair and self.state["provider"] == "codex":
-            profile = {"model": "gpt-5.6-sol", "effort": "high"}
+            profile = {"model": "gpt-6-sol", "effort": "high"}
         command = providers.invocation(
             self.state["provider"],
             role,
