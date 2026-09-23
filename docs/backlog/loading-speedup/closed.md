@@ -27,7 +27,7 @@ makes one in-place multi-kth `partition` call whose introselect reuses pivots so
 neighbours are nearly free, and that NumPy 2.0 routes `partition` through Intel x86-simd-sort.
 Replacing that one call with a partition at the high rank, a partition of its prefix at the low rank
 and two tail reductions measured **1.44–1.63x faster with bit-identical bounds on 24 real
-acquisitions** ([evidence](ranked-by-gain.md#measurement-behind-rank-5)), so the multi-kth
+acquisitions** ([evidence](../../history/loading-speedup-ranked-by-gain.md#measurement-behind-rank-5)), so the multi-kth
 call was not the floor that argument assumed. What still closes, and is unaffected: coarse-histogram
 selection is 1.67x slower on real pixels, and `np.quantile` does strictly more work than either
 formulation (a NaN scan and a float64 lerp), so neither of those can win. The exact single-rank

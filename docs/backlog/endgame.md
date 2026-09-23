@@ -169,7 +169,8 @@ with the final bundle.
 
 - **Localizers and scouts:** drop series whose `ImageType` holds `LOCALIZER`, or whose description
   names a localizer, scout or survey. None exist in training
-  ([signals](../research/series-filtering-signals.md#localizers-scouts-and-calibration)).
+  ([signals](../research/series-filtering-signals.md#localizers-scouts-and-calibration),
+  [risk](risks.md#silent-input-changes)).
 - **Within-series consistency:** keep the most common TE, TR and `ImageType` of a series, and drop
   repeated-position instances, so that a dual-echo series cannot mix contrasts inside one triplet.
   The 2026-09-22 check of all 24,371 training series found no series with more than one TE, TR or
@@ -219,8 +220,8 @@ is the [distillation](#distillation) entry above.
   No measured gain was found for multi-label AUC on report-derived labels; the closest setting,
   [chest X-rays with NLP labels](https://link.springer.com/chapter/10.1007/978-3-030-87358-5_57),
   is paywalled.
-- *Settings:* 0.7/0.3 is the only weight with a winning precedent; per-label weights, with more
-  teacher weight on the noisiest labels, only if the first round moves. Children keep their
+- *Settings:* 0.7/0.3 is the only weight with a winning precedent; one weight for all labels.
+  Children keep their
   augmentation, since removing student noise removed the student's gain in
   [Noisy Student](https://arxiv.org/abs/1911.04252). One round only: a few rounds reduce
   overfitting and more underfit ([Mobahi et al., NeurIPS 2020](https://arxiv.org/abs/2002.05715)).

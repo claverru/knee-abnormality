@@ -3,9 +3,8 @@
 Research completed 2026-09-20. **Compare a small bank of independent classifiers on shared
 frozen features, select a loss for each label, then evaluate the assembled recipe with trainable
 features.** Learned mixtures and changes of loss during training are promising extensions.
-Implementation and training remain unstarted; the
-[Big bets entry](../backlog/big-bets.md#per-label-loss-selection-and-learned-mixtures) owns the
-experiment sequence. The [objective survey](auc_loss_approaches.md) owns the broader catalog.
+Implementation and training never started: the backlog entry was dropped on 2026-09-23 by user
+decision, which rules out per-label loss selection and tuning; this note is kept as research. The [objective survey](auc_loss_approaches.md) owns the broader catalog.
 
 ## Trusted motivation
 

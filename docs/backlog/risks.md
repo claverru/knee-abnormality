@@ -60,7 +60,8 @@ code also completed ([submission](../inference/submissions/2026-09-17-ranked-fil
   series loses its minority instances, which is intended for scouts inside a series.
 - **Localizer or scout series** (measured: none in training). The host's series table appears to
   exclude them. A separate localizer series in the test would be sampled like any other series;
-  only scouts inside a series are guarded.
+  only scouts inside a series are guarded. The header guard waits in
+  [endgame](endgame.md#defensive-guards-for-faults-absent-from-training).
 - **Rejected study centres** (measured: 4% of training studies). They fall back to local
   sampling; expect a similar share in the test. A robust centre did not score better
   ([history](../history/robust-study-centre.md)).

@@ -9,15 +9,6 @@ remove the entry from this file. Runs follow the
 [controlled-comparison rules](../validation/validation-strategy.md#controlled-comparisons). Each
 entry says whether its motivation is measured or a hypothesis.
 
-## Retired configuration cleanup
-
-Remove the unused `trainer.min_delta` option: its only consumer is EarlyStopping, whose patience
-covers the complete fixed training budget. This is implementation cleanup, not a hyperparameter
-experiment. The rejected `repeated_series_share`, `gated_attention` and `residual_readout`
-branches remain cleanup candidates with their findings below. The compartment adapter
-has been removed; its [result](../validation/results/2026-09-20-compartment-adapter-result.md)
-is historical evidence, not pending implementation work.
-
 ## AdamP for ReXNet
 
 **Accepted for the backlog on 2026-09-21; unimplemented and untested.** Compare AdamP with
@@ -45,8 +36,7 @@ per step and adds no inference work.
 types, so the reallocation rejection does not cover it. Every other question on this axis is closed
 in the [triplet-budget investigation](../history/triplet-budget-allocation.md), which owns the
 evidence: fixed-total reallocation, the missing-type fill, budgets A/B and the repeated-series
-share were all measured and none survived. `data.repeated_series_share` is still in the code from
-its rejected run and is a removal.
+share were all measured and none survived.
 
 ## Attention pooling
 
@@ -56,7 +46,7 @@ trained and [rejected](../validation/results/2026-09-17-count-normalized-attenti
 attention and the per-target residual readout were measured at +0.0010 and −0.0005 on 2026-09-18,
 at or below the control mean
 ([overnight](../validation/results/2026-09-18-overnight-results.md)); they are rejected, and
-`model.gated_attention` and `model.residual_readout` are removals rather than candidates. The
+removing their options is a [refactor](refactors/retired-options.md). The
 attention temperature τ 0.75 is adopted at inference and carries the best submission
 ([result](../validation/results/2026-09-17-attention-temperature.md),
 [state](../ongoing/state.md)).
@@ -96,24 +86,6 @@ regularization experiment, not a missing architectural capability.
   runtime. Inspect focal findings explicitly: retaining a valid token does not guarantee that
   lesion evidence remains. Require evidence of benefit beyond random masking before preferring
   attention-challenging masking. Implementation requires a separate user request.
-
-### Per-label attention temperatures
-
-**Untried; first inexpensive investigation from the 2026-09-20 agenda review.** Global τ 0.75
-already gained about 0.0020–0.0026 across four frozen checkpoints
-([result](../validation/results/2026-09-17-attention-temperature.md)); that gain is already adopted.
-Compare twelve static attention temperatures against the global 0.75 control, initially choosing
-only between 0.75 and 1.0 per label and retaining 0.75 when the difference is unresolved.
-
-- Screen with cached attention scores and scalar token contributions, keeping the checkpoint,
-  sampled images and valid tokens fixed. Existing caches cover older checkpoints and approximate
-  intensity windows; confirm a locked candidate with the chosen checkpoint's exact preprocessing.
-  A new export has a bounded cost; no retraining is needed.
-- Separate selection from confirmation; do not report twelve validation maxima as a combined gain.
-  Measure macro and per-label AUC against global 0.75. Stop if specialization does not confirm.
-- These are pooling temperatures, not final-logit calibration. Fold static scales into the scorer
-  rows; if scores already include τ_old, multiply by τ_old / τ_new. No extra image pass or learned
-  temperature network. Implement only when requested, through one per-label temperature option.
 
 ### Plane/contrast-specific readouts
 
@@ -181,36 +153,6 @@ trainable ReXNet is a project adaptation of that idea, not a reproduction or a m
   weighting remains unimplemented. Preserve gold labels and original evidence indicators; Steven
   v4 probabilities are not calibrated confidence.
 
-### Grade-aware targets for low-grade report positives
-
-**Implemented 2026-09-23 as `combined_v2`; failed its gold check, not trained on.** The table's
-gold macro AUC fell 0.9075 → 0.9044 (Effusion −0.020): the consensus mean puts low grades at the
-not-addressed level, breaking an order `combined_v1` already has right
-([result](../public-labels/report-attributes.md#consensus-mean-rule-tested-on-gold)). Drop it, or
-run it once on the leaderboard by explicit user decision. The original motivation follows.
-
-**Measured mismatch (corpus-wide, gold-confirmed on few cells).**
-On the eight targets that `combined_v1` still takes from Steven v4, cells that Ramit's GPT-luna
-extraction calls LOW-grade positive train at 0.85–0.91, while 32 of 59 such gold cells are positive
-(0.54). Effusion supplies 25 of the 59 cells. The four consensus targets already give LOW cells
-0.34–0.59, and on the fold-0 predictions LOW positives are where ranking loses most
-([report attributes](../public-labels/report-attributes.md#gold-rate-by-report-call)).
-
-- **Change:** a new label source equal to `combined_v1` except that every cell Ramit calls a
-  LOW-grade positive takes the nine-extractor consensus mean, whatever its label. The four
-  consensus targets already follow this rule, so in practice only the Steven v4 targets change. Keep
-  gold overrides. Do not fit values to the gold rates.
-- **Prediction first:** before submitting, record the
-  [calibrated judge's](../validation/results/2026-09-22-calibrated-judge.md#interpretation)
-  compare-mode delta against the reference. The judge's source, Hosseini's JEV v2, is not used to
-  build these labels.
-- **Run:** one fold-0 run on the incumbent recipe and seed, exported at ×4 τ 0.75 and judged on the
-  public leaderboard. Fold-0 validation is a secondary diagnostic: its targets carry the same
-  overcall, so it cannot judge this change, and autoresearch cannot run it.
-- **Relation:** [OA-only label repair](big-bets.md#oa-only-rubric-aligned-label-repair) reviews OA
-  reports by hand; this is a rule from an existing extraction across all eight targets. Do not
-  combine the two in one run.
-
 ### Auxiliary report-state prediction
 
 **Hypothesis; unimplemented and untested.** Add a reporting head alongside the disease head
@@ -249,7 +191,7 @@ strong affine (−0.002389) on the
 [current base](../validation/results/2026-09-15-overnight-results.md), and on the restored code
 affine off (−0.0041 [−0.0078, −0.0002]) and noise probability 0.3 (−0.0019)
 ([result](../validation/results/2026-09-17-overnight-results.md)). Intensity-off was dropped by
-[user decision](overnight.md#user-decisions-2026-09-16); the
+[user decision](overnight.md#already-measured); the
 [later candidates](overnight.md#candidates-for-later-queues) hold the other probability and
 strength values of the existing families.
 
@@ -302,24 +244,6 @@ or evidence that scanner shift is currently our bottleneck.
   scanner robustness from aggregate AUC alone. Implementation needs a separate user request;
   move its run to the overnight queue only after implementation.
 
-## RadImageNet-pretrained backbone
-
-**Evidence-backed (one external report), untested here.** Load a RadImageNet-pretrained
-ResNet-50 in place of its ImageNet weights, behind one option naming the pretraining source, and
-compare the two at identical architecture, normalization and recipe. A participant reports that
-going the other way — RadImageNet to ImageNet ResNet-50, same architecture, per-corpus
-normalization corrected — cost them **−0.063**, the largest in-competition number anyone has
-published on medical pretraining ([sweep](../research/public-research.md#the-2026-09-20-re-sweep));
-the public 0.942 stack also carries RadImageNet heads as one of five families. It disagrees with
-the [benchmark ranking](../research/backbone-mri-evidence.md) that put RadImageNet ResNet-50 19th
-and MedDINOv3 25th, which is what makes it worth one measurement rather than an adoption.
-
-Two caveats price the work. RadImageNet publishes ResNet-50, DenseNet-121, InceptionV3 and
-IRV2 only, so neither of our backbones (EfficientNet-B0, ReXNet-200) can take these weights; the
-comparison needs a ResNet-50 pair that is off the current recipe, and a win would then have to be
-re-measured on a backbone we would actually submit. The weights are a third-party download, so
-they need a pinned source, hash and licence check before any run.
-
 ## BCE weighting and study sampling
 
 **Hypotheses; unimplemented.** Keep BCE while varying one of positive/negative
@@ -356,12 +280,8 @@ and mean-weight-one normalisation. One change per run against a fresh control.
   (Synovitis 0.341 against 0.126, Fracture 0.187 against 0.073, Baker's 0.358 against 0.249,
   Lateral Meniscus 0.228 against 0.158), and it damps their weights accordingly. It confounds
   with the exponent, so run it only against the same control, never in the same arm.
-- **Ramped exponent** (one new option; hypothesis; judge it on the public leaderboard, not fold-0 validation). Increase
-  `class_balance_exponent` linearly from 0 to its configured value over the training steps, so
-  early epochs train near-uniform and late epochs fully balanced. Precedent: progressively-balanced
-  sampling was best in Kang et al. ICLR 2020 (ImageNet-LT 47.2 vs 45.1 class-balanced, 46.8
-  square-root), and deferred re-weighting (LDAM-DRW, BBN) beat always-on weighting; all were long
-  from-scratch runs, unlike our 10-epoch pretrained fine-tune.
+
+A ramped exponent belongs to [adaptive training allocation](big-bets.md#adaptive-training-allocation).
 
 Later [soft-mass weighting](../../autoresearch/campaigns/losses/findings.md#completion-20260920t161203z-14ae6e65)
 and [prior-offset](../../autoresearch/campaigns/losses/findings.md#completion-20260920t181036z-45163c52)
