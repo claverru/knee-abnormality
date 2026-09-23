@@ -191,9 +191,9 @@ rewrites checkpoints on save: the saved `state_dict`'s `model.*` keys hold the a
 (what selection, prediction, export and `compare_fold_runs` use, unchanged), and a new top-level
 `live_state_dict` key holds the live, unaveraged weights, restored to `model.*` on resume and
 dropped by export's checkpoint allowlist. Validation scores both models on the same batches every
-epoch: `val_macro_auc`, `val_soft_target_bce` and `val_gold_macro_auc` always score the saved
-(averaged) weights, while `val_live_macro_auc`, `val_live_soft_target_bce` and
-`val_live_gold_macro_auc` score the live ones. The per-epoch files gain `epochs/live_metrics_epoch_*.json`
+epoch: `val_macro_auc`, `val_soft_macro_auc`, `val_soft_target_bce` and `val_gold_macro_auc`
+always score the saved (averaged) weights, while `val_live_macro_auc`, `val_live_soft_macro_auc`,
+`val_live_soft_target_bce` and `val_live_gold_macro_auc` score the live ones. The per-epoch files gain `epochs/live_metrics_epoch_*.json`
 and `epochs/live_validation_epoch_*.csv` alongside the existing (unprefixed) ones. With
 `weight_averaging: null`, none of this exists: no `live_state_dict`, no `val_live_*` metrics, no
 `live_*` files. Independent of weight averaging, `KneeModule` always logs the pre-clip total

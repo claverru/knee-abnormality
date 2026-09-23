@@ -474,6 +474,11 @@ class KneeModule(L.LightningModule):
             sync_dist=False,
         )
         self.log(
+            f"{metric_prefix}soft_macro_auc",
+            result["soft_macro_auc"],
+            sync_dist=False,
+        )
+        self.log(
             f"{metric_prefix}soft_target_bce",
             result["soft_target_bce"],
             sync_dist=False,

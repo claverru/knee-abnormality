@@ -6,9 +6,19 @@ Plot epoch metrics from completed run folders with:
 rtk proxy uv run --locked python -m scripts.tools.plot_validation_metrics baseline0 baseline1 baseline4
 ```
 
-The command writes `outputs/analysis/validation_metrics.png` by default with four
-panels: full-validation macro AUC, gold macro AUC, per-target AUC at the best
-epoch, and soft-target BCE. Use `--output` to select another PNG path.
+The command writes `outputs/analysis/validation_metrics.png` by default with six
+panels in two rows. The top row holds the ranking metrics, where higher is better:
+hard macro AUC, [soft macro AUC](results/2026-09-23-validation-auc-variants.md)
+and gold macro AUC. The bottom row holds training BCE and validation soft-target BCE
+side by side for reading overfitting, then the per-target AUC at the best epoch. Use
+`--output` to select another PNG path.
+
+Soft macro AUC is computed from each epoch's saved `validation_epoch_*.csv` against
+the run's frozen split targets, so runs trained before it was logged are plotted
+too. The split named in `effective_config.json` must load. Training BCE is the
+epoch-mean `train_loss_epoch` from `logs/version_*/metrics.csv`. It is the loss as
+optimized, including class-balance weights, so only compare it across runs that
+use the same class-balance setting.
 
 The per-target panel draws the 12 target AUCs from each series best macro-AUC
 epoch as grouped bars, with a dashed horizontal line at that epoch macro AUC so

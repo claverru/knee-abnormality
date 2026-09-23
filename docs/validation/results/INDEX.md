@@ -2,6 +2,7 @@
 
 | Read when | Document |
 |---|---|
+| Choosing how to compute validation AUC against the public leaderboard (S05–S48): soft-label vs hard-threshold, same-side pairs, gold-calibrated targets, consensus targets, machine/field/acquisition strata, report weights | [2026-09-23 validation AUC variants](2026-09-23-validation-auc-variants.md) |
 | Scoring series-cleaning rules at inference only: contrast-slot relabel, keep one series per same-signature group (retakes, Philips second reconstructions), near-empty frames | [2026-09-22 series-cleaning rules](2026-09-22-series-cleaning-rules.md) |
 | Reviewing stride-16/stride-32 fusion (token sum, deep-branch dropout, per-scale heads): per-label AUC against `k_05`, fine/deep branch ablation, pair-ensemble ceiling | [2026-09-22 stride-16 fusion](2026-09-22-stride16-fusion-result.md) |
 | Reviewing ReXNet stride-16 truncation (14×14 tokens): per-label AUC against `k_05`, runtime, memory, parameters | [2026-09-22 stride-16 truncation](2026-09-22-stride16-truncation-result.md) |

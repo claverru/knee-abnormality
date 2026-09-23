@@ -567,6 +567,22 @@ scripts:
       - Public scores are rounded to three decimals and every run is one fold and one seed.
     docs: [docs/validation/results/2026-09-18-local-public-metric-comparison.md, docs/validation/local-to-public-score-relationship.md]
 
+  - id: score-validation-auc-variants
+    path: scripts/adhoc/score_validation_auc_variants.py
+    summary: Recompute fold-0 validation AUC for each submitted checkpoint in 85 ways (soft-label, pair weightings, thresholds, gold-calibrated targets, consensus targets, report/study weights, and same-group, cross-group or balanced strata over scanner group, vendor, field strength, machine model, slice thickness, pixel spacing, sex and series count) and correlate each with the Kaggle public score per cohort, with a max-corrected permutation test.
+    tags: [validation, public, leaderboard, correlation, metric, auc, soft, pairwise, calibration, gold, consensus, threshold, scanner, machine, vendor, field, strata, report, weighting, permutation, submissions, selection]
+    commands:
+      - rtk proxy env CUDA_VISIBLE_DEVICES= uv run --locked python -m scripts.adhoc.score_validation_auc_variants --output-dir outputs/analysis/validation-auc-variants-new
+    inputs: [outputs/submission/kaggle-ledger.json and each bundle manifest's checkpoint path, Saved per-epoch validation predictions under outputs/training, Frozen split evaluation targets, Steven v4 / combined v1 label tables and the nine consensus extractor tables loaded through scripts/tools/prepare_combined_labels.py, data/raw/train.csv reports and train_series.csv, outputs/analysis/sharing-disagreement-20260914/study_headers.parquet for scanner groups]
+    outputs: [submissions.csv with every variant per submission, summary.json with per-cohort Pearson, Spearman, concordant pairs and permutation p-values; the ranked table is printed to stdout]
+    notes:
+      - Reads saved artifacts only; no GPU. Refuses an existing output directory.
+      - Cohorts are hard-coded by submission number (v3 x2 validation, v3 x1 validation with x4 tau0.75 inference, scanner split x1); S48 is added by hand because the ledger JSON predates it.
+      - Uses the submitted checkpoint's own epoch predictions at the training validation multiplier, not the x4 tau0.75 used on Kaggle.
+      - Gold calibration fits one logistic map from the split's training label table to official labels on gold studies outside fold 0; gold-propensity weights fit a logistic of report length, hedging-term count and series count on all training studies.
+      - Builds dense n x n pair-weight matrices per label (roughly 6 GB for both splits); takes a few minutes on CPU.
+    docs: [docs/validation/results/2026-09-23-validation-auc-variants.md]
+
   - id: relabel-kaggle-submission-datasets
     path: scripts/adhoc/relabel_kaggle_submissions.py
     summary: Number every Kaggle submission, retitle its notebook and rewrite its private bundle dataset title, subtitle and description into the unified submission format.

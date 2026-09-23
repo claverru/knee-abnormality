@@ -112,6 +112,12 @@ The Lightning module gathers every held-out study before computing metrics:
 - `val_macro_auc`: mean of twelve ROC-AUCs against `targets.csv >= 0.5` over
   the complete validation fold. Predictions themselves remain continuous.
   An exact target probability of 0.5 maps to positive by this fixed rule.
+- `val_soft_macro_auc`: mean of twelve soft ROC-AUCs against the unthresholded frozen
+  probabilities. Each ordered pair of distinct studies (i, j) is weighted y_i(1 − y_j), and the
+  score is the weighted share of pairs the model ranks correctly, with ties counting half. It
+  ranked past submissions closer to the public leaderboard than `val_macro_auc`
+  ([result](results/2026-09-23-validation-auc-variants.md)). It is used to compare runs.
+  Checkpoint selection stays on `val_macro_auc`.
 - `val_soft_target_bce`: BCE against the original frozen probabilities.
 - Epoch JSON files contain `gold` and `report_derived` subgroup metrics,
   study counts and per-target AUCs. An absent class produces `null` for that

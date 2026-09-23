@@ -41,6 +41,32 @@ def aucs(
     }
 
 
+def soft_auc(target: np.ndarray, score: np.ndarray) -> float:
+    values, inverse = np.unique(score, return_inverse=True)
+    negative = 1 - target
+    per_value = np.bincount(inverse, weights=negative, minlength=len(values))
+    below = np.cumsum(per_value) - per_value
+    tied = per_value[inverse] - negative
+    numerator = (target * (below[inverse] + 0.5 * tied)).sum()
+    denominator = target.sum() * negative.sum() - (target * negative).sum()
+    return float(numerator / denominator)
+
+
+def soft_aucs(
+    y: np.ndarray, prediction: np.ndarray, targets: list[str] | tuple[str, ...]
+) -> dict:
+    result = {
+        target: soft_auc(
+            y[:, index].astype(np.float64), prediction[:, index].astype(np.float64)
+        )
+        for index, target in enumerate(targets)
+    }
+    return {
+        "soft_macro_auc": float(np.mean(list(result.values()))),
+        "per_target_soft_auc": result,
+    }
+
+
 def validation_metrics(
     y: np.ndarray,
     prediction: np.ndarray,
@@ -61,6 +87,7 @@ def validation_metrics(
         "studies": len(y),
         "auc_target_threshold": threshold,
         **aucs(hard, prediction, targets),
+        **soft_aucs(y, prediction, targets),
         "soft_target_bce": float(
             -(y * np.log(probabilities) + (1 - y) * np.log1p(-probabilities)).mean()
         ),
