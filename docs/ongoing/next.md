@@ -9,9 +9,10 @@ adopted; appearance-only pooling, learned widths and the pooled compartment adap
 are removed. There is no pending confirmation run or adapter-removal task. See
 [adoption evidence](../../autoresearch/anatomical-attention.md).
 
-**No training is queued for automatic launch.** No campaign is running; historical
-queues and decisions live under [autoresearch](../../autoresearch/status.md).
-The general [overnight queue](../backlog/overnight.md) holds one run, the series-hygiene bundle (exact copies, superseded series, contrast relabel, near-empty frames). New candidates use
+**No training is queued for automatic launch.** No campaign is active: the three oblique
+campaigns are retired with the [oblique line](../history/oblique-groups.md), closed 2026-09-23.
+Historical queues and decisions live under [autoresearch](../../autoresearch/status.md).
+The general [overnight queue](../backlog/overnight.md) is empty. New candidates use
 the incumbent's seed and the [shared evaluation and adoption rule](../../autoresearch/protocol.md#shared-evaluation-and-adoption).
 Starting a campaign is a separate user action.
 

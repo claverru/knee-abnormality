@@ -47,7 +47,7 @@ permissions using the same runtime.
    ```
 
    Either configured subscription provider works. Use the campaign ID with status,
-   stop, resume, usage and import-ideas too. Omitting it selects `sampling`.
+   stop, resume, usage and import-ideas too. Omitting it selects `oblique-clean`.
 
 ## Declarative policy
 

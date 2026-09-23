@@ -12,6 +12,15 @@ pending experiments are classified in the [backlog](../backlog/INDEX.md).
   (`k_05` epoch 9, 0.944) against S41 (epoch 7, 0.945), is inconclusive
   ([result](../validation/results/2026-09-23-validation-auc-variants.md)).
 
+- **Oblique line closed, 2026-09-23 (user decision):** oblique groups (own slot budget for tilted
+  axial-fluid and coronal series) and the group embedding are removed from `configs/training.yaml`
+  and the code. Three paired submissions came out level or lower with them: S46 0.944 against S41
+  0.945, S51 0.942 against S48 0.942, and S52 0.943 against S50 0.945. At the ×4 submission
+  setting the local gain was at most +0.0003 hard. The three oblique campaigns are retired, and
+  none adopted anything. The recipe's preprocessing identity again matches the `image-blend` run
+  ([history](../history/oblique-groups.md)). The sampling campaign, stopped overnight by a
+  transient provider error after six rejected experiments, remains retired.
+
 - **Stride-16 feature fusion closed, 2026-09-22:** truncation lost 0.0042 fold-0 macro AUC against
   `k_05`; token-sum fusion (+0.0011), deep-branch dropout (−0.0027) and per-scale heads (+0.0006)
   did not clear +0.002. Stride-16 features trade labels rather than add signal; no code was kept
@@ -76,12 +85,12 @@ pending experiments are classified in the [backlog](../backlog/INDEX.md).
 - **Autoresearch:** every campaign now shares one
   [evaluation and adoption rule](../../autoresearch/protocol.md#shared-evaluation-and-adoption):
   fold 0 of `all_5fold_scanner_v1`, combined labels, checkpoint selected at ×1 and scored on its
-  ×4 τ 1 predictions (since 2026-09-22), gain ≥ 0.001 with a positive
-  80% lower bound. The three earlier campaigns stay stopped as historical records; they were
-  sealed on `all_5fold_v3` and cannot resume. The
-  [sampling campaign](../../autoresearch/campaigns/sampling/INDEX.md), defined against the
-  exponent-0.5 champion `k_05` (0.899042), ran six experiments on 2026-09-21/22, all rejected,
-  and is retired. Current state and transition evidence are owned by
+  ×4 τ 1 predictions (since 2026-09-22), gain ≥ 0.001 with a positive 80% lower bound. The three
+  earliest campaigns were sealed on `all_5fold_v3`, and sampling and the first oblique campaign on
+  ×1 predictions; none can resume. The x4 and
+  [cleaned-source](../../autoresearch/campaigns/oblique-clean/INDEX.md) oblique campaigns are
+  retired with the [oblique line](../history/oblique-groups.md), and no campaign is active. Current
+  state and transition evidence are owned by
   [autoresearch](../../autoresearch/status.md).
   The watchdog initializes its incident history on load, so direct `watch` can recover
   without a preceding `start`; existing incident history is preserved.
@@ -103,8 +112,8 @@ pending experiments are classified in the [backlog](../backlog/INDEX.md).
   changes, it sits inside the ×1 cohort spread (median 0.88707, sd 0.00331, and the cohort's own two
   controls are 0.88380 and 0.88645), and `outputs/submission/exports/control-check-x4-tau075` is
   exported from it at ×4 and temperature 0.75.
-- **Best public score since 2026-09-21: 0.945**, reached by two single fold-0 models: `k_05` at ×4 τ 0.75
-  (S41) and the `oblique` experiment at ×5 τ 0.70 (S47)
+- **Best public score since 2026-09-21: 0.945**, reached by three single fold-0 models: `k_05` at
+  ×4 τ 0.75 (S41), `oblique` at ×5 τ 0.70 (S47) and `image-blend` at ×4 τ 0.75 (S50)
   ([ledger](../inference/submissions/ledger.md)). The ensemble below was the best before them.
 - **Best submission 2026-09-19: 0.943 public**, a ten-member bundle of five EfficientNet-B0 and
   five ReXNet-200 fold models with mirror TTA, at ×4 and temperature 0.75. The five-b0 bundle
@@ -173,10 +182,10 @@ pending experiments are classified in the [backlog](../backlog/INDEX.md).
 - **Per-label loss research completed, 2026-09-20:** the
   [research note](../research/per-label-losses.md) develops the trusted ACL-ranking/MCL-focal
   observation into a shared-feature classifier comparison, per-label selection, joint
-  continuation and learned mixtures. Implementation and experiments remain unstarted in
-  [Big bets](../backlog/big-bets.md#per-label-loss-selection-and-learned-mixtures).
+  continuation and learned mixtures. Dropped from the backlog on 2026-09-23 by user decision: no
+  per-label selection or tuning; the note remains as research.
 - **Research-agenda review completed, 2026-09-20:** the retained unstarted priorities are
-  [per-label attention temperatures](../backlog/small-changes.md#per-label-attention-temperatures),
+  per-label attention temperatures (dropped 2026-09-23: no per-label tuning),
   [OA-only label repair](../backlog/big-bets.md#oa-only-rubric-aligned-label-repair) and
   [plane/contrast-specific readouts](../backlog/small-changes.md#planecontrast-specific-readouts).
   [Balance damping](../backlog/small-changes.md#weighting-strength-exponent-and-prevalence-definition)

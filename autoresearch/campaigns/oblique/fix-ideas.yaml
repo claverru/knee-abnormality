@@ -1,0 +1,129 @@
+ideas:
+  - id: acl-gated-oblique-tokens
+    mechanism_id: oblique-tokens-gated-to-acl-attention
+    parent_idea_id: label-view-attention-bias
+    title: Let tokens from fluid-sensitive oblique groups enter the ACL attention only
+    opportunity: >-
+      The reference's loss sits in the studies it changes: on the 103 fold-0 split studies
+      its macro AUC is 0.8566 against 0.8667 for k_05 (paired bootstrap +0.0103 [-0.0027,
+      +0.0234]), with MCL -0.058 (11 positives) and lateral meniscus -0.028 (22), while the
+      802 unchanged studies score the same (0.9017 against 0.9018). The dedicated fluid
+      obliques are ACL views (COR ACL T2W FS), and their extra tokens appear to dilute
+      attention for other labels. On k_05 at x4, giving the oblique group its own budget but
+      letting its tokens vote only for ACL improved the 102 affected studies by +0.0020,
+      against -0.0001 for the same budget without the gate.
+    mechanism: >-
+      In _attention_pool, tokens of acquisitions in a fluid-sensitive oblique group (coronal
+      fluid and axial fluid) are masked out of every label's softmax except ACL, as a fixed
+      prior with no learned parameters. Standard series and non-split slots are unchanged,
+      and split studies always keep their standard tokens, so no label loses all its tokens.
+    precedents:
+      - outputs/analysis/tilted-slot-policies-v2-k05-20260922/results.csv (additive_acl +0.0020 and intact_acl +0.0011 on the affected subset against additive -0.0001, k_05 at x4 tau 0.75)
+      - outputs/analysis/acquisition-geometry-20260922/localize_campaign.py (split-study and unchanged-study macro AUC for the reference, k_05 and each candidate)
+      - autoresearch/campaigns/oblique/prior-work.md#what-the-oblique-groups-are (descriptions of the fluid obliques)
+      - outputs/autoresearch/oblique/experiments/oblique-group-embedding-20260922T115506Z-f5d616dd/changes.diff (flag plumbing to reuse)
+    novelty: >-
+      A fixed routing prior instead of a learned one: label-view-attention-bias must learn 108
+      values from about 12% of studies, while the gate encodes what the protocol was acquired
+      for.
+    coverage: >-
+      Sampling and counts identical to the reference; only attention masks change, in split
+      studies with a fluid oblique group.
+    exploitation: >-
+      ACL keeps the dedicated view's evidence; MCL, the menisci and the other labels stop
+      paying for the extra tokens.
+    budget: >-
+      A boolean per acquisition and one mask; no parameters, no extra compute.
+    implementation: >-
+      Adds behavior. Reuse the oblique flag plumbing of oblique-group-embedding (one
+      PreparedSeries field set in dataset.py, carried through collate_studies) and mask
+      scores in _attention_pool behind one setting under model.oblique naming the allowed
+      labels. The embeddings, scorer, anatomical term and heads stay. Report split-study and
+      unchanged-study macro and per-label AUC against both the reference and k_05.
+    open_choices: >-
+      Whether coronal T1/PD oblique groups are gated too (their studies are OA-rich, so the
+      default leaves them ungated); a hard mask or a large fixed negative bias.
+    dependencies: []
+    priority_rationale: >-
+      The only fix with a direct paired test on the affected studies, it targets the measured
+      MCL and lateral meniscus loss, and it costs nothing.
+  - id: oblique-identity-with-view-bias
+    mechanism_id: oblique-embedding-plus-view-attention-bias
+    parent_idea_id: oblique-group-embedding
+    title: Combine the oblique-group embedding with the per-label view-group attention bias
+    opportunity: >-
+      Each identity mechanism alone repaired part of the reference's loss on the 103 split
+      studies: the embedding +0.0052 [-0.0054, +0.0160] and the view bias +0.0068 [-0.0060,
+      +0.0187] against the reference's 0.8566, both still below k_05's 0.8667. They act at
+      different places, one on token features and one on attention mass, so their repairs
+      may add.
+    mechanism: >-
+      Implement both together: a zero-initialized learned vector per splittable oblique type
+      added to oblique-group tokens, and a zero-initialized labels x view-groups bias (six
+      slot types plus three oblique groups) added to attention scores, sharing one oblique
+      flag.
+    precedents:
+      - outputs/autoresearch/oblique/experiments/oblique-group-embedding-20260922T115506Z-f5d616dd (rejected at 0.899287, +0.00176 against the reference)
+      - outputs/autoresearch/oblique/experiments/label-view-attention-bias-20260922T120824Z-29aa5863
+      - outputs/analysis/acquisition-geometry-20260922/localize_campaign.py (split-study bootstrap)
+    novelty: >-
+      A composition of the two identity mechanisms; each was tested alone.
+    coverage: >-
+      Sampling and counts identical to the reference.
+    exploitation: >-
+      Features say which view a token comes from, and attention can reweight views per label.
+    budget: >-
+      A few 256-d vectors plus 108 scalars; negligible.
+    implementation: >-
+      Adds behavior; reuse both candidates' diffs for the plumbing, embedding and bias, behind
+      settings under model.oblique. All new parameters start at zero.
+    open_choices: >-
+      One embedding shared by all oblique types or one per type.
+    dependencies: []
+    priority_rationale: >-
+      Cheap to build from two existing diffs; its value is whether the partial repairs stack
+      past k_05 on the split studies.
+  - id: oblique-training-only-views
+    mechanism_id: oblique-groups-in-training-only
+    parent_idea_id: null
+    title: Train with oblique groups but evaluate split slots on their standard series alone, at the same validation count
+    opportunity: >-
+      The reference's loss is on the evaluated studies it changes, and on k_05 dropping the
+      tilted series at inference improved the affected subset (+0.0066 at x1, +0.0011 to
+      +0.0026 at x4) while the full fold barely moved. The oblique views may help most as
+      extra training evidence, and least as extra tokens competing at evaluation.
+    mechanism: >-
+      Training keeps the reference's split slots. In validation and inference, a split slot
+      gives its whole combined count, the standard budget plus the oblique budget, to its
+      standard series, capped by that series' capacity, so validation x1 triplets per epoch
+      equal the reference exactly and no oblique token is scored.
+    precedents:
+      - outputs/analysis/tilted-slot-policies-check-20260922/results.csv (standard-only subset +0.0066 at x1)
+      - outputs/analysis/tilted-slot-policies-v2-k05-20260922/results.csv (standard-only subset +0.0011 at x4)
+      - outputs/analysis/acquisition-geometry-20260922/oblique_reach.txt (standard series capacity of 28 windows in coronal fluid and 30 in coronal T1/PD)
+    novelty: >-
+      Uses the oblique views as training data only; no earlier run separated their training
+      value from their evaluation value.
+    coverage: >-
+      Training coverage identical to the reference; at evaluation the standard series of a
+      split slot gains the oblique group's share.
+    exploitation: >-
+      The model still learns from the dedicated views, and its scored bags match k_05's
+      series mix with more standard coverage.
+    budget: >-
+      No extra triplets; validation count identical by construction at x1.
+    implementation: >-
+      Adds behavior in dataset.py: in evaluation mode (no training seed) a split slot routes
+      its combined count to the standard group. Behind one setting under data.oblique.
+      Record the changed deterministic validation selection identity.
+    open_choices: >-
+      How to handle multipliers where the combined count exceeds the standard series'
+      capacity at inference (cap and accept fewer triplets, or give the rest to the oblique
+      group).
+    dependencies: []
+    priority_rationale: >-
+      Tests the most direct reading of the localization, that oblique tokens cost the
+      scored split studies, at no compute cost; lower than the gate, which keeps the ACL view.
+exhausted_directions: >-
+  Written by the user's session on 2026-09-22 after the first two results; see
+  prior-work.md and the localization script for the evidence.

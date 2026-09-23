@@ -1,5 +1,14 @@
 # Implementation status
 
+Oblique line closed, 2026-09-23 (user decision): oblique groups and the group embedding are removed
+from the recipe and the code, and `oblique-clean` is retired alongside `oblique` and `oblique-x4`.
+No campaign is active. `oblique-group-embedding`, trained but never compared by the supervisor,
+was compared by hand: +0.0015 hard and +0.0019 soft at ×4 against `oblique-clean`. Its S51
+submission scored 0.942, and S52 (the same code on image-blend labels) scored 0.943 against 0.945
+for S50 ([history](../docs/history/oblique-groups.md)). The campaign's state and outputs are
+unchanged. It cannot resume on main, whose preprocessing identity no longer matches its sealed
+source. The justfile defaults still name it, and only its read-only commands are useful.
+
 Automatic recovery, 2026-09-23 (user decision): all nine campaign stops so far came from five
 agent reports that broke a runtime rule and four provider errors. A rejected orchestrator or
 developer report now returns to the same role with the error as `previous_rejection`; consecutive
@@ -25,13 +34,43 @@ Developers (Sonnet 5, GPT-5.6 Terra), the Codex researcher (GPT-6 Astra) and the
 reporter (Haiku 4.5) are unchanged, as are all efforts. Campaigns seal their profiles at start, so
 retired campaigns keep their recorded models; the watchdog reads the file on each repair.
 
+Cleaned-source oblique campaign, 2026-09-22 (user decision): main gained series cleaning
+(`b483140`) and loader and inference speedups (`4d23276`, `9e0c3ee`) that the x4 campaign's frozen
+source predates, and a started campaign cannot change its reference. The user retired
+[`oblique-x4`](campaigns/oblique-x4/INDEX.md) at revision 78, stopped on a developer's Claude
+session limit (HTTP 429), after three rejections; `acl-gated-oblique-tokens` finished training
+(×1 0.895663) without a comparison and `oblique-standard-frame-depth` was not developed. The
+[`oblique-clean` campaign](campaigns/oblique-clean/INDEX.md) copies its contract and policy against
+`outputs/training/oblique-clean`, the oblique recipe retrained on the current source at seed
+2263738815, with six carried-over seeds. Validation against the old reference passed (6 seeds,
+policy, recipe compatibility). One chained command trained `k05-clean` (`k_05`'s recipe,
+`configs/k05.yaml`, an evidence run; ×4 0.902760) and `oblique-clean` (×4 0.903705), then validated
+and started the campaign with its [watchdog](watchdog.md). The first candidate,
+`acl-gated-oblique-tokens`, crashed on its first training batch (a per-acquisition gate flag not
+expanded to spatial tokens). The orchestrator's completion re-ranked that launched idea into the
+queue, which the ranking gate rejects; the watchdog judged the repair out of scope and stopped the
+campaign at 01:22 on 2026-09-23. With the user's approval the fixed gate was imported as
+`acl-gated-oblique-tokens-token-mask` ([fix ideas](campaigns/oblique-clean/fix-ideas.yaml)), the
+campaign resumed so the orchestrator retries with the rejection reason, and the watchdog restarted. The justfile recipes default to it.
+
 Shared evaluation on ×4 predictions, 2026-09-22 (user decision): `EVALUATION` in `gates.py`
 now carries `validation.prediction_image_multiplier: 4`. Training still selects the checkpoint
 by ×1 epoch validation, then writes that checkpoint's fold-0 predictions at ×4 and attention
 temperature 1 with their macro AUC in `selected_checkpoint.json`; `compare_fold_runs` checks the
-saved predictions against that value. A campaign needs a reference whose predictions are at ×4:
-`scripts/tools/repredict_run.py` derives one from a completed run. Campaigns sealed on ×1
-predictions cannot resume.
+saved predictions against that value. The `oblique` campaign, sealed on ×1 predictions, is
+retired after two rejected experiments and one trained but uncompared (residual readout, ×1
+0.899668). Its topic continues in the [x4 oblique campaign](campaigns/oblique-x4/INDEX.md),
+referenced to `outputs/training/oblique-x4` (the `oblique` run re-predicted at ×4 by
+`scripts/tools/repredict_run.py`, 0.902373) with eleven carried-over ideas, of which the user kept seven; `validate oblique-x4`
+passes (ceiling 1,902 s). The user started it; its first review admitted five of the seven to the backlog, and the four excluded ideas stay registered as proposals only. The justfile recipes default to it.
+
+Oblique campaign, 2026-09-22 (user decisions): the [oblique campaign](campaigns/oblique/INDEX.md)
+is defined against `outputs/training/oblique` (0.897527), the recipe that gives oblique series
+their own slot budget, with six seed ideas and budget changes limited to exact redistribution.
+`validate oblique` passes (runtime ceiling 1,868 s, 4,380 steps, no equivalences); it is not sealed
+or started. The sampling campaign is retired: its supervisor stopped at revision 145 when an
+orchestrator job hit a transient provider error (API 529), after six rejected experiments, and it
+stays a historical record. No GPU work or training was started by this change.
 
 Shared evaluation and sampling campaign, 2026-09-21 (user decision): the metric,
 split, labels, validation multiplier, bootstrap and adoption rule are one

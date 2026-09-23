@@ -8,6 +8,7 @@
 | Reviewing crop-selection and learned-zoom experiments | [Crop-selection investigation](crop-selection-investigation.md) |
 | Recovering robust study-center findings and implementation | [Robust study centre](robust-study-centre.md) |
 | Reviewing the closed stride-16 truncation and stride-16/stride-32 fusion line, and recovering its code | [Stride-16 feature fusion](stride16-feature-fusion.md) |
+| Reviewing the closed oblique-groups line (own slot budget for tilted series, group embedding): paired submissions S41/S46, S48/S51, S50/S52, the three oblique campaigns, and recovering its code | [Oblique groups](oblique-groups.md) |
 | Reviewing the superseded 2026-09-19 inference-loading gain ranking and its bit-exact conversion and quantile measurements | [Loading speedup ranked by gain](loading-speedup-ranked-by-gain.md) |
 | Reviewing triplet-budget allocation experiments | [Triplet budget allocation](triplet-budget-allocation.md) |
 | Reading the original crop-selection design | [Crop selection implementation plan](crop-selection-plan.md) |

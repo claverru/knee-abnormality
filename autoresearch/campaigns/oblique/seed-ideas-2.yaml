@@ -1,0 +1,43 @@
+ideas:
+  - id: axial-t1pd-to-oblique-transfer
+    mechanism_id: zero-sum-type-transfer-into-oblique-groups
+    parent_idea_id: null
+    title: Fund part of the oblique groups' budget from the same study's axial T1/PD slot
+    opportunity: >-
+      Axial T1/PD is the lowest-value type on frozen models: dropping it moved macro AUC
+      from 0.8924 to 0.8926 and its marginal value was -0.00025 per triplet, and it is
+      absent in 81% of studies. The oblique groups carry the dedicated views of trauma
+      studies. Moving triplets inside a study keeps every total.
+    mechanism: >-
+      In studies that hold both a split slot and an axial T1/PD series, move a fixed number
+      of triplets per multiplier from the axial T1/PD slot to the study's oblique groups,
+      split between them by capacity, in training and validation, never leaving axial
+      T1/PD with fewer than one triplet or any group above its capacity. Study and run
+      totals equal the reference exactly.
+    precedents:
+      - docs/validation/results/2026-09-17-test-time-allocation.md (axial T1/PD removal cost nothing on macro, but dropping it entirely cost MCL and fracture about 0.008 on the confirm half)
+      - docs/validation/results/2026-09-18-overnight-results.md (repeated_series_share moved triplets from other types into repeated slots, topped fold 0 and lost publicly)
+    novelty: >-
+      A zero-sum transfer from one measured low-value type into the oblique groups only,
+      unlike repeated_series_share's reallocation from all types into any repeated series.
+    coverage: >-
+      Oblique groups gain triplets and axial T1/PD loses some in the 253 training studies
+      (5.7% of all, 47% of the 544 split studies) that hold both.
+    exploitation: >-
+      Tests whether more oblique evidence per study helps when it is paid for by the type
+      with the least measured value.
+    budget: >-
+      No extra triplets or decoding; accounting identical to the reference.
+    implementation: >-
+      Adds behavior in dataset.py (per-study budgets before the per-slot preparation)
+      behind one setting under data.oblique; study_budgets and the study floor stay.
+      Record the changed validation selection identity.
+    open_choices: >-
+      Transfer size, fixed before training from the axial T1/PD budget (for example half of
+      it); whether the oblique groups first fill to capacity.
+    dependencies: []
+    priority_rationale: >-
+      Lower priority: it rests on frozen-model value estimates and resembles a rejected
+      reallocation, though it takes from one low-value type only.
+exhausted_directions: >-
+  See seed-ideas.yaml.

@@ -10,11 +10,11 @@ rtk proxy uv run --locked just autoresearch-start codex
 rtk proxy uv run --locked just autoresearch-start claude
 ```
 
-These default to `sampling`. Select another configured campaign explicitly:
+These default to `oblique-clean`. Select another configured campaign explicitly:
 
 ```bash
-rtk proxy uv run --locked python -m scripts.tools.autoresearch validate sampling
-rtk proxy uv run --locked just autoresearch-start claude sampling
+rtk proxy uv run --locked python -m scripts.tools.autoresearch validate oblique-clean
+rtk proxy uv run --locked just autoresearch-start claude oblique-clean
 ```
 
 The validation command checks configuration and saved control artifacts without

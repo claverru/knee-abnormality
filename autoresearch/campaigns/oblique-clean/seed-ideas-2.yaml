@@ -1,0 +1,232 @@
+ideas:
+- id: oblique-training-only-views
+  mechanism_id: oblique-groups-in-training-only
+  parent_idea_id: null
+  title: Train with oblique groups but evaluate split slots on their standard series alone, at the same
+    validation count
+  opportunity: The reference's loss is on the evaluated studies it changes, and on k_05 dropping the tilted
+    series at inference improved the affected subset (+0.0066 at x1, +0.0011 to +0.0026 at x4) while the
+    full fold barely moved. The oblique views may help most as extra training evidence, and least as extra
+    tokens competing at evaluation.
+  mechanism: Training keeps the reference's split slots. In validation and inference, a split slot gives
+    its whole combined count, the standard budget plus the oblique budget, to its standard series, capped
+    by that series' capacity, so validation x1 triplets per epoch equal the reference exactly and no oblique
+    token is scored.
+  precedents:
+  - outputs/analysis/tilted-slot-policies-check-20260922/results.csv (standard-only subset +0.0066 at
+    x1)
+  - outputs/analysis/tilted-slot-policies-v2-k05-20260922/results.csv (standard-only subset +0.0011 at
+    x4)
+  - outputs/analysis/acquisition-geometry-20260922/oblique_reach.txt (standard series capacity of 28 windows
+    in coronal fluid and 30 in coronal T1/PD)
+  novelty: Uses the oblique views as training data only; no earlier run separated their training value
+    from their evaluation value.
+  coverage: Training coverage identical to the reference; at evaluation the standard series of a split
+    slot gains the oblique group's share.
+  exploitation: The model still learns from the dedicated views, and its scored bags match k_05's series
+    mix with more standard coverage.
+  budget: No extra triplets; validation count identical by construction at x1.
+  implementation: 'Adds behavior in dataset.py: in evaluation mode (no training seed) a split slot routes
+    its combined count to the standard group. Behind one setting under data.oblique. Record the changed
+    deterministic validation selection identity.'
+  open_choices: How to handle multipliers where the combined count exceeds the standard series' capacity
+    at inference (cap and accept fewer triplets, or give the rest to the oblique group).
+  dependencies: []
+  priority_rationale: Tests the most direct reading of the localization, that oblique tokens cost the
+    scored split studies, at no compute cost; lower than the gate, which keeps the ACL view.
+- id: coverage-matched-slot-split
+  mechanism_id: zero-sum-coverage-split-within-split-slots
+  parent_idea_id: null
+  title: Split each split slot's combined budget by the share of windows each group covers, at the reference's
+    per-slot total
+  opportunity: The reference gives both groups the full type budget. At x1 a thin coronal fluid oblique
+    sees 5 of about 16 windows per pass while the full-knee standard series beside it sees 5 of 28, so
+    the series that shows the whole joint, including MCL and the meniscal body, is covered at a lower
+    rate than the 45 mm slab. Equalizing coverage moves triplets to the standard series without touching
+    other slots.
+  mechanism: In slots holding both groups, divide the combined count (standard budget plus oblique budget,
+    as in the reference) between the groups in proportion to each group's distinct geometry-group capacity,
+    by largest remainder, with at least one triplet each and never above capacity, in training and validation
+    alike. Per-slot, per-study and run totals equal the reference exactly.
+  precedents:
+  - outputs/analysis/acquisition-geometry-20260922/oblique_reach.txt (windows and run coverage per group)
+  - docs/validation/results/2026-09-17-test-time-allocation.md#repeated-series-in-one-slot (second-series
+    triplets help on frozen models)
+  - docs/validation/results/2026-09-18-overnight-results.md (repeated_series_share took triplets from
+    other types and lost publicly; this split stays inside the slot)
+  novelty: The first zero-sum split between the two groups of one slot; the reference and repeated_series_share
+    both changed slot totals.
+  coverage: Standard series gain coverage and oblique groups lose some; run coverage of the oblique groups
+    stays high because they hold few windows.
+  exploitation: Tests whether the reference's equal split over-weights the thin slab relative to the full-knee
+    series.
+  budget: No extra triplets or decoding; accounting identical to the reference by construction.
+  implementation: Adds behavior in dataset.py _prepare_slot (group budgets) behind one setting under data.oblique;
+    oblique_split stays. Record the changed deterministic validation selection identity.
+  open_choices: Capacity as distinct geometry groups or as physical support length; how to round when
+    the combined count exceeds total capacity.
+  dependencies: []
+  priority_rationale: Cheap and exact, and it answers the budget question in the one direction the reference
+    did not test; lower priority than the representation ideas, because budget alone already failed to
+    move fold 0.
+- id: oblique-standard-statistics-alignment
+  mechanism_id: per-study-oblique-feature-statistics-alignment-to-slot-standard-series
+  parent_idea_id: null
+  title: Align each oblique group's token feature statistics to the standard series in its slot, per study,
+    behind a zero-initialized gate
+  opportunity: 'The scorer and heads that read oblique-group tokens were trained mostly on standard series,
+    and the oblique groups use different protocols from the series they share a slot with:
+
+    - On fold 0, all 47 Coronal0 oblique groups are T2 TSE and sit in the T1/PD slot. 45 of them are Bondorf-type
+    coronals (Siemens t2_tse_bond*, Philips T2W_BONDORF). The Coronal1 groups are mostly fat-suppressed
+    ACL slabs.
+
+
+    Measured effects of the mismatch:
+
+    - In the 47 Coronal0 split studies, the reference sets OA and medial-meniscus logits 0.27 lower than
+    k_05 at ×4 τ0.75, and positives and negatives shift alike. The protocol, not the pathology, moves
+    the level (shift_by_kind.txt, kind_pairs_x4.txt).
+
+    - On frozen k_05 and k_075, reading a split slot from its oblique group alone lost 0.0044–0.0103 subset
+    AUC, mostly MCL and PF OA. This is confounded by slab coverage.
+
+    - At ×1, the per-type constant embedding was the only candidate that repaired split-vs-unchanged pairs:
+    net +0.0005 of k_05''s +0.0011 (x1_candidates.txt). A constant cannot follow the contrast differences
+    between the two groups in each study.'
+  mechanism: 'For each study and each split slot (a slot with visually valid tokens from both groups),
+    take the per-channel mean and std of the projected 256-d features over the visually valid tokens of
+    each group: μ_s, σ_s for the standard group and μ_o, σ_o for the oblique group, in fp32.
+
+
+    Each oblique-group token x becomes x + α_g ⊙ (σ_s ⊙ (x − μ_o)/(σ_o + ε) + μ_s − x). Here α_g is a
+    zero-initialized per-channel gate for each splittable type. This is AdaIN with the same study''s standard
+    series as the style reference.
+
+
+    Neutrality and scope:
+
+    - The positional, plane and contrast codes are added afterwards as today, so only appearance statistics
+    change.
+
+    - Standard tokens, non-split slots and non-split studies are untouched, and α = 0 reproduces the reference
+    exactly.
+
+
+    Both groups image the same knee in the same session and share its labels. The alignment can therefore
+    remove offsets caused by protocol and contrast (a T2 Bondorf series read in the T1/PD slot, a fat-suppressed
+    slab beside a standard coronal) without the label-shift failure of population-level alignment. Variation
+    between tokens within a group, which carries the lesion signal, is kept up to a per-channel rescale.'
+  precedents:
+  - 'Huang & Belongie 2017, AdaIN (arXiv:1703.06868): transfers per-instance channel mean and std from
+    a reference. Here the reference is the study''s own standard series.'
+  - 'Li et al. 2016, AdaBN (arXiv:1603.04779), and Chang et al. CVPR 2019, DSBN (arXiv:1906.03950): domain-specific
+    normalization statistics for inputs from different domains that share one network.'
+  - 'docs/research/medial-lateral-transfer.md footnote 16 (Zhao et al. ICML 2019): unconditional feature
+    alignment fails under label shift. Per-study alignment is conditioned on the same knee and the same
+    labels.'
+  - 'Retired ×1 oblique-group-embedding-20260922T115506Z-f5d616dd, the closest mechanism (a constant per-type
+    shift before mil_norm): +0.0052 on split studies; split-vs-unchanged pairs net +0.0005, of which Coronal0
+    contributed +0.0004 to the su term. View bias ×1: +0.0004 net; residual readout: −0.0005 net (scratch/evidence/x1_candidates.txt).'
+  - 'outputs/analysis/tilted-slot-policies-check-20260922 and -v2check-20260922/results.csv: the tilted-only
+    slot pass on frozen k_05 and k_075 lost 0.0044–0.0103 subset AUC (confounded by slab coverage, per
+    the oblique-feature-adapter record).'
+  - 'oblique-feature-adapter, declined by the user as part of the identity family: a learned low-rank
+    branch. Also docs/backlog/small-changes.md#planecontrast-specific-feature-adapters (all studies, general
+    backlog). This idea learns no feature branch.'
+  - 'docs/validation/results/2026-09-16-label-private-crops-result.md: a zero-initialized FiLM stayed
+    near zero (mean |scale| 0.02). The gate here may do the same.'
+  - 'New evidence: outputs/autoresearch/oblique-x4/jobs/researcher-20260922T145144Z-bef067e9/scratch/evidence/{pair_decomposition,shift_by_kind,kind_pairs_x4,kind_net,x1_candidates,tau_pairs}.{py,txt};
+    fold-0 series descriptions in researcher-20260922T142228Z-40754723/scratch/evidence/cor0_descriptions.txt.'
+  novelty: 'No idea in the registry uses the study''s own standard series as a reference for the oblique
+    group:
+
+    - oblique-group-embedding adds one learned constant per type.
+
+    - The declined adapter learns a branch that depends on the features.
+
+    - oblique-standard-frame-depth corrects positional codes, not appearance.
+
+    - The view bias, the ACL gate and mixture pooling change attention mass or pooling.
+
+
+    Here the transform is computed in each study from the two groups'' token statistics, and only its
+    strength per channel (768 gates) is learned. It is harmonization, not identity marking, so it can
+    follow differences between protocols and scans that a per-type constant cannot.'
+  coverage: 'Only oblique-group tokens in split slots change: 103 fold-0 studies (47 Coronal0, 54 Coronal1,
+    2 axial fluid) and about 545 training studies. The other 802 fold-0 studies and all standard tokens
+    get the reference forward pass at any fixed weights; they change only through shared training. Sampling,
+    triplets, visits, ×1 validation selection and the input identity are unchanged, because the oblique
+    flag is attached after preparation. Series dropout removes both groups of a (study, type) together,
+    so a dropped slot never leaves one group without its reference.'
+  exploitation: 'Expected signature: in the Coronal0 split studies, OA and medial-meniscus logits move
+    back toward k_05''s level relative to unchanged studies (0.27 lower today at ×4 τ0.75). Coronal1 contusion
+    and ACL gains should hold.
+
+
+    Checks and reporting:
+
+    - Within-model check: re-predict the trained candidate with α = 0. Only split-study predictions change,
+    which separates the mechanism from same-seed divergence.
+
+    - Report the pair strata (ss, su, us, uu) with scratch/evidence/pair_decomposition.py rather than
+    within-split AUC alone. Within-split pairs are only 1–3% of each label''s pairs.'
+  budget: 'No change to triplets, decoding or the backbone.
+
+    - Added work: per batch, scatter-add sums and sums of squares over at most a few thousand tokens ×
+    256 channels, then one elementwise transform of oblique tokens. That is well under 0.5% of the 1,653
+    s reference.
+
+    - Parameters: 768 (3 × 256). Memory adds a few [groups, 256] buffers.
+
+    - Accounting is identical to the reference by construction, and ×4 prediction uses the same deterministic
+    path.'
+  implementation: 'Adds behavior and removes nothing.
+
+    - preparation.py: add PreparedSeries.oblique: bool = False.
+
+    - dataset.py: in _prepare_slot, after both groups are prepared, apply dataclasses.replace(oblique=True)
+    to the oblique group''s values. Call order and budgets stay unchanged. collate_studies emits series_oblique.
+    Reuse the flag plumbing of label-view-attention-bias-20260922T134812Z-7b4fa495/changes.diff.
+
+    - model.py: move series_oblique to the device yourself, because engine.move_batch leaves unlisted
+    keys on the CPU. Index it with keep_series, and map images to (study, type, oblique) through acquisition_index.
+    After feature_geometry supplies visual_valid, compute the group statistics outside autocast and transform
+    the oblique rows of features. Add a zero-initialized parameter of shape [type_count, 256] and use
+    only the splittable types.
+
+    - Config: one setting, model.oblique.feature_alignment. Remove it if the idea is discarded; make it
+    unconditional if adopted.
+
+    - If the embedding or the embedding + view-bias combination becomes the incumbent, keep it and apply
+    the alignment before the embedding is added. If depth-frame or the ACL gate is adopted, keep them;
+    they act on other components.'
+  open_choices: '- Moments: mean and std (recommended; contrast differences scale channels) or mean only.
+
+    - Statistics: detached (recommended; the oblique path should not reshape standard features) or differentiable.
+
+    - Gate: per channel and per type (recommended), or one scalar per type. Stored in 2-D, it gets weight
+    decay toward the neutral value.
+
+    - Reference tokens: all valid standard tokens (recommended), or only those inside the oblique slab''s
+    patient-space footprint (thin slabs cover about 45 mm).
+
+    - Guard: ε, plus a minimum count of valid tokens per group.'
+  dependencies: []
+  priority_rationale: 'It is distinct and cheap, neutral at initialization, and it acts on the protocol
+    mismatch that the constant embedding partly repaired at ×1. Uncertainty is high:
+
+    - At ×4 the Coronal0 level shift cancels between the su and us pair terms (net −0.0001), so any gain
+    must come from reading oblique content better, not from repairing the level.
+
+    - Zero-initialized gates stayed small in this repository before.
+
+
+    Ranking: after the running combination and the ACL gate. If the combination shows the embedding repairing
+    split-vs-unchanged pairs at ×4, run this as its per-study extension; if it shows nothing, rank this
+    lower.'
+exhausted_directions: 'On the oblique-x4 campaign (old source, reference oblique-x4 at 0.902373, x4 tau
+  1) three mechanisms were rejected: label-view-attention-bias +0.000610 (adoption 80% [-0.001142, +0.002319]),
+  split-slot-view-mixture-pooling +0.000054 ([-0.001854, +0.001890]) and oblique-identity-with-view-bias
+  -0.000615 ([-0.002386, +0.001046]; ACL -0.0086 and lateral meniscus -0.0080). The x1 campaign rejected
+  the embedding and the view bias alone. See autoresearch/campaigns/oblique-clean/prior-work.md.'

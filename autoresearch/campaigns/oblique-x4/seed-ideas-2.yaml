@@ -1,0 +1,167 @@
+ideas:
+- id: split-slot-view-mixture-pooling
+  mechanism_id: split-slot-alternative-view-mixture-pooling
+  parent_idea_id: null
+  title: Pool a split study twice, with the standard series and with the oblique group in each split slot,
+    and train on the mixture of the two predictions
+  opportunity: 'In the reference, a split slot adds the oblique group''s full type budget beside the standard
+    series, so both compete in one softmax per label and the slot''s token share rises (×1 five-type study:
+    coronal 5/26 → 10/31; +5.0 triplets per split study). On three frozen checkpoints (k_025, k_05, k_075),
+    with identical triplets, pooling the two groups as alternatives (mean of a standard-only and a tilted-only
+    pass) beat joint pooling on the split studies in all 9 measured settings, by +0.0015 to +0.0039 subset
+    AUC (k_05 ×1 τ1 ≥20°: joint −0.0013, mixture +0.0024; full fold −0.00019 vs +0.00022). Joint pooling''s
+    per-label cost falls on MCL and PF OA (k_05 full fold −0.0006 to −0.0026 vs intact); dropping the
+    tilted series instead costs ACL −0.0031 to −0.0046. This structure has never been trained.'
+  mechanism: Compute token scores (scorer plus anatomical term) once. In each study, a slot is split when
+    its kept, visually valid tokens include both oblique-group and standard tokens. Pass A masks every
+    split slot's oblique tokens; pass B masks every split slot's standard tokens. Other slots are in both
+    passes. Each pass runs the existing masked softmax, pooling and heads. For split studies the output
+    logit is logit(½σ(z_A)+½σ(z_B)), computed stably as logaddexp(logσ(z_A),logσ(z_B)) − logaddexp(logσ(−z_A),logσ(−z_B)).
+    For every other study, torch.where returns z_A, which equals the reference pass. Training and validation
+    are identical and no parameters are added. Each pass shows the scorer and heads a split study with
+    one series per slot, the composition they see in 88% of studies. The oblique view becomes an alternative
+    reading of its slot instead of diluting the other slots.
+  precedents:
+  - 'outputs/analysis/tilted-slot-policies-20260922/partial_log.txt, tilted-slot-policies-check-20260922
+    and -v2check-20260922/results.csv (scripts/adhoc/score_tilted_slot_policies.py): frozen mean_standard_tilted
+    vs additive on the same triplets; the mixture wins on the split subset in 9/9 checkpoint×setting cells.'
+  - 'Same artifacts: mean_intact_standard (two passes without the tilted series) gains +0.0000 to +0.0037
+    on the subset, so part of the frozen gain is sub-bag ensembling rather than use of the oblique views.'
+  - 'docs/validation/results/2026-09-17-count-normalized-attention-result.md: per-acquisition count normalisation
+    was rejected (−0.0035); subset and per-slot variants were never tested. Here learned score levels
+    stay intact within each pass.'
+  - 'docs/validation/results/2026-09-17-test-time-allocation.md#repeated-series-in-one-slot: a slot''s
+    second series adds value, and losing it hurts.'
+  - 'autoresearch/campaigns/oblique/prior-work.md: the two-pass average was left to the endgame as a test-time
+    policy that re-encodes the study.'
+  - docs/validation/results/2026-09-22-oblique-groups-result.md (reference; split-study MCL −0.058 and
+    PF OA −0.026 vs k_05).
+  - Proposed by the retired x1 campaign's researcher; implementation was cancelled by the stop (outputs/autoresearch/oblique/experiments/split-slot-view-mixture-pooling-20260922T125450Z-e32cf52c)
+  novelty: 'The first trained use of the only positive frozen oblique measurement. Unlike the endgame
+    two-pass test-time average, nothing is re-encoded: both passes pool the same encoded bag, the scorer
+    and heads learn under this pooling, and validation stays one ×1 pass. label-view-attention-bias adds
+    per-label constant offsets inside one softmax, and its standard columns are shared with all studies.
+    oblique-residual-readout adds an oblique-only pool with new parameters to the joint logit. This mechanism
+    instead removes the within-slot competition and the slot-share inflation, with no parameters.'
+  coverage: 'Only studies that still hold a split slot after series dropout change: 103 on fold 0 and
+    about 545 in training. At any fixed weights, the other 802 fold-0 studies get the reference forward
+    pass exactly; they change only through shared training. Sampling, triplets, visits and validation
+    selection are identical to the reference.'
+  exploitation: 'Expected signature in split studies: MCL, PF OA and the menisci stop losing relative
+    to the non-split drift, and ACL holds. A within-model toggle on the trained candidate (joint vs mixture
+    pooling, pass A only, pass B only) separates the pooling''s inference-time effect from training divergence.
+    Compare the split-study label deltas with the non-split drift.'
+  budget: 'No change to triplets, decoding or the backbone. Scores are shared, so the cost is one extra
+    masked softmax and pooling einsum per batch: well under 1% of the reference''s 1,624 s. Memory rises
+    by one extra [batch, labels, tokens] float32 buffer.'
+  implementation: 'Adds behavior and removes nothing.
+
+    - preparation.py: PreparedSeries.oblique: bool = False.
+
+    - dataset.py: set the flag with dataclasses.replace on the oblique group''s prepared values after
+    _prepare_slot_group; call order and budgets stay unchanged. collate_studies emits series_oblique.
+
+    - model.py: move series_oblique to all_study.device before indexing, because engine.move_batch leaves
+    unlisted keys on the CPU. Carry the per-acquisition oblique flag and type index into the encoded dict
+    and expand them per spatial token in pool_encoded. In _attention_pool, derive split slots from kept
+    valid tokens (per study×type: any oblique and any standard), build the two masks, pool twice with
+    the shared scores, and combine as described.
+
+    - Config: one setting under model.oblique (e.g. mixture_pooling). Remove it if discarded; make it
+    unconditional if adopted.
+
+    - If label-view-attention-bias or oblique-residual-readout becomes the incumbent during development,
+    rebase and reuse its flag plumbing. The bias enters the shared scores before both passes; the residual
+    logit is added once, after the mixture.'
+  open_choices: '- Mixture form: probability mixture (recommended; matches the frozen evidence) or logit
+    mean.
+
+    - Weight: fixed ½, or a learned per-label weight initialised at ½. The learned weight would let ACL
+    lean on pass B, and it overlaps label-view-attention-bias.
+
+    - Passes: two joint passes across all split slots (recommended; matches the frozen plans) or a per-slot
+    factorisation.
+
+    - Strict neutrality at initialisation: if the orchestrator requires it, gate z = z_joint + λ_c(z_mix
+    − z_joint), with λ zero-initialised per label.'
+  dependencies: []
+  priority_rationale: 'First. It has the best evidence in the campaign: a consistent frozen advantage
+    over joint pooling on split studies across three checkpoints. It adds no parameters, leaves non-split
+    studies exact and costs almost nothing. Uncertainties: the frozen models were not trained with split
+    budgets; part of the frozen gain is ensembling; and subset gains shrink about tenfold on the full
+    fold, so an adoption-sized macro gain needs a trained effect larger than the frozen one.
+
+
+    Missing evidence: the supervisor could run a one-pass inference check of mixture vs joint pooling
+    on the reference checkpoint.'
+- id: oblique-training-only-views
+  mechanism_id: oblique-groups-in-training-only
+  parent_idea_id: null
+  title: Train with oblique groups but evaluate split slots on their standard series alone, at the same
+    validation count
+  opportunity: The reference's loss is on the evaluated studies it changes, and on k_05 dropping the tilted
+    series at inference improved the affected subset (+0.0066 at x1, +0.0011 to +0.0026 at x4) while the
+    full fold barely moved. The oblique views may help most as extra training evidence, and least as extra
+    tokens competing at evaluation.
+  mechanism: Training keeps the reference's split slots. In validation and inference, a split slot gives
+    its whole combined count, the standard budget plus the oblique budget, to its standard series, capped
+    by that series' capacity, so validation x1 triplets per epoch equal the reference exactly and no oblique
+    token is scored.
+  precedents:
+  - outputs/analysis/tilted-slot-policies-check-20260922/results.csv (standard-only subset +0.0066 at
+    x1)
+  - outputs/analysis/tilted-slot-policies-v2-k05-20260922/results.csv (standard-only subset +0.0011 at
+    x4)
+  - outputs/analysis/acquisition-geometry-20260922/oblique_reach.txt (standard series capacity of 28 windows
+    in coronal fluid and 30 in coronal T1/PD)
+  novelty: Uses the oblique views as training data only; no earlier run separated their training value
+    from their evaluation value.
+  coverage: Training coverage identical to the reference; at evaluation the standard series of a split
+    slot gains the oblique group's share.
+  exploitation: The model still learns from the dedicated views, and its scored bags match k_05's series
+    mix with more standard coverage.
+  budget: No extra triplets; validation count identical by construction at x1.
+  implementation: 'Adds behavior in dataset.py: in evaluation mode (no training seed) a split slot routes
+    its combined count to the standard group. Behind one setting under data.oblique. Record the changed
+    deterministic validation selection identity.'
+  open_choices: How to handle multipliers where the combined count exceeds the standard series' capacity
+    at inference (cap and accept fewer triplets, or give the rest to the oblique group).
+  dependencies: []
+  priority_rationale: Tests the most direct reading of the localization, that oblique tokens cost the
+    scored split studies, at no compute cost; lower than the gate, which keeps the ACL view.
+- id: coverage-matched-slot-split
+  mechanism_id: zero-sum-coverage-split-within-split-slots
+  parent_idea_id: null
+  title: Split each split slot's combined budget by the share of windows each group covers, at the reference's
+    per-slot total
+  opportunity: The reference gives both groups the full type budget. At x1 a thin coronal fluid oblique
+    sees 5 of about 16 windows per pass while the full-knee standard series beside it sees 5 of 28, so
+    the series that shows the whole joint, including MCL and the meniscal body, is covered at a lower
+    rate than the 45 mm slab. Equalizing coverage moves triplets to the standard series without touching
+    other slots.
+  mechanism: In slots holding both groups, divide the combined count (standard budget plus oblique budget,
+    as in the reference) between the groups in proportion to each group's distinct geometry-group capacity,
+    by largest remainder, with at least one triplet each and never above capacity, in training and validation
+    alike. Per-slot, per-study and run totals equal the reference exactly.
+  precedents:
+  - outputs/analysis/acquisition-geometry-20260922/oblique_reach.txt (windows and run coverage per group)
+  - docs/validation/results/2026-09-17-test-time-allocation.md#repeated-series-in-one-slot (second-series
+    triplets help on frozen models)
+  - docs/validation/results/2026-09-18-overnight-results.md (repeated_series_share took triplets from
+    other types and lost publicly; this split stays inside the slot)
+  novelty: The first zero-sum split between the two groups of one slot; the reference and repeated_series_share
+    both changed slot totals.
+  coverage: Standard series gain coverage and oblique groups lose some; run coverage of the oblique groups
+    stays high because they hold few windows.
+  exploitation: Tests whether the reference's equal split over-weights the thin slab relative to the full-knee
+    series.
+  budget: No extra triplets or decoding; accounting identical to the reference by construction.
+  implementation: Adds behavior in dataset.py _prepare_slot (group budgets) behind one setting under data.oblique;
+    oblique_split stays. Record the changed deterministic validation selection identity.
+  open_choices: Capacity as distinct geometry groups or as physical support length; how to round when
+    the combined count exceeds total capacity.
+  dependencies: []
+  priority_rationale: Cheap and exact, and it answers the budget question in the one direction the reference
+    did not test; lower priority than the representation ideas, because budget alone already failed to
+    move fold 0.
+exhausted_directions: See seed-ideas.yaml.
