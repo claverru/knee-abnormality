@@ -66,8 +66,8 @@ after resume; its decision is completed after resume. To terminate training too:
 rtk proxy uv run --locked python -m scripts.tools.autoresearch stop sampling --abort
 ```
 
-Status shows a compact summary of calibration passes, active jobs and elapsed time,
-the ranked backlog, the next candidate, training progress, recent results, budget,
+Status shows a compact summary of calibration passes, any provider wait and its
+end time, active jobs and elapsed time, the ranked backlog, the next candidate, training progress, recent results, budget,
 and recorded agent usage by role/event. It includes failed calls and explicitly
 marks partial or unavailable usage; unparseable usage counts as unavailable and
 never blocks result processing or status. The metric summary shows the original reference
@@ -148,29 +148,66 @@ rtk proxy watch -n 5 'rtk proxy uv run --locked python -m scripts.tools.autorese
 ```
 
 There is no overall experiment-count limit, total-runtime limit, or automatic stop
-on a performance plateau. The campaign continues until stopped. Quota and unexpected
-failures pause it; an exhausted research backlog leaves it idle without repeated
-model calls. Each experiment still has its fixed compute ceiling; exceeding it
-invalidates that attempt and does not itself stop the entire campaign.
+on a performance plateau. The campaign continues until stopped. Failures that the
+supervisor cannot recover automatically pause it; an exhausted research backlog
+leaves it idle without repeated model calls. Each experiment still has its fixed
+compute ceiling; exceeding it invalidates that attempt and does not itself stop
+the entire campaign.
 
 Resume uses the recorded provider and profiles. It adopts live owned workers and
 consumes their completion receipts. A lost training attempt becomes invalid; it is
 never automatically launched again. This command resumes campaign orchestration,
-not an interrupted model checkpoint. Quota, authentication, malformed reports, and
-unexpected orchestration failures pause scheduling, retain artifacts, and require
-fixing the reported cause followed by resume. If applying a finished training,
-comparison, calibration or configuration result fails, the state is rolled back,
-the job keeps its receipt, and the campaign pauses; resume reapplies the saved
-result without rerunning the command. Waiting consumes no model turns.
+not an interrupted model checkpoint. Authentication failures, unclassified agent
+failures, exhausted retries, a third consecutive rejected report and unexpected
+orchestration failures pause scheduling, retain artifacts, and require fixing the
+reported cause followed by resume. If applying a finished training, comparison,
+calibration or configuration result fails, the state is rolled back, the job keeps
+its receipt, and the campaign pauses; resume reapplies the saved result without
+rerunning the command. Waiting consumes no model turns.
+
+The supervisor recovers three failure classes without pausing:
+
+- **Rejected reports.** When applying an orchestrator or developer report raises
+  (schema validation or a runtime rule such as the queue ranking or integration-plan
+  checks), the state is rolled back, the error is stored as `previous_rejection` on
+  the event or experiment, and the same role is assigned again with that text. The
+  developer keeps its workspace. The consecutive `rejections` count resets when a
+  report for that event or experiment is applied; the third consecutive rejection
+  pauses with a reason starting `Report rejected`. A rejected completion-reporter
+  report escalates its event to the orchestrator; a rejected researcher report pauses.
+- **Provider errors.** A failed agent job is classified from its provider output:
+  Claude's final stream-json `result` (`api_error_status` and message) or Codex's
+  last `error`/`turn.failed` event, falling back to the stderr tail. Overload, 5xx
+  and network errors retry the same role for the same event or experiment after
+  60 s, 300 s and 900 s, and the fourth consecutive failure pauses; the count resets
+  when that work item's next call returns. A session or usage limit (HTTP 429)
+  stores `retry_after` at the parsed reset time plus one minute, in the message's
+  timezone or else local time, or 60 minutes ahead if unparseable, and retries
+  afterwards without a cap. Authentication failures, runtime timeouts, lost workers
+  and every other failure pause as before. During a wait no agent job is dispatched;
+  training, comparison, configuration gates, claims and launches continue. A failed
+  completion reporter still escalates its event to the orchestrator, which also waits.
+- **Crashes before training.** A launched training that exits nonzero before
+  completing any epoch (no `train` rows in its triplet accounting) records no
+  completion. The experiment becomes `repair_requested` with the exit code and
+  stderr tail as its repair instruction. Once no candidate is reserved and the queue
+  is below its target, its idea returns to the queue head and the developer repairs
+  it as the attempt's single repair; the result passes the configuration gate and
+  review as usual. A crash of a repaired attempt or after an epoch, a timeout, a
+  lost worker and a cancellation stay invalid as before.
+
+Resume clears a pending provider wait so agents are retried at once; rejection and transient-retry counts persist until the
+next success, so a resume after either pause grants one more attempt.
 
 Report prose lengths and concern/reference counts are advisory targets, so
 exceeding them cannot exhaust structured-output retries or pause the campaign.
 Full text is preserved. Invalid fields, types, decisions or campaign operations
-still fail validation; authentication, quota and process failures still pause.
+still fail validation and return to the agent as rejections; authentication and
+unclassified process failures still pause.
 
 A proposal dependency rejection preserves the pending event and the existing
-queue. On resume, the orchestrator receives the rejection and explicit dependency
-eligibility, then returns a corrected admission/ranking. Unresolved proposals stay
+queue. On its next assignment, the orchestrator receives the rejection and explicit
+dependency eligibility, then returns a corrected admission/ranking. Unresolved proposals stay
 outside the queue until their prerequisites have recorded provisional acceptance.
 Completed training and prepared candidates are retained; this recovery does not
 repeat training or change the acceptance rule. If runtime code or role guidance
