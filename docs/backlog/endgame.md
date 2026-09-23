@@ -45,6 +45,12 @@ the [validation strategy](../validation/validation-strategy.md), then combine mo
   about +0.0009 more, led by `shared-bce-ranking` and `shared-shift-projected-bce`. Subset search
   did not beat averaging every run once selection optimism was removed
   ([simulation](../validation/results/2026-09-21-loss-ensemble-simulation.md)).
+- *Scale diversity:* on fold-0 ×4 predictions, pairs of a stride-32 run with a stride-16 or fused
+  run gained about +0.001 more over the pair mean than two stride-32 runs (+0.0040 against
+  +0.0030). `fusion-sum`, `fusion-scaleheads` and `stride16` are candidate members; their model code
+  exists only in their run's `source_snapshot.zip`
+  ([pair ensembles](../validation/results/2026-09-22-stride16-fusion-result.md#pair-ensembles),
+  [history](../history/stride16-feature-fusion.md#implementation-notes)).
 
 ## Bigger images
 
