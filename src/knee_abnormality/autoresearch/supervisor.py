@@ -62,10 +62,15 @@ from knee_abnormality.autoresearch.storage import (
     process_identity,
     read_json,
     sha256,
+    tail,
     terminate,
     write_json,
 )
 from knee_abnormality.config import load_config
+
+RETRY_DELAYS = (60, 300, 900)
+REJECTION_LIMIT = 3
+REJECTION_PAUSE = "Report rejected"
 
 
 def seed_files(docs: Path):
@@ -96,6 +101,19 @@ def gpu_available(gpu: str):
     if result.returncode:
         raise ValueError(f"Cannot inspect selected GPU: {result.stderr.strip()}")
     return not result.stdout.strip()
+
+
+def work_item(job):
+    payload = job["payload"]
+    return f"{job['kind']}:{payload.get('experiment') or payload.get('event', {}).get('id', '')}"
+
+
+def trained_epochs(directory: Path):
+    path = directory / "training/fold_0/triplet_accounting.json"
+    try:
+        return len(read_json(path)["train"]) if path.exists() else 0
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
 
 
 class Supervisor:
@@ -889,6 +907,58 @@ class Supervisor:
             },
         )
 
+    def waiting(self):
+        return time.time() < self.state.get("retry_after", 0)
+
+    def provider_wait(self, job, problem):
+        if problem["kind"] == "transient":
+            retries = self.state.setdefault("provider_retries", {})
+            key = work_item(job)
+            retries[key] = retries.get(key, 0) + 1
+            if retries[key] > len(RETRY_DELAYS):
+                return False
+            until = time.time() + RETRY_DELAYS[retries[key] - 1]
+            attempt = f"retry {retries[key]}/{len(RETRY_DELAYS)}"
+        elif problem["kind"] == "limit":
+            until = problem["retry_after"]
+            attempt = "retry after the reset"
+        else:
+            return False
+        self.state["retry_after"] = max(until, self.state.get("retry_after", 0))
+        wait = time.strftime(
+            "%Y-%m-%d %H:%M:%S %Z", time.localtime(self.state["retry_after"])
+        )
+        self.state["reason"] = (
+            f"{job['kind']} {problem['kind']} provider error: {problem['message'][:500]}. "
+            f"Agent jobs wait until {wait} ({attempt})."
+        )
+        return True
+
+    def reject(self, job, error):
+        job["processed"] = True
+        self.state.get("provider_retries", {}).pop(work_item(job), None)
+        if job["kind"] == "developer":
+            target = self.state["experiments"][job["payload"]["experiment"]]
+            target["stage"] = "needs_developer"
+        else:
+            target = next(
+                (
+                    event
+                    for event in self.state["events"]
+                    if event["id"] == job["payload"]["event"]["id"]
+                ),
+                None,
+            )
+            if target is None:
+                return
+        target["previous_rejection"] = str(error)
+        target["rejections"] = target.get("rejections", 0) + 1
+        if target["rejections"] >= REJECTION_LIMIT:
+            self.state.update(
+                status="paused",
+                reason=f"{REJECTION_PAUSE} {target['rejections']} consecutive times for {job['id']}: {error}",
+            )
+
     def process_result(self, job, receipt):
         kind = job["kind"]
         directory = Path(job["path"])
@@ -921,6 +991,26 @@ class Supervisor:
                 return
             self.dequeue_launched(exp)
             exp["training_receipt"] = receipt
+            if (
+                exp["launched"]
+                and exp["repair_count"] < 1
+                and receipt["exit_code"] != 0
+                and not receipt.get("error")
+                and not receipt.get("cancelled")
+                and trained_epochs(Path(exp["directory"])) == 0
+            ):
+                self.state["running"] = None
+                self.state["crash_repair"] = exp["id"]
+                exp.update(
+                    stage="repair_requested",
+                    repair_instruction=(
+                        f"Training exited with code {receipt['exit_code']} before completing an epoch; "
+                        "no result was recorded. Fix the cause within the same idea; the repaired candidate "
+                        f"returns to review. Full log: {directory / 'stderr.log'}. Stderr tail:\n"
+                        f"{tail(directory / 'stderr.log')}"
+                    ),
+                )
+                return
             measured = {
                 **receipt,
                 "seconds": receipt["seconds"] + exp["preparation_seconds"]
@@ -1002,7 +1092,12 @@ class Supervisor:
                     },
                 )
             return
-        if failed:
+        problem = (
+            providers.failure(self.state["provider"], directory, receipt)
+            if kind in REPORTS
+            else None
+        )
+        if failed or problem:
             if kind == "completion_reporter":
                 self.escalate_completion(job, f"Reporter failed; inspect {directory}")
             if kind == "config":
@@ -1017,9 +1112,16 @@ class Supervisor:
                 return
             if kind == "developer":
                 exp["stage"] = "needs_developer"
+            if problem and self.provider_wait(job, problem):
+                if kind == "researcher":
+                    self.state["last_refill_revision"] = -1
+                return
+            detail = (
+                f" ({problem['kind']}: {problem['message'][:500]})" if problem else ""
+            )
             self.state.update(
                 status="paused",
-                reason=f"{kind} failed; inspect {directory}. Fix the cause and use resume.",
+                reason=f"{kind} failed; inspect {directory}{detail}. Fix the cause and use resume.",
             )
             return
         if kind == "calibration":
@@ -1042,6 +1144,7 @@ class Supervisor:
                     "review", {"experiment": exp["id"], "gate_error": str(error)}
                 )
         else:
+            self.state.get("provider_retries", {}).pop(work_item(job), None)
             report = providers.result(self.state["provider"], kind, directory)
             if kind == "researcher":
                 self.state["last_refill_revision"] = self.state["evidence_revision"]
@@ -1051,6 +1154,8 @@ class Supervisor:
                         {"report": report, "artifact": str(directory / "report.json")},
                     )
             elif kind == "developer":
+                exp.pop("rejections", None)
+                exp.pop("previous_rejection", None)
                 exp["developer_report"] = report
                 exp["integration"] = report["integration"]
                 if report["status"] == "blocked":
@@ -1339,17 +1444,18 @@ class Supervisor:
                     RuntimeError,
                     subprocess.SubprocessError,
                 ) as error:
+                    if job["kind"] in {"orchestrator", "developer"}:
+                        self.state = rollback
+                        self.reject(self.state["jobs"][job["id"]], error)
+                        self.save()
+                        return
+                    if job["kind"] == "completion_reporter":
+                        self.escalate_completion(
+                            job, f"Reporter result processing failed: {error}"
+                        )
+                        self.save()
+                        continue
                     if job["kind"] in REPORTS:
-                        if job["kind"] == "developer":
-                            self.state["experiments"][job["payload"]["experiment"]][
-                                "stage"
-                            ] = "needs_developer"
-                        if job["kind"] == "completion_reporter":
-                            self.escalate_completion(
-                                job, f"Reporter result processing failed: {error}"
-                            )
-                        elif job["kind"] == "orchestrator" and self.state["events"]:
-                            self.state["events"][0]["previous_rejection"] = str(error)
                         self.state.update(
                             status="paused",
                             reason=f"Result processing failed for {job['id']}: {error}",
@@ -1424,6 +1530,10 @@ class Supervisor:
                     timeout=14400,
                 )
             return
+        if "retry_after" in self.state and not self.waiting():
+            self.state.pop("retry_after")
+            self.state["reason"] = None
+            self.save()
         running = self.state["experiments"].get(self.state["running"])
         if running and running["stage"] == "needs_comparison":
             self.comparison(running)
@@ -1435,6 +1545,8 @@ class Supervisor:
         ):
             return
         if self.state["events"]:
+            if self.waiting():
+                return
             self.state["events"].sort(
                 key=lambda event: {"completion": 0, "review": 1, "proposals": 2}[
                     event["kind"]
@@ -1540,6 +1652,14 @@ class Supervisor:
             and gpu_available(self.state["gpu"])
         ):
             self.training(claimed)
+        if (
+            self.state["claimed"] is None
+            and self.state.get("crash_repair")
+            and len(self.state["queue"]) < self.state["refill_to"]
+        ):
+            crashed = self.state["experiments"][self.state.pop("crash_repair")]
+            self.state["queue"].insert(0, crashed["idea"])
+            self.claim(repair=crashed)
         if self.state["claimed"] is None and self.state["queue"]:
             self.claim()
         claimed = self.state["experiments"].get(self.state["claimed"])
@@ -1547,6 +1667,7 @@ class Supervisor:
             claimed
             and claimed["stage"] == "needs_developer"
             and not self.active("developer")
+            and not self.waiting()
         ):
             claimed["stage"] = "developing"
             self.role(
@@ -1560,6 +1681,7 @@ class Supervisor:
                     ].get("repair_instruction")
                     if claimed["repair_of"]
                     else None,
+                    "previous_rejection": claimed.get("previous_rejection"),
                     "completion": self.policy.developer_instructions,
                 },
                 payload={"experiment": claimed["id"]},
@@ -1568,6 +1690,7 @@ class Supervisor:
         if (
             len(self.state["queue"]) < self.state["refill_below"]
             and not self.active("researcher")
+            and not self.waiting()
             and self.state["last_refill_revision"] != self.state["evidence_revision"]
         ):
             self.state["last_refill_revision"] = self.state["evidence_revision"]
@@ -1610,6 +1733,7 @@ class Supervisor:
                             reason=None,
                         )
                         self.state["last_refill_revision"] = -1
+                        self.state.pop("retry_after", None)
                         for job in self.state["jobs"].values():
                             job.pop("application_error", None)
                         self.save()

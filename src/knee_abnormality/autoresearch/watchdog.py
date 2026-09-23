@@ -26,7 +26,7 @@ from knee_abnormality.autoresearch.storage import (
     sha256,
     write_json,
 )
-from knee_abnormality.autoresearch.supervisor import Supervisor
+from knee_abnormality.autoresearch.supervisor import REJECTION_PAUSE, Supervisor
 from knee_abnormality.autoresearch.usage import capture_usage
 from knee_abnormality.cli import CLISettings
 
@@ -83,6 +83,7 @@ class Watchdog:
         self.directory = self.output / "watchdog"
         self.record = optional_json(self.directory / "state.json") or {}
         self.record.setdefault("incidents", [])
+        self.record.setdefault("resumes", [])
 
     def save(self, **fields):
         self.record.update(fields, updated_at=time.time())
@@ -340,6 +341,28 @@ class Watchdog:
             preflight(supervisor.state["provider"], self.root)
             write_json(self.output / "resume.json", {})
             launch(supervisor)
+        self.await_running()
+
+    def plain_resume(self, state):
+        with lock(self.output / "control.lock"):
+            current = read_json(self.output / "state.json")
+            if (
+                current["status"] != "paused"
+                or current.get("reason") != state.get("reason")
+                or (self.output / "stop.json").exists()
+                or (self.output / "resume.json").exists()
+                or (self.directory / "stop.json").exists()
+            ):
+                return False
+            supervisor = Supervisor(self.root, self.campaign)
+            preflight(supervisor.state["provider"], self.root)
+            write_json(self.output / "resume.json", {})
+            if not self.supervisor_alive():
+                launch(supervisor)
+        self.await_running()
+        return True
+
+    def await_running(self):
         deadline = time.monotonic() + 30
         while time.monotonic() < deadline:
             state = read_json(self.output / "state.json")
@@ -369,7 +392,11 @@ class Watchdog:
                     self.save(status="stopped", reason="Campaign stop requested")
                     return
                 live = self.supervisor_alive()
-                self.save(campaign_status=state["status"], supervisor_alive=live)
+                self.save(
+                    campaign_status=state["status"],
+                    supervisor_alive=live,
+                    retry_after=state.get("retry_after"),
+                )
                 if state["status"] == "paused" or not live:
                     outstanding = [
                         job
@@ -385,13 +412,23 @@ class Watchdog:
                             for name in ("owner.json", "launcher.json")
                         )
                     )
-                    if busy:
+                    reason = state.get("reason") or "Supervisor exited unexpectedly"
+                    fingerprint = re.sub(
+                        r"\d{8}T\d{6}Z-[0-9a-f]{8}", "<attempt>", reason
+                    )
+                    if (
+                        state["status"] == "paused"
+                        and reason.startswith(REJECTION_PAUSE)
+                        and fingerprint not in self.record["resumes"]
+                        and len(self.record["resumes"]) < 3
+                    ):
+                        self.save(status="resuming", reason=reason)
+                        if self.plain_resume(state):
+                            self.record["resumes"].append(fingerprint)
+                        self.save(status="watching", reason=None)
+                    elif busy:
                         self.save(status="waiting_for_jobs")
                     else:
-                        reason = state.get("reason") or "Supervisor exited unexpectedly"
-                        fingerprint = re.sub(
-                            r"\d{8}T\d{6}Z-[0-9a-f]{8}", "<attempt>", reason
-                        )
                         if (
                             fingerprint in self.record["incidents"]
                             or len(self.record["incidents"]) >= 3

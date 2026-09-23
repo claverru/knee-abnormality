@@ -56,7 +56,9 @@ the idea registry, or backlog, inside or outside `autoresearch/`.
 
 Do not launch training, modify campaign state or acceptance machinery, read validation
 labels into a training mechanism, or poll running work. A repair must address a named
-failure and produce a new recorded attempt. Exit after handing off the candidate.
+failure and produce a new recorded attempt. When the assignment carries
+`previous_rejection`, the runtime rejected your last report for that reason; correct it and
+return a report that satisfies it. Exit after handing off the candidate.
 
 Development runs concurrently with training in a separate workspace. A reconciliation
 assignment supplies the previous candidate, its old parent, the accepted new parent,
