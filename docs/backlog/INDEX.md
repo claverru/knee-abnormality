@@ -11,7 +11,6 @@
 | Adapting acquisition features before attention selects evidence | [Plane/contrast-specific feature adapters](small-changes.md#planecontrast-specific-feature-adapters) |
 | Planning larger investigations | [Big bets](big-bets.md) |
 | Planning an autoresearch campaign on training-only auxiliary losses and heads (report state, OA attributes, per-view classifiers, pretext tasks) | [Auxiliary-loss campaign](big-bets.md#auxiliary-loss-campaign) |
-| Making class weights change during training, judged on the leaderboard | [Adaptive training allocation](big-bets.md#adaptive-training-allocation) |
 | Planning a bounded OA report audit and supervision repair | [OA-only label repair](big-bets.md#oa-only-rubric-aligned-label-repair) |
 | Using report-derived OA severity attributes for training-only image supervision | [Richer report supervision](big-bets.md#richer-report-supervision-oa-attributes) |
 | Comparing RadImageNet with ImageNet weights on a ResNet-50 pair | [RadImageNet backbone](big-bets.md#radimagenet-pretrained-backbone) |

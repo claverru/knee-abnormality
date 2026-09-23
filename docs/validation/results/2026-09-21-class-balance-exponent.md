@@ -149,5 +149,5 @@ weights fall on exactly the labels whose report positives differ most from offic
 
 - Judge loss-weighting and other label-mimicking changes on the public leaderboard (or on future
   official-label evidence), not on fold-0 validation against report-derived labels alone.
-- The exponent curve is complete (S40–S42, S44, S45). Dynamic alternatives are planned under
-  [adaptive training allocation](../../backlog/big-bets.md#adaptive-training-allocation).
+- The exponent curve is complete (S40–S42, S44, S45). A 1→0 schedule and noise-aware down-weighting ran in the
+  [noisy-labels campaign](2026-09-23-noisy-labels-campaign.md): neither was adopted on fold 0.

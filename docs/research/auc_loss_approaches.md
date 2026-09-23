@@ -102,7 +102,7 @@ label frequencies describe exposure, not which intervention will improve AUC.
 Static weighting and study/batch sampling belong to
 [small changes](../backlog/small-changes.md#bce-weighting-and-study-sampling), including the existing
 [cell-masking proposal](../backlog/small-changes.md#report-label-supervision).
-Adaptive allocation belongs to [big bets](../backlog/big-bets.md#adaptive-training-allocation).
+Adaptive allocation ran in the [noisy-labels campaign](../validation/results/2026-09-23-noisy-labels-campaign.md), none adopted.
 The first proposed comparison is
 [fixed class-balanced BCE](../validation/results/2026-09-19-balanced-bce-result.md), completed on
 2026-09-19; [supervision](../modeling/supervision.md#fixed-class-balanced-bce)

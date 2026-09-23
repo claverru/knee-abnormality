@@ -20,7 +20,12 @@ permissions using the same runtime.
    output path and `reference_equivalences`. An equivalence names a recipe key the
    control's config lacks and the exact value that reproduces the control's
    behavior; validation rejects it if the control records the key or the recipe
-   value differs. Use `{}` when there are none. It supplies the fixed epochs, optimizer steps and 115% runtime
+   value differs. Use `{}` when there are none. A reference trained on source that differed
+   only by now-removed, inactive code may instead be declared with
+   `reference_config_exceptions` and `reference_identity_exceptions`: dotted paths (`[]` for
+   every item of a list) that exist in the reference's recorded config or input identity and are
+   removed from both sides before the start, sealing and comparison checks. Each needs a user
+   authorization and a recorded proof that the removed code never ran. It supplies the fixed epochs, optimizer steps and 115% runtime
    ceiling; the baseline CPU replay supplies realized triplet counts.
 3. Put actionable proposals in `seed-ideas.yaml` using the
    [research-report schema](../src/knee_abnormality/autoresearch/models.py). A report

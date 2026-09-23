@@ -220,6 +220,10 @@ is the [distillation](#distillation) entry above.
   No measured gain was found for multi-label AUC on report-derived labels; the closest setting,
   [chest X-rays with NLP labels](https://link.springer.com/chapter/10.1007/978-3-030-87358-5_57),
   is paywalled.
+- *Why an independent teacher (2026-09-23):* teachers from the same run add nothing here. The
+  model does not memorize its labels in ten epochs, so bootstrapped, running-average and EMA targets
+  tied or lost, while two independent seeds averaged gained +0.0028
+  ([noisy-labels campaign](../validation/results/2026-09-23-noisy-labels-campaign.md#why-the-family-barely-acts)).
 - *Settings:* 0.7/0.3 is the only weight with a winning precedent; one weight for all labels.
   Children keep their
   augmentation, since removing student noise removed the student's gain in

@@ -9,6 +9,7 @@ import torch
 from pydantic import Field
 from pydantic_settings import SettingsError
 
+from knee_abnormality.autoresearch.gates import without_fields
 from knee_abnormality.cli import CLISettings
 from knee_abnormality.data.labels import STUDY, TARGET_THRESHOLD
 from knee_abnormality.evaluation.metrics import (
@@ -31,6 +32,7 @@ class CompareCLI(CLISettings):
     output_dir: Path
     allowed_config_differences: list[str] = Field(default_factory=lambda: ["name"])
     allowed_input_identity_differences: list[str] = Field(default_factory=list)
+    reference_identity_exceptions: list[str] = Field(default_factory=list)
     fold: int = Field(default=0, ge=0)
     headers: Path = Path(
         "outputs/analysis/sharing-disagreement-20260914/study_headers.parquet"
@@ -188,7 +190,15 @@ def compare(settings: CompareCLI) -> None:
     predictions = {name: run["predictions"] for name, run in loaded.items()}
     runs = {name: run["record"] for name, run in loaded.items()}
     identity_diff = differences(
-        loaded["reference"]["input_identity"], loaded["candidate"]["input_identity"]
+        without_fields(
+            loaded["reference"]["input_identity"],
+            settings.reference_identity_exceptions,
+        ),
+        without_fields(
+            loaded["candidate"]["input_identity"],
+            settings.reference_identity_exceptions,
+            required=False,
+        ),
     )
     if rejected := unexpected(
         identity_diff, settings.allowed_input_identity_differences
@@ -346,6 +356,7 @@ def compare(settings: CompareCLI) -> None:
         },
         "config_differences": config_diff,
         "input_identity_differences": sorted(identity_diff),
+        "reference_identity_exceptions": settings.reference_identity_exceptions,
         "parameters_only_in_run": parameter_differences,
         "changed_source_archive_members": source_changes,
         "inputs": [

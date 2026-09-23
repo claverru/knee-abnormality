@@ -13,6 +13,15 @@ and gold macro AUC. The bottom row holds training BCE and validation soft-target
 side by side for reading overfitting, then the per-target AUC at the best epoch. Use
 `--output` to select another PNG path.
 
+Autoresearch experiments keep their run in a `training/` folder; the legend names them by
+their experiment folder without its timestamp and hash. Runs with no epoch metrics yet are
+skipped with a note, so a campaign's control and all its experiments plot with one glob:
+
+```bash
+rtk proxy uv run --locked python -m scripts.tools.plot_validation_metrics k05-clean \
+  outputs/autoresearch/noisy-labels/experiments/*/training --output outputs/analysis/noisy-labels.png
+```
+
 Soft macro AUC is computed from each epoch's saved `validation_epoch_*.csv` against
 the run's frozen split targets, so runs trained before it was logged are plotted
 too. The split named in `effective_config.json` must load. Training BCE is the

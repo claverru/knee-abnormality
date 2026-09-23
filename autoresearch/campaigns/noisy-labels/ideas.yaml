@@ -1,0 +1,762 @@
+revision: 145
+ideas:
+- id: bootstrapped-soft-targets
+  mechanism_id: prediction-bootstrapped-targets
+  parent_idea_id: null
+  title: Train on a blend of each cell's label and the model's own detached prediction
+    after a warm-up
+  opportunity: An offline blend of an image teacher into the labels raised their gold
+    agreement by +0.020 and tied publicly (S50 0.945 against 0.942), with its only
+    loss on PF OA traced to a teacher trained on looser labels. Soft bootstrapping
+    gets a similar correction online, from the model being trained, so the teacher
+    always matches the current labels, loss and split.
+  mechanism: For every observed training cell, replace the BCE target y with t = beta
+    * y + (1 - beta) * stopgrad(sigmoid(logit)), with beta = 0.8, from the start of
+    epoch index 2 (zero-based) onward. Epochs 0-1 train on y unchanged so that predictions
+    carry image evidence before they feed back. The class-balance weight of a cell
+    keeps using its original y >= 0.5 group. Reduction, masking and gold overrides
+    are unchanged; gold cells follow the same rule as every other cell.
+  precedents:
+  - 'Reed et al. 2014, soft bootstrapping (arXiv 1412.6596): beta * y + (1 - beta)
+    * p improved robustness to label noise on MNIST and detection benchmarks.'
+  - 'docs/validation/results/2026-09-23-image-blend-labels-result.md: offline 0.5/0.5
+    blend, gold agreement +0.020 [95% +0.006, +0.036], fold 0 +0.0035 hard and +0.0065
+    soft (leaky), public tie.'
+  - 'docs/research/public-research.md: a top participant reports mixing image predictions
+    into extracted labels beat replacing and masking.'
+  novelty: No campaign has used the model's own predictions in the target. The losses
+    campaign changed loss shape and label-derived weights only.
+  coverage: Every observed cell of every label, one beta, one warm-up.
+  exploitation: If it helps, the temporal-ensemble and ELR ideas test whether a steadier
+    prediction signal does better than the instantaneous one.
+  budget: One sigmoid and a blend per cell; no measurable runtime change.
+  implementation: 'Adds to the current loss in training/lightning.py: build t inside
+    training_step before masked_binary_cross_entropy_with_logits, keeping the weight
+    lookup on the original targets. New settings under trainer.label_noise (mode,
+    beta, start epoch). Log the mean absolute target change per epoch. Validation
+    is untouched.'
+  open_choices: beta 0.8 and start epoch 2 are fixed before launch; the offline precedent
+    used 0.5 and 0.7.
+  dependencies: []
+  priority_rationale: The simplest online form of the one label intervention with
+    a gold gain and a public tie on a mismatched teacher.
+  status: completed
+  created_revision: 4
+  ranking_rationale: 'All five seed ideas are in scope: each is a training-objective
+    change driven by the model''s own training-time predictions, or a class-balance
+    schedule shared across labels. None has dependencies, none duplicates another,
+    and none repeats a mechanism the losses campaign measured. The active incumbent
+    ideas list is empty, so admission passes.
+
+
+    Order:
+
+    1. Bootstrapped soft targets go first. They are the simplest online form of the
+    only label intervention with a gold gain (+0.020) and a public tie. They need
+    no per-study memory, and they give a baseline for the idea after them.
+
+    2. Temporal-ensemble targets come next. They answer whether an averaged prediction
+    beats an instantaneous one, and they introduce the per-study memory that ideas
+    3 and 4 reuse.
+
+    3. Early-learning regularization third. It is the strongest published single-network
+    method, but its lambda calibration is less concrete than the others'' coefficients.
+
+    4. Confident-contradiction down-weighting fourth. It interacts with the rare-label
+    class-balance weights and runs a cut-off rule on the same memory, so it is best
+    read after ideas 2 and 3.
+
+    5. The relaxing class-balance schedule goes last. By the proposal''s own prediction
+    it loses on hard AUC, which is the adoption judge. Its main value is a hard-versus-soft
+    AUC diagnostic under the judge caveat, not a likely adoption.'
+  experiments:
+  - bootstrapped-soft-targets-20260923T120951Z-db740f7e
+  decision: reject
+- id: temporal-ensemble-targets
+  mechanism_id: temporal-ensemble-target-correction
+  parent_idea_id: null
+  title: Blend each cell's label with a per-study running average of the model's past
+    training predictions
+  opportunity: 'A single training-time prediction is noisy: each visit sees a different
+    triplet draw, series dropout and augmentation. Averaging a study''s predictions
+    across epochs gives an ensemble teacher for free, closer to the out-of-fold teacher
+    of the offline blend, and less self-confirming than bootstrapping on the current
+    step.'
+  mechanism: Keep a memory m[study, label] updated on every training visit as m <-
+    0.7 * m + 0.3 * sigmoid(logit).detach(). From the third visit of a study on, train
+    on t = 0.7 * y + 0.3 * m for every observed cell; earlier visits use y. Class-balance
+    weights keep the original y >= 0.5 groups. The memory is a tensor indexed by the
+    training study list, saved and restored with the checkpoint.
+  precedents:
+  - 'Laine and Aila 2017, temporal ensembling (arXiv 1610.02242): an exponential average
+    of past predictions as a target.'
+  - 'Plant Pathology 2020 first place: 0.7 truth + 0.3 out-of-fold prediction.'
+  - 'docs/validation/results/2026-09-23-image-blend-labels-result.md: the teacher
+    alone did not beat the labels on gold (-0.0015) while the blend did (+0.020),
+    so a blend rather than a replacement.'
+  novelty: Uses predictions averaged over draws and epochs, unlike the instantaneous
+    bootstrap; no extra forward passes, unlike an EMA-weight teacher.
+  coverage: Every observed cell of every label, one momentum and one blend weight.
+  exploitation: A gain here and not in bootstrapping says the prediction must be averaged
+    to help.
+  budget: One 4,407 x 12 float tensor; no measurable runtime change.
+  implementation: Adds to the current loss in training/lightning.py. Map study_uid
+    to a row once from the training dataset; register the memory and visit counts
+    as buffers so the checkpoint carries them. Settings under trainer.label_noise.
+    Log the mean absolute target change and the share of cells in use per epoch.
+  open_choices: Momentum 0.7, blend 0.7/0.3 and the three-visit start are fixed before
+    launch.
+  dependencies: []
+  priority_rationale: The closest online analogue of the offline teacher blend, at
+    no compute cost.
+  status: completed
+  created_revision: 4
+  ranking_rationale: 'All five seed ideas are in scope: each is a training-objective
+    change driven by the model''s own training-time predictions, or a class-balance
+    schedule shared across labels. None has dependencies, none duplicates another,
+    and none repeats a mechanism the losses campaign measured. The active incumbent
+    ideas list is empty, so admission passes.
+
+
+    Order:
+
+    1. Bootstrapped soft targets go first. They are the simplest online form of the
+    only label intervention with a gold gain (+0.020) and a public tie. They need
+    no per-study memory, and they give a baseline for the idea after them.
+
+    2. Temporal-ensemble targets come next. They answer whether an averaged prediction
+    beats an instantaneous one, and they introduce the per-study memory that ideas
+    3 and 4 reuse.
+
+    3. Early-learning regularization third. It is the strongest published single-network
+    method, but its lambda calibration is less concrete than the others'' coefficients.
+
+    4. Confident-contradiction down-weighting fourth. It interacts with the rare-label
+    class-balance weights and runs a cut-off rule on the same memory, so it is best
+    read after ideas 2 and 3.
+
+    5. The relaxing class-balance schedule goes last. By the proposal''s own prediction
+    it loses on hard AUC, which is the adoption judge. Its main value is a hard-versus-soft
+    AUC diagnostic under the judge caveat, not a likely adoption.'
+  experiments:
+  - temporal-ensemble-targets-20260923T121257Z-3e6e8fc9
+  - temporal-ensemble-targets-20260923T121814Z-74391894
+  decision: reject
+- id: early-learning-regularization
+  mechanism_id: early-learning-regularization
+  parent_idea_id: null
+  title: Add an early-learning regularizer that keeps predictions close to their own
+    running average
+  opportunity: Networks fit clean labels first and memorize noisy ones later. Our
+    best epochs sit at 7-9 of 10, the phase where memorization would set in, and the
+    low-rate tail is where the class-balance weights sharpen the report extractor's
+    boundary.
+  mechanism: Keep the same per-study running average m as the temporal-ensemble idea
+    (momentum 0.7). Add lambda * mean over observed cells of log(1 - (m * p + (1 -
+    m) * (1 - p))), with p = sigmoid(logit) not detached and m detached, to the unchanged
+    class-balanced BCE. The term rewards agreement with the running average and so
+    resists moving a cell's prediction toward a label it has contradicted for several
+    epochs. Fix lambda before launch so the term is about 20% of the BCE at epoch
+    2 on the reference.
+  precedents:
+  - 'Liu et al. NeurIPS 2020, early-learning regularization (arXiv 2007.00151): state
+    of the art on CIFAR with synthetic noise and on Clothing1M and WebVision with
+    real noise.'
+  - 'docs/validation/results/2026-09-21-class-balance-exponent.md: fold-0 hard AUC
+    rises with weighting strength while the public score falls past k=0.5.'
+  novelty: 'A regularizer rather than a target change: the labels stay intact and
+    the pull toward the running average does the correction.'
+  coverage: Every observed cell of every label, one lambda and one momentum.
+  exploitation: Compared with the temporal-ensemble target on the same memory, it
+    separates target replacement from regularization.
+  budget: Same memory as the temporal-ensemble idea; no measurable runtime change.
+  implementation: Adds a loss term in training/lightning.py. Log the BCE and the regularizer
+    separately each epoch to show the term is active; the losses campaign once shipped
+    an auxiliary term six orders of magnitude below the main loss.
+  open_choices: The binary form of the inner product and the 20% calibration are fixed
+    before launch; record the resulting lambda.
+  dependencies: []
+  priority_rationale: The strongest published method on real label noise among single-network,
+    no-extra-pass methods.
+  status: completed
+  created_revision: 4
+  ranking_rationale: 'All five seed ideas are in scope: each is a training-objective
+    change driven by the model''s own training-time predictions, or a class-balance
+    schedule shared across labels. None has dependencies, none duplicates another,
+    and none repeats a mechanism the losses campaign measured. The active incumbent
+    ideas list is empty, so admission passes.
+
+
+    Order:
+
+    1. Bootstrapped soft targets go first. They are the simplest online form of the
+    only label intervention with a gold gain (+0.020) and a public tie. They need
+    no per-study memory, and they give a baseline for the idea after them.
+
+    2. Temporal-ensemble targets come next. They answer whether an averaged prediction
+    beats an instantaneous one, and they introduce the per-study memory that ideas
+    3 and 4 reuse.
+
+    3. Early-learning regularization third. It is the strongest published single-network
+    method, but its lambda calibration is less concrete than the others'' coefficients.
+
+    4. Confident-contradiction down-weighting fourth. It interacts with the rare-label
+    class-balance weights and runs a cut-off rule on the same memory, so it is best
+    read after ideas 2 and 3.
+
+    5. The relaxing class-balance schedule goes last. By the proposal''s own prediction
+    it loses on hard AUC, which is the adoption judge. Its main value is a hard-versus-soft
+    AUC diagnostic under the judge caveat, not a likely adoption.'
+  experiments:
+  - early-learning-regularization-20260923T124105Z-5579c9a9
+  - early-learning-regularization-20260923T124737Z-7aba30fc
+  decision: reject
+- id: confident-contradiction-downweighting
+  mechanism_id: persistent-disagreement-cell-weights
+  parent_idea_id: null
+  title: Down-weight training cells whose label the model has contradicted with confidence
+    over several visits
+  opportunity: The class-balance curve points at rare-label report positives that
+    disagree with gold (MCL, Fracture), and unaddressed negatives that are 14% gold-positive.
+    Cells the model persistently contradicts are the likeliest wrong labels; reducing
+    their weight stops the model from being pulled toward them.
+  mechanism: Keep the per-study running average m (momentum 0.7). After a study's
+    third visit, a cell is contradicted when m and y fall on opposite sides of 0.5
+    and |m - y| > 0.5. Contradicted cells get weight 0.25 on top of their class-balance
+    weight; all other cells keep 1. Rescale the batch's cell weights so their observed
+    mean equals the mean without the mechanism, keeping the effective learning rate
+    unchanged.
+  precedents:
+  - 'Han et al. 2018, co-teaching (arXiv 1804.06872), and the small-loss selection
+    literature: high-loss samples are the likeliest mislabelled.'
+  - 'Zhang et al. 2021, SPLC and Hill (arXiv 2112.07368): down-weighting suspected
+    false negatives in multi-label learning with missing labels.'
+  - 'docs/public-labels/report-attributes.md: low-grade positives are ranked worst
+    and only about half are gold-positive.'
+  novelty: The losses campaign weighted cells by label values; this weights them by
+    the model's persistent disagreement, a training-time signal.
+  coverage: Every observed cell of every label under one threshold and one weight.
+    Per-label contradicted fractions are diagnostics only.
+  exploitation: If it helps, a softer weight curve or a positive-only variant are
+    follow-ups; if it hurts on low-grade positives, the completion should show it.
+  budget: Same memory as the temporal-ensemble idea; no measurable runtime change.
+  implementation: Adds a weight factor in training/lightning.py, applied before the
+    observed-cell mean. Log the contradicted fraction per epoch and per label, split
+    by positive and negative original targets.
+  open_choices: Threshold 0.5, weight 0.25 and the three-visit start are fixed before
+    launch.
+  dependencies: []
+  priority_rationale: The noise-aware candidate from the adaptive-allocation big bet,
+    aimed at the label-gold disagreement its evidence identifies.
+  status: completed
+  created_revision: 4
+  ranking_rationale: "I admitted persistent-excess-residual-absorber. It has no dependencies,\
+    \ and proposal_admission says it is eligible. It stays in scope: it changes only\
+    \ the training objective, it is driven by the model's own training-time predictions,\
+    \ and it uses one step size, initialization, cap and momentum for every label\
+    \ and cell. The per-(label, side) \u03C1 is a running statistic, like the class-balance\
+    \ fractions, not a per-label coefficient. The researcher's CPU sizing supports\
+    \ the claim that it reaches a different set of cells from CCD. Measured on TE's\
+    \ memory, group-centred excess above 0.4 covers 1.4% of cells and is spread across\
+    \ labels: 0.5% of MCL positives and 1.3% of Fracture positives (scratch/absorber_sizing.txt).\
+    \ The fixed |m\u2212y|>0.5 rule instead reaches about 43% of MCL positives and\
+    \ 38% of Fracture positives below m 0.5. That makes it a real alternative trust\
+    \ lever, and it avoids the known Fracture/MCL hard-AUC sensitivity.\n\nI ranked\
+    \ it after the class-balance schedule rather than beside CCD. CCD's result, and\
+    \ ELR's, will show whether down-weighting cells the model persistently contradicts\
+    \ helps on either judge. The absorber is a refinement of that same lever, so its\
+    \ prior depends heavily on those outcomes. The schedule is an independent lever\
+    \ that measured evidence supports: in the public class-balance curve, the score\
+    \ moved with the exponent. The absorber's declared plan is to replace CCD's weight\
+    \ factor if CCD is accepted, not to stack on it. That matches the one-trust-rule\
+    \ principle, and it must set removed_idea_ids accordingly at integration.\n\n\
+    class-centered-self-correction stays proposed. Its parent is temporal-ensemble\
+    \ targets, which was rejected, and uniform self-targets have now failed twice\
+    \ (bootstrap \u22120.00046, TE +0.00025). The researcher also measured higher\
+    \ cross-label coupling under TE: mean |corr| rose from 0.359 to 0.384. Class-centring\
+    \ does not obviously undo that coupling, so it is not worth a queue slot yet."
+  experiments:
+  - confident-contradiction-downweighting-20260923T130931Z-120e2541
+  decision: reject
+- id: relaxing-class-balance-schedule
+  mechanism_id: scheduled-class-balance-strength
+  parent_idea_id: null
+  title: Relax the class-balance exponent from 1 to 0 linearly over the optimizer
+    steps
+  opportunity: Fixed strengths gave public 0.940 at k=1, 0.945 at 0.5 and 0.943 at
+    0. Full balancing may help rare labels get learned early, while late in training
+    the large weights mostly sharpen the report extractor's boundary. A schedule keeps
+    the early benefit and drops the late cost.
+  mechanism: Compute the class-balance weights with exponent k(step) = 1 - step /
+    total_steps instead of the fixed 0.5, from the same saved training-fold prevalences
+    and with the same mean-weight-one normalization. The average exponent over the
+    run is 0.5, matching the current recipe.
+  precedents:
+  - 'docs/validation/results/2026-09-21-class-balance-exponent.md: public 0.943, 0.944,
+    0.945, 0.942, 0.940 for k = 0, 0.25, 0.5, 0.75, 1.'
+  - 'Kang et al. 2020 (arXiv 1910.09217) and Cao et al. 2019 (arXiv 1906.07413): balance-strength
+    schedules beat fixed balancing in long-tail vision, though in the opposite direction
+    (0 to 1).'
+  novelty: The exponent has only been tested as a constant. The reverse ramp is the
+    external precedent; this direction follows the project's own evidence.
+  coverage: One schedule shared by all labels; per-label weights still come from the
+    existing formula.
+  exploitation: A gain here motivates testing the reverse ramp as its own idea.
+  budget: No runtime change.
+  implementation: Replaces the fixed exponent inside training/lightning.py with a
+    step-dependent one, recomputed from the stored class_balance counts; config.py
+    gains trainer.label_noise settings for the schedule while trainer.class_balance_exponent
+    stays in the recipe. Log the exponent and the largest weight ratio per epoch.
+  open_choices: The linear shape and the 1-to-0 endpoints are fixed before launch.
+  dependencies: []
+  priority_rationale: Directly supported by the one public curve that varies label
+    trust; expected to lose hard AUC and gain soft AUC if the mechanism is right,
+    which the completion must report.
+  status: completed
+  created_revision: 4
+  ranking_rationale: "I admitted persistent-excess-residual-absorber. It has no dependencies,\
+    \ and proposal_admission says it is eligible. It stays in scope: it changes only\
+    \ the training objective, it is driven by the model's own training-time predictions,\
+    \ and it uses one step size, initialization, cap and momentum for every label\
+    \ and cell. The per-(label, side) \u03C1 is a running statistic, like the class-balance\
+    \ fractions, not a per-label coefficient. The researcher's CPU sizing supports\
+    \ the claim that it reaches a different set of cells from CCD. Measured on TE's\
+    \ memory, group-centred excess above 0.4 covers 1.4% of cells and is spread across\
+    \ labels: 0.5% of MCL positives and 1.3% of Fracture positives (scratch/absorber_sizing.txt).\
+    \ The fixed |m\u2212y|>0.5 rule instead reaches about 43% of MCL positives and\
+    \ 38% of Fracture positives below m 0.5. That makes it a real alternative trust\
+    \ lever, and it avoids the known Fracture/MCL hard-AUC sensitivity.\n\nI ranked\
+    \ it after the class-balance schedule rather than beside CCD. CCD's result, and\
+    \ ELR's, will show whether down-weighting cells the model persistently contradicts\
+    \ helps on either judge. The absorber is a refinement of that same lever, so its\
+    \ prior depends heavily on those outcomes. The schedule is an independent lever\
+    \ that measured evidence supports: in the public class-balance curve, the score\
+    \ moved with the exponent. The absorber's declared plan is to replace CCD's weight\
+    \ factor if CCD is accepted, not to stack on it. That matches the one-trust-rule\
+    \ principle, and it must set removed_idea_ids accordingly at integration.\n\n\
+    class-centered-self-correction stays proposed. Its parent is temporal-ensemble\
+    \ targets, which was rejected, and uniform self-targets have now failed twice\
+    \ (bootstrap \u22120.00046, TE +0.00025). The researcher also measured higher\
+    \ cross-label coupling under TE: mean |corr| rose from 0.359 to 0.384. Class-centring\
+    \ does not obviously undo that coupling, so it is not worth a queue slot yet."
+  experiments:
+  - relaxing-class-balance-schedule-20260923T133826Z-824ef437
+  decision: reject
+- id: class-centered-self-correction
+  mechanism_id: class-centered-instance-specific-self-targets
+  parent_idea_id: temporal-ensemble-targets
+  title: "Correct each target by the model's within-class deviation only: y + 0.3\xB7\
+    (memory \u2212 the memory's mean over cells with the same label and target bin)"
+  opportunity: "The bootstrap run was rejected and read as mild label smoothing: a\
+    \ uniform blend pulls each class's mean target toward the model's compressed mean.\
+    \ On fold 0, k05-clean predicts 0.11\u20130.32 for y<0.5 cells (mean labels 0.07\u2013\
+    0.25) and 0.50\u20130.79 for y\u22650.5 cells (0.76\u20130.95). Both report-derived\
+    \ judges reward the report's between-class spacing, so this compression works\
+    \ against them. With an out-of-fold image teacher on the 58 gold studies, a class-centered\
+    \ blend keeps most of the uniform blend's ranking gain: 0.9241 against 0.9259\
+    \ at weight 0.3, with labels at 0.9075. It changes targets 27% less (mean |t\u2212\
+    y| 0.037 against 0.051). Uniform blends (bootstrap, TE) and ELR all move class\
+    \ means; this separates the two components."
+  mechanism: "Keep a memory m[study, label]: an EMA (momentum 0.7) of the detached\
+    \ train-mode sigmoid predictions from this run's training batches. Update it after\
+    \ the loss, so the current step never feeds its own target. Assign every cell\
+    \ to one of 10 equal-width bins of its raw target, with bin edges shared by all\
+    \ labels. Each step, recompute c[label, bin] as the mean of m over visited training\
+    \ studies in that label and bin. From a study's third visit on, train on t = clip(y\
+    \ + 0.3\xB7(m \u2212 c[label, bin(y)]), 0, 1). Cells in bins with fewer than 20\
+    \ visited studies keep y. Class-balance groups use the raw y. Masking, reduction\
+    \ and gold cells follow the unchanged rule."
+  precedents:
+  - 'Zhang and Sabuncu, NeurIPS 2020 (arXiv 2006.05065): self-distillation acts as
+    instance-specific label smoothing. Its gains track the diversity of the teacher''s
+    predictions, and uniform smoothing does not reproduce them.'
+  - "bootstrapped-soft-targets (reject): hard \u22120.00046, soft \u22120.00032; the\
+    \ OA family fell on both judges, and the completion reads the blend as mild label\
+    \ smoothing."
+  - "temporal-ensemble-targets (running): same memory, uniform 0.7\xB7y + 0.3\xB7\
+    EMA, current step included."
+  - 'Gold check, /home/claudio/src/knee-abnormality/outputs/autoresearch/noisy-labels/jobs/researcher-20260923T124106Z-48cb4f6b/scratch/gold_teacher_checks.{py,txt}:
+    centered 0.9230/0.9241/0.9222 at w 0.1/0.3/0.5; uniform 0.9230/0.9259/0.9275;
+    call-value bins give the same result as equal bins (0.9244).'
+  novelty: This is the first self-target that removes the class-level shift, so the
+    model's per-study image evidence enters without flattening the report's call-class
+    levels. The per-(label, bin) means are running statistics, like the class-balance
+    fractions, not coefficients.
+  coverage: Every observed cell of every label, under one weight, one momentum, one
+    bin grid and one minimum count.
+  exploitation: "Suppose TE loses hard AUC on LOW-heavy labels (OA, Effusion, Baker's)\
+    \ and this does not. Then class-level compression is the harm, and centering should\
+    \ also apply to ELR's anchor. If both are neutral, the self-target line is closed.\
+    \ Expected signature: the within-class reordering is invisible to tied report\
+    \ targets, so any gain must come from variance reduction. Hard AUC is expected\
+    \ within \xB10.001 and soft AUC near 0. Small per-label losses are possible where\
+    \ call classes overlap, but there should be no systematic OA loss. Report per\
+    \ epoch: mean |t\u2212y|, the share of cells with |t\u2212y|>0.05, and the mean\
+    \ (t\u2212y) per bin, which should be about 0."
+  budget: "One 3,502\xD712 memory with visit counts, plus a 12\xD710 scatter mean\
+    \ per step. The cost is negligible, well inside the 1,846 s ceiling. Triplets,\
+    \ visits and steps are unchanged."
+  implementation: 'Adds to training/lightning.py and puts its settings under trainer.label_noise:
+    weight, momentum, minimum_visits, bins and minimum_bin_count. Map study_uid to
+    a row from the training dataset. Persist memory and visits in the checkpoint and
+    restore them to the module''s device (TE''s repaired pattern). Pass weight_targets
+    = raw y. If TE is accepted during development, replace its uniform blend with
+    this centered blend on TE''s memory: remove the target_weight blend, keep persistence,
+    and exclude the current step. Do not stack the two. If ELR is accepted, keep its
+    term unchanged. If TE is rejected, implement this idea''s own memory from the
+    parent source.'
+  open_choices: Weight 0.3 matches TE for a clean contrast. The bin choice is 10 equal-width
+    bins; call-value bins scored the same on gold. The minimum bin count of 20 is
+    fixed before launch. Whether to launch only after TE completes is the orchestrator's
+    call; this proposal recommends it.
+  dependencies: []
+  priority_rationale: 'Adoption potential is low: the within-class correction is invisible
+    to report-derived judges. Its value is attribution. It is cheap and distinct,
+    and the gold check supports it. Queue it after TE''s completion, when it can separate
+    class-level compression from the instance-specific evidence in any TE or ELR outcome.'
+  status: blocked
+  created_revision: 52
+  blocked_reason: 'Retired by explicit user instruction on 2026-09-23: the mechanism
+    corrects or re-weights labels from the model''s own running memory of its training
+    predictions. The first three completed experiments showed this premise barely
+    acts in this regime (ten epochs of pretrained fine-tuning, validation BCE still
+    falling at the last epoch, so little label memorization to resist), and the running
+    down-weighting run trailed the reference by about 0.005 at x1 from its third epoch.
+    Preserve the idea as history; requeueing needs new evidence and explicit user
+    review.'
+  blocked_event: user-retire-self-memory-ideas-20260923T140728Z-a7821a6a
+- id: persistent-excess-residual-absorber
+  mechanism_id: group-relative-persistent-residual-absorber
+  parent_idea_id: null
+  title: Absorb each cell's persistent excess residual, relative to cells with the
+    same label and side, into a label-directed logit offset used only in the training
+    loss (SOP-style; never silences a cell)
+  opportunity: "Uniform self-targets moved every cell and failed twice: bootstrap\
+    \ \u22120.00046 and TE +0.00025, with the OA family down on both judges. TE also\
+    \ raised cross-label coupling (scratch/coupling_checks.txt). The remaining lever\
+    \ is to reduce the pull of specific cells. The queued CCD uses a fixed |m\u2212\
+    y|>0.5 rule. On TE's final memory, positives with m<0.5 are 43% of MCL and 38%\
+    \ of Fracture positives, the cells amplified about 4\xD7; Fracture's hard AUC\
+    \ is sensitive to positive weight (k 0.5\u21920.25 cost \u22120.0121). Low-grade\
+    \ positives are about half real, so rules must not silence them. Measured against\
+    \ each cell's (label, side) typical residual, excess above 0.4 reaches 1.4% of\
+    \ cells, spread across labels, including 0.5% of MCL and 1.3% of Fracture positives\
+    \ (scratch/absorber_sizing.txt). The contract's reasoning suggests the model contradicts\
+    \ random extraction errors and agrees with systematic ones, so a narrow, persistent\
+    \ selection could help both judges."
+  mechanism: "For each training study and label keep a scalar a (initialized at ln\
+    \ 1e-3) and a side s = +1 if y \u2265 0.5 else \u22121. The offset is \u03B4 =\
+    \ s\xB7exp(2a), capped at 6 logits. The unchanged class-balanced masked BCE is\
+    \ computed on z + stopgrad(\u03B4) against the raw y. After the loss, update under\
+    \ no_grad:\n- r = s\xB7(y \u2212 \u03C3(z+\u03B4)), the label-directed residual;\n\
+    - \u03C1[label, side] = running mean (momentum 0.99 per step) of s\xB7(y \u2212\
+    \ \u03C3(z)) over observed batch cells;\n- a \u2190 clamp(a + \u03B7\xB7(r \u2212\
+    \ \u03C1), ln 1e-3, \xBD ln 6), with \u03B7 = 3.5.\n\nThis is a CUSUM of excess\
+    \ residual that drives an exponentially growing offset. The offset stays below\
+    \ about 0.001 logit for typical cells. It reaches about 1 logit after 4\u2013\
+    5 visits with an excess near 0.4. It then settles where the cell's residual equals\
+    \ \u03C1, so an absorbed cell keeps its class-typical pull toward its label and\
+    \ loses only the excess. If the network later moves toward the label, r falls\
+    \ below \u03C1 and the offset decays. One \u03B7, initialization, cap and momentum\
+    \ apply to all labels and cells, gold cells included. Validation, prediction and\
+    \ export never see \u03B4."
+  precedents:
+  - "Liu, Zhu, Qu, You 2022, SOP (arXiv 2202.14026): per-sample noise s_i = u\u2299\
+    u\u2299y \u2212 v\u2299v\u2299(1\u2212y), initialized at sd 1e-8 with separate\
+    \ step ratios. Clothing1M 73.5 against 72.9 for ELR; WebVision 76.6 against 76.2.\
+    \ Designed for many epochs; this adaptation centres the residual because the model\
+    \ here stays under-fitted (positives' mean memory 0.68 against targets of about\
+    \ 0.93)."
+  - 'Pleiss et al., NeurIPS 2020, AUM (arXiv 2001.10528): a margin accumulated across
+    epochs separates mislabeled samples from hard clean ones better than the instantaneous
+    loss.'
+  - 'confident-contradiction-downweighting (queued): a fixed threshold with weight
+    0.25. On TE''s memory its reach is concentrated on rare-label positives (scratch/absorber_sizing.txt).'
+  - 'bootstrapped-soft-targets and temporal-ensemble-targets (both rejected): uniform
+    self-targets. TE raised prediction coupling from 0.359 to 0.384 (scratch/coupling_checks.txt).'
+  - 'Losses campaign: Huberised BCE and gradient clipping were closed by analysis.
+    Those are instantaneous and label-derived; this rule is gated by persistence and
+    measured relative to the cell''s group.'
+  novelty: "This is the first mechanism in the campaign that changes a cell's effective\
+    \ prediction inside the loss, rather than its target or its weight, through a\
+    \ learned per-cell latent variable. It is relative to the cell's (label, side)\
+    \ group, so it cannot fall on a rare label's positives wholesale. It never pushes\
+    \ a cell below the typical pull of its class, and it releases a cell automatically\
+    \ once the network fits it. The \u03C1 values are running statistics, like the\
+    \ class-balance fractions, not tuned coefficients."
+  coverage: Every observed cell of every label and side, gold included. One step size,
+    initialization, cap and momentum.
+  exploitation: "Expected signature: absorbed fraction (|\u03B4|>0.1) near 0 through\
+    \ epoch 2, then about 1\u20133% by epoch 5, positive-heavy, possibly 5\u20138%\
+    \ by epoch 9. Hard \u0394 is expected within \xB10.001, with a small gain if absorbed\
+    \ cells are mostly random errors. Soft \u0394 is expected to be at least the hard\
+    \ \u0394. There should be no concentration on MCL or Fracture. Risk: Effusion\
+    \ and Medial OA negatives are the negatives most often reached, and they carry\
+    \ the Lateral OA/Synovitis separation signal. Report per epoch the absorbed fraction\
+    \ by side and label, mean |\u03C3(z+\u03B4)\u2212\u03C3(z)| and \u03C1 by side,\
+    \ plus the partner-leakage ratios (scratch/coupling_checks.py). If this and CCD\
+    \ both fail, the trust lever is closed."
+  budget: "One 3,502\xD712 float32 variable (about 170 KB) and 24 running means, with\
+    \ elementwise work on [8,12] per step: well under 1% of the 1,605 s reference\
+    \ and inside the 1,846 s ceiling. Visits, triplets and steps are unchanged, and\
+    \ there is no extra forward pass."
+  implementation: "This adds to src/knee_abnormality/training/lightning.py and puts\
+    \ settings under trainer.label_noise (step_size, initial_offset, max_offset, residual_momentum).\
+    \ The raw y stays the target, so class-balance groups are unchanged and no weight_targets\
+    \ argument is needed.\n\nPlan:\n- Keep a per-study tensor keyed by study_uid (TE/ELR\
+    \ pattern) plus the \u03C1 table.\n- Update after the loss, so each step uses\
+    \ the offset from before the update.\n- Persist a and \u03C1 in on_save_checkpoint,\
+    \ restore them in on_load_checkpoint, and move them to the logits' device and\
+    \ dtype at use.\n- Keep them out of the model state_dict.\n- Validation and prediction\
+    \ paths are unchanged.\n- Log per epoch the absorbed fraction by side and label,\
+    \ the mean probability shift and \u03C1.\n\nIf CCD is accepted during development,\
+    \ replace its weight factor with this absorber and remove CCD's settings; do not\
+    \ stack two trust rules. If ELR is accepted, keep its term and apply the absorber\
+    \ inside the BCE only. If the class-balance schedule is accepted, keep it."
+  open_choices: "The following are fixed analytically before launch and are not tuned\
+    \ on validation:\n- \u03B7 3.5 and initial offset 1e-6, which give absorption\
+    \ after about 4\u20135 visits with an excess of about 0.4;\n- a cap of 6 logits\
+    \ and \u03C1 momentum of 0.99;\n- \u03C1 computed from \u03C3(z) without the offset.\n\
+    \nStill open:\n- The side rule s comes from y \u2265 0.5, so mid-range soft targets\
+    \ (0.3\u20130.5) can absorb only in the downward direction.\n- Updates start at\
+    \ the first visit rather than after warm-up."
+  dependencies: []
+  priority_rationale: The potential is moderate and the cost is small. The main uncertainty
+    is whether persistently contradicted cells are random report errors, which would
+    help both judges, or hard or coupled true cells, which would hurt both. It differs
+    from CCD in the cells it reaches (relative to the group, not concentrated on rare
+    positives) and in never silencing a cell. Rank it after ELR completes and beside
+    CCD. If only one trust rule can run, this one is less likely to trigger the known
+    Fracture/MCL hard-AUC loss.
+  status: blocked
+  created_revision: 70
+  ranking_rationale: "I admitted persistent-excess-residual-absorber. It has no dependencies,\
+    \ and proposal_admission says it is eligible. It stays in scope: it changes only\
+    \ the training objective, it is driven by the model's own training-time predictions,\
+    \ and it uses one step size, initialization, cap and momentum for every label\
+    \ and cell. The per-(label, side) \u03C1 is a running statistic, like the class-balance\
+    \ fractions, not a per-label coefficient. The researcher's CPU sizing supports\
+    \ the claim that it reaches a different set of cells from CCD. Measured on TE's\
+    \ memory, group-centred excess above 0.4 covers 1.4% of cells and is spread across\
+    \ labels: 0.5% of MCL positives and 1.3% of Fracture positives (scratch/absorber_sizing.txt).\
+    \ The fixed |m\u2212y|>0.5 rule instead reaches about 43% of MCL positives and\
+    \ 38% of Fracture positives below m 0.5. That makes it a real alternative trust\
+    \ lever, and it avoids the known Fracture/MCL hard-AUC sensitivity.\n\nI ranked\
+    \ it after the class-balance schedule rather than beside CCD. CCD's result, and\
+    \ ELR's, will show whether down-weighting cells the model persistently contradicts\
+    \ helps on either judge. The absorber is a refinement of that same lever, so its\
+    \ prior depends heavily on those outcomes. The schedule is an independent lever\
+    \ that measured evidence supports: in the public class-balance curve, the score\
+    \ moved with the exponent. The absorber's declared plan is to replace CCD's weight\
+    \ factor if CCD is accepted, not to stack on it. That matches the one-trust-rule\
+    \ principle, and it must set removed_idea_ids accordingly at integration.\n\n\
+    class-centered-self-correction stays proposed. Its parent is temporal-ensemble\
+    \ targets, which was rejected, and uniform self-targets have now failed twice\
+    \ (bootstrap \u22120.00046, TE +0.00025). The researcher also measured higher\
+    \ cross-label coupling under TE: mean |corr| rose from 0.359 to 0.384. Class-centring\
+    \ does not obviously undo that coupling, so it is not worth a queue slot yet."
+  blocked_reason: 'Retired by explicit user instruction on 2026-09-23: the mechanism
+    corrects or re-weights labels from the model''s own running memory of its training
+    predictions. The first three completed experiments showed this premise barely
+    acts in this regime (ten epochs of pretrained fine-tuning, validation BCE still
+    falling at the last epoch, so little label memorization to resist), and the running
+    down-weighting run trailed the reference by about 0.005 at x1 from its third epoch.
+    Preserve the idea as history; requeueing needs new evidence and explicit user
+    review.'
+  blocked_event: user-retire-self-memory-ideas-20260923T140728Z-a7821a6a
+- id: schedule-plus-early-learning
+  mechanism_id: scheduled-class-balance-with-early-learning-regularization
+  parent_idea_id: null
+  title: Combine the linear 1-to-0 class-balance exponent schedule with the early-learning
+    regularizer, both unchanged
+  opportunity: User request, 2026-09-23. Both single runs are to be judged on the
+    public leaderboard, where class-weighting changes that tie locally have moved
+    the score (fixed exponents 0 to 1 scored 0.943, 0.944, 0.945, 0.942, 0.940 while
+    fold-0 ranked them in reverse). The combination gives a third public candidate,
+    to be submitted only if a single one scores well. Locally the schedule tied (hard
+    -0.000002, soft +0.0007) and early-learning regularization gained +0.0013 hard
+    and +0.0008 soft, both within noise.
+  mechanism: 'Training loss = class-balanced BCE with the scheduled exponent k(step)
+    = 1 - step / total_steps, exactly as in relaxing-class-balance-schedule-20260923T133826Z-824ef437,
+    plus the early-learning term exactly as in early-learning-regularization-20260923T124737Z-7aba30fc:
+    weight 0.075 times the mean over observed cells of log(1 - (m p + (1 - m)(1 -
+    p))), with p = sigmoid(logit) and m the per-study running average of detached
+    training predictions, momentum 0.7. The regularizer is not class-weighted. No
+    setting differs from the two single runs.'
+  precedents:
+  - outputs/autoresearch/noisy-labels/experiments/relaxing-class-balance-schedule-20260923T133826Z-824ef437/changes.diff
+    (schedule; exponent logged from 0.95 to 0.05, maximum weight ratio 17.4 to 1.35).
+  - outputs/autoresearch/noisy-labels/experiments/early-learning-regularization-20260923T124737Z-7aba30fc/changes.diff
+    (regularizer; term about -0.07 to -0.11 against a BCE of 0.61 to 0.43).
+  - 'docs/validation/results/2026-09-21-class-balance-exponent.md: the public exponent
+    curve.'
+  novelty: 'The two mechanisms act on different terms: the schedule reweights the
+    BCE, the regularizer adds a separate prediction-anchored term. Neither single
+    run tested them together.'
+  coverage: One schedule and one regularizer shared by all labels and all observed
+    cells.
+  exploitation: A public result at or above 0.945 against S48's 0.942 would justify
+    keeping the pair.
+  budget: Both singles ran inside the ceiling with negligible overhead; the sum adds
+    nothing measurable.
+  implementation: 'Adds both mechanisms to the current training objective by merging
+    the two existing diffs without changing their logic or settings: the scheduled
+    weight tensor from the schedule diff and the running-average memory, regularizer
+    and its logging from the early-learning diff. Keep both sets of logged metrics
+    (class_balance_exponent, class_balance_weight_ratio_max, train_bce_loss, train_label_noise_loss).
+    Both configuration switches live under trainer.label_noise. The regularizer''s
+    memory is saved and restored with the checkpoint as in the single run.'
+  open_choices: None; every setting is copied from the single runs.
+  dependencies: []
+  priority_rationale: User-requested combination of the campaign's two public-leaderboard
+    candidates, run now so its weights are ready to submit alongside the singles.
+  status: completed
+  created_revision: 112
+  ranking_rationale: 'I admitted and queued the user''s requested combination, schedule-plus-early-learning.
+    It is the only proposal and the queue was empty. It has no declared dependencies,
+    and proposal_admission reports them as satisfied. The combination has never been
+    run, so the rule against re-queuing rejected work does not apply, even though
+    both single mechanisms were rejected locally. It stays within scope. The class-balance
+    exponent schedule is shared by all labels, which the contract allows when a schedule
+    replaces the balance strength. The regularizer is prediction-anchored, uses per-study
+    memory filled only from this run''s training batches, and has one shared set of
+    coefficients. It uses only the files and config prefix the campaign allows to
+    be edited (trainer.label_noise).
+
+
+    Both mechanisms change the loss in different places: one reweights the BCE term,
+    the other adds a separate term. So a small additive effect is plausible, but I
+    have no prior evidence for it. The early-learning single run gave the best local
+    result so far: +0.00134 macro AUC, 80% bootstrap interval [-0.00043, +0.00309].
+    The schedule single run tied: +0.0000 with 80% interval [-0.00170, +0.00173].
+    On the local judge, the realistic expectation is a gain near the early-learning
+    result, and it may again fail the 80% lower-bound rule. The shared adoption rule
+    decides the result, whatever the public-score motivation.'
+  experiments:
+  - schedule-plus-early-learning-20260923T150445Z-fac24a7d
+  decision: reject
+- id: full-to-half-bag-distillation
+  mechanism_id: same-step-sub-bag-self-distillation
+  parent_idea_id: null
+  title: 'Distil the detached full-bag prediction into two complementary half-bag
+    readouts of the same encoded tokens: a label-free, memory-free second readout
+    in the training loss'
+  opportunity: "The user's retirement note shows why self-targets failed here. A detached\
+    \ own prediction on the same logit gives gradient \u03B2(p\u2212y), which AdamW\
+    \ normalizes away. Running-memory targets are retired, and lagged or EMA teachers\
+    \ reduce to self-targets because this regime does not memorize (researcher-20260923T143657Z\
+    \ teacher_gap). A self-target applied to a different readout of the same features\
+    \ is neither degenerate nor memory-based. model.forward is pool_encoded(encode_batch(batch))\
+    \ (model.py:371-372), so half-bags of already-encoded acquisitions can be pooled\
+    \ for about 1\u20132% extra cost. Consider a cell whose label is wrong while the\
+    \ full-bag prediction already leans the right way: the full bag pulls the shared\
+    \ features toward the label, and the half-bag term pulls them toward the prediction.\
+    \ This is bootstrapping at the feature level. ELR, the only mechanism off the\
+    \ class-balance frontier (hard +0.0013, negative-side soft +0.0026 at \xD71),\
+    \ is also a label-free term."
+  mechanism: "encoded = model.encode_batch(batch) and s = model.pool_encoded(encoded),\
+    \ so the primary logits are bit-identical. For each study, randomly permute its\
+    \ encoded acquisitions within each series type and assign them alternately to\
+    \ halves A and B, so both halves keep every present series. Studies with a single\
+    \ acquisition skip the term. s_A and s_B come from pool_encoded with visual_valid\
+    \ ANDed with the half's acquisition mask. The loss is the unchanged class-balanced\
+    \ BCE(s, y) plus \u03BB\xB7\xBD\xB7\u03A3_h mean over observed cells of BCE(s_h,\
+    \ stopgrad \u03C3(s)). The added term is unweighted and active from epoch index\
+    \ 1, after the warm-up epoch; \u03BB = 0.5. Its gradient reaches the backbone\
+    \ features, attention and head only through the half-bag readouts, never through\
+    \ the teacher. Validation, prediction and export use the full bag only. There\
+    \ is no per-study state, one \u03BB and one split rule for all labels and cells,\
+    \ and gold cells follow the same rule."
+  precedents:
+  - 'Yu & Huang 2019, universally slimmable networks (arXiv 1903.05134): in-place
+    distillation, where sub-networks train on the full network''s detached same-step
+    prediction.'
+  - 'Englesson & Azizpour 2021 (arXiv 2110.01242): consistency between views improves
+    robustness to label noise.'
+  - 'Wei et al. 2020, JoCoR (CVPR): agreement between two predictors resists noisy
+    labels. Here the two readouts share one network, so there is no second network.'
+  - 'Zhang et al. 2022, DTFD-MIL (CVPR): pseudo-bags that inherit the parent label
+    carry label noise. Distilling the parent''s prediction avoids that.'
+  - "Losses campaign ideas.yaml: shared-split-view-consistency (symmetric (s_A\u2212\
+    s_B)\xB2) and shared-subview-supervision (halves trained on y), both queued and\
+    \ never run. That orchestrator ruled re-pooling one encode_batch in scope: one\
+    \ encode per step, bit-identical primary logits, views built only by masking visual_valid,\
+    \ and a dedicated split RNG."
+  - "Losses findings, completion-20260920T184207Z: the cross-epoch draw-consistency\
+    \ anchor was inconclusive at \u22120.0030. Two consistency terms raised Effusion\
+    \ and Medial OA and lowered Lateral Meniscus, MCL, Synovitis and ACL. The anchor's\
+    \ +9.6% runtime came from per-step logging."
+  - noisy-labels findings, user-retire-self-memory-ideas-20260923T140728Z (degenerate
+    detached bootstrap; memory retired) and the ELR run early-learning-regularization-20260923T124737Z-7aba30fc.
+  novelty: This would be the campaign's first self-target that uses no memory and
+    is not degenerate. It differs from the losses campaign's split-view ideas in direction
+    and purpose. The teacher is the full bag, detached and anchored by the labels,
+    so it has no collapse mode, and the halves never carry the label, so pseudo-bags
+    pick up no new label noise. The aim is a label-free share of the backbone gradient,
+    not draw invariance for its own sake. It is not a lagged or EMA teacher, so the
+    user's retirement of running-memory correction does not apply.
+  coverage: "Every observed cell of every label, in every study with at least two\
+    \ encoded acquisitions, from epoch index 1. One shared \u03BB, split rule and\
+    \ loss form."
+  exploitation: 'Expected signature: soft macro AUC and negative-side soft AUC rise,
+    as they did for ELR''s label-free term, while hard AUC moves little either way.
+    The per-label risk is the losses campaign pattern, where consistency terms lost
+    focal ligament and meniscus AUC and gained Effusion and OA, the opposite of ELR''s
+    pattern. Stratifying the halves within series keeps focal evidence in both halves.
+    If the result passes, the term acts on different readouts from ELR and can stack
+    with it. If it fails with focal labels down, the within-step second-readout family
+    is closed for this campaign.'
+  budget: "Two extra poolings (LayerNorm, attention MLP and einsum over about 10k\
+    \ tokens per batch) plus their backward into the same features tensor. The losses\
+    \ campaign estimated under 1 GFLOP against about 300 GFLOP for the rexnet_200\
+    \ pass, or 1\u20132% of step time. Diagnostics must be kept in buffers and logged\
+    \ once per epoch, because the draw-consistency anchor's +9.6% came from 48 per-step\
+    \ log calls. The expected run is about 1,640 s against the 1,846 s ceiling. There\
+    \ is no extra backbone pass or data pass, and visits, triplets, steps and epochs\
+    \ are unchanged."
+  implementation: "Adds behavior and removes nothing. In lightning.py training_step,\
+    \ replace self(batch) with encode_batch followed by pool_encoded, which is the\
+    \ same computation. Build the halves from encoded['study'] and the acquisition\
+    \ masks with a dedicated torch.Generator seeded from (config.seed, global_step).\
+    \ That leaves the augmentation and series-dropout RNG streams unchanged and makes\
+    \ resume stateless. Config: trainer.label_noise.sub_bag_distillation {weight:\
+    \ 0.5, start_epoch: 1}. Log per epoch: the term, the unweighted BCE, mean |\u03C3\
+    (s_h)\u2212\u03C3(s)|, the fraction of observed cells with |\u0394p| > 0.05 (the\
+    \ contract's changed fraction), the term-to-BCE gradient proxy \u03BB\xB7mean|\u0394\
+    p| / mean w|p\u2212y|, and acquisitions per half. If schedule-plus-early-learning\
+    \ is adopted during development, rebase onto it and keep its schedule and ELR\
+    \ unchanged, with this term added alongside. If a later incumbent removes ELR,\
+    \ keep only this term."
+  open_choices: "\u03BB of 0.5 or 1.0, fixed before launch; aim for a gradient proxy\
+    \ of about 20\u201330% at epoch 1. Split unit: acquisitions stratified within\
+    \ series (default) or whole series; whole series risks losing plane-specific focal\
+    \ evidence. Loss form: BCE toward \u03C3(s) (default) or ELR's form log(1\u2212\
+    <\u03C3(s),\u03C3(s_h)>). Start at epoch 0 or 1. Whether the term takes class-balance\
+    \ weights by the y\u22650.5 group (default: unweighted, like ELR)."
+  dependencies: []
+  priority_rationale: 'This is the only remaining direction that is neither retired
+    nor degenerate, and it is cheap. Its potential is moderate to low. The losses
+    campaign''s lagged draw-consistency anchor lost 0.003, with focal labels down,
+    and the mechanism adds no new label information. It only changes how much of the
+    backbone gradient comes from labels versus self-consistency. Scope risk: the contract
+    excludes augmentation, and pooling a half-bag is a view change at pooling time,
+    even though the losses orchestrator ruled it a loss computation. Run it after
+    the pending schedule-plus-early-learning result.'
+  status: launched
+  created_revision: 125
+  ranking_rationale: "I admitted full-to-half-bag-distillation. It has no dependencies,\
+    \ and it is the only unretired direction that is not degenerate. The researcher's\
+    \ argument holds: any target f(y, stopgrad p) on the same logit only reweights\
+    \ (p\u2212y). A detached full-bag teacher applied to a different readout of the\
+    \ same encoded tokens is new. It has no memory and no second network, so it passes\
+    \ the retirement.\n\nScope: the primary logits stay bit-identical (model.py:371-372\
+    \ is exactly pool_encoded(encode_batch)). The halves come only from masking visual_valid\
+    \ in an extra loss term. They are not new training data, sampling or augmentation.\
+    \ Visits, triplets, steps and epochs are unchanged, and only lightning.py, config.py\
+    \ and training.yaml need to change. I count it as a training-objective change.\
+    \ The judgment call is recorded under concerns.\n\nIt goes in the queue behind\
+    \ nothing. Its independence from the running schedule-plus-early-learning result\
+    \ is preserved: the proposal says to rebase only if that run is adopted, and otherwise\
+    \ to add to historical-control."
+  experiments:
+  - full-to-half-bag-distillation-20260923T151702Z-304fcf92

@@ -1,3 +1,4 @@
+import copy
 import math
 from decimal import Decimal
 from pathlib import Path
@@ -68,6 +69,32 @@ def flatten(value, prefix=""):
     return {prefix.removesuffix("."): value}
 
 
+def without_fields(record, paths, required=True):
+    record = copy.deepcopy(record)
+    for path in paths:
+        if not remove_field(record, path.split(".")) and required:
+            raise ValueError(
+                f"Reference exception is absent from the reference: {path}"
+            )
+    return record
+
+
+def remove_field(value, parts):
+    name, rest = parts[0], parts[1:]
+    if name.endswith("[]"):
+        items = value.get(name[:-2]) if isinstance(value, dict) else None
+        if not isinstance(items, list):
+            return False
+        removed = [remove_field(item, rest) for item in items]
+        return any(removed)
+    if not isinstance(value, dict) or name not in value:
+        return False
+    if rest:
+        return remove_field(value[name], rest)
+    del value[name]
+    return True
+
+
 def config_differences(reference, candidate):
     left, right = flatten(reference), flatten(candidate)
     return sorted(
@@ -111,8 +138,20 @@ def validate_config(reference, candidate, policy: CampaignPolicy):
     return changed
 
 
-def initial_limits(reference: Path, config: dict, equivalences: dict):
-    historical = read_json(reference / "effective_config.json")
+def initial_limits(
+    reference: Path,
+    config: dict,
+    equivalences: dict,
+    config_exceptions: list[str],
+    identity_exceptions: list[str],
+):
+    historical = without_fields(
+        read_json(reference / "effective_config.json"), config_exceptions
+    )
+    without_fields(
+        read_json(reference / "fold_0/input_identity.json"), identity_exceptions
+    )
+    config = without_fields(config, config_exceptions, required=False)
     recorded, current = flatten(historical), flatten(config)
     for key, value in equivalences.items():
         if key in recorded or key not in current or current[key] != value:
@@ -146,6 +185,8 @@ def initial_limits(reference: Path, config: dict, equivalences: dict):
             reference / "fold_0/validation_predictions.csv"
         ),
         "reference_equivalences": dict(equivalences),
+        "reference_config_exceptions": list(config_exceptions),
+        "reference_identity_exceptions": list(identity_exceptions),
         "bootstrap_draws": EVALUATION["bootstrap_draws"],
         "bootstrap_seed": EVALUATION["bootstrap_seed"],
     }

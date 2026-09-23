@@ -120,6 +120,7 @@ scripts:
       - CPU only; reads checkpoints raw (unvalidated) and loads saved predictions and checkpoint tensors without model construction, so it compares runs from retired model code.
       - --headers defaults to outputs/analysis/sharing-disagreement-20260914/study_headers.parquet, the per-study vendor table from the sharing disagreement audit.
       - Rejects configuration differences outside --allowed-config-differences (dotted keys or prefixes; default name) and input identity differences outside --allowed-input-identity-differences.
+      - --reference-identity-exceptions removes dotted input-identity fields from both runs before that check; the autoresearch supervisor passes a campaign's user-authorized reference exceptions this way.
       - Reports selected epochs, full-fold and per-target AUC, BCE, gold and report-derived metrics, family means, exclusive-positive margins, lateral cross-talk, vendor strata with supports, prediction changes, epoch curves, timing and peak memory, parameters present in only one run and changed src/configs archive members.
       - Uses paired report-group bootstrap intervals for all targets, the meniscus and OA pairs, the other eight targets and both margins; intervals exclude training-seed and checkpoint-selection variability.
       - Output directory must be fresh; selected predictions must reproduce the recorded prediction_macro_auc in selected_checkpoint.json, or the selected epoch's macro AUC for runs that predicted at the validation multiplier and record none.
@@ -153,6 +154,7 @@ scripts:
     notes:
       - Each run name resolves relative to outputs/training/ unless it is an existing folder path.
       - Runs with several folds produce one line per fold.
+      - An autoresearch run folder named training/ is labelled by its experiment folder without the timestamp and hash. Runs without epoch metrics yet are skipped with a note, so experiments/*/training plots a whole campaign.
       - The per-target panel draws the 12 target AUCs at each series best macro-AUC epoch as grouped bars, with a dashed horizontal line at that epoch macro AUC.
       - Per-target bars start at the 0.05 step below the lowest plotted AUC, stated in the axis label; one or two series also get value labels.
       - Undefined gold macro AUCs appear as gaps; full-validation AUC, BCE and per-target AUCs must be numeric.

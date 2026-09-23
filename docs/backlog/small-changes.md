@@ -257,8 +257,8 @@ remains under [report-label supervision](#report-label-supervision).
 The four positive-directed plus four random studies example illustrates one sampler, not an
 accepted ratio or next run. Choose one concrete arm with the user before implementation, keep the
 optimizer-step budget and validation fixed, and record per-label exposure and study repetition.
-Feedback-driven allocation is classified separately in
-[big bets](big-bets.md#adaptive-training-allocation).
+Feedback-driven allocation ran in the
+[noisy-labels campaign](../validation/results/2026-09-23-noisy-labels-campaign.md), none adopted.
 
 ### Weighting strength: exponent and prevalence definition
 
@@ -281,7 +281,8 @@ and mean-weight-one normalisation. One change per run against a fresh control.
   Lateral Meniscus 0.228 against 0.158), and it damps their weights accordingly. It confounds
   with the exponent, so run it only against the same control, never in the same arm.
 
-A ramped exponent belongs to [adaptive training allocation](big-bets.md#adaptive-training-allocation).
+A 1→0 ramped exponent tied on fold 0; its public score is pending
+([noisy-labels campaign](../validation/results/2026-09-23-noisy-labels-campaign.md#class-weighting-changes-need-the-public-board)).
 
 Later [soft-mass weighting](../../autoresearch/campaigns/losses/findings.md#completion-20260920t161203z-14ae6e65)
 and [prior-offset](../../autoresearch/campaigns/losses/findings.md#completion-20260920t181036z-45163c52)

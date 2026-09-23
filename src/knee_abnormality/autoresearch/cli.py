@@ -15,9 +15,11 @@ from knee_abnormality.autoresearch.isolation import environment, sandbox
 from knee_abnormality.autoresearch.models import ResearchReport
 from knee_abnormality.autoresearch.progress import (
     decision_text,
-    metric_line,
+    difference,
+    interval_text,
     progress_lines,
     results_summary,
+    score_text,
 )
 from knee_abnormality.autoresearch.providers import auth_environment
 from knee_abnormality.autoresearch.storage import (
@@ -155,159 +157,205 @@ def status(supervisor: Supervisor):
     }
 
 
-def status_summary(supervisor: Supervisor):
-    current = status(supervisor)
-    lines = [
-        f"{current['campaign']} | {current['provider'] or 'no provider'} | {current['status'].upper()}"
-    ]
-    lines.append(
-        f"Supervisor: {'alive' if current['supervisor_alive'] else 'not running'}"
+def duration_text(seconds):
+    seconds = max(0, int(seconds))
+    return f"{seconds // 60}m {seconds % 60:02d}s"
+
+
+def job_line(job, state):
+    directory = Path(job["path"])
+    receipt = directory / "receipt.json"
+    owner = directory / "owner.json"
+    job_status = (
+        "result application failed; fix the cause and resume"
+        if job.get("application_error")
+        else "finished, awaiting processing"
+        if receipt.exists()
+        else (
+            "running"
+            if owner.exists() and alive(read_json(owner))
+            else "starting or awaiting recovery"
+        )
     )
-    if supervisor.state is None:
-        return "\n".join(lines)
-    state = supervisor.state
-    if current["reason"]:
-        lines.append(f"Reason: {current['reason']}")
-    retry_after = state.get("retry_after", 0)
-    if current["status"] == "running" and retry_after > time.time():
-        remaining = int(retry_after - time.time())
-        lines.append(
-            f"Provider wait: no agent jobs until {time.strftime('%Y-%m-%d %H:%M:%S %Z', time.localtime(retry_after))} "
-            f"({remaining // 60}m {remaining % 60:02d}s left); training and comparison continue."
-        )
-    if (supervisor.output / "stop.json").exists() and current["status"] != "stopped":
-        lines.append("Stop requested; waiting for the supervisor to finish stopping.")
-    if current["status"] == "calibrating":
-        path = supervisor.output / "baseline/triplet_accounting.json"
-        ledger = read_json(path) if path.exists() else {"train": [], "validation": []}
-        lines.append(
-            f"Calibration: {len(ledger['train'])}/{state['limits']['epochs']} training passes; "
-            f"{len(ledger['validation'])}/2 validation passes completed (CPU only)"
-        )
-    active = [job for job in state["jobs"].values() if not job["processed"]]
-    for job in active:
-        directory = Path(job["path"])
-        elapsed = max(0, int(time.time() - job["created_at"]))
-        receipt = directory / "receipt.json"
-        owner = directory / "owner.json"
-        job_status = (
-            "result application failed; fix the cause and resume"
-            if job.get("application_error")
-            else "finished, awaiting processing"
-            if receipt.exists()
-            else (
-                "running"
-                if owner.exists() and alive(read_json(owner))
-                else "starting or awaiting recovery"
-            )
-        )
-        lines.append(
-            f"Job: {job['kind']} — {job_status}, elapsed {elapsed // 60}m {elapsed % 60:02d}s"
-        )
-    if not active:
-        lines.append("Jobs: none active")
-    queue = state["queue"]
-    lines.append(
-        f"Backlog: {len(queue)} ideas (refill below {state['refill_below']}, target {state['refill_to']})"
-    )
-    for index, idea_id in enumerate(queue[:3], 1):
-        idea = state["ideas"][idea_id]
-        lines.append(f"  {index}. {idea['title']} [{idea['status']}]")
-    claimed = state["experiments"].get(state["claimed"])
-    lines.append(
-        f"Next candidate: {claimed['idea']} — {claimed['stage']}"
-        if claimed
-        else "Next candidate: none"
-    )
-    running = state["experiments"].get(state["running"])
-    if running:
-        lines.append(f"Experiment: {running['idea']} — {running['stage']}")
-        fold = Path(running["directory"]) / "training/fold_0"
-        path = fold / "triplet_accounting.json"
-        if path.exists():
-            ledger = read_json(path)
-            lines.append(
-                f"Training epochs completed: {len(ledger['train'])}/{state['limits']['epochs']}"
+    payload = job["payload"] if isinstance(job["payload"], dict) else {}
+    exp = state["experiments"].get(payload.get("experiment"))
+    detail = exp["idea"] if exp else ""
+    if exp and job["kind"] == "training":
+        fold = Path(exp["directory"]) / "training/fold_0"
+        ledger = fold / "triplet_accounting.json"
+        if ledger.exists():
+            detail += (
+                f", epoch {len(read_json(ledger)['train'])}/{state['limits']['epochs']}"
             )
         metrics = sorted((fold / "epochs").glob("metrics_epoch_*.json"))
         if metrics:
             try:
-                score = read_json(metrics[-1])["macro_auc"]
-                lines.append(f"Latest validation AUC: {score:.6f}")
+                detail += f", val AUC {read_json(metrics[-1])['macro_auc']:.6f}"
             except (OSError, ValueError, KeyError):
                 pass
-    completed = [exp for exp in state["experiments"].values() if exp.get("decision")]
-    accepted = sum(exp["decision"] == "provisional_accept" for exp in completed)
-    lines.append(
-        f"Results: {len(completed)} decided; {accepted} provisionally accepted"
+    text = (
+        detail
+        if detail and job_status == "running"
+        else f"{detail} ({job_status})"
+        if detail
+        else job_status
     )
-    if completed:
-        latest = completed[-1]
-        lines.append(f"Latest decision: {latest['idea']} — {decision_text(latest)}")
-        lines.append(
-            f"  Reference: {latest.get('reference', {}).get('id', 'unavailable')}"
+    elapsed = duration_text(time.time() - job["created_at"])
+    return f"  {job['kind']:<13}{elapsed:>8}  {text}"
+
+
+def result_rows(completed):
+    width = max(len(exp["idea"]) for exp in completed)
+    rows = [f"  {'idea':<{width}}  {'delta':>9}  {'adoption 80% CI':<24}  verdict"]
+    for exp in completed:
+        evidence = exp.get("evidence", {})
+        scores = evidence.get("macro_auc", {})
+        delta = difference(scores.get("candidate"), scores.get("reference"))
+        bounds = (evidence.get("adoption_bootstrap") or {}).get("delta_percentile_80")
+        rows.append(
+            f"  {exp['idea']:<{width}}  {score_text(delta, True):>9}  "
+            f"{interval_text(bounds):<24}  {decision_text(exp)}"
         )
-        lines.append(f"  {metric_line(latest)}")
-    lines.extend(progress_lines(state, supervisor.root, supervisor.output))
-    usage = campaign_usage(state)
-    completion_reporting = usage["completion_reporting"]
-    if completion_reporting:
-        lines.append(
-            "Completion reporting: "
-            f"{completion_reporting.get('reported', 0)} reported; "
-            f"{completion_reporting.get('escalated', 0)} escalated; "
-            f"{completion_reporting.get('orchestrator', 0)} direct to orchestrator; "
-            f"{completion_reporting.get('assigned', 0)} pending"
-        )
-    totals = usage["total"]
-    if totals.get("jobs"):
-        lines.append(
-            f"Agent usage: {totals.get('jobs', 0)} jobs; "
-            f"{totals.get('input', 0) + totals.get('cache_write', 0):,} new input, "
-            f"{totals.get('cache_read', 0):,} cached input, {totals.get('output', 0):,} output tokens"
-        )
-        lines.append(
-            f"Usage coverage: {totals.get('complete_jobs', 0)} complete, "
-            f"{totals.get('partial_jobs', 0)} partial, {totals.get('unavailable_jobs', 0)} unavailable; "
-            f"{totals.get('failed_jobs', 0)} failed jobs included"
-        )
-        if totals.get("cost_known_jobs"):
-            lines.append(
-                f"Recorded API cost equivalent: ${totals['recorded_cost_usd']:.2f} (not subscription quota)"
-            )
-        per_valid = usage["recorded_cost_per_valid_experiment_usd"]
-        if per_valid is not None:
-            coverage = (
-                "complete coverage"
-                if usage["cost_coverage_complete"]
-                else "incomplete coverage"
-            )
-            lines.append(
-                f"Recorded cost per valid experiment: ${per_valid:.2f} ({coverage})"
-            )
-        for name, values in usage["by_role_event"].items():
-            cost = (
-                f"${values['recorded_cost_usd']:.2f}"
-                if values.get("cost_known_jobs")
-                else "cost unavailable"
-            )
-            lines.append(
-                f"  {name}: {values['jobs']} jobs, {cost}, {values.get('output', 0):,} output tokens"
-            )
-    seconds = state["limits"]["max_run_seconds"]
-    lines.append(
-        f"Budget: {seconds // 60}m {seconds % 60:02d}s per experiment; {state['limits']['epochs']} epochs; fold 0"
+    return rows
+
+
+def status_summary(supervisor: Supervisor):
+    current = status(supervisor)
+    supervisor_text = (
+        "supervisor alive" if current["supervisor_alive"] else "supervisor not running"
     )
+    header = (
+        f"{current['campaign']} · {current['provider'] or 'no provider'} · "
+        f"{current['status'].upper()} · {supervisor_text}"
+    )
+    lines = [header]
+    if supervisor.state is None:
+        return "\n".join(lines)
+    state = supervisor.state
+    limits = state["limits"]
+    lines.append(
+        f"Budget {duration_text(limits['max_run_seconds'])} per experiment · "
+        f"{limits['epochs']} epochs · fold 0"
+    )
+    warnings = []
+    if current["reason"]:
+        warnings.append(f"Reason: {current['reason']}")
+    retry_after = state.get("retry_after", 0)
+    if current["status"] == "running" and retry_after > time.time():
+        warnings.append(
+            "Provider wait: no agent jobs until "
+            f"{time.strftime('%Y-%m-%d %H:%M:%S %Z', time.localtime(retry_after))} "
+            f"({duration_text(retry_after - time.time())} left); training and comparison continue."
+        )
+    if (supervisor.output / "stop.json").exists() and current["status"] != "stopped":
+        warnings.append(
+            "Stop requested; waiting for the supervisor to finish stopping."
+        )
+    active = [job for job in state["jobs"].values() if not job["processed"]]
+    queue = state["queue"]
     if (
         current["status"] == "running"
         and not active
         and not queue
         and not state["events"]
     ):
-        lines.append(
+        warnings.append(
             "Idle: backlog exhausted; waiting for a new research direction or resume."
         )
-    lines.append(f"Artifacts: {supervisor.output}")
+    if warnings:
+        lines.extend(["", *warnings])
+
+    lines.extend(["", "Now"])
+    if current["status"] == "calibrating":
+        path = supervisor.output / "baseline/triplet_accounting.json"
+        ledger = read_json(path) if path.exists() else {"train": [], "validation": []}
+        lines.append(
+            f"  calibration  {len(ledger['train'])}/{limits['epochs']} training passes, "
+            f"{len(ledger['validation'])}/2 validation passes (CPU only)"
+        )
+    lines.extend(job_line(job, state) for job in active)
+    if not active:
+        lines.append("  no active jobs")
+
+    backlog = (
+        f"Backlog  {len(queue)} queued (refill below {state['refill_below']}, "
+        f"target {state['refill_to']})"
+    )
+    lines.extend(["", backlog])
+    for index, idea_id in enumerate(queue, 1):
+        idea = state["ideas"][idea_id]
+        lines.append(f"  {index}. {idea_id} [{idea['status']}]")
+    claimed = state["experiments"].get(state["claimed"])
+    lines.append(
+        f"  next candidate: {claimed['idea']} ({claimed['stage']})"
+        if claimed
+        else "  next candidate: none"
+    )
+
+    lines.extend(["", "Score"])
+    lines.extend(
+        f"  {line}"
+        for line in progress_lines(state, supervisor.root, supervisor.output)
+    )
+    completed = [exp for exp in state["experiments"].values() if exp.get("decision")]
+    accepted = sum(exp["decision"] == "provisional_accept" for exp in completed)
+    lines.extend(
+        ["", f"Results  {len(completed)} decided, {accepted} provisionally accepted"]
+    )
+    if completed:
+        lines.extend(result_rows(completed))
+
+    usage = campaign_usage(state)
+    totals = usage["total"]
+    if totals.get("jobs"):
+        lines.extend(["", "Cost (API-equivalent, not subscription quota)"])
+        roles = sorted(
+            usage["by_role_event"].items(),
+            key=lambda item: -(item[1].get("recorded_cost_usd") or 0),
+        )
+        width = max(len(name) for name, _ in roles)
+        for name, values in [*roles, ("total", totals)]:
+            cost = (
+                f"${values['recorded_cost_usd']:.2f}"
+                if values.get("cost_known_jobs")
+                else "n/a"
+            )
+            lines.append(f"  {name:<{width}}  {values['jobs']:>3} jobs  {cost:>8}")
+        per_valid = usage["recorded_cost_per_valid_experiment_usd"]
+        if per_valid is not None:
+            lines.append(
+                f"  {'per valid experiment':<{width}}  {'':>8}  {f'${per_valid:.2f}':>8}"
+            )
+        gaps = {
+            "partial": totals.get("partial_jobs", 0),
+            "unavailable": totals.get("unavailable_jobs", 0),
+            "failed": totals.get("failed_jobs", 0),
+        }
+        if not usage["cost_coverage_complete"] or any(gaps.values()):
+            lines.append(
+                "  usage incomplete: "
+                + ", ".join(f"{count} {name}" for name, count in gaps.items() if count)
+            )
+        lines.append(
+            f"  tokens: {(totals.get('input', 0) + totals.get('cache_write', 0)) / 1e6:.2f}M new input, "
+            f"{totals.get('cache_read', 0) / 1e6:.2f}M cached, "
+            f"{totals.get('output', 0) / 1e6:.2f}M output"
+        )
+        reporting = usage["completion_reporting"]
+        if reporting:
+            counts = {
+                "reported": reporting.get("reported", 0),
+                "escalated": reporting.get("escalated", 0),
+                "direct to orchestrator": reporting.get("orchestrator", 0),
+                "pending": reporting.get("assigned", 0),
+            }
+            lines.append(
+                "  completion reports: "
+                + ", ".join(
+                    f"{count} {name}" for name, count in counts.items() if count
+                )
+            )
+    lines.extend(["", f"Artifacts: {supervisor.output}"])
     return "\n".join(lines)
 
 
@@ -316,7 +364,11 @@ def validate_campaign(supervisor: Supervisor):
     config = recipe.model_dump(mode="json")
     reference = supervisor.root / supervisor.campaign["reference_run"]
     limits = initial_limits(
-        reference, config, supervisor.campaign["reference_equivalences"]
+        reference,
+        config,
+        supervisor.campaign["reference_equivalences"],
+        supervisor.campaign["reference_config_exceptions"],
+        supervisor.campaign["reference_identity_exceptions"],
     )
     validate_config(config, config, supervisor.policy)
     for name in supervisor.policy.editable_files:

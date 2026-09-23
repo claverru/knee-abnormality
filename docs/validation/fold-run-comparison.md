@@ -10,7 +10,9 @@ rtk proxy env CUDA_VISIBLE_DEVICES= POLARS_MAX_THREADS=1 OPENBLAS_NUM_THREADS=1 
 The example compares the `03-min-lr-0.1` candidate with its `00-baseline` control. Add
 `--allowed-input-identity-differences preprocessing_identity` when the runs come from different
 sources. Allowed configuration differences are dotted keys or prefixes (default `name`);
-allowed input-identity differences are top-level keys. Any other difference fails,
+allowed input-identity differences are top-level keys. `--reference-identity-exceptions`
+removes dotted input-identity fields from both runs before the check; autoresearch uses it for
+a campaign's user-authorized reference exceptions. Any other difference fails,
 as do selected predictions that do not reproduce their recorded macro AUC: the
 `prediction_macro_auc` in `selected_checkpoint.json` for runs that predict at another
 multiplier than their epoch validation (×4 since 2026-09-22), otherwise the selected epoch's.
