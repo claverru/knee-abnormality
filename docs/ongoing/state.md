@@ -5,6 +5,13 @@ Active lines of development have their own documents in [this folder](INDEX.md).
 coverage diagnostics live in [data preparation](../data-preparation/peripheral-coverage.md);
 pending experiments are classified in the [backlog](../backlog/INDEX.md).
 
+- **Soft macro AUC logged, 2026-09-23:** validation now also records `val_soft_macro_auc`, a
+  pairwise AUC weighted by the soft targets. It ranked 33 past submissions closer to the public
+  leaderboard than hard macro AUC (168 vs 140 of 213 pairs), and it is used to compare runs and
+  choose submissions. Checkpoint selection stays on `val_macro_auc`: the one paired test, S49
+  (`k_05` epoch 9, 0.944) against S41 (epoch 7, 0.945), is inconclusive
+  ([result](../validation/results/2026-09-23-validation-auc-variants.md)).
+
 - **Stride-16 feature fusion closed, 2026-09-22:** truncation lost 0.0042 fold-0 macro AUC against
   `k_05`; token-sum fusion (+0.0011), deep-branch dropout (−0.0027) and per-scale heads (+0.0006)
   did not clear +0.002. Stride-16 features trade labels rather than add signal; no code was kept

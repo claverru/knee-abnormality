@@ -129,18 +129,20 @@ scripts:
   - id: plot-validation-metrics
     path: scripts/tools/plot_validation_metrics.py
     summary: Plot epoch validation metrics from one or more completed experiment run folders.
-    tags: [plot, validation, metrics, auc, bce, experiments, comparison, runs]
+    tags: [plot, validation, metrics, auc, soft, bce, training, loss, experiments, comparison, runs]
     commands:
       - rtk proxy uv run --locked python -m scripts.tools.plot_validation_metrics baseline0 baseline1 baseline4
       - rtk proxy uv run --locked python -m scripts.tools.plot_validation_metrics outputs/training/baseline0 outputs/training/baseline4 --output outputs/analysis/baselines.png
-    inputs: [Run folders under outputs/training/ containing fold epoch metric JSON files]
-    outputs: [PNG comparison plot of validation macro AUC, gold macro AUC, per-target AUC at the best epoch and soft-target BCE]
+    inputs: [Run folders under outputs/training/ containing fold epoch metric JSON files, per-epoch validation prediction CSVs, logs/version_*/metrics.csv and effective_config.json, Frozen split targets under data/folds and data/raw/train.csv]
+    outputs: [PNG comparison plot with hard, soft and gold macro AUC on the top row and training BCE, validation soft-target BCE and per-target AUC at the best epoch on the bottom row]
     notes:
       - Each run name resolves relative to outputs/training/ unless it is an existing folder path.
       - Runs with several folds produce one line per fold.
       - The per-target panel draws the 12 target AUCs at each series best macro-AUC epoch as grouped bars, with a dashed horizontal line at that epoch macro AUC.
       - Per-target bars start at the 0.05 step below the lowest plotted AUC, stated in the axis label; one or two series also get value labels.
       - Undefined gold macro AUCs appear as gaps; full-validation AUC, BCE and per-target AUCs must be numeric.
+      - Soft macro AUC is recomputed from each epoch's saved predictions against the frozen split targets, so it covers runs trained before it was logged; the run's split must load.
+      - Training BCE is train_loss_epoch from the Lightning CSV logs, as optimized (including class-balance weights); a fold without it fails.
       - The default output is outputs/analysis/validation_metrics.png and is overwritten on every run.
     docs: [docs/validation/plot-validation-metrics.md]
 

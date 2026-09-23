@@ -7,10 +7,13 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import matplotlib
+import polars as pl
 from pydantic import Field
 from pydantic_settings import CliPositionalArg, SettingsError
 
 from knee_abnormality.cli import CLISettings
+from knee_abnormality.data.labels import STUDY, load_split
+from knee_abnormality.evaluation.metrics import soft_aucs
 
 matplotlib.use("Agg")
 from matplotlib import pyplot as plt
@@ -30,7 +33,9 @@ class MetricSeries:
     label: str
     epochs: list[int]
     macro_auc: list[float]
+    soft_macro_auc: list[float]
     gold_macro_auc: list[float]
+    training_bce: list[float]
     soft_target_bce: list[float]
     per_target_auc: list[dict[str, float]]
 
@@ -59,6 +64,51 @@ def metric_files(run: Path) -> Iterable[tuple[str, Path]]:
             raise ValueError(f"No epoch metrics found in {fold}")
         for _, path in sorted(files):
             yield fold.name, path
+
+
+def evaluation_targets(run: Path) -> pl.DataFrame:
+    config = json.loads((run / "effective_config.json").read_text(encoding="utf-8"))
+    split = load_split(
+        ROOT / "data/raw", ROOT / "data/folds" / config["validation"]["split"]
+    )
+    return split.evaluation.join(split.membership.select(STUDY, "fold"), on=STUDY)
+
+
+def soft_macro_aucs(
+    fold: Path, epochs: list[int], targets: pl.DataFrame
+) -> list[float]:
+    index = int(fold.name.removeprefix("fold_"))
+    names = [column for column in targets.columns if column not in (STUDY, "fold")]
+    truth = targets.filter(pl.col("fold") == index).drop("fold").sort(STUDY)
+    values = []
+    for epoch in epochs:
+        path = fold / "epochs" / f"validation_epoch_{epoch:03d}.csv"
+        prediction = pl.read_csv(path).select(STUDY, *names).sort(STUDY)
+        if prediction[STUDY].to_list() != truth[STUDY].to_list():
+            raise ValueError(f"Validation studies differ from the frozen fold: {path}")
+        values.append(
+            soft_aucs(
+                truth.select(names).to_numpy(),
+                prediction.select(names).to_numpy(),
+                names,
+            )["soft_macro_auc"]
+        )
+    return values
+
+
+def training_bce(fold: Path, epochs: list[int]) -> list[float]:
+    by_epoch: dict[int, float] = {}
+    for path in sorted(fold.glob("logs/version_*/metrics.csv")):
+        frame = pl.read_csv(path, infer_schema_length=None)
+        if "train_loss_epoch" not in frame.columns:
+            continue
+        for epoch, loss in (
+            frame.select("epoch", "train_loss_epoch").drop_nulls().iter_rows()
+        ):
+            by_epoch[int(epoch)] = float(loss)
+    if not by_epoch:
+        raise ValueError(f"No epoch training loss logged in {fold}")
+    return [by_epoch.get(epoch, float("nan")) for epoch in epochs]
 
 
 def load_metric_series(run: Path) -> list[MetricSeries]:
@@ -91,20 +141,24 @@ def load_metric_series(run: Path) -> list[MetricSeries]:
         ):
             raise ValueError(f"Invalid metric values in {path}")
         by_fold.setdefault(fold, []).append((int(match.group(1)), metric))
+    targets = evaluation_targets(run)
     series = []
     for fold, records in by_fold.items():
         label = run.name if len(by_fold) == 1 else f"{run.name}/{fold}"
+        epochs = [epoch for epoch, _ in records]
         series.append(
             MetricSeries(
                 label=label,
-                epochs=[epoch for epoch, _ in records],
+                epochs=epochs,
                 macro_auc=[float(metric["macro_auc"]) for _, metric in records],
+                soft_macro_auc=soft_macro_aucs(run / fold, epochs, targets),
                 gold_macro_auc=[
                     float(metric["gold"]["macro_auc"])
                     if metric["gold"]["macro_auc"] is not None
                     else float("nan")
                     for _, metric in records
                 ],
+                training_bce=training_bce(run / fold, epochs),
                 soft_target_bce=[
                     float(metric["soft_target_bce"]) for _, metric in records
                 ],
@@ -180,7 +234,7 @@ def plot_per_target(axis: Axes, series: list[MetricSeries], palette: list[str]) 
 
 
 def plot(series: list[MetricSeries], output: Path) -> None:
-    figure, axes = plt.subplots(2, 2, figsize=(13, 9), constrained_layout=True)
+    figure, axes = plt.subplots(2, 3, figsize=(19, 9), constrained_layout=True)
     cycle = plt.rcParams["axes.prop_cycle"].by_key()["color"]
     palette = [cycle[index % len(cycle)] for index in range(len(series))]
     labels = [
@@ -188,9 +242,16 @@ def plot(series: list[MetricSeries], output: Path) -> None:
         for item in series
     ]
     panels = (
-        (axes[0, 0], "Validation macro AUC", "macro_auc", "ROC-AUC"),
-        (axes[0, 1], "Gold macro AUC", "gold_macro_auc", "ROC-AUC"),
-        (axes[1, 1], "Soft-target BCE", "soft_target_bce", "BCE"),
+        (
+            axes[0, 0],
+            "Validation macro AUC (hard targets at 0.5)",
+            "macro_auc",
+            "ROC-AUC",
+        ),
+        (axes[0, 1], "Validation soft macro AUC", "soft_macro_auc", "Soft ROC-AUC"),
+        (axes[0, 2], "Gold macro AUC", "gold_macro_auc", "ROC-AUC"),
+        (axes[1, 0], "Training BCE (epoch mean, as optimized)", "training_bce", "BCE"),
+        (axes[1, 1], "Validation soft-target BCE", "soft_target_bce", "BCE"),
     )
     for axis, title, attribute, ylabel in panels:
         for item, color, label in zip(series, palette, labels, strict=True):
@@ -205,7 +266,7 @@ def plot(series: list[MetricSeries], output: Path) -> None:
         axis.set_xlabel("Epoch")
         axis.set_ylabel(ylabel)
         axis.grid(alpha=0.3)
-    plot_per_target(axes[1, 0], series, palette)
+    plot_per_target(axes[1, 2], series, palette)
     axes[0, 0].legend(loc="best", fontsize=9)
     output.parent.mkdir(parents=True, exist_ok=True)
     figure.savefig(output, dpi=180)
