@@ -3,8 +3,8 @@
 Three candidate series-cleaning rules, each applied only at prediction time with the incumbent
 checkpoint on the fold-0 studies it touches. Only one rule moves fold 0: keeping a single series per
 same-signature, same-geometry group, at +0.00013 to +0.00015. The contrast relabel and near-empty
-frames are at or below 0.00001. No model was retrained; a model trained with a rule may respond
-differently.
+frames are at or below 0.00001. No model was retrained for these measurements; `k_05`'s recipe
+[retrained with all four rules](#retrained-with-cleaning) moved fold 0 by +0.0003 at ×4.
 
 - **Setup:** `oblique-x4` checkpoint (`best-epoch=09`), fold 0 of `all_5fold_scanner_v1`,
   ×4 images, attention temperature 1, CPU inference.
@@ -77,3 +77,22 @@ contrast. Same-plane series are used only when both contrasts exist in that plan
 The production path reproduces 11 moves, all census mislabels, each moved to the census target slot.
 Scratch evaluation scripts are not kept; the rule's inputs are the census parquets in
 `outputs/analysis/series-filtering-20260917/`.
+
+## Retrained with cleaning
+
+`k05-clean` (2026-09-23) retrains `k_05`'s recipe on the source with all four rules: `configs/k05.yaml`,
+seed 2263738815, fold 0 of `all_5fold_scanner_v1`, combined labels. The loader and inference
+changes made since `b483140` leave the prepared images bit-identical, so the difference from `k_05`
+is the cleaning plus same-seed training divergence.
+
+| Run | Selected epoch | ×1 epoch macro AUC | ×4 τ 1 macro AUC | Public (×4 τ 0.75) |
+|---|---:|---:|---:|---:|
+| `k_05` | 7 | 0.899042 | 0.902469 | 0.945 (S41) |
+| `k05-clean` | 8 | 0.899419 | 0.902760 | 0.942 (S48) |
+
+Fold 0 gains +0.0004 at ×1 and +0.0003 at ×4. The public score drops 0.003, inside the 0.928–0.934
+spread of the same recipe trained four times
+([seed controls](../../inference/submissions/2026-09-17-seed-control-submissions.md)). The rules
+stay: they remove copies, superseded retakes, mislabelled contrast and near-empty frames at almost
+no cost. Artifacts: `outputs/training/k05-clean`, bundle
+`outputs/submission/exports/k05clean-20260923-x4-tau075`.
