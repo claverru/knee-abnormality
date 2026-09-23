@@ -1,5 +1,6 @@
 import hashlib
 import json
+import logging
 import os
 import shutil
 import sys
@@ -343,6 +344,8 @@ def run_fold(
 def main() -> None:
     try:
         args = TrainCLI()
+        for module in (KneeStudyDataset.__module__, predict_loader.__module__):
+            logging.getLogger(module).setLevel(logging.ERROR)
         configure_cuda_allocator()
         config_path = args.config.expanduser().resolve()
         config = load_config(
