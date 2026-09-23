@@ -1,5 +1,30 @@
 # Implementation status
 
+Automatic recovery, 2026-09-23 (user decision): all nine campaign stops so far came from five
+agent reports that broke a runtime rule and four provider errors. A rejected orchestrator or
+developer report now returns to the same role with the error as `previous_rejection`; consecutive
+rejections per event or experiment reset when a report applies, and only the third pauses. A
+rejected completion-reporter report escalates to the orchestrator without pausing. Failed agent
+jobs are classified from Claude's stream-json result or Codex's last error event: overload, 5xx
+and network errors retry the same work item after 60 s, 300 s and 900 s, then pause; a session or
+usage limit (429) sets `retry_after` to the parsed reset (60 minutes if unparseable), during which
+no agent job starts while training and comparison continue, and `status` shows the wait;
+authentication and other failures pause as before. A launched training that exits nonzero before
+completing an epoch records no completion and returns to its developer as the attempt's single
+repair, with the stderr tail as the instruction. The watchdog treats a provider wait as healthy
+and answers a `Report rejected` pause with one plain resume before its repair flow. Gates,
+evaluation, acceptance, accounting, limits, approval binding and seeds are unchanged. Only static
+checks ran; the parser classified the real 2026-09-22 session-limit failure as a limit with the
+retry at 17:51. `oblique-clean` was stopped for the merge with `oblique-group-embedding` trained
+(10/10) and awaiting its comparison, which runs on resume.
+
+Agent models, 2026-09-23 (user decision): [agents.yaml](agents.yaml) moves the Claude
+orchestrator and researcher to Opus 5.5, and the Codex orchestrator, completion reporter and
+watchdog to GPT-6 Sol and GPT-6 Luna; the one-off Codex repair assignment uses GPT-6 Sol at high.
+Developers (Sonnet 5, GPT-5.6 Terra), the Codex researcher (GPT-6 Astra) and the Claude completion
+reporter (Haiku 4.5) are unchanged, as are all efforts. Campaigns seal their profiles at start, so
+retired campaigns keep their recorded models; the watchdog reads the file on each repair.
+
 Shared evaluation on ×4 predictions, 2026-09-22 (user decision): `EVALUATION` in `gates.py`
 now carries `validation.prediction_image_multiplier: 4`. Training still selects the checkpoint
 by ×1 epoch validation, then writes that checkpoint's fold-0 predictions at ×4 and attention

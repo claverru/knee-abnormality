@@ -2,8 +2,9 @@
 
 The optional watchdog checks an existing campaign once a minute using ordinary
 Python. Healthy checks make no model requests. A paused campaign or dead supervisor
-triggers one Codex repair session using the Codex `watchdog` profile in
-[agents.yaml](agents.yaml), GPT-5.6 Luna at medium effort.
+triggers recovery: a plain resume for a rejected-report pause, otherwise one Codex
+repair session using the Codex `watchdog` profile in [agents.yaml](agents.yaml),
+GPT-6 Luna at medium effort.
 The campaign keeps its own research provider; a Claude campaign remains Claude.
 
 Enable monitoring only when operational repairs and resume are authorized:
@@ -25,8 +26,21 @@ campaign stop also ends monitoring and prevents automatic resume.
 
 ## Recovery and limits
 
-When the supervisor is paused, the watcher waits for outstanding jobs to drain.
-For a dead supervisor it waits for owned live workers to exit. It records a compact
+A campaign waiting on `retry_after` for a provider limit or transient provider error
+stays running with a live supervisor, so it is healthy: the watcher records the
+wait time in its state and takes no action. The supervisor retries by itself; see
+[automatic recovery](runtime.md#inspect-stop-and-resume).
+
+A pause whose reason starts with `Report rejected` (the third consecutive rejected
+report for one event or experiment) first gets one plain resume without a repair
+agent. The watcher rechecks the same pause under the control lock, runs the
+existing preflight and requests resume, launching the supervisor only when it is
+not alive; it does not quiesce or wait for jobs to drain. Only if the same
+normalized failure recurs does the repair flow below run. Plain resumes are limited
+to one per normalized failure and three in total, recorded as `resumes` in its state.
+
+Otherwise, when the supervisor is paused, the watcher waits for outstanding jobs
+to drain. For a dead supervisor it waits for owned live workers to exit. It records a compact
 incident, requests a graceful supervisor stop with an ownership marker, and allows
 one repair session of at most fifteen minutes. This gives runtime edits a clean
 process restart and avoids interfering with training. User stop/resume commands

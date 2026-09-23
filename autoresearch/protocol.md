@@ -139,7 +139,10 @@ snapshot, so preparing the next candidate cannot alter a live run.
 6. Training completion triggers numeric evaluation and either restricted factual
    reporting or orchestrator interpretation under the rules below.
    The supervisor records the fixed verdict directly after the report,
-   launches the prepared head when eligible, and repeats from step 3.
+   launches the prepared head when eligible, and repeats from step 3. A launched
+   run that exits nonzero before completing any epoch records no result; the
+   supervisor returns it to its developer as the attempt's single repair, reviewed
+   as usual.
 
 Record a candidate's implementation parent separately from the incumbent used for
 comparison, which is pinned at launch. Preparing during another run may leave it
@@ -174,8 +177,12 @@ in the integration plan, without inventing historical acceptance decisions.
 
 Agents exit when their assignment is complete. They never poll training, sleep
 through a run, or repeatedly invoke tools to discover whether another agent is done.
-Failures produce one event with evidence, not an unlimited retry loop. Recovery
-must identify a concrete cause; quota waits consume no model turns and preserve state.
+Failures produce one event with evidence, not an unlimited retry loop. A rejected
+report returns to the same role with its error until the third consecutive
+rejection pauses; transient provider errors retry three times with backoff; a usage
+limit waits for its reset. Other recovery must identify a concrete cause; quota
+waits consume no model turns and preserve state. See
+[automatic recovery](runtime.md#inspect-stop-and-resume).
 
 ## Backlog and ownership
 
@@ -220,8 +227,9 @@ satisfy this requirement. Evidence-only links belong in precedents, not dependen
 The orchestrator receives `proposal_admission` with dependency
 status and decision from the same gate that checks its response. Unresolved
 proposals stay `proposed` outside both admission and ranking lists, even when they
-would be last in the queue. A rejected report leaves the queue/event intact and
-pauses; resume requests a corrected orchestrator decision with the rejection reason.
+would be last in the queue. A rejected report leaves the queue/event intact; the
+supervisor requests a corrected orchestrator decision with the rejection reason and
+pauses after the third consecutive rejection of the same event.
 Agents share artifact references and compact findings, not complete transcripts.
 The supervisor handles scheduling and mechanical transitions. Unchanged rankings
 are represented by `ranked_ids: null`; a changed ranking contains the complete
@@ -232,7 +240,7 @@ eligible completion call; it does not add a summarizer before every review.
 
 ## Restricted completion reporting
 
-Use Haiku 4.5 with no effort override for Claude and GPT-5.6 Luna at low effort for
+Use Haiku 4.5 with no effort override for Claude and GPT-6 Luna at low effort for
 Codex, as recorded in [agents.yaml](agents.yaml). Eligibility is code-owned:
 
 - The fixed decision is reject or inconclusive, with a recorded clean implementation
@@ -255,9 +263,10 @@ A reported result with no concerns is recorded directly, with queue and incumben
 unchanged. Uncertainty, concerns or changed eligibility sends the original event and
 retained reporter evidence to the full orchestrator. There is at most one reporter
 attempt per completion. Reporter and orchestrator event handling are serialized.
-Quota, process and malformed-report failures keep the existing pause-and-resume
-behavior; the event is marked for the orchestrator on resume. A cancelled reporter
-also leaves its event for the orchestrator. Never launch a retry loop.
+A failed or malformed reporter escalates its event to the orchestrator without
+another reporter attempt. Provider waits apply to that orchestrator call;
+authentication and unclassified failures still pause. A cancelled reporter also
+leaves its event for the orchestrator. Never launch a retry loop.
 
 Record routing reasons, reporter outcome and both calls' usage when escalation
 occurs. Assess savings per valid completed experiment, including failures and

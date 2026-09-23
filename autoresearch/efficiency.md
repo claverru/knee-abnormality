@@ -1,10 +1,11 @@
 # Agent usage and context efficiency
 
 Keep substantive implementation review and scientific interpretation with the
-recorded orchestrator model: Claude Opus 5 at medium for the Claude campaign.
+recorded orchestrator model: Claude Opus 5.5 at medium for the Claude campaign (Opus 5 before
+2026-09-23).
 Repeated information and mechanical work are handled by compact packets and code.
 A restricted completion reporter now replaces eligible routine completion calls:
-Haiku 4.5 without an effort override for Claude, GPT-5.6 Luna at low effort for Codex.
+Haiku 4.5 without an effort override for Claude, GPT-6 Luna at low effort for Codex.
 Implementation review, scientific interpretation and research priorities remain
 with the orchestrator.
 
