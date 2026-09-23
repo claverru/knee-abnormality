@@ -205,6 +205,9 @@ class KneeDataModule(L.LightningDataModule):
             persistent_workers=False,
         )
 
+    def on_after_batch_transfer(self, batch: dict, dataloader_idx: int) -> dict:
+        return with_images(batch)
+
 
 class KneeModule(L.LightningModule):
     def __init__(
@@ -265,9 +268,6 @@ class KneeModule(L.LightningModule):
 
     def forward(self, batch: dict) -> torch.Tensor:
         return self.model(batch)
-
-    def on_after_batch_transfer(self, batch: dict, dataloader_idx: int) -> dict:
-        return with_images(batch)
 
     def on_load_checkpoint(self, checkpoint: dict) -> None:
         self.sampling_epoch = checkpoint_sampling_epoch(checkpoint)
