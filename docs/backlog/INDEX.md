@@ -11,7 +11,6 @@
 | Keeping acquisition types separate through the classifier | [Plane/contrast-specific readouts](small-changes.md#planecontrast-specific-readouts) |
 | Adapting acquisition features before attention selects evidence | [Plane/contrast-specific feature adapters](small-changes.md#planecontrast-specific-feature-adapters) |
 | Planning larger investigations | [Big bets](big-bets.md) |
-| Comparing ReXNet truncation and fusion of stride-16/stride-32 features | [Stride-16 truncation and fusion](big-bets.md#intermediate-stride-16-feature-fusion) |
 | Finding the campaign that owns the former medial/lateral transfer proposals | [Transfer: training-only detector](big-bets.md#medial-and-lateral-disease-transfer-training-only-shared-detector) |
 | Making class weights change during training, judged on the leaderboard | [Adaptive training allocation](big-bets.md#adaptive-training-allocation) |
 | Planning a bounded OA report audit and supervision repair | [OA-only label repair](big-bets.md#oa-only-rubric-aligned-label-repair) |

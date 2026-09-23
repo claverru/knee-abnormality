@@ -405,6 +405,21 @@ scripts:
       - Retained to explain the historical environment verification, not as evidence of MRI pipeline correctness.
     docs: [docs/architecture/environment.md#local-verification]
 
+  - id: diagnose-fusion-branches
+    path: scripts/adhoc/diagnose_fusion_branches.py
+    summary: Historical ablation of a stride-16/stride-32 token-sum fusion checkpoint that zeroes the fine or deep term in held-out validation passes to measure which branch the predictions use.
+    tags: [fusion, stride16, stride32, ablation, diagnosis, branch, fine, deep, encoding, spatial, tokens, validation]
+    status: historical
+    commands: []
+    inputs: [Trained token-sum fusion run's effective config and selected fold checkpoint, Frozen validation fold DICOMs and labels]
+    outputs: [predictions_full.csv, predictions_fine_zeroed.csv, predictions_deep_zeroed.csv, summary.json with per-pass macro/per-label AUC, per-label deltas, branch norm/cosine statistics and wall time, Source snapshot of the script under source/]
+    notes:
+      - Needs the fusion model code, which is not in this tree; it runs only against the sources in outputs/training/fusion-scaleheads/source_snapshot.zip (model.stride16_fusion true, model.fusion_readout token_sum). Invocation there was `python -m scripts.adhoc.diagnose_fusion_branches --run outputs/training/fusion-sum --output-dir <fresh dir>`.
+      - Three production validation passes (full, fine_zeroed, deep_zeroed) at one image multiplier; the full pass must reproduce the run's recorded x4 macro AUC within 1e-6.
+      - Replaces the model instance's _encode_images inside the script only; branch norms and cosine are recorded over visually valid tokens during the full pass.
+      - Produced outputs/analysis/fusion-branches-fusion-sum on 2026-09-22.
+    docs: [docs/validation/results/2026-09-22-stride16-fusion-result.md#branch-ablation]
+
   - id: probe-kaggle-loading
     path: scripts/adhoc/probe_kaggle_loading.py
     summary: Launch one self-contained Kaggle CPU script kernel per proposed loading speedup and collect its throughput and equality audit.

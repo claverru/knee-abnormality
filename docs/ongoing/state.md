@@ -5,13 +5,15 @@ Active lines of development have their own documents in [this folder](INDEX.md).
 coverage diagnostics live in [data preparation](../data-preparation/peripheral-coverage.md);
 pending experiments are classified in the [backlog](../backlog/INDEX.md).
 
+- **Stride-16 feature fusion closed, 2026-09-22:** truncation lost 0.0042 fold-0 macro AUC against
+  `k_05`; token-sum fusion (+0.0011), deep-branch dropout (−0.0027) and per-scale heads (+0.0006)
+  did not clear +0.002. Stride-16 features trade labels rather than add signal; no code was kept
+  ([history](../history/stride16-feature-fusion.md)).
+
 - **Research backlog review, 2026-09-21:** the user accepted
   [AdamP for ReXNet](../backlog/small-changes.md#adamp-for-rexnet) and
   [plane/contrast-specific feature adapters](../backlog/small-changes.md#planecontrast-specific-feature-adapters)
-  as unstarted small changes. Late-stage ReXNet trimming is merged into the existing
-  [stride-16 investigation](../backlog/big-bets.md#intermediate-stride-16-feature-fusion), which
-  compares the current model, stride-16 truncation and stride-16/stride-32 fusion. The
-  terminal-1×1-only proposal was rejected. Implementation and training remain pending.
+  as unstarted small changes. The terminal-1×1-only trimming proposal was rejected.
   Bias-field augmentation, layer-wise
   CoAtNet learning-rate decay, standalone BatchNorm recalibration, ordered within-series
   aggregation and SAM were not selected for the backlog in this review.

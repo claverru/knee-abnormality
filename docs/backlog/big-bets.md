@@ -215,50 +215,6 @@ This entry owns loss selection within each label. The parked
 and study exposure; [static ranking loss](../../autoresearch/campaigns/losses/findings.md#completion-20260920t121537z-5b39b418) remains a separate
 completed comparison.
 
-## Intermediate stride-16 feature fusion
-
-**Hypothesis; external evidence only, unimplemented and untested.** This investigation owns
-both late-stage ReXNet truncation and stride-16/stride-32 fusion, merged by user decision on
-2026-09-21. Compare the following arms in order, with each feature map projected to 256 channels:
-
-| Arm | Features sent to the existing embeddings and MIL | Grid at 224 px | Deep stride-32 stage |
-|---|---|---|---|
-| Current-model control | `P32(F32)` | 7×7 | Retained |
-| Truncation | `P16(F16)` | 14×14 | Removed |
-| Fusion | `P16(F16) + resample_to_F16_anchors(P32(F32))` | 14×14 | Retained |
-
-Truncation tests the accuracy/compute tradeoff of using an earlier representation. Fusion asks
-whether adding the deeper features improves on that earlier output enough to justify their cost.
-The control-to-truncation comparison changes both representation depth and token resolution.
-Input-resolution changes remain in [bigger images](endgame.md#bigger-images).
-
-The [backbone research](../research/backbone-mri-evidence.md#answer) records CheXtransfer's
-evidence for trimming pretrained blocks without a significant chest-X-ray AUC loss. Fusion
-follows [feature pyramid networks](https://arxiv.org/abs/1612.03144), whose evidence is object
-detection. Neither establishes a knee-MRI gain.
-
-- *Cut point:* verify the final stride-16 stage boundary on the instantiated ReXNet. Retain
-  pretrained weights through it and rebuild the projection from its actual channel width.
-  Truncation removes all subsequent bottleneck blocks and the terminal expansion. Removing only
-  the terminal 1×1 expansion is excluded; preserving the 7×7 grid is not a requirement.
-- *Geometry:* verify module, channels, stride and anchor origin; resample fusion features by
-  anchor coordinates rather than generic resizing. Recompute positions and visual validity
-  with the affine and reflection handling (`src/knee_abnormality/modeling/spatial_tokens.py`,
-  [geometry audit](../data-preparation/spatial-token-geometry-and-mapping-audit.md)). The retired
-  crop-selection scout already resampled a stride-32 map at stride-16 anchors
-  ([plan](../history/crop-selection-plan.md)).
-- *Cost:* both candidates use 196 tokens per triplet instead of 49. Measure whether additional
-  projection, embeddings, attention and activations offset the backbone work saved by truncation.
-  A user-launched memory/runtime check comes first; do not silently shrink the batch or change
-  BatchNorm behavior. Record the cut point and model identity in checkpoints and exports.
-- *Comparison:* fresh current-model control, identical labels, split, incumbent seed, optimizer,
-  training budget and attention-head architecture. Keep 224 px, 0.625 mm, the 140 mm field and
-  triplet budgets fixed, with no scout, learned crop or second backbone. Report macro/per-label
-  AUC, paired uncertainty, parameters, training time, memory and full inference time. Parameter
-  savings alone do not establish a runtime gain or preserved AUC.
-- *Order:* after the cheaper [attention and readout changes](small-changes.md#attention-pooling).
-  Implementation and user-launched training remain pending; this is the sole backlog owner.
-
 ## Image-model predictions as a label source
 
 **Hypothesis (evidence from chest X-ray only).** Report extractors share each report's gap from
