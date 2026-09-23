@@ -8,6 +8,7 @@
 | Reviewing crop-selection and learned-zoom experiments | [Crop-selection investigation](crop-selection-investigation.md) |
 | Recovering robust study-center findings and implementation | [Robust study centre](robust-study-centre.md) |
 | Reviewing the closed stride-16 truncation and stride-16/stride-32 fusion line, and recovering its code | [Stride-16 feature fusion](stride16-feature-fusion.md) |
+| Reviewing the superseded 2026-09-19 inference-loading gain ranking and its bit-exact conversion and quantile measurements | [Loading speedup ranked by gain](loading-speedup-ranked-by-gain.md) |
 | Reviewing triplet-budget allocation experiments | [Triplet budget allocation](triplet-budget-allocation.md) |
 | Reading the original crop-selection design | [Crop selection implementation plan](crop-selection-plan.md) |
 | Recovering crop-selection and learned-zoom sources | [Historical crop-selection sources](crop-selection-sources/README.md) |

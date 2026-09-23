@@ -75,7 +75,7 @@ zero-based epoch numbers, so the sigma checkpoint says `epoch=05`.
 
 Archived sources show the same-seed reference predates shared-memory collation, support-limited
 float32 conversion/resampling and the exact quantile partition optimization. These have bounded
-[bit-exact evidence](../../backlog/loading-speedup/ranked-by-gain.md), but full training equivalence
+[bit-exact evidence](../../history/loading-speedup-ranked-by-gain.md), but full training equivalence
 was not established by this comparison. The newer `rexnet-fold0` has identical data/preprocessing
 sources to `balanced-bce`; its model difference is the later inference-only `force_reflection`
 argument, defaulting to false, in addition to the new training-loss plumbing. Neither is an

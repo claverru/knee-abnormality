@@ -127,17 +127,6 @@ the user also declined approach 3 on 2026-09-14. Image-based side inference is d
 request. The [coordinate audit](../metadata/knee-side-coordinate-investigation.md) owns the side
 evidence.
 
-## Medial and lateral disease transfer: training-only shared detector
-
-The original sharing proposals were transferred into the
-[medial/lateral autoresearch campaign](../../autoresearch/campaigns/medial-lateral-transfer/INDEX.md).
-That campaign's history owns attempted mechanisms, findings and dormant proposals;
-this is not a second executable queue. It is stopped on the adopted learned-strength
-baseline. Classifier coupling and the pooled adapter were rejected and removed;
-[their research history](../research/medial-lateral-transfer.md) remains evidence.
-Starting another transfer investigation requires a materially new mechanism and a
-session with the user; do not automatically revive the old training-only detector.
-
 ## Learned acquisition intensity bounds
 
 Hypothesis. Compare a shared predictor with the current fixed percentile clipping. It must receive
@@ -180,48 +169,6 @@ validation bag. The variability may also act as useful augmentation.
   that the [loading speedups](loading-speedup/INDEX.md) rely on.
 - *Stop if* the variability is negligible, the runtime cost is disproportionate, or a controlled
   run gains nothing.
-
-## Per-label loss selection and learned mixtures
-
-**Research completed 2026-09-20; implementation and experiments unstarted.** Exploit the trusted
-external observation that ranking improves ACL while focal works better for MCL. The user wants
-to develop the principle independently of the contact's implementation. The
-[research note](../research/per-label-losses.md) owns the results, primary sources, candidate
-formulas, model fit, pair-coverage calculation and evaluation design.
-
-**Deferred after the 2026-09-20 agenda review.** The shared ranking and focal ingredients have now
-been trained: ranking was inconclusive and focal trended negative
-([ranking record](../../autoresearch/campaigns/losses/findings.md#completion-20260920t121537z-5b39b418),
-[focal record](../../autoresearch/campaigns/losses/findings.md#completion-20260920t124339z-2948d523)).
-These results do not settle per-label selection, but lower its priority below OA repair and the
-new pooling comparisons. Reconsider a bounded frozen-feature screen before a full training program.
-
-1. **Compare independent heads:** cache the current model's per-label pooled features and train
-   balanced soft BCE, focal and ranking classifiers for all twelve labels. Share expensive
-   feature extraction, allow larger ranking pools and repeat classifier seeds. Use current
-   class-balanced BCE as the control.
-2. **Assemble per-label winners:** compare stable selections against the original model and
-   refitted-BCE controls. Selected linear rows preserve inference cost. Retain the current loss
-   when differences are unresolved.
-3. **Evaluate joint continuation:** introduce the selected losses after feature learning,
-   comparing with an equally long current-loss continuation. Check every label because shared
-   features couple their gradients.
-4. **Investigate mixtures:** compare fixed BCE-plus-ranking hybrids with a small per-label
-   bilevel controller, first on frozen features. Nonnegative coefficients sum to one per label;
-   learn them from a fixed tuning objective after virtual training updates, not by minimizing
-   the same weighted training loss. Evaluate warmup, slower coefficient updates and shrinkage
-   toward a common prior only as needed. Noise-aware ranking follows only if diagnostics justify it.
-
-Preserve soft-label semantics explicitly, define loss scales and usable pairs, and separate
-tuning from evaluation according to the research note. Record configuration, revision, parent,
-split/label/feature identities, seeds, coefficients, AUCs and compute. Advance when evidence
-justifies the extra complexity; a failed frozen-head screen does not rule out representation
-gains. Training remains user-launched. Move this entry to ongoing work when experiments start.
-
-This entry owns loss selection within each label. The parked
-[adaptive allocation](#adaptive-training-allocation) proposal concerns weights between targets
-and study exposure; [static ranking loss](../../autoresearch/campaigns/losses/findings.md#completion-20260920t121537z-5b39b418) remains a separate
-completed comparison.
 
 ## Leave-one-scanner-out diagnostic
 
@@ -272,18 +219,17 @@ disagreements.
 1. **Scheduled exponent.** k changes per epoch, balancing early so rare labels are learned and
    relaxing late, e.g. 1 → 0. The reverse direction, deferred re-weighting
    ([Cao et al. 2019](https://arxiv.org/abs/1906.07413)), won in long-tail vision, so the
-   direction is two-sided; run the evidence-motivated 1 → 0 first. Needs epoch-dependent weights
-   in the training loop and resume checks that record the schedule.
+   direction is two-sided; run the evidence-motivated 1 → 0 first. The reverse ramp, 0 → k
+   linearly over the training steps, has the external precedent: progressively balanced sampling
+   was best in Kang et al. (ImageNet-LT 47.2 against 45.1 class-balanced and 46.8 square-root), and
+   LDAM-DRW and BBN beat always-on weighting, all in long from-scratch runs unlike our 10-epoch
+   pretrained fine-tune. Needs epoch-dependent weights in the training loop and resume checks that
+   record the schedule.
 2. **Noise-aware down-weighting.** Reduce the weight of rare-label cells the model confidently
    contradicts over training: [self-paced loss correction](../research/auc_loss_approaches.md#12-self-paced-loss-correction--splc),
    small-loss selection, or bootstrapped targets β·y + (1 − β)·p
    ([Reed et al. 2014](https://arxiv.org/abs/1412.6596)). Aimed at the gold-versus-report
    disagreement; the risk is suppressing genuinely hard positives.
-3. **Per-label task weighting.** One adaptive weight per label from training dynamics:
-   uncertainty weighting ([Kendall et al. 2018](https://arxiv.org/abs/1705.07115)), which
-   down-weights noisy labels, or [GradNorm](https://proceedings.mlr.press/v80/chen18a.html). No
-   knee evidence.
-
 **Excluded.** Meta-learning the weights on the gold studies: 58 studies, gold AUC does not track
 the leaderboard, and gold weighting is ruled out. Study-exposure allocation (visit frequency) was
 dropped from the sampling scope by user decision on 2026-09-21.
@@ -293,6 +239,65 @@ each run at ×4 and τ 0.75 and submit; record fold-0 validation and the nine-ex
 as secondary diagnostics. Three seeds of one earlier model spanned 0.003 public
 ([seed controls](../inference/submissions/2026-09-17-seed-control-submissions.md)). An autoresearch
 campaign under the shared validation ×1 rule cannot judge this line.
+
+## Auxiliary-loss campaign
+
+**Requested by the user on 2026-09-22; undefined and unstarted.** An autoresearch campaign on
+training-only auxiliary objectives added beside the unchanged disease loss. Its premise is a
+hypothesis: no auxiliary objective has trained active in this project. The GPU is free since the
+[oblique line](../history/oblique-groups.md) closed on 2026-09-23.
+
+- **Scope:** extra heads or loss terms on the shared features, discarded at inference, so the
+  submission's runtime does not change. The class-balanced soft BCE, its twelve targets, gold
+  overrides, sampler, budget and evaluation stay fixed. Objectives and coefficients are shared
+  across labels, never selected or weighted per label. Each candidate fixes its coefficient before
+  launch; coefficient sweeps are not ideas.
+- **Seed candidates** (all would transfer to the campaign when it is defined):
+  [report-state prediction](small-changes.md#auxiliary-report-state-prediction) (hypothesis, with
+  a measured judge risk: it teaches reporting behaviour that fold 0 rewards and the leaderboard
+  may not), [OA attributes](#richer-report-supervision-oa-attributes) (premise weakened: agreed
+  severity is already in the targets, moderate confidence) and per-view disease classifiers
+  (below). Acquisition or geometry pretext tasks (plane, contrast, slice position, knee side) are
+  guesses with no measured premise.
+- **Per-view disease classifiers** (guess, low-to-moderate confidence; added 2026-09-23 from the
+  RSNA 2024 lumbar winner's modality-classifier auxiliaries, whose
+  [ablation](https://files.speakerdeck.com/presentations/3a7b5a2c84e14df2a1bce0b41dd609d0/slide_29.jpg)
+  bundles them with other objectives and does not isolate them). For each present plane/contrast
+  type, pool that type's existing tokens into a bag and predict all twelve study labels from it,
+  masking absent types; no view/label subset is selected. The main global head, its attention
+  normalization and anatomical bias stay unchanged; reuse the backbone pass and drop the heads at
+  inference. Average the auxiliary loss over present views so studies with more types gain no
+  extra weight. A positive study label need not be visible in every view, so the auxiliary targets
+  carry noise. [Series dropout](../modeling/current-model.md#architecture) already forces
+  predictions from subsets of views, which may leave little to gain.
+- **Prior evidence:** the [shared-loss campaign](../../autoresearch/campaigns/losses/INDEX.md)
+  replaced the main objective rather than adding one (ranking inconclusive, focal negative). The
+  medial/lateral exclusivity penalty
+  [never became active](../../autoresearch/campaigns/medial-lateral-transfer/prior-work.md#corrected-exclusivity-follow-up)
+  (about 1e-6 against a main loss of 0.47), so every candidate logs each loss component and shows
+  the auxiliary term is active.
+- **To define it:** follow [campaign setup](../../autoresearch/campaign-setup.md) with the
+  incumbent at that time as the reference. Start from the losses campaign's policy (the loss
+  directory, `training/lightning.py`, `config.py`, `trainer.loss`) and add `modeling/model.py`
+  for the heads, plus any label-source access the report-state targets need.
+
+## RadImageNet-pretrained backbone
+
+**Evidence-backed (one external report), untested here; moved from small changes on 2026-09-23 because it needs an off-recipe backbone pair.** Load a RadImageNet-pretrained
+ResNet-50 in place of its ImageNet weights, behind one option naming the pretraining source, and
+compare the two at identical architecture, normalization and recipe. A participant reports that
+going the other way — RadImageNet to ImageNet ResNet-50, same architecture, per-corpus
+normalization corrected — cost them **−0.063**, the largest in-competition number anyone has
+published on medical pretraining ([sweep](../research/public-research.md#the-2026-09-20-re-sweep));
+the public 0.942 stack also carries RadImageNet heads as one of five families. It disagrees with
+the [benchmark ranking](../research/backbone-mri-evidence.md) that put RadImageNet ResNet-50 19th
+and MedDINOv3 25th, which is what makes it worth one measurement rather than an adoption.
+
+Two caveats price the work. RadImageNet publishes ResNet-50, DenseNet-121, InceptionV3 and
+IRV2 only, so neither of our backbones (EfficientNet-B0, ReXNet-200) can take these weights; the
+comparison needs a ResNet-50 pair that is off the current recipe, and a win would then have to be
+re-measured on a backbone we would actually submit. The weights are a third-party download, so
+they need a pinned source, hash and licence check before any run.
 
 ## Parked until a specific need
 
@@ -306,6 +311,8 @@ same architecture's general-image weights. OmniRad-S is an alternative after its
 license metadata is resolved. These require spatial mappings or patch-token adapters; they are
 not hyperparameter-only runs. Hold the current balanced-BCE recipe and data contract fixed,
 compare fresh controls, and record per-label AUC, ensemble contribution, time and memory.
+The [RadImageNet comparison](#radimagenet-pretrained-backbone) is the one medical-pretraining
+measurement with an in-competition claim behind it.
 
 OrthoFoundation-L is the strongest direct 2D knee-pretraining lead; MRI-CORE and the released
 three-plane OrthoDiffusion weights are higher-cost alternatives within this investigation.
@@ -313,38 +320,6 @@ Establish loading, source/competition eligibility and input semantics before all
 The 3D option needs a separate volume pipeline. Existing historical ranks do not settle transfer
 under the current recipe. Training remains user-launched; move this entry to ongoing work if
 implementation or experiments start.
-
-### 3D embedding: training-time effect
-
-**Hypothesis; needs multiple seeds.** The retired additive 3D embedding is ignored at inference:
-replacing it with the `unknown_3d` vector changed fold-0 macro AUC by +0.000037 [−0.00011,
-+0.00017] on the knee-side checkpoint
-([result](../validation/results/2026-09-14-knee-side-embedding-result.md)), and the champion scored
-0.936 publicly both with and without it
-([submission](../inference/submissions/2026-09-15-champion-without-3d-at-inference.md)). Yet the
-champion (with 3D, one training) scored 0.936, above all four no-3D trainings of the same recipe
-(0.928–0.934, mean 0.931, standard deviation about 0.0025;
-[seed controls](../inference/submissions/2026-09-17-seed-control-submissions.md)). The simplest
-explanation is a lucky run; a training-time effect is possible but unproven.
-
-- **Possible mechanisms:** scaffolding (position helps attention and the backbone learn
-  position-aware features early, after which visual features carry the information and 3D is
-  ignored); regularisation (per-study embeddings that flip with reflection change token norms,
-  normalisation statistics and attention temperature); a different random stream (adding a
-  module changes initialisation draws, so a 3D and a no-3D model at the same seed are effectively
-  different seeds, which alone could explain the public gap).
-- **Change:** restore the embedding from the champion's source snapshot
-  (`outputs/training/reflection-sigma40/source_snapshot.zip`) behind a three-way option: real 3D,
-  placebo (same module, every token gets `unknown_3d`, so random-number use and capacity match)
-  and none (today's model).
-- **Test:** three arms × about three seeds (nine runs, about 4.5 hours, one overnight queue). Real
-  versus placebo isolates the information at an equal random stream; placebo versus none isolates
-  the module. Fold 0 probably shows a tie again, so the evidence would come mostly from public
-  scores (three submissions per arm). To check scaffolding directly, save a checkpoint every epoch
-  in the real-3D arm and run the 3D removal on each: removal should hurt early and not at the end;
-  logging the gradient norm reaching the embedding shows the same.
-- **Priority:** low; do it only to settle the question. Seed-to-seed spread (fold 0 0.0032,
-  public up to 0.006) is the context for any result.
 
 ### Study overlap and anatomical matching
 
