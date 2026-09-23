@@ -1,6 +1,6 @@
 # Submission ledger
 
-All 47 Kaggle competition submissions, newest first, with submission times in UTC. The table is
+All 48 Kaggle competition submissions, newest first, with submission times in UTC. The table is
 regenerated from the live submission list and the local bundles by
 [`relabel_kaggle_submission_datasets`](../../../scripts/adhoc/relabel_kaggle_submissions.py),
 which also writes `outputs/submission/kaggle-ledger.json`. The dated records in this folder cover
@@ -45,6 +45,7 @@ comes from the table in the relabel script rather than from the manifest.
 
 | S | Submitted (UTC) | Label | Inference | Fold 0 | Public | ID | Record |
 |---|---|---|---|---|---:|---:|---|
+| S48 | 2026-09-23 07:09 | k05 cleaned source fold0 | x4 tau0.75 bs4 | (x1, scanner split) 0.899419 | 0.942 | 56486378 | [Series cleaning](../../validation/results/2026-09-22-series-cleaning-rules.md#retrained-with-cleaning) |
 | S47 | 2026-09-22 11:29 | oblique groups fold0 | x5 tau0.7 bs4 | (x1, scanner split) 0.897527 | **0.945** | 56463079 | [Oblique groups](../../validation/results/2026-09-22-oblique-groups-result.md) |
 | S46 | 2026-09-22 11:07 | oblique groups fold0 | x4 tau0.75 bs4 | (x1, scanner split) 0.897527 | 0.944 | 56462626 | [Oblique groups](../../validation/results/2026-09-22-oblique-groups-result.md) |
 | S45 | 2026-09-22 07:20 | class-balance exponent k0.75 fold0 | x4 tau0.75 bs4 | (x1, scanner split) 0.901737 | 0.942 | 56457101 | [Class-balance exponent](../../validation/results/2026-09-21-class-balance-exponent.md) |
