@@ -2,8 +2,8 @@ import os
 import shutil
 from pathlib import Path
 
-from knee_abnormality.autoresearch.campaigns import CampaignPolicy
-from knee_abnormality.autoresearch.storage import sha256
+from knee_abnormality.autoresearch.campaign.definition import CampaignPolicy
+from knee_abnormality.autoresearch.runtime.storage import sha256
 
 SOURCE_ROOTS = ("src", "scripts", "configs", "docs", "autoresearch", "labels")
 SOURCE_FILES = ("AGENTS.md", "README.md", "pyproject.toml", "uv.lock", "justfile")

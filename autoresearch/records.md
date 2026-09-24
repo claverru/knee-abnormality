@@ -3,7 +3,7 @@
 Paths in YAML and runtime records are repository-relative unless explicitly absolute.
 Every state update carries a revision and event identifier so a resumed supervisor
 can recognize work already completed. Structured agent report schemas live in
-[models.py](../src/knee_abnormality/autoresearch/models.py); the runtime state and
+[campaign/reports.py](../src/knee_abnormality/autoresearch/campaign/reports.py); the runtime state and
 immutable job artifacts preserve the mechanical transitions and exact evidence.
 Runtime state also stores the sealed campaign policy from `campaign.yaml`; each
 role assignment includes its permissions. A changed definition cannot silently

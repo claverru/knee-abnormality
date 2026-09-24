@@ -5,14 +5,14 @@ import time
 from contextlib import ExitStack
 from pathlib import Path
 
-from knee_abnormality.autoresearch.isolation import environment
-from knee_abnormality.autoresearch.storage import (
+from knee_abnormality.autoresearch.runtime.isolation import environment
+from knee_abnormality.autoresearch.runtime.storage import (
     lock,
     process_identity,
     read_json,
     write_json,
 )
-from knee_abnormality.autoresearch.usage import capture_usage
+from knee_abnormality.autoresearch.runtime.usage import capture_usage
 
 
 def run_job(directory: Path):
@@ -63,7 +63,9 @@ def run_job(directory: Path):
                             },
                         )
                         return
-                    from knee_abnormality.autoresearch.supervisor import gpu_available
+                    from knee_abnormality.autoresearch.supervisor.common import (
+                        gpu_available,
+                    )
 
                     if not gpu_available(spec["gpu"]):
                         write_json(

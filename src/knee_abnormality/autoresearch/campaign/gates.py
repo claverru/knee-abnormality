@@ -3,11 +3,12 @@ import math
 from decimal import Decimal
 from pathlib import Path
 
-from knee_abnormality.autoresearch.campaigns import CampaignPolicy
-from knee_abnormality.autoresearch.storage import read_json, sha256
+from knee_abnormality.autoresearch.campaign.definition import CampaignPolicy
+from knee_abnormality.autoresearch.runtime.storage import read_json, sha256
 
 LOGISTICAL_KEYS = {"name", "seed", "paths.output_root"}
 RUNTIME_FACTOR = 1.15
+CALIBRATION_EPOCHS = 2
 EVALUATION = {
     "labels_source": "combined_v1",
     "validation": {

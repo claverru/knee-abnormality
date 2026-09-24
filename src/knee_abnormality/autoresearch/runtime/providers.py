@@ -6,11 +6,11 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from knee_abnormality.autoresearch.campaigns import CampaignPolicy
-from knee_abnormality.autoresearch.isolation import SOURCE_FILES, sandbox
-from knee_abnormality.autoresearch.models import REPORTS
-from knee_abnormality.autoresearch.storage import read_json, tail, write_json
-from knee_abnormality.autoresearch.usage import capture_usage, events
+from knee_abnormality.autoresearch.campaign.definition import CampaignPolicy
+from knee_abnormality.autoresearch.campaign.reports import REPORTS
+from knee_abnormality.autoresearch.runtime.isolation import SOURCE_FILES, sandbox
+from knee_abnormality.autoresearch.runtime.storage import read_json, tail, write_json
+from knee_abnormality.autoresearch.runtime.usage import capture_usage, events
 
 LIMIT = re.compile(
     r"session limit|usage limit|weekly limit|5-hour limit|hit your limit|rate limit"

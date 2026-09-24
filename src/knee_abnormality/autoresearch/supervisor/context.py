@@ -1,18 +1,18 @@
 import json
 from pathlib import Path
 
-from knee_abnormality.autoresearch.diagnostics import (
-    INTERPRETATION,
-    experiment_diagnostics,
-)
-from knee_abnormality.autoresearch.gates import (
+from knee_abnormality.autoresearch.campaign.gates import (
     active_incumbent_ideas,
     config_differences,
     dependency_blockers,
     flatten,
 )
-from knee_abnormality.autoresearch.models import REPORTS
-from knee_abnormality.autoresearch.storage import read_json, sha256, write_json
+from knee_abnormality.autoresearch.campaign.reports import REPORTS
+from knee_abnormality.autoresearch.runtime.storage import read_json, sha256, write_json
+from knee_abnormality.autoresearch.scoring.diagnostics import (
+    INTERPRETATION,
+    experiment_diagnostics,
+)
 
 
 def select(value, keys):
@@ -254,7 +254,7 @@ def build_context(state, role, assignment, directory, docs, state_path):
             ],
             "reports": history,
             "full_registry": str(docs / "ideas.yaml"),
-            "full_findings": str(docs / "findings.md"),
+            "full_findings": str(Path(state_path).parent / "findings.md"),
             "state": str(state_path),
         },
     )

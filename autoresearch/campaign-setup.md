@@ -26,14 +26,23 @@ permissions using the same runtime.
    every item of a list) that exist in the reference's recorded config or input identity and are
    removed from both sides before the start, sealing and comparison checks. Each needs a user
    authorization and a recorded proof that the removed code never ran. It supplies the fixed epochs, optimizer steps and 115% runtime
-   ceiling; the baseline CPU replay supplies realized triplet counts.
+   ceiling; the baseline CPU replay (two epochs, extrapolated to the schedule) supplies realized triplet counts.
 3. Put actionable proposals in `seed-ideas.yaml` using the
-   [research-report schema](../src/knee_abnormality/autoresearch/models.py). A report
+   [research-report schema](../src/knee_abnormality/autoresearch/campaign/reports.py). A report
    holds at most five ideas; put more in further `seed-ideas-*.yaml` files, which
    startup imports after `seed-ideas.yaml` as separate proposal events. Keep
    `ideas.yaml` as `revision: 0` plus `ideas: []`, and `backlog.yaml` as
    `revision: 0` plus `queue: []`. Create `findings.md` with an explicit no-results
-   status. Startup submits seeds for orchestrator ranking; they are not preapproved.
+   status; the runner later rewrites it as a decision summary and keeps the full
+   orchestrator log in `outputs/autoresearch/<id>/findings.md`.
+   With the default `backlog.seed_order: ranked`, startup submits seeds for
+   orchestrator ranking; they are not preapproved. With `seed_order: forced`,
+   startup queues every seed directly in file order (files as above, ideas in file
+   order), outside the five-entry target. The orchestrator cannot reorder or park
+   them except by blocking a seed at its own review, and the researcher does not
+   run until every seed is completed or blocked; normal refills resume after that.
+   Forced seeds cannot declare dependencies: order a follow-up after its parents
+   instead.
 4. List each file in the campaign's `INDEX.md` and add the directory to the
    [campaign index](campaigns/INDEX.md). Keep campaign work tracking here.
 5. Validate without a provider, model call, GPU work, or training:
@@ -56,7 +65,7 @@ permissions using the same runtime.
 
 ## Declarative policy
 
-The strict [policy schema](../src/knee_abnormality/autoresearch/campaigns.py) rejects
+The strict [policy schema](../src/knee_abnormality/autoresearch/campaign/definition.py) rejects
 unknown fields. All fields below are explicit in the configuration.
 
 | Field | Effect |

@@ -6,7 +6,8 @@ from pathlib import Path
 
 import pytorch_lightning as L
 
-from knee_abnormality.autoresearch.storage import read_json, write_json
+from knee_abnormality.autoresearch.campaign.gates import CALIBRATION_EPOCHS
+from knee_abnormality.autoresearch.runtime.storage import read_json, write_json
 
 
 def digest(value) -> str:
@@ -184,7 +185,7 @@ def calibrate(config_path: Path, destination: Path):
     train_loader = build_data_loader(
         data.train_dataset, config.trainer, config.trainer.batch_size
     )
-    for epoch in range(config.trainer.max_epochs):
+    for epoch in range(min(CALIBRATION_EPOCHS, config.trainer.max_epochs)):
         data.train_dataset.set_epoch(epoch)
         ledger.begin()
         for batch in train_loader:

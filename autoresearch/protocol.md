@@ -43,7 +43,7 @@ changes and generated runtime artifacts are separate from this documentation bou
 
 Every campaign uses one evaluation and one adoption rule. They are defined once in
 code, `EVALUATION` and `ACCEPTANCE_RULE` in
-[`gates.py`](../src/knee_abnormality/autoresearch/gates.py), and described only here.
+[`campaign/gates.py`](../src/knee_abnormality/autoresearch/campaign/gates.py), and described only here.
 Campaign contracts link to this section instead of restating it and cannot override
 it. Changing either is a user decision that applies to all campaigns at once.
 
@@ -58,6 +58,9 @@ it. Changing either is a user decision that applies to all campaigns at once.
 - **Enforcement:** configuration gates reject any recipe whose split, folds, label
   source, validation multiplier or prediction multiplier differs; the seal takes the
   bootstrap settings from the same definition.
+- **Soft AUC (diagnostic):** each comparison also records soft macro and per-label
+  AUC (pairs weighted by the soft targets) as point estimates, shown in results and
+  given to the orchestrator. It does not enter the adoption rule.
 
 Campaigns sealed under an earlier evaluation cannot resume. Triplet-sampling,
 losses and medial-lateral-transfer were sealed on `all_5fold_v3` with Steven v4
@@ -110,7 +113,18 @@ attempts keep their historical seed and evaluation record; no completed experime
 is relabeled as matched. Genuine checkpoint resumes retain the original run seed.
 The bootstrap seed is independent and unchanged. Matched seeds reduce one source
 of comparison noise; they do not guarantee deterministic training or measure
-robustness across training seeds. No automatic control rerun is required.
+robustness across training seeds.
+
+**Control retrain on adoption (since 2026-09-24).** An adopted run is the best of the
+candidates tried against it, so its own seed luck would count against every later
+candidate. After a `provisional_accept`, the supervisor draws a fresh random seed
+once (never searched or chosen by score), retrains the adopted source with it under
+the same limits and gates, and makes that run the incumbent reference; later
+candidates use its seed. No candidate trains until the control finishes. A failed
+control pauses the campaign, and resume retrains it. This mirrors the
+[project rule](../docs/validation/validation-strategy.md#controlled-comparisons) for
+adoptions merged into main, and it is a re-seeded control, not a confirmation run:
+the adoption decision stands.
 
 ## Event-driven operation
 
@@ -211,7 +225,9 @@ Accepting and ranking proposals is serialized against the live queue and stops a
 surplus proposals remain in the idea registry outside the queue.
 Do not pad the backlog with weak variants;
 an incomplete refill records why and awaits new evidence or a changed search direction
-instead of immediately spawning itself again.
+instead of immediately spawning itself again. Resuming a campaign does not by itself
+start a refill; only new evidence does. With forced seeds, no refill starts until
+every seed is completed or blocked.
 
 The researcher returns proposals and priority recommendations; the developer returns
 implementation evidence and is the only experiment-code writer. Neither edits docs,

@@ -2,8 +2,8 @@ import json
 from collections import Counter, defaultdict
 from pathlib import Path
 
-from knee_abnormality.autoresearch.models import REPORTS
-from knee_abnormality.autoresearch.storage import read_json, write_json
+from knee_abnormality.autoresearch.campaign.reports import REPORTS
+from knee_abnormality.autoresearch.runtime.storage import read_json, write_json
 
 TOKEN_FIELDS = ("input", "cache_write", "cache_read", "output", "thinking")
 USAGE_ERRORS = (OSError, ValueError, KeyError, TypeError, AttributeError)
