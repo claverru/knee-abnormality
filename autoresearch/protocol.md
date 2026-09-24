@@ -318,8 +318,7 @@ failed calls. Distinguish complete, partial and unavailable usage. `status` prov
 a summary and `usage` provides role/event and experiment-level JSON. Measure cost
 per valid completed experiment alongside missed issues, repairs and research quality;
 API cost equivalents are not subscription-quota percentages. Do not tune the harness recursively during a
-campaign. If Terra has a concrete implementation blocker, the
-orchestrator may assign one bounded Sol/high repair; subsequent work returns to Terra.
+campaign.
 
 The evidence-handling and fixed acceptance boundary draw on
 [SoL-Pi, sections 2.1–2.4](https://arxiv.org/pdf/2609.20519).

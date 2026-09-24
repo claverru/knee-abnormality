@@ -381,7 +381,7 @@ class Supervisor:
         self.launch_worker(self.state["jobs"][job_id])
         return job_id, directory
 
-    def role(self, role, source: Path, context, *, payload=None, repair=False):
+    def role(self, role, source: Path, context, *, payload=None):
         if role != "completion_reporter":
             context = {
                 **context,
@@ -395,8 +395,6 @@ class Supervisor:
                 dict(event["completion_reporting"])
             )
         profile = dict(self.state["profiles"][self.state["provider"]][role])
-        if repair and self.state["provider"] == "codex":
-            profile = {"model": "gpt-6-sol", "effort": "high"}
         command = providers.invocation(
             self.state["provider"],
             role,
@@ -1700,7 +1698,6 @@ class Supervisor:
                     "completion": self.policy.developer_instructions,
                 },
                 payload={"experiment": claimed["id"]},
-                repair=bool(claimed["repair_count"]),
             )
         if (
             len(self.state["queue"]) < self.state["refill_below"]
