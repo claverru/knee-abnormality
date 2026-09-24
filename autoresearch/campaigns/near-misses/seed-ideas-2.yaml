@@ -1,0 +1,135 @@
+ideas:
+- id: side-normalized-3d-position
+  mechanism_id: side-normalized-3d-token-position
+  parent_idea_id: null
+  title: Replace the 1D and 2D position embeddings with one side-normalized 3D patient-position encoding per token
+  opportunity: >-
+    Tokens carry slice position within their series (1D) and pixel position (2D); neither says
+    where the token is in the knee consistently across series. The related token-attention run
+    lost -0.0015 overall but raised menisci (+0.0027) and OA (+0.0035); its losses (PF OA and
+    Fracture about -0.015, MCL -0.006) are the labels a re-seed also moves, and it changed an
+    attention block at the same time. Never run; parked in knee-geometry because of the fallback
+    contract.
+  mechanism: >-
+    For every token, q = (knee_side_sign * (p_x - c_x), p_y - c_y, p_z - c_z) in mm, with p the
+    token's own patient position from the patient maps (per token, not per slice) and c the knee
+    centre (per-knee for bilateral studies). Encode q with fixed 3D sine features (wavelengths
+    about 8 to 512 mm) and a small MLP, and add it to the token in place of position_1d and
+    position_2d, which are removed. Unknown side keeps y and z and uses a learned x vector;
+    untrusted geometry uses a learned unknown-position vector. Under reflection q is unchanged
+    (x and side both flip), and reflection TTA must give identical q.
+  precedents:
+  - 'side-normalized-3d-position (knee-geometry, never run): autoresearch/campaigns/knee-geometry/ideas.yaml'
+  - 'token-attention run with 3D RoPE on raw coordinates: outputs/training/token-attention; docs/validation/results/2026-09-23-side-mask-and-token-attention.md'
+  - 'study-anchored-through-plane-position logged zero active studies because it required one frame-of-reference UID across series; every accepted study fit has several. Do not use that gate.'
+  - 'claverru/RSNA-lumbar fed side-normalized world coordinates and slice normals as meta inputs.'
+  novelty: The replacement alone, without an attention change, on consistent per-knee coordinates.
+  coverage: All labels, through every token's position.
+  exploitation: '#13 adds slice orientation to it.'
+  budget: A small MLP replaces two embeddings; negligible runtime.
+  implementation: modeling/spatial_tokens.py and model.py under model.position_encoding; record the change in SPATIAL_TOKEN_IDENTITY. Log how many studies and tokens use each branch (full, unknown side, unknown position) per epoch.
+  open_choices: Wavelength range fixed from knee extent before launch; no sweep.
+  dependencies: []
+  priority_rationale: A user hypothesis whose only test was confounded.
+- id: pf-oa-front-back-bias
+  mechanism_id: pf-oa-anterior-anatomical-bias
+  parent_idea_id: null
+  title: Pull PF OA attention toward the front of the knee with the adopted anatomical bias mechanism on the front-back axis
+  opportunity: >-
+    PF OA is the weakest label (0.852 on the re-seeded control). In the spatial importance map it
+    has the strongest front-back contrast of any label (+1.85 anterior). The adopted medial-lateral
+    anatomical bias (fixed 20 mm width, learned strength) gained +0.0023 when adopted. The retired
+    attention prior learned position and width for every label from a nearly flat start and
+    barely moved, a different design.
+  mechanism: >-
+    For the PF OA attention row only, add s * tanh(a / 20) to the attention scores, where a is the
+    token's anterior distance in mm from the knee centre along patient y (positive toward the
+    front) and s is a learned strength initialized to zero, mirroring the adopted medial-lateral
+    bias. Other labels and rows are unchanged. Tokens without trusted geometry get no bias.
+  precedents:
+  - 'Adopted learned anatomical strength: autoresearch/anatomical-attention.md'
+  - 'Spatial importance map: docs/data-preparation/peripheral-coverage.md#spatial-importance-map'
+  - 'Retired attention prior: docs/validation/results/2026-09-15-attention-prior-result.md'
+  novelty: First anatomical bias on the front-back axis, for the label that the map places most clearly.
+  coverage: PF OA only (OA family rule).
+  exploitation: Its region can serve #8's patellofemoral readout.
+  budget: One scalar; no runtime change.
+  implementation: modeling/model.py under model.oa_readout; log the learned strength per epoch.
+  open_choices: The 20 mm width copies the adopted bias; no sweep.
+  dependencies: []
+  priority_rationale: Targets the weakest label with a mechanism that has worked once.
+- id: three-compartment-oa-detector
+  mechanism_id: shared-oa-detector-across-compartments
+  parent_idea_id: null
+  title: One cartilage-degeneration detector shared across the medial, lateral and patellofemoral compartments, each with its own readout
+  opportunity: >-
+    Medial, lateral and patellofemoral OA are the same disease in three places. The lumbar
+    solution shared one head per condition across five spinal levels. PF OA (0.852) would learn
+    from the more frequent tibiofemoral cases. Three OA readouts on the adopted model came out
+    flat, but none shared evidence across compartments.
+  mechanism: >-
+    A training-and-inference detector d(t) = v . t shared by the three OA labels. Each label pools
+    d over its compartment region - the medial half, the lateral half (both with the 10 mm band as
+    in the half-knee loss) and the anterior region (front of the knee centre, as in #7) - with a
+    smooth-max, and adds it to its existing logit through a zero-initialized per-label scale.
+    Existing OA attention and readouts are otherwise unchanged. Tokens without trusted geometry
+    contribute to no region.
+  precedents:
+  - 'claverru/RSNA-lumbar: one head per condition shared across levels.'
+  - 'oa-own-half-readout-supervision, oa-own-half-feature-dispersion (knee-geometry, flat): per-compartment OA readouts without sharing.'
+  novelty: First OA readout that shares evidence across compartments, including PF.
+  coverage: The OA family (Medial, Lateral, PF OA).
+  exploitation: If PF OA gains, the detector can later take a training-only form.
+  budget: One linear detector and three scalars; negligible runtime.
+  implementation: modeling/model.py under model.oa_readout; log the three learned scales and region token counts.
+  open_choices: The region split reuses the 10 mm band and the knee centre; no sweep.
+  dependencies: []
+  priority_rationale: Directly aimed at PF OA with the lumbar solution's strongest sharing trick.
+- id: attention-token-dropout-random
+  mechanism_id: attention-token-dropout
+  parent_idea_id: null
+  title: During training, drop a few random valid tokens from each label's attention softmax
+  opportunity: >-
+    Attention may collapse onto a few tokens. ACMIL supports stochastic token masking in
+    histopathology MIL; there is no project evidence. The random arm is the control for #10.
+  mechanism: >-
+    After attention scoring and anatomical bias, exclude a random subset of valid tokens from each
+    study-label softmax and renormalize, training only. Always keep at least one valid token per
+    study-label pair inside the meniscus own-side mask. Evaluation, the backbone pass, image
+    budget, anatomical bias and series dropout are unchanged.
+  precedents:
+  - 'Spec: docs/backlog/small-changes.md#attention-token-dropout'
+  - 'ACMIL, https://arxiv.org/abs/2311.07125'
+  novelty: Token-level masking inside retained acquisitions, unlike series dropout.
+  coverage: All labels.
+  exploitation: '#10 tests whether targeting the highest-attention tokens beats random masking.'
+  budget: No parameters; negligible runtime.
+  implementation: modeling/model.py under model.token_dropout; fix a conservative rate and cap before implementation, no sweep; log masked counts per epoch.
+  open_choices: The rate and cap are fixed before launch.
+  dependencies: []
+  priority_rationale: Label-agnostic and cheap; needed as the control for #10.
+- id: attention-token-dropout-top
+  mechanism_id: attention-token-dropout
+  parent_idea_id: null
+  title: 'Follow-up to #9: drop the same number of tokens, drawn from the highest-attention ones'
+  opportunity: >-
+    If attention-challenging masking helps, it should beat random masking with the same count;
+    otherwise any gain is just noise injection.
+  mechanism: >-
+    As #9, but the masked tokens are drawn from the top of each study-label attention
+    distribution, with the same number removed per study-label as #9. Keep at least one valid
+    token inside the meniscus own-side mask.
+  precedents:
+  - 'Spec: docs/backlog/small-changes.md#attention-token-dropout'
+  - 'Code of this campaign''s attention-token-dropout-random experiment.'
+  novelty: The attention-challenging arm of the ACMIL idea.
+  coverage: All labels.
+  exploitation: Kept only if it beats #9.
+  budget: No parameters; negligible runtime.
+  implementation: modeling/model.py under model.token_dropout, reusing #9's code with a mode switch fixed on.
+  open_choices: None beyond #9's fixed rate and cap.
+  dependencies: []
+  priority_rationale: The informative arm; interpretable only next to #9.
+exhausted_directions: >-
+  A learned-position attention prior for every label, study-anchored depth gated on a shared
+  frame-of-reference UID, and forcing OA evidence apart without shared context.
