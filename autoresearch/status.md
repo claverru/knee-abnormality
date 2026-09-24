@@ -1,5 +1,14 @@
 # Implementation status
 
+Knee-geometry campaign stopped, 2026-09-24 (user decision): 18 decisions, one adoption,
+`meniscus-half-knee-mil` (fitted midline, meniscus-only side mask, training-only half-knee loss;
++0.00307 fold 0, 0.944 public as S54). The last run, `meniscus-core-band-contrast-readout`, trained
+but was not compared. The user adopted the model on main, added the robust centre and bilateral
+knee geometry outside the rule, and retrained the control at a fresh seed
+([findings](campaigns/knee-geometry/findings.md), [contract](campaigns/knee-geometry/contract.md)).
+The first launch was restarted after calibration to make `inference/engine.py` editable: the final
+×4 prediction moves only `MODEL_BATCH_KEYS` to the GPU. The watchdog is stopped.
+
 Noisy-labels campaign stopped, 2026-09-23 (user decision): six experiments decided, none adopted
 (see [findings](campaigns/noisy-labels/findings.md)). The user retired two queued memory-based
 ideas mid-campaign, then imported the schedule plus early-learning combination (rejected, −0.0003).
