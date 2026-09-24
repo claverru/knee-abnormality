@@ -7,7 +7,11 @@ from functools import lru_cache
 
 import numpy as np
 
-from knee_abnormality.data.preprocessing.geometry import image_center, valid_pose
+from knee_abnormality.data.preprocessing.geometry import (
+    RELIABILITY,
+    image_center,
+    valid_pose,
+)
 
 UNKNOWN, LEFT, RIGHT = 0, 1, 2
 SIDE_NAMES = ("unknown", "left", "right")
@@ -287,6 +291,36 @@ def resolve_knee_side(series: tuple[tuple[str, SeriesSide], ...]) -> KneeSide:
         tuple(sorted({name for _, value in ordered for name in value.manufacturers})),
         tuple(sorted({name for _, value in ordered for name in value.models})),
     )
+
+
+def split_knee_geometry(
+    series: tuple[tuple[str, SeriesSide], ...],
+) -> tuple[dict[str, int], bool, frozenset[str]]:
+    limit = RELIABILITY["bilateral_minimum_abs_center_x_mm"]
+    groups = {
+        uid: (
+            1 if value.center_x_mm > limit else -1 if value.center_x_mm < -limit else 0
+        )
+        for uid, value in series
+        if value.center_x_mm is not None
+    }
+    positive = sum(group == 1 for group in groups.values())
+    negative = sum(group == -1 for group in groups.values())
+    minimum = RELIABILITY["bilateral_minimum_series_each_side"]
+    bilateral = positive >= minimum and negative >= minimum
+    if bilateral:
+        return groups, True, frozenset()
+    dominant = (
+        1
+        if positive >= minimum and negative == 1
+        else -1
+        if negative >= minimum and positive == 1
+        else 0
+    )
+    strays = frozenset(
+        uid for uid, group in groups.items() if dominant and group == -dominant
+    )
+    return groups, False, strays
 
 
 def side_record(study_uid: str, side: KneeSide) -> dict:

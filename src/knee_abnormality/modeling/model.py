@@ -339,8 +339,8 @@ class KneeAbnormalityModel(nn.Module):
                 (prepared_xy.float(), torch.ones_like(prepared_xy[..., :1])), -1
             )
             patient_x = torch.einsum("nj,nkj->nk", middle_map[:, 0], homogeneous)
-            side = batch["knee_side_sign"][token_study].float()
-            center = batch["knee_center_x_mm"][token_study].float()
+            side = batch["knee_side_sign"][keep_series][acquisition_index].float()
+            center = batch["knee_center_x_mm"][keep_series][acquisition_index].float()
             valid_geometry = batch["geometry_valid"].flatten()[flat_indices]
             valid_geometry = valid_geometry & torch.isfinite(middle_map).all((-1, -2))
             medial_axis = torch.where(

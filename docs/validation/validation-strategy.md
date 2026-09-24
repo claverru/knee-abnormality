@@ -33,7 +33,12 @@ rerun is required for each experiment.
 
 Change one factor against a matched control, and predefine the principal comparison and
 checkpoint rule; never search seeds for an apparent improvement. **Candidates use the
-current incumbent's recorded training seed.** Adopt a valid implementation only when
+current incumbent's recorded training seed.** When an adoption is merged into the recipe on
+main, draw a fresh seed once (never searched or chosen by score), set it in
+`configs/training.yaml` and retrain the new control with it, so the recipe is not tuned to one
+seed; later candidates use that control's seed. The seed alone is worth several thousandths: the
+adopted knee-geometry model scored 0.905834 at seed 2263738815 and 0.899547 at 638120755 with the
+same code, −0.0063 (95% [−0.0108, −0.0023]), mostly on labels the change does not touch. Adopt a valid implementation only when
 macro gain >= 0.001 and the central 80% paired-report-group bootstrap lower bound
 is strictly positive; otherwise discard it. Keep the 95% interval as diagnostic
 evidence. No automatic confirmation branches or control reruns follow a result.

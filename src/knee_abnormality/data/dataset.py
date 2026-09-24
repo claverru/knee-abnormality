@@ -22,6 +22,7 @@ from knee_abnormality.data.preprocessing.laterality import (
     RIGHT,
     KneeSide,
     resolve_knee_side,
+    split_knee_geometry,
 )
 from knee_abnormality.data.preprocessing.preparation import (
     PreparedSeries,
@@ -32,6 +33,8 @@ from knee_abnormality.data.preprocessing.sampling import (
     build_pool,
     select_triplets,
     study_budgets,
+    usable_local_order,
+    valid_runs,
 )
 from knee_abnormality.data.preprocessing.series import IndexedSeries, index_series
 from knee_abnormality.data.sources import SeriesCandidate, StudySeries
@@ -63,6 +66,7 @@ class KneeStudyDataset(Dataset):
         self._slice_index: dict[Path, IndexedSeries] = {}
         self._study_references: dict[str, StudyReference] = {}
         self._study_sides: dict[str, KneeSide] = {}
+        self._series_geometry: dict[str, dict[str, tuple[float, float, bool]]] = {}
         self._excluded_series: dict[str, frozenset[str]] = {}
         self._cleaned_studies: dict[str, StudySeries] = {}
         missing = set(studies[STUDY].to_list()) - set(series_index)
@@ -121,13 +125,69 @@ class KneeStudyDataset(Dataset):
         eligible = tuple(
             (uid, plane, value.geometry)
             for uid, (value, plane) in indexed.items()
-            if uid not in excluded and len(value.records) >= SLICES_PER_INPUT
+            if uid not in excluded
+            and usable_local_order(value)
+            and all(record.relative_position_mm is not None for record in value.records)
+            and valid_runs(value.records, set())
         )
+        eligible_uids = frozenset(uid for uid, _, _ in eligible)
         self._excluded_series[study.uid] = excluded
-        self._study_references[study.uid] = estimate_reference(eligible)
-        self._study_sides[study.uid] = resolve_knee_side(
-            tuple((uid, value.side) for uid, (value, _) in indexed.items())
+        sides = tuple((uid, indexed[uid][0].side) for uid in sorted(eligible_uids))
+        groups, bilateral, strays = split_knee_geometry(sides)
+        fluid_uids = frozenset(
+            candidate.uid
+            for slot, values in enumerate(study.slots)
+            if self.data.series_types[slot].plane == "Sagittal"
+            and self.data.series_types[slot].fluid_sensitive == 1
+            for candidate in values
         )
+        reference = estimate_reference(
+            tuple(item for item in eligible if item[0] not in strays),
+            not bilateral,
+            fluid_uids,
+        )
+        self._study_references[study.uid] = reference
+        side = resolve_knee_side(tuple(item for item in sides if item[0] not in strays))
+        self._study_sides[study.uid] = side
+        knee_references = (
+            {
+                group: estimate_reference(
+                    tuple(item for item in eligible if groups.get(item[0]) == group),
+                    True,
+                    fluid_uids,
+                )
+                for group in (-1, 1)
+            }
+            if bilateral
+            else {}
+        )
+        series_geometry = {}
+        for uid in indexed:
+            if uid not in eligible_uids:
+                series_geometry[uid] = (0.0, 0.0, False)
+                continue
+            group = groups.get(uid, 0)
+            own_reference = knee_references.get(group) if bilateral else reference
+            if uid in strays or (bilateral and group == 0):
+                series_geometry[uid] = (0.0, 0.0, False)
+                continue
+            own_side = {1: LEFT, -1: RIGHT}.get(group, 0) if bilateral else side.value
+            sign = {LEFT: -1.0, RIGHT: 1.0}.get(own_side, 0.0)
+            fitted = (
+                own_reference.point[0]
+                if own_reference is not None and own_reference.point is not None
+                else None
+            )
+            center = fitted if fitted is not None else side.center_x_mm
+            valid = bool(
+                sign
+                and center is not None
+                and own_reference is not None
+                and own_reference.point is not None
+                and own_reference.method in {"fit", "robust"}
+            )
+            series_geometry[uid] = (sign if valid else 0.0, center or 0.0, valid)
+        self._series_geometry[study.uid] = series_geometry
         self._cleaned_studies[study.uid] = study
         return study
 
@@ -146,7 +206,7 @@ class KneeStudyDataset(Dataset):
         )
 
     def _try_prepare_candidate(
-        self, candidate, selected, cache, failures, physical, plane
+        self, candidate, selected, cache, failures, physical, plane, study_uid
     ):
         try:
             value = self._prepare_candidate(selected, cache)
@@ -155,16 +215,21 @@ class KneeStudyDataset(Dataset):
             eligible, reason = reflection_eligibility(geometry, plane)
             if not bool(value.geometry_valid.all()):
                 eligible, reason = False, "invalid_selected_pose"
+            sign, center, valid = self._series_geometry[study_uid].get(
+                candidate.uid, (0.0, 0.0, False)
+            )
             return replace(
                 value,
                 uid=candidate.uid,
                 geometry_valid=value.geometry_valid
                 & geometry.native_poses_valid
                 & (geometry.reason is None)
-                & physical,
+                & valid,
                 sampling_path="physical" if physical else "local",
                 reflection_eligible=eligible,
                 reflection_reason=reason,
+                knee_side_sign=sign,
+                knee_center_x_mm=center,
             )
         except PREPARATION_ERRORS as error:
             failures.append(f"{candidate.uid}: {type(error).__name__}: {error}")
@@ -232,6 +297,7 @@ class KneeStudyDataset(Dataset):
                     failures,
                     pool.physical,
                     kind.plane,
+                    study.uid,
                 )
                 if value is None:
                     new_sources.add(uid)
@@ -343,6 +409,8 @@ def collate_studies(items: list[dict]) -> dict:
     valid_rects = torch.zeros((len(entries), max_slices, SLICES_PER_INPUT, 4))
     patient_maps = torch.zeros((len(entries), max_slices, SLICES_PER_INPUT, 3, 3))
     geometry_valid = torch.zeros((len(entries), max_slices), dtype=torch.bool)
+    knee_side_sign = torch.zeros(len(entries), dtype=torch.float32)
+    knee_center_x_mm = torch.zeros(len(entries), dtype=torch.float32)
     reflection_eligible = torch.ones(batch_size, dtype=torch.bool)
     for index, item in enumerate(items):
         supplied = [
@@ -388,21 +456,11 @@ def collate_studies(items: list[dict]) -> dict:
         valid_rects[series_index, :count] = series.valid_rects
         patient_maps[series_index, :count] = series.patient_maps
         geometry_valid[series_index, :count] = series.geometry_valid
+        knee_side_sign[series_index] = series.knee_side_sign
+        knee_center_x_mm[series_index] = series.knee_center_x_mm
         slice_mask[series_index, :count] = True
         study_indices[series_index] = study_index
         type_indices[series_index] = type_index
-    knee_centers = []
-    for item in items:
-        median = item["knee_side"].center_x_mm
-        reference = item["study_reference"]
-        fitted = (
-            reference.point[0]
-            if reference is not None and reference.point is not None
-            else None
-        )
-        knee_centers.append(
-            fitted if median is not None and fitted is not None else (median or 0.0)
-        )
     return {
         "study_uid": [item["study_uid"] for item in items],
         "is_gold": torch.tensor([item["is_gold"] for item in items], dtype=torch.bool),
@@ -416,19 +474,8 @@ def collate_studies(items: list[dict]) -> dict:
         "valid_rects": valid_rects,
         "patient_maps": patient_maps,
         "geometry_valid": geometry_valid,
-        "knee_side_sign": torch.tensor(
-            [
-                {LEFT: -1.0, RIGHT: 1.0}.get(item["knee_side"].value, 0.0)
-                if item["knee_side"].center_x_mm is not None
-                else 0.0
-                for item in items
-            ],
-            dtype=torch.float32,
-        ),
-        "knee_center_x_mm": torch.tensor(
-            knee_centers,
-            dtype=torch.float32,
-        ),
+        "knee_side_sign": knee_side_sign,
+        "knee_center_x_mm": knee_center_x_mm,
         "knee_side_reasons": [item["knee_side"].reason for item in items],
         "reflection_eligible": reflection_eligible,
         "reflection_reasons": [item["reflection_reasons"] for item in items],

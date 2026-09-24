@@ -13,6 +13,12 @@ pending experiments are classified in the [backlog](../backlog/INDEX.md).
   ([current model](../modeling/current-model.md)). The campaign stopped after 18 decisions with no
   second adoption.
 
+- **New control with a fresh seed, 2026-09-24:** the adopted model plus the robust study centre and
+  per-knee geometry for bilateral studies, retrained at seed 638120755 as `knee-geometry-merged-2`:
+  ×4 0.900955, public 0.940 (S55). Each adoption now draws a fresh seed
+  ([rule](../validation/validation-strategy.md#controlled-comparisons)); the seed alone moved the
+  adopted model by −0.0063 on fold 0.
+
 - **Soft macro AUC logged, 2026-09-23:** validation now also records `val_soft_macro_auc`, a
   pairwise AUC weighted by the soft targets. It ranked 33 past submissions closer to the public
   leaderboard than hard macro AUC (168 vs 140 of 213 pairs), and it is used to compare runs and

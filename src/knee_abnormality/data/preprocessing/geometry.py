@@ -9,7 +9,14 @@ RELIABILITY = {
     "maximum_condition": 1e3,
     "maximum_rms_mm": 10.0,
     "maximum_residual_mm": 20.0,
-    "fitted_midline": "validated_study_reference_x_replaces_series_median",
+    "robust_outlier_mm": 10.0,
+    "robust_center": "rejected_fit_drop_worst_then_sagittal_fluid_then_sagittal_any",
+    "geometry_valid": "native_pose_independent_of_sampling_path",
+    "midline": "fitted_or_refitted_center_x_sagittal_fallback_sampling_only",
+    "bilateral_minimum_series_each_side": 2,
+    "bilateral_minimum_abs_center_x_mm": 40.0,
+    "geometry_source_eligibility": "cleaned_source_with_trustworthy_local_order_and_complete_triplet_run",
+    "bilateral_stray": "sampled_without_anatomical_geometry",
 }
 
 
@@ -50,6 +57,7 @@ class StudyReference:
     residuals_mm: tuple[tuple[str, float], ...]
     frame_uids: tuple[str, ...]
     reason: str | None
+    method: str = "fit"
 
 
 def reflection_eligibility(geometry: SeriesGeometry, plane: str) -> tuple[bool, str]:
@@ -220,6 +228,8 @@ def fit_center(
 
 def estimate_reference(
     series: tuple[tuple[str, str, SeriesGeometry], ...],
+    robust: bool = False,
+    fluid_uids: frozenset[str] = frozenset(),
 ) -> StudyReference:
     usable = sorted(
         (uid, plane, geometry)
@@ -239,6 +249,58 @@ def estimate_reference(
         > RELIABILITY["maximum_residual_mm"]
     ):
         reason = "excessive_residual"
+    if reason is not None and robust:
+        retained = usable.copy()
+        while len(retained) >= 2:
+            refit_reason, refit_point, refit_condition, refit_rms, refit_residuals = (
+                fit_center(retained)
+            )
+            if refit_reason is not None:
+                break
+            worst = max(refit_residuals, key=lambda item: (item[1], item[0]))
+            if worst[1] <= RELIABILITY["robust_outlier_mm"]:
+                if refit_rms <= RELIABILITY["maximum_rms_mm"]:
+                    return StudyReference(
+                        tuple(refit_point),
+                        tuple(uid for uid, _, _ in retained),
+                        refit_condition,
+                        refit_rms,
+                        refit_residuals,
+                        frames,
+                        None,
+                        "robust",
+                    )
+                break
+            retained = [item for item in retained if item[0] != worst[0]]
+        for candidates, method in (
+            (
+                [
+                    geometry.center
+                    for uid, plane, geometry in usable
+                    if plane == "Sagittal" and uid in fluid_uids
+                ],
+                "sagittal_fluid",
+            ),
+            (
+                [
+                    geometry.center
+                    for _, plane, geometry in usable
+                    if plane == "Sagittal"
+                ],
+                "sagittal",
+            ),
+        ):
+            if candidates:
+                return StudyReference(
+                    tuple(np.mean(candidates, axis=0)),
+                    contributors,
+                    condition,
+                    rms,
+                    residuals,
+                    frames,
+                    None,
+                    method,
+                )
     return StudyReference(
         tuple(point) if reason is None else None,
         contributors,
@@ -248,3 +310,19 @@ def estimate_reference(
         frames,
         reason,
     )
+
+
+def within_acquired_range(
+    geometry: SeriesGeometry, point: tuple[float, float, float]
+) -> bool:
+    if (
+        geometry.reason is not None
+        or geometry.bounds is None
+        or geometry.normal is None
+    ):
+        return False
+    normal = np.asarray(geometry.normal, dtype=float)
+    normal /= np.linalg.norm(normal)
+    lower, upper = sorted(geometry.bounds)
+    projection = float(np.dot(point, normal))
+    return lower <= projection <= upper
