@@ -18,6 +18,11 @@ Adopted 2026-09-24 from the [knee-geometry campaign](../../autoresearch/campaign
 (`meniscus-half-knee-mil`): ×4 macro 0.905834 against `k05-clean`'s 0.902760, +0.00307, 80%
 [+0.00152, +0.00476]; public 0.944 (S54) against 0.942 (S48).
 
+The current control, `knee-geometry-merged-2` (2026-09-24), adds the robust centre and bilateral
+rule below and draws a fresh seed, 638120755: ×4 macro 0.900955, public 0.940 (S55). At that seed
+the robust centre and bilateral rule measured +0.0014 (95% [−0.0022, +0.0053]) against the same
+model without them (`adopted-new-seed`, 0.899547).
+
 There is no additive 3D embedding or token graph. The best submitted bundle is distinct
 from the local research incumbent; submission status lives in
 [project state](../ongoing/state.md) and the [inference overview](../inference/inference-overview.md).
@@ -123,8 +128,23 @@ other backbone mapping fails explicitly. Grid dimensions may vary independently.
 Patient-coordinate geometry supplies the anatomical bias, not another additive embedding.
 The audited side resolver uses DICOM laterality and conservative coordinate consensus;
 unknown side and invalid geometry contribute zero bias. The medial axis is knee-side sign
-(-1 left, +1 right) times patient LPS X minus the midline: the fitted study centre's X
-(`estimate_reference`), or the median series-centre X when the fit is rejected. The middle-slice patient map
+(-1 left, +1 right) times patient LPS X minus the fitted centre's X (`estimate_reference`).
+On 20 studies where axial or axial+coronal medians of series x disagree with it by more than
+5 mm, the fitted x was closest to the intercondylar notch in 16 (median error 1.0 mm, against
+2.9 mm for the axial median; `outputs/analysis/midline-notch-marks-20260924/result.md`).
+Side and centre are carried per series:
+
+- **Robust centre:** a rejected fit is refitted after dropping the worst series above 10 mm,
+  then falls back to the sagittal fluid slab centre, then any sagittal series. The sagittal
+  fallbacks only steer sampling: as a midline they sit a median 13–23 mm from the fitted
+  centre, so those studies get no anatomical geometry (never triggered in training data;
+  `outputs/analysis/sagittal-fallback-midline-20260924/`). A robust centre outside a series'
+  acquired range samples that series locally. Token geometry no longer
+  requires physical sampling.
+- **Bilateral studies:** at least two series beyond +40 mm and two beyond −40 mm in X mark two
+  knees; each knee gets its own fitted centre and its side from the sign of X (+X is patient
+  left). A single series on the other side is a stray: it is still sampled but has no geometry.
+- Geometry sources are cleaned series with trustworthy local order and a complete triplet run. The middle-slice patient map
 and inverse augmentation locate each token. Reflection keeps coordinates consistent.
 
 - **Geometry output:** `feature_geometry` returns `(xy, visual_valid, prepared_xy)`.
