@@ -123,6 +123,7 @@ scripts:
       - Refuses unready bundles, existing record paths and overlapping notebook runs.
       - Takes one --label of 2 to 45 characters, counts the existing competition submissions and builds the sequence number, the shared dataset and notebook title "S<nn> <label>" and the unified submission description from the bundle manifest. A 52-character notebook title failed SaveKernel with HTTP 400 on 2026-09-15, so the label bound keeps every title inside 50 characters.
       - The description is the only text Kaggle keeps for a submission and cannot be edited afterwards, so the label has to be right before launching.
+      - The count only sees submissions already on Kaggle, so a submission launched while another is still running would reuse its number; pass --sequence to set it explicitly.
       - Records each remote response before advancing; notebook failure or invalid submission.csv prevents competition submission.
       - Records timestamped stage transitions in history and prints them for detached runner logs; queue and scoring intervals include polling delay.
       - Downloads and validates the saved notebook output before submitting that exact notebook version, then records available status and scores.

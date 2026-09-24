@@ -176,7 +176,7 @@ scripts:
     outputs: [Detached user systemd service for start, JSON status and stage durations, Runner log excerpt or explicit live follow]
     notes:
       - Start verifies bundle hashes and readiness without local inference, then returns after systemd accepts the service; execution and submission remain in scripts.pipeline.submit.
-      - Start requires --label and passes it through; the sequence number, titles and submission description are built in scripts.pipeline.submit and reported by status.
+      - Start requires --label and passes it and an optional --sequence through; the sequence number, titles and submission description are built in scripts.pipeline.submit and reported by status.
       - Requires Linux user systemd for start and the current project environment; quotes arguments through subprocess arrays and rejects existing records or logs.
       - Status and logs also read older manually launched runners using the matching record-stem-runner.log convention.
       - Logs return the last 60 lines by default; only explicit --follow waits for more output. Stage durations include polling delay and are not official hidden-test execution time.

@@ -36,6 +36,7 @@ class SubmitCLI(CLISettings):
     record: Path
     competition: str = "rsna-knee-abnormality-detection"
     label: str
+    sequence: int | None = Field(default=None, gt=0)
     dataset_license: str = "other"
     accelerator: str = "NvidiaTeslaT4"
     notebook_timeout_seconds: int = Field(default=32400, gt=0, le=32400)
@@ -282,7 +283,7 @@ def submit(args: SubmitCLI) -> dict:
     api = KaggleApi()
     try:
         api.authenticate()
-        sequence = _submission_sequence(api, args.competition)
+        sequence = args.sequence or _submission_sequence(api, args.competition)
         title = f"S{sequence:02d} {label}"
         description = submission_description(
             sequence,
