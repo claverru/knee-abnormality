@@ -177,20 +177,13 @@ with the final bundle.
   `ImageType`, no repeated slice position and no spacing gap
   ([audit data](../metadata/repeated-series.md#detection)).
 
-## Distillation
-
-**Distilling an ensemble into one fast model** (hypothesis; no speedup or score measured). Train a
-single model on the ensemble's predictions, so that inference costs one model. The idea recurs in
-the [unverified notes](../modeling/unverified-modeling-notes.md#loss-and-ensemble-diversity) and
-the [runtime leads](../inference/runtime-evidence-and-leads.md#runtime-leads).
-
 ## Out-of-fold self-distillation
 
 **Train a second five-fold round on targets blended with the first round's out-of-fold
 predictions** (filed 2026-09-21; first test 2026-09-23, a public tie). Every non-gold training cell
 becomes `0.7 · label + 0.3 · teacher`, where the teacher is that study's out-of-fold prediction. Gold
-labels and the evaluation targets stay unblended. The aim is robustness to report-label noise; speed
-is the [distillation](#distillation) entry above.
+labels and the evaluation targets stay unblended. The aim is robustness to report-label noise; the
+same option also serves speed (*Speed* below).
 
 - *First test ([result](../validation/results/2026-09-23-image-blend-labels-result.md)):* one
   fold-0 child at 0.5/0.5, with the on-hand teacher described below. It gave:
@@ -242,3 +235,9 @@ is the [distillation](#distillation) entry above.
   ([supervision](../modeling/supervision.md#downstream-benefit-changed-over-time)).
 - *Cost:* a training option that blends a predictions table into the targets, then a second
   five-fold round; the fold-0 gate is five runs.
+- *Speed (hypothesis; no speedup or score measured):* the same blending option distills the
+  ensemble into one fast model, so that inference costs one model. Point the teacher at the full
+  ensemble's predictions, raise the teacher weight, and train one full-data student, possibly on a
+  smaller backbone. The idea recurs in the
+  [unverified notes](../modeling/unverified-modeling-notes.md#loss-and-ensemble-diversity) and the
+  [runtime leads](../inference/runtime-evidence-and-leads.md#runtime-leads).
