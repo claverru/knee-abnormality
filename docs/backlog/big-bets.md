@@ -240,6 +240,36 @@ they need a pinned source, hash and licence check before any run.
 
 ## Parked until a specific need
 
+### Fused study volume and 3D model
+
+**Hypothesis; prototype fusion measured on one study, value on the metric unmeasured (2026-09-23).**
+Fuse a study's 2D stacks into one volume on a shared patient-coordinate grid and train a 3D model
+on it: one fused fluid volume, one volume per contrast as channels, or each series resampled onto
+the grid as its own channel with missing-series masks. A one-study prototype (study
+`…26592250`, three GE 4 mm fluid stacks) registered each stack rigidly on the GPU by exhaustive
+±8 mm translation search plus refinement, then fused with a super-resolution solve on a 0.8 mm
+grid. Header placement was already correct within the 1.4 mm loop-closure precision, so no motion
+correction was needed there; the fused volume streaks where 3–4 mm slices leave gaps and loses the
+native in-plane detail. Costs on the 3090: about 26 s per registered pair unoptimised and 3–4 s
+per fusion.
+
+Evidence against the main benefit: cross-series 3D position, through the additive 3D embedding and
+the token graph, was worth about 0 and was removed
+([champion without 3D](../inference/submissions/2026-09-15-champion-without-3d-at-inference.md)).
+A 3D network also gives up most of the 2D ImageNet pretraining; the realistic encoders reuse 2D
+weights (inflated kernels, a 2D encoder with 3D aggregation, or the
+[knee-specific 3D lead](../research/huggingface-image-encoders.md#knee-specific-3d-lead)). Fusion
+adds preparation time that counts toward the efficiency prize. The
+[volumetric CNN brief](../research/volumetric-cnns.md#6-volume-construction-and-geometry) proposes
+the other route first: one native-plane volume per acquisition, fused at the feature level,
+without registration or a study cube. This entry is the fused-cube alternative.
+
+- **First gate, no training:** score the frozen incumbent on fold 0 with triplets resliced from
+  header-placed fused volumes instead of native slices. A large drop means fusion loses what the
+  model uses and a 3D model would start handicapped; about an hour of GPU for 905 studies.
+- **Most plausible use:** a deliberately different member of the final ensemble, which belongs to
+  the [endgame](endgame.md).
+
 ### External pretrained image encoders
 
 **Survey completed 2026-09-20; implementation and training unstarted.** The

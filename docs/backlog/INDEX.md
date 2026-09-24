@@ -15,6 +15,7 @@
 | Using report-derived OA severity attributes for training-only image supervision | [Richer report supervision](big-bets.md#richer-report-supervision-oa-attributes) |
 | Comparing RadImageNet with ImageNet weights on a ResNet-50 pair | [RadImageNet backbone](big-bets.md#radimagenet-pretrained-backbone) |
 | Filling empty sagittal/coronal fluid slots with reformats (MPR) of a study's 3D DESS or 3D PD FS series | [Reformatted fluid planes](big-bets.md#reformatted-fluid-planes-from-3d-series) |
+| Fusing a study's 2D stacks into one registered volume for a 3D model, and its frozen-model reslice gate | [Fused study volume](big-bets.md#fused-study-volume-and-3d-model) |
 | Finding inference loading investigations and candidates | [Loading speedup](loading-speedup/INDEX.md) |
 | Finding tooling and code-structure changes that leave training behavior unchanged | [Refactors](refactors/INDEX.md) |
 | Planning final-phase experiments | [Endgame](endgame.md) |
