@@ -24,13 +24,17 @@ from knee_abnormality.data.dataset import KneeStudyDataset, build_data_loader
 from knee_abnormality.data.labels import FoldLabels, load_fold_labels
 from knee_abnormality.data.preprocessing.device import with_images
 from knee_abnormality.data.sources import build_series_index
-from knee_abnormality.evaluation.metrics import validation_metrics
+from knee_abnormality.evaluation.metrics import COMPARTMENT_PAIRS, validation_metrics
 from knee_abnormality.evaluation.predictions import make_prediction_frame
 from knee_abnormality.identity import preprocessing_identity
-from knee_abnormality.modeling.model import KneeAbnormalityModel
+from knee_abnormality.modeling.model import (
+    COMPARTMENT_MIDLINE_BAND_MM,
+    KneeAbnormalityModel,
+)
 from knee_abnormality.training.checkpoints import checkpoint_sampling_epoch
 
 PRECISION = "bf16-mixed"
+HALF_KNEE_TEMPERATURE = 1.0
 
 
 def build_optimizer(model: KneeAbnormalityModel, settings: OptimizerConfig) -> AdamW:
@@ -124,6 +128,56 @@ def masked_binary_cross_entropy_with_logits(
         )
         losses = losses * weights
     return losses[observed].mean()
+
+
+def half_knee_mil_loss(
+    model: KneeAbnormalityModel,
+    encoded: dict,
+    batch: dict,
+    meniscus_indices: tuple[int, int],
+    class_balance_weights: torch.Tensor | None,
+) -> tuple[torch.Tensor, int]:
+    axis = encoded["medial_axis"].float()
+    selected = encoded["visual_valid"] & (axis.abs() > COMPARTMENT_MIDLINE_BAND_MM)
+    token_index = selected.flatten().nonzero(as_tuple=True)[0]
+    if token_index.numel() == 0:
+        return encoded["features"].sum() * 0, 0
+    study = encoded["study"][:, None].expand_as(selected).flatten()[token_index]
+    half = (axis.flatten()[token_index] < 0).long()
+    group = study * 2 + half
+    group_count = 2 * encoded["batch_size"]
+    tokens = model.half_knee_tokens(encoded)[token_index]
+    with torch.autocast(device_type=axis.device.type, enabled=False):
+        logits = model.half_knee_detector(tokens.float())
+        values = logits.squeeze(-1).float()
+        peak = torch.full((group_count,), -torch.inf, device=axis.device)
+        peak.scatter_reduce_(0, group, values, reduce="amax", include_self=True)
+        counts = torch.zeros(group_count, device=axis.device)
+        counts.scatter_add_(0, group, torch.ones_like(values))
+        present = counts > 0
+        safe_peak = torch.where(present, peak, 0)
+        total = torch.zeros(group_count, device=axis.device)
+        total.scatter_add_(
+            0, group, ((values - safe_peak[group]) / HALF_KNEE_TEMPERATURE).exp()
+        )
+        scores = (
+            safe_peak
+            + HALF_KNEE_TEMPERATURE
+            * (total.clamp_min(1e-20) / counts.clamp_min(1)).log()
+        )
+        scores = scores.view(-1, 2)
+        observed = batch["target_observed"][:, list(meniscus_indices)]
+        used = present.view(-1, 2).all(-1) & observed.all(-1)
+        if not used.any():
+            return values.sum() * 0, 0
+        targets = batch["target"][:, list(meniscus_indices)][used].float()
+        losses = F.binary_cross_entropy_with_logits(
+            scores[used], targets, reduction="none"
+        )
+        if class_balance_weights is not None:
+            weights = class_balance_weights[:, list(meniscus_indices)]
+            losses = losses * torch.where(targets >= 0.5, weights[0], weights[1])
+        return losses.mean(), int(used.sum())
 
 
 class KneeDataModule(L.LightningDataModule):
@@ -242,6 +296,9 @@ class KneeModule(L.LightningModule):
         self.model = KneeAbnormalityModel(
             config.model, config.data, targets, load_pretrained=load_pretrained
         )
+        self.meniscus_indices = tuple(
+            targets.index(name) for name in COMPARTMENT_PAIRS["meniscus"]
+        )
         self.weight_averaging = config.optimizer.weight_averaging
         self._last_averaged_step = -1
         self.batch_norm_refresh_seconds = 0.0
@@ -323,14 +380,45 @@ class KneeModule(L.LightningModule):
                 on_epoch=True,
                 batch_size=1,
             )
+        self.log(
+            "half_knee_detector_norm",
+            self.model.half_knee_detector.weight.detach().float().norm(),
+            on_step=False,
+            on_epoch=True,
+            batch_size=1,
+        )
 
     def training_step(self, batch: dict, batch_index: int) -> torch.Tensor:
-        logits = self(batch).to(torch.float32)
+        encoded = self.model.encode_batch(batch)
+        logits = self.model.pool_encoded(encoded).to(torch.float32)
         loss = masked_binary_cross_entropy_with_logits(
             logits,
             batch["target"],
             batch["target_observed"],
             self.class_balance_weights if self.class_balance is not None else None,
+        )
+        auxiliary, used_studies = half_knee_mil_loss(
+            self.model,
+            encoded,
+            batch,
+            self.meniscus_indices,
+            self.class_balance_weights if self.class_balance is not None else None,
+        )
+        loss = loss + self.config.trainer.half_knee_loss_weight * auxiliary
+        self.log(
+            "half_knee_loss",
+            auxiliary,
+            on_step=False,
+            on_epoch=True,
+            batch_size=len(batch["study_uid"]),
+        )
+        self.log(
+            "half_knee_used_studies",
+            used_studies,
+            on_step=False,
+            on_epoch=True,
+            reduce_fx="sum",
+            batch_size=1,
         )
         self.log(
             "train_loss",

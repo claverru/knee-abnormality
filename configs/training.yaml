@@ -80,3 +80,4 @@ trainer:
   deterministic: false
   class_balanced_bce: true
   class_balance_exponent: 0.5
+  half_knee_loss_weight: 0.075

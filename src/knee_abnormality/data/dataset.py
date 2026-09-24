@@ -391,6 +391,18 @@ def collate_studies(items: list[dict]) -> dict:
         slice_mask[series_index, :count] = True
         study_indices[series_index] = study_index
         type_indices[series_index] = type_index
+    knee_centers = []
+    for item in items:
+        median = item["knee_side"].center_x_mm
+        reference = item["study_reference"]
+        fitted = (
+            reference.point[0]
+            if reference is not None and reference.point is not None
+            else None
+        )
+        knee_centers.append(
+            fitted if median is not None and fitted is not None else (median or 0.0)
+        )
     return {
         "study_uid": [item["study_uid"] for item in items],
         "is_gold": torch.tensor([item["is_gold"] for item in items], dtype=torch.bool),
@@ -414,7 +426,7 @@ def collate_studies(items: list[dict]) -> dict:
             dtype=torch.float32,
         ),
         "knee_center_x_mm": torch.tensor(
-            [item["knee_side"].center_x_mm or 0.0 for item in items],
+            knee_centers,
             dtype=torch.float32,
         ),
         "knee_side_reasons": [item["knee_side"].reason for item in items],

@@ -57,6 +57,7 @@ SPATIAL_TOKEN_IDENTITY = {
     "preparation": "rounded_resampling_half_pixel_crop_v1",
     "augmentation": "kornia_normalized_affine_align_corners_false_v1",
     "aggregation": "layernorm_target_attention_256_128_12",
+    "meniscus_half_knee": "own_side_attention_excludes_opposite_tokens_beyond_10mm_training_shared_float32_smooth_max",
 }
 
 

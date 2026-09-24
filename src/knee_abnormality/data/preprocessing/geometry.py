@@ -9,6 +9,7 @@ RELIABILITY = {
     "maximum_condition": 1e3,
     "maximum_rms_mm": 10.0,
     "maximum_residual_mm": 20.0,
+    "fitted_midline": "validated_study_reference_x_replaces_series_median",
 }
 
 

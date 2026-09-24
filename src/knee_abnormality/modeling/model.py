@@ -28,6 +28,7 @@ from knee_abnormality.modeling.spatial_tokens import (
 PROJECTION_WIDTH = 256
 MIL_ATTENTION_WIDTH = 128
 READOUT_WIDTH = 32
+COMPARTMENT_MIDLINE_BAND_MM = 10.0
 
 
 def sinusoidal_positions(
@@ -123,6 +124,14 @@ class KneeAbnormalityModel(nn.Module):
         self.register_buffer(
             "compartment_families", compartment_families, persistent=False
         )
+        meniscus_mask_signs = torch.zeros(target_count)
+        for target in COMPARTMENT_PAIRS["meniscus"]:
+            meniscus_mask_signs[targets.index(target)] = compartment_signs[
+                targets.index(target)
+            ]
+        self.register_buffer(
+            "meniscus_mask_signs", meniscus_mask_signs, persistent=False
+        )
         self.anatomical_log_strength = nn.Parameter(torch.zeros(len(COMPARTMENT_PAIRS)))
         self.attention = nn.Sequential(
             nn.Linear(PROJECTION_WIDTH, MIL_ATTENTION_WIDTH),
@@ -152,6 +161,8 @@ class KneeAbnormalityModel(nn.Module):
             self.readout_out_bias = nn.Parameter(torch.zeros(target_count))
         self.head = nn.Linear(PROJECTION_WIDTH, target_count)
         self.spatial_tokens = SpatialTokens(PROJECTION_WIDTH, data.series_types)
+        with torch.random.fork_rng(devices=[]):
+            self.half_knee_detector = nn.Linear(PROJECTION_WIDTH, 1)
         self.train(self.training)
 
     def train(self, mode: bool = True) -> "KneeAbnormalityModel":
@@ -238,11 +249,17 @@ class KneeAbnormalityModel(nn.Module):
         ) & token_valid[None]
         if not membership.any(-1).all():
             raise ValueError("A study has no visually valid spatial tokens")
+        mask_signs = self.meniscus_mask_signs[:, None]
+        own_side = (mask_signs == 0) | (
+            mask_signs * medial_axis.float()[None] > -COMPARTMENT_MIDLINE_BAND_MM
+        )
+        restricted = membership[:, None] & own_side[None]
+        allowed = torch.where(
+            restricted.any(-1, keepdim=True), restricted, membership[:, None]
+        )
         with torch.autocast(device_type=tokens.device.type, enabled=False):
             attention = scores.float().unsqueeze(0).expand(batch_size, -1, -1)
-            attention = attention.masked_fill(~membership[:, None], -torch.inf).softmax(
-                -1
-            )
+            attention = attention.masked_fill(~allowed, -torch.inf).softmax(-1)
             pooled = torch.einsum("btn,nf->btf", attention, values.float())
             logits = (pooled * self.head.weight.float()[None]).sum(
                 -1
@@ -354,6 +371,9 @@ class KneeAbnormalityModel(nn.Module):
         ).flatten(0, 1)
         tokens = self.mil_norm(tokens)
         return tokens, tokens
+
+    def half_knee_tokens(self, encoded: dict) -> torch.Tensor:
+        return self._pooling_tokens(encoded)[0]
 
     def pool_encoded(self, encoded: dict) -> torch.Tensor:
         tokens, values = self._pooling_tokens(encoded)

@@ -1,0 +1,206 @@
+ideas:
+- id: geometry-bundle
+  mechanism_id: robust-centre-bilateral-split-fitted-midline
+  parent_idea_id: null
+  title: Give every study a centre, split bilateral studies into two knees, and draw the medial-lateral midline at the fitted centre's x
+  opportunity: >-
+    Three measured geometry errors decide which tokens count as medial or lateral. About 3% of
+    studies (30 of 905 on fold 0) have a rejected centre, so their tokens get no anatomical bias.
+    The midline is the median series x, which differs from the fitted centre's x by more than 5 mm
+    in 12.5% of studies because sagittal slabs sit off-centre; the fit's x is the one measured
+    against the notch (1.1 +/- 1.3 mm). Seven bilateral studies get one side for both knees. Each
+    fix touches few studies and is likely below +0.001 alone, and every later mechanism of this
+    campaign reads this geometry.
+  mechanism: >-
+    (1) Robust centre: when estimate_reference rejects a study, refit dropping the worst series
+    above 10 mm residual until none remain, then fall back to the sagittal fluid slab centre, then
+    any sagittal series; token geometry_valid no longer requires physical sampling. (2) Bilateral
+    rule: a study with at least two series at X > +40 mm and at least two at X < -40 mm is two
+    knees; split its series by the sign of X, fit a centre per knee, take each knee's side from the
+    sign of X (+X is patient left in LPS), and give every token the centre and side of its own
+    knee. A single series on the other side is a stray: it stays in sampling but its tokens get
+    invalid geometry. (3) Midline: medial_mm uses the fitted centre's x instead of the median
+    series x. Unknown side still gives no bias.
+  precedents:
+  - 'outputs/analysis/robust-center-rescore-20260923/robust_center.patch: robust refit and fallback, applies to d914079; inference gate +0.0001, bias alone +0.00009 [80% +0.00003, +0.00015].'
+  - 'outputs/analysis/midline-vs-centre-20260923/result.md: midline vs fitted x, median 1.55 mm, p95 8.6 mm, 12.5% above 5 mm; worst cases are off-centre sagittal slabs.'
+  - 'docs/research/series-filtering-signals.md#contralateral-knee: seven bilateral studies, X sign separates the knees.'
+  novelty: >-
+    The robust centre was measured only at inference, before the bias depended on it at training
+    time; per-knee geometry for bilateral studies and the fitted-x midline are new.
+  coverage: >-
+    Rescued centres about 3%, bilateral about 0.16%, midline moved by more than 5 mm about 12.5%
+    of studies; all labels through sampling, the compartment labels through the bias.
+  exploitation: >-
+    Every later geometry idea builds on it. If rejected, the per-stratum diagnostic decides which
+    components are re-proposed as a smaller combination.
+  budget: Header arithmetic at preparation; no measurable runtime change.
+  implementation: >-
+    Adds to geometry.py (robust refit, per-knee fit), laterality.py (bilateral split, per-knee side
+    and centre), dataset.py (per-series or per-token centre and side in the batch, geometry_valid
+    decoupled from physical sampling) and model.py (medial_mm from the fitted centre). Settings
+    under data.study_geometry; move the patch's identity.py hunk into RELIABILITY. The completion
+    must report per-stratum deltas for rescued-centre, bilateral and midline-moved (> 5 mm)
+    studies against the rest. Aggregate triplet counts must equal the replay.
+  open_choices: >-
+    10 mm residual limit and the fallback order come from the patch; the +/-40 mm bilateral
+    threshold and two-series minimum from the contralateral audit. Fixed before launch.
+  dependencies: []
+  priority_rationale: >-
+    Correctness of the geometry every other idea reads; must run first.
+- id: sagittal-normal-knee-frame
+  mechanism_id: medial-axis-along-sagittal-slice-normal
+  parent_idea_id: null
+  title: Measure each token's medial position along the knee's sagittal slice normal instead of scanner X
+  opportunity: >-
+    Knees sit rotated in the scanner: the sagittal slice normal deviates from scanner X by a
+    median 6.7 degrees (p90 16.2) across 4,410 studies. For a posterior horn 40 mm behind the
+    centre that shifts X by more than 10 mm in 14% of studies, enough to push lateral posterior
+    horn tokens across the side mask's +/-10 mm band.
+  mechanism: >-
+    medial_mm = knee_side_sign * dot(p - c, n_ml), where p is the token's patient position, c the
+    study (or knee) centre, and n_ml the unit sagittal slice normal projected onto the axial plane
+    and oriented toward patient left (+X). Take n_ml as the study's median sagittal normal;
+    studies without a sagittal series keep scanner X. Everything else, including the bias and any
+    mask, reads medial_mm unchanged.
+  precedents:
+  - 'outputs/analysis/knee-rotation-survey-20260923/result.md: median 6.7 deg, 30% above 10 deg; several sagittal series of one study agree (median spread 0 deg).'
+  novelty: The medial axis has always been scanner X.
+  coverage: >-
+    Compartment labels through the bias and any mask; matters most in the ~30% of studies rotated
+    above 10 degrees.
+  exploitation: >-
+    If it helps, the same frame side-normalizes the 3D position encoding. If it hurts, the normal
+    follows the prescription (for example the ACL) rather than the knee.
+  budget: A per-study normal at preparation; no measurable runtime change.
+  implementation: >-
+    Adds the normal to the per-study geometry (geometry.py or laterality.py, dataset.py) and uses
+    it in model.py's medial_mm; reflection must mirror it consistently. Setting under
+    data.study_geometry. Builds on the geometry bundle when it is the incumbent; otherwise carries
+    its surviving components. Report per-stratum deltas for rotation above and below 10 degrees.
+  open_choices: >-
+    Median sagittal normal per study, axial-plane projection; fixed before launch.
+  dependencies: []
+  priority_rationale: >-
+    Measured premise and a large touched share, but the axis itself is a hypothesis, so it runs
+    alone after the bundle.
+- id: meniscus-only-side-mask
+  mechanism_id: meniscus-family-own-side-attention-mask
+  parent_idea_id: null
+  title: Let the two meniscus labels attend only to their own side of the knee, and leave OA whole-knee
+  opportunity: >-
+    The trained side mask for both families gave meniscus +0.0046 [95% +0.0005, +0.0090] with both
+    negative groups improving, and OA -0.0040 [-0.0087, +0.0002], for macro +0.0012 [80% -0.0004,
+    +0.0028]. Meniscus labels correlate at 0.08, OA at 0.52: menisci are judged best blind, while
+    OA reads real evidence from the whole knee.
+  mechanism: >-
+    For Medial and Lateral Meniscus only, attention scores of tokens on the sibling side beyond the
+    +/-10 mm band are set to -inf before the softmax; the band stays visible to both. The
+    anatomical bias still acts on the allowed tokens. Unknown side or invalid geometry keeps every
+    token visible; a study-target with no own-side token falls back to all its tokens. OA and the
+    other eight labels are unchanged.
+  precedents:
+  - 'outputs/training/side-mask and outputs/analysis/side-mask-vs-k05-clean: trained mask for both families; strata Medial Meniscus +0.0031/+0.0056, Lateral Meniscus +0.0063/+0.0047 (sibling-clean/sibling-positive).'
+  - 'outputs/analysis/side-mask-vs-k05-clean/side_mask.patch: implementation (model.compartment_evidence), applies to d914079.'
+  novelty: >-
+    Restricts the measured mask to the family it helped; the OA loss that cancelled the gain is
+    removed by design.
+  coverage: The two meniscus labels; every study with a resolved side and valid geometry.
+  exploitation: >-
+    Base for the half-knee loss and the shared-plus-residual meniscus head; the OA readout is its
+    OA counterpart.
+  budget: One mask per compartment row; no measurable runtime change.
+  implementation: >-
+    Reuses the side_mask patch in model.py, restricted to the meniscus family, under
+    model.compartment_evidence. Builds on the geometry bundle when it is the incumbent; otherwise
+    carries its surviving components. Log the learned anatomical strengths per epoch.
+  open_choices: The +/-10 mm band comes from the notch geometry; not tuned.
+  dependencies: []
+  priority_rationale: >-
+    The largest measured family gain in this topic; removing its measured loss is the most direct
+    next step.
+- id: curve-density-sampler
+  mechanism_id: slice-density-proportional-to-measured-usefulness
+  parent_idea_id: null
+  title: Draw each plane's slices in proportion to its measured label-usefulness curve instead of a Gaussian
+  opportunity: >-
+    The measured usefulness by slice position has a sagittal middle dip (91% of peak) and humps at
+    the compartments (+/-31.5 mm); coronal and axial peak at the centre but are lopsided. The
+    Gaussian puts most sagittal slices on the notch. Sampling acts mostly during training, where it
+    sets how much label-relevant signal each step sees.
+  mechanism: >-
+    For physical pools, replace the Gaussian target density along each plane's slice axis with a
+    piecewise-linear interpolation of the plane's total utility from
+    spatial-importance-20260918/axis_marginals.csv (sagittal l_mm, coronal p_mm, axial s_mm), the
+    edge value held beyond the measured range. Sagittal is symmetrized, f(d) = (u(d) + u(-d)) / 2,
+    because the map pools left and right knees. Pool depth is positive toward left, posterior and
+    superior, matching the file. Local pools, triplet counts and validation determinism are
+    unchanged.
+  precedents:
+  - 'outputs/analysis/two-peak-sagittal-gate-20260923/result.md: frozen k05-clean with the curve density, x4 -0.00057 [80% -0.00120, +0.00008], despite the train-inference sampler mismatch; narrow two-peak -0.00153 [-0.00246, -0.00064]; sampling_curve.py implements the density.'
+  - 'docs/validation/results/2026-09-18-per-plane-sigma-cache.md: coronal narrower than 40 mm gains +0.00135 on frozen checkpoints.'
+  novelty: >-
+    Every sampler so far was a Gaussian around the centre; this shape comes from the measured map,
+    with no width to tune.
+  coverage: All labels, all three planes, every physical pool.
+  exploitation: >-
+    If it helps, the plane that moved most (from the offsets log) shows where density matters;
+    combinations with the meniscus mask test whether off-midline sagittal slices feed it.
+  budget: A lookup per candidate at selection; no measurable runtime change.
+  implementation: >-
+    Replaces target_depths' Gaussian in sampling.py when data.sampling_density selects the curve;
+    the curve values live in the code and in SAMPLING_IDENTITY. Aggregate triplet counts must equal
+    the replay (the gate verified identical counts). Log the realized mean absolute offset per
+    plane.
+  open_choices: Interpolation and edge handling fixed before launch; no exponent or smoothing.
+  dependencies: []
+  priority_rationale: >-
+    Independent of the geometry chain and near-neutral even on a mismatched frozen model.
+- id: side-normalized-3d-position
+  mechanism_id: absolute-side-normalized-3d-position-replacing-1d-2d
+  parent_idea_id: null
+  title: Replace the 1D and 2D position embeddings with one absolute, side-normalized 3D patient-position encoding
+  opportunity: >-
+    Tokens carry slice position (1D) and in-image position (2D), neither of which says where the
+    token is in the knee across series. User hypothesis: a good 3D encoding makes 1D and 2D
+    redundant. The retired additive 3D embedding sat beside 1D and 2D and was not side-normalized,
+    so the same offset meant medial in one knee and lateral in the other.
+  mechanism: >-
+    For every token, q = (knee_side_sign * (p_x - c_x), p_y - c_y, p_z - c_z) in mm, with p the
+    token's patient position and c the study (or knee) centre; encode q with 3D sinusoidal
+    features (fixed wavelengths spanning about 8 to 512 mm) plus a small MLP, and add it to the
+    token in place of position_1d and position_2d, which are removed. Reflection rule: mirroring
+    flips both p_x - c_x and the effective side, so the side-normalized x is reflection-invariant
+    and y, z are unchanged; reflection TTA must give identical q. Fallbacks: unknown side keeps
+    y and z and replaces the x features with a learned unknown-side vector; invalid geometry (no
+    trusted patient position) replaces the whole encoding with a learned unknown-position vector.
+    The control's 1D and 2D embeddings are removed by design, so no study falls back to them; the
+    completion reports metrics for unknown-side and invalid-geometry studies separately.
+  precedents:
+  - 'outputs/analysis/token-attention-vs-k05-clean: dropping 1D/2D with only relative, raw-LPS 3D RoPE gave -0.0015 (PF OA -0.0152, Fracture -0.0153; meniscus +0.0027, OA +0.0035), confounded with an added attention block.'
+  - 'docs/inference/submissions/2026-09-15-champion-without-3d-at-inference.md: the additive, non-side-normalized 3D embedding was worth about 0.'
+  novelty: >-
+    Absolute and side-normalized, replacing rather than joining 1D and 2D; anterior structures
+    such as the patellofemoral joint stay locatable, unlike the relative-only arm.
+  coverage: All labels and all tokens.
+  exploitation: >-
+    If PF OA or Fracture still lose, the origin (12.8 mm superior-inferior error) is the next
+    refinement: a learned soft-argmax or rule-based joint-line origin.
+  budget: One small MLP per token; no measurable runtime change.
+  implementation: >-
+    Replaces the 1D and 2D embeddings in model.py and spatial_tokens.py with the 3D encoding under
+    model.position_encoding; reflection in augmentation.py and inference/reflection.py must keep q
+    consistent. Origin is the robust centre; builds on the geometry bundle when it is the
+    incumbent, otherwise carries its surviving components. Report PF OA, Fracture and MCL deltas
+    explicitly.
+  open_choices: >-
+    Wavelength range and MLP width fixed before launch; the origin stays the robust centre (its
+    scatter, A-P 4.7 mm and S-I 7.8 mm, is below the 20 mm token spacing).
+  dependencies: []
+  priority_rationale: >-
+    Tests the user's hypothesis directly and builds on the geometry the bundle fixes.
+exhausted_directions: >-
+  Tuning the +/-10 mm band or sampler widths to the score, a narrow sagittal two-peak sampler
+  (starves the notch, -0.00153 frozen), hard-tied compartment classifiers without a mask and
+  mirror-consistency or exchange operators (medial-lateral-transfer, all negative), forcing OA
+  evidence apart, and inferring side, centre or landmarks with a trained model.

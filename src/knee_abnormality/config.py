@@ -234,6 +234,7 @@ class TrainerConfig(ConfigModel):
     deterministic: bool
     class_balanced_bce: bool = False
     class_balance_exponent: Annotated[float, Field(gt=0, le=1)] = 1.0
+    half_knee_loss_weight: PositiveFiniteFloat = 0.075
 
 
 class ValidationConfig(ConfigModel):
