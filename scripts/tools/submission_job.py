@@ -22,6 +22,7 @@ class SubmissionJobCLI(CLISettings):
     dataset: str | None = Field(default=None, pattern=r"^[\w.-]+/[\w.-]+$")
     notebook: str | None = Field(default=None, pattern=r"^[\w.-]+/[\w.-]+$")
     label: str | None = None
+    sequence: int | None = Field(default=None, gt=0)
     lines: int = Field(default=60, gt=0)
     follow: CliImplicitFlag[bool] = False
 
@@ -76,6 +77,7 @@ def start(args: SubmissionJobCLI, record: Path) -> dict:
             str(record),
             "--label",
             args.label,
+            *(["--sequence", str(args.sequence)] if args.sequence else []),
         ],
         check=True,
         capture_output=True,
