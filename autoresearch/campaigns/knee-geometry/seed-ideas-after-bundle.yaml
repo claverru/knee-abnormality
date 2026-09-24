@@ -1,0 +1,118 @@
+ideas:
+- id: meniscus-only-side-mask-on-midline
+  mechanism_id: meniscus-family-own-side-attention-mask
+  parent_idea_id: meniscus-only-side-mask
+  title: Let the two meniscus labels attend only to their own side of the knee, and leave OA whole-knee
+  opportunity: 'The trained side mask for both families gave meniscus +0.0046 [95% +0.0005, +0.0090] with
+    both negative groups improving, and OA -0.0040 [-0.0087, +0.0002], for macro +0.0012 [80% -0.0004,
+    +0.0028]. Meniscus labels correlate at 0.08, OA at 0.52: menisci are judged best blind, while OA reads
+    real evidence from the whole knee.'
+  mechanism: For Medial and Lateral Meniscus only, attention scores of tokens on the sibling side beyond
+    the +/-10 mm band are set to -inf before the softmax; the band stays visible to both. The anatomical
+    bias still acts on the allowed tokens. Unknown side or invalid geometry keeps every token visible;
+    a study-target with no own-side token falls back to all its tokens. OA and the other eight labels
+    are unchanged.
+  precedents:
+  - 'outputs/training/side-mask and outputs/analysis/side-mask-vs-k05-clean: trained mask for both families;
+    strata Medial Meniscus +0.0031/+0.0056, Lateral Meniscus +0.0063/+0.0047 (sibling-clean/sibling-positive).'
+  - 'outputs/analysis/side-mask-vs-k05-clean/side_mask.patch: implementation (model.compartment_evidence),
+    applies to d914079.'
+  novelty: Parked after its repair could not carry the undecided geometry bundle; it never trained. Restricts
+    the measured mask to the family it helped; the OA loss that cancelled the gain is removed by design.
+  coverage: The two meniscus labels; every study with a resolved side and valid geometry.
+  exploitation: Base for the half-knee loss and the shared-plus-residual meniscus head; the OA readout
+    is its OA counterpart.
+  budget: One mask per compartment row; no measurable runtime change.
+  implementation: 'Base: the current incumbent plus the fitted midline (medial_mm from the accepted fitted
+    centre''s x, median series x where the fit is rejected), carried as part of this change unless fitted-midline-only
+    is already the incumbent, in which case build on it. No robust centre and no bilateral split. This
+    base is fixed now; do not wait for any other idea''s decision. Reuses the side_mask patch in model.py,
+    restricted to the meniscus family, under model.compartment_evidence. Log the learned anatomical strengths
+    per epoch.'
+  open_choices: The +/-10 mm band comes from the notch geometry; not tuned.
+  dependencies: []
+  priority_rationale: The largest measured family gain in this topic; removing its measured loss is the
+    most direct next step.
+- id: curve-density-sampler-retry
+  mechanism_id: slice-density-proportional-to-measured-usefulness
+  parent_idea_id: curve-density-sampler
+  title: Draw each plane's slices in proportion to its measured label-usefulness curve instead of a Gaussian
+  opportunity: The measured usefulness by slice position has a sagittal middle dip (91% of peak) and humps
+    at the compartments (+/-31.5 mm); coronal and axial peak at the centre but are lopsided. The Gaussian
+    puts most sagittal slices on the notch. Sampling acts mostly during training, where it sets how much
+    label-relevant signal each step sees.
+  mechanism: For physical pools, replace the Gaussian target density along each plane's slice axis with
+    a piecewise-linear interpolation of the plane's total utility from spatial-importance-20260918/axis_marginals.csv
+    (sagittal l_mm, coronal p_mm, axial s_mm), the edge value held beyond the measured range. Sagittal
+    is symmetrized, f(d) = (u(d) + u(-d)) / 2, because the map pools left and right knees. Pool depth
+    is positive toward left, posterior and superior, matching the file. Local pools, triplet counts and
+    validation determinism are unchanged.
+  precedents:
+  - 'outputs/analysis/two-peak-sagittal-gate-20260923/result.md: frozen k05-clean with the curve density,
+    x4 -0.00057 [80% -0.00120, +0.00008], despite the train-inference sampler mismatch; narrow two-peak
+    -0.00153 [-0.00246, -0.00064]; sampling_curve.py implements the density.'
+  - 'docs/validation/results/2026-09-18-per-plane-sigma-cache.md: coronal narrower than 40 mm gains +0.00135
+    on frozen checkpoints.'
+  novelty: Parked unrun to make queue room; it never trained, so this is its first test, not a revisit.
+    Every sampler so far was a Gaussian around the centre; this shape comes from the measured map, with
+    no width to tune.
+  coverage: All labels, all three planes, every physical pool.
+  exploitation: If it helps, the plane that moved most (from the offsets log) shows where density matters;
+    combinations with the meniscus mask test whether off-midline sagittal slices feed it.
+  budget: A lookup per candidate at selection; no measurable runtime change.
+  implementation: 'Base: the current incumbent; independent of the geometry chain. Replaces target_depths''
+    Gaussian in sampling.py when data.sampling_density selects the curve; the curve values live in the
+    code and in SAMPLING_IDENTITY. Aggregate triplet counts must equal the replay (the gate verified identical
+    counts). Log the realized mean absolute offset per plane.'
+  open_choices: Interpolation and edge handling fixed before launch; no exponent or smoothing.
+  dependencies: []
+  priority_rationale: Independent of the geometry chain and near-neutral even on a mismatched frozen model.
+- id: side-normalized-3d-position-retry
+  mechanism_id: absolute-side-normalized-3d-position-replacing-1d-2d
+  parent_idea_id: side-normalized-3d-position
+  title: Replace the 1D and 2D position embeddings with one absolute, side-normalized 3D patient-position
+    encoding
+  opportunity: 'Tokens carry slice position (1D) and in-image position (2D), neither of which says where
+    the token is in the knee across series. User hypothesis: a good 3D encoding makes 1D and 2D redundant.
+    The retired additive 3D embedding sat beside 1D and 2D and was not side-normalized, so the same offset
+    meant medial in one knee and lateral in the other.'
+  mechanism: 'For every token, q = (knee_side_sign * (p_x - c_x), p_y - c_y, p_z - c_z) in mm, with p
+    the token''s patient position and c the study (or knee) centre; encode q with 3D sinusoidal features
+    (fixed wavelengths spanning about 8 to 512 mm) plus a small MLP, and add it to the token in place
+    of position_1d and position_2d, which are removed. Reflection rule: mirroring flips both p_x - c_x
+    and the effective side, so the side-normalized x is reflection-invariant and y, z are unchanged; reflection
+    TTA must give identical q. Fallbacks: unknown side keeps y and z and replaces the x features with
+    a learned unknown-side vector; invalid geometry (no trusted patient position) replaces the whole encoding
+    with a learned unknown-position vector. The control''s 1D and 2D embeddings are removed by design,
+    so no study falls back to them; the completion reports metrics for unknown-side and invalid-geometry
+    studies separately.'
+  precedents:
+  - 'outputs/analysis/token-attention-vs-k05-clean: dropping 1D/2D with only relative, raw-LPS 3D RoPE
+    gave -0.0015 (PF OA -0.0152, Fracture -0.0153; meniscus +0.0027, OA +0.0035), confounded with an added
+    attention block.'
+  - 'docs/inference/submissions/2026-09-15-champion-without-3d-at-inference.md: the additive, non-side-normalized
+    3D embedding was worth about 0.'
+  novelty: Parked unrun to make queue room; it never trained, so this is its first test, not a revisit.
+    Absolute and side-normalized, replacing rather than joining 1D and 2D; anterior structures such as
+    the patellofemoral joint stay locatable, unlike the relative-only arm.
+  coverage: All labels and all tokens.
+  exploitation: 'If PF OA or Fracture still lose, the origin (12.8 mm superior-inferior error) is the
+    next refinement: a learned soft-argmax or rule-based joint-line origin.'
+  budget: One small MLP per token; no measurable runtime change.
+  implementation: 'Base: the current incumbent plus the fitted midline (medial_mm from the accepted fitted
+    centre''s x, median series x where the fit is rejected), carried as part of this change unless fitted-midline-only
+    is already the incumbent, in which case build on it. No robust centre and no bilateral split. This
+    base is fixed now; do not wait for any other idea''s decision. Origin: the accepted fitted centre;
+    studies with a rejected fit use the learned unknown-position vector. Replaces the 1D and 2D embeddings
+    in model.py and spatial_tokens.py with the 3D encoding under model.position_encoding; reflection in
+    augmentation.py and inference/reflection.py must keep q consistent. Report PF OA, Fracture and MCL
+    deltas explicitly.'
+  open_choices: Wavelength range and MLP width fixed before launch; the origin is the accepted fitted
+    centre (its scatter, A-P 4.7 mm and S-I 7.8 mm, is below the 20 mm token spacing).
+  dependencies: []
+  priority_rationale: Tests the user's hypothesis directly and builds on the geometry the bundle fixes.
+exhausted_directions: Tuning the +/-10 mm band or sampler widths to the score, a narrow sagittal two-peak
+  sampler (starves the notch, -0.00153 frozen), hard-tied compartment classifiers without a mask and mirror-consistency
+  or exchange operators (medial-lateral-transfer, all negative), forcing OA evidence apart, and inferring
+  side, centre or landmarks with a trained model. The full geometry bundle (rejected); the robust centre
+  alone (rescued stratum about -0.0003).

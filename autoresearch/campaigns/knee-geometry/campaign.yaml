@@ -1,0 +1,83 @@
+id: knee-geometry
+status: defined
+recipe: configs/training.yaml
+reference_run: outputs/training/k05-clean
+reference_equivalences: {}
+reference_config_exceptions:
+  - data.series_types[].oblique_tilt_deg
+reference_identity_exceptions:
+  - preprocessing_identity.sampling.oblique_split
+  - preprocessing_identity.sources_sha256
+additional_evidence_runs:
+  - outputs/training/side-mask
+  - outputs/training/token-attention
+backlog:
+  refill_below: 3
+  refill_to: 5
+artifacts_root: outputs/autoresearch/knee-geometry
+policy:
+  editable_files:
+    - configs/training.yaml
+    - src/knee_abnormality/config.py
+    - src/knee_abnormality/data/dataset.py
+    - src/knee_abnormality/data/preprocessing/geometry.py
+    - src/knee_abnormality/data/preprocessing/laterality.py
+    - src/knee_abnormality/data/preprocessing/preparation.py
+    - src/knee_abnormality/data/preprocessing/sampling.py
+    - src/knee_abnormality/modeling/augmentation.py
+    - src/knee_abnormality/modeling/model.py
+    - src/knee_abnormality/modeling/spatial_tokens.py
+    - src/knee_abnormality/training/lightning.py
+    - src/knee_abnormality/inference/engine.py
+    - src/knee_abnormality/inference/reflection.py
+  editable_directories: []
+  config_keys: []
+  config_prefixes:
+    - data.study_geometry
+    - data.sampling_density
+    - model.compartment_evidence
+    - model.position_encoding
+    - trainer.half_knee_loss
+  list_item_fields: {}
+  input_identity_keys:
+    - preprocessing_identity
+  require_source_change: true
+  developer_instructions: >-
+    Implement one knee-geometry mechanism and update configs/training.yaml only to enable it. New
+    settings go under data.study_geometry, data.sampling_density, model.compartment_evidence,
+    model.position_encoding or trainer.half_knee_loss in config.py. identity.py is protected:
+    record every new preprocessing setting inside the existing identity dictionaries
+    (RELIABILITY in geometry.py, SAMPLING_IDENTITY in sampling.py, SPATIAL_TOKEN_IDENTITY in
+    spatial_tokens.py, REFLECTION_IDENTITY in augmentation.py) so the preprocessing identity
+    changes with it. Study centre, knee side, midline and medial-lateral axis come only from
+    DICOM headers, metadata and rule-based within-study checks available before training; never
+    from labels, images through a trained model, or predictions. Family-scoped behaviour is
+    authorized only for the four compartment labels (Medial/Lateral Meniscus, Medial/Lateral OA),
+    one rule per family, and only as the idea specifies; every other label keeps its path.
+    Aggregate training and x1 validation triplet counts must equal the sealed baseline replay:
+    geometry changes may move triplets but never add or remove selectable series (a stray
+    bilateral series stays in sampling and only loses geometry). Unknown side or invalid geometry
+    must fall back to the control's behaviour for that study. Every new batch key the model reads
+    must be added to MODEL_BATCH_KEYS in inference/engine.py, or the final x4 prediction, which runs
+    through predict_loader and moves only those keys to the GPU, fails after training; change
+    nothing else in engine.py. Reflection augmentation and
+    reflection TTA must keep every new side-dependent quantity consistent. Reuse the patches named
+    in the idea (robust centre, side mask) where they apply, adapting them to these config
+    prefixes. Log each mechanism's activity per epoch (studies or tokens affected, learned
+    strengths, auxiliary loss values) so it is shown to be active. Return prepared or blocked. Use
+    the existing Python environment for static checks. No tests.
+  researcher_instructions: >-
+    Propose mechanisms that make each label's evidence come from the right place in the knee and
+    treat each compartment family the way it behaves: study centre and bilateral handling,
+    medial-lateral midline and axis, compartment masks and readouts for the meniscus and OA
+    families, sampling density taken from measured geometry, and absolute side-normalized
+    position encoding. Prefer refinements and combinations of this campaign's completed runs,
+    driven by their diagnostics (family deltas, compartment margins and cross-talk, learned
+    anatomical strengths, geometry strata), and say which parents each builds on. Spatial
+    settings come from measured anatomy or geometry, never from score sweeps: no sweeps of the
+    midline band, sampler widths, loss weights or offsets. No trained model for side, centre or
+    landmarks; everything geometric must be computable before training. Family-scoped rules are
+    allowed only for the meniscus and OA compartment pairs, with one rule per family and no
+    per-label coefficients. For every idea say how it should show in the meniscus and OA family
+    deltas and in the other eight labels. Out of scope: label tables and label noise, backbone,
+    optimizer, image size, ensembling, TTA, OA severity supervision, and the shared evaluation.

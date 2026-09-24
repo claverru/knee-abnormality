@@ -5,6 +5,14 @@ Active lines of development have their own documents in [this folder](INDEX.md).
 coverage diagnostics live in [data preparation](../data-preparation/peripheral-coverage.md);
 pending experiments are classified in the [backlog](../backlog/INDEX.md).
 
+- **Knee-geometry model adopted, 2026-09-24:** the [knee-geometry campaign](../../autoresearch/campaigns/knee-geometry/INDEX.md)
+  adopted `meniscus-half-knee-mil`: the medial-lateral midline at the fitted study centre, a
+  meniscus-only own-side attention mask and a training-only half-knee MIL loss. Fold 0 ×4
+  0.905834 against 0.902760 for `k05-clean`, +0.00307 (80% [+0.00152, +0.00476]); public 0.944
+  (S54) against 0.942 (S48). It is now the recipe in `configs/training.yaml`
+  ([current model](../modeling/current-model.md)). The campaign stopped after 18 decisions with no
+  second adoption.
+
 - **Soft macro AUC logged, 2026-09-23:** validation now also records `val_soft_macro_auc`, a
   pairwise AUC weighted by the soft targets. It ranked 33 past submissions closer to the public
   leaderboard than hard macro AUC (168 vs 140 of 213 pairs), and it is used to compare runs and

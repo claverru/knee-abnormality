@@ -1,0 +1,39 @@
+ideas:
+- id: oa-own-side-plus-knee-channel-fallback-safe
+  mechanism_id: oa-masked-own-side-pool-plus-shared-knee-level-channel
+  parent_idea_id: oa-own-side-plus-knee-channel
+  title: Read each OA compartment from a masked own-side pool plus a shared knee-level OA channel
+  opportunity: 'OA needs whole-knee evidence: the side mask cost OA -0.0040, lateral OA -0.0093 on its
+    sibling-positive group, and every run that forced OA apart lost. But the model over-couples the pair:
+    OA logits correlate at 0.854 against 0.51-0.56 for the labels. OA needs both the shared degeneration
+    and a clean compartment channel.'
+  mechanism: 'For Medial and Lateral OA: z_c = w_c . pool_own(c) + a_c * s_OA + b_c. pool_own(c) is the
+    compartment''s attention pool masked to its own side (as in the meniscus mask). s_OA = w_k . pool_knee
+    is one whole-knee attention pool with its own attention row, read by one shared classifier. a_c are
+    two zero-initialized scalars, so training starts from the masked own-side readout and learns how much
+    knee-level evidence to add. Fallback: for a study with unknown side or without valid geometry, both
+    OA logits are exactly the incumbent''s (pool_own over all tokens and the knee-channel term multiplied
+    by zero), so those studies follow the parent readout whatever a_c learns.'
+  precedents:
+  - 'side-mask: OA -0.0040 [95% -0.0087, +0.0002]; strata Medial OA -0.0038/+0.0003, Lateral OA -0.0034/-0.0093.'
+  - 'shared-family-level-channel (medial-lateral-transfer, +0.0009 macro, OA +0.0001): a shared knee-level
+    channel added to private pathways, the only non-negative sharing design.'
+  novelty: 'The first attempt was blocked after its one repair: its knee channel stayed active on unknown-side
+    studies, breaking the contract''s fallback. This version gates the channel off there; it never trained.
+    Separates knee-level from compartment-level OA evidence explicitly; earlier OA designs either forced
+    separation or shared everything.'
+  coverage: The two OA labels.
+  exploitation: Report the OA pair's prediction correlation against the reference's 0.854; a drop with
+    a gain confirms the decoupling reading.
+  budget: One extra attention row and head; no measurable runtime change.
+  implementation: 'Base: the incumbent meniscus-half-knee-mil-20260923T231102Z-edeb9f68 (fitted midline,
+    meniscus-only mask, half-knee loss); keep all of it. Gate the knee-channel term with the per-study
+    valid-side flag so fallback studies reproduce the incumbent''s OA logits exactly. Adds the OA readout
+    in model.py under model.compartment_evidence, reusing the side-mask code for pool_own. Builds on the
+    geometry bundle when it is the incumbent, otherwise carries its surviving components; combines with
+    the meniscus-only mask when that is the incumbent. Log a_c and the OA logit correlation per epoch.'
+  open_choices: Zero-initialized scalars; the knee channel's attention row starts like the other rows.
+    Fixed before launch.
+  dependencies: []
+  priority_rationale: The OA counterpart to the meniscus mask, designed around the measured OA behaviour.
+exhausted_directions: The OA knee channel without a fallback gate (blocked).

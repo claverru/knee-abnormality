@@ -9,7 +9,14 @@ position/knee-side experiments and the current research reference, 0.897443 macr
   field.
 - **Tokens:** every visually valid backbone location is a token with four additive embeddings.
 - **Pooling:** target-specific attention MIL pools position-rich tokens, with side-aware
-  anatomical bias and two learned positive strengths for meniscus and OA.
+  anatomical bias and two learned positive strengths for meniscus and OA. The two meniscus
+  labels see only their own side of the knee; OA stays whole-knee.
+- **Half-knee loss (training only):** a shared meniscus tear detector is supervised on each
+  half of the knee, so token features learn the medial-lateral split.
+
+Adopted 2026-09-24 from the [knee-geometry campaign](../../autoresearch/campaigns/knee-geometry/INDEX.md)
+(`meniscus-half-knee-mil`): ×4 macro 0.905834 against `k05-clean`'s 0.902760, +0.00307, 80%
+[+0.00152, +0.00476]; public 0.944 (S54) against 0.942 (S48).
 
 There is no additive 3D embedding or token graph. The best submitted bundle is distinct
 from the local research incumbent; submission status lives in
@@ -40,6 +47,8 @@ bands; the experimental ten-epoch schedule was reverted. Historical
 | Projection and attention widths | 256 and 128 (`PROJECTION_WIDTH`, `MIL_ATTENTION_WIDTH`, constants) |
 | `model.dropout`, `model.series_dropout` | 0.0, 0.2 |
 | Anatomical attention | Fixed `sign * exp(log_strength) * tanh(medial_mm / 20)` for medial/lateral meniscus and OA; two trainable strengths start at 1 |
+| Meniscus side mask | Medial/Lateral Meniscus attend only to own-side tokens plus the ±10 mm band (`COMPARTMENT_MIDLINE_BAND_MM`); unknown side, invalid geometry or no own-side token keep all tokens |
+| `trainer.half_knee_loss_weight` | 0.075 |
 | Training seed | 2263738815, inherited by new research candidates from the incumbent |
 | Precision | BF16 mixed on one automatically selected device (`PRECISION`, a constant) |
 
@@ -97,9 +106,14 @@ Tokens receive four additive embeddings:
   LayerNorm.
 - **Attention:** add the anatomical term to the four compartment-label scores, then run one
   float32 masked softmax per study and target over
-  the study's visually valid tokens. A study without valid tokens fails before the softmax.
+  the study's visually valid tokens. For the two meniscus labels the mask also drops tokens on
+  the sibling side beyond ±10 mm. A study without valid tokens fails before the softmax.
 - **Heads:** pool the weighted features, apply twelve independent classifier vectors and biases,
-  and train with the masked soft-target BCE alone.
+  and train with the masked soft-target BCE plus the half-knee loss.
+- **Half-knee loss:** one linear detector (`half_knee_detector`, shared by both menisci) scores
+  the normalized tokens beyond ±10 mm; a float32 smooth-max per half is trained with soft BCE and
+  the class-balance weights against the matching meniscus label, for studies with resolved side,
+  valid geometry and both halves present. Weight 0.075. Prediction never uses the detector.
 
 The plane and contrast lookup buffers derive from the configured metadata, not from slot order.
 The ReXNet adapter derives stride 32 and origin 0 from its convolutions. The
@@ -109,7 +123,8 @@ other backbone mapping fails explicitly. Grid dimensions may vary independently.
 Patient-coordinate geometry supplies the anatomical bias, not another additive embedding.
 The audited side resolver uses DICOM laterality and conservative coordinate consensus;
 unknown side and invalid geometry contribute zero bias. The medial axis is knee-side sign
-(-1 left, +1 right) times patient LPS X minus study-center X. The middle-slice patient map
+(-1 left, +1 right) times patient LPS X minus the midline: the fitted study centre's X
+(`estimate_reference`), or the median series-centre X when the fit is rejected. The middle-slice patient map
 and inverse augmentation locate each token. Reflection keeps coordinates consistent.
 
 - **Geometry output:** `feature_geometry` returns `(xy, visual_valid, prepared_xy)`.

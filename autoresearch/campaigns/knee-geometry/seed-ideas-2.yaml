@@ -1,0 +1,113 @@
+ideas:
+- id: meniscus-half-knee-mil
+  mechanism_id: side-aware-half-knee-token-mil-for-menisci
+  parent_idea_id: null
+  title: Teach meniscus token features the medial-lateral split with a training-only half-knee MIL loss on a shared tear detector
+  opportunity: >-
+    The meniscus mask removes sibling tokens from the pooling but not sibling pixels from each
+    token: a stride-32 token near the midline takes about 30% of its input from the other half.
+    Nothing tells the trunk that, in a study with one torn meniscus, the other half must look
+    clean. Training fold 0 has 1,150 exclusive medial and 279 exclusive lateral meniscus studies.
+  mechanism: >-
+    Training only. One linear token detector d(t) = v . t + b over the normalized tokens, shared
+    by both menisci. For every study with resolved side and valid geometry, split its tokens into
+    medial and lateral halves by medial_mm, excluding the +/-10 mm band (the mask's partition).
+    Each half gets a smooth-max of d over its tokens; the medial score trains on the Medial
+    Meniscus target and the lateral score on the Lateral Meniscus target with the targets' soft
+    BCE and class-balance weights. Added to the main loss at weight 0.075. Forward and
+    predictions are unchanged; unknown side or invalid geometry is skipped.
+  precedents:
+  - 'permutation-invariant-half-knee-mil (medial-lateral-transfer, invalid): same halves with a min over both assignments because side was unknown; crashed on step 1 from a bf16 dtype bug in _segment_smooth_max (total allocated in bf16, exp() promoted to fp32). Diff in outputs/autoresearch/medial-lateral-transfer/experiments/permutation-invariant-half-knee-mil-20260921T035443Z-6d769087/changes.diff.'
+  - 'side-mask: meniscus +0.0046 when judged blind, so the family benefits from own-side evidence.'
+  - 'anatomical-attention-local-lesion-evidence-retry (-0.0058 meniscus) and the hard-tied meniscus head (-0.0071): shared detectors in the public path lost, so this detector stays training-only.'
+  novelty: >-
+    First trained run of half-knee supervision, now side-aware; the only mechanism here aimed at
+    the receptive-field leak without half-image inputs.
+  coverage: The two meniscus labels, all planes, every study with resolved side and valid geometry.
+  exploitation: >-
+    Pairs with the shared-plus-residual head: the loss shapes the tokens, the head reads them. If it
+    helps, the same loss for OA is not implied: forcing OA apart lost three times.
+  budget: One linear map and a segment smooth-max per study; about 1% extra step time.
+  implementation: >-
+    Adds the auxiliary to training/lightning.py, reading tokens and medial_mm exposed by model.py
+    in training only; settings under trainer.half_knee_loss. Compute the smooth-max in float32.
+    Stacks on the meniscus-only side mask when it is the incumbent; otherwise carries it (and the
+    geometry bundle's surviving components). Log the auxiliary loss and the share of studies used
+    per epoch.
+  open_choices: Weight 0.075 and band 10 mm from the original design; smooth-max temperature fixed before launch.
+  dependencies: []
+  priority_rationale: >-
+    Addresses the one leak the mask cannot, at no inference cost, and revives a never-trained
+    design.
+- id: meniscus-shared-residual-head
+  mechanism_id: shared-plus-residual-meniscus-classifier-on-masked-pools
+  parent_idea_id: null
+  title: Read both masked meniscus pools with a shared classifier plus zero-initialized per-compartment residuals
+  opportunity: >-
+    Lateral tears are rarer (279 exclusive training studies against 1,150 medial) but look like
+    medial ones. Hard-tied meniscus classifiers lost before (-0.0071, -0.0075), but without a mask
+    each pool mixed both sides, so a tied classifier could not tell them apart. With the meniscus
+    mask the pools come from separate halves, where sharing makes sense.
+  mechanism: >-
+    For the two meniscus rows, w_med = w_shared + delta_med and w_lat = w_shared + delta_lat, with
+    w_shared initialized to the mean of the two current rows, delta initialized to zero, no penalty
+    and private biases. Both compartments train w_shared; delta keeps real anatomical differences
+    (the lateral meniscus is shaped differently). Attention rows, masks and every other head stay
+    private and unchanged.
+  precedents:
+  - 'anatomical-position-rich-shared-meniscus-readout (reject, -0.0071 meniscus) and appearance-value-tied-meniscus-classifier (-0.0075): hard ties without a mask.'
+  - 'shared-family-level-channel (+0.0003 meniscus): the one non-negative sharing design kept private pathways.'
+  novelty: >-
+    Soft sharing by reparameterization on masked pools; the implemented side_mask_shared_head hard
+    tie was never run and this replaces it.
+  coverage: The two meniscus labels.
+  exploitation: A gain with the half-knee loss would stack both as the meniscus incumbent.
+  budget: No measurable runtime change.
+  implementation: >-
+    Reparameterizes the two meniscus head rows in model.py under model.compartment_evidence.
+    Stacks on the meniscus-only side mask when it is the incumbent; otherwise carries it. Log the
+    norms of w_shared and each delta per epoch.
+  open_choices: Initialization at the mean of the two rows; no penalty. Fixed before launch.
+  dependencies: []
+  priority_rationale: >-
+    Cheap test of whether sharing works once the pools are separated.
+- id: oa-own-side-plus-knee-channel
+  mechanism_id: oa-masked-own-side-pool-plus-shared-knee-level-channel
+  parent_idea_id: null
+  title: Read each OA compartment from a masked own-side pool plus a shared knee-level OA channel
+  opportunity: >-
+    OA needs whole-knee evidence: the side mask cost OA -0.0040, lateral OA -0.0093 on its
+    sibling-positive group, and every run that forced OA apart lost. But the model over-couples the
+    pair: OA logits correlate at 0.854 against 0.51-0.56 for the labels. OA needs both the shared
+    degeneration and a clean compartment channel.
+  mechanism: >-
+    For Medial and Lateral OA: z_c = w_c . pool_own(c) + a_c * s_OA + b_c. pool_own(c) is the
+    compartment's attention pool masked to its own side (as in the meniscus mask). s_OA = w_k .
+    pool_knee is one whole-knee attention pool with its own attention row, read by one shared
+    classifier. a_c are two zero-initialized scalars, so training starts from the masked own-side
+    readout and learns how much knee-level evidence to add. Unknown side or invalid geometry: pool_own falls
+    back to all tokens.
+  precedents:
+  - 'side-mask: OA -0.0040 [95% -0.0087, +0.0002]; strata Medial OA -0.0038/+0.0003, Lateral OA -0.0034/-0.0093.'
+  - 'shared-family-level-channel (medial-lateral-transfer, +0.0009 macro, OA +0.0001): a shared knee-level channel added to private pathways, the only non-negative sharing design.'
+  novelty: >-
+    Separates knee-level from compartment-level OA evidence explicitly; earlier OA designs either
+    forced separation or shared everything.
+  coverage: The two OA labels.
+  exploitation: >-
+    Report the OA pair's prediction correlation against the reference's 0.854; a drop with a gain
+    confirms the decoupling reading.
+  budget: One extra attention row and head; no measurable runtime change.
+  implementation: >-
+    Adds the OA readout in model.py under model.compartment_evidence, reusing the side-mask code
+    for pool_own. Builds on the geometry bundle when it is the incumbent, otherwise carries its
+    surviving components; combines with the meniscus-only mask when that is the incumbent. Log a_c
+    and the OA logit correlation per epoch.
+  open_choices: Zero-initialized scalars; the knee channel's attention row starts like the other rows. Fixed before launch.
+  dependencies: []
+  priority_rationale: >-
+    The OA counterpart to the meniscus mask, designed around the measured OA behaviour.
+exhausted_directions: >-
+  Forcing OA evidence apart (attribution exclusivity, the OA side mask), hard-tied compartment
+  classifiers and shared detectors in the public path without a mask, mirror or exchange
+  consistency, and permutation-invariant half losses now that side is resolved.
