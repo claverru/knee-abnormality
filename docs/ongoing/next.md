@@ -18,6 +18,12 @@ Starting a campaign is a separate user action.
 
 Pending:
 
+- **After the knee-geometry campaign (stopped 2026-09-24).** The control is
+  `knee-geometry-merged-2` (seed 638120755, ×4 0.900955, S55 0.940). Untried there: the
+  curve-density sampler, the side-normalized 3D encoding replacing 1D/2D, and the fallback-safe OA
+  readout ([campaign ideas](../../autoresearch/campaigns/knee-geometry/INDEX.md));
+  `meniscus-core-band-contrast-readout` trained but was never compared. The adopted model has not
+  been combined with image-blend labels, which scored 0.945 alone (S50).
 - **Noisy-labels campaign stopped 2026-09-23, nothing adopted.** Hard fold-0 AUC against
   `k05-clean` (S48, 0.942): bootstrapped targets −0.0005, running-average targets +0.0002,
   early-learning regularization +0.0013 (soft +0.0008), confident-contradiction down-weighting

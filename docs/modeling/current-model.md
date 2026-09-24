@@ -3,7 +3,7 @@
 The code carries one model: the full-slice spatial-token recipe with learned anatomical
 family strengths, defined by [`configs/training.yaml`](../../configs/training.yaml).
 The [adoption evidence](../../autoresearch/anatomical-attention.md) records the closed
-position/knee-side experiments and the current research reference, 0.897443 macro AUC.
+position/knee-side experiments; the current control is `knee-geometry-merged-2` (below).
 
 - **Inputs:** ReXNet-200 reads every sampled triplet at 224 px, 0.625 mm spacing and a 140 mm
   field.
