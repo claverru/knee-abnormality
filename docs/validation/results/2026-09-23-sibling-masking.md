@@ -23,7 +23,7 @@ the sibling hidden. The training-time test, `side-mask`, is recorded in the
   - `token_mask`: each of the four compartment labels pools only own-side and band tokens.
   - `pixel_blank`: `token_mask` plus sibling-side pixels beyond the band set to zero (the value
     outside the prepared rectangle), with one backbone pass per side.
-- **Script:** `scripts/adhoc/score_sibling_masking.py` on the unmerged `sibling-masking` branch
+- **Script:** [`score_sibling_masking`](../../../scripts/adhoc/score_sibling_masking.py), historical, from the retired `sibling-masking` branch
   (it needs that branch's `model.compartment_evidence`; a source snapshot is kept with the outputs); outputs
   in `outputs/analysis/sibling-masking-20260923/` (per-arm predictions, per-study token counts,
   summary). Intervals are central 80% paired report-group bootstraps, 2,000 draws.

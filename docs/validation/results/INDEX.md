@@ -2,6 +2,7 @@
 
 | Read when | Document |
 |---|---|
+| Checking the trained medial/lateral side mask (meniscus +0.0046, OA −0.0040) and global token self-attention with 3D RoPE replacing the 1D/2D embeddings (−0.0015, PF OA and Fracture −0.015) | [2026-09-23 side mask and token attention](2026-09-23-side-mask-and-token-attention.md) |
 | Checking whether compartment labels read the other compartment (medial/lateral sibling cross-talk): inference-only token masking and pixel blanking on `k05-clean`, AUC against sibling-positive vs sibling-clean negatives, the +0.006 ceiling | [2026-09-23 sibling masking](2026-09-23-sibling-masking.md) |
 | Reviewing prediction-driven label-noise training (bootstrapped and running-average targets, early-learning regularization, contradiction down-weighting, 1→0 class-balance schedule): six fold-0 results, why the model never memorizes its labels, submission candidates | [2026-09-23 noisy-labels campaign](2026-09-23-noisy-labels-campaign.md) |
 | Choosing how to compute validation AUC against the public leaderboard (S05–S48): soft-label vs hard-threshold, same-side pairs, gold-calibrated targets, consensus targets, machine/field/acquisition strata, report weights | [2026-09-23 validation AUC variants](2026-09-23-validation-auc-variants.md) |
