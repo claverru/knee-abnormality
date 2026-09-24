@@ -1,5 +1,29 @@
 # Implementation status
 
+Runner restructured and extended, 2026-09-24 (user request):
+
+- **Package layout.** `src/knee_abnormality/autoresearch/` is split into `campaign/` (definition,
+  report schemas, gates, review binding, completion checks), `runtime/` (storage, isolation, job
+  runner, providers, usage), `scoring/` (triplet accounting, per-label diagnostics), `reporting/`
+  (progress, status) and `supervisor/`. The supervisor is now one class composed from job,
+  experiment, result and scheduling parts, with role prompt texts in `supervisor/prompts.py`.
+  `cli.py` and `watchdog.py` stay at the top.
+- **Refactor verified unchanged:** `status`, `results` and `validate` for all nine historical
+  campaigns gave identical output before and after; every moved method and prompt text matched
+  the original syntax tree.
+- **Forced seeds:** an opt-in `backlog.seed_order: forced` runs every seed in file order before
+  any research ([campaign setup](campaign-setup.md#files-and-startup)).
+- **Control retrain on adoption:** after a `provisional_accept`, a fresh-seed retrain of the adopted
+  source becomes the incumbent reference ([protocol](protocol.md#training-seed-policy)).
+- **Soft AUC:** comparisons record soft macro and per-label AUC as diagnostics.
+- **Resume:** resuming no longer triggers a researcher refill by itself.
+- **Calibration:** the start-up replay covers two training epochs instead of ten and
+  extrapolates the fixed per-epoch counts ([runtime](runtime.md)).
+- **Near-misses campaign** defined and validated, not started: 15 forced seeds on
+  `knee-geometry-merged-2` ([campaign](campaigns/near-misses/INDEX.md)).
+- **Findings:** the tracked `findings.md` is a decision summary; the full orchestrator log is in
+  the campaign's `outputs/autoresearch/<id>/findings.md`.
+
 Knee-geometry campaign stopped, 2026-09-24 (user decision): 18 decisions, one adoption,
 `meniscus-half-knee-mil` (fitted midline, meniscus-only side mask, training-only half-knee loss;
 +0.00307 fold 0, 0.944 public as S54). The last run, `meniscus-core-band-contrast-readout`, trained

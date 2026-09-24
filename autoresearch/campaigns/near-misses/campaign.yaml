@@ -1,0 +1,73 @@
+id: near-misses
+status: defined
+recipe: configs/training.yaml
+reference_run: outputs/training/knee-geometry-merged-2
+reference_equivalences: {}
+additional_evidence_runs:
+  - outputs/training/k05-clean
+  - outputs/training/adopted-new-seed
+  - outputs/training/token-attention
+backlog:
+  refill_below: 3
+  refill_to: 5
+  seed_order: forced
+artifacts_root: outputs/autoresearch/near-misses
+policy:
+  editable_files:
+    - configs/training.yaml
+    - src/knee_abnormality/config.py
+    - src/knee_abnormality/data/dataset.py
+    - src/knee_abnormality/data/preprocessing/geometry.py
+    - src/knee_abnormality/data/preprocessing/laterality.py
+    - src/knee_abnormality/data/preprocessing/preparation.py
+    - src/knee_abnormality/modeling/augmentation.py
+    - src/knee_abnormality/modeling/model.py
+    - src/knee_abnormality/modeling/spatial_tokens.py
+    - src/knee_abnormality/training/lightning.py
+    - src/knee_abnormality/inference/engine.py
+    - src/knee_abnormality/inference/reflection.py
+  editable_directories: []
+  config_keys: []
+  config_prefixes:
+    - model.meniscus_readout
+    - model.oa_readout
+    - model.position_encoding
+    - model.token_dropout
+    - model.plane_readout
+    - trainer.half_knee
+    - trainer.label_noise
+    - trainer.any_oa_loss
+  list_item_fields: {}
+  input_identity_keys:
+    - preprocessing_identity
+  require_source_change: true
+  developer_instructions: >-
+    Implement exactly the assigned idea on the current incumbent and switch it on in
+    configs/training.yaml. New settings go under the idea's prefix in config.py:
+    model.meniscus_readout (ideas 1, 3, 4, 15), model.oa_readout (7, 8), model.position_encoding
+    (6, 13), model.token_dropout (9, 10), model.plane_readout (11), trainer.half_knee (2, 3, 14,
+    15), trainer.label_noise (5) or trainer.any_oa_loss (12); never change
+    trainer.half_knee_loss_weight. identity.py is protected: record any new preprocessing setting
+    inside the existing identity dictionaries (RELIABILITY in geometry.py, SAMPLING_IDENTITY in
+    sampling.py, SPATIAL_TOKEN_IDENTITY in spatial_tokens.py, REFLECTION_IDENTITY in
+    augmentation.py) so the preprocessing identity changes with it. Knee side, centre, midline
+    and patient coordinates come only from headers and existing rule-based checks. Keep the
+    current per-token handling of unknown side and invalid geometry; do not add a study-level
+    incomplete-geometry fallback. Family-scoped behavior is allowed only for the meniscus pair
+    and the OA family (Medial, Lateral and PF OA), one rule per family, as the idea specifies;
+    every other label keeps its path. Follow-up ideas reuse the parents' code from the
+    changes.diff paths named in the idea, adapted to the current source. Every new batch key the
+    model reads must be added to MODEL_BATCH_KEYS in inference/engine.py; change nothing else in
+    engine.py. Reflection augmentation and reflection TTA must keep every new side- or
+    position-dependent quantity consistent. Log each mechanism's activity per epoch (studies or
+    tokens affected, learned scales, auxiliary losses, dropped or masked counts) so it is shown to
+    be active. Return prepared or blocked. Use the existing Python environment for static checks.
+    No tests.
+  researcher_instructions: >-
+    Research starts only after the user's 15 seeds finish. Propose refinements or combinations of
+    this campaign's completed runs, driven by their diagnostics (family deltas, soft AUC, per-label
+    patterns against the seed noise measured between knee-geometry-merged-2 and the adopted run),
+    and say which parents each builds on. Focus on the weakest labels (PF OA, Effusion, Lateral
+    OA, Synovitis). No sampler, crop or image-budget changes, no score sweeps of spatial settings,
+    no trained model for side, centre or landmarks, no per-label rules outside the meniscus and OA
+    families, and no report-derived supervision.

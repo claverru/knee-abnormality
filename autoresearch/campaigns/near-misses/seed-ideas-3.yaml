@@ -1,0 +1,122 @@
+ideas:
+- id: plane-contrast-readouts
+  mechanism_id: plane-contrast-specific-readouts
+  parent_idea_id: null
+  title: Give each plane/contrast type its own readout weights before summing, initialized from the shared readout
+  opportunity: >-
+    Current pooling collapses all acquisition types before one linear classifier per label. PF OA
+    draws its evidence from axial fluid (29%) and sagittal (54%) and almost none from coronal;
+    other labels have different profiles. An accepted, never-started small change.
+  mechanism: >-
+    Keep six partial vectors per label, u_cq = sum over tokens of type q of alpha_ci * h_i, and
+    compute z_c = sum_q w_cq . u_cq + b_c with the same global attention denominator. Initialize
+    every w_cq from the current w_c, reproducing the original predictions apart from summation
+    order; missing types contribute zero. Image and token budgets unchanged.
+  precedents:
+  - 'Spec: docs/backlog/small-changes.md#planecontrast-specific-readouts'
+  - 'Per-type contribution: docs/validation/results/2026-09-17-type-contribution.md'
+  novelty: First per-type readout; count normalization, gated attention and residual readouts were different changes.
+  coverage: All labels.
+  exploitation: Check missing-type studies and vendor strata in the diagnostics.
+  budget: Six times the readout weights; compute type contributions without a large pooling tensor.
+  implementation: modeling/model.py under model.plane_readout; log the divergence of w_cq from w_c per epoch.
+  open_choices: None; initialization is fixed.
+  dependencies: []
+  priority_rationale: Label-agnostic, suits PF OA's plane profile, and costs no images.
+- id: any-oa-auxiliary
+  mechanism_id: knee-level-oa-auxiliary-target
+  parent_idea_id: null
+  title: Training-only whole-knee head that predicts the maximum of the three OA soft labels
+  opportunity: >-
+    Reports often say "tricompartmental" or leave the compartment vague, so compartment OA labels
+    are noisy while "any OA in the knee" is denser and cleaner. PF OA features would learn from
+    every OA case.
+  mechanism: >-
+    One extra attention row and classifier predict max(Medial OA, Lateral OA, PF OA) from the soft
+    targets, with the same soft BCE and class-balance treatment, added to the loss at a fixed small
+    weight. Training only: the head is discarded at inference and the twelve outputs are
+    unchanged.
+  precedents:
+  - 'OA-family readouts in knee-geometry were flat; none used a knee-level target.'
+  novelty: First auxiliary target that pools the OA family.
+  coverage: The OA family, through shared token features.
+  exploitation: If it helps, OA grade or extent targets become worth deriving.
+  budget: One attention row and classifier; negligible runtime.
+  implementation: modeling/model.py and training/lightning.py under trainer.any_oa_loss; the weight is fixed before launch; log the auxiliary loss.
+  open_choices: The weight is fixed before launch, no sweep.
+  dependencies: []
+  priority_rationale: A cheap, label-noise-aware way to give PF OA more signal.
+- id: slice-orientation-3d-position
+  mechanism_id: side-normalized-3d-token-position
+  parent_idea_id: null
+  title: 'Follow-up to #6: add each slice''s normal vector to the side-normalized 3D position input'
+  opportunity: >-
+    The lumbar solution fed world coordinates plus the slice normal as meta inputs. The normal
+    tells the model how a slice cuts the knee, which the 3D position alone does not; it matters
+    most for oblique series.
+  mechanism: >-
+    As #6, with the slice's unit normal (side-normalized in x, as the position) concatenated to
+    the 3D position features before the MLP. Unknown or untrusted geometry uses the same learned
+    vectors as #6.
+  precedents:
+  - 'claverru/RSNA-lumbar: META_COLS include xx, yy, zz and nx, ny, nz.'
+  - 'Code of this campaign''s side-normalized-3d-position experiment.'
+  novelty: Orientation-aware position encoding.
+  coverage: All labels.
+  exploitation: Runs regardless of #6's outcome, on #6's code.
+  budget: Three more inputs to the MLP; negligible runtime.
+  implementation: modeling/spatial_tokens.py and model.py under model.position_encoding; record in SPATIAL_TOKEN_IDENTITY.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: User interest; cheap on top of #6.
+- id: plane-negative-half-knee-mil
+  mechanism_id: plane-negative-half-knee-loss
+  parent_idea_id: null
+  title: In the half-knee loss, require a negative meniscus half to show no tear evidence in every plane it has
+  opportunity: >-
+    The half-knee loss was the only adoption of the last campaign. Its refinements so far changed
+    which tokens it sees (and lost); none changed what it teaches.
+  mechanism: >-
+    Keep the whole-half score z_h for positive supervision. Also compute the same smooth-max
+    score z_hp per represented anatomical plane in that half. Replace the auxiliary BCE by
+    y * softplus(-z_h) + (1 - y) * mean_p softplus(z_hp), with the incumbent's class-balance
+    weight and coefficient 0.075. Identical rules for both menisci; absent planes omitted; equals
+    the original loss with one plane.
+  precedents:
+  - 'meniscus-plane-negative-mil (knee-geometry, proposed, never run): autoresearch/campaigns/knee-geometry/ideas.yaml'
+  - 'Adopted meniscus-half-knee-mil: outputs/autoresearch/knee-geometry/experiments/meniscus-half-knee-mil-20260923T231102Z-edeb9f68/changes.diff'
+  novelty: First change to what the half-knee loss supervises.
+  coverage: The two meniscus labels through the training-only detector.
+  exploitation: Inference unchanged.
+  budget: Per-plane smooth-max; negligible runtime.
+  implementation: training/lightning.py under trainer.half_knee; log per-plane loss terms.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The only untested refinement of the adopted mechanism's supervision.
+- id: attention-coupled-meniscus-mil
+  mechanism_id: attention-weighted-half-knee-aggregation
+  parent_idea_id: null
+  title: Weight the half-knee detector's aggregation by the public meniscus attention scores
+  opportunity: >-
+    In knee-geometry this idea crashed on its first batch with an IndexError in a token-count
+    logging line (used length 8 against counts 16), so the mechanism never trained. Detector-ranked
+    pooling, the closest idea tried, lost -0.0018 (Lateral Meniscus -0.0039).
+  mechanism: >-
+    For eligible half tokens H, detector logits d and the existing anatomically biased attention
+    scores s, use z = logsumexp_H(s + d) - logsumexp_H(s) instead of the uniform smooth-max, with
+    temperature 1, backpropagating through both s and d. Keep the partition, observed-target
+    handling, class balance and coefficient 0.075; both menisci follow the same equation. The
+    auxiliary disappears at inference.
+  precedents:
+  - 'meniscus-attention-coupled-mil (knee-geometry, invalid): outputs/autoresearch/knee-geometry/experiments/meniscus-attention-coupled-mil-20260924T011048Z-069c8673/changes.diff; fix the logging crash.'
+  novelty: First trained run of attention-coupled half-knee aggregation.
+  coverage: The two meniscus labels.
+  exploitation: Tells whether coupling the loss to public attention helps or hurts.
+  budget: Negligible.
+  implementation: training/lightning.py and model.py under trainer.half_knee and model.meniscus_readout.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Never ran because of a logging bug; low expected value, last in order.
+exhausted_directions: >-
+  Changes to which tokens the half-knee loss sees (axis consensus, fractional footprint,
+  detector ranking) all lost; this campaign only changes what it supervises or how it aggregates.

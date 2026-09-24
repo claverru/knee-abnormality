@@ -1,0 +1,133 @@
+ideas:
+- id: meniscus-shared-residual-head
+  mechanism_id: shared-plus-residual-meniscus-classifier
+  parent_idea_id: null
+  title: Read both masked meniscus pools with one shared classifier plus zero-initialized per-side residuals, without the study-level fallback
+  opportunity: >-
+    In knee-geometry this head scored -0.0006 against the adopted run but +0.0025 against
+    k05-clean (80% interval [+0.0008, +0.0041]); both menisci improved (+0.0028, +0.0041), OA
+    +0.0020, and its x1 score was the campaign's best. Its loss was almost all Fracture (-0.0135),
+    the label a re-seed of the same recipe moves by -0.0137. It also carried the study-level
+    fallback, which alone scored -0.0018, so the head was never measured on its own.
+  mechanism: >-
+    For the two meniscus rows, w_med = w_shared + delta_med and w_lat = w_shared + delta_lat, with
+    w_shared initialized to the mean of the two current rows, deltas at zero, no penalty and
+    private biases. Attention rows, the own-side meniscus mask, the half-knee loss and every other
+    head stay unchanged. Lateral tears (279 exclusive training studies against 1,150 medial) learn
+    from medial examples through the shared vector.
+  precedents:
+  - 'meniscus-shared-residual-head (knee-geometry): diff at outputs/autoresearch/knee-geometry/experiments/meniscus-shared-residual-head-20260924T002657Z-24ba1afc/changes.diff; take the head, not the fallback.'
+  - 'Hard-tied meniscus classifiers lost -0.0071 and -0.0075 when each pool still mixed both halves (medial-lateral-transfer); the mask now separates them.'
+  novelty: First measurement of the shared-plus-residual head without the study-level fallback, on the re-seeded control.
+  coverage: The two meniscus labels, every study.
+  exploitation: If it helps, #3 combines it with the folded detector and #4 extends it to a full side split.
+  budget: One extra 2560-parameter vector; no runtime change.
+  implementation: Adds the shared and residual vectors in modeling/model.py under model.meniscus_readout; keeps the per-token mask and half-knee loss exactly as the incumbent has them.
+  open_choices: None; initialization and no penalty are fixed.
+  dependencies: []
+  priority_rationale: The strongest measured near-miss; the loss that sank it looks like seed noise.
+- id: meniscus-folded-detector-isolated
+  mechanism_id: folded-half-knee-detector-position
+  parent_idea_id: null
+  title: Give the training-only half-knee detector distance from the midline instead of signed side, with its gradients kept out of the shared position and normalization layers
+  opportunity: >-
+    Two knee-geometry runs of this idea scored +0.0020 and +0.0027 against k05-clean (80% lower
+    bounds +0.0002 and +0.0011); the menisci rose in both (+0.0023, +0.0025). Against the adopted
+    run they were -0.0011 and -0.0004, with losses in Fracture (-0.0155), Baker's and Contusion,
+    the labels the re-seed moves. The isolated version was better and also carried the fallback.
+  mechanism: >-
+    In the half-knee detector's input only, replace the signed medial-lateral coordinate with its
+    absolute value (sagittal 1D position becomes tokenwise |medial_axis| in mm; coronal and axial
+    2D first input becomes |medial_axis| / R). Detach the positional, plane and contrast
+    embeddings and the LayerNorm affine parameters for the detector path, so its loss updates the
+    detector, projected features and backbone but not shared position calibration. Main-loss
+    gradients and the public readout are unchanged; inference is unchanged.
+  precedents:
+  - 'meniscus-folded-medial-position (knee-geometry): outputs/autoresearch/knee-geometry/experiments/meniscus-folded-medial-position-20260924T045834Z-da90ae15/changes.diff'
+  - 'meniscus-folded-auxiliary-gradient-isolation (knee-geometry): outputs/autoresearch/knee-geometry/experiments/meniscus-folded-auxiliary-gradient-isolation-20260924T062707Z-a52c3a01/changes.diff; implement this version, without the fallback.'
+  novelty: The isolated folded detector measured on its own, without the fallback, on the re-seeded control.
+  coverage: The two meniscus labels through the shared training-only detector.
+  exploitation: Combined with #1 in #3.
+  budget: No parameters; negligible runtime.
+  implementation: Changes only the detector input path in modeling/model.py and training/lightning.py under trainer.half_knee; the public path and inference are untouched.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Two runs with positive lower bounds against the pre-adoption control.
+- id: meniscus-shared-head-folded-detector
+  mechanism_id: shared-head-plus-folded-detector
+  parent_idea_id: null
+  title: 'Follow-up to #1 and #2: combine the shared-plus-residual meniscus head with the isolated folded detector'
+  opportunity: >-
+    #1 shares the public meniscus classifier; #2 shares a side-free detector during training.
+    They change different parameters but target the same two labels, so their gains may add or
+    overlap. Nobody has trained them together.
+  mechanism: >-
+    Implement both mechanisms together on the current incumbent, exactly as specified in #1 and
+    #2, regardless of whether either was adopted.
+  precedents:
+  - 'Code of this campaign''s meniscus-shared-residual-head and meniscus-folded-detector-isolated experiments.'
+  novelty: First combination of a shared public meniscus classifier with a side-free training detector.
+  coverage: The two meniscus labels.
+  exploitation: Measures whether the two meniscus mechanisms stack.
+  budget: Same as #1 plus #2.
+  implementation: Reuse both experiments' changes on the current source under model.meniscus_readout and trainer.half_knee.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The combination's upside is the sum of the two strongest near-misses; run after both.
+- id: meniscus-side-split-readout
+  mechanism_id: side-split-meniscus-readout
+  parent_idea_id: null
+  title: 'Follow-up to #3: read each meniscus half with one shared attention row and classifier on folded coordinates, plus per-side corrections'
+  opportunity: >-
+    The RSNA lumbar solution (claverru/RSNA-lumbar) trained one head per condition shared across
+    left and right sides and spinal levels, with side-normalized world coordinates. Our adopted
+    half-knee loss uses this split only during training, and #1 and #2 share parts of it. Here
+    the split becomes the inference readout too. Before the anatomical bias the incumbent's medial
+    and lateral meniscus attention rows are already nearly shared.
+  mechanism: >-
+    One meniscus attention row and one classifier, each plus a zero-initialized per-side residual
+    (as in #1), read the medial-half tokens for Medial Meniscus and the lateral-half tokens for
+    Lateral Meniscus, with the medial-lateral coordinate folded to distance from the midline (as
+    in #2). Unknown-side or invalid-geometry tokens follow the incumbent's current handling.
+    Medial and lateral compartments are not mirror images, so keep the residuals and never mirror
+    pixels between halves.
+  precedents:
+  - 'claverru/RSNA-lumbar: train_study2levelside and mirror_world (side-free labels, side-normalized coordinates).'
+  - 'Code of this campaign''s #1 and #2 experiments.'
+  novelty: First full side-split meniscus readout at inference, rather than a training-only loss or shared classifier.
+  coverage: The two meniscus labels.
+  exploitation: The strongest form of the sharing idea; if it loses, the partial forms (#1 to #3) remain.
+  budget: One attention row and classifier replace two; negligible runtime.
+  implementation: modeling/model.py under model.meniscus_readout, building on #3's code.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Tests the full lumbar-style split after its parts.
+- id: early-learning-regularization-current
+  mechanism_id: early-learning-regularization
+  parent_idea_id: null
+  title: Port early-learning regularization unchanged (lambda 0.075, momentum 0.7) to the current recipe
+  opportunity: >-
+    Against its same-seed control k05-clean it scored +0.0013 hard (80% [-0.0004, +0.0031]) and
+    +0.0008 soft, and 0.943 public (S57) against 0.942 (S48). Against the mean of its three
+    near-null sibling runs, ligaments gained +0.0045 (soft 95% interval above zero) and menisci
+    +0.0031; Baker's was the only term-specific loss (-0.0050). It sharpens predictions rather
+    than re-ranking them.
+  mechanism: >-
+    Keep a per-study running average of the model's own predictions (momentum 0.7) and add the
+    penalty weight * log(1 - overlap(running_average, p)) to the loss, weight 0.075, exactly as in
+    the noisy-labels run. Nothing else changes.
+  precedents:
+  - 'early-learning-regularization (noisy-labels): outputs/autoresearch/noisy-labels/experiments/early-learning-regularization-20260923T124737Z-7aba30fc/changes.diff'
+  - 'Per-label analysis: docs/ongoing/early-learning-regularization.md'
+  - 'Combined with the class-balance schedule it lost Lateral OA -0.0086 and PF OA -0.0075, an interaction risk with other loss terms.'
+  novelty: First run on the knee-geometry recipe, which adds the half-knee loss the term may interact with.
+  coverage: All twelve labels.
+  exploitation: Predefined checks for interpretation - ligaments above zero, OA no worse than about -0.002, Baker's loss no larger than about -0.005.
+  budget: A per-study memory tensor; negligible runtime.
+  implementation: training/lightning.py and config.py under trainer.label_noise, from the noisy-labels diff.
+  open_choices: None; lambda and momentum are fixed.
+  dependencies: []
+  priority_rationale: Two agreeing paired signals, local and public, and a cheap port.
+exhausted_directions: >-
+  Study-level incomplete-geometry fallbacks (confounded earlier runs), sampler and crop changes,
+  bigger images, and report-derived supervision are outside this campaign.
