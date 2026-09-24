@@ -1,6 +1,6 @@
 # Submission ledger
 
-All 55 Kaggle competition submissions, newest first, with submission times in UTC. The table is
+All 56 Kaggle competition submissions, newest first, with submission times in UTC. The table is
 regenerated from the live submission list and the local bundles by
 [`relabel_kaggle_submission_datasets`](../../../scripts/adhoc/relabel_kaggle_submissions.py),
 which also writes `outputs/submission/kaggle-ledger.json`. The dated records in this folder cover
@@ -45,6 +45,7 @@ comes from the table in the relabel script rather than from the manifest.
 
 | S | Submitted (UTC) | Label | Inference | Fold 0 | Public | ID | Record |
 |---|---|---|---|---|---:|---:|---|
+| S56 | 2026-09-24 11:14 | knee-geometry adopted new seed fold0 | x4 tau0.75 bs4 | (x1, scanner split) 0.896343 | 0.940 | 56519764 | [Current model](../../modeling/current-model.md) |
 | S55 | 2026-09-24 09:34 | knee-geometry merged new seed fold0 | x4 tau0.75 bs4 | (x1, scanner split) 0.897581 | 0.940 | 56517876 | [Knee-geometry findings](../../../autoresearch/campaigns/knee-geometry/findings.md) |
 | S54 | 2026-09-24 08:08 | knee-geometry half-knee MIL fold0 | x4 tau0.75 bs4 | (x1, scanner split) 0.900879 | 0.944 | 56516135 | [Knee-geometry findings](../../../autoresearch/campaigns/knee-geometry/findings.md) |
 | S53 | 2026-09-24 08:20 | class-balance schedule fold0 | x4 tau0.75 bs4 | (x1, scanner split) 0.899067 | 0.941 | 56516372 | [Noisy-labels campaign](../../validation/results/2026-09-23-noisy-labels-campaign.md#class-weighting-changes-need-the-public-board) |

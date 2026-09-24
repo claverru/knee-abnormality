@@ -21,7 +21,8 @@ Adopted 2026-09-24 from the [knee-geometry campaign](../../autoresearch/campaign
 The current control, `knee-geometry-merged-2` (2026-09-24), adds the robust centre and bilateral
 rule below and draws a fresh seed, 638120755: ×4 macro 0.900955, public 0.940 (S55). At that seed
 the robust centre and bilateral rule measured +0.0014 (95% [−0.0022, +0.0053]) against the same
-model without them (`adopted-new-seed`, 0.899547).
+model without them (`adopted-new-seed`, 0.899547); publicly both scored 0.940 (S55 with them,
+S56 without), so the drop from S54's 0.944 is the seed, not the robust centre or bilateral rule.
 
 There is no additive 3D embedding or token graph. The best submitted bundle is distinct
 from the local research incumbent; submission status lives in
