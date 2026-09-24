@@ -47,9 +47,10 @@ retry at 17:51. `oblique-clean` was stopped for the merge with `oblique-group-em
 
 Agent models, 2026-09-23 (user decision): [agents.yaml](agents.yaml) moves the Claude
 orchestrator and researcher to Opus 5.5, and the Codex orchestrator, completion reporter and
-watchdog to GPT-6 Sol and GPT-6 Luna; the one-off Codex repair assignment uses GPT-6 Sol at high.
-Developers (Sonnet 5, GPT-5.6 Terra), the Codex researcher (GPT-6 Astra) and the Claude completion
-reporter (Haiku 4.5) are unchanged, as are all efforts. Campaigns seal their profiles at start, so
+watchdog to GPT-6 Sol and GPT-6 Luna, and the Codex developer from GPT-5.6 Terra to GPT-6 Sol at
+high, which retires the separate Sol/high repair override. The Claude developer (Sonnet 5), the
+Codex researcher (GPT-6 Astra) and the Claude completion reporter (Haiku 4.5) are unchanged, as are
+all efforts. Campaigns seal their profiles at start, so
 retired campaigns keep their recorded models; the watchdog reads the file on each repair.
 
 Cleaned-source oblique campaign, 2026-09-22 (user decision): main gained series cleaning
