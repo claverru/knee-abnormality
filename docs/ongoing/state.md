@@ -30,7 +30,8 @@ pending experiments are classified in the [backlog](../backlog/INDEX.md).
   objectives against `k05-clean` (S48), none adopted; the best was early-learning regularization
   at +0.0013 hard. The model does not memorize its labels in ten fine-tuning epochs, so its own
   predictions add no teacher; only an independent model does. The 1→0 class-balance schedule tied
-  locally and, with early-learning regularization, awaits a public submission
+  locally and scored 0.941 public (S53) against 0.942 for S48; early-learning regularization
+  awaits a public submission
   ([result](../validation/results/2026-09-23-noisy-labels-campaign.md)). The adaptive-allocation
   big bet is retired with it.
 

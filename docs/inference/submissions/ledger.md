@@ -1,6 +1,6 @@
 # Submission ledger
 
-All 52 Kaggle competition submissions, newest first, with submission times in UTC. The table is
+All 55 Kaggle competition submissions, newest first, with submission times in UTC. The table is
 regenerated from the live submission list and the local bundles by
 [`relabel_kaggle_submission_datasets`](../../../scripts/adhoc/relabel_kaggle_submissions.py),
 which also writes `outputs/submission/kaggle-ledger.json`. The dated records in this folder cover
@@ -47,6 +47,7 @@ comes from the table in the relabel script rather than from the manifest.
 |---|---|---|---|---|---:|---:|---|
 | S55 | 2026-09-24 09:34 | knee-geometry merged new seed fold0 | x4 tau0.75 bs4 | (x1, scanner split) 0.897581 | 0.940 | 56517876 | [Knee-geometry findings](../../../autoresearch/campaigns/knee-geometry/findings.md) |
 | S54 | 2026-09-24 08:08 | knee-geometry half-knee MIL fold0 | x4 tau0.75 bs4 | (x1, scanner split) 0.900879 | 0.944 | 56516135 | [Knee-geometry findings](../../../autoresearch/campaigns/knee-geometry/findings.md) |
+| S53 | 2026-09-24 08:20 | class-balance schedule fold0 | x4 tau0.75 bs4 | (x1, scanner split) 0.899067 | 0.941 | 56516372 | [Noisy-labels campaign](../../validation/results/2026-09-23-noisy-labels-campaign.md#class-weighting-changes-need-the-public-board) |
 | S52 | 2026-09-23 11:09 | image-blend oblique embedding fold0 | x4 tau0.75 bs4 | (x1, scanner split) 0.905319 | 0.943 | 56491424 | [Oblique groups](../../validation/results/2026-09-22-oblique-groups-result.md#group-embedding-on-image-blend-labels-s52) |
 | S51 | 2026-09-23 10:17 | oblique group embedding fold0 | x4 tau0.75 bs4 | (x1, scanner split) 0.901635 | 0.942 | 56490382 | [Oblique groups](../../validation/results/2026-09-22-oblique-groups-result.md#group-embedding-on-the-cleaned-source-s51) |
 | S50 | 2026-09-23 09:29 | k05 clean image-blend labels fold0 | x4 tau0.75 bs4 | (x1, scanner split) 0.904133 | **0.945** | 56489466 | – |

@@ -44,8 +44,10 @@ from the [class-balance exponent result](2026-09-21-class-balance-exponent.md): 
 and MCL −0.005 on hard AUC, 0.000 and +0.001 on soft. Weighted by the learning-rate schedule its
 effective exponent is 0.66, between k=0.5 (0.945 public) and k=0.75 (0.942). Fixed exponents moved
 the public score by 0.005 while fold 0 ranked them in reverse, so a local tie does not settle it.
-Its checkpoint and early-learning regularization's are the two submission candidates against
-S48, exported from their experiment sources as S51 was.
+Submitted from its experiment source as S53 (×4, τ 0.75, batch 4, bundle 2036c2b7), it scored
+0.941 public against 0.942 for S48, so decaying the weighting to zero does not recover k=0.5's
+0.945. Its notebook and dataset are titled S55 (the ledger's S55 is a different submission) because a stalled first attempt was stopped
+before submitting and the relaunch set the sequence by hand.
 
 Combining them was worse than either alone. Early-learning regularization pulls predictions toward
 their recent average while the schedule wants them to move late, and the pair lost Lateral OA
@@ -53,7 +55,8 @@ their recent average while the schedule wants them to move late, and the pair lo
 
 ## Artifacts
 
-Experiments, sources and checkpoints: `outputs/autoresearch/noisy-labels/experiments/`. The two
-submission candidates are `relaxing-class-balance-schedule-20260923T133826Z-824ef437` and
-`early-learning-regularization-20260923T124737Z-7aba30fc`. Soft AUC deltas are recomputed from
+Experiments, sources and checkpoints: `outputs/autoresearch/noisy-labels/experiments/`. The schedule
+run is `relaxing-class-balance-schedule-20260923T133826Z-824ef437` (S53, bundle
+`outputs/submission/exports/cbschedule-20260924-x4-tau075`); the unsubmitted early-learning
+candidate is `early-learning-regularization-20260923T124737Z-7aba30fc`. Soft AUC deltas are recomputed from
 each run's saved ×4 predictions with `soft_aucs`; they have no paired interval.
