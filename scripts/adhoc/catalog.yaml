@@ -784,3 +784,19 @@ scripts:
       - Full-fold scores replace only the affected studies; all predictions are recomputed at batch size 1 in bf16. Paired report-group bootstrap on the full fold and on the affected subset, which scores only labels with both classes.
       - Measures inference-time behaviour of checkpoints trained with pooled slots, not the value of training under a policy. Choosing among variants on fold 0 is selection; the intervals ignore it.
       - Historical since the oblique line closed on 2026-09-23 (docs/history/oblique-groups.md); it does not depend on the removed oblique-group code.
+  - id: score-sibling-masking
+    path: scripts/adhoc/score_sibling_masking.py
+    status: historical
+    summary: Re-predict the validation fold with a frozen checkpoint under three arms (intact, compartment tokens restricted to their own knee side, and sibling-side pixels blanked plus the token restriction) and score each compartment label against negatives whose sibling compartment is negative or positive.
+    tags: [medial, lateral, compartment, sibling, cross-talk, masking, occlusion, knee-side, meniscus, osteoarthritis, inference, validation, bootstrap, gpu]
+    commands:
+      - rtk proxy uv run --locked python -m scripts.adhoc.score_sibling_masking --output-dir outputs/analysis/sibling-masking-new
+    inputs: [Run directory with effective_config.json, selected checkpoint and saved validation predictions, Frozen split membership and evaluation targets, Original DICOMs]
+    outputs: [Per-arm prediction CSVs, Per-study token and fallback diagnostics CSV, Summary JSON with macro and per-stratum AUCs and 80% report-group intervals, Manifest and source snapshot]
+    notes:
+      - GPU; about three backbone passes per study. Attention temperature 1; the image multiplier defaults to 4. Accepts only checkpoints trained with whole_knee compartment evidence.
+      - Skips the checkpoint preprocessing-identity check and drops the removed oblique_tilt_deg series field; the intact arm's maximum difference from the saved predictions is the parity check.
+      - The side sign comes from the medial axis the model already computes; tokens within the midline band stay visible to both compartments, and unknown-side or invalid-geometry studies are left unmasked.
+      - Blanked pixels are set to zero, the value outside the prepared valid rectangle; a study-target with no token left on its side falls back to all tokens and is counted.
+      - Historical since the sibling-masking branch was retired on 2026-09-24. It needs that branch's model.compartment_evidence, which main never had; run it from the source snapshot in outputs/analysis/sibling-masking-20260923/source.
+    docs: [docs/validation/results/2026-09-23-sibling-masking.md]

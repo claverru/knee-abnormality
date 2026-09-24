@@ -101,7 +101,7 @@ Measured 2026-09-23 from headers, 4,410 studies
 - **Receptive field** (medial-lateral-transfer campaign): a stride-32 token 64 px from the
   midline takes about 30% of its input from the other image half, so a pooling mask does not
   remove sibling pixels from each token.
-- **Trained side mask, `side-mask`** (2026-09-23, `model.compartment_evidence: side_mask` on the
+- **Trained side mask, `side-mask`** ([result](../../../docs/validation/results/2026-09-23-side-mask-and-token-attention.md#trained-side-mask-side-mask); 2026-09-23, `model.compartment_evidence: side_mask` on the
   `sibling-masking` branch, patch in
   `outputs/analysis/side-mask-vs-k05-clean/side_mask.patch`, applies to `d914079`): the four
   compartment labels attend only to own-side tokens plus the ±10 mm band; unknown side or invalid
@@ -183,7 +183,7 @@ guide. Family deltas:
   [champion without 3D](../../../docs/inference/submissions/2026-09-15-champion-without-3d-at-inference.md)).
 - **Token graph** (kNN message passing with LPS offsets) stayed near initialization in both
   fold-0 runs ([lineage](../../../docs/history/model-lineage.md#retired-token-graph)).
-- **`token-attention`** (2026-09-23, branch `token-attention`, patch in
+- **`token-attention`** ([result](../../../docs/validation/results/2026-09-23-side-mask-and-token-attention.md#global-token-attention-token-attention); 2026-09-23, branch `token-attention`, patch in
   `outputs/analysis/token-attention-vs-k05-clean/token_attention.patch`): one pre-norm transformer
   block over each study's valid tokens with 3D RoPE on raw patient LPS (not side-normalized,
   relative only), 1D and 2D embeddings dropped, reflected studies negate x. Against `k05-clean`:
