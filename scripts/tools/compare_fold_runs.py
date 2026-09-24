@@ -9,7 +9,7 @@ import torch
 from pydantic import Field
 from pydantic_settings import SettingsError
 
-from knee_abnormality.autoresearch.gates import without_fields
+from knee_abnormality.autoresearch.campaign.gates import without_fields
 from knee_abnormality.cli import CLISettings
 from knee_abnormality.data.labels import STUDY, TARGET_THRESHOLD
 from knee_abnormality.evaluation.metrics import (

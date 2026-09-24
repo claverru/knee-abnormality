@@ -4,15 +4,21 @@ import subprocess
 import time
 from pathlib import Path
 
-from knee_abnormality.autoresearch.gates import acceptance_text
-from knee_abnormality.autoresearch.isolation import environment
-from knee_abnormality.autoresearch.storage import lock, read_json, sha256, write_json
+from knee_abnormality.autoresearch.campaign.gates import acceptance_text
+from knee_abnormality.autoresearch.runtime.isolation import environment
+from knee_abnormality.autoresearch.runtime.storage import (
+    lock,
+    read_json,
+    sha256,
+    write_json,
+)
 
 INTERPRETATION = (
     "Per-label intervals are exploratory, unadjusted paired report-group bootstrap "
     "95% intervals for candidate minus reference. They do not provide simultaneous "
     "coverage across labels or account for training-seed, checkpoint-selection or "
     f"repeated validation-selection uncertainty. Macro rule: {acceptance_text()}; "
+    "soft AUC (pairs weighted by soft targets) is a reported diagnostic with no interval; "
     "label diagnostics do not authorize per-label losses."
 )
 
@@ -82,10 +88,12 @@ def write_diagnostics(comparison, root):
             or frame["report_group"].null_count()
         ):
             raise ValueError("Comparison cohort or report groups cannot be reproduced")
-        hard = (frame.select(targets).to_numpy() >= labels.TARGET_THRESHOLD).astype(int)
+        soft_targets = frame.select(targets).to_numpy().astype(float)
+        hard = (soft_targets >= labels.TARGET_THRESHOLD).astype(int)
         predictions = {}
         prediction_inputs = {}
         point_scores = {}
+        soft_scores = {}
         for name in ("reference", "candidate"):
             record = next(
                 item
@@ -102,6 +110,9 @@ def write_diagnostics(comparison, root):
             point_scores[name] = metrics.aucs(hard, predictions[name], targets)[
                 "per_target_auc"
             ]
+            soft_scores[name] = metrics.soft_aucs(
+                soft_targets, predictions[name], targets
+            )
             prediction_inputs[name] = {"path": str(path), "sha256": record["sha256"]}
         bootstrap = report["paired_report_group_bootstrap"]
         groups, inverse = np.unique(
@@ -139,11 +150,16 @@ def write_diagnostics(comparison, root):
                 hard[:, [index]], predictions["reference"][:, [index]], weights
             )
             deltas.append(delta)
+            soft = {
+                name: soft_scores[name]["per_target_soft_auc"][target]
+                for name in predictions
+            }
             rows.append(
                 {
                     **row,
                     "negatives": frame.height - row["positives"],
                     "bootstrap": interval(delta, valid_draws),
+                    "soft": {**soft, "delta": soft["candidate"] - soft["reference"]},
                 }
             )
         macro_deltas = np.mean(deltas, axis=0)
@@ -194,6 +210,12 @@ def write_diagnostics(comparison, root):
             },
             "per_target": rows,
             "macro_bootstrap": macro,
+            "soft_macro": {
+                "reference": soft_scores["reference"]["soft_macro_auc"],
+                "candidate": soft_scores["candidate"]["soft_macro_auc"],
+                "delta": soft_scores["candidate"]["soft_macro_auc"]
+                - soft_scores["reference"]["soft_macro_auc"],
+            },
             "macro_adoption_confidence_level": 0.8,
             "interpretation": INTERPRETATION,
         }

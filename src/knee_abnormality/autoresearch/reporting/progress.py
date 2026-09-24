@@ -2,8 +2,8 @@ import math
 import re
 from pathlib import Path
 
-from knee_abnormality.autoresearch.diagnostics import experiment_diagnostics
-from knee_abnormality.autoresearch.storage import read_json
+from knee_abnormality.autoresearch.runtime.storage import read_json
+from knee_abnormality.autoresearch.scoring.diagnostics import experiment_diagnostics
 
 
 def number(value):
@@ -140,6 +140,14 @@ def per_label_lines(exp):
         "   Per-label AUC (exploratory; unadjusted paired 95% CI for delta):",
         f"   {'Label':<22} {'Reference':>9} {'Candidate':>9} {'Delta':>10}  {'95% CI':<24} {'Pos/Neg':>9} {'Draws':>10}",
     ]
+    soft = diagnostics.get("soft_macro")
+    if soft is not None:
+        lines.insert(
+            0,
+            f"   Soft macro AUC (diagnostic): {score_text(soft['reference'])} -> "
+            f"{score_text(soft['candidate'])}; delta {score_text(soft['delta'], True)}",
+        )
+        lines[-1] += f" {'Soft delta':>10}"
     for row in diagnostics["per_target"]:
         bootstrap = row["bootstrap"]
         lines.append(
@@ -148,6 +156,11 @@ def per_label_lines(exp):
             f"{interval_text(bootstrap['delta_percentile_95']):<24} "
             f"{row['positives']:>4}/{row['negatives']:<4} "
             f"{bootstrap['valid_draws']:>4}/{diagnostics['bootstrap']['draws']:<4}"
+            + (
+                f" {score_text(row['soft']['delta'], True):>10}"
+                if "soft" in row
+                else ""
+            )
         )
     return lines
 
@@ -191,6 +204,12 @@ def progress_lines(state, root, output):
                 f"Reference changed: gains measured from {anchor['id']} "
                 f"at AUC {score_text(anchor_score)}; reference change excluded from gain."
             )
+    for record in state.get("control_retrains", []):
+        lines.append(
+            f"Control retrained after adopting {record['adopted']} at seed {record['seed']}: "
+            f"AUC {score_text(saved_auc(root, record['control_run']))} "
+            f"(adopted run {score_text(saved_auc(root, record['adopted_run']))})"
+        )
     withdrawn = sum(
         exp.get("eligible_decision") == "provisional_accept"
         and exp.get("decision") not in {None, "provisional_accept"}

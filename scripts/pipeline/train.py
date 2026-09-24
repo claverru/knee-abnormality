@@ -19,7 +19,7 @@ from pydantic_settings import CliPositionalArg, SettingsError
 from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
 from pytorch_lightning.loggers import CSVLogger
 
-from knee_abnormality.autoresearch.accounting import TripletAccounting
+from knee_abnormality.autoresearch.scoring.accounting import TripletAccounting
 from knee_abnormality.cli import CLISettings
 from knee_abnormality.config import (
     INFERENCE_BATCH_SIZE,

@@ -1,4 +1,5 @@
 from pathlib import Path, PurePosixPath
+from typing import Literal
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -65,6 +66,7 @@ class BacklogPolicy(BaseModel):
 
     refill_below: int = Field(ge=1)
     refill_to: int = Field(ge=1, le=5)
+    seed_order: Literal["ranked", "forced"] = "ranked"
 
     @model_validator(mode="after")
     def thresholds(self):

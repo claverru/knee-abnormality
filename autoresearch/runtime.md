@@ -255,10 +255,13 @@ research fills only the remaining places. Calibration and sealed limits are reta
 
 Start checks the subscription login, Linux bubblewrap isolation, local GPU identity,
 control artifacts, and current recipe. A CPU-only replay then traverses the complete
-fold-0 training cohort for the existing ten-epoch schedule and deterministic validation
-twice. It measures actual prepared triplets, including decoding/retry shortfalls,
-without fitting another model. This one-time accounting pass can take substantial
-CPU and disk time. Research and candidate training wait for it to finish.
+fold-0 training cohort for two epochs and deterministic validation twice. It measures
+actual prepared triplets, including decoding/retry shortfalls, without fitting another
+model. Per-epoch counts are fixed by the triplet budget: the ten recorded knee-geometry
+epochs were identical. So the seal multiplies the replayed per-epoch count by the
+schedule's epochs, and refuses if the two replayed epochs differ. This one-time pass
+takes about two minutes of CPU (it took about nine with ten epochs). Research and
+candidate training wait for it to finish.
 
 The training budget is the measured total divided by the unchanged study-visit count.
 Tolerance is zero. Redistribution is allowed; increasing or decreasing the aggregate

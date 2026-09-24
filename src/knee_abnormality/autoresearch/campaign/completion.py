@@ -1,9 +1,9 @@
 import math
 from pathlib import Path
 
-from knee_abnormality.autoresearch.diagnostics import read_diagnostics
-from knee_abnormality.autoresearch.gates import evaluate, verdict
-from knee_abnormality.autoresearch.storage import read_json
+from knee_abnormality.autoresearch.campaign.gates import evaluate, verdict
+from knee_abnormality.autoresearch.runtime.storage import read_json
+from knee_abnormality.autoresearch.scoring.diagnostics import read_diagnostics
 
 
 def completion_blockers(state, event):

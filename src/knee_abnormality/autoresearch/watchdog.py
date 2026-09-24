@@ -13,11 +13,11 @@ import yaml
 from pydantic import Field
 from pydantic_settings import CliPositionalArg
 
+from knee_abnormality.autoresearch.campaign.binding import digest
 from knee_abnormality.autoresearch.cli import launch, preflight
-from knee_abnormality.autoresearch.integration import digest
-from knee_abnormality.autoresearch.isolation import changed_files, manifest
-from knee_abnormality.autoresearch.providers import auth_environment
-from knee_abnormality.autoresearch.storage import (
+from knee_abnormality.autoresearch.runtime.isolation import changed_files, manifest
+from knee_abnormality.autoresearch.runtime.providers import auth_environment
+from knee_abnormality.autoresearch.runtime.storage import (
     alive,
     atomic_write,
     lock,
@@ -26,8 +26,8 @@ from knee_abnormality.autoresearch.storage import (
     sha256,
     write_json,
 )
+from knee_abnormality.autoresearch.runtime.usage import capture_usage
 from knee_abnormality.autoresearch.supervisor import REJECTION_PAUSE, Supervisor
-from knee_abnormality.autoresearch.usage import capture_usage
 from knee_abnormality.cli import CLISettings
 
 
@@ -40,12 +40,12 @@ class WatchCLI(CLISettings):
 PROTECTED_CODE = tuple(
     f"src/knee_abnormality/autoresearch/{name}.py"
     for name in (
-        "gates",
-        "diagnostics",
-        "integration",
-        "completion",
-        "accounting",
-        "campaigns",
+        "campaign/gates",
+        "scoring/diagnostics",
+        "campaign/binding",
+        "campaign/completion",
+        "scoring/accounting",
+        "campaign/definition",
     )
 )
 REPAIRABLE_FILES = (

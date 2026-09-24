@@ -2,14 +2,14 @@ import hashlib
 import json
 from pathlib import Path
 
-from knee_abnormality.autoresearch.gates import (
+from knee_abnormality.autoresearch.campaign.gates import (
     ACCEPTANCE_RULE,
     active_incumbent_ideas,
     dependency_blockers,
 )
-from knee_abnormality.autoresearch.isolation import manifest
-from knee_abnormality.autoresearch.models import DeveloperReport
-from knee_abnormality.autoresearch.storage import read_json, sha256
+from knee_abnormality.autoresearch.campaign.reports import DeveloperReport
+from knee_abnormality.autoresearch.runtime.isolation import manifest
+from knee_abnormality.autoresearch.runtime.storage import read_json, sha256
 
 
 def digest(value):
@@ -173,10 +173,12 @@ def launch_blockers(state, exp):
         blockers.append("Previous training or its decision is still outstanding")
     if state["events"]:
         blockers.append("Campaign events are still pending")
+    if state.get("control_retrain"):
+        blockers.append("The adopted incumbent's control retrain is still pending")
     if any(
         not job["processed"]
         and job["kind"]
-        in {"training", "comparison", "orchestrator", "completion_reporter"}
+        in {"training", "comparison", "control", "orchestrator", "completion_reporter"}
         for job in state["jobs"].values()
     ):
         blockers.append("Training, comparison or decision work is still active")
