@@ -14,6 +14,15 @@ pending experiments are classified in the [backlog](../backlog/INDEX.md).
   incumbent's lead over them sits mostly in Fracture, Baker's and Contusion, labels a re-seed also
   moves ([findings](../../autoresearch/campaigns/knee-geometry/findings.md)).
 
+- **Report-attribute heads adopted, 2026-09-25 (user decision):** 35 training-only heads learn
+  JevK5 report attributes (target set 3.1) at weight 0.1. Against `oa-detector-control` they scored
+  +0.00105 ×4 macro (95% [−0.0012, +0.0035]) and 0.940 public (S62) against 0.938 (S60); the first
+  version on raw v3 targets tied at 0.938 (S61)
+  ([result](../validation/results/2026-09-25-report-attribute-heads.md),
+  [design](../modeling/report-attribute-heads.md)). The new control, `report-attributes-control`
+  (seed 2464012069, fold 2), scored ×4 0.898663 (best epoch 7); candidates pair with it. Fold 2
+  scores are not comparable with fold 1 scores.
+
 - **Three-compartment OA detector adopted, 2026-09-25 (user decision):** it narrowly missed the
   local rule in the [near-misses campaign](../validation/results/2026-09-25-near-misses-campaign.md)
   (+0.0013), but scored 0.944 public (S58) against 0.940 for its same-seed reference (S55). Its
@@ -75,7 +84,7 @@ pending experiments are classified in the [backlog](../backlog/INDEX.md).
   aggregation and SAM were not selected for the backlog in this review.
 
 - **Literature shortlist accepted, 2026-09-21:**
-  [richer report supervision through OA attributes](../backlog/big-bets.md#richer-report-supervision-oa-attributes)
+  [richer report supervision through OA attributes](report-attribute-extraction.md)
   is an unstarted big bet;
   [attention-token dropout](../backlog/small-changes.md#attention-token-dropout) was later tested
   and rejected (2026-09-25).

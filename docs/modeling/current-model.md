@@ -15,12 +15,22 @@ position/knee-side experiments; the current control is `knee-geometry-merged-2` 
   half of the knee, so token features learn the medial-lateral split.
 - **Three-compartment OA detector:** one detector, shared by Medial, Lateral and PF OA, is read
   over each compartment's region and added to that label's output through a learned scale.
+- **Report-attribute heads (training only):** 35 auxiliary heads predict the JevK5 report
+  attributes (grades, hedging, silence, tear and contusion location, extra findings) from the
+  shared tokens, weighted 0.1 ([design](report-attribute-heads.md)).
+
+Adopted 2026-09-25 by user decision: the report-attribute heads on target set 3.1
+([result](../validation/results/2026-09-25-report-attribute-heads.md)). Against
+`oa-detector-control` (seed 1485198267, fold 1) they scored +0.00105 ×4 macro, 95%
+[−0.0012, +0.0035], and 0.940 public (S62) against the control's 0.938 (S60). The new control,
+`report-attributes-control` (seed 2464012069, fold 2), scored ×4 0.898663 (best epoch 7, ×1
+0.890335); its public score is pending. Fold 2 scores are not comparable with fold 1 scores.
 
 Adopted 2026-09-25 by user decision: the three-compartment OA detector from the
 [near-misses campaign](../validation/results/2026-09-25-near-misses-campaign.md). It narrowly
 missed the local rule (+0.0013, 80% [−0.0002, +0.0029]) but scored 0.944 public (S58) against
-0.940 for its same-seed reference (S55). The new control trains at fresh seed 1485198267; its
-scores are pending.
+0.940 for its same-seed reference (S55). Its control, `oa-detector-control` (seed 1485198267,
+fold 1), scored ×4 0.900568 and 0.938 public (S60).
 
 Adopted 2026-09-24 from the [knee-geometry campaign](../../autoresearch/campaigns/knee-geometry/INDEX.md)
 (`meniscus-half-knee-mil`): ×4 macro 0.905834 against `k05-clean`'s 0.902760, +0.00307, 80%
@@ -62,7 +72,8 @@ bands; the experimental ten-epoch schedule was reverted. Historical
 | Anatomical attention | Fixed `sign * exp(log_strength) * tanh(medial_mm / 20)` for medial/lateral meniscus and OA; two trainable strengths start at 1 |
 | Meniscus side mask | Medial/Lateral Meniscus attend only to own-side tokens plus the ±10 mm band (`COMPARTMENT_MIDLINE_BAND_MM`); unknown side, invalid geometry or no own-side token keep all tokens |
 | `trainer.half_knee_loss_weight` | 0.075 |
-| Training seed | 2263738815, inherited by new research candidates from the incumbent |
+| `trainer.report_attribute_loss_weight`, `paths.report_attribute_manifest` | 0.1, `labels/jevk5-report-attribute-targets-v3.1.json` |
+| Training seed, fold | 2464012069 on fold 2 (`configs/training.yaml`), inherited by new research candidates from the control |
 | Precision | BF16 mixed on one automatically selected device (`PRECISION`, a constant) |
 
 The optimizer, schedule and trainer settings are described in
@@ -132,6 +143,11 @@ Tokens receive four additive embeddings:
   lateral half (both beyond ±10 mm); PF OA pools it over tokens in front of the knee centre. Each
   pooled score is added to the label's logit through its own zero-initialized scale. Tokens
   without trusted geometry belong to no region. Used at inference.
+- **Report-attribute heads:** `ReportAttributeHeads` in the Lightning module, outside
+  `KneeAbnormalityModel`, gives each report-attribute question its own attention query over the
+  normalized tokens and a softmax over its options. The reliability-weighted soft cross-entropy
+  against the JevK5 targets is added with weight 0.1. Prediction never uses the heads
+  ([report-attribute heads](report-attribute-heads.md)).
 
 The plane and contrast lookup buffers derive from the configured metadata, not from slot order.
 The ReXNet adapter derives stride 32 and origin 0 from its convolutions. The

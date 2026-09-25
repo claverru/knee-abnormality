@@ -1,0 +1,500 @@
+{
+  "version": 3,
+  "preamble": "The evidence is a knee MRI radiology report, possibly written in a language other than English. Answer only from what the report states about the structure the criterion names. A general statement covers every structure it names: 'cruciate ligaments normal' covers the ACL and PCL, 'collateral ligaments normal' covers the MCL and LCL, 'menisci normal' covers both menisci, 'articular cartilage normal' covers every compartment, and 'extensor mechanism normal' covers the patellar and quadriceps tendons; 'bones normal' covers bone marrow, not cartilage. A specific finding overrides a general 'normal' statement. A negated finding ('no tear', 'without signs of rupture') is absent, but other findings in the same sentence (degeneration, signal change, thickening, distension, edema) still count. Synonyms: interno or Innen = medial; externo or Aussen = lateral; pars intermedia = body.",
+  "questions": [
+    {
+      "id": "study_side",
+      "group": "Study",
+      "criterion": "Which knee was examined?",
+      "options": {
+        "right": "the right knee (right, derecha, desno, rechts, sağ, δεξιό, дясно)",
+        "left": "the left knee (left, izquierda, lijevo, links, sol, αριστερό, ляво)",
+        "both": "both knees",
+        "not_stated": "no side word appears in the report ('regelrecht' means normal, not right)"
+      }
+    },
+    {
+      "id": "study_context",
+      "group": "Study",
+      "criterion": "What reason for the examination does the report's clinical history or indication state? Use only the indication or history section (for example 'Indication', 'Clinical history', 'Antecedentes', 'Klinische Angaben'); ignore the findings and the conclusion.",
+      "options": {
+        "acute_injury": "a recent injury, trauma, twist, fall or sports injury, or an indication that calls the problem acute or current",
+        "pain_or_degenerative": "knee pain, a degenerative condition, or an indication that only names a diagnosis or a suspected lesion ('meniscal tear', 'Lesión LCM', 'Obs. ...', 'Descartar ...') without an injury",
+        "postoperative": "follow-up after knee surgery",
+        "other": "another stated reason, such as a mass, infection or inflammatory disease",
+        "not_stated": "no indication is given, or it only refers to a separate request ('see scanned request', 'Zie gescande aanvraag')"
+      }
+    },
+    {
+      "id": "acl_status",
+      "group": "ACL",
+      "criterion": "What does the report describe for the anterior cruciate ligament (ACL, LCA, VKB)? A statement that the cruciate ligaments are normal covers the ACL. If the report names a grade or extent, choose it even when the wording is hedged ('in favor of', 'consistent with').",
+      "options": {
+        "not_mentioned": "the report says nothing about the ACL or the cruciate ligaments",
+        "intact": "the ACL is normal, with no degeneration, signal change, thickening, distension or edema, stated directly or by a statement that the cruciate ligaments are normal",
+        "degeneration_or_sprain": "mucoid degeneration, thickening, increased signal, distension or a grade 1 sprain, with no tear",
+        "possible_tear": "the report is uncertain whether there is a tear: suspected, possible, cannot be excluded, rule out",
+        "tear_unspecified": "a tear the report names ('tear', 'rupture', 'consistent with a tear') without saying partial or complete",
+        "partial_unspecified": "a partial or grade 2 tear the report does not call low-grade, small, high-grade or subtotal",
+        "partial_low_grade": "a partial tear the report calls low-grade, small or minor, or one involving less than half of the fibres",
+        "partial_high_grade": "a high-grade, subtotal or near-complete partial tear, or one involving more than half of the fibres",
+        "complete_tear": "a complete, full-thickness or grade 3 tear, rupture or discontinuity, not subtotal or near-complete",
+        "graft": "a reconstructed ACL or an ACL graft"
+      }
+    },
+    {
+      "id": "mcl_status",
+      "group": "MCL",
+      "criterion": "What does the report describe for the medial collateral ligament (MCL, LCM, LCI, LCT, Innenband, tibial collateral ligament)? A statement that the collateral ligaments are normal covers the MCL.",
+      "options": {
+        "not_mentioned": "the report says nothing about the MCL or the collateral ligaments, including a report with no ligament findings at all",
+        "intact": "the MCL is normal, with no signal change, thickening, distension or edema, stated directly or by a statement that the collateral ligaments are normal",
+        "sprain_or_thickening": "a grade 1 or low-grade sprain, distension, edema in or around the ligament, or thickening or chronic change without a tear",
+        "possible_tear": "the report is uncertain whether there is a tear: suspected, possible, cannot be excluded, rule out",
+        "partial_unspecified": "a grade 2 or partial tear that the report does not call high-grade",
+        "partial_high_grade": "a high-grade partial tear with most fibres disrupted",
+        "complete_tear": "a grade 3, complete or full-thickness tear or rupture"
+      }
+    },
+    {
+      "id": "mcl_timing",
+      "group": "MCL",
+      "criterion": "When did the medial collateral ligament (MCL) injury happen, according to the report?",
+      "options": {
+        "no_injury": "the report describes no MCL injury: the MCL is normal or not mentioned",
+        "acute": "an MCL injury described as acute, recent or fresh, or with edema or fluid in or around the ligament",
+        "chronic": "an MCL injury described as old, chronic, remote, scarred or healed, or Pellegrini-Stieda calcification",
+        "not_stated": "an MCL injury is described, but nothing indicates its timing and no edema or fluid is mentioned"
+      }
+    },
+    {
+      "id": "medial_meniscus_status",
+      "group": "Medial Meniscus",
+      "criterion": "What does the report describe for the medial meniscus? A statement that the menisci are normal covers it. If several findings are described, answer for the most severe.",
+      "options": {
+        "not_mentioned": "the report says nothing about the medial meniscus itself or about the menisci in general; findings described only for the lateral meniscus belong here",
+        "normal": "the medial meniscus is normal or intact, stated directly or by a statement that the menisci are normal",
+        "degeneration": "intrasubstance, myxoid or mucoid signal, degeneration or meniscopathy, including grade 1, 2, 2a or 2b signal and a 'lesion' or 'partial damage' graded 2, not reaching the surface; subluxation or extrusion alone does not make it a tear",
+        "possible_tear": "the report is uncertain whether there is a tear: rule out, R/O, suspicious of, suspected, may or could represent, cannot be excluded, equivocal",
+        "tear": "a tear of any type or size reaching the surface, including small, degenerative, grade 3 or partial-thickness tears; 'in favor of', 'consistent with', 'compatible with' or 'represents' a tear counts",
+        "displaced_or_truncated": "a displaced or flipped fragment or flap, a bucket-handle tear, or loss of meniscal substance (truncated, amputated, diminutive, macerated, volume loss, resected); this applies even when a tear is also described"
+      }
+    },
+    {
+      "id": "medial_meniscus_tear_location",
+      "group": "Medial Meniscus",
+      "criterion": "Where in the medial meniscus does the report place a tear, suspected tear or displaced fragment? The parts are the anterior horn, the body (mid portion, corpus, pars intermedia) and the posterior horn with the posterior root.",
+      "options": {
+        "no_tear": "no tear of the medial meniscus: it is normal, not mentioned, or shows only degeneration or grade 1 or 2 signal; tears of the lateral meniscus do not count",
+        "anterior": "a tear located in the anterior horn only",
+        "body": "a tear located in the body only",
+        "posterior": "a tear located in the posterior horn or posterior root only",
+        "posterior_body": "a tear located in the posterior horn and the body",
+        "anterior_body": "a tear located in the anterior horn and the body",
+        "multiple": "a tear through all three parts or the whole meniscus, or separate tears in the anterior and posterior horns",
+        "not_stated": "a tear of the medial meniscus whose location is not stated"
+      }
+    },
+    {
+      "id": "medial_meniscus_tear_type",
+      "group": "Medial Meniscus",
+      "criterion": "What type of medial meniscus tear does the report describe?",
+      "options": {
+        "no_tear": "no tear of the medial meniscus is described: it is normal, not mentioned, or shows only degeneration; tears of the lateral meniscus do not count",
+        "horizontal": "a horizontal, oblique or cleavage tear",
+        "longitudinal": "a vertical longitudinal tear",
+        "radial": "a radial, transverse or parrot-beak tear in the horn or body",
+        "complex": "a complex tear without a displaced fragment",
+        "displaced": "a bucket-handle, flap or displaced tear, even if also called complex or longitudinal; extrusion or expulsion of the meniscus does not count",
+        "root": "a tear at the root attachment or a root avulsion",
+        "not_stated": "a tear of the medial meniscus is described but its pattern is not named"
+      }
+    },
+    {
+      "id": "medial_meniscus_extrusion",
+      "group": "Medial Meniscus",
+      "criterion": "Does the report describe extrusion of the medial meniscus?",
+      "options": {
+        "yes": "the medial meniscus is extruded, subluxed or bulging beyond the tibial margin, including a known extrusion described as unchanged or not progressing",
+        "no": "extrusion is not described; a fragment displaced into the notch, a gutter or a recess is not extrusion"
+      }
+    },
+    {
+      "id": "lateral_meniscus_status",
+      "group": "Lateral Meniscus",
+      "criterion": "What does the report describe for the lateral meniscus? A statement that the menisci are normal covers it. If several findings are described, answer for the most severe.",
+      "options": {
+        "not_mentioned": "the report says nothing about the lateral meniscus itself or about the menisci in general; findings described only for the medial meniscus belong here",
+        "normal": "the lateral meniscus is normal or intact, stated directly or by a statement that the menisci are normal; a discoid meniscus without a tear counts here",
+        "degeneration": "intrasubstance, myxoid or mucoid signal, degeneration or meniscopathy, including grade 1, 2, 2a or 2b signal and a 'lesion' or 'partial damage' graded 2, not reaching the surface; subluxation or extrusion alone does not make it a tear",
+        "possible_tear": "the report is uncertain whether there is a tear: rule out, R/O, suspicious of, suspected, may or could represent, cannot be excluded, equivocal",
+        "tear": "a tear of any type or size reaching the surface, including small, degenerative, grade 3 or partial-thickness tears; 'in favor of', 'consistent with', 'compatible with' or 'represents' a tear counts",
+        "displaced_or_truncated": "a displaced or flipped fragment or flap, a bucket-handle tear, or loss of meniscal substance (truncated, amputated, diminutive, macerated, volume loss, resected); this applies even when a tear is also described"
+      }
+    },
+    {
+      "id": "lateral_meniscus_tear_location",
+      "group": "Lateral Meniscus",
+      "criterion": "Where in the lateral meniscus does the report place a tear, suspected tear or displaced fragment? The parts are the anterior horn, the body (mid portion, corpus, pars intermedia) and the posterior horn with the posterior root.",
+      "options": {
+        "no_tear": "no tear of the lateral meniscus: it is normal, not mentioned, or shows only degeneration or grade 1 or 2 signal; tears of the medial meniscus do not count",
+        "anterior": "a tear located in the anterior horn only",
+        "body": "a tear located in the body only",
+        "posterior": "a tear located in the posterior horn or posterior root only",
+        "posterior_body": "a tear located in the posterior horn and the body",
+        "anterior_body": "a tear located in the anterior horn and the body",
+        "multiple": "a tear through all three parts or the whole meniscus, or separate tears in the anterior and posterior horns",
+        "not_stated": "a tear of the lateral meniscus whose location is not stated"
+      }
+    },
+    {
+      "id": "lateral_meniscus_tear_type",
+      "group": "Lateral Meniscus",
+      "criterion": "What type of lateral meniscus tear does the report describe?",
+      "options": {
+        "no_tear": "no tear of the lateral meniscus is described: it is normal, not mentioned, or shows only degeneration; tears of the medial meniscus do not count",
+        "horizontal": "a horizontal, oblique or cleavage tear",
+        "longitudinal": "a vertical longitudinal tear",
+        "radial": "a radial, transverse or parrot-beak tear in the horn or body",
+        "complex": "a complex tear without a displaced fragment",
+        "displaced": "a bucket-handle, flap or displaced tear, even if also called complex or longitudinal; extrusion or expulsion of the meniscus does not count",
+        "root": "a tear at the root attachment or a root avulsion",
+        "not_stated": "a tear of the lateral meniscus is described but its pattern is not named"
+      }
+    },
+    {
+      "id": "medial_cartilage_depth",
+      "group": "Medial OA",
+      "criterion": "What is the deepest cartilage damage the report describes in the medial femorotibial compartment (medial femoral condyle and medial tibial plateau)? Meniscal degeneration or tears and their grades are not cartilage findings.",
+      "options": {
+        "not_mentioned": "the report says nothing about medial femorotibial compartment cartilage or about the articular cartilage in general",
+        "normal": "the cartilage is normal, intact or preserved, stated directly or by a general statement such as 'articular cartilage normal', 'no chondropathy' or 'no focal cartilage defects'",
+        "only_elsewhere": "cartilage damage is described only on the patella or the femoral trochlea (including their medial and lateral facets), not in this compartment",
+        "softening": "chondromalacia, softening, fibrillation or signal change without thickness loss (grade 1)",
+        "unspecified_loss": "cartilage thinning, loss, chondropathy or osteoarthritis of this compartment without a stated depth or grade",
+        "partial_low": "superficial or low-grade partial-thickness loss or fissuring, under half the thickness (grade 2)",
+        "partial_high": "deep or high-grade partial-thickness loss or fissuring, over half the thickness (grade 3), including when only part of the damage is this deep",
+        "full_thickness": "full-thickness loss, a chondral defect or ulcer down to bone, or exposed subchondral bone (grade 4), including when only part of the damage is full thickness",
+        "bone_on_bone": "denuded bone over a wide area or bone-on-bone contact"
+      }
+    },
+    {
+      "id": "medial_cartilage_extent",
+      "group": "Medial OA",
+      "criterion": "How large is the cartilage loss the report describes in the medial femorotibial compartment (medial femoral condyle and medial tibial plateau)? If several lesions are described, answer for their combined size.",
+      "options": {
+        "no_loss": "no cartilage loss is described in this compartment: the cartilage is normal or not addressed",
+        "only_elsewhere": "cartilage loss is described only on the patella or the femoral trochlea (including their medial and lateral facets), not in this compartment",
+        "focal": "a single lesion the report measures under about 1 cm or calls focal, small or tiny",
+        "large": "an area the report measures at about 1 cm or more, or calls large or extensive, or several separate lesions",
+        "diffuse": "diffuse, global or compartment-wide loss or thinning",
+        "not_stated": "cartilage loss, thinning, fissures, ulcers, chondropathy or osteoarthritis of this compartment without a stated size"
+      }
+    },
+    {
+      "id": "lateral_cartilage_depth",
+      "group": "Lateral OA",
+      "criterion": "What is the deepest cartilage damage the report describes in the lateral femorotibial compartment (lateral femoral condyle and lateral tibial plateau)? Meniscal degeneration or tears and their grades are not cartilage findings.",
+      "options": {
+        "not_mentioned": "the report says nothing about lateral femorotibial compartment cartilage or about the articular cartilage in general",
+        "normal": "the cartilage is normal, intact or preserved, stated directly or by a general statement such as 'articular cartilage normal', 'no chondropathy' or 'no focal cartilage defects'",
+        "only_elsewhere": "cartilage damage is described only on the patella or the femoral trochlea (including their medial and lateral facets), not in this compartment",
+        "softening": "chondromalacia, softening, fibrillation or signal change without thickness loss (grade 1)",
+        "unspecified_loss": "cartilage thinning, loss, chondropathy or osteoarthritis of this compartment without a stated depth or grade",
+        "partial_low": "superficial or low-grade partial-thickness loss or fissuring, under half the thickness (grade 2)",
+        "partial_high": "deep or high-grade partial-thickness loss or fissuring, over half the thickness (grade 3), including when only part of the damage is this deep",
+        "full_thickness": "full-thickness loss, a chondral defect or ulcer down to bone, or exposed subchondral bone (grade 4), including when only part of the damage is full thickness",
+        "bone_on_bone": "denuded bone over a wide area or bone-on-bone contact"
+      }
+    },
+    {
+      "id": "lateral_cartilage_extent",
+      "group": "Lateral OA",
+      "criterion": "How large is the cartilage loss the report describes in the lateral femorotibial compartment (lateral femoral condyle and lateral tibial plateau)? If several lesions are described, answer for their combined size.",
+      "options": {
+        "no_loss": "no cartilage loss is described in this compartment: the cartilage is normal or not addressed",
+        "only_elsewhere": "cartilage loss is described only on the patella or the femoral trochlea (including their medial and lateral facets), not in this compartment",
+        "focal": "a single lesion the report measures under about 1 cm or calls focal, small or tiny",
+        "large": "an area the report measures at about 1 cm or more, or calls large or extensive, or several separate lesions",
+        "diffuse": "diffuse, global or compartment-wide loss or thinning",
+        "not_stated": "cartilage loss, thinning, fissures, ulcers, chondropathy or osteoarthritis of this compartment without a stated size"
+      }
+    },
+    {
+      "id": "pf_cartilage_depth",
+      "group": "PF OA",
+      "criterion": "What is the deepest cartilage damage the report describes in the patellofemoral compartment (patella and femoral trochlea)? Meniscal degeneration or tears and their grades are not cartilage findings.",
+      "options": {
+        "not_mentioned": "the report says nothing about patellofemoral compartment cartilage or about the articular cartilage in general",
+        "normal": "the cartilage is normal, intact or preserved, stated directly or by a general statement such as 'articular cartilage normal', 'no chondropathy' or 'no focal cartilage defects'",
+        "softening": "chondromalacia, softening, fibrillation or signal change without thickness loss (grade 1)",
+        "unspecified_loss": "cartilage thinning, loss, chondropathy or osteoarthritis of this compartment without a stated depth or grade",
+        "partial_low": "superficial or low-grade partial-thickness loss or fissuring, under half the thickness (grade 2)",
+        "partial_high": "deep or high-grade partial-thickness loss or fissuring, over half the thickness (grade 3), including when only part of the damage is this deep",
+        "full_thickness": "full-thickness loss, a chondral defect or ulcer down to bone, or exposed subchondral bone (grade 4), including when only part of the damage is full thickness",
+        "bone_on_bone": "denuded bone over a wide area or bone-on-bone contact"
+      }
+    },
+    {
+      "id": "pf_cartilage_extent",
+      "group": "PF OA",
+      "criterion": "How large is the cartilage loss the report describes in the patellofemoral compartment (patella and femoral trochlea)? If several lesions are described, answer for their combined size.",
+      "options": {
+        "no_loss": "no cartilage loss is described in this compartment: the cartilage is normal or not addressed",
+        "focal": "a single lesion the report measures under about 1 cm or calls focal, small or tiny",
+        "large": "an area the report measures at about 1 cm or more, or calls large or extensive, or several separate lesions",
+        "diffuse": "diffuse, global or compartment-wide loss or thinning",
+        "not_stated": "cartilage loss, thinning, fissures, ulcers, chondropathy or osteoarthritis of this compartment without a stated size"
+      }
+    },
+    {
+      "id": "pf_cartilage_surface",
+      "group": "PF OA",
+      "criterion": "Where in the patellofemoral compartment does the report place cartilage damage?",
+      "options": {
+        "no_damage": "no patellofemoral cartilage damage: normal, not addressed, or a sentence saying the patellar and trochlear cartilage are normal or without lesions; patellar marrow edema is not cartilage damage",
+        "patella": "damage to the patellar cartilage (kneecap, its facets, apex or median ridge), with the trochlea normal or not described",
+        "trochlea": "damage to the femoral trochlea only",
+        "both": "damage to both the patella and the trochlea",
+        "not_stated": "damage described only as patellofemoral, without naming the patella or the trochlea"
+      }
+    },
+    {
+      "id": "medial_osteophytes",
+      "group": "Medial OA",
+      "criterion": "What osteophytes does the report describe in the medial femorotibial compartment (medial femoral condyle and medial tibial plateau)? A statement that names no compartment ('osteophytes are present', 'tricompartmental osteophytes') covers this compartment.",
+      "options": {
+        "none": "no osteophytes are described; the words osteoarthritis or degenerative changes alone are not osteophytes, nor are enthesophytes at tendon insertions, 'secondary bone changes', sclerosis or cysts",
+        "only_elsewhere": "osteophytes are described only in other compartments",
+        "small": "small, marginal or incipient osteophytes",
+        "moderate_large": "osteophytes the report calls moderate, large, prominent or marked",
+        "unspecified": "osteophytes, spurs or osteophytic changes without a size word"
+      }
+    },
+    {
+      "id": "lateral_osteophytes",
+      "group": "Lateral OA",
+      "criterion": "What osteophytes does the report describe in the lateral femorotibial compartment (lateral femoral condyle and lateral tibial plateau)? A statement that names no compartment ('osteophytes are present', 'tricompartmental osteophytes') covers this compartment.",
+      "options": {
+        "none": "no osteophytes are described; the words osteoarthritis or degenerative changes alone are not osteophytes, nor are enthesophytes at tendon insertions, 'secondary bone changes', sclerosis or cysts",
+        "only_elsewhere": "osteophytes are described only in other compartments",
+        "small": "small, marginal or incipient osteophytes",
+        "moderate_large": "osteophytes the report calls moderate, large, prominent or marked",
+        "unspecified": "osteophytes, spurs or osteophytic changes without a size word"
+      }
+    },
+    {
+      "id": "pf_osteophytes",
+      "group": "PF OA",
+      "criterion": "What osteophytes does the report describe in the patellofemoral compartment (patella and femoral trochlea)? A statement that names no compartment ('osteophytes are present', 'tricompartmental osteophytes') covers this compartment.",
+      "options": {
+        "none": "no osteophytes are described; the words osteoarthritis or degenerative changes alone are not osteophytes, nor are enthesophytes at tendon insertions, 'secondary bone changes', sclerosis or cysts",
+        "only_elsewhere": "osteophytes are described only in other compartments",
+        "small": "small, marginal or incipient osteophytes",
+        "moderate_large": "osteophytes the report calls moderate, large, prominent or marked",
+        "unspecified": "osteophytes, spurs or osteophytic changes without a size word"
+      }
+    },
+    {
+      "id": "overall_osteoarthritis",
+      "group": "OA",
+      "criterion": "What osteoarthritis grade does the report itself state? Use only wording that names osteoarthritis, arthrosis, gonarthrosis or degenerative joint disease, or a Kellgren-Lawrence grade; do not infer a grade from cartilage lesion grades. A severity stated for one compartment counts; if several, use the highest.",
+      "options": {
+        "not_mentioned": "osteoarthritis is not mentioned and the articular cartilage is normal or not described; meniscal or ligament degeneration does not count",
+        "none": "the report states there is no osteoarthritis or degenerative joint disease",
+        "cartilage_only": "damage of the articular cartilage itself (chondromalacia, chondropathy, chondrosis, chondral lesion, thinning) that the report does not call osteoarthritis",
+        "mild": "mild, early, beginning, initial or incipient osteoarthritis, or Kellgren-Lawrence grade 1 or 2",
+        "moderate": "moderate osteoarthritis, or Kellgren-Lawrence grade 3",
+        "severe": "severe, advanced or marked osteoarthritis, or Kellgren-Lawrence grade 4",
+        "unspecified": "osteoarthritis named without a severity"
+      }
+    },
+    {
+      "id": "contusion_status",
+      "group": "Contusion",
+      "criterion": "Does the report describe a bone contusion (bone bruise) anywhere in the knee?",
+      "options": {
+        "none": "no contusion and no marrow edema: the marrow is normal or not described, even if cartilage, osteophyte, cyst, sclerosis or bone-island findings are described",
+        "contusion": "a bone bruise or contusion the report names, including 'likely', 'in favor of', 'consistent with' or 'probably post-contusional', or marrow edema the report ties to an injury",
+        "possible": "the report says a contusion is questioned or cannot be excluded",
+        "other_edema_only": "only marrow edema not tied to an injury: degenerative or subchondral edema under cartilage damage, reactive or stress edema, an insufficiency fracture, osteonecrosis, a bone infarct, or edema with no stated cause"
+      }
+    },
+    {
+      "id": "contusion_location",
+      "group": "Contusion",
+      "criterion": "Where does the report place bone contusions (bone bruises)?",
+      "options": {
+        "none": "no bone contusion is described; degenerative, reactive or unexplained marrow edema does not count",
+        "lateral": "the lateral femoral condyle, the lateral tibial plateau or both, and no other compartment",
+        "medial": "the medial femoral condyle, the medial tibial plateau or both, and no other compartment",
+        "medial_lateral": "both the medial and the lateral femorotibial compartments",
+        "patellofemoral": "the patella or the femoral trochlea only",
+        "patellofemoral_femorotibial": "the patella or trochlea together with a femorotibial compartment",
+        "not_stated": "a contusion whose location is not stated, or only the fibula"
+      }
+    },
+    {
+      "id": "fracture_status",
+      "group": "Fracture",
+      "criterion": "What fracture of bone does the report describe anywhere in the knee? A negated fracture ('no fracture', 'no fresh fracture') counts as none.",
+      "options": {
+        "none": "no fracture is described; a bone bruise, contusion, marrow edema, trabecular or microtrabecular fracture, chondral or osteochondral cartilage defect, osteonecrosis or bone infarct is not a fracture",
+        "acute": "an acute or recent fracture of bone, including an avulsion (such as Segond or tibial spine), impaction, depression, compression or osteochondral fracture",
+        "possible": "a fracture the report itself calls suspected, possible, subtle or not excludable",
+        "stress_or_insufficiency": "a stress fracture or subchondral insufficiency fracture named as such",
+        "old": "an old, healed or chronic fracture of bone"
+      }
+    },
+    {
+      "id": "effusion_size",
+      "group": "Effusion",
+      "criterion": "How much joint effusion (fluid in the knee joint, including the suprapatellar recess) does the report describe?",
+      "options": {
+        "not_mentioned": "the report says nothing about joint fluid or effusion",
+        "none": "no effusion or only physiological fluid (no effusion, sin derrame, kein Erguss, bez izljeva, geen hydrops, няма излив, χωρίς συλλογή)",
+        "small": "an effusion the report calls small, minimal, mild, slight or trace (leve, escaso, gering, mala, μικρή, малък)",
+        "moderate": "a moderate or considerable effusion (moderado, mäßig, matig, umjerena, μέτρια, ικανή, orta, modéré)",
+        "large": "a large, marked, pronounced, extensive, massive or tense effusion (abundante, deutlich, ausgeprägt, veća količina, μεγάλη, volumineux)",
+        "unspecified": "an effusion with no size word, including 'some' fluid, hydrarthrosis or hemarthrosis; size words of a Baker's cyst or a bursa do not apply to the effusion"
+      }
+    },
+    {
+      "id": "synovitis_status",
+      "group": "Synovitis",
+      "criterion": "Does the report describe synovitis, meaning inflammation or thickening of the synovial lining?",
+      "options": {
+        "absent": "synovitis is not described: the synovium is not mentioned or is called normal; an effusion, hemarthrosis, debris, a plica, a loose body or a 'synovial cyst' alone is not synovitis",
+        "present": "synovitis, including mild synovitis, or synovial thickening, proliferation, hypertrophy or enhancement",
+        "possible": "the report itself calls synovitis suspected or possible"
+      }
+    },
+    {
+      "id": "baker_size",
+      "group": "Baker's",
+      "criterion": "What popliteal (Baker's) cyst does the report describe?",
+      "options": {
+        "absent": "no popliteal cyst is described: it is absent or not mentioned",
+        "other_cyst_only": "only another kind of cyst, such as a meniscal, parameniscal, ganglion or bone cyst, with no popliteal cyst",
+        "small": "a trace, minimal, tiny, very small or small popliteal cyst or gastrocnemius-semimembranosus bursal distension",
+        "moderate": "a moderate or medium popliteal cyst or gastrocnemius-semimembranosus bursal distension",
+        "large": "a large popliteal cyst or gastrocnemius-semimembranosus bursal distension",
+        "unspecified": "a popliteal cyst or gastrocnemius-semimembranosus bursitis without a size word or measurement; the size of an effusion does not apply to the cyst"
+      }
+    },
+    {
+      "id": "baker_ruptured",
+      "group": "Baker's",
+      "criterion": "Does the report describe a ruptured or leaking popliteal (Baker's) cyst?",
+      "options": {
+        "no_cyst": "no popliteal (Baker's) cyst; meniscal, parameniscal, ganglion or bone cysts do not count",
+        "intact": "a popliteal cyst that is not described as ruptured or leaking; communication with the joint is not rupture",
+        "ruptured": "a popliteal cyst that is ruptured, partially ruptured, leaking or dissecting, including probable or suspected rupture or leakage (filtración, sızdırıyor)"
+      }
+    },
+    {
+      "id": "extra_pcl",
+      "group": "Extra",
+      "criterion": "Does the report describe an injury of the posterior cruciate ligament (PCL, LCP, HKB)? A statement that the cruciate ligaments are normal covers the PCL.",
+      "options": {
+        "none": "no PCL injury: the PCL is normal or not mentioned, or only edema, a ganglion or artefact next to it, a 'double PCL' sign, or buckling or a changed course secondary to an ACL tear",
+        "present": "a PCL sprain, partial or complete tear, including hedged wording that names it ('in favor of partial tear')",
+        "possible": "the report calls a PCL injury suspected, possible or 'rule out'; hedged wording that still names it ('in favor of', 'consistent with') is not uncertain"
+      }
+    },
+    {
+      "id": "extra_lateral_ligaments",
+      "group": "Extra",
+      "criterion": "Does the report describe an injury of the lateral collateral ligament (LCL, fibular collateral ligament, FCL, LCE, Aussenband) or the posterolateral corner (biceps femoris tendon, popliteus tendon, arcuate complex)? A statement that the collateral ligaments are normal covers the LCL.",
+      "options": {
+        "none": "no injury of these structures: they are normal or not mentioned, or only iliotibial band friction or MCL findings are described",
+        "present": "a sprain, strain, distension, edema around the ligament, low-grade injury, partial or complete tear of one of them",
+        "possible": "the report calls an injury of one of them suspected, possible or 'rule out'; hedged wording that still names it ('in favor of', 'consistent with') is not uncertain"
+      }
+    },
+    {
+      "id": "extra_extensor_tendons",
+      "group": "Extra",
+      "criterion": "Does the report describe an abnormality of the patellar tendon (patellar ligament) or the quadriceps tendon? A statement that the extensor mechanism is normal covers them.",
+      "options": {
+        "none": "no abnormality of these tendons: they are normal or not mentioned, or only other tendons (gastrocnemius, semimembranosus, popliteus, biceps), the retinacula or the medial patellofemoral ligament are abnormal",
+        "tendinosis": "tendinosis, tendinopathy, enthesopathy, enthesopathic changes or an enthesophyte at the insertion, or thickening without a tear",
+        "tear": "a partial, interstitial or complete tear of the patellar or quadriceps tendon"
+      }
+    },
+    {
+      "id": "extra_hoffa",
+      "group": "Extra",
+      "criterion": "Does the report describe edema, inflammation or impingement of the infrapatellar (Hoffa) fat pad?",
+      "options": {
+        "none": "the report does not name the Hoffa fat pad, or calls it normal",
+        "other_soft_tissue_only": "only edema of the suprapatellar, quadriceps or prefemoral fat pad, prepatellar or subcutaneous tissue, or around the iliotibial band, or a bursitis, with the Hoffa fat pad normal or not named",
+        "present": "the report names the Hoffa (infrapatellar) fat pad and describes edema, inflammation, impingement or scarring of it"
+      }
+    },
+    {
+      "id": "extra_bursitis",
+      "group": "Extra",
+      "criterion": "Does the report describe bursitis of a bursa outside the joint?",
+      "options": {
+        "none": "no bursitis is described",
+        "suprapatellar_only": "only suprapatellar bursitis, suprapatellar recess fluid or distension, which is joint effusion",
+        "soft_tissue_edema_only": "only subcutaneous, prepatellar or peritendinous edema, Hoffa fat pad edema, or pes anserinus tendon-sheath inflammation, without a fluid-filled bursa",
+        "present": "bursitis or fluid distending a prepatellar, superficial or deep infrapatellar, pes anserine, MCL or semimembranosus bursa"
+      }
+    },
+    {
+      "id": "extra_meniscal_cyst",
+      "group": "Extra",
+      "criterion": "Does the report describe a parameniscal (meniscal) cyst, meaning a cyst arising from or next to a meniscus?",
+      "options": {
+        "none": "no cyst of any kind is described",
+        "other_cyst_only": "only another kind of cyst, such as a Baker's or popliteal cyst, a gastrocnemius-semimembranosus bursa, a ganglion of a ligament or tendon, or a bone cyst, even when a meniscal tear is present",
+        "medial": "a cyst the report calls parameniscal or meniscal, or places at the medial meniscus margin",
+        "lateral": "a cyst the report calls parameniscal or meniscal, or places at the lateral meniscus margin"
+      }
+    },
+    {
+      "id": "extra_other_cysts",
+      "group": "Extra",
+      "criterion": "Does the report describe a cyst or ganglion other than a popliteal (Baker's) cyst or a meniscal or parameniscal cyst?",
+      "options": {
+        "none": "no such cyst: Baker's (popliteal, gastrocnemius-semimembranosus bursa), meniscal, intrameniscal and parameniscal cysts count as none, as do bone tumors, bone islands, enostoses and fibromas",
+        "ganglion": "a ganglion or mucoid cyst anywhere, such as at a cruciate ligament, the tibiofibular joint, the popliteus tendon, the capsule or a tendon sheath",
+        "intraosseous": "an intraosseous, subchondral or degenerative bone cyst, a geode, or subchondral cystic change",
+        "other": "a soft-tissue cyst that is not a ganglion, Baker's, meniscal or parameniscal cyst"
+      }
+    },
+    {
+      "id": "extra_patellar_instability",
+      "group": "Extra",
+      "criterion": "Does the report describe patellar instability or malalignment?",
+      "options": {
+        "none": "no patellar instability or malalignment is described",
+        "dislocation": "a patellar dislocation or acute subluxation, or a medial patellofemoral ligament or medial retinaculum tear or sprain of any grade",
+        "maltracking": "patellar tilt, lateralization, chronic subluxation, maltracking, trochlear dysplasia or patella alta (including mild), without a dislocation"
+      }
+    },
+    {
+      "id": "extra_osteochondral",
+      "group": "Extra",
+      "criterion": "Does the report describe a lesion it names as osteochondral (lesion, defect, fracture or fragment), osteochondritis dissecans, osteonecrosis (avascular necrosis, bone infarct, SONK) or a subchondral insufficiency fracture? A negated or excluded finding ('no osteonecrosis', 'without insufficiency fracture') does not count.",
+      "options": {
+        "none": "none of these, and no other cartilage or bone finding",
+        "chondral_only": "only cartilage lesions, such as chondromalacia or chondral ulcers, fissures or defects of any grade, even with bone edema, sclerosis or cysts beneath them",
+        "bone_only": "only a bone bruise, contusion, trabecular fracture, other fracture, degenerative cyst, loose body, or a bone tumor or island",
+        "present": "a lesion the report itself names as osteochondral, osteochondritis dissecans, osteonecrosis, a bone infarct or a subchondral insufficiency fracture",
+        "possible": "an osteochondral lesion, osteochondritis dissecans, osteonecrosis or insufficiency fracture named only as suspected or as a differential diagnosis; other uncertain findings do not count"
+      }
+    },
+    {
+      "id": "extra_loose_bodies",
+      "group": "Extra",
+      "criterion": "Does the report describe intra-articular loose bodies?",
+      "options": {
+        "none": "no loose bodies are described; a displaced or flipped meniscal fragment is not a loose body",
+        "present": "one or more loose bodies, loose or free osteochondral or cartilage fragments, joint mice, or synovial chondromatosis"
+      }
+    }
+  ]
+}
