@@ -98,14 +98,10 @@ def class_balance_weight_tensor(class_balance: dict) -> torch.Tensor:
 
 
 def validated_class_balance_weights(
-    config: ExperimentConfig, targets: tuple[str, ...], class_balance: dict | None
-) -> torch.Tensor | None:
-    if config.trainer.class_balanced_bce != (class_balance is not None):
+    config: ExperimentConfig, targets: tuple[str, ...], class_balance: dict
+) -> torch.Tensor:
+    if class_balance.get("exponent") != config.trainer.class_balance_exponent:
         raise ValueError("Class-balanced BCE settings and statistics disagree")
-    if class_balance is None:
-        if config.trainer.class_balance_exponent != 1.0:
-            raise ValueError("class_balance_exponent requires class-balanced BCE")
-        return None
     if class_balance.get("version") != 1 or [
         row.get("target") for row in class_balance.get("targets", [])
     ] != list(targets):
@@ -117,17 +113,15 @@ def masked_binary_cross_entropy_with_logits(
     logits: torch.Tensor,
     targets: torch.Tensor,
     observed: torch.Tensor,
-    class_balance_weights: torch.Tensor | None = None,
+    class_balance_weights: torch.Tensor,
 ) -> torch.Tensor:
     if not observed.any():
         raise RuntimeError("Training batch has no observed targets")
     losses = F.binary_cross_entropy_with_logits(logits, targets, reduction="none")
-    if class_balance_weights is not None:
-        weights = torch.where(
-            targets >= 0.5, class_balance_weights[0], class_balance_weights[1]
-        )
-        losses = losses * weights
-    return losses[observed].mean()
+    weights = torch.where(
+        targets >= 0.5, class_balance_weights[0], class_balance_weights[1]
+    )
+    return (losses * weights)[observed].mean()
 
 
 def half_knee_mil_loss(
@@ -135,7 +129,7 @@ def half_knee_mil_loss(
     encoded: dict,
     batch: dict,
     meniscus_indices: tuple[int, int],
-    class_balance_weights: torch.Tensor | None,
+    class_balance_weights: torch.Tensor,
 ) -> tuple[torch.Tensor, int]:
     axis = encoded["medial_axis"].float()
     selected = encoded["visual_valid"] & (axis.abs() > COMPARTMENT_MIDLINE_BAND_MM)
@@ -174,9 +168,8 @@ def half_knee_mil_loss(
         losses = F.binary_cross_entropy_with_logits(
             scores[used], targets, reduction="none"
         )
-        if class_balance_weights is not None:
-            weights = class_balance_weights[:, list(meniscus_indices)]
-            losses = losses * torch.where(targets >= 0.5, weights[0], weights[1])
+        weights = class_balance_weights[:, list(meniscus_indices)]
+        losses = losses * torch.where(targets >= 0.5, weights[0], weights[1])
         return losses.mean(), int(used.sum())
 
 
@@ -272,7 +265,7 @@ class KneeModule(L.LightningModule):
         training_studies: int,
         validation_studies: int,
         prediction_dir: Path,
-        class_balance: dict | None,
+        class_balance: dict,
         load_pretrained: bool | None = None,
         input_identity: dict | None = None,
     ) -> None:
@@ -283,14 +276,9 @@ class KneeModule(L.LightningModule):
         self.validation_studies = validation_studies
         self.prediction_dir = prediction_dir
         self.class_balance = class_balance
-        class_balance_weights = validated_class_balance_weights(
-            config, targets, class_balance
-        )
         self.register_buffer(
             "class_balance_weights",
-            class_balance_weights
-            if class_balance_weights is not None
-            else torch.empty(0),
+            validated_class_balance_weights(config, targets, class_balance),
             persistent=False,
         )
         self.model = KneeAbnormalityModel(
@@ -460,14 +448,14 @@ class KneeModule(L.LightningModule):
             logits,
             batch["target"],
             batch["target_observed"],
-            self.class_balance_weights if self.class_balance is not None else None,
+            self.class_balance_weights,
         )
         auxiliary, used_studies = half_knee_mil_loss(
             self.model,
             encoded,
             batch,
             self.meniscus_indices,
-            self.class_balance_weights if self.class_balance is not None else None,
+            self.class_balance_weights,
         )
         loss = loss + self.config.trainer.half_knee_loss_weight * auxiliary
         self.log(

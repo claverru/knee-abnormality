@@ -260,12 +260,10 @@ class KneeStudyDataset(Dataset):
         base = tuple(
             kind.max_images * multiplier // 3 for kind in self.data.series_types
         )
-        total = self.data.study_triplet_total
         return study_budgets(
             base,
             tuple(len(sources) for _, sources in slot_sources),
-            total * multiplier if total is not None else None,
-            self.data.repeated_series_share,
+            self.data.study_triplet_total * multiplier,
         )
 
     def _prepare_slot(self, study, slot, candidates, sources, budget, failures):

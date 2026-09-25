@@ -418,19 +418,13 @@ def largest_remainder(total: int, weights: np.ndarray) -> np.ndarray:
 def study_budgets(
     base: tuple[int, ...],
     sources: tuple[int, ...],
-    total: int | None,
-    repeated_share: float | None,
+    total: int,
 ) -> tuple[int, ...]:
     present = np.asarray(sources, dtype=np.int64) > 0
     counts = np.asarray(base, dtype=np.int64) * present
     if not present.any():
         return tuple(int(value) for value in counts)
-    if repeated_share is not None:
-        weights = counts * (
-            1 + repeated_share * np.maximum(np.asarray(sources) - 1, 0) * present
-        )
-        counts = largest_remainder(int(counts.sum()), weights)
-    elif total is not None and counts.sum() < total:
+    if counts.sum() < total:
         counts = largest_remainder(total, counts.astype(float))
     counts = np.where(present, counts, np.asarray(base, dtype=np.int64))
     return tuple(int(value) for value in counts)

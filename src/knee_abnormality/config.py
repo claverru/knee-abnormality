@@ -117,8 +117,7 @@ class DataConfig(ConfigModel):
     series_types: Annotated[tuple[SeriesTypeConfig, ...], Field(min_length=1)]
     sampling_sigma_fraction: PositiveFiniteFloat = 0.867
     validation_image_multiplier: Annotated[StrictInt, Field(gt=0)] = 1
-    study_triplet_total: Annotated[StrictInt, Field(gt=0)] | None = None
-    repeated_series_share: Annotated[float, Field(gt=0)] | None = None
+    study_triplet_total: Annotated[StrictInt, Field(gt=0)]
     intensity_augmentation: IntensityAugmentationConfig = Field(
         default_factory=IntensityAugmentationConfig
     )
@@ -134,17 +133,6 @@ class DataConfig(ConfigModel):
     upper_quantile: Annotated[float, Field(ge=0, le=1)]
     mean: tuple[FiniteFloat, FiniteFloat, FiniteFloat]
     std: tuple[PositiveFiniteFloat, PositiveFiniteFloat, PositiveFiniteFloat]
-
-    @model_validator(mode="after")
-    def one_budget_rule(self) -> "DataConfig":
-        if (
-            self.study_triplet_total is not None
-            and self.repeated_series_share is not None
-        ):
-            raise ValueError(
-                "study_triplet_total and repeated_series_share are separate experiments"
-            )
-        return self
 
     @model_validator(mode="after")
     def triplet_inputs(self) -> "DataConfig":
@@ -183,8 +171,6 @@ class ModelConfig(ConfigModel):
     backbone_eval: bool = False
     dropout: Annotated[float, Field(ge=0, lt=1)]
     series_dropout: Annotated[float, Field(ge=0, lt=1)]
-    gated_attention: bool = False
-    residual_readout: bool = False
 
     @model_validator(mode="after")
     def validate_model_options(self) -> "ModelConfig":
@@ -232,8 +218,7 @@ class TrainerConfig(ConfigModel):
     patience: Annotated[StrictInt, Field(ge=0)]
     min_delta: Annotated[float, Field(ge=0)]
     deterministic: bool
-    class_balanced_bce: bool = False
-    class_balance_exponent: Annotated[float, Field(gt=0, le=1)] = 1.0
+    class_balance_exponent: Annotated[float, Field(ge=0, le=1)]
     half_knee_loss_weight: PositiveFiniteFloat = 0.075
 
 

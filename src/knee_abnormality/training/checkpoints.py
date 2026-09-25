@@ -108,7 +108,7 @@ def validate_resume_checkpoint(
     fold: int,
     training_studies: int,
     input_identity: dict,
-    class_balance: dict | None,
+    class_balance: dict,
 ) -> None:
     saved_config = validate_checkpoint(checkpoint, config, targets, fold)
     saved = checkpoint["hyper_parameters"]

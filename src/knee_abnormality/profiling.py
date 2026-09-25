@@ -57,7 +57,7 @@ def training_step(
     optimizer,
     batch: dict,
     config: ExperimentConfig,
-    class_balance_weights: torch.Tensor | None,
+    class_balance_weights: torch.Tensor,
 ) -> float:
     optimizer.zero_grad(set_to_none=True)
     with torch.autocast("cuda", dtype=torch.bfloat16, cache_enabled=False):

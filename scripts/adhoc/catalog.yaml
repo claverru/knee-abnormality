@@ -360,14 +360,14 @@ scripts:
       - rtk proxy uv run --locked python -m scripts.adhoc.profile_training configs/training.yaml --output-dir outputs/profiling/loader-new --mode loader --batch-sizes 4 --workers 2,4,8 --samples 48 --warmup 2 --steps 6 --threads 16
       - rtk proxy uv run --locked python -m scripts.adhoc.profile_training configs/training.yaml --output-dir outputs/profiling/lightning-new --mode lightning --samples 64 --warmup 1 --steps 2 --threads 16
     inputs: [Experiment config, Training DICOMs, Frozen fold and label sources]
-    outputs: [JSON timings and input identities, fixed class-balance statistics when enabled, Recursive project-relative source snapshot, CPU profiles, GPU memory and loader wait measurements, Backbone BatchNorm update counts]
+    outputs: [JSON timings and input identities, fixed class-balance statistics in GPU modes, Recursive project-relative source snapshot, CPU profiles, GPU memory and loader wait measurements, Backbone BatchNorm update counts]
     notes:
       - Samples fold-0 training studies only, retaining full configured slice limits.
       - Reports triplets, channel appearances and unique source slices separately in preprocessing mode.
       - Counts and hashes each selected acquisition separately while retaining the configured total budget per plane/contrast.
       - Uses a few development steps without running an epoch or reporting validation AUC; Lightning mode uses the training BF16 precision and the configured batch size.
       - GPU modes use seeded random weights and require CUDA; capacity profiling disables series dropout and accepts batch sizes up to eight.
-      - GPU modes use fixed class-balanced BCE weights from their selected profiling datasets when the training option is enabled.
+      - GPU modes use fixed class-balanced BCE weights from their selected profiling datasets.
       - The GPU training step disables the autocast weight cache, as Lightning does.
       - The shared sample starts with up to eight maximum-load training studies, then seeded random studies.
       - Capacity mode records BatchNorm counters to audit recomputation during activation checkpointing.

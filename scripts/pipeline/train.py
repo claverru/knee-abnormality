@@ -128,7 +128,7 @@ def _check_resume(
     targets: tuple[str, ...],
     training_studies: int,
     input_identity: dict,
-    class_balance: dict | None,
+    class_balance: dict,
 ) -> None:
     validate_resume_checkpoint(
         checkpoint,
@@ -155,14 +155,10 @@ def run_fold(
     data.setup("fit")
     labels = data.labels
     training_studies = len(data.train_dataset)
-    class_balance = (
-        fixed_class_balance(
-            data.train_dataset.studies,
-            labels.targets,
-            config.trainer.class_balance_exponent,
-        )
-        if config.trainer.class_balanced_bce
-        else None
+    class_balance = fixed_class_balance(
+        data.train_dataset.studies,
+        labels.targets,
+        config.trainer.class_balance_exponent,
     )
     input_identity = training_input_identity(
         config, labels, data.train_dataset.studies, data.validation_dataset.studies
@@ -181,10 +177,9 @@ def run_fold(
             input_identity,
             class_balance,
         )
-    if class_balance is not None:
-        (fold_dir / "class_balance.json").write_text(
-            json.dumps(class_balance, indent=2) + "\n"
-        )
+    (fold_dir / "class_balance.json").write_text(
+        json.dumps(class_balance, indent=2) + "\n"
+    )
     (fold_dir / "input_identity.json").write_text(
         json.dumps(input_identity, indent=2) + "\n"
     )

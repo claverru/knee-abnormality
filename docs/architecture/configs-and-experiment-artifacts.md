@@ -166,16 +166,15 @@ in `modeling/model.py`, which is in `identity.PREPROCESSING_SOURCES`, it changes
 source digest and is a fresh-runs-only change; earlier checkpoints keep validating against their
 archived sources.
 
-**Study triplet total** (`data.study_triplet_total`, optional, **26 in `configs/training.yaml`
+**Study triplet total** (`data.study_triplet_total`, required, **26 in `configs/training.yaml`
 since 2026-09-18**) raises a study whose per-type budgets sum below that many training triplets to
 it, scaling the slots it has in proportion to their configured budgets, largest-remainder rounded
 and capped by each slot's capacity; a study already at or above the floor is untouched. On fold 0
 it lifts the ~29% of studies missing two types from about 21 triplets to 26 and leaves the rest
 alone, so the mean rises from 25.4 to 26.7. It scales with the image multiplier, applies in
 training, validation and inference, and changes the preprocessing identity, so it takes effect for
-fresh runs only. **Repeated-series share** (`data.repeated_series_share`, optional, unset) is the
-rejected counterpart, kept only because its run exists
-([overnight](../backlog/overnight.md#already-measured)).
+fresh runs only. The rejected **repeated-series share** (`data.repeated_series_share`) was removed
+on 2026-09-25 ([overnight](../validation/results/2026-09-18-overnight-results.md)).
 
 **Robust study centre** was removed on 2026-09-18; `data.robust_center_outlier_mm` no longer
 exists. Configs and checkpoints that carry it fail validation and need their archived sources, as
