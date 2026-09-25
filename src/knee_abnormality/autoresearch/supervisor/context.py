@@ -170,7 +170,7 @@ def build_context(state, role, assignment, directory, docs, state_path):
         evidence = experiment_evidence(state, exp)
         evidence_path = directory / "evidence.json"
         write_json(evidence_path, evidence)
-        comparison = read_json(event["evidence"]["comparison"])
+        comparison = read_json(Path(event["evidence"]["comparison"]))
         scores = comparison["family_means"]["all"]
         return {
             "role": role,
