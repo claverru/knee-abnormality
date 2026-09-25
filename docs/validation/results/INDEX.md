@@ -2,6 +2,7 @@
 
 | Read when | Document |
 |---|---|
+| Reviewing the near-misses campaign (15 forced seeds plus researcher ideas), the PF OA pattern from knee-wide OA context, S58 (OA detector, 0.944) against S59 (token dropout, 0.939), and why the adopted token dropout was too weak | [2026-09-25 near-misses campaign](2026-09-25-near-misses-campaign.md) |
 | Checking the trained medial/lateral side mask (meniscus +0.0046, OA −0.0040) and global token self-attention with 3D RoPE replacing the 1D/2D embeddings (−0.0015, PF OA and Fracture −0.015) | [2026-09-23 side mask and token attention](2026-09-23-side-mask-and-token-attention.md) |
 | Checking whether compartment labels read the other compartment (medial/lateral sibling cross-talk): inference-only token masking and pixel blanking on `k05-clean`, AUC against sibling-positive vs sibling-clean negatives, the +0.006 ceiling | [2026-09-23 sibling masking](2026-09-23-sibling-masking.md) |
 | Reviewing prediction-driven label-noise training (bootstrapped and running-average targets, early-learning regularization, contradiction down-weighting, 1→0 class-balance schedule): six fold-0 results, why the model never memorizes its labels, schedule public score (S53) | [2026-09-23 noisy-labels campaign](2026-09-23-noisy-labels-campaign.md) |

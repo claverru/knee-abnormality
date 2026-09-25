@@ -18,40 +18,30 @@ Starting a campaign is a separate user action.
 
 Pending:
 
+- **OA-detector control on fold 1 is the incumbent** (`configs/training.yaml`, seed 1485198267,
+  ×4 τ 1 0.900568, S60 0.938). Token dropout at 5% was rejected against it
+  ([follow-up](../validation/results/2026-09-25-near-misses-campaign.md#follow-up-on-main)).
 - **After the knee-geometry campaign (stopped 2026-09-24).** The control is
   `knee-geometry-merged-2` (seed 638120755, ×4 0.900955, S55 0.940). Untried there: the
   curve-density sampler, the side-normalized 3D encoding replacing 1D/2D, and the fallback-safe OA
   readout ([campaign ideas](../../autoresearch/campaigns/knee-geometry/INDEX.md));
-  `meniscus-core-band-contrast-readout` trained but was never compared. The adopted model has not
-  been combined with image-blend labels, which scored 0.945 alone (S50).
+  `meniscus-core-band-contrast-readout` trained but was never compared.
 - **Noisy-labels campaign stopped 2026-09-23, nothing adopted.** Hard fold-0 AUC against
   `k05-clean` (S48, 0.942): bootstrapped targets −0.0005, running-average targets +0.0002,
   early-learning regularization +0.0013 (soft +0.0008), confident-contradiction down-weighting
   −0.0060, class-balance schedule 1→0 −0.0000 (soft +0.0007), schedule plus early learning −0.0003.
   Prediction-memory methods barely act: the model does not memorize its labels in ten fine-tuning
-  epochs. The schedule scored 0.941 public (S53) against 0.942 for S48. Next: export the
-  early-learning checkpoint from its experiment source (×4, τ 0.75, batch 4, as S53) and submit it
-  against S48
+  epochs. The schedule scored 0.941 public (S53) against 0.942 for S48. Early-learning regularization was
+  exported from its experiment source (×4, τ 0.75, batch 4, bundle `1d22fc40`,
+  `outputs/submission/exports/elr-20260924-x4-tau075`) and submitted as S57: 0.943 public against
+  0.942 for S48. Porting it to the current recipe is
+  [under consideration](early-learning-regularization.md)
   ([campaign](../../autoresearch/campaigns/noisy-labels/INDEX.md)).
 - **Combined labels scored 0.940 public (S40)** against 0.933 for the last single models on
   Steven v4 labels ([result](../validation/results/2026-09-21-combined-labels-first-run.md)). A
   Steven-v4-trained control on the same split (`labels.source: steven_v4`) would separate the
   label change from the new training fold. Before the next queue, move the overnight launcher
   to `all_5fold_scanner_v1`; the autoresearch gate already uses it.
-- **Evaluation count above ×4:** ×3 scored 0.938 and ×4 0.939 publicly, one rounding step apart,
-  so where the count stops paying is unresolved, and its inference-time cost counts toward the
-  efficiency prize
-  ([submissions](../inference/submissions/2026-09-18-temperature-and-count-submissions.md)).
-  Geometry caps the axis (fold-0 sampler replay of the `k_05` recipe, 2026-09-22): ×4 already
-  takes 80% of the triplet windows of a slot's only 2D series and decodes 94% of its slices; ×5
-  and ×6 reach 92% and 98% for +18% and +29% triplets but only +5% and +9% decoded slices per
-  study, and every step past ×6 adds triplets from 3D series alone. On the 2026-09-17 token caches
-  (older ordinary-BCE checkpoints) every candidate scored −0.0018 against 24 per type at τ 0.75
-  ([bag size](../validation/results/2026-09-17-attention-temperature.md#bag-size)), so ×5 is the
-  step to try if the count is tested again; ×6 and above approach that all-candidate bag
-  (`outputs/analysis/acquisition-geometry-20260922/capacity_*`). On `oblique`, ×5 at τ 0.70 then
-  scored 0.945 publicly against 0.944 at ×4 τ 0.75 (S47, S46), one rounding step, with +0.0003 on
-  fold 0 ([result](../validation/results/2026-09-22-oblique-groups-result.md#temperature-and-count)).
 - **Decide on the `inference-opt` branch.** It runs the Kaggle command in about 270 s against 429.5 s
   with bit-identical prepared images, but its GPU preparation changes hashed sources, so the next
   submission needs a checkpoint trained on it; check local training memory first

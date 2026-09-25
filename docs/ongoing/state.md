@@ -5,6 +5,23 @@ Active lines of development have their own documents in [this folder](INDEX.md).
 coverage diagnostics live in [data preparation](../data-preparation/peripheral-coverage.md);
 pending experiments are classified in the [backlog](../backlog/INDEX.md).
 
+- **Near-miss review, 2026-09-24 (user decisions):** early-learning regularization scored
+  0.943 public (S57) against 0.942 for its paired control S48; `trainer.max_epochs: 12` queued in the [overnight queue](../backlog/overnight.md);
+  loss variants that gain on soft AUC parked on a
+  [watch list](../validation/results/2026-09-23-validation-auc-variants.md#losses-campaign-rescored-2026-09-24).
+  Dropped: combining the adopted model with image-blend labels, and inference counts above ×4.
+  Rescoring the knee-geometry candidates against `k05-clean` puts 16 of 17 above it; the
+  incumbent's lead over them sits mostly in Fracture, Baker's and Contusion, labels a re-seed also
+  moves ([findings](../../autoresearch/campaigns/knee-geometry/findings.md)).
+
+- **Three-compartment OA detector adopted, 2026-09-25 (user decision):** it narrowly missed the
+  local rule in the [near-misses campaign](../validation/results/2026-09-25-near-misses-campaign.md)
+  (+0.0013), but scored 0.944 public (S58) against 0.940 for its same-seed reference (S55). Its
+  code is merged into the recipe with fresh seed 1485198267 on fold 1; the control scored ×4 τ 1
+  0.900568 and 0.938 public (S60). The campaign's adopted token dropout scored 0.939 (S59) and
+  masked only 0.3% of tokens; a 5% uncapped retest on the new control lost at every τ
+  ([follow-up](../validation/results/2026-09-25-near-misses-campaign.md#follow-up-on-main)).
+
 - **Knee-geometry model adopted, 2026-09-24:** the [knee-geometry campaign](../../autoresearch/campaigns/knee-geometry/INDEX.md)
   adopted `meniscus-half-knee-mil`: the medial-lateral midline at the fitted study centre, a
   meniscus-only own-side attention mask and a training-only half-knee MIL loss. Fold 0 ×4
@@ -60,8 +77,8 @@ pending experiments are classified in the [backlog](../backlog/INDEX.md).
 - **Literature shortlist accepted, 2026-09-21:**
   [richer report supervision through OA attributes](../backlog/big-bets.md#richer-report-supervision-oa-attributes)
   is an unstarted big bet;
-  [attention-token dropout](../backlog/small-changes.md#attention-token-dropout) is an unstarted
-  small change, including a random-masking control with series dropout unchanged.
+  [attention-token dropout](../backlog/small-changes.md#attention-token-dropout) was later tested
+  and rejected (2026-09-25).
   [Feature-space augmentation (DSU)](../backlog/small-changes.md#feature-space-augmentation-dsu)
   was also accepted as an unstarted small change, with acquisition-coherent perturbations and
   safeguards for diagnostic contrast. No implementation, extraction or training has started.

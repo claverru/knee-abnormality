@@ -172,6 +172,28 @@ S51, the oblique group embedding, is a data point against both metrics when comp
 ([result](2026-09-22-oblique-groups-result.md#group-embedding-on-the-cleaned-source-s51)). Soft
 AUC did no better than hard AUC on this pair.
 
+## Losses campaign rescored (2026-09-24)
+
+The [losses campaign](../../../autoresearch/campaigns/losses/findings.md) was judged on hard AUC
+against control B (`all_5fold_v3`, Steven v4, k=1). When its saved predictions are rescored on soft
+AUC, the hard-AUC ranking reverses. These are point estimates with no paired interval; two
+same-recipe controls differ by about 0.0018 in soft AUC.
+
+| Run | Hard Δ | Soft Δ |
+|---|---:|---:|
+| `shared-soft-mass-balance` | −0.0092 | +0.0080 |
+| `shared-prior-offset-bce` | −0.0119 | +0.0074 |
+| `shared-bernoulli-pair-ranking` | −0.0091 | +0.0071 |
+| `shared-label-contrast-ranking` | −0.0063 | +0.0050 |
+| `shared-bce-ranking` | +0.0007 | −0.0061 |
+| `shared-target-logit-margin` | +0.0001 | −0.0072 |
+
+On the scanner fold, soft AUC peaks at k=0.5 across the class-balance exponent runs (k1 0.7918,
+k0.75 0.7933, k0.5 0.7987, k0.25 0.7971, unweighted 0.7959), matching the public peak, while hard
+AUC rises monotonically with k. So the soft-gaining losses may share k=0.5's effect rather than
+add to it (hypothesis). **Parked 2026-09-24 (user decision), on a watch list:** none is queued. If
+revisited, test one on top of k=0.5 and judge it on soft AUC.
+
 ## Adopted use
 
 Since 2026-09-23, `validation_metrics` also records `soft_macro_auc` and `per_target_soft_auc`,
