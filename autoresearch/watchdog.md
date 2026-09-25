@@ -51,8 +51,9 @@ it does not launch jobs or resume the campaign. Its allowlist is the autoresearc
 runtime package, role briefs, and the listed operational docs and the two CLI
 wrappers (`runtime.md`, `watchdog.md`, `status.md`, `scripts.md`,
 `scripts/tools/autoresearch.py`, `scripts/tools/autoresearch_watch.py`); the gate,
-evaluation, binding, accounting and policy modules (`gates.py`, `diagnostics.py`,
-`integration.py`, `completion.py`, `accounting.py`, `campaigns.py`) are off-limits.
+evaluation, binding, accounting and policy modules (`campaign/gates.py`,
+`scoring/diagnostics.py`, `campaign/binding.py`, `campaign/completion.py`,
+`scoring/accounting.py`, `campaign/definition.py`) are off-limits.
 It uses the workspace-write sandbox, subscription authentication and no additional
 agents. Existing repository rules apply, including no tests and preservation of
 unrelated edits. The watcher compares actual before/after file hashes of the
