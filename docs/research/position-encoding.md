@@ -257,6 +257,8 @@ macro noise is about ±0.003.
 1. **Untied position path.** LayerNorm the appearance features alone, and give position
    its own normalized channel or feature gate into the attention logits only.
    Zero-initialize it, and add position-only auxiliary logits if it still goes unused.
+   Appearance-only pooled values were [rejected](../validation/results/2026-09-21-untied-position-result.md)
+   (−0.0018, confounded by repaired data).
 2. **Anchored attention priors.** Add per-target learned 3D Gaussian bias on attention
    logits, outside LayerNorm:
    - |X|, Y and Z priors without a frame;

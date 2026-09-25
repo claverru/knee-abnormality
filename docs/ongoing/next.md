@@ -7,11 +7,11 @@ canonical topic documents; this file is not a log.
 **The position/knee-side experiment sequence is closed.** Learned family strength is
 adopted; appearance-only pooling, learned widths and the pooled compartment adapter
 are removed. There is no pending confirmation run or adapter-removal task. See
-[adoption evidence](../../autoresearch/anatomical-attention.md).
+[adoption evidence](../validation/results/2026-09-21-anatomical-attention-result.md).
 
 **No training is queued for automatic launch.** No campaign is active: the three oblique
 campaigns are retired with the [oblique line](../history/oblique-groups.md), closed 2026-09-23.
-Historical queues and decisions live under [autoresearch](../../autoresearch/status.md).
+Historical queues and decisions live under [autoresearch](../../autoresearch/campaigns/INDEX.md).
 The general [overnight queue](../backlog/overnight.md) is empty. New candidates use
 the incumbent's seed and the [shared evaluation and adoption rule](../../autoresearch/protocol.md#shared-evaluation-and-adoption).
 Starting a campaign is a separate user action.

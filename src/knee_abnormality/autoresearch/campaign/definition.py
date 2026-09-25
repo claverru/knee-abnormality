@@ -2,7 +2,14 @@ from pathlib import Path, PurePosixPath
 from typing import Literal
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    computed_field,
+    field_validator,
+    model_validator,
+)
 
 
 class CampaignPolicy(BaseModel):
@@ -79,7 +86,6 @@ class Campaign(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     id: str = Field(pattern=r"^[a-z][a-z0-9-]*$")
-    status: str
     recipe: str
     reference_run: str
     reference_equivalences: dict[str, bool | int | float | str]
@@ -87,8 +93,12 @@ class Campaign(BaseModel):
     reference_identity_exceptions: list[str] = Field(default_factory=list)
     additional_evidence_runs: list[str]
     backlog: BacklogPolicy
-    artifacts_root: str
     policy: CampaignPolicy
+
+    @computed_field
+    @property
+    def artifacts_root(self) -> str:
+        return f"outputs/autoresearch/{self.id}"
 
     @field_validator("reference_equivalences")
     @classmethod

@@ -2,21 +2,23 @@ import math
 from pathlib import Path
 
 from knee_abnormality.autoresearch.campaign.gates import evaluate, verdict
+from knee_abnormality.autoresearch.runtime.layout import (
+    campaign_fold,
+    comparison_path,
+    read_diagnostics,
+)
 from knee_abnormality.autoresearch.runtime.storage import read_json
-from knee_abnormality.autoresearch.scoring.diagnostics import read_diagnostics
 
 
 def completion_blockers(state, event):
     if event["kind"] != "completion":
         return ["Only completion events can use the reporter"]
-    if event["eligible_decision"] not in {"reject", "inconclusive"}:
+    if event["eligible_decision"] != "reject":
         return ["Wins and invalid runs require the orchestrator"]
     exp = state["experiments"][event["experiment"]]
     approval = exp.get("implementation_review")
     if not approval or approval["decision"] != "approve":
         return ["No recorded implementation approval"]
-    if approval["concerns"] or exp.get("concerns"):
-        return ["Implementation review has unresolved concerns"]
     if (
         exp["stage"] != "awaiting_decision"
         or state["running"] != exp["id"]
@@ -24,31 +26,21 @@ def completion_blockers(state, event):
         or exp.get("reference") != state["incumbent"]
     ):
         return ["Completion or incumbent state changed"]
-    if any(other["id"] != event["id"] for other in state["events"]):
-        return ["Other pending events may require research or queue decisions"]
-    idea = state["ideas"][exp["idea"]]
-    for other in state["ideas"].values():
-        if other["id"] == idea["id"] or other["status"] in {"completed", "retired"}:
-            continue
-        if (
-            other["mechanism_id"] == idea["mechanism_id"]
-            or other["parent_idea_id"] == idea["id"]
-            or idea["id"] in other["dependencies"]
-            or other["id"] == idea["parent_idea_id"]
-        ):
-            return ["Related outstanding ideas require orchestrator interpretation"]
     directory = Path(exp["directory"])
     try:
         seconds = exp["measured_compute_seconds"]
         if not math.isfinite(seconds) or seconds < 0:
             return ["Measured compute is unavailable or invalid"]
         reasons = evaluate(
-            directory, state["limits"], {**exp["training_receipt"], "seconds": seconds}
+            directory,
+            campaign_fold(state),
+            state["limits"],
+            {**exp["training_receipt"], "seconds": seconds},
         )
         if reasons:
             return reasons
         evidence = event["evidence"]
-        comparison = directory / "comparison/comparison.json"
+        comparison = comparison_path(exp)
         if Path(evidence["comparison"]) != comparison:
             return ["Comparison artifact path does not match the attempt"]
         report = read_json(comparison)
@@ -99,7 +91,7 @@ def completion_blockers(state, event):
             "config.yaml",
             "evaluation.json",
             "training/effective_config.json",
-            "training/fold_0/input_identity.json",
+            f"training/fold_{campaign_fold(state)}/input_identity.json",
         )
         if any(not (directory / name).is_file() for name in required):
             return ["Required completion artifacts are missing"]

@@ -1,5 +1,4 @@
 id: medial-lateral-transfer
-status: stopped
 recipe: outputs/training/overnight-20260919T235434Z-8ol_1c30/runs/13-control-repeat/effective_config.json
 reference_run: outputs/training/overnight-20260919T235434Z-8ol_1c30/runs/13-control-repeat
 reference_equivalences: {}
@@ -16,7 +15,6 @@ additional_evidence_runs:
 backlog:
   refill_below: 4
   refill_to: 5
-artifacts_root: outputs/autoresearch/medial-lateral-transfer
 policy:
   editable_files:
   - configs/training.yaml

@@ -18,30 +18,26 @@ from knee_abnormality.autoresearch.campaign.gates import (
     initial_limits,
     validate_config,
 )
-from knee_abnormality.autoresearch.campaign.reports import (
-    ResearchReport,
-)
-from knee_abnormality.autoresearch.reporting.progress import (
-    decision_text,
-    difference,
-    interval_text,
-    score_text,
-)
+from knee_abnormality.autoresearch.campaign.reports import ResearchReport
+from knee_abnormality.autoresearch.campaign.rules import SEED_TERMINAL
+from knee_abnormality.autoresearch.reporting.progress import findings_summary
 from knee_abnormality.autoresearch.runtime.isolation import (
+    environment,
     manifest,
     snapshot,
 )
 from knee_abnormality.autoresearch.runtime.storage import (
     atomic_write,
     lock,
+    optional_json,
     process_identity,
     read_json,
     sha256,
+    spawn,
     terminate,
     write_json,
 )
 from knee_abnormality.autoresearch.supervisor.common import (
-    SEED_TERMINAL,
     identifier,
     seed_files,
 )
@@ -63,10 +59,8 @@ class Supervisor(JobMixin, ExperimentMixin, ResultMixin, SchedulingMixin):
         if self.campaign["id"] != campaign:
             raise ValueError(f"Mismatched campaign: {campaign}")
         self.output = (root / self.campaign["artifacts_root"]).resolve()
-        if not self.output.is_relative_to(root / "outputs/autoresearch"):
-            raise ValueError("Campaign artifacts must stay in outputs/autoresearch")
         self.state_path = self.output / "state.json"
-        self.state = read_json(self.state_path) if self.state_path.exists() else None
+        self.state = optional_json(self.state_path)
         if self.state is not None:
             if self.state["campaign"] != campaign:
                 raise ValueError("Artifact directory belongs to a different campaign")
@@ -125,41 +119,39 @@ class Supervisor(JobMixin, ExperimentMixin, ResultMixin, SchedulingMixin):
         atomic_write(
             self.output / "findings.md", f"# Campaign findings\n\n{findings}\n"
         )
-        atomic_write(self.docs / "findings.md", self.findings_summary())
+        atomic_write(
+            self.docs / "findings.md", findings_summary(self.state, self.campaign)
+        )
 
-    def findings_summary(self):
-        log = Path(self.campaign["artifacts_root"]) / "findings.md"
-        lines = [
-            "# Campaign findings",
-            "",
-            f"Decision summary. The full orchestrator log is `{log}` (not tracked).",
-            "",
-            f"Incumbent: `{self.state['incumbent']['id']}`",
-        ]
-        decided = [
-            exp for exp in self.state["experiments"].values() if exp.get("decision")
-        ]
-        if not decided:
-            return "\n".join([*lines, "", "No decided experiments yet.", ""])
-        lines.append("")
-        for exp in decided:
-            evidence = exp.get("evidence", {})
-            scores = evidence.get("macro_auc", {})
-            delta = difference(scores.get("candidate"), scores.get("reference"))
-            bounds = (evidence.get("adoption_bootstrap") or {}).get(
-                "delta_percentile_80"
-            )
-            soft = evidence.get("soft_macro_auc")
-            lines.append(
-                f"- `{exp['idea']}`: {decision_text(exp)}, macro AUC delta "
-                f"{score_text(delta, True)}, adoption 80% CI {interval_text(bounds)}"
-                + (
-                    f", soft AUC delta {score_text(soft['delta'], True)}"
-                    if soft
-                    else ""
-                )
-            )
-        return "\n".join([*lines, ""])
+    def launch(self):
+        spawn(
+            [
+                "knee_abnormality.autoresearch.cli",
+                "supervise",
+                self.state["campaign"],
+                "--root",
+                str(self.root),
+            ],
+            self.root,
+            self.output / "supervisor.log",
+            self.output / "supervisor.json",
+            environment(self.root),
+        )
+
+    def recipe_limits(self):
+        config = load_config(self.root / self.campaign["recipe"]).model_dump(
+            mode="json"
+        )
+        reference = (self.root / self.campaign["reference_run"]).resolve()
+        limits = initial_limits(
+            reference,
+            config,
+            self.campaign["reference_equivalences"],
+            self.campaign["reference_config_exceptions"],
+            self.campaign["reference_identity_exceptions"],
+        )
+        validate_config(config, config, self.policy)
+        return config, reference, limits
 
     def initialize(self, provider: str, gpu: str):
         if self.state is not None:
@@ -177,17 +169,7 @@ class Supervisor(JobMixin, ExperimentMixin, ResultMixin, SchedulingMixin):
             raise ValueError(
                 "Incomplete initialization exists; inspect baseline/ before starting again"
             )
-        recipe = load_config(self.root / self.campaign["recipe"], folds=[0])
-        config = recipe.model_dump(mode="json")
-        reference = (self.root / self.campaign["reference_run"]).resolve()
-        limits = initial_limits(
-            reference,
-            config,
-            self.campaign["reference_equivalences"],
-            self.campaign["reference_config_exceptions"],
-            self.campaign["reference_identity_exceptions"],
-        )
-        validate_config(config, config, self.policy)
+        config, reference, limits = self.recipe_limits()
         headers = (
             self.root
             / "outputs/analysis/sharing-disagreement-20260914/study_headers.parquet"
@@ -203,7 +185,6 @@ class Supervisor(JobMixin, ExperimentMixin, ResultMixin, SchedulingMixin):
         write_json(self.output / "baseline/config.json", config)
         write_json(self.output / "limits.json", limits)
         self.state = {
-            "version": 2,
             "revision": 0,
             "campaign": self.campaign["id"],
             "policy": self.policy.model_dump(mode="json"),
@@ -211,6 +192,7 @@ class Supervisor(JobMixin, ExperimentMixin, ResultMixin, SchedulingMixin):
             "gpu": gpu,
             "status": "calibrating",
             "reason": None,
+            "pause_kind": None,
             "profiles": yaml.safe_load(
                 (self.root / "autoresearch/agents.yaml").read_text()
             ),
@@ -275,13 +257,29 @@ class Supervisor(JobMixin, ExperimentMixin, ResultMixin, SchedulingMixin):
         self.save()
 
     def seeds_pending(self):
-        return self.state.get("seed_order") == "forced" and any(
+        return self.state["seed_order"] == "forced" and any(
             self.state["ideas"][idea_id]["status"] not in SEED_TERMINAL
             for idea_id in self.state["seed_ideas"]
         )
 
     def event(self, kind, payload):
         self.state["events"].append({"id": identifier(kind), "kind": kind, **payload})
+
+    def request_review(self, exp, gate_error=None, refresh_reason=None):
+        exp["stage"] = "awaiting_review"
+        payload = {"experiment": exp["id"], "gate_error": gate_error}
+        if refresh_reason:
+            payload["refresh_reason"] = refresh_reason
+        self.event("review", payload)
+
+    def route_completion(self, event, record):
+        event["completion_reporting"] = record
+        self.state["experiments"][event["experiment"]]["completion_reporting"] = dict(
+            record
+        )
+
+    def pause(self, reason, kind=None):
+        self.state.update(status="paused", reason=reason, pause_kind=kind)
 
     def import_ideas(self, path: Path):
         report = ResearchReport.model_validate(yaml.safe_load(path.read_text()))
@@ -332,9 +330,10 @@ class Supervisor(JobMixin, ExperimentMixin, ResultMixin, SchedulingMixin):
                             if self.state.get("sealed_sha256")
                             else "calibrating",
                             reason=None,
+                            pause_kind=None,
                         )
                         self.state.pop("retry_after", None)
-                        control = self.state.get("control_retrain")
+                        control = self.state["control_retrain"]
                         if control and control["stage"] == "failed":
                             control["stage"] = "pending"
                         for job in self.state["jobs"].values():
@@ -351,6 +350,13 @@ class Supervisor(JobMixin, ExperimentMixin, ResultMixin, SchedulingMixin):
                         if self.state["status"] != "stopping":
                             self.state["status"] = "stopping"
                             self.save()
+                        running = self.state["experiments"].get(self.state["running"])
+                        if (
+                            not abort
+                            and running
+                            and running["stage"] == "needs_comparison"
+                        ):
+                            self.comparison(running)
                         for job in self.outstanding():
                             if abort or job["kind"] not in {
                                 "training",
@@ -374,9 +380,7 @@ class Supervisor(JobMixin, ExperimentMixin, ResultMixin, SchedulingMixin):
                     RuntimeError,
                     subprocess.SubprocessError,
                 ) as error:
-                    self.state.update(
-                        status="paused", reason=f"{type(error).__name__}: {error}"
-                    )
+                    self.pause(f"{type(error).__name__}: {error}")
                     self.save()
                 self.wakeup.wait(5)
                 self.wakeup.clear()

@@ -14,20 +14,32 @@ from pydantic import Field
 from pydantic_settings import CliPositionalArg
 
 from knee_abnormality.autoresearch.campaign.binding import digest
-from knee_abnormality.autoresearch.cli import launch, preflight
-from knee_abnormality.autoresearch.runtime.isolation import changed_files, manifest
-from knee_abnormality.autoresearch.runtime.providers import auth_environment
+from knee_abnormality.autoresearch.campaign.reports import WatchdogReport
+from knee_abnormality.autoresearch.runtime.isolation import (
+    changed_files,
+    environment,
+    manifest,
+    scrubbed_environment,
+)
+from knee_abnormality.autoresearch.runtime.layout import (
+    PREDICTIONS,
+    campaign_fold,
+    fold_dir,
+)
+from knee_abnormality.autoresearch.runtime.providers import codex_command, preflight
 from knee_abnormality.autoresearch.runtime.storage import (
     alive,
     atomic_write,
     lock,
+    optional_json,
     process_identity,
     read_json,
     sha256,
+    spawn,
     write_json,
 )
 from knee_abnormality.autoresearch.runtime.usage import capture_usage
-from knee_abnormality.autoresearch.supervisor import REJECTION_PAUSE, Supervisor
+from knee_abnormality.autoresearch.supervisor import Supervisor
 from knee_abnormality.cli import CLISettings
 
 
@@ -37,19 +49,28 @@ class WatchCLI(CLISettings):
     root: Path = Path(__file__).resolve().parents[3]
 
 
-PROTECTED_CODE = tuple(
-    f"src/knee_abnormality/autoresearch/{name}.py"
-    for name in (
-        "campaign/gates",
-        "scoring/diagnostics",
-        "campaign/binding",
-        "campaign/completion",
-        "scoring/accounting",
-        "campaign/definition",
-    )
+PROTECTED = (
+    "autoresearch/roles/watchdog.md",
+    *(
+        f"src/knee_abnormality/autoresearch/{name}.py"
+        for name in (
+            "campaign/gates",
+            "campaign/rules",
+            "runtime/layout",
+            "scoring/diagnostics",
+            "campaign/binding",
+            "campaign/completion",
+            "scoring/accounting",
+            "campaign/definition",
+            "supervisor/results",
+            "supervisor/experiments",
+            "runtime/isolation",
+        )
+    ),
 )
 REPAIRABLE_FILES = (
     "autoresearch/runtime.md",
+    "autoresearch/lifecycle.md",
     "autoresearch/watchdog.md",
     "autoresearch/status.md",
     "autoresearch/scripts.md",
@@ -60,16 +81,12 @@ PROJECTIONS = ("backlog.yaml", "ideas.yaml", "findings.md")
 
 
 def repairable(path):
-    return path not in PROTECTED_CODE and (
+    return path not in PROTECTED and (
         path in REPAIRABLE_FILES
         or path.startswith(
             ("src/knee_abnormality/autoresearch/", "autoresearch/roles/")
         )
     )
-
-
-def optional_json(path):
-    return read_json(path) if path.exists() else None
 
 
 class Watchdog:
@@ -133,7 +150,7 @@ class Watchdog:
         files = [
             self.output / "limits.json",
             Path(state["headers"]),
-            Path(state["incumbent"]["run"]) / "fold_0/validation_predictions.csv",
+            fold_dir(state["incumbent"]["run"], campaign_fold(state)) / PREDICTIONS,
             self.root / "autoresearch/campaigns" / self.campaign / "campaign.yaml",
             self.root / "autoresearch/campaigns" / self.campaign / "contract.md",
             self.output / "baseline/input_identity.json",
@@ -144,7 +161,8 @@ class Watchdog:
                 "state": {
                     key: value
                     for key, value in state.items()
-                    if key not in {"status", "reason", "revision", "updated_at"}
+                    if key
+                    not in {"status", "reason", "pause_kind", "revision", "updated_at"}
                 },
                 "files": {
                     str(path): sha256(path) if path.exists() else None for path in files
@@ -203,40 +221,22 @@ class Watchdog:
                 ],
             },
         )
-        schema = {
-            "type": "object",
-            "additionalProperties": False,
-            "properties": {
-                "status": {"type": "string", "enum": ["ready", "blocked"]},
-                "summary": {"type": "string"},
-                "changed_files": {"type": "array", "items": {"type": "string"}},
-            },
-            "required": ["status", "summary", "changed_files"],
-        }
-        write_json(attempt / "schema.json", schema)
+        write_json(attempt / "schema.json", WatchdogReport.model_json_schema())
         prompt = (
-            f"Repair one operational failure in autoresearch campaign {self.campaign}. "
-            f"The user explicitly authorized failure-triggered repairs and resume. "
-            f"Read {attempt / 'incident.json'} for the pre-stop state and only the relevant failed job logs. "
-            f"The watchdog has quiesced the supervisor and owns recovery. "
-            "Do not start, resume, stop or launch any campaign, model, GPU job or other agent yourself. "
-            "Return ready only after a concrete root cause is fixed and relevant static checks pass. "
-            "For a dead supervisor with intact artifacts, verified ordinary resume readiness can suffice. "
-            "Quota/authentication failures, lost training, scientific decisions, source/data mismatches, "
-            "and fixes requiring changes to sealed inputs must return blocked with evidence. "
-            "Never loosen gates, limits, scope, sandboxing, acceptance criteria or dependencies. "
-            "Never rewrite state, canonical decisions, predictions, identities, hashes, frozen sources, "
-            "trained artifacts, policy seals or the campaign's reference. Do not change campaign proposals. "
-            f"Only files under src/knee_abnormality/autoresearch/, autoresearch/roles/, and {', '.join(REPAIRABLE_FILES)} may change; "
-            f"never edit {', '.join(PROTECTED_CODE)}; return blocked if the fix needs any other file. "
-            "The watchdog verifies the actual changed files against this scope, and any other change blocks resume. "
-            "Follow AGENTS.md and applicable skills. No tests. All shell commands use rtk. "
-            "Other work is present: preserve unrelated edits, never reset, checkout or commit. "
-            "Use the existing environment and no dependency installation. Keep the investigation narrow. "
-            f"Before editing, confirm {self.output / 'stop.json'} still contains watchdog={token}; "
-            f"if changed or {self.directory / 'stop.json'} exists, stop and return blocked. "
-            "Do not remove or alter those control files. The watchdog will recheck them before resume. "
-            "Exit with a concise structured result; no polling or repeated attempts."
+            (self.root / "autoresearch/roles/watchdog.md").read_text()
+            + f"""
+# Incident
+
+- Campaign: {self.campaign}
+- Incident record (pre-stop state): {attempt / "incident.json"}
+- Control files: {self.output / "stop.json"} must still contain watchdog={token}, and
+  {self.directory / "stop.json"} must not exist.
+- You may change only files under src/knee_abnormality/autoresearch/ and
+  autoresearch/roles/, plus {", ".join(REPAIRABLE_FILES)}.
+- You must never change {", ".join(PROTECTED)}.
+- The watchdog verifies the actual changed files against this scope; any other change
+  blocks resume.
+"""
         )
         atomic_write(attempt / "stdin.txt", prompt)
         profile = yaml.safe_load((self.root / "autoresearch/agents.yaml").read_text())[
@@ -252,30 +252,14 @@ class Watchdog:
                 },
             },
         )
-        command = [
-            "codex",
-            "exec",
-            "--ignore-user-config",
-            "--ephemeral",
-            "--sandbox",
+        command = codex_command(
+            profile,
+            attempt / "schema.json",
+            attempt / "report.json",
             "workspace-write",
-            "-c",
-            'approval_policy="never"',
-            "-c",
-            "features.multi_agent=false",
-            "-m",
-            profile["model"],
-            "-c",
-            f'model_reasoning_effort="{profile["effort"]}"',
             "--cd",
             str(self.root),
-            "--json",
-            "--output-schema",
-            str(attempt / "schema.json"),
-            "--output-last-message",
-            str(attempt / "report.json"),
-            "-",
-        ]
+        )
         before = self.workspace_manifest()
         with (
             (attempt / "stdin.txt").open() as source,
@@ -285,7 +269,7 @@ class Watchdog:
             process = subprocess.Popen(
                 command,
                 cwd=self.root,
-                env=auth_environment(),
+                env=scrubbed_environment(),
                 stdin=source,
                 stdout=stdout,
                 stderr=stderr,
@@ -321,11 +305,10 @@ class Watchdog:
             )
         if process.returncode:
             raise ValueError(f"Repair agent failed; inspect {attempt}")
-        result = read_json(attempt / "report.json")
-        if result["status"] != "ready":
-            raise ValueError(result["summary"])
-        result["actual_changed_files"] = changed
-        return result
+        result = WatchdogReport.model_validate(read_json(attempt / "report.json"))
+        if result.status != "ready":
+            raise ValueError(result.summary)
+        return {**result.model_dump(mode="json"), "actual_changed_files": changed}
 
     def resume(self, token, guard):
         with lock(self.output / "control.lock"):
@@ -340,7 +323,7 @@ class Watchdog:
             supervisor = Supervisor(self.root, self.campaign)
             preflight(supervisor.state["provider"], self.root)
             write_json(self.output / "resume.json", {})
-            launch(supervisor)
+            supervisor.launch()
         self.await_running()
 
     def plain_resume(self, state):
@@ -358,7 +341,7 @@ class Watchdog:
             preflight(supervisor.state["provider"], self.root)
             write_json(self.output / "resume.json", {})
             if not self.supervisor_alive():
-                launch(supervisor)
+                supervisor.launch()
         self.await_running()
         return True
 
@@ -418,7 +401,7 @@ class Watchdog:
                     )
                     if (
                         state["status"] == "paused"
-                        and reason.startswith(REJECTION_PAUSE)
+                        and state["pause_kind"] == "rejection"
                         and fingerprint not in self.record["resumes"]
                         and len(self.record["resumes"]) < 3
                     ):
@@ -496,25 +479,18 @@ def main():
                     reason=None,
                     incidents=watcher.record.get("incidents", []),
                 )
-                with (watcher.directory / "watch.log").open("ab") as log:
-                    process = subprocess.Popen(
-                        [
-                            sys.executable,
-                            "-m",
-                            "scripts.tools.autoresearch_watch",
-                            "watch",
-                            args.campaign,
-                            "--root",
-                            str(watcher.root),
-                        ],
-                        cwd=watcher.root,
-                        stdin=subprocess.DEVNULL,
-                        stdout=log,
-                        stderr=log,
-                        start_new_session=True,
-                    )
-                write_json(
-                    watcher.directory / "launcher.json", process_identity(process.pid)
+                spawn(
+                    [
+                        "knee_abnormality.autoresearch.watchdog",
+                        "watch",
+                        args.campaign,
+                        "--root",
+                        str(watcher.root),
+                    ],
+                    watcher.root,
+                    watcher.directory / "watch.log",
+                    watcher.directory / "launcher.json",
+                    environment(watcher.root),
                 )
         elif args.action == "stop":
             write_json(watcher.directory / "stop.json", {})

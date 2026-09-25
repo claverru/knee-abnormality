@@ -32,14 +32,9 @@ follow-up gets a new idea ID under the same mechanism. Historical links alone do
 not make an idea queued or authorize duplicate work.
 
 `backlog.yaml` contains a `queue` list of unique idea IDs ranked by the orchestrator,
-highest potential first. It is the work queue, not the research memory. The
-orchestrator reranks unclaimed entries after new proposals or results and records why.
-A claim reserves the first idea and marks it developing
-without popping it. Its successful training launch removes the ID and records the
-experiment reference. Launch failure leaves the head in place. The entire queue
-length, including its developing or prepared head, determines the refill threshold.
-The claimed head is fixed until launch or explicit parking; only its unclaimed tail
-can change order. Launch removal never deletes the permanent idea record.
+highest potential first. It is the work queue, not the research memory; claiming,
+launch removal and refill are described in the [lifecycle](lifecycle.md#claim-and-refill).
+Launch removal never deletes the permanent idea record.
 
 ## Experiments
 
@@ -56,7 +51,7 @@ checks, and the decision with its rationale. Record the reference predictions an
 their hash as well as the candidate's. Never overwrite an earlier attempt.
 
 Execution states are `prepared`, `running`, `completed`, `failed`, and `cancelled`.
-New evaluation decisions are `provisional_accept` (the
+Evaluation decisions are `provisional_accept` (the
 [shared adoption rule](protocol.md#shared-evaluation-and-adoption) holds), `reject`
 (either adoption condition fails), and `invalid`. `adoption_bootstrap` in evaluation
 evidence records that interval; the original 95% summary remains in `bootstrap`. Historical `inconclusive` records
@@ -71,11 +66,9 @@ attempts remain addressable; they are not counted as trained failures.
 
 `implementation_reference` records the parent ID, source tree digest, saved recipe,
 input identity and prediction hash. Prepared developer reports require
-`integration`: `mode` (`add` or `replace`), `retained_components`, `added_components`,
-`removed_components`, `removed_idea_ids`, and `rationale`. Blocked reports use null.
-Replacement includes pure ablations; it must name removed behavior. Accepted idea
-IDs may be removed only if they are active. Required dependencies of both the
-candidate and every retained accepted method must remain.
+`integration`: `retained_components`, `added_components`, `removed_components`,
+`removed_idea_ids`, and `rationale`; blocked reports use null. Its rules are in the
+[lifecycle](lifecycle.md#development-and-gates).
 
 Approval requires a nonempty `integration_review`; other orchestrator responses
 use null. Each review writes `review-<event-id>.json` in the attempt directory.
@@ -146,13 +139,11 @@ logs remain available for substantive review.
 
 Orchestrator `ranked_ids: null` preserves the queue; an explicit list changes it.
 The supervisor owns the numerical completion verdict, so reports do not repeat it
-as an agent-controlled field. Reports contain concise `rationale`, `finding`,
-`concerns`, and `evidence_refs`, with advisory length/count targets in the schema
-descriptions. Full text and every concern/reference are retained even when those
-targets are exceeded; narrative size cannot reject an otherwise valid report.
-Required fields, types, decision enums and campaign gates remain strict. Concerns
-and new findings are retained with the experiment and canonical findings.
-Historical reports remain untouched; `usage.json` records actual report bytes.
+as an agent-controlled field. Reports contain `rationale`, `finding`, `concerns` and
+`evidence_refs`, with advisory length/count targets in the schema descriptions
+([protocol](protocol.md#evidence-and-context)). Concerns and new findings are
+retained with the experiment and canonical findings. Historical reports remain
+untouched; `usage.json` records actual report bytes.
 
 `usage.json` is captured independently of report validation and process success.
 It records provider/model/effort, role/event/experiment, token categories, any
@@ -167,7 +158,8 @@ failed calls whose separate usage file was never written. It reports complete,
 partial and unavailable jobs, direct experiment attribution, repairs and measured
 compute time. Research and proposal-ranking costs remain campaign overhead, while
 the campaign cost-per-valid-experiment figure includes that overhead. Valid means
-a decided `provisional_accept`, `reject` or `inconclusive` experiment. Unavailable
+any recorded decision except `invalid`, so historical `inconclusive` records count.
+Unavailable
 costs make recorded cost totals and cost per valid experiment incomplete.
 Reporter outcomes and routing counts appear under `completion_reporting`, alongside
 per-experiment records. An escalated completion includes both reporter and

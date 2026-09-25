@@ -1,5 +1,4 @@
 id: noisy-labels
-status: stopped
 recipe: configs/training.yaml
 reference_run: outputs/training/k05-clean
 reference_equivalences: {}
@@ -13,7 +12,6 @@ additional_evidence_runs:
 backlog:
   refill_below: 4
   refill_to: 5
-artifacts_root: outputs/autoresearch/noisy-labels
 policy:
   editable_files:
     - configs/training.yaml

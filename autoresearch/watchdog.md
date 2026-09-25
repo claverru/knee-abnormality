@@ -10,14 +10,14 @@ The campaign keeps its own research provider; a Claude campaign remains Claude.
 Enable monitoring only when operational repairs and resume are authorized:
 
 ```bash
-rtk proxy uv run --locked python -m scripts.tools.autoresearch_watch start medial-lateral-transfer
+rtk proxy uv run --locked python -m scripts.tools.autoresearch_watch start CAMPAIGN
 ```
 
 The process runs detached. Inspect it or stop monitoring:
 
 ```bash
-rtk proxy uv run --locked python -m scripts.tools.autoresearch_watch status medial-lateral-transfer
-rtk proxy uv run --locked python -m scripts.tools.autoresearch_watch stop medial-lateral-transfer
+rtk proxy uv run --locked python -m scripts.tools.autoresearch_watch status CAMPAIGN
+rtk proxy uv run --locked python -m scripts.tools.autoresearch_watch stop CAMPAIGN
 ```
 
 Stopping the watcher leaves a healthy campaign running. If a repair is underway,
@@ -31,8 +31,8 @@ stays running with a live supervisor, so it is healthy: the watcher records the
 wait time in its state and takes no action. The supervisor retries by itself; see
 [automatic recovery](runtime.md#inspect-stop-and-resume).
 
-A pause whose reason starts with `Report rejected` (the third consecutive rejected
-report for one event or experiment) first gets one plain resume without a repair
+A pause with `pause_kind: rejection` (the third consecutive rejected report for one
+event or experiment) first gets one plain resume without a repair
 agent. The watcher rechecks the same pause under the control lock, runs the
 existing preflight and requests resume, launching the supervisor only when it is
 not alive; it does not quiesce or wait for jobs to drain. Only if the same
@@ -46,14 +46,18 @@ one repair session of at most fifteen minutes. This gives runtime edits a clean
 process restart and avoids interfering with training. User stop/resume commands
 replace the marker and cancel recovery ownership.
 
-The repair agent can fix operational autoresearch code, briefs and documentation;
-it does not launch jobs or resume the campaign. Its allowlist is the autoresearch
-runtime package, role briefs, and the listed operational docs and the two CLI
-wrappers (`runtime.md`, `watchdog.md`, `status.md`, `scripts.md`,
-`scripts/tools/autoresearch.py`, `scripts/tools/autoresearch_watch.py`); the gate,
-evaluation, binding, accounting and policy modules (`campaign/gates.py`,
+The repair agent follows its [brief](roles/watchdog.md), to which the watchdog appends
+the incident paths, token and scope. It can fix operational autoresearch code, briefs
+and documentation; it does not launch jobs or resume the campaign. Its allowlist is the
+autoresearch runtime package, role briefs, the operational docs `runtime.md`,
+`lifecycle.md`, `watchdog.md`, `status.md` and `scripts.md`, and the two CLI wrappers
+(`scripts/tools/autoresearch.py`, `scripts/tools/autoresearch_watch.py`). Off-limits
+(`PROTECTED` in `watchdog.py`): its own brief; the gate, evaluation, binding, accounting
+and policy modules (`campaign/gates.py`, `campaign/rules.py`, `runtime/layout.py`,
 `scoring/diagnostics.py`, `campaign/binding.py`, `campaign/completion.py`,
-`scoring/accounting.py`, `campaign/definition.py`) are off-limits.
+`scoring/accounting.py`, `campaign/definition.py`); the verdict and launch modules
+(`supervisor/results.py`, `supervisor/experiments.py`); and the developer scope check
+(`runtime/isolation.py`).
 It uses the workspace-write sandbox, subscription authentication and no additional
 agents. Existing repository rules apply, including no tests and preservation of
 unrelated edits. The watcher compares actual before/after file hashes of the
@@ -66,7 +70,7 @@ report. Failure or uncertainty leaves a recorded blocker.
 Quota/authentication failures, lost training, scientific choices, source/data
 mismatches and changes to sealed inputs are blockers. Recovery cannot change the
 reference, proposals, acceptance rule, resource limits, recorded identities,
-predictions or frozen source. It does not turn an inconclusive result into a failure.
+predictions or frozen source, and it never changes a recorded verdict.
 
 The same normalized failure cannot dispatch another repair. Three total repair
 attempts exhaust automatic recovery, even across watcher restarts. These bounds

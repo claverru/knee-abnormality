@@ -26,7 +26,7 @@ class Idea(Report):
     )
     open_choices: str = Field(description="Aim for at most 800 characters.")
     dependencies: list[str] = Field(
-        description="Required active incumbent idea IDs. Each must have a recorded provisional_accept and remain present, not superseded. Historical evidence belongs in precedents, not dependencies."
+        description="Active incumbent idea IDs this mechanism requires; historical methods belong in precedents."
     )
     priority_rationale: str = Field(description="Aim for at most 600 characters.")
 
@@ -37,16 +37,13 @@ class ResearchReport(Report):
 
 
 class IntegrationPlan(Report):
-    mode: Literal["add", "replace"] = Field(
-        description="Relative to the supplied implementation parent: add if and only if removed_components is empty; replace if and only if removed_components is nonempty, including ablations and cleanup of an earlier failed attempt."
-    )
     retained_components: list[Annotated[str, Field(min_length=1)]]
     added_components: list[Annotated[str, Field(min_length=1)]]
     removed_components: list[Annotated[str, Field(min_length=1)]] = Field(
-        description="Components absent from the final candidate but present in the supplied implementation parent. Must be empty for add and nonempty for replace."
+        description="Components present in the supplied implementation parent source but absent from the final candidate, including ablations and cleanup of an earlier failed attempt. Designs borrowed from historical or rejected implementations that never existed in the parent are not removals."
     )
     removed_idea_ids: list[str] = Field(
-        description="Accepted ideas explicitly removed from active_incumbent_ideas. Empty for addition or replacement of baseline behavior with no campaign idea ID. Unlisted accepted ideas must be preserved."
+        description="Accepted ideas intentionally superseded from active_incumbent_ideas; their components must appear in removed_components. Baseline behavior has no idea ID. Unlisted accepted ideas must stay implemented."
     )
     rationale: str = Field(min_length=1)
 
@@ -62,14 +59,10 @@ class IntegrationPlan(Report):
             raise ValueError("Integration components must be nonempty and distinct")
         if not self.added_components and not self.removed_components:
             raise ValueError("Integration must add or remove a component")
-        if (self.mode == "replace") != bool(self.removed_components):
-            raise ValueError(
-                "Replacement must name removals; addition must retain them"
-            )
         if len(self.removed_idea_ids) != len(set(self.removed_idea_ids)):
             raise ValueError("Removed idea IDs must be unique")
-        if self.mode == "add" and self.removed_idea_ids:
-            raise ValueError("Addition cannot remove accepted ideas")
+        if self.removed_idea_ids and not self.removed_components:
+            raise ValueError("Removed idea IDs need their removed components")
         if not self.rationale.strip():
             raise ValueError("Integration needs a rationale")
         return self
@@ -83,7 +76,7 @@ class DeveloperReport(Report):
         description="Aim for at most 1,200 characters; preserve the complete blocker."
     )
     integration: IntegrationPlan | None = Field(
-        description="Required when prepared, null when blocked. Relative to the supplied implementation parent, name topic-relevant components retained, added and removed, using behavior and source/config references. Add preserves accepted components; replace explicitly removes named components, including pure ablations."
+        description="Required when prepared, null when blocked. Relative to the supplied implementation parent, name topic-relevant components retained, added and removed, using behavior and source/config references. A candidate replaces parent behavior exactly when removed_components is nonempty."
     )
 
     @model_validator(mode="after")
@@ -109,7 +102,7 @@ class CompletionReport(Report):
 
 class OrchestratorReport(Report):
     accepted_proposal_ids: list[str] = Field(
-        description="Proposals to queue now. Every dependency must already have decision=provisional_accept. Omit unresolved proposals from this list and ranked_ids; they remain proposed."
+        description="Proposals to queue now; only those whose dependencies proposal_admission reports satisfied."
     )
     ranked_ids: list[str] | None = Field(
         description="Null preserves the live queue order; supply a full order only when changing it."
@@ -140,6 +133,12 @@ class OrchestratorReport(Report):
         elif self.integration_review is not None:
             raise ValueError("Only approval can contain an integration review")
         return self
+
+
+class WatchdogReport(Report):
+    status: Literal["ready", "blocked"]
+    summary: str
+    changed_files: list[str]
 
 
 REPORTS = {

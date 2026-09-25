@@ -1,5 +1,4 @@
 id: sampling
-status: ready-to-seal
 recipe: configs/training.yaml
 reference_run: outputs/training/k_05
 reference_equivalences: {}
@@ -7,7 +6,6 @@ additional_evidence_runs: []
 backlog:
   refill_below: 4
   refill_to: 5
-artifacts_root: outputs/autoresearch/sampling
 policy:
   editable_files:
     - configs/training.yaml

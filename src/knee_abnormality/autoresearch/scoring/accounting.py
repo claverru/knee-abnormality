@@ -6,7 +6,10 @@ from pathlib import Path
 
 import pytorch_lightning as L
 
-from knee_abnormality.autoresearch.campaign.gates import CALIBRATION_EPOCHS
+from knee_abnormality.autoresearch.campaign.rules import (
+    CALIBRATION_EPOCHS,
+    CALIBRATION_VALIDATION_PASSES,
+)
 from knee_abnormality.autoresearch.runtime.storage import read_json, write_json
 
 
@@ -178,8 +181,8 @@ def calibrate(config_path: Path, destination: Path):
     from knee_abnormality.training.lightning import KneeDataModule
 
     started = time.monotonic()
-    config = load_config(config_path, folds=[0])
-    data = KneeDataModule(config, 0)
+    config = load_config(config_path)
+    data = KneeDataModule(config, config.validation.folds[0])
     data.setup("fit")
     ledger = TripletLedger(destination / "triplet_accounting.json")
     train_loader = build_data_loader(
@@ -192,7 +195,7 @@ def calibrate(config_path: Path, destination: Path):
             ledger.observe(batch)
         ledger.end("train", epoch)
     validation_loader = data.val_dataloader()
-    for epoch in range(2):
+    for epoch in range(CALIBRATION_VALIDATION_PASSES):
         ledger.begin()
         for batch in validation_loader:
             ledger.observe(batch)

@@ -115,7 +115,7 @@ pending experiments are classified in the [backlog](../backlog/INDEX.md).
   run scores 0.897443 versus 0.895112 for the current matched-seed control (+0.002331;
   80% interval [+0.000103, +0.004518]). It is adopted; appearance-only pooling,
   learned widths and the pooled compartment adapter are removed. See the
-  [current model](../modeling/current-model.md) and [durable experiment record](../../autoresearch/anatomical-attention.md).
+  [current model](../modeling/current-model.md) and [durable experiment record](../validation/results/2026-09-21-anatomical-attention-result.md).
 - **Research decisions:** valid candidates are adopted when macro gain >= 0.001 and the
   central 80% paired-report-group interval has lower bound > 0; otherwise discarded.
   The 95% interval remains diagnostic. Candidates inherit the incumbent seed. This is
@@ -131,7 +131,7 @@ pending experiments are classified in the [backlog](../backlog/INDEX.md).
   [cleaned-source](../../autoresearch/campaigns/oblique-clean/INDEX.md) oblique campaigns are
   retired with the [oblique line](../history/oblique-groups.md), and no campaign is active. Current
   state and transition evidence are owned by
-  [autoresearch](../../autoresearch/status.md).
+  [autoresearch](../../autoresearch/campaigns/INDEX.md).
   The watchdog initializes its incident history on load, so direct `watch` can recover
   without a preceding `start`; existing incident history is preserved.
 - **Local metrics against the leaderboard (measured 2026-09-18):** over the nineteen comparable

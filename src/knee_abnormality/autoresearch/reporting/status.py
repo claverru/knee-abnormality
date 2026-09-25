@@ -1,26 +1,34 @@
 import time
 from pathlib import Path
 
-from knee_abnormality.autoresearch.campaign.gates import CALIBRATION_EPOCHS
+from knee_abnormality.autoresearch.campaign.rules import (
+    CALIBRATION_EPOCHS,
+    CALIBRATION_VALIDATION_PASSES,
+    SEED_TERMINAL,
+)
 from knee_abnormality.autoresearch.reporting.progress import (
+    adoption_result,
     decision_text,
-    difference,
     interval_text,
     progress_lines,
     score_text,
 )
+from knee_abnormality.autoresearch.runtime.layout import (
+    campaign_fold,
+    fold_dir,
+    job_experiment,
+)
 from knee_abnormality.autoresearch.runtime.storage import (
     alive,
+    optional_json,
     read_json,
 )
 from knee_abnormality.autoresearch.runtime.usage import campaign_usage
-from knee_abnormality.autoresearch.supervisor import Supervisor
 
 
-def status(supervisor: Supervisor):
-    state = read_json(supervisor.state_path) if supervisor.state_path.exists() else None
-    owner_path = supervisor.output / "supervisor.json"
-    owner = read_json(owner_path) if owner_path.exists() else None
+def status(supervisor):
+    state = optional_json(supervisor.state_path)
+    owner = optional_json(supervisor.output / "supervisor.json")
     return {
         "campaign": supervisor.campaign["id"],
         "status": state["status"] if state else "not_started",
@@ -57,11 +65,10 @@ def job_line(job, state):
             else "starting or awaiting recovery"
         )
     )
-    payload = job["payload"] if isinstance(job["payload"], dict) else {}
-    exp = state["experiments"].get(payload.get("experiment"))
+    exp = state["experiments"].get(job_experiment(job))
     detail = exp["idea"] if exp else ""
     if exp and job["kind"] == "training":
-        fold = Path(exp["directory"]) / "training/fold_0"
+        fold = fold_dir(Path(exp["directory"]) / "training", campaign_fold(state))
         ledger = fold / "triplet_accounting.json"
         if ledger.exists():
             detail += (
@@ -88,10 +95,7 @@ def result_rows(completed):
     width = max(len(exp["idea"]) for exp in completed)
     rows = [f"  {'idea':<{width}}  {'delta':>9}  {'adoption 80% CI':<24}  verdict"]
     for exp in completed:
-        evidence = exp.get("evidence", {})
-        scores = evidence.get("macro_auc", {})
-        delta = difference(scores.get("candidate"), scores.get("reference"))
-        bounds = (evidence.get("adoption_bootstrap") or {}).get("delta_percentile_80")
+        delta, bounds = adoption_result(exp)
         rows.append(
             f"  {exp['idea']:<{width}}  {score_text(delta, True):>9}  "
             f"{interval_text(bounds):<24}  {decision_text(exp)}"
@@ -99,7 +103,7 @@ def result_rows(completed):
     return rows
 
 
-def status_summary(supervisor: Supervisor):
+def status_summary(supervisor):
     current = status(supervisor)
     supervisor_text = (
         "supervisor alive" if current["supervisor_alive"] else "supervisor not running"
@@ -115,7 +119,7 @@ def status_summary(supervisor: Supervisor):
     limits = state["limits"]
     lines.append(
         f"Budget {duration_text(limits['max_run_seconds'])} per experiment · "
-        f"{limits['epochs']} epochs · fold 0"
+        f"{limits['epochs']} epochs · fold {campaign_fold(state)}"
     )
     warnings = []
     if current["reason"]:
@@ -151,10 +155,10 @@ def status_summary(supervisor: Supervisor):
         ledger = read_json(path) if path.exists() else {"train": [], "validation": []}
         lines.append(
             f"  calibration  {len(ledger['train'])}/{min(CALIBRATION_EPOCHS, limits['epochs'])} training passes, "
-            f"{len(ledger['validation'])}/2 validation passes (CPU only)"
+            f"{len(ledger['validation'])}/{CALIBRATION_VALIDATION_PASSES} validation passes (CPU only)"
         )
     lines.extend(job_line(job, state) for job in active)
-    control = state.get("control_retrain")
+    control = state["control_retrain"]
     if control:
         lines.append(
             f"  control retrain of {control['adopted']} at seed {control['seed']} "
@@ -167,12 +171,11 @@ def status_summary(supervisor: Supervisor):
         f"Backlog  {len(queue)} queued (refill below {state['refill_below']}, "
         f"target {state['refill_to']})"
     )
-    if state.get("seed_order") == "forced":
+    if state["seed_order"] == "forced":
         remaining = [
             idea_id
             for idea_id in state["seed_ideas"]
-            if state["ideas"][idea_id]["status"]
-            not in {"completed", "blocked", "retired"}
+            if state["ideas"][idea_id]["status"] not in SEED_TERMINAL
         ]
         backlog += (
             f"; forced seeds {len(state['seed_ideas']) - len(remaining)}/"

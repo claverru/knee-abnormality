@@ -5,27 +5,23 @@ scripts:
     summary: Validate, run, inspect macro and per-label results, backfill label diagnostics, and account for local autoresearch campaigns through Codex or Claude subscriptions.
     tags: [autoresearch, campaigns, losses, sampling, triplets, background, train, validation, bootstrap, per-label, codex, claude, progress, results, auc, usage, tokens, cost]
     commands:
-      - rtk proxy uv run --locked just autoresearch-start codex
-      - rtk proxy uv run --locked just autoresearch-start claude
-      - rtk proxy uv run --locked python -m scripts.tools.autoresearch validate losses
-      - rtk proxy uv run --locked just autoresearch-start claude losses
-      - rtk proxy uv run --locked just autoresearch-status losses
-      - rtk proxy uv run --locked just autoresearch-status
-      - rtk proxy uv run --locked just autoresearch-results triplet-sampling
-      - rtk proxy uv run --locked python -m scripts.tools.autoresearch results losses
-      - rtk proxy uv run --locked python -m scripts.tools.autoresearch backfill-labels losses
-      - rtk proxy uv run --locked python -m scripts.tools.autoresearch usage
-      - rtk proxy uv run --locked just autoresearch-stop
-      - rtk proxy uv run --locked just autoresearch-resume
-      - rtk proxy uv run --locked python -m scripts.tools.autoresearch import-ideas --ideas-file autoresearch/campaigns/triplet-sampling/seed-ideas.yaml
-    inputs: [autoresearch campaign contract and role profiles, Existing fold-0 control, Local data and cached pretrained weights, Subscription-authenticated CLI, Linux bubblewrap and NVIDIA GPU]
+      - rtk proxy uv run --locked python -m scripts.tools.autoresearch validate CAMPAIGN
+      - rtk proxy uv run --locked just autoresearch-start codex CAMPAIGN
+      - rtk proxy uv run --locked just autoresearch-status CAMPAIGN
+      - rtk proxy uv run --locked just autoresearch-results CAMPAIGN
+      - rtk proxy uv run --locked python -m scripts.tools.autoresearch backfill-labels CAMPAIGN
+      - rtk proxy uv run --locked python -m scripts.tools.autoresearch usage CAMPAIGN
+      - rtk proxy uv run --locked just autoresearch-stop CAMPAIGN
+      - rtk proxy uv run --locked just autoresearch-resume CAMPAIGN
+      - rtk proxy uv run --locked python -m scripts.tools.autoresearch import-ideas CAMPAIGN --ideas-file IDEAS.yaml
+    inputs: [autoresearch campaign contract and role profiles, Existing control trained on the recipe's fold, Local data and cached pretrained weights, Subscription-authenticated CLI, Linux bubblewrap and NVIDIA GPU]
     outputs: [Durable campaign state and detached job receipts, Frozen candidate sources and local training artifacts, Ranked backlog and attributed findings, Read-only metric progress and complete experiment results, Focused evidence packets and usage by role event and experiment]
     notes:
       - Start authorizes ongoing local training and validation only; submissions and publication are prohibited.
       - Reuses only scripts.pipeline.train and scripts.tools.compare_fold_runs; includes a one-time CPU replay to seal realized triplet counts without another trained model.
       - Runtime is capped at 115 percent of the initial historical control total, with fixed epochs, optimizer steps, and zero triplet-count tolerance.
       - Stop drains active training; --abort terminates it. Resume adopts owned live jobs and never automatically repeats a lost training attempt.
-      - Quota and unexpected role failures pause the campaign without model polling; resolve the cause and resume.
+      - Provider limits wait until the parsed reset and transient errors retry with backoff; other role failures pause without model polling until resume.
       - Report prose lengths and concern/reference counts are advisory targets; full content is retained without formatting-only retries, while structured actions and campaign gates remain strict.
       - Proposal admission requires every dependency to be provisionally accepted and still active in the incumbent; replaced methods remain historical evidence and do not satisfy behavioral prerequisites.
       - Prepared candidates declare retained, added and removed components; acceptance tracks active idea IDs, and every incumbent change requires developer integration assessment plus renewed review, including clean merges.
@@ -37,28 +33,28 @@ scripts:
       - Usage is read-only and includes failed calls with explicit partial or unavailable coverage; cost equivalents do not measure subscription quota.
       - Startup reviews seed-ideas.yaml before fresh research; import-ideas requires a stopped campaign and submits existing proposals for orchestrator ranking without replacing the queue.
       - New topics declare source/configuration permissions and role instructions in campaign.yaml; the policy is validated and sealed, without runner edits or legacy hardcoded fallbacks.
-      - Validate checks campaign policy, initial proposals and saved-control recipe compatibility without model calls, GPU work, or training. Omitting a campaign ID defaults to triplet-sampling.
-      - Routine rejected/inconclusive completions can use Haiku 4.5 or Luna low with code-owned eligibility and no decision authority; concerns escalate to the orchestrator, with both calls included in usage.
-    docs: [autoresearch/README.md, autoresearch/runtime.md, autoresearch/campaign-setup.md, autoresearch/campaigns/triplet-sampling/contract.md, autoresearch/campaigns/losses/contract.md]
+      - Validate checks campaign policy, initial proposals and saved-control recipe compatibility without model calls, GPU work, or training. Every campaign action requires a campaign ID.
+      - Approved rejects with complete evidence go to Haiku 4.5 or Luna low with code-owned eligibility and no decision authority; only an explicit escalation reaches the orchestrator, with both calls included in usage.
+    docs: [autoresearch/README.md, autoresearch/runtime.md, autoresearch/protocol.md, autoresearch/campaign-setup.md]
 
   - id: autoresearch-watch
     path: scripts/tools/autoresearch_watch.py
     summary: Monitor an existing campaign without model polling and dispatch bounded Codex repairs only for operational failures.
     tags: [autoresearch, watchdog, monitor, recovery, repair, background, tokens, codex]
     commands:
-      - rtk proxy uv run --locked python -m scripts.tools.autoresearch_watch start medial-lateral-transfer
-      - rtk proxy uv run --locked python -m scripts.tools.autoresearch_watch status medial-lateral-transfer
-      - rtk proxy uv run --locked python -m scripts.tools.autoresearch_watch stop medial-lateral-transfer
-    inputs: [Existing campaign state and process identities, Codex subscription login, Existing Codex orchestrator profile]
+      - rtk proxy uv run --locked python -m scripts.tools.autoresearch_watch start CAMPAIGN
+      - rtk proxy uv run --locked python -m scripts.tools.autoresearch_watch status CAMPAIGN
+      - rtk proxy uv run --locked python -m scripts.tools.autoresearch_watch stop CAMPAIGN
+    inputs: [Existing campaign state and process identities, Codex subscription login, Codex watchdog profile in autoresearch/agents.yaml]
     outputs: [Detached watcher status, Incident-specific repair logs and usage, Verified supervisor resume or recorded blocker]
     notes:
       - Enabling the watcher authorizes bounded operational repairs and resume for that campaign; healthy minute checks use no model calls.
-      - Uses the existing Codex orchestrator profile with a workspace-write sandbox and no API fallback. Research still uses the campaign's configured provider.
+      - Uses the Codex watchdog profile and the autoresearch/roles/watchdog.md brief with a workspace-write sandbox and no API fallback. Research still uses the campaign's configured provider.
       - Pauses or supervisor loss trigger recovery after active jobs drain. Each incident gets one model call capped at fifteen minutes; repeated failures or three total repair attempts stop automatic recovery.
       - Deliberate campaign stops are respected. Quota failures, scientific decisions and sealed-input changes require a blocker rather than automatic modification.
       - Logs and token usage live under the campaign's watchdog directory, separately from normal campaign usage.
       - Status checks operational liveness; it does not prove scientific validity or detect every hang inside a live worker.
-    docs: [autoresearch/watchdog.md]
+    docs: [autoresearch/watchdog.md, autoresearch/roles/watchdog.md]
 
   - id: prepare-tonylin-labels
     path: scripts/tools/prepare_tonylin_labels.py
