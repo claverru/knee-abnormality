@@ -27,7 +27,6 @@ from knee_abnormality.modeling.spatial_tokens import (
 
 PROJECTION_WIDTH = 256
 MIL_ATTENTION_WIDTH = 128
-READOUT_WIDTH = 32
 COMPARTMENT_MIDLINE_BAND_MM = 10.0
 
 
@@ -139,26 +138,6 @@ class KneeAbnormalityModel(nn.Module):
             nn.Dropout(model.dropout),
             nn.Linear(MIL_ATTENTION_WIDTH, target_count),
         )
-        self.gated_attention = model.gated_attention
-        self.attention_gate = (
-            nn.Linear(PROJECTION_WIDTH, MIL_ATTENTION_WIDTH)
-            if model.gated_attention
-            else None
-        )
-        if self.attention_gate is not None:
-            nn.init.zeros_(self.attention_gate.weight)
-            nn.init.zeros_(self.attention_gate.bias)
-        self.residual_readout = model.residual_readout
-        if model.residual_readout:
-            self.readout_hidden = nn.Parameter(
-                torch.empty(target_count, PROJECTION_WIDTH, READOUT_WIDTH)
-            )
-            self.readout_hidden_bias = nn.Parameter(
-                torch.zeros(target_count, READOUT_WIDTH)
-            )
-            nn.init.xavier_uniform_(self.readout_hidden)
-            self.readout_out = nn.Parameter(torch.zeros(target_count, READOUT_WIDTH))
-            self.readout_out_bias = nn.Parameter(torch.zeros(target_count))
         self.head = nn.Linear(PROJECTION_WIDTH, target_count)
         self.spatial_tokens = SpatialTokens(PROJECTION_WIDTH, data.series_types)
         with torch.random.fork_rng(devices=[]):
@@ -228,13 +207,6 @@ class KneeAbnormalityModel(nn.Module):
             images, series_index, parameters, matrices=matrices
         ), inverse[series_index]
 
-    def _attention_scores(self, tokens: torch.Tensor) -> torch.Tensor:
-        if not self.gated_attention:
-            return self.attention(tokens)
-        hidden = self.attention[1](self.attention[0](tokens))
-        hidden = hidden * 2 * torch.sigmoid(self.attention_gate(tokens))
-        return self.attention[3](self.attention[2](hidden))
-
     def _attention_pool(
         self,
         tokens: torch.Tensor,
@@ -242,13 +214,11 @@ class KneeAbnormalityModel(nn.Module):
         token_study: torch.Tensor,
         token_valid: torch.Tensor,
         batch_size: int,
-        medial_axis: torch.Tensor | None,
+        medial_axis: torch.Tensor,
         anterior_axis: torch.Tensor,
         trusted_geometry: torch.Tensor,
     ) -> torch.Tensor:
-        scores = self._attention_scores(tokens).transpose(0, 1)
-        if medial_axis is None:
-            raise ValueError("Anatomical attention requires token geometry")
+        scores = self.attention(tokens).transpose(0, 1)
         strengths = self.anatomical_log_strength.float().exp()
         signs = self.compartment_signs * strengths[self.compartment_families]
         scaled_axis = medial_axis.float()[None] / 20.0
@@ -273,18 +243,6 @@ class KneeAbnormalityModel(nn.Module):
             logits = (pooled * self.head.weight.float()[None]).sum(
                 -1
             ) + self.head.bias.float()
-            if self.residual_readout:
-                hidden = torch.einsum(
-                    "btf,tfh->bth", pooled, self.readout_hidden.float()
-                )
-                hidden = torch.nn.functional.gelu(
-                    hidden + self.readout_hidden_bias.float()[None]
-                )
-                logits = (
-                    logits
-                    + (hidden * self.readout_out.float()[None]).sum(-1)
-                    + self.readout_out_bias.float()
-                )
             regions = (
                 torch.stack(
                     (
@@ -431,9 +389,7 @@ class KneeAbnormalityModel(nn.Module):
             encoded["study"][:, None].expand_as(encoded["visual_valid"]).flatten(),
             encoded["visual_valid"].flatten(),
             encoded["batch_size"],
-            encoded["medial_axis"].flatten()
-            if encoded["medial_axis"] is not None
-            else None,
+            encoded["medial_axis"].flatten(),
             encoded["anterior_axis"].flatten(),
             encoded["trusted_geometry"].flatten(),
         )

@@ -222,14 +222,10 @@ def loader_candidate(
         dataset,
         np.random.default_rng(config.seed).permutation(len(dataset))[:count].tolist(),
     )
-    class_balance = (
-        fixed_class_balance(
-            dataset.studies[sample.indices],
-            dataset.targets,
-            config.trainer.class_balance_exponent,
-        )
-        if config.trainer.class_balanced_bce
-        else None
+    class_balance = fixed_class_balance(
+        dataset.studies[sample.indices],
+        dataset.targets,
+        config.trainer.class_balance_exponent,
     )
     loader = build_data_loader(
         sample,
@@ -415,7 +411,7 @@ def run(args: ProfileCLI) -> None:
         fixed_class_balance(
             dataset.studies, dataset.targets, config.trainer.class_balance_exponent
         )
-        if config.trainer.class_balanced_bce and args.mode in ("gpu", "lightning")
+        if args.mode in ("gpu", "lightning")
         else None
     )
     result = profile_manifest(

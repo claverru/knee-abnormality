@@ -53,7 +53,6 @@ bands; the experimental ten-epoch schedule was reverted. Historical
 | `data.image_size`, `data.spacing_mm` | 224, 0.625 (140 mm) |
 | `data.sampling_sigma_fraction`, `data.validation_image_multiplier` | 0.867, 1 (×2 before 2026-09-17; scores differ by about 0.0035, and submissions set their own count) |
 | Training targets | One independent random draw per probability band at each epoch; [implemented sampler](../data-preparation/physical-sampling/implemented-sampler.md) |
-| `trainer.class_balanced_bce` | `true` |
 | `trainer.class_balance_exponent` | `0.5` |
 | `data.study_triplet_total` | 26: a study whose per-type budgets sum below 26 training triplets is scaled up to it, proportionally over the types it has |
 | `data.reflection_augmentation.probability` | 0.5 |

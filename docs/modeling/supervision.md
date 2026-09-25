@@ -39,9 +39,8 @@ is proposed but unimplemented; the current disease targets and loss remain in fo
 
 **Measured 2026-09-19:** `balanced-bce` reached 0.895282, +0.008796 over the closest same-seed
 historical reference ([result and attribution limits](../validation/results/2026-09-19-balanced-bce-result.md)).
-Enable with `trainer.class_balanced_bce: true`.
-The schema defaults to `false`,
-which retains ordinary masked soft-target BCE. The
+It is always on; `trainer.class_balance_exponent` (required) damps it, and 0 gives unit weights,
+ordinary masked soft-target BCE. The
 [research note](../research/auc_loss_approaches.md#weighting-and-sampling-design-space) explains
 the hypothesis and alternative weighting/sampling methods.
 
