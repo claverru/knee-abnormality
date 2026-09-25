@@ -54,7 +54,7 @@ token_i = appearance_i + position(xyz_i) + side_embedding(side) + other_embeddin
 
 The same side vector is broadcast to every token of the study. Two vectors
 at width 256 add 512 parameters. The
-[archived first-experiment plan](../history/knee-side-sources/knee-side-embedding-plan.md.txt) specified conservative
+archived first-experiment plan (`f076a09:docs/history/knee-side-sources/knee-side-embedding-plan.md.txt`) specified conservative
 metadata assignments, zero-initialized vectors, a fixed zero contribution for
 unknown side and study-level side dropout. All attention outputs and disease
 classifiers remain independent.

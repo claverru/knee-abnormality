@@ -1,5 +1,4 @@
 import json
-import sys
 from pathlib import Path
 from zipfile import ZipFile
 
@@ -7,10 +6,10 @@ import numpy as np
 import polars as pl
 import torch
 from pydantic import Field
-from pydantic_settings import SettingsError
 
 from knee_abnormality.autoresearch.campaign.gates import without_fields
-from knee_abnormality.cli import CLISettings
+from knee_abnormality.cli import Bootstrap, CLISettings, RunFold, describe
+from knee_abnormality.config import STUDY_HEADERS
 from knee_abnormality.data.labels import STUDY, TARGET_THRESHOLD
 from knee_abnormality.evaluation.metrics import (
     COMPARTMENT_PAIRS,
@@ -26,19 +25,31 @@ from knee_abnormality.provenance import copy_sources, sha256_file
 ANALYSIS_SOURCES = (Path(__file__), Path("src/knee_abnormality/evaluation/metrics.py"))
 
 
-class CompareCLI(CLISettings):
-    reference: Path
-    candidate: Path
-    output_dir: Path
-    allowed_config_differences: list[str] = Field(default_factory=lambda: ["name"])
-    allowed_input_identity_differences: list[str] = Field(default_factory=list)
-    reference_identity_exceptions: list[str] = Field(default_factory=list)
-    fold: int | None = Field(default=None, ge=0)
-    headers: Path = Path(
-        "outputs/analysis/sharing-disagreement-20260914/study_headers.parquet"
+class CompareCLI(CLISettings, Bootstrap, RunFold):
+    model_config = describe(
+        "Compare a candidate fold run with a reference run from saved predictions and "
+        "checkpoint tensors, with paired report-group bootstrap intervals"
     )
-    bootstrap_draws: int = Field(default=2000, ge=100)
-    seed: int = 20260914
+
+    reference: Path = Field(description="Reference run directory")
+    candidate: Path = Field(description="Candidate run directory")
+    output_dir: Path = Field(description="New comparison directory")
+    allowed_config_differences: list[str] = Field(
+        default_factory=lambda: ["name"],
+        description="Dotted config fields allowed to differ between the runs",
+    )
+    allowed_input_identity_differences: list[str] = Field(
+        default_factory=list,
+        description="Input identity fields allowed to differ between the runs",
+    )
+    reference_identity_exceptions: list[str] = Field(
+        default_factory=list,
+        description="Input identity fields ignored in both runs, e.g. ones the reference predates",
+    )
+    headers: Path = Field(
+        default=STUDY_HEADERS,
+        description="Per-study header table supplying the vendor",
+    )
 
 
 def fingerprint(path: Path) -> dict:
@@ -163,14 +174,7 @@ def compare(settings: CompareCLI) -> None:
     if rejected := unexpected(config_diff, settings.allowed_config_differences):
         raise ValueError(f"Unexpected configuration differences: {rejected}")
     config = configs["candidate"]
-    fold = settings.fold
-    if fold is None:
-        folds = config["validation"]["folds"]
-        if len(folds) != 1:
-            raise ValueError(f"Runs have several validation folds {folds}; pass --fold")
-        fold = folds[0]
-    if fold not in config["validation"]["folds"]:
-        raise ValueError("Requested fold is absent from the compared configurations")
+    fold = settings.run_fold(config["validation"]["folds"])
     split = Path(config["paths"]["data_root"]) / "folds" / config["validation"]["split"]
     targets_path, studies_path = split / "targets.csv", split / "studies.csv"
     labels = pl.read_csv(targets_path)
@@ -190,8 +194,7 @@ def compare(settings: CompareCLI) -> None:
     if frame["vendor"].null_count():
         raise ValueError("Missing acquisition metadata")
     loaded = {
-        name: load_run(root, fold, frame, targets)
-        for name, root in roots.items()
+        name: load_run(root, fold, frame, targets) for name, root in roots.items()
     }
     predictions = {name: run["predictions"] for name, run in loaded.items()}
     runs = {name: run["record"] for name, run in loaded.items()}
@@ -280,7 +283,7 @@ def compare(settings: CompareCLI) -> None:
         for vendor in sorted(frame["vendor"].unique().to_list())
     }
     groups, inverse = np.unique(frame["report_group"].to_numpy(), return_inverse=True)
-    rng = np.random.default_rng(settings.seed)
+    rng = np.random.default_rng(settings.bootstrap_seed)
     counts = rng.multinomial(
         len(groups),
         np.full(len(groups), 1 / len(groups)),
@@ -373,7 +376,7 @@ def compare(settings: CompareCLI) -> None:
         "paired_report_group_bootstrap": {
             "groups": len(groups),
             "draws": settings.bootstrap_draws,
-            "seed": settings.seed,
+            "seed": settings.bootstrap_seed,
             "unit": "report group; margin intervals keep each draw's weights on exclusive-positive studies",
             "intervals": intervals,
         },
@@ -415,11 +418,7 @@ def compare(settings: CompareCLI) -> None:
 
 
 def main() -> None:
-    try:
-        compare(CompareCLI())
-    except (KeyError, OSError, TypeError, ValueError, SettingsError) as error:
-        print(f"Fold comparison error: {error}", file=sys.stderr)
-        raise SystemExit(2) from None
+    compare(CompareCLI())
 
 
 if __name__ == "__main__":

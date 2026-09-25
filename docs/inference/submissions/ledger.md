@@ -2,7 +2,7 @@
 
 All 56 Kaggle competition submissions, newest first, with submission times in UTC. The table is
 regenerated from the live submission list and the local bundles by
-[`relabel_kaggle_submission_datasets`](../../../scripts/adhoc/relabel_kaggle_submissions.py),
+[`update_submission_ledger`](../../../scripts/tools/update_submission_ledger.py),
 which also writes `outputs/submission/kaggle-ledger.json`. The dated records in this folder cover
 S01–S32; the baseline4 image-count comparisons are recorded in
 [Inference image count and memory](../inference-image-count-and-memory.md), and the 2026-09-19
@@ -24,7 +24,7 @@ S33 | b0-fold0 | x4 tau0.75 bs4 | val0(x1) 0.886354 | bundle c99de9cc
 | Field | Meaning |
 |---|---|
 | `S<nn>` | Position in the submission list, counted from the first submission; stable because submissions only append |
-| label | The run and its one change against the run it is meant to beat, 2 to 45 characters, the single `--label` argument |
+| label | The run and its one change against the run it is meant to beat, 2 to 45 characters, the single `--label` argument; the bound keeps the title within 50 characters, since a 52-character notebook title failed `SaveKernel` with HTTP 400 |
 | inference | `x<images> tau<effective temperature> bs<batch per device>`, plus `+mirrorTTA`, read from the bundle manifest |
 | `val0(x<m>)` | Fold-0 macro AUC of the exported checkpoint at validation multiplier `m`; an ensemble reports `<k>x mean` over its members |
 | bundle | First eight characters of the bundle manifest SHA-256, which identifies the exact submitted artifact |
@@ -34,12 +34,35 @@ the Kaggle notebook list, the dataset list and this ledger on the same handles. 
 dataset also carries the same line as its description and `Submission S<nn>, public LB <score>` as
 its subtitle.
 
+The sequence number counts only submissions already on Kaggle, so a job launched while another
+has not yet submitted would reuse its number; pass `--sequence` explicitly for overlapping
+launches.
+
 Two caveats apply to the rows before S33. Kaggle notebook titles were set from their slugs until
 this scheme, so the notebook names on Kaggle still read `Knee Rf Tau075 4X 20260918 Inference`
-rather than `S31 …`; renaming them needs a manual edit per notebook in the Kaggle UI, because
-pushing a notebook version re-runs it. And the three `ranked-filtered … + tau0.75` bundles carry
+rather than `S31 …` until the ledger script's `--apply` renames them. And the three `ranked-filtered … + tau0.75` bundles carry
 the temperature folded into the scorer weights rather than in a runtime field, so their `tau0.75`
-comes from the table in the relabel script rather than from the manifest.
+comes from the table in the ledger script rather than from the manifest.
+
+### Regenerating the ledger
+
+```bash
+rtk proxy uv run --locked python -m scripts.tools.update_submission_ledger
+rtk proxy uv run --locked python -m scripts.tools.update_submission_ledger --apply
+```
+
+Without `--apply` it writes only the ledger JSON and prints the planned titles. Labels for S01–S37
+come from a table in the script; later ones are recovered from the notebook slug. With `--apply` it:
+
+- rewrites each private bundle dataset's title, subtitle and description, refusing any dataset
+  that is not private and keeping the `Private inference bundle <sha>` line, so `submit` still
+  recognizes an unchanged bundle and reuses its version;
+- renames each notebook by saving its current source and metadata back as a quick save, a new
+  version that is not executed, so no GPU quota is spent and submitted versions are untouched;
+- skips datasets and notebooks that already match, and any notebook whose latest run has not
+  finished;
+- pauses between calls and retries HTTP 429 with exponential backoff, since a full pass is
+  rate limited.
 
 ## Ledger
 

@@ -61,7 +61,7 @@ permissions using the same runtime.
 6. The user starts the campaign:
 
    ```bash
-   rtk proxy uv run --locked just autoresearch-start claude CAMPAIGN
+   rtk proxy uv run --locked just autoresearch start CAMPAIGN --provider claude
    ```
 
    Either configured subscription provider works. Every command, including status,

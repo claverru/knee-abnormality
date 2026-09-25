@@ -1,15 +1,15 @@
 import json
-import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
 import numpy as np
 import polars as pl
-from pydantic_settings import SettingsError
+from pydantic import Field
 from sklearn.metrics import roc_auc_score
 
-from knee_abnormality.cli import CLISettings
+from knee_abnormality.cli import CLISettings, describe
 from knee_abnormality.data.labels import STUDY, TARGET_THRESHOLD, require_unique_ids
+from knee_abnormality.kaggle import COMPETITION
 from knee_abnormality.provenance import sha256_file
 from scripts.tools.prepare_combined_labels import fingerprint
 
@@ -24,9 +24,24 @@ BOOTSTRAP_SEED = 2263738815
 
 
 class PrepareCLI(CLISettings):
-    base_manifest: Path = Path("configs/labels/combined-label-sources.json")
-    output_dir: Path = Path("data/labels/prepared/image-blend-v1")
-    output_manifest: Path = Path("configs/labels/image-blend-v1-label-sources.json")
+    model_config = describe(
+        "Build the image_blend_v1 label table (half combined_v1, half the mean "
+        "out-of-fold predictions of the 2026-09-18 ReXNet-200 and EfficientNet-B0 "
+        "five-fold runs) and its pinned manifest"
+    )
+
+    base_manifest: Path = Field(
+        default=Path("configs/labels/combined-label-sources.json"),
+        description="Pinned combined_v1 label manifest",
+    )
+    output_dir: Path = Field(
+        default=Path("data/labels/prepared/image-blend-v1"),
+        description="Directory for the prepared label table",
+    )
+    output_manifest: Path = Field(
+        default=Path("configs/labels/image-blend-v1-label-sources.json"),
+        description="Manifest to write for the prepared table",
+    )
 
 
 def base_labels(manifest: dict) -> tuple[pl.DataFrame, dict]:
@@ -199,7 +214,7 @@ def prepare(settings: PrepareCLI) -> dict:
     prepared = {**fingerprint(output_path), "label_table": LABEL_TABLE}
     manifest = {
         "prepared_at": datetime.now(UTC).isoformat(),
-        "competition": "rsna-knee-abnormality-detection",
+        "competition": COMPETITION,
         "method": (
             f"{1 - BLEND_WEIGHT:g} times {BASE_TABLE} plus {BLEND_WEIGHT:g} times an image "
             "teacher: the mean of ReXNet-200 and EfficientNet-B0 out-of-fold probabilities "
@@ -268,11 +283,7 @@ def prepare(settings: PrepareCLI) -> dict:
 
 
 def main() -> None:
-    try:
-        report = prepare(PrepareCLI())
-    except (OSError, TypeError, ValueError, SettingsError) as error:
-        print(f"Image-blend label preparation error: {error!r}", file=sys.stderr)
-        raise SystemExit(2) from None
+    report = prepare(PrepareCLI())
     print(json.dumps(report, indent=2))
 
 

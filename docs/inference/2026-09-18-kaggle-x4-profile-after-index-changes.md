@@ -7,8 +7,16 @@ condition for condition.
 
 **Weights are random.** No trained checkpoint carries the current `preprocessing_identity`, so the
 bundle was exported from `outputs/submission/timing-profile-random-weights.ckpt`, rebuilt for this
-identity with [make-timing-checkpoint](../../scripts/adhoc/catalog.yaml). Every timing is real;
+identity with [`make_timing_checkpoint`](../../scripts/tools/make_timing_checkpoint.py). Every timing is real;
 every prediction is meaningless, and no AUC or parity number was computed.
+
+Rebuild it whenever a change to `PREPROCESSING_SOURCES` bumps the identity and no trained
+checkpoint carries it. It keeps the source checkpoint's config, targets, fold and study counts,
+so timing bundles stay comparable, and writes fresh seeded weights on CPU without reading data:
+
+```bash
+rtk proxy env CUDA_VISIBLE_DEVICES= uv run --locked python -m scripts.tools.make_timing_checkpoint
+```
 
 Bundle `outputs/submission/exports/timing-profile-x4-v2`, dataset
 `claverru/knee-profile-timing-x4-20260918b`. Prediction artifacts in

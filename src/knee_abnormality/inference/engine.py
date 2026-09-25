@@ -1,7 +1,6 @@
 import logging
 import time
 from collections.abc import Iterable
-from typing import Literal
 
 import polars as pl
 import torch
@@ -9,7 +8,9 @@ import torch
 from knee_abnormality.config import (
     INFERENCE_IO_THREADS,
     SLICES_PER_INPUT,
+    Device,
     ExperimentConfig,
+    RuntimePrecision,
 )
 from knee_abnormality.data.dataset import KneeStudyDataset
 from knee_abnormality.data.labels import STUDY
@@ -66,10 +67,7 @@ def use_fixed_backbone_chunks(model: KneeAbnormalityModel, image_size: int) -> N
     model.backbone.forward_features = chunked_features
 
 
-RuntimePrecision = Literal["auto", "fp32", "fp16", "bf16"]
-
-
-def resolve_device(requested: str) -> torch.device:
+def resolve_device(requested: Device) -> torch.device:
     if requested == "auto":
         return torch.device("cuda" if torch.cuda.is_available() else "cpu")
     if requested not in {"cpu", "cuda"}:

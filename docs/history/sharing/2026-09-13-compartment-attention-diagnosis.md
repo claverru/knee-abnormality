@@ -138,7 +138,7 @@ aggregation described by [Ilse et al.](https://proceedings.mlr.press/v80/ilse18a
 the disease/compartment constraint and these intervention findings are specific to
 this repository.
 
-Reproduce 1C with the [archived diagnostic](../sharing-sources/diagnose_compartment_attention.py.txt)
+Reproduce 1C with the archived diagnostic (`f076a09:docs/history/sharing-sources/diagnose_compartment_attention.py.txt`)
 in its matching runtime; see [source requirements](../sharing-sources/README.md). For 1B,
 extract its `source_snapshot.zip` to an isolated directory, copy the diagnostic
 into `scripts/adhoc/`, and run there with `PYTHONPATH` pointing to its `src`, the

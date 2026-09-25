@@ -75,6 +75,16 @@ For scale, the configured intensity augmentation deliberately applies a contrast
 0.2 relative range, so the median series' draw-to-draw wobble sits inside an augmentation the
 recipe already applies, while the 14.2% tail exceeds it.
 
+The script replays the real dataset path with the configured training seed, one epoch per draw, so
+the selections are the ones training sees. It records the pipeline's own bounds and recomputes
+pooled quantiles from the decode cache; the recomputed 0.995 level reproduces the recorded high
+bound. CPU only, refusing an existing output directory. It is historical since intensity bounds moved
+to the GPU on 2026-09-22, so run it against the source of `ab49830` or earlier:
+
+```bash
+rtk proxy uv run --locked python -m scripts.adhoc.measure_intensity_bound_stability --output-dir outputs/analysis/intensity-bound-stability-new --studies 40 --epochs 6
+```
+
 ## Earlier profile
 
 On 2026-09-10, a bounded profile used eight fold-0 training studies with seed 42:
@@ -105,9 +115,20 @@ pixel hashes are in `outputs/profiling/before/` and `outputs/profiling/after/`.
 The [historical profiling findings](../modeling/training-runtime-and-memory.md#batch-4-memory-fix)
 summarize the corresponding model-side measurements.
 
-Reproduce a bounded preprocessing profile through the
-[profile-training catalog entry](../../scripts/adhoc/catalog.yaml):
+Reproduce a bounded profile with
+[`profile_training`](../../scripts/adhoc/profile_training.py). It samples fold-0 training studies
+only, up to eight maximum-load studies then seeded random ones, with full configured slice limits,
+and never runs an epoch or reports validation AUC. The second preprocessing pass reuses the metadata
+indexes; loader profiling starts with empty header caches. The GPU modes need CUDA and use seeded
+random weights and fixed class-balanced BCE weights from the profiling subset; the GPU step disables
+the autocast weight cache as Lightning does. Capacity mode disables series dropout, accepts batch
+sizes up to eight, stops on OOM or excessive allocator reservation, and counts backbone BatchNorm
+updates to audit recomputation under activation checkpointing. Lightning mode uses the training BF16
+precision and configured batch size, and refuses to exhaust its subset.
 
 ```bash
 rtk proxy uv run --locked python -m scripts.adhoc.profile_training configs/training.yaml --mode preprocessing --output-dir outputs/profiling/preprocessing-new
+rtk proxy uv run --locked python -m scripts.adhoc.profile_training configs/training.yaml --mode gpu --batch-sizes 8 --samples 8 --warmup 1 --steps 2 --output-dir outputs/profiling/gpu-new
+rtk proxy uv run --locked python -m scripts.adhoc.profile_training configs/training.yaml --mode loader --batch-sizes 4 --workers 2,4,8 --samples 48 --warmup 2 --steps 6 --threads 16 --output-dir outputs/profiling/loader-new
+rtk proxy uv run --locked python -m scripts.adhoc.profile_training configs/training.yaml --mode lightning --samples 64 --warmup 1 --steps 2 --threads 16 --output-dir outputs/profiling/lightning-new
 ```

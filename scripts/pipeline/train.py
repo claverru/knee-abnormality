@@ -3,7 +3,6 @@ import json
 import logging
 import os
 import shutil
-import sys
 import time
 import zipfile
 from datetime import UTC, datetime
@@ -13,19 +12,17 @@ from pathlib import Path
 import polars as pl
 import pytorch_lightning as L
 import torch
-import yaml
-from pydantic import Field
-from pydantic_settings import CliPositionalArg, SettingsError
+from pydantic import ConfigDict, Field
 from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
 from pytorch_lightning.loggers import CSVLogger
 
 from knee_abnormality.autoresearch.scoring.accounting import TripletAccounting
-from knee_abnormality.cli import CLISettings
 from knee_abnormality.config import (
     INFERENCE_BATCH_SIZE,
+    ConfigOptions,
     ExperimentConfig,
-    Fold,
     load_config,
+    parse_experiment_arguments,
 )
 from knee_abnormality.data.dataset import KneeStudyDataset, build_data_loader
 from knee_abnormality.data.labels import STUDY
@@ -55,23 +52,40 @@ from knee_abnormality.training.lightning import (
 )
 
 
-class TrainCLI(CLISettings):
-    config: CliPositionalArg[Path] = Field(description="Experiment YAML file")
-    data_root: Path | None = None
-    output_root: Path | None = None
-    folds: list[Fold] | None = None
-    run_id: str | None = None
-    resume: Path | None = None
-    limit_train: int | None = Field(default=None, gt=0)
+class TrainOptions(ConfigOptions):
+    model_config = ConfigDict(
+        json_schema_extra={
+            "description": "Train the experiment on its selected folds and save validation "
+            "predictions. A dotted flag overrides that field of the YAML; the defaults "
+            "and required marks shown are the schema's, not the YAML's"
+        }
+    )
+
+    run_id: str | None = Field(
+        default=None,
+        description="Run directory name under paths.output_root; defaults to a UTC timestamp and the experiment name",
+    )
+    resume: Path | None = Field(
+        default=None,
+        description="Checkpoint to resume from; requires exactly one selected fold and reuses its seed",
+    )
+    limit_train: int | None = Field(
+        default=None,
+        gt=0,
+        description="Train on only the first N training studies of each fold; validation stays complete",
+    )
 
 
-def _snapshot(run_dir: Path, config_path: Path, config: ExperimentConfig) -> None:
+def _snapshot(
+    run_dir: Path, config_path: Path, config: ExperimentConfig, overrides: dict
+) -> None:
     shutil.copy2(config_path, run_dir / "input_config.yaml")
     (run_dir / "effective_config.json").write_text(
         json.dumps(config.model_dump(mode="json"), indent=2) + "\n"
     )
     commit, status = git_revision(Path.cwd())
     provenance = {
+        "overrides": overrides,
         "preprocessing_identity": preprocessing_identity(config.model.backbone),
         "created_at": datetime.now(UTC).isoformat(),
         "git_commit": commit,
@@ -337,83 +351,64 @@ def run_fold(
 
 
 def main() -> None:
-    try:
-        args = TrainCLI()
-        for module in (KneeStudyDataset.__module__, predict_loader.__module__):
-            logging.getLogger(module).setLevel(logging.ERROR)
-        configure_cuda_allocator()
-        config_path = args.config.expanduser().resolve()
-        config = load_config(
-            config_path,
-            data_root=args.data_root,
-            output_root=args.output_root,
-            folds=args.folds,
+    args, overrides = parse_experiment_arguments(TrainOptions)
+    for module in (KneeStudyDataset.__module__, predict_loader.__module__):
+        logging.getLogger(module).setLevel(logging.ERROR)
+    configure_cuda_allocator()
+    config_path = args.config.expanduser().resolve()
+    config = load_config(config_path, overrides=overrides)
+    torch.set_float32_matmul_precision("high")
+    if args.resume is not None and len(config.validation.folds) != 1:
+        raise ValueError("--resume requires exactly one selected fold")
+    resume_checkpoint = (
+        read_checkpoint(args.resume) if args.resume is not None else None
+    )
+    if resume_checkpoint is not None:
+        config = config.model_copy(
+            update={"seed": resume_checkpoint["hyper_parameters"]["config"]["seed"]}
         )
-        torch.set_float32_matmul_precision("high")
-        if args.resume is not None and len(config.validation.folds) != 1:
-            raise ValueError("--resume requires exactly one selected fold")
-        resume_checkpoint = (
-            read_checkpoint(args.resume) if args.resume is not None else None
+    run_id = (
+        args.run_id or f"{datetime.now(UTC).strftime('%Y%m%d-%H%M%S')}-{config.name}"
+    )
+    run_dir = config.paths.output_root / run_id
+    run_dir.mkdir(parents=True, exist_ok=False)
+    _snapshot(run_dir, config_path, config, overrides)
+    (run_dir / "execution.json").write_text(
+        json.dumps(
+            {
+                "folds": list(config.validation.folds),
+                "limit_train": args.limit_train,
+                "resume": str(args.resume.expanduser().resolve())
+                if args.resume is not None
+                else None,
+            },
+            indent=2,
         )
-        if resume_checkpoint is not None:
-            config = config.model_copy(
-                update={"seed": resume_checkpoint["hyper_parameters"]["config"]["seed"]}
-            )
-        run_id = (
-            args.run_id
-            or f"{datetime.now(UTC).strftime('%Y%m%d-%H%M%S')}-{config.name}"
+        + "\n"
+    )
+    for fold in config.validation.folds:
+        fold_dir = run_dir / f"fold_{fold}"
+        fold_dir.mkdir()
+        run_fold(
+            config,
+            fold,
+            fold_dir,
+            args.resume,
+            resume_checkpoint,
+            args.limit_train,
         )
-        run_dir = config.paths.output_root / run_id
-        run_dir.mkdir(parents=True, exist_ok=False)
-        _snapshot(run_dir, config_path, config)
-        (run_dir / "execution.json").write_text(
-            json.dumps(
-                {
-                    "folds": list(config.validation.folds),
-                    "limit_train": args.limit_train,
-                    "resume": str(args.resume.expanduser().resolve())
-                    if args.resume is not None
-                    else None,
-                },
-                indent=2,
-            )
-            + "\n"
-        )
-        for fold in config.validation.folds:
-            fold_dir = run_dir / f"fold_{fold}"
-            fold_dir.mkdir()
-            run_fold(
-                config,
-                fold,
-                fold_dir,
-                args.resume,
-                resume_checkpoint,
-                args.limit_train,
-            )
-        predictions = pl.concat(
-            [
-                pl.read_csv(run_dir / f"fold_{fold}" / "validation_predictions.csv")
-                for fold in config.validation.folds
-            ]
-        ).sort(STUDY)
-        oof_path = run_dir / "oof_predictions.csv"
-        predictions.write_csv(oof_path)
-        protocol = json.loads((config.split_dir / "protocol.json").read_text())
-        if set(config.validation.folds) == set(range(protocol["n_splits"])):
-            metrics = score(config.raw_dir, config.split_dir, oof_path)
-            (run_dir / "oof_metrics.json").write_text(
-                json.dumps(metrics, indent=2) + "\n"
-            )
-    except (
-        OSError,
-        RuntimeError,
-        TypeError,
-        ValueError,
-        yaml.YAMLError,
-        SettingsError,
-    ) as error:
-        print(f"Training error: {error}", file=sys.stderr)
-        raise SystemExit(2) from None
+    predictions = pl.concat(
+        [
+            pl.read_csv(run_dir / f"fold_{fold}" / "validation_predictions.csv")
+            for fold in config.validation.folds
+        ]
+    ).sort(STUDY)
+    oof_path = run_dir / "oof_predictions.csv"
+    predictions.write_csv(oof_path)
+    protocol = json.loads((config.split_dir / "protocol.json").read_text())
+    if set(config.validation.folds) == set(range(protocol["n_splits"])):
+        metrics = score(config.raw_dir, config.split_dir, oof_path)
+        (run_dir / "oof_metrics.json").write_text(json.dumps(metrics, indent=2) + "\n")
 
 
 if __name__ == "__main__":

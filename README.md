@@ -22,10 +22,10 @@ editable mode, so scripts and notebooks can import `knee_abnormality` while
 source edits take effect immediately. Select `.venv/bin/python` in your editor
 or notebook.
 The config command prints the selected inputs and resolved paths. The default
-config selects fold 0 for quick development; use `--folds 0,1,2,3,4` to inspect
-or train a full comparison. Reload a checkpoint for offline test prediction with
-`python -m scripts.pipeline.predict`; see the [script catalog](scripts/pipeline/catalog.yaml)
-for complete commands.
+config selects fold 0 for quick development; use `--validation.folds '[0,1,2,3,4]'` to
+inspect or train a full comparison. Reload a checkpoint for offline test prediction with
+`python -m scripts.pipeline.predict`; see the [pipeline index](scripts/pipeline/INDEX.md)
+and each script's `--help` for complete commands.
 Experiment YAML is validated with Pydantic; `pydantic-settings` parses explicit
 CLI overrides. Environment variables and `.env` files do not override experiments.
 
@@ -33,18 +33,19 @@ The root `justfile` exposes the maintained four-command workflow. All artifact
 and remote identities are explicit:
 
 ```bash
-rtk proxy uv run --locked just train RUN_ID
-rtk proxy uv run --locked just export CHECKPOINT OUTPUT
-rtk proxy uv run --locked just infer BUNDLE DATA_ROOT OUTPUT auto auto 8 2
-rtk proxy uv run --locked just submit BUNDLE OWNER/DATASET OWNER/NOTEBOOK RECORD "Fold 0"
+rtk proxy uv run --locked just train configs/training.yaml --run-id RUN_ID
+rtk proxy uv run --locked just export --checkpoint CHECKPOINT --output OUTPUT
+rtk proxy uv run --locked just infer BUNDLE DATA_ROOT OUTPUT --batch-size 8 --num-workers 2
+rtk proxy uv run --locked just submission-job start --bundle BUNDLE --dataset OWNER/DATASET --notebook OWNER/NOTEBOOK --record RECORD --label "Fold 0"
 ```
 
-`train` always selects fold 0 and creates a fresh named run. `export` never
-selects or resumes a checkpoint implicitly. `infer` imports prediction code
-from the bundle and accepts direct competition data mounts. `submit` versions
-a private Kaggle Dataset, runs the attached notebook with Internet disabled,
-validates its output, and submits only that successful saved version. A bare
-`just` lists these recipes without starting work.
+Each recipe passes its arguments to the module it names, so `just RECIPE --help`
+documents it. `train` runs the YAML's folds (fold 0 in `configs/training.yaml`) into a
+fresh named run. `export` never selects or resumes a checkpoint implicitly. `infer`
+imports prediction code from the bundle and accepts direct competition data mounts.
+`submission-job start` versions a private Kaggle Dataset, runs the attached notebook
+with Internet disabled, validates its output, and submits only that successful saved
+version. A bare `just` lists the recipes without starting work.
 
 - [Project architecture](docs/architecture/INDEX.md): where code belongs, component
   boundaries, configuration, reusable caches, and fast experiment iteration.

@@ -6,7 +6,7 @@ unseeded run with its seed in its config. Scores are therefore about 0.0035 belo
 fold-0 number, which was measured at ×2, and comparable only within this table.
 
 Queue: `outputs/training/overnight-20260917T215351Z-ik2qer7m/` (`status.tsv`, `summary.tsv`,
-`configs/`, `runs/`), launched with `scripts/adhoc/train_overnight.py`. Total 7 h 23 m.
+`configs/`, `runs/`), launched with `scripts/tools/train_overnight.py`. Total 7 h 23 m.
 
 ## Controls
 

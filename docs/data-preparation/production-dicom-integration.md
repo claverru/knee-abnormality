@@ -20,10 +20,10 @@ The fresh read supplies spacing and affine values while indexed positions and
 selection stay fixed. Native I/O errors propagate through existing preparation
 handling. There is no new format support, inversion, LUT or windowing.
 
-The benchmark now uses the actual `KneeStudyDataset` and production collation.
-Its independent `production-reference` uses frozen preprocessing and dataset
-code in `scripts/adhoc/dataloader_reference/`; earlier prototype candidates remain
-historical. Both timing candidates perform the same raw series discovery and
+The benchmark (`scripts/adhoc/benchmark_dataloader_optimizations.py`, removed; last in
+commit `aec290d`) used the actual `KneeStudyDataset` and production collation.
+Its independent `production-reference` used frozen preprocessing and dataset
+code in `scripts/adhoc/dataloader_reference/` (last in commit `204d29c`). Both timing candidates perform the same raw series discovery and
 start with empty application slice indexes. Source inventories and copied
 snapshots include nested modules with project-relative paths. The exporter
 copied the package successfully, and isolated imports resolved every new module
@@ -90,7 +90,11 @@ package audits, supplemental selection hashes, final source/configuration
 snapshots, dependency versions, fixtures and all timing pairs, is under
 [`outputs/profiling/dicom-integration-20260912`](../../outputs/profiling/dicom-integration-20260912).
 The [final summary](../../outputs/profiling/dicom-integration-20260912/final/summary.json)
-records the gate and unrounded ratios. Reproduce through the `dicom-suite`
-command in the [script catalog](../../scripts/adhoc/catalog.yaml), using the saved
-workload and cohort rather than the current baseline's different split.
+records the gate and unrounded ratios. It was produced by the `dicom-suite`
+mode of the removed benchmark (`aec290d:scripts/adhoc/benchmark_dataloader_optimizations.py`,
+invoked as `python -m scripts.adhoc.benchmark_dataloader_optimizations
+outputs/profiling/dicom-reader-20260912/workload.yaml --cohort
+outputs/profiling/dicom-reader-20260912/comparison-v1/timing_cohort.json --mode dicom-suite
+--samples 128 --repeats 3 --audit-samples 8` from that commit), with the saved workload and
+cohort rather than the current baseline's different split.
 Recheck parser assumptions and edge coverage when pydicom or NumPy changes.

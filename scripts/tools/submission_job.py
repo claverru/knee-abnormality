@@ -4,27 +4,15 @@ import subprocess
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Literal
 
-from pydantic import Field
-from pydantic_settings import CliImplicitFlag, CliPositionalArg, SettingsError
+from pydantic import BaseModel, Field
+from pydantic_settings import CliApp, CliSubCommand
 
-from knee_abnormality.cli import CLISettings
+from knee_abnormality.cli import CLISettings, command, describe
 from knee_abnormality.inference.bundle import verify_bundle
+from knee_abnormality.kaggle import SubmissionRequest
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-
-
-class SubmissionJobCLI(CLISettings):
-    command: CliPositionalArg[Literal["start", "status", "logs"]]
-    record: Path
-    bundle: Path | None = None
-    dataset: str | None = Field(default=None, pattern=r"^[\w.-]+/[\w.-]+$")
-    notebook: str | None = Field(default=None, pattern=r"^[\w.-]+/[\w.-]+$")
-    label: str | None = None
-    sequence: int | None = Field(default=None, gt=0)
-    lines: int = Field(default=60, gt=0)
-    follow: CliImplicitFlag[bool] = False
 
 
 def _unit(record: Path) -> str:
@@ -36,15 +24,9 @@ def _log(record: Path) -> Path:
     return record.with_name(f"{record.stem}-runner.log")
 
 
-def start(args: SubmissionJobCLI, record: Path) -> dict:
-    if (
-        args.bundle is None
-        or args.dataset is None
-        or args.notebook is None
-        or args.label is None
-    ):
-        raise ValueError("start requires --bundle, --dataset, --notebook and --label")
-    bundle = args.bundle.expanduser().resolve()
+def start(request: SubmissionRequest) -> dict:
+    record = request.record.expanduser().resolve()
+    bundle = request.bundle.expanduser().resolve()
     manifest = verify_bundle(bundle)
     if not manifest.get("ready"):
         raise ValueError(f"Bundle is not ready: {manifest.get('unmet_prerequisites')}")
@@ -67,17 +49,9 @@ def start(args: SubmissionJobCLI, record: Path) -> dict:
             "-u",
             "-m",
             "scripts.pipeline.submit",
-            "--bundle",
-            str(bundle),
-            "--dataset",
-            args.dataset,
-            "--notebook",
-            args.notebook,
-            "--record",
-            str(record),
-            "--label",
-            args.label,
-            *(["--sequence", str(args.sequence)] if args.sequence else []),
+            *CliApp.serialize(
+                request.model_copy(update={"bundle": bundle, "record": record})
+            ),
         ],
         check=True,
         capture_output=True,
@@ -137,25 +111,56 @@ def status(record: Path) -> dict:
     }
 
 
+class JobCommand(BaseModel):
+    record: Path = Field(
+        description="Submission record JSON; the runner log is written beside it"
+    )
+
+
+class Start(SubmissionRequest):
+    model_config = describe(
+        "Launch scripts.pipeline.submit as a detached systemd user service whose log "
+        "is written beside the record"
+    )
+
+    def cli_cmd(self) -> None:
+        print(json.dumps(start(self), indent=2))
+
+
+class Status(JobCommand):
+    model_config = describe("Show the submission state and stage durations")
+
+    def cli_cmd(self) -> None:
+        print(json.dumps(status(self.record.expanduser().resolve()), indent=2))
+
+
+class Logs(JobCommand):
+    model_config = describe("Print the end of the runner log")
+
+    lines: int = Field(default=60, gt=0, description="Log lines to print")
+    follow: bool = Field(default=False, description="Keep printing new lines")
+
+    def cli_cmd(self) -> None:
+        tail = ["tail", "-n", str(self.lines), *(["-F"] if self.follow else [])]
+        log = _log(self.record.expanduser().resolve())
+        subprocess.run([*tail, "--", str(log)], check=True)
+
+
+class SubmissionJobCLI(CLISettings):
+    model_config = describe(
+        "Launch a detached submission service or inspect its record and runner log"
+    )
+
+    start: CliSubCommand[Start] = command(Start)
+    status: CliSubCommand[Status] = command(Status)
+    logs: CliSubCommand[Logs] = command(Logs)
+
+    def cli_cmd(self) -> None:
+        CliApp.run_subcommand(self)
+
+
 def main() -> None:
-    try:
-        args = SubmissionJobCLI()
-        record = args.record.expanduser().resolve()
-        if args.command == "start":
-            print(json.dumps(start(args, record), indent=2))
-        elif args.command == "status":
-            print(json.dumps(status(record), indent=2))
-        else:
-            command = ["tail", "-n", str(args.lines)]
-            if args.follow:
-                command.append("-F")
-            subprocess.run([*command, "--", str(_log(record))], check=True)
-    except subprocess.CalledProcessError as error:
-        print(f"Submission job error: {error.stderr or error}", file=sys.stderr)
-        raise SystemExit(2) from None
-    except (OSError, ValueError, TypeError, KeyError, SettingsError) as error:
-        print(f"Submission job error: {error}", file=sys.stderr)
-        raise SystemExit(2) from None
+    CliApp.run(SubmissionJobCLI)
 
 
 if __name__ == "__main__":

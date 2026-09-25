@@ -44,7 +44,16 @@ complete original validation batches and the original validation density under n
 then performs a bounded FP32 memory check at the requested density and predicts the three
 example studies. It writes `verification.json`, `verification_sample.csv` and
 `verification_example.csv` into the bundle directory, which then no longer matches its
-manifest inventory; run it on a disposable copy of the bundle. This is an on-demand diagnostic
+manifest inventory; run it on a disposable copy of the bundle:
+
+```bash
+rtk proxy uv run --locked env PYTHONPATH=outputs/submission/verification/BUNDLE-copy/code \
+  python -m scripts.tools.verify_inference --bundle outputs/submission/verification/BUNDLE-copy \
+  --request-file outputs/submission/verification/BUNDLE-request.json
+```
+
+The sampled batches span low and high input counts. An ensemble bundle is checked the same way,
+comparing the members' averaged prediction with the reference CSV. This is an on-demand diagnostic
 after relevant inference changes, not a step to repeat for each submission. It does not
 calculate a partial-fold AUC or require a full training run.
 

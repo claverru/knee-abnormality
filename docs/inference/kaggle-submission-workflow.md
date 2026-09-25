@@ -33,10 +33,11 @@ The commands below follow the installed 2.0.2 interface. Prefix each with
 
 `-m` is the submission description, the only text Kaggle keeps for a submission row, and it is
 write-once: the API exposes submit, status, list and download but no update, and the site offers
-no edit control either. `just submit` composes it in the
+no edit control either. `scripts.pipeline.submit` composes it in the
 [unified submission format](submissions/ledger.md#naming) from one `--label`, so use the recipe
-rather than a hand-written message. The notebook title shown beside a submission can only be
-changed by renaming the notebook in the Kaggle UI, because `kernels push` re-runs the notebook.
+rather than a hand-written message. The notebook title shown beside a submission can be changed
+afterwards: `kernels push` would re-run the notebook, but the
+[ledger script](submissions/ledger.md#regenerating-the-ledger) renames it with an unexecuted quick save.
 
 See the official [dataset commands](https://github.com/Kaggle/kaggle-cli/blob/main/docs/datasets.md),
 [notebook commands](https://github.com/Kaggle/kaggle-cli/blob/main/docs/kernels.md)
@@ -146,7 +147,9 @@ scored-run check.
    score and reported runtime. Inspect failed-run logs before retrying and
    keep final selections explicit before the deadline.
 
-Bundle readiness records successful packaging checks. The remote notebook
+Bundle readiness records successful packaging checks. `scripts.pipeline.submit` refuses an
+existing record path, an unready bundle and a notebook whose latest run is still active, and
+writes each remote response to the record before advancing. The remote notebook
 must still finish and produce valid output before automatic submission. A
 successful scored submission confirms the hidden-data execution path for that
 artifact. Baseline3 and baseline4's original submissions both completed scoring.

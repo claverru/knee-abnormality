@@ -39,7 +39,7 @@ shows that validation represents these training-label marginals; it says nothing
 about hidden distribution agreement. The 58 gold studies have different rates,
 but their annotation/selection and size prevent using them as test-set priors.
 
-The [archived case-mixture command](../sharing-sources/analyze_sharing_case_mix.py.txt)
+The archived case-mixture command (`f076a09:docs/history/sharing-sources/analyze_sharing_case_mix.py.txt`)
 generated 2,000 paired 390-study bootstrap cohorts with replacement from the
 saved 904-study predictions, seed 20260915. Every model uses the same sampled
 studies. This isolates sampling variation under the empirical local case/label

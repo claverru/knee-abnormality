@@ -52,7 +52,7 @@ contains the complete candidate, audit utility and executed plan; SHA-256
 `8c5b2c04f841246ebc04fa6402cc70940db7df77027f4d2a9f561135b811a1d7`.
 It is also extracted under that directory's `candidate-source/`. Reproduction
 uses the archived `src` on `PYTHONPATH`, the saved `candidate.json`, and the
-[archived profiler source](../../history/regional-sources/profile_spatial_fusion.py.txt).
+archived profiler source (`f076a09:docs/history/regional-sources/profile_spatial_fusion.py.txt`).
 
 The [image audit](../../data-preparation/spatial-token-geometry-and-mapping-audit.md#spatial-fusion-mapping-audit) supports
 coordinate bookkeeping on a bounded real sample, not complete registration

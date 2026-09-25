@@ -15,12 +15,15 @@ report calls as gold does, so the mismatch is in spacing, not order. The first r
 consensus mean, pushed low-grade cells down to the not-addressed level and lowered the table's gold
 agreement ([below](#consensus-mean-rule-tested-on-gold)), so it was not trained on.
 
-- **Script:** [`check_report_attributes`](../../scripts/adhoc/check_report_attributes.py), CPU only.
+- **Script:** [`check_report_attributes`](../../scripts/adhoc/check_report_attributes.py), CPU only,
+  under a minute, no LLM calls; refuses an existing output directory:
+  `rtk proxy uv run --locked python -m scripts.adhoc.check_report_attributes --output-dir outputs/analysis/report-attributes-new`.
 - **Artifacts:** `outputs/analysis/report-attributes-20260922/`, holding the tables, input hashes and
   a source snapshot.
 - **Scope:** training rows are folds 1–4 of `all_5fold_scanner_v1` (3,502 studies), with targets
   from [`combined_v1`](combined-labels.md). Grounding uses the `k_05` fold-0 predictions at ×4
-  (905 studies). The gold rows are the 58 gold studies.
+  (905 studies), against the fold's evaluation targets thresholded at 0.5. The gold rows are the
+  58 gold studies.
 
 ## Sources
 
@@ -35,7 +38,8 @@ Ramit is also one of the nine consensus sources behind the combined labels.
 ## Cross-source agreement
 
 Severity is compared on positives that both sources rated, using quadratic kappa with Zaid rounded
-to three levels.
+to three levels. Zaid values of 0 or below count as unrated, and Zaid rows with no contributing
+models are dropped.
 
 | Kappa | Labels |
 |---|---|
@@ -106,7 +110,10 @@ had at least five sources.
 - **Script:** [`prepare_grade_aware_labels`](../../scripts/adhoc/prepare_grade_aware_labels.py).
 - **Output:** `data/labels/prepared/combined-v2/` (labels SHA-256 `e8dec30f…`), with
   `preparation.json`. The manifest is
-  `configs/labels/combined-v2-label-sources.json`.
+  `configs/labels/combined-v2-label-sources.json`. CPU only, seconds, deterministic:
+  `rtk proxy uv run --locked python -m scripts.adhoc.prepare_grade_aware_labels`, with fresh
+  `--output-dir` and `--output-manifest` paths on a rerun. It fails if any consensus target
+  changes.
 
 On non-gold studies the changed cells move a long way:
 

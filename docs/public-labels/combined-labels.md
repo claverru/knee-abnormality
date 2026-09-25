@@ -110,11 +110,17 @@ the clearest case: every text source misses 14 or more of its 27 gold positives.
 - Table: `rtk proxy uv run --locked python -m scripts.tools.prepare_combined_labels` writes
   `data/labels/prepared/combined-v1/labels.csv` (SHA-256 `1e586b57…be215fb`) and
   [`configs/labels/combined-label-sources.json`](../../configs/labels/combined-label-sources.json).
-  The manifest pins every input's hash and also lists `steven_v4`, so one manifest serves both
-  label sources.
-- Evidence: `scripts.adhoc.analyze_label_combination` writes
+  with `preparation.json` beside the table. It reads the 2026-09-21 snapshots under
+  `data/labels/public/<owner>/<slug>/downloaded-20260921/`, is deterministic and requires fresh
+  output paths. The manifest pins every input's hash and also lists `steven_v4`, so one manifest
+  serves both label sources.
+- Evidence: `scripts.adhoc.analyze_label_combination` wrote
   `outputs/analysis/label-combination-20260921/`, with `per_target.csv`,
-  `silver_agreement.csv` and `summary.json`. It fails if its selection differs from the prepared
-  table.
+  `silver_agreement.csv` and `summary.json`. It runs on CPU in about a minute, refuses an existing
+  output directory and fails if its selection differs from the prepared table:
+
+  ```bash
+  rtk proxy uv run --locked python -m scripts.adhoc.analyze_label_combination --output-dir outputs/analysis/label-combination-new
+  ```
 - The validation split built on these labels is
   [`all_5fold_scanner_v1`](../validation/validation-strategy.md).

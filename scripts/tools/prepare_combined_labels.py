@@ -1,14 +1,14 @@
 import json
-import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
 import numpy as np
 import polars as pl
-from pydantic_settings import SettingsError
+from pydantic import Field
 
-from knee_abnormality.cli import CLISettings
+from knee_abnormality.cli import CLISettings, describe
 from knee_abnormality.data.labels import STUDY, TARGET_THRESHOLD, require_unique_ids
+from knee_abnormality.kaggle import COMPETITION
 from knee_abnormality.provenance import sha256_file
 
 LABEL_TABLE = "combined_v1"
@@ -38,12 +38,27 @@ SNAPSHOTS = {
 
 
 class PrepareCLI(CLISettings):
-    base_manifest: Path = Path("configs/labels/public-label-sources.json")
-    comparison_manifest: Path = Path(
-        "configs/labels/public-label-comparison-sources.json"
+    model_config = describe(
+        "Build the combined_v1 label table (Steven v4 plus a nine-source consensus "
+        "mean for ACL, MCL, PF OA and Fracture) and its pinned manifest"
     )
-    output_dir: Path = Path("data/labels/prepared/combined-v1")
-    output_manifest: Path = Path("configs/labels/combined-label-sources.json")
+
+    base_manifest: Path = Field(
+        default=Path("configs/labels/public-label-sources.json"),
+        description="Pinned Steven v4 label manifest",
+    )
+    comparison_manifest: Path = Field(
+        default=Path("configs/labels/public-label-comparison-sources.json"),
+        description="Pinned manifest of the consensus label sources",
+    )
+    output_dir: Path = Field(
+        default=Path("data/labels/prepared/combined-v1"),
+        description="Directory for the prepared label table",
+    )
+    output_manifest: Path = Field(
+        default=Path("configs/labels/combined-label-sources.json"),
+        description="Manifest to write for the prepared table",
+    )
 
 
 def fingerprint(path: Path) -> dict:
@@ -212,7 +227,7 @@ def prepare(settings: PrepareCLI) -> dict:
     prepared = {**fingerprint(output_path), "label_table": LABEL_TABLE}
     manifest = {
         "prepared_at": datetime.now(UTC).isoformat(),
-        "competition": "rsna-knee-abnormality-detection",
+        "competition": COMPETITION,
         "method": (
             f"Steven v4 for every target except {', '.join(CONSENSUS_TARGETS)}, which take "
             "the per-study mean of the available probabilities from nine independent "
@@ -264,11 +279,7 @@ def prepare(settings: PrepareCLI) -> dict:
 
 
 def main() -> None:
-    try:
-        report = prepare(PrepareCLI())
-    except (OSError, StopIteration, TypeError, ValueError, SettingsError) as error:
-        print(f"Combined label preparation error: {error!r}", file=sys.stderr)
-        raise SystemExit(2) from None
+    report = prepare(PrepareCLI())
     print(json.dumps(report, indent=2))
 
 

@@ -156,10 +156,9 @@ study at ×4 contains one.
 Metadata separates triplets, channel appearances, unique files, distinct middle
 geometry, decode attempts, placement errors and missing capacity.
 
-The physical-preparation inspection (`scripts/adhoc/inspect_physical_preparation.py`)
-checked serial/four-thread and row-order agreement and independent clipping
+The physical-preparation inspection (`scripts/adhoc/inspect_physical_preparation.py`,
+removed; last in commit `df4b6cd`) checked serial/four-thread and row-order agreement and independent clipping
 populations against the CPU preparation; it reads prepared images and bounds that
-the loader no longer produces and is historical.
+the loader no longer produces.
 See [implementation evidence](physical-sampling/implementation-verification.md).
-The former dataloader optimization benchmark is historical and requires its
-original source/config runtime; it is no longer an active current-config caller.
+The former dataloader optimization benchmark was removed; its code is in commit `aec290d`.

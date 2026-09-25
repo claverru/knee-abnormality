@@ -16,7 +16,7 @@ ReXNet-200) of the [full-slice model](current-model.md).
     preprocessing and BatchNorm handling.
 - **History:** the crop-era budget, with the MobileNetV3 scout, its delta formula and its code
   requirements, is in the
-  [learned-zoom snapshot](../history/crop-selection-sources/learned-zoom-backbone-swaps.md.txt).
+  learned-zoom snapshot (`f076a09:docs/history/crop-selection-sources/learned-zoom-backbone-swaps.md.txt`).
 
 ## Current budget
 

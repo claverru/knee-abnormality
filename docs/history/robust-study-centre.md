@@ -35,7 +35,7 @@ checkpoints. Tables: [macro](../../outputs/analysis/series-filtering-20260917/ro
 [per target](../../outputs/analysis/series-filtering-20260917/robust-centre-rescore/per_target_deltas.csv),
 [series paths](../../outputs/analysis/series-filtering-20260917/robust-centre-rescore/series_sampling.parquet),
 [sanity](../../outputs/analysis/series-filtering-20260917/robust-centre-rescore/sanity_slots.csv).
-Script: [`robust_rescore.py`](../history/series-and-sampling-sources/series-filtering/robust_rescore.py.txt).
+Script: `robust_rescore.py` (`041bd16:docs/history/series-and-sampling-sources/series-filtering/robust_rescore.py.txt`).
 
 - *Patch:* a `KneeStudyDataset` subclass replaces a rejected reference with the robust fit. Series
   dropped from the fit remain model inputs. A wrapper around `build_pool` passes the robust centre

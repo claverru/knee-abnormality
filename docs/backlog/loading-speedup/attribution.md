@@ -70,6 +70,21 @@ The threaded frame reads rest on a byte-matched Kaggle CPU probe: **2.40x at 16 
 more CPU**, zero failures and zero audit mismatches. Locally the same change is flat, because NVMe
 has no latency to hide — see [how to measure](measuring.md#local-results-do-not-transfer-to-nfs).
 
+The probes behind these changes are in
+[`kaggle_loading_probes/`](../../../scripts/adhoc/kaggle_loading_probes/):
+
+- **`header.py`** reproduces every `DicomHeader` field, including the twelve series tags and the
+  native pixel descriptor gate. It extends the fixed prefix up to three times before falling back to
+  pydicom, so a long header costs an extra read rather than a reparse. It matched the production copy
+  exactly on 20,000 local files, with no fallbacks or extensions at the default prefix. Only its
+  split variants time read and parse separately; the others time the whole reader per file.
+- **`frames.py`** reads descriptors before timing, as production indexes before decoding, and times
+  only files that qualify for the native descriptor path; pydicom fallbacks are excluded, not
+  counted as reads.
+- **`indexing.py`** times listing only, no headers. Its double-glob baseline is Kaggle's behaviour
+  before the single listing: with no image-count parquet, each series directory was globbed once
+  for counting and again for ordering. Its per-study cost is what the worker filter avoids.
+
 ## The box is out of CPU, not waiting on NFS
 
 Sampled once a second by the profiler and never read until 2026-09-18, `cpu.csv` answers the
@@ -208,7 +223,7 @@ pass alone separates work from wait.
 
 ## The profiler's defects, fixed 2026-09-18
 
-All of them are repaired in `scripts/adhoc/profile_kaggle_inference.py`; artifacts written before
+All of them are repaired in `scripts/tools/profile_kaggle_inference.py`; artifacts written before
 the fix keep the old shape, and `loading_summary` no longer reads them.
 
 - **There was no CPU measurement at all**, so the CPU/NFS split above is a cold/warm split (see
@@ -273,6 +288,22 @@ Re-measured on the current recipe, 2026-09-18 (`compare-header-implementations`,
 penalty is 4.25 s for pydicom and 3.24 s for the parser, so parsing is about a quarter of it and
 cold disk plus index construction is the rest. Median steady-state batch time was 7.6–8.0 ms for a
 batch of eight in both arms, which is queue drain, not work.
+
+Reproduction, local and CPU only (no CUDA, pinning or model). The arms are production itself:
+`parser` is `header_threads=1`, `threaded` is `--threads`, and `pydicom` swaps `parse_prefix` for
+the retained `pydicom_read_header` inside `_indexed`, so the patch holds in every worker under fork
+and spawn. Run one arm per invocation, dropping the page cache before each
+(`sync; echo 3 > /proc/sys/vm/drop_caches`, needs root); the manifest records `Cached` from
+`/proc/meminfo` so a warm run is recognisable. Only pass 0 parses headers, and a run needs more
+batches than workers or it measures startup. The default prewarm reads every selected file once
+(studies average ~121 MB, so keep samples within free memory); use it only to isolate parser cost.
+Audit mode is the regression check that all three arms prepare identical batches: it collates one
+study at a time and raises on any differing field.
+
+```bash
+rtk proxy env OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 uv run --locked python -m scripts.adhoc.compare_header_implementations configs/training.yaml --mode loader --implementation pydicom --samples 256 --workers 16 --passes 2 --no-prewarm --output-dir outputs/profiling/header-cold-pydicom-new
+rtk proxy uv run --locked python -m scripts.adhoc.compare_header_implementations configs/training.yaml --mode audit --samples 8 --no-prewarm --output-dir outputs/profiling/header-audit-new
+```
 
 The choice is not separable anyway: one `KneeStudyDataset` path serves training, validation and
 inference, so whatever ships for inference is what training runs.

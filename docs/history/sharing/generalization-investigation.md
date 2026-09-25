@@ -46,7 +46,7 @@ variable study costs as concrete candidates for poor scaling.
 
 ## Reproduction and artifacts
 
-The [archived CPU analysis command](../sharing-sources/analyze_sharing_generalization.py.txt)
+The archived CPU analysis command (`f076a09:docs/history/sharing-sources/analyze_sharing_generalization.py.txt`)
 requires its [original runtime](../sharing-sources/README.md), not current
 `main`. It joins the saved predictions to frozen
 targets, checks study identity/probabilities, calculates target/subset metrics,

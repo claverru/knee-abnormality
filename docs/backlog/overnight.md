@@ -3,7 +3,7 @@
 Hyperparameter-only runs: values of existing training options on the
 [current recipe](../modeling/current-model.md), one change per run against the incumbent (fold 0
 of `all_5fold_scanner_v1`, the incumbent's recorded training seed). The
-[queue launcher](../../scripts/adhoc/train_overnight.py) still pins `all_5fold_v3` and must move to
+[queue launcher](../../scripts/tools/train_overnight.py) still pins `all_5fold_v3` and must move to
 the current split before the next queue ([next](../ongoing/next.md)). A [small change](small-changes.md)
 enters this queue once it is implemented; other ideas belong to the other [backlog](INDEX.md) documents. The queue runs
 unattended and the user launches it, detached from agent sessions; the

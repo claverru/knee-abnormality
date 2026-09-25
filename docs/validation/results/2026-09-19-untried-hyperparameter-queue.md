@@ -8,7 +8,7 @@ config. Every arm was a value no run had ever used: a scan of the 143 saved
 `data.noise_augmentation.std_range` at `[0.005, 0.02]` in 142 of 142.
 
 Queue: `outputs/training/overnight-20260919T120130Z-i2oqlnls/` (`status.tsv`, `summary.tsv`,
-`configs/`, `runs/`, `validation_metrics.png`), launched with `scripts/adhoc/train_overnight.py`.
+`configs/`, `runs/`, `validation_metrics.png`), launched with `scripts/tools/train_overnight.py`.
 Total 2 h 11 m, 1,532–1,557 s of training per run, 19.0–19.6 GiB peak.
 
 This is the first queue on the [class-balanced BCE](../../modeling/supervision.md#fixed-class-balanced-bce)

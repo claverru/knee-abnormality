@@ -4,7 +4,7 @@
 three example-test studies. It was the side source for the retired
 [knee-side embedding](../modeling/retired-side-and-compartment-variants.md#knee-side-embedding), shared by training,
 validation and Kaggle inference; its resolver is preserved in the
-[archived sources](../history/knee-side-sources/laterality.py.txt). Inputs were DICOM headers the loader already
+archived sources (`f076a09:docs/history/knee-side-sources/laterality.py.txt`). Inputs were DICOM headers the loader already
 read for supported series; reports, labels, study IDs, lookup tables and
 manufacturer never determined the side.
 

@@ -95,9 +95,16 @@ moves slightly to 0.75–0.80, and the gain is smaller. Moving from ×1 to ×4 a
 ## Reproduction
 
 - Comparison: `scripts.adhoc.compare_across_splits` →
-  `outputs/analysis/combined-scanner-vs-learned-strength/`.
-- Sweep: `outputs/analysis/tau-sweep-fold0-combined-scanner/run_sweep.sh`, scored by
-  `scripts.adhoc.score_temperature_sweep` into `scores.csv` and `summary.json` in the same folder.
+  `outputs/analysis/combined-scanner-vs-learned-strength/`, on CPU from saved predictions:
+
+  ```bash
+  rtk proxy env CUDA_VISIBLE_DEVICES= uv run --locked python -m scripts.adhoc.compare_across_splits --candidate outputs/training/fold0-combined-scanner --references '{"learned_strength":"outputs/training/anatomical-attention/learned-strength","control_repeat":"outputs/training/anatomical-attention/control-repeat"}' --output-dir outputs/analysis/combined-scanner-vs-learned-strength-new
+  ```
+
+- Sweep: `outputs/analysis/tau-sweep-fold0-combined-scanner/run_sweep.sh` writes one
+  `x<multiplier>-tau<value>.csv` per setting with `scripts.pipeline.predict --split validation`;
+  `rtk proxy env CUDA_VISIBLE_DEVICES= uv run --locked python -m scripts.adhoc.score_temperature_sweep --sweep-dir outputs/analysis/tau-sweep-fold0-combined-scanner`
+  scores them on CPU into `scores.csv` and `summary.json` in the same folder.
   Each τ is one full inference pass: 26 s at ×1 and 65 s at ×4. No token cache exists for the
   current model; the 2026-09-17 caches belong to older checkpoints.
 - The ×1, τ 1 pass reproduces the saved validation score to within 5e-5 (0.90200 against 0.90205,

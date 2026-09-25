@@ -29,7 +29,7 @@ scores 0.890976 AUC and remains the 0.931 public benchmark.
 | 07 effective batch 16 | 0.887154 | -0.002276 | 0.451711 | 30.3 |
 
 The queue used these fixed overrides against its sigma-80 1C baseline.
-The [archived launcher](../sharing-sources/train_overnight.py.txt) and each
+The archived launcher (`f076a09:docs/history/sharing-sources/train_overnight.py.txt`) and each
 run's effective config preserve the full settings.
 
 | Run | Changes from baseline |

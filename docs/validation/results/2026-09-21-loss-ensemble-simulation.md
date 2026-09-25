@@ -28,7 +28,12 @@ ensembles cannot be rebuilt as bundles. Each run's epoch was already selected on
 Script: [`simulate_loss_ensembles.py`](../../../scripts/adhoc/simulate_loss_ensembles.py), run on
 the `a960863` tree, with its source copied under the output's `source/`. Output: `outputs/analysis/loss-ensembles-20260921/` (`summary.json`, `subsets.parquet`,
 `pairs.csv`, `marginal.csv`, `best_by_size.csv`, `top_frequency.csv`, `greedy.csv`,
-`selection_splits.csv`).
+`selection_splits.csv`). It reads saved predictions on CPU, about 90 s at 16 workers, and refuses
+an existing output directory:
+
+```bash
+rtk proxy env CUDA_VISIBLE_DEVICES= OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 uv run --locked python -m scripts.adhoc.simulate_loss_ensembles --output-dir outputs/analysis/loss-ensembles-new
+```
 
 ## Seed diversity versus loss diversity
 

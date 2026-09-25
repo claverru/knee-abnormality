@@ -1,7 +1,6 @@
 import json
 import math
 import secrets
-import sys
 from pathlib import Path
 from typing import Annotated, Literal
 
@@ -18,9 +17,12 @@ from pydantic import (
     field_validator,
     model_validator,
 )
-from pydantic_settings import CliPositionalArg, SettingsError
-
-from knee_abnormality.cli import CLISettings
+from pydantic_settings import (
+    BaseSettings,
+    CliPositionalArg,
+    CliSettingsSource,
+    SettingsConfigDict,
+)
 
 SLICES_PER_INPUT = 3
 TEST_IMAGE_MULTIPLIER = 2
@@ -30,10 +32,15 @@ INFERENCE_NUM_WORKERS = 16
 INFERENCE_IO_THREADS = 8
 INFERENCE_LOADER_NICENESS = 10
 SERIES_LISTING_THREADS = 16
+STUDY_HEADERS = Path(
+    "outputs/analysis/sharing-disagreement-20260914/study_headers.parquet"
+)
 
 Identifier = Annotated[str, StringConstraints(pattern=r"^[A-Za-z0-9][A-Za-z0-9_.-]*$")]
 Fold = Annotated[StrictInt, Field(ge=0)]
 PositiveFiniteFloat = Annotated[float, Field(gt=0, allow_inf_nan=False)]
+Device = Literal["auto", "cpu", "cuda"]
+RuntimePrecision = Literal["auto", "fp32", "fp16", "bf16"]
 
 
 def validate_attention_temperature(value: object) -> float:
@@ -267,13 +274,22 @@ class ExperimentConfig(ConfigModel):
         return self.paths.data_root / "raw"
 
 
+def merge(values: dict, changes: dict) -> dict:
+    merged = dict(values)
+    for key, value in changes.items():
+        if isinstance(value, dict) and isinstance(merged.get(key), dict):
+            merged[key] = merge(merged[key], value)
+        else:
+            merged[key] = value
+    return merged
+
+
 def load_config(
     path: Path,
     *,
     data_root: Path | None = None,
-    output_root: Path | None = None,
     label_manifest: Path | None = None,
-    folds: list[int] | None = None,
+    overrides: dict | None = None,
 ) -> ExperimentConfig:
     path = path.expanduser().resolve()
     with path.open(encoding="utf-8") as stream:
@@ -286,59 +302,76 @@ def load_config(
         "inference",
     }:
         raw = raw["experiment"]
+    if overrides:
+        raw = merge(raw, overrides)
     config = ExperimentConfig.model_validate(raw, context={"config_dir": path.parent})
 
-    if (
-        data_root is not None
-        or output_root is not None
-        or label_manifest is not None
-        or folds is not None
-    ):
+    if data_root is not None or label_manifest is not None:
         effective = config.model_dump()
         for key, value in (
             ("data_root", data_root),
-            ("output_root", output_root),
             ("label_manifest", label_manifest),
         ):
             if value is not None:
                 effective["paths"][key] = value.expanduser().resolve()
-        if folds is not None:
-            effective["validation"]["folds"] = folds
         config = ExperimentConfig.model_validate(effective)
     if config.seed is None:
         config = config.model_copy(update={"seed": secrets.randbits(32)})
     return config
 
 
-class ConfigCLI(CLISettings):
+def parse_value(value: object) -> object:
+    if isinstance(value, dict):
+        return {key: parse_value(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [parse_value(item) for item in value]
+    return yaml.safe_load(value) if isinstance(value, str) else value
+
+
+def parse_experiment_arguments[T: BaseModel](options: type[T]) -> tuple[T, dict]:
+    parser = type(
+        f"{options.__name__}Parser",
+        (BaseSettings, ExperimentConfig, options),
+        {
+            "model_config": SettingsConfigDict(
+                cli_kebab_case=True,
+                cli_implicit_flags=True,
+                cli_hide_none_type=True,
+                cli_avoid_json=True,
+                json_schema_extra=options.model_config.get("json_schema_extra"),
+            )
+        },
+    )
+    given = CliSettingsSource(parser, cli_parse_args=True)()
+    arguments = options.model_validate(
+        {name: given.pop(name) for name in options.model_fields if name in given}
+    )
+    overrides = parse_value(given)
+    for key, value in overrides.get("paths", {}).items():
+        overrides["paths"][key] = str(Path(value).expanduser().resolve())
+    return arguments, overrides
+
+
+class ConfigOptions(BaseModel):
+    model_config = ConfigDict(
+        json_schema_extra={
+            "description": "Print the effective experiment configuration. A dotted "
+            "flag overrides that field of the YAML; the defaults and required marks "
+            "shown are the schema's, not the YAML's"
+        }
+    )
+
     config: CliPositionalArg[Path] = Field(description="Experiment YAML file")
-    data_root: Path | None = Field(
-        default=None, description="Data location, relative to the working directory"
-    )
-    output_root: Path | None = Field(
-        default=None, description="Output location, relative to the working directory"
-    )
-    folds: list[Fold] | None = Field(
-        default=None, description="Saved folds to run, e.g. 0,1,2,3,4"
-    )
 
 
 def main() -> None:
-    try:
-        args = ConfigCLI()
-        config = load_config(
-            args.config,
-            data_root=args.data_root,
-            output_root=args.output_root,
-            folds=args.folds,
-        )
-    except (OSError, ValueError, yaml.YAMLError, SettingsError) as error:
-        print(f"Configuration error: {error}", file=sys.stderr)
-        raise SystemExit(2) from None
+    args, overrides = parse_experiment_arguments(ConfigOptions)
+    config = load_config(args.config, overrides=overrides)
     print(
         json.dumps(
             {
                 "config_file": str(args.config.expanduser().resolve()),
+                "overrides": overrides,
                 **config.model_dump(mode="json"),
                 "split_dir": str(config.split_dir),
             },

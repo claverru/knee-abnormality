@@ -3,11 +3,13 @@
 After training a run, run the separate command manually against the selected checkpoint:
 
 ```bash
-rtk proxy uv run --locked python -m scripts.adhoc.diagnose_encoding_usage outputs/training/run --output-dir outputs/analysis/encoding-usage-run --workers 8
+rtk proxy uv run --locked python -m scripts.tools.diagnose_encoding_usage outputs/training/run --output-dir outputs/analysis/encoding-usage-run --workers 8
 ```
 
 `--checkpoint` selects an explicit checkpoint; otherwise the run's fold selection
-is used. The output directory must be fresh. Configuration, source/checkpoint and
+is used. It runs inference on the whole held-out fold, on the GPU by default, so check GPU
+usage first. The output directory must be fresh; the package and the script are copied to
+`source/` under their repository-relative paths. Configuration, source/checkpoint and
 input identities are checked and recorded. No training weights are changed and
 no callback or training recipe launches this command. It requires the current
 [spatial-token model](../modeling/current-model.md) and preprocessing identity `v9`. Earlier
@@ -18,10 +20,14 @@ overnight queue, `00-baseline` among them.
 Every variant reuses one batch's projected backbone features and deterministic held-out
 images. It then recomputes the embedding sum, LayerNorm and MIL with the same visual token
 membership. The graph variants and graph statistics of the `00-baseline` version were removed
-with the graph. The six full-fold variants are:
+with the graph. The seven full-fold variants are:
 - intact;
-- without the 1D, 2D, plane or contrast embedding; and without all position
-  information (1D and 2D).
+- without the 1D, 2D, plane or contrast embedding;
+- without the anatomical bias, which zeroes the medial axis while keeping the independent
+  heads and learned family strengths; and
+- without all position information (1D and 2D embeddings and the anatomical bias).
+
+Embedding removals affect both attention and the position-rich pooled values.
 
 The attention-prior variants were removed with the
 [prior](../history/model-lineage.md#retired-attention-prior) on 2026-09-16; the
@@ -52,7 +58,7 @@ the [fold-run comparison](fold-run-comparison.md): macro AUC 0.892360, margins 0
 against medial-positive base rates of 36.7% and 21.6%.
 
 Paired study-level bootstrap resampling retains all twelve targets together.
-The default is 2,000 replicates with seed 20260913 and percentile 95% intervals
+The default is 2,000 replicates with seed 20260914 and percentile 95% intervals
 on variant-minus-intact differences, recording valid replicate counts. These
 intervals describe this checkpoint and held-out fold, not training-seed variability.
 The intact output is compared with saved validation probabilities; investigate

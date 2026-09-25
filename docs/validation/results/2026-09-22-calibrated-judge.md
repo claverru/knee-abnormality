@@ -6,7 +6,15 @@ that label and weighting changes produce.** It cannot judge a label-construction
 without submissions. Label changes stay judged on the public leaderboard. The judge's compare mode
 is recorded as a secondary, pre-registered prediction before each submission.
 
-- **Script:** [`validate_calibrated_judge`](../../../scripts/adhoc/validate_calibrated_judge.py), CPU only.
+- **Script:** [`validate_calibrated_judge`](../../../scripts/adhoc/validate_calibrated_judge.py), CPU only,
+  a few minutes; refuses an existing output directory. It prefers a run's
+  `validation_predictions.csv.x1` when present, so the history is scored at its cohort's
+  multiplier. Full history, then the compare mode against a reference:
+
+  ```bash
+  rtk proxy uv run --locked python -m scripts.adhoc.validate_calibrated_judge --output-dir outputs/analysis/calibrated-judge-new
+  rtk proxy uv run --locked python -m scripts.adhoc.validate_calibrated_judge --output-dir outputs/analysis/calibrated-judge-compare --reference outputs/training/k_05 --candidate outputs/training/<run>
+  ```
 - **Artifacts:** `outputs/analysis/calibrated-judge-20260922/`.
 - **Question it answers:** can a local metric evaluate training-label changes, which fold-0 macro
   AUC misranks ([class-balance exponent](2026-09-21-class-balance-exponent.md))?

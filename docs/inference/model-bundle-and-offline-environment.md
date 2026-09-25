@@ -59,7 +59,7 @@ The generated bundle contains:
 ### Multi-checkpoint ensemble bundles
 
 `export.py --checkpoint` takes a comma-separated list of one or more
-checkpoints (the same list convention as `--folds`). One checkpoint keeps
+checkpoints. One checkpoint keeps
 every current behavior exactly: `model.ckpt` at the bundle root and
 `manifest.json`'s singular `checkpoint` record. More than one checkpoint
 builds an ensemble bundle instead:
@@ -187,6 +187,19 @@ Test-mode prediction reads the submission template and test metadata; it does
 not call `load_fold_labels()`. Training CSVs, report-label sources, fold files,
 training DICOMs and the original ImageNet download need not accompany the
 inference bundle. Preserve their provenance with the trained artifact.
+Because labels and folds are not bundled, reproducing validation through a bundle needs the
+original data root and the checkpoint's label manifest, run from the bundle's own code:
+
+```bash
+rtk proxy uv run --locked env PYTHONPATH=outputs/submission/exports/BUNDLE/code \
+  python -m scripts.pipeline.predict outputs/submission/exports/BUNDLE/config.json \
+  --bundle outputs/submission/exports/BUNDLE --data-root data \
+  --label-manifest configs/labels/combined-label-sources.json \
+  --output outputs/analysis/BUNDLE-reproduced.csv --split validation --fold 0
+```
+
+Like the image multiplier, a bundle's attention temperature is frozen: a differing
+`--attention-temperature` is rejected, so export a new bundle instead.
 
 The exporter checks checkpoint metadata, reconstructs the model strictly on
 CPU, and hashes packaged files. Readiness requires target Python/platform values

@@ -1,7 +1,6 @@
 import base64
 import hashlib
 import json
-import sys
 from dataclasses import replace
 from importlib.metadata import version
 from io import BytesIO
@@ -10,12 +9,11 @@ from typing import Literal
 
 import polars as pl
 import torch
-import yaml
 from PIL import Image, ImageDraw, ImageFont
 from pydantic import Field
-from pydantic_settings import CliPositionalArg, SettingsError
+from pydantic_settings import CliPositionalArg
 
-from knee_abnormality.cli import CLISettings
+from knee_abnormality.cli import CLISettings, describe
 from knee_abnormality.config import SLICES_PER_INPUT, load_config
 from knee_abnormality.data.dataset import collate_studies
 from knee_abnormality.data.labels import STUDY
@@ -159,20 +157,45 @@ render();
 
 
 class PreviewCLI(CLISettings):
-    config: CliPositionalArg[Path] = Path("configs/training.yaml")
-    output_dir: Path = Path("outputs/previews/augmentations")
-    study_uid: str | None = None
-    seed: int | None = Field(default=None, ge=0, lt=2**32)
-    variants: int = Field(default=4, ge=1, le=12)
-    sampling: Literal["validation", "training"] = "validation"
-    epoch: int = Field(default=0, ge=0)
-    split: Literal["test", "validation"] = "test"
-    max_studies: int = Field(default=8, ge=1, le=128)
-    offset: int = Field(default=0, ge=0)
-    profile_cuda: bool = False
-    profile_iterations: int = Field(default=30, ge=1, le=100)
-    geometry_headers: Path = Path(
-        "outputs/analysis/geometry-metadata-20260912/headers.parquet"
+    model_config = describe(
+        "Render study-coherent reflection and other augmentations with source geometry "
+        "for browsing, with optional CUDA profiling of the reflection"
+    )
+
+    config: CliPositionalArg[Path] = Field(
+        default=Path("configs/training.yaml"), description="Experiment YAML file"
+    )
+    output_dir: Path = Field(
+        default=Path("outputs/previews/augmentations"), description="Preview directory"
+    )
+    study_uid: str | None = Field(default=None, description="Preview only this study")
+    seed: int | None = Field(
+        default=None,
+        ge=0,
+        lt=2**32,
+        description="Augmentation seed; defaults to the config's",
+    )
+    variants: int = Field(
+        default=4, ge=1, le=12, description="Augmented variants per study"
+    )
+    sampling: Literal["validation", "training"] = Field(
+        default="validation", description="Triplet sampling mode"
+    )
+    epoch: int = Field(default=0, ge=0, description="Sampling epoch")
+    split: Literal["test", "validation"] = Field(
+        default="test", description="Studies to preview"
+    )
+    max_studies: int = Field(default=8, ge=1, le=128, description="Studies to preview")
+    offset: int = Field(default=0, ge=0, description="Skip this many studies")
+    profile_cuda: bool = Field(
+        default=False, description="Also time the reflection on CUDA"
+    )
+    profile_iterations: int = Field(
+        default=30, ge=1, le=100, description="CUDA profiling iterations"
+    )
+    geometry_headers: Path = Field(
+        default=Path("outputs/analysis/geometry-metadata-20260912/headers.parquet"),
+        description="Header table used for source geometry when present",
     )
 
 
@@ -751,18 +774,7 @@ def create_preview(args: PreviewCLI) -> dict:
 
 
 def main() -> None:
-    try:
-        result = create_preview(PreviewCLI())
-    except (
-        OSError,
-        TypeError,
-        ValueError,
-        RuntimeError,
-        yaml.YAMLError,
-        SettingsError,
-    ) as error:
-        print(f"Preview error: {error}", file=sys.stderr)
-        raise SystemExit(2) from None
+    result = create_preview(PreviewCLI())
     print(json.dumps(result, indent=2))
 
 

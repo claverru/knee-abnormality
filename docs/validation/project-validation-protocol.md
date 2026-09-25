@@ -160,8 +160,8 @@ cover every fold. It accepts only protocol version 2 and applies the same protoc
 as the training label loader (input hashes, membership hash, 0.5 target threshold and
 complete evaluation-target coverage). It aligns
 by ID, verifies membership and source hashes, rejects invalid probabilities,
-and reports pooled OOF macro AUC, per-target AUC, per-fold scores, their mean,
-soft-target BCE and gold/report-derived diagnostics. A single-class full-fold
+and prints pooled OOF macro AUC, per-target AUC, per-fold scores, their mean,
+soft-target BCE and gold/report-derived diagnostics as JSON on stdout. A single-class full-fold
 target fails explicitly; diagnostic subgroups use the null semantics above.
 Fold IDs alone cannot prove a model excluded its validation data; retain
 training membership, label versions, and checkpoint provenance with each run.

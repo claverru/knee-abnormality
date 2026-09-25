@@ -7,8 +7,28 @@ way produced a wrong answer that survived until someone re-measured.
 
 One self-contained Kaggle CPU script kernel per change, reproducing only the operation under test
 rather than the whole pipeline, each auditing its candidate against a copy of the production
-function (`probe-kaggle-loading` in [the catalog](../../../scripts/adhoc/catalog.yaml)). Five CPU
-sessions run at once.
+function ([`probe_kaggle_loading`](../../../scripts/adhoc/probe_kaggle_loading.py), probes in
+[`kaggle_loading_probes/`](../../../scripts/adhoc/kaggle_loading_probes/)). Five CPU sessions run at
+once; the launcher caps concurrency at five and records a rejected push in `status.json` rather
+than queueing it. It needs Kaggle credentials but no exported bundle.
+
+```bash
+rtk proxy uv run --locked python -m scripts.adhoc.probe_kaggle_loading launch --output-dir outputs/profiling/kaggle-loading-probes-new --probes '["header","frames"]'
+rtk proxy uv run --locked python -m scripts.adhoc.probe_kaggle_loading collect --output-dir outputs/profiling/kaggle-loading-probes-new
+```
+
+`collect` writes each probe's result JSON, kernel log and `summary.json`; the 2026-09-17/18 runs are
+in `outputs/profiling/kaggle-loading-probes-20260917/`. Each kernel is one file, `common.py`
+concatenated with the probe body, so it has no repository dependency. `common.py` shuffles studies
+with a fixed seed, so every probe and session draws the same blocks in the same order. The
+baseline in each probe is a copy of the production function that can drift from `src/` and is not
+checked against it automatically. To run a probe on local data, concatenate it the same way and
+set `KNEE_PROBE_DATA` (data root), `KNEE_PROBE_OUT` (result directory) and, to check correctness
+without timing, `KNEE_PROBE_AUDIT_ONLY=1`:
+
+```bash
+cat scripts/adhoc/kaggle_loading_probes/common.py scripts/adhoc/kaggle_loading_probes/header.py > /tmp/header_probe.py && KNEE_PROBE_DATA=data/raw KNEE_PROBE_AUDIT_ONLY=1 rtk proxy uv run --locked python /tmp/header_probe.py
+```
 
 - Discover the competition root by globbing for `train_series.csv`, as the existing profiler does.
   The slug path does not exist, which is what made the first run's four data-reading probes error.
@@ -17,7 +37,9 @@ sessions run at once.
 - Balance cells on the quantity under test. The first frame probe read 900 frames per cell but
   352.7–1,109.7 MB, so neither frames/s nor MB/s isolated the thread count; `matched_blocks` now
   deals whole studies into cells balanced per frame byte-length and truncates to the shared count.
-- Pure-CPU probes (resample, quantiles, sampling) need no NFS and can be answered locally.
+- Pure-CPU probes (resample, quantiles, sampling) need no NFS and can be answered locally. The
+  quantiles probe reads real resampled pixels; its synthetic generator stays behind the
+  `REAL_PIXELS = False` module constant only as the recorded wrong answer.
 
 ## Separate host variance from the change
 

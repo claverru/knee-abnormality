@@ -12,7 +12,7 @@ reached **0.879626** fold-0 macro AUC at epoch 8: +0.0345 against
 - **Change from label-private:** every label pools all 24 crops of its study; label FiLM removed;
   selection ranks the per-label coarse attention alone (same choices as before); coarse tokens,
   scores and pool computed once; attention prior retired
-  ([recipe snapshot](../../history/crop-selection-sources/active-spatial-token-model.md.txt)). Kept: 2 crops
+  (recipe snapshot (`f076a09:docs/history/crop-selection-sources/active-spatial-token-model.md.txt`)). Kept: 2 crops
   per label with plane spread, 24 ReXNet-200 crops per study without deduplication, coupled fine
   scores, the per-label gate on one shared classifier. 300-pixel canvases at 0.5 mm, 224-pixel
   crops, batch 8, 10 epochs, seed 42, fold 0 of `all_5fold_v3`.

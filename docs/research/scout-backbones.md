@@ -9,7 +9,7 @@ The scout was removed later that day with the
 historical. It applies only if a scout design returns. The shared background lives elsewhere:
 
 - **Costs:** the
-  [learned-zoom backbone-swap snapshot](../history/crop-selection-sources/learned-zoom-backbone-swaps.md.txt)
+  learned-zoom backbone-swap snapshot (`f076a09:docs/history/crop-selection-sources/learned-zoom-backbone-swaps.md.txt`)
   has the scout's cost counts, delta formula and code requirements.
 - **Mapping:** [mapping pitfalls](../modeling/backbone-swaps.md#mapping-pitfalls) is current.
 - **Evidence:** [backbone MRI evidence](backbone-mri-evidence.md) covers which families have
@@ -38,7 +38,7 @@ historical. It applies only if a scout design returns. The shared background liv
 ## Candidates
 
 - **Deltas:** relative to the whole learned-zoom model, from the scout formula in the
-  [backbone-swap snapshot](../history/crop-selection-sources/learned-zoom-backbone-swaps.md.txt).
+  backbone-swap snapshot (`f076a09:docs/history/crop-selection-sources/learned-zoom-backbone-swaps.md.txt`).
 - **Top-1:** from the timm table at each model's own evaluation size.
 - **Adapt:** a [mapping category](../modeling/backbone-swaps.md#mapping-pitfalls).
   - *native:* a mapping entry is enough.

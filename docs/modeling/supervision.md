@@ -149,22 +149,22 @@ membership, protocol and evaluation-target hashes.
 After editing the YAML, launch a fresh run with:
 
 ```bash
-rtk proxy uv run --locked just train tonylin-soft-v3 configs/tonylin-soft-v3.yaml 0
+rtk proxy uv run --locked just train configs/tonylin-soft-v3.yaml --run-id tonylin-soft-v3 --validation.folds '[0]'
 ```
 
-`just train` does not generate folds. Do not run `just prepare-folds` for this
+`just train` does not generate folds. Do not run `just validation prepare` for this
 label-source comparison: stratification and frozen evaluation targets depend
 on the selected labels, so rebuilding them with Tonylin would propose a
 different protocol. The preparation command refuses to overwrite conflicting
 existing split artifacts, but a new split directory would also change the
 comparison endpoint. Reuse the saved split throughout the experiment.
 
-The [preparation utility](../../scripts/tools/prepare_tonylin_labels.py) uses only
+The [preparation utility](../../scripts/adhoc/prepare_tonylin_labels.py) uses only
 tabular metadata and the existing fold-label loader. To reproduce into fresh
 locations, run from the repository root:
 
 ```bash
-rtk proxy uv run --locked python -m scripts.tools.prepare_tonylin_labels --output-dir data/labels/prepared/tonylin-soft-v3-reproduction --output-manifest configs/labels/tonylin-label-sources-reproduction.json
+rtk proxy uv run --locked python -m scripts.adhoc.prepare_tonylin_labels --output-dir data/labels/prepared/tonylin-soft-v3-reproduction --output-manifest configs/labels/tonylin-label-sources-reproduction.json
 ```
 
 The utility leaves the input YAML and split files unchanged. Preparation ran

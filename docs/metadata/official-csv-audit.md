@@ -37,7 +37,8 @@ rtk proxy uv run --locked python -m scripts.adhoc.audit_metadata
 with Polars and writes aggregates, full schemas, null counts, and file SHA-256
 hashes to `data/metadata/audit.json`; target counts also go to
 `data/metadata/label_counts.csv`. It does not download files, modify raw data,
-or emit report text. Data and generated audit artifacts are ignored by Git.
+or emit report text. Reruns overwrite existing outputs; `--output-dir` selects another
+destination. Data and generated audit artifacts are ignored by Git.
 The CLI returned plain CSVs for this snapshot; if a future download returns a
 ZIP, extract its named CSV into `data/raw/` before running the audit.
 
