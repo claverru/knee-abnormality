@@ -18,15 +18,20 @@ from knee_abnormality.autoresearch.campaign.reports import (
     OrchestratorReport,
 )
 from knee_abnormality.autoresearch.runtime import providers
+from knee_abnormality.autoresearch.runtime.gpu import GPU_BUSY
+from knee_abnormality.autoresearch.runtime.layout import (
+    PREDICTIONS,
+    campaign_fold,
+    comparison_path,
+    diagnostics_path,
+    fold_dir,
+    read_diagnostics,
+)
 from knee_abnormality.autoresearch.runtime.storage import (
     read_json,
     sha256,
     tail,
     write_json,
-)
-from knee_abnormality.autoresearch.scoring.diagnostics import (
-    diagnostics_path,
-    read_diagnostics,
 )
 from knee_abnormality.autoresearch.supervisor.common import (
     identifier,
@@ -78,11 +83,13 @@ class ResultMixin:
 
     def control_result(self, receipt):
         control = self.state["control_retrain"]
-        if receipt.get("cancelled") or receipt["exit_code"] == 75:
+        if receipt.get("cancelled") or receipt["exit_code"] == GPU_BUSY:
             control["stage"] = "pending"
             return
         directory = Path(control["directory"])
-        reasons = evaluate(directory, self.state["limits"], receipt)
+        reasons = evaluate(
+            directory, campaign_fold(self.state), self.state["limits"], receipt
+        )
         try:
             seed = read_json(directory / "training/effective_config.json")["seed"]
             if seed != control["seed"]:
@@ -91,11 +98,10 @@ class ResultMixin:
             reasons.append(f"Missing or malformed control seed evidence: {error}")
         if reasons:
             control.update(stage="failed", reasons=reasons)
-            self.state.update(
-                status="paused",
-                reason=f"Control retrain of {control['adopted']} failed; inspect {directory}: "
+            self.pause(
+                f"Control retrain of {control['adopted']} failed; inspect {directory}: "
                 + "; ".join(reasons)
-                + ". Fix the cause and resume to retrain.",
+                + ". Fix the cause and resume to retrain."
             )
             return
         run = directory / "training"
@@ -103,9 +109,11 @@ class ResultMixin:
         self.state["incumbent"] = {
             **previous,
             "run": str(run),
-            "predictions_sha256": sha256(run / "fold_0/validation_predictions.csv"),
+            "predictions_sha256": sha256(
+                fold_dir(run, campaign_fold(self.state)) / PREDICTIONS
+            ),
         }
-        self.state.setdefault("control_retrains", []).append(
+        self.state["control_retrains"].append(
             {
                 "id": control["id"],
                 "adopted": control["adopted"],
@@ -132,7 +140,7 @@ class ResultMixin:
             self.state["last_refill_revision"] = -1
 
     def training_result(self, exp, receipt, directory):
-        if receipt["exit_code"] == 75:
+        if receipt["exit_code"] == GPU_BUSY:
             exp["stage"] = "prepared"
             self.state["running"] = None
             return
@@ -140,11 +148,11 @@ class ResultMixin:
         exp["training_receipt"] = receipt
         if (
             exp["launched"]
-            and exp["repair_count"] < 1
+            and exp["repair_count"] < 2
             and receipt["exit_code"] != 0
             and not receipt.get("error")
             and not receipt.get("cancelled")
-            and trained_epochs(Path(exp["directory"])) == 0
+            and trained_epochs(Path(exp["directory"]), campaign_fold(self.state)) == 0
         ):
             self.state["running"] = None
             self.state["crash_repair"] = exp["id"]
@@ -164,30 +172,27 @@ class ResultMixin:
             if receipt.get("seconds") is not None
             else None,
         }
-        reasons = evaluate(Path(exp["directory"]), self.state["limits"], measured)
-        if "training_seed" in exp.get("launch_binding", {}):
-            try:
-                actual_seed = read_json(
-                    Path(exp["directory"]) / "training/effective_config.json"
-                )["seed"]
-                if (
-                    actual_seed != exp["launch_binding"]["training_seed"]
-                    or actual_seed != exp["seed"]
-                    or actual_seed != reference_seed(exp["reference"])
-                ):
-                    reasons.append("Training seed differs from the recorded incumbent")
-            except (OSError, KeyError, ValueError) as error:
-                reasons.append(f"Missing or malformed training seed evidence: {error}")
+        reasons = evaluate(
+            Path(exp["directory"]),
+            campaign_fold(self.state),
+            self.state["limits"],
+            measured,
+        )
+        try:
+            actual_seed = read_json(
+                Path(exp["directory"]) / "training/effective_config.json"
+            )["seed"]
+            if (
+                actual_seed != exp["launch_binding"]["training_seed"]
+                or actual_seed != exp["seed"]
+                or actual_seed != reference_seed(exp["reference"])
+            ):
+                reasons.append("Training seed differs from the recorded incumbent")
+        except (OSError, KeyError, ValueError) as error:
+            reasons.append(f"Missing or malformed training seed evidence: {error}")
         if not exp["launched"]:
             self.state["running"] = None
-            exp["stage"] = "awaiting_review"
-            self.event(
-                "review",
-                {
-                    "experiment": exp["id"],
-                    "gate_error": f"Launch failed: {reasons}",
-                },
-            )
+            self.request_review(exp, f"Launch failed: {reasons}")
         elif reasons:
             self.completion(exp, "invalid", {"reasons": reasons})
         else:
@@ -208,25 +213,18 @@ class ResultMixin:
                 {"reasons": [f"Comparison failed; inspect {directory}"]},
             )
         else:
-            report = read_json(Path(exp["directory"]) / "comparison/comparison.json")
-            diagnostics = read_diagnostics(
-                Path(exp["directory"]) / "comparison/comparison.json"
-            )
+            comparison = comparison_path(exp)
+            report = read_json(comparison)
+            diagnostics = read_diagnostics(comparison)
             macro_bootstrap = (diagnostics or {}).get("macro_bootstrap")
             self.completion(
                 exp,
                 verdict(report, macro_bootstrap),
                 {
-                    "comparison": str(
-                        Path(exp["directory"]) / "comparison/comparison.json"
-                    ),
+                    "comparison": str(comparison),
                     "macro_auc": report["family_means"]["all"],
                     "adoption_bootstrap": macro_bootstrap,
-                    "per_label": str(
-                        diagnostics_path(
-                            Path(exp["directory"]) / "comparison/comparison.json"
-                        )
-                    ),
+                    "per_label": str(diagnostics_path(comparison)),
                     "bootstrap": report["paired_report_group_bootstrap"]["intervals"][
                         "all"
                     ],
@@ -239,14 +237,7 @@ class ResultMixin:
         if kind == "completion_reporter":
             self.escalate_completion(job, f"Reporter failed; inspect {directory}")
         if kind == "config":
-            exp["stage"] = "awaiting_review"
-            self.event(
-                "review",
-                {
-                    "experiment": exp["id"],
-                    "gate_error": f"Configuration failed; inspect {directory}",
-                },
-            )
+            self.request_review(exp, f"Configuration failed; inspect {directory}")
             return
         if kind == "developer":
             exp["stage"] = "needs_developer"
@@ -255,9 +246,8 @@ class ResultMixin:
                 self.state["last_refill_revision"] = -1
             return
         detail = f" ({problem['kind']}: {problem['message'][:500]})" if problem else ""
-        self.state.update(
-            status="paused",
-            reason=f"{kind} failed; inspect {directory}{detail}. Fix the cause and use resume.",
+        self.pause(
+            f"{kind} failed; inspect {directory}{detail}. Fix the cause and use resume."
         )
         return
 
@@ -271,16 +261,14 @@ class ResultMixin:
             exp["config"] = config
             if not parent_changed(self.state, exp):
                 self.review_binding(exp)
-            exp["stage"] = "awaiting_review"
-            self.event("review", {"experiment": exp["id"], "gate_error": None})
+            self.request_review(exp)
         except (ValueError, KeyError) as error:
-            exp["stage"] = "awaiting_review"
-            self.event("review", {"experiment": exp["id"], "gate_error": str(error)})
+            self.request_review(exp, str(error))
 
     def agent_result(self, job, exp, directory):
         kind = job["kind"]
         self.state.get("provider_retries", {}).pop(work_item(job), None)
-        report = providers.result(self.state["provider"], kind, directory)
+        report = providers.result(self.state["provider"], REPORTS[kind], directory)
         if kind == "researcher":
             self.state["last_refill_revision"] = self.state["evidence_revision"]
             if report["ideas"]:
@@ -294,25 +282,14 @@ class ResultMixin:
             exp["developer_report"] = report
             exp["integration"] = report["integration"]
             if report["status"] == "blocked":
-                exp["stage"] = "awaiting_review"
-                self.event(
-                    "review",
-                    {
-                        "experiment": exp["id"],
-                        "gate_error": report["blocker"] or "Developer blocked",
-                    },
-                )
+                self.request_review(exp, report["blocker"] or "Developer blocked")
             elif self.state["status"] != "running":
                 exp["stage"] = "needs_prepare"
             else:
                 try:
                     self.prepare(exp, report)
                 except (OSError, ValueError, SyntaxError) as error:
-                    exp["stage"] = "awaiting_review"
-                    self.event(
-                        "review",
-                        {"experiment": exp["id"], "gate_error": str(error)},
-                    )
+                    self.request_review(exp, str(error))
         elif kind == "completion_reporter":
             self.apply_completion_report(job, report)
         else:
@@ -332,25 +309,25 @@ class ResultMixin:
 
     def escalate_completion(self, job, reason):
         event = self.completion_event(job)
-        record = {
-            "status": "escalated",
-            "job": job["id"],
-            "reason": reason,
-            "report": str(Path(job["path"]) / "report.json"),
-        }
-        event["completion_reporting"] = record
-        self.state["experiments"][event["experiment"]]["completion_reporting"] = dict(
-            record
+        self.route_completion(
+            event,
+            {
+                "status": "escalated",
+                "job": job["id"],
+                "reason": reason,
+                "report": str(Path(job["path"]) / "report.json"),
+            },
         )
 
     def apply_completion_report(self, job, report):
         event = self.completion_event(job)
         reasons = completion_blockers(self.state, event)
-        if report["status"] == "escalate" or report["concerns"] or reasons:
+        if report["status"] == "escalate" or reasons:
             reason = "; ".join([*reasons, *report["concerns"]]) or report["summary"]
             self.escalate_completion(job, reason)
             return
         exp = self.state["experiments"][event["experiment"]]
+        concerns = [*exp["implementation_review"]["concerns"], *report["concerns"]]
         self.apply_orchestrator(
             event,
             {
@@ -361,7 +338,7 @@ class ResultMixin:
                 "integration_review": None,
                 "rationale": COMPLETION_RATIONALE,
                 "finding": report["summary"],
-                "concerns": [],
+                "concerns": concerns,
                 "evidence_refs": [
                     str(Path(job["path"]) / "report.json"),
                     *report["evidence_refs"],
@@ -404,7 +381,7 @@ class ResultMixin:
         )
         seeds = (
             set(self.state["seed_ideas"])
-            if self.state.get("seed_order") == "forced"
+            if self.state["seed_order"] == "forced"
             else set()
         )
         if (
@@ -569,7 +546,7 @@ class ResultMixin:
                     "source": exp["source"],
                     "run": str(run),
                     "predictions_sha256": sha256(
-                        run / "fold_0/validation_predictions.csv"
+                        fold_dir(run, campaign_fold(self.state)) / PREDICTIONS
                     ),
                 }
                 current_seed = reference_seed(self.state["incumbent"])

@@ -5,6 +5,7 @@ import time
 from contextlib import ExitStack
 from pathlib import Path
 
+from knee_abnormality.autoresearch.runtime.gpu import GPU_BUSY, gpu_available
 from knee_abnormality.autoresearch.runtime.isolation import environment
 from knee_abnormality.autoresearch.runtime.storage import (
     lock,
@@ -57,22 +58,20 @@ def run_job(directory: Path):
                         write_json(
                             directory / "receipt.json",
                             {
-                                "exit_code": 75,
+                                "exit_code": GPU_BUSY,
                                 "error": "GPU lease occupied",
                                 "seconds": 0,
                             },
                         )
                         return
-                    from knee_abnormality.autoresearch.supervisor.common import (
-                        gpu_available,
-                    )
-
                     if not gpu_available(spec["gpu"]):
                         write_json(
                             directory / "receipt.json",
-                            {"exit_code": 75, "error": "GPU busy", "seconds": 0},
+                            {"exit_code": GPU_BUSY, "error": "GPU busy", "seconds": 0},
                         )
                         return
+                if cancelled:
+                    raise InterruptedError("Cancelled before launch")
                 with (
                     (directory / "stdin.txt").open("rb") as stdin,
                     (directory / "stdout.log").open("wb") as stdout,

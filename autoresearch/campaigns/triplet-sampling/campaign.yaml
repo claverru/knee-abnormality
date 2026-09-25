@@ -1,5 +1,4 @@
 id: triplet-sampling
-status: stopped
 recipe: configs/training.yaml
 reference_run: outputs/training/overnight-20260919T120130Z-i2oqlnls/runs/00-control
 reference_equivalences: {}
@@ -10,7 +9,6 @@ additional_evidence_runs:
 backlog:
   refill_below: 4
   refill_to: 5
-artifacts_root: outputs/autoresearch/triplet-sampling
 policy:
   editable_files:
     - configs/training.yaml

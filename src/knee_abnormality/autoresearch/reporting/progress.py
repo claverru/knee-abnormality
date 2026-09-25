@@ -1,9 +1,12 @@
 import math
-import re
 from pathlib import Path
 
+from knee_abnormality.autoresearch.runtime.layout import (
+    campaign_fold,
+    experiment_diagnostics,
+    fold_dir,
+)
 from knee_abnormality.autoresearch.runtime.storage import read_json
-from knee_abnormality.autoresearch.scoring.diagnostics import experiment_diagnostics
 
 
 def number(value):
@@ -32,19 +35,12 @@ def difference(candidate, reference):
     )
 
 
-def saved_auc(root, run):
+def saved_auc(root, run, fold):
     if not run:
         return None
-    fold = root / run / "fold_0"
     try:
-        selected = read_json(fold / "selected_checkpoint.json")
-        if "prediction_macro_auc" in selected:
-            return number(selected["prediction_macro_auc"])
-        epoch = re.search(r"(?:^|-)epoch=(\d+)(?:-|$)", Path(selected["path"]).name)
-        if epoch is None:
-            return None
-        metrics = read_json(fold / "epochs" / f"metrics_epoch_{int(epoch[1]):03d}.json")
-        return number(metrics["macro_auc"])
+        selected = read_json(fold_dir(root / run, fold) / "selected_checkpoint.json")
+        return number(selected["prediction_macro_auc"])
     except (OSError, ValueError, KeyError, TypeError):
         return None
 
@@ -165,11 +161,44 @@ def per_label_lines(exp):
     return lines
 
 
+def adoption_result(exp):
+    evidence = exp.get("evidence", {})
+    scores = evidence.get("macro_auc", {})
+    delta = difference(scores.get("candidate"), scores.get("reference"))
+    bounds = (evidence.get("adoption_bootstrap") or {}).get("delta_percentile_80")
+    return delta, bounds
+
+
+def findings_summary(state, campaign):
+    log = Path(campaign["artifacts_root"]) / "findings.md"
+    lines = [
+        "# Campaign findings",
+        "",
+        f"Decision summary. The full orchestrator log is `{log}` (not tracked).",
+        "",
+        f"Incumbent: `{state['incumbent']['id']}`",
+    ]
+    decided = [exp for exp in state["experiments"].values() if exp.get("decision")]
+    if not decided:
+        return "\n".join([*lines, "", "No decided experiments yet.", ""])
+    lines.append("")
+    for exp in decided:
+        delta, bounds = adoption_result(exp)
+        soft = exp.get("evidence", {}).get("soft_macro_auc")
+        lines.append(
+            f"- `{exp['idea']}`: {decision_text(exp)}, macro AUC delta "
+            f"{score_text(delta, True)}, adoption 80% CI {interval_text(bounds)}"
+            + (f", soft AUC delta {score_text(soft['delta'], True)}" if soft else "")
+        )
+    return "\n".join([*lines, ""])
+
+
 def progress_lines(state, root, output):
+    fold = campaign_fold(state)
     decisions = manual_decisions(state, output)
-    baseline = saved_auc(root, state["reference"])
+    baseline = saved_auc(root, state["reference"], fold)
     incumbent = state["incumbent"]
-    current = saved_auc(root, incumbent["run"])
+    current = saved_auc(root, incumbent["run"], fold)
     anchor, retained = retained_lineage(state, decisions)
     lines = [
         f"Starting reference AUC: {score_text(baseline)} (historical-control)",
@@ -193,7 +222,7 @@ def progress_lines(state, root, output):
             "Retained experimental gain: unavailable (accepted lineage is incomplete)"
         )
     else:
-        anchor_score = saved_auc(root, anchor["run"])
+        anchor_score = saved_auc(root, anchor["run"], fold)
         gain = difference(current, anchor_score) if retained else 0.0
         lines.append(
             f"Retained experimental gain: {score_text(gain, True)} "
@@ -204,11 +233,11 @@ def progress_lines(state, root, output):
                 f"Reference changed: gains measured from {anchor['id']} "
                 f"at AUC {score_text(anchor_score)}; reference change excluded from gain."
             )
-    for record in state.get("control_retrains", []):
+    for record in state["control_retrains"]:
         lines.append(
             f"Control retrained after adopting {record['adopted']} at seed {record['seed']}: "
-            f"AUC {score_text(saved_auc(root, record['control_run']))} "
-            f"(adopted run {score_text(saved_auc(root, record['adopted_run']))})"
+            f"AUC {score_text(saved_auc(root, record['control_run'], fold))} "
+            f"(adopted run {score_text(saved_auc(root, record['adopted_run'], fold))})"
         )
     withdrawn = sum(
         exp.get("eligible_decision") == "provisional_accept"
@@ -247,7 +276,7 @@ def results_summary(state, root, output, campaign):
             [
                 "",
                 "Delta is candidate minus its recorded reference, not the bootstrap mean.",
-                "Intervals are paired bootstrap 95% intervals; positive inconclusive deltas are not retained gains.",
+                "Intervals are paired bootstrap 95% intervals; positive rejected deltas are not retained gains.",
                 "Per-label intervals are unadjusted diagnostics, not simultaneous intervals or acceptance criteria.",
                 "Withdrawn acceptances keep their original scores and intervals; the displayed decision is current.",
             ]
@@ -261,6 +290,7 @@ def results_summary(state, root, output, campaign):
         lines.extend(["", "Training attempts without a final decision:"])
         lines.extend(f"  {exp['id']} — {exp['stage']}" for exp in pending)
     decisions = manual_decisions(state, output)
+    fold = campaign_fold(state)
     if decisions:
         lines.extend(
             ["", "Manual reference changes (excluded from experimental gain):"]
@@ -271,8 +301,8 @@ def results_summary(state, root, output, campaign):
                 [
                     f"  Revision {record['revision_after']}: {previous['id']} -> {current['id']}",
                     (
-                        f"    AUC {score_text(saved_auc(root, previous['run']))} -> "
-                        f"{score_text(saved_auc(root, current['run']))}"
+                        f"    AUC {score_text(saved_auc(root, previous['run'], fold))} -> "
+                        f"{score_text(saved_auc(root, current['run'], fold))}"
                     ),
                     f"    Record: {output / 'decisions' / record['event'] / 'decision.json'}",
                 ]

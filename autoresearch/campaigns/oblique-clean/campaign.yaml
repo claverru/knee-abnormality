@@ -1,5 +1,4 @@
 id: oblique-clean
-status: ready-to-seal
 recipe: configs/training.yaml
 reference_run: outputs/training/oblique-clean
 reference_equivalences: {}
@@ -8,7 +7,6 @@ additional_evidence_runs:
 backlog:
   refill_below: 4
   refill_to: 5
-artifacts_root: outputs/autoresearch/oblique-clean
 policy:
   editable_files:
     - configs/training.yaml

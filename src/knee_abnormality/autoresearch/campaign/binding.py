@@ -3,12 +3,17 @@ import json
 from pathlib import Path
 
 from knee_abnormality.autoresearch.campaign.gates import (
-    ACCEPTANCE_RULE,
     active_incumbent_ideas,
     dependency_blockers,
 )
 from knee_abnormality.autoresearch.campaign.reports import DeveloperReport
+from knee_abnormality.autoresearch.campaign.rules import ACCEPTANCE_RULE
 from knee_abnormality.autoresearch.runtime.isolation import manifest
+from knee_abnormality.autoresearch.runtime.layout import (
+    PREDICTIONS,
+    campaign_fold,
+    fold_dir,
+)
 from knee_abnormality.autoresearch.runtime.storage import read_json, sha256
 
 
@@ -27,46 +32,23 @@ def reference_seed(reference):
     return seed
 
 
-def comparison_identity_keys(state, exp, policy):
-    allowed = list(policy.input_identity_keys)
-    transition = state.get("incumbent_transition")
-    if (
-        not transition
-        or exp["reference"]["id"] != transition["incumbent_id"]
-        or "preprocessing_identity" in allowed
-    ):
-        return allowed
-    reference_path = Path(exp["reference"]["run"]) / "fold_0/input_identity.json"
-    if sha256(reference_path) != transition["reference_input_identity_sha256"]:
-        raise ValueError("Adopted reference input identity changed")
-    candidate = read_json(
-        Path(exp["directory"]) / "training/fold_0/input_identity.json"
-    )
-    reference = read_json(reference_path)
-    if candidate["preprocessing_identity"] != reference["preprocessing_identity"]:
-        if candidate["preprocessing_identity"] != transition["preprocessing_identity"]:
-            raise ValueError("Candidate preprocessing differs from the adopted cleanup")
-        allowed.append("preprocessing_identity")
-    return allowed
-
-
-def reference_snapshot(reference):
+def reference_snapshot(reference, fold):
     source = Path(reference["source"])
     run = Path(reference["run"])
     if not source.is_dir():
         raise ValueError(f"Missing incumbent source: {source}")
-    predictions = sha256(run / "fold_0/validation_predictions.csv")
+    predictions = sha256(fold_dir(run, fold) / PREDICTIONS)
     if predictions != reference["predictions_sha256"]:
         raise ValueError("Incumbent predictions changed")
     return {
         **reference,
         "source_sha256": digest(manifest(source)),
         "config_sha256": sha256(run / "effective_config.json"),
-        "input_identity_sha256": sha256(run / "fold_0/input_identity.json"),
+        "input_identity_sha256": sha256(fold_dir(run, fold) / "input_identity.json"),
     }
 
 
-def external_evidence(root, campaign):
+def external_evidence(root, campaign, fold):
     root = Path(root)
     runs = {}
     for name in sorted(set(campaign["additional_evidence_runs"])):
@@ -76,10 +58,10 @@ def external_evidence(root, campaign):
             for filename in (
                 "effective_config.json",
                 "source_snapshot.zip",
-                "fold_0/input_identity.json",
-                "fold_0/selected_checkpoint.json",
-                "fold_0/validation_predictions.csv",
-                "fold_0/timing.json",
+                f"fold_{fold}/input_identity.json",
+                f"fold_{fold}/selected_checkpoint.json",
+                f"fold_{fold}/{PREDICTIONS}",
+                f"fold_{fold}/timing.json",
             )
             for path in [run / filename]
         }
@@ -101,7 +83,7 @@ def external_evidence(root, campaign):
 
 
 def parent_changed(state, exp):
-    current = reference_snapshot(state["incumbent"])
+    current = reference_snapshot(state["incumbent"], campaign_fold(state))
     recorded = exp.get("implementation_reference")
     if recorded and recorded["id"] == current["id"] and recorded != current:
         raise ValueError(
@@ -111,7 +93,7 @@ def parent_changed(state, exp):
 
 
 def candidate_binding(state, exp, evidence):
-    reference = reference_snapshot(state["incumbent"])
+    reference = reference_snapshot(state["incumbent"], campaign_fold(state))
     seed = reference_seed(reference)
     if exp["config"]["seed"] != seed or exp.get("seed") != seed:
         raise ValueError("Candidate training seed differs from the incumbent")
@@ -154,7 +136,6 @@ def candidate_binding(state, exp, evidence):
         "reference": reference,
         "training_seed": seed,
         "acceptance_rule": dict(ACCEPTANCE_RULE),
-        "incumbent_transition": state.get("incumbent_transition"),
         "candidate_source_sha256": digest(actual),
         "candidate_config_sha256": digest(exp["config"]),
         "integration": integration,
@@ -173,7 +154,7 @@ def launch_blockers(state, exp):
         blockers.append("Previous training or its decision is still outstanding")
     if state["events"]:
         blockers.append("Campaign events are still pending")
-    if state.get("control_retrain"):
+    if state["control_retrain"]:
         blockers.append("The adopted incumbent's control retrain is still pending")
     if any(
         not job["processed"]

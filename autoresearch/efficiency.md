@@ -40,54 +40,58 @@ Of the orchestrator's $43.15 equivalent, cache writes account for $25.80, cache
 reads $9.30, and output $8.04. Repeated context is therefore the primary observed
 orchestration cost, with new-input cost particularly prominent.
 
-## Implemented changes
+## Changes this baseline motivated
 
-- Role/event-specific cards and a retrievable history index replace full queue
-  narratives and the last twelve complete reports.
-- Code assembles candidate evidence packets with exact metrics, accounting,
-  configuration differences, timings and original artifact references.
-- Concise reports retain new findings, unresolved concerns and evidence paths;
-  unchanged rankings use `null`. Opus still inspects the real candidate source.
-- Prose lengths and concern/reference counts are advisory targets. Hard prose
-  limits caused five failed shortening attempts on an otherwise structurally valid
-  losses report, ending just two characters over the rationale limit. Full report
-  text is now preserved without formatting-only retries or truncation; schema
-  structure and campaign gates stay strict. Actual report bytes remain in usage.
-- Code applies the fixed numerical verdict after orchestrator interpretation.
-  Scheduling stays in the supervisor. Empty research refills create no review call.
-- Usage capture is independent of report acceptance. Claude streams events for
-  partial interrupted-call accounting. Unknown usage and cost remain explicit.
-- `status` and the read-only `usage` command expose role/event totals, per-job
-  model/effort, prompt/report sizes, direct experiment costs, repairs, and compute
-  time. Historical raw provider records are included without rewriting them.
-- Code routes only clean rejected/inconclusive completions without outstanding
-  related work to the restricted reporter. It receives compact verified facts
-  and original artifacts; it can summarize or escalate but has no decision fields.
-  Eligibility is rechecked before applying its report. See the
-  [exact routing rules](protocol.md#restricted-completion-reporting).
-- The supervisor records routine results with the incumbent and queue unchanged.
-  Escalation retains the reporter job and sends the same event to the orchestrator.
-  Both costs are included in experiment and campaign usage. There is at most one
-  reporter attempt per completion, including across stop/resume.
+Repeated context was the largest orchestration cost, so assignments now carry
+role-specific cards, a retrievable history index and code-assembled evidence packets
+instead of full queue narratives and the last twelve complete reports
+([evidence and context](protocol.md#evidence-and-context)). Opus still inspects the
+real candidate source. Hard prose limits caused five failed shortening attempts on an
+otherwise valid losses report, which ended two characters over the rationale limit;
+prose lengths are now advisory and full text is kept. Code records the fixed verdict,
+empty refills create no review call, and usage is captured independently of report
+acceptance ([records](records.md#agent-handoffs-and-usage)). Eligible reject
+completions go to the
+[restricted completion reporter](protocol.md#restricted-completion-reporting).
 
-The maintained runner and role briefs take effect on the next supervisor launch.
-Frozen experiment source and sealed acceptance limits are unchanged. The original
-context/usage changes were checked without starting a campaign; subsequent losses
-recovery and its verification are recorded in [implementation status](status.md).
-Repository policy prohibits writing or running tests.
+No new-run token savings or unchanged research quality were measured against this
+baseline. The $14.93 completion-interpretation total was an opportunity to measure,
+not promised savings: only a subset qualifies, and escalation adds another call.
+Compare cost per valid completed experiment, usage coverage, prompt/report sizes,
+repair frequency, unresolved issues and research outcomes on real runs, using
+`usage.completion_reporting` (reported, escalated, pending and direct routes) and
+`by_role_event.completion_reporter/completion`. Keep missed issues and poor
+scientific decisions visible; shorter reports alone do not establish better
+efficiency.
 
-No new-run token savings or unchanged research quality have been measured yet.
-The historical $14.93 completion-interpretation total is an opportunity to measure,
-not promised savings: only a subset will qualify, and escalation adds another call.
-At the next user-launched campaign, compare cost per valid completed experiment,
-usage coverage, prompt/report sizes, repair frequency, unresolved issues, and
-research outcomes against this baseline. Keep missing issues and poor scientific
-decisions visible; shorter reports alone do not establish better efficiency.
+## Knee-geometry baseline and completion routing
 
-`usage.completion_reporting` counts reported, escalated, pending and direct-to-
-orchestrator routes. `by_role_event.completion_reporter/completion` accounts for
-reporter calls. Compare total completion cost including escalations, the proportion
-of eligible events, report repairs, and missed issues on subsequent real runs.
+Codex campaign, 2026-09-23/24: 105 agent jobs, all completed; Codex records tokens but no cost.
+
+| Role | Model and effort | Jobs | New input | Cached input | Output |
+|---|---|---:|---:|---:|---:|
+| Developer | GPT-6 Sol, high | 32 | 2.69M | 47.52M | 0.37M |
+| Orchestrator, reviews | GPT-6 Sol, medium | 32 | 2.23M | 12.02M | 0.10M |
+| Orchestrator, completions | GPT-6 Sol, medium | 19 | 1.20M | 9.29M | 0.06M |
+| Orchestrator, proposals | GPT-6 Sol, medium | 13 | 0.76M | 3.94M | 0.04M |
+| Researcher | GPT-6 Astra, xhigh | 9 | 1.28M | 10.60M | 0.13M |
+| **Total** | | **105** | **8.15M** | **83.37M** | **0.70M** |
+
+- **Repairs:** 9 of 22 first attempts needed one, adding 9 developer jobs and 9 reviews,
+  about 28% of developer and review tokens.
+- **Completion routing:** the reporter almost never ran. In knee-geometry 16 of 18
+  completions, and in near-misses 17 of 19, were rejects routed to the orchestrator only
+  because the implementation review listed concerns; the orchestrator lists concerns in
+  nearly every approval. On all 33, the orchestrator made no queue, ranking, parking or
+  proposal decision; it only recorded the finding.
+- **Change, 2026-09-25:** review concerns, other pending events and related outstanding
+  ideas no longer block the reporter, and its own concerns no longer escalate; both are
+  recorded with the finding. Only `status: escalate` or a failed eligibility recheck
+  reaches the orchestrator ([protocol](protocol.md#restricted-completion-reporting)).
+  Measure it on the next campaign's `usage.completion_reporting`.
+- **Deferred:** lowering developer effort (the largest single cost) risks more repairs;
+  fewer, larger researcher batches could cut the 13 proposal calls, but with forced seeds
+  ranking starts only after the seeds finish.
 
 ## Evidence informing the design
 

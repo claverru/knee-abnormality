@@ -1,14 +1,17 @@
 import json
-import os
 import re
+import shutil
+import subprocess
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from knee_abnormality.autoresearch.campaign.definition import CampaignPolicy
-from knee_abnormality.autoresearch.campaign.reports import REPORTS
-from knee_abnormality.autoresearch.runtime.isolation import SOURCE_FILES, sandbox
+from knee_abnormality.autoresearch.runtime.isolation import (
+    SOURCE_FILES,
+    sandbox,
+    scrubbed_environment,
+)
 from knee_abnormality.autoresearch.runtime.storage import read_json, tail, write_json
 from knee_abnormality.autoresearch.runtime.usage import capture_usage, events
 
@@ -62,10 +65,34 @@ UNITS = {"d": 86400, "h": 3600, "m": 60, "s": 1}
 LIMIT_FALLBACK_SECONDS = 3600
 
 
-def invocation(
-    provider, role, profile, source: Path, job: Path, policy: CampaignPolicy
-):
-    schema = REPORTS[role].model_json_schema()
+def codex_command(profile, schema: Path, output: Path, sandbox_mode, *options):
+    return [
+        "codex",
+        "exec",
+        "--ignore-user-config",
+        "--ephemeral",
+        *options,
+        "--sandbox",
+        sandbox_mode,
+        "-c",
+        'approval_policy="never"',
+        "-c",
+        "features.multi_agent=false",
+        "-m",
+        profile["model"],
+        "-c",
+        f'model_reasoning_effort="{profile["effort"]}"',
+        "--json",
+        "--output-schema",
+        str(schema),
+        "--output-last-message",
+        str(output),
+        "-",
+    ]
+
+
+def invocation(provider, model, profile, source: Path, job: Path, editable=None):
+    schema = model.model_json_schema()
     write_json(job / "schema.json", schema)
     scratch = job / "scratch"
     scratch.mkdir()
@@ -76,29 +103,13 @@ def invocation(
     if provider == "codex":
         state = home / ".codex"
         writable.append(state)
-        command = [
-            "codex",
-            "exec",
-            "--ignore-user-config",
-            "--ephemeral",
-            "--skip-git-repo-check",
-            "--sandbox",
+        command = codex_command(
+            profile,
+            job / "schema.json",
+            scratch / "result.json",
             "danger-full-access",
-            "-c",
-            'approval_policy="never"',
-            "-c",
-            "features.multi_agent=false",
-            "-m",
-            profile["model"],
-            "-c",
-            f'model_reasoning_effort="{profile["effort"]}"',
-            "--json",
-            "--output-schema",
-            str(job / "schema.json"),
-            "--output-last-message",
-            str(scratch / "result.json"),
-            "-",
-        ]
+            "--skip-git-repo-check",
+        )
     else:
         writable.append(home / ".claude")
         command = [
@@ -127,8 +138,8 @@ def invocation(
             "--strict-mcp-config",
         ]
     readonly = []
-    if role == "developer":
-        for name in policy.editable_directories:
+    if editable is not None:
+        for name in editable:
             (source / name).mkdir(parents=True, exist_ok=True)
         writable.append(source)
         readonly = [
@@ -151,7 +162,7 @@ def invocation(
     return sandbox(command, source, writable, readonly=readonly, network=True)
 
 
-def result(provider, role, job: Path):
+def result(provider, model, job: Path):
     capture_usage(provider, job)
     if provider == "codex":
         value = read_json(job / "scratch/result.json")
@@ -161,7 +172,7 @@ def result(provider, role, job: Path):
             for event in events(job / "stdout.log")
             if event.get("type") == "result"
         ][-1]["structured_output"]
-    report = REPORTS[role].model_validate(value).model_dump(mode="json")
+    report = model.model_validate(value).model_dump(mode="json")
     write_json(job / "report.json", report)
     capture_usage(provider, job)
     return report
@@ -275,10 +286,49 @@ def failure(provider, job: Path, receipt):
     return classify(message, status)
 
 
-def auth_environment():
-    return {
-        key: value
-        for key, value in os.environ.items()
-        if not key.startswith(("OPENAI_", "ANTHROPIC_", "CODEX_", "CLAUDE_"))
-        and key != "CLAUDECODE"
-    }
+def preflight(provider: str, root: Path):
+    for executable in (provider, "bwrap", "nvidia-smi", "rtk"):
+        if shutil.which(executable) is None:
+            raise ValueError(f"Required command is unavailable: {executable}")
+    command = (
+        ["codex", "login", "status"]
+        if provider == "codex"
+        else ["claude", "auth", "status"]
+    )
+    authentication_environment = scrubbed_environment()
+    if provider == "claude":
+        authentication_environment["CLAUDE_CONFIG_DIR"] = str(Path.home() / ".claude")
+    result = subprocess.run(
+        command,
+        capture_output=True,
+        text=True,
+        timeout=30,
+        env=authentication_environment,
+        check=False,
+    )
+    if result.returncode:
+        raise ValueError(
+            f"{provider} subscription login is unavailable; log in with its CLI first"
+        )
+    if provider == "codex":
+        if "using ChatGPT" not in result.stdout + result.stderr:
+            raise ValueError("Codex must use ChatGPT subscription authentication")
+    else:
+        info = json.loads(result.stdout)
+        if (
+            not info.get("loggedIn")
+            or info.get("authMethod") != "claude.ai"
+            or info.get("apiProvider") != "firstParty"
+        ):
+            raise ValueError("Claude must use its first-party subscription login")
+    result = subprocess.run(
+        sandbox(["true"], root, []),
+        capture_output=True,
+        text=True,
+        timeout=15,
+        check=False,
+    )
+    if result.returncode:
+        raise ValueError(
+            f"Required Linux isolation is unavailable: {result.stderr.strip()}"
+        )

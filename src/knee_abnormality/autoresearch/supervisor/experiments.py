@@ -9,7 +9,6 @@ import yaml
 
 from knee_abnormality.autoresearch.campaign.binding import (
     candidate_binding,
-    comparison_identity_keys,
     digest,
     external_evidence,
     launch_blockers,
@@ -18,14 +17,14 @@ from knee_abnormality.autoresearch.campaign.binding import (
     reference_snapshot,
 )
 from knee_abnormality.autoresearch.campaign.gates import (
-    ACCEPTANCE_RULE,
-    CALIBRATION_EPOCHS,
     config_differences,
     validate_config,
     without_fields,
 )
-from knee_abnormality.autoresearch.campaign.reports import (
-    DeveloperReport,
+from knee_abnormality.autoresearch.campaign.reports import DeveloperReport
+from knee_abnormality.autoresearch.campaign.rules import (
+    ACCEPTANCE_RULE,
+    CALIBRATION_EPOCHS,
 )
 from knee_abnormality.autoresearch.runtime.isolation import (
     changed_files,
@@ -33,6 +32,12 @@ from knee_abnormality.autoresearch.runtime.isolation import (
     manifest,
     sandbox,
     snapshot,
+)
+from knee_abnormality.autoresearch.runtime.layout import (
+    PREDICTIONS,
+    campaign_fold,
+    comparison_path,
+    fold_dir,
 )
 from knee_abnormality.autoresearch.runtime.storage import (
     atomic_write,
@@ -65,7 +70,7 @@ class ExperimentMixin:
             else incumbent["id"],
             "implementation_reference": repair["implementation_reference"]
             if repair
-            else reference_snapshot(incumbent),
+            else reference_snapshot(incumbent, campaign_fold(self.state)),
             "parent_source": repair["parent_source"] if repair else incumbent["source"],
             "repair_of": repair["id"] if repair else None,
             "repair_count": repair["repair_count"] + 1 if repair else 0,
@@ -236,7 +241,10 @@ class ExperimentMixin:
             )
         exceptions = self.state["limits"]["reference_identity_exceptions"]
         expected = without_fields(
-            read_json(Path(self.state["reference"]) / "fold_0/input_identity.json"),
+            read_json(
+                fold_dir(self.state["reference"], campaign_fold(self.state))
+                / "input_identity.json"
+            ),
             exceptions,
         )
         actual = without_fields(
@@ -290,7 +298,9 @@ class ExperimentMixin:
         exp["config"] = {**exp["config"], "seed": seed}
         exp["seed"] = seed
         return candidate_binding(
-            self.state, exp, external_evidence(self.root, self.campaign)
+            self.state,
+            exp,
+            external_evidence(self.root, self.campaign, campaign_fold(self.state)),
         )
 
     def training(self, exp):
@@ -300,14 +310,9 @@ class ExperimentMixin:
         binding = self.review_binding(exp)
         approval = exp.get("implementation_review", {})
         if approval.get("decision") != "approve" or approval.get("binding") != binding:
-            exp["stage"] = "awaiting_review"
-            self.event(
-                "review",
-                {
-                    "experiment": exp["id"],
-                    "gate_error": None,
-                    "refresh_reason": "Approval changed before launch; inspect the updated evidence",
-                },
+            self.request_review(
+                exp,
+                refresh_reason="Approval changed before launch; inspect the updated evidence",
             )
             self.save()
             return
@@ -317,17 +322,18 @@ class ExperimentMixin:
         if sha256(self.output / "limits.json") != self.state["sealed_sha256"]:
             raise ValueError("Sealed campaign limits changed")
         reference = self.state["incumbent"]
-        if (
-            sha256(Path(reference["run"]) / "fold_0/validation_predictions.csv")
-            != reference["predictions_sha256"]
-        ):
+        reference_predictions = sha256(
+            fold_dir(reference["run"], campaign_fold(self.state)) / PREDICTIONS
+        )
+        if reference_predictions != reference["predictions_sha256"]:
             raise ValueError("Incumbent predictions changed")
-        config = dict(exp["config"])
-        config["seed"] = binding["training_seed"]
-        config["name"] = exp["id"]
-        config["paths"] = {**config["paths"], "output_root": exp["directory"]}
-        config_path = Path(exp["directory"]) / "config.yaml"
-        atomic_write(config_path, yaml.safe_dump(config, sort_keys=False))
+        config = {
+            **exp["config"],
+            "seed": binding["training_seed"],
+            "name": exp["id"],
+            "paths": {**exp["config"]["paths"], "output_root": exp["directory"]},
+        }
+        validate_config(self.state["config"], config, self.policy)
         exp.update(
             reference=dict(reference),
             seed=config["seed"],
@@ -335,43 +341,50 @@ class ExperimentMixin:
             launch_binding=binding,
             active_idea_ids=binding["active_idea_ids"],
         )
-        exp["reference_predictions_sha256"] = sha256(
-            Path(reference["run"]) / "fold_0/validation_predictions.csv"
-        )
+        exp["reference_predictions_sha256"] = reference_predictions
         exp["comparison_keys"] = config_differences(
             read_json(Path(reference["run"]) / "effective_config.json"), config
         )
-        validate_config(self.state["config"], config, self.policy)
         self.state["running"] = exp["id"]
-        writable = [Path(exp["directory"])]
+        self.submit_training(
+            "training",
+            config,
+            Path(exp["directory"]),
+            source,
+            {"experiment": exp["id"]},
+            self.state["limits"]["max_run_seconds"] - exp["preparation_seconds"],
+        )
+
+    def submit_training(self, kind, config, directory, source, payload, timeout):
+        config_path = directory / "config.yaml"
+        atomic_write(config_path, yaml.safe_dump(config, sort_keys=False))
+        writable = [directory]
         cache = Path.home() / ".cache"
         if cache.exists():
             writable.append(cache)
-        command = sandbox(
-            [
-                sys.executable,
-                "-m",
-                "scripts.pipeline.train",
-                str(config_path),
-                "--folds",
-                "0",
-                "--output-root",
-                exp["directory"],
-                "--run-id",
-                "training",
-            ],
-            source,
-            writable,
-            gpu=True,
-            readonly=[source, config_path],
-        )
         self.submit(
-            "training",
+            kind,
             source,
-            command,
-            payload={"experiment": exp["id"]},
-            timeout=self.state["limits"]["max_run_seconds"]
-            - exp["preparation_seconds"],
+            sandbox(
+                [
+                    sys.executable,
+                    "-m",
+                    "scripts.pipeline.train",
+                    str(config_path),
+                    "--folds",
+                    str(campaign_fold(self.state)),
+                    "--output-root",
+                    str(directory),
+                    "--run-id",
+                    "training",
+                ],
+                source,
+                writable,
+                gpu=True,
+                readonly=[source, config_path],
+            ),
+            payload=payload,
+            timeout=timeout,
             gpu=self.state["gpu"],
             extra_env={"KNEE_AUTORESEARCH_LIMITS": str(self.output / "limits.json")},
         )
@@ -396,7 +409,7 @@ class ExperimentMixin:
         directory = Path(exp["directory"])
         reference = Path(exp["reference"]["run"])
         if (
-            sha256(reference / "fold_0/validation_predictions.csv")
+            sha256(fold_dir(reference, campaign_fold(self.state)) / PREDICTIONS)
             != exp["reference_predictions_sha256"]
         ):
             raise ValueError("Launch-time reference predictions changed")
@@ -413,7 +426,7 @@ class ExperimentMixin:
             "--output-dir",
             str(directory / "comparison"),
             "--fold",
-            "0",
+            str(campaign_fold(self.state)),
             "--headers",
             self.state["headers"],
             "--bootstrap-draws",
@@ -423,7 +436,7 @@ class ExperimentMixin:
             "--allowed-config-differences",
             ",".join(exp["comparison_keys"]),
         ]
-        identity_keys = comparison_identity_keys(self.state, exp, self.policy)
+        identity_keys = self.policy.input_identity_keys
         if identity_keys:
             command += [
                 "--allowed-input-identity-differences",
@@ -455,7 +468,7 @@ class ExperimentMixin:
             {
                 "source": str(base),
                 "command": command,
-                "comparison": str(directory / "comparison/comparison.json"),
+                "comparison": str(comparison_path(exp)),
             },
         )
         self.submit(

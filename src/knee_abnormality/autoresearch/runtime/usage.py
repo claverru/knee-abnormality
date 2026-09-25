@@ -2,7 +2,6 @@ import json
 from collections import Counter, defaultdict
 from pathlib import Path
 
-from knee_abnormality.autoresearch.campaign.reports import REPORTS
 from knee_abnormality.autoresearch.runtime.storage import read_json, write_json
 
 TOKEN_FIELDS = ("input", "cache_write", "cache_read", "output", "thinking")
@@ -151,8 +150,6 @@ def campaign_usage(state):
     total = Counter()
     records = []
     for job in state["jobs"].values():
-        if job["kind"] not in REPORTS:
-            continue
         directory = Path(job["path"])
         if not (directory / "assignment.json").is_file():
             continue
@@ -210,7 +207,7 @@ def campaign_usage(state):
             }
         )
     valid = sum(
-        exp.get("decision") in {"provisional_accept", "reject", "inconclusive"}
+        exp.get("decision") not in {None, "invalid"}
         for exp in state["experiments"].values()
     )
     experiment_records = {

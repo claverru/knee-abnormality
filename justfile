@@ -21,19 +21,19 @@ train run_id config="configs/training.yaml" folds="":
     if [[ -n "$3" ]]; then args+=(--folds "$3"); fi; \
     rtk proxy uv run --locked python -m scripts.pipeline.train "$2" --run-id "$1" "${args[@]}"
 
-autoresearch-start provider campaign="oblique-clean":
+autoresearch-start provider campaign:
     rtk proxy uv run --locked python -m scripts.tools.autoresearch start "$2" --provider "$1"
 
-autoresearch-status campaign="oblique-clean":
+autoresearch-status campaign:
     rtk proxy uv run --locked python -m scripts.tools.autoresearch status "$1"
 
-autoresearch-results campaign="oblique-clean":
+autoresearch-results campaign:
     rtk proxy uv run --locked python -m scripts.tools.autoresearch results "$1"
 
-autoresearch-stop campaign="oblique-clean":
+autoresearch-stop campaign:
     rtk proxy uv run --locked python -m scripts.tools.autoresearch stop "$1"
 
-autoresearch-resume campaign="oblique-clean":
+autoresearch-resume campaign:
     rtk proxy uv run --locked python -m scripts.tools.autoresearch resume "$1"
 
 resume run_id checkpoint config fold="":

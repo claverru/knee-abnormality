@@ -3,7 +3,7 @@
 ## Knee-side embedding
 
 The embedding remains retired. The audited side resolver was restored on 2026-09-21
-for the adopted [anatomical attention](../../autoresearch/anatomical-attention.md);
+for the adopted [anatomical attention](../validation/results/2026-09-21-anatomical-attention-result.md);
 it now supplies a geometric bias rather than a left/right token embedding.
 
 **Retired on 2026-09-14.** Research approach 1 added a zero-initialized learned

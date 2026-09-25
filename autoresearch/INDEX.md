@@ -2,20 +2,22 @@
 
 | Read when | Document |
 |---|---|
-| Starting here or checking what is implemented | [Overview](README.md) |
-| Starting either provider, inspecting metric progress and results, stopping, recovering, or understanding reconciliation | [Runtime operation](runtime.md) |
-| Monitoring without model polling and enabling bounded failure-triggered operational repairs | [Failure-triggered watchdog](watchdog.md) |
+| Starting here: what autoresearch is and which campaigns are active or retired | [Overview](README.md) |
 | Applying the directory's agent and documentation ownership rules | [Agent guidance](AGENTS.md) |
-| Checking the adopted baseline, frozen source transition and closed stale campaign work | [Checkpoint closure](checkpoint-closure.md) |
+| Checking authority, scope, ownership, backlog ranking policy and what agents receive | [Protocol](protocol.md) |
+| Checking the metric, bootstrap and 0.001-plus-80%-interval adoption rule every campaign shares | [Shared evaluation and adoption](protocol.md#shared-evaluation-and-adoption) |
+| Checking which seed a candidate trains with, the control retrain after adoption, or where the campaign fold comes from | [Training seed policy](protocol.md#training-seed-policy) |
+| Checking which completions the cheap reporter handles and when it escalates | [Restricted completion reporting](protocol.md#restricted-completion-reporting) |
+| Following one idea from claim through development, gates, review, reconciliation, launch, comparison and completion | [Idea lifecycle](lifecycle.md) |
+| Starting, inspecting, stopping or resuming a campaign; reading results and usage; importing ideas | [Runtime operation](runtime.md) |
+| Understanding which failures recover automatically and which pause | [Automatic recovery](runtime.md#running-pausing-and-resuming) |
+| Checking how the per-experiment triplet and time budgets are sealed | [Sealing and budget](runtime.md#initial-sealing-and-fixed-budget) |
+| Looking up idea, experiment, review, completion or usage record fields | [Records](records.md) |
+| Running the training and comparison scripts the supervisor invokes | [Script integrations](scripts.md) |
+| Enabling the failure-triggered watchdog or checking what its repair agent may change | [Watchdog](watchdog.md) |
+| Adding and validating a campaign through YAML policy, contract and seeds | [Campaign setup](campaign-setup.md) |
+| Checking measured agent cost, completion-routing data and what to measure next | [Agent usage and efficiency](efficiency.md) |
 | Continuing the runner implementation or checking remaining work | [Implementation status](status.md) |
-| Reviewing the discarded appearance-only pooling experiment | [Untied position path](untied-position.md) |
-| Understanding adopted learned anatomical strength and the closed experiment results | [Anatomical attention](anatomical-attention.md) |
-| Checking the shared evaluation and adoption rule | [Shared evaluation](protocol.md#shared-evaluation-and-adoption) |
-| Following scheduling, incumbent-matched seeds, ownership, and memory rules | [Protocol](protocol.md) |
-| Selecting the agreed provider, model, and effort for each role | [Agent assignments](agents.yaml) |
-| Invoking a role with a bounded assignment | [Agent briefs](roles/INDEX.md) |
-| Recording an idea, experiment, or completion report | [Records](records.md) |
-| Understanding measured agent usage, compact handoffs, and how to assess efficiency without weakening review | [Agent usage and context efficiency](efficiency.md) |
-| Invoking the two existing scripts selected for training and bootstrap comparison | [Script integrations](scripts.md) |
-| Selecting a topic and its fixed constraints | [Campaigns](campaigns/INDEX.md) |
-| Adding and validating a campaign through configuration without editing the runner | [Campaign setup](campaign-setup.md) |
+| Selecting the provider, model and effort for each role | [Agent assignments](agents.yaml) |
+| Reading the brief a role is invoked with | [Agent briefs](roles/INDEX.md) |
+| Selecting a campaign or recovering a stopped one | [Campaigns](campaigns/INDEX.md) |

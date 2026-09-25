@@ -3,8 +3,8 @@
 Add a directory under `autoresearch/campaigns/<id>/` with a contract, configuration,
 initial proposals and empty runtime projections. **No runner changes are needed
 for a new topic using the existing local training and evaluation protocol.**
-The [sampling campaign](campaigns/sampling/INDEX.md) is the current example; the
-historical [shared-loss campaign](campaigns/losses/INDEX.md) shows different
+The [near-misses campaign](campaigns/near-misses/INDEX.md) is the current example;
+the historical [shared-loss campaign](campaigns/losses/INDEX.md) shows different
 permissions using the same runtime.
 
 ## Files and startup
@@ -12,10 +12,14 @@ permissions using the same runtime.
 1. Write `contract.md`: objective, exclusions, fixed recipe, permitted mechanisms
    and evidence requirements. Link the
    [shared evaluation and adoption rule](protocol.md#shared-evaluation-and-adoption)
-   instead of restating it. Record prior evidence,
+   instead of restating it. State the granularity of every fallback rule (per study
+   or per token); knee-geometry's "for that study" was read both ways, and children
+   were repeatedly sent back to repair behavior inherited from the incumbent. Record prior evidence,
    general-backlog ownership and blocked directions in `prior-work.md`.
 2. Write `campaign.yaml` with a unique `id`, recipe, saved control, evidence runs,
-   refill thresholds, `artifacts_root: outputs/autoresearch/<id>`, and `policy`.
+   `backlog` settings (`refill_below`, `refill_to` of at most five, `seed_order`) and
+   `policy`. The recipe's single `validation.folds` entry is the campaign fold, and the
+   control must be trained on it. Artifacts go to `outputs/autoresearch/<id>`.
    The control must match the starting effective recipe apart from name, seed,
    output path and `reference_equivalences`. An equivalence names a recipe key the
    control's config lacks and the exact value that reproduces the control's
@@ -38,7 +42,7 @@ permissions using the same runtime.
    With the default `backlog.seed_order: ranked`, startup submits seeds for
    orchestrator ranking; they are not preapproved. With `seed_order: forced`,
    startup queues every seed directly in file order (files as above, ideas in file
-   order), outside the five-entry target. The orchestrator cannot reorder or park
+   order), outside the `refill_to` target. The orchestrator cannot reorder or park
    them except by blocking a seed at its own review, and the researcher does not
    run until every seed is completed or blocked; normal refills resume after that.
    Forced seeds cannot declare dependencies: order a follow-up after its parents
@@ -48,20 +52,20 @@ permissions using the same runtime.
 5. Validate without a provider, model call, GPU work, or training:
 
    ```bash
-   rtk proxy uv run --locked python -m scripts.tools.autoresearch validate sampling
+   rtk proxy uv run --locked python -m scripts.tools.autoresearch validate CAMPAIGN
    ```
 
-   Replace `sampling` with the new ID. This checks the definition, policy, contract
+   Replace `CAMPAIGN` with the new ID. This checks the definition, policy, contract
    presence, seed schema/IDs, editable files and control/recipe compatibility. It
    does not establish scientific correctness or execute candidate code.
 6. The user starts the campaign:
 
    ```bash
-   rtk proxy uv run --locked just autoresearch-start claude sampling
+   rtk proxy uv run --locked just autoresearch-start claude CAMPAIGN
    ```
 
-   Either configured subscription provider works. Use the campaign ID with status,
-   stop, resume, usage and import-ideas too. Omitting it selects `oblique-clean`.
+   Either configured subscription provider works. Every command, including status,
+   stop, resume, usage and import-ideas, takes the campaign ID; there is no default.
 
 ## Declarative policy
 
@@ -87,18 +91,20 @@ documentation, dependencies and campaign instructions remain outside candidate
 scope. Choose narrow paths; permission to edit a shared file does not authorize
 changing unrelated functions in it.
 
-Name, seed and output path are always logistical differences. List-item permissions
-are useful for sampling's `data.series_types: [max_images]`, without allowing plane
-or contrast definitions to change. Losses instead permits `trainer.loss` and the
-existing class-balance switch, with no input-identity exceptions. Do not add broad
-config prefixes or identity exceptions merely to bypass a failed gate.
+Name, seed and output path are always logistical differences. Near-misses gives each
+idea family its own config prefix (`model.meniscus_readout`, `trainer.half_knee` and
+so on) and permits `preprocessing_identity` differences. List-item permissions suit
+sampling's `data.series_types: [max_images]`, without allowing plane or contrast
+definitions to change. Losses permitted only `trainer.loss` and the class-balance
+switch, with no input-identity exceptions. Do not add broad config prefixes or
+identity exceptions merely to bypass a failed gate.
 
 The runner seals the full policy in runtime state at initialization and includes
 its operative permissions in role assignments. A later YAML/state mismatch is an
-error. Campaign agents must use a new campaign for a different scope; they cannot
-amend a seal. The user explicitly authorized the stopped sampling amendment
-recorded below. A candidate cannot edit its policy, contract, role briefs or
-acceptance machinery. All topic decisions live in these declarations; adding an
+error. A different scope needs a new campaign; campaign agents cannot amend a seal,
+and only an explicit user decision, recorded under the campaign's
+`outputs/autoresearch/<id>/decisions/`, can. A candidate cannot edit its policy,
+contract, role briefs or acceptance machinery. All topic decisions live in these declarations; adding an
 ID does not require a Python dispatch branch.
 
 ## Shared invariants and limits
@@ -114,18 +120,3 @@ evaluation protocol requires separate harness work, not a permissive topic polic
 Mechanism correctness, shared-versus-per-label semantics, leakage and changes inside
 an allowed shared file still need substantive orchestrator review. Static policy
 validation is not proof that a candidate respects its scientific contract.
-
-The existing stopped sampling campaign was explicitly migrated at revision 178;
-its original state and equivalent policy are preserved in the
-[migration record](../outputs/autoresearch/triplet-sampling/decisions/campaign-policy-migration-20260920T100729Z-22dfb2d4/decision.json).
-Its incumbent, queue, experiment history and sealed numerical limits did not change.
-The runtime does not retain a legacy hardcoded-policy fallback.
-
-At revision 180, the user explicitly authorized a narrow stopped-campaign
-amendment for `physical-span-standardized-triplets`: permit `preparation.py`
-changes for nonconsecutive-triplet validation. The
-[amendment record](../outputs/autoresearch/triplet-sampling/decisions/user-authorize-triplet-preparation-20260920T192746Z-e03bfe70/decision.json)
-preserves the previous state, definition and projections. It updates the live
-definition and saved policy together, retaining all numerical limits, incumbent,
-experiments and blocked follow-ups. This is a recorded user instruction; it grants
-no policy-editing authority to campaign agents and adds no automatic migration.

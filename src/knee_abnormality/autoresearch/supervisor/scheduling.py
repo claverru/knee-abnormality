@@ -1,18 +1,13 @@
 import sys
 from pathlib import Path
 
-import yaml
-
 from knee_abnormality.autoresearch.campaign.binding import parent_changed
 from knee_abnormality.autoresearch.campaign.completion import completion_blockers
 from knee_abnormality.autoresearch.campaign.gates import validate_config
+from knee_abnormality.autoresearch.runtime.gpu import gpu_available
 from knee_abnormality.autoresearch.runtime.isolation import sandbox
-from knee_abnormality.autoresearch.runtime.storage import atomic_write
-from knee_abnormality.autoresearch.supervisor.common import gpu_available
 from knee_abnormality.autoresearch.supervisor.prompts import (
     FORCED_SEED_INSTRUCTIONS,
-    ORCHESTRATOR_INSTRUCTIONS,
-    researcher_instructions,
 )
 
 
@@ -37,10 +32,10 @@ class SchedulingMixin:
             and self.state["experiments"][self.state["running"]]["stage"] == "launching"
         ):
             return
-        if self.state["events"]:
+        if self.next_event():
             self.schedule_event()
             return
-        if self.state.get("control_retrain"):
+        if self.state["control_retrain"]:
             self.schedule_control()
             return
         if self.advance_claimed():
@@ -75,14 +70,16 @@ class SchedulingMixin:
             timeout=14400,
         )
 
+    def next_event(self):
+        deferred = self.state["control_retrain"] is not None
+        order = {"completion": 0, "review": 3 if deferred else 1, "proposals": 2}
+        self.state["events"].sort(key=lambda event: order[event["kind"]])
+        head = self.state["events"][0] if self.state["events"] else None
+        return None if head and deferred and head["kind"] == "review" else head
+
     def schedule_event(self):
         if self.waiting():
             return
-        self.state["events"].sort(
-            key=lambda event: {"completion": 0, "review": 1, "proposals": 2}[
-                event["kind"]
-            ]
-        )
         event = self.state["events"][0]
         if event["kind"] == "review" and not event.get("gate_error"):
             exp = self.state["experiments"][event["experiment"]]
@@ -102,18 +99,16 @@ class SchedulingMixin:
                     payload={"event": event},
                 )
                 return
-            event["completion_reporting"] = {
-                "status": "orchestrator",
-                "reasons": blockers or [event["previous_rejection"]],
-            }
-            self.state["experiments"][event["experiment"]]["completion_reporting"] = (
-                dict(event["completion_reporting"])
+            self.route_completion(
+                event,
+                {
+                    "status": "orchestrator",
+                    "reasons": blockers or [event["previous_rejection"]],
+                },
             )
-        context = {
-            "event": event,
-            "instructions": ORCHESTRATOR_INSTRUCTIONS
-            + (FORCED_SEED_INSTRUCTIONS if self.seeds_pending() else ""),
-        }
+        context = {"event": event}
+        if self.seeds_pending():
+            context["instructions"] = FORCED_SEED_INSTRUCTIONS
         if event.get("experiment"):
             context["experiment"] = self.state["experiments"][event["experiment"]]
         self.role(
@@ -153,14 +148,9 @@ class SchedulingMixin:
                 approval.get("decision") != "approve"
                 or approval.get("binding") != binding
             ):
-                claimed["stage"] = "awaiting_review"
-                self.event(
-                    "review",
-                    {
-                        "experiment": claimed["id"],
-                        "gate_error": None,
-                        "refresh_reason": "Approval is absent or its parent, candidate or external evidence changed",
-                    },
+                self.request_review(
+                    claimed,
+                    refresh_reason="Approval is absent or its parent, candidate or external evidence changed",
                 )
                 self.save()
                 return True
@@ -179,7 +169,7 @@ class SchedulingMixin:
             and self.state.get("crash_repair")
             and (
                 len(self.state["queue"]) < self.state["refill_to"]
-                or self.state.get("seed_order") == "forced"
+                or self.state["seed_order"] == "forced"
             )
         ):
             crashed = self.state["experiments"][self.state.pop("crash_repair")]
@@ -210,7 +200,7 @@ class SchedulingMixin:
                 if claimed["repair_of"]
                 else None,
                 "previous_rejection": claimed.get("previous_rejection"),
-                "completion": self.policy.developer_instructions,
+                "campaign_instructions": self.policy.developer_instructions,
             },
             payload={"experiment": claimed["id"]},
         )
@@ -230,9 +220,7 @@ class SchedulingMixin:
             Path(self.state["incumbent"]["source"]),
             {
                 "needed": self.state["refill_to"] - len(self.state["queue"]),
-                "instructions": researcher_instructions(
-                    self.policy.researcher_instructions
-                ),
+                "campaign_instructions": self.policy.researcher_instructions,
             },
         )
 
@@ -246,42 +234,19 @@ class SchedulingMixin:
         control["attempts"] += 1
         directory = self.output / "controls" / f"{control['id']}-{control['attempts']}"
         directory.mkdir(parents=True)
-        config = dict(adopted["config"])
-        config["seed"] = control["seed"]
-        config["name"] = control["id"]
-        config["paths"] = {**config["paths"], "output_root": str(directory)}
+        config = {
+            **adopted["config"],
+            "seed": control["seed"],
+            "name": control["id"],
+            "paths": {**adopted["config"]["paths"], "output_root": str(directory)},
+        }
         validate_config(self.state["config"], config, self.policy)
-        config_path = directory / "config.yaml"
-        atomic_write(config_path, yaml.safe_dump(config, sort_keys=False))
-        source = Path(adopted["source"])
-        writable = [directory]
-        cache = Path.home() / ".cache"
-        if cache.exists():
-            writable.append(cache)
         control.update(stage="training", directory=str(directory))
-        self.submit(
+        self.submit_training(
             "control",
-            source,
-            sandbox(
-                [
-                    sys.executable,
-                    "-m",
-                    "scripts.pipeline.train",
-                    str(config_path),
-                    "--folds",
-                    "0",
-                    "--output-root",
-                    str(directory),
-                    "--run-id",
-                    "training",
-                ],
-                source,
-                writable,
-                gpu=True,
-                readonly=[source, config_path],
-            ),
-            payload={"control": control["id"]},
-            timeout=self.state["limits"]["max_run_seconds"],
-            gpu=self.state["gpu"],
-            extra_env={"KNEE_AUTORESEARCH_LIMITS": str(self.output / "limits.json")},
+            config,
+            directory,
+            Path(adopted["source"]),
+            {"control": control["id"]},
+            self.state["limits"]["max_run_seconds"],
         )

@@ -4,8 +4,13 @@ import subprocess
 import time
 from pathlib import Path
 
-from knee_abnormality.autoresearch.campaign.gates import acceptance_text
+from knee_abnormality.autoresearch.campaign.rules import acceptance_text
 from knee_abnormality.autoresearch.runtime.isolation import environment
+from knee_abnormality.autoresearch.runtime.layout import (
+    comparison_path,
+    diagnostics_path,
+    read_diagnostics,
+)
 from knee_abnormality.autoresearch.runtime.storage import (
     lock,
     read_json,
@@ -21,25 +26,6 @@ INTERPRETATION = (
     "soft AUC (pairs weighted by soft targets) is a reported diagnostic with no interval; "
     "label diagnostics do not authorize per-label losses."
 )
-
-
-def diagnostics_path(comparison):
-    return Path(comparison).with_name("per_label.json")
-
-
-def read_diagnostics(comparison):
-    comparison = Path(comparison)
-    path = diagnostics_path(comparison)
-    if not path.is_file():
-        return None
-    report = read_json(path)
-    if report["comparison"]["sha256"] != sha256(comparison):
-        raise ValueError(f"Label diagnostics refer to a changed comparison: {path}")
-    return report
-
-
-def experiment_diagnostics(exp):
-    return read_diagnostics(Path(exp["directory"]) / "comparison/comparison.json")
 
 
 def checked_path(record, root):
@@ -251,7 +237,7 @@ def backfill(state, root):
     )
     added, existing, unavailable, deferred = [], [], [], []
     for exp in state["experiments"].values():
-        comparison = Path(exp["directory"]) / "comparison/comparison.json"
+        comparison = comparison_path(exp)
         if not comparison.is_file():
             unavailable.append(exp["id"])
             continue

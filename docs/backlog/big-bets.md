@@ -88,7 +88,7 @@ accepted pilot. Start only in a user session; training remains user-launched.
 
 **The supervised anatomical-attention sequence is closed:** learned family strengths
 with fixed 20 mm width were adopted; appearance-only pooling and learned widths
-were discarded. [Evidence](../../autoresearch/anatomical-attention.md) owns these
+were discarded. [Evidence](../validation/results/2026-09-21-anatomical-attention-result.md) owns these
 results. The items below are unstarted independent proposals, not pending branches
 of that experiment sequence.
 

@@ -8,11 +8,15 @@ from knee_abnormality.autoresearch.campaign.gates import (
     flatten,
 )
 from knee_abnormality.autoresearch.campaign.reports import REPORTS
-from knee_abnormality.autoresearch.runtime.storage import read_json, sha256, write_json
-from knee_abnormality.autoresearch.scoring.diagnostics import (
-    INTERPRETATION,
+from knee_abnormality.autoresearch.runtime.layout import (
+    campaign_fold,
+    comparison_path,
+    diagnostics_path,
     experiment_diagnostics,
+    job_experiment,
 )
+from knee_abnormality.autoresearch.runtime.storage import read_json, sha256, write_json
+from knee_abnormality.autoresearch.scoring.diagnostics import INTERPRETATION
 
 
 def select(value, keys):
@@ -71,6 +75,7 @@ def experiment_card(exp):
 
 def experiment_evidence(state, exp):
     directory = Path(exp["directory"])
+    fold = campaign_fold(state)
     packet = {
         "experiment": experiment_card(exp),
         "limits": state["limits"],
@@ -84,9 +89,9 @@ def experiment_evidence(state, exp):
                 "comparison/comparison.json",
                 "comparison/per_label.json",
                 "training/effective_config.json",
-                "training/fold_0/triplet_accounting.json",
-                "training/fold_0/timing.json",
-                "training/fold_0/input_identity.json",
+                f"training/fold_{fold}/triplet_accounting.json",
+                f"training/fold_{fold}/timing.json",
+                f"training/fold_{fold}/input_identity.json",
             )
         },
         "accounting_available": False,
@@ -104,7 +109,7 @@ def experiment_evidence(state, exp):
         packet["candidate_config_changes"] = {
             key: candidate.get(key) for key in packet["config_differences"]
         }
-    ledger_path = directory / "training/fold_0/triplet_accounting.json"
+    ledger_path = directory / f"training/fold_{fold}/triplet_accounting.json"
     if ledger_path.is_file():
         ledger = read_json(ledger_path)
         packet["accounting_available"] = True
@@ -136,7 +141,7 @@ def experiment_evidence(state, exp):
                 for phase in ("train", "validation")
             },
         }
-    timing_path = directory / "training/fold_0/timing.json"
+    timing_path = directory / f"training/fold_{fold}/timing.json"
     if timing_path.is_file():
         packet["timing"] = read_json(timing_path)
     evaluation_path = directory / "evaluation.json"
@@ -155,12 +160,35 @@ def experiment_evidence(state, exp):
             "stderr": str(Path(job["path"]) / "stderr.log"),
         }
         for job in state["jobs"].values()
-        if job["payload"].get(
-            "experiment", job["payload"].get("event", {}).get("experiment")
-        )
-        == exp["id"]
+        if job_experiment(job) == exp["id"]
     ]
     return packet
+
+
+def campaign_defects(state, exclude):
+    logs = {
+        job["payload"]["experiment"]: str(Path(job["path"]) / "stderr.log")
+        for job in state["jobs"].values()
+        if job["kind"] == "training"
+    }
+    rows = []
+    for value in state["experiments"].values():
+        if value["id"] == exclude:
+            continue
+        if value.get("repair_instruction"):
+            text = value["repair_instruction"]
+        elif value.get("decision") == "invalid" and not value.get(
+            "training_receipt", {}
+        ).get("cancelled"):
+            text = "; ".join(value.get("evidence", {}).get("reasons", [])) + (
+                f" Log: {logs[value['id']]}" if value["id"] in logs else ""
+            )
+        else:
+            continue
+        rows.append(
+            {"experiment": value["id"], "idea": value["idea"], "defect": text[:800]}
+        )
+    return rows[-12:]
 
 
 def build_context(state, role, assignment, directory, docs, state_path):
@@ -229,9 +257,7 @@ def build_context(state, role, assignment, directory, docs, state_path):
             "id": job["id"],
             "role": job["kind"],
             "event": job["payload"].get("event", {}).get("kind"),
-            "experiment": job["payload"].get(
-                "experiment", job["payload"].get("event", {}).get("experiment")
-            ),
+            "experiment": job_experiment(job),
             "report": str(Path(job["path"]) / "report.json"),
             "assignment": str(Path(job["path"]) / "assignment.json"),
         }
@@ -246,9 +272,7 @@ def build_context(state, role, assignment, directory, docs, state_path):
             "experiments": [
                 {
                     **experiment_card(value),
-                    "per_label_path": str(
-                        Path(value["directory"]) / "comparison/per_label.json"
-                    ),
+                    "per_label_path": str(diagnostics_path(comparison_path(value))),
                 }
                 for value in state["experiments"].values()
             ],
@@ -306,6 +330,8 @@ def build_context(state, role, assignment, directory, docs, state_path):
             for key in (state["claimed"], state["running"])
             if key is not None
         ]
+    if role == "developer" or event.get("kind") == "review":
+        context["campaign_defects"] = campaign_defects(state, exp_id)
     if role == "researcher":
         context["mechanism_registry"] = [idea_card(idea) for idea in ideas.values()]
     if role == "orchestrator":
@@ -364,14 +390,7 @@ def build_context(state, role, assignment, directory, docs, state_path):
             context["assignment"]["facts"] = {
                 key: value
                 for key, value in evidence.items()
-                if key
-                not in {
-                    "experiment",
-                    "limits",
-                    "artifacts",
-                    "jobs",
-                    "candidate_sampling_config",
-                }
+                if key not in {"experiment", "limits", "artifacts", "jobs"}
             }
         related_ids = {
             value["id"]

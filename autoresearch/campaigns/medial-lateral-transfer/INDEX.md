@@ -10,4 +10,3 @@
 | Implementing the user-authorized correction of the inactive attribution penalty | [Corrected exclusivity proposal](corrected-exclusivity.yaml) |
 | Claiming the highest-ranked next idea after startup | [Ranked backlog](backlog.yaml) |
 | Reviewing campaign decisions and measured findings | [Findings](findings.md) |
-| Finding the adopted reference and closure of stale campaign work | [Checkpoint closure](../../checkpoint-closure.md) |

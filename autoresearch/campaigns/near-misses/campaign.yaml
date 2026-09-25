@@ -1,5 +1,4 @@
 id: near-misses
-status: defined
 recipe: configs/training.yaml
 reference_run: outputs/training/knee-geometry-merged-2
 reference_equivalences: {}
@@ -11,7 +10,6 @@ backlog:
   refill_below: 3
   refill_to: 5
   seed_order: forced
-artifacts_root: outputs/autoresearch/near-misses
 policy:
   editable_files:
     - configs/training.yaml

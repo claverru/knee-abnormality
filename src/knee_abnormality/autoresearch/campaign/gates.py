@@ -4,38 +4,12 @@ from decimal import Decimal
 from pathlib import Path
 
 from knee_abnormality.autoresearch.campaign.definition import CampaignPolicy
+from knee_abnormality.autoresearch.campaign.rules import ACCEPTANCE_RULE, EVALUATION
+from knee_abnormality.autoresearch.runtime.layout import PREDICTIONS, fold_dir
 from knee_abnormality.autoresearch.runtime.storage import read_json, sha256
 
 LOGISTICAL_KEYS = {"name", "seed", "paths.output_root"}
 RUNTIME_FACTOR = 1.15
-CALIBRATION_EPOCHS = 2
-EVALUATION = {
-    "labels_source": "combined_v1",
-    "validation": {
-        "split": "all_5fold_scanner_v1",
-        "folds": [0],
-        "prediction_image_multiplier": 4,
-    },
-    "validation_image_multiplier": 1,
-    "bootstrap_draws": 2000,
-    "bootstrap_seed": 20260914,
-}
-ACCEPTANCE_RULE = {
-    "metric": "candidate_minus_incumbent_macro_auc",
-    "minimum_gain": 0.001,
-    "bootstrap_confidence_level": 0.8,
-    "bootstrap_lower_bound_strictly_above": 0.0,
-    "reporting_confidence_level": 0.95,
-}
-
-
-def acceptance_text():
-    return (
-        f"adopt only when valid macro AUC improvement >= {ACCEPTANCE_RULE['minimum_gain']} "
-        f"AND the central {ACCEPTANCE_RULE['bootstrap_confidence_level']:.0%} "
-        "paired-bootstrap lower bound is strictly above "
-        f"{ACCEPTANCE_RULE['bootstrap_lower_bound_strictly_above']:g}; otherwise discard"
-    )
 
 
 def active_incumbent_ideas(state):
@@ -132,8 +106,15 @@ def validate_config(reference, candidate, policy: CampaignPolicy):
         != EVALUATION["validation_image_multiplier"]
     ):
         raise ValueError("Validation multiplier differs from the shared evaluation")
-    if candidate["validation"] != EVALUATION["validation"]:
-        raise ValueError("Validation split differs from the shared evaluation")
+    validation = candidate["validation"]
+    if validation != reference["validation"]:
+        raise ValueError("Validation differs from the sealed recipe")
+    if (
+        len(validation["folds"]) != 1
+        or {key: value for key, value in validation.items() if key != "folds"}
+        != EVALUATION["validation"]
+    ):
+        raise ValueError("Validation must be one fold of the shared evaluation split")
     if candidate["labels"]["source"] != EVALUATION["labels_source"]:
         raise ValueError("Label source differs from the shared evaluation")
     return changed
@@ -146,11 +127,16 @@ def initial_limits(
     config_exceptions: list[str],
     identity_exceptions: list[str],
 ):
+    reference_fold = fold_dir(reference, config["validation"]["folds"][0])
+    if not reference_fold.is_dir():
+        raise ValueError(
+            f"Reference run has no {reference_fold.name}; it must be trained on the recipe's fold"
+        )
     historical = without_fields(
         read_json(reference / "effective_config.json"), config_exceptions
     )
     without_fields(
-        read_json(reference / "fold_0/input_identity.json"), identity_exceptions
+        read_json(reference_fold / "input_identity.json"), identity_exceptions
     )
     config = without_fields(config, config_exceptions, required=False)
     recorded, current = flatten(historical), flatten(config)
@@ -166,7 +152,7 @@ def initial_limits(
         raise ValueError(
             f"Historical control differs from the starting recipe: {sorted(unexpected)}"
         )
-    timing = read_json(reference / "fold_0/timing.json")
+    timing = read_json(reference_fold / "timing.json")
     seconds = sum(
         timing[key]
         for key in (
@@ -181,10 +167,7 @@ def initial_limits(
         "max_run_seconds": math.ceil(seconds * RUNTIME_FACTOR),
         "epochs": config["trainer"]["max_epochs"],
         "optimizer_steps": timing["optimizer_steps"],
-        "triplet_tolerance": 0,
-        "reference_predictions_sha256": sha256(
-            reference / "fold_0/validation_predictions.csv"
-        ),
+        "reference_predictions_sha256": sha256(reference_fold / PREDICTIONS),
         "reference_equivalences": dict(equivalences),
         "reference_config_exceptions": list(config_exceptions),
         "reference_identity_exceptions": list(identity_exceptions),
@@ -193,15 +176,16 @@ def initial_limits(
     }
 
 
-def evaluate(experiment: Path, limits: dict, receipt: dict):
+def evaluate(experiment: Path, fold: int, limits: dict, receipt: dict):
     reasons = []
     if receipt["exit_code"] != 0 or receipt.get("error"):
         reasons.append(f"Training failed: {receipt}")
     if receipt.get("seconds") is None or receipt["seconds"] > limits["max_run_seconds"]:
         reasons.append("Fixed wall-clock ceiling exceeded or unavailable")
     try:
-        ledger = read_json(experiment / "training/fold_0/triplet_accounting.json")
-        timing = read_json(experiment / "training/fold_0/timing.json")
+        run = fold_dir(experiment / "training", fold)
+        ledger = read_json(run / "triplet_accounting.json")
+        timing = read_json(run / "timing.json")
         if not ledger["complete"]:
             reasons.append("Triplet accounting is incomplete")
         for key in ("training_triplets", "training_visits"):

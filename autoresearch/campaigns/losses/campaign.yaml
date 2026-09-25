@@ -1,5 +1,4 @@
 id: losses
-status: stopped
 recipe: configs/training.yaml
 reference_run: outputs/training/overnight-20260919T235434Z-8ol_1c30/runs/13-control-repeat
 reference_equivalences: {}
@@ -9,7 +8,6 @@ additional_evidence_runs:
 backlog:
   refill_below: 4
   refill_to: 5
-artifacts_root: outputs/autoresearch/losses
 policy:
   editable_files:
     - configs/training.yaml

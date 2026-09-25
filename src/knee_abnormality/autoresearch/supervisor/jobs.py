@@ -8,27 +8,25 @@ from knee_abnormality.autoresearch.campaign.binding import (
     external_evidence,
     reference_seed,
 )
-from knee_abnormality.autoresearch.campaign.gates import (
-    ACCEPTANCE_RULE,
-    EVALUATION,
-)
 from knee_abnormality.autoresearch.campaign.reports import (
     REPORTS,
 )
+from knee_abnormality.autoresearch.campaign.rules import ACCEPTANCE_RULE, EVALUATION
 from knee_abnormality.autoresearch.runtime import providers
 from knee_abnormality.autoresearch.runtime.isolation import (
     environment,
 )
+from knee_abnormality.autoresearch.runtime.layout import campaign_fold
 from knee_abnormality.autoresearch.runtime.storage import (
     alive,
     atomic_write,
-    process_identity,
+    optional_json,
     read_json,
+    spawn,
     write_json,
 )
 from knee_abnormality.autoresearch.supervisor.common import (
     REJECTION_LIMIT,
-    REJECTION_PAUSE,
     RETRY_DELAYS,
     identifier,
     work_item,
@@ -91,24 +89,13 @@ class JobMixin:
 
     def launch_worker(self, job):
         directory = Path(job["path"])
-        with (directory / "worker.log").open("ab") as log:
-            process = subprocess.Popen(
-                [
-                    sys.executable,
-                    "-m",
-                    "knee_abnormality.autoresearch.cli",
-                    "job",
-                    "--job-dir",
-                    str(directory),
-                ],
-                cwd=self.root,
-                env=environment(self.root),
-                stdin=subprocess.DEVNULL,
-                stdout=log,
-                stderr=log,
-                start_new_session=True,
-            )
-        write_json(directory / "launcher.json", process_identity(process.pid))
+        spawn(
+            ["knee_abnormality.autoresearch.cli", "job", "--job-dir", str(directory)],
+            self.root,
+            directory / "worker.log",
+            directory / "launcher.json",
+            environment(self.root),
+        )
 
     def submit(self, *args, **kwargs):
         job_id, directory = self.create_job(*args, **kwargs)
@@ -120,23 +107,23 @@ class JobMixin:
         if role != "completion_reporter":
             context = {
                 **context,
-                "external_evidence": external_evidence(self.root, self.campaign),
+                "external_evidence": external_evidence(
+                    self.root, self.campaign, campaign_fold(self.state)
+                ),
             }
         job_id, directory = self.create_job(role, source, [], payload=payload)
         if role == "completion_reporter":
-            event = payload["event"]
-            event["completion_reporting"] = {"status": "assigned", "job": job_id}
-            self.state["experiments"][event["experiment"]]["completion_reporting"] = (
-                dict(event["completion_reporting"])
+            self.route_completion(
+                payload["event"], {"status": "assigned", "job": job_id}
             )
         profile = dict(self.state["profiles"][self.state["provider"]][role])
         command = providers.invocation(
             self.state["provider"],
-            role,
+            REPORTS[role],
             profile,
             source,
             directory,
-            self.policy,
+            self.policy.editable_directories if role == "developer" else None,
         )
         brief = (
             self.root / "autoresearch/roles" / f"{role.replace('_', '-')}.md"
@@ -153,14 +140,14 @@ class JobMixin:
         context["python_executable"] = sys.executable
         context["incumbent_training_seed"] = reference_seed(self.state["incumbent"])
         context["acceptance_rule"] = dict(ACCEPTANCE_RULE)
-        context["shared_evaluation"] = dict(EVALUATION)
+        context["shared_evaluation"] = {**EVALUATION, "fold": campaign_fold(self.state)}
         if role != "completion_reporter":
             context["campaign_policy"] = self.policy.model_dump(
                 mode="json",
                 exclude={"developer_instructions", "researcher_instructions"},
             )
         guidance = (Path(self.state["base"]) / "AGENTS.md").read_text()
-        prompt = role_prompt(guidance, brief, contract, role, context)
+        prompt = role_prompt(guidance, brief, contract, context)
         atomic_write(directory / "stdin.txt", prompt)
         write_json(directory / "context-metrics.json", prompt_sizes(context, prompt))
         spec = read_json(directory / "spec.json")
@@ -220,9 +207,9 @@ class JobMixin:
         target["previous_rejection"] = str(error)
         target["rejections"] = target.get("rejections", 0) + 1
         if target["rejections"] >= REJECTION_LIMIT:
-            self.state.update(
-                status="paused",
-                reason=f"{REJECTION_PAUSE} {target['rejections']} consecutive times for {job['id']}: {error}",
+            self.pause(
+                f"Report rejected {target['rejections']} consecutive times for {job['id']}: {error}",
+                "rejection",
             )
 
     def harvest(self):
@@ -262,27 +249,19 @@ class JobMixin:
                         self.save()
                         continue
                     if job["kind"] in REPORTS:
-                        self.state.update(
-                            status="paused",
-                            reason=f"Result processing failed for {job['id']}: {error}",
-                        )
+                        self.pause(f"Result processing failed for {job['id']}: {error}")
                         self.save()
                         continue
                     self.state = rollback
                     self.state["jobs"][job["id"]]["application_error"] = str(error)
-                    self.state.update(
-                        status="paused",
-                        reason=f"Result processing failed for {job['id']}: {error}",
-                    )
+                    self.pause(f"Result processing failed for {job['id']}: {error}")
                     self.save()
                     return
                 self.save()
                 continue
             owner_path = directory / "owner.json"
             launcher_path = directory / "launcher.json"
-            owner = read_json(owner_path) if owner_path.exists() else None
-            launcher = read_json(launcher_path) if launcher_path.exists() else None
-            if alive(owner) or alive(launcher):
+            if alive(optional_json(owner_path)) or alive(optional_json(launcher_path)):
                 continue
             if time.time() - job["created_at"] < 10:
                 continue

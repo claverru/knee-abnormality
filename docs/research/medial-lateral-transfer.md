@@ -6,7 +6,7 @@ Current status, 2026-09-21: the original proposals below are historical design
 notes owned by the [stopped autoresearch campaign](../../autoresearch/campaigns/medial-lateral-transfer/INDEX.md),
 not an active queue. Learned anatomical family strength with independent heads
 is now adopted, while the pooled adapter and other rejected implementations are
-removed. [The current result record](../../autoresearch/anatomical-attention.md)
+removed. [The current result record](../validation/results/2026-09-21-anatomical-attention-result.md)
 supersedes the next-experiment recommendations below. No confirmation branch is pending.
 
 The medial/lateral similarity hypothesis remains useful. The completed experiments reject treating stronger parameter sharing as a reliable improvement; they do not establish that the model should learn the two compartments independently at every level. The successful reflection model already shares its image backbone, token projection and part of its attention network across all targets. Additional sharing must improve on that existing transfer.
