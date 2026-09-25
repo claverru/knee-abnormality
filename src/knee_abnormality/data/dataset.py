@@ -66,7 +66,9 @@ class KneeStudyDataset(Dataset):
         self._slice_index: dict[Path, IndexedSeries] = {}
         self._study_references: dict[str, StudyReference] = {}
         self._study_sides: dict[str, KneeSide] = {}
-        self._series_geometry: dict[str, dict[str, tuple[float, float, bool]]] = {}
+        self._series_geometry: dict[
+            str, dict[str, tuple[float, float, float, bool]]
+        ] = {}
         self._excluded_series: dict[str, frozenset[str]] = {}
         self._cleaned_studies: dict[str, StudySeries] = {}
         missing = set(studies[STUDY].to_list()) - set(series_index)
@@ -164,12 +166,12 @@ class KneeStudyDataset(Dataset):
         series_geometry = {}
         for uid in indexed:
             if uid not in eligible_uids:
-                series_geometry[uid] = (0.0, 0.0, False)
+                series_geometry[uid] = (0.0, 0.0, 0.0, False)
                 continue
             group = groups.get(uid, 0)
             own_reference = knee_references.get(group) if bilateral else reference
             if uid in strays or (bilateral and group == 0):
-                series_geometry[uid] = (0.0, 0.0, False)
+                series_geometry[uid] = (0.0, 0.0, 0.0, False)
                 continue
             own_side = {1: LEFT, -1: RIGHT}.get(group, 0) if bilateral else side.value
             sign = {LEFT: -1.0, RIGHT: 1.0}.get(own_side, 0.0)
@@ -186,7 +188,13 @@ class KneeStudyDataset(Dataset):
                 and own_reference.point is not None
                 and own_reference.method in {"fit", "robust"}
             )
-            series_geometry[uid] = (sign if valid else 0.0, center or 0.0, valid)
+            center_y = own_reference.point[1] if valid else 0.0
+            series_geometry[uid] = (
+                sign if valid else 0.0,
+                center or 0.0,
+                center_y,
+                valid,
+            )
         self._series_geometry[study.uid] = series_geometry
         self._cleaned_studies[study.uid] = study
         return study
@@ -215,8 +223,8 @@ class KneeStudyDataset(Dataset):
             eligible, reason = reflection_eligibility(geometry, plane)
             if not bool(value.geometry_valid.all()):
                 eligible, reason = False, "invalid_selected_pose"
-            sign, center, valid = self._series_geometry[study_uid].get(
-                candidate.uid, (0.0, 0.0, False)
+            sign, center, center_y, valid = self._series_geometry[study_uid].get(
+                candidate.uid, (0.0, 0.0, 0.0, False)
             )
             return replace(
                 value,
@@ -230,6 +238,7 @@ class KneeStudyDataset(Dataset):
                 reflection_reason=reason,
                 knee_side_sign=sign,
                 knee_center_x_mm=center,
+                knee_center_y_mm=center_y,
             )
         except PREPARATION_ERRORS as error:
             failures.append(f"{candidate.uid}: {type(error).__name__}: {error}")
@@ -411,6 +420,7 @@ def collate_studies(items: list[dict]) -> dict:
     geometry_valid = torch.zeros((len(entries), max_slices), dtype=torch.bool)
     knee_side_sign = torch.zeros(len(entries), dtype=torch.float32)
     knee_center_x_mm = torch.zeros(len(entries), dtype=torch.float32)
+    knee_center_y_mm = torch.zeros(len(entries), dtype=torch.float32)
     reflection_eligible = torch.ones(batch_size, dtype=torch.bool)
     for index, item in enumerate(items):
         supplied = [
@@ -458,6 +468,7 @@ def collate_studies(items: list[dict]) -> dict:
         geometry_valid[series_index, :count] = series.geometry_valid
         knee_side_sign[series_index] = series.knee_side_sign
         knee_center_x_mm[series_index] = series.knee_center_x_mm
+        knee_center_y_mm[series_index] = series.knee_center_y_mm
         slice_mask[series_index, :count] = True
         study_indices[series_index] = study_index
         type_indices[series_index] = type_index
@@ -476,6 +487,7 @@ def collate_studies(items: list[dict]) -> dict:
         "geometry_valid": geometry_valid,
         "knee_side_sign": knee_side_sign,
         "knee_center_x_mm": knee_center_x_mm,
+        "knee_center_y_mm": knee_center_y_mm,
         "knee_side_reasons": [item["knee_side"].reason for item in items],
         "reflection_eligible": reflection_eligible,
         "reflection_reasons": [item["reflection_reasons"] for item in items],

@@ -1,5 +1,5 @@
 name: training
-seed: 638120755
+seed: 1485198267
 
 paths:
   data_root: ../data
@@ -11,7 +11,7 @@ labels:
 
 validation:
   split: all_5fold_scanner_v1
-  folds: [0]
+  folds: [1]
   prediction_image_multiplier: 4
 
 data:

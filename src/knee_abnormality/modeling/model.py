@@ -163,6 +163,13 @@ class KneeAbnormalityModel(nn.Module):
         self.spatial_tokens = SpatialTokens(PROJECTION_WIDTH, data.series_types)
         with torch.random.fork_rng(devices=[]):
             self.half_knee_detector = nn.Linear(PROJECTION_WIDTH, 1)
+        self.oa_indices = tuple(
+            targets.index(name) for name in (*COMPARTMENT_PAIRS["oa"], "PF OA")
+        )
+        with torch.random.fork_rng(devices=[]):
+            self.oa_detector = nn.Linear(PROJECTION_WIDTH, 1, bias=False)
+            nn.init.xavier_uniform_(self.oa_detector.weight)
+        self.oa_detector_scale = nn.Parameter(torch.zeros(3))
         self.train(self.training)
 
     def train(self, mode: bool = True) -> "KneeAbnormalityModel":
@@ -236,6 +243,8 @@ class KneeAbnormalityModel(nn.Module):
         token_valid: torch.Tensor,
         batch_size: int,
         medial_axis: torch.Tensor | None,
+        anterior_axis: torch.Tensor,
+        trusted_geometry: torch.Tensor,
     ) -> torch.Tensor:
         scores = self._attention_scores(tokens).transpose(0, 1)
         if medial_axis is None:
@@ -275,6 +284,33 @@ class KneeAbnormalityModel(nn.Module):
                     logits
                     + (hidden * self.readout_out.float()[None]).sum(-1)
                     + self.readout_out_bias.float()
+                )
+            regions = (
+                torch.stack(
+                    (
+                        medial_axis.float() > COMPARTMENT_MIDLINE_BAND_MM,
+                        medial_axis.float() < -COMPARTMENT_MIDLINE_BAND_MM,
+                        anterior_axis.float() > 0,
+                    )
+                )
+                & trusted_geometry[None]
+            )
+            region_membership = membership[:, None] & regions[None]
+            counts = region_membership.sum(-1)
+            empty = counts == 0
+            safe_membership = region_membership.clone()
+            safe_membership[..., 0] |= empty
+            evidence = self.oa_detector(tokens.float()).squeeze(-1)
+            scores = evidence[None, None].masked_fill(~safe_membership, -torch.inf)
+            pooled_evidence = torch.logsumexp(scores, -1) - counts.clamp_min(1).log()
+            pooled_evidence = torch.where(empty, 0.0, pooled_evidence)
+            correction = pooled_evidence * self.oa_detector_scale.float()[None]
+            logits[:, list(self.oa_indices)] += correction
+            if self.training:
+                self.oa_detector_activity = (
+                    counts.detach(),
+                    (token_valid & ~trusted_geometry).sum().detach(),
+                    correction.detach().abs().mean(0),
                 )
         if not torch.isfinite(logits).all():
             raise RuntimeError("Study attention pooling produced non-finite logits")
@@ -339,6 +375,7 @@ class KneeAbnormalityModel(nn.Module):
                 (prepared_xy.float(), torch.ones_like(prepared_xy[..., :1])), -1
             )
             patient_x = torch.einsum("nj,nkj->nk", middle_map[:, 0], homogeneous)
+            patient_y = torch.einsum("nj,nkj->nk", middle_map[:, 1], homogeneous)
             side = batch["knee_side_sign"][keep_series][acquisition_index].float()
             center = batch["knee_center_x_mm"][keep_series][acquisition_index].float()
             valid_geometry = batch["geometry_valid"].flatten()[flat_indices]
@@ -347,6 +384,15 @@ class KneeAbnormalityModel(nn.Module):
                 valid_geometry[:, None] & (side[:, None] != 0),
                 side[:, None] * (patient_x - center[:, None]),
                 0.0,
+            )
+            center_y = batch["knee_center_y_mm"][keep_series][acquisition_index].float()
+            anterior_axis = torch.where(
+                valid_geometry[:, None] & (side[:, None] != 0),
+                center_y[:, None] - patient_y,
+                0.0,
+            )
+            trusted_geometry = (
+                valid_geometry[:, None] & (side[:, None] != 0) & visual_valid
             )
         return {
             "features": features,
@@ -358,6 +404,8 @@ class KneeAbnormalityModel(nn.Module):
             "image_plane": token_plane,
             "visual_valid": visual_valid,
             "medial_axis": medial_axis,
+            "anterior_axis": anterior_axis,
+            "trusted_geometry": trusted_geometry,
             "batch_size": len(presence),
         }
 
@@ -386,6 +434,8 @@ class KneeAbnormalityModel(nn.Module):
             encoded["medial_axis"].flatten()
             if encoded["medial_axis"] is not None
             else None,
+            encoded["anterior_axis"].flatten(),
+            encoded["trusted_geometry"].flatten(),
         )
 
     def forward(self, batch: dict) -> torch.Tensor:

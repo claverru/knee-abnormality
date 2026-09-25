@@ -38,17 +38,23 @@ class RepredictCLI(CLISettings):
     run: Path = Field(description="Completed training run directory")
     output: Path = Field(description="New run directory to create")
     image_multiplier: int = Field(gt=0, description="Validation prediction multiplier")
-    fold: int = Field(default=0, ge=0)
+    fold: int | None = Field(default=None, ge=0)
 
 
 def repredict(settings: RepredictCLI) -> dict:
     source, output = settings.run, settings.output
     if output.exists():
         raise ValueError(f"Output already exists: {output}")
-    fold_name = f"fold_{settings.fold}"
+    effective = json.loads((source / "effective_config.json").read_text())
+    fold = settings.fold
+    if fold is None:
+        folds = effective["validation"]["folds"]
+        if len(folds) != 1:
+            raise ValueError(f"Run has several validation folds {folds}; pass --fold")
+        fold = folds[0]
+    fold_name = f"fold_{fold}"
     selected = json.loads((source / fold_name / "selected_checkpoint.json").read_text())
     checkpoint = source / fold_name / Path(selected["path"]).name
-    effective = json.loads((source / "effective_config.json").read_text())
     effective["validation"]["prediction_image_multiplier"] = settings.image_multiplier
     shutil.copytree(source, output, ignore=shutil.ignore_patterns(*REPLACED))
     linked = output / fold_name / checkpoint.name
@@ -58,25 +64,25 @@ def repredict(settings: RepredictCLI) -> dict:
     )
     config = load_config(output / "effective_config.json")
     dataset, targets, _ = prediction_data(
-        config, "validation", settings.fold, image_multiplier=settings.image_multiplier
+        config, "validation", fold, image_multiplier=settings.image_multiplier
     )
     loader = build_data_loader(dataset, config.trainer, INFERENCE_BATCH_SIZE)
     device = resolve_device("auto")
     model = load_checkpoint_model(
-        config, targets, linked, device, expected_fold=settings.fold
+        config, targets, linked, device, expected_fold=fold
     )
     started = time.perf_counter()
     study_ids, predictions, _ = predict_loader([model], loader, device)
     seconds = time.perf_counter() - started
     path = output / fold_name / "validation_predictions.csv"
-    make_prediction_frame(study_ids, predictions, targets, settings.fold).write_csv(
+    make_prediction_frame(study_ids, predictions, targets, fold).write_csv(
         path
     )
     selected.update(
         path=str(linked.resolve()),
         prediction_image_multiplier=settings.image_multiplier,
         prediction_macro_auc=fold_prediction_macro_auc(
-            config.split_dir, settings.fold, targets, path
+            config.split_dir, fold, targets, path
         ),
     )
     (output / fold_name / "selected_checkpoint.json").write_text(
@@ -88,7 +94,7 @@ def repredict(settings: RepredictCLI) -> dict:
     record = {
         "source_run": str(source.resolve()),
         "checkpoint": str(checkpoint.resolve()),
-        "fold": settings.fold,
+        "fold": fold,
         "image_multiplier": settings.image_multiplier,
         "attention_temperature": 1.0,
         "prediction_macro_auc": selected["prediction_macro_auc"],

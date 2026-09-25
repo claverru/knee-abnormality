@@ -16,8 +16,10 @@ prepare-codecs output="outputs/submission/dependencies/kaggle-v170" python_versi
 prepare-folds config="configs/training.yaml":
     rtk proxy uv run --locked python -m scripts.tools.validation prepare --config "$1"
 
-train run_id config="configs/training.yaml" folds="0":
-    rtk proxy uv run --locked python -m scripts.pipeline.train "$2" --folds "$3" --run-id "$1"
+train run_id config="configs/training.yaml" folds="":
+    args=(); \
+    if [[ -n "$3" ]]; then args+=(--folds "$3"); fi; \
+    rtk proxy uv run --locked python -m scripts.pipeline.train "$2" --run-id "$1" "${args[@]}"
 
 autoresearch-start provider campaign="oblique-clean":
     rtk proxy uv run --locked python -m scripts.tools.autoresearch start "$2" --provider "$1"
@@ -34,15 +36,18 @@ autoresearch-stop campaign="oblique-clean":
 autoresearch-resume campaign="oblique-clean":
     rtk proxy uv run --locked python -m scripts.tools.autoresearch resume "$1"
 
-resume run_id checkpoint config fold="0":
-    rtk proxy uv run --locked python -m scripts.pipeline.train "$3" --folds "$4" --run-id "$1" --resume "$2"
-
-validate config checkpoint output fold="0" image_multiplier="" batch_size="" attention_temperature="":
+resume run_id checkpoint config fold="":
     args=(); \
+    if [[ -n "$4" ]]; then args+=(--folds "$4"); fi; \
+    rtk proxy uv run --locked python -m scripts.pipeline.train "$3" --run-id "$1" --resume "$2" "${args[@]}"
+
+validate config checkpoint output fold="" image_multiplier="" batch_size="" attention_temperature="":
+    args=(); \
+    if [[ -n "$4" ]]; then args+=(--fold "$4"); fi; \
     if [[ -n "$5" ]]; then args+=(--image-multiplier "$5"); fi; \
     if [[ -n "$6" ]]; then args+=(--batch-size "$6"); fi; \
     if [[ -n "$7" ]]; then args+=(--attention-temperature "$7"); fi; \
-    rtk proxy uv run --locked python -m scripts.pipeline.predict "$1" --checkpoint "$2" --output "$3" --split validation --fold "$4" "${args[@]}"
+    rtk proxy uv run --locked python -m scripts.pipeline.predict "$1" --checkpoint "$2" --output "$3" --split validation "${args[@]}"
 
 export checkpoint output image_multiplier="" batch_size="" wheel_dir="outputs/submission/dependencies/kaggle-v170" target_python="3.12" target_platform="manylinux_x86_64" num_workers="" attention_temperature="":
     args=(); \

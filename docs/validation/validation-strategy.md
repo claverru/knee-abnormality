@@ -20,8 +20,17 @@ submissions gold-only AUC and gold-only BCE carry no public-score signal, and go
 times macro AUC's run-to-run noise
 ([comparison](results/2026-09-18-local-public-metric-comparison.md)).
 
-The strategy selected on **2026-09-11** is to iterate on **fold 0** until near
-the end of the competition. Use its complete 905-study validation predictions
+The strategy selected on **2026-09-11** was to iterate on **fold 0** until near
+the end of the competition. **Since 2026-09-25 the screening fold is fold 1** (user decision).
+Every fold-0 decision since the scanner split had been made on the same 905 studies, and the
+public board disagreed with it: S59 (a fold-0 adoption) scored 0.939, while S58 (a fold-0 reject)
+scored 0.944. The fold switched when the OA-detector control was retrained, so no extra run was
+needed. The fold lives only in `configs/training.yaml` (`validation.folds`): the `just` recipes,
+`predict`, `compare_fold_runs` and `repredict_run` read it from there unless a fold is passed
+explicitly. Fold-0 results stay valid as a record but cannot be compared with fold-1 ones. The
+autoresearch shared evaluation still requires fold 0 and fails validation until it is updated.
+
+The screening fold is iterated on until near the end of the competition. Use its complete 905-study validation predictions
 for routine comparisons. Additional-fold training, full OOF scoring,
 ensembling and, since 2026-09-16, bigger images are deferred to that
 [later phase](../backlog/endgame.md); they are not
@@ -32,13 +41,40 @@ rerun is required for each experiment.
 ## Controlled comparisons
 
 Change one factor against a matched control, and predefine the principal comparison and
-checkpoint rule; never search seeds for an apparent improvement. **Candidates use the
-current incumbent's recorded training seed.** When an adoption is merged into the recipe on
-main, draw a fresh seed once (never searched or chosen by score), set it in
-`configs/training.yaml` and retrain the new control with it, so the recipe is not tuned to one
-seed; later candidates use that control's seed. The seed alone is worth several thousandths: the
-adopted knee-geometry model scored 0.905834 at seed 2263738815 and 0.899547 at 638120755 with the
-same code, −0.0063 (95% [−0.0108, −0.0023]), mostly on labels the change does not touch. Adopt a valid implementation only when
+checkpoint rule; never search seeds for an apparent improvement.
+
+**Fold and seed rotation** (user decision, 2026-09-25):
+
+1. **Paired comparisons:** a candidate always uses its control's fold and seed.
+2. **Rotate at adoptions merged into main:** each adoption the user merges into the recipe
+   retrains the new control with a fresh random seed (drawn once, never searched or chosen by
+   score) on the next fold, cycling 0 → 1 → 2 → 3 → 4 → 0. Later candidates use that fold and
+   seed. Autoresearch `provisional_accept` decisions are working choices within a campaign, not
+   adoptions.
+3. **One source of truth:** the fold and seed live only in `configs/training.yaml`
+   (`validation.folds`, `seed`), and commands take them from there.
+4. **Campaigns:** a campaign runs on its reference's fold from start to end. Its control
+   retrain after a provisional acceptance changes only the seed.
+5. **Reporting:** scores are reported per fold stretch; never add up or compare scores across
+   folds.
+6. **Final check:** the public board, then all five folds in the endgame.
+
+**Why:**
+- **Seed:** the seed alone is worth several thousandths. The adopted knee-geometry model scored
+  0.905834 at seed 2263738815 and 0.899547 at 638120755 with the same code, −0.0063 (95%
+  [−0.0108, −0.0023]), mostly on labels the change does not touch.
+- **Fold:** reusing one fold for every decision overfits it. The public board disagreed with fold
+  0 on S58 against S59, and the literature is consistent:
+  [Dwork et al. 2015](https://www.science.org/doi/10.1126/science.aaa9375) on holdout reuse,
+  [Bouthillier et al. 2021](https://arxiv.org/pdf/2103.03098) on split variance exceeding seed
+  variance, and [Nagler et al. 2024](https://arxiv.org/pdf/2405.15393) on reshuffling splits
+  during selection.
+- **Cost:** rotating at adoptions costs no extra runs, because the new control is retrained
+  anyway; rotating per experiment would need a control on every fold.
+
+The OA-detector control (fold 1, seed 1485198267) is the first rotation. The autoresearch
+runner still hardcodes fold 0, so it needs to take the fold from the recipe before the next
+campaign ([protocol](../../autoresearch/protocol.md#training-seed-policy)). Adopt a valid implementation only when
 macro gain >= 0.001 and the central 80% paired-report-group bootstrap lower bound
 is strictly positive; otherwise discard it. Keep the 95% interval as diagnostic
 evidence. No automatic confirmation branches or control reruns follow a result.
