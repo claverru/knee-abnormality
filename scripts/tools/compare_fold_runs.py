@@ -33,7 +33,7 @@ class CompareCLI(CLISettings):
     allowed_config_differences: list[str] = Field(default_factory=lambda: ["name"])
     allowed_input_identity_differences: list[str] = Field(default_factory=list)
     reference_identity_exceptions: list[str] = Field(default_factory=list)
-    fold: int = Field(default=0, ge=0)
+    fold: int | None = Field(default=None, ge=0)
     headers: Path = Path(
         "outputs/analysis/sharing-disagreement-20260914/study_headers.parquet"
     )
@@ -163,7 +163,13 @@ def compare(settings: CompareCLI) -> None:
     if rejected := unexpected(config_diff, settings.allowed_config_differences):
         raise ValueError(f"Unexpected configuration differences: {rejected}")
     config = configs["candidate"]
-    if settings.fold not in config["validation"]["folds"]:
+    fold = settings.fold
+    if fold is None:
+        folds = config["validation"]["folds"]
+        if len(folds) != 1:
+            raise ValueError(f"Runs have several validation folds {folds}; pass --fold")
+        fold = folds[0]
+    if fold not in config["validation"]["folds"]:
         raise ValueError("Requested fold is absent from the compared configurations")
     split = Path(config["paths"]["data_root"]) / "folds" / config["validation"]["split"]
     targets_path, studies_path = split / "targets.csv", split / "studies.csv"
@@ -171,7 +177,7 @@ def compare(settings: CompareCLI) -> None:
     targets = labels.columns[1:]
     frame = (
         pl.read_csv(studies_path)
-        .filter(pl.col("fold") == settings.fold)
+        .filter(pl.col("fold") == fold)
         .join(labels, on=STUDY, validate="1:1")
         .join(
             pl.read_parquet(settings.headers).select(STUDY, "vendor"),
@@ -184,7 +190,7 @@ def compare(settings: CompareCLI) -> None:
     if frame["vendor"].null_count():
         raise ValueError("Missing acquisition metadata")
     loaded = {
-        name: load_run(root, settings.fold, frame, targets)
+        name: load_run(root, fold, frame, targets)
         for name, root in roots.items()
     }
     predictions = {name: run["predictions"] for name, run in loaded.items()}
@@ -320,7 +326,7 @@ def compare(settings: CompareCLI) -> None:
         row["delta"] = row["candidate"] - row["reference"]
     report = {
         "settings": settings.model_dump(mode="json"),
-        "fold": settings.fold,
+        "fold": fold,
         "studies": frame.height,
         "targets": targets,
         "runs": runs,

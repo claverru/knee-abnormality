@@ -126,6 +126,14 @@ control pauses the campaign, and resume retrains it. This mirrors the
 adoptions merged into main, and it is a re-seeded control, not a confirmation run:
 the adoption decision stands.
 
+**Pending runner change (fold from the recipe, 2026-09-25):** the screening fold moved to fold 1
+and now lives in `configs/training.yaml`. A campaign runs on its reference's fold from start to
+end; fold rotation happens only when the user merges an adoption into main
+([project rule](../docs/validation/validation-strategy.md#controlled-comparisons)). The runner
+still hardcodes fold 0 (`EVALUATION` and the `fold_0` run paths), so it must take the fold from
+the sealed recipe before the next campaign. Until then, a recipe on another fold fails campaign
+validation.
+
 ## Event-driven operation
 
 The supervisor is ordinary code and outlives agent sessions. It owns process

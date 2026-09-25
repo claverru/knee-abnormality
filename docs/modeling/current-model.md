@@ -13,6 +13,14 @@ position/knee-side experiments; the current control is `knee-geometry-merged-2` 
   labels see only their own side of the knee; OA stays whole-knee.
 - **Half-knee loss (training only):** a shared meniscus tear detector is supervised on each
   half of the knee, so token features learn the medial-lateral split.
+- **Three-compartment OA detector:** one detector, shared by Medial, Lateral and PF OA, is read
+  over each compartment's region and added to that label's output through a learned scale.
+
+Adopted 2026-09-25 by user decision: the three-compartment OA detector from the
+[near-misses campaign](../validation/results/2026-09-25-near-misses-campaign.md). It narrowly
+missed the local rule (+0.0013, 80% [−0.0002, +0.0029]) but scored 0.944 public (S58) against
+0.940 for its same-seed reference (S55). The new control trains at fresh seed 1485198267; its
+scores are pending.
 
 Adopted 2026-09-24 from the [knee-geometry campaign](../../autoresearch/campaigns/knee-geometry/INDEX.md)
 (`meniscus-half-knee-mil`): ×4 macro 0.905834 against `k05-clean`'s 0.902760, +0.00307, 80%
@@ -120,6 +128,11 @@ Tokens receive four additive embeddings:
   the normalized tokens beyond ±10 mm; a float32 smooth-max per half is trained with soft BCE and
   the class-balance weights against the matching meniscus label, for studies with resolved side,
   valid geometry and both halves present. Weight 0.075. Prediction never uses the detector.
+- **OA detector:** one linear detector shared by the three
+  OA labels. Medial OA pools it with a smooth-max over the medial half and Lateral OA over the
+  lateral half (both beyond ±10 mm); PF OA pools it over tokens in front of the knee centre. Each
+  pooled score is added to the label's logit through its own zero-initialized scale. Tokens
+  without trusted geometry belong to no region. Used at inference.
 
 The plane and contrast lookup buffers derive from the configured metadata, not from slot order.
 The ReXNet adapter derives stride 32 and origin 0 from its convolutions. The

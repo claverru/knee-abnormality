@@ -118,6 +118,7 @@ MODEL_BATCH_KEYS = frozenset(
         "geometry_valid",
         "knee_side_sign",
         "knee_center_x_mm",
+        "knee_center_y_mm",
     }
 )
 

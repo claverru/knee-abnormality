@@ -387,10 +387,75 @@ class KneeModule(L.LightningModule):
             on_epoch=True,
             batch_size=1,
         )
+        for region, scale in zip(
+            ("medial", "lateral", "pf"),
+            self.model.oa_detector_scale.detach().float(),
+            strict=True,
+        ):
+            self.log(
+                f"oa_detector_scale_{region}",
+                scale,
+                on_step=False,
+                on_epoch=True,
+                batch_size=1,
+            )
+        self.log(
+            "oa_detector_weight_norm",
+            self.model.oa_detector.weight.detach().float().norm(),
+            on_step=False,
+            on_epoch=True,
+            batch_size=1,
+        )
 
     def training_step(self, batch: dict, batch_index: int) -> torch.Tensor:
         encoded = self.model.encode_batch(batch)
         logits = self.model.pool_encoded(encoded).to(torch.float32)
+        counts, masked, absolute_corrections = self.model.oa_detector_activity
+        for region, region_counts, absolute_correction in zip(
+            ("medial", "lateral", "pf"),
+            counts.unbind(1),
+            absolute_corrections,
+            strict=True,
+        ):
+            self.log(
+                f"oa_detector_absolute_correction_{region}",
+                absolute_correction,
+                on_step=False,
+                on_epoch=True,
+                batch_size=len(batch["study_uid"]),
+            )
+            self.log(
+                f"oa_detector_tokens_{region}",
+                region_counts.sum().float(),
+                on_step=False,
+                on_epoch=True,
+                reduce_fx="sum",
+                batch_size=1,
+            )
+            self.log(
+                f"oa_detector_studies_{region}",
+                (region_counts > 0).sum().float(),
+                on_step=False,
+                on_epoch=True,
+                reduce_fx="sum",
+                batch_size=1,
+            )
+            self.log(
+                f"oa_detector_empty_studies_{region}",
+                (region_counts == 0).sum().float(),
+                on_step=False,
+                on_epoch=True,
+                reduce_fx="sum",
+                batch_size=1,
+            )
+        self.log(
+            "oa_detector_masked_tokens",
+            masked.float(),
+            on_step=False,
+            on_epoch=True,
+            reduce_fx="sum",
+            batch_size=1,
+        )
         loss = masked_binary_cross_entropy_with_logits(
             logits,
             batch["target"],

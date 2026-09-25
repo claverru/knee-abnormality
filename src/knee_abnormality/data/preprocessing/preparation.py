@@ -72,6 +72,7 @@ class PreparedSeries:
     reflection_reason: str = "unavailable"
     knee_side_sign: float = 0.0
     knee_center_x_mm: float = 0.0
+    knee_center_y_mm: float = 0.0
 
     @property
     def triplet_count(self) -> int:
