@@ -285,3 +285,55 @@ per-label total loss mass rises with rarity (1.01 to 1.20 across our labels) and
 scale with it. That is a third difference, deliberately not adopted here: our normalisation is
 what keeps the comparison to the control a change of emphasis rather than of effective learning
 rate.
+
+## Same-cost backbone candidates
+
+**Proposed 2026-09-25; ReXNet-R is implemented in the `convnext-atto` worktree and promising
+with tuning (below); the other two are unimplemented.** Three timm backbones of about ReXNet-200's
+size (13.8M parameters, 1.53 GMACs at 224 px) that could replace it. Each needs only a
+`BACKBONE_MAPPINGS` entry with a verified origin; `model.backbone` is the option
+([swapping a backbone](../modeling/backbone-swaps.md#code-requirements)). All three checkpoints
+declare the configured ImageNet mean/std. Counts are backbone-only, measured on the meta device
+with `FlopCounterMode` (timm 1.0.26).
+
+| Candidate | Params | GMACs | Mapping | Motivation | Confidence |
+|---|---:|---:|---|---|---|
+| `rexnetr_200.sw_in12k_ft_in1k` | 14.0M | 1.56 | `_rexnet_mapping`, verified origin 0, stride 32, 2560 channels | Same family and cost, ImageNet-12k pretraining; lumbar 2024 7th place | Moderate, evidence-backed |
+| `convnext_nano.in12k_ft_in1k` | 15.0M | 2.44 | [Offset origin](../modeling/backbone-swaps.md#mapping-pitfalls); the `convnext-atto` worktree's `_convnext_mapping` should only need a registration | Best in lumbar 3rd place's comparison; DINOv3 ConvNeXt-T 2nd in the [backbone search](../modeling/backbone-search.md#finished-model-comparison) | Moderate |
+| `hgnetv2_b3.ssld_stage2_ft_in1k` | 14.2M | 1.77 | Offset origin, reported 2 px, unverified | Dense and GPU-friendly; family evidence only as a lumbar localizer | Low, speculative |
+
+- **Excluded:** EfficientNet and EfficientNetV2 (measured losses on this dataset), `tf_` ports
+  and reparameterizable or fixed-size families (mapping), `regnetz_c16` (0.5 mean/std),
+  MobileNetV4, RepViT and small transformers (no MRI evidence), ResNet-18 (trailed ConvNeXt-nano
+  in lumbar 3rd's comparison). See [backbone MRI evidence](../research/backbone-mri-evidence.md).
+- **Cost:** GMACs do not predict wall time for depthwise-heavy families; ConvNeXt-nano's 1.6×
+  GMACs may cost less than that. Estimate time from the run's own logs, then time any winner on a
+  Kaggle T4 in FP16.
+- **Comparison:** one run per candidate against the incumbent control, same fold, seed and
+  budget. Scale `backbone_lr` by the checkpoint's convolution-weight RMS relative to ReXNet-200's
+  ([weight scale](../modeling/backbone-swaps.md#checkpoint-weight-scale)); leave other rates
+  unchanged. Record macro/per-label AUC, paired uncertainty, time and memory under the current
+  adoption rule. Ensemble contribution belongs to the
+  [endgame](endgame.md#ensembling).
+
+### ReXNet-R results
+
+**First run lost, but it is promising with tuning.** `rexnetr-200`, config
+`configs/rexnetr-200.yaml` in the `convnext-atto` worktree, against `oa-detector-control`: fold 1 of `all_5fold_scanner_v1`,
+seed 1485198267, all rates unchanged. ×4 macro 0.8952 against 0.9006, **−0.0053**, paired
+report-group bootstrap 95% [−0.0098, −0.0010]
+(`outputs/analysis/rexnetr-200-vs-oa-detector-control/comparison.json`). Training took 1607 s against
+1639 s, with the same peak memory. The worktree's older OA-detector port changes the preprocessing
+source hash; the comparison allowed that difference.
+
+- **Per label:** the meniscus pair gained +0.0036 (lateral +0.0054, medial +0.0018), with MCL
+  +0.0070 and Baker's +0.0042. OA lost 0.0059 (PF OA −0.0181), and synovitis −0.0224,
+  effusion −0.0129 and fracture −0.0148 lost most.
+- **Why tuning should help (measured mechanism):** the checkpoint's convolution weights are 2.5×
+  smaller (RMS 0.0204 against 0.0508), so the same AdamW rate is a 2.5× larger relative step.
+  Gradient norms ran 3–4× the control's (median about 2.3 against 0.6), so clipping at 1.0 fired on
+  nearly every step. Convolution weights drifted 28% from pretraining against 16%. Validation
+  trailed by 0.076 at epoch 0 and closed to −0.004 by epoch 8 as the cosine rate fell, still rising
+  at the last epoch, while training loss stayed about 0.05 higher throughout.
+- **Next run:** `configs/rexnetr-200-lr8e-5.yaml`, `backbone_lr` 8e-5 (2e-4 × 0.0204/0.0508),
+  nothing else changed.

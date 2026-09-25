@@ -220,6 +220,29 @@ hypothesis: no auxiliary objective has trained active in this project. The GPU i
   directory, `training/lightning.py`, `config.py`, `trainer.loss`) and add `modeling/model.py`
   for the heads, plus any label-source access the report-state targets need.
 
+## Hard-pair mining phase
+
+**One unverified external report; untested here (added 2026-09-25).** Another participant says
+their best setup ends with 3 epochs of hard mining: score the training set, mine the pairs the model
+orders worst, batch each pair together and train on those batches. Their loss and mining schedule
+are unknown; ask for both before designing anything.
+
+- **Why batching matters:** our only pair term is the within-microbatch ranking loss (batch size 8,
+  about 118 usable pairs per step). With random batches most hard pairs never share a batch, which
+  may explain why the always-on hybrid
+  [was neutral](../../autoresearch/campaigns/losses/findings.md#completion-20260920t121537z-5b39b418)
+  (+0.0007, interval spanning zero). Mining changes the pairs the term sees, not its formula.
+- **Without a pair term** it reduces to oversampling hard studies, and the nearest measured
+  relative, [shared balanced focal](../../autoresearch/campaigns/losses/findings.md#completion-20260920t124339z-2948d523)
+  (up-weighting hard cells), lost 0.0026. The losses campaign's `shared-ranking-memory-bank`
+  (pairs against stored scores beyond the batch) is the closest unrun relative, still blocked.
+- **Design constraints:** one mining rule shared by all twelve labels; mine only training studies;
+  training-set scores partly reflect memorization, so the hardness source is an open choice; hard
+  pairs under soft labels can be label noise rather than signal, the
+  [OA audit](#oa-only-rubric-aligned-label-repair) found such cells.
+- **Test:** the incumbent recipe plus a final mined phase against a fresh control at the same
+  total budget.
+
 ## RadImageNet-pretrained backbone
 
 **Evidence-backed (one external report), untested here; moved from small changes on 2026-09-23 because it needs an off-recipe backbone pair.** Load a RadImageNet-pretrained

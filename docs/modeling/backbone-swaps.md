@@ -14,6 +14,8 @@ ReXNet-200) of the [full-slice model](current-model.md).
     checkpoints, patch-token adapters and the knee-specific 3D alternatives.
   - [EfficientNet training](../research/efficientnet-training.md) covers EfficientNet
     preprocessing and BatchNorm handling.
+- **Candidates:** proposed same-cost replacements are in the
+  [backlog](../backlog/small-changes.md#same-cost-backbone-candidates).
 - **History:** the crop-era budget, with the MobileNetV3 scout, its delta formula and its code
   requirements, is in the
   learned-zoom snapshot (`f076a09:docs/history/crop-selection-sources/learned-zoom-backbone-swaps.md.txt`).
@@ -81,6 +83,16 @@ In `KneeAbnormalityModel.__init__`:
   of 32.
 - **Anchors:** token anchors come from the mapping, so any verified origin works.
 - **Activation checkpointing:** `model.checkpoint_backbone` requires `model.backbone_eval: true`.
+
+## Checkpoint weight scale
+
+Batch-normalized convolutions are scale-invariant, while AdamW's step is about the learning rate
+per weight, so a checkpoint with smaller weights takes proportionally larger relative steps at the
+same `backbone_lr`. Measured 2026-09-25: `rexnetr_200.sw_in12k_ft_in1k` has convolution-weight RMS
+0.0204 against 0.0508 for `rexnet_200.nav_in1k`; at the same rate its gradient norms ran 3–4× higher
+and it fitted more slowly
+([result](../backlog/small-changes.md#rexnet-r-results)). Compare the pretrained convolution-weight
+RMS before a swap and scale `backbone_lr` by the ratio.
 
 ## Mapping pitfalls
 
