@@ -2,6 +2,7 @@
 
 | Read when | Document |
 |---|---|
+| Reviewing the report-attribute auxiliary-heads runs (JevK5 v3 and cleaned, reliability-weighted 3.1 targets, weight 0.1) against `oa-detector-control`: +0.00075 and +0.00105 ×4 macro, public 0.938 (S61 tie) and 0.940 (S62) against 0.938, MCL/Contusion gains and Fracture/Baker's losses in both, attribute loss and per-question KL | [2026-09-25 report-attribute heads](2026-09-25-report-attribute-heads.md) |
 | Reviewing the near-misses campaign (15 forced seeds plus researcher ideas), the PF OA pattern from knee-wide OA context, S58 (OA detector, 0.944) against S59 (token dropout, 0.939), and why the adopted token dropout was too weak | [2026-09-25 near-misses campaign](2026-09-25-near-misses-campaign.md) |
 | Reviewing the knee-geometry campaign (study centre, bilateral split, fitted midline, knee frames, meniscus masks and readouts, OA readouts): the adopted half-knee MIL (+0.0031, S54 0.944), 17 other decisions, geometry-bundle strata | [2026-09-24 knee-geometry campaign](2026-09-24-knee-geometry-campaign.md) |
 | Checking the trained medial/lateral side mask (meniscus +0.0046, OA −0.0040) and global token self-attention with 3D RoPE replacing the 1D/2D embeddings (−0.0015, PF OA and Fracture −0.015) | [2026-09-23 side mask and token attention](2026-09-23-side-mask-and-token-attention.md) |

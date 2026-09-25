@@ -1,17 +1,18 @@
 name: training
-seed: 1485198267
+seed: 2464012069
 
 paths:
   data_root: ../data
   output_root: ../outputs/training
   label_manifest: labels/combined-label-sources.json
+  report_attribute_manifest: labels/jevk5-report-attribute-targets-v3.1.json
 
 labels:
   source: combined_v1
 
 validation:
   split: all_5fold_scanner_v1
-  folds: [1]
+  folds: [2]
   prediction_image_multiplier: 4
 
 data:
@@ -80,3 +81,4 @@ trainer:
   deterministic: false
   class_balance_exponent: 0.5
   half_knee_loss_weight: 0.075
+  report_attribute_loss_weight: 0.1

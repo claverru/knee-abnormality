@@ -71,8 +71,15 @@ class PathsConfig(ConfigModel):
     data_root: Path
     output_root: Path
     label_manifest: Path
+    report_attribute_manifest: Path
 
-    @field_validator("data_root", "output_root", "label_manifest", mode="before")
+    @field_validator(
+        "data_root",
+        "output_root",
+        "label_manifest",
+        "report_attribute_manifest",
+        mode="before",
+    )
     @classmethod
     def resolve_path(cls, value: object, info: ValidationInfo) -> object:
         if isinstance(value, str) and not value.strip():
@@ -227,6 +234,7 @@ class TrainerConfig(ConfigModel):
     deterministic: bool
     class_balance_exponent: Annotated[float, Field(ge=0, le=1)]
     half_knee_loss_weight: PositiveFiniteFloat = 0.075
+    report_attribute_loss_weight: PositiveFiniteFloat
 
 
 class ValidationConfig(ConfigModel):

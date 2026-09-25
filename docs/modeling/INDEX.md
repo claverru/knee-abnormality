@@ -7,6 +7,7 @@
 | Using the CoAtNet backbone and its spatial anchors | [CoAtNet 224 spatial backbone](coatnet-224-spatial-backbone.md) |
 | Understanding triplet channels, normalization and sampling | [Triplet inputs and sampling](triplet-inputs-and-sampling.md) |
 | Checking reference labels, class-balanced BCE, masking and Tonylin supervision | [Supervision](supervision.md) |
+| Enabling or interpreting the training-only report-attribute auxiliary heads (JevK5 question targets, parent gating, soft cross-entropy, KL diagnostics) | [Report-attribute heads](report-attribute-heads.md) |
 | Diagnosing GPU batches, host RAM, prefetch and validation loader waves | [Training runtime and memory](training-runtime-and-memory.md) |
 | Checking training schedules, augmentation and weight averaging | [Training schedule and augmentation](schedule-and-augmentation.md) |
 | Recovering retired side embeddings and classifier-sharing variants | [Retired side and compartment variants](retired-side-and-compartment-variants.md) |

@@ -42,48 +42,6 @@ Since 2026-09-21, PF OA in both training and evaluation comes from the
 The split's evaluation targets were rewritten by user decision. Medial and lateral OA are still
 Steven v4.
 
-## Richer report supervision: OA attributes
-
-**Accepted for the backlog on 2026-09-21; investigation, implementation and training unstarted.**
-Train image features to predict reliable anatomical/severity information from reports beyond
-the twelve disease targets. [MedKLIP](https://arxiv.org/abs/2301.02228) motivates structured
-report supervision in chest radiographs; the proposed small auxiliary heads are a knee-specific
-adaptation, not a reproduction or a measured gain.
-
-**Premise weakened, 2026-09-22.** Public tables already hold per-label severity, so step 1 needs no
-LLM run. But where two sources agree on severity (OA, Effusion, Baker's, ACL), the soft training
-targets already encode it (Spearman 0.66–0.79 among positives), and the incumbent's predictions
-already rise with it. The model ranks worst on low-grade positives, and only about half of those
-gold cells are positive: label noise that an auxiliary head cannot fix
-([report attributes](../public-labels/report-attributes.md)). Location attributes (horn,
-compartment, bruise site) are not in any public table.
-
-1. **Bounded extraction pilot:** start with compartment-specific OA severity attributes, not a
-   broad concept vocabulary. Define and audit an assertion-aware extraction policy on training
-   reports, with a separate report panel for confirmation. Version the policy, source text
-   identity, extracted values and observation masks; report coverage and class counts. Do not
-   invent severity from report silence, unresolved wording or the existing disease probability.
-   Any learned extractor must exclude the outer validation partition. Stop if reliable attribute
-   supervision is too sparse to justify training.
-2. **Training-only heads:** reuse the corresponding image-derived pooled features for small
-   auxiliary predictors; supervise only supported attributes. Compartment identity routes the
-   evidence to the correct target; do not add a constant compartment-classification task where
-   the disease head already fixes it. Keep all twelve disease targets, gold overrides and the
-   current disease loss unchanged. Fix the attribute encoding and auxiliary loss coefficient
-   before the comparison. Discard auxiliary heads at inference; reports are never model inputs.
-3. **Controlled comparison:** fresh current-recipe control versus auxiliary supervision only,
-   preserving the split, evaluation targets, incumbent seed, image workload and training budget.
-   Follow the [controlled-comparison rules](../validation/validation-strategy.md#controlled-comparisons),
-   recording macro/per-label AUC, paired uncertainty, auxiliary coverage/loss and runtime.
-   Attribute-prediction accuracy is diagnostic, not the adoption metric.
-
-This learns finding content, unlike the existing
-[report-state head](small-changes.md#auxiliary-report-state-prediction), which predicts whether
-a finding was reported. It is also separate from [OA label repair](#oa-only-rubric-aligned-label-repair):
-that investigation changes disease supervision and still excludes auxiliary heads from its own
-comparison. Do not combine the interventions. Finding-level text alignment is not part of this
-accepted pilot. Start only in a user session; training remains user-launched.
-
 ## Position and knee side
 
 **The supervised anatomical-attention sequence is closed:** learned family strengths
@@ -194,8 +152,10 @@ hypothesis: no auxiliary objective has trained active in this project. The GPU i
 - **Seed candidates** (all would transfer to the campaign when it is defined):
   [report-state prediction](small-changes.md#auxiliary-report-state-prediction) (hypothesis, with
   a measured judge risk: it teaches reporting behaviour that fold 0 rewards and the leaderboard
-  may not), [OA attributes](#richer-report-supervision-oa-attributes) (premise weakened: agreed
-  severity is already in the targets, moderate confidence) and per-view disease classifiers
+  may not), [report attributes](../ongoing/report-attribute-extraction.md) (implemented
+  2026-09-25 as [report-attribute heads](../modeling/report-attribute-heads.md), first run
+  +0.00075 ([result](../validation/results/2026-09-25-report-attribute-heads.md)); agreed severity is already in the targets, but
+  location, confusers and extra findings are not) and per-view disease classifiers
   (below). Acquisition or geometry pretext tasks (plane, contrast, slice position, knee side) are
   guesses with no measured premise.
 - **Per-view disease classifiers** (guess, low-to-moderate confidence; added 2026-09-23 from the

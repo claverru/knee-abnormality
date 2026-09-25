@@ -70,6 +70,9 @@ def training_input_identity(
     )
     return {
         "version": 1,
+        "report_attribute_manifest_sha256": sha256_file(
+            config.paths.report_attribute_manifest
+        ),
         "preprocessing_identity": preprocessing_identity(config.model.backbone),
         "label_manifest_sha256": labels.provenance["manifest_sha256"],
         "split_protocol_sha256": labels.provenance["split_protocol_sha256"],

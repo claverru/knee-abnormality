@@ -23,6 +23,7 @@ from knee_abnormality.config import (
 from knee_abnormality.data.dataset import KneeStudyDataset, build_data_loader
 from knee_abnormality.data.labels import FoldLabels, load_fold_labels
 from knee_abnormality.data.preprocessing.device import with_images
+from knee_abnormality.data.report_attributes import load_report_attribute_targets
 from knee_abnormality.data.sources import build_series_index
 from knee_abnormality.evaluation.metrics import COMPARTMENT_PAIRS, validation_metrics
 from knee_abnormality.evaluation.predictions import make_prediction_frame
@@ -32,14 +33,30 @@ from knee_abnormality.modeling.model import (
     KneeAbnormalityModel,
 )
 from knee_abnormality.training.checkpoints import checkpoint_sampling_epoch
+from knee_abnormality.training.report_attributes import (
+    ReportAttributeHeads,
+    report_attribute_loss,
+)
 
 PRECISION = "bf16-mixed"
 HALF_KNEE_TEMPERATURE = 1.0
 
 
-def build_optimizer(model: KneeAbnormalityModel, settings: OptimizerConfig) -> AdamW:
+def build_optimizer(
+    model: KneeAbnormalityModel,
+    settings: OptimizerConfig,
+    heads: tuple[torch.nn.Module, ...],
+) -> AdamW:
     groups: dict[tuple[float, float], list[torch.nn.Parameter]] = {}
-    for name, parameter in model.named_parameters():
+    named = [
+        *model.named_parameters(),
+        *(
+            (f"heads.{name}", parameter)
+            for head in heads
+            for name, parameter in head.named_parameters()
+        ),
+    ]
+    for name, parameter in named:
         if not parameter.requires_grad:
             continue
         learning_rate = (
@@ -287,6 +304,11 @@ class KneeModule(L.LightningModule):
         self.meniscus_indices = tuple(
             targets.index(name) for name in COMPARTMENT_PAIRS["meniscus"]
         )
+        attributes = load_report_attribute_targets(
+            config.paths.report_attribute_manifest, config.paths.data_root
+        )
+        with torch.random.fork_rng(devices=[]):
+            self.report_attribute_heads = ReportAttributeHeads(attributes)
         self.weight_averaging = config.optimizer.weight_averaging
         self._last_averaged_step = -1
         self.batch_norm_refresh_seconds = 0.0
@@ -308,6 +330,13 @@ class KneeModule(L.LightningModule):
                 "class_balance": class_balance,
                 "input_identity": input_identity,
                 "preprocessing_identity": preprocessing_identity(config.model.backbone),
+                "report_attributes": {
+                    **attributes.provenance,
+                    "questions": [
+                        question.model_dump(mode="json")
+                        for question in attributes.questions
+                    ],
+                },
             }
         )
 
@@ -458,6 +487,7 @@ class KneeModule(L.LightningModule):
             self.class_balance_weights,
         )
         loss = loss + self.config.trainer.half_knee_loss_weight * auxiliary
+        loss = loss + self._report_attribute_step(encoded, batch)
         self.log(
             "half_knee_loss",
             auxiliary,
@@ -482,6 +512,44 @@ class KneeModule(L.LightningModule):
             batch_size=len(batch["study_uid"]),
         )
         return loss
+
+    def _report_attribute_step(self, encoded: dict, batch: dict) -> torch.Tensor:
+        heads = self.report_attribute_heads
+        batch_size = len(batch["study_uid"])
+        logits = heads(
+            self.model.half_knee_tokens(encoded),
+            encoded["study"][:, None].expand_as(encoded["visual_valid"]).flatten(),
+            encoded["visual_valid"].flatten(),
+            encoded["batch_size"],
+        )
+        targets, weights, observed = heads.targets(batch["study_uid"])
+        loss, divergence = report_attribute_loss(
+            logits, targets, weights, observed, heads.option_counts
+        )
+        self.log(
+            "report_attribute_loss",
+            loss,
+            on_step=False,
+            on_epoch=True,
+            batch_size=batch_size,
+        )
+        self.log(
+            "report_attribute_studies",
+            observed.sum().float(),
+            on_step=False,
+            on_epoch=True,
+            reduce_fx="sum",
+            batch_size=1,
+        )
+        for question, value in zip(heads.question_ids, divergence, strict=True):
+            self.log(
+                f"report_attribute_kl_{question}",
+                value,
+                on_step=False,
+                on_epoch=True,
+                batch_size=batch_size,
+            )
+        return self.config.trainer.report_attribute_loss_weight * loss
 
     def on_before_optimizer_step(self, optimizer) -> None:
         gradients = [
@@ -649,7 +717,9 @@ class KneeModule(L.LightningModule):
 
     def configure_optimizers(self):
         settings = self.config.optimizer
-        optimizer = build_optimizer(self.model, settings)
+        optimizer = build_optimizer(
+            self.model, settings, (self.report_attribute_heads,)
+        )
         total_steps = self.trainer.estimated_stepping_batches
         steps_per_epoch = max(
             1, math.ceil(total_steps / self.config.trainer.max_epochs)
