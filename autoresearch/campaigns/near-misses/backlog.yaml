@@ -1,2 +1,5 @@
-revision: 0
-queue: []
+revision: 316
+queue:
+- attention-dropout-antithetic-loss
+- oa-geometry-detached-correction
+- plane-readout-visual-residual

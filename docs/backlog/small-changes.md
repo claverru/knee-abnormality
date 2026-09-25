@@ -66,26 +66,9 @@ attention temperature τ 0.75 is adopted at inference and carries the best submi
 
 ### Attention-token dropout
 
-**Accepted for the backlog on 2026-09-21; unimplemented and untested.** Stochastically mask a
-small subset of dominant spatial tokens during training, separately for each study and disease.
-[ACMIL](https://arxiv.org/abs/2311.07125) supports this mechanism in histopathology MIL, not a
-measured knee-MRI gain. Concentrated attention is not inherently wrong; this is an incremental
-regularization experiment, not a missing architectural capability.
-
-- **Change:** after attention scoring and anatomical bias, exclude selected valid tokens from
-  that label's softmax and renormalize over the remainder. Always retain a valid token for every
-  study–label pair. Disable the masking at evaluation; keep the backbone pass, image budget,
-  anatomical bias and existing series dropout unchanged. Series dropout removes whole
-  plane/contrast slots; this changes evidence selection within retained acquisitions.
-- **Comparison:** one token-masking mode option for off, random masking and attention-challenging
-  masking. Compare a fresh current-recipe control with random valid-token masking and masking
-  drawn from the highest-scoring tokens, matching the number removed per study and label.
-  Fix a conservative candidate-pool size, masking rate and cap before implementation; no sweep.
-- **Decision:** follow the controlled-comparison rules with identical labels, split, incumbent
-  seed and training budget. Record macro/per-label AUC, paired uncertainty, masking counts and
-  runtime. Inspect focal findings explicitly: retaining a valid token does not guarantee that
-  lesion evidence remains. Require evidence of benefit beyond random masking before preferring
-  attention-challenging masking. Implementation requires a separate user request.
+**Tested and rejected, 2026-09-25.** Random masking at 5% of valid tokens lost to the OA-detector
+control at every inference τ; top-attention masking lost in the near-misses campaign
+([results](../validation/results/2026-09-25-near-misses-campaign.md#follow-up-on-main)).
 
 ### Plane/contrast-specific readouts
 
@@ -290,6 +273,8 @@ runs lost about 0.0092 and 0.0119 macro AUC.
 They changed other loss semantics, so neither settles the soft-prevalence alternative. It remains
 lower priority: retain one isolated comparison, with original soft targets, fixed training-fold
 counts and observed-cell reduction, rather than a sweep.
+Both runs, and two ranking losses, gain on soft AUC; they are parked on a
+[watch list](../validation/results/2026-09-23-validation-auc-variants.md#losses-campaign-rescored-2026-09-24).
 
 Per-label figures above come from `outputs/training/balanced-bce/fold_0/class_balance.json` for
 the thresholded fractions, and from the Steven v4 blend restricted to the fold-0 training rows of

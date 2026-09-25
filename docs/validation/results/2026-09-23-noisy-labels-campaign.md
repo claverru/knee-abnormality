@@ -53,6 +53,13 @@ Combining them was worse than either alone. Early-learning regularization pulls 
 their recent average while the schedule wants them to move late, and the pair lost Lateral OA
 (−0.0086) and PF OA (−0.0102) with intervals excluding zero.
 
+## Early-learning regularization public score (S57)
+
+Exported from its experiment source at ×4, τ 0.75, batch 4 (bundle `1d22fc40`,
+`outputs/submission/exports/elr-20260924-x4-tau075`), it scored 0.943 public on 2026-09-24
+against 0.942 for S48 (`k05-clean`, same seed and source without the term). One rounding step,
+the same direction as its fold-0 +0.0013; it stays below S54 (0.944) and the best 0.945.
+
 ## Artifacts
 
 Experiments, sources and checkpoints: `outputs/autoresearch/noisy-labels/experiments/`. The schedule

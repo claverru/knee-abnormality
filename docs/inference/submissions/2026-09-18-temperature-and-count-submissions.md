@@ -55,9 +55,22 @@ one recipe change submitted the same day, `series-share`, lost.
   it had already completed, and the second submission was sent on the assumption it had not. Both
   scored 0.938, which at least confirms the score is reproducible.
 
+## Later evidence and decision
+
+Geometry caps the count (fold-0 sampler replay of the `k_05` recipe, 2026-09-22): ×4 already takes
+80% of the triplet windows of a slot's only 2D series and decodes 94% of its slices; ×5 and ×6
+reach 92% and 98% for +18% and +29% triplets but only +5% and +9% decoded slices per study, and
+every step past ×6 adds triplets from 3D series alone
+(`outputs/analysis/acquisition-geometry-20260922/capacity_*`). On the 2026-09-17 token caches every
+candidate scored −0.0018 against 24 per type at τ 0.75
+([bag size](../../validation/results/2026-09-17-attention-temperature.md#bag-size)). On `oblique`,
+×5 at τ 0.70 scored 0.945 publicly against 0.944 at ×4 τ 0.75 (S47, S46), with +0.0003 on fold 0
+([result](../../validation/results/2026-09-22-oblique-groups-result.md#temperature-and-count)).
+**Dropped 2026-09-24 (user decision):** submissions stay at ×4 τ 0.75; no count above ×4 is
+pending.
+
 ## Open
 
-- Where the evaluation count turns over above ×4, and whether the runtime cost is worth it.
 - Whether τ 0.70 beats 0.75 at the larger counts; on fold 0 the optimum shifts to 0.70 at ×3 but
   by 7e-5.
 - Applying τ to any future checkpoint: it is free at inference and independent of the recipe, so

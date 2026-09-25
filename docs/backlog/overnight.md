@@ -13,8 +13,14 @@ from this file.
 
 ## Next queue
 
-No run is queued. The series-hygiene bundle trained on main as `k05-clean`, and as
-`oblique-clean` with the since-closed [oblique groups](../history/oblique-groups.md).
+- **`trainer.max_epochs: 12`** (queued 2026-09-24, user decision) against the current control
+  `knee-geometry-merged-2` (seed 638120755, ×4 0.900955). Under ordinary BCE, 15 epochs gained
+  +0.0023 and +0.0025 on ReXNet and +0.0029 on B0, all inside seed noise
+  ([overnight results](../validation/results/2026-09-18-overnight-results.md),
+  [epoch arms](../validation/results/2026-09-19-fold-ensembles-and-sigma-sweep.md)). Under
+  class-balanced BCE several runs selected their last or second-to-last epoch, and the
+  [noisy-labels campaign](../validation/results/2026-09-23-noisy-labels-campaign.md) found the
+  model does not memorize its labels within ten epochs.
 
 **No delta recorded before 2026-09-19 is a prior for a new queue.** Those historical runs used
 ordinary BCE; the recipe in force uses class-balanced BCE, which by itself moves fold 0 by about
@@ -23,9 +29,6 @@ Keep `validation_image_multiplier: 1` in comparisons.
 
 ## Candidates for later queues
 
-- **The epoch budget is reopened under this loss.** Three of the four arms on 2026-09-19 selected
-  epoch 10, the last one, and so did both positives; the control peaked at 9. The measurements
-  that closed the axis were all made under ordinary BCE, where the peak came earlier.
 - **Denser per-type budgets** (hypothesis; the only untested side of a measured axis). Raise
   `data.series_types[*].max_images` above today's 18/18/15/15/15/15 at a fixed sampler width and
   crop. Only the cheaper side has been measured and it loses monotonically: 15/15/12/12/12/12

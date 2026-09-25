@@ -1,2 +1,1236 @@
-revision: 0
-ideas: []
+revision: 316
+ideas:
+- id: meniscus-shared-residual-head
+  mechanism_id: shared-plus-residual-meniscus-classifier
+  parent_idea_id: null
+  title: Read both masked meniscus pools with one shared classifier plus zero-initialized
+    per-side residuals, without the study-level fallback
+  opportunity: In knee-geometry this head scored -0.0006 against the adopted run but
+    +0.0025 against k05-clean (80% interval [+0.0008, +0.0041]); both menisci improved
+    (+0.0028, +0.0041), OA +0.0020, and its x1 score was the campaign's best. Its
+    loss was almost all Fracture (-0.0135), the label a re-seed of the same recipe
+    moves by -0.0137. It also carried the study-level fallback, which alone scored
+    -0.0018, so the head was never measured on its own.
+  mechanism: For the two meniscus rows, w_med = w_shared + delta_med and w_lat = w_shared
+    + delta_lat, with w_shared initialized to the mean of the two current rows, deltas
+    at zero, no penalty and private biases. Attention rows, the own-side meniscus
+    mask, the half-knee loss and every other head stay unchanged. Lateral tears (279
+    exclusive training studies against 1,150 medial) learn from medial examples through
+    the shared vector.
+  precedents:
+  - 'meniscus-shared-residual-head (knee-geometry): diff at outputs/autoresearch/knee-geometry/experiments/meniscus-shared-residual-head-20260924T002657Z-24ba1afc/changes.diff;
+    take the head, not the fallback.'
+  - Hard-tied meniscus classifiers lost -0.0071 and -0.0075 when each pool still mixed
+    both halves (medial-lateral-transfer); the mask now separates them.
+  novelty: First measurement of the shared-plus-residual head without the study-level
+    fallback, on the re-seeded control.
+  coverage: The two meniscus labels, every study.
+  exploitation: If it helps,
+  budget: One extra 2560-parameter vector; no runtime change.
+  implementation: Adds the shared and residual vectors in modeling/model.py under
+    model.meniscus_readout; keeps the per-token mask and half-knee loss exactly as
+    the incumbent has them.
+  open_choices: None; initialization and no penalty are fixed.
+  dependencies: []
+  priority_rationale: The strongest measured near-miss; the loss that sank it looks
+    like seed noise.
+  status: completed
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality/autoresearch/campaigns/near-misses/seed-ideas.yaml
+  experiments:
+  - meniscus-shared-residual-head-20260924T210640Z-860b1d41
+  decision: reject
+- id: meniscus-folded-detector-isolated
+  mechanism_id: folded-half-knee-detector-position
+  parent_idea_id: null
+  title: Give the training-only half-knee detector distance from the midline instead
+    of signed side, with its gradients kept out of the shared position and normalization
+    layers
+  opportunity: Two knee-geometry runs of this idea scored +0.0020 and +0.0027 against
+    k05-clean (80% lower bounds +0.0002 and +0.0011); the menisci rose in both (+0.0023,
+    +0.0025). Against the adopted run they were -0.0011 and -0.0004, with losses in
+    Fracture (-0.0155), Baker's and Contusion, the labels the re-seed moves. The isolated
+    version was better and also carried the fallback.
+  mechanism: In the half-knee detector's input only, replace the signed medial-lateral
+    coordinate with its absolute value (sagittal 1D position becomes tokenwise |medial_axis|
+    in mm; coronal and axial 2D first input becomes |medial_axis| / R). Detach the
+    positional, plane and contrast embeddings and the LayerNorm affine parameters
+    for the detector path, so its loss updates the detector, projected features and
+    backbone but not shared position calibration. Main-loss gradients and the public
+    readout are unchanged; inference is unchanged.
+  precedents:
+  - 'meniscus-folded-medial-position (knee-geometry): outputs/autoresearch/knee-geometry/experiments/meniscus-folded-medial-position-20260924T045834Z-da90ae15/changes.diff'
+  - 'meniscus-folded-auxiliary-gradient-isolation (knee-geometry): outputs/autoresearch/knee-geometry/experiments/meniscus-folded-auxiliary-gradient-isolation-20260924T062707Z-a52c3a01/changes.diff;
+    implement this version, without the fallback.'
+  novelty: The isolated folded detector measured on its own, without the fallback,
+    on the re-seeded control.
+  coverage: The two meniscus labels through the shared training-only detector.
+  exploitation: Combined with
+  budget: No parameters; negligible runtime.
+  implementation: Changes only the detector input path in modeling/model.py and training/lightning.py
+    under trainer.half_knee; the public path and inference are untouched.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Two runs with positive lower bounds against the pre-adoption
+    control.
+  status: completed
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality/autoresearch/campaigns/near-misses/seed-ideas.yaml
+  experiments:
+  - meniscus-folded-detector-isolated-20260924T211136Z-fa25910b
+  decision: reject
+- id: meniscus-shared-head-folded-detector
+  mechanism_id: shared-head-plus-folded-detector
+  parent_idea_id: null
+  title: 'Follow-up to #1 and #2: combine the shared-plus-residual meniscus head with
+    the isolated folded detector'
+  opportunity: '#1 shares the public meniscus classifier; #2 shares a side-free detector
+    during training. They change different parameters but target the same two labels,
+    so their gains may add or overlap. Nobody has trained them together.'
+  mechanism: 'Implement both mechanisms together on the current incumbent, exactly
+    as specified in #1 and #2, regardless of whether either was adopted.'
+  precedents:
+  - Code of this campaign's meniscus-shared-residual-head and meniscus-folded-detector-isolated
+    experiments.
+  novelty: First combination of a shared public meniscus classifier with a side-free
+    training detector.
+  coverage: The two meniscus labels.
+  exploitation: Measures whether the two meniscus mechanisms stack.
+  budget: Same as
+  implementation: Reuse both experiments' changes on the current source under model.meniscus_readout
+    and trainer.half_knee.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The combination's upside is the sum of the two strongest near-misses;
+    run after both.
+  status: completed
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality/autoresearch/campaigns/near-misses/seed-ideas.yaml
+  experiments:
+  - meniscus-shared-head-folded-detector-20260924T214202Z-084e3da9
+  decision: reject
+- id: meniscus-side-split-readout
+  mechanism_id: side-split-meniscus-readout
+  parent_idea_id: null
+  title: 'Follow-up to #3: read each meniscus half with one shared attention row and
+    classifier on folded coordinates, plus per-side corrections'
+  opportunity: 'The RSNA lumbar solution (claverru/RSNA-lumbar) trained one head per
+    condition shared across left and right sides and spinal levels, with side-normalized
+    world coordinates. Our adopted half-knee loss uses this split only during training,
+    and #1 and #2 share parts of it. Here the split becomes the inference readout
+    too. Before the anatomical bias the incumbent''s medial and lateral meniscus attention
+    rows are already nearly shared.'
+  mechanism: 'One meniscus attention row and one classifier, each plus a zero-initialized
+    per-side residual (as in #1), read the medial-half tokens for Medial Meniscus
+    and the lateral-half tokens for Lateral Meniscus, with the medial-lateral coordinate
+    folded to distance from the midline (as in #2). Unknown-side or invalid-geometry
+    tokens follow the incumbent''s current handling. Medial and lateral compartments
+    are not mirror images, so keep the residuals and never mirror pixels between halves.'
+  precedents:
+  - 'claverru/RSNA-lumbar: train_study2levelside and mirror_world (side-free labels,
+    side-normalized coordinates).'
+  - 'Code of this campaign''s #1 and #2 experiments.'
+  novelty: First full side-split meniscus readout at inference, rather than a training-only
+    loss or shared classifier.
+  coverage: The two meniscus labels.
+  exploitation: The strongest form of the sharing idea; if it loses, the partial forms
+    (#1 to
+  budget: One attention row and classifier replace two; negligible runtime.
+  implementation: modeling/model.py under model.meniscus_readout, building on
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Tests the full lumbar-style split after its parts.
+  status: completed
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality/autoresearch/campaigns/near-misses/seed-ideas.yaml
+  experiments:
+  - meniscus-side-split-readout-20260924T221106Z-ff6a0d56
+  decision: reject
+- id: early-learning-regularization-current
+  mechanism_id: early-learning-regularization
+  parent_idea_id: null
+  title: Port early-learning regularization unchanged (lambda 0.075, momentum 0.7)
+    to the current recipe
+  opportunity: Against its same-seed control k05-clean it scored +0.0013 hard (80%
+    [-0.0004, +0.0031]) and +0.0008 soft, and 0.943 public (S57) against 0.942 (S48).
+    Against the mean of its three near-null sibling runs, ligaments gained +0.0045
+    (soft 95% interval above zero) and menisci +0.0031; Baker's was the only term-specific
+    loss (-0.0050). It sharpens predictions rather than re-ranking them.
+  mechanism: Keep a per-study running average of the model's own predictions (momentum
+    0.7) and add the penalty weight * log(1 - overlap(running_average, p)) to the
+    loss, weight 0.075, exactly as in the noisy-labels run. Nothing else changes.
+  precedents:
+  - 'early-learning-regularization (noisy-labels): outputs/autoresearch/noisy-labels/experiments/early-learning-regularization-20260923T124737Z-7aba30fc/changes.diff'
+  - 'Per-label analysis: docs/ongoing/early-learning-regularization.md'
+  - Combined with the class-balance schedule it lost Lateral OA -0.0086 and PF OA
+    -0.0075, an interaction risk with other loss terms.
+  novelty: First run on the knee-geometry recipe, which adds the half-knee loss the
+    term may interact with.
+  coverage: All twelve labels.
+  exploitation: Predefined checks for interpretation - ligaments above zero, OA no
+    worse than about -0.002, Baker's loss no larger than about -0.005.
+  budget: A per-study memory tensor; negligible runtime.
+  implementation: training/lightning.py and config.py under trainer.label_noise, from
+    the noisy-labels diff.
+  open_choices: None; lambda and momentum are fixed.
+  dependencies: []
+  priority_rationale: Two agreeing paired signals, local and public, and a cheap port.
+  status: completed
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality/autoresearch/campaigns/near-misses/seed-ideas.yaml
+  experiments:
+  - early-learning-regularization-current-20260924T224004Z-c94eea0a
+  decision: reject
+- id: side-normalized-3d-position
+  mechanism_id: side-normalized-3d-token-position
+  parent_idea_id: null
+  title: Replace the 1D and 2D position embeddings with one side-normalized 3D patient-position
+    encoding per token
+  opportunity: Tokens carry slice position within their series (1D) and pixel position
+    (2D); neither says where the token is in the knee consistently across series.
+    The related token-attention run lost -0.0015 overall but raised menisci (+0.0027)
+    and OA (+0.0035); its losses (PF OA and Fracture about -0.015, MCL -0.006) are
+    the labels a re-seed also moves, and it changed an attention block at the same
+    time. Never run; parked in knee-geometry because of the fallback contract.
+  mechanism: For every token, q = (knee_side_sign * (p_x - c_x), p_y - c_y, p_z -
+    c_z) in mm, with p the token's own patient position from the patient maps (per
+    token, not per slice) and c the knee centre (per-knee for bilateral studies).
+    Encode q with fixed 3D sine features (wavelengths about 8 to 512 mm) and a small
+    MLP, and add it to the token in place of position_1d and position_2d, which are
+    removed. Unknown side keeps y and z and uses a learned x vector; untrusted geometry
+    uses a learned unknown-position vector. Under reflection q is unchanged (x and
+    side both flip), and reflection TTA must give identical q.
+  precedents:
+  - 'side-normalized-3d-position (knee-geometry, never run): autoresearch/campaigns/knee-geometry/ideas.yaml'
+  - 'token-attention run with 3D RoPE on raw coordinates: outputs/training/token-attention;
+    docs/validation/results/2026-09-23-side-mask-and-token-attention.md'
+  - study-anchored-through-plane-position logged zero active studies because it required
+    one frame-of-reference UID across series; every accepted study fit has several.
+    Do not use that gate.
+  - claverru/RSNA-lumbar fed side-normalized world coordinates and slice normals as
+    meta inputs.
+  novelty: The replacement alone, without an attention change, on consistent per-knee
+    coordinates.
+  coverage: All labels, through every token's position.
+  exploitation: '#13 adds slice orientation to it.'
+  budget: A small MLP replaces two embeddings; negligible runtime.
+  implementation: modeling/spatial_tokens.py and model.py under model.position_encoding;
+    record the change in SPATIAL_TOKEN_IDENTITY. Log how many studies and tokens use
+    each branch (full, unknown side, unknown position) per epoch.
+  open_choices: Wavelength range fixed from knee extent before launch; no sweep.
+  dependencies: []
+  priority_rationale: A user hypothesis whose only test was confounded.
+  status: completed
+  created_revision: 1
+  seeded: /home/claudio/src/knee-abnormality/autoresearch/campaigns/near-misses/seed-ideas-2.yaml
+  experiments:
+  - side-normalized-3d-position-20260924T230919Z-02c6579a
+  decision: reject
+- id: pf-oa-front-back-bias
+  mechanism_id: pf-oa-anterior-anatomical-bias
+  parent_idea_id: null
+  title: Pull PF OA attention toward the front of the knee with the adopted anatomical
+    bias mechanism on the front-back axis
+  opportunity: PF OA is the weakest label (0.852 on the re-seeded control). In the
+    spatial importance map it has the strongest front-back contrast of any label (+1.85
+    anterior). The adopted medial-lateral anatomical bias (fixed 20 mm width, learned
+    strength) gained +0.0023 when adopted. The retired attention prior learned position
+    and width for every label from a nearly flat start and barely moved, a different
+    design.
+  mechanism: For the PF OA attention row only, add s * tanh(a / 20) to the attention
+    scores, where a is the token's anterior distance in mm from the knee centre along
+    patient y (positive toward the front) and s is a learned strength initialized
+    to zero, mirroring the adopted medial-lateral bias. Other labels and rows are
+    unchanged. Tokens without trusted geometry get no bias.
+  precedents:
+  - 'Adopted learned anatomical strength: autoresearch/anatomical-attention.md'
+  - 'Spatial importance map: docs/data-preparation/peripheral-coverage.md#spatial-importance-map'
+  - 'Retired attention prior: docs/validation/results/2026-09-15-attention-prior-result.md'
+  novelty: First anatomical bias on the front-back axis, for the label that the map
+    places most clearly.
+  coverage: PF OA only (OA family rule).
+  exploitation: Its region can serve
+  budget: One scalar; no runtime change.
+  implementation: modeling/model.py under model.oa_readout; log the learned strength
+    per epoch.
+  open_choices: The 20 mm width copies the adopted bias; no sweep.
+  dependencies: []
+  priority_rationale: Targets the weakest label with a mechanism that has worked once.
+  status: completed
+  created_revision: 1
+  seeded: /home/claudio/src/knee-abnormality/autoresearch/campaigns/near-misses/seed-ideas-2.yaml
+  experiments:
+  - pf-oa-front-back-bias-20260924T233809Z-6883e2b1
+  - pf-oa-front-back-bias-20260924T234415Z-1d504ce1
+  decision: reject
+- id: three-compartment-oa-detector
+  mechanism_id: shared-oa-detector-across-compartments
+  parent_idea_id: null
+  title: One cartilage-degeneration detector shared across the medial, lateral and
+    patellofemoral compartments, each with its own readout
+  opportunity: Medial, lateral and patellofemoral OA are the same disease in three
+    places. The lumbar solution shared one head per condition across five spinal levels.
+    PF OA (0.852) would learn from the more frequent tibiofemoral cases. Three OA
+    readouts on the adopted model came out flat, but none shared evidence across compartments.
+  mechanism: 'A training-and-inference detector d(t) = v . t shared by the three OA
+    labels. Each label pools d over its compartment region - the medial half, the
+    lateral half (both with the 10 mm band as in the half-knee loss) and the anterior
+    region (front of the knee centre, as in #7) - with a smooth-max, and adds it to
+    its existing logit through a zero-initialized per-label scale. Existing OA attention
+    and readouts are otherwise unchanged. Tokens without trusted geometry contribute
+    to no region.'
+  precedents:
+  - 'claverru/RSNA-lumbar: one head per condition shared across levels.'
+  - 'oa-own-half-readout-supervision, oa-own-half-feature-dispersion (knee-geometry,
+    flat): per-compartment OA readouts without sharing.'
+  novelty: First OA readout that shares evidence across compartments, including PF.
+  coverage: The OA family (Medial, Lateral, PF OA).
+  exploitation: If PF OA gains, the detector can later take a training-only form.
+  budget: One linear detector and three scalars; negligible runtime.
+  implementation: modeling/model.py under model.oa_readout; log the three learned
+    scales and region token counts.
+  open_choices: The region split reuses the 10 mm band and the knee centre; no sweep.
+  dependencies: []
+  priority_rationale: Directly aimed at PF OA with the lumbar solution's strongest
+    sharing trick.
+  status: completed
+  created_revision: 1
+  seeded: /home/claudio/src/knee-abnormality/autoresearch/campaigns/near-misses/seed-ideas-2.yaml
+  experiments:
+  - three-compartment-oa-detector-20260925T000723Z-c06ea5c7
+  decision: reject
+- id: attention-token-dropout-random
+  mechanism_id: attention-token-dropout
+  parent_idea_id: null
+  title: During training, drop a few random valid tokens from each label's attention
+    softmax
+  opportunity: 'Attention may collapse onto a few tokens. ACMIL supports stochastic
+    token masking in histopathology MIL; there is no project evidence. The random
+    arm is the control for #10.'
+  mechanism: After attention scoring and anatomical bias, exclude a random subset
+    of valid tokens from each study-label softmax and renormalize, training only.
+    Always keep at least one valid token per study-label pair inside the meniscus
+    own-side mask. Evaluation, the backbone pass, image budget, anatomical bias and
+    series dropout are unchanged.
+  precedents:
+  - 'Spec: docs/backlog/small-changes.md#attention-token-dropout'
+  - ACMIL, https://arxiv.org/abs/2311.07125
+  novelty: Token-level masking inside retained acquisitions, unlike series dropout.
+  coverage: All labels.
+  exploitation: '#10 tests whether targeting the highest-attention tokens beats random
+    masking.'
+  budget: No parameters; negligible runtime.
+  implementation: modeling/model.py under model.token_dropout; fix a conservative
+    rate and cap before implementation, no sweep; log masked counts per epoch.
+  open_choices: The rate and cap are fixed before launch.
+  dependencies: []
+  priority_rationale: Label-agnostic and cheap; needed as the control for
+  status: completed
+  created_revision: 1
+  seeded: /home/claudio/src/knee-abnormality/autoresearch/campaigns/near-misses/seed-ideas-2.yaml
+  experiments:
+  - attention-token-dropout-random-20260925T003602Z-b69e50d5
+  decision: provisional_accept
+- id: attention-token-dropout-top
+  mechanism_id: attention-token-dropout
+  parent_idea_id: null
+  title: 'Follow-up to #9: drop the same number of tokens, drawn from the highest-attention
+    ones'
+  opportunity: If attention-challenging masking helps, it should beat random masking
+    with the same count; otherwise any gain is just noise injection.
+  mechanism: 'As #9, but the masked tokens are drawn from the top of each study-label
+    attention distribution, with the same number removed per study-label as #9. Keep
+    at least one valid token inside the meniscus own-side mask.'
+  precedents:
+  - 'Spec: docs/backlog/small-changes.md#attention-token-dropout'
+  - Code of this campaign's attention-token-dropout-random experiment.
+  novelty: The attention-challenging arm of the ACMIL idea.
+  coverage: All labels.
+  exploitation: Kept only if it beats
+  budget: No parameters; negligible runtime.
+  implementation: modeling/model.py under model.token_dropout, reusing
+  open_choices: None beyond
+  dependencies: []
+  priority_rationale: The informative arm; interpretable only next to
+  status: completed
+  created_revision: 1
+  seeded: /home/claudio/src/knee-abnormality/autoresearch/campaigns/near-misses/seed-ideas-2.yaml
+  experiments:
+  - attention-token-dropout-top-20260925T010521Z-ef7d3a95
+  - attention-token-dropout-top-20260925T020151Z-6f4a2a9b
+  decision: reject
+- id: plane-contrast-readouts
+  mechanism_id: plane-contrast-specific-readouts
+  parent_idea_id: null
+  title: Give each plane/contrast type its own readout weights before summing, initialized
+    from the shared readout
+  opportunity: Current pooling collapses all acquisition types before one linear classifier
+    per label. PF OA draws its evidence from axial fluid (29%) and sagittal (54%)
+    and almost none from coronal; other labels have different profiles. An accepted,
+    never-started small change.
+  mechanism: Keep six partial vectors per label, u_cq = sum over tokens of type q
+    of alpha_ci * h_i, and compute z_c = sum_q w_cq . u_cq + b_c with the same global
+    attention denominator. Initialize every w_cq from the current w_c, reproducing
+    the original predictions apart from summation order; missing types contribute
+    zero. Image and token budgets unchanged.
+  precedents:
+  - 'Spec: docs/backlog/small-changes.md#planecontrast-specific-readouts'
+  - 'Per-type contribution: docs/validation/results/2026-09-17-type-contribution.md'
+  novelty: First per-type readout; count normalization, gated attention and residual
+    readouts were different changes.
+  coverage: All labels.
+  exploitation: Check missing-type studies and vendor strata in the diagnostics.
+  budget: Six times the readout weights; compute type contributions without a large
+    pooling tensor.
+  implementation: modeling/model.py under model.plane_readout; log the divergence
+    of w_cq from w_c per epoch.
+  open_choices: None; initialization is fixed.
+  dependencies: []
+  priority_rationale: Label-agnostic, suits PF OA's plane profile, and costs no images.
+  status: completed
+  created_revision: 2
+  seeded: /home/claudio/src/knee-abnormality/autoresearch/campaigns/near-misses/seed-ideas-3.yaml
+  experiments:
+  - plane-contrast-readouts-20260925T020628Z-2efb517d
+  decision: reject
+- id: any-oa-auxiliary
+  mechanism_id: knee-level-oa-auxiliary-target
+  parent_idea_id: null
+  title: Training-only whole-knee head that predicts the maximum of the three OA soft
+    labels
+  opportunity: Reports often say "tricompartmental" or leave the compartment vague,
+    so compartment OA labels are noisy while "any OA in the knee" is denser and cleaner.
+    PF OA features would learn from every OA case.
+  mechanism: 'One extra attention row and classifier predict max(Medial OA, Lateral
+    OA, PF OA) from the soft targets, with the same soft BCE and class-balance treatment,
+    added to the loss at a fixed small weight. Training only: the head is discarded
+    at inference and the twelve outputs are unchanged.'
+  precedents:
+  - OA-family readouts in knee-geometry were flat; none used a knee-level target.
+  novelty: First auxiliary target that pools the OA family.
+  coverage: The OA family, through shared token features.
+  exploitation: If it helps, OA grade or extent targets become worth deriving.
+  budget: One attention row and classifier; negligible runtime.
+  implementation: modeling/model.py and training/lightning.py under trainer.any_oa_loss;
+    the weight is fixed before launch; log the auxiliary loss.
+  open_choices: The weight is fixed before launch, no sweep.
+  dependencies: []
+  priority_rationale: A cheap, label-noise-aware way to give PF OA more signal.
+  status: completed
+  created_revision: 2
+  seeded: /home/claudio/src/knee-abnormality/autoresearch/campaigns/near-misses/seed-ideas-3.yaml
+  experiments:
+  - any-oa-auxiliary-20260925T023501Z-fd9784f2
+  decision: reject
+- id: slice-orientation-3d-position
+  mechanism_id: side-normalized-3d-token-position
+  parent_idea_id: null
+  title: 'Follow-up to #6: add each slice''s normal vector to the side-normalized
+    3D position input'
+  opportunity: The lumbar solution fed world coordinates plus the slice normal as
+    meta inputs. The normal tells the model how a slice cuts the knee, which the 3D
+    position alone does not; it matters most for oblique series.
+  mechanism: 'As #6, with the slice''s unit normal (side-normalized in x, as the position)
+    concatenated to the 3D position features before the MLP. Unknown or untrusted
+    geometry uses the same learned vectors as #6.'
+  precedents:
+  - 'claverru/RSNA-lumbar: META_COLS include xx, yy, zz and nx, ny, nz.'
+  - Code of this campaign's side-normalized-3d-position experiment.
+  novelty: Orientation-aware position encoding.
+  coverage: All labels.
+  exploitation: Runs regardless of
+  budget: Three more inputs to the MLP; negligible runtime.
+  implementation: modeling/spatial_tokens.py and model.py under model.position_encoding;
+    record in SPATIAL_TOKEN_IDENTITY.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: User interest; cheap on top of
+  status: completed
+  created_revision: 2
+  seeded: /home/claudio/src/knee-abnormality/autoresearch/campaigns/near-misses/seed-ideas-3.yaml
+  experiments:
+  - slice-orientation-3d-position-20260925T030427Z-c5f4b859
+  decision: reject
+- id: plane-negative-half-knee-mil
+  mechanism_id: plane-negative-half-knee-loss
+  parent_idea_id: null
+  title: In the half-knee loss, require a negative meniscus half to show no tear evidence
+    in every plane it has
+  opportunity: The half-knee loss was the only adoption of the last campaign. Its
+    refinements so far changed which tokens it sees (and lost); none changed what
+    it teaches.
+  mechanism: Keep the whole-half score z_h for positive supervision. Also compute
+    the same smooth-max score z_hp per represented anatomical plane in that half.
+    Replace the auxiliary BCE by y * softplus(-z_h) + (1 - y) * mean_p softplus(z_hp),
+    with the incumbent's class-balance weight and coefficient 0.075. Identical rules
+    for both menisci; absent planes omitted; equals the original loss with one plane.
+  precedents:
+  - 'meniscus-plane-negative-mil (knee-geometry, proposed, never run): autoresearch/campaigns/knee-geometry/ideas.yaml'
+  - 'Adopted meniscus-half-knee-mil: outputs/autoresearch/knee-geometry/experiments/meniscus-half-knee-mil-20260923T231102Z-edeb9f68/changes.diff'
+  novelty: First change to what the half-knee loss supervises.
+  coverage: The two meniscus labels through the training-only detector.
+  exploitation: Inference unchanged.
+  budget: Per-plane smooth-max; negligible runtime.
+  implementation: training/lightning.py under trainer.half_knee; log per-plane loss
+    terms.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The only untested refinement of the adopted mechanism's supervision.
+  status: completed
+  created_revision: 2
+  seeded: /home/claudio/src/knee-abnormality/autoresearch/campaigns/near-misses/seed-ideas-3.yaml
+  experiments:
+  - plane-negative-half-knee-mil-20260925T033325Z-d661934e
+  decision: reject
+- id: attention-coupled-meniscus-mil
+  mechanism_id: attention-weighted-half-knee-aggregation
+  parent_idea_id: null
+  title: Weight the half-knee detector's aggregation by the public meniscus attention
+    scores
+  opportunity: In knee-geometry this idea crashed on its first batch with an IndexError
+    in a token-count logging line (used length 8 against counts 16), so the mechanism
+    never trained. Detector-ranked pooling, the closest idea tried, lost -0.0018 (Lateral
+    Meniscus -0.0039).
+  mechanism: For eligible half tokens H, detector logits d and the existing anatomically
+    biased attention scores s, use z = logsumexp_H(s + d) - logsumexp_H(s) instead
+    of the uniform smooth-max, with temperature 1, backpropagating through both s
+    and d. Keep the partition, observed-target handling, class balance and coefficient
+    0.075; both menisci follow the same equation. The auxiliary disappears at inference.
+  precedents:
+  - 'meniscus-attention-coupled-mil (knee-geometry, invalid): outputs/autoresearch/knee-geometry/experiments/meniscus-attention-coupled-mil-20260924T011048Z-069c8673/changes.diff;
+    fix the logging crash.'
+  novelty: First trained run of attention-coupled half-knee aggregation.
+  coverage: The two meniscus labels.
+  exploitation: Tells whether coupling the loss to public attention helps or hurts.
+  budget: Negligible.
+  implementation: training/lightning.py and model.py under trainer.half_knee and model.meniscus_readout.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Never ran because of a logging bug; low expected value, last
+    in order.
+  status: completed
+  created_revision: 2
+  seeded: /home/claudio/src/knee-abnormality/autoresearch/campaigns/near-misses/seed-ideas-3.yaml
+  experiments:
+  - attention-coupled-meniscus-mil-20260925T040233Z-4ffbb1ea
+  decision: reject
+- id: oa-geometry-attention-residual
+  mechanism_id: oa-geometry-appearance-attention-interaction
+  parent_idea_id: slice-orientation-3d-position
+  title: "Use 3D geometry to adjust OA attention while retaining the incumbent\u2019\
+    s positional values"
+  opportunity: "The orientation-plus-position replacement gained PF OA +0.015619 and\
+    \ soft macro +0.001099, but lost hard macro \u22120.001681, both tibiofemoral\
+    \ OA labels, both menisci, ACL and contusion. Its three-label OA mean nevertheless\
+    \ rose +0.002368. This motivates separating geometry-assisted evidence selection\
+    \ from wholesale replacement of shared token representations. PF OA\u2019s gain\
+    \ is comparable to the historical reseed movement, so it supplies a hypothesis\
+    \ rather than evidence of a reliable benefit."
+  mechanism: "Keep incumbent tokens h, attention, positional embeddings and classified\
+    \ values. For all three OA rows, add the same form of low-rank interaction: delta_score_c\
+    \ = sum_k (U h)_k (V_c phi(g))_k. Use rank 16, shared U, and zero-initialized\
+    \ V_c. phi(g) reuses the completed orientation run\u2019s fixed Fourier coordinates\
+    \ and canonical side-normalized slice normal. Set the entire residual to zero\
+    \ for tokens lacking usable geometry or known side. Add it before the existing\
+    \ attention mask and token dropout. Geometry conditions selection without entering\
+    \ the pooled values or imposing a hand-selected anterior preference."
+  precedents:
+  - "[Orientation completion](/home/claudio/src/knee-abnormality/outputs/autoresearch/near-misses/jobs/orchestrator-20260925T040133Z-15a23c9e/report.json):\
+    \ macro \u22120.001681; 80% interval [\u22120.004379,+0.001251]. PF OA improved\
+    \ while several other labels declined."
+  - '[Position-only completion](/home/claudio/src/knee-abnormality/outputs/autoresearch/near-misses/jobs/orchestrator-20260925T000608Z-a3155809/report.json)
+    and [anterior-bias completion](/home/claudio/src/knee-abnormality/outputs/autoresearch/near-misses/jobs/orchestrator-20260925T003506Z-b9ee65cb/report.json):
+    neither was accepted. The latter reduced PF OA, arguing against simply restoring
+    a fixed anterior preference.'
+  - "[Original reseed analysis](/home/claudio/src/knee-abnormality/outputs/analysis/elr-per-label-20260924/elr_per_label.json):\
+    \ adopted-new-seed minus meniscus-half-knee-mil moved macro \u22120.006287 and\
+    \ PF OA \u22120.015373. This is a two-run yardstick, not an estimated seed distribution."
+  - '[Absolute-position MIL research](https://proceedings.mlr.press/v248/krishnamoorthy24a.html)
+    supports retaining useful positional context. It does not establish this interaction
+    or a knee-MRI benefit.'
+  novelty: "Combines the completed geometry experiments with a new placement and interaction:\
+    \ geometry modifies OA selection through appearance-dependent scores while the\
+    \ established positional values survive. It differs from replacing embeddings,\
+    \ a geometry-only attention bias, and the stopped knee-geometry campaign\u2019\
+    s queued own-context bilinear readout, which changes classified regional evidence."
+  coverage: One architectural rule covers medial, lateral and PF OA. The historical
+    geometry branch reached 3,359 training studies per epoch; actual token coverage
+    must be remeasured. Effusion and synovitis receive no special rule. Their results,
+    and all other labels, remain necessary diagnostics of shared-training effects.
+  exploitation: Log valid and bypassed tokens, affected studies, residual-score magnitudes
+    and changes in OA attention mass by epoch. Inspect the complete hard/soft label
+    vector and OA family mean. A smaller PF-versus-tibiofemoral tradeoff is the intended
+    signature; attention localization alone cannot establish improvement.
+  budget: "Approximately 6,300 new weights and linear token-wise work, with no extra\
+    \ encoder pass. The larger completed geometry replacement used 1,688.7 seconds\
+    \ against the 1,905-second ceiling. This suggests feasibility but does not measure\
+    \ the proposed implementation\u2019s runtime."
+  implementation: "Against revision 233, add the residual under model.position_encoding;\
+    \ retain random token dropout, incumbent 1D/2D embeddings, anatomical strengths,\
+    \ meniscus masks and half-knee supervision. Reuse the orientation parent\u2019\
+    s header-derived metadata and reflection handling, but omit its embedding replacement\
+    \ and learned unknown-position vectors. Add newly consumed batch fields to MODEL_BATCH_KEYS\
+    \ and aggregate activity once per epoch. Initialize new weights without advancing\
+    \ the incumbent augmentation RNG stream. Classification: small-changes.md; related\
+    \ geometry investigations belong to the stopped knee-geometry campaign. If another\
+    \ incumbent is accepted, retain unrelated improvements and reconcile any overlapping\
+    \ OA score or positional mechanism explicitly rather than restoring the historical\
+    \ source."
+  open_choices: "Geometry quality may be insufficient for appearance-dependent routing,\
+    \ and the residual can still alter shared features through OA gradients. Rank\
+    \ 16 and the parent\u2019s spatial frequencies are proposed fixed design choices,\
+    \ not a sweep. Whether the residual uses geometry meaningfully, rather than nearly\
+    \ constant Fourier components, remains unmeasured."
+  dependencies: []
+  priority_rationale: 'Priority 1: directly addresses the recurring PF OA versus other-label
+    tradeoff while preserving more of the incumbent representation. It has a precise
+    architectural distinction and modest expected cost, but its motivation remains
+    vulnerable to seed variation.'
+  status: completed
+  created_revision: 236
+  ranking_rationale: "Admit all four proposals: proposal_admission reports every dependency\
+    \ satisfied, and each proposal declares an empty dependency list. Their rejected\
+    \ historical parents supply precedents, not required incumbent components. Keep\
+    \ the geometry attention residual first because it tests whether OA can use geometry\
+    \ for selection while retaining the incumbent\u2019s positional values. Move the\
+    \ OA detector proposal ahead of the plane readout: its active regional predecessor\
+    \ gained 0.001346 macro AUC and narrowly missed the 80% interval gate, whereas\
+    \ the active plane readout lost 0.000634 and its metadata-confounding explanation\
+    \ remains unmeasured. Rank spatial cluster dropout third because it changes the\
+    \ accepted dropout mechanism with a fixed removal count and proposed RNG parity.\
+    \ Put the plane readout fourth; its constrained residual is actionable, but the\
+    \ evidence for its proposed cause is weakest."
+  experiments:
+  - oa-geometry-attention-residual-20260925T051045Z-2860a65e
+  decision: reject
+- id: plane-readout-visual-residual
+  mechanism_id: metadata-centered-acquisition-readout-residual
+  parent_idea_id: plane-contrast-readouts
+  title: Restrict plane-specific readout corrections to the visual increment over
+    token metadata
+  opportunity: "Six independent readouts produced a small OA-family gain (+0.000590)\
+    \ but a \u22120.003508 mean across effusion, synovitis and Baker\u2019s, and \u2212\
+    0.000634 macro overall. Incumbent values contain position, plane and contrast\
+    \ embeddings as well as image features. Type-specific classifiers can therefore\
+    \ specialize on metadata contributions alongside appearance. Whether that contributes\
+    \ to the observed tradeoff is unknown."
+  mechanism: "Let f be projected image features, m the existing summed metadata embeddings,\
+    \ and N the incumbent LayerNorm. Keep h=N(f+m), its attention and the shared classifier\
+    \ unchanged. Add zero-initialized type-specific residual weights D_cq acting only\
+    \ on r=N(f+m)\u2212N(m): z_c=z_inc,c+sum_t alpha_ct D_c,type(t)\xB7r_t. Use the\
+    \ same equation for all twelve labels, the same global attention denominator and\
+    \ the same dropout mask. The added correction vanishes at the algebraic reference\
+    \ f=0; metadata can still condition image interpretation through normalization."
+  precedents:
+  - "[Plane-readout completion](/home/claudio/src/knee-abnormality/outputs/autoresearch/near-misses/jobs/orchestrator-20260925T030301Z-268e2236/report.json):\
+    \ macro \u22120.000634, soft macro \u22120.000381; all six types were active.\
+    \ Baker\u2019s fell \u22120.010287 with exploratory 95% interval [\u22120.018675,\u2212\
+    0.002584]."
+  - '[Incumbent pooling](/home/claudio/src/knee-abnormality/outputs/autoresearch/near-misses/experiments/attention-token-dropout-random-20260925T003602Z-b69e50d5/source/src/knee_abnormality/modeling/model.py:390)
+    uses the same normalized image-plus-metadata tensor for attention and classified
+    values.'
+  - '[Knee-geometry registry](/home/claudio/src/knee-abnormality/autoresearch/campaigns/knee-geometry/ideas.yaml):
+    meniscus-position-residualized-values was prepared without a recorded result.
+    It subtracts positional contributions from the existing meniscus values; it is
+    an overlapping algebraic precedent, not accepted evidence.'
+  - '[General backlog ownership](/home/claudio/src/knee-abnormality/docs/backlog/small-changes.md#planecontrast-specific-readouts):
+    type-specific readouts and feature adapters are separate entries. This refines
+    the completed readout arm; it does not implement the pending pre-attention adapters.'
+  novelty: Retains the shared classifier and constrains only acquisition-specific
+    additions. Unlike the completed six-head replacement, the added classifiers cannot
+    directly read the metadata-only tensor. Unlike the historical meniscus proposal,
+    this applies one rule to every label and leaves the base values intact.
+  coverage: All represented plane/contrast types and all twelve labels participate.
+    Effusion and synovitis are evaluated through the shared mechanism, with no selective
+    loss or head rule. Missing types contribute no correction; missing-type and vendor
+    results need counts because the original completion lacked a missing-type analysis.
+  exploitation: Log type coverage, residual-weight norms, visual-increment norms and
+    absolute logit corrections per epoch. Examine hard and soft AUC across all labels,
+    plus descriptive acquisition-availability strata. Reduced metadata-only correction
+    is a construction property, not evidence of reduced scanner confounding.
+  budget: Adds 18,432 residual weights, one extra token normalization and type-indexed
+    linear scoring. No backbone, image or sampling work is added. The completed full
+    type-readout run showed little overhead; the additional normalization and temporary
+    tensor still require measurement within 1,905 seconds.
+  implementation: 'Against revision 233, add one mechanism under model.plane_readout
+    in model.py/config.py and epoch logging in lightning.py. Retain the shared head,
+    accepted random dropout, attention denominator, embeddings and auxiliary path.
+    Do not restore the rejected six complete classifier tensors or add pre-attention
+    feature adapters. Classification: small-changes.md, owned by the existing plane-readout
+    entry. If a new incumbent introduces acquisition specialization, replace that
+    overlapping specialization with this constrained residual rather than stacking
+    duplicate classifiers; retain unrelated accepted changes and revise the metadata
+    reference if their token representation changes.'
+  open_choices: Zero projected features are an algebraic reference, not a blank MRI
+    or causal intervention. Availability shortcuts can remain through attention and
+    image statistics. Subtraction also changes gradients into shared metadata embeddings
+    and normalization, so collateral label effects remain possible. Token-cache evidence
+    of harmful metadata contributions is currently missing.
+  dependencies: []
+  priority_rationale: 'Priority 2: a cheap, distinct refinement of a completed near-null
+    architecture with direct relevance to effusion and synovitis. The mechanism is
+    easy to interpret, but its nuisance-metadata explanation has not been measured.'
+  status: queued
+  created_revision: 236
+  ranking_rationale: "Admit both proposals: proposal_admission confirms their declared\
+    \ dependencies are currently satisfied, and each specifies a bounded mechanism\
+    \ distinct from the live queue. Keep the reserved head first. Rank antithetic\
+    \ loss next because each complementary mask retains the accepted uniform fixed-count\
+    \ marginal distribution, so averaging their separate losses preserves the expected\
+    \ primary objective while changing its estimator. Place detached OA correction\
+    \ ahead of the plane readout: it directly targets the completed geometry residual\u2019\
+    s OA-versus-other-label tradeoff, though the cause of that tradeoff is unmeasured.\
+    \ The plane proposal remains live."
+- id: oa-detector-isolated-union-supervision
+  mechanism_id: shared-oa-detector-with-detached-union-auxiliary
+  parent_idea_id: three-compartment-oa-detector
+  title: Train the regional OA detector with any-OA supervision whose gradients stop
+    at its input features
+  opportunity: "The regional OA detector gained macro +0.001346 and soft macro +0.001414\
+    \ but missed adoption because its 80% lower bound was \u22120.000207. The separate\
+    \ any-OA auxiliary improved PF OA while reducing lateral OA, both menisci and\
+    \ Baker\u2019s. Combining their useful roles through the same detector, while\
+    \ blocking direct auxiliary gradients into shared features, tests whether family\
+    \ supervision can help OA readout learning with less interference."
+  mechanism: "Restore the completed shared scalar OA detector and its three regional\
+    \ smooth-max residuals over unchanged public OA logits. Use that same detector\
+    \ for a training-only whole-knee smooth-max score plus an auxiliary bias, supervised\
+    \ by max of the three observed OA soft targets. For this auxiliary computation\
+    \ only, detach the detector\u2019s input tokens. Thus auxiliary BCE updates the\
+    \ shared detector and auxiliary bias immediately, while public OA BCE still trains\
+    \ the detector, regional scales and image representation normally. Retain the\
+    \ parent auxiliary weight 0.05 and its training-fold balancing convention."
+  precedents:
+  - "[Regional-detector completion](/home/claudio/src/knee-abnormality/outputs/autoresearch/near-misses/jobs/orchestrator-20260925T010401Z-046f6e5b/report.json):\
+    \ macro +0.001346, 80% [\u22120.000207,+0.002940]; PF OA +0.01017, medial/lateral\
+    \ OA \u22120.00022/\u22120.00090. Regional corrections were active."
+  - "[Any-OA completion](/home/claudio/src/knee-abnormality/outputs/autoresearch/near-misses/jobs/orchestrator-20260925T033224Z-1d005938/report.json):\
+    \ macro \u22120.002104, soft macro \u22120.001133. Its three-label OA mean rose\
+    \ +0.001220 while the meniscus mean fell \u22120.008042; these derived means have\
+    \ no new intervals."
+  - '[Historical shared-family channel finding](/home/claudio/src/knee-abnormality/autoresearch/campaigns/medial-lateral-transfer/findings.md#completion-20260921t035352z-f3073e34):
+    inconclusive, with very small selected-checkpoint scales. Direct supervision of
+    the shared detector addresses weak training of an initially gated branch; the
+    archived diagnosis does not prove why it stayed small.'
+  - '[Auxiliary-loss backlog](/home/claudio/src/knee-abnormality/docs/backlog/big-bets.md#auxiliary-loss-campaign)
+    owns general auxiliary-head investigations. This proposal combines two completed
+    near-misses mechanisms using existing OA targets; it does not consume the separate
+    ongoing report-attribute work.'
+  novelty: The auxiliary now trains parameters that directly contribute to public
+    regional OA predictions. Simply detaching the original disposable any-OA head
+    would have no useful route to the public output. This shared detector provides
+    that route while preventing the auxiliary term itself from updating backbone,
+    projection, embeddings or shared normalization.
+  coverage: All three OA compartments use one detector and one family rule. The prior
+    regional path reached 3,359 studies per epoch; the auxiliary reached all 3,502.
+    Empty regions retain the base prediction. Non-OA labels have no new direct path,
+    but public OA training can still change their shared representation.
+  exploitation: Log observed union targets, auxiliary loss, detector updates, regional
+    token counts, learned scales and public correction magnitudes every epoch. Inspect
+    lateral OA alongside PF OA and the complete non-OA vector. Auxiliary activity
+    without a nonzero public correction is insufficient evidence that the combined
+    mechanism was exercised.
+  budget: "A shared 256-dimensional detector, three scales and one training-only bias;\
+    \ no adapter or extra encoder pass. The original detector and auxiliary each used\
+    \ about 1,674\u20131,678 seconds separately. Their combination is plausibly within\
+    \ 1,905 seconds, but separate timings do not establish combined cost."
+  implementation: "Against revision 233, add the joint mechanism under model.oa_readout\
+    \ and trainer.any_oa_loss. Retain incumbent random dropout, public heads, positional\
+    \ representation and half-knee loss. Reuse the detector parent\u2019s fixed regional\
+    \ definitions and header-derived anterior geometry. Replace the historical independent\
+    \ auxiliary attention/classifier with the shared-detector auxiliary; do not restore\
+    \ its unrestricted gradient path. Carry required geometry keys through MODEL_BATCH_KEYS\
+    \ and reflection handling. Classification: small-changes.md. If the incumbent\
+    \ changes, preserve unrelated improvements; reuse or replace any newly accepted\
+    \ overlapping OA detector explicitly, maintaining the detached auxiliary boundary\
+    \ rather than installing two competing family channels."
+  open_choices: Whole-knee maximum targets may favor whichever OA compartment is easiest
+    and still fail to help lateral OA. Direct detector supervision avoids an initially
+    untrained shared direction, but cannot ensure useful regional scales. The chosen
+    global smooth-max aggregation differs from the original auxiliary attention head,
+    so a result would assess the combined mechanism rather than isolate gradient detachment.
+  dependencies: []
+  priority_rationale: 'Priority 3: combines the strongest rejected OA macro result
+    with a concrete route for auxiliary supervision. Cost appears modest, but the
+    extra objective and shared regional detector introduce more interaction uncertainty
+    than the first two proposals.'
+  status: completed
+  created_revision: 236
+  ranking_rationale: "Admit all four proposals: proposal_admission reports every dependency\
+    \ satisfied, and each proposal declares an empty dependency list. Their rejected\
+    \ historical parents supply precedents, not required incumbent components. Keep\
+    \ the geometry attention residual first because it tests whether OA can use geometry\
+    \ for selection while retaining the incumbent\u2019s positional values. Move the\
+    \ OA detector proposal ahead of the plane readout: its active regional predecessor\
+    \ gained 0.001346 macro AUC and narrowly missed the 80% interval gate, whereas\
+    \ the active plane readout lost 0.000634 and its metadata-confounding explanation\
+    \ remains unmeasured. Rank spatial cluster dropout third because it changes the\
+    \ accepted dropout mechanism with a fixed removal count and proposed RNG parity.\
+    \ Put the plane readout fourth; its constrained residual is actionable, but the\
+    \ evidence for its proposed cause is weakest."
+  experiments:
+  - oa-detector-isolated-union-supervision-20260925T051852Z-2cf24244
+  decision: reject
+- id: spatial-cluster-token-dropout
+  mechanism_id: spatially-correlated-attention-token-dropout
+  parent_idea_id: attention-token-dropout-random
+  title: Drop a small random spatial cluster using the accepted token-removal count
+  opportunity: Random dropout was accepted, but highest-score removal exchanged PF
+    OA and synovitis gains for substantial lateral-meniscus loss and a negative macro
+    result. Independent random omissions may leave neighboring, correlated evidence
+    almost intact. A spatial cluster tests that suspected redundancy without deliberately
+    removing the strongest lesion evidence. Neighbor similarity and the effective
+    strength of a four-token cluster have not been measured.
+  mechanism: "Keep the accepted count k=min(floor(0.05*n),4,n\u22121) for each study-label\
+    \ pool. Use the incumbent random-key tensor to choose a uniformly random allowed\
+    \ anchor, then remove its nearest allowed feature-grid neighbors within that same\
+    \ encoded image until k tokens are selected. Resolve equal distances using the\
+    \ same random keys. If that image cannot supply k tokens, continue from the lowest-key\
+    \ remaining anchor. Apply this single rule to every label after existing anatomical\
+    \ restrictions, renormalize attention, and disable it at evaluation."
+  precedents:
+  - '[Random-dropout completion](/home/claudio/src/knee-abnormality/outputs/autoresearch/near-misses/jobs/orchestrator-20260925T013304Z-e56c661f/report.json):
+    macro +0.002477, 80% [+0.000476,+0.004378]; 168,096 masked selections per epoch.
+    This is the accepted behavioral parent.'
+  - "[Highest-score completion](/home/claudio/src/knee-abnormality/outputs/autoresearch/near-misses/jobs/orchestrator-20260925T023405Z-f49ba564/report.json):\
+    \ macro \u22120.000709; PF OA +0.011320, synovitis +0.007665 and lateral meniscus\
+    \ \u22120.012962. Removing its random draw also changed subsequent RNG consumption."
+  - '[DropBlock](https://arxiv.org/abs/1810.12890) motivates correlated spatial masking
+    because neighboring convolutional activations can preserve information after independent
+    dropout. Its feature-map experiments do not establish a benefit from masking attention
+    tokens.'
+  - '[ACMIL](https://arxiv.org/abs/2311.07125) studies multiple attention branches
+    and stochastic masking within highly attended instances. This proposal instead
+    uses spatial adjacency and random anchors. The [general attention-dropout backlog](/home/claudio/src/knee-abnormality/docs/backlog/small-changes.md#attention-token-dropout)
+    owns the broader direction.'
+  novelty: Changes the correlation structure of exclusions while preserving their
+    count, training boundary and random-key consumption. It is neither a rate/cap
+    sweep nor a renamed highest-score mask. Unlike the historical overlapping-triplet
+    smoothing proposal, it changes public attention support rather than auxiliary
+    detector logits.
+  coverage: The same rule covers all twelve labels, including effusion and synovitis.
+    Meniscus exclusions remain inside its allowed pool. Masking uses feature-grid
+    identity within an already encoded image, requiring neither patient landmarks
+    nor new image sampling.
+  exploitation: "Log total dropped tokens, multi-token same-image clusters, cluster\
+    \ distances, affected study-label pairs and removed attention mass by epoch. Preserve\
+    \ the incumbent random draw\u2019s shape and call position so this comparison\
+    \ avoids the known RNG-consumption difference of the top-token arm. Assess the\
+    \ complete label vector, especially whether diffuse-label gains again accompany\
+    \ focal-label losses."
+  budget: "No new learned parameters or encoder work. Distances are computed from\
+    \ selected anchors to existing grid positions; no all-pairs token matrix is needed.\
+    \ Extra mask-selection work should be small relative to the accepted run\u2019\
+    s 1,662.8-second compute, but realized runtime remains unmeasured."
+  implementation: 'Against revision 233, replace independent random selection in model.token_dropout
+    with spatial clustering, retaining its count rule and logging. Expose encoded-image
+    identity and grid positions internally in model.py; no new dataset batch field
+    is expected. Keep anatomical eligibility, half-knee supervision and all inference
+    behavior. Classification: small-changes.md. If accepted, this supersedes attention-token-dropout-random
+    rather than stacking another mask. Retain unrelated incumbent improvements; if
+    another dropout mechanism is accepted during development, reassess the replacement
+    against that mechanism before proceeding.'
+  open_choices: A cluster can erase an entire focal finding even when its anchor is
+    random. Four tokens may also be too few to alter redundant evidence materially.
+    Nearest valid anchors need not form a connected shape around invalid support,
+    so log realized geometry rather than assuming every mask is contiguous.
+  dependencies: []
+  priority_rationale: 'Priority 4: the cheapest structural extension of the only accepted
+    campaign mechanism, with a clear external rationale and improved RNG comparability.
+    Its expected effect is least certain because spatial redundancy and cluster strength
+    are unmeasured.'
+  status: completed
+  created_revision: 236
+  ranking_rationale: 'Both proposals pass proposal_admission and describe distinct,
+    bounded changes. Acquisition-mass routing moves ahead of the queued plane readout
+    because the completed OA geometry run confirms substantial attention movement,
+    although it does not identify harmful movement between acquisitions. Expectation-preserving
+    dropout follows: its fixed-count construction addresses a real algebraic difference
+    in the accepted readout, but the size and predictive cost of that difference are
+    unmeasured. The reserved spatial-cluster head stays first. The plane proposal
+    remains live; its suspected metadata contribution is also unmeasured.'
+  experiments:
+  - spatial-cluster-token-dropout-20260925T054803Z-0d48bf47
+  decision: reject
+- id: oa-acquisition-mass-conserving-routing
+  mechanism_id: oa-geometry-routing-with-acquisition-mass-conservation
+  parent_idea_id: oa-geometry-attention-residual
+  title: Let geometry redistribute OA attention within acquisitions while preserving
+    their existing attention mass
+  opportunity: "The completed geometry residual gained +0.002094 averaged across the\
+    \ three OA labels but lost \u22120.001120 across the other nine; macro fell \u2212\
+    0.000317. PF OA improved while medial and lateral OA declined. New read-only analysis\
+    \ of epoch-7 training logs gives mean attention total variation \u22480.233 per\
+    \ eligible OA row, so the residual made substantial changes. The logs do not distinguish\
+    \ redistribution within acquisitions from shifts between acquisitions. Constraining\
+    \ the latter could preserve useful acquisition selection while allowing spatial\
+    \ refinement; this remains a hypothesis."
+  mechanism: "Reuse the parent's rank-16 appearance\u2013geometry interaction, fixed\
+    \ geometry features and zero initialization. Compute base attention a after the\
+    \ incumbent masks and random token dropout. For each OA row and acquisition j,\
+    \ let G_j contain retained tokens with usable geometry and M_j=sum_{t in G_j}\
+    \ a_t. Replace their weights by a'_t=M_j*softmax_{G_j}(base_score_t+geometry_residual_t).\
+    \ Leave all other weights unchanged. Empty groups contribute nothing; singleton\
+    \ groups remain unchanged. This preserves each acquisition's total mass and every\
+    \ unusable token's weight within that forward, while learning where to attend\
+    \ inside usable groups. Keep the original classified values and ordinary public\
+    \ supervision."
+  precedents:
+  - "[Geometry completion](/home/claudio/src/knee-abnormality/outputs/autoresearch/near-misses/jobs/orchestrator-20260925T054637Z-f5413a53/report.json):\
+    \ macro \u22120.000317, 80% interval [\u22120.001895,+0.001305], soft macro +0.000446.\
+    \ PF OA gained +0.010129 while both tibiofemoral OA labels and ACL declined."
+  - '[Epoch metrics](/home/claudio/src/knee-abnormality/outputs/autoresearch/near-misses/experiments/oa-geometry-attention-residual-20260925T051045Z-2860a65e/training/fold_0/logs/version_0/metrics.csv):
+    epoch 7 logged total-variation sum 2343.103 over 3359 eligible studies and three
+    OA rows; their quotient is 0.232520. This is an evolving-training statistic, not
+    a validation localization measurement.'
+  - '[Historical geometry registry](/home/claudio/src/knee-abnormality/autoresearch/campaigns/knee-geometry/ideas.yaml),
+    within-acquisition-geometry-pooling: blocked without a result. Its mass-conservation
+    construction used fixed represented-depth weights; this proposal instead constrains
+    the completed learned OA interaction.'
+  - "[Original reseed analysis](/home/claudio/src/knee-abnormality/outputs/analysis/elr-per-label-20260924/elr_per_label.json):\
+    \ adopted-new-seed versus the adopted half-knee run moved macro \u22120.006287\
+    \ and PF OA \u22120.015373. This two-run comparison is a cautionary yardstick,\
+    \ not an estimated seed distribution."
+  - '[Krishnamoorthy and Wiens, 2024](https://proceedings.mlr.press/v248/krishnamoorthy24a.html)
+    supports positional information in MIL. It does not establish acquisition-mass
+    conservation or a knee-MRI benefit.'
+  novelty: Combines a completed appearance-dependent geometry mechanism with a conditional
+    normalization constraint. Unlike the rejected global score residual, geometry
+    cannot directly transfer attention between acquisitions or between usable and
+    unusable geometry. Unlike the historical depth-weighting proposal, it learns spatial
+    selection. The queued plane-readout residual changes classified evidence; the
+    running union-supervised detector adds regional evidence. Neither implements this
+    constraint.
+  coverage: One rule covers medial, lateral and PF OA. Historical eligibility was
+    3359 studies per epoch; groups with multiple usable retained tokens must be counted
+    separately. Effusion, synovitis and other labels retain their direct paths, but
+    shared-training effects remain possible. The intended result is broader OA improvement
+    without repeating the collateral declines; exploratory label intervals cannot
+    establish that outcome independently.
+  exploitation: Log affected studies, usable and bypassed tokens, empty/singleton
+    groups, residual norms, within-group attention changes, and maximum acquisition-mass
+    discrepancy each epoch. Preserve dropout activity accounting. Compare the complete
+    hard/soft label vector. Measuring the parent's between-acquisition mass shifts
+    would sharpen the premise; total variation alone cannot identify that failure
+    mode.
+  budget: Retains approximately 6300 interaction weights and adds grouped reductions
+    for three rows, without another encoder pass. The unrestricted parent took 1664.7
+    seconds against the 1905-second ceiling. That supports plausibility, but grouped
+    softmax and logging costs remain unmeasured.
+  implementation: Against revision 262, add this constrained geometry path under model.position_encoding;
+    do not restore the rejected unrestricted residual alongside it. Retain incumbent
+    positional values, public heads, token dropout and auxiliary behavior. Reuse the
+    completed parent's header-derived coordinates and reflection transport; propagate
+    its required batch fields through MODEL_BATCH_KEYS. Carry the existing acquisition-row
+    index into encoded tokens. Classify in small-changes.md, with historical ownership
+    in the knee-geometry registry. If the incumbent changes, retain unrelated accepted
+    readouts and detectors. Replace overlapping geometry routing explicitly; if a
+    new dropout placement makes the mass contract incompatible with an accepted prerequisite,
+    return for redesign rather than silently changing its behavior.
+  open_choices: The base scorer still learns, so conservation within a forward does
+    not freeze acquisition allocation over training. Harmful between-acquisition shifts
+    have not been measured, and preventing them could remove useful geometry information.
+    Shared-feature gradients can still move non-OA labels. Keep the parent's rank
+    and spatial frequencies fixed; introduce no spatial sweep.
+  dependencies: []
+  priority_rationale: 'Priority 1: directly refines the newest active-but-rejected
+    mechanism and its recurring PF-versus-tibiofemoral tradeoff. The constraint is
+    precise and inexpensive, although its proposed failure mechanism remains unmeasured
+    and the label movements remain vulnerable to seed variation.'
+  status: completed
+  created_revision: 270
+  ranking_rationale: 'Both proposals pass proposal_admission and describe distinct,
+    bounded changes. Acquisition-mass routing moves ahead of the queued plane readout
+    because the completed OA geometry run confirms substantial attention movement,
+    although it does not identify harmful movement between acquisitions. Expectation-preserving
+    dropout follows: its fixed-count construction addresses a real algebraic difference
+    in the accepted readout, but the size and predictive cost of that difference are
+    unmeasured. The reserved spatial-cluster head stays first. The plane proposal
+    remains live; its suspected metadata contribution is also unmeasured.'
+  experiments:
+  - oa-acquisition-mass-conserving-routing-20260925T061725Z-1616619a
+  decision: reject
+- id: attention-dropout-unbiased-weights
+  mechanism_id: fixed-count-expectation-preserving-attention-dropout
+  parent_idea_id: attention-token-dropout-random
+  title: Preserve the expected attention readout by applying fixed-count dropout after
+    softmax
+  opportunity: Accepted random masking combines token omission with renormalization
+    over survivors. Its normalized ratio generally has a different expectation from
+    evaluation attention. Highest-attention removal produced opposing PF OA/synovitis
+    and lateral-OA/effusion movements, with negative macro change; its changed RNG
+    consumption prevents clean attribution. A distinct refinement is to retain uniform
+    random omissions while removing the normalization-induced mean shift. The size
+    or harm of that shift in the incumbent has not been measured.
+  mechanism: "For each study-label pool, compute ordinary attention a over all n allowed\
+    \ tokens. Draw the same uniform subset of k=min(floor(0.05*n),4,n\u22121) tokens\
+    \ using the incumbent random-key tensor. Set training weights to a'_t=a_t*I(t\
+    \ retained)/(1\u2212k/n), without renormalizing their sum. Keep the classifier\
+    \ bias unscaled. Conditional on the encoded bag, each token survives with probability\
+    \ 1\u2212k/n, so E[a']=a and the current linear readout has exactly the evaluation\
+    \ logit in expectation. Evaluation uses ordinary attention. This preserves random\
+    \ omission while changing its stochastic aggregation operator."
+  precedents:
+  - '[Random-dropout completion](/home/claudio/src/knee-abnormality/outputs/autoresearch/near-misses/jobs/orchestrator-20260925T013304Z-e56c661f/report.json):
+    macro +0.002477, 80% [+0.000476,+0.004378], soft macro +0.001866. All study-label
+    pairs were affected, but lateral meniscus, Baker''s and MCL declined.'
+  - "[Highest-attention completion](/home/claudio/src/knee-abnormality/outputs/autoresearch/near-misses/jobs/orchestrator-20260925T023405Z-f49ba564/report.json):\
+    \ macro \u22120.000709, 80% [\u22120.002901,+0.001600], soft macro +0.000263.\
+    \ PF OA and synovitis rose; lateral OA, effusion and both menisci fell. Removal\
+    \ of the random draw changed subsequent RNG consumption."
+  - '[Incumbent implementation](/home/claudio/src/knee-abnormality/outputs/autoresearch/near-misses/experiments/attention-token-dropout-random-20260925T003602Z-b69e50d5/source/src/knee_abnormality/modeling/model.py:237)
+    masks scores before softmax and uses a linear classifier. These establish the
+    proposed algebraic distinction, not a measured predictive benefit.'
+  - '[Dropout, Srivastava et al., 2014](https://jmlr.org/papers/v15/srivastava14a.html)
+    supplies the stochastic regularization precedent. The exact fixed-count expectation
+    argument here follows from uniform inclusion probabilities.'
+  - '[DropKey, CVPR 2023](https://arxiv.org/html/2208.02646v4) analyzes training/evaluation
+    expectation mismatch, but its ViT experiments favor masking before softmax over
+    conventional weight dropout. That is relevant counterevidence, not support for
+    assuming this replacement will improve knee MIL.'
+  novelty: Changes normalization rather than the masking rate, count, or spatial pattern.
+    The expected linear readout is preserved exactly, while individual training weight
+    sums may differ from one. The developing spatial-cluster idea instead changes
+    mask correlation and retains survivor renormalization. This proposal is an alternative
+    dropout mechanism, not an additional mask or consistency loss.
+  coverage: "The identical operation applies to all twelve labels and their existing\
+    \ allowed pools. Effusion and synovitis participate without special rules. Counts\
+    \ with k=0 pass through unchanged; k\u2264n\u22121 retains at least one token.\
+    \ Expected logits are preserved conditional on the bag, but sigmoid probabilities,\
+    \ BCE and optimization trajectories are not expectation-equivalent."
+  exploitation: Log omitted token counts, affected studies, removed original attention
+    mass, realized weight sums, scaling factors and masked-versus-full logit differences
+    each epoch. These diagnostics distinguish mass fluctuation from denominator-induced
+    redistribution. Examine every label's hard and soft AUC; no label-specific coefficient
+    is introduced.
+  budget: Adds no parameters and replaces one masking/normalization placement with
+    elementwise scaling. The same random draw and pooling dimensions can be retained.
+    Full-logit diagnostics need only readout arithmetic over existing tokens. Expected
+    cost is close to the 1662.83-second original random-dropout run, but must still
+    be measured against 1905 seconds.
+  implementation: Against revision 262, replace attention-token-dropout-random's pre-softmax
+    omission with this post-softmax operator under model.token_dropout. Retain its
+    uniform mask draw, count rule and activity logging; remove the superseded renormalized
+    branch. Preserve unrelated heads, geometry and auxiliary components. Classify
+    in small-changes.md under attention-token dropout. If spatial-cluster dropout
+    becomes incumbent, this proposal deliberately replaces that overlapping dropout
+    mechanism with uniform fixed-count weighting; do not stack masks or assume cluster
+    inclusion probabilities are uniform. Retain other accepted improvements. If a
+    new nonlinear pooled readout or mask-dependent mechanism invalidates the expectation
+    claim or a retained prerequisite, return for redesign.
+  open_choices: Survivor renormalization may be part of the accepted method's useful
+    regularization. Post-softmax scaling introduces stochastic readout magnitude and
+    can penalize useful concentrated evidence. The small four-token cap may make the
+    mean mismatch negligible. No incumbent cache probe currently establishes its magnitude.
+    Preserve RNG consumption so this comparison avoids the highest-attention run's
+    known confound.
+  dependencies: []
+  priority_rationale: 'Priority 2: a very cheap, mathematically distinct replacement
+    with coverage of the weakest non-OA labels. Its local opportunity is less evidenced
+    than the geometry refinement, and external results favoring pre-softmax masking
+    increase uncertainty.'
+  status: launched
+  created_revision: 270
+  ranking_rationale: "Admit both proposals: proposal_admission confirms their declared\
+    \ dependencies are currently satisfied, and each specifies a bounded mechanism\
+    \ distinct from the live queue. Keep the reserved head first. Rank antithetic\
+    \ loss next because each complementary mask retains the accepted uniform fixed-count\
+    \ marginal distribution, so averaging their separate losses preserves the expected\
+    \ primary objective while changing its estimator. Place detached OA correction\
+    \ ahead of the plane readout: it directly targets the completed geometry residual\u2019\
+    s OA-versus-other-label tradeoff, though the cause of that tradeoff is unmeasured.\
+    \ The plane proposal remains live."
+  experiments:
+  - attention-dropout-unbiased-weights-20260925T064636Z-54dcad7f
+- id: attention-dropout-antithetic-loss
+  mechanism_id: antithetic-fixed-count-dropout-loss-estimation
+  parent_idea_id: attention-token-dropout-random
+  title: Average losses from two complementary random dropout masks over the same
+    encoded tokens
+  opportunity: Random dropout improved macro AUC by 0.002477, whereas highest-attention
+    and spatial-cluster replacements produced negative macro changes and different
+    label tradeoffs. These results motivate preserving the accepted masking distribution
+    while changing how its training objective is estimated. Two inexpensive pooling
+    evaluations could reduce sensitivity to an unlucky omission, including for effusion
+    and synovitis. Incumbent mask-induced gradient variance has not been measured.
+  mechanism: "Encode images and score tokens once. Reuse the incumbent random-key\
+    \ tensor: mask A removes the k lowest keys and mask B the k highest keys within\
+    \ each allowed study-label pool, with the existing k=min(floor(0.05*n),4,n\u2212\
+    1). Both masks individually have the incumbent uniform fixed-count distribution;\
+    \ their dropped sets are disjoint whenever k>0 under this count rule. Apply the\
+    \ existing survivor-renormalized pooling separately and replace the primary training\
+    \ loss by 0.5*(BCE(z_A,y)+BCE(z_B,y)), preserving masks, class weights and reduction.\
+    \ Compute half-knee supervision once. This has the same expected primary objective\
+    \ as accepted dropout; it changes its stochastic estimator. Average losses, not\
+    \ logits. Evaluation retains one ordinary pooling."
+  precedents:
+  - '[Random-dropout completion](/home/claudio/src/knee-abnormality/outputs/autoresearch/near-misses/jobs/orchestrator-20260925T013304Z-e56c661f/report.json):
+    macro +0.002477, 80% interval [+0.000476,+0.004378], soft macro +0.001866. Logged
+    counts imply four omissions per affected study-label pair.'
+  - "[Cluster completion](/home/claudio/src/knee-abnormality/outputs/autoresearch/near-misses/jobs/orchestrator-20260925T064516Z-ebfd0a02/report.json):\
+    \ macro \u22120.000172 and soft macro \u22120.000669; all label intervals crossed\
+    \ zero. PF OA and effusion rose while lateral OA and synovitis fell."
+  - "[Highest-attention completion](/home/claudio/src/knee-abnormality/outputs/autoresearch/near-misses/jobs/orchestrator-20260925T023405Z-f49ba564/report.json):\
+    \ macro \u22120.000709, with PF OA/synovitis gains and lateral-OA/effusion declines.\
+    \ Removing the random draw also changed subsequent RNG consumption."
+  - '[Losses registry](/home/claudio/src/knee-abnormality/autoresearch/campaigns/losses/ideas.yaml):
+    queued split-view consistency and subview supervision change the objective using
+    acquisition halves. The [cross-epoch anchor completion](/home/claudio/src/knee-abnormality/outputs/autoresearch/losses/jobs/orchestrator-20260920T184207Z-3e033654/report.json)
+    was inconclusive, mixed learning drift with draw variation, and added substantial
+    logging overhead.'
+  - '[Ren, Zhao and Ermon, ICML 2019](https://proceedings.mlr.press/v97/ren19b.html)
+    establishes antithetic sampling as a variance-reduction approach while emphasizing
+    that effective correlation is application-specific. It does not validate this
+    fixed mask construction.'
+  novelty: 'Changes estimation of the accepted objective without adding a consistency
+    penalty, strengthening individual masks, or changing their marginal distribution.
+    It differs from the developing unbiased-weights proposal, which changes normalization
+    and therefore the objective. It also differs from acquisition-half supervision:
+    each branch here is an ordinary incumbent dropout draw.'
+  coverage: One rule covers all twelve labels and their existing eligible token pools.
+    Effusion, synovitis and OA receive no special coefficients. Every token omitted
+    by one branch remains available to the other. That coverage property does not
+    guarantee preservation of diagnostic evidence or improved AUC.
+  exploitation: Aggregate per-epoch counts for both masks, their overlap, affected
+    studies, removed attention mass, branch logit differences and squared loss differences.
+    Retain existing dropout activity logs. Assess the complete hard/soft label vector.
+    Branch disagreement establishes that pairing changes the estimator; it does not
+    by itself establish reduced gradient variance.
+  budget: No new parameters or encoded images. Adds a second pooling/readout and BCE
+    over shared tokens, followed by one combined backward pass through the encoder.
+    The original dropout run used 1662.83 seconds against the 1905-second ceiling.
+    Extra pooling memory and backward arithmetic remain unmeasured; buffer diagnostics
+    and emit them once per epoch.
+  implementation: 'Against revision 294, add paired estimation under model.token_dropout
+    and replace the single masked primary BCE in lightning.py. Retain accepted uniform
+    masking, its count rule and pre-softmax placement, anatomical eligibility, public
+    heads and the single half-knee auxiliary. Reuse the same random draw at the same
+    call position; do not invoke a second stochastic encoder or scorer. Classification:
+    small-changes.md, under the existing attention-token-dropout ownership. Retain
+    unrelated incumbent improvements. If unbiased-weights or another dropout replacement
+    supersedes attention-token-dropout-random during development, re-scope and rebind
+    the prerequisite before proceeding; do not restore the superseded operator or
+    silently remove the dependency.'
+  open_choices: Disjoint omissions need not produce negatively correlated gradients
+    through nonlinear softmax/BCE. Mask noise may be negligible compared with image
+    augmentation and sampling, or may contribute useful optimization noise. No cache
+    measurement currently distinguishes these possibilities. The two-branch mean and
+    existing mask count are fixed design choices, not a sweep.
+  dependencies:
+  - attention-token-dropout-random
+  priority_rationale: 'Priority 1: inexpensive, structurally distinct, and applicable
+    to all four weak labels while preserving the accepted expected objective. Its
+    main uncertainty is whether mask-level estimation noise is large enough to matter.
+    It requires explicit reconciliation if the developing dropout replacement is accepted.'
+  status: developing
+  created_revision: 302
+  ranking_rationale: "Admit both proposals: proposal_admission confirms their declared\
+    \ dependencies are currently satisfied, and each specifies a bounded mechanism\
+    \ distinct from the live queue. Keep the reserved head first. Rank antithetic\
+    \ loss next because each complementary mask retains the accepted uniform fixed-count\
+    \ marginal distribution, so averaging their separate losses preserves the expected\
+    \ primary objective while changing its estimator. Place detached OA correction\
+    \ ahead of the plane readout: it directly targets the completed geometry residual\u2019\
+    s OA-versus-other-label tradeoff, though the cause of that tradeoff is unmeasured.\
+    \ The plane proposal remains live."
+  experiments:
+  - attention-dropout-antithetic-loss-20260925T071946Z-254d2271
+- id: oa-geometry-detached-correction
+  mechanism_id: oa-geometry-residual-with-detached-base-readout
+  parent_idea_id: oa-geometry-attention-residual
+  title: Train the OA geometry correction without sending its additional gradient
+    paths into shared token features
+  opportunity: "The geometry residual averaged +0.002094 across OA but \u22120.001120\
+    \ across the other nine labels; macro fell 0.000317. PF OA improved while both\
+    \ tibiofemoral OA labels declined. Shared-feature interference is a possible explanation,\
+    \ not a measured cause. Keeping the observed OA gains while merely eliminating\
+    \ other-label losses would contribute only +0.000523 macro, so this proposal also\
+    \ needs broader OA improvement to clear adoption. Historical PF OA reseed movement\
+    \ was larger than the apparent geometry gain."
+  mechanism: "Let s be incumbent scores, h token values, a0 incumbent attention and\
+    \ z0 incumbent logits, using one shared dropout mask. Restore the completed rank-16\
+    \ geometry interaction r_theta(stopgrad(h),g), with its fixed features and zero\
+    \ initialization. Compute ag=softmax(stopgrad(s)+r_theta) on the same retained\
+    \ support. For each OA row add delta_c=sum_t(ag_ct\u2212stopgrad(a0_ct))*stopgrad(w_c\xB7\
+    h_t), giving z_c=z0_c+delta_c. At fixed parameters this reproduces the unrestricted\
+    \ parent's forward prediction, but only new geometry parameters receive gradients\
+    \ through delta. The ordinary base path remains differentiable. Keep the existing\
+    \ public BCE; add no auxiliary target or loss. Zero the score residual wherever\
+    \ geometry is unusable."
+  precedents:
+  - "[Geometry completion](/home/claudio/src/knee-abnormality/outputs/autoresearch/near-misses/jobs/orchestrator-20260925T054637Z-f5413a53/report.json):\
+    \ macro \u22120.000317, 80% [\u22120.001895,+0.001305], soft macro +0.000446.\
+    \ Its [source](/home/claudio/src/knee-abnormality/outputs/autoresearch/near-misses/experiments/oa-geometry-attention-residual-20260925T051045Z-2860a65e/source/src/knee_abnormality/modeling/model.py:301)\
+    \ sends gradients through both the appearance interaction and geometry-reweighted\
+    \ values."
+  - "[Isolated-union completion](/home/claudio/src/knee-abnormality/outputs/autoresearch/near-misses/jobs/orchestrator-20260925T061620Z-3faf3ac9/report.json):\
+    \ macro \u22120.002923, 80% [\u22120.004790,\u22120.001005]. It detached auxiliary\
+    \ inputs only; public regional corrections still trained shared features. This\
+    \ is counterevidence against assuming that partial isolation is sufficient."
+  - '[Historical ownership-gradient completion](/home/claudio/src/knee-abnormality/outputs/autoresearch/medial-lateral-transfer/jobs/orchestrator-20260921T064727Z-6a8fde9b/report.json):
+    withholding much of the existing compartment trunk credit lost about 0.0039 macro.
+    The proposed construction retains the complete base path and isolates only the
+    added correction.'
+  - "[Original reseed analysis](/home/claudio/src/knee-abnormality/outputs/analysis/elr-per-label-20260924/elr_per_label.json):\
+    \ adopted-new-seed versus the adopted half-knee run moved macro \u22120.006287\
+    \ and PF OA \u22120.015373. This is a two-run yardstick. The merged-geometry versus\
+    \ adopted-run comparison also changes geometry and is not seed-only evidence."
+  - '[Side-Tuning, ECCV 2020](https://sidetuning.berkeley.edu/) provides an additive
+    adaptation precedent with an unchanged base network. Here the base continues ordinary
+    training, so its guarantees and measured benefits do not transfer.'
+  - '[Historical transfer registry](/home/claudio/src/knee-abnormality/autoresearch/campaigns/medial-lateral-transfer/ideas.yaml):
+    unbiased-credit-compartment-attention also changes backward credit, but substitutes
+    an unbiased attention Jacobian for anatomical-score credit. It does not isolate
+    an added geometry correction.'
+  novelty: Combines the completed OA geometry mechanism with a different backward
+    boundary. Unlike isolated union supervision, the public correction itself cannot
+    directly update backbone, projection, normalization, base attention or classifier
+    parameters. Unlike historical ownership routing, it does not attenuate the existing
+    base path. The running acquisition-mass proposal constrains forward allocation
+    instead.
+  coverage: The same construction covers medial, lateral and PF OA. Retain per-token
+    geometry handling and reflection consistency. Historical geometry activity reached
+    3359 studies per epoch, but correction activity must be remeasured. Effusion,
+    synovitis and all other labels retain their direct paths and remain part of the
+    complete evaluation.
+  exploitation: 'Log geometry coverage, bypassed tokens, attention changes, correction
+    magnitudes and geometry-parameter update norms per epoch. Compare all hard/soft
+    label deltas and the three-label OA mean. Non-OA stability would be suggestive
+    only: corrected OA errors still change the gradient entering z0, and shared clipping
+    and checkpoint selection can also affect other labels.'
+  budget: Approximately the parent's 6300 interaction parameters, plus a base OA pooling
+    used to form the correction. No extra encoder pass or per-task backward pass.
+    The unrestricted parent used 1664.7 seconds; the additional pooling should plausibly
+    fit within 1905 seconds, but runtime is unmeasured.
+  implementation: 'Against revision 294, add the detached correction under model.position_encoding.
+    Retain current positional values, dropout, public heads, anatomical attention
+    and half-knee supervision. Reuse the completed geometry parent''s header metadata,
+    fixed frequencies, reflection transport and MODEL_BATCH_KEYS entries. Replace
+    its unrestricted gradient connections; do not add the rejected union detector
+    or auxiliary. Classification: small-changes.md, with historical geometry/gradient-routing
+    ownership in the stopped campaigns. Retain unrelated new incumbents. If acquisition-mass
+    routing is accepted during development, preserve its forward mass constraint and
+    isolate that correction instead, with an explicit integration review. If dropout
+    or readouts change, rederive the matched base/corrected pooling difference rather
+    than assuming the current linear formula still applies.'
+  open_choices: 'This deliberately changes the gradient of the unrestricted forward
+    model. Blocking adaptation through the correction may prevent learning useful
+    geometry-sensitive features. It does not preserve the base training trajectory:
+    BCE residuals still depend on corrected logits. There is no measured gradient-conflict
+    evidence, and the observed OA-only contribution is below the adoption threshold.'
+  dependencies: []
+  priority_rationale: 'Priority 2: directly addresses a recurring OA-versus-other-label
+    tradeoff through a precise, low-cost change. Historical gradient withholding and
+    the failed isolated-union combination are substantial counterevidence. Potential
+    depends on improving tibiofemoral OA as well as reducing collateral losses.'
+  status: queued
+  created_revision: 302
+  ranking_rationale: "Admit both proposals: proposal_admission confirms their declared\
+    \ dependencies are currently satisfied, and each specifies a bounded mechanism\
+    \ distinct from the live queue. Keep the reserved head first. Rank antithetic\
+    \ loss next because each complementary mask retains the accepted uniform fixed-count\
+    \ marginal distribution, so averaging their separate losses preserves the expected\
+    \ primary objective while changing its estimator. Place detached OA correction\
+    \ ahead of the plane readout: it directly targets the completed geometry residual\u2019\
+    s OA-versus-other-label tradeoff, though the cause of that tradeoff is unmeasured.\
+    \ The plane proposal remains live."

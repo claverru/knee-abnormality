@@ -5,14 +5,13 @@
 | Planning hyperparameter-only runs | [Overnight queue](overnight.md) |
 | Finding proposed small code changes | [Small changes](small-changes.md) |
 | Comparing AdamP with AdamW on ReXNet | [AdamP optimizer](small-changes.md#adamp-for-rexnet) |
-| Comparing dominant-token masking with random masking beyond series dropout | [Attention-token dropout](small-changes.md#attention-token-dropout) |
+| Why attention-token dropout (random or top-attention masking) was rejected | [Attention-token dropout](small-changes.md#attention-token-dropout) |
 | Augmenting feature-channel statistics beyond existing pixel transforms | [Feature-space augmentation (DSU)](small-changes.md#feature-space-augmentation-dsu) |
 | Keeping acquisition types separate through the classifier | [Plane/contrast-specific readouts](small-changes.md#planecontrast-specific-readouts) |
 | Adapting acquisition features before attention selects evidence | [Plane/contrast-specific feature adapters](small-changes.md#planecontrast-specific-feature-adapters) |
 | Planning larger investigations | [Big bets](big-bets.md) |
 | Planning an autoresearch campaign on training-only auxiliary losses and heads (report state, OA attributes, per-view classifiers, pretext tasks) | [Auxiliary-loss campaign](big-bets.md#auxiliary-loss-campaign) |
 | Planning a bounded OA report audit and supervision repair | [OA-only label repair](big-bets.md#oa-only-rubric-aligned-label-repair) |
-| Using report-derived OA severity attributes for training-only image supervision | [Richer report supervision](big-bets.md#richer-report-supervision-oa-attributes) |
 | Comparing RadImageNet with ImageNet weights on a ResNet-50 pair | [RadImageNet backbone](big-bets.md#radimagenet-pretrained-backbone) |
 | Filling empty sagittal/coronal fluid slots with reformats (MPR) of a study's 3D DESS or 3D PD FS series | [Reformatted fluid planes](big-bets.md#reformatted-fluid-planes-from-3d-series) |
 | Fusing a study's 2D stacks into one registered volume for a 3D model, and its frozen-model reslice gate | [Fused study volume](big-bets.md#fused-study-volume-and-3d-model) |
