@@ -11,6 +11,12 @@ placement errors. Historical comparison results remain embedded in the summary.
 rtk proxy uv run --locked python -m scripts.adhoc.analyze_physical_sampling --output-dir outputs/analysis/physical-sampling-new/geometry
 ```
 
+It reads saved metadata only and refuses an existing output directory. The saved
+headers carry no series tags and bypass the loader's instance guard, so its source
+ranking sees only crop coverage and UID. Since the known-bad-instance filter was
+removed on 2026-09-20 with the repaired DICOMs, the cohort contributes two slices
+that earlier runs skipped.
+
 Final artifacts are in
 [`geometry-verified`](../../../outputs/analysis/physical-sampling-implementation-20260913/geometry-verified/summary.json),
 [`preparation-verified`](../../../outputs/analysis/physical-sampling-implementation-20260913/preparation-verified/report.json)

@@ -46,9 +46,27 @@ of draws. `--study-uid` restricts the source to one UID from the selected split:
 rtk proxy uv run --locked python -m scripts.tools.preview_augmentations configs/training.yaml --seed 100 --variants 6 --output-dir outputs/previews/augmentations-seed100
 ```
 
+`--split validation` previews fold-0 validation studies instead and needs the prepared fold
+labels; `--offset` and `--max-studies` bound the range. Sampling is deterministic evaluation
+sampling unless `--sampling training --epoch N` runs the seeded training sampler for that
+epoch. Reflection decisions apply to every acquisition of a study, and all selected
+acquisitions of a plane–contrast type stay separately selectable. Each variant draws reflection
+and acquisition parameters from one advancing CPU generator; gates consume separate draws.
+Cards also show centered LPS anchors from each prepared series' middle-slice patient maps
+(the model does not use them), visual and geometry validity, and eligibility and source
+laterality from the `--geometry-headers` audit when present. `--profile-cuda` adds bounded
+augmentation-only CUDA timing and peak memory, without a backbone or optimizer; check GPU usage
+first:
+
+```bash
+rtk proxy uv run --locked python -m scripts.tools.preview_augmentations configs/training.yaml --variants 1 --profile-cuda --output-dir outputs/previews/reflection-profile-new
+```
+
 `manifest.json` records settings, CPU seeds, per-series parameters, sampled
 application flags, study/type identities, selected positions, prepared-pixel
-hashes, input/source hashes and dependency versions. The output also includes
+hashes, input/source hashes, dependency versions, unavailable coverage categories and the
+preprocessing identity with the configured backbone's spatial mapping, without building the
+backbone. The output also includes
 the effective config and source snapshot. Existing directories are preserved.
 Historical single-slice preview evidence remains under
 `outputs/previews/augmentations/` and

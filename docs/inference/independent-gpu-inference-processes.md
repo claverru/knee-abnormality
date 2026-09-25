@@ -55,7 +55,9 @@ Worker failures abort publication and trigger process cleanup; the parent
 includes the failed worker's log tail in its error. The adjacent
 `submission.runtime.json` records active devices, assigned GPU IDs, GPU names,
 study counts, precision, backbone chunk size, batch size, loader workers, startup and
-setup timings, and per-batch loader wait, transfer and forward times per process.
+setup timings, and per-batch loader wait, transfer and forward times per process. Forward time
+covers GPU image preparation and every member's pass, both passes under reflection TTA; each
+worker also records its `member_count` and `peak_allocated_gib`.
 
 `src/knee_abnormality/inference/processes.py`
 owns serialized requests and subprocess lifecycle without importing PyTorch.

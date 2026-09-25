@@ -54,7 +54,7 @@ All three runs selected epoch 10. Selected-epoch soft-target BCE was 0.44893, 0.
 
 Pairwise comparison of fold-0 validation predictions
 (`outputs/analysis/prediction-agreement-20260917/`: `summary.json`, `pairs.csv`; script
-[`analyze.py`](../../history/series-and-sampling-sources/prediction-agreement/analyze.py.txt)).
+`analyze.py` (`041bd16:docs/history/series-and-sampling-sources/prediction-agreement/analyze.py.txt`)).
 
 | Pair | Logit correlation | Mean \|Δ probability\| | RMS Δ logit | Mean \|Δ per-target AUC\| | Two-model average gain |
 |---|---:|---:|---:|---:|---:|

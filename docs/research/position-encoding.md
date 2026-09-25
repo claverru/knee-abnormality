@@ -273,7 +273,7 @@ macro noise is about ±0.003.
    transformer on Δxyz, with cross-plane intersection neighbours. It needs no side and is
    reflection-consistent. It changes how location is used, not just how it is encoded.
    On 2026-09-14 the user chose to pursue it ahead of Phase 0/1 as a deliberate risk; the
-   [token graph plan](../history/token-graph-sources/token-graph-plan.md.txt) used raw
+   token graph plan (`f076a09:docs/history/token-graph-sources/token-graph-plan.md.txt`) used raw
    tokens and a kNN graph. Two trained runs did not use the graph, so it was
    [retired](../validation/results/2026-09-14-token-graph-result.md) on 2026-09-15. The Phase 0
    plane-restricted inference on the champion was skipped by user decision, so

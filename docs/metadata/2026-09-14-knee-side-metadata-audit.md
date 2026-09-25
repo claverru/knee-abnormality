@@ -98,5 +98,5 @@ rtk proxy env CUDA_VISIBLE_DEVICES= POLARS_MAX_THREADS=1 uv run --locked python 
 ```
 
 Omit `--headers` to collect a fresh snapshot from the official local inventories.
-The [cataloged script](../../scripts/adhoc/audit_knee_laterality.py) uses two CPU
+The [audit script](../../scripts/adhoc/audit_knee_laterality.py) uses two CPU
 threads by default and refuses an existing output directory.

@@ -46,7 +46,7 @@ from knee_abnormality.autoresearch.supervisor.jobs import JobMixin
 from knee_abnormality.autoresearch.supervisor.prompts import IMPORT_INSTRUCTIONS
 from knee_abnormality.autoresearch.supervisor.results import ResultMixin
 from knee_abnormality.autoresearch.supervisor.scheduling import SchedulingMixin
-from knee_abnormality.config import load_config
+from knee_abnormality.config import STUDY_HEADERS, load_config
 
 
 class Supervisor(JobMixin, ExperimentMixin, ResultMixin, SchedulingMixin):
@@ -170,10 +170,7 @@ class Supervisor(JobMixin, ExperimentMixin, ResultMixin, SchedulingMixin):
                 "Incomplete initialization exists; inspect baseline/ before starting again"
             )
         config, reference, limits = self.recipe_limits()
-        headers = (
-            self.root
-            / "outputs/analysis/sharing-disagreement-20260914/study_headers.parquet"
-        )
+        headers = self.root / STUDY_HEADERS
         if not headers.is_file():
             raise ValueError(f"Missing bootstrap acquisition metadata: {headers}")
         snapshot(self.root, base)

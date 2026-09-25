@@ -1,16 +1,15 @@
 import gc
 import json
 import math
-import sys
 import time
 from pathlib import Path
 
 import polars as pl
 import torch
-from pydantic_settings import SettingsError
+from pydantic import Field
 
 import knee_abnormality
-from knee_abnormality.cli import CLISettings
+from knee_abnormality.cli import CLISettings, describe
 from knee_abnormality.config import SLICES_PER_INPUT, ExperimentConfig
 from knee_abnormality.data.dataset import build_data_loader
 from knee_abnormality.data.labels import STUDY
@@ -27,8 +26,15 @@ from knee_abnormality.training.cuda import configure_cuda_allocator
 
 
 class VerifyInferenceCLI(CLISettings):
-    bundle: Path
-    request_file: Path
+    model_config = describe(
+        "Check real-study parity, FP32 inference memory and example output of an "
+        "exported bundle using the bundle's own source"
+    )
+
+    bundle: Path = Field(description="Exported bundle directory")
+    request_file: Path = Field(
+        description="Verification request JSON: config, samples, reference_csv, image_multiplier, batch_size, checkpoint_sha256, bundled_source_sha256 and codec_evidence"
+    )
 
 
 def _sample_batches(dataset, count: int, batch_size: int) -> list[int]:
@@ -223,22 +229,11 @@ def verify_inference(bundle: Path, request: dict) -> None:
 
 
 def main() -> None:
-    try:
-        args = VerifyInferenceCLI()
-        verify_inference(
-            args.bundle.expanduser().resolve(),
-            json.loads(args.request_file.expanduser().read_text()),
-        )
-    except (
-        OSError,
-        RuntimeError,
-        ValueError,
-        TypeError,
-        KeyError,
-        SettingsError,
-    ) as error:
-        print(f"Inference verification error: {error}", file=sys.stderr)
-        raise SystemExit(2) from None
+    args = VerifyInferenceCLI()
+    verify_inference(
+        args.bundle.expanduser().resolve(),
+        json.loads(args.request_file.expanduser().read_text()),
+    )
 
 
 if __name__ == "__main__":

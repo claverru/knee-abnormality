@@ -16,7 +16,7 @@ labels, seed 42 and the fixed `all_5fold_v3` fold 0: 3,503 training and 904
 validation studies, including eleven gold and 893 report-derived validation
 studies. Training batch size was eight; validation density was 2×.
 The [control configuration](../../../outputs/training/overnight-20260911T234416Z-8du9a4nh/runs/01-control/effective_config.json)
-and the table below define the comparison. The launcher, `scripts/adhoc/train_overnight.py`
+and the table below define the comparison. The launcher, `scripts/tools/train_overnight.py`
 at `ea19772`, fixed batch size eight with no accumulation, series dropout 0.2 and
 validation density 2×. Each run changed one setting from the control:
 

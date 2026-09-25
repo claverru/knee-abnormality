@@ -60,14 +60,14 @@ and intensity gates; regenerate them to inspect sampled combinations.
 and `--study-uid` bound the selection; `--sampling training --epoch N` previews
 seeded sampling without training. `--geometry-headers` points to an existing header
 audit for optional laterality display. Missing categories are reported explicitly.
-`--profile-cuda true` adds a bounded augmentation-only CUDA profile on the same
+`--profile-cuda` adds a bounded augmentation-only CUDA profile on the same
 prepared workload with zero and forced-eligible reflection, fixed supplied affine
 parameters and paired noise generators. It records warmup/iteration counts,
 hardware, shapes, seeds, incremental peak allocated/reserved memory, source/config
 identity and input hashes in `manifest.json`. It does not run a backbone or optimizer.
 
 ```bash
-rtk proxy uv run --locked python -m scripts.tools.preview_augmentations configs/training.yaml --variants 1 --profile-cuda true --output-dir outputs/previews/reflection-new
+rtk proxy uv run --locked python -m scripts.tools.preview_augmentations configs/training.yaml --variants 1 --profile-cuda --output-dir outputs/previews/reflection-new
 rtk proxy uv run --locked python -m scripts.tools.preview_augmentations configs/training.yaml --split validation --offset 604 --max-studies 8 --variants 1 --output-dir outputs/previews/reflection-validation-new
 ```
 

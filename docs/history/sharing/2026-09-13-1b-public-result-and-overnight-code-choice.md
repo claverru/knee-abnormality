@@ -59,7 +59,7 @@ launched during this analysis.
 
 This is the completed September 13 queue. The active-queue instructions below
 describe the decision at that time; they do not schedule or stop any current job.
-Its [eleven-run launcher](../sharing-sources/train_overnight.py.txt) is
+Its eleven-run launcher (`f076a09:docs/history/sharing-sources/train_overnight.py.txt`) is
 archived separately from the seven-run launcher at `ea19772`.
 
 The user-launched queue `outputs/training/overnight-20260913T214822Z-74udtekr` was already

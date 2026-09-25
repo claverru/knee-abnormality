@@ -1,7 +1,6 @@
 import hashlib
 import json
 import shutil
-import sys
 import tempfile
 import time
 import zipfile
@@ -13,13 +12,11 @@ from pathlib import Path
 from typing import NamedTuple
 
 import torch
-import yaml
 from packaging.utils import parse_wheel_filename
 from pydantic import Field
-from pydantic_settings import CliImplicitFlag, SettingsError
 from pytorch_lightning.plugins.io import TorchCheckpointIO
 
-from knee_abnormality.cli import CLISettings
+from knee_abnormality.cli import CLISettings, describe
 from knee_abnormality.config import (
     ATTENTION_TEMPERATURE,
     INFERENCE_BATCH_SIZE,
@@ -37,6 +34,12 @@ from knee_abnormality.inference.checkpoint import (
     ensemble_member_path,
     read_checkpoint,
     validate_checkpoint,
+)
+from knee_abnormality.kaggle import (
+    CODEC_WHEELS,
+    KAGGLE_PLATFORM,
+    KAGGLE_PYTHON,
+    KAGGLE_WHEELS,
 )
 from knee_abnormality.provenance import git_revision, sha256_file
 
@@ -62,26 +65,49 @@ INFERENCE_DISTRIBUTIONS = (
     "torch",
     "torchvision",
 )
-CODEC_DISTRIBUTIONS = (
-    "pylibjpeg",
-    "pylibjpeg-libjpeg",
-    "pylibjpeg-openjpeg",
-)
+CODEC_DISTRIBUTIONS = tuple(wheel.split("==")[0] for wheel in CODEC_WHEELS)
 
 
 class ExportCLI(CLISettings):
-    checkpoint: list[Path] = Field(min_length=1)
-    output: Path
-    wheel_dir: Path | None = None
-    target_python: str | None = Field(default=None, pattern=r"^\d+\.\d+$")
-    target_platform: str | None = None
-    image_multiplier: int = Field(default=TEST_IMAGE_MULTIPLIER, gt=0)
-    attention_temperature: list[PositiveFiniteFloat] = Field(
-        default_factory=lambda: [ATTENTION_TEMPERATURE]
+    model_config = describe(
+        "Export one or more scored training checkpoints as an atomic, portable "
+        "inference bundle and notebook; several checkpoints are averaged as an ensemble"
     )
-    inference_batch_size: int = Field(default=INFERENCE_BATCH_SIZE, gt=0)
-    inference_num_workers: int = Field(default=INFERENCE_NUM_WORKERS, ge=0)
-    reflection_tta: CliImplicitFlag[bool] = Field(
+
+    checkpoint: list[Path] = Field(
+        min_length=1, description="Training checkpoints, one per ensemble member"
+    )
+    output: Path = Field(description="New bundle directory; must not exist")
+    wheel_dir: Path = Field(
+        default=KAGGLE_WHEELS,
+        description="Offline wheels to bundle, such as the DICOM codecs from prepare-codecs",
+    )
+    target_python: str = Field(
+        default=KAGGLE_PYTHON,
+        pattern=r"^\d+\.\d+$",
+        description="Kaggle Python version",
+    )
+    target_platform: str = Field(
+        default=KAGGLE_PLATFORM, description="Kaggle wheel platform tag"
+    )
+    image_multiplier: int = Field(
+        default=TEST_IMAGE_MULTIPLIER, gt=0, description="Test-time image multiplier"
+    )
+    attention_temperature: list[PositiveFiniteFloat] = Field(
+        default_factory=lambda: [ATTENTION_TEMPERATURE],
+        description="Pooling softmax temperature: one value for all members or one per checkpoint",
+    )
+    inference_batch_size: int = Field(
+        default=INFERENCE_BATCH_SIZE,
+        gt=0,
+        description="Studies per GPU batch on Kaggle",
+    )
+    inference_num_workers: int = Field(
+        default=INFERENCE_NUM_WORKERS,
+        ge=0,
+        description="Total loader workers across GPUs on Kaggle",
+    )
+    reflection_tta: bool = Field(
         default=False,
         description="Also run each member on the mirrored batch and average per study by reflection eligibility",
     )
@@ -251,50 +277,49 @@ def _license_record(info) -> dict:
 
 
 def _wheel_requirements(
-    wheel_dir: Path | None, destination: Path
+    wheel_dir: Path, destination: Path
 ) -> tuple[list[str], list[str], list[dict]]:
     requirements = []
     copied = []
     dependencies = []
     versions = {}
-    if wheel_dir is not None:
-        wheel_dir = wheel_dir.expanduser().resolve()
-        if not wheel_dir.is_dir():
-            raise FileNotFoundError(f"Wheel directory does not exist: {wheel_dir}")
-        for source in sorted(wheel_dir.glob("*.whl")):
-            name, wheel_version, _, _ = parse_wheel_filename(source.name)
-            normalized_name = str(name)
-            normalized_version = str(wheel_version)
-            if (
-                normalized_name in versions
-                and versions[normalized_name] != normalized_version
-            ):
-                raise ValueError(
-                    f"Wheel directory contains multiple {normalized_name} versions"
-                )
-            versions[normalized_name] = normalized_version
-            requirements.append(f"{normalized_name}=={normalized_version}")
-            shutil.copy2(source, destination / source.name)
-            copied.append(source.name)
-            with zipfile.ZipFile(source) as archive:
-                metadata_names = [
-                    value
-                    for value in archive.namelist()
-                    if value.endswith(".dist-info/METADATA")
-                ]
-                if len(metadata_names) != 1:
-                    raise ValueError(f"Wheel has no unique METADATA file: {source}")
-                info = Parser().parsestr(
-                    archive.read(metadata_names[0]).decode("utf-8", errors="replace")
-                )
-            dependencies.append(
-                {
-                    "name": normalized_name,
-                    "version": normalized_version,
-                    **_license_record(info),
-                    "wheel": source.name,
-                }
+    wheel_dir = wheel_dir.expanduser().resolve()
+    if not wheel_dir.is_dir():
+        raise FileNotFoundError(f"Wheel directory does not exist: {wheel_dir}")
+    for source in sorted(wheel_dir.glob("*.whl")):
+        name, wheel_version, _, _ = parse_wheel_filename(source.name)
+        normalized_name = str(name)
+        normalized_version = str(wheel_version)
+        if (
+            normalized_name in versions
+            and versions[normalized_name] != normalized_version
+        ):
+            raise ValueError(
+                f"Wheel directory contains multiple {normalized_name} versions"
             )
+        versions[normalized_name] = normalized_version
+        requirements.append(f"{normalized_name}=={normalized_version}")
+        shutil.copy2(source, destination / source.name)
+        copied.append(source.name)
+        with zipfile.ZipFile(source) as archive:
+            metadata_names = [
+                value
+                for value in archive.namelist()
+                if value.endswith(".dist-info/METADATA")
+            ]
+            if len(metadata_names) != 1:
+                raise ValueError(f"Wheel has no unique METADATA file: {source}")
+            info = Parser().parsestr(
+                archive.read(metadata_names[0]).decode("utf-8", errors="replace")
+            )
+        dependencies.append(
+            {
+                "name": normalized_name,
+                "version": normalized_version,
+                **_license_record(info),
+                "wheel": source.name,
+            }
+        )
     return sorted(set(requirements)), copied, dependencies
 
 
@@ -547,10 +572,6 @@ def export_bundle(args: ExportCLI) -> dict:
             requirement.split("==", 1)[0].lower() for requirement in requirements
         }
         unmet = []
-        if args.target_python is None:
-            unmet.append("Target Python version was not supplied")
-        if args.target_platform is None:
-            unmet.append("Target platform was not supplied")
         missing_codecs = [
             name for name in CODEC_DISTRIBUTIONS if name not in supplied_names
         ]
@@ -601,37 +622,25 @@ def export_bundle(args: ExportCLI) -> dict:
 
 
 def main() -> None:
-    try:
-        args = ExportCLI()
-        manifest = export_bundle(args)
-        summary = {
-            "bundle": str(args.output.expanduser().resolve()),
-            "member_count": manifest.get("member_count", 1),
-            "fold": manifest["checkpoints"][0]["fold"]
-            if "checkpoints" in manifest
-            else manifest["checkpoint"]["fold"],
-            "ready": manifest["ready"],
-            "preparation_seconds": manifest["preparation_seconds"],
-            "unmet_prerequisites": manifest["unmet_prerequisites"],
-        }
-        if "checkpoint" in manifest:
-            summary["checkpoint_sha256"] = manifest["checkpoint"]["source_sha256"]
-        else:
-            summary["checkpoint_sha256"] = [
-                entry["source_sha256"] for entry in manifest["checkpoints"]
-            ]
-        print(json.dumps(summary))
-    except (
-        KeyError,
-        OSError,
-        RuntimeError,
-        TypeError,
-        ValueError,
-        yaml.YAMLError,
-        SettingsError,
-    ) as error:
-        print(f"Export error: {error}", file=sys.stderr)
-        raise SystemExit(2) from None
+    args = ExportCLI()
+    manifest = export_bundle(args)
+    summary = {
+        "bundle": str(args.output.expanduser().resolve()),
+        "member_count": manifest.get("member_count", 1),
+        "fold": manifest["checkpoints"][0]["fold"]
+        if "checkpoints" in manifest
+        else manifest["checkpoint"]["fold"],
+        "ready": manifest["ready"],
+        "preparation_seconds": manifest["preparation_seconds"],
+        "unmet_prerequisites": manifest["unmet_prerequisites"],
+    }
+    if "checkpoint" in manifest:
+        summary["checkpoint_sha256"] = manifest["checkpoint"]["source_sha256"]
+    else:
+        summary["checkpoint_sha256"] = [
+            entry["source_sha256"] for entry in manifest["checkpoints"]
+        ]
+    print(json.dumps(summary))
 
 
 if __name__ == "__main__":

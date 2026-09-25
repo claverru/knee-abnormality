@@ -251,7 +251,7 @@ but cannot by themselves resolve an incorrectly specified clinical endpoint.
 
 ## Artifacts and reproduction
 
-The [archived command](../sharing-sources/audit_sharing_disagreements.py.txt)
+The archived command (`f076a09:docs/history/sharing-sources/audit_sharing_disagreements.py.txt`)
 is preserved with [runtime requirements](../sharing-sources/README.md).
 All evidence is under
 [`outputs/analysis/sharing-disagreement-20260914/`](../../../outputs/analysis/sharing-disagreement-20260914):

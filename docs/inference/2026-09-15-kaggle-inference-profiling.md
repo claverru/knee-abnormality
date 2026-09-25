@@ -6,7 +6,7 @@ Bundle `outputs/submission/exports/knee-reflection-sigma40-profiling-20260915` (
 `claverru/knee-sigma40-profiling-20260915`) adds only timing instrumentation to the
 champion runtime; its checkpoint and preprocessing identity are unchanged. Artifacts are in
 `outputs/profiling/kaggle-inference-20260915` and `outputs/profiling/kaggle-loading-20260915`,
-produced by [`profile_kaggle_inference`](../../scripts/adhoc/catalog.yaml).
+produced by [`profile_kaggle_inference`](../../scripts/tools/profile_kaggle_inference.py).
 
 ## Setup
 
@@ -203,3 +203,47 @@ simultaneous FP32 control. Macro AUC stayed 0.892380.
   These edit preprocessing-identity files.
 - On T4, FP16 pays off only with fixed backbone input shapes; test FP16 with 64-image chunks and
   channels-last in the full pipeline at 16 workers before switching.
+
+## Running the profiler
+
+`launch` uploads the bundle as a private dataset and pushes one notebook per condition;
+`analyze` reads the finished outputs from the same `--output-dir`:
+
+```bash
+rtk proxy uv run --locked python -m scripts.tools.profile_kaggle_inference launch \
+  --bundle outputs/submission/exports/BUNDLE --dataset OWNER/knee-profile-BUNDLE \
+  --output-dir outputs/profiling/kaggle-inference-NEW --conditions '["fp16-b4-w16"]'
+rtk proxy env CUDA_VISIBLE_DEVICES= uv run --locked python -m scripts.tools.profile_kaggle_inference \
+  analyze --output-dir outputs/profiling/kaggle-inference-NEW
+```
+
+- `--concurrency` defaults to two notebooks, the account's batch GPU session limit, and pushes
+  rejected for that limit are retried. A reused dataset must hold the same bundle manifest.
+- Launch writes `status.json` with push and run states; each notebook samples `/proc/stat`,
+  `/proc/<pid>` and `nvidia-smi` once per second into `cpu.csv` and `processes.csv`, and records the
+  `/dev/shm` size in `environment.json`. `analyze` writes `summary.json`.
+- The loading and precision cells import the bundle's `knee_abnormality` data, preprocessing and
+  inference modules, so they need a bundle exported from the current package layout; bundles
+  exported before 2026-09-16 support only the prediction conditions.
+- Non-prediction conditions: `startup` times cold and warm imports (`-X importtime`), each
+  model-load step in a fresh process, and CPU against wall of a backbone loop with default and
+  blocking CUDA synchronization, with and without four CPU burners; `cudnn` times the first and
+  steady FP16 chunks of a random-weight backbone under default, legacy and benchmark cuDNN
+  selection; `mainloop` times the per-batch GPU steps over 64 studies, synchronized and
+  uncontended.
+- `parity` attaches a second bundle through `--reference-dataset` and prepares the same studies
+  with each bundle's code in its own process, comparing per-series digests of the uint8 images and
+  geometry tensors; it is the bit-exactness proof for a change to hashed preprocessing sources:
+
+  ```bash
+  rtk proxy uv run --locked python -m scripts.tools.profile_kaggle_inference launch \
+    --bundle outputs/submission/exports/NEW-CODE --dataset OWNER/knee-profile-new-code \
+    --reference-dataset OWNER/knee-profile-old-code --output-dir outputs/profiling/kaggle-parity-NEW \
+    --conditions '["parity"]' --target-studies 1300 --split-dir data/folds/all_5fold_scanner_v1
+  ```
+
+- `census-0` to `census-4` split every study of `--split-dir` over five CPU notebooks
+  (`--concurrency 5`) and record every preparation failure at the bundle's multiplier.
+
+- Every notebook finds its bundle by the dataset slug (`KNEE_BUNDLE_DIR`), so an attached
+  reference dataset does not confuse bundle discovery.

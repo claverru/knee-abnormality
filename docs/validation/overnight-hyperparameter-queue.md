@@ -7,7 +7,7 @@ The candidates for the next queue are tracked in the [overnight queue](../backlo
 Run the fourteen prepared experiments sequentially with:
 
 ```bash
-nohup rtk proxy uv run --locked python -m scripts.adhoc.train_overnight > outputs/training/overnight.out 2>&1 &
+nohup rtk proxy uv run --locked python -m scripts.tools.train_overnight > outputs/training/overnight.out 2>&1 &
 ```
 
 Use `--prepare-only` to write the fourteen configurations without starting training, or
@@ -39,7 +39,7 @@ runs before the machine or WSL stopped; the run list below replaces it.
 
 The launcher snapshots the current training config into fourteen validated YAML files under a
 unique `outputs/training/overnight-<UTC timestamp>-<suffix>/configs/` directory. It fixes
-`all_5fold_v3` and fold 0; every run carries its own recorded random seed. All other settings come
+`all_5fold_v3`, fold 0 and validation image multiplier 1; every run carries its own recorded random seed. All other settings come
 from the training config at launch, which since 2026-09-19 means
 `trainer.class_balanced_bce: true`, `data.sampling_sigma_fraction: 0.867` and
 `data.study_triplet_total: 26`. Each run starts fresh with exactly the listed overrides from

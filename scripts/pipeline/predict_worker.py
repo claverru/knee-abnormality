@@ -6,9 +6,10 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-from pydantic_settings import CliPositionalArg, SettingsError
+from pydantic import Field
+from pydantic_settings import CliPositionalArg
 
-from knee_abnormality.cli import CLISettings
+from knee_abnormality.cli import CLISettings, describe
 from knee_abnormality.config import INFERENCE_LOADER_NICENESS
 from knee_abnormality.data.labels import STUDY
 from knee_abnormality.data.sources import (
@@ -21,7 +22,13 @@ from knee_abnormality.inference.processes import PredictionRequest, use_blocking
 
 
 class PredictionWorkerCLI(CLISettings):
-    request: CliPositionalArg[Path]
+    model_config = describe(
+        "Predict one study partition on one device for the prediction coordinator"
+    )
+
+    request: CliPositionalArg[Path] = Field(
+        description="Prediction request JSON written by the coordinator"
+    )
 
 
 def lower_priority(worker_id: int) -> None:
@@ -165,13 +172,9 @@ def predict_request(request: PredictionRequest) -> dict:
 
 def main() -> None:
     logging.basicConfig(level=logging.INFO)
-    try:
-        args = PredictionWorkerCLI()
-        request = PredictionRequest.model_validate(json.loads(args.request.read_text()))
-        print(json.dumps(predict_request(request)))
-    except (OSError, RuntimeError, TypeError, ValueError, SettingsError) as error:
-        print(f"Prediction worker error: {error}", file=sys.stderr)
-        raise SystemExit(2) from None
+    args = PredictionWorkerCLI()
+    request = PredictionRequest.model_validate(json.loads(args.request.read_text()))
+    print(json.dumps(predict_request(request)))
 
 
 if __name__ == "__main__":

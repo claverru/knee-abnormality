@@ -78,7 +78,7 @@ All 904 studies contain all three planes, and no token was isolated.
   the research hypothesis that sagittal tokens lack compartment identity, and plane-only
   inputs were rare in training.
 
-Following the [plan's reading rule](../../history/token-graph-sources/token-graph-plan.md.txt) (section 6),
+Following the plan's reading rule (`f076a09:docs/history/token-graph-sources/token-graph-plan.md.txt`) (section 6),
 an unused graph is retired whatever its macro AUC. The result rejects this optimization
 setup (zero-initialized residual update before LayerNorm, head learning rate and weight
 decay, ten epochs), not every possible form of token interaction. Artifacts are in

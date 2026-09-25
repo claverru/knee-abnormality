@@ -48,3 +48,4 @@ and `duplicate_groups.csv` with final fingerprints and study membership.
 The JSON records input/script/output SHA-256 hashes, settings, Python,
 Polars and Unicode versions, counts and limitations. The run uses no
 randomness. Outputs stay under Git-ignored `data/`; the raw CSV is unchanged.
+Reruns overwrite existing outputs; `--input` and `--output-dir` select other paths.

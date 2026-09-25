@@ -152,7 +152,7 @@ The completed fold-0 run was launched manually with the config then named
 `configs/baseline.yaml`:
 
 ```bash
-rtk proxy uv run --locked just train spatial-tokens-reflection configs/baseline.yaml 0
+rtk proxy uv run --locked just train configs/baseline.yaml --run-id spatial-tokens-reflection --validation.folds '[0]'
 ```
 
 Keep seed 42, `all_5fold_v3`, Steven v4, ReXNet-200, 224-pixel/140-mm crops,

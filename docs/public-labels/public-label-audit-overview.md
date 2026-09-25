@@ -67,7 +67,8 @@ pinned file hashes before aligning sources by `StudyInstanceUID`. It writes
 - `report_group_disagreements.csv`, `fold_reference_coverage.csv`: normalized
   report-group consistency and coverage of the fixed reference folds.
 
-No report text is emitted. Source metadata can change independently of versioned
+A rerun overwrites these files; pass `--output-dir` to write elsewhere. The source names are
+fixed in the script. No report text is emitted. Source metadata can change independently of versioned
 CSV downloads; the saved metadata snapshots are fingerprinted as evidence, and
 a future live metadata response need not reproduce those bytes.
 

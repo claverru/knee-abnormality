@@ -29,7 +29,15 @@ non-zero pixels) whose central 8 KB coincide. Full-frame verification rejects th
 therefore needs a full-frame hash, or a chunk hash confirmed on the full frame.
 
 Artifacts: `outputs/analysis/repeated-series-20260922/`, which holds per-file hashes, per-series
-headers, verified pairs, the summary, the manifest and a source snapshot.
+headers, verified pairs, the summary, the manifest and a source snapshot. Pairs are classed as
+identical, subset or partial over their distinct informative chunks.
+
+Reproduction (CPU only, fresh output directory; `--studies N` limits the scan to the first N sorted
+studies of each split for a trial):
+
+```bash
+rtk proxy env CUDA_VISIBLE_DEVICES= uv run --locked python -m scripts.adhoc.audit_repeated_series --output-dir outputs/analysis/repeated-series-new
+```
 
 ## Same-study repeats
 
@@ -77,6 +85,14 @@ The filter has to run per study at inference, so it is simulated with the
 For scale: at x4, prediction already reads about 180 headers and decodes 149 frames per study, at
 0.82 s per study cold on Kaggle ([profile](../inference/2026-09-18-kaggle-x4-profile-after-loading-changes.md#cold-loading-stages-100-studies)).
 The check therefore adds about 0.3% to frame reads. This is an I/O-count estimate that has not been timed on Kaggle.
+
+Reproduction (CPU only, fresh output directory; ground truth is the audit's
+`outputs/analysis/repeated-series-20260922/pairs.parquet`). It runs `index_series` per series on one
+thread, so its indexing time is not the threaded inference loader's, and its frame-read timings are local:
+
+```bash
+rtk proxy env CUDA_VISIBLE_DEVICES= uv run --locked python -m scripts.adhoc.simulate_online_series_dedup --output-dir outputs/analysis/online-series-dedup-new
+```
 
 The exhaustive scan found every same-study relation to be all-or-nothing, so one frame decides
 as well as a full comparison. Exact equality is also well separated from the nearest non-copies. Those

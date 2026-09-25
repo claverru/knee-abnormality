@@ -212,16 +212,19 @@ The run is `outputs/training/overnight-20260914T220805Z-ozsz4qbu/runs/00-baselin
 
 ## Reproduce
 
-Train the recipe on fold 0 in a fresh run directory:
+Train the recipe on its configured fold (`validation.folds`) in a fresh run directory:
 
 ```bash
-rtk proxy uv run --locked just train RUN_ID
+rtk proxy uv run --locked just train configs/training.yaml --run-id RUN_ID
 rtk proxy uv run --locked python -m scripts.pipeline.train configs/training.yaml --run-id RUN_ID
 ```
 
 The run writes its effective configuration, provenance, source snapshot, checkpoints, epoch
-metrics and `fold_0/validation_predictions.csv`. Recompute a new run's validation predictions
-with `just validate RUN_DIR/effective_config.json CHECKPOINT OUTPUT_CSV`, and compare two runs
+metrics and `fold_<N>/validation_predictions.csv`. `--validation.folds '[0,1,2,3,4]'` trains
+every fold, and only then does the run root get `oof_metrics.json` beside
+`oof_predictions.csv`. `--limit-train N` trains on N studies per fold for development runs;
+validation stays complete. Recompute a new run's validation predictions
+with `just predict RUN_DIR/effective_config.json --checkpoint CHECKPOINT --output OUTPUT_CSV --split validation`, and compare two runs
 with the [fold-run comparison](../validation/fold-run-comparison.md).
 
 The `00-baseline` checkpoint itself records identity `…token_graph_v3`, so it no longer loads

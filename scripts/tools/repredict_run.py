@@ -1,15 +1,13 @@
 import json
 import os
 import shutil
-import sys
 import time
 from datetime import UTC, datetime
 from pathlib import Path
 
 from pydantic import Field
-from pydantic_settings import SettingsError
 
-from knee_abnormality.cli import CLISettings
+from knee_abnormality.cli import CLISettings, RunFold, describe
 from knee_abnormality.config import INFERENCE_BATCH_SIZE, load_config
 from knee_abnormality.data.dataset import build_data_loader
 from knee_abnormality.evaluation.predictions import (
@@ -34,11 +32,15 @@ REPLACED = (
 )
 
 
-class RepredictCLI(CLISettings):
+class RepredictCLI(CLISettings, RunFold):
+    model_config = describe(
+        "Derive a new run directory whose selected checkpoint's validation predictions "
+        "are remade at another image multiplier, at attention temperature 1"
+    )
+
     run: Path = Field(description="Completed training run directory")
     output: Path = Field(description="New run directory to create")
     image_multiplier: int = Field(gt=0, description="Validation prediction multiplier")
-    fold: int | None = Field(default=None, ge=0)
 
 
 def repredict(settings: RepredictCLI) -> dict:
@@ -46,12 +48,7 @@ def repredict(settings: RepredictCLI) -> dict:
     if output.exists():
         raise ValueError(f"Output already exists: {output}")
     effective = json.loads((source / "effective_config.json").read_text())
-    fold = settings.fold
-    if fold is None:
-        folds = effective["validation"]["folds"]
-        if len(folds) != 1:
-            raise ValueError(f"Run has several validation folds {folds}; pass --fold")
-        fold = folds[0]
+    fold = settings.run_fold(effective["validation"]["folds"])
     fold_name = f"fold_{fold}"
     selected = json.loads((source / fold_name / "selected_checkpoint.json").read_text())
     checkpoint = source / fold_name / Path(selected["path"]).name
@@ -68,16 +65,12 @@ def repredict(settings: RepredictCLI) -> dict:
     )
     loader = build_data_loader(dataset, config.trainer, INFERENCE_BATCH_SIZE)
     device = resolve_device("auto")
-    model = load_checkpoint_model(
-        config, targets, linked, device, expected_fold=fold
-    )
+    model = load_checkpoint_model(config, targets, linked, device, expected_fold=fold)
     started = time.perf_counter()
     study_ids, predictions, _ = predict_loader([model], loader, device)
     seconds = time.perf_counter() - started
     path = output / fold_name / "validation_predictions.csv"
-    make_prediction_frame(study_ids, predictions, targets, fold).write_csv(
-        path
-    )
+    make_prediction_frame(study_ids, predictions, targets, fold).write_csv(path)
     selected.update(
         path=str(linked.resolve()),
         prediction_image_multiplier=settings.image_multiplier,
@@ -107,13 +100,9 @@ def repredict(settings: RepredictCLI) -> dict:
 
 
 def main() -> None:
-    try:
-        settings = RepredictCLI()
-        configure_cuda_allocator()
-        print(json.dumps(repredict(settings), indent=2))
-    except (KeyError, OSError, TypeError, ValueError, SettingsError) as error:
-        print(f"Re-prediction error: {error}", file=sys.stderr)
-        raise SystemExit(2) from None
+    settings = RepredictCLI()
+    configure_cuda_allocator()
+    print(json.dumps(repredict(settings), indent=2))
 
 
 if __name__ == "__main__":

@@ -1,12 +1,10 @@
 import json
-import subprocess
-import sys
 from pathlib import Path
-from typing import Literal
+from typing import Annotated, Literal
 
 import yaml
-from pydantic import Field, model_validator
-from pydantic_settings import CliImplicitFlag, CliPositionalArg, SettingsError
+from pydantic import BaseModel, Field, StringConstraints
+from pydantic_settings import CliApp, CliPositionalArg, CliSubCommand
 
 from knee_abnormality.autoresearch.campaign.reports import ResearchReport
 from knee_abnormality.autoresearch.reporting.progress import (
@@ -23,65 +21,36 @@ from knee_abnormality.autoresearch.runtime.storage import (
 from knee_abnormality.autoresearch.runtime.usage import campaign_usage
 from knee_abnormality.autoresearch.scoring.diagnostics import backfill, compare
 from knee_abnormality.autoresearch.supervisor import Supervisor, seed_files
-from knee_abnormality.cli import CLISettings
+from knee_abnormality.cli import CLISettings, command, describe
 
-ACTION_ARGUMENTS = {
-    "start": ("provider",),
-    "job": ("job_dir",),
-    "calibrate": ("config", "destination"),
-    "compare": ("config",),
-    "import-ideas": ("ideas_file",),
-}
+ROOT = Path(__file__).resolve().parents[3]
+CampaignId = Annotated[str, StringConstraints(pattern=r"^[a-z][a-z0-9-]*$")]
 
 
-RUNTIME_ACTIONS = {"job", "calibrate", "compare"}
+class RootCommand(BaseModel):
+    root: Path = Field(default=ROOT, description="Repository root")
 
 
-class AutoresearchCLI(CLISettings):
-    action: CliPositionalArg[
-        Literal[
-            "start",
-            "validate",
-            "status",
-            "results",
-            "backfill-labels",
-            "usage",
-            "stop",
-            "resume",
-            "import-ideas",
-            "supervise",
-            "job",
-            "calibrate",
-            "compare",
-        ]
-    ]
-    campaign: CliPositionalArg[str | None] = Field(
-        default=None, pattern=r"^[a-z][a-z0-9-]*$"
+class CampaignCommand(RootCommand):
+    campaign: CliPositionalArg[CampaignId] = Field(
+        description="Campaign ID under autoresearch/campaigns"
     )
-    provider: Literal["codex", "claude"] | None = None
-    gpu: str = "0"
-    abort: CliImplicitFlag[bool] = False
-    root: Path = Path(__file__).resolve().parents[3]
-    job_dir: Path | None = None
-    config: Path | None = None
-    destination: Path | None = None
-    ideas_file: Path | None = None
 
-    @model_validator(mode="after")
-    def action_arguments(self):
-        missing = [
-            f"--{name.replace('_', '-')}"
-            for name in ACTION_ARGUMENTS.get(self.action, ())
-            if getattr(self, name) is None
-        ]
-        if missing:
-            raise ValueError(f"{self.action} requires {' and '.join(missing)}")
-        if (self.campaign is None) != (self.action in RUNTIME_ACTIONS):
-            raise ValueError(
-                f"{self.action} "
-                + ("takes no campaign" if self.campaign else "requires a campaign ID")
-            )
-        return self
+    def supervisor(self) -> Supervisor:
+        return Supervisor(self.root.resolve(), self.campaign)
+
+
+def control(name: str, command: CampaignCommand, action) -> None:
+    supervisor = command.supervisor()
+    with lock(supervisor.output / "control.lock"):
+        supervisor = action(supervisor, status(supervisor)) or supervisor
+    print(json.dumps({"requested": name, **status(supervisor)}, indent=2))
+
+
+def started(supervisor: Supervisor) -> Supervisor:
+    if supervisor.state is None:
+        raise ValueError("Campaign has not been started")
+    return supervisor
 
 
 def validate_campaign(supervisor: Supervisor):
@@ -121,102 +90,186 @@ def validate_campaign(supervisor: Supervisor):
     )
 
 
-def main():
-    try:
-        args = AutoresearchCLI()
-        if args.action == "job":
-            run_job(args.job_dir)
-            return
-        if args.action == "calibrate":
-            from knee_abnormality.autoresearch.scoring.accounting import calibrate
+class Start(CampaignCommand):
+    model_config = describe("Seal the campaign policy and launch its supervisor")
 
-            calibrate(args.config, args.destination)
-            return
-        if args.action == "compare":
-            compare(args.config, args.root.resolve())
-            return
-        supervisor = Supervisor(args.root.resolve(), args.campaign)
-        if args.action == "validate":
-            validate_campaign(supervisor)
-            return
-        if args.action == "supervise":
-            supervisor.run()
-            return
-        if args.action == "status":
-            print(status_summary(supervisor))
-            return
-        if args.action == "results":
-            print(
-                results_summary(
-                    supervisor.state, supervisor.root, supervisor.output, args.campaign
-                )
+    provider: Literal["codex", "claude"] = Field(description="Agent subscription")
+    gpu: str = Field(default="0", description="GPU index or UUID for training")
+
+    def cli_cmd(self) -> None:
+        def action(supervisor, current):
+            preflight(self.provider, supervisor.root)
+            supervisor.initialize(self.provider, gpu_uuid(self.gpu))
+            supervisor.launch()
+
+        control("start", self, action)
+
+
+class Validate(CampaignCommand):
+    model_config = describe("Check the campaign files and seed ideas without starting")
+
+    def cli_cmd(self) -> None:
+        validate_campaign(self.supervisor())
+
+
+class Status(CampaignCommand):
+    model_config = describe("Summarize the campaign state")
+
+    def cli_cmd(self) -> None:
+        print(status_summary(self.supervisor()))
+
+
+class Results(CampaignCommand):
+    model_config = describe("Summarize macro and per-label experiment results")
+
+    def cli_cmd(self) -> None:
+        supervisor = self.supervisor()
+        print(
+            results_summary(
+                supervisor.state, supervisor.root, supervisor.output, self.campaign
             )
-            return
-        if args.action == "backfill-labels":
-            if supervisor.state is None:
-                raise ValueError("Campaign has not been started")
-            print(json.dumps(backfill(supervisor.state, supervisor.root), indent=2))
-            return
-        if args.action == "usage":
-            print(
-                json.dumps(
-                    campaign_usage(supervisor.state)
-                    if supervisor.state
-                    else {"status": "not_started"},
-                    indent=2,
-                )
+        )
+
+
+class BackfillLabels(CampaignCommand):
+    model_config = describe("Backfill per-label diagnostics for finished experiments")
+
+    def cli_cmd(self) -> None:
+        supervisor = started(self.supervisor())
+        print(json.dumps(backfill(supervisor.state, supervisor.root), indent=2))
+
+
+class Usage(CampaignCommand):
+    model_config = describe("Account for the campaign's subscription usage")
+
+    def cli_cmd(self) -> None:
+        supervisor = self.supervisor()
+        print(
+            json.dumps(
+                campaign_usage(supervisor.state)
+                if supervisor.state
+                else {"status": "not_started"},
+                indent=2,
             )
-            return
-        with lock(supervisor.output / "control.lock"):
-            current = status(supervisor)
-            if args.action == "start":
-                preflight(args.provider, supervisor.root)
-                supervisor.initialize(args.provider, gpu_uuid(args.gpu))
+        )
+
+
+class Stop(CampaignCommand):
+    model_config = describe("Ask the supervisor to stop after the current job")
+
+    abort: bool = Field(default=False, description="Cancel running jobs instead")
+
+    def cli_cmd(self) -> None:
+        def action(supervisor, current):
+            started(supervisor)
+            write_json(supervisor.output / "stop.json", {"abort": self.abort})
+            if not current["supervisor_alive"]:
                 supervisor.launch()
-            elif args.action == "import-ideas":
-                with lock(supervisor.output / "supervisor.lock"):
-                    supervisor = Supervisor(args.root.resolve(), args.campaign)
-                    if (
-                        supervisor.state is None
-                        or supervisor.state["status"] != "stopped"
-                    ):
-                        raise ValueError(
-                            "Stop the campaign and wait for STOPPED before importing ideas"
-                        )
-                    if any(
-                        not job["processed"]
-                        for job in supervisor.state["jobs"].values()
-                    ):
-                        raise ValueError("Cannot import while jobs remain unprocessed")
-                    supervisor.import_ideas(args.ideas_file)
-            elif args.action == "resume":
-                if supervisor.state is None:
-                    raise ValueError("Campaign has not been started")
-                if (
-                    args.provider is not None
-                    and args.provider != supervisor.state["provider"]
+
+        control("stop", self, action)
+
+
+class Resume(CampaignCommand):
+    model_config = describe("Resume a stopped campaign with its recorded provider")
+
+    def cli_cmd(self) -> None:
+        def action(supervisor, current):
+            started(supervisor)
+            preflight(supervisor.state["provider"], supervisor.root)
+            write_json(supervisor.output / "resume.json", {})
+            if not current["supervisor_alive"]:
+                supervisor.launch()
+
+        control("resume", self, action)
+
+
+class ImportIdeas(CampaignCommand):
+    model_config = describe("Add ideas to the backlog of a stopped campaign")
+
+    ideas_file: Path = Field(description="Research report YAML with the new ideas")
+
+    def cli_cmd(self) -> None:
+        def action(supervisor, current):
+            with lock(supervisor.output / "supervisor.lock"):
+                supervisor = self.supervisor()
+                if supervisor.state is None or supervisor.state["status"] != "stopped":
+                    raise ValueError(
+                        "Stop the campaign and wait for STOPPED before importing ideas"
+                    )
+                if any(
+                    not job["processed"] for job in supervisor.state["jobs"].values()
                 ):
-                    raise ValueError("Resume uses the campaign's recorded provider")
-                preflight(supervisor.state["provider"], supervisor.root)
-                write_json(supervisor.output / "resume.json", {})
-                if not current["supervisor_alive"]:
-                    supervisor.launch()
-            else:
-                if supervisor.state is None:
-                    raise ValueError("Campaign has not been started")
-                write_json(supervisor.output / "stop.json", {"abort": args.abort})
-                if not current["supervisor_alive"]:
-                    supervisor.launch()
-        print(json.dumps({"requested": args.action, **status(supervisor)}, indent=2))
-    except (
-        OSError,
-        ValueError,
-        KeyError,
-        SettingsError,
-        subprocess.SubprocessError,
-    ) as error:
-        print(f"Autoresearch error: {error}", file=sys.stderr)
-        raise SystemExit(2) from None
+                    raise ValueError("Cannot import while jobs remain unprocessed")
+                supervisor.import_ideas(self.ideas_file)
+            return supervisor
+
+        control("import-ideas", self, action)
+
+
+class Supervise(CampaignCommand):
+    model_config = describe("Run the supervisor loop in the foreground")
+
+    def cli_cmd(self) -> None:
+        self.supervisor().run()
+
+
+class Job(BaseModel):
+    model_config = describe("Run one queued supervisor job")
+
+    job_dir: Path = Field(description="Job directory written by the supervisor")
+
+    def cli_cmd(self) -> None:
+        run_job(self.job_dir)
+
+
+class Calibrate(BaseModel):
+    model_config = describe("Measure the reference recipe's runtime limits")
+
+    config: Path = Field(description="Experiment YAML to calibrate")
+    destination: Path = Field(description="Output directory for the calibration run")
+
+    def cli_cmd(self) -> None:
+        from knee_abnormality.autoresearch.scoring.accounting import calibrate
+
+        calibrate(self.config, self.destination)
+
+
+class Compare(RootCommand):
+    model_config = describe("Compare an experiment with its reference run")
+
+    config: Path = Field(
+        description="Comparison command JSON written by the supervisor"
+    )
+
+    def cli_cmd(self) -> None:
+        compare(self.config, self.root.resolve())
+
+
+class AutoresearchCLI(CLISettings):
+    model_config = describe(
+        "Validate, run, stop and inspect local autoresearch campaigns"
+    )
+
+    start: CliSubCommand[Start] = command(Start)
+    validate_campaign: CliSubCommand[Validate] = command(Validate, alias="validate")
+    status: CliSubCommand[Status] = command(Status)
+    results: CliSubCommand[Results] = command(Results)
+    backfill_labels: CliSubCommand[BackfillLabels] = command(BackfillLabels)
+    usage: CliSubCommand[Usage] = command(Usage)
+    stop: CliSubCommand[Stop] = command(Stop)
+    resume: CliSubCommand[Resume] = command(Resume)
+    import_ideas: CliSubCommand[ImportIdeas] = command(ImportIdeas)
+    supervise: CliSubCommand[Supervise] = command(Supervise)
+    job: CliSubCommand[Job] = command(Job)
+    calibrate: CliSubCommand[Calibrate] = command(Calibrate)
+    compare: CliSubCommand[Compare] = command(Compare)
+
+    def cli_cmd(self) -> None:
+        CliApp.run_subcommand(self)
+
+
+def main():
+    CliApp.run(AutoresearchCLI)
 
 
 if __name__ == "__main__":

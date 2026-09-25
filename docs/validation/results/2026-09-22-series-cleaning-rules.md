@@ -13,6 +13,12 @@ frames are at or below 0.00001. No model was retrained for these measurements; `
   (0.902379 against 0.902373). The full-fold delta uses 2,000 report-group bootstrap draws.
 - **Artifacts:** `outputs/analysis/series-cleaning-rules-20260922/`, produced by the
   [scoring script](../../../scripts/adhoc/score_series_cleaning_rules.py).
+- **Reproduction:** CPU only, about 3.5 s per study at ×4 with 16 threads. Inputs are the run
+  directory's `effective_config.json`, selected checkpoint and saved validation predictions, the
+  series-filtering census and `outputs/analysis/repeated-series-20260922/files.parquet`. The
+  checkpoint must match the executing preprocessing identity; the script was written against
+  `b483140` and may not run on later source:
+  `rtk proxy env CUDA_VISIBLE_DEVICES= uv run --locked python -m scripts.adhoc.score_series_cleaning_rules --output-dir outputs/analysis/series-cleaning-rules-new`.
 
 | Rule | Fold-0 studies | Mean shift | Max shift | Studies moved >0.05 | Fold-0 macro Δ [95%] |
 |---|---:|---:|---:|---:|---|

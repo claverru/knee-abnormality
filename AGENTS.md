@@ -5,7 +5,7 @@ Workspace for the [RSNA Knee Abnormality Detection competition on Kaggle](https:
 - Consult the competition page for rules, data details, evaluation, and submission requirements.
 - Use `$docs-maintainer` to consult, create, update, or audit repository documentation. Open known paths or sections directly, use `rg` for specific terms, and use the relevant folder index for broad topics; start with `docs/INDEX.md` when the destination is unclear.
 - Keep indexes navigation-only, with distinctive "read when" descriptions and section links for common lookups. Update entries when documents are added, moved, removed, change purpose, or their navigation needs repair; a changed result inside a document does not require an index update.
-- Use the repository's [$scripts-maintainer](.agents/skills/scripts-maintainer/SKILL.md) to find, create, update, move, or retire scripts. Open known paths directly, search the catalog for an operation, or use `scripts/INDEX.md` for orientation; keep affected catalog entries current in the same change.
+- Use the repository's [$scripts-maintainer](.agents/skills/scripts-maintainer/SKILL.md) to find, create, update, move, or retire scripts. Open known paths directly or start at `scripts/INDEX.md`; keep the script indexes current in the same change.
 - Prefer Polars for tabular data processing.
 - Use Lightning for the training framework.
 - Use `pydantic-settings` for CLIs.

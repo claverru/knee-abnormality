@@ -1,19 +1,16 @@
 import hashlib
 import json
-import sys
 from importlib.metadata import version
 from pathlib import Path
-from typing import Literal
 
 import numpy as np
 import polars as pl
-import yaml
 from iterstrat.ml_stratifiers import MultilabelStratifiedKFold
-from pydantic import Field
-from pydantic_settings import CliPositionalArg, SettingsError
+from pydantic import BaseModel, Field
+from pydantic_settings import CliApp, CliSubCommand
 
-from knee_abnormality.cli import CLISettings
-from knee_abnormality.config import ExperimentConfig, load_config
+from knee_abnormality.cli import CLISettings, command, describe
+from knee_abnormality.config import STUDY_HEADERS, ExperimentConfig, load_config
 from knee_abnormality.data.labels import (
     STUDY,
     TARGET_THRESHOLD,
@@ -304,59 +301,91 @@ def prepare(
     return metadata
 
 
-class ValidationCLI(CLISettings):
-    command: CliPositionalArg[Literal["prepare", "score"]]
-    config: Path = Path("configs/training.yaml")
-    data_dir: Path | None = None
-    split_dir: Path | None = None
-    n_splits: int = Field(default=5, ge=2)
-    seed: int | None = Field(default=None, ge=0, lt=2**32)
-    predictions: Path | None = None
-    scanner_table: Path = Path(
-        "outputs/analysis/sharing-disagreement-20260914/study_headers.parquet"
+class ValidationCommand(BaseModel):
+    config: Path = Field(
+        default=Path("configs/training.yaml"),
+        description="Experiment YAML supplying the data, split, seed and label defaults",
     )
-    label_source: str | None = None
+    data_dir: Path | None = Field(
+        default=None,
+        description="Official competition CSV directory; defaults to the config's raw data",
+    )
+    split_dir: Path | None = Field(
+        default=None, description="Fold directory; defaults to the config's split"
+    )
+
+    def locations(self) -> tuple[ExperimentConfig, Path, Path]:
+        data_dir = (
+            self.data_dir.expanduser().resolve() if self.data_dir is not None else None
+        )
+        config = load_config(
+            self.config, data_root=data_dir.parent if data_dir is not None else None
+        )
+        split_dir = (
+            self.split_dir.expanduser().resolve()
+            if self.split_dir is not None
+            else config.split_dir
+        )
+        return config, data_dir or config.raw_dir, split_dir
+
+
+class Prepare(ValidationCommand):
+    model_config = describe(
+        "Create scanner-stratified report-group folds with full and gold target coverage"
+    )
+
+    n_splits: int = Field(default=5, ge=2, description="Number of folds")
+    seed: int | None = Field(
+        default=None, ge=0, lt=2**32, description="Fold seed; defaults to the config's"
+    )
+    scanner_table: Path = Field(
+        default=STUDY_HEADERS,
+        description="Per-study header table supplying the scanner strata",
+    )
+    label_source: str | None = Field(
+        default=None, description="Label source; defaults to the config's"
+    )
+
+    def cli_cmd(self) -> None:
+        config, data_dir, split_dir = self.locations()
+        result = prepare(
+            data_dir,
+            split_dir,
+            self.n_splits,
+            config.seed if self.seed is None else self.seed,
+            config,
+            self.scanner_table,
+            config.labels.source if self.label_source is None else self.label_source,
+        )
+        print(json.dumps(result, indent=2))
+
+
+class Score(ValidationCommand):
+    model_config = describe(
+        "Score complete out-of-fold predictions with separate gold diagnostics"
+    )
+
+    predictions: Path = Field(description="Out-of-fold predictions CSV")
+
+    def cli_cmd(self) -> None:
+        _, data_dir, split_dir = self.locations()
+        print(json.dumps(score(data_dir, split_dir, self.predictions), indent=2))
+
+
+class ValidationCLI(CLISettings):
+    model_config = describe(
+        "Create the validation folds or score out-of-fold predictions"
+    )
+
+    prepare: CliSubCommand[Prepare] = command(Prepare)
+    score: CliSubCommand[Score] = command(Score)
+
+    def cli_cmd(self) -> None:
+        CliApp.run_subcommand(self)
 
 
 def main() -> None:
-    try:
-        args = ValidationCLI()
-        config = load_config(
-            args.config,
-            data_root=args.data_dir.expanduser().resolve().parent
-            if args.data_dir is not None
-            else None,
-        )
-        data_dir = (
-            args.data_dir.expanduser().resolve()
-            if args.data_dir is not None
-            else config.raw_dir
-        )
-        split_dir = (
-            args.split_dir.expanduser().resolve()
-            if args.split_dir is not None
-            else config.split_dir
-        )
-        if args.command == "prepare":
-            result = prepare(
-                data_dir,
-                split_dir,
-                args.n_splits,
-                config.seed if args.seed is None else args.seed,
-                config,
-                args.scanner_table,
-                config.labels.source
-                if args.label_source is None
-                else args.label_source,
-            )
-        else:
-            if args.predictions is None:
-                raise ValueError("score requires --predictions")
-            result = score(data_dir, split_dir, args.predictions)
-    except (OSError, TypeError, ValueError, yaml.YAMLError, SettingsError) as error:
-        print(f"Validation error: {error}", file=sys.stderr)
-        raise SystemExit(2) from None
-    print(json.dumps(result, indent=2))
+    CliApp.run(ValidationCLI)
 
 
 if __name__ == "__main__":

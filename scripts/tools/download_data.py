@@ -16,11 +16,10 @@ from pathlib import Path, PurePosixPath
 
 import requests
 from pydantic import Field
-from pydantic_settings import CliImplicitFlag, SettingsError
 
-from knee_abnormality.cli import CLISettings
+from knee_abnormality.cli import CLISettings, describe
+from knee_abnormality.kaggle import COMPETITION
 
-COMPETITION = "rsna-knee-abnormality-detection"
 GIB = 1024**3
 CHUNK_BYTES = 128 * 1024**2
 COPY_BYTES = 1024**2
@@ -440,12 +439,20 @@ def extract(archive: zipfile.ZipFile, destination: Path, state: Path, args) -> N
 
 
 class DownloadCLI(CLISettings):
-    data_dir: Path = Path(__file__).resolve().parents[2] / "data/raw"
+    model_config = describe(
+        "Download and extract the Kaggle MRI archive with bounded disk use and "
+        "resumable chunks; rerun the same command to resume"
+    )
+
+    data_dir: Path = Field(
+        default=Path(__file__).resolve().parents[2] / "data/raw",
+        description="Extraction directory",
+    )
     reserve_gib: float = Field(
         default=50, ge=0, allow_inf_nan=False, description="Space to leave free in GiB"
     )
     retries: int = Field(default=20, gt=0, description="Attempts per network operation")
-    verify_existing: CliImplicitFlag[bool] = Field(
+    verify_existing: bool = Field(
         default=False,
         description="Re-read CRCs of all existing files; otherwise reuse journal entries with matching size/mtime",
     )
@@ -517,7 +524,6 @@ if __name__ == "__main__":
         sqlite3.Error,
         zipfile.BadZipFile,
         zlib.error,
-        SettingsError,
     ) as error:
         if isinstance(error, requests.RequestException):
             LOG.error("Network operation failed; rerun to resume")

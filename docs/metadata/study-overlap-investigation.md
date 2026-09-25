@@ -23,6 +23,17 @@ Artifacts: `outputs/analysis/study-overlap-20260920/`. The manifest preserves in
 hashes and the executed source snapshot. A later source snapshot and separate
 manifest preserve the supplementary approximate-pixel analysis.
 
+Reproduction (CPU only, fresh output directory; folds default to `all_5fold_v3`,
+`--pixel-pairs` sets the 40-pair image shortlist):
+
+```bash
+rtk proxy env CUDA_VISIBLE_DEVICES= OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 uv run --locked python -m scripts.adhoc.audit_study_overlap --output-dir outputs/analysis/study-overlap-new
+```
+
+The shortlist decodes one complete representative series per study and gives
+cross-fold pairs priority within each evidence tier. Exact hashes cover decoded
+pixel arrays and dimensions only, ignoring identifiers and compression containers.
+
 | Check | Result |
 |---|---:|
 | Representative headers read successfully | 4,407 |

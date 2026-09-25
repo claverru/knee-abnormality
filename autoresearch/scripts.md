@@ -17,8 +17,8 @@ Invocation template, from that checkout's repository root:
 
 ```bash
 rtk proxy uv run --locked python -m scripts.pipeline.train CANDIDATE_CONFIG \
-  --folds FOLD \
-  --output-root outputs/autoresearch/CAMPAIGN_ID/experiments/EXPERIMENT_ID \
+  --validation.folds '[FOLD]' \
+  --paths.output-root outputs/autoresearch/CAMPAIGN_ID/experiments/EXPERIMENT_ID \
   --run-id training
 ```
 
@@ -57,7 +57,7 @@ rtk proxy env CUDA_VISIBLE_DEVICES= POLARS_MAX_THREADS=1 OPENBLAS_NUM_THREADS=1 
   --candidate EXPERIMENT_RUN \
   --output-dir outputs/autoresearch/CAMPAIGN_ID/experiments/EXPERIMENT_ID/comparison \
   --fold FOLD \
-  --bootstrap-draws 2000 --seed 20260914 \
+  --bootstrap-draws 2000 --bootstrap-seed 20260914 \
   --allowed-config-differences RECORDED_KEYS
 ```
 

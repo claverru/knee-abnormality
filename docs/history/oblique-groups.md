@@ -59,6 +59,29 @@ Nothing passed.
 | [`oblique-x4`](../../autoresearch/campaigns/oblique-x4/INDEX.md) | `oblique-x4` 0.902373 | view bias +0.0006, identity with view bias −0.0006, mixture pooling +0.0001, all rejected; ACL-gated tokens trained but not compared |
 | [`oblique-clean`](../../autoresearch/campaigns/oblique-clean/INDEX.md) | `oblique-clean` 0.903705 | ACL-gated tokens +0.0011, coverage-matched split −0.0008, standard-frame depth −0.0017, training-only views −0.0014, all rejected; group embedding compared by hand (above); statistics alignment never trained |
 
+Before and during the campaigns, [`score_tilted_slot_policies`](../../scripts/adhoc/score_tilted_slot_policies.py)
+re-predicted fold 0 with frozen checkpoints (`k_05`, `k_025`, `k_075` and others) under
+inference-only series policies. Tilted variants acted on coronal and sagittal slots holding a
+series at or above the census obliquity threshold beside another series (axial slots were never
+modified): standard only, tilted only, additive, an ACL-only attention gate on tilted tokens,
+hidden tilted tokens, and means or ACL routing of the single-group passes. General variants acted
+on every multi-series slot. Each variant was scored against intact predictions on the full fold
+and on the affected studies, with paired report-group bootstrap; it measures checkpoints trained
+with pooled slots, not training under a policy. It used the GPU, about five minutes per checkpoint
+for every variant at ×4 τ 0.75 on one RTX 3090, and did not depend on the removed oblique code:
+
+```bash
+rtk proxy uv run --locked python -m scripts.adhoc.score_tilted_slot_policies --output-dir outputs/analysis/tilted-slot-policies-gate --run-dirs '["outputs/training/k_05"]' --thresholds '[30]' --variants '["standard","additive_acl","intact_acl","intact_hidden"]'
+```
+
+Outputs are in `outputs/analysis/tilted-slot-policies-*` (`results.csv`, `aggregate.csv`,
+`predictions.parquet`, slot plans, `summary.json`). Results are summarized in the campaigns'
+prior work ([`oblique`](../../autoresearch/campaigns/oblique/prior-work.md#already-measured),
+[`oblique-x4`](../../autoresearch/campaigns/oblique-x4/prior-work.md),
+[`oblique-clean`](../../autoresearch/campaigns/oblique-clean/prior-work.md)) and cited in their
+`findings.md`: additive −0.0001 to +0.0006 on the full fold, and the ACL-only gate +0.0020 on
+the 102 affected studies of `k_05` at ×4.
+
 A recurring pattern in the campaigns was a label trade-off on the split studies. Representation
 and routing repairs recovered MCL and the menisci but gave up ACL.
 

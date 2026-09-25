@@ -7,7 +7,13 @@ agrees on 37% of ranked pairs. Gold-only BCE is pure noise.** Since 2026-09-13 n
 ranks the submissions, because their local differences are smaller than one run's training noise.
 
 Reproduce with the [comparison script](../../../scripts/adhoc/compare_local_and_public_scores.py);
-artifacts in `outputs/analysis/local-public-metrics-20260918/`.
+artifacts in `outputs/analysis/local-public-metrics-20260918/`. It reads saved artifacts and
+`scripts/adhoc/submission_public_scores.json` on CPU, refuses an existing output directory, and
+fails if a recomputed macro AUC differs from the run's saved metrics:
+
+```bash
+rtk proxy env CUDA_VISIBLE_DEVICES= uv run --locked python -m scripts.adhoc.compare_local_and_public_scores --output-dir outputs/analysis/local-public-metrics-new
+```
 
 ## Which submissions are comparable
 

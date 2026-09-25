@@ -209,7 +209,7 @@ Historical checks completed on 2026-09-09, before the Lightning installation:
 - The original 13 Kaggle-reference pins matched installed versions. After
   adding the stratifier, `uv pip check` found no incompatibilities among the
   107 installed packages.
-- [`scripts/adhoc/check_environment.py`](../../scripts/adhoc/check_environment.py) passed:
+- `scripts/adhoc/check_environment.py` (removed; last in commit `fc90227`) passed:
   Polars Parquet round-trip, synthetic uncompressed DICOM pixel decoding,
   scikit-learn scoring, a timm ResNet-18 BF16 forward/backward pass, an AdamW
   weight update, and TorchVision CUDA NMS on the RTX 3090. The smoke model

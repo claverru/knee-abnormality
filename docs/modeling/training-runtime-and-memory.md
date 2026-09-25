@@ -56,7 +56,9 @@ First, processing hundreds of slices in one encoder batch exceeded the RTX
 3090's practical memory capacity; channels-last plus activation checkpointing
 reduced one 740-slice batch-four profile from 31.04 GiB allocated to 12.84 GiB.
 Second, four to eight loader workers mostly hid preparation time in those
-bounded workloads. Exact configurations and measurements remain in
+bounded workloads. Training defaults the CUDA allocator to `expandable_segments:True` unless
+`PYTORCH_ALLOC_CONF` or `PYTORCH_CUDA_ALLOC_CONF` is set, and records the setting in the run
+provenance. Exact configurations and measurements remain in
 `outputs/profiling/batch4-*`, while the more representative loader comparison
 and its negative threading result live in
 [data preparation](../data-preparation/threading-inside-dataset-loading.md#standalone-loading-measurement).

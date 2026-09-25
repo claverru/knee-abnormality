@@ -5,8 +5,8 @@ there is no default campaign:
 
 ```bash
 rtk proxy uv run --locked python -m scripts.tools.autoresearch validate CAMPAIGN
-rtk proxy uv run --locked just autoresearch-start codex CAMPAIGN
-rtk proxy uv run --locked just autoresearch-start claude CAMPAIGN
+rtk proxy uv run --locked just autoresearch start CAMPAIGN --provider codex
+rtk proxy uv run --locked just autoresearch start CAMPAIGN --provider claude
 ```
 
 The validation command checks configuration and saved control artifacts without
@@ -37,10 +37,10 @@ rtk proxy uv run --locked python -m scripts.tools.autoresearch start CAMPAIGN --
 ## Inspect, stop, and resume
 
 ```bash
-rtk proxy uv run --locked just autoresearch-status CAMPAIGN
-rtk proxy uv run --locked just autoresearch-results CAMPAIGN
-rtk proxy uv run --locked just autoresearch-stop CAMPAIGN
-rtk proxy uv run --locked just autoresearch-resume CAMPAIGN
+rtk proxy uv run --locked just autoresearch status CAMPAIGN
+rtk proxy uv run --locked just autoresearch results CAMPAIGN
+rtk proxy uv run --locked just autoresearch stop CAMPAIGN
+rtk proxy uv run --locked just autoresearch resume CAMPAIGN
 ```
 
 Commands act on one campaign; stopping one does not stop another. Campaigns share
@@ -215,7 +215,7 @@ campaign, stop it and wait until status is `STOPPED`, then import and resume:
 
 ```bash
 rtk proxy uv run --locked python -m scripts.tools.autoresearch import-ideas CAMPAIGN --ideas-file autoresearch/campaigns/CAMPAIGN/IDEAS.yaml
-rtk proxy uv run --locked just autoresearch-resume CAMPAIGN
+rtk proxy uv run --locked just autoresearch resume CAMPAIGN
 ```
 
 The file uses the researcher-report format. Import preserves an immutable proposal

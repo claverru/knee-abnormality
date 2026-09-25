@@ -129,6 +129,15 @@ describe what the sampler actually sees.
   slice spacing farther out; median spacing is 3.90 mm axial, 3.51 coronal and 3.30 sagittal.
   Sagittal right and left are patient laterality and mix medial with lateral across knee
   sides. Rejected studies contribute no distances.
+- **Reproduction.** Header prefixes only, no pixels, models or GPU; about 20 s for the whole
+  split at the default 12 workers and 4 IO threads, refusing an existing output directory
+  (`--studies 16 --workers 4` for a trial). The current script's truncation fractions
+  compare each side with the group's own mean nearest-side reach times
+  `data.sampling_sigma_fraction`, not the 40-mm sigma above:
+
+  ```bash
+  rtk proxy uv run --locked python -m scripts.adhoc.analyze_study_center_extents --output-dir outputs/analysis/study-center-extents-new
+  ```
 
 See [modeling](../modeling/unverified-modeling-notes.md#window-sampling) for slice-window selection and
 [inference](../inference/runtime-evidence-and-leads.md#runtime-leads) for reducing decoding work.

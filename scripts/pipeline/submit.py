@@ -2,19 +2,15 @@ import csv
 import json
 import math
 import shutil
-import sys
 import tempfile
 import time
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Annotated
 
 from kaggle.api.kaggle_api_extended import KaggleApi
-from pydantic import Field, StringConstraints
-from pydantic_settings import SettingsError
-from requests import HTTPError
+from pydantic import Field
 
-from knee_abnormality.cli import CLISettings
+from knee_abnormality.cli import CLISettings, describe
 from knee_abnormality.inference.bundle import (
     bundle_validation_multiplier,
     submission_description,
@@ -22,26 +18,26 @@ from knee_abnormality.inference.bundle import (
     submission_validation,
     verify_bundle,
 )
+from knee_abnormality.kaggle import (
+    COMPETITION,
+    NotebookRun,
+    SubmissionRequest,
+)
 from knee_abnormality.provenance import sha256_file
 
-KaggleId = Annotated[
-    str, StringConstraints(pattern=r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
-]
 
+class SubmitCLI(CLISettings, SubmissionRequest, NotebookRun):
+    model_config = describe(
+        "Version a private bundle dataset, run the offline Kaggle notebook, verify its "
+        "output and submit that exact notebook version, in the foreground"
+    )
 
-class SubmitCLI(CLISettings):
-    bundle: Path
-    dataset: KaggleId
-    notebook: KaggleId
-    record: Path
-    competition: str = "rsna-knee-abnormality-detection"
-    label: str
-    sequence: int | None = Field(default=None, gt=0)
-    dataset_license: str = "other"
-    accelerator: str = "NvidiaTeslaT4"
-    notebook_timeout_seconds: int = Field(default=32400, gt=0, le=32400)
-    poll_seconds: int = Field(default=30, gt=0)
-    max_wait_seconds: int = Field(default=36000, gt=0)
+    dataset_license: str = Field(default="other", description="Kaggle dataset license")
+    max_wait_seconds: int = Field(
+        default=36000,
+        gt=0,
+        description="Give up waiting on each Kaggle stage after this",
+    )
 
 
 def _jsonable(value: object) -> object:
@@ -215,7 +211,7 @@ def _submission_sequence(api: KaggleApi, competition: str) -> int:
 def _submission_match(
     api: KaggleApi, args: SubmitCLI, response: object, description: str
 ) -> object | None:
-    submissions = api.competition_submissions(args.competition, page_size=50) or []
+    submissions = api.competition_submissions(COMPETITION, page_size=50) or []
     response_values = _jsonable(response)
     response_id = None
     if isinstance(response_values, dict):
@@ -275,7 +271,7 @@ def submit(args: SubmitCLI) -> dict:
         "bundle_manifest_sha256": sha256_file(bundle / "manifest.json"),
         "dataset": args.dataset,
         "notebook": args.notebook,
-        "competition": args.competition,
+        "competition": COMPETITION,
         "state": "starting",
     }
     record["history"] = [{"state": "starting", "at": record["created_at"]}]
@@ -283,7 +279,7 @@ def submit(args: SubmitCLI) -> dict:
     api = KaggleApi()
     try:
         api.authenticate()
-        sequence = args.sequence or _submission_sequence(api, args.competition)
+        sequence = args.sequence or _submission_sequence(api, COMPETITION)
         title = f"S{sequence:02d} {label}"
         description = submission_description(
             sequence,
@@ -400,7 +396,7 @@ def submit(args: SubmitCLI) -> dict:
                 "is_private": True,
                 "enable_gpu": True,
                 "enable_internet": False,
-                "competition_sources": [args.competition],
+                "competition_sources": [COMPETITION],
                 "dataset_sources": [args.dataset],
             }
             (notebook_dir / "kernel-metadata.json").write_text(
@@ -470,7 +466,7 @@ def submit(args: SubmitCLI) -> dict:
             submission_response = api.competition_submit_code(
                 "submission.csv",
                 description,
-                args.competition,
+                COMPETITION,
                 notebook,
                 int(version_number),
                 False,
@@ -521,20 +517,9 @@ def submit(args: SubmitCLI) -> dict:
 
 
 def main() -> None:
-    try:
-        args = SubmitCLI()
-        record = submit(args)
-        print(json.dumps(record))
-    except (
-        HTTPError,
-        OSError,
-        RuntimeError,
-        TypeError,
-        ValueError,
-        SettingsError,
-    ) as error:
-        print(f"Submission error: {error}", file=sys.stderr)
-        raise SystemExit(2) from None
+    args = SubmitCLI()
+    record = submit(args)
+    print(json.dumps(record))
 
 
 if __name__ == "__main__":

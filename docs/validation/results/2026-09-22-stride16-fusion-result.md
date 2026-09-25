@@ -64,7 +64,9 @@ failure to keep it is not established by the between-run comparison alone. Gold 
 checkpoint at ×4 three times (`outputs/analysis/fusion-branches-fusion-sum/summary.json`). The
 unmodified pass reproduced the recorded 0.903516 within 2.5e-7. Zeroing a term also shifts the
 LayerNorm input, so the deep-zeroed drop overstates dependence; the fine-zeroed pass is the
-informative one.
+informative one. The fusion model code is not in the tree, so the script runs only from the
+sources in `outputs/training/fusion-scaleheads/source_snapshot.zip`, on GPU:
+`python -m scripts.adhoc.diagnose_fusion_branches --run outputs/training/fusion-sum --output-dir <fresh dir>`.
 
 | Label | Full | Fine zeroed Δ | Deep zeroed Δ |
 |---|---:|---:|---:|

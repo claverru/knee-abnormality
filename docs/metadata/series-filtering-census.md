@@ -240,7 +240,7 @@ Kaggle inference it must run on the same tags and thresholds.
 
 ## Follow-up measurements (2026-09-17)
 
-Measured, CPU only. Script: [`followup_geometry.py`](../history/series-and-sampling-sources/series-filtering/followup_geometry.py.txt), which reruns the
+Measured, CPU only. Script: `followup_geometry.py` (`041bd16:docs/history/series-and-sampling-sources/series-filtering/followup_geometry.py.txt`), which reruns the
 loader's indexing. Tables: `outputs/analysis/series-filtering-20260917/followup/`
 (`reference_after_drops.parquet`, `reflection_eligibility_series.parquet`,
 `items_1_2_summary.json`).
@@ -302,7 +302,7 @@ ineligible.
 
 Reports and Steven v4 labels of the 8 non-knee studies (measured), plus a rough visual check of
 three series (`outputs/analysis/series-filtering-20260917/offknee-review.png`, 27 thumbnails,
-[`render.py`](../history/series-and-sampling-sources/offknee-review/render.py.txt)):
+`render.py` (`041bd16:docs/history/series-and-sampling-sources/offknee-review/render.py.txt`)):
 
 - The ankle study `…93672103` has a knee-only report and labels; the ankle series carry nothing
   labelled. No non-knee study has a positive Fracture label, and of 28 training reports mentioning
@@ -339,7 +339,7 @@ Preprocessing identity `ranked_filtered_physical_gaussian_overlap_spatial_tokens
   implemented (evidence above).
 
 Verification, CPU, all 24,386 series of the 4,407 training and 3 example-test studies (
-[`index_census.py`](../history/series-and-sampling-sources/deterministic-selection/index_census.py.txt); `outputs/analysis/deterministic-selection-20260917/`
+`index_census.py` (`041bd16:docs/history/series-and-sampling-sources/deterministic-selection/index_census.py.txt`); `outputs/analysis/deterministic-selection-20260917/`
 `index_report.json`, `index_series.parquet`, `index_studies.parquet`):
 
 | Check | Result |

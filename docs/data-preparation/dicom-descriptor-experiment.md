@@ -70,7 +70,7 @@ retained a trailing padding element and therefore exercised fallback; they are
 superseded by the corrected fixtures with explicit dispatch assertions. No
 timing code changed for that correction. The starting source was already dirty;
 the saved source snapshots and manifest hashes identify the implementation.
-The [script catalog](../../scripts/adhoc/catalog.yaml) records `dicom-suite` and
-`dicom-audit` invocations. The current baseline uses `all_5fold_v3`; use the saved
+The `dicom-suite` and `dicom-audit` modes of the removed dataloader benchmark
+(`aec290d:scripts/adhoc/benchmark_dataloader_optimizations.py`) ran them. The current baseline uses `all_5fold_v3`; use the saved
 `workload.yaml` with this saved cohort, or generate a new matched cohort when
 benchmarking the current split.

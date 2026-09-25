@@ -27,6 +27,11 @@ the sibling hidden. The training-time test, `side-mask`, is recorded in the
   (it needs that branch's `model.compartment_evidence`; a source snapshot is kept with the outputs); outputs
   in `outputs/analysis/sibling-masking-20260923/` (per-arm predictions, per-study token counts,
   summary). Intervals are central 80% paired report-group bootstraps, 2,000 draws.
+- **Reproduction:** run from the snapshot in `outputs/analysis/sibling-masking-20260923/source`,
+  on GPU (about three backbone passes per study), with
+  `python -m scripts.adhoc.score_sibling_masking --output-dir <fresh dir>`; the run directory
+  defaults to `outputs/training/k05-clean`. It accepts only checkpoints trained with `whole_knee`
+  compartment evidence.
 
 ## Results
 

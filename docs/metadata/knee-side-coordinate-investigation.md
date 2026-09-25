@@ -112,3 +112,7 @@ Reproduce from the enriched snapshot without another DICOM scan:
 ```bash
 rtk proxy env CUDA_VISIBLE_DEVICES= POLARS_MAX_THREADS=1 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 uv run --locked python -m scripts.adhoc.audit_knee_side_geometry --enriched-headers outputs/analysis/knee-side-geometry-20260914/headers.parquet --output-dir outputs/analysis/knee-side-geometry-reanalysis
 ```
+
+Omit `--enriched-headers` to reread dimensions and coil fields from the DICOM headers, starting from
+the reviewed [knee-side metadata audit](2026-09-14-knee-side-metadata-audit.md) snapshots, with two
+CPU worker threads by default. The script refuses an existing output directory.

@@ -7,14 +7,13 @@ import sys
 import time
 import uuid
 from pathlib import Path
-from typing import Literal
 
 import yaml
-from pydantic import Field
-from pydantic_settings import CliPositionalArg
+from pydantic_settings import CliApp, CliSubCommand
 
 from knee_abnormality.autoresearch.campaign.binding import digest
 from knee_abnormality.autoresearch.campaign.reports import WatchdogReport
+from knee_abnormality.autoresearch.cli import CampaignCommand
 from knee_abnormality.autoresearch.runtime.isolation import (
     changed_files,
     environment,
@@ -40,14 +39,7 @@ from knee_abnormality.autoresearch.runtime.storage import (
 )
 from knee_abnormality.autoresearch.runtime.usage import capture_usage
 from knee_abnormality.autoresearch.supervisor import Supervisor
-from knee_abnormality.cli import CLISettings
-
-
-class WatchCLI(CLISettings):
-    action: CliPositionalArg[Literal["start", "status", "stop", "watch"]]
-    campaign: CliPositionalArg[str] = Field(pattern=r"^[a-z][a-z0-9-]*$")
-    root: Path = Path(__file__).resolve().parents[3]
-
+from knee_abnormality.cli import CLISettings, command, describe
 
 PROTECTED = (
     "autoresearch/roles/watchdog.md",
@@ -441,25 +433,26 @@ class Watchdog:
             self.save(status="stopped", reason="Watchdog stop requested")
 
 
-def main():
-    args = WatchCLI()
-    watcher = Watchdog(args.root, args.campaign)
-    if args.action == "watch":
-        try:
-            watcher.watch()
-        except BlockingIOError:
-            print("Watchdog already locked by another process", file=sys.stderr)
-        except (
-            OSError,
-            ValueError,
-            KeyError,
-            RuntimeError,
-            subprocess.SubprocessError,
-        ) as error:
-            watcher.save(status="blocked", reason=str(error))
-        return
-    with lock(watcher.directory / "control.lock"):
-        if args.action == "start":
+def report(watcher: "Watchdog") -> None:
+    watcher.record = optional_json(watcher.directory / "state.json") or {}
+    print(
+        json.dumps(
+            {
+                **watcher.record,
+                "alive": watcher.alive(),
+                "artifacts": str(watcher.directory),
+            },
+            indent=2,
+        )
+    )
+
+
+class Start(CampaignCommand):
+    model_config = describe("Launch a detached watchdog for a running campaign")
+
+    def cli_cmd(self) -> None:
+        watcher = Watchdog(self.root, self.campaign)
+        with lock(watcher.directory / "control.lock"):
             if not watcher.alive():
                 attempt = watcher.record.get("attempt")
                 if attempt and alive(
@@ -483,7 +476,7 @@ def main():
                     [
                         "knee_abnormality.autoresearch.watchdog",
                         "watch",
-                        args.campaign,
+                        self.campaign,
                         "--root",
                         str(watcher.root),
                     ],
@@ -492,19 +485,64 @@ def main():
                     watcher.directory / "launcher.json",
                     environment(watcher.root),
                 )
-        elif args.action == "stop":
+            report(watcher)
+
+
+class Status(CampaignCommand):
+    model_config = describe("Show the watchdog state")
+
+    def cli_cmd(self) -> None:
+        watcher = Watchdog(self.root, self.campaign)
+        with lock(watcher.directory / "control.lock"):
+            report(watcher)
+
+
+class Stop(CampaignCommand):
+    model_config = describe("Ask the watchdog to stop")
+
+    def cli_cmd(self) -> None:
+        watcher = Watchdog(self.root, self.campaign)
+        with lock(watcher.directory / "control.lock"):
             write_json(watcher.directory / "stop.json", {})
-        watcher.record = optional_json(watcher.directory / "state.json") or {}
-        print(
-            json.dumps(
-                {
-                    **watcher.record,
-                    "alive": watcher.alive(),
-                    "artifacts": str(watcher.directory),
-                },
-                indent=2,
-            )
-        )
+            report(watcher)
+
+
+class Watch(CampaignCommand):
+    model_config = describe("Run the watchdog loop in the foreground")
+
+    def cli_cmd(self) -> None:
+        watcher = Watchdog(self.root, self.campaign)
+        try:
+            watcher.watch()
+        except BlockingIOError:
+            print("Watchdog already locked by another process", file=sys.stderr)
+        except (
+            OSError,
+            ValueError,
+            KeyError,
+            RuntimeError,
+            subprocess.SubprocessError,
+        ) as error:
+            watcher.save(status="blocked", reason=str(error))
+
+
+class WatchCLI(CLISettings):
+    model_config = describe(
+        "Monitor a campaign without model polling and dispatch bounded Codex repairs "
+        "for operational failures"
+    )
+
+    start: CliSubCommand[Start] = command(Start)
+    status: CliSubCommand[Status] = command(Status)
+    stop: CliSubCommand[Stop] = command(Stop)
+    watch: CliSubCommand[Watch] = command(Watch)
+
+    def cli_cmd(self) -> None:
+        CliApp.run_subcommand(self)
+
+
+def main():
+    CliApp.run(WatchCLI)
 
 
 if __name__ == "__main__":

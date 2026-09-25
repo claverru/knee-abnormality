@@ -26,21 +26,31 @@ are frozen after validation. Their nesting matches the YAML, for example
 
 Use `pydantic-settings` for argument parsing and configuration in new CLIs,
 following [project guidance](../../AGENTS.md). The shared `CLISettings` base in `cli.py` accepts
-only explicit arguments, disables environment, dotenv and secrets sources, and raises
-`SettingsError` so each script reports argument errors through its own handler.
-The YAML must be valid on its own; explicit overrides then take precedence and
-are validated again. Keep this explicit source policy for experiment commands
-so a shell environment cannot silently change an experiment.
+only explicit arguments and disables environment, dotenv and secrets sources, so a shell
+environment cannot silently change an experiment. Argument errors print usage and exit
+with code 2; any other failure raises with its traceback. Booleans are flags
+(`--reflection-tta`, `--no-reflection-tta`). Each CLI states its purpose with
+`model_config = describe(...)` and every field has a `description`, so `--help` documents
+it; related actions are `CliSubCommand` subcommands run by `CliApp.run`.
+
+`train.py` and the config inspector accept any experiment field as a dotted flag, such as
+`--trainer.class-balance-exponent 0.5`, `--seed null`, `--no-model.pretrained` or
+`--validation.folds '[0,1,2,3,4]'` (tuple and range fields take JSON). The overrides are
+merged into the YAML before validation, so the YAML itself need not change for a one-change
+run. Path overrides (`--paths.data-root`, `--paths.output-root`,
+`--paths.label-manifest`) resolve against the current directory, while YAML paths resolve
+against the YAML's directory. Training records the overrides in `provenance.json`;
+`input_config.yaml` stays the unmodified YAML and `effective_config.json` the result.
 
 Current commands, from the repository root:
 
 ```bash
 rtk proxy uv run --locked python -m knee_abnormality.config configs/training.yaml
-rtk proxy uv run --locked python -m knee_abnormality.config configs/training.yaml --folds 0,1,2,3,4
+rtk proxy uv run --locked python -m knee_abnormality.config configs/training.yaml --validation.folds '[0,1,2,3,4]'
 ```
 
 These print resolved settings as JSON, retaining the YAML's nested sections
-and adding `config_file` and `split_dir`. They do not create run artifacts,
+and adding `config_file`, `overrides` and `split_dir`. They do not create run artifacts,
 train or check dataset availability.
 
 ### Training seeds and fold selection
@@ -62,9 +72,9 @@ Preparation/training verifies requested folds and the label-source fingerprint.
 ### Path resolution
 
 Configured paths are relative to the YAML file, so moving the checkout does
-not require absolute paths in version control. `--data-root` and `--output-root`
-override machine-specific storage locations; relative CLI overrides use the
-current working directory. `label_manifest` points to a pinned source
+not require absolute paths in version control. `--paths.data-root` and
+`--paths.output-root` override machine-specific storage locations; relative CLI overrides
+use the current working directory. `label_manifest` points to a pinned source
 manifest in `configs/labels/` (`combined-label-sources.json` for training; it lists both
 `combined_v1` and `steven_v4`).
 
@@ -111,7 +121,7 @@ submission records, analysis comparisons); `outputs/archive/move-map.tsv` maps t
 current locations. Only the `00-baseline`, `01-sigma30` and `03-min-lr-0.1` overnight runs and
 `reflection-sigma40` kept a checkpoint, the best one; the other runs kept their records and
 predictions, and stale bundles kept everything except `model.ckpt` and `wheels/`. A saved
-configuration records an absolute `output_root`, so pass `--output-root outputs/training` when
+configuration records an absolute `output_root`, so pass `--paths.output-root outputs/training` when
 training from one saved before the reorganisation.
 
 Use one fresh directory per run under `outputs/training/<run_id>/`. Store the copied

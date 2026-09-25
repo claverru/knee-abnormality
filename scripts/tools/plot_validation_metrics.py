@@ -9,9 +9,9 @@ from pathlib import Path
 import matplotlib
 import polars as pl
 from pydantic import Field
-from pydantic_settings import CliPositionalArg, SettingsError
+from pydantic_settings import CliPositionalArg
 
-from knee_abnormality.cli import CLISettings
+from knee_abnormality.cli import CLISettings, describe
 from knee_abnormality.data.labels import STUDY, load_split
 from knee_abnormality.evaluation.metrics import soft_aucs
 
@@ -25,8 +25,17 @@ EXPERIMENT_SUFFIX = re.compile(r"-\d{8}T\d{6}Z-[0-9a-f]{8}$")
 
 
 class PlotCLI(CLISettings):
-    runs: CliPositionalArg[list[str]] = Field(min_length=1)
-    output: Path = Path("outputs/analysis/validation_metrics.png")
+    model_config = describe(
+        "Plot epoch validation metrics from one or more experiment run folders"
+    )
+
+    runs: CliPositionalArg[list[str]] = Field(
+        min_length=1, description="Run directories or run IDs under outputs/training"
+    )
+    output: Path = Field(
+        default=Path("outputs/analysis/validation_metrics.png"),
+        description="PNG to write, relative to the repository root",
+    )
 
 
 @dataclass(frozen=True)
@@ -280,27 +289,21 @@ def plot(series: list[MetricSeries], output: Path) -> None:
 
 
 def main() -> None:
-    try:
-        args = PlotCLI()
-        runs = [resolve_run(value) for value in args.runs]
-        if len(runs) != len(set(runs)):
-            raise ValueError("Run folders must be unique")
-        for run in runs:
-            if not any(run.glob("fold_*/epochs/metrics_epoch_*.json")):
-                print(f"Skipping {run}: no epoch metrics yet", file=sys.stderr)
-        runs = [
-            run for run in runs if any(run.glob("fold_*/epochs/metrics_epoch_*.json"))
-        ]
-        if not runs:
-            raise ValueError("No run has epoch metrics")
-        series = [item for run in runs for item in load_metric_series(run)]
-        output = args.output.expanduser()
-        if not output.is_absolute():
-            output = ROOT / output
-        plot(series, output)
-    except (OSError, TypeError, ValueError, SettingsError) as error:
-        print(f"Validation metric plot error: {error}", file=sys.stderr)
-        raise SystemExit(2) from None
+    args = PlotCLI()
+    runs = [resolve_run(value) for value in args.runs]
+    if len(runs) != len(set(runs)):
+        raise ValueError("Run folders must be unique")
+    for run in runs:
+        if not any(run.glob("fold_*/epochs/metrics_epoch_*.json")):
+            print(f"Skipping {run}: no epoch metrics yet", file=sys.stderr)
+    runs = [run for run in runs if any(run.glob("fold_*/epochs/metrics_epoch_*.json"))]
+    if not runs:
+        raise ValueError("No run has epoch metrics")
+    series = [item for run in runs for item in load_metric_series(run)]
+    output = args.output.expanduser()
+    if not output.is_absolute():
+        output = ROOT / output
+    plot(series, output)
     print(output)
 
 

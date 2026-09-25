@@ -27,7 +27,11 @@ lever: mixing image-model predictions into the extracted label beat both replaci
   (`outputs/training/overnight-20260918T232636Z-mt7ouybk/runs/{rexnet,b0}-fold{0..4}`). Those runs
   used ordinary BCE, Steven v4 labels and ×1. Each study's value comes from the two models that held
   it out.
-- **Tool:** [`prepare_image_blend_labels`](../../../scripts/tools/prepare_image_blend_labels.py).
+- **Tool:** [`prepare_image_blend_labels`](../../../scripts/tools/prepare_image_blend_labels.py)
+  (`rtk proxy uv run --locked python -m scripts.tools.prepare_image_blend_labels`), CPU only, about a
+  minute, deterministic and requiring fresh output paths. It fails unless each teacher run is the
+  matching `all_5fold_v3` fold and its predictions hold exactly that fold's studies, and it records
+  the silver change counts and the gold check below in `preparation.json` and on stdout.
 - **Outputs:** `data/labels/prepared/image-blend-v1/` (labels SHA-256 `7bffba41…`) with
   `preparation.json`. The manifest is `configs/labels/image-blend-v1-label-sources.json`.
 - **Gold labels** still override the table in training and evaluation.
@@ -91,7 +95,15 @@ and scored 0.904133 at ×1 and 0.906294 at ×4.
 
 Soft AUC weights every ordered pair of distinct studies by y_i(1 − y_j) of the frozen targets
 ([`compare_soft_auc`](../../../scripts/adhoc/compare_soft_auc.py)). It rises on eleven labels and
-falls only on PF OA (−0.0015); MCL, flat on hard AUC, gains +0.014.
+falls only on PF OA (−0.0015); MCL, flat on hard AUC, gains +0.014. Same-study pairs are excluded,
+and the score still inherits the report labellers' bias. The script runs on CPU in about 30 s,
+refuses an existing output directory and writes `summary.json` and `per_target.csv`. Its bootstrap
+mirrors `compare_fold_runs` (multinomial report-group counts, seed 20260914, 2,000 draws, draws
+dropped when a label loses a hard class), so the hard delta reproduces that tool's macro interval:
+
+```bash
+rtk proxy uv run --locked python -m scripts.adhoc.compare_soft_auc --reference outputs/training/k05-clean --candidate outputs/training/image-blend --output-dir outputs/analysis/soft-auc-new
+```
 
 Hard AUC by label:
 

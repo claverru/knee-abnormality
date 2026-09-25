@@ -7,7 +7,7 @@
 | Working with slice records and prepared-triplet geometry | [Shared geometry contract](shared-geometry-contract.md) |
 | Tracing data through training and prediction | [Data flow and iteration speed](data-flow-and-iteration-speed.md) |
 | Writing configs and identifying experiment artifacts | [Configs and experiment artifacts](configs-and-experiment-artifacts.md) |
-| Finding script commands, catalog fields and maintenance procedures | [Script discovery and catalog maintenance](script-catalog.md) |
+| Finding script commands and maintenance procedures | [Script index](../../scripts/INDEX.md) |
 | Reviewing documentation retrieval measurements and their limitations | [Documentation navigation measurement](documentation-navigation-measurement.md) |
 
 ## Common lookups

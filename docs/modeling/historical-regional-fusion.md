@@ -42,7 +42,7 @@ preserve selected paths, geometry hashes, per-query distances and executable
 sources. Training membership SHA-256 is
 `31422731caf633a55b8d7bf2406dfa1fe1f791e78a16482c14ca5fe2089af749`.
 Reproduction requires the original analysis source bundle and configuration.
-The [coverage source snapshot](../history/regional-sources/measure_fusion_coverage.py.txt)
+The coverage source snapshot (`f076a09:docs/history/regional-sources/measure_fusion_coverage.py.txt`)
 is historical; its 18-mm radius has no role in the current spatial-token model.
 The [regional usage results](../validation/results/2026-09-13-per-plane-fusion-usage-diagnosis.md)
 remain historical evidence, with repeatability and deployment cost unresolved.

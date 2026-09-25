@@ -93,7 +93,7 @@ pending experiments are classified in the [backlog](../backlog/INDEX.md).
   τ 0.75. On the 209 studies both splits hold out, it ties learned strength. τ 0.75 remains best.
   **Its submission S40 scores 0.940 public**, against 0.933 for the last two single fold-0 models
   on Steven v4 labels ([result](../validation/results/2026-09-21-combined-labels-first-run.md)).
-  `scripts/adhoc/train_overnight.py` still requires `all_5fold_v3`; the autoresearch gate now
+  `scripts/tools/train_overnight.py` still requires `all_5fold_v3`; the autoresearch gate now
   requires the new split and labels.
 
 - **Hugging Face backbone survey completed, 2026-09-20:** the
