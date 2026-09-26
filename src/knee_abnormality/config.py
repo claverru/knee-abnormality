@@ -61,6 +61,12 @@ def ordered_range(value: tuple[float, float]) -> tuple[float, float]:
 PositiveFiniteRange = Annotated[
     tuple[PositiveFiniteFloat, PositiveFiniteFloat], AfterValidator(ordered_range)
 ]
+UnitFloat = Annotated[float, Field(ge=0, le=1)]
+UnitFloatRange = Annotated[tuple[UnitFloat, UnitFloat], AfterValidator(ordered_range)]
+KeepFraction = Annotated[float, Field(gt=0, le=1)]
+KeepFractionRange = Annotated[
+    tuple[KeepFraction, KeepFraction], AfterValidator(ordered_range)
+]
 
 
 class ConfigModel(BaseModel):
@@ -102,31 +108,52 @@ class SeriesTypeConfig(ConfigModel):
     max_images: Annotated[StrictInt, Field(gt=0)]
 
 
-class IntensityAugmentationConfig(ConfigModel):
-    probability: Annotated[float, Field(ge=0, le=1)] = 0.0
+class AugmentationConfig(ConfigModel):
+    probability: UnitFloat = 0.0
+
+
+class ReflectionAugmentationConfig(AugmentationConfig):
+    pass
+
+
+class ContrastMixingAugmentationConfig(AugmentationConfig):
+    target_weight_range: UnitFloatRange = (0.5, 1.0)
+
+
+class IntensityAugmentationConfig(AugmentationConfig):
     gamma_range: PositiveFiniteRange = (1.0, 1.0)
     contrast_range: PositiveFiniteRange = (1.0, 1.0)
 
 
-class AffineAugmentationConfig(ConfigModel):
-    probability: Annotated[float, Field(ge=0, le=1)] = 0.0
+class AffineAugmentationConfig(AugmentationConfig):
     rotation_degrees: Annotated[float, Field(ge=0, le=180)] = 0.0
-    translation_fraction: Annotated[float, Field(ge=0, le=1)] = 0.0
+    translation_fraction: UnitFloat = 0.0
     scale_range: PositiveFiniteRange = (1.0, 1.0)
 
 
-class NoiseAugmentationConfig(ConfigModel):
-    probability: Annotated[float, Field(ge=0, le=1)] = 0.0
+class NoiseAugmentationConfig(AugmentationConfig):
     std_range: PositiveFiniteRange = (0.005, 0.02)
 
 
-class ReflectionAugmentationConfig(ConfigModel):
-    probability: Annotated[float, Field(ge=0, le=1)] = 0.0
+class SmoothingAugmentationConfig(AugmentationConfig):
+    spatial_sigma: PositiveFiniteFloat = 1.0
+    range_sigma_range: PositiveFiniteRange = (0.05, 0.1)
+
+
+class ResolutionAugmentationConfig(AugmentationConfig):
+    keep_fraction_range: KeepFractionRange = (0.70, 1.0)
+
+
+class GinAugmentationConfig(AugmentationConfig):
+    blend_max: Annotated[float, Field(gt=0, le=1)] = 0.5
 
 
 class DataConfig(ConfigModel):
     reflection_augmentation: ReflectionAugmentationConfig = Field(
         default_factory=ReflectionAugmentationConfig
+    )
+    contrast_mixing_augmentation: ContrastMixingAugmentationConfig = Field(
+        default_factory=ContrastMixingAugmentationConfig
     )
     series_types: Annotated[tuple[SeriesTypeConfig, ...], Field(min_length=1)]
     sampling_sigma_fraction: PositiveFiniteFloat = 0.867
@@ -140,6 +167,15 @@ class DataConfig(ConfigModel):
     )
     noise_augmentation: NoiseAugmentationConfig = Field(
         default_factory=NoiseAugmentationConfig
+    )
+    smoothing_augmentation: SmoothingAugmentationConfig = Field(
+        default_factory=SmoothingAugmentationConfig
+    )
+    resolution_augmentation: ResolutionAugmentationConfig = Field(
+        default_factory=ResolutionAugmentationConfig
+    )
+    gin_augmentation: GinAugmentationConfig = Field(
+        default_factory=GinAugmentationConfig
     )
     spacing_mm: Annotated[float, Field(gt=0)]
     image_size: Annotated[StrictInt, Field(gt=0)]
@@ -177,6 +213,10 @@ class DataConfig(ConfigModel):
         return value
 
 
+class FeatureStatisticsAugmentationConfig(AugmentationConfig):
+    pass
+
+
 class ModelConfig(ConfigModel):
     backbone: Identifier
     pretrained: bool
@@ -185,6 +225,9 @@ class ModelConfig(ConfigModel):
     backbone_eval: bool = False
     dropout: Annotated[float, Field(ge=0, lt=1)]
     series_dropout: Annotated[float, Field(ge=0, lt=1)]
+    feature_statistics_augmentation: FeatureStatisticsAugmentationConfig = Field(
+        default_factory=FeatureStatisticsAugmentationConfig
+    )
 
     @model_validator(mode="after")
     def validate_model_options(self) -> "ModelConfig":

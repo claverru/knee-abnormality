@@ -14,7 +14,9 @@ from this file.
 ## Next queue
 
 - **`trainer.max_epochs: 12`** (queued 2026-09-24, user decision) against the current control
-  `knee-geometry-merged-2` (seed 638120755, ×4 0.900955). Under ordinary BCE, 15 epochs gained
+  `half-stack-control` (seed 2617320043, fold 3, ×4 0.905205). The heavier augmentation
+  makes it more pressing: both augmentation stacks learned slower and were still improving in soft
+  AUC at epoch 9 ([augmentation campaign](../validation/results/2026-09-26-augmentation-campaign.md)). Under ordinary BCE, 15 epochs gained
   +0.0023 and +0.0025 on ReXNet and +0.0029 on B0, all inside seed noise
   ([overnight results](../validation/results/2026-09-18-overnight-results.md),
   [epoch arms](../validation/results/2026-09-19-fold-ensembles-and-sigma-sweep.md)). Under

@@ -2,6 +2,7 @@
 
 | Read when | Document |
 |---|---|
+| Recovering the closed augmentation campaign (13 user-ordered seeds, reruns and researcher refills: GIN, k-space resolution, sharpening, image/token/pooled MixUp, late affine shutdown, bias field, channel reversal, bilateral smoothing, intra-study contrast mixing, DSU and follow-ups, stochastic depth; smoothing and DSU adopted, the half stack adopted on main) | [Augmentation](augmentation/INDEX.md) |
 | Recovering the stopped near-misses campaign (15 user-ordered seeds, then researcher ideas: meniscus readouts, early-learning regularization, 3D position, PF OA bias and three-compartment detector, token dropout, plane readouts, half-knee refinements; token dropout adopted, 18 rejected) | [Near misses](near-misses/INDEX.md) |
 | Recovering the stopped knee-geometry campaign (study centre, bilateral studies, midline and knee frame, meniscus and OA compartment readouts; half-knee MIL adopted, 16 rejected, 1 invalid) | [Knee geometry](knee-geometry/INDEX.md) |
 | Recovering the stopped noisy-labels campaign (prediction-memory target correction and down-weighting, early-learning regularization, class-balance schedule; nothing adopted) | [Noisy labels](noisy-labels/INDEX.md) |

@@ -1,0 +1,82 @@
+ideas:
+- id: intra-study-contrast-mixing
+  mechanism_id: intra-study-contrast-mixing
+  parent_idea_id: null
+  title: Blend a study's fluid-sensitive fat-suppressed and non-fat-suppressed acquisitions of the same plane, keeping the target's slot
+  opportunity: >-
+    Contrast varies inside each slot: 19% of T1/PD-slot series are T2 without fat suppression,
+    129 T1-FS series carry non-FS flags and 130 GE zero-TE sagittals have flat near-PD contrast.
+    Blending a study's own two contrasts of one plane synthesizes these in-between contrasts with
+    no label risk, because both images come from the same patient and study.
+  mechanism: >-
+    For each plane where both the fluid-sensitive fat-suppressed and the non-fat-suppressed slots
+    survive series dropout, with probability 0.3 pick one of the two as target (equal odds) and
+    replace each of its triplets by l*x_target + (1 - l)*x_other, l ~ U(0.5, 1.0) per acquisition,
+    where x_other is the other acquisition's triplet nearest in slice position along the shared
+    plane normal (the developer verifies both positions share a patient frame). Mix before either
+    acquisition's own augmentation, since both crops are centred on the same knee at 0.625 mm;
+    restore the target's padding. The target keeps its slot, plane/contrast embedding, positions,
+    geometry and masks; the other acquisition stays unmixed.
+  precedents:
+  - 'Contrast heterogeneity: docs/metadata/series-filtering-census.md.'
+  - 'GIN (seed 1) and broader gamma/contrast (-0.0033/-0.0067, 2026-09-20) perturb contrast synthetically; this uses the study''s own second contrast.'
+  novelty: First augmentation that mixes two real contrasts of the same anatomy; no cross-study label mixing.
+  coverage: Coronal and sagittal in most studies; axial where a T1/PD axial exists (857 studies).
+  exploitation: If it helps, extend it to mixing across the study's repeated acquisitions of one slot.
+  budget: Triplet matching and a blend before augmentation; negligible.
+  implementation: Adds data.contrast_mixing_augmentation (probability 0.3, target_weight_range [0.5, 1.0]) in config.py and the blend in modeling/model.py before _augment_images; logs planes mixed and mean weight.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Label-safe and grounded in measured slot heterogeneity; the fat-suppression cue can weaken, as with GIN.
+- id: dsu-feature-statistics
+  mechanism_id: feature-statistics-uncertainty
+  parent_idea_id: null
+  title: Resample per-acquisition feature-channel means and standard deviations at one ReXNet stage (DSU)
+  opportunity: >-
+    Channel statistics of CNN features mostly encode style (scanner, contrast, texture). The
+    feature-level counterpart of seed 1: perturbing them may reduce reliance on acquisition style.
+  mechanism: >-
+    At the output of the last ReXNet block at stride 8, compute each acquisition's per-channel
+    mean and standard deviation over its triplets and spatial positions. Estimate the spread of
+    those statistics across the batch's acquisitions of the same plane/contrast type (skip types
+    with fewer than two acquisitions), draw new statistics mu' = mu + e1*spread_mu and
+    sigma' = sigma + e2*spread_sigma with e ~ N(0, 1) per acquisition and channel, and
+    re-normalize that acquisition's features to them. Probability 0.5 per acquisition, training
+    only.
+  precedents:
+  - 'Li et al., DSU (arXiv:2202.03958): gains on natural-image domain-generalization benchmarks; no medical evidence found.'
+  - 'MixStyle, its predecessor, scored -0.8 to +0.5 Dice in the MRI comparisons of the GIN and SLAug papers.'
+  - 'docs/backlog/small-changes.md, Feature-space augmentation (DSU).'
+  novelty: First feature-level augmentation here.
+  coverage: Every acquisition; feature statistics also carry diagnostic signal (overall fluid brightness in effusion).
+  exploitation: If it helps, the insertion stage is not swept; a plane/contrast-free variant would be the contrast test.
+  budget: A forward hook with per-acquisition reductions; negligible.
+  implementation: Adds model.feature_statistics_augmentation (probability 0.5, stage stride 8) in config.py and a training-only hook in modeling/model.py.
+  open_choices: None; stage, probability and unit strength are fixed.
+  dependencies: []
+  priority_rationale: Weak evidence; runs last.
+- id: rexnet-stochastic-depth
+  mechanism_id: stochastic-depth
+  parent_idea_id: null
+  title: Stochastic depth (drop path) in ReXNet-200 at rate 0.1
+  opportunity: >-
+    Stochastic depth has never run on ReXNet here; the backbone is built without it. It is a
+    standard regularizer in timm training recipes and costs nothing at inference.
+  mechanism: >-
+    Pass drop_path_rate 0.1 to timm.create_model for the backbone. During training timm's
+    ReXNet-200 randomly skips the residual branch of its 11 shortcut blocks per sample, with the
+    rate rising linearly with depth to 0.1; validation and inference run every block. Requires
+    model.backbone_eval false, the recipe's value.
+  precedents:
+  - 'Head dropout 0.1 gave +0.0032 (2026-09-18) and -0.0005 (2026-09-20): regularization effects here sit near seed noise.'
+  - 'Stochastic depth appears only in docs/modeling/coatnet-224-spatial-backbone.md and docs/research/efficientnet-training.md; never measured on ReXNet.'
+  novelty: First layer-level stochastic regularization on ReXNet here.
+  coverage: Every study; all labels.
+  exploitation: If it helps, it combines with adopted augmentation families as independent regularization.
+  budget: None measurable; a per-sample mask in 11 blocks.
+  implementation: Adds model.drop_path_rate (0.1) in config.py and passes it to timm.create_model in modeling/model.py; logs the configured rate and confirms DropPath modules are active in training mode.
+  open_choices: None; the rate is not swept.
+  dependencies: []
+  priority_rationale: Cheap, standard and untested here; low expected effect.
+exhausted_directions: >-
+  The rejected alternatives and their reasons are listed in prior-work.md.

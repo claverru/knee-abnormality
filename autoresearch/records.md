@@ -36,6 +36,17 @@ highest potential first. It is the work queue, not the research memory; claiming
 launch removal and refill are described in the [lifecycle](lifecycle.md#claim-and-refill).
 Launch removal never deletes the permanent idea record.
 
+## Family verdicts
+
+State `research.verdicts` holds one standing verdict per `mechanism_id` (`extend`,
+`retry` or `close`, with reason, next step and a miss count), written by the researcher
+for every family in its `new_results` and validated in code: a missing verdict, a
+non-`close` verdict after two consecutive rejected follow-ups, a proposal in a closed
+family, or an open line left without a follow-up while slots allow is rejected and the
+refill retried, up to the report-rejection limit. `research.reviewed` lists the results
+already given verdicts. The researcher and proposal-admission contexts receive these as
+`family_ledger`, one row per family with attempts, decided results and verdict.
+
 ## Experiments
 
 Use one immutable directory per attempt in

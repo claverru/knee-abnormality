@@ -154,12 +154,10 @@ def launch_blockers(state, exp):
         blockers.append("Previous training or its decision is still outstanding")
     if state["events"]:
         blockers.append("Campaign events are still pending")
-    if state["control_retrain"]:
-        blockers.append("The adopted incumbent's control retrain is still pending")
     if any(
         not job["processed"]
         and job["kind"]
-        in {"training", "comparison", "control", "orchestrator", "completion_reporter"}
+        in {"training", "comparison", "orchestrator", "completion_reporter"}
         for job in state["jobs"].values()
     ):
         blockers.append("Training, comparison or decision work is still active")

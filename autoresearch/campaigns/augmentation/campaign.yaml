@@ -1,0 +1,62 @@
+id: augmentation
+recipe: configs/training.yaml
+reference_run: outputs/training/report-attributes-control
+reference_equivalences: {}
+additional_evidence_runs: []
+backlog:
+  refill_below: 3
+  refill_to: 5
+  seed_order: forced
+policy:
+  editable_files:
+    - configs/training.yaml
+    - src/knee_abnormality/config.py
+    - src/knee_abnormality/modeling/augmentation.py
+    - src/knee_abnormality/modeling/model.py
+    - src/knee_abnormality/training/lightning.py
+  editable_directories: []
+  config_keys: []
+  config_prefixes:
+    - data.gin_augmentation
+    - data.resolution_augmentation
+    - data.sharpen_augmentation
+    - data.bias_field_augmentation
+    - data.channel_reversal_augmentation
+    - data.smoothing_augmentation
+    - data.affine_shutdown_epoch
+    - data.contrast_mixing_augmentation
+    - model.feature_statistics_augmentation
+    - model.drop_path_rate
+    - trainer.image_mixup
+    - trainer.token_mixup
+    - trainer.pooled_mixup
+  list_item_fields: {}
+  input_identity_keys:
+    - preprocessing_identity
+  require_source_change: true
+  developer_instructions: >-
+    Implement exactly the assigned idea on the current incumbent and switch it on in
+    configs/training.yaml with the idea's fixed settings; never change the values of the existing
+    reflection, affine, intensity or noise families or series dropout. New settings go under the
+    idea's prefix in config.py. Image transforms run in modeling/augmentation.py on [0, 1] images
+    before ImageNet normalization, training only, with parameters sampled per acquisition and
+    applied identically to its three slice channels and all its triplets; never filter across the
+    channel axis. Draw a new family's random numbers only when it is enabled and after the existing
+    families' draws, so a disabled family reproduces the incumbent exactly and the existing draws
+    are unchanged. Filtering transforms (resolution, sharpening, smoothing, bias field) must use
+    the geometric valid region (valid_rects warped with the acquisition's affine), not image == 0,
+    and leave padding at zero. Validation and inference must neither apply the transform nor
+    consume its random numbers. Log each mechanism's activity per epoch (acquisitions or studies
+    affected, mean absolute pixel or logit change, mixed-study count, mean lambda, mixed-loss component, effective probability) so
+    it is shown to be active. Return prepared or blocked. Use the existing Python environment for
+    static checks. No tests.
+  researcher_instructions: >-
+    Research starts only after the user's thirteen seeds finish. Work on training-time input
+    variation: image augmentation families, their schedule and feature-level augmentation. Build
+    on the seeds' diagnostics (per-label deltas against the seed noise yardstick in prior-work.md,
+    vendor and field-strength subgroups, activity logs). Check every proposal against the
+    precedent table in prior-work.md. Once two or more image families are adopted, consider a
+    one-of composition that applies a single new family per acquisition, keeping the total
+    corruption rate fixed instead of stacking every family. No strength sweeps of existing or
+    adopted families, no changes to sampling, crop, image size, labels, losses other than a MixUp
+    loss, or backbone, no extra forward passes, and no test-time augmentation.

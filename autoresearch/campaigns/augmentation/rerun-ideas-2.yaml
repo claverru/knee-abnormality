@@ -1,0 +1,42 @@
+ideas:
+- id: aligned-image-mixup-rerun
+  mechanism_id: aligned-image-mixup
+  parent_idea_id: aligned-image-mixup
+  title: 'MixUp variant C: mix the input triplets of same-side study pairs, slot by slot and matched by depth, before the backbone'
+  opportunity: >-
+    MixUp is part of the RSNA 2024 lumbar 2nd (image MixUp p 0.3, alpha 1, plus manifold MixUp),
+    3rd and 6th-place recipes, never isolated. Image MixUp is the common form: the whole network
+    sees mixed inputs. Here the crops are centred on the knee at a fixed 0.625 mm, so same-side
+    studies roughly align anatomically, which makes an aligned image version possible.
+  mechanism: >-
+    Pairing (shared by variants A, B, C): choose 30% of the batch's studies as a; pair each with a
+    random other study b of the same knee side (knee_side_sign, excluding unknown-side and
+    bilateral studies) and the same reflection draw; skip a when no partner exists. Draw
+    l ~ Beta(1, 1) per pair. For every plane/contrast slot present in both studies, match each of
+    a's triplets to b's triplet in that slot with the nearest relative depth (rank fraction among
+    the selected triplets), and replace a's triplet by l*x_a + (1 - l)*x_b after both have had
+    their own augmentation and before ImageNet normalization; slots only a has stay unmixed. Study
+    a keeps its own positions, geometry, valid region and masks; b is also used unmixed as its own
+    row. Loss for mixed rows: l*w(y_a)*BCE(z, y_a) + (1 - l)*w(y_b)*BCE(z, y_b) per label with each
+    source target's class-balance weight, only where the label is observed in both studies, never
+    turning a missing label into a negative; unmixed rows keep the current loss, normalized over
+    supervised cells as the masked BCE does. The auxiliary losses mix the same way, with the
+    same lambda: the half-knee detector's medial and lateral halves (aligned because pairs share a
+    knee side) take l*loss(y_a) + (1 - l)*loss(y_b) for that side's meniscus, and each
+    report-attribute question takes l*loss(a) + (1 - l)*loss(b), both only where the target is
+    observed in both studies.
+  precedents:
+  - 'aligned-image-mixup (this campaign, experiment aligned-image-mixup-20260925T225700Z-2dc20772) trained all ten epochs with the mechanism active (23-25% of studies mixed per epoch) and a x1 in-training validation peak of 0.89622 against the control''s 0.89033, then crashed at checkpoint reload: KneeAbnormalityModel.__init__() missing the required image_mixup argument (checkpoint.py:102). Rerun the same mechanism and loss; the only change is the constructor fix already used by token-feature-mixup.'
+  - 'RSNA 2024 lumbar 2nd place (github.com/brendanartley/RSNA-2024-Competition, cfg_stage2_s2_sp1.py): image MixUp p 0.3, alpha 1, with CutMix and manifold MixUp; 3rd and 6th place also used MixUp. Not isolated.'
+  - 'Panfilov et al. (arXiv:1908.04126): MixUp improved cross-scanner knee cartilage segmentation (femoral 0.791 -> 0.819, tibial 0.746 -> 0.802).'
+  - 'Public EfficientNet-B0 in this competition: MixUp 0.7914 -> 0.7937, judged noise (docs/research/public-research.md).'
+  novelty: First MixUp here; alignment by knee side, slot and depth replaces the naive mixing that the anatomical geometry forbids.
+  coverage: 30% of training studies per batch; all labels.
+  exploitation: Variants B and A share its pairing and loss and move only the mixing point, so the three results rank where mixing helps.
+  budget: No extra forward pass; triplet matching and a two-target BCE.
+  implementation: Adds trainer.image_mixup (fraction 0.3, beta_alpha 1.0) in config.py, pairing and image mixing in modeling/model.py after augmentation, and the mixed main, half-knee and report-attribute losses in training/lightning.py; logs mixed-study count, mean lambda and each mixed-loss component.
+  open_choices: None; fraction and alpha are the lumbar 2nd-place setting, shared by all three variants.
+  dependencies: []
+  priority_rationale: The most common and strongest MixUp form; first of the three variants.
+exhausted_directions: >-
+  None; this re-imports a seed invalidated by a checkpoint-reload defect.

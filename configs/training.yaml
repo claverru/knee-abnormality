@@ -1,5 +1,5 @@
 name: training
-seed: 2464012069
+seed: 2617320043
 
 paths:
   data_root: ../data
@@ -12,12 +12,15 @@ labels:
 
 validation:
   split: all_5fold_scanner_v1
-  folds: [2]
+  folds: [3]
   prediction_image_multiplier: 4
 
 data:
   reflection_augmentation:
     probability: 0.5
+  contrast_mixing_augmentation:
+    probability: 0.3
+    target_weight_range: [0.5, 1.0]
   sampling_sigma_fraction: 0.867
   validation_image_multiplier: 1
   study_triplet_total: 26
@@ -33,6 +36,16 @@ data:
   noise_augmentation:
     probability: 0.15
     std_range: [0.005, 0.02]
+  smoothing_augmentation:
+    probability: 0.2
+    spatial_sigma: 1.0
+    range_sigma_range: [0.05, 0.1]
+  resolution_augmentation:
+    probability: 0.25
+    keep_fraction_range: [0.70, 1.0]
+  gin_augmentation:
+    probability: 0.3
+    blend_max: 0.5
   series_types:
     - {plane: Axial, fluid_sensitive: 0, fat_suppression: 0, max_images: 18}
     - {plane: Axial, fluid_sensitive: 1, fat_suppression: 1, max_images: 18}
@@ -55,6 +68,8 @@ model:
   backbone_eval: false
   dropout: 0.0
   series_dropout: 0.2
+  feature_statistics_augmentation:
+    probability: 0.5
 
 optimizer:
   backbone_lr: 0.0002

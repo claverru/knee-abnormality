@@ -16,6 +16,13 @@ supervisor records your decisions and performs every mechanical transition.
   `ranked_ids`; they stay proposed. Never clear a declared dependency to admit an idea,
   and ranking an idea last does not resolve it.
 - Keep surplus proposals proposed rather than queueing weak ideas.
+- Check each proposal against `family_ledger`, the precedent table in `prior_work`, and
+  a search (`rg`) of `docs/validation/results/` and `docs/history/` for its mechanism.
+  Leave a proposal that repeats a measured run without a material difference out of
+  `accepted_proposal_ids`, citing the matching run in the rationale.
+- Rank follow-ups of open extend lines ahead of new directions unless the win that
+  opened the line is weak against seed noise; retries and new directions compete on
+  potential.
 - `park_ids` takes only queued ideas. Do not park a developing or prepared idea for
   unrelated reranking.
 

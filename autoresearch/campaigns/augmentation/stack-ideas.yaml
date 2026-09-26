@@ -1,0 +1,58 @@
+ideas:
+- id: augmentation-half-stack
+  mechanism_id: augmentation-stack
+  parent_idea_id: null
+  title: 'Stack the three strongest near-miss augmentations on the incumbent: intra-study contrast mixing, GIN v3 and one-axis resolution degradation'
+  opportunity: >-
+    13 of 15 campaign results were positive (mean +0.0009) against three different controls, but
+    each single mechanism sat near the +0.001 threshold and inside seed noise. The user ordered two
+    stacking runs to test whether the small gains add. This is the half dose; the full stack
+    follows.
+  mechanism: >-
+    On the current incumbent (bilateral smoothing + DSU, both kept), enable three mechanisms
+    together at exactly their measured settings: intra-study contrast mixing (probability 0.3 per
+    plane with both contrasts, target weight U(0.5, 1.0)), GIN v3 (probability 0.3, blend up to
+    0.5, 4 layers, 2 hidden channels, kernel 1 or 3, one network per acquisition, mask built per
+    slice as geometric_valid_mask does), and one-axis k-space resolution degradation (probability
+    0.25, keep 70-100% of frequencies along one random in-plane axis). No strength changes.
+  precedents:
+  - 'intra-study-contrast-mixing: +0.0015 vs the smoothing retrain; code in outputs/autoresearch/augmentation/experiments/intra-study-contrast-mixing-20260926T034254Z-ac1de092/changes.diff'
+  - 'gin-intensity-augmentation-v3: +0.0013 vs smoothing + DSU; code in outputs/autoresearch/augmentation/experiments/gin-intensity-augmentation-v3-20260926T074639Z-0d98d2fa/changes.diff'
+  - 'phase-axis-resolution-degradation: +0.0012 vs the original control; code in outputs/autoresearch/augmentation/experiments/phase-axis-resolution-degradation-20260925T221420Z-c259dc97/changes.diff'
+  novelty: First combination of augmentation families in this campaign; tests whether near-threshold gains stack.
+  coverage: Every study; all labels.
+  exploitation: The full stack adds channel reversal and stochastic depth; the pair reads as a dose response.
+  budget: About +65 s of training over the incumbent (measured overheads 25, 27 and 13 s), about 1,930 s total against the 2,027 s ceiling.
+  implementation: Port each mechanism from its changes.diff onto the incumbent source, adapted to it, and switch on data.contrast_mixing_augmentation, data.gin_augmentation and data.resolution_augmentation in configs/training.yaml with the settings above. Keep smoothing and DSU. Keep each mechanism's random draws after the existing families' draws and its activity logging.
+  open_choices: None; settings are the measured ones.
+  dependencies: []
+  priority_rationale: User-ordered stacking test, first of two.
+- id: augmentation-full-stack
+  mechanism_id: augmentation-stack
+  parent_idea_id: augmentation-half-stack
+  title: 'Stack all five positive near-miss augmentations: the half stack plus triplet channel reversal and ReXNet stochastic depth'
+  opportunity: >-
+    Second of the two user-ordered stacking runs. If the half stack is adopted it is the incumbent
+    and this run measures the two added mechanisms; otherwise it measures all five on smoothing +
+    DSU. Either way the candidate contains all five.
+  mechanism: >-
+    On the current incumbent, make sure all of these are enabled at their measured settings:
+    intra-study contrast mixing, GIN v3 and one-axis resolution degradation as in
+    augmentation-half-stack (port them if the incumbent lacks them), plus triplet channel reversal
+    (probability 0.5 per axial or coronal acquisition, with the channel mapping passed to
+    feature_geometry composed with reflection_channels) and ReXNet stochastic depth
+    (model.drop_path_rate 0.1). Keep smoothing and DSU. No strength changes.
+  precedents:
+  - 'augmentation-half-stack (this campaign) and its three sources.'
+  - 'triplet-channel-reversal: +0.0012 vs the original control; code in outputs/autoresearch/augmentation/experiments/triplet-channel-reversal-20260926T014024Z-1123cd9d/changes.diff'
+  - 'rexnet-stochastic-depth: +0.0011 vs the original control; code in outputs/autoresearch/augmentation/experiments/rexnet-stochastic-depth-20260926T045526Z-1de7a03e/changes.diff'
+  novelty: The maximum dose of the campaign's positive mechanisms.
+  coverage: Every study; all labels.
+  exploitation: Read against the half stack; if it ties or loses, the regularization ceiling is reached.
+  budget: Channel reversal and stochastic depth measured no overhead; about 1,930 s total against the 2,027 s ceiling.
+  implementation: Port the missing mechanisms from their changes.diff onto the incumbent source and switch them on in configs/training.yaml (data.channel_reversal_augmentation, model.drop_path_rate, and the half-stack prefixes if absent). Keep smoothing and DSU and each mechanism's activity logging.
+  open_choices: None; settings are the measured ones.
+  dependencies: []
+  priority_rationale: User-ordered stacking test, second of two; the campaign closes after it.
+exhausted_directions: >-
+  User-ordered stacking runs; the campaign closes after both are decided.

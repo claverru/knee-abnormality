@@ -233,12 +233,6 @@ def progress_lines(state, root, output):
                 f"Reference changed: gains measured from {anchor['id']} "
                 f"at AUC {score_text(anchor_score)}; reference change excluded from gain."
             )
-    for record in state["control_retrains"]:
-        lines.append(
-            f"Control retrained after adopting {record['adopted']} at seed {record['seed']}: "
-            f"AUC {score_text(saved_auc(root, record['control_run'], fold))} "
-            f"(adopted run {score_text(saved_auc(root, record['adopted_run'], fold))})"
-        )
     withdrawn = sum(
         exp.get("eligible_decision") == "provisional_accept"
         and exp.get("decision") not in {None, "provisional_accept"}

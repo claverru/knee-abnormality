@@ -81,8 +81,7 @@ Calibration progress updates after each complete pass, not after each study.
 experiment history. Each decided attempt keeps its own launch-time reference,
 reference/candidate AUC, candidate-minus-reference delta, paired 95% interval and
 current decision, at six decimals. Withdrawn acceptances retain their original
-numerical evidence and are marked. Control retrains after adoptions are listed with
-both AUCs. Training attempts awaiting a final decision, including blocked attempts,
+numerical evidence and are marked. Training attempts awaiting a final decision, including blocked attempts,
 appear separately; missing metrics appear as unavailable. An unstarted campaign
 reports no results.
 

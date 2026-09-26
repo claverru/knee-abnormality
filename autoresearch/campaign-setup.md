@@ -15,7 +15,10 @@ permissions using the same runtime.
    instead of restating it. State the granularity of every fallback rule (per study
    or per token); knee-geometry's "for that study" was read both ways, and children
    were repeatedly sent back to repair behavior inherited from the incumbent. Record prior evidence,
-   general-backlog ownership and blocked directions in `prior-work.md`.
+   general-backlog ownership and blocked directions in `prior-work.md`, with a precedent
+   table of measured runs outside autoresearch in the campaign topic (mechanism, setting,
+   run, macro delta, source). The researcher checks proposals against that table instead
+   of searching `docs/` on every refill.
 2. Write `campaign.yaml` with a unique `id`, recipe, saved control, evidence runs,
    `backlog` settings (`refill_below`, `refill_to` of at most five, `seed_order`) and
    `policy`. The recipe's single `validation.folds` entry is the campaign fold, and the

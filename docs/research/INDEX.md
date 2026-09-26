@@ -18,6 +18,7 @@
 | Comparing approaches from RSNA MRI competitions | [RSNA MRI competitions](rsna-mri.md) |
 | Considering methods from RSNA CT competitions | [Transfer from RSNA CT](rsna-ct.md) |
 | Reviewing other MRI benchmarks | [Other MRI benchmarks](mri-benchmarks.md) |
+| Choosing MRI image augmentations: evidence for GIN, k-space resolution, sharpening, MixUp placement, bias field, smoothing, contrast mixing and DSU, the data facts that set their strengths, and the rejected list | [MRI augmentation candidates](mri-augmentation.md) |
 | Judging multi-scale features, branch dominance and fine-detail levers (token pitch vs pixels vs crops) | [Multiscale features for knee MRI](multiscale-features-knee-mri.md) |
 | Comparing backbone evidence from MRI tasks | [Backbone MRI evidence](backbone-mri-evidence.md) |
 | Choosing reusable Hugging Face, radiology and knee-MRI checkpoints and checking integration costs | [Image and MRI encoders](huggingface-image-encoders.md#practical-2d-shortlist) |

@@ -18,7 +18,7 @@ from knee_abnormality.autoresearch.campaign.gates import (
     initial_limits,
     validate_config,
 )
-from knee_abnormality.autoresearch.campaign.reports import ResearchReport
+from knee_abnormality.autoresearch.campaign.reports import IdeaReport
 from knee_abnormality.autoresearch.campaign.rules import SEED_TERMINAL
 from knee_abnormality.autoresearch.reporting.progress import findings_summary
 from knee_abnormality.autoresearch.runtime.isolation import (
@@ -215,12 +215,16 @@ class Supervisor(JobMixin, ExperimentMixin, ResultMixin, SchedulingMixin):
             "running": None,
             "evidence_revision": 0,
             "last_refill_revision": -1,
+            "research": {
+                "verdicts": {},
+                "reviewed": [],
+                "rejections": 0,
+                "previous_rejection": None,
+            },
             "refill_below": self.campaign["backlog"]["refill_below"],
             "refill_to": self.campaign["backlog"]["refill_to"],
             "seed_order": self.campaign["backlog"]["seed_order"],
             "seed_ideas": [],
-            "control_retrain": None,
-            "control_retrains": [],
         }
         seeds = seed_files(self.docs)
         for path in seeds:
@@ -232,7 +236,7 @@ class Supervisor(JobMixin, ExperimentMixin, ResultMixin, SchedulingMixin):
             self.save()
 
     def queue_seeds(self, path: Path):
-        report = ResearchReport.model_validate(yaml.safe_load(path.read_text()))
+        report = IdeaReport.model_validate(yaml.safe_load(path.read_text()))
         ids = [idea.id for idea in report.ideas]
         if not ids or len(ids) != len(set(ids)) or set(ids) & set(self.state["ideas"]):
             raise ValueError("Forced seeds need nonempty, unique, unused idea IDs")
@@ -279,7 +283,7 @@ class Supervisor(JobMixin, ExperimentMixin, ResultMixin, SchedulingMixin):
         self.state.update(status="paused", reason=reason, pause_kind=kind)
 
     def import_ideas(self, path: Path):
-        report = ResearchReport.model_validate(yaml.safe_load(path.read_text()))
+        report = IdeaReport.model_validate(yaml.safe_load(path.read_text()))
         ids = [idea.id for idea in report.ideas]
         if not ids or len(ids) != len(set(ids)):
             raise ValueError("Import requires nonempty ideas with unique IDs")
@@ -330,9 +334,6 @@ class Supervisor(JobMixin, ExperimentMixin, ResultMixin, SchedulingMixin):
                             pause_kind=None,
                         )
                         self.state.pop("retry_after", None)
-                        control = self.state["control_retrain"]
-                        if control and control["stage"] == "failed":
-                            control["stage"] = "pending"
                         for job in self.state["jobs"].values():
                             job.pop("application_error", None)
                         self.save()
@@ -358,7 +359,6 @@ class Supervisor(JobMixin, ExperimentMixin, ResultMixin, SchedulingMixin):
                             if abort or job["kind"] not in {
                                 "training",
                                 "comparison",
-                                "control",
                             }:
                                 owner = Path(job["path"]) / "owner.json"
                                 if owner.exists():

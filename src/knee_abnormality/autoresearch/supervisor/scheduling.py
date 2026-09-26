@@ -3,7 +3,6 @@ from pathlib import Path
 
 from knee_abnormality.autoresearch.campaign.binding import parent_changed
 from knee_abnormality.autoresearch.campaign.completion import completion_blockers
-from knee_abnormality.autoresearch.campaign.gates import validate_config
 from knee_abnormality.autoresearch.runtime.gpu import gpu_available
 from knee_abnormality.autoresearch.runtime.isolation import sandbox
 from knee_abnormality.autoresearch.supervisor.prompts import (
@@ -34,9 +33,6 @@ class SchedulingMixin:
             return
         if self.next_event():
             self.schedule_event()
-            return
-        if self.state["control_retrain"]:
-            self.schedule_control()
             return
         if self.advance_claimed():
             return
@@ -71,11 +67,9 @@ class SchedulingMixin:
         )
 
     def next_event(self):
-        deferred = self.state["control_retrain"] is not None
-        order = {"completion": 0, "review": 3 if deferred else 1, "proposals": 2}
+        order = {"completion": 0, "review": 1, "proposals": 2}
         self.state["events"].sort(key=lambda event: order[event["kind"]])
-        head = self.state["events"][0] if self.state["events"] else None
-        return None if head and deferred and head["kind"] == "review" else head
+        return self.state["events"][0] if self.state["events"] else None
 
     def schedule_event(self):
         if self.waiting():
@@ -215,38 +209,21 @@ class SchedulingMixin:
         ):
             return
         self.state["last_refill_revision"] = self.state["evidence_revision"]
+        research = self.state["research"]
+        needed = self.state["refill_to"] - len(self.state["queue"])
+        new_results = [
+            key
+            for key, value in self.state["experiments"].items()
+            if value.get("decision") and key not in research["reviewed"]
+        ]
         self.role(
             "researcher",
             Path(self.state["incumbent"]["source"]),
             {
-                "needed": self.state["refill_to"] - len(self.state["queue"]),
+                "needed": needed,
+                "new_results": new_results,
+                "previous_rejection": research["previous_rejection"],
                 "campaign_instructions": self.policy.researcher_instructions,
             },
-        )
-
-    def schedule_control(self):
-        control = self.state["control_retrain"]
-        if control["stage"] != "pending" or self.active("control"):
-            return
-        if self.state["running"] is not None or not gpu_available(self.state["gpu"]):
-            return
-        adopted = self.state["experiments"][control["adopted"]]
-        control["attempts"] += 1
-        directory = self.output / "controls" / f"{control['id']}-{control['attempts']}"
-        directory.mkdir(parents=True)
-        config = {
-            **adopted["config"],
-            "seed": control["seed"],
-            "name": control["id"],
-            "paths": {**adopted["config"]["paths"], "output_root": str(directory)},
-        }
-        validate_config(self.state["config"], config, self.policy)
-        control.update(stage="training", directory=str(directory))
-        self.submit_training(
-            "control",
-            config,
-            directory,
-            Path(adopted["source"]),
-            {"control": control["id"]},
-            self.state["limits"]["max_run_seconds"],
+            payload={"new_results": new_results, "needed": needed},
         )

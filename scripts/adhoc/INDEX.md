@@ -38,6 +38,7 @@ findings doc holds the question, method, command and result.
 |---|---|---|
 | [profile_training.py](profile_training.py) | Where does preprocessing spend time, and what batch fits? | [Preprocessing profile](../../docs/data-preparation/preprocessing-implementation-and-profile.md) |
 | [profile_threaded_loading.py](profile_threaded_loading.py) | Do worker-local slice threads beat process-only loading? | [Threading inside loading](../../docs/data-preparation/threading-inside-dataset-loading.md) |
+| [benchmark_output_stride.py](benchmark_output_stride.py) | What does a dilated stride-16 ReXNet cost in training time and memory? | [Dilated stride 16](../../docs/research/multiscale-features-knee-mri.md#a-dilated-stride-16-backbone-costs-three-times-the-backbone) |
 | [compare_header_implementations.py](compare_header_implementations.py) | Does the native header parser speed up the training dataloader? | [Loading attribution](../../docs/backlog/loading-speedup/attribution.md#only-inference-benefits) |
 | [probe_kaggle_loading.py](probe_kaggle_loading.py), [kaggle_loading_probes/](kaggle_loading_probes/) | How fast is each proposed loading speedup on Kaggle CPUs? The probes are code blocks run in Kaggle kernels, not importable modules. | [Measuring](../../docs/backlog/loading-speedup/measuring.md) |
 

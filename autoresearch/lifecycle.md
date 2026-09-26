@@ -21,8 +21,6 @@ checkout, and a winner never replaces main-checkout code automatically. Training
 runs from an immutable snapshot, so preparing the next candidate cannot alter it.
 
 Pending events are handled in order: completions, then reviews, then proposals.
-While an adoption's control retrain is pending, reviews wait and no candidate trains
-([seed policy](protocol.md#training-seed-policy)).
 
 ## Startup and proposals
 
@@ -64,9 +62,12 @@ reranked, and an unrelated event cannot park it.
 Refill thresholds are per campaign: `backlog.refill_below` and `backlog.refill_to`
 in `campaign.yaml`. Queue length counts the claimed head; launched and blocked ideas
 do not count. When the queue drops below `refill_below`, one researcher is asked for
-`refill_to` minus the queue length, running alongside development and training. A
-refill starts only after new evidence (a launch, a decision, a parked idea or a
-finished control retrain), so a resume or an empty refill does not respawn it; an
+`refill_to` minus the queue length, running alongside development and training, with
+the results decided since its last report; it returns a
+[family verdict](records.md#family-verdicts) for each, and open lines take refill slots
+first. A rejected report retries the refill with the reason attached. A
+refill starts only after new evidence (a launch, a decision or a parked
+idea), so a resume or an empty refill does not respawn it; an
 empty report is kept without an orchestrator call. No refill runs while forced seeds remain.
 
 ## Development and gates
@@ -155,8 +156,8 @@ other completion, and every escalation, goes to the orchestrator. Either way the
 supervisor records the fixed `eligible_decision` itself: the orchestrator interprets
 the result, records the finding and may rerank or park, but never applies or changes
 a verdict. A completion whose reference is no longer the incumbent needs explicit
-recovery. A `provisional_accept` makes the candidate the incumbent and starts the
-control retrain; a reject or invalid run leaves incumbent and queue unchanged.
+recovery. A `provisional_accept` makes the adopted run the incumbent, and later
+candidates train at its seed ([seed policy](protocol.md#training-seed-policy)); a reject or invalid run leaves incumbent and queue unchanged.
 
 A training that exits nonzero before its first epoch records no result and returns
 to the developer as a repair ([crashes before training](runtime.md#inspect-stop-and-resume));

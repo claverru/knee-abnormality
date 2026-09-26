@@ -9,12 +9,16 @@ from knee_abnormality.evaluation.metrics import COMPARTMENT_PAIRS
 from knee_abnormality.modeling.augmentation import (
     ImageAugmentation,
     affine_matrices,
+    apply_contrast_mixing,
+    apply_feature_statistics_augmentation,
     apply_reflection,
     augmented_to_prepared,
     reflection_channels,
     reflection_inverse,
     reflection_positions,
+    reflection_valid_rects,
     sample_augmentation_parameters,
+    sample_contrast_mixing_parameters,
     sample_reflection_parameters,
 )
 from knee_abnormality.modeling.spatial_tokens import (
@@ -28,6 +32,7 @@ from knee_abnormality.modeling.spatial_tokens import (
 PROJECTION_WIDTH = 256
 MIL_ATTENTION_WIDTH = 128
 COMPARTMENT_MIDLINE_BAND_MM = 10.0
+REXNET_STRIDE_8_BLOCK_COUNT = 5
 
 
 def sinusoidal_positions(
@@ -58,7 +63,8 @@ class KneeAbnormalityModel(nn.Module):
         target_count = len(targets)
         self.series_dropout = model.series_dropout
         self.augmentation_settings = data
-        self.image_augmentation = ImageAugmentation()
+        self.feature_statistics_settings = model.feature_statistics_augmentation
+        self.image_augmentation = ImageAugmentation(data)
         self.register_buffer(
             "mean", torch.tensor(data.mean).reshape(1, -1, 1, 1), persistent=False
         )
@@ -86,6 +92,15 @@ class KneeAbnormalityModel(nn.Module):
             **backbone_kwargs,
         )
         self.feature_mapping = backbone_mapping(model.backbone, self.backbone)
+        if self.feature_statistics_settings.probability > 0 and not (
+            hasattr(self.backbone, "stem")
+            and hasattr(self.backbone, "features")
+            and len(self.backbone.features) > REXNET_STRIDE_8_BLOCK_COUNT
+        ):
+            raise ValueError(
+                "Feature statistics augmentation requires a ReXNet backbone with a "
+                "stride-8 block to resample"
+            )
         backbone_training = self.backbone.training
         self.backbone.eval()
         try:
@@ -140,6 +155,18 @@ class KneeAbnormalityModel(nn.Module):
         )
         self.head = nn.Linear(PROJECTION_WIDTH, target_count)
         self.spatial_tokens = SpatialTokens(PROJECTION_WIDTH, data.series_types)
+        if data.contrast_mixing_augmentation.probability > 0:
+            plane_lookup = self.spatial_tokens.plane_lookup.tolist()
+            self.contrast_mixing_pairs = tuple(
+                tuple(
+                    index for index, plane in enumerate(plane_lookup) if plane == target
+                )
+                for target in range(3)
+            )
+            if any(len(pair) != 2 for pair in self.contrast_mixing_pairs):
+                raise ValueError(
+                    "Contrast mixing requires exactly two series types per plane"
+                )
         with torch.random.fork_rng(devices=[]):
             self.half_knee_detector = nn.Linear(PROJECTION_WIDTH, 1)
         self.oa_indices = tuple(
@@ -157,12 +184,30 @@ class KneeAbnormalityModel(nn.Module):
             self.backbone.eval()
         return self
 
-    def _encode_images(self, images: torch.Tensor) -> torch.Tensor:
+    def _encode_images(
+        self,
+        images: torch.Tensor,
+        acquisition_index: torch.Tensor,
+        acquisition_type: torch.Tensor,
+    ) -> torch.Tensor:
         if self.checkpoint_backbone:
             self.backbone.set_grad_checkpointing(
                 self.training and torch.is_grad_enabled()
             )
-        return self.backbone.forward_features(images)
+        if not self.training or self.feature_statistics_settings.probability == 0:
+            return self.backbone.forward_features(images)
+        features = self.backbone.features[:REXNET_STRIDE_8_BLOCK_COUNT](
+            self.backbone.stem(images)
+        )
+        features, self.feature_statistics_activity = (
+            apply_feature_statistics_augmentation(
+                features,
+                acquisition_index,
+                acquisition_type,
+                self.feature_statistics_settings,
+            )
+        )
+        return self.backbone.features[REXNET_STRIDE_8_BLOCK_COUNT:](features)
 
     def _effective_presence(self, presence: torch.Tensor) -> torch.Tensor:
         if not presence.any(dim=1).all():
@@ -182,8 +227,45 @@ class KneeAbnormalityModel(nn.Module):
             keep[rows, selected[rows]] = True
         return keep
 
+    def _mix_contrast(
+        self,
+        images: torch.Tensor,
+        effective: torch.Tensor,
+        acquisition_index: torch.Tensor,
+        token_study: torch.Tensor,
+        token_type: torch.Tensor,
+        token_plane: torch.Tensor,
+        patient_maps: torch.Tensor,
+        geometry_valid: torch.Tensor,
+    ) -> torch.Tensor:
+        settings = self.augmentation_settings.contrast_mixing_augmentation
+        if not self.training or settings.probability == 0:
+            return images
+        pairs = torch.tensor(
+            self.contrast_mixing_pairs, device=images.device, dtype=torch.long
+        )
+        parameters = sample_contrast_mixing_parameters(
+            settings.probability, effective[:, pairs[:, 0]] & effective[:, pairs[:, 1]]
+        )
+        images, self.contrast_mixing_activity = apply_contrast_mixing(
+            images,
+            parameters,
+            self.contrast_mixing_pairs,
+            settings.target_weight_range,
+            acquisition_index,
+            token_study,
+            token_type,
+            token_plane,
+            patient_maps,
+            geometry_valid,
+        )
+        return images
+
     def _augment_images(
-        self, images: torch.Tensor, slice_mask: torch.Tensor
+        self,
+        images: torch.Tensor,
+        slice_mask: torch.Tensor,
+        valid_rects: torch.Tensor,
     ) -> tuple[torch.Tensor, torch.Tensor]:
         settings = self.augmentation_settings
         if not self.training or not any(
@@ -192,6 +274,9 @@ class KneeAbnormalityModel(nn.Module):
                 settings.intensity_augmentation,
                 settings.affine_augmentation,
                 settings.noise_augmentation,
+                settings.smoothing_augmentation,
+                settings.resolution_augmentation,
+                settings.gin_augmentation,
             )
         ):
             return images, torch.eye(3, device=images.device)[None].expand(
@@ -204,7 +289,12 @@ class KneeAbnormalityModel(nn.Module):
         matrices = affine_matrices(parameters.affine, *images.shape[-2:])
         inverse = augmented_to_prepared(matrices, *images.shape[-2:])
         return self.image_augmentation(
-            images, series_index, parameters, matrices=matrices
+            images,
+            series_index,
+            parameters,
+            matrices=matrices,
+            valid_rects=valid_rects,
+            inverse_affine=inverse[series_index],
         ), inverse[series_index]
 
     def _attention_pool(
@@ -293,6 +383,11 @@ class KneeAbnormalityModel(nn.Module):
             (keep_series[:, None] & batch["slice_mask"]).flatten().nonzero().flatten()
         )
         positions = batch["slice_positions"].flatten()[flat_indices]
+        valid_rects = batch["valid_rects"].flatten(0, 1)[flat_indices]
+        patient_maps = batch["patient_maps"].flatten(0, 1)[flat_indices].float()
+        geometry_valid = batch["geometry_valid"].flatten()[
+            flat_indices
+        ] & torch.isfinite(patient_maps[:, 1]).all((-1, -2))
 
         valid_images = (
             batch["images"].flatten(0, 1)[flat_indices].to(torch.float32).div_(255.0)
@@ -310,17 +405,33 @@ class KneeAbnormalityModel(nn.Module):
             valid_images = apply_reflection(valid_images, reflected, sagittal)
         positions = reflection_positions(positions, reflected, sagittal)
         channels = reflection_channels(reflected, sagittal)
-        valid_images, inverse_affine = self._augment_images(valid_images, slice_mask)
+        valid_images = self._mix_contrast(
+            valid_images,
+            effective,
+            acquisition_index,
+            token_study,
+            token_type,
+            token_plane,
+            patient_maps,
+            geometry_valid,
+        )
+        valid_images, inverse_affine = self._augment_images(
+            valid_images,
+            slice_mask,
+            reflection_valid_rects(
+                valid_rects, reflected, sagittal, valid_images.shape[-1]
+            ),
+        )
         inverse_affine = reflection_inverse(
             inverse_affine, reflected, sagittal, valid_images.shape[-1]
         )
         valid_images = valid_images.sub(self.mean).div_(self.std)
         if self.channels_last:
             valid_images = valid_images.contiguous(memory_format=torch.channels_last)
-        maps = self._encode_images(valid_images)
+        maps = self._encode_images(valid_images, acquisition_index, token_type)
         features = self.projection(maps.flatten(2).transpose(1, 2))
         xy, visual_valid, prepared_xy = feature_geometry(
-            batch["valid_rects"].flatten(0, 1)[flat_indices],
+            valid_rects,
             inverse_affine,
             maps.shape[-2:],
             valid_images.shape[-2:],
@@ -328,7 +439,7 @@ class KneeAbnormalityModel(nn.Module):
             channels,
         )
         with torch.autocast(device_type=features.device.type, enabled=False):
-            middle_map = batch["patient_maps"].flatten(0, 1)[flat_indices, 1].float()
+            middle_map = patient_maps[:, 1]
             homogeneous = torch.cat(
                 (prepared_xy.float(), torch.ones_like(prepared_xy[..., :1])), -1
             )
@@ -336,21 +447,19 @@ class KneeAbnormalityModel(nn.Module):
             patient_y = torch.einsum("nj,nkj->nk", middle_map[:, 1], homogeneous)
             side = batch["knee_side_sign"][keep_series][acquisition_index].float()
             center = batch["knee_center_x_mm"][keep_series][acquisition_index].float()
-            valid_geometry = batch["geometry_valid"].flatten()[flat_indices]
-            valid_geometry = valid_geometry & torch.isfinite(middle_map).all((-1, -2))
             medial_axis = torch.where(
-                valid_geometry[:, None] & (side[:, None] != 0),
+                geometry_valid[:, None] & (side[:, None] != 0),
                 side[:, None] * (patient_x - center[:, None]),
                 0.0,
             )
             center_y = batch["knee_center_y_mm"][keep_series][acquisition_index].float()
             anterior_axis = torch.where(
-                valid_geometry[:, None] & (side[:, None] != 0),
+                geometry_valid[:, None] & (side[:, None] != 0),
                 center_y[:, None] - patient_y,
                 0.0,
             )
             trusted_geometry = (
-                valid_geometry[:, None] & (side[:, None] != 0) & visual_valid
+                geometry_valid[:, None] & (side[:, None] != 0) & visual_valid
             )
         return {
             "features": features,

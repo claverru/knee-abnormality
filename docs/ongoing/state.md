@@ -14,6 +14,17 @@ pending experiments are classified in the [backlog](../backlog/INDEX.md).
   incumbent's lead over them sits mostly in Fracture, Baker's and Contusion, labels a re-seed also
   moves ([findings](../../autoresearch/campaigns/knee-geometry/findings.md)).
 
+- **Half-stack augmentation adopted, 2026-09-26 (user decision):** the
+  [augmentation campaign](../validation/results/2026-09-26-augmentation-campaign.md) adopted
+  bilateral smoothing and DSU; on top of them the user adopted intra-study contrast mixing, GIN and
+  one-axis resolution degradation. On fold 2 at seed 1704794368 the half stack scored +0.0011 ×4
+  macro against smoothing + DSU and 0.943 public (S64) against 0.940 (S63); the full stack (plus
+  channel reversal and stochastic depth) added only +0.0005 locally and was not adopted. The new
+  control, `half-stack-control` (seed 2617320043, fold 3), scored ×4 0.905205 (epoch 9); candidates
+  pair with it. S65 (the half stack's epoch 9) also scored 0.943, a second tie between hard-AUC and
+  last-epoch checkpoints, so selection stays on hard AUC. The augmentation campaign is closed, and campaigns no longer retrain
+  controls after adoptions.
+
 - **Report-attribute heads adopted, 2026-09-25 (user decision):** 35 training-only heads learn
   JevK5 report attributes (target set 3.1) at weight 0.1. Against `oa-detector-control` they scored
   +0.00105 ×4 macro (95% [−0.0012, +0.0035]) and 0.940 public (S62) against 0.938 (S60); the first
@@ -88,9 +99,8 @@ pending experiments are classified in the [backlog](../backlog/INDEX.md).
   is an unstarted big bet;
   [attention-token dropout](../backlog/small-changes.md#attention-token-dropout) was later tested
   and rejected (2026-09-25).
-  [Feature-space augmentation (DSU)](../backlog/small-changes.md#feature-space-augmentation-dsu)
-  was also accepted as an unstarted small change, with acquisition-coherent perturbations and
-  safeguards for diagnostic contrast. No implementation, extraction or training has started.
+  Feature-space augmentation (DSU) was also accepted; it was later adopted in the
+  [augmentation campaign](../validation/results/2026-09-26-augmentation-campaign.md).
 
 - **New labels and split, 2026-09-21 (user decision):** training and evaluation use the
   [combined labels](../public-labels/combined-labels.md). These are Steven v4 plus a nine-source

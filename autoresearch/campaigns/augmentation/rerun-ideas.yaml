@@ -1,0 +1,32 @@
+ideas:
+- id: gin-intensity-augmentation-rerun
+  mechanism_id: global-intensity-nonlinear-augmentation
+  parent_idea_id: gin-intensity-augmentation
+  title: Remap each acquisition's intensities through a freshly sampled random shallow conv net (GIN), blended with the original
+  opportunity: >-
+    Seven vendors and 46 machine models, 19% of T1/PD-slot series that are T2 without fat
+    suppression, 129 T1-FS series with non-FS flags and 130 flat near-PD GE zero-TE sagittals: the
+    contrast varies inside a slot far beyond what global gamma/contrast jitter models. Broader
+    gamma/contrast lost (contrast 0.8-1.2 -0.0033 and -0.0067), so the lever is a different shape of
+    variation, not more of the same.
+  mechanism: >-
+    For each augmented acquisition sample one network g: 4 conv layers, 2 hidden channels, one
+    input and one output channel, kernel size 1 or 3 drawn per network, weights N(0, 1), LeakyReLU
+    between layers. Apply g with shared weights to each of the three slice channels separately
+    (in_channels = 1), blend x' = a*g(x) + (1 - a)*x with a ~ U(0, 0.5), rescale x' so its
+    Frobenius norm over the acquisition's valid pixels equals the input's, clamp to [0, 1] and
+    restore padding. Probability 0.3 per acquisition. Runs after gamma/contrast and before noise.
+  precedents:
+  - 'gin-intensity-augmentation (this campaign) was parked untested: a runner defect put overrides: {} into every generated training config, the launch gate failed, and the crash used its one repair. The runner now strips the key (supervisor/results.py config_result); the mechanism is unchanged and was never measured.'
+  - 'Ouyang et al., Causality-inspired single-source domain generalization (arXiv:2111.12525): GIN alone, on top of affine, elastic, brightness, contrast, gamma and noise, raised cross-centre prostate MRI Dice 56.6 -> 65.1 and cardiac bSSFP -> LGE 76.0 -> 83.8; 2/4/8/16 layers gave 84.3/86.0/85.7/79.2. Segmentation, not classification.'
+  - 'Broader contrast 0.80-1.20 lost -0.0033/-0.0067 and gamma 0.70-1.30 -0.0007 (docs/validation/results/2026-09-20-overnight-hyperparameter-results.md).'
+  novelty: First non-monotonic, spatially local intensity remapping in this project; existing intensity augmentation is a global gamma and a global contrast.
+  coverage: Every plane and contrast; all labels.
+  exploitation: If it helps, a monotone Bezier variant tests whether contrast inversion matters; if it hurts fluid-sensitive labels, that variant is the retry.
+  budget: Grouped 1x1/3x3 convolutions on augmented acquisitions; negligible GPU time, no parameters trained.
+  implementation: Adds a family under data.gin_augmentation (probability 0.3, blend_max 0.5, layers 4, hidden_channels 2) in config.py and modeling/augmentation.py; retains every existing family and draw.
+  open_choices: None; depth, width, blend range and probability are fixed from the paper's best depth and a mild blend.
+  dependencies: []
+  priority_rationale: The best isolated evidence found for any new MRI augmentation, and it targets the contrast heterogeneity measured in this data.
+exhausted_directions: >-
+  None; this re-imports a seed parked by a runner defect.

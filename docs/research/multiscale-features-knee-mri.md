@@ -39,6 +39,19 @@ The knee evidence with large effects is about **where the model looks and how ma
 
 The project's measurements agree. Only 23% of series keep their full acquired band at 0.625 mm, against 59% at 0.5 mm, and finer than about 0.5 mm adds almost nothing ([input-resolution research](../research/input-resolution.md)). Coarsening to about 0.875 mm cost lateral meniscus −0.1057 and MCL −0.0671 ([learned-zoom result](../validation/results/2026-09-16-learned-zoom-result.md)). Every crop run showed the same geography: central, thin structures up and peripheral or whole-joint labels down. Examples are two 160-px crops (medial meniscus +0.0114, Baker's −0.0194) ([two-crops result](../validation/results/2026-09-15-two-crops-result.md)) and crop224 (ACL +0.0081, fracture −0.0142) ([crop224 result](../validation/results/2026-09-16-crop224-result.md)). The stride-16 per-label split is that same geography reproduced without new pixels: finer local evidence at the expense of context. The input-resolution doc also ranks depth sampling (triplets about 17 mm apart at ×1) as a larger gap than in-plane resolution for menisci. None of this contradicts the line's results. It explains why a token-pitch lever at fixed pixels has a small ceiling (inference, medium confidence).
 
+### A dilated stride-16 backbone costs three times the backbone
+
+*Measured 2026-09-25.* Dilating ReXNet-200's last stage (`output_stride=16` in timm) keeps the
+pretrained weights and gives a 14×14 grid from the whole network, unlike truncation or fusion. At
+the training shape (208 triplets of 3×224×224, bf16 autocast, RTX 3090) one forward and backward
+took 0.997 s and peaked at 24.0 GiB, against 0.333 s and 18.6 GiB at stride 32
+(`scripts/adhoc/benchmark_output_stride.py`). The backbone is about 86% of the control's
+0.388 s training step (`report-attributes-control`, 1,709 s over 4,400 steps), so a run would take
+roughly 2.7× as long, and the full model would not fit in 24 GiB without backbone checkpointing
+or a smaller image budget. It adds token pitch but no pixels, at nearly twice the cost of the
+[bigger-images](../backlog/endgame.md#bigger-images) run (1.61× GMACs, 9×9 grid, real 0.5 mm
+pixels), which dominates it. Not a candidate at the current budget.
+
 ## Four gaps that could move the verdict, only one by 0.002
 
 **Temperature and bag size at the deployed operating point (evidence for the interaction; its size on these arms is unknown).** All stride-16 comparisons were scored at ×4 **τ 1**, but deployment is ×4 τ 0.75 (or ×5 τ 0.70). τ 0.75 is worth +0.0024 on frozen checkpoints ([attention temperature](../validation/results/2026-09-17-attention-temperature.md)) and +0.0025 at ×4 on the current split ([combined-labels run](../validation/results/2026-09-21-combined-labels-first-run.md)). The same doc shows larger bags lose through weaker evidence stealing attention mass, a loss that sharper τ removes. The 196-token arms put about 20k tokens into each per-label softmax, against about 5k for `k_05`. Models are also known to scale differently from ×1 to ×4 (`oblique` went from −0.0015 at ×1 to +0.0003 at ×4). `fusion-sum`'s own swing from −0.0002 at ×1 to +0.0011 at ×4 fits this. This is the only gap that could plausibly move `fusion-sum`'s margin by 0.001–0.002, and checking it costs no training.

@@ -3,7 +3,8 @@
 The code carries one model: the full-slice spatial-token recipe with learned anatomical
 family strengths, defined by [`configs/training.yaml`](../../configs/training.yaml).
 The [adoption evidence](../validation/results/2026-09-21-anatomical-attention-result.md) records the closed
-position/knee-side experiments; the current control is `knee-geometry-merged-2` (below).
+position/knee-side experiments. The current control is `half-stack-control` (seed 2617320043,
+fold 3), ×4 0.905205.
 
 - **Inputs:** ReXNet-200 reads every sampled triplet at 224 px, 0.625 mm spacing and a 140 mm
   field.
@@ -18,6 +19,17 @@ position/knee-side experiments; the current control is `knee-geometry-merged-2` 
 - **Report-attribute heads (training only):** 35 auxiliary heads predict the JevK5 report
   attributes (grades, hedging, silence, tear and contusion location, extra findings) from the
   shared tokens, weighted 0.1 ([design](report-attribute-heads.md)).
+- **Augmentation (training only):** reflection, contrast mixing, affine, bilateral smoothing,
+  one-axis resolution degradation, gamma/contrast, GIN, noise and DSU feature statistics
+  ([pipeline](schedule-and-augmentation.md#ten-epoch-schedule-and-augmentation)).
+
+Adopted 2026-09-26 by user decision: the half stack from the
+[augmentation campaign](../validation/results/2026-09-26-augmentation-campaign.md), bilateral
+smoothing, DSU, intra-study contrast mixing, GIN and resolution degradation. On fold 2 at seed
+1704794368 it scored +0.0011 ×4 macro (0.899054, 80% [−0.0015, +0.0038]) against smoothing + DSU
+and 0.943 public (S64, epoch 7; S65, epoch 9, also 0.943) against 0.940 (S63). The new control,
+`half-stack-control` (seed 2617320043, fold 3), scored ×4 0.905205 (×1 0.90207, epoch 9); fold 3
+scores are not comparable with earlier folds.
 
 Adopted 2026-09-25 by user decision: the report-attribute heads on target set 3.1
 ([result](../validation/results/2026-09-25-report-attribute-heads.md)). Against
@@ -66,6 +78,7 @@ bands; the experimental ten-epoch schedule was reverted. Historical
 | `trainer.class_balance_exponent` | `0.5` |
 | `data.study_triplet_total` | 26: a study whose per-type budgets sum below 26 training triplets is scaled up to it, proportionally over the types it has |
 | `data.reflection_augmentation.probability` | 0.5 |
+| Other augmentation | Contrast mixing 0.3, affine 0.7, smoothing 0.2, resolution 0.25, gamma/contrast 0.5, GIN 0.3, noise 0.15, DSU 0.5 ([pipeline](schedule-and-augmentation.md#ten-epoch-schedule-and-augmentation)) |
 | `model.backbone` | `rexnet_200.nav_in1k`, pretrained |
 | Projection and attention widths | 256 and 128 (`PROJECTION_WIDTH`, `MIL_ATTENTION_WIDTH`, constants) |
 | `model.dropout`, `model.series_dropout` | 0.0, 0.2 |
@@ -73,7 +86,7 @@ bands; the experimental ten-epoch schedule was reverted. Historical
 | Meniscus side mask | Medial/Lateral Meniscus attend only to own-side tokens plus the ±10 mm band (`COMPARTMENT_MIDLINE_BAND_MM`); unknown side, invalid geometry or no own-side token keep all tokens |
 | `trainer.half_knee_loss_weight` | 0.075 |
 | `trainer.report_attribute_loss_weight`, `paths.report_attribute_manifest` | 0.1, `labels/jevk5-report-attribute-targets-v3.1.json` |
-| Training seed, fold | 2464012069 on fold 2 (`configs/training.yaml`), inherited by new research candidates from the control |
+| Training seed, fold | 2617320043 on fold 3 (`configs/training.yaml`), inherited by new research candidates from the control |
 | Precision | BF16 mixed on one automatically selected device (`PRECISION`, a constant) |
 
 The optimizer, schedule and trainer settings are described in

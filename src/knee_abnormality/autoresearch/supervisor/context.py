@@ -73,6 +73,38 @@ def experiment_card(exp):
     )
 
 
+def family_ledger(state):
+    families = {}
+    for idea in state["ideas"].values():
+        families.setdefault(
+            idea["mechanism_id"], {"family": idea["mechanism_id"], "attempts": []}
+        )["attempts"].append(select(idea, ("id", "parent_idea_id", "status")))
+    for exp in state["experiments"].values():
+        if not exp.get("decision"):
+            continue
+        idea = state["ideas"][exp["idea"]]
+        scores = exp["evidence"].get("macro_auc")
+        bounds = (exp["evidence"].get("adoption_bootstrap") or {}).get(
+            "delta_percentile_80"
+        )
+        families[idea["mechanism_id"]].setdefault("results", []).append(
+            {
+                "experiment": exp["id"],
+                "idea": idea["id"],
+                "decision": exp["decision"],
+                "macro_delta": scores["candidate"] - scores["reference"]
+                if scores
+                else None,
+                "adoption_interval_80": bounds,
+            }
+        )
+    for family, verdict in state["research"]["verdicts"].items():
+        families[family]["verdict"] = select(
+            verdict, ("verdict", "reason", "next_step", "misses")
+        )
+    return list(families.values())
+
+
 def experiment_evidence(state, exp):
     directory = Path(exp["directory"])
     fold = campaign_fold(state)
@@ -285,7 +317,12 @@ def build_context(state, role, assignment, directory, docs, state_path):
     results = [
         value
         for value in state["experiments"].values()
-        if value.get("decision") and (role == "researcher" or value["idea"] in relevant)
+        if value.get("decision")
+        and (
+            value["id"] in assignment["new_results"]
+            if role == "researcher"
+            else value["idea"] in relevant
+        )
     ]
     context = {
         "role": role,
@@ -303,13 +340,15 @@ def build_context(state, role, assignment, directory, docs, state_path):
                 "evidence": value.get("evidence", {}),
                 "per_label": diagnostics["per_target"] if diagnostics else None,
             }
-            for value in results[-6:]
+            for value in (results if role == "researcher" else results[-6:])
             for diagnostics in [experiment_diagnostics(value)]
         ],
         "per_label_interpretation": INTERPRETATION,
-        "earlier_results": max(0, len(results) - 6),
+        "earlier_results": len(state["research"]["reviewed"])
+        if role == "researcher"
+        else max(0, len(results) - 6),
         "research_reports": [item for item in history if item["role"] == "researcher"][
-            -3:
+            -1:
         ]
         if role == "researcher"
         else [],
@@ -332,8 +371,8 @@ def build_context(state, role, assignment, directory, docs, state_path):
         ]
     if role == "developer" or event.get("kind") == "review":
         context["campaign_defects"] = campaign_defects(state, exp_id)
-    if role == "researcher":
-        context["mechanism_registry"] = [idea_card(idea) for idea in ideas.values()]
+    if role == "researcher" or event.get("kind") == "proposals":
+        context["family_ledger"] = family_ledger(state)
     if role == "orchestrator":
         context["proposal_admission"] = [
             {

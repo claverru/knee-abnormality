@@ -92,7 +92,7 @@ def _poll_dataset(
         if (
             identity is not None
             and identity["version"] >= minimum_version
-            and identity["total_bytes"] > 0
+            and api.dataset_status(dataset) == "ready"
         ):
             return "ready"
         if time.monotonic() >= deadline:

@@ -1,0 +1,146 @@
+ideas:
+- id: gin-intensity-augmentation
+  mechanism_id: global-intensity-nonlinear-augmentation
+  parent_idea_id: null
+  title: Remap each acquisition's intensities through a freshly sampled random shallow conv net (GIN), blended with the original
+  opportunity: >-
+    Seven vendors and 46 machine models, 19% of T1/PD-slot series that are T2 without fat
+    suppression, 129 T1-FS series with non-FS flags and 130 flat near-PD GE zero-TE sagittals: the
+    contrast varies inside a slot far beyond what global gamma/contrast jitter models. Broader
+    gamma/contrast lost (contrast 0.8-1.2 -0.0033 and -0.0067), so the lever is a different shape of
+    variation, not more of the same.
+  mechanism: >-
+    For each augmented acquisition sample one network g: 4 conv layers, 2 hidden channels, one
+    input and one output channel, kernel size 1 or 3 drawn per network, weights N(0, 1), LeakyReLU
+    between layers. Apply g with shared weights to each of the three slice channels separately
+    (in_channels = 1), blend x' = a*g(x) + (1 - a)*x with a ~ U(0, 0.5), rescale x' so its
+    Frobenius norm over the acquisition's valid pixels equals the input's, clamp to [0, 1] and
+    restore padding. Probability 0.3 per acquisition. Runs after gamma/contrast and before noise.
+  precedents:
+  - 'Ouyang et al., Causality-inspired single-source domain generalization (arXiv:2111.12525): GIN alone, on top of affine, elastic, brightness, contrast, gamma and noise, raised cross-centre prostate MRI Dice 56.6 -> 65.1 and cardiac bSSFP -> LGE 76.0 -> 83.8; 2/4/8/16 layers gave 84.3/86.0/85.7/79.2. Segmentation, not classification.'
+  - 'Broader contrast 0.80-1.20 lost -0.0033/-0.0067 and gamma 0.70-1.30 -0.0007 (docs/validation/results/2026-09-20-overnight-hyperparameter-results.md).'
+  novelty: First non-monotonic, spatially local intensity remapping in this project; existing intensity augmentation is a global gamma and a global contrast.
+  coverage: Every plane and contrast; all labels.
+  exploitation: If it helps, a monotone Bezier variant tests whether contrast inversion matters; if it hurts fluid-sensitive labels, that variant is the retry.
+  budget: Grouped 1x1/3x3 convolutions on augmented acquisitions; negligible GPU time, no parameters trained.
+  implementation: Adds a family under data.gin_augmentation (probability 0.3, blend_max 0.5, layers 4, hidden_channels 2) in config.py and modeling/augmentation.py; retains every existing family and draw.
+  open_choices: None; depth, width, blend range and probability are fixed from the paper's best depth and a mild blend.
+  dependencies: []
+  priority_rationale: The best isolated evidence found for any new MRI augmentation, and it targets the contrast heterogeneity measured in this data.
+- id: phase-axis-resolution-degradation
+  mechanism_id: k-space-resolution-degradation
+  parent_idea_id: null
+  title: Low-pass one in-plane axis by k-space truncation to the measured range of coarser acquisitions
+  opportunity: >-
+    Acquired resolution against the 0.625 mm grid: finer axis p5/p50/p95 0.33/0.49/0.70 mm, phase
+    axis 0.45/0.625/0.885 mm (p75 0.70), GE the coarsest. About a quarter of series are effectively
+    coarser than the grid along one axis and the rest sharper, so the model sees a sharpness mix it
+    is never trained to be invariant to.
+  mechanism: >-
+    For each augmented acquisition pick one in-plane axis (rows or columns, equal odds) and a keep
+    fraction f ~ U(0.70, 1.0). FFT each slice channel, zero the frequencies beyond f times Nyquist
+    along that axis only, inverse FFT, take the real part, clamp to [0, 1] and restore padding.
+    This reproduces a coarser phase-encoding matrix, including its Gibbs ringing: f = 0.70 is an
+    effective 0.89 mm, the measured p95. Probability 0.25; never both axes. Runs after affine and
+    before gamma/contrast, inside the geometric valid region.
+  precedents:
+  - 'nnU-Net trainer: simulated low resolution is a standard recipe component, not isolated (github.com/MIC-DKFZ/nnUNet, nnUNetTrainer.py).'
+  - 'Acquired-resolution distributions: outputs/analysis/input-resolution-research-20260915/acquisition/distributions_train.csv; docs/research/input-resolution.md.'
+  - 'Training and evaluating at 0.875 mm cost -0.0228, lateral meniscus -0.106 (docs/validation/results/2026-09-16-learned-zoom-result.md): the range stays inside the measured one.'
+  novelty: First resolution augmentation here, one axis at a time, bounded by the measured acquisition distribution.
+  coverage: Every acquisition; resolution-sensitive labels (menisci, ligaments) are the ones to watch.
+  exploitation: If it helps, an acquisition-aware variant could degrade only along the stored phase direction; if detail labels drop, a narrower range is not a retry (no sweeps), a different degradation model is.
+  budget: Two 224x224 FFTs per augmented slice channel; negligible.
+  implementation: Adds data.resolution_augmentation (probability 0.25, keep_fraction_range [0.70, 1.0]) in config.py and modeling/augmentation.py; retains every existing family.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The data mismatch is measured and the transform is physically faithful and cheap.
+- id: unsharp-sharpening-augmentation
+  mechanism_id: unsharp-mask-sharpening
+  parent_idea_id: null
+  title: Mild unsharp-mask sharpening per acquisition to imitate vendor sharpening filters
+  opportunity: >-
+    Vendor post-processing varies: GE deep-learning reconstructions and Philips reformats appear as
+    duplicate pairs in the training set, and stored images are interpolated about 2x with
+    vendor-specific filters. Nothing in the pipeline varies edge sharpness upward.
+  mechanism: >-
+    x' = x + s*(x - G_sigma(x)) per slice channel, sigma ~ U(0.5, 1.0) px, s ~ U(0.2, 1.0), one
+    draw per acquisition, clamp to [0, 1], restore padding. Probability 0.25. Runs after affine
+    and before gamma/contrast, inside the geometric valid region.
+  precedents:
+  - 'BigAug (Zhang et al., arXiv:1906.03347): best single MRI transform; unseen-site prostate Dice 60.4 -> 65.5, 58.0 -> 82.8, 76.8 -> 84.0 against a crop-only baseline.'
+  - 'RSNA 2024 lumbar 9th place: sharpen or motion blur, p 0.5, as a recipe component.'
+  novelty: First sharpness augmentation here; the opposite direction to seed 2 and run separately from it.
+  coverage: Every acquisition; all labels.
+  exploitation: If both seeds 2 and 3 help, a combined sharpness family is a follow-up.
+  budget: One separable Gaussian blur per augmented slice channel.
+  implementation: Adds data.sharpen_augmentation (probability 0.25, sigma_range [0.5, 1.0], amount_range [0.2, 1.0]) in config.py and modeling/augmentation.py.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Isolated evidence, though against a weak baseline; cheap and physically motivated.
+- id: aligned-image-mixup
+  mechanism_id: aligned-image-mixup
+  parent_idea_id: null
+  title: 'MixUp variant C: mix the input triplets of same-side study pairs, slot by slot and matched by depth, before the backbone'
+  opportunity: >-
+    MixUp is part of the RSNA 2024 lumbar 2nd (image MixUp p 0.3, alpha 1, plus manifold MixUp),
+    3rd and 6th-place recipes, never isolated. Image MixUp is the common form: the whole network
+    sees mixed inputs. Here the crops are centred on the knee at a fixed 0.625 mm, so same-side
+    studies roughly align anatomically, which makes an aligned image version possible.
+  mechanism: >-
+    Pairing (shared by variants A, B, C): choose 30% of the batch's studies as a; pair each with a
+    random other study b of the same knee side (knee_side_sign, excluding unknown-side and
+    bilateral studies) and the same reflection draw; skip a when no partner exists. Draw
+    l ~ Beta(1, 1) per pair. For every plane/contrast slot present in both studies, match each of
+    a's triplets to b's triplet in that slot with the nearest relative depth (rank fraction among
+    the selected triplets), and replace a's triplet by l*x_a + (1 - l)*x_b after both have had
+    their own augmentation and before ImageNet normalization; slots only a has stay unmixed. Study
+    a keeps its own positions, geometry, valid region and masks; b is also used unmixed as its own
+    row. Loss for mixed rows: l*w(y_a)*BCE(z, y_a) + (1 - l)*w(y_b)*BCE(z, y_b) per label with each
+    source target's class-balance weight, only where the label is observed in both studies, never
+    turning a missing label into a negative; unmixed rows keep the current loss, normalized over
+    supervised cells as the masked BCE does. The auxiliary losses mix the same way, with the
+    same lambda: the half-knee detector's medial and lateral halves (aligned because pairs share a
+    knee side) take l*loss(y_a) + (1 - l)*loss(y_b) for that side's meniscus, and each
+    report-attribute question takes l*loss(a) + (1 - l)*loss(b), both only where the target is
+    observed in both studies.
+  precedents:
+  - 'RSNA 2024 lumbar 2nd place (github.com/brendanartley/RSNA-2024-Competition, cfg_stage2_s2_sp1.py): image MixUp p 0.3, alpha 1, with CutMix and manifold MixUp; 3rd and 6th place also used MixUp. Not isolated.'
+  - 'Panfilov et al. (arXiv:1908.04126): MixUp improved cross-scanner knee cartilage segmentation (femoral 0.791 -> 0.819, tibial 0.746 -> 0.802).'
+  - 'Public EfficientNet-B0 in this competition: MixUp 0.7914 -> 0.7937, judged noise (docs/research/public-research.md).'
+  novelty: First MixUp here; alignment by knee side, slot and depth replaces the naive mixing that the anatomical geometry forbids.
+  coverage: 30% of training studies per batch; all labels.
+  exploitation: Variants B and A share its pairing and loss and move only the mixing point, so the three results rank where mixing helps.
+  budget: No extra forward pass; triplet matching and a two-target BCE.
+  implementation: Adds trainer.image_mixup (fraction 0.3, beta_alpha 1.0) in config.py, pairing and image mixing in modeling/model.py after augmentation, and the mixed main, half-knee and report-attribute losses in training/lightning.py; logs mixed-study count, mean lambda and each mixed-loss component.
+  open_choices: None; fraction and alpha are the lumbar 2nd-place setting, shared by all three variants.
+  dependencies: []
+  priority_rationale: The most common and strongest MixUp form; first of the three variants.
+- id: token-feature-mixup
+  mechanism_id: token-feature-mixup
+  parent_idea_id: null
+  title: 'MixUp variant B: mix projected token features of matched triplets before position embeddings, mil_norm and attention'
+  opportunity: >-
+    Manifold MixUp on sequence embeddings was part of the RSNA 2024 lumbar 2nd-place solution. Here
+    the nonlinear steps come before pooling (mil_norm, attention softmax, OA detector
+    log-sum-exp), so mixing tokens is the manifold version that still passes through them.
+  mechanism: >-
+    Same pairing, slot matching, lambda, main loss and mixed auxiliary losses as variant C
+    (aligned-image-mixup). Instead of images, mix the projection output of each matched triplet,
+    token by token, before the position, plane and contrast embeddings are added; mix only tokens
+    visually valid in both triplets and keep a's features elsewhere. Study a's positions,
+    geometry, embeddings and masks are then added as usual.
+  precedents:
+  - 'RSNA 2024 lumbar 2nd place: manifold MixUp on sequence embeddings (github.com/brendanartley/RSNA-2024-Competition); not isolated.'
+  - 'Verma et al., Manifold Mixup (arXiv:1806.05236): mixing hidden states regularizes beyond input MixUp on natural images.'
+  novelty: Token-level MixUp through the anatomical attention; the backbone sees clean images.
+  coverage: 30% of training studies per batch; all labels.
+  exploitation: Compared with C and A, it locates where mixing helps.
+  budget: No extra forward pass.
+  implementation: Adds trainer.token_mixup (fraction 0.3, beta_alpha 1.0) in config.py, mixing in modeling/model.py after the projection, and the shared loss in training/lightning.py; logs as C.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Second variant; keeps the backbone input clean while mixing before every nonlinear pooling step.
+exhausted_directions: >-
+  Strength sweeps of the existing families are measured and excluded; see the precedent table in
+  prior-work.md.

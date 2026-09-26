@@ -6,7 +6,6 @@
 | Finding proposed small code changes | [Small changes](small-changes.md) |
 | Comparing AdamP with AdamW on ReXNet | [AdamP optimizer](small-changes.md#adamp-for-rexnet) |
 | Why attention-token dropout (random or top-attention masking) was rejected | [Attention-token dropout](small-changes.md#attention-token-dropout) |
-| Augmenting feature-channel statistics beyond existing pixel transforms | [Feature-space augmentation (DSU)](small-changes.md#feature-space-augmentation-dsu) |
 | Keeping acquisition types separate through the classifier | [Plane/contrast-specific readouts](small-changes.md#planecontrast-specific-readouts) |
 | Adapting acquisition features before attention selects evidence | [Plane/contrast-specific feature adapters](small-changes.md#planecontrast-specific-feature-adapters) |
 | Planning larger investigations | [Big bets](big-bets.md) |
