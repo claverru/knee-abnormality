@@ -31,9 +31,35 @@ class Idea(Report):
     priority_rationale: str = Field(description="Aim for at most 600 characters.")
 
 
-class ResearchReport(Report):
+class IdeaReport(Report):
     ideas: list[Idea] = Field(max_length=5)
     exhausted_directions: str = Field(description="Aim for at most 1,600 characters.")
+
+
+class FamilyVerdict(Report):
+    mechanism_id: str = Field(max_length=120)
+    verdict: Literal["extend", "retry", "close"] = Field(
+        description="extend: build on a result that helped; retry: a named change could fix a diagnosed or unactivated failure; close: drop the family."
+    )
+    reason: str = Field(
+        min_length=1,
+        description="Aim for at most 600 characters; cite the result and diagnosis behind the verdict.",
+    )
+    next_step: str | None = Field(
+        description="The concrete follow-up for extend or retry, aim for at most 400 characters; null for close."
+    )
+
+    @model_validator(mode="after")
+    def open_line_step(self):
+        if (self.verdict == "close") != (self.next_step is None):
+            raise ValueError("extend and retry need a next step; close has none")
+        return self
+
+
+class ResearchReport(IdeaReport):
+    family_verdicts: list[FamilyVerdict] = Field(
+        description="One verdict for every family in new_results; other families only when new evidence changes their verdict."
+    )
 
 
 class IntegrationPlan(Report):

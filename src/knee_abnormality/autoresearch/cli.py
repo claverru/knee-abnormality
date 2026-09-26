@@ -6,7 +6,7 @@ import yaml
 from pydantic import BaseModel, Field, StringConstraints
 from pydantic_settings import CliApp, CliPositionalArg, CliSubCommand
 
-from knee_abnormality.autoresearch.campaign.reports import ResearchReport
+from knee_abnormality.autoresearch.campaign.reports import IdeaReport
 from knee_abnormality.autoresearch.reporting.progress import (
     results_summary,
 )
@@ -64,9 +64,7 @@ def validate_campaign(supervisor: Supervisor):
     ideas = [
         idea
         for path in seed_files(supervisor.docs)
-        for idea in ResearchReport.model_validate(
-            yaml.safe_load(path.read_text())
-        ).ideas
+        for idea in IdeaReport.model_validate(yaml.safe_load(path.read_text())).ideas
     ]
     if len({idea.id for idea in ideas}) != len(ideas):
         raise ValueError("Seed idea IDs must be unique")

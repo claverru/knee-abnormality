@@ -103,16 +103,11 @@ original run seed. The bootstrap seed is independent and unchanged. Matched seed
 reduce one source of comparison noise; they do not guarantee deterministic training
 or measure robustness across training seeds.
 
-**Control retrain on adoption (since 2026-09-24).** An adopted run is the best of the
-candidates tried against it, so its own seed luck would count against every later
-candidate. After a `provisional_accept`, the supervisor draws a fresh random seed
-once (never searched or chosen by score), retrains the adopted source with it under
-the same limits and gates, and makes that run the incumbent reference; later
-candidates use its seed. No candidate trains until the control finishes. A failed
-control pauses the campaign, and resume retrains it. This mirrors the
-[project rule](../docs/validation/validation-strategy.md#controlled-comparisons) for
-adoptions merged into main, and it is a re-seeded control, not a confirmation run:
-the adoption decision stands.
+**Adoption keeps the adopted run (since 2026-09-26, user decision).** A
+`provisional_accept` makes the adopted run itself the incumbent reference, and later
+candidates train at its seed. The campaign draws no fresh seed and retrains nothing:
+the fresh-seed control retrain belongs to the user when an adoption is merged into
+main ([project rule](../docs/validation/validation-strategy.md#controlled-comparisons)).
 
 **Fold from the recipe (since 2026-09-25).** The campaign's fold is the single
 `validation.folds` entry of its sealed recipe, and its reference run must be on that
@@ -204,8 +199,9 @@ Start each assignment with the contract, current incumbent, role-specific idea a
 experiment cards, and its concrete input and completion condition. Do not inject
 the last twelve full reports or duplicate ranking rationales into assignments.
 An immutable per-job history index links the complete record. Developers receive
-their own idea and relevant predecessors; researchers receive mechanism identities
-and recent results; orchestrators receive event-specific evidence and queue cards.
+their own idea and relevant predecessors; researchers receive the family ledger
+([records](records.md#family-verdicts)) and full detail only for results decided since
+their last report; orchestrators receive event-specific evidence and queue cards.
 Developers and candidate reviews also receive `campaign_defects`, the last twelve
 repair instructions and invalid-run reasons of other attempts
 ([lifecycle](lifecycle.md#development-and-gates)). Keep full source, configs, logs

@@ -91,6 +91,9 @@ and the sampler's 70 mm in-plane radius.
   ([host memory](../modeling/training-runtime-and-memory.md#host-memory-with-larger-inputs)).
 - *Inference:* the backbone forward is about a quarter of Kaggle prediction time at 16 loader
   workers ([profiling](../inference/2026-09-15-kaggle-inference-profiling.md)).
+- *Dominated alternative:* a dilated stride-16 ReXNet (14×14 tokens, no new pixels) measured 3.0×
+  the backbone time and a full 24 GiB
+  ([measurement](../research/multiscale-features-knee-mri.md#a-dilated-stride-16-backbone-costs-three-times-the-backbone)).
 
 ## Test-time augmentation
 

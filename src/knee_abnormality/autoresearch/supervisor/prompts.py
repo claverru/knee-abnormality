@@ -22,9 +22,10 @@ these rules, these rules win.
   no basis for per-label objectives. Add no other threshold, pending branch or
   confirmation run.
 - **Seeds and references.** Every candidate trains at the current incumbent's recorded
-  seed, set by the supervisor; historical runs keep their actual seeds. The live
-  incumbent and these rules supersede anything contrary in archived contracts and
-  findings.
+  seed, set by the supervisor; historical runs keep their actual seeds. The assignment's
+  incumbent and seed replace the starting run and seed named in the campaign contract.
+  The live incumbent and these rules supersede anything contrary in archived contracts
+  and findings.
 - **Evidence.** Facts absent from the assignment and the artifacts it links are unknown;
   retrieve originals when a decision depends on them. Separate measurements from
   hypotheses.

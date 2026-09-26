@@ -13,21 +13,31 @@ latest checkpoints remain separate. The peak backbone/head learning rates are
 `2e-4` and `6e-4`, adopted in the training config (then `configs/baseline.yaml`) on 2026-09-12 from
 the [overnight comparison](../validation/results/2026-09-12-overnight-results.md).
 
-Each acquisition independently samples affine augmentation with probability
-0.7, gamma/contrast with probability 0.5 and Gaussian noise with probability
-0.15. Affine strengths are up to 10 degrees rotation, 4% translation and
-`[0.95, 1.05]` scale. Gamma uses `[0.85, 1.15]`, contrast uses `[0.9, 1.1]`,
-and noise standard deviation uses `[0.005, 0.02]` on the `[0, 1]` scale.
-Geometry and scalar strengths are shared by every triplet in an acquisition;
-noise pixels differ. Zero background is restored after augmentation.
+Augmentation runs in this order, on the GPU, during training only; validation and inference
+neither apply it nor draw its random numbers. Every family is a config block with a
+`probability`; at 0 it draws nothing and changes nothing, so a paired comparison can switch one
+off. Unless noted, parameters are sampled per acquisition and shared by all its triplets and
+slice channels.
 
-The transforms run on the GPU on each retained triplet, after study reflection and before
-normalization and the backbone. Evaluation bypasses augmentation. Each family defaults to disabled when absent
-from an older config, and probability zero disables it for a paired comparison.
-The current combined recipe does not establish the contribution of any one
-family; the on/off and strength comparisons are in the
-[overnight queue](../backlog/overnight.md), and ordering and new families in the
-[small changes](../backlog/small-changes.md#augmentation-families).
+| Order | Family (`data.*` unless noted) | Setting | What it does |
+|---|---|---|---|
+| 1 | `model.series_dropout` | 0.2 | Drops series-type slots per study, keeping at least one |
+| 2 | Study reflection (`reflection_augmentation`) | p 0.5 | Mirrors the whole study left–right, keeping labels and geometry consistent ([below](#study-level-knee-reflection)) |
+| 3 | `contrast_mixing_augmentation` | p 0.3 per plane with both contrasts, target weight 0.5–1.0 | Blends a study's fat-suppressed and non-fat-suppressed acquisitions of one plane, slice-matched along the plane normal; the target keeps its slot and geometry |
+| 4 | `affine_augmentation` | p 0.7; ±10°, ±4%, scale 0.95–1.05 | Rigid affine; its inverse updates token geometry |
+| 5 | `smoothing_augmentation` | p 0.2; 5×5 bilateral, spatial σ 1 px, range σ 0.05–0.1 | Edge-preserving smoothing, imitating deep-learning reconstructions |
+| 6 | `resolution_augmentation` | p 0.25; keep 70–100% of frequencies | Truncates k-space along one random in-plane axis, imitating coarser phase encoding |
+| 7 | `intensity_augmentation` | p 0.5; gamma 0.85–1.15, contrast 0.9–1.1 | Global gamma and contrast |
+| 8 | `gin_augmentation` | p 0.3; blend up to 0.5 | Random 4-layer conv net remaps intensities, blended with the input and renormalized |
+| 9 | `noise_augmentation` | p 0.15; std 0.005–0.02 | Gaussian noise; pixels differ per triplet |
+| 10 | `model.feature_statistics_augmentation` | p 0.5 | DSU: resamples feature-channel means and standard deviations at ReXNet's stride-8 stage, per acquisition |
+
+Filtering families (5, 6, 8) use the geometric valid region, and padding stays zero. Contrast
+mixing draws from the global generator before the image families; the image families draw in
+table order. The contribution of each family was measured one at a time in the
+[augmentation campaign](../validation/results/2026-09-26-augmentation-campaign.md): gains of about
++0.001 each that did not add when stacked; the half stack (3, 6, 8 on top of 5 and 10) was adopted
+on 0.943 public.
 
 Use the [augmentation viewer](../data-preparation/preview-augmentations.md) to
 inspect original/augmented example-test slices for each plane–contrast type,

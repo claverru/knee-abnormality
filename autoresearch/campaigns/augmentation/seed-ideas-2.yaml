@@ -1,0 +1,122 @@
+ideas:
+- id: pooled-output-mixup
+  mechanism_id: pooled-output-mixup
+  parent_idea_id: null
+  title: 'MixUp variant A: mix pooled study outputs, equivalent to mixing the final logits'
+  opportunity: >-
+    The cheapest MixUp: no image or token change. It isolates the effect of two-target
+    supervision on interpolated outputs from input or feature mixing.
+  mechanism: >-
+    Same pairing, lambda and main loss as variant C (aligned-image-mixup),
+    without slot matching. The readout after pooling is linear in the pooled features and the OA
+    detector correction is linear in the pooled evidence, so mixing both with the same lambda
+    equals z_mix = l*z_a + (1 - l)*z_b. The half-knee and report-attribute losses stay unchanged
+    because tokens are not mixed.
+  precedents:
+  - 'Variants C and B of this campaign; RSNA 2024 lumbar MixUp precedents.'
+  novelty: Logit interpolation with two-target supervision; the weakest of the three by construction.
+  coverage: 30% of training studies per batch; all labels.
+  exploitation: If A matches B or C, the benefit comes from the targets, not from mixed features.
+  budget: A permutation and a second BCE on mixed rows.
+  implementation: Adds trainer.pooled_mixup (fraction 0.3, beta_alpha 1.0) in config.py and the mixing and loss in training/lightning.py; logs as C.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Third variant; the control for where mixing matters.
+- id: late-affine-shutdown
+  mechanism_id: late-affine-shutdown
+  parent_idea_id: null
+  title: Turn affine augmentation off for the last two epochs
+  opportunity: >-
+    Affine off for the whole run lost -0.0041 and stronger affine -0.0024, so the current affine
+    helps overall. Whether it still helps in the low-learning-rate tail, where unaugmented inputs
+    match evaluation, is untested.
+  mechanism: >-
+    Affine probability 0.7 for epochs 0-7 and 0 for epochs 8-9 (zero-based current_epoch >= 8);
+    every other family and series dropout unchanged. The model receives the epoch from
+    training/lightning.py at on_train_epoch_start; the effective probability is logged each epoch
+    and restored on resume.
+  precedents:
+  - 'docs/backlog/small-changes.md, Augmentation families: late affine shutdown (hypothesis).'
+  - 'Affine off -0.0041 [-0.0078, -0.0002] (2026-09-17); strong affine -0.0024 (2026-09-15).'
+  novelty: First epoch-dependent augmentation schedule here.
+  coverage: Every acquisition in the last two epochs.
+  exploitation: If it helps, the same schedule applies to adopted image families.
+  budget: None.
+  implementation: Adds data.affine_shutdown_epoch (8) in config.py, the epoch hand-off in training/lightning.py and the gate in modeling/model.py; the other families' draws are unchanged. The report states the fixed last epoch as well as the selected one.
+  open_choices: None; the shutdown epoch is not swept.
+  dependencies: []
+  priority_rationale: Measured premise that affine matters; zero cost.
+- id: smooth-bias-field-augmentation
+  mechanism_id: multiplicative-bias-field
+  parent_idea_id: null
+  title: Multiply each acquisition by a smooth low-order polynomial field within plus or minus 20%
+  opportunity: >-
+    Knee surface coils produce spatial intensity shading; global gamma and contrast cannot
+    reproduce it. Residual shading in these images was never measured, and bias-field augmentation
+    was not selected in the 2026-09-21 backlog review for unrecorded reasons; this seed runs
+    without that measurement.
+  mechanism: >-
+    For each augmented acquisition draw a cubic polynomial P(x, y) over normalized image
+    coordinates with coefficients N(0, 1), scale it so max |P| over the valid region is 1, and
+    multiply by B = 1 + a*P with a ~ U(0, 0.2); one field shared by the three slice channels and
+    all triplets. Clamp to [0, 1], restore padding. Probability 0.25. Runs after affine and before
+    gamma/contrast.
+  precedents:
+  - 'TorchIO RandomBiasField and MONAI bias-field transforms: MRI inhomogeneity model, availability only.'
+  - 'AdvBias (adversarial bias field) gained in the GIN and SLAug comparisons; a different, adversarial method.'
+  novelty: First spatially varying intensity augmentation here.
+  coverage: Every acquisition; all labels.
+  exploitation: If it helps, measure residual shading by vendor and coil to set a data-derived amplitude.
+  budget: One polynomial evaluation per augmented acquisition.
+  implementation: Adds data.bias_field_augmentation (probability 0.25, amplitude 0.2, degree 3) in config.py and modeling/augmentation.py.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Mechanism-only evidence and an unmeasured premise; runs after the better-supported seeds.
+- id: triplet-channel-reversal
+  mechanism_id: slice-channel-order-reversal
+  parent_idea_id: null
+  title: Reverse the three slice channels of axial and coronal acquisitions
+  opportunity: >-
+    Slice order within a triplet carries through-plane direction; sagittal reflection already
+    reverses it, axial and coronal never do. Lumbar solutions report channel shuffle and sequence
+    flips helping, without numbers.
+  mechanism: >-
+    With probability 0.5 per axial or coronal acquisition, reverse the order of its three slice
+    channels in every triplet, and update the per-channel source mapping passed to feature_geometry
+    so token geometry stays consistent (compose with reflection_channels). The middle slice and
+    its position are unchanged. Sagittal acquisitions are untouched.
+  precedents:
+  - 'RSNA 2024 lumbar 9th place: channel shuffle p 0.5 on axial "significantly improved", no numbers; 2nd place flipped the sequence order.'
+  novelty: First through-plane order augmentation for axial and coronal here.
+  coverage: Axial and coronal acquisitions; all labels.
+  exploitation: If it helps, nothing obvious follows; if it hurts, close the family.
+  budget: None.
+  implementation: Adds data.channel_reversal_augmentation (probability 0.5) in config.py, the reversal in modeling/augmentation.py and the channel-mapping composition in modeling/model.py.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Author claims only; low confidence.
+- id: bilateral-smoothing-augmentation
+  mechanism_id: edge-preserving-smoothing
+  parent_idea_id: null
+  title: Mild bilateral filtering per acquisition to imitate deep-learning reconstructions
+  opportunity: >-
+    GE deep-learning reconstructions occur in the training set, so their smooth, low-noise,
+    edge-preserving look is part of the data and may be more common in newer test acquisitions.
+    Seed 2 removes resolution along one axis and seed 3 adds edge contrast; neither removes texture
+    while keeping edges.
+  mechanism: >-
+    Bilateral filter with a 5x5 window, spatial sigma 1 px and range sigma ~ U(0.05, 0.1) on the
+    [0, 1] scale, per slice channel with one draw per acquisition, inside the geometric valid
+    region; restore padding. Probability 0.2. Runs after affine and before gamma/contrast.
+  precedents:
+  - 'None isolated; premise from the GE deep-learning reconstruction pairs in docs/data-preparation/current-preparation.md.'
+  novelty: First denoising-style augmentation here.
+  coverage: Every acquisition; subtle intrasubstance meniscal signal and faint marrow edema are at risk.
+  exploitation: If it helps, combine with seed 3 as a sharpness family.
+  budget: A 5x5 bilateral filter per augmented slice channel.
+  implementation: Adds data.smoothing_augmentation (probability 0.2, spatial_sigma 1.0, range_sigma_range [0.05, 0.1]) in config.py and modeling/augmentation.py.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: A guess with a data premise; low confidence.
+exhausted_directions: >-
+  The rejected alternatives and their reasons are listed in prior-work.md.

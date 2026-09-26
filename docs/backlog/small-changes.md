@@ -168,34 +168,19 @@ owns the measured motivation, missingness semantics and limits of the three-stat
 
 ## Augmentation families
 
-Measured so far: stronger intensity (+0.000249) and no noise (+0.000105) on
-[1C](../history/sharing/2026-09-14-overnight-hyperparameter-results.md), treated as settled,
-strong affine (−0.002389) on the
-[current base](../validation/results/2026-09-15-overnight-results.md), and on the restored code
-affine off (−0.0041 [−0.0078, −0.0002]) and noise probability 0.3 (−0.0019)
-([result](../validation/results/2026-09-17-overnight-results.md)). Intensity-off was dropped by
-[user decision](overnight.md#already-measured); the
-[later candidates](overnight.md#candidates-for-later-queues) hold the other probability and
-strength values of the existing families.
+The pipeline and its settings are in
+[schedule and augmentation](../modeling/schedule-and-augmentation.md#ten-epoch-schedule-and-augmentation).
+Strength and on/off comparisons of the original families are in the
+[overnight queue](overnight.md#already-measured); the new families, late affine shutdown, MixUp,
+bias field, channel reversal and stochastic depth were measured in the
+[augmentation campaign](../validation/results/2026-09-26-augmentation-campaign.md), and the
+rejected candidates with their reasons are in
+[MRI augmentation research](../research/mri-augmentation.md#rejected-or-deferred).
 
-- **Late affine shutdown** (hypothesis; needs epoch-dependent augmentation). Affine probability
-  0.7 for epochs 1–8 and 0 for epochs 9–10 (zero-based `current_epoch >= 8`), everything else
-  unchanged, including series dropout, whose removal would also change the image workload.
-  - *Why:* affine off for the whole run and the stronger affine both lost, so the current affine
-    helps overall; this asks whether it still helps in the low-learning-rate tail.
-  - *Implementation:* pass the epoch from `src/knee_abnormality/training/lightning.py` to the
-    model's augmentation sampling and derive the effective probability without changing the saved
-    recipe; log it, restore it on resume, and keep the other families' random draws unchanged where
-    feasible.
-  - *Run:* report the fixed last epoch as well as the selected one. Two clean epochs may be too
-    short to matter; do not sweep the shutdown epoch before the first comparison is informative.
-
-- **Transform ordering and selected interactions** (hypothesis; untested), after the family
-  probabilities and strengths are compared. Keep supervision, sampling, model and training budget
-  fixed against a matched reference, and record which findings benefit or deteriorate.
-- **Simulated lower resolution** (hypothesis; a new family). Degrade through-plane resolution by
-  physical spacing rather than slice index
-  ([M&Ms evidence](../research/mri-benchmarks.md#mms-scanner-and-protocol-robustness)).
+- **Transform ordering and selected interactions** (hypothesis; untested). Nine image families
+  now run in a fixed order; the campaign showed their gains do not add. Keep supervision,
+  sampling, model and training budget fixed against a matched reference, and record which findings
+  benefit or deteriorate.
 - **Before changing a family,** inspect sampled and forced transformations across planes,
   acquisition orientations and missing-series cases with the
   [augmentation viewer](../data-preparation/reflection-geometry-and-previews.md#reflection-preview-evidence);
@@ -203,29 +188,6 @@ strength values of the existing families.
 
 Validation inputs stay unaugmented; inference augmentation belongs to the
 [endgame](endgame.md#test-time-augmentation).
-
-### Feature-space augmentation (DSU)
-
-**Accepted for the backlog on 2026-09-21; unimplemented and untested.** Add conservative
-feature-statistics augmentation alongside the existing image augmentations.
-[DSU](https://arxiv.org/abs/2202.03958) perturbs feature-channel means and standard deviations
-to model domain variation. Its vision results are external motivation, not a measured knee gain
-or evidence that scanner shift is currently our bottleneck.
-
-- **Change:** one training-only option at one early or intermediate ReXNet feature map, before
-  spatial MIL. Perturb per-channel spatial statistics rather than adding another pixel transform
-  or masking tokens. Draw the perturbation coherently across triplets from the same acquisition;
-  keep statistics plane/contrast-aware instead of mixing unlike MRI contrasts. Use training-only
-  statistics and define stable behavior for small acquisition groups. Fix the insertion point,
-  application probability and modest strength before the first comparison; no layer/strength sweep.
-- **Control:** disable feature augmentation entirely at evaluation. Preserve image augmentation,
-  series dropout, image/token budgets, labels, split, incumbent seed and training schedule.
-  Compare against a fresh current-recipe control without combining other pending experiments.
-- **Decision:** follow the controlled-comparison rules and record macro/per-label AUC, paired
-  uncertainty, runtime and scanner/vendor/contrast diagnostics with subgroup counts. MRI feature
-  statistics also contain diagnostic signal: do not assume all variation is nuisance or claim
-  scanner robustness from aggregate AUC alone. Implementation needs a separate user request;
-  move its run to the overnight queue only after implementation.
 
 ## BCE weighting and study sampling
 

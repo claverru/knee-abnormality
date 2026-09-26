@@ -1,6 +1,6 @@
 # Submission ledger
 
-All 56 Kaggle competition submissions, newest first, with submission times in UTC. The table is
+All 65 Kaggle competition submissions, newest first, with submission times in UTC. The table is
 regenerated from the live submission list and the local bundles by
 [`update_submission_ledger`](../../../scripts/tools/update_submission_ledger.py),
 which also writes `outputs/submission/kaggle-ledger.json`. The dated records in this folder cover
@@ -36,7 +36,9 @@ its subtitle.
 
 The sequence number counts only submissions already on Kaggle, so a job launched while another
 has not yet submitted would reuse its number; pass `--sequence` explicitly for overlapping
-launches.
+launches. The ledger script numbers rows by submission time, so an explicit `--sequence` that
+disagrees with time order is swapped in `kaggle-ledger.json`: S59 was submitted 28 s before S58.
+The descriptions on Kaggle, and this table, carry the correct numbers.
 
 Two caveats apply to the rows before S33. Kaggle notebook titles were set from their slugs until
 this scheme, so the notebook names on Kaggle still read `Knee Rf Tau075 4X 20260918 Inference`
@@ -68,6 +70,15 @@ come from a table in the script; later ones are recovered from the notebook slug
 
 | S | Submitted (UTC) | Label | Inference | Fold 0 | Public | ID | Record |
 |---|---|---|---|---|---:|---:|---|
+| S65 | 2026-09-26 11:41 | half-stack augmentation fold2 epoch 09 | x4 tau0.75 bs4 | (x1, fold 2) 0.893525 | 0.943 | 56578320 | [Augmentation campaign](../../validation/results/2026-09-26-augmentation-campaign.md) |
+| S64 | 2026-09-26 10:45 | half-stack augmentation fold2 epoch 07 | x4 tau0.75 bs4 | (x1, fold 2) 0.893622 | 0.943 | 56577204 | [Augmentation campaign](../../validation/results/2026-09-26-augmentation-campaign.md) |
+| S63 | 2026-09-26 09:15 | smoothing + DSU augmentation fold2 | x4 tau0.75 bs4 | (x1, fold 2) 0.891370 | 0.940 | 56575386 | [Augmentation campaign](../../validation/results/2026-09-26-augmentation-campaign.md) |
+| S62 | 2026-09-25 19:45 | report-attribute heads v3.1 fold1 | x4 tau0.75 bs4 | (x1, fold 1) 0.895294 | 0.940 | 56559056 | [Report-attribute heads](../../validation/results/2026-09-25-report-attribute-heads.md) |
+| S61 | 2026-09-25 18:29 | report-attribute heads fold1 | x4 tau0.75 bs4 | (x1, fold 1) 0.896116 | 0.938 | 56557729 | [Report-attribute heads](../../validation/results/2026-09-25-report-attribute-heads.md) |
+| S60 | 2026-09-25 08:44 | OA detector control fold1 | x4 tau0.75 bs4 | (x1, fold 1) 0.895202 | 0.938 | 56546031 | [Project state](../../ongoing/state.md) |
+| S59 | 2026-09-25 07:29 | token dropout random fold0 | x4 tau0.75 bs4 | (x1, scanner split) 0.900029 | 0.939 | 56544445 | [Near-misses campaign](../../validation/results/2026-09-25-near-misses-campaign.md) |
+| S58 | 2026-09-25 07:30 | three-compartment OA detector fold0 | x4 tau0.75 bs4 | (x1, scanner split) 0.897369 | 0.944 | 56544456 | [Near-misses campaign](../../validation/results/2026-09-25-near-misses-campaign.md) |
+| S57 | 2026-09-24 17:05 | early learning reg fold0 | x4 tau0.75 bs4 | (x1, scanner split) 0.900934 | 0.943 | 56527174 | [Near-miss review](../../ongoing/state.md) |
 | S56 | 2026-09-24 11:14 | knee-geometry adopted new seed fold0 | x4 tau0.75 bs4 | (x1, scanner split) 0.896343 | 0.940 | 56519764 | [Current model](../../modeling/current-model.md) |
 | S55 | 2026-09-24 09:34 | knee-geometry merged new seed fold0 | x4 tau0.75 bs4 | (x1, scanner split) 0.897581 | 0.940 | 56517876 | [Knee-geometry findings](../../../autoresearch/campaigns/knee-geometry/findings.md) |
 | S54 | 2026-09-24 08:08 | knee-geometry half-knee MIL fold0 | x4 tau0.75 bs4 | (x1, scanner split) 0.900879 | 0.944 | 56516135 | [Knee-geometry findings](../../../autoresearch/campaigns/knee-geometry/findings.md) |

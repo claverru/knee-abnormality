@@ -158,12 +158,6 @@ def status_summary(supervisor):
             f"{len(ledger['validation'])}/{CALIBRATION_VALIDATION_PASSES} validation passes (CPU only)"
         )
     lines.extend(job_line(job, state) for job in active)
-    control = state["control_retrain"]
-    if control:
-        lines.append(
-            f"  control retrain of {control['adopted']} at seed {control['seed']} "
-            f"({control['stage']}); candidates wait for it"
-        )
     if not active:
         lines.append("  no active jobs")
 

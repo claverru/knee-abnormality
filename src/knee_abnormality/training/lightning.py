@@ -28,6 +28,7 @@ from knee_abnormality.data.sources import build_series_index
 from knee_abnormality.evaluation.metrics import COMPARTMENT_PAIRS, validation_metrics
 from knee_abnormality.evaluation.predictions import make_prediction_frame
 from knee_abnormality.identity import preprocessing_identity
+from knee_abnormality.modeling.augmentation import AugmentationActivity
 from knee_abnormality.modeling.model import (
     COMPARTMENT_MIDLINE_BAND_MM,
     KneeAbnormalityModel,
@@ -424,8 +425,73 @@ class KneeModule(L.LightningModule):
             batch_size=1,
         )
 
+    def _log_epoch_metric(
+        self,
+        name: str,
+        value: torch.Tensor | float,
+        batch_size: int,
+        reduce_fx: str = "mean",
+    ) -> None:
+        self.log(
+            name,
+            value,
+            on_step=False,
+            on_epoch=True,
+            reduce_fx=reduce_fx,
+            batch_size=batch_size,
+        )
+
+    def _log_family_activity(
+        self, prefix: str, activity: AugmentationActivity, change_name: str
+    ) -> None:
+        affected = activity.affected_acquisitions.float()
+        total = activity.total_acquisitions
+        self._log_epoch_metric(f"{prefix}_affected_acquisitions", affected, 1, "sum")
+        self._log_epoch_metric(f"{prefix}_total_acquisitions", float(total), 1, "sum")
+        self._log_epoch_metric(
+            f"{prefix}_effective_probability", affected / total, total
+        )
+        changed = int(activity.changed_elements.item())
+        if changed > 0:
+            self._log_epoch_metric(
+                f"{prefix}_{change_name}", activity.mean_absolute_change, changed
+            )
+
+    def _log_augmentation_activity(self, study_count: int) -> None:
+        data = self.config.data
+        image_activity = self.model.image_augmentation.activity
+        for prefix, settings in (
+            ("smoothing", data.smoothing_augmentation),
+            ("resolution", data.resolution_augmentation),
+            ("gin", data.gin_augmentation),
+        ):
+            if settings.probability > 0:
+                self._log_family_activity(
+                    prefix, image_activity[prefix], "mean_absolute_pixel_change"
+                )
+        if self.config.model.feature_statistics_augmentation.probability > 0:
+            self._log_family_activity(
+                "feature_statistics",
+                self.model.feature_statistics_activity,
+                "mean_absolute_change",
+            )
+        if data.contrast_mixing_augmentation.probability > 0:
+            mixing = self.model.contrast_mixing_activity
+            for name, value in (
+                ("acquisitions", mixing.acquisitions),
+                ("studies", mixing.studies),
+            ):
+                self._log_epoch_metric(f"contrast_mixing_{name}", value, 1, "sum")
+            for name, value in (
+                ("lambda", mixing.mean_lambda),
+                ("pixel_change", mixing.mean_pixel_change),
+                ("effective_probability", mixing.effective_probability),
+            ):
+                self._log_epoch_metric(f"contrast_mixing_{name}", value, study_count)
+
     def training_step(self, batch: dict, batch_index: int) -> torch.Tensor:
         encoded = self.model.encode_batch(batch)
+        self._log_augmentation_activity(len(batch["study_uid"]))
         logits = self.model.pool_encoded(encoded).to(torch.float32)
         counts, masked, absolute_corrections = self.model.oa_detector_activity
         for region, region_counts, absolute_correction in zip(

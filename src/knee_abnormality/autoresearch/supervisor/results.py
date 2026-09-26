@@ -1,4 +1,3 @@
-import secrets
 from pathlib import Path
 
 from knee_abnormality.autoresearch.campaign.binding import (
@@ -34,7 +33,6 @@ from knee_abnormality.autoresearch.runtime.storage import (
     write_json,
 )
 from knee_abnormality.autoresearch.supervisor.common import (
-    identifier,
     trained_epochs,
     work_item,
 )
@@ -53,9 +51,6 @@ class ResultMixin:
             and not (directory / "started.json").exists()
         ):
             exp["stage"] = "needs_comparison"
-            return
-        if kind == "control":
-            self.control_result(receipt)
             return
         if receipt.get("cancelled") and kind not in {"training", "comparison"}:
             self.cancelled_result(job, exp)
@@ -80,50 +75,6 @@ class ResultMixin:
             self.config_result(exp, receipt, directory)
         else:
             self.agent_result(job, exp, directory)
-
-    def control_result(self, receipt):
-        control = self.state["control_retrain"]
-        if receipt.get("cancelled") or receipt["exit_code"] == GPU_BUSY:
-            control["stage"] = "pending"
-            return
-        directory = Path(control["directory"])
-        reasons = evaluate(
-            directory, campaign_fold(self.state), self.state["limits"], receipt
-        )
-        try:
-            seed = read_json(directory / "training/effective_config.json")["seed"]
-            if seed != control["seed"]:
-                reasons.append("Control training seed differs from the drawn seed")
-        except (OSError, KeyError, ValueError) as error:
-            reasons.append(f"Missing or malformed control seed evidence: {error}")
-        if reasons:
-            control.update(stage="failed", reasons=reasons)
-            self.pause(
-                f"Control retrain of {control['adopted']} failed; inspect {directory}: "
-                + "; ".join(reasons)
-                + ". Fix the cause and resume to retrain."
-            )
-            return
-        run = directory / "training"
-        previous = self.state["incumbent"]
-        self.state["incumbent"] = {
-            **previous,
-            "run": str(run),
-            "predictions_sha256": sha256(
-                fold_dir(run, campaign_fold(self.state)) / PREDICTIONS
-            ),
-        }
-        self.state["control_retrains"].append(
-            {
-                "id": control["id"],
-                "adopted": control["adopted"],
-                "seed": control["seed"],
-                "adopted_run": previous["run"],
-                "control_run": str(run),
-            }
-        )
-        self.state["control_retrain"] = None
-        self.state["evidence_revision"] += 1
 
     def cancelled_result(self, job, exp):
         kind = job["kind"]
@@ -256,6 +207,7 @@ class ResultMixin:
         try:
             config = read_json(directory / "stdout.log")
             config.pop("config_file")
+            config.pop("overrides")
             config.pop("split_dir")
             validate_config(self.state["config"], config, self.policy)
             exp["config"] = config
@@ -270,6 +222,7 @@ class ResultMixin:
         self.state.get("provider_retries", {}).pop(work_item(job), None)
         report = providers.result(self.state["provider"], REPORTS[kind], directory)
         if kind == "researcher":
+            self.apply_research(job, report)
             self.state["last_refill_revision"] = self.state["evidence_revision"]
             if report["ideas"]:
                 self.event(
@@ -294,6 +247,73 @@ class ResultMixin:
             self.apply_completion_report(job, report)
         else:
             self.apply_orchestrator(job["payload"]["event"], report)
+
+    def apply_research(self, job, report):
+        research = self.state["research"]
+        ideas = self.state["ideas"]
+        verdicts = {item["mechanism_id"]: item for item in report["family_verdicts"]}
+        if len(verdicts) != len(report["family_verdicts"]):
+            raise ValueError("Give each family at most one verdict")
+        unknown = verdicts.keys() - {idea["mechanism_id"] for idea in ideas.values()}
+        if unknown:
+            raise ValueError(f"Verdicts name unknown families: {sorted(unknown)}")
+        results = {}
+        for key in job["payload"]["new_results"]:
+            exp = self.state["experiments"][key]
+            results.setdefault(ideas[exp["idea"]]["mechanism_id"], []).append(
+                exp["decision"]
+            )
+        missing = results.keys() - verdicts.keys()
+        if missing:
+            raise ValueError(
+                f"Families with new results need a verdict: {sorted(missing)}"
+            )
+        for family, item in verdicts.items():
+            previous = research["verdicts"].get(family)
+            decisions = results.get(family, [])
+            if previous and previous["verdict"] == "close" and not decisions:
+                raise ValueError(f"{family} is closed; only a new result reopens it")
+            misses = (
+                0
+                if previous is None or "provisional_accept" in decisions
+                else previous["misses"] + decisions.count("reject")
+            )
+            if misses >= 2 and item["verdict"] != "close":
+                raise ValueError(
+                    f"{family}: two consecutive follow-ups were not adopted; close it"
+                )
+            research["verdicts"][family] = {
+                **item,
+                "misses": misses,
+                "revision": self.state["evidence_revision"],
+            }
+        proposed = {idea["mechanism_id"] for idea in report["ideas"]}
+        closed = {
+            family
+            for family, item in research["verdicts"].items()
+            if item["verdict"] == "close"
+        }
+        if proposed & closed:
+            raise ValueError(
+                f"Closed families cannot receive proposals: {sorted(proposed & closed)}"
+            )
+        live = {
+            idea["mechanism_id"]
+            for idea in ideas.values()
+            if idea["status"] in {"queued", "developing", "prepared", "launched"}
+        }
+        uncovered = {
+            family
+            for family, item in research["verdicts"].items()
+            if item["verdict"] != "close" and family not in live
+        }
+        if len(uncovered & proposed) < min(len(uncovered), job["payload"]["needed"]):
+            raise ValueError(
+                "Open extend/retry lines take refill slots first; propose their next steps "
+                f"or close them: {sorted(uncovered - proposed)}"
+            )
+        research["reviewed"].extend(job["payload"]["new_results"])
+        research.update(rejections=0, previous_rejection=None)
 
     def completion_event(self, job):
         event_id = job["payload"]["event"]["id"]
@@ -548,17 +568,6 @@ class ResultMixin:
                     "predictions_sha256": sha256(
                         fold_dir(run, campaign_fold(self.state)) / PREDICTIONS
                     ),
-                }
-                current_seed = reference_seed(self.state["incumbent"])
-                seed = secrets.randbits(32)
-                while seed == current_seed:
-                    seed = secrets.randbits(32)
-                self.state["control_retrain"] = {
-                    "id": identifier("control"),
-                    "adopted": exp["id"],
-                    "seed": seed,
-                    "stage": "pending",
-                    "attempts": 0,
                 }
         self.state["findings"].append(
             {

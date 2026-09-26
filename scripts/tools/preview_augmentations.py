@@ -319,6 +319,19 @@ def anchor_record(series, size, center, eligible, sagittal, inverse=None):
     }
 
 
+def preview_settings(config):
+    return config.data.model_copy(
+        update={
+            name: type(getattr(config.data, name))()
+            for name in (
+                "smoothing_augmentation",
+                "resolution_augmentation",
+                "gin_augmentation",
+            )
+        }
+    )
+
+
 def profile_reflection(config, stacks, entries, iterations, seed):
     if not torch.cuda.is_available():
         raise RuntimeError("--profile-cuda requires CUDA")
@@ -343,7 +356,7 @@ def profile_reflection(config, stacks, entries, iterations, seed):
     )
     matrices = affine_matrices(parameters.affine, *pixels.shape[-2:])
     inverse = augmented_to_prepared(matrices, *pixels.shape[-2:])[series_index]
-    augmenter = ImageAugmentation().to(device)
+    augmenter = ImageAugmentation(preview_settings(config)).to(device)
     results = {}
     for name, enabled in (("probability_zero", False), ("forced_eligible", True)):
         reflected = eligible if enabled else torch.zeros_like(eligible)
@@ -519,7 +532,7 @@ def create_preview(args: PreviewCLI) -> dict:
         "affine": config.data.affine_augmentation,
         "noise": config.data.noise_augmentation,
     }
-    augmenter = ImageAugmentation()
+    augmenter = ImageAugmentation(preview_settings(config))
     seeds = [seed + variant for variant in range(args.variants)]
     study_ids = [item["study_uid"] for item in items]
     eligibility = collate_studies(items)["reflection_eligible"]

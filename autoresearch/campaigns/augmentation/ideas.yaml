@@ -1,0 +1,1460 @@
+revision: 388
+ideas:
+- id: gin-intensity-augmentation
+  mechanism_id: global-intensity-nonlinear-augmentation
+  parent_idea_id: null
+  title: Remap each acquisition's intensities through a freshly sampled random shallow
+    conv net (GIN), blended with the original
+  opportunity: 'Seven vendors and 46 machine models, 19% of T1/PD-slot series that
+    are T2 without fat suppression, 129 T1-FS series with non-FS flags and 130 flat
+    near-PD GE zero-TE sagittals: the contrast varies inside a slot far beyond what
+    global gamma/contrast jitter models. Broader gamma/contrast lost (contrast 0.8-1.2
+    -0.0033 and -0.0067), so the lever is a different shape of variation, not more
+    of the same.'
+  mechanism: 'For each augmented acquisition sample one network g: 4 conv layers,
+    2 hidden channels, one input and one output channel, kernel size 1 or 3 drawn
+    per network, weights N(0, 1), LeakyReLU between layers. Apply g with shared weights
+    to each of the three slice channels separately (in_channels = 1), blend x'' =
+    a*g(x) + (1 - a)*x with a ~ U(0, 0.5), rescale x'' so its Frobenius norm over
+    the acquisition''s valid pixels equals the input''s, clamp to [0, 1] and restore
+    padding. Probability 0.3 per acquisition. Runs after gamma/contrast and before
+    noise.'
+  precedents:
+  - 'Ouyang et al., Causality-inspired single-source domain generalization (arXiv:2111.12525):
+    GIN alone, on top of affine, elastic, brightness, contrast, gamma and noise, raised
+    cross-centre prostate MRI Dice 56.6 -> 65.1 and cardiac bSSFP -> LGE 76.0 -> 83.8;
+    2/4/8/16 layers gave 84.3/86.0/85.7/79.2. Segmentation, not classification.'
+  - Broader contrast 0.80-1.20 lost -0.0033/-0.0067 and gamma 0.70-1.30 -0.0007 (docs/validation/results/2026-09-20-overnight-hyperparameter-results.md).
+  novelty: First non-monotonic, spatially local intensity remapping in this project;
+    existing intensity augmentation is a global gamma and a global contrast.
+  coverage: Every plane and contrast; all labels.
+  exploitation: If it helps, a monotone Bezier variant tests whether contrast inversion
+    matters; if it hurts fluid-sensitive labels, that variant is the retry.
+  budget: Grouped 1x1/3x3 convolutions on augmented acquisitions; negligible GPU time,
+    no parameters trained.
+  implementation: Adds a family under data.gin_augmentation (probability 0.3, blend_max
+    0.5, layers 4, hidden_channels 2) in config.py and modeling/augmentation.py; retains
+    every existing family and draw.
+  open_choices: None; depth, width, blend range and probability are fixed from the
+    paper's best depth and a mild blend.
+  dependencies: []
+  priority_rationale: The best isolated evidence found for any new MRI augmentation,
+    and it targets the contrast heterogeneity measured in this data.
+  status: blocked
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality/autoresearch/campaigns/augmentation/seed-ideas.yaml
+  experiments:
+  - gin-intensity-augmentation-20260925T214925Z-2f257b0e
+  - gin-intensity-augmentation-20260925T215651Z-742fdbb7
+  blocked_reason: 'The launch gate failed before training. The generated experiment
+    config has a top-level `overrides: {}` field that the schema rejects; the candidate''s
+    source config has no such field. This does not demonstrate a GIN defect, but a
+    failed gate cannot be approved. The idea has used its one bounded repair, so park
+    it. The ranking lists every remaining user-ordered seed once, in its fixed order,
+    to address the previous ranking rejection.'
+- id: phase-axis-resolution-degradation
+  mechanism_id: k-space-resolution-degradation
+  parent_idea_id: null
+  title: Low-pass one in-plane axis by k-space truncation to the measured range of
+    coarser acquisitions
+  opportunity: 'Acquired resolution against the 0.625 mm grid: finer axis p5/p50/p95
+    0.33/0.49/0.70 mm, phase axis 0.45/0.625/0.885 mm (p75 0.70), GE the coarsest.
+    About a quarter of series are effectively coarser than the grid along one axis
+    and the rest sharper, so the model sees a sharpness mix it is never trained to
+    be invariant to.'
+  mechanism: 'For each augmented acquisition pick one in-plane axis (rows or columns,
+    equal odds) and a keep fraction f ~ U(0.70, 1.0). FFT each slice channel, zero
+    the frequencies beyond f times Nyquist along that axis only, inverse FFT, take
+    the real part, clamp to [0, 1] and restore padding. This reproduces a coarser
+    phase-encoding matrix, including its Gibbs ringing: f = 0.70 is an effective 0.89
+    mm, the measured p95. Probability 0.25; never both axes. Runs after affine and
+    before gamma/contrast, inside the geometric valid region.'
+  precedents:
+  - 'nnU-Net trainer: simulated low resolution is a standard recipe component, not
+    isolated (github.com/MIC-DKFZ/nnUNet, nnUNetTrainer.py).'
+  - 'Acquired-resolution distributions: outputs/analysis/input-resolution-research-20260915/acquisition/distributions_train.csv;
+    docs/research/input-resolution.md.'
+  - 'Training and evaluating at 0.875 mm cost -0.0228, lateral meniscus -0.106 (docs/validation/results/2026-09-16-learned-zoom-result.md):
+    the range stays inside the measured one.'
+  novelty: First resolution augmentation here, one axis at a time, bounded by the
+    measured acquisition distribution.
+  coverage: Every acquisition; resolution-sensitive labels (menisci, ligaments) are
+    the ones to watch.
+  exploitation: If it helps, an acquisition-aware variant could degrade only along
+    the stored phase direction; if detail labels drop, a narrower range is not a retry
+    (no sweeps), a different degradation model is.
+  budget: Two 224x224 FFTs per augmented slice channel; negligible.
+  implementation: Adds data.resolution_augmentation (probability 0.25, keep_fraction_range
+    [0.70, 1.0]) in config.py and modeling/augmentation.py; retains every existing
+    family.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The data mismatch is measured and the transform is physically
+    faithful and cheap.
+  status: completed
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality/autoresearch/campaigns/augmentation/seed-ideas.yaml
+  ranking_rationale: Admit the user-requested GIN rerun behind every remaining ordered
+    seed. Its dependency check is satisfied. The earlier GIN idea was blocked after
+    a generated config failed validation before training; it produced no measured
+    result to duplicate. The supervisor now removes the offending `overrides` field
+    before retaining the config. Preserve the blocked parent as provenance; the new
+    proposal receives its own implementation review.
+  experiments:
+  - phase-axis-resolution-degradation-20260925T220337Z-2e33e83e
+  - phase-axis-resolution-degradation-20260925T221420Z-c259dc97
+  decision: reject
+- id: unsharp-sharpening-augmentation
+  mechanism_id: unsharp-mask-sharpening
+  parent_idea_id: null
+  title: Mild unsharp-mask sharpening per acquisition to imitate vendor sharpening
+    filters
+  opportunity: 'Vendor post-processing varies: GE deep-learning reconstructions and
+    Philips reformats appear as duplicate pairs in the training set, and stored images
+    are interpolated about 2x with vendor-specific filters. Nothing in the pipeline
+    varies edge sharpness upward.'
+  mechanism: x' = x + s*(x - G_sigma(x)) per slice channel, sigma ~ U(0.5, 1.0) px,
+    s ~ U(0.2, 1.0), one draw per acquisition, clamp to [0, 1], restore padding. Probability
+    0.25. Runs after affine and before gamma/contrast, inside the geometric valid
+    region.
+  precedents:
+  - 'BigAug (Zhang et al., arXiv:1906.03347): best single MRI transform; unseen-site
+    prostate Dice 60.4 -> 65.5, 58.0 -> 82.8, 76.8 -> 84.0 against a crop-only baseline.'
+  - 'RSNA 2024 lumbar 9th place: sharpen or motion blur, p 0.5, as a recipe component.'
+  novelty: First sharpness augmentation here; the opposite direction to seed 2 and
+    run separately from it.
+  coverage: Every acquisition; all labels.
+  exploitation: If both seeds 2 and 3 help, a combined sharpness family is a follow-up.
+  budget: One separable Gaussian blur per augmented slice channel.
+  implementation: Adds data.sharpen_augmentation (probability 0.25, sigma_range [0.5,
+    1.0], amount_range [0.2, 1.0]) in config.py and modeling/augmentation.py.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Isolated evidence, though against a weak baseline; cheap and
+    physically motivated.
+  status: completed
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality/autoresearch/campaigns/augmentation/seed-ideas.yaml
+  ranking_rationale: Admit the user-requested GIN rerun behind every remaining ordered
+    seed. Its dependency check is satisfied. The earlier GIN idea was blocked after
+    a generated config failed validation before training; it produced no measured
+    result to duplicate. The supervisor now removes the offending `overrides` field
+    before retaining the config. Preserve the blocked parent as provenance; the new
+    proposal receives its own implementation review.
+  experiments:
+  - unsharp-sharpening-augmentation-20260925T221732Z-69fd7f2f
+  decision: reject
+- id: aligned-image-mixup
+  mechanism_id: aligned-image-mixup
+  parent_idea_id: null
+  title: 'MixUp variant C: mix the input triplets of same-side study pairs, slot by
+    slot and matched by depth, before the backbone'
+  opportunity: 'MixUp is part of the RSNA 2024 lumbar 2nd (image MixUp p 0.3, alpha
+    1, plus manifold MixUp), 3rd and 6th-place recipes, never isolated. Image MixUp
+    is the common form: the whole network sees mixed inputs. Here the crops are centred
+    on the knee at a fixed 0.625 mm, so same-side studies roughly align anatomically,
+    which makes an aligned image version possible.'
+  mechanism: 'Pairing (shared by variants A, B, C): choose 30% of the batch''s studies
+    as a; pair each with a random other study b of the same knee side (knee_side_sign,
+    excluding unknown-side and bilateral studies) and the same reflection draw; skip
+    a when no partner exists. Draw l ~ Beta(1, 1) per pair. For every plane/contrast
+    slot present in both studies, match each of a''s triplets to b''s triplet in that
+    slot with the nearest relative depth (rank fraction among the selected triplets),
+    and replace a''s triplet by l*x_a + (1 - l)*x_b after both have had their own
+    augmentation and before ImageNet normalization; slots only a has stay unmixed.
+    Study a keeps its own positions, geometry, valid region and masks; b is also used
+    unmixed as its own row. Loss for mixed rows: l*w(y_a)*BCE(z, y_a) + (1 - l)*w(y_b)*BCE(z,
+    y_b) per label with each source target''s class-balance weight, only where the
+    label is observed in both studies, never turning a missing label into a negative;
+    unmixed rows keep the current loss, normalized over supervised cells as the masked
+    BCE does. The auxiliary losses mix the same way, with the same lambda: the half-knee
+    detector''s medial and lateral halves (aligned because pairs share a knee side)
+    take l*loss(y_a) + (1 - l)*loss(y_b) for that side''s meniscus, and each report-attribute
+    question takes l*loss(a) + (1 - l)*loss(b), both only where the target is observed
+    in both studies.'
+  precedents:
+  - 'RSNA 2024 lumbar 2nd place (github.com/brendanartley/RSNA-2024-Competition, cfg_stage2_s2_sp1.py):
+    image MixUp p 0.3, alpha 1, with CutMix and manifold MixUp; 3rd and 6th place
+    also used MixUp. Not isolated.'
+  - 'Panfilov et al. (arXiv:1908.04126): MixUp improved cross-scanner knee cartilage
+    segmentation (femoral 0.791 -> 0.819, tibial 0.746 -> 0.802).'
+  - 'Public EfficientNet-B0 in this competition: MixUp 0.7914 -> 0.7937, judged noise
+    (docs/research/public-research.md).'
+  novelty: First MixUp here; alignment by knee side, slot and depth replaces the naive
+    mixing that the anatomical geometry forbids.
+  coverage: 30% of training studies per batch; all labels.
+  exploitation: Variants B and A share its pairing and loss and move only the mixing
+    point, so the three results rank where mixing helps.
+  budget: No extra forward pass; triplet matching and a two-target BCE.
+  implementation: Adds trainer.image_mixup (fraction 0.3, beta_alpha 1.0) in config.py,
+    pairing and image mixing in modeling/model.py after augmentation, and the mixed
+    main, half-knee and report-attribute losses in training/lightning.py; logs mixed-study
+    count, mean lambda and each mixed-loss component.
+  open_choices: None; fraction and alpha are the lumbar 2nd-place setting, shared
+    by all three variants.
+  dependencies: []
+  priority_rationale: The most common and strongest MixUp form; first of the three
+    variants.
+  status: completed
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality/autoresearch/campaigns/augmentation/seed-ideas.yaml
+  ranking_rationale: Admit the user-requested GIN rerun behind every remaining ordered
+    seed. Its dependency check is satisfied. The earlier GIN idea was blocked after
+    a generated config failed validation before training; it produced no measured
+    result to duplicate. The supervisor now removes the offending `overrides` field
+    before retaining the config. Preserve the blocked parent as provenance; the new
+    proposal receives its own implementation review.
+  experiments:
+  - aligned-image-mixup-20260925T225700Z-2dc20772
+  decision: invalid
+- id: token-feature-mixup
+  mechanism_id: token-feature-mixup
+  parent_idea_id: null
+  title: 'MixUp variant B: mix projected token features of matched triplets before
+    position embeddings, mil_norm and attention'
+  opportunity: Manifold MixUp on sequence embeddings was part of the RSNA 2024 lumbar
+    2nd-place solution. Here the nonlinear steps come before pooling (mil_norm, attention
+    softmax, OA detector log-sum-exp), so mixing tokens is the manifold version that
+    still passes through them.
+  mechanism: Same pairing, slot matching, lambda, main loss and mixed auxiliary losses
+    as variant C (aligned-image-mixup). Instead of images, mix the projection output
+    of each matched triplet, token by token, before the position, plane and contrast
+    embeddings are added; mix only tokens visually valid in both triplets and keep
+    a's features elsewhere. Study a's positions, geometry, embeddings and masks are
+    then added as usual.
+  precedents:
+  - 'RSNA 2024 lumbar 2nd place: manifold MixUp on sequence embeddings (github.com/brendanartley/RSNA-2024-Competition);
+    not isolated.'
+  - 'Verma et al., Manifold Mixup (arXiv:1806.05236): mixing hidden states regularizes
+    beyond input MixUp on natural images.'
+  novelty: Token-level MixUp through the anatomical attention; the backbone sees clean
+    images.
+  coverage: 30% of training studies per batch; all labels.
+  exploitation: Compared with C and A, it locates where mixing helps.
+  budget: No extra forward pass.
+  implementation: Adds trainer.token_mixup (fraction 0.3, beta_alpha 1.0) in config.py,
+    mixing in modeling/model.py after the projection, and the shared loss in training/lightning.py;
+    logs as C.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Second variant; keeps the backbone input clean while mixing
+    before every nonlinear pooling step.
+  status: completed
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality/autoresearch/campaigns/augmentation/seed-ideas.yaml
+  ranking_rationale: Admit the user-requested GIN rerun behind every remaining ordered
+    seed. Its dependency check is satisfied. The earlier GIN idea was blocked after
+    a generated config failed validation before training; it produced no measured
+    result to duplicate. The supervisor now removes the offending `overrides` field
+    before retaining the config. Preserve the blocked parent as provenance; the new
+    proposal receives its own implementation review.
+  experiments:
+  - token-feature-mixup-20260925T232758Z-31a1b503
+  - token-feature-mixup-20260925T233730Z-e35a91c3
+  decision: reject
+- id: pooled-output-mixup
+  mechanism_id: pooled-output-mixup
+  parent_idea_id: null
+  title: 'MixUp variant A: mix pooled study outputs, equivalent to mixing the final
+    logits'
+  opportunity: 'The cheapest MixUp: no image or token change. It isolates the effect
+    of two-target supervision on interpolated outputs from input or feature mixing.'
+  mechanism: Same pairing, lambda and main loss as variant C (aligned-image-mixup),
+    without slot matching. The readout after pooling is linear in the pooled features
+    and the OA detector correction is linear in the pooled evidence, so mixing both
+    with the same lambda equals z_mix = l*z_a + (1 - l)*z_b. The half-knee and report-attribute
+    losses stay unchanged because tokens are not mixed.
+  precedents:
+  - Variants C and B of this campaign; RSNA 2024 lumbar MixUp precedents.
+  novelty: Logit interpolation with two-target supervision; the weakest of the three
+    by construction.
+  coverage: 30% of training studies per batch; all labels.
+  exploitation: If A matches B or C, the benefit comes from the targets, not from
+    mixed features.
+  budget: A permutation and a second BCE on mixed rows.
+  implementation: Adds trainer.pooled_mixup (fraction 0.3, beta_alpha 1.0) in config.py
+    and the mixing and loss in training/lightning.py; logs as C.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Third variant; the control for where mixing matters.
+  status: completed
+  created_revision: 1
+  seeded: /home/claudio/src/knee-abnormality/autoresearch/campaigns/augmentation/seed-ideas-2.yaml
+  ranking_rationale: 'I admitted aligned-image-mixup-rerun. proposal_admission shows
+    it has no dependencies. It does not repeat a measured result: the only earlier
+    attempt (aligned-image-mixup-20260925T225700Z-2dc20772) is marked invalid, not
+    scored. evaluation.json shows training exited with code 1 after 1735 s, and fold_2/timing.json
+    was never written, so there is no macro delta. The rerun changes only the checkpoint-reload
+    constructor defect. The mechanism and loss stay the ones already reviewed and
+    approved in review-20260925T231411Z-00ff7fa5.
+
+
+    The other family results do not make it a duplicate. token-feature-mixup was rejected
+    (delta -0.00011) and pooled-output-mixup is still developing, but both mix at
+    a different point in the network. Variant C (image mixing) has never been measured.
+
+
+    Placement follows the assignment rule: after all remaining user-ordered seeds,
+    next to the other re-imported rerun (gin-intensity-augmentation-rerun). The seed
+    order and the reserved head (pooled-output-mixup) are unchanged.'
+  experiments:
+  - pooled-output-mixup-20260925T235740Z-a1b54b1a
+  decision: reject
+- id: late-affine-shutdown
+  mechanism_id: late-affine-shutdown
+  parent_idea_id: null
+  title: Turn affine augmentation off for the last two epochs
+  opportunity: Affine off for the whole run lost -0.0041 and stronger affine -0.0024,
+    so the current affine helps overall. Whether it still helps in the low-learning-rate
+    tail, where unaugmented inputs match evaluation, is untested.
+  mechanism: Affine probability 0.7 for epochs 0-7 and 0 for epochs 8-9 (zero-based
+    current_epoch >= 8); every other family and series dropout unchanged. The model
+    receives the epoch from training/lightning.py at on_train_epoch_start; the effective
+    probability is logged each epoch and restored on resume.
+  precedents:
+  - 'docs/backlog/small-changes.md, Augmentation families: late affine shutdown (hypothesis).'
+  - Affine off -0.0041 [-0.0078, -0.0002] (2026-09-17); strong affine -0.0024 (2026-09-15).
+  novelty: First epoch-dependent augmentation schedule here.
+  coverage: Every acquisition in the last two epochs.
+  exploitation: If it helps, the same schedule applies to adopted image families.
+  budget: None.
+  implementation: Adds data.affine_shutdown_epoch (8) in config.py, the epoch hand-off
+    in training/lightning.py and the gate in modeling/model.py; the other families'
+    draws are unchanged. The report states the fixed last epoch as well as the selected
+    one.
+  open_choices: None; the shutdown epoch is not swept.
+  dependencies: []
+  priority_rationale: Measured premise that affine matters; zero cost.
+  status: completed
+  created_revision: 1
+  seeded: /home/claudio/src/knee-abnormality/autoresearch/campaigns/augmentation/seed-ideas-2.yaml
+  ranking_rationale: 'I admitted aligned-image-mixup-rerun. proposal_admission shows
+    it has no dependencies. It does not repeat a measured result: the only earlier
+    attempt (aligned-image-mixup-20260925T225700Z-2dc20772) is marked invalid, not
+    scored. evaluation.json shows training exited with code 1 after 1735 s, and fold_2/timing.json
+    was never written, so there is no macro delta. The rerun changes only the checkpoint-reload
+    constructor defect. The mechanism and loss stay the ones already reviewed and
+    approved in review-20260925T231411Z-00ff7fa5.
+
+
+    The other family results do not make it a duplicate. token-feature-mixup was rejected
+    (delta -0.00011) and pooled-output-mixup is still developing, but both mix at
+    a different point in the network. Variant C (image mixing) has never been measured.
+
+
+    Placement follows the assignment rule: after all remaining user-ordered seeds,
+    next to the other re-imported rerun (gin-intensity-augmentation-rerun). The seed
+    order and the reserved head (pooled-output-mixup) are unchanged.'
+  experiments:
+  - late-affine-shutdown-20260926T004000Z-0fee047d
+  decision: reject
+- id: smooth-bias-field-augmentation
+  mechanism_id: multiplicative-bias-field
+  parent_idea_id: null
+  title: Multiply each acquisition by a smooth low-order polynomial field within plus
+    or minus 20%
+  opportunity: Knee surface coils produce spatial intensity shading; global gamma
+    and contrast cannot reproduce it. Residual shading in these images was never measured,
+    and bias-field augmentation was not selected in the 2026-09-21 backlog review
+    for unrecorded reasons; this seed runs without that measurement.
+  mechanism: For each augmented acquisition draw a cubic polynomial P(x, y) over normalized
+    image coordinates with coefficients N(0, 1), scale it so max |P| over the valid
+    region is 1, and multiply by B = 1 + a*P with a ~ U(0, 0.2); one field shared
+    by the three slice channels and all triplets. Clamp to [0, 1], restore padding.
+    Probability 0.25. Runs after affine and before gamma/contrast.
+  precedents:
+  - 'TorchIO RandomBiasField and MONAI bias-field transforms: MRI inhomogeneity model,
+    availability only.'
+  - AdvBias (adversarial bias field) gained in the GIN and SLAug comparisons; a different,
+    adversarial method.
+  novelty: First spatially varying intensity augmentation here.
+  coverage: Every acquisition; all labels.
+  exploitation: If it helps, measure residual shading by vendor and coil to set a
+    data-derived amplitude.
+  budget: One polynomial evaluation per augmented acquisition.
+  implementation: Adds data.bias_field_augmentation (probability 0.25, amplitude 0.2,
+    degree 3) in config.py and modeling/augmentation.py.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Mechanism-only evidence and an unmeasured premise; runs after
+    the better-supported seeds.
+  status: completed
+  created_revision: 1
+  seeded: /home/claudio/src/knee-abnormality/autoresearch/campaigns/augmentation/seed-ideas-2.yaml
+  ranking_rationale: 'I admitted aligned-image-mixup-rerun. proposal_admission shows
+    it has no dependencies. It does not repeat a measured result: the only earlier
+    attempt (aligned-image-mixup-20260925T225700Z-2dc20772) is marked invalid, not
+    scored. evaluation.json shows training exited with code 1 after 1735 s, and fold_2/timing.json
+    was never written, so there is no macro delta. The rerun changes only the checkpoint-reload
+    constructor defect. The mechanism and loss stay the ones already reviewed and
+    approved in review-20260925T231411Z-00ff7fa5.
+
+
+    The other family results do not make it a duplicate. token-feature-mixup was rejected
+    (delta -0.00011) and pooled-output-mixup is still developing, but both mix at
+    a different point in the network. Variant C (image mixing) has never been measured.
+
+
+    Placement follows the assignment rule: after all remaining user-ordered seeds,
+    next to the other re-imported rerun (gin-intensity-augmentation-rerun). The seed
+    order and the reserved head (pooled-output-mixup) are unchanged.'
+  experiments:
+  - smooth-bias-field-augmentation-20260926T011026Z-b7fa0f09
+  decision: reject
+- id: triplet-channel-reversal
+  mechanism_id: slice-channel-order-reversal
+  parent_idea_id: null
+  title: Reverse the three slice channels of axial and coronal acquisitions
+  opportunity: Slice order within a triplet carries through-plane direction; sagittal
+    reflection already reverses it, axial and coronal never do. Lumbar solutions report
+    channel shuffle and sequence flips helping, without numbers.
+  mechanism: With probability 0.5 per axial or coronal acquisition, reverse the order
+    of its three slice channels in every triplet, and update the per-channel source
+    mapping passed to feature_geometry so token geometry stays consistent (compose
+    with reflection_channels). The middle slice and its position are unchanged. Sagittal
+    acquisitions are untouched.
+  precedents:
+  - 'RSNA 2024 lumbar 9th place: channel shuffle p 0.5 on axial "significantly improved",
+    no numbers; 2nd place flipped the sequence order.'
+  novelty: First through-plane order augmentation for axial and coronal here.
+  coverage: Axial and coronal acquisitions; all labels.
+  exploitation: If it helps, nothing obvious follows; if it hurts, close the family.
+  budget: None.
+  implementation: Adds data.channel_reversal_augmentation (probability 0.5) in config.py,
+    the reversal in modeling/augmentation.py and the channel-mapping composition in
+    modeling/model.py.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Author claims only; low confidence.
+  status: completed
+  created_revision: 1
+  seeded: /home/claudio/src/knee-abnormality/autoresearch/campaigns/augmentation/seed-ideas-2.yaml
+  ranking_rationale: 'I admitted aligned-image-mixup-rerun. proposal_admission shows
+    it has no dependencies. It does not repeat a measured result: the only earlier
+    attempt (aligned-image-mixup-20260925T225700Z-2dc20772) is marked invalid, not
+    scored. evaluation.json shows training exited with code 1 after 1735 s, and fold_2/timing.json
+    was never written, so there is no macro delta. The rerun changes only the checkpoint-reload
+    constructor defect. The mechanism and loss stay the ones already reviewed and
+    approved in review-20260925T231411Z-00ff7fa5.
+
+
+    The other family results do not make it a duplicate. token-feature-mixup was rejected
+    (delta -0.00011) and pooled-output-mixup is still developing, but both mix at
+    a different point in the network. Variant C (image mixing) has never been measured.
+
+
+    Placement follows the assignment rule: after all remaining user-ordered seeds,
+    next to the other re-imported rerun (gin-intensity-augmentation-rerun). The seed
+    order and the reserved head (pooled-output-mixup) are unchanged.'
+  experiments:
+  - triplet-channel-reversal-20260926T014024Z-1123cd9d
+  decision: reject
+- id: bilateral-smoothing-augmentation
+  mechanism_id: edge-preserving-smoothing
+  parent_idea_id: null
+  title: Mild bilateral filtering per acquisition to imitate deep-learning reconstructions
+  opportunity: GE deep-learning reconstructions occur in the training set, so their
+    smooth, low-noise, edge-preserving look is part of the data and may be more common
+    in newer test acquisitions. Seed 2 removes resolution along one axis and seed
+    3 adds edge contrast; neither removes texture while keeping edges.
+  mechanism: Bilateral filter with a 5x5 window, spatial sigma 1 px and range sigma
+    ~ U(0.05, 0.1) on the [0, 1] scale, per slice channel with one draw per acquisition,
+    inside the geometric valid region; restore padding. Probability 0.2. Runs after
+    affine and before gamma/contrast.
+  precedents:
+  - None isolated; premise from the GE deep-learning reconstruction pairs in docs/data-preparation/current-preparation.md.
+  novelty: First denoising-style augmentation here.
+  coverage: Every acquisition; subtle intrasubstance meniscal signal and faint marrow
+    edema are at risk.
+  exploitation: If it helps, combine with seed 3 as a sharpness family.
+  budget: A 5x5 bilateral filter per augmented slice channel.
+  implementation: Adds data.smoothing_augmentation (probability 0.2, spatial_sigma
+    1.0, range_sigma_range [0.05, 0.1]) in config.py and modeling/augmentation.py.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: A guess with a data premise; low confidence.
+  status: completed
+  created_revision: 1
+  seeded: /home/claudio/src/knee-abnormality/autoresearch/campaigns/augmentation/seed-ideas-2.yaml
+  ranking_rationale: 'I admitted aligned-image-mixup-rerun. proposal_admission shows
+    it has no dependencies. It does not repeat a measured result: the only earlier
+    attempt (aligned-image-mixup-20260925T225700Z-2dc20772) is marked invalid, not
+    scored. evaluation.json shows training exited with code 1 after 1735 s, and fold_2/timing.json
+    was never written, so there is no macro delta. The rerun changes only the checkpoint-reload
+    constructor defect. The mechanism and loss stay the ones already reviewed and
+    approved in review-20260925T231411Z-00ff7fa5.
+
+
+    The other family results do not make it a duplicate. token-feature-mixup was rejected
+    (delta -0.00011) and pooled-output-mixup is still developing, but both mix at
+    a different point in the network. Variant C (image mixing) has never been measured.
+
+
+    Placement follows the assignment rule: after all remaining user-ordered seeds,
+    next to the other re-imported rerun (gin-intensity-augmentation-rerun). The seed
+    order and the reserved head (pooled-output-mixup) are unchanged.'
+  experiments:
+  - bilateral-smoothing-augmentation-20260926T021107Z-ea5abbac
+  decision: provisional_accept
+- id: intra-study-contrast-mixing
+  mechanism_id: intra-study-contrast-mixing
+  parent_idea_id: null
+  title: Blend a study's fluid-sensitive fat-suppressed and non-fat-suppressed acquisitions
+    of the same plane, keeping the target's slot
+  opportunity: 'Contrast varies inside each slot: 19% of T1/PD-slot series are T2
+    without fat suppression, 129 T1-FS series carry non-FS flags and 130 GE zero-TE
+    sagittals have flat near-PD contrast. Blending a study''s own two contrasts of
+    one plane synthesizes these in-between contrasts with no label risk, because both
+    images come from the same patient and study.'
+  mechanism: For each plane where both the fluid-sensitive fat-suppressed and the
+    non-fat-suppressed slots survive series dropout, with probability 0.3 pick one
+    of the two as target (equal odds) and replace each of its triplets by l*x_target
+    + (1 - l)*x_other, l ~ U(0.5, 1.0) per acquisition, where x_other is the other
+    acquisition's triplet nearest in slice position along the shared plane normal
+    (the developer verifies both positions share a patient frame). Mix before either
+    acquisition's own augmentation, since both crops are centred on the same knee
+    at 0.625 mm; restore the target's padding. The target keeps its slot, plane/contrast
+    embedding, positions, geometry and masks; the other acquisition stays unmixed.
+  precedents:
+  - 'Contrast heterogeneity: docs/metadata/series-filtering-census.md.'
+  - GIN (seed 1) and broader gamma/contrast (-0.0033/-0.0067, 2026-09-20) perturb
+    contrast synthetically; this uses the study's own second contrast.
+  novelty: First augmentation that mixes two real contrasts of the same anatomy; no
+    cross-study label mixing.
+  coverage: Coronal and sagittal in most studies; axial where a T1/PD axial exists
+    (857 studies).
+  exploitation: If it helps, extend it to mixing across the study's repeated acquisitions
+    of one slot.
+  budget: Triplet matching and a blend before augmentation; negligible.
+  implementation: Adds data.contrast_mixing_augmentation (probability 0.3, target_weight_range
+    [0.5, 1.0]) in config.py and the blend in modeling/model.py before _augment_images;
+    logs planes mixed and mean weight.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Label-safe and grounded in measured slot heterogeneity; the
+    fat-suppression cue can weaken, as with GIN.
+  status: completed
+  created_revision: 2
+  seeded: /home/claudio/src/knee-abnormality/autoresearch/campaigns/augmentation/seed-ideas-3.yaml
+  ranking_rationale: 'I admitted aligned-image-mixup-rerun. proposal_admission shows
+    it has no dependencies. It does not repeat a measured result: the only earlier
+    attempt (aligned-image-mixup-20260925T225700Z-2dc20772) is marked invalid, not
+    scored. evaluation.json shows training exited with code 1 after 1735 s, and fold_2/timing.json
+    was never written, so there is no macro delta. The rerun changes only the checkpoint-reload
+    constructor defect. The mechanism and loss stay the ones already reviewed and
+    approved in review-20260925T231411Z-00ff7fa5.
+
+
+    The other family results do not make it a duplicate. token-feature-mixup was rejected
+    (delta -0.00011) and pooled-output-mixup is still developing, but both mix at
+    a different point in the network. Variant C (image mixing) has never been measured.
+
+
+    Placement follows the assignment rule: after all remaining user-ordered seeds,
+    next to the other re-imported rerun (gin-intensity-augmentation-rerun). The seed
+    order and the reserved head (pooled-output-mixup) are unchanged.'
+  experiments:
+  - intra-study-contrast-mixing-20260926T024122Z-c40ca478
+  - intra-study-contrast-mixing-20260926T025959Z-405e23ca
+  - intra-study-contrast-mixing-20260926T034254Z-ac1de092
+  decision: reject
+- id: dsu-feature-statistics
+  mechanism_id: feature-statistics-uncertainty
+  parent_idea_id: null
+  title: Resample per-acquisition feature-channel means and standard deviations at
+    one ReXNet stage (DSU)
+  opportunity: 'Channel statistics of CNN features mostly encode style (scanner, contrast,
+    texture). The feature-level counterpart of seed 1: perturbing them may reduce
+    reliance on acquisition style.'
+  mechanism: At the output of the last ReXNet block at stride 8, compute each acquisition's
+    per-channel mean and standard deviation over its triplets and spatial positions.
+    Estimate the spread of those statistics across the batch's acquisitions of the
+    same plane/contrast type (skip types with fewer than two acquisitions), draw new
+    statistics mu' = mu + e1*spread_mu and sigma' = sigma + e2*spread_sigma with e
+    ~ N(0, 1) per acquisition and channel, and re-normalize that acquisition's features
+    to them. Probability 0.5 per acquisition, training only.
+  precedents:
+  - 'Li et al., DSU (arXiv:2202.03958): gains on natural-image domain-generalization
+    benchmarks; no medical evidence found.'
+  - MixStyle, its predecessor, scored -0.8 to +0.5 Dice in the MRI comparisons of
+    the GIN and SLAug papers.
+  - docs/backlog/small-changes.md, Feature-space augmentation (DSU).
+  novelty: First feature-level augmentation here.
+  coverage: Every acquisition; feature statistics also carry diagnostic signal (overall
+    fluid brightness in effusion).
+  exploitation: If it helps, the insertion stage is not swept; a plane/contrast-free
+    variant would be the contrast test.
+  budget: A forward hook with per-acquisition reductions; negligible.
+  implementation: Adds model.feature_statistics_augmentation (probability 0.5, stage
+    stride 8) in config.py and a training-only hook in modeling/model.py.
+  open_choices: None; stage, probability and unit strength are fixed.
+  dependencies: []
+  priority_rationale: Weak evidence; runs last.
+  status: completed
+  created_revision: 2
+  seeded: /home/claudio/src/knee-abnormality/autoresearch/campaigns/augmentation/seed-ideas-3.yaml
+  ranking_rationale: 'I admitted aligned-image-mixup-rerun. proposal_admission shows
+    it has no dependencies. It does not repeat a measured result: the only earlier
+    attempt (aligned-image-mixup-20260925T225700Z-2dc20772) is marked invalid, not
+    scored. evaluation.json shows training exited with code 1 after 1735 s, and fold_2/timing.json
+    was never written, so there is no macro delta. The rerun changes only the checkpoint-reload
+    constructor defect. The mechanism and loss stay the ones already reviewed and
+    approved in review-20260925T231411Z-00ff7fa5.
+
+
+    The other family results do not make it a duplicate. token-feature-mixup was rejected
+    (delta -0.00011) and pooled-output-mixup is still developing, but both mix at
+    a different point in the network. Variant C (image mixing) has never been measured.
+
+
+    Placement follows the assignment rule: after all remaining user-ordered seeds,
+    next to the other re-imported rerun (gin-intensity-augmentation-rerun). The seed
+    order and the reserved head (pooled-output-mixup) are unchanged.'
+  experiments:
+  - dsu-feature-statistics-20260926T034836Z-6298ea10
+  decision: provisional_accept
+- id: rexnet-stochastic-depth
+  mechanism_id: stochastic-depth
+  parent_idea_id: null
+  title: Stochastic depth (drop path) in ReXNet-200 at rate 0.1
+  opportunity: Stochastic depth has never run on ReXNet here; the backbone is built
+    without it. It is a standard regularizer in timm training recipes and costs nothing
+    at inference.
+  mechanism: Pass drop_path_rate 0.1 to timm.create_model for the backbone. During
+    training timm's ReXNet-200 randomly skips the residual branch of its 11 shortcut
+    blocks per sample, with the rate rising linearly with depth to 0.1; validation
+    and inference run every block. Requires model.backbone_eval false, the recipe's
+    value.
+  precedents:
+  - 'Head dropout 0.1 gave +0.0032 (2026-09-18) and -0.0005 (2026-09-20): regularization
+    effects here sit near seed noise.'
+  - Stochastic depth appears only in docs/modeling/coatnet-224-spatial-backbone.md
+    and docs/research/efficientnet-training.md; never measured on ReXNet.
+  novelty: First layer-level stochastic regularization on ReXNet here.
+  coverage: Every study; all labels.
+  exploitation: If it helps, it combines with adopted augmentation families as independent
+    regularization.
+  budget: None measurable; a per-sample mask in 11 blocks.
+  implementation: Adds model.drop_path_rate (0.1) in config.py and passes it to timm.create_model
+    in modeling/model.py; logs the configured rate and confirms DropPath modules are
+    active in training mode.
+  open_choices: None; the rate is not swept.
+  dependencies: []
+  priority_rationale: Cheap, standard and untested here; low expected effect.
+  status: completed
+  created_revision: 2
+  seeded: /home/claudio/src/knee-abnormality/autoresearch/campaigns/augmentation/seed-ideas-3.yaml
+  ranking_rationale: 'I admitted aligned-image-mixup-rerun. proposal_admission shows
+    it has no dependencies. It does not repeat a measured result: the only earlier
+    attempt (aligned-image-mixup-20260925T225700Z-2dc20772) is marked invalid, not
+    scored. evaluation.json shows training exited with code 1 after 1735 s, and fold_2/timing.json
+    was never written, so there is no macro delta. The rerun changes only the checkpoint-reload
+    constructor defect. The mechanism and loss stay the ones already reviewed and
+    approved in review-20260925T231411Z-00ff7fa5.
+
+
+    The other family results do not make it a duplicate. token-feature-mixup was rejected
+    (delta -0.00011) and pooled-output-mixup is still developing, but both mix at
+    a different point in the network. Variant C (image mixing) has never been measured.
+
+
+    Placement follows the assignment rule: after all remaining user-ordered seeds,
+    next to the other re-imported rerun (gin-intensity-augmentation-rerun). The seed
+    order and the reserved head (pooled-output-mixup) are unchanged.'
+  experiments:
+  - rexnet-stochastic-depth-20260926T042212Z-019e29ce
+  - rexnet-stochastic-depth-20260926T045526Z-1de7a03e
+  decision: reject
+- id: gin-intensity-augmentation-rerun
+  mechanism_id: global-intensity-nonlinear-augmentation
+  parent_idea_id: gin-intensity-augmentation
+  title: Remap each acquisition's intensities through a freshly sampled random shallow
+    conv net (GIN), blended with the original
+  opportunity: 'Seven vendors and 46 machine models, 19% of T1/PD-slot series that
+    are T2 without fat suppression, 129 T1-FS series with non-FS flags and 130 flat
+    near-PD GE zero-TE sagittals: the contrast varies inside a slot far beyond what
+    global gamma/contrast jitter models. Broader gamma/contrast lost (contrast 0.8-1.2
+    -0.0033 and -0.0067), so the lever is a different shape of variation, not more
+    of the same.'
+  mechanism: 'For each augmented acquisition sample one network g: 4 conv layers,
+    2 hidden channels, one input and one output channel, kernel size 1 or 3 drawn
+    per network, weights N(0, 1), LeakyReLU between layers. Apply g with shared weights
+    to each of the three slice channels separately (in_channels = 1), blend x'' =
+    a*g(x) + (1 - a)*x with a ~ U(0, 0.5), rescale x'' so its Frobenius norm over
+    the acquisition''s valid pixels equals the input''s, clamp to [0, 1] and restore
+    padding. Probability 0.3 per acquisition. Runs after gamma/contrast and before
+    noise.'
+  precedents:
+  - 'gin-intensity-augmentation (this campaign) was parked untested: a runner defect
+    put overrides: {} into every generated training config, the launch gate failed,
+    and the crash used its one repair. The runner now strips the key (supervisor/results.py
+    config_result); the mechanism is unchanged and was never measured.'
+  - 'Ouyang et al., Causality-inspired single-source domain generalization (arXiv:2111.12525):
+    GIN alone, on top of affine, elastic, brightness, contrast, gamma and noise, raised
+    cross-centre prostate MRI Dice 56.6 -> 65.1 and cardiac bSSFP -> LGE 76.0 -> 83.8;
+    2/4/8/16 layers gave 84.3/86.0/85.7/79.2. Segmentation, not classification.'
+  - Broader contrast 0.80-1.20 lost -0.0033/-0.0067 and gamma 0.70-1.30 -0.0007 (docs/validation/results/2026-09-20-overnight-hyperparameter-results.md).
+  novelty: First non-monotonic, spatially local intensity remapping in this project;
+    existing intensity augmentation is a global gamma and a global contrast.
+  coverage: Every plane and contrast; all labels.
+  exploitation: If it helps, a monotone Bezier variant tests whether contrast inversion
+    matters; if it hurts fluid-sensitive labels, that variant is the retry.
+  budget: Grouped 1x1/3x3 convolutions on augmented acquisitions; negligible GPU time,
+    no parameters trained.
+  implementation: Adds a family under data.gin_augmentation (probability 0.3, blend_max
+    0.5, layers 4, hidden_channels 2) in config.py and modeling/augmentation.py; retains
+    every existing family and draw.
+  open_choices: None; depth, width, blend range and probability are fixed from the
+    paper's best depth and a mild blend.
+  dependencies: []
+  priority_rationale: The best isolated evidence found for any new MRI augmentation,
+    and it targets the contrast heterogeneity measured in this data.
+  status: blocked
+  created_revision: 38
+  ranking_rationale: 'I admitted aligned-image-mixup-rerun. proposal_admission shows
+    it has no dependencies. It does not repeat a measured result: the only earlier
+    attempt (aligned-image-mixup-20260925T225700Z-2dc20772) is marked invalid, not
+    scored. evaluation.json shows training exited with code 1 after 1735 s, and fold_2/timing.json
+    was never written, so there is no macro delta. The rerun changes only the checkpoint-reload
+    constructor defect. The mechanism and loss stay the ones already reviewed and
+    approved in review-20260925T231411Z-00ff7fa5.
+
+
+    The other family results do not make it a duplicate. token-feature-mixup was rejected
+    (delta -0.00011) and pooled-output-mixup is still developing, but both mix at
+    a different point in the network. Variant C (image mixing) has never been measured.
+
+
+    Placement follows the assignment rule: after all remaining user-ordered seeds,
+    next to the other re-imported rerun (gin-intensity-augmentation-rerun). The seed
+    order and the reserved head (pooled-output-mixup) are unchanged.'
+  experiments:
+  - gin-intensity-augmentation-rerun-20260926T045752Z-89cdb70b
+  - gin-intensity-augmentation-rerun-20260926T051029Z-6c1eda39
+  - gin-intensity-augmentation-rerun-20260926T060419Z-33a31975
+  blocked_reason: 'Block and park. This keeps the earlier decision (orchestrator-20260926T061420Z-41bff601).
+    I re-checked the source; the only change from that report is an explicit ranking.
+    The supervisor rejected the earlier report for its null ranking, because parking
+    the reserved head changes the live queue.
+
+
+    Defect: in the candidate, `valid_rect_mask` (augmentation.py:370-384) indexes
+    `top[:, None, None]`. The real `valid_rects` hold one rectangle per slice: shape
+    (series, slices, 3, 4) at data/dataset.py:416, flattened to per-triplet (N,3,4)
+    at model.py:355. The indexing therefore yields (N,1,1,3). That does not broadcast
+    with `x` of shape (1,1,W), so the function raises on the first GIN-enabled training
+    step (model.py:358). A failed gate cannot be approved.
+
+
+    The idea already used its one bounded repair (orchestrator-20260926T050924Z-5d4e332f
+    on 045752Z), so this is a block, which also parks the idea. The rest of the GIN
+    work is sound and reusable:
+
+    - one network and one Frobenius rescale per acquisition;
+
+    - input masked before the convolution;
+
+    - the exclusion survives noise;
+
+    - no random draws when disabled;
+
+    - smoothing and DSU retained.
+
+
+    A fresh GIN proposal should build its mask with the per-slice (N,3,H,W) indexing
+    that `geometric_valid_mask` uses.
+
+
+    Queue: gin-intensity-augmentation-rerun is parked, so aligned-image-mixup-rerun
+    becomes the head and the only live entry.'
+- id: aligned-image-mixup-rerun
+  mechanism_id: aligned-image-mixup
+  parent_idea_id: aligned-image-mixup
+  title: 'MixUp variant C: mix the input triplets of same-side study pairs, slot by
+    slot and matched by depth, before the backbone'
+  opportunity: 'MixUp is part of the RSNA 2024 lumbar 2nd (image MixUp p 0.3, alpha
+    1, plus manifold MixUp), 3rd and 6th-place recipes, never isolated. Image MixUp
+    is the common form: the whole network sees mixed inputs. Here the crops are centred
+    on the knee at a fixed 0.625 mm, so same-side studies roughly align anatomically,
+    which makes an aligned image version possible.'
+  mechanism: 'Pairing (shared by variants A, B, C): choose 30% of the batch''s studies
+    as a; pair each with a random other study b of the same knee side (knee_side_sign,
+    excluding unknown-side and bilateral studies) and the same reflection draw; skip
+    a when no partner exists. Draw l ~ Beta(1, 1) per pair. For every plane/contrast
+    slot present in both studies, match each of a''s triplets to b''s triplet in that
+    slot with the nearest relative depth (rank fraction among the selected triplets),
+    and replace a''s triplet by l*x_a + (1 - l)*x_b after both have had their own
+    augmentation and before ImageNet normalization; slots only a has stay unmixed.
+    Study a keeps its own positions, geometry, valid region and masks; b is also used
+    unmixed as its own row. Loss for mixed rows: l*w(y_a)*BCE(z, y_a) + (1 - l)*w(y_b)*BCE(z,
+    y_b) per label with each source target''s class-balance weight, only where the
+    label is observed in both studies, never turning a missing label into a negative;
+    unmixed rows keep the current loss, normalized over supervised cells as the masked
+    BCE does. The auxiliary losses mix the same way, with the same lambda: the half-knee
+    detector''s medial and lateral halves (aligned because pairs share a knee side)
+    take l*loss(y_a) + (1 - l)*loss(y_b) for that side''s meniscus, and each report-attribute
+    question takes l*loss(a) + (1 - l)*loss(b), both only where the target is observed
+    in both studies.'
+  precedents:
+  - 'aligned-image-mixup (this campaign, experiment aligned-image-mixup-20260925T225700Z-2dc20772)
+    trained all ten epochs with the mechanism active (23-25% of studies mixed per
+    epoch) and a x1 in-training validation peak of 0.89622 against the control''s
+    0.89033, then crashed at checkpoint reload: KneeAbnormalityModel.__init__() missing
+    the required image_mixup argument (checkpoint.py:102). Rerun the same mechanism
+    and loss; the only change is the constructor fix already used by token-feature-mixup.'
+  - 'RSNA 2024 lumbar 2nd place (github.com/brendanartley/RSNA-2024-Competition, cfg_stage2_s2_sp1.py):
+    image MixUp p 0.3, alpha 1, with CutMix and manifold MixUp; 3rd and 6th place
+    also used MixUp. Not isolated.'
+  - 'Panfilov et al. (arXiv:1908.04126): MixUp improved cross-scanner knee cartilage
+    segmentation (femoral 0.791 -> 0.819, tibial 0.746 -> 0.802).'
+  - 'Public EfficientNet-B0 in this competition: MixUp 0.7914 -> 0.7937, judged noise
+    (docs/research/public-research.md).'
+  novelty: First MixUp here; alignment by knee side, slot and depth replaces the naive
+    mixing that the anatomical geometry forbids.
+  coverage: 30% of training studies per batch; all labels.
+  exploitation: Variants B and A share its pairing and loss and move only the mixing
+    point, so the three results rank where mixing helps.
+  budget: No extra forward pass; triplet matching and a two-target BCE.
+  implementation: Adds trainer.image_mixup (fraction 0.3, beta_alpha 1.0) in config.py,
+    pairing and image mixing in modeling/model.py after augmentation, and the mixed
+    main, half-knee and report-attribute losses in training/lightning.py; logs mixed-study
+    count, mean lambda and each mixed-loss component.
+  open_choices: None; fraction and alpha are the lumbar 2nd-place setting, shared
+    by all three variants.
+  dependencies: []
+  priority_rationale: The most common and strongest MixUp form; first of the three
+    variants.
+  status: completed
+  created_revision: 119
+  ranking_rationale: "I admitted all three proposals. `proposal_admission` shows each\
+    \ dependency is satisfied: both dependencies are provisional_accept and both are\
+    \ in `active_incumbent_ideas`.\n\n**Precedent check:** I found no repeat of a\
+    \ measured run. A grep of `docs/validation/results`, `docs/history` and the campaign\
+    \ folder found no CSU, correlated-style, study-coherent, Immerk\xE6r or noise-referenced\
+    \ run. In `family_ledger`, feature-statistics-uncertainty has only the DSU run,\
+    \ and edge-preserving-smoothing has only the adopted bilateral run. Both families\
+    \ carry `extend` verdicts that name these proposals as their next steps.\n\n**Ranking:**\
+    \ the reserved head, aligned-image-mixup-rerun, stays first.\n1. **correlated-style-uncertainty.**\
+    \ It follows up the only mechanism that gained at two seeds (+0.0022 and +0.0012).\
+    \ It keeps the incumbent's \u03B5 draws, selection and eligibility, and changes\
+    \ only the sampler's cross-channel structure. The \u03B5 draws, shape (group_count,\
+    \ channel_count), come after the per-type spread computation in `apply_feature_statistics_augmentation`\
+    \ (dsu source `modeling/augmentation.py:451-511`), so \u03B5\xB7P can replace\
+    \ \u03B5\u2299spread without changing the random stream.\n2. **study-coherent-feature-statistics.**\
+    \ It adds no cost; `token_study` already exists in `encode_batch` (`model.py:340`).\
+    \ It ranks after CSU because its premise has no published precedent, and both\
+    \ would be rebuilt on whichever of the two is adopted first.\n3. **noise-referenced-bilateral-smoothing.**\
+    \ Last, because its parent's win is the narrowest in the campaign: the retrain\
+    \ of the same source at a fresh seed scored 0.0049 lower. It also needs a label-free\
+    \ reference measurement before launch.\n\nBoth extend lines open on wins that\
+    \ are weak against seed noise. They still rank ahead because no competing new\
+    \ direction is proposed; the researcher closed every other family."
+  experiments:
+  - aligned-image-mixup-rerun-20260926T061601Z-89ebd313
+  decision: reject
+- id: correlated-style-uncertainty
+  mechanism_id: feature-statistics-uncertainty
+  parent_idea_id: dsu-feature-statistics
+  title: 'Correlated DSU: draw each acquisition''s stride-8 feature-statistic perturbation
+    from a running per-type channel covariance (CSU) instead of independent channels'
+  opportunity: "DSU is the only mechanism in this campaign that gained at two seeds:\
+    \ +0.0022 on top of smoothing (seed 1704794368, soft AUC +0.0043) and +0.0012\
+    \ without smoothing (seed 2464012069). Its sampler perturbs each of the 122 stride-8\
+    \ channels independently. The spread comes from about six same-type acquisitions\
+    \ per batch (34.5 acquisitions per step across six types).\n\nThis has two weaknesses:\n\
+    - Real scanner and protocol shifts move many channels together, so independent\
+    \ draws create combinations of statistics that no acquisition has.\n- A spread\
+    \ estimated from six samples makes the per-step strength itself noisy.\n\nThe\
+    \ per-label and vendor patterns of the two DSU runs disagree (PF OA +0.022 vs\
+    \ \u22120.003; GE \u22120.009 vs +0.002), so the gain looks like diffuse regularization.\
+    \ Making the perturbation realistic at unchanged strength is the lever left that\
+    \ is not a sweep."
+  mechanism: "Everything except the sampler stays as in the incumbent:\n- the site\
+    \ (after rexnet_200 features[:5]: 122 channels at 28\xD728);\n- each acquisition's\
+    \ channel mean \u03BC and std \u03C3 over its triplets and positions;\n- the plane/contrast\
+    \ grouping;\n- probability 0.5;\n- the eligibility rule (the type has at least\
+    \ two acquisitions in the batch).\n\nFor each type, keep running covariances \u03A3\
+    _\u03BC and \u03A3_\u03C3 (122\xD7122) of the acquisition statistics around the\
+    \ type mean. Each step, compute the batch's divide-by-n covariance S from detached\
+    \ statistics; its diagonal is what DSU uses. Update \u03A3 \u2190 0.99\xB7\u03A3\
+    \ + 0.01\xB7S; the first batch initializes \u03A3.\n\nPerturb with CSU's symmetric\
+    \ square root. Take the eigendecomposition of the running \u03A3, clamp eigenvalues\
+    \ at 0 and form P = Q\u039B^\xBDQ\u1D40. Then \u03B4_\u03BC = \u03B5_\u03BC\xB7\
+    P_\u03BC, \u03B4_\u03C3 = \u03B5_\u03C3\xB7P_\u03C3, \u03BC' = \u03BC + \u03B4\
+    _\u03BC and \u03C3' = \u03C3 + \u03B4_\u03C3, and the acquisition's features are\
+    \ re-normalized to (\u03BC', \u03C3') as now.\n\nThe \u03B5 values are the incumbent's\
+    \ own draws, with the same shapes and order. So the random stream, the selected\
+    \ acquisitions and the expected per-channel variance all match DSU; only the cross-channel\
+    \ correlation and the stability of the estimate change.\n\nMomentum 0.99 averages\
+    \ about 100 steps, roughly 580 acquisitions per type. It is the smallest round\
+    \ value whose effective sample exceeds the 122 channels, so \u03A3 is full rank\
+    \ after warm-up."
+  precedents:
+  - "This campaign: dsu-feature-statistics-20260926T034836Z-6298ea10 gained +0.002155\
+    \ (80% [\u22120.00048, +0.00462], soft AUC +0.0043) on top of smoothing at seed\
+    \ 1704794368. The user's rerun without smoothing at seed 2464012069 gained +0.00124\
+    \ (95% [\u22120.0016, +0.0042]); see outputs/analysis/dsu-without-smoothing-vs-report-attributes-control/comparison.json.\
+    \ The per-label and vendor deltas of the two runs disagree."
+  - "Zhang et al., Domain Generalization with Correlated Style Uncertainty (WACV 2024,\
+    \ arXiv:2212.09950) perturbs by \u03B5\xB7\u03A3^\xBD from the batch covariance\
+    \ of style statistics, using the eigendecomposition square root. Average accuracy\
+    \ for CSU/DSU/MixStyle: PACS 85.2/84.1/82.8, Office-Home 66.8/66.1/65.5, Camelyon17\
+    \ (histopathology) 95.1/94.5/93.6. They used batch 64, and their batch-size ablation\
+    \ (16\u2013512) notes that the covariance is hard to estimate in small batches.\
+    \ That is why this idea uses a running estimate."
+  - Li et al., DSU (ICLR 2022, arXiv:2202.03958) draws an independent Gaussian per
+    channel; it is the incumbent's sampler.
+  - "The incumbent's DSU logs show effective probability 0.49\u20130.50, about 7,500\
+    \ of about 15,200 acquisitions perturbed per epoch, and mean |\u0394feature| 0.37\u2013\
+    0.41. The site has 122 channels at 28\xD728, measured with timm rexnet_200."
+  - "prior-work.md closed MixStyle (medical evidence \u22120.8 to +0.5 Dice). CSU\
+    \ does not interpolate toward a partner."
+  novelty: This is the first perturbation here that preserves the channel correlation
+    of acquisition style. Unlike MixStyle (closed), it does not interpolate toward
+    one partner. It samples from the covariance of the whole type population and extrapolates,
+    as DSU does.
+  coverage: "About half of all acquisitions every step (effective probability 0.49\u2013\
+    0.50 in the incumbent), in every plane and contrast, affecting all twelve labels.\
+    \ All backbone layers after stride 8, and everything downstream, see the perturbed\
+    \ features."
+  exploitation: "If it helps, the next DSU step is study-coherent sharing of the same\
+    \ \u03B5 (proposed separately). The two compose by mapping each study's \u03B5\
+    \ through each type's P. A second step is to log which eigen-directions dominate\
+    \ each type's \u03A3, to check that they are scanner axes rather than pathology\
+    \ axes. Multi-site insertion stays out because it would be a dose increase."
+  budget: "Twelve 122\xD7122 eigendecompositions and a few small matrix products per\
+    \ step: a few milliseconds on the GPU. No extra forward pass and no trained parameters.\
+    \ The incumbent uses 1,848 s of the 2,027 s limit (1,799 s training plus 49 s\
+    \ of \xD74 prediction)."
+  implementation: "Modifies the incumbent's apply_feature_statistics_augmentation\
+    \ in modeling/augmentation.py and its caller in model.py.\n\n**Replaces:** the\
+    \ independent diagonal sampler.\n\n**Retains:**\n- the stride-8 hook, probability\
+    \ 0.5, per-acquisition statistics, type grouping, the two-per-type eligibility\
+    \ rule, re-normalization and activity logging;\n- bilateral smoothing and every\
+    \ image family.\n\n**Buffers:** register running covariance buffers of shape (types,\
+    \ channels, channels) for \u03BC and \u03C3, plus an initialized flag per type.\
+    \ Read the channel count from the stride-8 block. Make them persistent=False and\
+    \ create them in __init__ from the existing settings. This leaves the constructor\
+    \ signature and inference/checkpoint.py untouched, which is the lesson of the\
+    \ MixUp reload crash.\n\n**Each training step,** inside the existing float32 block:\n\
+    1. Compute each present type's divide-by-n covariance of the detached \u03BC and\
+    \ \u03C3 around the type mean.\n2. Update the buffers with momentum 0.99; the\
+    \ first batch copies.\n3. Take eigh of each type's running \u03A3, clamp eigenvalues\
+    \ at 0 and form P = Q\u039B^\xBDQ\u1D40.\n4. Replace \u03B5\u2299spread with \u03B5\
+    \xB7P, keeping the incumbent's rand and randn draws in the same order and shapes.\n\
+    \n**Config:** add model.feature_statistics_augmentation.covariance_momentum: 0.99\
+    \ to config.py and configs/training.yaml.\n\n**Logging:** each epoch, log the\
+    \ ratio of realized per-channel perturbation variance to the batch-diagonal DSU\
+    \ variance (expected about 1) and each type's top-10 eigenvalue share of \u03A3\
+    _\u03BC.\n\nKeep any newly adopted incumbent (GIN, aligned MixUp) unchanged."
+  open_choices: None. The site, probability and eligibility are the incumbent's, the
+    momentum follows from the channel count, and the eigenvalue clamp is numerical.
+  dependencies:
+  - dsu-feature-statistics
+  priority_rationale: 'First. It extends the only replicated gain with a published
+    successor that beat DSU on PACS, Office-Home and Camelyon17. Matched strength
+    and an identical random stream make the comparison as clean as one seed allows.
+    Risks: correlated shifts can follow label-bearing directions, such as overall
+    fluid brightness, and a scanner-stratified in-distribution split may not reward
+    realism.'
+  status: completed
+  created_revision: 292
+  ranking_rationale: 'I admitted gin-intensity-augmentation-v3. proposal_admission
+    lists no dependencies and marks it satisfied. It does not repeat a measured run.
+    In the family_ledger, both earlier GIN attempts (gin-intensity-augmentation, gin-intensity-augmentation-rerun)
+    are blocked and never trained. The first was parked by a runner defect (overrides
+    key). The rerun stopped on the per-slice valid_rects broadcast bug. A search of
+    docs/ for GIN or random-convolution runs finds nothing. The earlier rejections
+    close a different lever: the broader gamma and contrast runs are global strength
+    sweeps (2026-09-20 overnight results), while GIN is a non-monotonic local remap.
+    Its settings (4 layers, 2 hidden channels, blend U(0,0.5), p 0.3) come from the
+    paper and are fixed, so this is not a strength sweep.
+
+
+    Ranking: the reserved head, correlated-style-uncertainty, stays first. study-coherent-feature-statistics
+    stays second because the DSU extend line opened on the only mechanism that gained
+    at two seeds. GIN goes ahead of noise-referenced-bilateral-smoothing. The smoothing
+    win behind that extend line is weak against seed noise: the same source retrained
+    at a fresh seed scored 0.0049 below it. That lets the new direction compete on
+    potential, and GIN has the strongest external precedent of the open ideas and
+    targets measured within-slot contrast heterogeneity.'
+  experiments:
+  - correlated-style-uncertainty-20260926T062318Z-d2e0be86
+  decision: reject
+- id: study-coherent-feature-statistics
+  mechanism_id: feature-statistics-uncertainty
+  parent_idea_id: dsu-feature-statistics
+  title: 'Study-coherent DSU: all perturbed acquisitions of a study share one standard-normal
+    direction, scaled by each type''s own spread'
+  opportunity: 'In this data, style is set per study: one scanner, coil and reconstruction
+    chain acquires every series of an exam, across 7 vendors and 46 machine models
+    in training.
+
+
+    DSU draws an independent direction per acquisition, so a study''s perturbed acquisitions
+    disagree in style. Attention pooling over the study''s ~4.3 acquisitions and 26
+    triplets can then down-weight or average out the odd acquisition. It never has
+    to become invariant to a study-wide style change, which is what a new scanner
+    produces at test time.
+
+
+    DSU''s gain is replicated but diffuse. The vendor strata of its two runs disagree,
+    so study-level style invariance has not been shown yet.'
+  mechanism: "Keep the incumbent DSU exactly as it is:\n- the site after features[:5];\n\
+    - per-acquisition statistics;\n- per-type batch-diagonal spreads;\n- per-acquisition\
+    \ selection at 0.5;\n- the two-per-type eligibility rule.\n\nDraw the selection\
+    \ and \u03B5_\u03BC, \u03B5_\u03C3 with the incumbent's shapes and order. Then\
+    \ give every acquisition the \u03B5 of its study's first acquisition in batch\
+    \ order: \u03BC'_a = \u03BC_a + \u03B5_\u03BC,s \u2299 spread_\u03BC(type_a) and\
+    \ \u03C3'_a = \u03C3_a + \u03B5_\u03C3,s \u2299 spread_\u03C3(type_a).\n\nThe\
+    \ per-acquisition marginal, the selected set and the random stream are unchanged.\
+    \ Only the correlation of directions between a study's perturbed acquisitions\
+    \ changes, from 0 to 1. At 4.3 acquisitions per study and p 0.5, about 70% of\
+    \ studies have two or more perturbed acquisitions, so the change reaches most\
+    \ studies."
+  precedents:
+  - "dsu-feature-statistics runs (details under correlated-style-uncertainty): the\
+    \ macro gain replicated, but the vendor strata disagree between runs. GE \u2212\
+    0.0087 vs +0.0018, Siemens +0.0069 vs +0.0010, Toshiba (33 studies) \u22120.0106\
+    \ vs +0.0039 (comparison.json strata)."
+  - 'Data facts in augmentation-campaign.md: 4,407 training studies from 7 vendors
+    and 46 machine models. A study is one exam on one scanner, so real style shifts
+    are study-wide.'
+  - 'Every existing family draws per acquisition independently: sample_augmentation_parameters,
+    sample_smoothing_parameters and apply_feature_statistics_augmentation in modeling/augmentation.py.'
+  - Incumbent logs show about 15,200 acquisitions for 3,520 studies per epoch after
+    series dropout 0.2, i.e. about 4.3 acquisitions per study.
+  novelty: This is the first study-coherent draw of any augmentation here. Every existing
+    family (affine, intensity, noise, smoothing, DSU) samples each acquisition independently.
+  coverage: About 50% of acquisitions per step, in all planes and contrasts, affecting
+    all labels. The coherence acts in about 70% of studies.
+  exploitation: "If it helps, compose it with correlated-style-uncertainty by sharing\
+    \ the standard-normal \u03B5 per study and mapping it through each type's covariance\
+    \ root. A vendor-stratum comparison of the result then tests the scanner-invariance\
+    \ premise."
+  budget: One index_select per step. No extra draws, forward passes or parameters,
+    so runtime matches the incumbent's 1,848 s.
+  implementation: "Changes only how the noise is shared inside the incumbent's apply_feature_statistics_augmentation.\n\
+    \n**Retains:**\n- the site, probability, selection, eligibility, per-type batch-diagonal\
+    \ spreads, re-normalization and activity logging;\n- bilateral smoothing and every\
+    \ image family.\n\n**Changes:**\n1. Pass the study index of each triplet (token_study,\
+    \ already computed in encode_batch) into the function, alongside acquisition_index\
+    \ and token_type.\n2. Draw rand(group_count) and the two randn(group_count, 122)\
+    \ exactly as now.\n3. Build a per-acquisition map to the first acquisition of\
+    \ the same study in batch order, and index both \u03B5 tensors through it before\
+    \ scaling by the spreads.\n\n**Config:** no change. The existing model.feature_statistics_augmentation.probability\
+    \ of 0.5 applies. The independent-direction behavior is replaced, not kept as\
+    \ an option.\n\n**Logging:** each epoch, add the number of studies with two or\
+    \ more perturbed acquisitions and their share of the perturbed acquisitions.\n\
+    \nIf correlated-style-uncertainty is adopted first, share its standard-normal\
+    \ \u03B5 per study the same way and map it through each type's covariance root.\
+    \ Keep any newly adopted incumbent unchanged."
+  open_choices: "None. The study's first acquisition supplies the representative \u03B5\
+    \ only so that the random stream stays identical."
+  dependencies:
+  - dsu-feature-statistics
+  priority_rationale: Second. It costs nothing and makes one clean change to the replicated
+    mechanism. However, the premise is a hypothesis without published precedent. Coherent
+    directions also add up in the pooled study features, so a perturbed study shifts
+    more as a whole, which could cost detail labels.
+  status: completed
+  created_revision: 292
+  ranking_rationale: 'I admitted gin-intensity-augmentation-v3. proposal_admission
+    lists no dependencies and marks it satisfied. It does not repeat a measured run.
+    In the family_ledger, both earlier GIN attempts (gin-intensity-augmentation, gin-intensity-augmentation-rerun)
+    are blocked and never trained. The first was parked by a runner defect (overrides
+    key). The rerun stopped on the per-slice valid_rects broadcast bug. A search of
+    docs/ for GIN or random-convolution runs finds nothing. The earlier rejections
+    close a different lever: the broader gamma and contrast runs are global strength
+    sweeps (2026-09-20 overnight results), while GIN is a non-monotonic local remap.
+    Its settings (4 layers, 2 hidden channels, blend U(0,0.5), p 0.3) come from the
+    paper and are fixed, so this is not a strength sweep.
+
+
+    Ranking: the reserved head, correlated-style-uncertainty, stays first. study-coherent-feature-statistics
+    stays second because the DSU extend line opened on the only mechanism that gained
+    at two seeds. GIN goes ahead of noise-referenced-bilateral-smoothing. The smoothing
+    win behind that extend line is weak against seed noise: the same source retrained
+    at a fresh seed scored 0.0049 below it. That lets the new direction compete on
+    potential, and GIN has the strongest external precedent of the open ideas and
+    targets measured within-slot contrast heterogeneity.'
+  experiments:
+  - study-coherent-feature-statistics-20260926T071110Z-09b346a2
+  decision: reject
+- id: noise-referenced-bilateral-smoothing
+  mechanism_id: edge-preserving-smoothing
+  parent_idea_id: bilateral-smoothing-augmentation
+  title: 'Noise-referenced bilateral smoothing: scale each acquisition''s drawn range
+    sigma by its measured noise relative to the training median'
+  opportunity: "Smoothing was adopted at +0.0020 (80% [+0.0002, +0.0039]), but narrowly:\
+    \ the same source retrained at seed 1704794368 scored 0.8958, 0.0049 below the\
+    \ adopted run.\n\nIts premise is imitating denoising (deep-learning) reconstructions,\
+    \ which remove noise in proportion to the input noise. The adopted filter instead\
+    \ draws range \u03C3 ~ U(0.05, 0.1) regardless of the acquisition:\n- on already\
+    \ clean acquisitions, it can flatten low-contrast texture that is signal, such\
+    \ as meniscal intrasubstance signal or faint edema;\n- on noisy acquisitions,\
+    \ it denoises only partly.\n\nTying the range to each acquisition's measured noise\
+    \ brings the transform closer to what a reconstruction does, without changing\
+    \ its median strength."
+  mechanism: "Keep the adopted smoothing: probability 0.2 per acquisition, its range\
+    \ draw r ~ U(0.05, 0.1), spatial \u03C3 1 px, the 5\xD75 kernel, the geometric\
+    \ valid mask, and its placement after affine and before intensity.\n\nFor each\
+    \ selected acquisition, estimate \u03C3\u0302 with Immerk\xE6r's operator: the\
+    \ 3\xD73 kernel [1,\u22122,1; \u22122,4,\u22122; 1,\u22122,1], with \u03C3\u0302\
+    \ = \u221A(\u03C0/2)\xB7mean|I\u2217N|/6. Compute it on the prepared, pre-affine\
+    \ image, over valid-rectangle pixels eroded by one pixel, and average it over\
+    \ the acquisition's triplets and slice channels.\n\nUse range \u03C3 = r \xB7\
+    \ clamp(\u03C3\u0302/\u03C3\u0302_ref, q05, q95). Here \u03C3\u0302_ref is the\
+    \ median of the same estimator over at least 2,000 training acquisitions, and\
+    \ q05 and q95 are its 5th and 95th percentile ratios; both are measured label-free\
+    \ before launch.\n\nThe median range stays 0.075. Noisy acquisitions get stronger\
+    \ denoising and clean ones weaker, and no new random numbers are drawn. \u03C3\
+    \u0302 measures the high-frequency residual on the 0.625 mm grid, which is what\
+    \ the 5\xD75 filter acts on, not the physical coil noise."
+  precedents:
+  - "bilateral-smoothing-augmentation-20260926T021107Z-ea5abbac: +0.0020, 80% [+0.00018,\
+    \ +0.0039], soft AUC +0.0006. It is active in the DSU incumbent, with effective\
+    \ probability 0.19\u20130.21 and mean |\u0394pixel| 0.0074. Its fresh-seed retrain\
+    \ (control-20260926T031233Z-662c7c0c-1) scored 0.8958 vs 0.9007. The user restored\
+    \ the adoption on 2026-09-26."
+  - "Immerk\xE6r, Fast noise variance estimation, CVIU 64(2):300\u2013302, 1996: the\
+    \ 3\xD73 Laplacian-difference noise estimator."
+  - "Zhang & Gunturk, Multiresolution bilateral filtering for image denoising, IEEE\
+    \ TIP 17(12), 2008: the best bilateral range parameter grows roughly linearly\
+    \ with the noise \u03C3, at about 2\u03C3_n."
+  - 'augmentation-campaign.md candidate 7 and its data facts: GE deep-learning reconstructions
+    and vendor denoising and sharpening filters vary across the training data.'
+  - 'In this campaign, the other reconstruction-appearance families did not clear
+    the rule: sharpening +0.0004 and one-axis k-space degradation +0.0012.'
+  novelty: This is the first augmentation here whose strength follows a label-free
+    property of the acquisition itself.
+  coverage: 20% of acquisitions, in all planes and contrasts, affecting all labels.
+  exploitation: If it helps, the same noise reference would let a later one-of reconstruction-appearance
+    composition choose smoothing for noisy acquisitions. That composition waits for
+    a second adopted image family.
+  budget: "One 3\xD73 convolution and a masked mean per selected acquisition: milliseconds\
+    \ per step, with no new random draws and no extra forward pass. The label-free\
+    \ reference measurement runs once before launch, off the training path."
+  implementation: "Modifies the adopted smoothing in modeling/augmentation.py and\
+    \ config.py.\n\n**Retains:**\n- the smoothing's probability, range draw, spatial\
+    \ \u03C3, kernel, geometric mask, activity logging, and the noise/intensity order;\n\
+    - DSU and every other family, unchanged.\n\n**Changes,** in ImageAugmentation.forward\
+    \ before the affine warp:\n1. For the acquisitions the smoothing draw selects,\
+    \ compute \u03C3\u0302: the Immerk\xE6r 3\xD73 convolution per slice channel on\
+    \ the prepared image, its absolute value, and the mean over pixels whose 3\xD7\
+    3 neighbourhood lies inside the reflection-adjusted valid rectangle.\n2. index_add\
+    \ those means over the acquisition's triplets and channels.\n3. Multiply those\
+    \ acquisitions' drawn range_sigma by clamp(\u03C3\u0302/noise_reference, *noise_ratio_range)\
+    \ before apply_bilateral_smoothing.\n\n**Config:** add data.smoothing_augmentation.noise_reference\
+    \ and noise_ratio_range to config.py and configs/training.yaml. Set them from\
+    \ a label-free measurement of the same estimator over at least 2,000 training\
+    \ acquisitions (the median, and the 5th/95th percentile ratios), and record the\
+    \ measurement with the prepare report. The fixed-range behavior is replaced, not\
+    \ kept as an option.\n\n**Logging:** each epoch, log the mean, p10 and p90 of\
+    \ the ratio and of the applied range \u03C3 next to the existing smoothing activity.\n\
+    \nKeep any newly adopted incumbent (GIN, aligned MixUp) unchanged."
+  open_choices: "None, once the label-free measurement fixes \u03C3\u0302_ref and\
+    \ the clamp bounds."
+  dependencies:
+  - bilateral-smoothing-augmentation
+  priority_rationale: Third. It is the adopted family's one required follow-up; it
+    is cheap and leaves the random stream unchanged. However, the parent win is the
+    narrowest adoption in the campaign, and the premise that a fixed range harms clean
+    acquisitions is untested. The smoothing run showed no losses on low-contrast labels
+    (Contusion +0.0079, medial meniscus +0.0008).
+  status: completed
+  created_revision: 292
+  ranking_rationale: 'I admitted gin-intensity-augmentation-v3. proposal_admission
+    lists no dependencies and marks it satisfied. It does not repeat a measured run.
+    In the family_ledger, both earlier GIN attempts (gin-intensity-augmentation, gin-intensity-augmentation-rerun)
+    are blocked and never trained. The first was parked by a runner defect (overrides
+    key). The rerun stopped on the per-slice valid_rects broadcast bug. A search of
+    docs/ for GIN or random-convolution runs finds nothing. The earlier rejections
+    close a different lever: the broader gamma and contrast runs are global strength
+    sweeps (2026-09-20 overnight results), while GIN is a non-monotonic local remap.
+    Its settings (4 layers, 2 hidden channels, blend U(0,0.5), p 0.3) come from the
+    paper and are fixed, so this is not a strength sweep.
+
+
+    Ranking: the reserved head, correlated-style-uncertainty, stays first. study-coherent-feature-statistics
+    stays second because the DSU extend line opened on the only mechanism that gained
+    at two seeds. GIN goes ahead of noise-referenced-bilateral-smoothing. The smoothing
+    win behind that extend line is weak against seed noise: the same source retrained
+    at a fresh seed scored 0.0049 below it. That lets the new direction compete on
+    potential, and GIN has the strongest external precedent of the open ideas and
+    targets measured within-slot contrast heterogeneity.'
+  experiments:
+  - noise-referenced-bilateral-smoothing-20260926T081854Z-5c6c595c
+  decision: reject
+- id: gin-intensity-augmentation-v3
+  mechanism_id: global-intensity-nonlinear-augmentation
+  parent_idea_id: gin-intensity-augmentation-rerun
+  title: Remap each acquisition's intensities through a freshly sampled random shallow
+    conv net (GIN), blended with the original
+  opportunity: 'Seven vendors and 46 machine models, 19% of T1/PD-slot series that
+    are T2 without fat suppression, 129 T1-FS series with non-FS flags and 130 flat
+    near-PD GE zero-TE sagittals: the contrast varies inside a slot far beyond what
+    global gamma/contrast jitter models. Broader gamma/contrast lost (contrast 0.8-1.2
+    -0.0033 and -0.0067), so the lever is a different shape of variation, not more
+    of the same.'
+  mechanism: 'For each augmented acquisition sample one network g: 4 conv layers,
+    2 hidden channels, one input and one output channel, kernel size 1 or 3 drawn
+    per network, weights N(0, 1), LeakyReLU between layers. Apply g with shared weights
+    to each of the three slice channels separately (in_channels = 1), blend x'' =
+    a*g(x) + (1 - a)*x with a ~ U(0, 0.5), rescale x'' so its Frobenius norm over
+    the acquisition''s valid pixels equals the input''s, clamp to [0, 1] and restore
+    padding. Probability 0.3 per acquisition. Runs after gamma/contrast and before
+    noise.'
+  precedents:
+  - 'Two earlier GIN attempts in this campaign never trained. The first was parked
+    by a runner defect (overrides key), since fixed. The rerun gin-intensity-augmentation-rerun
+    was blocked after its repair: valid_rect_mask indexed valid_rects as one rectangle
+    per acquisition (top[:, None, None]), but valid_rects hold one rectangle per slice,
+    shape (N, 3, 4) per triplet, so the mask did not broadcast on the first GIN step.
+    Build the mask exactly as geometric_valid_mask does, per slice with shape (N,
+    3, H, W), or reuse geometric_valid_mask. The orchestrator judged the rest of that
+    attempt sound: one network and one Frobenius rescale per acquisition, input masked
+    before the convolution, no draws when disabled. Keep the adopted smoothing and
+    DSU.'
+  - 'Ouyang et al., Causality-inspired single-source domain generalization (arXiv:2111.12525):
+    GIN alone, on top of affine, elastic, brightness, contrast, gamma and noise, raised
+    cross-centre prostate MRI Dice 56.6 -> 65.1 and cardiac bSSFP -> LGE 76.0 -> 83.8;
+    2/4/8/16 layers gave 84.3/86.0/85.7/79.2. Segmentation, not classification.'
+  - Broader contrast 0.80-1.20 lost -0.0033/-0.0067 and gamma 0.70-1.30 -0.0007 (docs/validation/results/2026-09-20-overnight-hyperparameter-results.md).
+  novelty: First non-monotonic, spatially local intensity remapping in this project;
+    existing intensity augmentation is a global gamma and a global contrast.
+  coverage: Every plane and contrast; all labels.
+  exploitation: If it helps, a monotone Bezier variant tests whether contrast inversion
+    matters; if it hurts fluid-sensitive labels, that variant is the retry.
+  budget: Grouped 1x1/3x3 convolutions on augmented acquisitions; negligible GPU time,
+    no parameters trained.
+  implementation: Adds a family under data.gin_augmentation (probability 0.3, blend_max
+    0.5, layers 4, hidden_channels 2) in config.py and modeling/augmentation.py; retains
+    every existing family and draw.
+  open_choices: None; depth, width, blend range and probability are fixed from the
+    paper's best depth and a mild blend.
+  dependencies: []
+  priority_rationale: The best isolated evidence found for any new MRI augmentation,
+    and it targets the contrast heterogeneity measured in this data.
+  status: completed
+  created_revision: 312
+  ranking_rationale: 'I admitted gin-intensity-augmentation-v3. proposal_admission
+    lists no dependencies and marks it satisfied. It does not repeat a measured run.
+    In the family_ledger, both earlier GIN attempts (gin-intensity-augmentation, gin-intensity-augmentation-rerun)
+    are blocked and never trained. The first was parked by a runner defect (overrides
+    key). The rerun stopped on the per-slice valid_rects broadcast bug. A search of
+    docs/ for GIN or random-convolution runs finds nothing. The earlier rejections
+    close a different lever: the broader gamma and contrast runs are global strength
+    sweeps (2026-09-20 overnight results), while GIN is a non-monotonic local remap.
+    Its settings (4 layers, 2 hidden channels, blend U(0,0.5), p 0.3) come from the
+    paper and are fixed, so this is not a strength sweep.
+
+
+    Ranking: the reserved head, correlated-style-uncertainty, stays first. study-coherent-feature-statistics
+    stays second because the DSU extend line opened on the only mechanism that gained
+    at two seeds. GIN goes ahead of noise-referenced-bilateral-smoothing. The smoothing
+    win behind that extend line is weak against seed noise: the same source retrained
+    at a fresh seed scored 0.0049 below it. That lets the new direction compete on
+    potential, and GIN has the strongest external precedent of the open ideas and
+    targets measured within-slot contrast heterogeneity.'
+  experiments:
+  - gin-intensity-augmentation-v3-20260926T074639Z-0d98d2fa
+  decision: reject
+- id: gin-reference-faithful-networks
+  mechanism_id: global-intensity-nonlinear-augmentation
+  parent_idea_id: gin-intensity-augmentation-v3
+  title: 'GIN as in the reference code: per-layer random shifts and kernel sizes applied
+    to each acquisition''s standardized intensities, de-standardized before clamping'
+  opportunity: "GIN v3 scored +0.0013 (80% [\u22120.0012, +0.0038]), but a label-free\
+    \ audit shows it did not run GIN. Audit: scratch/gin/README.md in this job. The\
+    \ cause: v3 dropped the reference code's random shifts and fed nonnegative [0,\
+    \ 1] inputs to the network, which makes it positively homogeneous.\n\nOn 1,424\
+    \ draws over real fold-2 acquisitions, using v3's own code:\n- 49\u201351% of\
+    \ selected acquisitions were unchanged; every 1\xD71 draw is g(x) = k\xB7x, which\
+    \ the norm rescale undoes.\n- 3.3\u20135.2% were fully blacked out, from \u2212\
+    x clamped to 0.\n- The 3\xD73 draws clipped 22\u201324% of pixels at 0 and acted\
+    \ as edge filters, not intensity remaps.\n\nThe logged effective p of 0.30 therefore\
+    \ overstated activity: only about 0.15 of acquisitions changed. The seed's mechanism\
+    \ is untested."
+  mechanism: "Each acquisition is selected with p 0.3, drawn per acquisition after\
+    \ the existing families' draws, as in v3.\n\nFor a selected acquisition:\n1. Compute\
+    \ \u03BC and s over its geometric valid region, pooled across all its triplets\
+    \ and slice channels. Set z = (x \u2212 \u03BC)/s inside the region and 0 outside.\n\
+    2. Sample a 4-layer network (1\u21922\u21922\u21922\u21921 channels). Draw each\
+    \ layer's kernel size independently from {1, 3}. Use N(0, 1) weights plus an N(0,\
+    \ 1) shift per output channel, with LeakyReLU after layers 1\u20133.\n3. Share\
+    \ the network across the acquisition's triplets. Filter each slice channel separately\
+    \ (in_channels = 1).\n4. Blend m = \u03B1\xB7g(z) + (1 \u2212 \u03B1)\xB7z, with\
+    \ \u03B1 ~ U(0, 0.5).\n5. Rescale m so its Frobenius norm over the region equals\
+    \ that of z.\n6. Map back with x' = m\xB7s + \u03BC, clamp to [0, 1], zero outside\
+    \ the region, and fold that region into the background mask.\n\nPlacement is unchanged:\
+    \ after intensity, before noise.\n\nMeasured with these settings on CPU:\n- 0%\
+    \ blackouts and \u22640.7% unchanged.\n- 8.7% of pixels clipped.\n- 10% of acquisitions\
+    \ inverted (Spearman < 0).\n- Median Spearman 0.97.\n- Mean |\u0394| 0.114."
+  precedents:
+  - "Ouyang et al., arXiv:2111.12525. The code (models/imagefilter.py) adds shift\
+    \ = randn(out_channel) after every conv, draws the kernel size per block from\
+    \ [1, 3], uses \u03B1 ~ U(0, 1) and a Frobenius rescale. Its MR inputs are z-scored\
+    \ per image ((x \u2212 mean)/std, dataloaders/abd_dataset_utils.py). GIN alone:\
+    \ prostate 56.6 \u2192 65.1, cardiac 76.0 \u2192 83.8; depth 4 was best."
+  - "GIN v3 (gin-intensity-augmentation-v3-20260926T074639Z-0d98d2fa): +0.0013, 80%\
+    \ [\u22120.0012, +0.0038], soft \u22120.0016. ACL \u22120.010, Medial OA +0.010,\
+    \ Baker's +0.010, fluid labels flat or slightly negative. Logged effective p 0.30\
+    \ and |\u0394| 0.060\u20130.066."
+  - "Audit (jobs/researcher-20260926T085330Z-107f085f/scratch/gin/README.md). v3:\
+    \ 49\u201351% of acquisitions unchanged, 3.3\u20135.2% blacked out, 22\u201324%\
+    \ of pixels clipped on 3\xD73 draws, median Spearman 0.83. The reference: no blackouts,\
+    \ 8.5\u20138.7% clipped, 10% inverted. v3's CPU |\u0394| of 0.065\u20130.068 matches\
+    \ its logs."
+  - "Precedent table: contrast 0.8\u20131.2 lost \u22120.0033/\u22120.0067 and gamma\
+    \ 0.7\u20131.3 lost \u22120.0007. A wider global monotone rescale is not the lever;\
+    \ a local non-linear remap is the untested shape."
+  - 'Adopted DSU (+0.0022) and closed intra-study contrast mixing (+0.0015): style
+    and contrast variation has been mildly positive in this campaign.'
+  novelty: 'The first faithful GIN in the project. v3 tested a different operator:
+    half no-op, and half clipped random edge filtering with occasional whole-acquisition
+    blackouts. The random shifts on zero-mean input produce the non-monotone, spatially
+    local intensity curves the seed described. Gamma and contrast jitter and the adopted
+    smoothing cannot produce these.'
+  coverage: "Every plane and contrast, about 30% of acquisitions per epoch, and all\
+    \ labels. The audit's inversion rate is 11% for non-fat-suppressed and 9\u2013\
+    10% for fat-suppressed types, so fluid-sensitive series are not singled out."
+  exploitation: If adopted, GIN becomes the second adopted image family, which enables
+    the campaign's one-of composition with bilateral smoothing. IPA, a spatially varying
+    blend of two GIN draws under a low-frequency random map, then becomes the family's
+    next step. If rejected, this is the family's second rejected follow-up and the
+    family closes.
+  budget: "The grouped convolutions are the same as in v3, plus per-acquisition index_add\
+    \ sums for \u03BC, s and the norms. v3 ran 1,826 s of training plus 49 s of prediction\
+    \ (the incumbent: 1,799 + 49) against the 2,027 s limit. Expect about 1,830 s.\
+    \ No extra forward pass and no trained parameters."
+  implementation: "Builds on the incumbent (DSU source). It reuses v3's plumbing:\
+    \ GinAugmentationConfig, the model.py enablement gate and filter_rects, the placement\
+    \ after intensity, the lightning.py logging and the valid-mask handling. It replaces\
+    \ v3's sample_gin_parameters and apply_gin_filter:\n- Add per-layer N(0, 1) shift\
+    \ tensors of shape (series, out_channels).\n- Draw the kernel size per layer,\
+    \ not per network (keep the ring-masked 3\xD73 implementation).\n- Standardize\
+    \ and de-standardize per acquisition over the geometric valid region, and do the\
+    \ Frobenius rescale on the standardized values.\n\nConfig: data.gin_augmentation.probability\
+    \ 0.3 and blend_max 0.5, unchanged, with no new fields. When p = 0, draw nothing.\n\
+    \nAdd three logs:\n- gin_unchanged_share: selected acquisitions with max |\u0394\
+    | < 1e-3.\n- gin_clipped_fraction.\n- gin_inverted_share: negative input/output\
+    \ Pearson correlation over the region.\n\nA run with gin_unchanged_share > 0.05\
+    \ or any blackout is invalid.\n\nRetain smoothing, DSU and all existing families\
+    \ unchanged. If noise-referenced smoothing is adopted first, implement on that\
+    \ incumbent; the two are independent."
+  open_choices: None. Depth, width, p and blend_max keep the seed's values. Shifts
+    and per-layer kernel draws follow the reference code. The statistics region is
+    the geometric valid region, the campaign's filtering rule and the analogue of
+    the reference's whole-image z-score. The ~8.7% of pixels clamped at 0 after de-standardization
+    is logged, not tuned.
+  dependencies:
+  - bilateral-smoothing-augmentation
+  - dsu-feature-statistics
+  priority_rationale: "This is the only open line. The defect is diagnosed and measured,\
+    \ and the fix is a correctness change, not a strength change. v3 came out positive\
+    \ (+0.0013) while about half idle. The seed's isolated evidence is the strongest\
+    \ of any MRI augmentation found. It is cheap and the family's last attempt.\n\n\
+    The risk is real: the fix doubles the changed-acquisition rate and raises |\u0394\
+    | to 0.114, and wider intensity jitter has lost before."
+  status: blocked
+  created_revision: 372
+  ranking_rationale: "I admitted gin-reference-faithful-networks. proposal_admission\
+    \ reports both of its dependencies satisfied: bilateral-smoothing-augmentation\
+    \ and dsu-feature-statistics are provisional_accept and active.\n\nIt is the family's\
+    \ recorded retry. The family_ledger verdict is retry, and its next_step names\
+    \ this idea. It is not a repeat of a measured run. v3 (gin-intensity-augmentation-v3-20260926T074639Z-0d98d2fa)\
+    \ ran a different operator. It had no bias terms and ran on nonnegative inputs,\
+    \ so every 1\xD71 draw was either a no-op or a blackout. The researcher's audit\
+    \ reproduces this with v3's own functions on real fold-2 acquisitions: 49\u2013\
+    51% of selected acquisitions were unchanged and 3.3\u20135.2% were blacked out.\
+    \ The audit's CPU mean |\u0394| of 0.065\u20130.068 matches v3's logged 0.060\u2013\
+    0.066, which validates it.\n\nThe fix adds per-layer shifts, per-layer kernel-size\
+    \ draws and per-acquisition standardization. These follow the reference code and\
+    \ are corrections to the seed's mechanism, not a new strength. p (0.3) and blend_max\
+    \ (0.5) keep the seed's values.\n\nA grep of docs/validation/results and docs/history\
+    \ for GIN found only incidental word matches, so there is no earlier project run\
+    \ of a faithful GIN.\n\nThe queue was empty, so this idea is now its only entry.\
+    \ The one other active line, noise-referenced-bilateral-smoothing, is already\
+    \ running."
+  experiments:
+  - gin-reference-faithful-networks-20260926T090646Z-aca7e8e1
+  blocked_reason: Parked by the user's decision to close the campaign after two stacking
+    runs.
+- id: augmentation-half-stack
+  mechanism_id: augmentation-stack
+  parent_idea_id: null
+  title: 'Stack the three strongest near-miss augmentations on the incumbent: intra-study
+    contrast mixing, GIN v3 and one-axis resolution degradation'
+  opportunity: 13 of 15 campaign results were positive (mean +0.0009) against three
+    different controls, but each single mechanism sat near the +0.001 threshold and
+    inside seed noise. The user ordered two stacking runs to test whether the small
+    gains add. This is the half dose; the full stack follows.
+  mechanism: 'On the current incumbent (bilateral smoothing + DSU, both kept), enable
+    three mechanisms together at exactly their measured settings: intra-study contrast
+    mixing (probability 0.3 per plane with both contrasts, target weight U(0.5, 1.0)),
+    GIN v3 (probability 0.3, blend up to 0.5, 4 layers, 2 hidden channels, kernel
+    1 or 3, one network per acquisition, mask built per slice as geometric_valid_mask
+    does), and one-axis k-space resolution degradation (probability 0.25, keep 70-100%
+    of frequencies along one random in-plane axis). No strength changes.'
+  precedents:
+  - 'intra-study-contrast-mixing: +0.0015 vs the smoothing retrain; code in outputs/autoresearch/augmentation/experiments/intra-study-contrast-mixing-20260926T034254Z-ac1de092/changes.diff'
+  - 'gin-intensity-augmentation-v3: +0.0013 vs smoothing + DSU; code in outputs/autoresearch/augmentation/experiments/gin-intensity-augmentation-v3-20260926T074639Z-0d98d2fa/changes.diff'
+  - 'phase-axis-resolution-degradation: +0.0012 vs the original control; code in outputs/autoresearch/augmentation/experiments/phase-axis-resolution-degradation-20260925T221420Z-c259dc97/changes.diff'
+  novelty: First combination of augmentation families in this campaign; tests whether
+    near-threshold gains stack.
+  coverage: Every study; all labels.
+  exploitation: The full stack adds channel reversal and stochastic depth; the pair
+    reads as a dose response.
+  budget: About +65 s of training over the incumbent (measured overheads 25, 27 and
+    13 s), about 1,930 s total against the 2,027 s ceiling.
+  implementation: Port each mechanism from its changes.diff onto the incumbent source,
+    adapted to it, and switch on data.contrast_mixing_augmentation, data.gin_augmentation
+    and data.resolution_augmentation in configs/training.yaml with the settings above.
+    Keep smoothing and DSU. Keep each mechanism's random draws after the existing
+    families' draws and its activity logging.
+  open_choices: None; settings are the measured ones.
+  dependencies: []
+  priority_rationale: User-ordered stacking test, first of two.
+  status: developing
+  created_revision: 381
+  seeded: /home/claudio/src/knee-abnormality/autoresearch/campaigns/augmentation/stack-ideas.yaml
+  experiments:
+  - augmentation-half-stack-20260926T092647Z-094783e4
+- id: augmentation-full-stack
+  mechanism_id: augmentation-stack
+  parent_idea_id: augmentation-half-stack
+  title: 'Stack all five positive near-miss augmentations: the half stack plus triplet
+    channel reversal and ReXNet stochastic depth'
+  opportunity: Second of the two user-ordered stacking runs. If the half stack is
+    adopted it is the incumbent and this run measures the two added mechanisms; otherwise
+    it measures all five on smoothing + DSU. Either way the candidate contains all
+    five.
+  mechanism: 'On the current incumbent, make sure all of these are enabled at their
+    measured settings: intra-study contrast mixing, GIN v3 and one-axis resolution
+    degradation as in augmentation-half-stack (port them if the incumbent lacks them),
+    plus triplet channel reversal (probability 0.5 per axial or coronal acquisition,
+    with the channel mapping passed to feature_geometry composed with reflection_channels)
+    and ReXNet stochastic depth (model.drop_path_rate 0.1). Keep smoothing and DSU.
+    No strength changes.'
+  precedents:
+  - augmentation-half-stack (this campaign) and its three sources.
+  - 'triplet-channel-reversal: +0.0012 vs the original control; code in outputs/autoresearch/augmentation/experiments/triplet-channel-reversal-20260926T014024Z-1123cd9d/changes.diff'
+  - 'rexnet-stochastic-depth: +0.0011 vs the original control; code in outputs/autoresearch/augmentation/experiments/rexnet-stochastic-depth-20260926T045526Z-1de7a03e/changes.diff'
+  novelty: The maximum dose of the campaign's positive mechanisms.
+  coverage: Every study; all labels.
+  exploitation: Read against the half stack; if it ties or loses, the regularization
+    ceiling is reached.
+  budget: Channel reversal and stochastic depth measured no overhead; about 1,930
+    s total against the 2,027 s ceiling.
+  implementation: Port the missing mechanisms from their changes.diff onto the incumbent
+    source and switch them on in configs/training.yaml (data.channel_reversal_augmentation,
+    model.drop_path_rate, and the half-stack prefixes if absent). Keep smoothing and
+    DSU and each mechanism's activity logging.
+  open_choices: None; settings are the measured ones.
+  dependencies: []
+  priority_rationale: User-ordered stacking test, second of two; the campaign closes
+    after it.
+  status: queued
+  created_revision: 381
+  seeded: /home/claudio/src/knee-abnormality/autoresearch/campaigns/augmentation/stack-ideas.yaml

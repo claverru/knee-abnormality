@@ -71,7 +71,7 @@ class JobMixin:
             "environment": extra_env or {},
             "gpu": gpu,
         }
-        if kind in {"training", "control"}:
+        if kind == "training":
             spec["gpu_lock"] = str(
                 self.root / "outputs/autoresearch/.gpu-locks" / f"{gpu}.lock"
             )
@@ -193,6 +193,9 @@ class JobMixin:
         if job["kind"] == "developer":
             target = self.state["experiments"][job["payload"]["experiment"]]
             target["stage"] = "needs_developer"
+        elif job["kind"] == "researcher":
+            target = self.state["research"]
+            self.state["last_refill_revision"] = -1
         else:
             target = next(
                 (
@@ -237,7 +240,7 @@ class JobMixin:
                     RuntimeError,
                     subprocess.SubprocessError,
                 ) as error:
-                    if job["kind"] in {"orchestrator", "developer"}:
+                    if job["kind"] in {"orchestrator", "developer", "researcher"}:
                         self.state = rollback
                         self.reject(self.state["jobs"][job["id"]], error)
                         self.save()
