@@ -68,7 +68,7 @@ permissions using the same runtime.
    ```
 
    Either configured subscription provider works. Every command, including status,
-   stop, resume, usage and import-ideas, takes the campaign ID; there is no default.
+   stop, resume, usage, import-ideas and adopt, takes the campaign ID; there is no default.
 
 ## Declarative policy
 

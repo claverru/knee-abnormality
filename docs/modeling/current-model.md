@@ -3,8 +3,8 @@
 The code carries one model: the full-slice spatial-token recipe with learned anatomical
 family strengths, defined by [`configs/training.yaml`](../../configs/training.yaml).
 The [adoption evidence](../validation/results/2026-09-21-anatomical-attention-result.md) records the closed
-position/knee-side experiments. The current control is `half-stack-control` (seed 2617320043,
-fold 3), ×4 0.905205.
+position/knee-side experiments. The current control is `scanner-confusion-control` (seed
+703791404, fold 4), ×4 0.909733.
 
 - **Inputs:** ReXNet-200 reads every sampled triplet at 224 px, 0.625 mm spacing and a 140 mm
   field.
@@ -19,9 +19,20 @@ fold 3), ×4 0.905205.
 - **Report-attribute heads (training only):** 35 auxiliary heads predict the JevK5 report
   attributes (grades, hedging, silence, tear and contusion location, extra findings) from the
   shared tokens, weighted 0.1 ([design](report-attribute-heads.md)).
+- **Scanner confusion head (training only):** a detached head learns the scanner group and a
+  bounded confusion loss, weighted 0.1, keeps the tokens from carrying more scanner information
+  than the group frequencies ([design](scanner-confusion-head.md)).
 - **Augmentation (training only):** reflection, contrast mixing, affine, bilateral smoothing,
   one-axis resolution degradation, gamma/contrast, GIN, noise and DSU feature statistics
   ([pipeline](schedule-and-augmentation.md#ten-epoch-schedule-and-augmentation)).
+
+Adopted 2026-09-27 by user decision: the scanner confusion head from the
+[auxiliary-signals campaign](../../autoresearch/campaigns/auxiliary-signals/INDEX.md). On fold 3 at
+seed 2617320043 it scored ×4 0.904442 (−0.00076, 80% [−0.0027, +0.0011]) against
+`half-stack-control` and 0.948 public (S67) against 0.947 (S68), one rounding step
+([evidence](scanner-confusion-head.md#evidence)). The new control, `scanner-confusion-control`
+(seed 703791404, fold 4), scored ×4 0.909733 (×1 0.902061, epoch 9; scanner head accuracy 0.311,
+loss 1.732); fold 4 scores are not comparable with earlier folds.
 
 Adopted 2026-09-26 by user decision: the half stack from the
 [augmentation campaign](../validation/results/2026-09-26-augmentation-campaign.md), bilateral
@@ -86,7 +97,8 @@ bands; the experimental ten-epoch schedule was reverted. Historical
 | Meniscus side mask | Medial/Lateral Meniscus attend only to own-side tokens plus the ±10 mm band (`COMPARTMENT_MIDLINE_BAND_MM`); unknown side, invalid geometry or no own-side token keep all tokens |
 | `trainer.half_knee_loss_weight` | 0.075 |
 | `trainer.report_attribute_loss_weight`, `paths.report_attribute_manifest` | 0.1, `labels/jevk5-report-attribute-targets-v3.1.json` |
-| Training seed, fold | 2617320043 on fold 3 (`configs/training.yaml`), inherited by new research candidates from the control |
+| `trainer.scanner_confusion_weight` | 0.1 |
+| Training seed, fold | 703791404 on fold 4 (`configs/training.yaml`), inherited by new research candidates from the control |
 | Precision | BF16 mixed on one automatically selected device (`PRECISION`, a constant) |
 
 The optimizer, schedule and trainer settings are described in
@@ -161,6 +173,10 @@ Tokens receive four additive embeddings:
   normalized tokens and a softmax over its options. The reliability-weighted soft cross-entropy
   against the JevK5 targets is added with weight 0.1. Prediction never uses the heads
   ([report-attribute heads](report-attribute-heads.md)).
+- **Scanner confusion head:** `ScannerConfusionHead` in the Lightning module learns the 8 scanner
+  groups from detached tokens; a second pass with detached head parameters adds
+  `0.1 × ramp × KL(frequencies ‖ prediction)` to the backbone's loss. Prediction never uses it
+  ([scanner confusion head](scanner-confusion-head.md)).
 
 The plane and contrast lookup buffers derive from the configured metadata, not from slot order.
 The ReXNet adapter derives stride 32 and origin 0 from its convolutions. The

@@ -14,6 +14,16 @@ pending experiments are classified in the [backlog](../backlog/INDEX.md).
   incumbent's lead over them sits mostly in Fracture, Baker's and Contusion, labels a re-seed also
   moves ([findings](../../autoresearch/campaigns/knee-geometry/findings.md)).
 
+- **Scanner confusion head adopted, 2026-09-27 (user decision):** the training-only scanner
+  confusion head from the [auxiliary-signals campaign](../../autoresearch/campaigns/auxiliary-signals/INDEX.md)
+  ([design](../modeling/scanner-confusion-head.md)) scored ×4 0.904442 against `half-stack-control`
+  (−0.00076, 80% [−0.0027, +0.0011]) and 0.948 public (S67) against 0.947 (S68) on fold 3, one
+  rounding step. Heavier site-debiasing variants lost publicly (S70 0.944, S71 0.943), the per-site
+  bias tied (S69 0.947) and the reliability filter lost (S72 0.943 against 0.947)
+  ([bias_free.md](../../bias_free.md), [gold versus silver labels](../public-labels/gold-versus-silver.md)). The new
+  control, `scanner-confusion-control` (seed 703791404, fold 4), scored ×4 0.909733 (epoch 9);
+  candidates pair with it. Fold 4 scores are not comparable with fold 3 scores.
+
 - **Half-stack augmentation adopted, 2026-09-26 (user decision):** the
   [augmentation campaign](../validation/results/2026-09-26-augmentation-campaign.md) adopted
   bilateral smoothing and DSU; on top of them the user adopted intra-study contrast mixing, GIN and

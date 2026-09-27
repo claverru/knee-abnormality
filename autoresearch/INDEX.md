@@ -9,7 +9,7 @@
 | Checking which seed a candidate trains with, what an adoption makes the incumbent, or where the campaign fold comes from | [Training seed policy](protocol.md#training-seed-policy) |
 | Checking which completions the cheap reporter handles and when it escalates | [Restricted completion reporting](protocol.md#restricted-completion-reporting) |
 | Following one idea from claim through development, gates, review, reconciliation, launch, comparison and completion | [Idea lifecycle](lifecycle.md) |
-| Starting, inspecting, stopping or resuming a campaign; reading results and usage; importing ideas | [Runtime operation](runtime.md) |
+| Starting, inspecting, stopping or resuming a campaign; reading results and usage; importing ideas, forced ideas or a manual adoption into a running campaign | [Runtime operation](runtime.md) |
 | Understanding which failures recover automatically and which pause | [Automatic recovery](runtime.md#running-pausing-and-resuming) |
 | Checking how the per-experiment triplet and time budgets are sealed | [Sealing and budget](runtime.md#initial-sealing-and-fixed-budget) |
 | Looking up idea, experiment, review, completion or usage record fields | [Records](records.md) |

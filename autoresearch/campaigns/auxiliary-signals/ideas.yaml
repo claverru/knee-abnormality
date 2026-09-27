@@ -1,0 +1,1638 @@
+revision: 394
+ideas:
+- id: attribute-loss-weight-0-2
+  mechanism_id: attribute-loss-coefficient
+  parent_idea_id: null
+  title: Double the report-attribute loss coefficient from 0.1 to 0.2
+  opportunity: The 0.1 coefficient was fixed before the first run from the loss scale,
+    never measured. On target set 3.1 the term trained every epoch (1.006 -> 0.806,
+    floor about 0.55) and gave +0.00105 macro, but its learnable part is only about
+    a fifth of the disease loss at the start and shrinks as the heads fit, so the
+    backbone may receive too little attribute pressure.
+  mechanism: Set trainer.report_attribute_loss_weight to 0.2 in configs/training.yaml.
+    Nothing else changes.
+  precedents:
+  - 'Target set 3.1 heads at 0.1: +0.00105 [95% -0.0012, +0.0035], public 0.940 vs
+    0.938 (docs/validation/results/2026-09-25-report-attribute-heads.md).'
+  - 'Coefficient reasoning and failure signs: docs/modeling/report-attribute-heads.md#coefficient.'
+  novelty: First measurement of the attribute coefficient.
+  coverage: All studies with attribute targets; all labels.
+  exploitation: If it helps, later structural ideas inherit 0.2; if disease validation
+    trails the control from the first epochs, the term is too strong and 0.1 stays.
+  budget: None beyond the incumbent.
+  implementation: Config only; trainer.report_attribute_loss_weight 0.2.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The cheapest test of whether the adopted signal is under-used.
+  status: completed
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality/autoresearch/campaigns/auxiliary-signals/seed-ideas.yaml
+  experiments:
+  - attribute-loss-weight-0-2-20260926T115621Z-85ecb058
+  decision: reject
+- id: area-balanced-attribute-loss
+  mechanism_id: attribute-loss-averaging
+  parent_idea_id: null
+  title: Average the attribute loss within each question group first, then equally
+    across groups
+  opportunity: 'The attribute loss is one reliability-weighted mean over 35 questions,
+    so each group''s share follows its question count: Extra 9, Medial Meniscus 4,
+    Lateral Meniscus 3, PF OA 3, the rest 1-2. Cartilage/OA and the menisci carry
+    about 43% of the signal, and the questions that fit worst (cartilage depth, meniscus)
+    are also the most numerous. The untested alternative noted in the heads design
+    is to give every group the same weight.'
+  mechanism: 'Read each question''s group from the question set the manifest records
+    (configs/labels/jevk5-report-attributes-v3.json, `group` field; 15 groups in target
+    set 3.1). For each group g compute the reliability-weighted mean cross-entropy
+    over its questions and the batch''s studies with targets, sum(w * CE) / sum(w)
+    within g; the attribute loss is the plain mean over the groups present in the
+    batch, times the unchanged coefficient 0.1. Setting trainer.report_attribute_heads.loss_averaging:
+    group (the incumbent behaviour is question). Log the per-group loss.'
+  precedents:
+  - Untested alternative, docs/modeling/report-attribute-heads.md#question-weighting.
+  - 'Group counts: prior-work.md, v3 answers.'
+  novelty: First change to how the attribute questions are weighted against each other.
+  coverage: All studies with targets; shifts weight from Extra and the menisci toward
+    single-question groups (Study, ACL, OA, Fracture, Effusion, Synovitis).
+  exploitation: If it helps, a follow-up can combine it with the winning coefficient;
+    if it hurts, the per-question mean stays.
+  budget: Negligible.
+  implementation: trainer.report_attribute_heads.loss_averaging in config.py; group
+    ids loaded with the question set in data/report_attributes.py; averaging in training/report_attributes.py.
+  open_choices: None; the groups are the question set's own, the same rule for every
+    group.
+  dependencies: []
+  priority_rationale: A documented, label-agnostic alternative that changes where
+    the backbone's attribute gradient goes without changing any target.
+  status: completed
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality/autoresearch/campaigns/auxiliary-signals/seed-ideas.yaml
+  experiments:
+  - area-balanced-attribute-loss-20260926T115857Z-cb5169c3
+  decision: reject
+- id: reliability-filtered-attribute-questions
+  mechanism_id: attribute-question-selection
+  parent_idea_id: null
+  title: Drop attribute questions whose mean order agreement is below 0.80, with their
+    gated children
+  opportunity: 'Per-cell reliability weights already down-weight answers that flip
+    between option orders, but the audits showed that systematic errors survive both
+    orders. The questions with the lowest mean agreement are those with known systematic
+    faults: medial cartilage extent 0.735, Baker''s size 0.758 (invents cysts), lateral
+    and PF cartilage extent 0.776, medial cartilage depth 0.787, PF surface 0.799.
+    Baker''s lost in both head runs (-0.0027, -0.0064).'
+  mechanism: 'At load time compute each question''s mean reliability weight over all
+    studies in the 3.1 table and drop every question below 0.80, then drop every gated
+    child whose parent was dropped. On target set 3.1 this removes medial_cartilage_extent,
+    baker_size, lateral_cartilage_extent, pf_cartilage_extent, medial_cartilage_depth,
+    pf_cartilage_surface and baker_ruptured (gated on baker_size), leaving 28 questions.
+    The loss and coefficient are unchanged. Setting trainer.report_attribute_targets.min_question_reliability:
+    0.8; log the kept question list.'
+  precedents:
+  - 'Reliability weights and gates: docs/modeling/report-attribute-heads.md#targets.'
+  - 'Known weak targets and audits: docs/ongoing/report-attribute-extraction.md.'
+  - Dropping osteophytes and Hoffa for noise was part of the v3 -> v3.1 change (+0.0003
+    vs v3, bundled).
+  novelty: First question selection by a fixed reliability rule instead of by hand.
+  coverage: Removes 7 of 35 heads, all cartilage extent/depth/surface or Baker's size
+    questions.
+  exploitation: If it helps, the rule becomes the target builder's default; if it
+    hurts, the noisy cartilage questions still carry signal and the next step is re-weighting,
+    not removal.
+  budget: Fewer heads; negligible.
+  implementation: trainer.report_attribute_targets.min_question_reliability in config.py;
+    filtering and gate propagation in data/report_attributes.py before the heads are
+    built.
+  open_choices: None; the 0.80 cut is fixed, not tuned.
+  dependencies: []
+  priority_rationale: The clearest measured target weakness, addressed by a label-agnostic
+    rule on data we already have.
+  status: completed
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality/autoresearch/campaigns/auxiliary-signals/seed-ideas.yaml
+  experiments:
+  - reliability-filtered-attribute-questions-20260926T123233Z-1bdbfd9d
+  decision: reject
+- id: drop-report-completeness-options
+  mechanism_id: attribute-option-removal
+  parent_idea_id: null
+  title: Remove the options that describe how complete the report was (not mentioned,
+    not stated, unspecified) and renormalize
+  opportunity: 'Many options encode report wording, not image content: whether the
+    report mentioned the structure or specified a grade, location or type. They hold
+    large mass in target set 3.1: study context not_stated 0.63, tear type not_stated
+    0.10-0.13, cartilage extent not_stated 0.18-0.25, OA unspecified 0.21, effusion
+    unspecified 0.14 and not_mentioned 0.09, Baker''s unspecified 0.18, cartilage
+    depth unspecified_loss 0.10-0.14. They are site style: 255 of 260 Spanish ACL
+    not-mentioned reports are short positive-only summaries that never name the cruciates,
+    and the largest option-order flips were between not-mentioned and none. The host
+    states that report silence is unobserved, not absent. Training the image to predict
+    these options teaches reporting style.'
+  mechanism: 'Completeness options are every option whose key is not_mentioned, not_stated,
+    unspecified, tear_unspecified, partial_unspecified or unspecified_loss (on target
+    set 3.1: 25 options over 21 questions; the gates'' fallback options are among
+    them). For each question and study let s be their total mass; the target becomes
+    the remaining options divided by (1 - s) and the reliability weight is multiplied
+    by (1 - s); where 1 - s < 1e-6 the weight is zero. The removed options leave the
+    heads. Applied after the 3.1 merges and gates, at load time. The loss, coefficient
+    and averaging are unchanged. Setting trainer.report_attribute_targets.drop_completeness_options:
+    true; log the removed options and the mean weight lost per question.'
+  precedents:
+  - 'v3 analysis: Spanish not-mentioned answers, order flips between same-meaning
+    options (docs/ongoing/report-attribute-extraction.md#v3-full-run-analysis-2026-09-25).'
+  - 'Host: silence is an unobserved label (docs/metadata/official-label-criteria.md).'
+  - Merging same-meaning options was part of the v3 -> v3.1 change (+0.0003 vs v3,
+    bundled).
+  novelty: First removal of report-style options; 3.1 only merged them into their
+    neighbours.
+  coverage: 21 of 35 questions; most mass lost in study context, cartilage extent
+    and the gated tear questions.
+  exploitation: If it helps, the same rule extends to hedged options (next seed) and
+    to the study-context question as a whole; if it hurts, the completeness options
+    carry disease evidence the image can see.
+  budget: Fewer options; negligible.
+  implementation: trainer.report_attribute_targets.drop_completeness_options in config.py;
+    the transform in data/report_attributes.py before the heads are built.
+  open_choices: None; the option keys are fixed above.
+  dependencies: []
+  priority_rationale: Measured evidence that these options track site and language,
+    and a single label-agnostic rule removes them.
+  status: completed
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality/autoresearch/campaigns/auxiliary-signals/seed-ideas.yaml
+  experiments:
+  - drop-report-completeness-options-20260926T130753Z-2bd433c0
+  decision: reject
+- id: drop-hedged-options
+  mechanism_id: attribute-option-removal
+  parent_idea_id: null
+  title: Remove the hedged options (possible, possible tear) and renormalize
+  opportunity: 'A hedged option means the report itself was uncertain; whether a radiologist
+    hedges is a reporting habit, and the image model is asked to predict the hedge
+    rather than the finding. Hedged mass in target set 3.1: medial meniscus possible_tear
+    0.037, lateral 0.026, ACL 0.020, MCL 0.011, contusion 0.023, fracture 0.020, synovitis
+    0.044, PCL 0.035, lateral ligaments 0.041, osteochondral 0.058. Synovitis possible
+    is a dead option (9 top answers).'
+  mechanism: 'Hedged options are every option whose key is possible or possible_tear
+    (on target set 3.1: 10 options over 10 questions). The same rule as the completeness
+    seed: per question and study, remove their mass s, divide the rest by (1 - s),
+    multiply the reliability weight by (1 - s), zero weight where 1 - s < 1e-6, and
+    drop the options from the heads. Completeness options stay. Setting trainer.report_attribute_targets.drop_hedged_options:
+    true; log the removed options and the mean weight lost per question.'
+  precedents:
+  - 'Question-set design: hedging is an option (docs/ongoing/report-attribute-extraction.md#question-set-design).'
+  - 'Dead options in the v3 analysis: synovitis possible (9 answers).'
+  novelty: First treatment of hedged answers as unobserved.
+  coverage: 10 questions; small mass, concentrated in the ambiguous studies where
+    the reliability weights are also lowest.
+  exploitation: If it helps, combine with the completeness rule; if it hurts, hedges
+    carry graded evidence and a half-positive mapping is the retry.
+  budget: Negligible.
+  implementation: trainer.report_attribute_targets.drop_hedged_options in config.py;
+    the transform in data/report_attributes.py, sharing the completeness seed's code
+    path if it exists.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Same mechanism as the completeness seed on a disjoint option
+    set, so the two results separate style from uncertainty.
+  status: completed
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality/autoresearch/campaigns/auxiliary-signals/seed-ideas.yaml
+  experiments:
+  - drop-hedged-options-20260926T134103Z-04383f87
+  decision: reject
+- id: scanner-group-adversarial-head
+  mechanism_id: metadata-adversarial-head
+  parent_idea_id: null
+  title: Remove scanner-group information from the pooled features with a gradient-reversal
+    head
+  opportunity: 'Site priors help locally but not on gold: every header stacker variant
+    scored negative on the 35 gold studies, the four minor vendors are one English-reporting
+    site whose labels are elevated on ten of twelve targets, and the hidden-test labels
+    come from images, not reports. Local folds reward site priors because the split
+    is stratified, not grouped, by scanner. A model that cannot read the scanner from
+    its features has to rank by image evidence.'
+  mechanism: 'Target: the eight scanner groups of data/folds/all_5fold_scanner_v1/protocol.json,
+    from outputs/analysis/sharing-disagreement-20260914/study_headers.parquet (check
+    SHA-256 8714fa8b025afe0ff47d0811ca735f0ec75c84808b462486db19553d0c3058f4): Siemens,
+    Philips and GE split by MagneticFieldStrength into 3T (>= 2), 1.5T (< 2) and unknown;
+    every other vendor pooled as minor. Head: a gradient-reversal layer on the study
+    tokens the disease head pools, then one attention query (256 -> 128 -> 1) and
+    a linear 8-way classifier; cross-entropy against the one-hot group, mean over
+    training studies, times trainer.metadata_heads.scanner_adversarial_weight 0.1.
+    The reversal factor ramps with training progress p in [0, 1] as 2 / (1 + exp(-10
+    p)) - 1 (Ganin and Lempitsky). The head''s own parameters descend normally; only
+    the gradient into the tokens is reversed. Training only, dropped at inference,
+    forked-RNG initialization. Log loss, accuracy and the reversal factor per epoch;
+    accuracy should fall toward the majority-group rate (about 0.26).'
+  precedents:
+  - 'Header stacker: site +0.0005 local, gold -0.006; protocol +0.0009 local, gold
+    -0.006 (prior-work.md, site priors).'
+  - 'Ganin and Lempitsky, Unsupervised domain adaptation by backpropagation (arXiv:1409.7495):
+    gradient reversal and the ramp schedule.'
+  novelty: First attempt to remove site information instead of adding it.
+  coverage: All training studies; all labels, most for Synovitis and OA, where site
+    priors are largest.
+  exploitation: The local rule is expected to understate it, because local labels
+    reward site priors. Whatever the local verdict, the user decides with a public
+    submission; if scanner accuracy never falls, the reversal is too weak and the
+    run is blocked evidence.
+  budget: One extra attention pool; negligible.
+  implementation: trainer.metadata_heads.scanner_adversarial_weight in config.py;
+    table loading and the reversal function in training/auxiliary/; head and loss
+    in the Lightning module; table SHA-256 in the checkpoint hyperparameters.
+  open_choices: None; weight 0.1 matches the attribute coefficient, the ramp is the
+    paper's.
+  dependencies: []
+  priority_rationale: The only metadata mechanism aimed at the report-versus-image
+    mismatch that the gold studies point to.
+  status: completed
+  created_revision: 1
+  seeded: /home/claudio/src/knee-abnormality/autoresearch/campaigns/auxiliary-signals/seed-ideas-2.yaml
+  experiments:
+  - scanner-group-adversarial-head-20260926T141522Z-0818ece2
+  decision: reject
+- id: scanner-adversarial-decoupled-weight
+  mechanism_id: metadata-adversarial-head
+  parent_idea_id: scanner-group-adversarial-head
+  title: Retry the scanner-group adversarial head with the head trained at full strength
+    and 0.1 applied only to the reversed gradient
+  opportunity: 'In scanner-group-adversarial-head the adversary never learned: after
+    four epochs its accuracy was 0.18-0.21 and its loss 2.03-1.91, worse than predicting
+    the training group frequencies (accuracy 0.263, loss 1.851), even in epoch 0 with
+    the reversal factor at 0.24. The cause is in the code: the step returned 0.1 *
+    cross-entropy, so the 0.1 weight scaled the head''s own gradient as well as the
+    reversed one. A head that cannot recognise the scanner gives the backbone no direction,
+    so no scanner information was removed and the run did not test the idea.'
+  mechanism: 'Same targets, head, token source, gradient-reversal layer and ramp 2
+    / (1 + exp(-10 p)) - 1 as the parent. One change: the head''s cross-entropy enters
+    the loss unweighted, so the head''s parameters learn at full strength, and the
+    reversal layer''s backward returns -(w * factor) * gradient with w = trainer.metadata_heads.scanner_adversarial_weight
+    0.1, so the backbone receives the parent''s intended pressure. Log the head loss,
+    accuracy, reversal factor and w * factor per epoch. Validity check: the head''s
+    epoch-0 accuracy must exceed 0.263 and its loss fall below 1.851 (it learns at
+    least the group frequencies while the reversal is weak); otherwise report the
+    run as blocked evidence.'
+  precedents:
+  - 'Parent run scanner-group-adversarial-head: head below the frequency baseline
+    for four epochs (this campaign).'
+  - 'Ganin and Lempitsky, Unsupervised domain adaptation by backpropagation (arXiv:1409.7495):
+    the domain classifier trains on its full loss; lambda scales only the reversed
+    gradient.'
+  novelty: Fixes the parent's coupling of head strength and reversal strength; no
+    new mechanism.
+  coverage: All training studies; all labels.
+  exploitation: The local rule is expected to understate it, because local labels
+    reward site priors. If the head learns and the reversal holds its accuracy near
+    0.26 later in training, the user decides with a public submission paired with
+    the fold-3 control.
+  budget: Same as the parent; negligible.
+  implementation: In training/auxiliary/scanner_adversarial.py the reversal backward
+    multiplies by weight * factor; in training/lightning.py the step returns the unweighted
+    cross-entropy. No config change beyond the parent's trainer.metadata_heads.scanner_adversarial_weight
+    0.1.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The parent was an implementation failure, not a negative result,
+    and the fix is one line in each file.
+  status: completed
+  created_revision: 96
+  seeded: /home/claudio/src/knee-abnormality/autoresearch/campaigns/auxiliary-signals/adversarial-retry-ideas.yaml
+  experiments:
+  - scanner-adversarial-decoupled-weight-20260926T152823Z-d509df07
+  decision: reject
+- id: attribute-cell-reliability-filter
+  mechanism_id: attribute-question-selection
+  parent_idea_id: reliability-filtered-attribute-questions
+  title: Apply the existing reliability cutoff to individual study-question cells
+  opportunity: Whole-question filtering discarded substantial reliable supervision.
+    On the 3,535 training studies, 47.36% of medial cartilage extent cells, 52.98%
+    of Baker's size cells and 74.79% of Baker's rupture cells have weight >= 0.80,
+    although their questions were removed. Across all 35 questions, cell filtering
+    would retain 76.11% of cells and 82.38% of original weight; every training study
+    retains at least 11 questions. These are answer statistics, not accuracy measurements.
+  mechanism: Keep every incumbent question and its soft target. Replace global mean-reliability
+    selection and recursive child deletion with w_new(s,q) = w(s,q) when w(s,q) >=
+    0.80, otherwise zero. Construct existing gates before applying this mask; a masked
+    parent loss does not delete its child's target. Keep the incumbent weighted-mean
+    loss and coefficient. The fixed cutoff operates independently on each study, without
+    fitting a selection statistic across training and validation.
+  precedents:
+  - 'Parent: reliability-filtered-attribute-questions. Its numerical result and retry
+    rationale are recorded in the family verdict below.'
+  - Training-only coverage was calculated from the hash-verified [3.1 target table](/home/claudio/src/knee-abnormality/data/labels/prepared/jevk5-report-attributes-v3.1/targets.parquet),
+    joined to [fold assignments](/home/claudio/src/knee-abnormality/data/folds/all_5fold_scanner_v1/studies.csv)
+    with fold != 3.
+  - '[Prior work](/home/claudio/src/knee-abnormality/autoresearch/campaigns/auxiliary-signals/prior-work.md#v3-answers-what-the-targets-can-and-cannot-carry)
+    documents systematic extraction errors that order agreement cannot detect.'
+  novelty: Moves the fixed 0.80 rule from entire questions to individual supervision
+    cells. It restores reliable examples within weak questions and removes unreliable
+    examples within otherwise retained questions.
+  coverage: All 35 incumbent questions and all 3,535 training studies remain represented.
+    Disease supervision, sampling and image coverage remain unchanged.
+  exploitation: Uses the positive question-selection near-miss while addressing its
+    coarse removal of useful examples. No selection depends on disease-label results.
+  budget: One supervisor-scheduled run at the current incumbent seed, presently 2617320043.
+    Preserve 10 epochs, 4,420 steps and all image workloads; maximum 2,267 seconds.
+    The transform is a small CPU mask, with the baseline number of heads and no additional
+    encoder passes. Runtime remains unmeasured.
+  implementation: Add one option under trainer.report_attribute_targets. Implement
+    masking in data/report_attributes.py and record the rule and transformed coverage
+    in checkpoint provenance. Retain existing target probabilities, gates, heads,
+    question averaging and coefficient. Log per-head targeted visits, retained weight,
+    weight removed and divergence over actual training visits each epoch. Disabled
+    behavior must reproduce the incumbent, with existing forked-RNG initialization.
+    If another incumbent is accepted, retain unrelated improvements; explicitly replace
+    any overlapping whole-question reliability filter rather than applying both selection
+    rules.
+  open_choices: The cutoff is fixed at 0.80. High agreement can still accompany hallucinated
+    findings, and inherited gate reliability may overstate child reliability. Neither
+    concern authorizes label-based exceptions.
+  dependencies: []
+  priority_rationale: 'First: required follow-up for the open selection family. It
+    has a concrete coverage diagnosis, minimal implementation cost and no new extraction.'
+  status: completed
+  created_revision: 115
+  ranking_rationale: "Admit all five: each has satisfied dependencies, fits the auxiliary-signals\
+    \ scope, and differs materially from measured runs. Rank the cell-level filter\
+    \ first as the diagnosed follow-up to whole-question filtering, then severity\
+    \ merges and conditional children for their measured target properties. Joint\
+    \ meniscus targets and shared pooling follow because their proposed benefits rely\
+    \ more on untested modeling assumptions. The earlier filter\u2019s +0.001036 gain\
+    \ failed adoption because its 80% lower bound was \u22120.000423; this priority\
+    \ is for exploration, not an adoption claim."
+  experiments:
+  - attribute-cell-reliability-filter-20260926T161611Z-4a98f1cf
+  decision: reject
+- id: attribute-threshold-grade-merges
+  mechanism_id: attribute-severity-coarsening
+  parent_idea_id: null
+  title: Merge size and cartilage-depth options across clinically meaningful severity
+    bands
+  opportunity: 'Existing extraction analysis identifies unstable fine grades and over-called
+    low-severity findings. A label-free calculation over all 4,407 answers shows that
+    the proposed merges raise mean order agreement: effusion 0.867 to 0.886, Baker''s
+    size 0.758 to 0.849, and medial/lateral/PF cartilage depth approximately 0.787/0.803/0.818
+    to 0.867/0.881/0.890. Improved agreement establishes cleaner targets, not a disease-AUC
+    gain.'
+  mechanism: Apply one mass-preserving merge family to five ordinal questions. For
+    all three cartilage-depth questions, merge {no_damage, softening, partial_low}
+    into below_high_grade and {partial_high, full_thickness} into high_grade; retain
+    unspecified_loss. For effusion_size, merge {none, small} and {moderate, large},
+    retaining not_mentioned and unspecified separately. For baker_size, merge {absent,
+    other_cyst_only, small} and {moderate, large}, retaining unspecified. Apply these
+    maps to both raw option orders after the existing 3.1 merges, average their distributions
+    and recompute reliability as one minus TV. Preserve all existing child targets
+    and gates constructed before coarsening.
+  precedents:
+  - '[The sealed manifest](/home/claudio/src/knee-abnormality/configs/labels/jevk5-report-attribute-targets-v3.1.json)
+    supplies exact option keys, original merges and raw-answer hashes. Raw answers,
+    question set and target table hashes were verified during this review.'
+  - '[Cached host criteria](/home/claudio/src/knee-abnormality/docs/metadata/official-label-criteria.md#label-description-discussion-733343-pinned-overview)
+    specify high-grade cartilage loss and moderate/large fluid collections. Cartilage
+    extent remains a separate requirement.'
+  - '[Extraction analysis](/home/claudio/src/knee-abnormality/docs/ongoing/report-attribute-extraction.md#v3-full-run-analysis-2026-09-25)
+    documents low-grade discrepancies and mixed small-sample gold results. These auxiliary
+    merges do not repair disease labels.'
+  novelty: Introduces severity coarsening while conserving every option's probability
+    mass. Unknown grades remain explicit, and existing child supervision is preserved.
+  coverage: All 35 questions remain. On the baseline schema, outputs fall from 181
+    to 167. The same rule covers every cartilage compartment and both fluid-size questions,
+    selected by measurement type.
+  exploitation: Reduces fine distinctions that show order disagreement while retaining
+    high-severity and unspecified supervision. Persistent difficulty fitting effusion
+    and cartilage depth motivates simplifying their auxiliary tasks.
+  budget: One run at the supervisor's current incumbent seed, with the fixed 10 epochs,
+    4,420 steps and image workloads; maximum 2,267 seconds. Hash-check and transform
+    existing answers once on CPU. Smaller classifiers and unchanged pooling require
+    no extra image passes; runtime is unmeasured.
+  implementation: Add one target-transform option under trainer.report_attribute_targets.
+    Retain the manifest path and build transformed targets at load time from its recorded
+    answers. Preserve other questions, coefficient and averaging. Compute child targets
+    before coarsening parents so original gate events remain intact. Record exact
+    maps, order agreement and hashes; log per-head loss/divergence and targeted visits
+    each epoch. Keep disabled parity and forked head initialization. Rebase onto any
+    new incumbent, retaining unrelated improvements and explicitly identifying overlapping
+    target transformations that this map replaces.
+  open_choices: Maps are fixed above. Coarsening may discard useful severity distinctions,
+    and greater order agreement does not correct systematic extraction errors. Live
+    Kaggle pages returned no readable body; threshold definitions rely on the linked
+    repository copy of the host text.
+  dependencies: []
+  priority_rationale: 'Second: strong label-free evidence, broad anatomical coverage
+    and low cost. The main uncertainty is whether simpler auxiliary grades improve
+    representation learning.'
+  status: completed
+  created_revision: 115
+  ranking_rationale: "Admit all five: each has satisfied dependencies, fits the auxiliary-signals\
+    \ scope, and differs materially from measured runs. Rank the cell-level filter\
+    \ first as the diagnosed follow-up to whole-question filtering, then severity\
+    \ merges and conditional children for their measured target properties. Joint\
+    \ meniscus targets and shared pooling follow because their proposed benefits rely\
+    \ more on untested modeling assumptions. The earlier filter\u2019s +0.001036 gain\
+    \ failed adoption because its 80% lower bound was \u22120.000423; this priority\
+    \ is for exploration, not an adoption claim."
+  experiments:
+  - attribute-threshold-grade-merges-20260926T162108Z-f2720d62
+  decision: reject
+- id: attribute-conditional-child-targets
+  mechanism_id: attribute-conditional-gates
+  parent_idea_id: null
+  title: Train gated children conditionally, leaving absence supervision to their
+    parents
+  opportunity: The existing gate makes each child repeat its parent's absence prediction.
+    Across all 4,407 target rows, mean empty-option mass ranges from 48.94% to 78.33%
+    across the eleven gated children. Meniscus location and type each carry 61.32%
+    medial and 78.33% lateral no-tear mass. This duplication is measured; its effect
+    on disease learning is a hypothesis.
+  mechanism: For every gate in the sealed manifest, reconstruct the child's pre-gate
+    distribution and reliability r from the existing raw answers and 3.1 merges. Move
+    its empty_option probability to the declared fallback_option and remove the empty
+    output, yielding a normalized conditional distribution. Let p be the original
+    parent's mass on parent_options. Supervise the conditional child with effective
+    weight p*r. Keep parent targets and all ungated questions unchanged. Retain the
+    incumbent loss normalization by total effective weight and its coefficient. This
+    replaces repeated absence prediction with parent-supported attribute prediction.
+  precedents:
+  - '[Head design](/home/claudio/src/knee-abnormality/docs/modeling/report-attribute-heads.md#targets)
+    defines the current mixture gate and inherited reliability.'
+  - '[Manifest gates](/home/claudio/src/knee-abnormality/configs/labels/jevk5-report-attribute-targets-v3.1.json)
+    provide all eleven parent events, empty options and fallback options; no relationship
+    is selected from label results.'
+  - '[Prior extraction findings](/home/claudio/src/knee-abnormality/autoresearch/campaigns/auxiliary-signals/prior-work.md)
+    establish that ungated children can invent findings. The proposed parent-support
+    weight preserves gating.'
+  novelty: Changes the factorization of auxiliary supervision. Parent heads learn
+    presence; child heads learn attributes conditional on presence. The study-dependent
+    support weight and conditional target change together.
+  coverage: Applies uniformly to all eleven declared gates, retaining all 35 baseline
+    questions and all ungated targets. The baseline output count falls by eleven.
+    No disease target or study-sampling rule changes.
+  exploitation: Concentrates child gradients on examples with parent support while
+    preserving the existing finding attributes and uncertainty. It avoids spending
+    most child-target mass on repeated absence states.
+  budget: One fixed-workload run at the current incumbent seed, maximum 2,267 seconds.
+    Transform answers once on CPU; retain the same attention-query count and slightly
+    smaller classifiers. No additional backbone pass or inference component.
+  implementation: Add one conditional-gate option under trainer.report_attribute_targets.
+    Replace child mixture targets and inherited weights in the loader; keep parent
+    heads, other questions, coefficient and loss averaging. Record raw-answer hashes,
+    gate mappings and support statistics. Log conditional loss/divergence, targeted
+    visits, summed parent support and effective weight per child each epoch; distinguish
+    training-visit statistics from preparation summaries. Preserve disabled parity
+    and forked initialization. On a new incumbent, retain unrelated improvements and
+    surviving joint heads; explicitly declare any replacement of overlapping child
+    target/weight behavior.
+  open_choices: Use the original pre-gate child reliability and original parent event
+    mass, with no support threshold or strength sweep. Soft parent probabilities can
+    leave very little effective supervision for rare attributes; activity must be
+    established from the required logs.
+  dependencies: []
+  priority_rationale: 'Third: directly supported by a large, measured structural property
+    of the targets. It is inexpensive and broad, but reducing repeated negative supervision
+    could also remove useful regularization.'
+  status: completed
+  created_revision: 115
+  ranking_rationale: "Admit all five: each has satisfied dependencies, fits the auxiliary-signals\
+    \ scope, and differs materially from measured runs. Rank the cell-level filter\
+    \ first as the diagnosed follow-up to whole-question filtering, then severity\
+    \ merges and conditional children for their measured target properties. Joint\
+    \ meniscus targets and shared pooling follow because their proposed benefits rely\
+    \ more on untested modeling assumptions. The earlier filter\u2019s +0.001036 gain\
+    \ failed adoption because its 80% lower bound was \u22120.000423; this priority\
+    \ is for exploration, not an adoption claim."
+  experiments:
+  - attribute-conditional-child-targets-20260926T173258Z-4b1d360d
+  decision: reject
+- id: meniscus-status-location-joint-targets
+  mechanism_id: attribute-joint-questions
+  parent_idea_id: null
+  title: Replace separate meniscus status and location questions with coherent joint
+    targets
+  opportunity: Status and location currently use separate heads despite a fixed logical
+    relationship, and both remain among the harder-fitting auxiliary questions. Combining
+    them can make location evidence support a specific status within one pooled prediction.
+    This is a constructed probabilistic target; the extractor did not provide observed
+    joint answers.
+  mechanism: 'Apply identically to medial and lateral menisci. In each raw option
+    order, retain three standalone status states: not_mentioned, normal and degeneration.
+    Cross each finding state {possible_tear, tear, displaced_or_truncated} with the
+    seven location options remaining after moving no_tear mass into not_stated. Assign
+    joint probability P(status)*P(adjusted location), giving 24 outputs per side.
+    Average the two constructed joint distributions and use one-minus-TV between them
+    as reliability. Replace only the status/location heads; retain tear-type targets
+    and their original status-based gates, plus medial extrusion.'
+  precedents:
+  - '[Sealed option and gate definitions](/home/claudio/src/knee-abnormality/configs/labels/jevk5-report-attribute-targets-v3.1.json)
+    supply both symmetric six-state status and eight-state location questions.'
+  - Label-free construction over the hash-verified raw answers yields mean joint order
+    agreement 0.8229 medial and 0.8220 lateral. Minimum mean state masses are approximately
+    0.00097 and 0.00103, respectively, indicating a sparse tail.
+  - '[Control epoch metrics](/home/claudio/src/knee-abnormality/outputs/training/half-stack-control/fold_3/logs/version_0/metrics.csv)
+    show final medial status KL 0.5657 and location KL 0.5079; these are fitting diagnostics
+    only.'
+  novelty: Combines two questions into one structured categorical prediction per side,
+    retaining uncertainty and location detail. It tests coherent joint supervision
+    and shared evidence within each joint head.
+  coverage: Both menisci receive the same rule. Baseline question count becomes 33
+    and output count 201. Every status probability is conserved; existing unrelated
+    questions remain.
+  exploitation: Uses existing status gates and location answers to prevent independent
+    auxiliary predictions from representing incompatible states. No new report processing
+    or disease-label-derived mapping is required.
+  budget: One run at the current incumbent seed with the fixed epochs, steps and image
+    workloads; maximum 2,267 seconds. Twenty additional classifier outputs and two
+    fewer attention queries are small relative to the backbone. Construct joint targets
+    once on CPU; runtime remains unmeasured.
+  implementation: Add one joint-question transform under trainer.report_attribute_targets.
+    Replace the four original heads with two joint heads, recording source-question
+    identities, ordered joint keys and construction formulas. Preserve original status
+    distributions for downstream tear-type gating; do not duplicate the replaced losses.
+    Log each joint head's loss, divergence, targeted visits and effective weight each
+    epoch. Retain forked initialization and disabled parity. If a new incumbent is
+    accepted, preserve unrelated changes and explicitly replace overlapping status/location
+    construction while retaining valid downstream gates.
+  open_choices: The product assumes conditional independence within each answer order;
+    it is not measured co-occurrence. Sparse states may fit poorly. Keep all 24 states
+    for this run, with no additional pruning, grade merging or label-selected exceptions.
+  dependencies: []
+  priority_rationale: 'Fourth: a distinct question-combination mechanism with clear
+    implementation and coverage. Product-factorization uncertainty and sparse states
+    make it less certain than the preceding target changes.'
+  status: completed
+  created_revision: 115
+  ranking_rationale: 'Correct the rejected decision: the two queued, user-ordered
+    scanner seeds remain in order behind the reserved meniscus head. All three proposals
+    have satisfied admission dependencies and distinct mechanisms; searches of docs/validation/results/
+    and docs/history/ found no materially equivalent measured run. Rank consensus
+    hardening next for its measured coverage and low expected compute cost, then the
+    existing family-pooling idea. The inference readout has greater integration risk;
+    acquisition conditioning ranks last because used-series coverage, runtime and
+    site effects remain uncertain.'
+  experiments:
+  - meniscus-status-location-joint-targets-20260926T180640Z-90729468
+  decision: reject
+- id: attribute-gate-family-shared-pooling
+  mechanism_id: attribute-family-pooling
+  parent_idea_id: null
+  title: Share auxiliary attention pooling within each declared parent-child family
+  opportunity: Current ReportAttributeHeads assigns an independent attention query
+    to every question. Related status, location, type or extent questions can therefore
+    supervise different visual evidence despite describing the same finding. The existing
+    gate graph provides a label-agnostic way to couple their pooling. Spatial disagreement
+    has not been measured, so this remains an architectural hypothesis.
+  mechanism: Build connected components of the manifest's parent-child graph. Use
+    one attention query and pooled feature per component, retaining separate option
+    classifiers for every question. Questions outside a component keep individual
+    queries. On the baseline, eleven gate edges reduce 35 queries to 24 pools. Preserve
+    the exact target distributions, reliability weights, loss averaging and coefficient.
+    Change only the mapping from questions to auxiliary pooled features.
+  precedents:
+  - '[Incumbent implementation](/home/claudio/src/knee-abnormality/outputs/autoresearch/auxiliary-signals/baseline/source/src/knee_abnormality/training/report_attributes.py)
+    uses a 256-to-128 attention network with one score per question and separate option-classifier
+    rows.'
+  - '[The sealed manifest](/home/claudio/src/knee-abnormality/configs/labels/jevk5-report-attribute-targets-v3.1.json)
+    defines the graph without disease-label-based grouping.'
+  - '[Ilse et al., Attention-based Deep Multiple Instance Learning](https://proceedings.mlr.press/v80/ilse18a.html)
+    provides the primary attention-pooling precedent. It does not establish that sharing
+    queries across these auxiliary questions will help.'
+  novelty: Couples visual evidence through the existing semantic gate graph. All auxiliary
+    targets and their weighting remain intact.
+  coverage: Retains all baseline questions, options and targeted studies. Eight nontrivial
+    parent-child components share pools; unrelated questions retain their own pools.
+    Inference remains unchanged.
+  exploitation: Allows related auxiliary tasks to reinforce a common visual representation
+    while retaining distinct categorical outputs. Uses the incumbent's already active
+    auxiliary supervision.
+  budget: One fixed-workload run at the supervisor's current incumbent seed, maximum
+    2,267 seconds. Baseline attention maps decrease from 35 to 24; classifier dimensions
+    are unchanged. No additional image passes or inference cost. Any runtime saving
+    is unmeasured.
+  implementation: Add one option under trainer.report_attribute_heads. Load the graph
+    from the hash-checked manifest, record question-to-pool mapping and adjust ReportAttributeHeads
+    pooling/indexing. Retain classifiers, targets, loss and training-only placement.
+    Log per-question loss/divergence and targeted visits, plus per-pool attention
+    entropy each epoch. Initialize modified modules under forked RNG; disabled behavior
+    must reproduce the incumbent. With a newly accepted incumbent, preserve its target
+    transforms, derive components over surviving questions and recorded joint-question
+    source identities, and explicitly replace only incompatible auxiliary pooling.
+  open_choices: Use graph components exactly, without selecting anatomical subsets
+    from label results. Sharing may underfit questions whose findings occupy different
+    regions. Attention entropy establishes activity, not localization correctness.
+  dependencies: []
+  priority_rationale: 'Fifth: inexpensive architectural diversity with unchanged supervision
+    and broad coverage. Evidence for the proposed spatial coupling is weaker than
+    the measured target-construction opportunities.'
+  status: completed
+  created_revision: 115
+  ranking_rationale: Block and park this candidate. Its v3-answer source addresses
+    the raw-report-text defect of the earlier report-completeness candidate, but its
+    defining learned, per-label offset still changes the logits passed into the fixed
+    disease loss. Removing that offset would remove the proposed mechanism, so a bounded
+    repair cannot make this idea compliant. The ranking removes only the parked reserved
+    head and preserves the remaining queue order.
+  experiments:
+  - attribute-gate-family-shared-pooling-20260926T214017Z-00cdf8cc
+  decision: reject
+- id: scanner-confusion-detached-head
+  mechanism_id: metadata-confusion-head
+  parent_idea_id: scanner-adversarial-decoupled-weight
+  title: Replace scanner gradient reversal with a detached scanner head and a bounded
+    confusion loss on the backbone
+  opportunity: 'Both gradient-reversal runs hurt (-0.00604 and -0.00419) while their
+    heads never learned: the head loss stayed above the group-frequency entropy (1.90-1.93
+    against 1.851) for all ten epochs, so the backbone was bending features to make
+    the head confidently wrong. Reversal maximizes an unbounded cross-entropy. It
+    also left open whether the scanner is readable from the pooled tokens at all,
+    since the head never trained undisturbed.'
+  mechanism: 'Same eight scanner-group targets, table check, token source (the tokens
+    the disease head pools), attention-pooled head architecture, forked-RNG initialization
+    and training-only use as scanner-adversarial-decoupled-weight; the gradient-reversal
+    layer is removed. Two terms per training step. (1) Head term: run the head on
+    detached tokens and add its unweighted cross-entropy against the one-hot group;
+    only the head''s parameters receive this gradient. (2) Confusion term: run the
+    head again on the non-detached tokens with its parameters detached (torch.func.functional_call
+    with detached parameters), and add w * ramp * (cross-entropy(prior, prediction)
+    - entropy(prior)), the KL divergence from the training fold''s group frequencies
+    to the head''s prediction, with w = trainer.metadata_heads.scanner_confusion_weight
+    0.1 and ramp = 2 / (1 + exp(-10 p)) - 1 over training progress p. Only the backbone
+    receives this gradient. It is minimized when the head can do no better than the
+    frequencies and cannot be pushed past that. Log per epoch: head loss and accuracy
+    on detached tokens, the confusion KL, the ramp and w * ramp.'
+  precedents:
+  - 'scanner-group-adversarial-head and scanner-adversarial-decoupled-weight: reversal
+    runs, heads at or above the frequency entropy for all epochs, -0.00604 and -0.00419
+    (this campaign).'
+  - 'Tzeng et al., Simultaneous deep transfer across domains and tasks (arXiv:1510.02192):
+    a domain classifier trained on its own loss and a bounded domain-confusion loss
+    on the features toward a fixed distribution, instead of reversal.'
+  novelty: First bounded confusion objective here; the head also trains undisturbed,
+    so its accuracy measures how readable the scanner is from the pooled tokens.
+  coverage: All training studies; all labels.
+  exploitation: If the head's accuracy stays near the majority rate (0.263), the scanner
+    is not readable from these tokens and the line closes. If it learns and the confusion
+    KL falls while disease AUC holds, the user judges it with a public submission
+    paired with the fold-3 control, because local labels reward site priors.
+  budget: A second head forward pass on the same tokens; negligible.
+  implementation: Replace the reversal in training/auxiliary/scanner_adversarial.py
+    with the two terms; group frequencies computed from the training fold's studies
+    at setup; config field trainer.metadata_heads.scanner_confusion_weight replaces
+    scanner_adversarial_weight in config.py and configs/training.yaml; logging in
+    training/lightning.py.
+  open_choices: None; weight 0.1 and the ramp match the parent runs so only the objective
+    changes.
+  dependencies: []
+  priority_rationale: User-ordered; fixes the measured failure mode of both reversal
+    runs and settles whether the scanner is readable, in one run.
+  status: completed
+  created_revision: 132
+  seeded: /home/claudio/src/knee-abnormality/autoresearch/campaigns/auxiliary-signals/confusion-ideas.yaml
+  experiments:
+  - scanner-confusion-detached-head-20260926T165429Z-55c4db64
+  decision: provisional_accept
+- id: scanner-confusion-stronger-head
+  mechanism_id: metadata-confusion-head
+  parent_idea_id: scanner-confusion-detached-head
+  title: Scanner confusion with a stronger detached head (two-layer classifier, doubled
+    learning rate, one-epoch confusion warm-up)
+  opportunity: In scanner-confusion-detached-head the detached head learned the scanner
+    only faintly (accuracy 0.249 -> 0.311 by epoch 6 against the 0.263 majority rate;
+    loss 1.875 -> 1.735 against the 1.851 frequency entropy) while the confusion KL
+    stayed flat near 0.03. A weak head's predictions barely leave the group frequencies,
+    so the confusion loss had little gradient and did not stop the head from improving.
+    Disease AUC tracked the control, so the bounded objective is safe; the head is
+    the bottleneck.
+  mechanism: 'Same targets, token source, detached head term, bounded confusion term
+    w * ramp * KL(prior || prediction) with w = 0.1, functional_call with detached
+    parameters, and logging as scanner-confusion-detached-head. Three changes to the
+    head only: (1) the classifier after attention pooling becomes Linear(256, 256),
+    GELU, Linear(256, 8); (2) the scanner head''s parameters get twice the head learning
+    rate, with the usual decay rule; (3) the confusion ramp is zero for the first
+    epoch and then follows 2 / (1 + exp(-10 q)) - 1 over the remaining training progress
+    q, so the head learns before the backbone is pushed. Validity check: head accuracy
+    after epoch 0 above the parent''s 0.249 and final head loss below the parent''s.'
+  precedents:
+  - 'scanner-confusion-detached-head: head accuracy 0.311 and loss 1.735 at epoch
+    6, confusion KL ~0.03, disease AUC within ~0.002 of the control (this campaign).'
+  - 'Ganin et al., Domain-adversarial training of neural networks (arXiv:1505.07818):
+    domain classifiers are multi-layer; a linear discriminator underestimates recoverable
+    domain information.'
+  novelty: First multi-layer scanner head with a warm-up before the confusion pressure.
+  coverage: All training studies; all labels.
+  exploitation: If the head reads more of the scanner and the confusion KL then carries
+    gradient while disease AUC holds, the user judges it with a public submission
+    paired with the fold-3 control.
+  budget: One small MLP; negligible.
+  implementation: Head classifier and warm-up ramp in training/auxiliary/; the scanner
+    head's optimizer group with doubled learning rate in training/lightning.py; config
+    under trainer.metadata_heads.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: User-ordered follow-up to the only scanner mechanism that did
+    not harm disease AUC; targets its measured bottleneck.
+  status: completed
+  created_revision: 171
+  seeded: /home/claudio/src/knee-abnormality/autoresearch/campaigns/auxiliary-signals/confusion-followup-ideas.yaml
+  ranking_rationale: 'Correct the rejected decision: the two queued, user-ordered
+    scanner seeds remain in order behind the reserved meniscus head. All three proposals
+    have satisfied admission dependencies and distinct mechanisms; searches of docs/validation/results/
+    and docs/history/ found no materially equivalent measured run. Rank consensus
+    hardening next for its measured coverage and low expected compute cost, then the
+    existing family-pooling idea. The inference readout has greater integration risk;
+    acquisition conditioning ranks last because used-series coverage, runtime and
+    site effects remain uncertain.'
+  experiments:
+  - scanner-confusion-stronger-head-20260926T184027Z-ff9a389a
+  - scanner-confusion-stronger-head-20260926T191359Z-8e1f5021
+  decision: reject
+- id: scanner-confusion-backbone-features
+  mechanism_id: metadata-confusion-head
+  parent_idea_id: scanner-confusion-detached-head
+  title: Scanner confusion with the detached head reading backbone features before
+    projection and token normalization
+  opportunity: 'The pooled tokens the disease head reads are normalized per series
+    and per token, which likely strips most vendor contrast: the detached head reached
+    only 0.311 accuracy on them. Scanner identity should be more readable earlier,
+    in the backbone''s feature vectors before the projection and normalization that
+    produce the pooled tokens, and that is where contrast and texture differences
+    between vendors live.'
+  mechanism: 'Same targets, detached head term, bounded confusion term w * ramp *
+    KL(prior || prediction) with w = 0.1 and the parent''s ramp, functional_call with
+    detached parameters, and logging as scanner-confusion-detached-head. One change:
+    the head''s input is the backbone''s per-token feature vectors before the projection
+    and token normalization that produce the pooled tokens, over the same visually
+    valid tokens and study membership; the attention and classifier layers take that
+    width. The confusion gradient therefore reaches the backbone without passing through
+    the projection.'
+  precedents:
+  - 'scanner-confusion-detached-head: head accuracy 0.311 on the pooled normalized
+    tokens (this campaign).'
+  - 'Series intensity normalization and token normalization before pooling: docs/modeling/current-model.md.'
+  novelty: First scanner head attached before the projection.
+  coverage: All training studies; all labels.
+  exploitation: If the head reads the scanner clearly better here, the confusion loss
+    can remove it where it originates; judged with a public submission paired with
+    the fold-3 control. If it is no more readable than on the pooled tokens, the scanner
+    line closes.
+  budget: One attention pool at backbone width; negligible.
+  implementation: Expose the pre-projection token features from modeling/model.py
+    without changing the disease path or outputs; head input width in training/auxiliary/;
+    wiring in training/lightning.py.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: User-ordered; tests whether scanner information is removable
+    where it survives normalization.
+  status: completed
+  created_revision: 171
+  seeded: /home/claudio/src/knee-abnormality/autoresearch/campaigns/auxiliary-signals/confusion-followup-ideas.yaml
+  ranking_rationale: 'Correct the rejected decision: the two queued, user-ordered
+    scanner seeds remain in order behind the reserved meniscus head. All three proposals
+    have satisfied admission dependencies and distinct mechanisms; searches of docs/validation/results/
+    and docs/history/ found no materially equivalent measured run. Rank consensus
+    hardening next for its measured coverage and low expected compute cost, then the
+    existing family-pooling idea. The inference readout has greater integration risk;
+    acquisition conditioning ranks last because used-series coverage, runtime and
+    site effects remain uncertain.'
+  experiments:
+  - scanner-confusion-backbone-features-20260926T191751Z-045f7078
+  decision: invalid
+- id: attribute-consensus-target-hardening
+  mechanism_id: attribute-target-hardening
+  parent_idea_id: null
+  title: Harden attribute answers only when both option orders have the same unique
+    winner
+  opportunity: 'After the existing 3.1 merges, 107,962 of 123,725 training study-question
+    cells have the same unique maximum in both answer orders: 87.3%. Their averaged
+    distributions retain 16.43% mean probability outside that answer. These are measured
+    properties of the 3,535 fold-3 training studies, before gating. Whether this remaining
+    mass represents useful uncertainty or extraction noise is unknown.'
+  mechanism: For each retained question, construct its forward and reverse distributions
+    after the incumbent's option transformations. When both distributions have the
+    same unique argmax, replace their average with a one-hot target at that option.
+    Leave disagreements and ties soft. Preserve the incumbent's reliability weights
+    exactly. Apply its existing child-gate construction using the original, unhardened
+    parent support, so sharpening does not change gate probabilities or inherited
+    weights. Apply the rule uniformly across questions; introduce no confidence threshold,
+    question selection or coefficient change.
+  precedents:
+  - '[Sealed manifest](/home/claudio/src/knee-abnormality/configs/labels/jevk5-report-attribute-targets-v3.1.json):
+    raw-answer, question-set and target-table hashes matched during this review. The
+    training-only audit used studies.csv with fold != 3.'
+  - '[Extraction analysis](/home/claudio/src/knee-abnormality/docs/ongoing/report-attribute-extraction.md#v3-full-run-analysis-2026-09-25)
+    documents option-order bias and systematic mistakes. Agreement between orders
+    therefore supports a deterministic hardening rule, but does not establish correctness.'
+  - '[Target construction](/home/claudio/src/knee-abnormality/docs/modeling/report-attribute-heads.md#targets)
+    defines the existing merges, reliability weights and mixture gates that must be
+    preserved.'
+  novelty: Changes the probability distribution supervised within a cell while retaining
+    every question, option and existing cell weight. It tests target hardness rather
+    than another reliability filter, option deletion or grade merge.
+  coverage: All 35 baseline questions and 181 outputs remain. Before gating, 107,962
+    training cells qualify; 1,770 cells have a tied maximum in at least one order
+    and remain soft. Child gates can retain soft final targets even when the underlying
+    child answer is hardened.
+  exploitation: Uses agreement between the two existing extraction orders to sharpen
+    stable answers while preserving disagreement and parent uncertainty. This could
+    strengthen visual supervision without discarding difficult studies.
+  budget: 'One run at the supervisor''s current incumbent seed, presently 2617320043:
+    10 epochs, 4,420 steps and unchanged image workloads, within 2,267 seconds. Transform
+    the existing answers once on CPU. Head dimensions, image passes and inference
+    cost remain unchanged; full runtime is unmeasured.'
+  implementation: Add one option under trainer.report_attribute_targets. Keep the
+    manifest unchanged and reconstruct distributions from its hash-checked raw answers.
+    Replace only qualifying target distributions; retain original weights, gate support,
+    auxiliary heads, loss averaging, coefficient and disease/half-knee paths. Record
+    the rule, hashes and transformed schema in checkpoint hyperparameters. Log per-question
+    loss/divergence, targeted visits, effective weight and hardened-cell counts each
+    epoch. Preserve disabled parity and forked initialization. On a new incumbent,
+    retain its unrelated improvements and surviving question schema, apply hardening
+    after its option/joint transformations, and preserve its original gate support
+    and weights.
+  open_choices: The agreement rule and tie handling are fixed. Two orders can confidently
+    repeat the same systematic error, and useful uncertainty may be lost. For newly
+    accepted joint questions, construct both order-specific joint distributions before
+    applying this rule; do not infer agreement from an already averaged target.
+  dependencies: []
+  priority_rationale: 'First: a measured, broad target-construction opportunity with
+    negligible additional compute and a clear distinction from the closed filtering
+    and coarsening families. The principal uncertainty is answer calibration.'
+  status: completed
+  created_revision: 181
+  ranking_rationale: Block and park this candidate. Its v3-answer source addresses
+    the raw-report-text defect of the earlier report-completeness candidate, but its
+    defining learned, per-label offset still changes the logits passed into the fixed
+    disease loss. Removing that offset would remove the proposed mechanism, so a bounded
+    repair cannot make this idea compliant. The ranking removes only the parked reserved
+    head and preserves the remaining queue order.
+  experiments:
+  - attribute-consensus-target-hardening-20260926T211926Z-e42b7503
+  - attribute-consensus-target-hardening-20260926T213450Z-82f18fae
+  decision: reject
+- id: predicted-attribute-residual-readout
+  mechanism_id: attribute-inference-readout
+  parent_idea_id: null
+  title: Use image-predicted attribute probabilities in a residual disease readout
+  opportunity: The incumbent trains 35 attribute predictors but discards them at inference.
+    Their predictions could provide a useful supervised representation alongside the
+    direct disease readout. This is an architectural hypothesis; no campaign measurement
+    establishes that predicted attributes add information beyond the existing disease
+    features.
+  mechanism: "Retain the attribute predictor inside the inference model. For each\
+    \ question, compute softmax probabilities and subtract the uniform vector 1/K;\
+    \ concatenate these vectors into z. Add W\xB7stop_gradient(z) to the full-study\
+    \ disease logits, with a bias-free W initialized to zero. On the baseline W has\
+    \ 12\xD7181 parameters. Train W through the unchanged disease loss, while attribute\
+    \ heads continue to receive their existing auxiliary supervision. Use predicted\
+    \ probabilities during both training and inference, never report-derived targets\
+    \ as readout inputs. Keep the direct disease pathway and half-knee objective intact."
+  precedents:
+  - '[Current head implementation](/home/claudio/src/knee-abnormality/outputs/autoresearch/auxiliary-signals/baseline/source/src/knee_abnormality/training/report_attributes.py)
+    already predicts question-specific probabilities from shared visual tokens.'
+  - '[Current checkpoint loader](/home/claudio/src/knee-abnormality/outputs/autoresearch/auxiliary-signals/baseline/source/src/knee_abnormality/inference/checkpoint.py:88)
+    reconstructs the model from model/data configuration and strictly loads model-prefixed
+    parameters. A predictor attached only to Lightning would be omitted.'
+  - '[Koh et al., Concept Bottleneck Models](https://proceedings.mlr.press/v119/koh20a.html)
+    provides a primary precedent for predicting labels through supervised concepts.
+    The proposed residual pathway retains direct visual prediction and does not claim
+    an interpretable bottleneck.'
+  - '[Prior work](/home/claudio/src/knee-abnormality/autoresearch/campaigns/auxiliary-signals/prior-work.md#precedent-table)
+    reports a negative disease-logit co-occurrence stacker. That limits confidence
+    in generic output stacking, though these inputs are separately supervised attribute
+    predictions.'
+  novelty: Makes the existing auxiliary predictions available to the disease readout.
+    Detached probabilities preserve the heads' auxiliary training objective, while
+    zero initialization initially preserves the direct disease logits.
+  coverage: Every surviving attribute question feeds every disease output through
+    one shared construction. There is no label-selected question mapping. All attribute
+    targets, weights and gates remain unchanged.
+  exploitation: Tests whether explicit status, grade, location and contextual predictions
+    expose combinations that the direct linear disease classifiers do not readily
+    use.
+  budget: One run at the current incumbent seed, presently 2617320043, with 10 epochs,
+    4,420 steps, fixed image workloads and the 2,267-second cap. Reuse attribute logits
+    already computed during training. Inference adds auxiliary pooling and a small
+    matrix multiplication, with no extra image pass. End-to-end overhead remains unmeasured.
+  implementation: Add one mode under trainer.report_attribute_heads. Move the visual
+    predictor into the model while leaving target tables and supervision lookup in
+    Lightning; remove the duplicate training-only predictor. Save its resolved question
+    schema with the allowed head settings. Within config.py, derive the model's construction
+    settings from that configuration so the unchanged model-only loader rebuilds the
+    predictor without target-table access. Retain existing pooling, targets, losses
+    and unrelated improvements. Register parameters once and include inference parameters
+    in any existing model averaging. Reuse logits within each training step; log per-head
+    activity, residual magnitude and W norm. Keep half-knee predictions on their existing
+    path. Preserve disabled parity and forked initialization. Rebase onto a new incumbent
+    using its surviving schema and pooling.
+  open_choices: Detached probabilities, uniform centering, a linear bias-free residual
+    and zero initialization are fixed for this proposal. The checkpoint configuration
+    handoff is the main integration risk and must fit the editable files without changing
+    the evaluator. Attribute errors or reporting-style features could also become
+    prediction shortcuts.
+  dependencies: []
+  priority_rationale: 'Second: directly exploits existing supervised heads and introduces
+    a distinct inference mechanism with little training compute. It has greater integration
+    risk and weaker local evidence than target hardening.'
+  status: completed
+  created_revision: 181
+  ranking_rationale: 'Correct the rejected queue decision: model-bias-product-of-experts
+    and site-bias-with-model-confusion are explicitly user-ordered, so both retain
+    their order immediately after the reserved head. Admit all three proposals; proposal_admission
+    reports their dependencies satisfied, and the targeted history search found no
+    measured duplicate. Rank option pooling and ordered readouts ahead of acquisition
+    work because they reuse existing inputs and make focused head changes. Keep acquisition
+    conditioning ahead of regression, whose representative-series targets introduce
+    more uncertainty.'
+  experiments:
+  - predicted-attribute-residual-readout-20260926T221406Z-cc935736
+  decision: invalid
+- id: acquisition-physics-feature-modulation
+  mechanism_id: acquisition-physics-conditioning
+  parent_idea_id: null
+  title: Condition visual features on numeric acquisition headers with neutral missing
+    values
+  opportunity: Numeric acquisition settings may help the model interpret visual features
+    across acquisitions. In the hash-verified representative-header table, field strength,
+    TR and TE are finite and positive for 3,344 of 3,535 training studies; pixel spacing
+    and slice thickness are valid for all 3,535. This establishes substantial study-level
+    availability, not coverage across every used acquisition. Prior header-stack results
+    make site shortcuts a material concern.
+  mechanism: "Read MagneticFieldStrength, RepetitionTime, EchoTime, PixelSpacing and\
+    \ SliceThickness from one canonical indexed DICOM per used series. Reduce PixelSpacing\
+    \ to the geometric mean of its two components. Encode each valid field as log(value/reference),\
+    \ using fixed references of 1.5 T, 2,000 ms, 30 ms, 0.5 mm and 3 mm. Missing,\
+    \ malformed or nonpositive fields contribute zero. Apply features' = features\
+    \ \xD7 [1 + tanh(W h)] after visual projection and before positional additions,\
+    \ with a bias-free 5-to-256 W initialized to zero. All-missing headers therefore\
+    \ produce identity modulation. Add no metadata-only disease-logit path or identity\
+    \ fields."
+  precedents:
+  - '[Header artifact](/home/claudio/src/knee-abnormality/outputs/analysis/sharing-disagreement-20260914/study_headers.parquet),
+    SHA-256 8714fa8b025afe0ff47d0811ca735f0ec75c84808b462486db19553d0c3058f4, supplied
+    the measured training coverage. It contains one representative series per study.'
+  - A read-only CPU check parsed the five fields from 32 existing representative DICOMs
+    in 0.0134 seconds. This small local sample establishes parser feasibility, not
+    full-run overhead or all-series coverage.
+  - '[Prior site analysis](/home/claudio/src/knee-abnormality/autoresearch/campaigns/auxiliary-signals/prior-work.md#site-priors)
+    found limited incremental header-prior value and negative gold-study signs. Numeric
+    fields can still encode site despite excluding vendor and model identity.'
+  - '[Perez et al., FiLM](https://arxiv.org/abs/1709.07871) establishes feature-wise
+    conditioning as an architectural mechanism. Its visual-reasoning results do not
+    establish an MRI benefit.'
+  novelty: Uses acquisition values to modulate image features within the model. It
+    is distinct from post-hoc site offsets, scanner classification and scanner-information
+    removal.
+  coverage: Apply the same five-field rule to every used acquisition. A study with
+    stripped fields still uses available spacing/thickness; each unavailable field
+    has a neutral contribution. Log actual per-study and per-acquisition coverage
+    rather than extrapolating from representative headers.
+  exploitation: Allows acquisition-dependent interpretation of the existing image
+    representation while preserving the backbone, image budget and auxiliary supervision.
+    The proposed benefit is an interaction with visual evidence; residual site-prior
+    learning remains possible.
+  budget: One run at the current incumbent seed, presently 2617320043, with fixed
+    10 epochs, 4,420 steps and image workloads, capped at 2,267 seconds including
+    header work. Cache one header read per used series within the dataset process.
+    The conditioner adds 1,280 parameters and no image passes. Header I/O across workers
+    and epochs remains an unmeasured runtime risk.
+  implementation: Add coordinated settings only under data.acquisition_inputs and
+    model.acquisition_inputs. In dataset.py, select the lexicographically first indexed
+    file for each used series, parse the five tags, and collate values aligned with
+    PreparedSeries.uid. Apply modulation in model.py before positional features. Retain
+    all losses, target transformations, sampling and augmentations. Record field names,
+    units, references, parser rule and missing-value behavior in checkpoint configuration.
+    Log field coverage per study/acquisition, all-missing counts, modulation magnitude
+    and parameter activity each epoch. Keep disabled parity and forked initialization.
+    On a new incumbent, retain unrelated improvements and replace only overlapping
+    acquisition-conditioning behavior. Separate production inference-loader work follows
+    adoption.
+  open_choices: The field list, reference scales, canonical-file rule and multiplicative
+    architecture are fixed. Representative-header coverage must not be presented as
+    all-series coverage. Numeric inputs and multiplication do not establish site invariance;
+    hidden-test benefit remains unknown, and the fixed macro adoption rule is unchanged.
+  dependencies: []
+  priority_rationale: 'Third: a distinct input mechanism with measured availability
+    and modest model cost. Site confounding, acquisition-level coverage and loader
+    overhead make it less certain than the two attribute proposals.'
+  status: queued
+  created_revision: 181
+  ranking_rationale: 'Correct the rejected queue decision: model-bias-product-of-experts
+    and site-bias-with-model-confusion are explicitly user-ordered, so both retain
+    their order immediately after the reserved head. Admit all three proposals; proposal_admission
+    reports their dependencies satisfied, and the targeted history search found no
+    measured duplicate. Rank option pooling and ordered readouts ahead of acquisition
+    work because they reuse existing inputs and make focused head changes. Keep acquisition
+    conditioning ahead of regression, whose representative-series targets introduce
+    more uncertainty.'
+- id: site-bias-product-of-experts
+  mechanism_id: site-bias-logit-offset
+  parent_idea_id: scanner-confusion-detached-head
+  title: Absorb each scanner group's label-rate shift with a training-only per-site
+    logit bias, dropped at validation and inference
+  opportunity: 'Training labels are report-derived and carry site reporting conventions
+    that the image-derived hidden-test labels do not: the four minor vendors are one
+    English-reporting site whose labels run x1.1-x3.6 higher on ten of twelve targets
+    (Synovitis x3.56) from reporting completeness, and every header site offset scored
+    negative on the gold studies. The adopted scanner confusion head removes site
+    information from the features; the label-rate shift itself is still fit by the
+    image pathway through whatever site cues remain. User-ordered exception to the
+    fixed disease loss (user decision 2026-09-26), because the disease targets and
+    evaluation are unchanged and the term is dropped outside training.'
+  mechanism: 'A learned table b of shape 8 x 12 (scanner group x disease label), zero-initialized,
+    lives in the Lightning module under a forked RNG. During training only, the disease
+    loss uses logits f(x) + b[group(study)], where group follows data/folds/all_5fold_scanner_v1/protocol.json
+    from the header table the incumbent already loads. The class-balanced BCE, targets,
+    gold overrides and half-knee loss are otherwise unchanged. Validation, checkpoint
+    selection, saved predictions and export use f(x) alone. b trains at the head learning
+    rate without weight decay. Setting trainer.metadata_heads.site_bias: true. Log
+    per epoch the mean absolute bias per label and the largest per-group bias.'
+  precedents:
+  - 'Clark et al., Don''t take the easy way out: ensemble based methods for avoiding
+    known dataset biases (arXiv:1909.03683): product of experts with a bias-only model
+    during training, removed at test time.'
+  - He et al., Unlearn dataset bias in natural language inference by fitting the residual
+    (arXiv:1908.10763).
+  - 'Vendor label associations and header stacker: prior-work.md, site priors.'
+  - Scanner confusion S67 0.948 public against its paired control S68 0.947 (adoption
+    record in this campaign).
+  novelty: First mechanism aimed at site label priors rather than site features.
+  coverage: All training studies; largest expected effect on Synovitis and OA, the
+    most site-inflated labels.
+  exploitation: Local labels contain the convention, so a local loss is expected;
+    the user judges it with a public submission. If the learned biases are near zero,
+    the incumbent's confusion head already covers it.
+  budget: 96 parameters; negligible.
+  implementation: Bias table and training-only logit offset in training/lightning.py
+    (group lookup reusing the incumbent's scanner table loader in training/auxiliary/);
+    config flag under trainer.metadata_heads in config.py and configs/training.yaml.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: User-ordered; targets the measured reporting-convention mechanism
+    directly and changes nothing at inference.
+  status: completed
+  created_revision: 196
+  seeded: /home/claudio/src/knee-abnormality/autoresearch/campaigns/auxiliary-signals/bias-ideas.yaml
+  experiments:
+  - site-bias-product-of-experts-20260926T195143Z-21b4b14d
+  decision: reject
+- id: scanner-model-confusion-target
+  mechanism_id: metadata-confusion-head
+  parent_idea_id: scanner-confusion-detached-head
+  title: Switch the adopted confusion head's target from 8 scanner groups to 31 scanner
+    models, a finer site identity
+  opportunity: 'The adopted confusion head removes information about 8 coarse scanner
+    groups (vendor x field strength, minor vendors pooled). A site is closer to a
+    scanner model: the header table has 51 models, 30 of them with at least 30 studies
+    covering 4,253 of 4,407 studies. The finest header site signal measured, the protocol
+    signature, gave +0.0009 locally and -0.006 on gold; the model is the closest site
+    identity available to a candidate without re-reading every DICOM header.'
+  mechanism: 'Same detached head, bounded confusion term, weight 0.1 and ramp as the
+    incumbent. One change: the target becomes the study''s (Manufacturer, ManufacturerModelName)
+    from outputs/analysis/sharing-disagreement-20260914/study_headers.parquet (same
+    SHA-256 check), keeping the 30 models with at least 30 studies in the whole table
+    and pooling the rest into one "other" class, 31 classes; the prior for the KL
+    is the training fold''s class frequencies. Log head accuracy and loss against
+    the majority rate and the frequency entropy of the new target.'
+  precedents:
+  - 'Adopted scanner-confusion-detached-head: head accuracy 0.314 vs 0.263 on 8 groups
+    (this campaign).'
+  - 'Header stacker: protocol signature +0.0009 local, gold -0.006 (prior-work.md,
+    site priors).'
+  novelty: First site-level confusion target.
+  coverage: All training studies; all labels.
+  exploitation: If the head reads models well beyond their frequencies and disease
+    AUC holds, judged publicly against the incumbent; if model identity is no more
+    readable than the groups, the coarse target stays.
+  budget: 31-way classifier instead of 8; negligible.
+  implementation: Target mapping and prior in training/auxiliary/; head output width;
+    no config change beyond a target selector under trainer.metadata_heads.
+  open_choices: None; the 30-study floor is fixed from the table.
+  dependencies: []
+  priority_rationale: User-ordered; the same adopted mechanism at site resolution.
+  status: completed
+  created_revision: 196
+  seeded: /home/claudio/src/knee-abnormality/autoresearch/campaigns/auxiliary-signals/bias-ideas.yaml
+  experiments:
+  - scanner-model-confusion-target-20260926T202630Z-e9304533
+  decision: reject
+- id: report-completeness-bias
+  mechanism_id: completeness-bias-logit-offset
+  parent_idea_id: scanner-confusion-detached-head
+  title: Model report-completeness label noise with a training-only logit bias per
+    report-length quintile
+  opportunity: 'Labels follow what a report bothers to list: silence becomes a negative
+    label, Toshiba reports run 1,317 characters against a 968 median and their Synovitis
+    labels match the literal word in 179 of 181 reports, and a quarter of Spanish
+    reports are short positive-only summaries. The image cannot know a report was
+    short, so those false negatives are label noise the image pathway is forced to
+    fit. User-ordered exception to the fixed disease loss (user decision 2026-09-26),
+    because the disease targets and evaluation are unchanged and the term is dropped
+    outside training.'
+  mechanism: 'Bucket each training study by the character length of its report in
+    data/raw/train.csv into quintiles whose boundaries come from the training fold''s
+    studies. A learned table b of shape 5 x 12, zero-initialized under a forked RNG,
+    is added to the disease logits during training only, exactly as a product-of-experts
+    bias; validation, selection, saved predictions and export use f(x) alone. b trains
+    at the head learning rate without weight decay. Setting trainer.metadata_heads.completeness_bias:
+    true. Log per epoch the per-quintile mean bias.'
+  precedents:
+  - 'Clark et al. (arXiv:1909.03683): a bias-only model during training, removed at
+    test time.'
+  - Vendor label associations (docs/metadata/vendor-label-associations.md) and the
+    v3 analysis of Spanish short reports (docs/ongoing/report-attribute-extraction.md).
+  - 'Noisy-labels campaign: prediction-memory correction rejected (autoresearch/campaigns/noisy-labels/findings.md);
+    a different mechanism.'
+  novelty: First label-noise model keyed on a report property.
+  coverage: All training studies; largest expected effect on labels most often left
+    unmentioned.
+  exploitation: If short-report biases come out negative and the public score holds
+    or rises, extend to a finer completeness measure (unmentioned-structure counts
+    from the v3 answers).
+  budget: 60 parameters; negligible.
+  implementation: Length quintiles at setup and the training-only offset in training/lightning.py;
+    config flag under trainer.metadata_heads.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: User-ordered; the one measured label-noise source the image
+    cannot see.
+  status: blocked
+  created_revision: 196
+  seeded: /home/claudio/src/knee-abnormality/autoresearch/campaigns/auxiliary-signals/bias-ideas.yaml
+  experiments:
+  - report-completeness-bias-20260926T210116Z-33cb77aa
+  blocked_reason: "Block and park the candidate. Its defining signal is raw report\
+    \ length, outside the campaign\u2019s permitted v3 answers and DICOM headers.\
+    \ It also adds a learned offset to logits entering the fixed disease loss. Removing\
+    \ those changes would remove the proposed mechanism, so a bounded repair cannot\
+    \ make this candidate compliant. The ranking lists every remaining queued idea\
+    \ once, in its existing order, correcting the previous report\u2019s rejected\
+    \ null ranking."
+- id: scanner-token-harmonization
+  mechanism_id: scanner-feature-harmonization
+  parent_idea_id: scanner-confusion-detached-head
+  title: Harmonize tokens per scanner group (ComBat-style location and scale) before
+    normalization, in training and inference
+  opportunity: The scanner group is known at inference from the DICOM headers (vendor
+    and field strength; missing field strength maps to the group's unknown class),
+    so its effect can be subtracted directly instead of only discouraged during training.
+    The adopted confusion head showed the scanner is faintly readable from the pooled
+    tokens (0.314 against 0.263) and scored 0.948 public against 0.947 for its paired
+    control. Multi-site MRI work removes site effects by standardizing features per
+    site (ComBat); here that means removing each group's mean and scale shift from
+    the tokens the disease head pools.
+  mechanism: 'Before mil_norm, for each token of a study in scanner group g (the 8
+    groups of data/folds/all_5fold_scanner_v1/protocol.json from the header table
+    the incumbent loads): token'' = (token - mu_g) / sigma_g * sigma_all + mu_all,
+    per channel. mu_g and sigma_g are per-group running statistics (momentum 0.01,
+    like BatchNorm running stats) over visually valid training tokens; mu_all and
+    sigma_all are the running statistics over all groups. Running statistics update
+    only in training and are used unchanged in validation and inference; a group with
+    fewer than 1,000 accumulated tokens uses the overall statistics. The statistics
+    are buffers of KneeAbnormalityModel, so they are saved, exported and applied at
+    inference. The adopted confusion head stays. Setting model.acquisition_inputs.scanner_harmonization:
+    true. Log per epoch each group''s mean absolute shift |mu_g - mu_all| averaged
+    over channels and the ratio sigma_g / sigma_all.'
+  precedents:
+  - 'Johnson et al., Adjusting batch effects in microarray expression data using empirical
+    Bayes methods (ComBat, Biostatistics 2007); Fortin et al., Harmonization of multi-site
+    diffusion tensor imaging data (NeuroImage 2017): per-site location and scale adjustment
+    of features.'
+  - Adopted scanner-confusion-detached-head and its public result (this campaign).
+  - 'Header availability at test time: bias_free.md.'
+  novelty: First mechanism that uses the scanner at inference, removing its feature
+    shift rather than discouraging it.
+  coverage: All studies in training, validation and inference; all labels.
+  exploitation: If it holds locally and gains publicly against the incumbent, the
+    inference loader gains the scanner-group lookup from headers it already reads;
+    if the per-group shifts are negligible, the tokens are already harmonized by series
+    normalization and the line stops here.
+  budget: Two 8 x 256 statistic buffers and an elementwise transform; negligible.
+  implementation: Buffers and the transform in modeling/model.py before mil_norm,
+    taking a per-study group index; group index delivered per study from the header
+    table in data/dataset.py for training and validation; config under model.acquisition_inputs.
+    Inference-loader support follows adoption as separate work.
+  open_choices: None; momentum and the 1,000-token floor are fixed.
+  dependencies: []
+  priority_rationale: User-ordered; the direct way to subtract the known scanner at
+    inference.
+  status: blocked
+  created_revision: 197
+  seeded: /home/claudio/src/knee-abnormality/autoresearch/campaigns/auxiliary-signals/harmonization-ideas.yaml
+  ranking_rationale: "Block and park the candidate. Its defining signal is raw report\
+    \ length, outside the campaign\u2019s permitted v3 answers and DICOM headers.\
+    \ It also adds a learned offset to logits entering the fixed disease loss. Removing\
+    \ those changes would remove the proposed mechanism, so a bounded repair cannot\
+    \ make this candidate compliant. The ranking lists every remaining queued idea\
+    \ once, in its existing order, correcting the previous report\u2019s rejected\
+    \ null ranking."
+  experiments:
+  - scanner-token-harmonization-20260926T210738Z-bab8401c
+  blocked_reason: Block and park this idea at its implementation review. The candidate
+    source and changes.diff are unavailable, and the workspace was restored to the
+    bound parent. The proposed scanner-group input cannot reach the required exported-model
+    validation prediction path within the editable-file policy. The ranking lists
+    every remaining eligible queue entry in its existing order, addressing the prior
+    report rejection.
+- id: answer-completeness-bias
+  mechanism_id: completeness-bias-logit-offset
+  parent_idea_id: report-completeness-bias
+  title: Model report-completeness label noise with a training-only logit bias per
+    quintile of v3 not-mentioned mass
+  opportunity: 'report-completeness-bias was blocked because raw report length is
+    outside the campaign''s permitted data. The same signal is available from the
+    v3 answers the campaign may use: how much of a report''s answer mass sits on options
+    that say the report did not address the structure or grade. Silence becomes a
+    negative label, a quarter of Spanish reports are short positive-only summaries
+    whose not-mentioned answers are correct (255 of 260 ACL cases), and the image
+    cannot know a report was silent, so those false negatives are label noise the
+    image pathway is forced to fit. The per-site logit bias with the same user-ordered
+    exception to the fixed disease loss was approved and scored +0.00040 locally.
+    User-ordered exception to the fixed disease loss (user decision 2026-09-26), because
+    the disease targets and evaluation are unchanged and the term is dropped outside
+    training.'
+  mechanism: 'For each training study, completeness mass = the sum, over the target
+    set 3.1 table the incumbent already loads, of the probability on every option
+    whose key is not_mentioned, not_stated, unspecified, tear_unspecified, partial_unspecified
+    or unspecified_loss (25 options over 21 questions, as in drop-report-completeness-options).
+    Bucket studies into quintiles of that mass with boundaries from the training fold''s
+    studies. A learned table b of shape 5 x 12, zero-initialized under a forked RNG,
+    is added to the disease logits during training only, like the approved per-site
+    bias; validation, selection, saved predictions and export use f(x) alone. b trains
+    at the head learning rate without weight decay. Setting trainer.metadata_heads.completeness_bias:
+    true. Log per epoch the per-quintile mean bias and the quintile boundaries.'
+  precedents:
+  - 'site-bias-product-of-experts: approved with the same exception, +0.00040 [80%
+    -0.0011, +0.0019], largest biases on Synovitis and Effusion (this campaign).'
+  - 'Clark et al. (arXiv:1909.03683): a bias-only model during training, removed at
+    test time.'
+  - v3 analysis of Spanish short reports and not-mentioned answers (docs/ongoing/report-attribute-extraction.md#v3-full-run-analysis-2026-09-25).
+  novelty: First label-noise model keyed on how completely a report addressed the
+    knee, measured from the permitted v3 answers.
+  coverage: All training studies; largest expected effect on labels most often left
+    unmentioned.
+  exploitation: If low-completeness quintiles learn negative biases and the public
+    score holds or rises, combine with the per-site bias.
+  budget: 60 parameters; negligible.
+  implementation: Completeness mass and quintiles at setup from the loaded attribute
+    table; the training-only offset in training/lightning.py next to the per-site
+    bias; config flag under trainer.metadata_heads.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: User-ordered; replaces the blocked version with permitted data.
+  status: blocked
+  created_revision: 272
+  seeded: /home/claudio/src/knee-abnormality/autoresearch/campaigns/auxiliary-signals/completeness-v3-ideas.yaml
+  experiments:
+  - answer-completeness-bias-20260926T211439Z-3e8cba85
+  blocked_reason: Block and park this candidate. Its v3-answer source addresses the
+    raw-report-text defect of the earlier report-completeness candidate, but its defining
+    learned, per-label offset still changes the logits passed into the fixed disease
+    loss. Removing that offset would remove the proposed mechanism, so a bounded repair
+    cannot make this idea compliant. The ranking removes only the parked reserved
+    head and preserves the remaining queue order.
+- id: model-bias-product-of-experts
+  mechanism_id: site-bias-logit-offset
+  parent_idea_id: site-bias-product-of-experts
+  title: Training-only logit bias per scanner model (31 x 12) instead of per scanner
+    group, dropped at validation and inference
+  opportunity: 'On the fold-3 site-signature scorecard (minor-site logit shift against
+    label inflation, bias_free.md), the per-site bias removed the site prior without
+    disease cost (signature rho -0.52, Synovitis -0.35, Effusion +0.24, major-vendor-only
+    delta +0.0005, local +0.00040), while the scanner-model confusion target had the
+    purest signature (rho -0.59) but cost disease signal (major-vendor-only -0.0013).
+    A site is closer to a scanner model than to a vendor x field strength group, so
+    a bias at model resolution should absorb finer site label priors with the mechanism
+    that costs nothing at inference. User-ordered exception to the fixed disease loss
+    (user decision 2026-09-26), the same exception approved for site-bias-product-of-experts:
+    disease targets and evaluation are unchanged and the term is dropped outside training.'
+  mechanism: 'Exactly site-bias-product-of-experts (training-only offset added to
+    the disease logits before the unchanged class-balanced BCE; zero-initialized table
+    under a forked RNG; head learning rate, no weight decay; validation, selection,
+    saved predictions and export use f(x) alone) on top of the incumbent, with one
+    change: the table is 31 x 12 over scanner models instead of 8 x 12 over groups.
+    Models follow scanner-model-confusion-target: (Manufacturer, ManufacturerModelName)
+    from outputs/analysis/sharing-disagreement-20260914/study_headers.parquet (same
+    SHA-256 check), the 30 models with at least 30 studies in the whole table, the
+    rest pooled into one other class. The incumbent''s 8-group confusion head stays.
+    Setting trainer.metadata_heads.site_bias with a model-resolution selector. Log
+    per epoch the mean absolute bias per label and the largest per-model bias.'
+  precedents:
+  - 'site-bias-product-of-experts: +0.00040 [80% -0.0011, +0.0019], approved with
+    the same exception; source under outputs/autoresearch/auxiliary-signals/experiments/site-bias-product-of-experts-*/source
+    (this campaign).'
+  - 'scanner-model-confusion-target: 31-model mapping and head 0.172 vs 0.125; source
+    under outputs/autoresearch/auxiliary-signals/experiments/scanner-model-confusion-target-*/source
+    (this campaign).'
+  - 'Clark et al. (arXiv:1909.03683): bias-only model during training, removed at
+    test time.'
+  novelty: First site bias at scanner-model resolution.
+  coverage: All training studies; largest expected effect on Synovitis and OA.
+  exploitation: Judged by the site-signature scorecard and a public submission paired
+    with the incumbent; if its biases spread thinly over rare models with no gain,
+    the group resolution stays.
+  budget: 372 parameters; negligible.
+  implementation: Model mapping from the scanner-model experiment into training/auxiliary/;
+    the bias table and training-only offset from the site-bias experiment in training/lightning.py;
+    config selector under trainer.metadata_heads.
+  open_choices: None; the 30-study floor is fixed.
+  dependencies: []
+  priority_rationale: User-ordered; combines the purest site resolution with the only
+    mechanism that removed the site prior at no disease cost.
+  status: completed
+  created_revision: 326
+  seeded: /home/claudio/src/knee-abnormality/autoresearch/campaigns/auxiliary-signals/site-bias-followup-ideas.yaml
+  ranking_rationale: 'Correct the rejected queue decision: model-bias-product-of-experts
+    and site-bias-with-model-confusion are explicitly user-ordered, so both retain
+    their order immediately after the reserved head. Admit all three proposals; proposal_admission
+    reports their dependencies satisfied, and the targeted history search found no
+    measured duplicate. Rank option pooling and ordered readouts ahead of acquisition
+    work because they reuse existing inputs and make focused head changes. Keep acquisition
+    conditioning ahead of regression, whose representative-series targets introduce
+    more uncertainty.'
+  experiments:
+  - model-bias-product-of-experts-20260926T224928Z-44f7ac95
+  decision: reject
+- id: site-bias-with-model-confusion
+  mechanism_id: site-bias-logit-offset
+  parent_idea_id: site-bias-product-of-experts
+  title: Combine the 8 x 12 training-only site bias with confusion over 31 scanner
+    models
+  opportunity: 'The two strongest signatures on the fold-3 scorecard came from different
+    mechanisms: the per-site bias (label priors; rho -0.52, no disease cost) and the
+    scanner-model confusion target (feature information; rho -0.59, disease cost -0.0013
+    on the major vendors). They act on different things, the bias on per-site label
+    rates and the confusion on site information in the features, so together they
+    may remove more of the site than either. User-ordered exception to the fixed disease
+    loss (user decision 2026-09-26), the same exception approved for site-bias-product-of-experts.'
+  mechanism: 'On top of the incumbent: (1) the confusion head''s target switches from
+    the 8 scanner groups to the 31 scanner models exactly as in scanner-model-confusion-target
+    (same detached head, bounded KL confusion, weight 0.1 and ramp; the prior is the
+    training fold''s model frequencies); and (2) the 8 x 12 training-only site bias
+    exactly as in site-bias-product-of-experts, dropped at validation, selection,
+    saved predictions and export. No other change. Log both mechanisms'' diagnostics
+    as in their source runs.'
+  precedents:
+  - site-bias-product-of-experts and scanner-model-confusion-target results and sources
+    (this campaign).
+  - 'Site-signature scorecard: bias_free.md.'
+  novelty: First combination of a label-prior bias and feature confusion on the site.
+  coverage: All training studies; all labels.
+  exploitation: If its signature beats both parents without the confusion target's
+    disease cost, it becomes the public candidate; if the disease cost returns, the
+    bias alone stays preferred.
+  budget: A 31-way detached head and a 96-parameter bias table; negligible.
+  implementation: Port both changes from their experiment sources under outputs/autoresearch/auxiliary-signals/experiments/
+    into training/auxiliary/ and training/lightning.py; config under trainer.metadata_heads.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: User-ordered; tests whether the two best site mechanisms add.
+  status: completed
+  created_revision: 326
+  seeded: /home/claudio/src/knee-abnormality/autoresearch/campaigns/auxiliary-signals/site-bias-followup-ideas.yaml
+  ranking_rationale: 'Correct the rejected queue decision: model-bias-product-of-experts
+    and site-bias-with-model-confusion are explicitly user-ordered, so both retain
+    their order immediately after the reserved head. Admit all three proposals; proposal_admission
+    reports their dependencies satisfied, and the targeted history search found no
+    measured duplicate. Rank option pooling and ordered readouts ahead of acquisition
+    work because they reuse existing inputs and make focused head changes. Keep acquisition
+    conditioning ahead of regression, whose representative-series targets introduce
+    more uncertainty.'
+  experiments:
+  - site-bias-with-model-confusion-20260926T232344Z-13c9dc8c
+  - site-bias-with-model-confusion-20260926T233021Z-841d86a2
+  decision: reject
+- id: attribute-location-option-pooling
+  mechanism_id: attribute-option-pooling
+  parent_idea_id: null
+  title: Give location and tear-morphology options separate attention pools
+  opportunity: The current attribute head uses one pooled feature for every answer
+    to a question. Different anatomical locations or tear morphologies may require
+    evidence from different tokens. In the incumbent's completed logs, final KL for
+    the six proposed questions ranges from 0.2412 to 0.5382. These residuals establish
+    imperfect fitting, not a pooling diagnosis; improved spatial specialization is
+    the hypothesis.
+  mechanism: Apply one fixed pooling change to medial_meniscus_tear_location, lateral_meniscus_tear_location,
+    medial_meniscus_tear_type, lateral_meniscus_tear_type, contusion_location and
+    pf_cartilage_surface. Replace each question's single attention query with one
+    query per existing option. Compute each option's logit using its own pooled feature
+    and the existing option classifier row, then retain the question-level softmax.
+    Initialize each replacement query by copying its former question query, so specialization
+    develops during training. Keep the shared attention trunk, targets, gates, reliability
+    weights, attribute coefficient and loss normalization. The six questions are selected
+    by their location/morphology semantics, without disease-label results.
+  precedents:
+  - 'The incumbent implementation pools once per question and applies separate option
+    classifier rows: [ReportAttributeHeads](/home/claudio/src/knee-abnormality/outputs/autoresearch/auxiliary-signals/experiments/scanner-confusion-detached-head-20260926T165429Z-55c4db64/source/src/knee_abnormality/training/report_attributes.py).'
+  - 'Incumbent epoch logs show learning but remaining location/morphology divergence:
+    [metrics](/home/claudio/src/knee-abnormality/outputs/autoresearch/auxiliary-signals/experiments/scanner-confusion-detached-head-20260926T165429Z-55c4db64/training/fold_3/logs/version_0/metrics.csv).'
+  - '[Ilse, Tomczak and Welling, 2018](https://proceedings.mlr.press/v80/ilse18a.html)
+    establishes learned attention aggregation for multiple-instance learning. Option-specific
+    pooling here is a proposed extension, with no measured knee-task benefit.'
+  - The running attribute-gate-family-shared-pooling experiment shares queries across
+    related questions. Its outcome is unknown; this proposal independently separates
+    queries within selected questions.
+  novelty: Changes where each answer gathers visual evidence while preserving every
+    target distribution. It introduces neither joint questions nor different gates.
+    It is distinct from sharing a pool across parent and child questions.
+  coverage: Six retained questions containing 44 options. With the supplied incumbent,
+    total attention queries increase from 35 to 73. Every option, including absence
+    and unspecified answers, remains supervised. All other questions retain their
+    current pooling.
+  exploitation: Reuses the existing normalized visual tokens and backbone pass. Option
+    classifiers can specialize their attention through their different supervised
+    gradients. No disease-label routing or additional image processing is introduced.
+  budget: One candidate at the supervisor's incumbent seed, currently 2617320043;
+    fold 3, ten epochs and 4,420 steps. Adds 38 attention-output rows, approximately
+    4,902 parameters at hidden width 128. Auxiliary attention work increases, but
+    there is no additional backbone pass. Runtime impact is unmeasured and must remain
+    within 2,267 seconds.
+  implementation: Replace selected pooling assignments in training/report_attributes.py
+    under one trainer.report_attribute_heads option; use config.py, configs/training.yaml
+    and training/lightning.py for wiring and provenance. Retain scanner confusion
+    and all unrelated incumbent behavior. Preserve the existing output order and probability
+    interface. Log per-question loss, targeted studies, effective weight, KL and divergence
+    between option attention maps each epoch. Preserve incumbent initialization and
+    fork RNG for added initialization; disabled behavior must reproduce the incumbent.
+    If family-shared pooling is accepted first, separate only these six questions
+    and retain sharing elsewhere. If predicted-attribute inference is accepted first,
+    retain that readout and feed it the updated predictions. Neither undecided mechanism
+    is required.
+  open_choices: The question list and copied-query initialization are fixed. Absence
+    options may attend to reporting-style correlates, and several location targets
+    have known systematic errors. Attention specialization and improved target fit
+    would remain diagnostics; only the unchanged macro adoption rule decides the candidate.
+  dependencies: []
+  priority_rationale: 'Priority 1: a small, explicit pooling intervention with unchanged
+    targets, straightforward integration and modest parameter cost. Its benefit is
+    uncertain, but it tests a capability absent from the current head.'
+  status: launched
+  created_revision: 331
+  ranking_rationale: 'Correct the rejected queue decision: model-bias-product-of-experts
+    and site-bias-with-model-confusion are explicitly user-ordered, so both retain
+    their order immediately after the reserved head. Admit all three proposals; proposal_admission
+    reports their dependencies satisfied, and the targeted history search found no
+    measured duplicate. Rank option pooling and ordered readouts ahead of acquisition
+    work because they reuse existing inputs and make focused head changes. Keep acquisition
+    conditioning ahead of regression, whose representative-series targets introduce
+    more uncertainty.'
+  experiments:
+  - attribute-location-option-pooling-20260926T235729Z-7307cc29
+- id: attribute-ordered-probability-heads
+  mechanism_id: attribute-ordinal-readout
+  parent_idea_id: null
+  title: Parameterize grade and size probabilities with ordered cutpoints while retaining
+    all answers
+  opportunity: "Five existing questions contain ordered severity or size answers alongside\
+    \ nominal answers. Label-free analysis of the 3,535 fold-3 training studies finds\
+    \ 86.16%, 90.39% and 89.49% mean target mass on ordered cartilage-depth answers,\
+    \ 77.17% for effusion size and 79.08% for Baker's size. Their incumbent final\
+    \ KL values span 0.3657\u20130.6408. Sharing a severity axis could improve supervision\
+    \ efficiency without discarding fine grades; that benefit is unmeasured."
+  mechanism: Replace the output parameterization for medial_cartilage_depth, lateral_cartilage_depth
+    and pf_cartilage_depth using order [no_damage, softening, partial_low, partial_high,
+    full_thickness]; effusion_size uses [none, small, moderate, large]; baker_size
+    uses [absent, small, moderate, large]. All remaining options stay nominal. From
+    each question's existing pooled feature, predict severity s, ordered-mass gate
+    a and nominal logits. Define increasing learned cutpoints t_j and cumulative probabilities
+    C_j=sigmoid(t_j-s); adjacent differences give ordered category probabilities.
+    Multiply these by sigmoid(a), and distribute the remaining mass through the nominal
+    softmax. Return normalized log probabilities in the original option order to the
+    unchanged soft categorical cross-entropy. Use positive cutpoint increments and
+    logistic-quantile initialization. Change no targets, gates or reliability weights.
+  precedents:
+  - '[The sealed 3.1 manifest](/home/claudio/src/knee-abnormality/configs/labels/jevk5-report-attribute-targets-v3.1.json)
+    defines the exact option keys. Training-fold mass calculations used its recorded
+    targets and the fixed fold membership, without disease labels.'
+  - '[Incumbent metrics](/home/claudio/src/knee-abnormality/outputs/autoresearch/auxiliary-signals/experiments/scanner-confusion-detached-head-20260926T165429Z-55c4db64/training/fold_3/logs/version_0/metrics.csv)
+    establish the reported final divergences.'
+  - '[Cao, Mirjalili and Raschka, 2020](https://arxiv.org/abs/1901.07884) motivates
+    rank-consistent neural ordinal outputs. This proposal uses a cumulative-probability
+    parameterization with the existing categorical likelihood; it does not import
+    CORAL''s binary-task loss.'
+  - The closed attribute-severity-coarsening family merged grades. This proposal retains
+    all grades and their original soft probability mass.
+  novelty: Introduces an ordered classifier structure rather than another target merge,
+    hardening rule or question filter. Nominal answers retain a separate probability
+    path, so unspecified findings are not assigned an invented grade.
+  coverage: Exactly five questions, selected by the stated option taxonomy. All original
+    options and all other question heads remain. The three cartilage compartments
+    use the same architectural rule without sharing their learned severity parameters.
+  exploitation: Reuses each question's current pooled feature. Adjacent grades share
+    a learned severity axis, potentially reducing sample requirements for uncommon
+    high grades. Existing categorical supervision still constrains the complete answer
+    distribution.
+  budget: One ten-epoch candidate at the current incumbent seed, currently 2617320043,
+    with unchanged 4,420 steps and image workload. Five small output blocks replace
+    existing classifier rows; no extra image pass is needed. Expected overhead is
+    small but unmeasured; the 2,267-second limit and fixed macro adoption rule apply.
+  implementation: Implement the selected output blocks in training/report_attributes.py
+    behind one trainer.report_attribute_heads option, retaining all current pooling
+    and unrelated classifier rows. Keep scanner confusion, the disease loss and the
+    attribute coefficient. Use stable log-CDF differences and preserve the original
+    normalized-probability interface. Record ordered keys, nominal keys and initialization
+    in checkpoint provenance. Log loss, KL, targeted studies, effective weights, ordered-mass
+    predictions and cutpoints per epoch. New initialization must use forked RNG; disabled
+    behavior reproduces the incumbent. Retain newly accepted pooling or inference-readout
+    improvements because they operate before or after this output parameterization.
+    If a future target transform changes these option keys, report the integration
+    conflict rather than silently changing the prescribed order.
+  open_choices: Mappings and nominal handling are fixed. A single severity axis may
+    underfit multimodal soft answers. Baker's size and cartilage targets contain documented
+    systematic errors that this architecture cannot repair. Better ordinal fit is
+    a hypothesis, not evidence that those answers are correct.
+  dependencies: []
+  priority_rationale: 'Priority 2: negligible image-compute cost and a distinct inductive
+    bias supported by substantial ordered target mass. More restrictive modeling assumptions
+    make it less certain than changing attention flexibility.'
+  status: developing
+  created_revision: 331
+  ranking_rationale: 'Correct the rejected queue decision: model-bias-product-of-experts
+    and site-bias-with-model-confusion are explicitly user-ordered, so both retain
+    their order immediately after the reserved head. Admit all three proposals; proposal_admission
+    reports their dependencies satisfied, and the targeted history search found no
+    measured duplicate. Rank option pooling and ordered readouts ahead of acquisition
+    work because they reuse existing inputs and make focused head changes. Keep acquisition
+    conditioning ahead of regression, whose representative-series targets introduce
+    more uncertainty.'
+  experiments:
+  - attribute-ordered-probability-heads-20260927T003146Z-cdf83bc3
+- id: acquisition-within-group-regression
+  mechanism_id: acquisition-physics-supervision
+  parent_idea_id: null
+  title: Predict acquisition measurements centered within scanner groups using a training-only
+    head
+  opportunity: The verified header table contains positive TR and TE for 3,344 of
+    3,535 training studies, and valid pixel spacing and slice thickness for all 3,535.
+    After centering log measurements within the incumbent's eight canonical scanner
+    groups, retained variance is 74.52%, 86.39%, 70.70% and 84.71%, respectively.
+    Thus substantial numeric variation remains beyond group means. Whether learning
+    that variation improves disease features is unknown.
+  mechanism: "Use the existing representative-header table to construct four study\
+    \ targets: log(TR), log(TE), log(geometric-mean PixelSpacing) and log(SliceThickness).\
+    \ Subtract each field's mean within the eight canonical scanner groups, calculated\
+    \ solely from training-fold studies, then divide by its pooled training residual\
+    \ standard deviation. Pool existing visually valid coronal encoded.features before\
+    \ positional additions into one study vector and apply a 256\u2192128\u21924 GELU\
+    \ regression head. Add 0.1 times Huber loss with delta 1, averaged over available\
+    \ fields per study and then eligible studies. Mask malformed or missing fields\
+    \ and studies with no surviving coronal tokens. Scanner identity is used only\
+    \ to construct targets; it is not a head input. Drop the head at inference."
+  precedents:
+  - '[Existing header table](/home/claudio/src/knee-abnormality/outputs/analysis/sharing-disagreement-20260914/study_headers.parquet),
+    SHA-256 8714fa8b025afe0ff47d0811ca735f0ec75c84808b462486db19553d0c3058f4. Training-fold
+    analysis used canonical eight-group mapping, not the table''s finer raw scanner_group
+    strings.'
+  - '[Scanner target loader](/home/claudio/src/knee-abnormality/outputs/autoresearch/auxiliary-signals/experiments/scanner-confusion-detached-head-20260926T165429Z-55c4db64/source/src/knee_abnormality/training/auxiliary/scanner_confusion.py)
+    supplies the canonical grouping and verified training membership pattern.'
+  - '[Prior work](/home/claudio/src/knee-abnormality/autoresearch/campaigns/auxiliary-signals/prior-work.md#site-priors)
+    documents site-shortcut concerns. Removing group means addresses one identifiable
+    component; it does not establish site invariance.'
+  - The queued acquisition-physics-feature-modulation proposal supplies numeric headers
+    as inference inputs. This proposal instead supervises an image-only training head
+    and requires no inference-loader additions.
+  novelty: Adds positive supervision for within-group numeric acquisition variation.
+    It neither predicts scanner identity nor changes disease logits, and it does not
+    depend on the queued acquisition-input result.
+  coverage: 'Four fields from existing study headers only. All training representatives
+    are coronal: 3,409 fluid-sensitive/fat-suppressed and 126 non-fluid-sensitive/non-fat-suppressed.
+    These are representative-study measurements, not verified measurements for every
+    sampled acquisition. Missing targets contribute no loss.'
+  exploitation: Uses already available projected image features and the existing coronal-plane
+    indicator. A small regression head could encourage sensitivity to contrast and
+    resolution differences while the retained scanner-confusion component continues
+    its existing objective.
+  budget: One candidate at seed 2617320043 unless the supervisor's incumbent changes,
+    with ten epochs and 4,420 steps. Header parsing and target statistics are CPU
+    setup; the head has approximately 33,412 parameters and requires no extra image
+    pass. Runtime is unmeasured and must fit 2,267 seconds. The coefficient is fixed
+    for this proposal, with no sweep.
+  implementation: Add the target loader and regression module under training/auxiliary,
+    wired through training/lightning.py and one trainer.metadata_heads option. Verify
+    header and split hashes; save group means, residual scales, masks and field definitions
+    in checkpoint provenance. Read existing encoded tensors without editing modeling/model.py
+    or preprocessing identity. Retain scanner confusion and all unrelated incumbent
+    behavior. Log field availability, actually supervised studies, per-field Huber
+    loss, MAE and prediction variance each epoch. Use forked initialization and exact
+    disabled-path parity. If acquisition conditioning is accepted first, regression
+    must read an already exposed pre-conditioning tensor so headers cannot directly
+    reveal their own targets; otherwise report integration blocked under the fixed
+    identity gate. Keep conditioning on the disease path.
+  open_choices: The four fields, canonical grouping, normalization and loss are fixed.
+    Representative headers imperfectly describe a study's entire coronal bag. Fixed
+    contrast mixing, resolution augmentation and feature-statistics augmentation may
+    obscure the requested measurements. Centering removes group means but leaves possible
+    scanner information in higher moments.
+  dependencies: []
+  priority_rationale: 'Priority 3: adds a distinct source of auxiliary supervision
+    with measured coverage and residual variation. Representative-series mismatch,
+    augmentation conflict and possible interaction with future header conditioning
+    make this the highest-uncertainty proposal.'
+  status: queued
+  created_revision: 331
+  ranking_rationale: 'Correct the rejected queue decision: model-bias-product-of-experts
+    and site-bias-with-model-confusion are explicitly user-ordered, so both retain
+    their order immediately after the reserved head. Admit all three proposals; proposal_admission
+    reports their dependencies satisfied, and the targeted history search found no
+    measured duplicate. Rank option pooling and ordered readouts ahead of acquisition
+    work because they reuse existing inputs and make focused head changes. Keep acquisition
+    conditioning ahead of regression, whose representative-series targets introduce
+    more uncertainty.'

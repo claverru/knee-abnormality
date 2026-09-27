@@ -1,0 +1,38 @@
+ideas:
+- id: scanner-confusion-detached-head
+  mechanism_id: metadata-confusion-head
+  parent_idea_id: scanner-adversarial-decoupled-weight
+  title: Replace scanner gradient reversal with a detached scanner head and a bounded confusion loss on the backbone
+  opportunity: >-
+    Both gradient-reversal runs hurt (-0.00604 and -0.00419) while their heads never learned: the
+    head loss stayed above the group-frequency entropy (1.90-1.93 against 1.851) for all ten
+    epochs, so the backbone was bending features to make the head confidently wrong. Reversal
+    maximizes an unbounded cross-entropy. It also left open whether the scanner is readable from
+    the pooled tokens at all, since the head never trained undisturbed.
+  mechanism: >-
+    Same eight scanner-group targets, table check, token source (the tokens the disease head
+    pools), attention-pooled head architecture, forked-RNG initialization and training-only use
+    as scanner-adversarial-decoupled-weight; the gradient-reversal layer is removed. Two terms per
+    training step. (1) Head term: run the head on detached tokens and add its unweighted
+    cross-entropy against the one-hot group; only the head's parameters receive this gradient.
+    (2) Confusion term: run the head again on the non-detached tokens with its parameters
+    detached (torch.func.functional_call with detached parameters), and add
+    w * ramp * (cross-entropy(prior, prediction) - entropy(prior)), the KL divergence from the
+    training fold's group frequencies to the head's prediction, with w =
+    trainer.metadata_heads.scanner_confusion_weight 0.1 and ramp = 2 / (1 + exp(-10 p)) - 1 over
+    training progress p. Only the backbone receives this gradient. It is minimized when the head
+    can do no better than the frequencies and cannot be pushed past that. Log per epoch: head
+    loss and accuracy on detached tokens, the confusion KL, the ramp and w * ramp.
+  precedents:
+  - 'scanner-group-adversarial-head and scanner-adversarial-decoupled-weight: reversal runs, heads at or above the frequency entropy for all epochs, -0.00604 and -0.00419 (this campaign).'
+  - 'Tzeng et al., Simultaneous deep transfer across domains and tasks (arXiv:1510.02192): a domain classifier trained on its own loss and a bounded domain-confusion loss on the features toward a fixed distribution, instead of reversal.'
+  novelty: First bounded confusion objective here; the head also trains undisturbed, so its accuracy measures how readable the scanner is from the pooled tokens.
+  coverage: All training studies; all labels.
+  exploitation: If the head's accuracy stays near the majority rate (0.263), the scanner is not readable from these tokens and the line closes. If it learns and the confusion KL falls while disease AUC holds, the user judges it with a public submission paired with the fold-3 control, because local labels reward site priors.
+  budget: A second head forward pass on the same tokens; negligible.
+  implementation: Replace the reversal in training/auxiliary/scanner_adversarial.py with the two terms; group frequencies computed from the training fold's studies at setup; config field trainer.metadata_heads.scanner_confusion_weight replaces scanner_adversarial_weight in config.py and configs/training.yaml; logging in training/lightning.py.
+  open_choices: None; weight 0.1 and the ramp match the parent runs so only the objective changes.
+  dependencies: []
+  priority_rationale: User-ordered; fixes the measured failure mode of both reversal runs and settles whether the scanner is readable, in one run.
+exhausted_directions: >-
+  Gradient reversal on the scanner head (two runs, both harmful, heads never learned).

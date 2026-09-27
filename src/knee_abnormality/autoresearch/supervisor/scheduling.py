@@ -163,7 +163,7 @@ class SchedulingMixin:
             and self.state.get("crash_repair")
             and (
                 len(self.state["queue"]) < self.state["refill_to"]
-                or self.state["seed_order"] == "forced"
+                or self.state["seed_ideas"]
             )
         ):
             crashed = self.state["experiments"][self.state.pop("crash_repair")]

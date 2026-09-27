@@ -6,7 +6,15 @@ target set 3.1 are part of the recipe (user decision): +0.00105 ×4 macro agains
 ([result](../validation/results/2026-09-25-report-attribute-heads.md)). The targets come from the
 v3 extraction below. Open work: a v4 question set (Baker's size first, then the weaknesses in the
 [v3 analysis](#v3-full-run-analysis-2026-09-25)), and a separate target-repair experiment on
-low-grade effusion, Baker's and cartilage findings. This entry replaces
+low-grade effusion, Baker's and cartilage findings.
+**Reliability filter, reevaluated 2026-09-27:** the question-level reliability filter
+(`reliability-filtered-attribute-questions` in the
+[auxiliary-signals campaign](../../autoresearch/campaigns/auxiliary-signals/INDEX.md): drop questions
+whose mean option-order agreement is below 0.80, plus their gated children, 7 of 35) scored +0.00104
+locally, 80% [−0.0004, +0.0024], against `half-stack-control`, the campaign's only local near miss,
+but **0.943 public (S72, bundle `f2a642bb`) against 0.947 for its paired control S68** (same fold and
+seed). Kaggle shows S72 with a stale "S66 … retry" description. Not adopted; the cell-level
+version lost locally (−0.00062). This entry replaces
 the backlog big bet "Richer report supervision: OA attributes", widened from OA to all twelve
 labels.
 

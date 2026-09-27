@@ -8,6 +8,7 @@ import numpy as np
 import polars as pl
 import pytorch_lightning as L
 import torch
+from torch.func import functional_call
 from torch.nn import functional as F
 from torch.nn.modules.batchnorm import _BatchNorm
 from torch.optim import AdamW
@@ -15,6 +16,7 @@ from torch.optim.lr_scheduler import LambdaLR
 from torch.utils.data import DataLoader
 
 from knee_abnormality.config import (
+    STUDY_HEADERS,
     EMAConfig,
     ExperimentConfig,
     OptimizerConfig,
@@ -32,6 +34,15 @@ from knee_abnormality.modeling.augmentation import AugmentationActivity
 from knee_abnormality.modeling.model import (
     COMPARTMENT_MIDLINE_BAND_MM,
     KneeAbnormalityModel,
+)
+from knee_abnormality.training.auxiliary.scanner_confusion import (
+    SCANNER_GROUPS,
+    SCANNER_TABLE_SHA256,
+    ScannerConfusionHead,
+    confusion_ramp,
+    load_scanner_groups,
+    scanner_group_labels,
+    scanner_group_prior,
 )
 from knee_abnormality.training.checkpoints import checkpoint_sampling_epoch
 from knee_abnormality.training.report_attributes import (
@@ -310,6 +321,14 @@ class KneeModule(L.LightningModule):
         )
         with torch.random.fork_rng(devices=[]):
             self.report_attribute_heads = ReportAttributeHeads(attributes)
+        self.scanner_targets = load_scanner_groups(
+            config.paths.data_root.parent / STUDY_HEADERS
+        )
+        prior, counts = scanner_group_prior(config.split_dir, fold, self.scanner_targets)
+        self.register_buffer("scanner_prior", prior, persistent=False)
+        self.scanner_group_counts = counts
+        with torch.random.fork_rng(devices=[]):
+            self.scanner_confusion_head = ScannerConfusionHead()
         self.weight_averaging = config.optimizer.weight_averaging
         self._last_averaged_step = -1
         self.batch_norm_refresh_seconds = 0.0
@@ -337,6 +356,11 @@ class KneeModule(L.LightningModule):
                         question.model_dump(mode="json")
                         for question in attributes.questions
                     ],
+                },
+                "scanner_groups": {
+                    "table_sha256": SCANNER_TABLE_SHA256,
+                    "groups": list(SCANNER_GROUPS),
+                    "training_group_counts": self.scanner_group_counts,
                 },
             }
         )
@@ -554,6 +578,7 @@ class KneeModule(L.LightningModule):
         )
         loss = loss + self.config.trainer.half_knee_loss_weight * auxiliary
         loss = loss + self._report_attribute_step(encoded, batch)
+        loss = loss + self._scanner_confusion_step(encoded, batch)
         self.log(
             "half_knee_loss",
             auxiliary,
@@ -616,6 +641,45 @@ class KneeModule(L.LightningModule):
                 batch_size=batch_size,
             )
         return self.config.trainer.report_attribute_loss_weight * loss
+
+    def _scanner_confusion_step(self, encoded: dict, batch: dict) -> torch.Tensor:
+        head = self.scanner_confusion_head
+        tokens = self.model.half_knee_tokens(encoded)
+        args = (
+            encoded["study"][:, None].expand_as(encoded["visual_valid"]).flatten(),
+            encoded["visual_valid"].flatten(),
+            encoded["batch_size"],
+        )
+        groups = scanner_group_labels(
+            batch["study_uid"], self.scanner_targets, tokens.device
+        )
+        head_logits = head(tokens.detach(), *args)
+        head_loss = F.cross_entropy(head_logits, groups)
+        accuracy = (head_logits.argmax(-1) == groups).float().mean()
+        detached_parameters = {
+            name: parameter.detach() for name, parameter in head.named_parameters()
+        }
+        confusion_logits = functional_call(head, detached_parameters, (tokens, *args))
+        confusion_kl = F.kl_div(
+            F.log_softmax(confusion_logits, dim=-1),
+            self.scanner_prior.expand_as(confusion_logits),
+            reduction="batchmean",
+        )
+        ramp = confusion_ramp(self.trainer.global_step, self.total_steps)
+        weight = self.config.trainer.scanner_confusion_weight
+        batch_size = len(batch["study_uid"])
+        self._log_epoch_metric("scanner_head_loss", head_loss, batch_size)
+        self._log_epoch_metric("scanner_head_accuracy", accuracy, batch_size)
+        self._log_epoch_metric("scanner_confusion_kl", confusion_kl, batch_size)
+        self._log_epoch_metric(
+            "scanner_confusion_loss", weight * ramp * confusion_kl, batch_size
+        )
+        self._log_epoch_metric("scanner_confusion_ramp", ramp, batch_size)
+        self._log_epoch_metric(
+            "scanner_confusion_effective_weight", weight * ramp, batch_size
+        )
+        self._log_epoch_metric("scanner_head_studies", batch_size, 1, "sum")
+        return head_loss + weight * ramp * confusion_kl
 
     def on_before_optimizer_step(self, optimizer) -> None:
         gradients = [
@@ -784,7 +848,9 @@ class KneeModule(L.LightningModule):
     def configure_optimizers(self):
         settings = self.config.optimizer
         optimizer = build_optimizer(
-            self.model, settings, (self.report_attribute_heads,)
+            self.model,
+            settings,
+            (self.report_attribute_heads, self.scanner_confusion_head),
         )
         total_steps = self.trainer.estimated_stepping_batches
         steps_per_epoch = max(

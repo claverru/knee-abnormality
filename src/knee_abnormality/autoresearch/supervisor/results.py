@@ -399,11 +399,8 @@ class ResultMixin:
             if report["ranked_ids"] is None
             else report["ranked_ids"]
         )
-        seeds = (
-            set(self.state["seed_ideas"])
-            if self.state["seed_order"] == "forced"
-            else set()
-        )
+        seeds = set(self.state["seed_ideas"])
+        claimed = self.state["experiments"].get(self.state["claimed"])
         if (
             set(ranking) != expected
             or len(ranking) != len(expected)
@@ -419,9 +416,16 @@ class ResultMixin:
                 for idea_id in self.state["queue"]
                 if idea_id in seeds and idea_id not in parked
             ]
-            if ranking[: len(kept)] != kept:
+            head = (
+                [claimed["idea"]]
+                if claimed
+                and claimed["idea"] not in seeds
+                and claimed["idea"] not in parked
+                else []
+            )
+            if ranking[: len(head) + len(kept)] != head + kept:
                 raise ValueError(
-                    "User-ordered seeds must keep their order ahead of every other idea"
+                    "User-ordered seeds must keep their order ahead of every other idea except the reserved head"
                 )
             reviewed = (
                 self.state["experiments"][event["experiment"]]["idea"]
@@ -436,7 +440,6 @@ class ResultMixin:
                 raise ValueError(
                     "A user-ordered seed can only be parked by blocking it at its own review"
                 )
-        claimed = self.state["experiments"].get(self.state["claimed"])
         if (
             claimed
             and claimed["idea"] in parked

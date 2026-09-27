@@ -278,6 +278,7 @@ class TrainerConfig(ConfigModel):
     class_balance_exponent: Annotated[float, Field(ge=0, le=1)]
     half_knee_loss_weight: PositiveFiniteFloat = 0.075
     report_attribute_loss_weight: PositiveFiniteFloat
+    scanner_confusion_weight: PositiveFiniteFloat
 
 
 class ValidationConfig(ConfigModel):
