@@ -40,8 +40,7 @@ Pending:
 - **Combined labels scored 0.940 public (S40)** against 0.933 for the last single models on
   Steven v4 labels ([result](../validation/results/2026-09-21-combined-labels-first-run.md)). A
   Steven-v4-trained control on the same split (`labels.source: steven_v4`) would separate the
-  label change from the new training fold. Before the next queue, move the overnight launcher
-  to `all_5fold_scanner_v1`; the autoresearch gate already uses it.
+  label change from the new training fold.
 - **Decide on the `inference-opt` branch.** It runs the Kaggle command in about 270 s against 429.5 s
   with bit-identical prepared images, but its GPU preparation changes hashed sources, so the next
   submission needs a checkpoint trained on it; check local training memory first

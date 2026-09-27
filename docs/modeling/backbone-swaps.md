@@ -91,7 +91,7 @@ per weight, so a checkpoint with smaller weights takes proportionally larger rel
 same `backbone_lr`. Measured 2026-09-25: `rexnetr_200.sw_in12k_ft_in1k` has convolution-weight RMS
 0.0204 against 0.0508 for `rexnet_200.nav_in1k`; at the same rate its gradient norms ran 3–4× higher
 and it fitted more slowly
-([result](../backlog/small-changes.md#rexnet-r-results)). Compare the pretrained convolution-weight
+([result](../validation/results/2026-09-25-backbone-swap-runs.md#rexnet-r)). Compare the pretrained convolution-weight
 RMS before a swap and scale `backbone_lr` by the ratio.
 
 ## Mapping pitfalls
