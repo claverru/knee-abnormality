@@ -3,8 +3,8 @@
 Hyperparameter-only runs: values of existing training options on the
 [current recipe](../modeling/current-model.md), one change per run against the incumbent (fold 0
 of `all_5fold_scanner_v1`, the incumbent's recorded training seed). The
-[queue launcher](../../scripts/tools/train_overnight.py) still pins `all_5fold_v3` and must move to
-the current split before the next queue ([next](../ongoing/next.md)). A [small change](small-changes.md)
+[queue launcher](../../scripts/tools/train_overnight.py) takes split, fold and seed from the
+control config. A [small change](small-changes.md)
 enters this queue once it is implemented; other ideas belong to the other [backlog](INDEX.md) documents. The queue runs
 unattended and the user launches it, detached from agent sessions; the
 [queue launcher guide](../validation/overnight-hyperparameter-queue.md) owns the procedure. Record
@@ -13,8 +13,8 @@ from this file.
 
 ## Next queue
 
-- **`trainer.max_epochs: 12`** (queued 2026-09-24, user decision) against the current control
-  `half-stack-control` (seed 2617320043, fold 3, ×4 0.905205). The heavier augmentation
+- **`trainer.max_epochs: 12`** (queued 2026-09-24, user decision; its own queue after B3) against the current control
+  `scanner-confusion-control` (seed 703791404, fold 4, ×4 0.909733). The heavier augmentation
   makes it more pressing: both augmentation stacks learned slower and were still improving in soft
   AUC at epoch 9 ([augmentation campaign](../validation/results/2026-09-26-augmentation-campaign.md)). Under ordinary BCE, 15 epochs gained
   +0.0023 and +0.0025 on ReXNet and +0.0029 on B0, all inside seed noise

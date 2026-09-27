@@ -250,8 +250,11 @@ rate.
 
 ## Same-cost backbone candidates
 
-**Proposed 2026-09-25; ReXNet-R is implemented in the `convnext-atto` worktree and promising
-with tuning (below); the other two are unimplemented.** Three timm backbones of about ReXNet-200's
+**Proposed 2026-09-25; ReXNet-R is implemented in the `convnext-atto` worktree and lost its first
+run (−0.0053) with a measured over-large learning rate; its follow-up at `backbone_lr` 8e-5 is
+open. ConvNeXt-Atto, run outside this list, lost −0.0192 and is closed
+([backbone swap runs](../validation/results/2026-09-25-backbone-swap-runs.md)). ConvNeXt-nano and
+HGNetV2-B3 are unimplemented.** Three timm backbones of about ReXNet-200's
 size (13.8M parameters, 1.53 GMACs at 224 px) that could replace it. Each needs only a
 `BACKBONE_MAPPINGS` entry with a verified origin; `model.backbone` is the option
 ([swapping a backbone](../modeling/backbone-swaps.md#code-requirements)). All three checkpoints
@@ -277,25 +280,3 @@ with `FlopCounterMode` (timm 1.0.26).
   unchanged. Record macro/per-label AUC, paired uncertainty, time and memory under the current
   adoption rule. Ensemble contribution belongs to the
   [endgame](endgame.md#ensembling).
-
-### ReXNet-R results
-
-**First run lost, but it is promising with tuning.** `rexnetr-200`, config
-`configs/rexnetr-200.yaml` in the `convnext-atto` worktree, against `oa-detector-control`: fold 1 of `all_5fold_scanner_v1`,
-seed 1485198267, all rates unchanged. ×4 macro 0.8952 against 0.9006, **−0.0053**, paired
-report-group bootstrap 95% [−0.0098, −0.0010]
-(`outputs/analysis/rexnetr-200-vs-oa-detector-control/comparison.json`). Training took 1607 s against
-1639 s, with the same peak memory. The worktree's older OA-detector port changes the preprocessing
-source hash; the comparison allowed that difference.
-
-- **Per label:** the meniscus pair gained +0.0036 (lateral +0.0054, medial +0.0018), with MCL
-  +0.0070 and Baker's +0.0042. OA lost 0.0059 (PF OA −0.0181), and synovitis −0.0224,
-  effusion −0.0129 and fracture −0.0148 lost most.
-- **Why tuning should help (measured mechanism):** the checkpoint's convolution weights are 2.5×
-  smaller (RMS 0.0204 against 0.0508), so the same AdamW rate is a 2.5× larger relative step.
-  Gradient norms ran 3–4× the control's (median about 2.3 against 0.6), so clipping at 1.0 fired on
-  nearly every step. Convolution weights drifted 28% from pretraining against 16%. Validation
-  trailed by 0.076 at epoch 0 and closed to −0.004 by epoch 8 as the cosine rate fell, still rising
-  at the last epoch, while training loss stayed about 0.05 higher throughout.
-- **Next run:** `configs/rexnetr-200-lr8e-5.yaml`, `backbone_lr` 8e-5 (2e-4 × 0.0204/0.0508),
-  nothing else changed.

@@ -4,7 +4,6 @@ import json
 import os
 import re
 import resource
-import secrets
 import shlex
 import signal
 import subprocess
@@ -31,6 +30,9 @@ SUMMARY_HEADER = [
     "last_val_macro_auc",
     "delta_best_vs_control",
     "delta_last_vs_control",
+    "prediction_macro_auc",
+    "delta_prediction_vs_control",
+    "soft_macro_auc_at_selected",
     "live_best_val_macro_auc",
     "live_last_val_macro_auc",
     "soft_target_bce_at_selected",
@@ -41,43 +43,36 @@ SUMMARY_HEADER = [
     "peak_cuda_memory_gib",
 ]
 
-QUEUE_SECONDS = 8 * 60 * 60
-RUN_ALLOWANCE_SECONDS = 30 * 60
+QUEUE_SECONDS = 5 * 60 * 60
+RUN_ALLOWANCE_SECONDS = 35 * 60
+CONTROL_RUN = (
+    ROOT
+    / "outputs/training/overnight-20260927T003247Z-kdc9bncm/runs/02-backbone-lr-0.00045"
+)
+
+BASE_CHANGES = {
+    "model": {
+        "backbone": "efficientnet_b3.ra2_in1k",
+        "feature_statistics_augmentation": {"probability": 0.0},
+    },
+    "optimizer": {"backbone_lr": 0.00045},
+}
 
 EXPERIMENTS = (
-    ("00-control", {}),
-    ("01-head-lr-0.0012", {"optimizer": {"head_lr": 0.0012}}),
-    (
-        "02-intensity-p-0.75",
-        {"data": {"intensity_augmentation": {"probability": 0.75}}},
-    ),
-    ("03-backbone-lr-0.0003", {"optimizer": {"backbone_lr": 0.0003}}),
-    ("04-dropout-0.1", {"model": {"dropout": 0.1}}),
-    (
-        "05-gamma-0.70-1.30",
-        {"data": {"intensity_augmentation": {"gamma_range": [0.70, 1.30]}}},
-    ),
-    (
-        "06-contrast-0.80-1.20",
-        {"data": {"intensity_augmentation": {"contrast_range": [0.80, 1.20]}}},
-    ),
-    ("07-affine-p-0.5", {"data": {"affine_augmentation": {"probability": 0.5}}}),
-    ("08-head-lr-0.0024", {"optimizer": {"head_lr": 0.0024}}),
-    ("09-rotation-7", {"data": {"affine_augmentation": {"rotation_degrees": 7}}}),
-    (
-        "10-scale-0.97-1.03",
-        {"data": {"affine_augmentation": {"scale_range": [0.97, 1.03]}}},
-    ),
-    ("11-weight-decay-0.03", {"optimizer": {"weight_decay": 0.03}}),
-    ("12-warmup-2", {"optimizer": {"warmup_epochs": 2}}),
-    ("13-control-repeat", {}),
+    ("01-head-lr-0.0009", {"optimizer": {"head_lr": 0.0009}}),
+    ("02-head-lr-0.0004", {"optimizer": {"head_lr": 0.0004}}),
+    ("03-warmup-2", {"optimizer": {"warmup_epochs": 2}}),
+    ("04-warmup-0", {"optimizer": {"warmup_epochs": 0}}),
+    ("05-minimum-lr-ratio-0.1", {"optimizer": {"minimum_lr_ratio": 0.1}}),
+    ("06-minimum-lr-ratio-0.001", {"optimizer": {"minimum_lr_ratio": 0.001}}),
+    ("07-epochs-20", {"trainer": {"max_epochs": 20}}),
 )
 
 
 class OvernightCLI(CLISettings):
     model_config = describe(
-        "Run the queued hyperparameter experiments on fold 0 with fresh distinct seeds "
-        "within an eight-hour budget"
+        "Run the queued EfficientNet-B3 experiments against a saved control run on the "
+        "control config's fold and seed within a five-hour budget"
     )
 
     config: Path = Field(
@@ -135,27 +130,28 @@ def gpu_processes() -> list[str]:
     return [line for line in result.stdout.splitlines() if line.strip()]
 
 
+def comparable(values: dict) -> dict:
+    values = deepcopy(values)
+    values.pop("name")
+    values["paths"].pop("output_root")
+    return values
+
+
 def prepare_queue(
     config_path: Path,
 ) -> tuple[Path, list[Path], dict[str, list[str]]]:
-    base = load_config(config_path).model_dump(mode="json")
-    base["validation"] = {"split": "all_5fold_v3", "folds": [0]}
-    base["data"]["validation_image_multiplier"] = 1
-    base["trainer"]["max_epochs"] = 10
-    base["trainer"]["patience"] = 10
+    base = merge(load_config(config_path).model_dump(mode="json"), BASE_CHANGES)
+    control = load_config(CONTROL_RUN / "input_config.yaml").model_dump(mode="json")
+    if comparable(control) != comparable(base):
+        raise ValueError(
+            f"Control run {CONTROL_RUN} differs from the queue base config"
+        )
     configs = []
     overrides = {}
-    seeds = set()
     for name, changes in EXPERIMENTS:
-        values = deepcopy(base)
+        values = merge(deepcopy(base), changes)
         values["name"] = name
-        values = merge(values, changes)
-        seed = secrets.randbits(32)
-        while seed in seeds:
-            seed = secrets.randbits(32)
-        seeds.add(seed)
-        values["seed"] = seed
-        overrides[name] = ["seed", *override_keys(base, changes)]
+        overrides[name] = override_keys(base, changes)
         config = ExperimentConfig.model_validate(values)
         if not (config.split_dir / "protocol.json").is_file():
             raise FileNotFoundError(f"Missing prepared split: {config.split_dir}")
@@ -208,9 +204,7 @@ def run_command(command: list[str], log_path: Path, deadline: float) -> int:
                     pass
                 process.wait()
             if isinstance(error, subprocess.TimeoutExpired):
-                print(
-                    "Eight-hour queue deadline reached; subprocess stopped.", flush=True
-                )
+                print("Queue deadline reached; subprocess stopped.", flush=True)
                 return 124
             raise
 
@@ -254,6 +248,8 @@ def run_summary(run_dir: Path) -> dict | None:
         "selected_epoch": selected_index + 1,
         "best_val_macro_auc": selected["score"],
         "last_val_macro_auc": last_record["macro_auc"],
+        "prediction_macro_auc": selected["prediction_macro_auc"],
+        "soft_macro_auc_at_selected": selected_record["soft_macro_auc"],
         "live_best_val_macro_auc": live_best,
         "live_last_val_macro_auc": live_last,
         "soft_target_bce_at_selected": selected_record["soft_target_bce"],
@@ -266,17 +262,16 @@ def run_summary(run_dir: Path) -> dict | None:
 
 
 def write_summary(queue: Path, configs: list[Path]) -> None:
-    summaries = {}
+    control = run_summary(CONTROL_RUN)
+    summaries = {f"control:{CONTROL_RUN.name}": control}
     for config in configs:
         summary = run_summary(queue / "runs" / config.stem)
         if summary is not None:
             summaries[config.stem] = summary
-    control = summaries.get("00-control")
     with (queue / "summary.tsv").open("w", encoding="utf-8", newline="") as stream:
         writer = csv.writer(stream, delimiter="\t")
         writer.writerow(SUMMARY_HEADER)
-        for config in configs:
-            summary = summaries.get(config.stem)
+        for name, summary in summaries.items():
             if summary is None:
                 continue
             delta_best = (
@@ -289,14 +284,22 @@ def write_summary(queue: Path, configs: list[Path]) -> None:
                 if control is not None
                 else None
             )
+            delta_prediction = (
+                summary["prediction_macro_auc"] - control["prediction_macro_auc"]
+                if control is not None
+                else None
+            )
             writer.writerow(
                 [
-                    config.stem,
+                    name,
                     summary["selected_epoch"],
                     summary["best_val_macro_auc"],
                     summary["last_val_macro_auc"],
                     delta_best,
                     delta_last,
+                    summary["prediction_macro_auc"],
+                    delta_prediction,
+                    summary["soft_macro_auc_at_selected"],
                     summary["live_best_val_macro_auc"],
                     summary["live_last_val_macro_auc"],
                     summary["soft_target_bce_at_selected"],
@@ -309,48 +312,52 @@ def write_summary(queue: Path, configs: list[Path]) -> None:
             )
 
 
+def comparison_command(
+    reference: Path, candidate: Path, output_dir: Path, allowed: list[str]
+) -> str:
+    return shlex.join(
+        [
+            "rtk",
+            "proxy",
+            "uv",
+            "run",
+            "--locked",
+            "python",
+            "-m",
+            "scripts.tools.compare_fold_runs",
+            "--reference",
+            str(reference),
+            "--candidate",
+            str(candidate),
+            "--output-dir",
+            str(output_dir),
+            "--allowed-config-differences",
+            ",".join(allowed),
+        ]
+    )
+
+
 def print_comparison_commands(
     queue: Path,
     configs: list[Path],
     completed: set[str],
     overrides: dict[str, list[str]],
 ) -> None:
-    for control in ("00-control", "13-control-repeat"):
-        if control not in completed:
-            print(
-                f"Skipping comparisons against {control}: it did not complete",
-                flush=True,
-            )
+    for config in configs:
+        name = config.stem
+        if name not in completed:
             continue
-        for config in configs:
-            name = config.stem
-            if name in {control, "00-control"} or name not in completed:
-                continue
-            allowed = ",".join(["name", *overrides[name]])
-            output_dir = ROOT / "outputs/analysis" / f"{queue.name}-{name}-vs-{control}"
-            print(
-                shlex.join(
-                    [
-                        "rtk",
-                        "proxy",
-                        "uv",
-                        "run",
-                        "--locked",
-                        "python",
-                        "-m",
-                        "scripts.tools.compare_fold_runs",
-                        "--reference",
-                        str(queue / "runs" / control),
-                        "--candidate",
-                        str(queue / "runs" / name),
-                        "--output-dir",
-                        str(output_dir),
-                        "--allowed-config-differences",
-                        allowed,
-                    ]
-                ),
-                flush=True,
-            )
+        print(
+            comparison_command(
+                CONTROL_RUN,
+                queue / "runs" / name,
+                ROOT
+                / "outputs/analysis"
+                / f"{queue.name}-{name}-vs-{CONTROL_RUN.name}",
+                ["name", "paths.output_root", *overrides[name]],
+            ),
+            flush=True,
+        )
 
 
 def run_queue(
@@ -381,7 +388,8 @@ def run_queue(
         for config in configs:
             if deadline - time.monotonic() < RUN_ALLOWANCE_SECONDS:
                 print(
-                    "Less than 30 minutes remain; leaving remaining runs unstarted.",
+                    f"Less than {RUN_ALLOWANCE_SECONDS // 60} minutes remain; "
+                    "leaving remaining runs unstarted.",
                     flush=True,
                 )
                 stopped = True
@@ -448,6 +456,7 @@ def run_queue(
                 "-u",
                 "-m",
                 "scripts.tools.plot_validation_metrics",
+                str(CONTROL_RUN),
                 *completed_dirs,
                 "--output",
                 str(queue / "validation_metrics.png"),

@@ -206,6 +206,7 @@ def predict_loader(
             if copy_events is not None:
                 copy_events[1].record()
             batch = with_images(batch)
+            mirrored = reflect_batch(batch, sagittal) if reflection_tta else None
             with torch.autocast(
                 device_type=device.type,
                 dtype=autocast_dtype,
@@ -214,8 +215,7 @@ def predict_loader(
                 probabilities = torch.stack(
                     [torch.sigmoid(model(batch).to(torch.float32)) for model in models]
                 ).mean(dim=0)
-                if reflection_tta:
-                    mirrored = reflect_batch(batch, sagittal)
+                if mirrored is not None:
                     reflected_probabilities = torch.stack(
                         [
                             torch.sigmoid(model(mirrored).to(torch.float32))

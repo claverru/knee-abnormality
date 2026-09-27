@@ -30,6 +30,14 @@ Backbone mapping is already implemented; see [swapping a backbone](../modeling/b
 
 ## Open
 
+- **EfficientNet-B3 on the current recipe, 2026-09-27:** the first queue put B3 at −0.0008 ×4
+  against ReXNet (`backbone_lr` 4.5e-4), and the pair at +0.0029 locally; the pair scored 0.946 public (bundle `5bf80349`, titled S70) against 0.947 for ReXNet alone (S68)
+  ([result](../validation/results/2026-09-27-b3-overnight-queue.md)). The second round of seven
+  learning-rate and schedule runs found one gain, a two-epoch warmup: ×4 0.905638, +0.0012 over the
+  B3 control and +0.0004 over ReXNet (95% [−0.0029, +0.0040])
+  ([second round](../validation/results/2026-09-27-b3-overnight-queue.md#second-round-learning-rates-and-schedule)).
+  The recipe has since moved to the scanner confusion head on fold 4, so a B3 follow-up needs a
+  control there.
 - Compare B0 and ReXNet with the current balanced-BCE recipe, matched controls and recorded
   budgets. Re-price the score/runtime tradeoff before adopting further B0 settings.
 - An isolated B0 head-LR increase remains untested. ReXNet's balanced-BCE 0.0012/0.0024 arms
