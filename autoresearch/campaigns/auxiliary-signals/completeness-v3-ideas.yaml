@@ -1,0 +1,41 @@
+ideas:
+- id: answer-completeness-bias
+  mechanism_id: completeness-bias-logit-offset
+  parent_idea_id: report-completeness-bias
+  title: Model report-completeness label noise with a training-only logit bias per quintile of v3 not-mentioned mass
+  opportunity: >-
+    report-completeness-bias was blocked because raw report length is outside the campaign's
+    permitted data. The same signal is available from the v3 answers the campaign may use: how
+    much of a report's answer mass sits on options that say the report did not address the
+    structure or grade. Silence becomes a negative label, a quarter of Spanish reports are short
+    positive-only summaries whose not-mentioned answers are correct (255 of 260 ACL cases), and
+    the image cannot know a report was silent, so those false negatives are label noise the image
+    pathway is forced to fit. The per-site logit bias with the same user-ordered exception to the
+    fixed disease loss was approved and scored +0.00040 locally. User-ordered exception to the fixed
+    disease loss (user decision 2026-09-26), because the disease targets and evaluation are
+    unchanged and the term is dropped outside training.
+  mechanism: >-
+    For each training study, completeness mass = the sum, over the target set 3.1 table the
+    incumbent already loads, of the probability on every option whose key is not_mentioned,
+    not_stated, unspecified, tear_unspecified, partial_unspecified or unspecified_loss (25 options
+    over 21 questions, as in drop-report-completeness-options). Bucket studies into quintiles of
+    that mass with boundaries from the training fold's studies. A learned table b of shape 5 x 12,
+    zero-initialized under a forked RNG, is added to the disease logits during training only, like
+    the approved per-site bias; validation, selection, saved predictions and export use f(x) alone.
+    b trains at the head learning rate without weight decay. Setting
+    trainer.metadata_heads.completeness_bias: true. Log per epoch the per-quintile mean bias and
+    the quintile boundaries.
+  precedents:
+  - 'site-bias-product-of-experts: approved with the same exception, +0.00040 [80% -0.0011, +0.0019], largest biases on Synovitis and Effusion (this campaign).'
+  - 'Clark et al. (arXiv:1909.03683): a bias-only model during training, removed at test time.'
+  - 'v3 analysis of Spanish short reports and not-mentioned answers (docs/ongoing/report-attribute-extraction.md#v3-full-run-analysis-2026-09-25).'
+  novelty: First label-noise model keyed on how completely a report addressed the knee, measured from the permitted v3 answers.
+  coverage: All training studies; largest expected effect on labels most often left unmentioned.
+  exploitation: If low-completeness quintiles learn negative biases and the public score holds or rises, combine with the per-site bias.
+  budget: 60 parameters; negligible.
+  implementation: Completeness mass and quintiles at setup from the loaded attribute table; the training-only offset in training/lightning.py next to the per-site bias; config flag under trainer.metadata_heads.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: User-ordered; replaces the blocked version with permitted data.
+exhausted_directions: >-
+  Raw report length as a signal: outside the campaign's permitted data.

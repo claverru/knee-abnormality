@@ -1,0 +1,64 @@
+ideas:
+- id: scanner-confusion-stronger-head
+  mechanism_id: metadata-confusion-head
+  parent_idea_id: scanner-confusion-detached-head
+  title: Scanner confusion with a stronger detached head (two-layer classifier, doubled learning rate, one-epoch confusion warm-up)
+  opportunity: >-
+    In scanner-confusion-detached-head the detached head learned the scanner only faintly
+    (accuracy 0.249 -> 0.311 by epoch 6 against the 0.263 majority rate; loss 1.875 -> 1.735
+    against the 1.851 frequency entropy) while the confusion KL stayed flat near 0.03. A weak
+    head's predictions barely leave the group frequencies, so the confusion loss had little
+    gradient and did not stop the head from improving. Disease AUC tracked the control, so the
+    bounded objective is safe; the head is the bottleneck.
+  mechanism: >-
+    Same targets, token source, detached head term, bounded confusion term
+    w * ramp * KL(prior || prediction) with w = 0.1, functional_call with detached parameters,
+    and logging as scanner-confusion-detached-head. Three changes to the head only: (1) the
+    classifier after attention pooling becomes Linear(256, 256), GELU, Linear(256, 8); (2) the
+    scanner head's parameters get twice the head learning rate, with the usual decay rule;
+    (3) the confusion ramp is zero for the first epoch and then follows
+    2 / (1 + exp(-10 q)) - 1 over the remaining training progress q, so the head learns before
+    the backbone is pushed. Validity check: head accuracy after epoch 0 above the parent's
+    0.249 and final head loss below the parent's.
+  precedents:
+  - 'scanner-confusion-detached-head: head accuracy 0.311 and loss 1.735 at epoch 6, confusion KL ~0.03, disease AUC within ~0.002 of the control (this campaign).'
+  - 'Ganin et al., Domain-adversarial training of neural networks (arXiv:1505.07818): domain classifiers are multi-layer; a linear discriminator underestimates recoverable domain information.'
+  novelty: First multi-layer scanner head with a warm-up before the confusion pressure.
+  coverage: All training studies; all labels.
+  exploitation: If the head reads more of the scanner and the confusion KL then carries gradient while disease AUC holds, the user judges it with a public submission paired with the fold-3 control.
+  budget: One small MLP; negligible.
+  implementation: Head classifier and warm-up ramp in training/auxiliary/; the scanner head's optimizer group with doubled learning rate in training/lightning.py; config under trainer.metadata_heads.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: User-ordered follow-up to the only scanner mechanism that did not harm disease AUC; targets its measured bottleneck.
+- id: scanner-confusion-backbone-features
+  mechanism_id: metadata-confusion-head
+  parent_idea_id: scanner-confusion-detached-head
+  title: Scanner confusion with the detached head reading backbone features before projection and token normalization
+  opportunity: >-
+    The pooled tokens the disease head reads are normalized per series and per token, which
+    likely strips most vendor contrast: the detached head reached only 0.311 accuracy on them.
+    Scanner identity should be more readable earlier, in the backbone's feature vectors before
+    the projection and normalization that produce the pooled tokens, and that is where contrast
+    and texture differences between vendors live.
+  mechanism: >-
+    Same targets, detached head term, bounded confusion term w * ramp * KL(prior || prediction)
+    with w = 0.1 and the parent's ramp, functional_call with detached parameters, and logging as
+    scanner-confusion-detached-head. One change: the head's input is the backbone's per-token
+    feature vectors before the projection and token normalization that produce the pooled tokens,
+    over the same visually valid tokens and study membership; the attention and classifier layers
+    take that width. The confusion gradient therefore reaches the backbone without passing
+    through the projection.
+  precedents:
+  - 'scanner-confusion-detached-head: head accuracy 0.311 on the pooled normalized tokens (this campaign).'
+  - 'Series intensity normalization and token normalization before pooling: docs/modeling/current-model.md.'
+  novelty: First scanner head attached before the projection.
+  coverage: All training studies; all labels.
+  exploitation: If the head reads the scanner clearly better here, the confusion loss can remove it where it originates; judged with a public submission paired with the fold-3 control. If it is no more readable than on the pooled tokens, the scanner line closes.
+  budget: One attention pool at backbone width; negligible.
+  implementation: Expose the pre-projection token features from modeling/model.py without changing the disease path or outputs; head input width in training/auxiliary/; wiring in training/lightning.py.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: User-ordered; tests whether scanner information is removable where it survives normalization.
+exhausted_directions: >-
+  Gradient reversal on the scanner head.

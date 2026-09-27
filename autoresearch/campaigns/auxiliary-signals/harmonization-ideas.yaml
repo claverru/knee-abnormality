@@ -1,0 +1,39 @@
+ideas:
+- id: scanner-token-harmonization
+  mechanism_id: scanner-feature-harmonization
+  parent_idea_id: scanner-confusion-detached-head
+  title: Harmonize tokens per scanner group (ComBat-style location and scale) before normalization, in training and inference
+  opportunity: >-
+    The scanner group is known at inference from the DICOM headers (vendor and field strength;
+    missing field strength maps to the group's unknown class), so its effect can be subtracted
+    directly instead of only discouraged during training. The adopted confusion head showed the
+    scanner is faintly readable from the pooled tokens (0.314 against 0.263) and scored 0.948
+    public against 0.947 for its paired control. Multi-site MRI work removes site effects by
+    standardizing features per site (ComBat); here that means removing each group's mean and
+    scale shift from the tokens the disease head pools.
+  mechanism: >-
+    Before mil_norm, for each token of a study in scanner group g (the 8 groups of
+    data/folds/all_5fold_scanner_v1/protocol.json from the header table the incumbent loads):
+    token' = (token - mu_g) / sigma_g * sigma_all + mu_all, per channel. mu_g and sigma_g are
+    per-group running statistics (momentum 0.01, like BatchNorm running stats) over visually valid
+    training tokens; mu_all and sigma_all are the running statistics over all groups. Running
+    statistics update only in training and are used unchanged in validation and inference; a group
+    with fewer than 1,000 accumulated tokens uses the overall statistics. The statistics are
+    buffers of KneeAbnormalityModel, so they are saved, exported and applied at inference. The
+    adopted confusion head stays. Setting model.acquisition_inputs.scanner_harmonization: true.
+    Log per epoch each group's mean absolute shift |mu_g - mu_all| averaged over channels and the
+    ratio sigma_g / sigma_all.
+  precedents:
+  - 'Johnson et al., Adjusting batch effects in microarray expression data using empirical Bayes methods (ComBat, Biostatistics 2007); Fortin et al., Harmonization of multi-site diffusion tensor imaging data (NeuroImage 2017): per-site location and scale adjustment of features.'
+  - 'Adopted scanner-confusion-detached-head and its public result (this campaign).'
+  - 'Header availability at test time: bias_free.md.'
+  novelty: First mechanism that uses the scanner at inference, removing its feature shift rather than discouraging it.
+  coverage: All studies in training, validation and inference; all labels.
+  exploitation: If it holds locally and gains publicly against the incumbent, the inference loader gains the scanner-group lookup from headers it already reads; if the per-group shifts are negligible, the tokens are already harmonized by series normalization and the line stops here.
+  budget: Two 8 x 256 statistic buffers and an elementwise transform; negligible.
+  implementation: Buffers and the transform in modeling/model.py before mil_norm, taking a per-study group index; group index delivered per study from the header table in data/dataset.py for training and validation; config under model.acquisition_inputs. Inference-loader support follows adoption as separate work.
+  open_choices: None; momentum and the 1,000-token floor are fixed.
+  dependencies: []
+  priority_rationale: User-ordered; the direct way to subtract the known scanner at inference.
+exhausted_directions: >-
+  None added.

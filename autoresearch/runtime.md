@@ -206,21 +206,43 @@ frozen. Each new agent job saves its exact brief, context, schema and evidence
 packet, so operational prompt changes remain attributable without changing old
 artifacts.
 
-## Importing ideas
+## Importing ideas and manual adoption
 
 Startup imports the campaign's `seed-ideas*.yaml` files
-([lifecycle](lifecycle.md#startup-and-proposals)). To add proposals to an existing
-campaign, stop it and wait until status is `STOPPED`, then import and resume:
+([lifecycle](lifecycle.md#startup-and-proposals)). Later additions and user adoptions go
+through the campaign inbox, `outputs/autoresearch/<campaign-id>/inbox/`, without
+stopping the campaign:
 
 ```bash
 rtk proxy uv run --locked python -m scripts.tools.autoresearch import-ideas CAMPAIGN --ideas-file autoresearch/campaigns/CAMPAIGN/IDEAS.yaml
-rtk proxy uv run --locked just autoresearch resume CAMPAIGN
+rtk proxy uv run --locked python -m scripts.tools.autoresearch import-ideas CAMPAIGN --ideas-file autoresearch/campaigns/CAMPAIGN/IDEAS.yaml --forced
+rtk proxy uv run --locked python -m scripts.tools.autoresearch adopt CAMPAIGN --experiment EXPERIMENT_ID --rationale "..."
 ```
 
-The file uses the researcher-report format. Import preserves an immutable proposal
-artifact and adds a review event under the supervisor lock. It rejects duplicate IDs
-in the registry or pending events and does not overwrite the live queue. The
-orchestrator admits and ranks proposals; research fills only the remaining places.
+The command validates the request against the saved state and writes it to the inbox.
+A live supervisor applies inbox requests in arrival order at the start of its next loop,
+under its own lock, and defers them while an orchestrator job is in flight, because that
+job ranks the queue as it was. With no live supervisor, the command applies them
+immediately under the supervisor lock. A request that fails when applied moves to
+`inbox/rejected/` with its error; status reports pending and rejected requests.
+
+- **Ideas** use the researcher-report format. Import preserves an immutable proposal
+  artifact and adds a proposal event: the orchestrator admits and ranks them, and
+  research fills only the remaining places. IDs must be new to the registry and pending
+  proposals.
+- **Forced ideas** (`--forced`) skip admission and join the user-ordered seeds: they are
+  queued in file order behind the reserved queue head and any pending forced ideas, ahead
+  of every other idea, and research waits until they are completed or blocked. They
+  cannot declare dependencies. This works in ranked campaigns too; `seed_order` only
+  decides how startup seed files are imported.
+- **Adoption** makes a valid completed experiment the incumbent by user decision. It
+  waits until no training is running, so no launched candidate changes reference, then
+  saves the state before the change and a decision record under
+  `outputs/autoresearch/<campaign-id>/decisions/`, marks the experiment accepted (its
+  original verdict stays visible) and adds a finding. A prepared candidate on the old
+  incumbent is reconciled as after any adoption. Results list it as a manual reference
+  change.
+
 Calibration and sealed limits are retained.
 
 ## Initial sealing and fixed budget

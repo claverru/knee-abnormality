@@ -1,0 +1,37 @@
+ideas:
+- id: scanner-group-adversarial-head
+  mechanism_id: metadata-adversarial-head
+  parent_idea_id: null
+  title: Remove scanner-group information from the pooled features with a gradient-reversal head
+  opportunity: >-
+    Site priors help locally but not on gold: every header stacker variant scored negative on the
+    35 gold studies, the four minor vendors are one English-reporting site whose labels are
+    elevated on ten of twelve targets, and the hidden-test labels come from images, not reports.
+    Local folds reward site priors because the split is stratified, not grouped, by scanner. A
+    model that cannot read the scanner from its features has to rank by image evidence.
+  mechanism: >-
+    Target: the eight scanner groups of data/folds/all_5fold_scanner_v1/protocol.json, from
+    outputs/analysis/sharing-disagreement-20260914/study_headers.parquet (check SHA-256
+    8714fa8b025afe0ff47d0811ca735f0ec75c84808b462486db19553d0c3058f4): Siemens, Philips and GE
+    split by MagneticFieldStrength into 3T (>= 2), 1.5T (< 2) and unknown; every other vendor
+    pooled as minor. Head: a gradient-reversal layer on the study tokens the disease head pools,
+    then one attention query (256 -> 128 -> 1) and a linear 8-way classifier; cross-entropy
+    against the one-hot group, mean over training studies, times
+    trainer.metadata_heads.scanner_adversarial_weight 0.1. The reversal factor ramps with
+    training progress p in [0, 1] as 2 / (1 + exp(-10 p)) - 1 (Ganin and Lempitsky). The head's
+    own parameters descend normally; only the gradient into the tokens is reversed. Training
+    only, dropped at inference, forked-RNG initialization. Log loss, accuracy and the reversal
+    factor per epoch; accuracy should fall toward the majority-group rate (about 0.26).
+  precedents:
+  - 'Header stacker: site +0.0005 local, gold -0.006; protocol +0.0009 local, gold -0.006 (prior-work.md, site priors).'
+  - 'Ganin and Lempitsky, Unsupervised domain adaptation by backpropagation (arXiv:1409.7495): gradient reversal and the ramp schedule.'
+  novelty: First attempt to remove site information instead of adding it.
+  coverage: All training studies; all labels, most for Synovitis and OA, where site priors are largest.
+  exploitation: The local rule is expected to understate it, because local labels reward site priors. Whatever the local verdict, the user decides with a public submission; if scanner accuracy never falls, the reversal is too weak and the run is blocked evidence.
+  budget: One extra attention pool; negligible.
+  implementation: trainer.metadata_heads.scanner_adversarial_weight in config.py; table loading and the reversal function in training/auxiliary/; head and loss in the Lightning module; table SHA-256 in the checkpoint hyperparameters.
+  open_choices: None; weight 0.1 matches the attribute coefficient, the ramp is the paper's.
+  dependencies: []
+  priority_rationale: The only metadata mechanism aimed at the report-versus-image mismatch that the gold studies point to.
+exhausted_directions: >-
+  See seed-ideas.yaml.

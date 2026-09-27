@@ -1,0 +1,151 @@
+ideas:
+- id: attribute-loss-weight-0-2
+  mechanism_id: attribute-loss-coefficient
+  parent_idea_id: null
+  title: Double the report-attribute loss coefficient from 0.1 to 0.2
+  opportunity: >-
+    The 0.1 coefficient was fixed before the first run from the loss scale, never measured. On
+    target set 3.1 the term trained every epoch (1.006 -> 0.806, floor about 0.55) and gave
+    +0.00105 macro, but its learnable part is only about a fifth of the disease loss at the start
+    and shrinks as the heads fit, so the backbone may receive too little attribute pressure.
+  mechanism: >-
+    Set trainer.report_attribute_loss_weight to 0.2 in configs/training.yaml. Nothing else
+    changes.
+  precedents:
+  - 'Target set 3.1 heads at 0.1: +0.00105 [95% -0.0012, +0.0035], public 0.940 vs 0.938 (docs/validation/results/2026-09-25-report-attribute-heads.md).'
+  - 'Coefficient reasoning and failure signs: docs/modeling/report-attribute-heads.md#coefficient.'
+  novelty: First measurement of the attribute coefficient.
+  coverage: All studies with attribute targets; all labels.
+  exploitation: If it helps, later structural ideas inherit 0.2; if disease validation trails the control from the first epochs, the term is too strong and 0.1 stays.
+  budget: None beyond the incumbent.
+  implementation: Config only; trainer.report_attribute_loss_weight 0.2.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The cheapest test of whether the adopted signal is under-used.
+- id: area-balanced-attribute-loss
+  mechanism_id: attribute-loss-averaging
+  parent_idea_id: null
+  title: Average the attribute loss within each question group first, then equally across groups
+  opportunity: >-
+    The attribute loss is one reliability-weighted mean over 35 questions, so each group's share
+    follows its question count: Extra 9, Medial Meniscus 4, Lateral Meniscus 3, PF OA 3, the rest
+    1-2. Cartilage/OA and the menisci carry about 43% of the signal, and the questions that fit
+    worst (cartilage depth, meniscus) are also the most numerous. The untested alternative noted
+    in the heads design is to give every group the same weight.
+  mechanism: >-
+    Read each question's group from the question set the manifest records
+    (configs/labels/jevk5-report-attributes-v3.json, `group` field; 15 groups in target set 3.1).
+    For each group g compute the reliability-weighted mean cross-entropy over its questions and
+    the batch's studies with targets, sum(w * CE) / sum(w) within g; the attribute loss is the
+    plain mean over the groups present in the batch, times the unchanged coefficient 0.1.
+    Setting trainer.report_attribute_heads.loss_averaging: group (the incumbent behaviour is
+    question). Log the per-group loss.
+  precedents:
+  - 'Untested alternative, docs/modeling/report-attribute-heads.md#question-weighting.'
+  - 'Group counts: prior-work.md, v3 answers.'
+  novelty: First change to how the attribute questions are weighted against each other.
+  coverage: All studies with targets; shifts weight from Extra and the menisci toward single-question groups (Study, ACL, OA, Fracture, Effusion, Synovitis).
+  exploitation: If it helps, a follow-up can combine it with the winning coefficient; if it hurts, the per-question mean stays.
+  budget: Negligible.
+  implementation: trainer.report_attribute_heads.loss_averaging in config.py; group ids loaded with the question set in data/report_attributes.py; averaging in training/report_attributes.py.
+  open_choices: None; the groups are the question set's own, the same rule for every group.
+  dependencies: []
+  priority_rationale: A documented, label-agnostic alternative that changes where the backbone's attribute gradient goes without changing any target.
+- id: reliability-filtered-attribute-questions
+  mechanism_id: attribute-question-selection
+  parent_idea_id: null
+  title: Drop attribute questions whose mean order agreement is below 0.80, with their gated children
+  opportunity: >-
+    Per-cell reliability weights already down-weight answers that flip between option orders,
+    but the audits showed that systematic errors survive both orders. The questions with the
+    lowest mean agreement are those with known systematic faults: medial cartilage extent 0.735,
+    Baker's size 0.758 (invents cysts), lateral and PF cartilage extent 0.776, medial cartilage
+    depth 0.787, PF surface 0.799. Baker's lost in both head runs (-0.0027, -0.0064).
+  mechanism: >-
+    At load time compute each question's mean reliability weight over all studies in the 3.1
+    table and drop every question below 0.80, then drop every gated child whose parent was
+    dropped. On target set 3.1 this removes medial_cartilage_extent, baker_size,
+    lateral_cartilage_extent, pf_cartilage_extent, medial_cartilage_depth, pf_cartilage_surface
+    and baker_ruptured (gated on baker_size), leaving 28 questions. The loss and coefficient are
+    unchanged. Setting trainer.report_attribute_targets.min_question_reliability: 0.8; log the
+    kept question list.
+  precedents:
+  - 'Reliability weights and gates: docs/modeling/report-attribute-heads.md#targets.'
+  - 'Known weak targets and audits: docs/ongoing/report-attribute-extraction.md.'
+  - 'Dropping osteophytes and Hoffa for noise was part of the v3 -> v3.1 change (+0.0003 vs v3, bundled).'
+  novelty: First question selection by a fixed reliability rule instead of by hand.
+  coverage: Removes 7 of 35 heads, all cartilage extent/depth/surface or Baker's size questions.
+  exploitation: If it helps, the rule becomes the target builder's default; if it hurts, the noisy cartilage questions still carry signal and the next step is re-weighting, not removal.
+  budget: Fewer heads; negligible.
+  implementation: trainer.report_attribute_targets.min_question_reliability in config.py; filtering and gate propagation in data/report_attributes.py before the heads are built.
+  open_choices: None; the 0.80 cut is fixed, not tuned.
+  dependencies: []
+  priority_rationale: The clearest measured target weakness, addressed by a label-agnostic rule on data we already have.
+- id: drop-report-completeness-options
+  mechanism_id: attribute-option-removal
+  parent_idea_id: null
+  title: Remove the options that describe how complete the report was (not mentioned, not stated, unspecified) and renormalize
+  opportunity: >-
+    Many options encode report wording, not image content: whether the report mentioned the
+    structure or specified a grade, location or type. They hold large mass in target set 3.1:
+    study context not_stated 0.63, tear type not_stated 0.10-0.13, cartilage extent not_stated
+    0.18-0.25, OA unspecified 0.21, effusion unspecified 0.14 and not_mentioned 0.09, Baker's
+    unspecified 0.18, cartilage depth unspecified_loss 0.10-0.14. They are site style: 255 of 260
+    Spanish ACL not-mentioned reports are short positive-only summaries that never name the
+    cruciates, and the largest option-order flips were between not-mentioned and none. The host
+    states that report silence is unobserved, not absent. Training the image to predict these
+    options teaches reporting style.
+  mechanism: >-
+    Completeness options are every option whose key is not_mentioned, not_stated, unspecified,
+    tear_unspecified, partial_unspecified or unspecified_loss (on target set 3.1: 25 options
+    over 21 questions; the gates' fallback options are among them). For each question and study
+    let s be their total mass; the target becomes the remaining options divided by (1 - s) and
+    the reliability weight is multiplied by (1 - s); where 1 - s < 1e-6 the weight is zero. The
+    removed options leave the heads. Applied after the 3.1 merges and gates, at load time. The
+    loss, coefficient and averaging are unchanged. Setting
+    trainer.report_attribute_targets.drop_completeness_options: true; log the removed options
+    and the mean weight lost per question.
+  precedents:
+  - 'v3 analysis: Spanish not-mentioned answers, order flips between same-meaning options (docs/ongoing/report-attribute-extraction.md#v3-full-run-analysis-2026-09-25).'
+  - 'Host: silence is an unobserved label (docs/metadata/official-label-criteria.md).'
+  - 'Merging same-meaning options was part of the v3 -> v3.1 change (+0.0003 vs v3, bundled).'
+  novelty: First removal of report-style options; 3.1 only merged them into their neighbours.
+  coverage: 21 of 35 questions; most mass lost in study context, cartilage extent and the gated tear questions.
+  exploitation: If it helps, the same rule extends to hedged options (next seed) and to the study-context question as a whole; if it hurts, the completeness options carry disease evidence the image can see.
+  budget: Fewer options; negligible.
+  implementation: trainer.report_attribute_targets.drop_completeness_options in config.py; the transform in data/report_attributes.py before the heads are built.
+  open_choices: None; the option keys are fixed above.
+  dependencies: []
+  priority_rationale: Measured evidence that these options track site and language, and a single label-agnostic rule removes them.
+- id: drop-hedged-options
+  mechanism_id: attribute-option-removal
+  parent_idea_id: null
+  title: Remove the hedged options (possible, possible tear) and renormalize
+  opportunity: >-
+    A hedged option means the report itself was uncertain; whether a radiologist hedges is a
+    reporting habit, and the image model is asked to predict the hedge rather than the finding.
+    Hedged mass in target set 3.1: medial meniscus possible_tear 0.037, lateral 0.026, ACL 0.020,
+    MCL 0.011, contusion 0.023, fracture 0.020, synovitis 0.044, PCL 0.035, lateral ligaments
+    0.041, osteochondral 0.058. Synovitis possible is a dead option (9 top answers).
+  mechanism: >-
+    Hedged options are every option whose key is possible or possible_tear (on target set 3.1:
+    10 options over 10 questions). The same rule as the completeness seed: per question and
+    study, remove their mass s, divide the rest by (1 - s), multiply the reliability weight by
+    (1 - s), zero weight where 1 - s < 1e-6, and drop the options from the heads. Completeness
+    options stay. Setting trainer.report_attribute_targets.drop_hedged_options: true; log the
+    removed options and the mean weight lost per question.
+  precedents:
+  - 'Question-set design: hedging is an option (docs/ongoing/report-attribute-extraction.md#question-set-design).'
+  - 'Dead options in the v3 analysis: synovitis possible (9 answers).'
+  novelty: First treatment of hedged answers as unobserved.
+  coverage: 10 questions; small mass, concentrated in the ambiguous studies where the reliability weights are also lowest.
+  exploitation: If it helps, combine with the completeness rule; if it hurts, hedges carry graded evidence and a half-positive mapping is the retry.
+  budget: Negligible.
+  implementation: trainer.report_attribute_targets.drop_hedged_options in config.py; the transform in data/report_attributes.py, sharing the completeness seed's code path if it exists.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Same mechanism as the completeness seed on a disjoint option set, so the two results separate style from uncertainty.
+exhausted_directions: >-
+  Per-bone marrow questions, knee side, osteophyte and Hoffa targets, label masking on report
+  silence, site-identity inputs (post-hoc stacker +0.0009 with a negative gold sign) and new
+  extraction are outside this campaign.

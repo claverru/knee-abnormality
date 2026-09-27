@@ -26,6 +26,11 @@ from knee_abnormality.autoresearch.runtime.isolation import (
     manifest,
     snapshot,
 )
+from knee_abnormality.autoresearch.runtime.layout import (
+    PREDICTIONS,
+    campaign_fold,
+    fold_dir,
+)
 from knee_abnormality.autoresearch.runtime.storage import (
     atomic_write,
     lock,
@@ -228,22 +233,35 @@ class Supervisor(JobMixin, ExperimentMixin, ResultMixin, SchedulingMixin):
         }
         seeds = seed_files(self.docs)
         for path in seeds:
+            report = IdeaReport.model_validate(yaml.safe_load(path.read_text()))
             if self.state["seed_order"] == "forced":
-                self.queue_seeds(path)
+                self.queue_seeds(report, path)
             else:
-                self.import_ideas(path)
+                self.import_ideas(report, path)
         if not seeds:
             self.save()
 
-    def queue_seeds(self, path: Path):
-        report = IdeaReport.model_validate(yaml.safe_load(path.read_text()))
+    def check_new_ideas(self, report: IdeaReport, forced: bool):
         ids = [idea.id for idea in report.ideas]
-        if not ids or len(ids) != len(set(ids)) or set(ids) & set(self.state["ideas"]):
-            raise ValueError("Forced seeds need nonempty, unique, unused idea IDs")
-        if any(idea.dependencies for idea in report.ideas):
-            raise ValueError(
-                "Forced seeds cannot declare dependencies; their file order sets the sequence"
+        if not ids or len(ids) != len(set(ids)):
+            raise ValueError("New ideas need nonempty, unique IDs")
+        known = set(self.state["ideas"])
+        for event in self.state["events"]:
+            known.update(
+                idea["id"] for idea in event.get("report", {}).get("ideas", [])
             )
+        if known.intersection(ids):
+            raise ValueError(
+                "New idea IDs already exist in the registry or pending proposals"
+            )
+        if forced and any(idea.dependencies for idea in report.ideas):
+            raise ValueError(
+                "Forced ideas cannot declare dependencies; their file order sets the sequence"
+            )
+
+    def queue_seeds(self, report: IdeaReport, source: Path):
+        self.check_new_ideas(report, forced=True)
+        ids = [idea.id for idea in report.ideas]
         artifact = self.output / "imports" / identifier("seeds") / "report.json"
         write_json(artifact, report.model_dump(mode="json"))
         for idea in report.ideas:
@@ -251,17 +269,125 @@ class Supervisor(JobMixin, ExperimentMixin, ResultMixin, SchedulingMixin):
                 **idea.model_dump(mode="json"),
                 "status": "queued",
                 "created_revision": self.state["revision"],
-                "seeded": str(path.resolve()),
+                "seeded": str(source.resolve()),
             }
-        self.state["queue"].extend(ids)
+        queue = self.state["queue"]
+        claimed = self.state["experiments"].get(self.state["claimed"])
+        position = 1 if claimed and queue and queue[0] == claimed["idea"] else 0
+        while position < len(queue) and queue[position] in self.state["seed_ideas"]:
+            position += 1
+        queue[position:position] = ids
         self.state["seed_ideas"].extend(ids)
         self.save()
 
     def seeds_pending(self):
-        return self.state["seed_order"] == "forced" and any(
+        return any(
             self.state["ideas"][idea_id]["status"] not in SEED_TERMINAL
             for idea_id in self.state["seed_ideas"]
         )
+
+    def request_ideas(self, report: IdeaReport, forced: bool, source: Path):
+        self.check_new_ideas(report, forced)
+        write_json(
+            self.output / "inbox" / f"{identifier('ideas')}.json",
+            {
+                "kind": "ideas",
+                "forced": forced,
+                "source": str(source.resolve()),
+                "report": report.model_dump(mode="json"),
+            },
+        )
+
+    def check_adoption(self, experiment: str):
+        exp = self.state["experiments"].get(experiment)
+        if not exp or exp["stage"] != "completed" or exp.get("decision") == "invalid":
+            raise ValueError("Only a valid completed experiment can be adopted")
+        if exp["id"] == self.state["incumbent"]["id"]:
+            raise ValueError("Experiment is already the incumbent")
+        return exp
+
+    def request_adoption(self, experiment: str, rationale: str):
+        self.check_adoption(experiment)
+        write_json(
+            self.output / "inbox" / f"{identifier('adopt')}.json",
+            {"kind": "adopt", "experiment": experiment, "rationale": rationale},
+        )
+
+    def adopt(self, request):
+        exp = self.check_adoption(request["experiment"])
+        event = identifier("user-adopt")
+        directory = self.output / "decisions" / event
+        write_json(directory / "state-before.json", self.state)
+        previous = self.state["incumbent"]
+        run = Path(exp["directory"]) / "training"
+        incumbent = {
+            "id": exp["id"],
+            "source": exp["source"],
+            "run": str(run),
+            "predictions_sha256": sha256(
+                fold_dir(run, campaign_fold(self.state)) / PREDICTIONS
+            ),
+        }
+        finding = (
+            f"ADOPTED BY USER: {exp['idea']} ({exp['id']}), recorded verdict "
+            f"{exp['decision']}. Later candidates build on it."
+        )
+        record = {
+            "event": event,
+            "kind": "incumbent_replacement",
+            "authority": "explicit_user_instruction",
+            "campaign": self.state["campaign"],
+            "revision_before": self.state["revision"],
+            "revision_after": self.state["revision"] + 1,
+            "adopted": exp["id"],
+            "original_decision": exp["decision"],
+            "finding": finding,
+            "rationale": request["rationale"],
+            "previous_incumbent": previous,
+            "incumbent": incumbent,
+            "incumbent_seed": reference_seed({"run": str(run)}),
+            "state_before": str(directory / "state-before.json"),
+        }
+        write_json(directory / "decision.json", record)
+        exp["decision"] = "provisional_accept"
+        self.state["ideas"][exp["idea"]]["decision"] = "provisional_accept"
+        self.state["incumbent"] = incumbent
+        self.state["evidence_revision"] += 1
+        self.state["findings"].append(
+            {
+                "event": event,
+                "finding": finding,
+                "rationale": request["rationale"],
+                "concerns": [],
+                "evidence_refs": [str(directory / "decision.json")],
+            }
+        )
+        self.save()
+
+    def drain_inbox(self):
+        if self.active("orchestrator"):
+            return
+        inbox = self.output / "inbox"
+        for path in sorted(inbox.glob("*.json")):
+            request = read_json(path)
+            if request["kind"] == "adopt" and self.state["running"]:
+                continue
+            try:
+                if request["kind"] == "adopt":
+                    self.adopt(request)
+                else:
+                    report = IdeaReport.model_validate(request["report"])
+                    source = Path(request["source"])
+                    if request["forced"]:
+                        self.queue_seeds(report, source)
+                    else:
+                        self.import_ideas(report, source)
+            except ValueError as error:
+                write_json(
+                    inbox / "rejected" / path.name,
+                    {**request, "error": str(error)},
+                )
+            path.unlink()
 
     def event(self, kind, payload):
         self.state["events"].append({"id": identifier(kind), "kind": kind, **payload})
@@ -282,20 +408,8 @@ class Supervisor(JobMixin, ExperimentMixin, ResultMixin, SchedulingMixin):
     def pause(self, reason, kind=None):
         self.state.update(status="paused", reason=reason, pause_kind=kind)
 
-    def import_ideas(self, path: Path):
-        report = IdeaReport.model_validate(yaml.safe_load(path.read_text()))
-        ids = [idea.id for idea in report.ideas]
-        if not ids or len(ids) != len(set(ids)):
-            raise ValueError("Import requires nonempty ideas with unique IDs")
-        known = set(self.state["ideas"])
-        for event in self.state["events"]:
-            known.update(
-                idea["id"] for idea in event.get("report", {}).get("ideas", [])
-            )
-        if known.intersection(ids):
-            raise ValueError(
-                "Imported IDs already exist in the registry or pending proposals"
-            )
+    def import_ideas(self, report: IdeaReport, source: Path):
+        self.check_new_ideas(report, forced=False)
         artifact = self.output / "imports" / identifier("ideas") / "report.json"
         value = report.model_dump(mode="json")
         write_json(artifact, value)
@@ -304,7 +418,7 @@ class Supervisor(JobMixin, ExperimentMixin, ResultMixin, SchedulingMixin):
             {
                 "report": value,
                 "artifact": str(artifact),
-                "source": str(path.resolve()),
+                "source": str(source.resolve()),
                 "instructions": IMPORT_INSTRUCTIONS,
             },
         )
@@ -368,6 +482,7 @@ class Supervisor(JobMixin, ExperimentMixin, ResultMixin, SchedulingMixin):
                             self.save()
                             return
                     else:
+                        self.drain_inbox()
                         self.schedule()
                 except (
                     OSError,

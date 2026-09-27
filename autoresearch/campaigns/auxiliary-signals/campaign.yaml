@@ -1,0 +1,67 @@
+id: auxiliary-signals
+recipe: configs/training.yaml
+reference_run: outputs/training/half-stack-control
+reference_equivalences: {}
+additional_evidence_runs: []
+backlog:
+  refill_below: 3
+  refill_to: 5
+  seed_order: forced
+policy:
+  editable_files:
+    - configs/training.yaml
+    - src/knee_abnormality/config.py
+    - src/knee_abnormality/data/dataset.py
+    - src/knee_abnormality/data/report_attributes.py
+    - src/knee_abnormality/modeling/model.py
+    - src/knee_abnormality/training/lightning.py
+    - src/knee_abnormality/training/report_attributes.py
+  editable_directories:
+    - src/knee_abnormality/training/auxiliary
+  config_keys:
+    - trainer.report_attribute_loss_weight
+  config_prefixes:
+    - trainer.report_attribute_targets
+    - trainer.report_attribute_heads
+    - trainer.metadata_heads
+    - data.acquisition_inputs
+    - model.acquisition_inputs
+  list_item_fields: {}
+  input_identity_keys: []
+  require_source_change: false
+  developer_instructions: >-
+    Implement exactly the assigned idea on the current incumbent and switch it on in
+    configs/training.yaml with the idea's fixed settings. New settings go under one of the
+    campaign prefixes in config.py: trainer.report_attribute_targets (load-time target
+    transforms), trainer.report_attribute_heads (head design and loss averaging),
+    trainer.metadata_heads (header or scanner-group targets), data.acquisition_inputs and
+    model.acquisition_inputs (header inputs). Never change paths.report_attribute_manifest or the
+    manifest and target files: build target variants in data/report_attributes.py at load time
+    from the 3.1 table or from the raw answers at the manifest's attributes.path after checking
+    its SHA-256, and record the transform settings and any extra table's SHA-256 in the
+    checkpoint hyperparameters. New helper modules go in src/knee_abnormality/training/auxiliary/.
+    The disease labels, gold overrides, disease loss, half-knee loss and augmentation stay
+    untouched. New modules initialize under a forked RNG so the disease model's random streams
+    match the incumbent; with the option off the run reproduces the incumbent. Training-only
+    heads live in the Lightning module, not in KneeAbnormalityModel, and are excluded from weight
+    averaging and export. Header inputs are read from the raw DICOMs for training and validation
+    studies with an explicit per-study missing path. Log every new term and input per epoch
+    (loss, studies covered, accuracy or divergence per head, field coverage). Return prepared or
+    blocked. Use the existing Python environment for static checks. No tests.
+  researcher_instructions: >-
+    Research starts only after the user's six seeds finish. Work on auxiliary supervision from
+    the existing JevK5 v3 answers and the DICOM headers, and on inference-available acquisition
+    inputs. Most of the work is fine-grained target construction: merging options (coarsening
+    grades to the official thresholds, folding dead options), removing options with
+    renormalization, un-merging 3.1 merges from the raw answers, combining questions (joint
+    status-location questions, one collapsed question per compartment), deleting or restoring
+    questions and question groups, changing gates, and soft versus hard targets. Build each
+    proposal on the seeds' diagnostics (per-label deltas against the seed-noise yardstick,
+    per-question KL and weight lost, scanner-group subgroups) and on label-free statistics of the
+    answers (option mass, order flips, dead options, co-occurrence between questions). Check every
+    proposal against the precedent table and the v3 answer analysis in prior-work.md. One
+    operation family per run; rules that select questions, options or weights must be stated
+    over option keys, question groups or answer statistics, fixed before the run and never
+    chosen from label results. No new extraction, no disease-target
+    changes, no site-identity inputs, no coefficient sweeps, no extra forward passes and no
+    test-time augmentation.

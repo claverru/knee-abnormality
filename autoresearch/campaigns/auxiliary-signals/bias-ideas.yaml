@@ -1,0 +1,99 @@
+ideas:
+- id: site-bias-product-of-experts
+  mechanism_id: site-bias-logit-offset
+  parent_idea_id: scanner-confusion-detached-head
+  title: Absorb each scanner group's label-rate shift with a training-only per-site logit bias, dropped at validation and inference
+  opportunity: >-
+    Training labels are report-derived and carry site reporting conventions that the
+    image-derived hidden-test labels do not: the four minor vendors are one English-reporting
+    site whose labels run x1.1-x3.6 higher on ten of twelve targets (Synovitis x3.56) from
+    reporting completeness, and every header site offset scored negative on the gold studies.
+    The adopted scanner confusion head removes site information from the features; the label-rate
+    shift itself is still fit by the image pathway through whatever site cues remain. User-ordered
+    exception to the fixed disease loss (user decision 2026-09-26), because the disease targets
+    and evaluation are unchanged and the term is dropped outside training.
+  mechanism: >-
+    A learned table b of shape 8 x 12 (scanner group x disease label), zero-initialized, lives in
+    the Lightning module under a forked RNG. During training only, the disease loss uses logits
+    f(x) + b[group(study)], where group follows data/folds/all_5fold_scanner_v1/protocol.json
+    from the header table the incumbent already loads. The class-balanced BCE, targets, gold
+    overrides and half-knee loss are otherwise unchanged. Validation, checkpoint selection,
+    saved predictions and export use f(x) alone. b trains at the head learning rate without
+    weight decay. Setting trainer.metadata_heads.site_bias: true. Log per epoch the mean absolute
+    bias per label and the largest per-group bias.
+  precedents:
+  - 'Clark et al., Don''t take the easy way out: ensemble based methods for avoiding known dataset biases (arXiv:1909.03683): product of experts with a bias-only model during training, removed at test time.'
+  - 'He et al., Unlearn dataset bias in natural language inference by fitting the residual (arXiv:1908.10763).'
+  - 'Vendor label associations and header stacker: prior-work.md, site priors.'
+  - 'Scanner confusion S67 0.948 public against its paired control S68 0.947 (adoption record in this campaign).'
+  novelty: First mechanism aimed at site label priors rather than site features.
+  coverage: All training studies; largest expected effect on Synovitis and OA, the most site-inflated labels.
+  exploitation: Local labels contain the convention, so a local loss is expected; the user judges it with a public submission. If the learned biases are near zero, the incumbent's confusion head already covers it.
+  budget: 96 parameters; negligible.
+  implementation: Bias table and training-only logit offset in training/lightning.py (group lookup reusing the incumbent's scanner table loader in training/auxiliary/); config flag under trainer.metadata_heads in config.py and configs/training.yaml.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: User-ordered; targets the measured reporting-convention mechanism directly and changes nothing at inference.
+- id: scanner-model-confusion-target
+  mechanism_id: metadata-confusion-head
+  parent_idea_id: scanner-confusion-detached-head
+  title: Switch the adopted confusion head's target from 8 scanner groups to 31 scanner models, a finer site identity
+  opportunity: >-
+    The adopted confusion head removes information about 8 coarse scanner groups (vendor x field
+    strength, minor vendors pooled). A site is closer to a scanner model: the header table has 51
+    models, 30 of them with at least 30 studies covering 4,253 of 4,407 studies. The finest header
+    site signal measured, the protocol signature, gave +0.0009 locally and -0.006 on gold; the
+    model is the closest site identity available to a candidate without re-reading every DICOM
+    header.
+  mechanism: >-
+    Same detached head, bounded confusion term, weight 0.1 and ramp as the incumbent. One change:
+    the target becomes the study's (Manufacturer, ManufacturerModelName) from
+    outputs/analysis/sharing-disagreement-20260914/study_headers.parquet (same SHA-256 check),
+    keeping the 30 models with at least 30 studies in the whole table and pooling the rest into
+    one "other" class, 31 classes; the prior for the KL is the training fold's class frequencies.
+    Log head accuracy and loss against the majority rate and the frequency entropy of the new
+    target.
+  precedents:
+  - 'Adopted scanner-confusion-detached-head: head accuracy 0.314 vs 0.263 on 8 groups (this campaign).'
+  - 'Header stacker: protocol signature +0.0009 local, gold -0.006 (prior-work.md, site priors).'
+  novelty: First site-level confusion target.
+  coverage: All training studies; all labels.
+  exploitation: If the head reads models well beyond their frequencies and disease AUC holds, judged publicly against the incumbent; if model identity is no more readable than the groups, the coarse target stays.
+  budget: 31-way classifier instead of 8; negligible.
+  implementation: Target mapping and prior in training/auxiliary/; head output width; no config change beyond a target selector under trainer.metadata_heads.
+  open_choices: None; the 30-study floor is fixed from the table.
+  dependencies: []
+  priority_rationale: User-ordered; the same adopted mechanism at site resolution.
+- id: report-completeness-bias
+  mechanism_id: completeness-bias-logit-offset
+  parent_idea_id: scanner-confusion-detached-head
+  title: Model report-completeness label noise with a training-only logit bias per report-length quintile
+  opportunity: >-
+    Labels follow what a report bothers to list: silence becomes a negative label, Toshiba reports
+    run 1,317 characters against a 968 median and their Synovitis labels match the literal word in
+    179 of 181 reports, and a quarter of Spanish reports are short positive-only summaries. The
+    image cannot know a report was short, so those false negatives are label noise the image
+    pathway is forced to fit. User-ordered exception to the fixed disease loss (user decision
+    2026-09-26), because the disease targets and evaluation are unchanged and the term is dropped
+    outside training.
+  mechanism: >-
+    Bucket each training study by the character length of its report in data/raw/train.csv into
+    quintiles whose boundaries come from the training fold's studies. A learned table b of shape
+    5 x 12, zero-initialized under a forked RNG, is added to the disease logits during training
+    only, exactly as a product-of-experts bias; validation, selection, saved predictions and
+    export use f(x) alone. b trains at the head learning rate without weight decay. Setting
+    trainer.metadata_heads.completeness_bias: true. Log per epoch the per-quintile mean bias.
+  precedents:
+  - 'Clark et al. (arXiv:1909.03683): a bias-only model during training, removed at test time.'
+  - 'Vendor label associations (docs/metadata/vendor-label-associations.md) and the v3 analysis of Spanish short reports (docs/ongoing/report-attribute-extraction.md).'
+  - 'Noisy-labels campaign: prediction-memory correction rejected (autoresearch/campaigns/noisy-labels/findings.md); a different mechanism.'
+  novelty: First label-noise model keyed on a report property.
+  coverage: All training studies; largest expected effect on labels most often left unmentioned.
+  exploitation: If short-report biases come out negative and the public score holds or rises, extend to a finer completeness measure (unmentioned-structure counts from the v3 answers).
+  budget: 60 parameters; negligible.
+  implementation: Length quintiles at setup and the training-only offset in training/lightning.py; config flag under trainer.metadata_heads.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: User-ordered; the one measured label-noise source the image cannot see.
+exhausted_directions: >-
+  Report language as a separate bias: it reaches the image only through site, so it duplicates the site targets.

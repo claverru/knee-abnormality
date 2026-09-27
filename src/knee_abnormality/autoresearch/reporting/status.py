@@ -131,6 +131,15 @@ def status_summary(supervisor):
             f"{time.strftime('%Y-%m-%d %H:%M:%S %Z', time.localtime(retry_after))} "
             f"({duration_text(retry_after - time.time())} left); training and comparison continue."
         )
+    inbox = supervisor.output / "inbox"
+    pending = len(list(inbox.glob("*.json")))
+    rejected = len(list((inbox / "rejected").glob("*.json")))
+    if pending:
+        warnings.append(
+            f"Inbox: {pending} request(s) waiting for the supervisor's next safe point."
+        )
+    if rejected:
+        warnings.append(f"Inbox: {rejected} rejected request(s) in {inbox / 'rejected'}.")
     if (supervisor.output / "stop.json").exists() and current["status"] != "stopped":
         warnings.append(
             "Stop requested; waiting for the supervisor to finish stopping."
@@ -165,7 +174,7 @@ def status_summary(supervisor):
         f"Backlog  {len(queue)} queued (refill below {state['refill_below']}, "
         f"target {state['refill_to']})"
     )
-    if state["seed_order"] == "forced":
+    if state["seed_ideas"]:
         remaining = [
             idea_id
             for idea_id in state["seed_ideas"]

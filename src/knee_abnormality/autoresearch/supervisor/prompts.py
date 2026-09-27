@@ -52,8 +52,9 @@ COMPLETION_RATIONALE = "Code recorded the fixed numerical result after restricte
 
 
 FORCED_SEED_INSTRUCTIONS = (
-    "User-ordered seed ideas are queued in their given order, ahead of every other idea, and do not "
-    "count toward the five-idea target. Keep their order and positions in any ranking and never park "
-    "them, except by blocking a seed at its own implementation review. Admit other proposals only "
-    "behind the remaining seeds."
+    "User-ordered seed ideas are queued in their given order, ahead of every other idea except a "
+    "reserved queue head already in development, and do not count toward the five-idea target. The "
+    "user can add more while the campaign runs. Keep their order and positions in any ranking and "
+    "never park them, except by blocking a seed at its own implementation review. Admit other "
+    "proposals only behind the remaining seeds."
 )

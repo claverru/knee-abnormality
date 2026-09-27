@@ -1,0 +1,35 @@
+ideas:
+- id: scanner-adversarial-decoupled-weight
+  mechanism_id: metadata-adversarial-head
+  parent_idea_id: scanner-group-adversarial-head
+  title: Retry the scanner-group adversarial head with the head trained at full strength and 0.1 applied only to the reversed gradient
+  opportunity: >-
+    In scanner-group-adversarial-head the adversary never learned: after four epochs its
+    accuracy was 0.18-0.21 and its loss 2.03-1.91, worse than predicting the training group
+    frequencies (accuracy 0.263, loss 1.851), even in epoch 0 with the reversal factor at 0.24.
+    The cause is in the code: the step returned 0.1 * cross-entropy, so the 0.1 weight scaled the
+    head's own gradient as well as the reversed one. A head that cannot recognise the scanner gives
+    the backbone no direction, so no scanner information was removed and the run did not test the
+    idea.
+  mechanism: >-
+    Same targets, head, token source, gradient-reversal layer and ramp 2 / (1 + exp(-10 p)) - 1 as
+    the parent. One change: the head's cross-entropy enters the loss unweighted, so the head's
+    parameters learn at full strength, and the reversal layer's backward returns
+    -(w * factor) * gradient with w = trainer.metadata_heads.scanner_adversarial_weight 0.1, so the
+    backbone receives the parent's intended pressure. Log the head loss, accuracy, reversal factor
+    and w * factor per epoch. Validity check: the head's epoch-0 accuracy must exceed 0.263 and its
+    loss fall below 1.851 (it learns at least the group frequencies while the reversal is weak);
+    otherwise report the run as blocked evidence.
+  precedents:
+  - 'Parent run scanner-group-adversarial-head: head below the frequency baseline for four epochs (this campaign).'
+  - 'Ganin and Lempitsky, Unsupervised domain adaptation by backpropagation (arXiv:1409.7495): the domain classifier trains on its full loss; lambda scales only the reversed gradient.'
+  novelty: Fixes the parent's coupling of head strength and reversal strength; no new mechanism.
+  coverage: All training studies; all labels.
+  exploitation: The local rule is expected to understate it, because local labels reward site priors. If the head learns and the reversal holds its accuracy near 0.26 later in training, the user decides with a public submission paired with the fold-3 control.
+  budget: Same as the parent; negligible.
+  implementation: In training/auxiliary/scanner_adversarial.py the reversal backward multiplies by weight * factor; in training/lightning.py the step returns the unweighted cross-entropy. No config change beyond the parent's trainer.metadata_heads.scanner_adversarial_weight 0.1.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The parent was an implementation failure, not a negative result, and the fix is one line in each file.
+exhausted_directions: >-
+  None added.

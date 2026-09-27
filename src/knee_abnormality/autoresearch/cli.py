@@ -181,27 +181,56 @@ class Resume(CampaignCommand):
         control("resume", self, action)
 
 
+def deliver(name: str, command: CampaignCommand, request) -> None:
+    def action(supervisor, current):
+        request(started(supervisor))
+        if not current["supervisor_alive"]:
+            with lock(supervisor.output / "supervisor.lock"):
+                supervisor = command.supervisor()
+                supervisor.drain_inbox()
+        return supervisor
+
+    control(name, command, action)
+
+
 class ImportIdeas(CampaignCommand):
-    model_config = describe("Add ideas to the backlog of a stopped campaign")
+    model_config = describe(
+        "Add ideas to a campaign; a running supervisor applies them at its next safe point"
+    )
 
     ideas_file: Path = Field(description="Research report YAML with the new ideas")
+    forced: bool = Field(
+        default=False,
+        description="Queue the ideas in file order ahead of every other idea except the reserved head, without orchestrator admission",
+    )
 
     def cli_cmd(self) -> None:
-        def action(supervisor, current):
-            with lock(supervisor.output / "supervisor.lock"):
-                supervisor = self.supervisor()
-                if supervisor.state is None or supervisor.state["status"] != "stopped":
-                    raise ValueError(
-                        "Stop the campaign and wait for STOPPED before importing ideas"
-                    )
-                if any(
-                    not job["processed"] for job in supervisor.state["jobs"].values()
-                ):
-                    raise ValueError("Cannot import while jobs remain unprocessed")
-                supervisor.import_ideas(self.ideas_file)
-            return supervisor
+        report = IdeaReport.model_validate(yaml.safe_load(self.ideas_file.read_text()))
+        deliver(
+            "import-ideas",
+            self,
+            lambda supervisor: supervisor.request_ideas(
+                report, self.forced, self.ideas_file
+            ),
+        )
 
-        control("import-ideas", self, action)
+
+class Adopt(CampaignCommand):
+    model_config = describe(
+        "Make a completed experiment the incumbent by user decision, applied when no training runs"
+    )
+
+    experiment: str = Field(description="Experiment ID to adopt")
+    rationale: str = Field(description="The user's reason for the adoption")
+
+    def cli_cmd(self) -> None:
+        deliver(
+            "adopt",
+            self,
+            lambda supervisor: supervisor.request_adoption(
+                self.experiment, self.rationale
+            ),
+        )
 
 
 class Supervise(CampaignCommand):
@@ -257,6 +286,7 @@ class AutoresearchCLI(CLISettings):
     stop: CliSubCommand[Stop] = command(Stop)
     resume: CliSubCommand[Resume] = command(Resume)
     import_ideas: CliSubCommand[ImportIdeas] = command(ImportIdeas)
+    adopt: CliSubCommand[Adopt] = command(Adopt)
     supervise: CliSubCommand[Supervise] = command(Supervise)
     job: CliSubCommand[Job] = command(Job)
     calibrate: CliSubCommand[Calibrate] = command(Calibrate)

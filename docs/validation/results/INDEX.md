@@ -2,6 +2,7 @@
 
 | Read when | Document |
 |---|---|
+| Reviewing the auxiliary-signals campaign (JevK5 attribute-target variants, scanner gradient reversal versus the bounded confusion head, per-site and per-model logit biases, public S67–S72) and why the scanner confusion head was adopted on 0.948 against 0.947 | [2026-09-27 auxiliary-signals campaign](2026-09-27-auxiliary-signals-campaign.md) |
 | Reviewing the augmentation campaign (13 forced seeds plus researcher refills, smoothing and DSU adopted, the smoothing withdrawal and restore, the DSU rerun, half and full stacks) and why augmentation gains were real but did not add: S63 0.940 against S64 half stack 0.943 | [2026-09-26 augmentation campaign](2026-09-26-augmentation-campaign.md) |
 | Reviewing the report-attribute auxiliary-heads runs (JevK5 v3 and cleaned, reliability-weighted 3.1 targets, weight 0.1) against `oa-detector-control`: +0.00075 and +0.00105 ×4 macro, public 0.938 (S61 tie) and 0.940 (S62) against 0.938, MCL/Contusion gains and Fracture/Baker's losses in both, attribute loss and per-question KL | [2026-09-25 report-attribute heads](2026-09-25-report-attribute-heads.md) |
 | Reviewing the near-misses campaign (15 forced seeds plus researcher ideas), the PF OA pattern from knee-wide OA context, S58 (OA detector, 0.944) against S59 (token dropout, 0.939), and why the adopted token dropout was too weak | [2026-09-25 near-misses campaign](2026-09-25-near-misses-campaign.md) |
