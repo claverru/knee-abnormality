@@ -1,8 +1,28 @@
 # Project validation protocol
 
+## all_5fold_scanner_v2
+
+The default split since 2026-09-28 (user decision, with the adoption of
+[`rebuild_state_v2`](../public-labels/label-rebuild.md#a2-common-state-scale-and-the-zhen-lineage-fix-2026-09-28)).
+It is produced by `scripts.tools.validation prepare` with the recipe config, so the label source is
+`rebuild_state_v2` and the stratification seed is the recipe seed **1533697213**. Grouping, scanner
+indicators and coverage rules are those of `all_5fold_scanner_v1` below; only the effective labels
+differ: gold on the 58 gold studies, `rebuild_state_v2` on the rest. These are also the frozen
+evaluation targets (`evaluation_targets_sha256` `0a11adce…`, stored as float32 like earlier splits).
+Fold membership is new: v2 fold 0 draws 214 / 179 / 184 / 167 / 168 studies from v1 folds 0–4, so
+**no score on `all_5fold_scanner_v1` is comparable** with a run on this split.
+
+| Fold | Training | Validation | Gold in validation | Siemens 1.5T / 3T | Philips 1.5T / 3T | GE 1.5T / 3T / unknown | Minor |
+|---:|---:|---:|---:|---|---|---|---:|
+| 0 | 3,495 | 912 | 12 | 237 / 159 | 133 / 134 | 149 / 28 / 21 | 51 |
+| 1 | 3,533 | 874 | 12 | 231 / 159 | 129 / 132 | 137 / 14 / 22 | 50 |
+| 2 | 3,532 | 875 | 12 | 229 / 158 | 119 / 139 | 144 / 15 / 22 | 49 |
+| 3 | 3,525 | 882 | 11 | 234 / 158 | 124 / 138 | 140 / 16 / 22 | 50 |
+| 4 | 3,543 | 864 | 11 | 228 / 158 | 120 / 133 | 138 / 15 / 22 | 50 |
+
 ## all_5fold_scanner_v1
 
-The default split since 2026-09-21. It is produced by `scripts.tools.validation prepare
+The default split from 2026-09-21 to 2026-09-28. It is produced by `scripts.tools.validation prepare
 --label-source combined_v1` with the recipe config, so the stratification seed is **2263738815**. It
 follows the `all_5fold_v3` design below with three differences:
 
@@ -77,7 +97,7 @@ image metadata or duplicate-image evidence supplies stronger identities.
 
 ## Membership and leakage controls
 
-`data/folds/all_5fold_v3/studies.csv` contains every training study with
+Each split's `data/folds/<split>/studies.csv` contains every training study with
 `StudyInstanceUID`, `report_group`, `is_gold`, and `fold`:
 
 - For model `k`, training membership is `fold != k`; validation membership is
@@ -102,8 +122,9 @@ the new membership before comparing it with the new endpoint.
 
 ## Frozen evaluation targets and metrics
 
-`targets.csv` freezes the effective gold/v4 probability table used to generate
-the split. Training can select a different pinned label source for a controlled
+`targets.csv` freezes the effective table used to generate the split: gold labels on the gold
+studies and the split's label source (Steven v4 for `all_5fold_v3`, `combined_v1` for
+`all_5fold_scanner_v1`, `rebuild_state_v2` for `all_5fold_scanner_v2`) elsewhere. Training can select a different pinned label source for a controlled
 label experiment, but validation continues to use these frozen targets. This
 keeps the endpoint unchanged when testing label weights or label sources.
 
@@ -134,13 +155,13 @@ the full-fold metric.
 ## Reproduce and score
 
 ```bash
-rtk proxy uv run --locked python -m scripts.tools.validation prepare --label-source combined_v1
+rtk proxy uv run --locked python -m scripts.tools.validation prepare
 rtk proxy uv run --locked python -m scripts.tools.validation score --predictions outputs/training/run/oof_predictions.csv
 ```
 
 [`scripts/tools/validation.py`](../../scripts/tools/validation.py) saves `studies.csv`,
 `label_counts.csv`, `targets.csv`, and `protocol.json` under the configured
-split directory, currently `data/folds/all_5fold_scanner_v1/`. `label_counts.csv` records
+split directory, currently `data/folds/all_5fold_scanner_v2/`. `label_counts.csv` records
 full-fold `positive`/`negative` and `gold_positive`/`gold_negative` counts for
 every target and fold. The explicit
 `pydantic-settings` CLI accepts `--config`, `--data-dir`, `--split-dir`,
@@ -150,8 +171,9 @@ The protocol records official input hashes, label source/version/hash,
 label-manifest hash, target-table hash, generator source hashes, dependency
 versions, scanner-group table hash and rule, and per-fold study and scanner counts. Identical regeneration is allowed; conflicting artifacts
 require a new `--split-dir`. Never change folds midway through a comparison.
-The current study-manifest SHA-256 is `2ed3ad16b5d34d2547b5b0d202543d24d386c6f96275ee2f44d488dcee4fdf74`;
-`all_5fold_v3`'s was `c709cd27ff54dd10d833abfa966622f9a5ecadef5d37670da658d81c26f7b3ed`.
+Study-manifest SHA-256s: `all_5fold_scanner_v2` `4b4563c3887cefad3c81ed7c525ffdd64a15c4ba922f7e1e6f1d440716d94032`,
+`all_5fold_scanner_v1` `2ed3ad16b5d34d2547b5b0d202543d24d386c6f96275ee2f44d488dcee4fdf74` and
+`all_5fold_v3` `c709cd27ff54dd10d833abfa966622f9a5ecadef5d37670da658d81c26f7b3ed`.
 
 The OOF CSV must contain exactly all 4,407 study IDs, their producing
 integer `fold`, and the twelve named target probabilities. The shared scorer,
@@ -168,8 +190,8 @@ training membership, label versions, and checkpoint provenance with each run.
 
 Near the competition end, when the other folds are trained, use pooled OOF
 macro AUC across all 4,407 studies alongside every fold and target. Until then,
-use full fold-0 macro AUC and per-target diagnostics. The OOF scorer requires
-all folds; training already writes complete fold-0 metrics.
+use the full screening-fold macro AUC and per-target diagnostics. The OOF scorer requires
+all folds; training already writes complete single-fold metrics.
 Pooled AUC compares scores from
 different models; it need not equal the mean fold AUC. Retain continuous
 probabilities with consistent output semantics. Avoid treating tiny changes

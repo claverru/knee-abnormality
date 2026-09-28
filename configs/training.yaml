@@ -1,18 +1,18 @@
 name: training
-seed: 703791404
+seed: 1533697213
 
 paths:
   data_root: ../data
   output_root: ../outputs/training
-  label_manifest: labels/combined-label-sources.json
+  label_manifest: labels/rebuild-state-v2-label-sources.json
   report_attribute_manifest: labels/jevk5-report-attribute-targets-v3.1.json
 
 labels:
-  source: combined_v1
+  source: rebuild_state_v2
 
 validation:
-  split: all_5fold_scanner_v1
-  folds: [4]
+  split: all_5fold_scanner_v2
+  folds: [0]
   prediction_image_multiplier: 4
 
 data:

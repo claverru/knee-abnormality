@@ -46,6 +46,7 @@ findings doc holds the question, method, command and result.
 
 | Script | Question | Findings |
 |---|---|---|
+| [audit_label_sources.py](audit_label_sources.py) | Are any public label sources trash? Blind report audit of each source's strong disagreements with the other families | [Source audit result](../../docs/public-labels/label-rebuild.md#source-audit-result-2026-09-28) |
 | [audit_public_labels.py](audit_public_labels.py) | How do the Steven, Pilkwang and lixin labels compare with gold? | [Public-label audit](../../docs/public-labels/public-label-audit-overview.md) |
 | [compare_public_labels.py](compare_public_labels.py) | How do the 2026-09-13 releases compare with Steven v4? | [New public labels](../../docs/public-labels/2026-09-13-new-public-label-comparison.md) |
 | [screen_public_label_tables.py](screen_public_label_tables.py) | Which 2026-09-21 snapshots are usable, and does strict MCL consensus help? | [Rescreen](../../docs/public-labels/2026-09-21-public-label-rescreen.md) |

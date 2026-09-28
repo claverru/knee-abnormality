@@ -1,36 +1,35 @@
 # Validation strategy
 
-The default split is **`all_5fold_scanner_v1`**, protocol version 2, prepared on **2026-09-21**.
-It has five stratified folds across **all 4,407 studies**, with roughly 20% held out for validation
-in each fold. Report groups stay intact. Stratification balances the effective labels, gold
-positives and negatives, `is_gold` and eight MRI scanner groups. Its evaluation targets are the
-[combined labels](../public-labels/combined-labels.md), with gold labels where available. The
-[protocol](project-validation-protocol.md#all_5fold_scanner_v1) gives the membership and scanner
-counts. Only 209 of its 905 fold-0 validation studies were in `all_5fold_v3`'s fold 0, and four
-evaluation targets changed. **No fold-0 score recorded before 2026-09-21 is comparable** with a run
-on this split. `all_5fold_v3` and earlier split artifacts remain available for reproducing
-historical runs.
+The default split is **`all_5fold_scanner_v2`**, protocol version 2, prepared on **2026-09-28**
+with the adoption of the [rebuilt labels](../public-labels/label-rebuild.md) (`rebuild_state_v2`). It has
+five stratified folds across **all 4,407 studies**, with roughly 20% held out for validation in each
+fold. Report groups stay intact. Stratification balances the effective labels, gold positives and
+negatives, `is_gold` and eight MRI scanner groups. Its evaluation targets are `rebuild_state_v2`,
+with gold labels where available. The [protocol](project-validation-protocol.md#all_5fold_scanner_v2)
+gives the membership and scanner counts. Fold membership and evaluation targets both changed, so
+**no score on `all_5fold_scanner_v1` (2026-09-21 to 2026-09-28) is comparable** with a run on this
+split; the earlier split artifacts remain available for reproducing historical runs.
 
 Use full held-out-fold macro AUC as the development selection metric, with
 report-derived diagnostics kept separate. This mixed-label
 endpoint is not a public leaderboard score or an independently annotated
 4,407-study reference endpoint. Repeated tuning remains development selection.
-The eleven-study gold subset is recorded but decides nothing: across the comparable
+The fold's gold subset (11–12 studies on `all_5fold_scanner_v2`) is recorded but decides nothing: across the comparable
 submissions gold-only AUC and gold-only BCE carry no public-score signal, and gold AUC has three
 times macro AUC's run-to-run noise
 ([comparison](results/2026-09-18-local-public-metric-comparison.md)).
 
 The strategy selected on **2026-09-11** was to iterate on **fold 0** until near
-the end of the competition. **Since 2026-09-25 the screening fold is fold 1** (user decision).
-Every fold-0 decision since the scanner split had been made on the same 905 studies, and the
-public board disagreed with it: S59 (a fold-0 adoption) scored 0.939, while S58 (a fold-0 reject)
-scored 0.944. The fold switched when the OA-detector control was retrained, so no extra run was
-needed. The fold lives only in `configs/training.yaml` (`validation.folds`): the `just` recipes,
-`predict`, `compare_fold_runs` and `repredict_run` read it from there unless a fold is passed
-explicitly. Fold-0 results stay valid as a record but cannot be compared with fold-1 ones. The
-autoresearch shared evaluation still requires fold 0 and fails validation until it is updated.
+the end of the competition. **Since 2026-09-25 the screening fold rotates** with each adoption
+(user decision, [below](#controlled-comparisons)); since 2026-09-28 it is fold 0 of
+`all_5fold_scanner_v2`. Every fold-0 decision on `all_5fold_scanner_v1` had been made on the same
+905 studies, and the public board disagreed with it: S59 (a fold-0 adoption) scored 0.939, while
+S58 (a fold-0 reject) scored 0.944. The fold lives only in `configs/training.yaml`
+(`validation.folds`): the `just` recipes, `predict`, `compare_fold_runs` and `repredict_run` read
+it from there unless a fold is passed explicitly, and the autoresearch runner takes it from the
+sealed recipe. Results on earlier folds stay valid as a record but cannot be compared across folds.
 
-The screening fold is iterated on until near the end of the competition. Use its complete 905-study validation predictions
+The screening fold is iterated on until near the end of the competition. Use its complete validation predictions
 for routine comparisons. Additional-fold training, full OOF scoring,
 ensembling and, since 2026-09-16, bigger images are deferred to that
 [later phase](../backlog/endgame.md); they are not
@@ -53,8 +52,9 @@ checkpoint rule; never search seeds for an apparent improvement.
    adoptions.
 3. **One source of truth:** the fold and seed live only in `configs/training.yaml`
    (`validation.folds`, `seed`), and commands take them from there.
-4. **Campaigns:** a campaign runs on its reference's fold from start to end. Its control
-   retrain after a provisional acceptance changes only the seed.
+4. **Campaigns:** a campaign runs on its reference's fold from start to end. Since 2026-09-26 a
+   provisional acceptance makes the adopted run the campaign's reference, with no control
+   retrain ([protocol](../../autoresearch/protocol.md#training-seed-policy)).
 5. **Reporting:** scores are reported per fold stretch; never add up or compare scores across
    folds.
 6. **Final check:** the public board, then all five folds in the endgame.
@@ -72,9 +72,8 @@ checkpoint rule; never search seeds for an apparent improvement.
 - **Cost:** rotating at adoptions costs no extra runs, because the new control is retrained
   anyway; rotating per experiment would need a control on every fold.
 
-The OA-detector control (fold 1, seed 1485198267) is the first rotation. The autoresearch
-runner still hardcodes fold 0, so it needs to take the fold from the recipe before the next
-campaign ([protocol](../../autoresearch/protocol.md#training-seed-policy)). Adopt a valid implementation only when
+The OA-detector control (fold 1, seed 1485198267) was the first rotation; the controls since are
+in the [adoption history](../modeling/current-model.md#adoption-history). Adopt a valid implementation only when
 macro gain >= 0.001 and the central 80% paired-report-group bootstrap lower bound
 is strictly positive; otherwise discard it. Keep the 95% interval as diagnostic
 evidence. No automatic confirmation branches or control reruns follow a result.
@@ -85,7 +84,7 @@ validation density (×1 since 2026-09-17) and prediction density (×4 since 2026
 is the factor; validation memberships and
 [frozen targets](project-validation-protocol.md#frozen-evaluation-targets-and-metrics)
 never change. Record full-fold and per-target AUC, subgroup diagnostics, BCE, runtime, peak
-VRAM and the distinct slices and TTA passes used, and keep all 904 validation predictions
+VRAM and the distinct slices and TTA passes used, and keep all validation predictions
 with the run's [identities](../architecture/configs-and-experiment-artifacts.md). Export
 parity is not required for each run or submission.
 
@@ -112,15 +111,15 @@ parity is not required for each run or submission.
   runs are comparable only with a control at the same multiplier.
 - **Prediction multiplier (since 2026-09-22):** each epoch is still validated at ×1 and the best
   one selected there, but the saved predictions that comparisons score come from that checkpoint
-  at ×4 and attention temperature 1 (`validation.prediction_image_multiplier`). Models scale
+  at ×4 and attention temperature 1 (`validation.prediction_image_multiplier`), about 50 s more
+  per run. Models scale
   differently with more triplets: `oblique` was −0.0015 against `k_05` at ×1 and +0.0003 at ×4
   τ 0.75 ([result](results/2026-09-22-oblique-groups-result.md#temperature-and-count)). Compare
   only runs predicted at the same multiplier.
-- **Against the leaderboard**, macro AUC is the best available local predictor (Pearson +0.907
-  over nineteen comparable submissions) and BCE adds nothing on top of it, but neither resolves
-  the submissions made since 2026-09-13, whose local spread is below one run's noise
-  ([comparison](results/2026-09-18-local-public-metric-comparison.md)). Prefer a public result
-  over a sub-0.005 fold-0 difference.
+- **Against the leaderboard**, macro AUC is the best available local predictor, but it does not
+  resolve submissions whose local spread is below one run's noise
+  ([local-to-public relationship](local-to-public-score-relationship.md)). Prefer a public result
+  over a sub-0.005 local difference.
 
 The user launches training and the
 [encoding diagnostic](manual-encoding-usage-diagnosis.md) manually; agents schedule no

@@ -1,9 +1,8 @@
 # Report attribute extraction with JevK5
 
 **Status, 2026-09-25:** the [report-attribute heads](../modeling/report-attribute-heads.md) on
-target set 3.1 are part of the recipe (user decision): +0.00105 ×4 macro against
-`oa-detector-control`, 95% [−0.0012, +0.0035], and 0.940 public (S62) against 0.938
-([result](../validation/results/2026-09-25-report-attribute-heads.md)). The targets come from the
+target set 3.1 are part of the recipe (user decision,
+[result](../validation/results/2026-09-25-report-attribute-heads.md)). The targets come from the
 v3 extraction below. Open work: a v4 question set (Baker's size first, then the weaknesses in the
 [v3 analysis](#v3-full-run-analysis-2026-09-25)), and a separate target-repair experiment on
 low-grade effusion, Baker's and cartilage findings.
@@ -17,6 +16,17 @@ seed). Kaggle shows S72 with a stale "S66 … retry" description. Not adopted; t
 version lost locally (−0.00062). This entry replaces
 the backlog big bet "Richer report supervision: OA attributes", widened from OA to all twelve
 labels.
+
+**v3 has two consumers (2026-09-28):** the report-attribute heads (target set 3.1, training only)
+and the adopted labels `rebuild_state_v2`, where JevK5 v3 is one root family and one of the state
+anchors ([label rebuild](../public-labels/label-rebuild.md#reproducing-a2)). The labels pin
+`outputs/labels/jevk5-attributes-v3/attributes.parquet` by SHA-256 and the folder is read-only, so
+v4 must never replace v3 in place. Order for v4 (user decision): first a label-free comparison of
+v4 against v3 answers on v3's known weak spots (hedged findings, 15 of JevK5's 18 wrong cells in the
+source audit, and Baker's size); then v4 targets in the heads as a normal candidate against
+`rebuild-state-v2-control`, which keeps the evaluation targets fixed; only then, if v4 clearly fixes
+the hedged-finding misses, a new label version `rebuild_state_v3` on the same split, judged with a
+new control and a public comparison because it moves the evaluation targets.
 
 ## Goal
 
@@ -190,7 +200,6 @@ Label-free checks over all 4,407 v3 answers (scripts in the session scratchpad; 
    - Compare against a fresh current-recipe control with the same split, evaluation targets,
      seed, image workload and training budget. Attribute accuracy is diagnostic, not the adoption
      metric.
-   - Keep this separate from [OA label repair](../backlog/big-bets.md#oa-only-rubric-aligned-label-repair).
    - **Known weak targets in v3** (spot check of the audited cases, 2026-09-25): Hoffa and Baker's
      size still invent findings, the patellar-facet leak into the femorotibial cartilage questions
      remains, osteochondral still counts bone lesions, and unexplained edema is now called a

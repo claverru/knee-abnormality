@@ -1,0 +1,202 @@
+{
+  "purpose": "Kaggle dataset, version and download command for every public label file that rebuild_state_v2 and rebuild_mean_v2 read; the adopted label manifest pins the same files by SHA-256 but records versions for only some of them",
+  "label_manifest": "configs/labels/rebuild-state-v2-label-sources.json",
+  "checked_at": "2026-09-28T15:33:43.893440+00:00",
+  "not_downloadable": {
+    "jevk5": "outputs/labels/jevk5-attributes-v3/attributes.parquet is our own JevK5 v3 extraction; keep the file, do not regenerate it in place",
+    "combined_v1": "data/labels/prepared/combined-v1/labels.csv is rebuilt from configs/labels/combined-label-sources.json",
+    "official": "data/raw/train.csv comes from the competition data"
+  },
+  "sources": [
+    {
+      "root": "ramit",
+      "path": "data/labels/public/ramitnandi/rsna-knee-labels-gpt-luna/downloaded-20260921/report_labels.csv",
+      "bytes": 8050551,
+      "sha256": "6e2d4eebb98671cf593a339e48ff11a4eaedce582e8a060b117470f7e4b255cf",
+      "dataset": "ramitnandi/rsna-knee-labels-gpt-luna",
+      "dataset_version": 1,
+      "evidence": "downloaded this version and matched the SHA-256 on 2026-09-28",
+      "download_command": "rtk proxy uv run --locked kaggle datasets download ramitnandi/rsna-knee-labels-gpt-luna/1 -f report_labels.csv -p data/labels/public/ramitnandi/rsna-knee-labels-gpt-luna/downloaded-20260921 --unzip -q"
+    },
+    {
+      "root": "vmohit",
+      "path": "data/labels/public/vmohitrao/rsna-knee-report-labels/downloaded-20260921/label_states.csv",
+      "bytes": 391542,
+      "sha256": "7b20796e52354702c429f16204f434d533586694b527a79e02fa34583d653a58",
+      "dataset": "vmohitrao/rsna-knee-report-labels",
+      "dataset_version": 3,
+      "evidence": "downloaded this version and matched the SHA-256 on 2026-09-28",
+      "download_command": "rtk proxy uv run --locked kaggle datasets download vmohitrao/rsna-knee-report-labels/3 -f label_states.csv -p data/labels/public/vmohitrao/rsna-knee-report-labels/downloaded-20260921 --unzip -q"
+    },
+    {
+      "root": "pilkwang",
+      "path": "data/labels/public/pilkwang/version-1/report_labels_v2.csv",
+      "bytes": 1004839,
+      "sha256": "6f704a7bdb2f894cc49445b19ba7c4378c3f548d3449e00361e10044bee40920",
+      "dataset": "pilkwang/rsna-knee-llm-labels",
+      "dataset_version": 1,
+      "evidence": "version pinned by an earlier label manifest",
+      "download_command": "rtk proxy uv run --locked kaggle datasets download pilkwang/rsna-knee-llm-labels/1 -f report_labels_v2.csv -p data/labels/public/pilkwang/version-1 --unzip -q"
+    },
+    {
+      "root": "steven_v1",
+      "path": "data/labels/public/stevenleehans/version-6/llm_labels_full.csv",
+      "bytes": 534442,
+      "sha256": "96444cd3c7d396bae4a71454317d9cbe0689759b5278b30939781e04d0774537",
+      "dataset": "stevenleehans/rsna-knee-llm-report-labels",
+      "dataset_version": 6,
+      "evidence": "version pinned by an earlier label manifest",
+      "download_command": "rtk proxy uv run --locked kaggle datasets download stevenleehans/rsna-knee-llm-report-labels/6 -f llm_labels_full.csv -p data/labels/public/stevenleehans/version-6 --unzip -q"
+    },
+    {
+      "root": "lixin73",
+      "path": "data/labels/public/lixin73/version-1/report_labels_gpt56sol.csv",
+      "bytes": 740621,
+      "sha256": "91678f249ec576d63e16c566b6d7a5c968dfd1af8d1d0721dfde4d0384832add",
+      "dataset": "lixin73/rsna-knee-llm-report-labels-sol56",
+      "dataset_version": 1,
+      "evidence": "version pinned by an earlier label manifest",
+      "download_command": "rtk proxy uv run --locked kaggle datasets download lixin73/rsna-knee-llm-report-labels-sol56/1 -f report_labels_gpt56sol.csv -p data/labels/public/lixin73/version-1 --unzip -q"
+    },
+    {
+      "root": "zhen_v7",
+      "path": "data/labels/public/zhen931/version-1/report_labels_v7.csv",
+      "bytes": 1021642,
+      "sha256": "cca73170576c188d0269ecb321354bd70743f3b06f89767c727552ef252a785d",
+      "dataset": "zhen931/rsna-knee-weak-labels-v7",
+      "dataset_version": 1,
+      "evidence": "version pinned by an earlier label manifest",
+      "download_command": "rtk proxy uv run --locked kaggle datasets download zhen931/rsna-knee-weak-labels-v7/1 -f report_labels_v7.csv -p data/labels/public/zhen931/version-1 --unzip -q"
+    },
+    {
+      "root": "laymond",
+      "path": "data/labels/public/laymond/version-4/weak_labels_v2_filled.csv",
+      "bytes": 11919995,
+      "sha256": "ed030920cb82d33d642610b2dfa4536d0f5b6f6d3e72d683735ff4495f186fcf",
+      "dataset": "laymond/rsna-knee-abnormality-qwen3-8b-weak-labels",
+      "dataset_version": 4,
+      "evidence": "version pinned by an earlier label manifest",
+      "download_command": "rtk proxy uv run --locked kaggle datasets download laymond/rsna-knee-abnormality-qwen3-8b-weak-labels/4 -f weak_labels_v2_filled.csv -p data/labels/public/laymond/version-4 --unzip -q"
+    },
+    {
+      "root": "yunus",
+      "path": "data/labels/public/yunusgmsoy/rsna-knee-llm-report-labels/downloaded-20260921/yunus_llm_labels.csv",
+      "bytes": 522625,
+      "sha256": "77a8d8fd093f3648f34b561610ced424363c25fd3d8b667c5347a353f0310642",
+      "dataset": "yunusgmsoy/rsna-knee-llm-report-labels",
+      "dataset_version": 3,
+      "evidence": "downloaded this version and matched the SHA-256 on 2026-09-28",
+      "download_command": "rtk proxy uv run --locked kaggle datasets download yunusgmsoy/rsna-knee-llm-report-labels/3 -f yunus_llm_labels.csv -p data/labels/public/yunusgmsoy/rsna-knee-llm-report-labels/downloaded-20260921 --unzip -q"
+    },
+    {
+      "root": "jev_text",
+      "path": "data/labels/public/riadmohamed42/jev-knee-labels/downloaded-20260921/FINAL2_labels_scores.csv",
+      "bytes": 1389334,
+      "sha256": "6f70de34e75d89b153577b4e8f09aef9c7a51064a81a7b022d97840b7ffbb39f",
+      "dataset": "riadmohamed42/jev-knee-labels",
+      "dataset_version": 5,
+      "evidence": "downloaded this version and matched the SHA-256 on 2026-09-28",
+      "download_command": "rtk proxy uv run --locked kaggle datasets download riadmohamed42/jev-knee-labels/5 -f FINAL2_labels_scores.csv -p data/labels/public/riadmohamed42/jev-knee-labels/downloaded-20260921 --unzip -q"
+    },
+    {
+      "root": "dreaddev",
+      "path": "data/labels/public/dreaddevelopment/rsna-knee-labels/downloaded-20260921/labels_llm_soft.csv",
+      "bytes": 535909,
+      "sha256": "8cec477fb555e88bbb4196197fd3f806cbafed8cc2f6b2d48d26a8d49fbd86a1",
+      "dataset": "dreaddevelopment/rsna-knee-labels",
+      "dataset_version": 3,
+      "evidence": "downloaded this version and matched the SHA-256 on 2026-09-28",
+      "download_command": "rtk proxy uv run --locked kaggle datasets download dreaddevelopment/rsna-knee-labels/3 -f labels_llm_soft.csv -p data/labels/public/dreaddevelopment/rsna-knee-labels/downloaded-20260921 --unzip -q"
+    },
+    {
+      "root": "josh",
+      "path": "data/labels/public/joshuaziel/rsna-knee-mri-report-labels-gpt-5-6-luna/downloaded-20260921/all_raw_predictions.json",
+      "bytes": 18613933,
+      "sha256": "3f666b92fb7b68bdc3e9ea4d34bbffb62f2f248e241517640d19b443b818e3c5",
+      "dataset": "joshuaziel/rsna-knee-mri-report-labels-gpt-5-6-luna",
+      "dataset_version": 1,
+      "evidence": "downloaded this version and matched the SHA-256 on 2026-09-28",
+      "download_command": "rtk proxy uv run --locked kaggle datasets download joshuaziel/rsna-knee-mri-report-labels-gpt-5-6-luna/1 -f all_raw_predictions.json -p data/labels/public/joshuaziel/rsna-knee-mri-report-labels-gpt-5-6-luna/downloaded-20260921 --unzip -q"
+    },
+    {
+      "root": "nartaa",
+      "path": "data/labels/public/nartaa/rsna-knee-hpo-assets/downloaded-20260922/train_labels_v1.parquet",
+      "bytes": 211780,
+      "sha256": "a134cfce2f751f90f4219d791a563ee677b6223ac28f32e456bb3759c1d3fba9",
+      "dataset": "nartaa/rsna-knee-hpo-assets",
+      "dataset_version": 9,
+      "evidence": "downloaded this version and matched the SHA-256 on 2026-09-28",
+      "download_command": "rtk proxy uv run --locked kaggle datasets download nartaa/rsna-knee-hpo-assets/9 -f train_labels_v1.parquet -p data/labels/public/nartaa/rsna-knee-hpo-assets/downloaded-20260922 --unzip -q"
+    },
+    {
+      "root": "qwen3_8b",
+      "path": "data/labels/public/xhaitanya/qwen38b-labels-rsnaknee/downloaded-20260927/llm_labels.csv",
+      "bytes": 525766,
+      "sha256": "2806eb6bf8504236cab05c8e4a5d05f7065a9a537898f60f702f84d8df41e5a9",
+      "dataset": "xhaitanya/qwen38b-labels-rsnaknee",
+      "dataset_version": 1,
+      "evidence": "version pinned by an earlier label manifest",
+      "download_command": "rtk proxy uv run --locked kaggle datasets download xhaitanya/qwen38b-labels-rsnaknee/1 -f llm_labels.csv -p data/labels/public/xhaitanya/qwen38b-labels-rsnaknee/downloaded-20260927 --unzip -q"
+    },
+    {
+      "root": "bhavesh",
+      "path": "data/labels/public/bhaveshkolhe/knee-llm-labels/downloaded-20260928/labels_full_shard0.csv",
+      "bytes": 487546,
+      "sha256": "8708667df0e70bea23d74e5b63628b3bfd14f2e25c96df30c2a522a233e92212",
+      "dataset": "bhaveshkolhe/knee-llm-labels",
+      "dataset_version": 2,
+      "evidence": "version pinned by an earlier label manifest",
+      "download_command": "rtk proxy uv run --locked kaggle datasets download bhaveshkolhe/knee-llm-labels/2 -f labels_full_shard0.csv -p data/labels/public/bhaveshkolhe/knee-llm-labels/downloaded-20260928 --unzip -q"
+    },
+    {
+      "root": "bhavesh",
+      "path": "data/labels/public/bhaveshkolhe/knee-llm-labels/downloaded-20260928/labels_full_shard1.csv",
+      "bytes": 477852,
+      "sha256": "34dcac1569a359c174bd33fb9831618011255f5c5fa343114000e309bbe74738",
+      "dataset": "bhaveshkolhe/knee-llm-labels",
+      "dataset_version": 2,
+      "evidence": "version pinned by an earlier label manifest",
+      "download_command": "rtk proxy uv run --locked kaggle datasets download bhaveshkolhe/knee-llm-labels/2 -f labels_full_shard1.csv -p data/labels/public/bhaveshkolhe/knee-llm-labels/downloaded-20260928 --unzip -q"
+    },
+    {
+      "root": "hosseini",
+      "path": "data/labels/public/hosseini7798/rsna-knee-label-extraction-jev/downloaded-20260922/Label_Extraction_Jev_v2.csv",
+      "bytes": 6331575,
+      "sha256": "aaefa4b661bcb3ee055dcc7bf810b38e4ecfb2d17ff71ffcd569bdc8df0018e9",
+      "dataset": "hosseini7798/rsna-knee-label-extraction-jev",
+      "dataset_version": 1,
+      "evidence": "downloaded this version and matched the SHA-256 on 2026-09-28",
+      "download_command": "rtk proxy uv run --locked kaggle datasets download hosseini7798/rsna-knee-label-extraction-jev/1 -f Label_Extraction_Jev_v2.csv -p data/labels/public/hosseini7798/rsna-knee-label-extraction-jev/downloaded-20260922 --unzip -q"
+    },
+    {
+      "root": "pearse",
+      "path": "data/labels/public/pearsejim01/rsna-2026-eda/downloaded-20260922/weak_labels_frontier.parquet",
+      "bytes": 277336,
+      "sha256": "017ea7b0bf76bc75ebf7ad416c489908b722f30330c251b1ee765b9aa10b0b9a",
+      "dataset": "pearsejim01/rsna-2026-eda",
+      "dataset_version": 1,
+      "evidence": "downloaded this version and matched the SHA-256 on 2026-09-28",
+      "download_command": "rtk proxy uv run --locked kaggle datasets download pearsejim01/rsna-2026-eda/1 -f weak_labels_frontier.parquet -p data/labels/public/pearsejim01/rsna-2026-eda/downloaded-20260922 --unzip -q"
+    },
+    {
+      "root": "opus_sonnet",
+      "path": "data/labels/public/dhiyaneshbabu/rsna-knee-labelled-train/downloaded-20260928/labelled_train.csv",
+      "bytes": 414377,
+      "sha256": "ec80ce0f39b07a15e7464f6237470e9fd374201d267fd390a4fce4a57e9fb24f",
+      "dataset": "dhiyaneshbabu/rsna-knee-labelled-train",
+      "dataset_version": 1,
+      "evidence": "downloaded this version and matched the SHA-256 on 2026-09-28",
+      "download_command": "rtk proxy uv run --locked kaggle datasets download dhiyaneshbabu/rsna-knee-labelled-train/1 -f labelled_train.csv -p data/labels/public/dhiyaneshbabu/rsna-knee-labelled-train/downloaded-20260928 --unzip -q"
+    },
+    {
+      "root": "yehezkiel",
+      "path": "data/labels/public/yehezkielhaganta/psuedo-labeling-knee/downloaded-20260928/data.csv",
+      "bytes": 5872928,
+      "sha256": "5256c91d3b8ec80e5d32a2e0d7054cdfe4fd7e1688282fed801a787eabe46e0b",
+      "dataset": "yehezkielhaganta/psuedo-labeling-knee",
+      "dataset_version": 7,
+      "evidence": "downloaded this version and matched the SHA-256 on 2026-09-28",
+      "download_command": "rtk proxy uv run --locked kaggle datasets download yehezkielhaganta/psuedo-labeling-knee/7 -f data.csv -p data/labels/public/yehezkielhaganta/psuedo-labeling-knee/downloaded-20260928 --unzip -q"
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "name": "Bhavesh LLM",
+  "label_table": "bhavesh_lateral_v1",
+  "column": "Lateral OA",
+  "competition": "rsna-knee-abnormality-detection",
+  "dataset": "bhaveshkolhe/knee-llm-labels",
+  "dataset_id": 12167421,
+  "dataset_version": 2,
+  "updated_at": "2026-09-24T14:14:39.993Z",
+  "checked_at": "2026-09-28",
+  "url": "https://www.kaggle.com/datasets/bhaveshkolhe/knee-llm-labels/versions/2",
+  "license": "unknown",
+  "download_command": "rtk proxy uv run --locked kaggle datasets download bhaveshkolhe/knee-llm-labels/2 -p data/labels/public/bhaveshkolhe/knee-llm-labels/downloaded-20260928 --unzip -q",
+  "files": [
+    {
+      "path": "data/labels/public/bhaveshkolhe/knee-llm-labels/downloaded-20260928/labels_full_shard0.csv",
+      "bytes": 487546,
+      "sha256": "8708667df0e70bea23d74e5b63628b3bfd14f2e25c96df30c2a522a233e92212"
+    },
+    {
+      "path": "data/labels/public/bhaveshkolhe/knee-llm-labels/downloaded-20260928/labels_full_shard1.csv",
+      "bytes": 477852,
+      "sha256": "34dcac1569a359c174bd33fb9831618011255f5c5fa343114000e309bbe74738"
+    }
+  ]
+}

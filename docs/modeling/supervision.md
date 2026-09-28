@@ -47,7 +47,7 @@ the hypothesis and alternative weighting/sampling methods.
 For each label, compute its positive fraction `r_c` once from observed targets in the actual
 training subset, after official-label overrides and any training-study limit. Count `y >= 0.5`
 as positive and `y < 0.5` as negative; require both groups. A damping exponent
-`trainer.class_balance_exponent` (default `1.0`, range `(0, 1]`) controls weighting strength:
+`trainer.class_balance_exponent` (required, range `[0, 1]`; the recipe uses 0.5) controls weighting strength:
 `rho_c = ((1 - r_c) / r_c) ** k`, `w_neg_c = 1 / (r_c * rho_c + 1 - r_c)`, `w_pos_c = rho_c * w_neg_c`.
 `k = 1.0` reproduces the previous fixed weights (`w_pos_c = 1 / (2 * r_c)`,
 `w_neg_c = 1 / (2 * (1 - r_c))`); smaller `k` damps the pos:neg ratio toward 1:1 (e.g. `k = 0.5`
@@ -64,7 +64,7 @@ has mean weight one and equal total weight in the thresholded positive and negat
 This differs from `pos_weight`, which scales only the positive term inside BCE, including the
 positive component of soft negative targets such as 0.25.
 
-Enabled runs save `fold_<N>/class_balance.json` alongside their effective run configuration.
+Runs save `fold_<N>/class_balance.json` alongside their effective run configuration.
 Its version-1 table also records a top-level `exponent`, alongside each target's observed,
 positive and negative counts, positive fraction and the two fixed weights, in model target order.
 Checkpoints retain the same table in `hyper_parameters.class_balance`; resume compares the full
@@ -110,8 +110,8 @@ and recorded identities remain unchanged.
 
 **Historical reproduction:** prepared on 2026-09-13 for the
 [completed fold-0 comparison](../validation/results/2026-09-13-tonylin-label-comparison.md),
-which scored 0.921 publicly versus Steven v4's 0.929. The active labels are now the
-[combined labels](../public-labels/combined-labels.md); the procedure below preserves the Tonylin
+which scored 0.921 publicly versus Steven v4's 0.929. The active labels are now
+[`rebuild_state_v2`](../public-labels/label-rebuild.md); the procedure below preserves the Tonylin
 experiment.
 The exact historical run needs its archived source; the procedure below trains the same label
 setup with the current code.

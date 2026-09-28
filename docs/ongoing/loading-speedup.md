@@ -33,6 +33,13 @@ the worktree `../knee-inference-opt`, based on `ab49830`, and is not merged or c
 - 2026-09-18: raw header parser, threaded I/O, worker-filtered index and the bit-exact CPU cluster,
   470.5 → 350.8 s of worker wall
   ([profile](../inference/2026-09-18-kaggle-x4-profile-after-cpu-cluster.md)).
+- 2026-09-18, historical loading reference: `control-check` (fold 0, best
+  epoch 6, validation macro AUC 0.88477, preprocessing identity `b8b6c639`) is the first
+  checkpoint carrying the loading changes. It sits inside the ×1 cohort spread (median 0.88707,
+  sd 0.00331; the cohort's own two controls are 0.88380 and 0.88645), and
+  `outputs/submission/exports/control-check-x4-tau075` is exported from it at ×4 and τ 0.75.
+  The relative sampler width adopted on 2026-09-19 and later bumps changed the preprocessing
+  identity, so `b8b6c639` no longer applies to fresh runs.
 - 2026-09-19: support-limited float conversion, single-rank quantiles, shared-memory collation and
   glibc tunables shipped without a Kaggle run. Measured on 2026-09-22: none paid on Kaggle, and the
   tunables were removed.

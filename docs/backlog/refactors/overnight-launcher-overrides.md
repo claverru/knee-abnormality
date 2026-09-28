@@ -10,7 +10,7 @@ queue entry could be a list of flags passed to one control YAML, such as
 
 ## Related decision (not behavior-neutral)
 
-`configs/training.yaml` pins `seed: 2263738815` to the adopted reference, so a fresh-seed run
+`configs/training.yaml` pins the current control's seed (1533697213 since 2026-09-28), so a fresh-seed run
 passes `--seed null`. Dropping the pinned seed would make fresh seeds the default but changes
 the seed policy for autoresearch and manual runs; it needs a decision before this refactor
 relies on it.

@@ -1,0 +1,239 @@
+{
+  "prepared_at": "2026-09-28T08:20:16.400232+00:00",
+  "competition": "rsna-knee-abnormality-detection",
+  "method": "Anchored Dawid-Skene over five latent report states per target (NEG, NOT_MENTIONED, LOW, HEDGED, POS) on each family representative's native symbols, fitted by EM on all reports without labels, tempering tau=0.15 chosen by held-out-source likelihood; P(y) = sum_k q_k sigmoid(beta_k + alpha_t + gamma z) fitted by MAP on gold with gold-tuned and gold-copying roots removed on gold rows. Silver rows only; gold rows keep combined_v1 values and the loader applies official gold overrides. Roots are lineage-level public report extractions plus JevK5 v3 attributes, merged into families at mean silver kappa >= 0.9.",
+  "preparer": {
+    "path": "/home/claudio/src/knee-abnormality-qwen-lateral-labels/scripts/tools/prepare_rebuilt_labels.py",
+    "bytes": 42995,
+    "sha256": "0a6226d2177b87e37ae5d387e730c4fe94c47648d066de60eab753d4e8503930"
+  },
+  "inputs": {
+    "combined_v1": {
+      "path": "data/labels/prepared/combined-v1/labels.csv",
+      "bytes": 872602,
+      "sha256": "1e586b574511fa1c67434e174681eee9a3aafe0d6db8f84cb829fdae5be215fb",
+      "label_table": "combined_v1"
+    },
+    "base_manifest": {
+      "path": "configs/labels/combined-label-sources.json",
+      "bytes": 5622,
+      "sha256": "1cbe97d262dae5950b81fcf188281776864163baa78963e36ac17ff675af6527"
+    },
+    "split_studies": {
+      "path": "data/folds/all_5fold_scanner_v1/studies.csv",
+      "bytes": 608151,
+      "sha256": "2ed3ad16b5d34d2547b5b0d202543d24d386c6f96275ee2f44d488dcee4fdf74"
+    },
+    "official": {
+      "path": "data/raw/train.csv",
+      "bytes": 5690007,
+      "sha256": "8ca2203c0e9d61c080c7a314c7cdb51c1b03a1d9eb4770819f7f34af53ef4e33"
+    },
+    "roots": {
+      "jevk5": [
+        {
+          "path": "outputs/labels/jevk5-attributes-v3/attributes.parquet",
+          "bytes": 11569867,
+          "sha256": "4e2eb3fcf0d3b696a3a671c9c0a42022256256bbc0143e5efdae9b3658b55be9"
+        }
+      ],
+      "ramit": [
+        {
+          "path": "data/labels/public/ramitnandi/rsna-knee-labels-gpt-luna/downloaded-20260921/report_labels.csv",
+          "bytes": 8050551,
+          "sha256": "6e2d4eebb98671cf593a339e48ff11a4eaedce582e8a060b117470f7e4b255cf"
+        }
+      ],
+      "vmohit": [
+        {
+          "path": "data/labels/public/vmohitrao/rsna-knee-report-labels/downloaded-20260921/label_states.csv",
+          "bytes": 391542,
+          "sha256": "7b20796e52354702c429f16204f434d533586694b527a79e02fa34583d653a58"
+        }
+      ],
+      "pilkwang": [
+        {
+          "path": "data/labels/public/pilkwang/version-1/report_labels_v2.csv",
+          "bytes": 1004839,
+          "sha256": "6f704a7bdb2f894cc49445b19ba7c4378c3f548d3449e00361e10044bee40920"
+        }
+      ],
+      "steven_v1": [
+        {
+          "path": "data/labels/public/stevenleehans/version-6/llm_labels_full.csv",
+          "bytes": 534442,
+          "sha256": "96444cd3c7d396bae4a71454317d9cbe0689759b5278b30939781e04d0774537"
+        }
+      ],
+      "lixin73": [
+        {
+          "path": "data/labels/public/lixin73/version-1/report_labels_gpt56sol.csv",
+          "bytes": 740621,
+          "sha256": "91678f249ec576d63e16c566b6d7a5c968dfd1af8d1d0721dfde4d0384832add"
+        }
+      ],
+      "zhen_v7": [
+        {
+          "path": "data/labels/public/zhen931/version-1/report_labels_v7.csv",
+          "bytes": 1021642,
+          "sha256": "cca73170576c188d0269ecb321354bd70743f3b06f89767c727552ef252a785d"
+        }
+      ],
+      "laymond": [
+        {
+          "path": "data/labels/public/laymond/version-4/weak_labels_v2_filled.csv",
+          "bytes": 11919995,
+          "sha256": "ed030920cb82d33d642610b2dfa4536d0f5b6f6d3e72d683735ff4495f186fcf"
+        }
+      ],
+      "yunus": [
+        {
+          "path": "data/labels/public/yunusgmsoy/rsna-knee-llm-report-labels/downloaded-20260921/yunus_llm_labels.csv",
+          "bytes": 522625,
+          "sha256": "77a8d8fd093f3648f34b561610ced424363c25fd3d8b667c5347a353f0310642"
+        }
+      ],
+      "jev_text": [
+        {
+          "path": "data/labels/public/riadmohamed42/jev-knee-labels/downloaded-20260921/FINAL2_labels_scores.csv",
+          "bytes": 1389334,
+          "sha256": "6f70de34e75d89b153577b4e8f09aef9c7a51064a81a7b022d97840b7ffbb39f"
+        }
+      ],
+      "dreaddev": [
+        {
+          "path": "data/labels/public/dreaddevelopment/rsna-knee-labels/downloaded-20260921/labels_llm_soft.csv",
+          "bytes": 535909,
+          "sha256": "8cec477fb555e88bbb4196197fd3f806cbafed8cc2f6b2d48d26a8d49fbd86a1"
+        }
+      ],
+      "josh": [
+        {
+          "path": "data/labels/public/joshuaziel/rsna-knee-mri-report-labels-gpt-5-6-luna/downloaded-20260921/all_raw_predictions.json",
+          "bytes": 18613933,
+          "sha256": "3f666b92fb7b68bdc3e9ea4d34bbffb62f2f248e241517640d19b443b818e3c5"
+        }
+      ],
+      "nartaa": [
+        {
+          "path": "data/labels/public/nartaa/rsna-knee-hpo-assets/downloaded-20260922/train_labels_v1.parquet",
+          "bytes": 211780,
+          "sha256": "a134cfce2f751f90f4219d791a563ee677b6223ac28f32e456bb3759c1d3fba9"
+        }
+      ],
+      "qwen3_8b": [
+        {
+          "path": "data/labels/public/xhaitanya/qwen38b-labels-rsnaknee/downloaded-20260927/llm_labels.csv",
+          "bytes": 525766,
+          "sha256": "2806eb6bf8504236cab05c8e4a5d05f7065a9a537898f60f702f84d8df41e5a9"
+        }
+      ],
+      "bhavesh": [
+        {
+          "path": "data/labels/public/bhaveshkolhe/knee-llm-labels/downloaded-20260928/labels_full_shard0.csv",
+          "bytes": 487546,
+          "sha256": "8708667df0e70bea23d74e5b63628b3bfd14f2e25c96df30c2a522a233e92212"
+        },
+        {
+          "path": "data/labels/public/bhaveshkolhe/knee-llm-labels/downloaded-20260928/labels_full_shard1.csv",
+          "bytes": 477852,
+          "sha256": "34dcac1569a359c174bd33fb9831618011255f5c5fa343114000e309bbe74738"
+        }
+      ],
+      "hosseini": [
+        {
+          "path": "data/labels/public/hosseini7798/rsna-knee-label-extraction-jev/downloaded-20260922/Label_Extraction_Jev_v2.csv",
+          "bytes": 6331575,
+          "sha256": "aaefa4b661bcb3ee055dcc7bf810b38e4ecfb2d17ff71ffcd569bdc8df0018e9"
+        }
+      ],
+      "pearse": [
+        {
+          "path": "data/labels/public/pearsejim01/rsna-2026-eda/downloaded-20260922/weak_labels_frontier.parquet",
+          "bytes": 277336,
+          "sha256": "017ea7b0bf76bc75ebf7ad416c489908b722f30330c251b1ee765b9aa10b0b9a"
+        }
+      ],
+      "opus_sonnet": [
+        {
+          "path": "data/labels/public/dhiyaneshbabu/rsna-knee-labelled-train/downloaded-20260928/labelled_train.csv",
+          "bytes": 414377,
+          "sha256": "ec80ce0f39b07a15e7464f6237470e9fd374201d267fd390a4fce4a57e9fb24f"
+        }
+      ],
+      "yehezkiel": [
+        {
+          "path": "data/labels/public/yehezkielhaganta/psuedo-labeling-knee/downloaded-20260928/data.csv",
+          "bytes": 5872928,
+          "sha256": "5256c91d3b8ec80e5d32a2e0d7054cdfe4fd7e1688282fed801a787eabe46e0b"
+        }
+      ]
+    }
+  },
+  "rows": 4407,
+  "sources": [
+    {
+      "dataset": "stevenleehans/rsna-knee-llm-report-labels",
+      "dataset_id": 11549447,
+      "dataset_version": 6,
+      "url": "https://www.kaggle.com/datasets/stevenleehans/rsna-knee-llm-report-labels/versions/6",
+      "license": "CC0: Public Domain",
+      "api_metadata_url": "https://www.kaggle.com/api/v1/datasets/view/stevenleehans/rsna-knee-llm-report-labels",
+      "download_command": "rtk proxy uv run --locked kaggle datasets download stevenleehans/rsna-knee-llm-report-labels/6 -p data/labels/public/stevenleehans/version-6 --unzip -q",
+      "files": [
+        {
+          "path": "data/labels/public/stevenleehans/version-6/dataset-metadata.json",
+          "bytes": 5720,
+          "sha256": "4fc5a8bb3fb2e837ac9f47af3365c48660d8b70722e82bdaa37bfc1911f50fa8"
+        },
+        {
+          "path": "data/labels/public/stevenleehans/version-6/dataset-view.json",
+          "bytes": 18034,
+          "sha256": "d590d331f855d8f3d8803cc55cc1fb276b98b5cb2af34fbc0ef2e756b514c240"
+        },
+        {
+          "path": "data/labels/public/stevenleehans/version-6/llm_labels_full.csv",
+          "bytes": 534442,
+          "sha256": "96444cd3c7d396bae4a71454317d9cbe0689759b5278b30939781e04d0774537",
+          "label_table": "steven_v1"
+        },
+        {
+          "path": "data/labels/public/stevenleehans/version-6/llm_labels_v2.csv",
+          "bytes": 548231,
+          "sha256": "3c082a987939528a55202028f655bd6f9dc5c9e28eff5058bbae7ef088a9f144",
+          "label_table": "steven_v2"
+        },
+        {
+          "path": "data/labels/public/stevenleehans/version-6/llm_labels_v4_blend.csv",
+          "bytes": 630153,
+          "sha256": "eb4c2b29e7e84adbb4b5ccee825ca20ade6a43dbe295f13be442d549e4f5dca4",
+          "label_table": "steven_v4"
+        }
+      ]
+    },
+    {
+      "dataset": "local/combined-labels",
+      "dataset_version": 1,
+      "files": [
+        {
+          "path": "data/labels/prepared/combined-v1/labels.csv",
+          "bytes": 872602,
+          "sha256": "1e586b574511fa1c67434e174681eee9a3aafe0d6db8f84cb829fdae5be215fb",
+          "label_table": "combined_v1"
+        }
+      ]
+    },
+    {
+      "dataset": "local/rebuild_state_v1",
+      "dataset_version": 1,
+      "files": [
+        {
+          "path": "data/labels/prepared/rebuild-state-v1/labels.csv",
+          "bytes": 1333429,
+          "sha256": "d47b631daee2616c1727f505c2ef5ecb63337add789f40bd457862dd5cca3817",
+          "label_table": "rebuild_state_v1"
+        }
+      ]
+    }
+  ]
+}

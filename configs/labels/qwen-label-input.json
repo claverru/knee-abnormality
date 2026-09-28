@@ -1,0 +1,21 @@
+{
+  "name": "Qwen3-8B",
+  "label_table": "qwen_lateral_v1",
+  "column": "lateral_oa",
+  "competition": "rsna-knee-abnormality-detection",
+  "dataset": "xhaitanya/qwen38b-labels-rsnaknee",
+  "dataset_id": 12209585,
+  "dataset_version": 1,
+  "updated_at": "2026-09-26T13:17:17.93Z",
+  "checked_at": "2026-09-27",
+  "url": "https://www.kaggle.com/datasets/xhaitanya/qwen38b-labels-rsnaknee/versions/1",
+  "license": "MIT",
+  "download_command": "rtk proxy uv run --locked kaggle datasets download xhaitanya/qwen38b-labels-rsnaknee/1 -p data/labels/public/xhaitanya/qwen38b-labels-rsnaknee/downloaded-20260927 --unzip -q",
+  "files": [
+    {
+      "path": "data/labels/public/xhaitanya/qwen38b-labels-rsnaknee/downloaded-20260927/llm_labels.csv",
+      "bytes": 525766,
+      "sha256": "2806eb6bf8504236cab05c8e4a5d05f7065a9a537898f60f702f84d8df41e5a9"
+    }
+  ]
+}

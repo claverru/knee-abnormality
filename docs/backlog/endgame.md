@@ -113,9 +113,10 @@ is already used by the submitted bundles; the pending work is its value under th
 0.938 at ×3 and 0.933 at ×2; the per-count fold-0 and public table, and the reason sharper pooling
 is what makes larger counts pay, are in the
 [submissions record](../inference/submissions/2026-09-18-temperature-and-count-submissions.md).
-Where the count stops paying above ×4, and what it costs against the efficiency prize, is tracked
-in [next](../ongoing/next.md); external evidence points the same way
-([public research](../research/public-research.md#slice-density-and-the-board-2026-09-18-re-sweep)).
+Counts above ×4 were dropped by user decision on 2026-09-24; the one submission above ×4,
+`oblique` at ×5 τ 0.70 (S47), scored 0.945 against 0.944 at ×4 τ 0.75 (S46)
+([history](../history/oblique-groups.md)). External evidence on density is in
+[public research](../research/public-research.md#slice-density-and-the-board-2026-09-18-re-sweep).
 
 ## Weight averaging
 
@@ -196,9 +197,10 @@ same option also serves speed (*Speed* below).
 
   The gains sat on the eight Steven v4 targets. PF OA lost on every measure, because the teacher
   learned Steven v4's looser definitions and ordinary BCE.
-- *When to resume:* once the final phase's fold training on the current recipe exists
-  (`combined_v1`, k = 0.5, `all_5fold_scanner_v1`). Its out-of-fold predictions are the matched
-  teacher. That removes the label-definition and loss mismatches and gives a clean fold-0 gate.
+- *When to resume:* once the final phase's fold training on the current recipe exists (its
+  labels, loss and split). Its out-of-fold predictions are the matched teacher. On 2026-09-24 the
+  user dropped combining the then-adopted model with the existing image-blend labels, so the
+  entry waits for that matched teacher. That removes the label-definition and loss mismatches and gives a clean fold-0 gate.
   Build the table with
   [`prepare_image_blend_labels`](../../scripts/tools/prepare_image_blend_labels.py), whose teacher
   runs, split and blend weight are constants to point at the new folds. Fix the weight before the
