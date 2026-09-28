@@ -1,0 +1,36 @@
+ideas:
+- id: nonlinear-plane-logit-fusion-no-dropout
+  mechanism_id: plane-fusion
+  parent_idea_id: dense-readouts-learned-fusion
+  title: Per-label MLP with a GELU on the detached plane logits as a residual on the learned fusion, without triplet dropout
+  opportunity: >-
+    nonlinear-plane-logit-fusion bundled the MLP fusion with 20% triplet dropout and trailed the
+    incumbent by about 0.005 at epoch 8 (x1). Its logs split the loss: every plane's own validation
+    AUC fell (axial -0.0056, coronal -0.0031, sagittal -0.0010), which the detached MLP cannot
+    cause, and the fusion gain over the best plane fell from +0.022 to +0.020. This run removes the
+    triplet dropout to measure the MLP alone. Requested by the user on 2026-09-28.
+  mechanism: >-
+    Keep the incumbent unchanged: dense plane-exclusive supervision and the learned fusion (softmax
+    weights over present planes on detached plane logits), with every training triplet kept. Add,
+    per label c, an MLP on six inputs: the three detached plane logits z_cq with absent planes set
+    to 0, and the three plane-presence flags. Layers: Linear(6, 16), GELU, Linear(16, 1), one MLP
+    per label (twelve in total), created under a forked RNG, with the output layer's weight and
+    bias initialized at zero so the run starts exactly at the incumbent's fused logit. The model
+    output becomes learned_fusion_c + mlp_c(inputs). Both fusion modules train with the
+    incumbent's class-balanced BCE on this output, on detached plane logits only, added to the
+    loss with weight 1 in place of the incumbent's fusion BCE; no gradient reaches the backbones,
+    heads or attention. The sum is the validation and inference output. No triplet dropout.
+  precedents:
+  - 'nonlinear-plane-logit-fusion (MLP plus 20% triplet dropout): about -0.005 x1 at epoch 8 against the incumbent; MLP correction 15-29% of the fused logit.'
+  - 'dense-readouts-learned-fusion: linear fusion +0.0009 over the present-plane mean.'
+  novelty: Isolates nonlinear fusion from triplet dropout.
+  coverage: All studies and labels; studies missing planes enter through the presence flags.
+  exploitation: Log per label and epoch the mean absolute MLP correction, its share of the fused logit, the fusion softmax weights and each plane's own validation macro AUC; per-plane AUCs should match the incumbent's, since nothing upstream of the fusion changes.
+  budget: About 1,550 parameters; negligible compute.
+  implementation: model.plane_pooling.fusion_mlp_hidden 16 in config.py; the MLP in modeling/planes/fusion.py; the fusion loss in the Lightning module under trainer.plane_pooling. Reuse the MLP from nonlinear-plane-logit-fusion's source if convenient, without its triplet dropout.
+  open_choices: None; hidden width 16, GELU, zero-initialized output layer and loss weight 1 are fixed.
+  dependencies: []
+  priority_rationale: The user's request; separates the two changes bundled in nonlinear-plane-logit-fusion.
+exhausted_directions: >-
+  Cross-label fusion inputs (header-stacker precedent) and out-of-fold stacking (needs five-fold
+  training outside the harness).

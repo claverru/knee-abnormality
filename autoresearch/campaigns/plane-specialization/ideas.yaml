@@ -1,0 +1,1349 @@
+revision: 452
+ideas:
+- id: random-label-plane-partition
+  mechanism_id: label-plane-assignment
+  parent_idea_id: null
+  title: Each training step, split the twelve labels at random into three groups of
+    four and train each group only on one plane's pooled logits
+  opportunity: 'With joint attention over all planes, the three backbones co-adapt:
+    a backbone can stay weak on a label another plane covers, and the pooled features
+    spread knowledge across planes. If every label''s training logit comes from a
+    single plane, no backbone can lean on another, and each has to extract as much
+    as its own plane holds. This is the user''s idea.'
+  mechanism: Plane-exclusive pooling as defined in the contract gives z_cq for every
+    label c and present plane q. At each training step draw one uniform random permutation
+    of the twelve labels (seeded by the run seed and the global step) and assign labels
+    1-4 to Axial, 5-8 to Coronal and 9-12 to Sagittal, the same partition for every
+    study in the batch. Label c's training logit is z_{c,q(c)}; when the study lacks
+    q(c), it uses a present plane drawn uniformly at random for that study and label.
+    The disease loss is the incumbent's class-balanced BCE on these logits. Validation
+    and inference output the present-plane mean of z_cq. Shared head (w_c, b_c) across
+    planes.
+  precedents:
+  - 'Single-plane inference on the ReXNet control: fusion adds 0.008 or less over
+    the best single plane for five labels (prior-work.md).'
+  - 'Plane/contrast readouts with a shared backbone: -0.0006 (near-misses #11).'
+  novelty: First scheme in the project where no label's training logit mixes planes.
+  coverage: All studies and labels; each backbone receives about four labels per step
+    and every label about a third of the steps.
+  exploitation: Log realized assignment shares per label and plane, fallback counts
+    per epoch and the validation macro AUC of each plane's own logits.
+  budget: Three masked attention pools instead of one; negligible against the backbones.
+  implementation: model.plane_pooling (plane-exclusive pooling, present-plane mean)
+    in config.py and a helper in modeling/planes/; trainer.plane_pooling.assignment
+    random_partition in the Lightning module.
+  open_choices: None; groups of four, one partition per step, present-plane mean.
+  dependencies: []
+  priority_rationale: The user's idea and the purest test of per-plane isolation.
+  status: completed
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality-plane-backbones/autoresearch/campaigns/plane-specialization/seed-ideas.yaml
+  experiments:
+  - random-label-plane-partition-20260927T214945Z-83f117ec
+  decision: reject
+- id: random-partition-learned-fusion
+  mechanism_id: plane-fusion
+  parent_idea_id: null
+  title: Random label-to-plane partition in training with a learned per-label plane
+    fusion at inference
+  opportunity: The present-plane mean weights a plane that barely sees a finding the
+    same as the plane that shows it (axial and sagittal for ACL). A fusion learned
+    on detached plane logits can weight planes by how well they predict each label
+    without letting fusion gradients reach the backbones, so the isolation of the
+    partition is kept.
+  mechanism: 'The random-label-plane-partition scheme for training the backbones,
+    unchanged. Add learned fusion as defined in the contract: weights a_cq (12 x 3,
+    zero init), fused logit = softmax of a_c over the study''s present planes applied
+    to the detached z_cq, trained with the class-balanced BCE on every study and label
+    and added to the loss with weight 1. The fused logit is the validation and inference
+    output.'
+  precedents:
+  - 'Radiologists weight planes by finding: ACL sagittal, MCL coronal, Baker''s axial.'
+  novelty: Separates what each backbone learns from how the planes are combined.
+  coverage: All studies and labels.
+  exploitation: Log the fusion weights per label and plane per epoch and each plane's
+    own validation macro AUC.
+  budget: 36 parameters; negligible.
+  implementation: model.plane_pooling.fusion learned in config.py and modeling/planes/;
+    the fusion loss in the Lightning module under trainer.plane_pooling.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Fixes the mean's known weakness at the same training signal
+    as seed 1.
+  status: completed
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality-plane-backbones/autoresearch/campaigns/plane-specialization/seed-ideas.yaml
+  experiments:
+  - random-partition-learned-fusion-20260927T215617Z-a9ad05ae
+  - random-partition-learned-fusion-20260927T220440Z-23efe1e3
+  decision: reject
+- id: dense-plane-readouts
+  mechanism_id: label-plane-assignment
+  parent_idea_id: null
+  title: Every step, every present plane predicts every label from its own pooled
+    tokens
+  opportunity: The random partition gives each backbone four labels per step. The
+    backbone forward pass is the same whatever the labels, so each plane can predict
+    all twelve every step with the same isolation and three times the label signal,
+    which matters at a fixed ten epochs.
+  mechanism: Plane-exclusive pooling gives z_cq for every label and present plane.
+    The disease loss is the incumbent's class-balanced BCE on every z_cq, averaged
+    over the study's present planes for each label so studies with more planes gain
+    no extra weight. Validation and inference output the present-plane mean. Shared
+    head.
+  precedents:
+  - 'Per-view disease classifiers (RSNA 2024 lumbar winner, as auxiliaries): docs/backlog/big-bets.md#auxiliary-loss-campaign.'
+  novelty: Dense counterpart of the random partition; isolates the effect of subsampling
+    labels.
+  coverage: All studies and labels.
+  exploitation: Log each plane's own validation macro AUC and the per-plane loss per
+    epoch.
+  budget: Three masked attention pools; negligible.
+  implementation: trainer.plane_pooling.assignment dense in the Lightning module;
+    pooling as in seed 1.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The natural comparison for the random partition.
+  status: completed
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality-plane-backbones/autoresearch/campaigns/plane-specialization/seed-ideas.yaml
+  experiments:
+  - dense-plane-readouts-20260927T222330Z-a9747fc9
+  decision: provisional_accept
+- id: dense-readouts-learned-fusion
+  mechanism_id: plane-fusion
+  parent_idea_id: null
+  title: Dense per-plane readouts in training with a learned per-label plane fusion
+    at inference
+  opportunity: Same fusion argument as random-partition-learned-fusion, on the dense
+    training signal.
+  mechanism: The dense-plane-readouts scheme for training the backbones, plus learned
+    fusion as defined in the contract (zero-initialized a_cq on detached z_cq, class-balanced
+    BCE, weight 1). The fused logit is the validation and inference output.
+  precedents:
+  - See random-partition-learned-fusion.
+  novelty: Completes the two-by-two of assignment (random, dense) and fusion (mean,
+    learned).
+  coverage: All studies and labels.
+  exploitation: Log fusion weights per label and plane and each plane's own validation
+    macro AUC.
+  budget: Negligible.
+  implementation: trainer.plane_pooling.assignment dense and model.plane_pooling.fusion
+    learned.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Completes the assignment-by-fusion grid.
+  status: completed
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality-plane-backbones/autoresearch/campaigns/plane-specialization/seed-ideas.yaml
+  experiments:
+  - dense-readouts-learned-fusion-20260927T225032Z-61c0e1c3
+  - dense-readouts-learned-fusion-20260927T231847Z-33417f97
+  decision: provisional_accept
+- id: dense-plane-heads
+  mechanism_id: plane-heads
+  parent_idea_id: null
+  title: Dense per-plane readouts with one classifier per plane and learned fusion
+  opportunity: A classifier shared across planes forces the three backbones into one
+    feature space, which brings back some coupling. One head per plane lets each backbone's
+    features mean what its plane needs.
+  mechanism: 'The dense-readouts-learned-fusion scheme with plane-specific heads:
+    z_cq = w_cq . u_cq + b_cq, where w_cq and b_cq start as copies of the shared head''s
+    initialization. Attention scorer, anatomical bias, meniscus mask and OA correction
+    stay shared. Learned fusion as defined in the contract is the validation and inference
+    output.'
+  precedents:
+  - 'Plane/contrast readouts with a shared backbone: six per-type heads, -0.0006 (near-misses
+    #11); here the backbones are separate.'
+  novelty: Per-plane heads on top of separate backbones.
+  coverage: All studies and labels.
+  exploitation: Log each plane's own validation macro AUC, the fusion weights and
+    the head weight norms per plane.
+  budget: 2 x 12 x 257 extra parameters; negligible.
+  implementation: model.plane_pooling.heads per_plane in config.py and modeling/planes/.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Tests whether the shared classifier limits specialization.
+  status: completed
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality-plane-backbones/autoresearch/campaigns/plane-specialization/seed-ideas.yaml
+  experiments:
+  - dense-plane-heads-20260927T232419Z-a28d05be
+  decision: reject
+- id: radiology-plane-mapping
+  mechanism_id: label-plane-mask
+  parent_idea_id: null
+  title: Each label pools only over the planes a radiologist reads it in, in training
+    and inference
+  opportunity: 'Radiologists read each finding on specific planes: ACL on sagittal,
+    MCL on coronal, Baker''s cysts on axial. Restricting each label''s attention to
+    those planes removes cross-plane shortcuts and has no train/inference mismatch,
+    because the same mask applies in both.'
+  mechanism: 'The incumbent''s joint attention pooling with a fixed label-to-plane
+    mask: label c attends only to the study''s tokens of the planes the contract''s
+    radiology mapping lists for it, in one softmax over their union. A study with
+    none of a label''s mapped planes pools that label over all its present planes.
+    Loss, head and output as in the incumbent.'
+  precedents:
+  - Knee MRI reading practice; the user fixed the mapping on 2026-09-27 and allowed
+    label-to-plane routing for it.
+  - 'Single-plane inference: ACL sagittal +0.003, MCL coronal -0.008, Baker''s axial
+    -0.001 against the full ReXNet model (prior-work.md).'
+  novelty: The only campaign scheme with a prior mapping instead of a random or learned
+    one.
+  coverage: All studies; every label keeps at least one plane.
+  exploitation: Log fallback counts per label and each plane's attention mass per
+    label.
+  budget: One mask on the incumbent's pooling; negligible.
+  implementation: model.plane_pooling.mask radiology with the table in modeling/planes/.
+  open_choices: None; the mapping is the contract's.
+  dependencies: []
+  priority_rationale: Tests the radiology prior directly and keeps inference identical
+    to training.
+  status: completed
+  created_revision: 1
+  seeded: /home/claudio/src/knee-abnormality-plane-backbones/autoresearch/campaigns/plane-specialization/seed-ideas-2.yaml
+  experiments:
+  - radiology-plane-mapping-20260927T235152Z-9a6db8a7
+  decision: reject
+- id: plane-auxiliary-readouts
+  mechanism_id: plane-auxiliary-objective
+  parent_idea_id: null
+  title: Keep the joint pooled output and add a training-only loss where every plane
+    predicts every label on its own
+  opportunity: The joint model may combine planes well at inference but let backbones
+    co-adapt. A training-only per-plane objective makes every backbone stand alone
+    without changing the output path.
+  mechanism: The incumbent's joint pooling, head and loss stay the output. Add plane-exclusive
+    pooling with training-only per-plane heads (12 x 3, forked-RNG initialization)
+    and the class-balanced BCE on every z_cq, averaged over the study's present planes
+    per label, times trainer.plane_pooling.auxiliary_weight 0.5, added to the loss.
+    The auxiliary heads are dropped at inference.
+  precedents:
+  - Per-view disease classifiers as auxiliaries (RSNA 2024 lumbar winner; bundled
+    with other objectives in its ablation).
+  novelty: The only seed that keeps the incumbent's output and adds per-plane pressure.
+  coverage: All studies and labels.
+  exploitation: Log the auxiliary loss, the joint loss and each plane's auxiliary
+    validation macro AUC per epoch; the auxiliary term must stay active (not orders
+    of magnitude below the main loss).
+  budget: Three masked attention pools during training; none at inference.
+  implementation: trainer.plane_pooling.auxiliary_weight in config.py; heads and loss
+    in the Lightning module.
+  open_choices: None; weight 0.5 fixed.
+  dependencies: []
+  priority_rationale: Adds specialization pressure with the smallest change to inference.
+  status: completed
+  created_revision: 1
+  seeded: /home/claudio/src/knee-abnormality-plane-backbones/autoresearch/campaigns/plane-specialization/seed-ideas-2.yaml
+  experiments:
+  - plane-auxiliary-readouts-20260928T001922Z-0eaf2e78
+  decision: reject
+- id: winner-take-all-plane-routing
+  mechanism_id: label-plane-assignment
+  parent_idea_id: null
+  title: For each study and label, train only the plane whose own logit fits best,
+    and fuse with learned weights
+  opportunity: 'A learned routing can settle near the radiologist''s mapping without
+    writing it down: the plane that predicts a label best keeps receiving that label''s
+    gradient and specializes in it.'
+  mechanism: Plane-exclusive pooling gives z_cq. For each study and label, compute
+    the class-balanced BCE of every present plane's logit and apply the loss only
+    to the plane with the lowest value (selection without gradient; ties to the lower
+    plane index). Learned fusion as defined in the contract (detached z_cq, weight
+    1) is the validation and inference output. Shared head.
+  precedents:
+  - Hard mixture-of-experts routing; no project precedent.
+  novelty: The only learned hard routing among the seeds.
+  coverage: All studies and labels; a study with one present plane always routes to
+    it.
+  exploitation: Log win shares per label and plane per epoch; a plane that never wins
+    any label is a lock-in failure to report.
+  budget: Three masked attention pools; negligible.
+  implementation: trainer.plane_pooling.assignment winner_take_all in the Lightning
+    module; fusion as in random-partition-learned-fusion.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Label-agnostic routing that can learn specialization; known
+    risk is early lock-in.
+  status: completed
+  created_revision: 1
+  seeded: /home/claudio/src/knee-abnormality-plane-backbones/autoresearch/campaigns/plane-specialization/seed-ideas-2.yaml
+  experiments:
+  - winner-take-all-plane-routing-20260928T004637Z-bcb07969
+  - winner-take-all-plane-routing-20260928T011442Z-3f1c336c
+  decision: reject
+- id: dense-plane-full-heads
+  mechanism_id: plane-heads
+  parent_idea_id: null
+  title: One independent head per plane (projection, token norm, attention scorer,
+    classifier) with dense readouts and learned fusion
+  opportunity: 'Per-plane classifiers still leave the projection, token norm and attention
+    scorer shared, so the three planes keep one token space and one rule for which
+    tokens matter. A full head per plane makes each plane an independent model up
+    to the fusion: its own features, its own token selection and its own classifier.'
+  mechanism: The dense-readouts-learned-fusion scheme, with every token going through
+    its plane's own projection (backbone features -> 256), token LayerNorm, attention
+    scorer (256 -> 128 -> 12) and classifier. Each per-plane module starts as a copy
+    of the corresponding shared module's initialization. Position, plane and contrast
+    embeddings, anatomical strengths, the meniscus mask, the OA detector and the training-only
+    heads stay shared. Learned fusion as defined in the contract is the validation
+    and inference output.
+  precedents:
+  - dense-plane-heads (seed 5) makes only the classifier per plane.
+  novelty: The strictest plane separation in the campaign; only the fusion is shared.
+  coverage: All studies and labels.
+  exploitation: Log each plane's own validation macro AUC, fusion weights and per-plane
+    attention entropy per epoch.
+  budget: About 330k extra parameters per plane; three smaller projections instead
+    of one, same compute.
+  implementation: model.plane_pooling.heads per_plane_full in config.py and modeling/planes/.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user's request for a full head per backbone and plane.
+  status: completed
+  created_revision: 1
+  seeded: /home/claudio/src/knee-abnormality-plane-backbones/autoresearch/campaigns/plane-specialization/seed-ideas-2.yaml
+  experiments:
+  - dense-plane-full-heads-20260928T011858Z-03de4918
+  - dense-plane-full-heads-20260928T014703Z-14fbe79c
+  decision: reject
+- id: fusion-guided-dense-plane-routing
+  mechanism_id: label-plane-assignment
+  parent_idea_id: winner-take-all-plane-routing
+  title: Learn plane supervision shares from fusion while guaranteeing supervision
+    for every present plane
+  opportunity: 'Winner-take-all activated every label-plane pair but produced poor
+    individual classifiers: selected-epoch plane macro AUCs were 0.65757, 0.64566
+    and 0.69196. Its selected-plane loss was 0.30291 while fusion loss remained 0.62051.
+    This supports an objective mismatch; specialization by target polarity is a hypothesis,
+    since polarity-conditioned assignments were not logged. Dense supervision supplies
+    the missing coverage.'
+  mechanism: Use the incumbent's present-plane fusion weights alpha, detached from
+    the disease objective, to allocate supervision. For each observed study-label
+    pair with n present planes, set r_q = 0.5/n + 0.5*stop_gradient(alpha_q). Compute
+    the existing class-balanced per-plane BCE weighted by r. Retain the separate fusion
+    BCE on detached plane logits exactly as defined by the contract. Every present
+    plane receives at least half its uniform supervision share. Assignment no longer
+    depends on which plane happens to fit that study's target best. Fix the mixing
+    fraction at 0.5 before training; do not sweep it.
+  precedents:
+  - The label-plane-assignment verdict below reconciles random, dense and winner-take-all
+    results.
+  - 'Selected-epoch losses, assignment shares and plane AUCs: [winner-take-all diagnostics](/home/claudio/src/knee-abnormality/outputs/autoresearch/plane-specialization/experiments/winner-take-all-plane-routing-20260928T011442Z-3f1c336c/training/fold_4/logs/version_0/metrics.csv).'
+  - Multiple-choice learning has documented overconfidence problems; this motivates
+    protecting nonwinning predictors, without establishing the cause here. [Confident
+    Multiple Choice Learning](https://proceedings.mlr.press/v70/lee17b.html).
+  novelty: Replaces target-dependent hard winners with training-learned, study-target-independent
+    supervision shares and a guaranteed dense component. It changes the routing mechanism,
+    rather than reseeding or adjusting winner-take-all strength.
+  coverage: Applies the same formula to all twelve labels. Missing planes receive
+    zero weight and remaining weights normalize per study. Labels, class weights,
+    anatomical pooling, meniscus fallback and OA corrections remain fixed. No validation-derived
+    mapping is introduced.
+  exploitation: Uses fusion parameters already trained from the complete study-label
+    objective. The incumbent's twelve fusion rows all moved; selected-epoch weights
+    ranged from 0.1869 to 0.5809. Their usefulness for allocating backbone supervision
+    remains a hypothesis.
+  budget: "Small-changes classification. Adds only arithmetic on existing plane logits\
+    \ and weights, with no additional encoder execution or parameters. The incumbent\
+    \ took 1,627.1 seconds, leaving 178.9 seconds below the fixed cap; similar runtime\
+    \ is expected, not measured. Use supervisor seed 703791404, ten epochs and 2,220\
+    \ steps. Keep the fixed \xD74 macro adoption rule and report the gap to ReXNet\
+    \ 0.909733."
+  implementation: Replace uniform-only disease aggregation with the stated mixture
+    while retaining dense coverage, learned fusion, shared heads and all fixed auxiliary
+    objectives. Log both loss components, realized supervision shares, effective present-plane
+    fusion weights, fallbacks and each plane's validation macro AUC. Add assignment
+    shares conditioned on the existing target >=0.5 split as diagnostics only. Disabling
+    the new option must reproduce the active incumbent, not the inherited joint-pooling
+    fallback. Rebase onto a newly accepted incumbent while preserving unrelated improvements;
+    if dense supervision or learned fusion has been removed, require supervisor reconciliation
+    of these real prerequisites.
+  open_choices: No coefficient search. Fusion weights optimize complementary fused
+    predictions, so they may not identify the best allocation of individual-plane
+    supervision. Polarity-conditioned diagnostics can assess the proposed failure
+    mechanism but cannot change the macro verdict.
+  dependencies:
+  - dense-plane-readouts
+  - dense-readouts-learned-fusion
+  priority_rationale: 'Priority 1: directly addresses an observed routing failure,
+    preserves coverage from the strongest result, and adds negligible compute.'
+  status: completed
+  created_revision: 167
+  ranking_rationale: "Queue the routing proposal first because it preserves both active\
+    \ ideas; if joint fusion later replaces learned fusion, routing would lose a prerequisite.\
+    \ Joint fusion follows as the open fusion line\u2019s distinct study-dependent\
+    \ readout, then radiology auxiliary supervision as a separate retry. All three\
+    \ have satisfied dependencies and differ materially from measured runs. Leave\
+    \ shared-classifier-plane-auxiliaries proposed: its parent improved macro AUC\
+    \ by only 0.000161 with an 80% interval crossing zero, and classifier tying has\
+    \ no measured support sufficient to justify another queue slot now. The incumbent\u2019\
+    s recorded learned-fusion acceptance conflicts with its numerical adoption result;\
+    \ preserve the assigned incumbent and do not describe that result as a qualifying\
+    \ win."
+  experiments:
+  - fusion-guided-dense-plane-routing-20260928T022756Z-bc64160e
+  decision: reject
+- id: dense-plane-detached-joint-fusion
+  mechanism_id: plane-fusion
+  parent_idea_id: dense-readouts-learned-fusion
+  title: Train joint attention fusion on detached tokens while keeping dense supervision
+    of the backbones
+  opportunity: The incumbent learns static label-plane weights, while the existing
+    joint attention pool can vary plane contributions by study. Earlier joint-pooling
+    candidates also changed backbone supervision. A joint readout with its backbone
+    gradients blocked can investigate study-dependent fusion while keeping every backbone
+    responsible for predicting every label.
+  mechanism: Encode each batch once. Retain the incumbent's dense plane-exclusive
+    BCE at coefficient 1. Add the existing all-plane joint-pooling BCE at coefficient
+    1, but detach the normalized token and value tensors entering that branch. Joint
+    BCE updates the shared attention scorer, classifier, anatomical strengths and
+    OA readout parameters, with no gradient reaching backbones, projection, embeddings
+    or token normalization through that branch. Use ordinary joint pooling as the
+    sole inference output. Remove static fusion parameters and detached plane-logit
+    fusion BCE. Masks and OA corrections follow the existing joint-pooling implementation.
+  precedents:
+  - The plane-fusion verdict below preserves the supplied incumbent while documenting
+    its numerical adoption discrepancy.
+  - 'The incumbent already separates fusion training from backbone gradients: [training
+    loss](/home/claudio/src/knee-abnormality/outputs/autoresearch/plane-specialization/experiments/dense-readouts-learned-fusion-20260927T231847Z-33417f97/source/src/knee_abnormality/training/lightning.py:594).'
+  - 'The authorized joint pool is already implemented: [attention pooling](/home/claudio/src/knee-abnormality/outputs/autoresearch/plane-specialization/experiments/dense-readouts-learned-fusion-20260927T231847Z-33417f97/source/src/knee_abnormality/modeling/model.py:347).'
+  - Attention MIL supplies a primary precedent for learned instance aggregation, not
+    evidence that this particular gradient separation will improve AUC. [Attention-based
+    Deep Multiple Instance Learning](https://proceedings.mlr.press/v80/ilse18a.html).
+  novelty: Replaces static logit fusion with the authorized joint attention readout
+    while retaining dense backbone supervision and blocking the joint objective's
+    feature gradients. Unlike the auxiliary-readout seed, joint BCE cannot directly
+    make backbones rely on other planes.
+  coverage: Every present plane still predicts all labels independently during training.
+    Joint inference uses all present tokens with the incumbent's anatomical rules.
+    No new label mapping, head architecture, acquisition normalization or additional
+    backbone pass is introduced.
+  exploitation: "Builds on dense readouts and the existing separation between fusion\
+    \ learning and backbone learning. Selected-epoch incumbent plane AUCs were 0.87470,\
+    \ 0.87785 and 0.87334; the fused \xD74 result remains 0.005698 below ReXNet. These\
+    \ different image-multiplier metrics are not directly comparable."
+  budget: "Small-changes classification. Adds one pooling branch over existing tokens\
+    \ and removes the tiny static fusion module. The historical joint-plus-plane auxiliary\
+    \ run took 1,659.9 seconds, suggesting feasibility under 1,806 seconds without\
+    \ guaranteeing it. Retain ten epochs, 2,220 steps and supervisor seed 703791404;\
+    \ use the unchanged \xD74 macro rule and ReXNet comparison."
+  implementation: Replace the enabled learned-fusion output and loss, retaining dense
+    plane readouts, shared modules and fixed auxiliary objectives. Reuse normalized
+    tensors; detach only the joint branch so the dense branch retains its original
+    gradients. Log dense and joint losses separately, per-plane AUCs, assignment shares,
+    fallbacks and joint attention mass by plane, explicitly identifying that mass
+    rather than calling it learned fusion parameters. The new option's disabled path
+    must reproduce the current incumbent. On a new incumbent, retain unrelated improvements
+    and explicitly reconcile any routing dependent on the removed static fusion; do
+    not silently preserve obsolete fusion behavior.
+  open_choices: The shared readout still couples the objectives through its parameters;
+    only feature gradients are separated. Joint pooling also changes OA aggregation
+    from weighted plane corrections to the authorized joint correction, so this evaluates
+    a complete fusion scheme rather than isolating attention weights.
+  dependencies:
+  - dense-plane-readouts
+  priority_rationale: 'Priority 2: a distinct, authorized fusion mechanism with modest
+    cost. The recorded fusion gain is uncertain, so this receives one follow-up without
+    treating that gain as statistically established.'
+  status: completed
+  created_revision: 167
+  ranking_rationale: 'Admit peer distillation: its dependency is satisfied, it adds
+    a fixed training-only objective to existing plane readouts, and the targeted precedent
+    search found no measured run of this mechanism. Keep the prepared reserved head
+    first and the open radiology follow-up ahead of the new direction. Leave shared-classifier-plane-auxiliaries
+    proposed: its measured parent gained only 0.000161 with an 80% interval crossing
+    zero, and this retry would replace the active dense supervision and learned fusion
+    without new supporting evidence.'
+  experiments:
+  - dense-plane-detached-joint-fusion-20260928T023503Z-1de0dad8
+  decision: reject
+- id: radiology-auxiliary-dense-readouts
+  mechanism_id: label-plane-mask
+  parent_idea_id: radiology-plane-mapping
+  title: Add radiology-mapped plane supervision while retaining dense readouts and
+    the incumbent's inference
+  opportunity: The radiology seed simultaneously restricted pooling and removed dense
+    per-plane supervision. Its Contusion decline occurred even though that label permits
+    all three planes, implicating the changed pooling/supervision scheme as a possible
+    contributor. The low aggregate plane AUCs include intentionally unsupervised label-plane
+    pairs and cannot diagnose failure of the mapped pairs.
+  mechanism: 'Retain the complete incumbent objective and inference. Add a training-only
+    auxiliary term at coefficient 0.5 using the existing plane-exclusive logits: for
+    each observed study-label pair, average the unchanged class-balanced BCE over
+    its present planes in the contract''s fixed radiology mapping. If none are present,
+    average over all present planes. Normalize within each study-label before averaging
+    observations, so labels with more mapped planes do not receive greater total auxiliary
+    weight. No inference mask is added.'
+  precedents:
+  - The label-plane-mask verdict below distinguishes the rejected complete scheme
+    from this supervision-only retry.
+  - Mapped assignments and zero fallbacks are recorded in [radiology diagnostics](/home/claudio/src/knee-abnormality/outputs/autoresearch/plane-specialization/experiments/radiology-plane-mapping-20260927T235152Z-9a6db8a7/training/fold_4/logs/version_0/metrics.csv).
+  - '[Prior work](/home/claudio/src/knee-abnormality-plane-backbones/autoresearch/campaigns/plane-specialization/prior-work.md)
+    records substantial seed variation and prohibits deriving new mappings from label
+    results.'
+  novelty: Uses the fixed mapping solely to add training emphasis while preserving
+    supervision of unmapped planes and the current fusion. It does not repeat masked
+    joint inference or select favorable labels.
+  coverage: All twelve labels retain dense supervision from every present plane. Only
+    the user-authorized mapping controls the extra term. The existing anatomical masks,
+    OA correction, class balance and target-observation masks remain unchanged.
+  exploitation: Retains the established dense-readout behavior instead of removing
+    it to test anatomical specialization. Radiology-specific label changes motivate
+    the question but do not determine the mapping, coefficient or evaluation objective.
+  budget: "Small-changes classification. Reuses existing logits and BCE tensors, adding\
+    \ a small masked reduction with no new parameters or pooling calls. Runtime should\
+    \ remain near the 1,627.1-second incumbent, subject to the fixed 1,806-second\
+    \ cap. Use seed 703791404, ten epochs, 2,220 steps and the unchanged \xD74 macro\
+    \ adoption rule; report the ReXNet gap."
+  implementation: Add one training-only mapped auxiliary term; retain dense disease
+    loss, the incumbent inference readout and all fixed auxiliary objectives. Log
+    raw and weighted auxiliary loss, mapped contribution shares, total supervision
+    shares, fallback counts, effective fusion diagnostics and per-plane AUCs. Distinguish
+    deliberately unmapped auxiliary pairs from idle dense supervision. Disabling the
+    option must exactly recover the live incumbent. If a new incumbent changes fusion,
+    retain that output because this method does not require learned fusion; if dense
+    readouts disappear, reconcile the prerequisite before implementation.
+  open_choices: Fix coefficient 0.5 and the complete contract mapping before training.
+    The hypothesis is that mapped emphasis can help without sacrificing general plane
+    competence; current evidence does not establish that the mapping itself is beneficial.
+  dependencies:
+  - dense-plane-readouts
+  priority_rationale: 'Priority 3: inexpensive and cleanly separates mapped supervision
+    from the destructive removal of dense coverage. Expected gains remain uncertain.'
+  status: completed
+  created_revision: 167
+  ranking_rationale: 'Admit peer distillation: its dependency is satisfied, it adds
+    a fixed training-only objective to existing plane readouts, and the targeted precedent
+    search found no measured run of this mechanism. Keep the prepared reserved head
+    first and the open radiology follow-up ahead of the new direction. Leave shared-classifier-plane-auxiliaries
+    proposed: its measured parent gained only 0.000161 with an 80% interval crossing
+    zero, and this retry would replace the active dense supervision and learned fusion
+    without new supporting evidence.'
+  experiments:
+  - radiology-auxiliary-dense-readouts-20260928T055043Z-4c5715f3
+  - radiology-auxiliary-dense-readouts-20260928T063128Z-66b0bcf5
+  - radiology-auxiliary-dense-readouts-20260928T070303Z-9c696114
+  - radiology-auxiliary-dense-readouts-20260928T082219Z-e8c3c28c
+  decision: reject
+- id: shared-classifier-plane-auxiliaries
+  mechanism_id: plane-auxiliary-objective
+  parent_idea_id: plane-auxiliary-readouts
+  title: Tie training-only plane readouts to the joint inference classifier
+  opportunity: The auxiliary seed's independent classifiers achieved selected-epoch
+    plane macro AUCs of 0.84855, 0.86684 and 0.85736, below dense-readout diagnostics.
+    Its three copied auxiliary classifiers could solve plane tasks differently from
+    the joint inference classifier. Parameter tying may make auxiliary supervision
+    more directly useful to inference; this is a hypothesis, not a demonstrated cause.
+  mechanism: Use the existing joint pooled output and its class-balanced BCE as the
+    main objective. Add present-plane-normalized plane-exclusive BCE at the seed's
+    unchanged coefficient 0.5, but use the exact same classifier parameters for joint
+    and all plane readouts. Keep projection, normalization and attention shared as
+    well. Both objectives backpropagate normally through the encoder. Remove the three
+    training-only classifier copies. Joint pooling is the sole inference output.
+  precedents:
+  - The plane-auxiliary-objective verdict below records the small positive delta that
+    missed adoption.
+  - 'The original seed creates three independent classifier copies: [auxiliary initialization](/home/claudio/src/knee-abnormality/outputs/autoresearch/plane-specialization/experiments/plane-auxiliary-readouts-20260928T001922Z-0eaf2e78/source/src/knee_abnormality/training/lightning.py:341).'
+  - 'Plane losses and AUCs: [auxiliary diagnostics](/home/claudio/src/knee-abnormality/outputs/autoresearch/plane-specialization/experiments/plane-auxiliary-readouts-20260928T001922Z-0eaf2e78/training/fold_4/logs/version_0/metrics.csv).'
+  novelty: Changes parameter sharing between auxiliary supervision and inference while
+    holding the historical auxiliary coefficient fixed. It does not retry independent
+    plane heads. Unlike detached joint fusion, the joint objective trains backbone
+    features.
+  coverage: Every present plane receives auxiliary supervision for every observed
+    label. Preserve anatomical pooling, meniscus fallbacks, OA correction and all
+    fixed losses. No label-specific choice is based on validation results.
+  exploitation: Tests whether direct classifier sharing transfers plane competence
+    into joint inference more effectively than independent auxiliary classifiers.
+    Dense shared readouts provide a precedent for this constraint, but their successful
+    complete scheme is not equivalent to this proposal.
+  budget: "Small-changes classification. Reuses one encoder execution and the historical\
+    \ joint-plus-plane pooling structure while reducing classifier parameters. The\
+    \ original auxiliary run took 1,659.9 seconds, leaving 146.1 seconds below the\
+    \ cap. Keep coefficient 0.5, seed 703791404, ten epochs and 2,220 steps; apply\
+    \ only the fixed \xD74 macro rule and report the ReXNet gap."
+  implementation: Replace the incumbent's dense-primary/learned-fusion scheme with
+    joint-primary/shared-plane-auxiliary training. Retain shared feature modules and
+    fixed auxiliary objectives; remove learned fusion and avoid constructing independent
+    auxiliary classifiers. Log joint loss, raw and weighted plane auxiliary losses,
+    assignment shares, fallbacks, joint attention mass and plane AUCs. The new option
+    off must reproduce the active incumbent. Rebase onto any newly accepted incumbent,
+    retaining unrelated improvements and explicitly replacing overlapping joint-fusion
+    behavior rather than stacking competing output schemes.
+  open_choices: No coefficient change or independent-head variant. Joint gradients
+    may again reduce the incentive for each backbone to extract complete evidence;
+    the retained auxiliary term may be insufficient. This risk is why the proposal
+    ranks last.
+  dependencies: []
+  priority_rationale: 'Priority 4: a specific, inexpensive retry of a positive near-miss.
+    Lower priority because classifier tying is only a plausible explanation and joint
+    training previously weakened plane diagnostics.'
+  status: proposed
+  created_revision: 167
+- id: leave-one-plane-out-distillation
+  mechanism_id: plane-peer-distillation
+  parent_idea_id: null
+  title: Add peer distillation between existing plane readouts while retaining dense
+    label supervision
+  opportunity: The incumbent supervises each plane independently and learns fusion
+    from detached logits; there is no direct transfer of predictive information between
+    plane readouts. At selected epoch 8, all label-plane assignment shares were approximately
+    one third, fallbacks were zero, and plane macro AUCs were 0.87470/0.87785/0.87334.
+    These are competent potential peers, but their error complementarity and the benefit
+    of matching predictions are unmeasured.
+  mechanism: Retain the complete incumbent objective. For each observed study-label
+    cell and present student plane q, form t_q as the detached arithmetic mean of
+    sigmoid(z_r) over the other present planes. Add 0.5 times the mean Bernoulli KL(t_q
+    || sigmoid(z_q)), averaging student planes within each cell and using the incumbent's
+    original-target class weights and observed-cell reduction. Use temperature 1 from
+    the first step. Skip cells with fewer than two present planes; an empty auxiliary
+    batch contributes zero. Each plane receives gradients only through its student
+    prediction for that direction. Ground-truth BCE, fusion training and inference
+    remain unchanged.
+  precedents:
+  - Existing plane logits and separate detached fusion training are visible in [training_step](/home/claudio/src/knee-abnormality/outputs/autoresearch/plane-specialization/experiments/dense-readouts-learned-fusion-20260927T231847Z-33417f97/source/src/knee_abnormality/training/lightning.py:594).
+    The proposed objective reuses these logits.
+  - '[Deep Mutual Learning](https://arxiv.org/abs/1706.00384) provides a primary precedent
+    for networks teaching one another during training without a pretrained teacher.
+    Applying that principle to different MRI planes and Bernoulli outputs is a hypothesis,
+    not a reported result from that paper.'
+  - 'Uniform self-bootstrapping was rejected: macro delta -0.00046, 80% [-0.00144,
+    0.00058]. It mixed each output''s own detached prediction into its target. This
+    proposal instead transfers predictions between distinct plane backbones. See [noisy-labels
+    evidence](/home/claudio/src/knee-abnormality-plane-backbones/outputs/autoresearch/noisy-labels/state.json).'
+  - '[Losses campaign evidence](/home/claudio/src/knee-abnormality-plane-backbones/outputs/autoresearch/losses/state.json)
+    records an inconclusive cross-epoch consistency anchor and queued split-view consistency.
+    Those concern repeated or partitioned acquisitions with a shared model; their
+    smoothing concerns remain relevant. The peer mechanism uses existing complete
+    plane readouts and separate backbones.'
+  - '[Prior work](/home/claudio/src/knee-abnormality-plane-backbones/autoresearch/campaigns/plane-specialization/prior-work.md)
+    records macro seed shifts of +0.0049 and -0.0063. Incumbent PF OA and Contusion
+    shifts of +0.009483 and +0.007239 remain exploratory and do not determine this
+    objective or select labels.'
+  novelty: Adds prediction transfer between plane backbones while preserving their
+    complete supervised objectives. It changes neither supervision assignment nor
+    fusion. Excluding the student from its teacher distinguishes it from self-bootstrapping;
+    using probabilities distinguishes it from embedding redundancy penalties. Additive
+    distillation can still behave like effective target smoothing, so its justification
+    rests on independent peer information, not the additive formulation alone.
+  coverage: Apply one formula and coefficient to all twelve labels and all present
+    student planes. Use existing observed-label masks and original-target class weights.
+    Absent planes contribute neither students nor teachers. Preserve all anatomical
+    pooling rules, dense coverage, fixed losses and inference behavior.
+  exploitation: Uses already computed predictions from the three trained plane backbones.
+    The incumbent's twelve fusion rows moved, with weights ranging from 0.1869 to
+    0.5809, demonstrating unequal learned contributions without establishing which
+    peer should teach another. Teachers therefore use a symmetric rule independent
+    of validation results and static fusion weights.
+  budget: "Classify in docs/backlog/small-changes.md. Adds arithmetic over batch \xD7\
+    \ three planes \xD7 twelve labels, with no new parameters, pooling calls, encoder\
+    \ passes or inference computation. Similar runtime to the 1,627.1-second incumbent\
+    \ is expected but unmeasured; the cap remains 1,806 seconds. Use supervisor seed\
+    \ 703791404, ten epochs, 2,220 steps and unchanged image accounting. Evaluate\
+    \ solely by the fixed \xD74 macro rule and report the ReXNet gap."
+  implementation: 'Add one training-only option under trainer.plane_pooling and implement
+    the auxiliary reduction in an authorized planes module or lightning.py. Retain
+    dense supervision, the live inference readout, fusion training and every unrelated
+    incumbent improvement; remove no existing component. Compute stable Bernoulli
+    KL in float32 from detached peer probabilities. Aggregate diagnostics before epoch
+    logging: raw/weighted KL, student and teacher shares per label-plane, singleton
+    skips, peer disagreement, existing fallbacks, fusion diagnostics and per-plane
+    AUCs. Disabled behavior must reproduce the live incumbent. If a new incumbent
+    changes fusion, retain it because this mechanism does not require static fusion.
+    If dense readouts are removed, reconcile the declared prerequisite before implementation.'
+  open_choices: Fix coefficient 0.5, temperature 1 and symmetric peer averaging; no
+    sweep or confidence gate. A lesion may be visible in only one plane, so matching
+    peers could suppress useful specialization or spread errors. Teacher quality and
+    cross-plane disagreement are missing evidence. Related queued consistency work
+    remains owned by the losses campaign and should be distinguished during admission.
+  dependencies:
+  - dense-plane-readouts
+  priority_rationale: 'Priority 2: a distinct training mechanism with negligible expected
+    compute and no inference changes. Confidence is limited by negative-transfer risk
+    and earlier consistency findings; no benefit is claimed before evaluation.'
+  status: completed
+  created_revision: 201
+  ranking_rationale: 'Admit the attention objective: proposal_admission confirms its
+    dense-readout dependency is satisfied, and the targeted results search found no
+    measured equivalent. The full ranking keeps the prepared, reserved distillation
+    idea first and includes the admitted idea, correcting the prior rejected report.
+    Leave probability diversity proposed because useful plane-error complementarity
+    is unmeasured and its disagreement objective competes with distillation. Leave
+    shared-classifier-plane-auxiliaries proposed: its measured parent missed adoption,
+    and its joint-primary design would replace both active incumbent methods.'
+  experiments:
+  - leave-one-plane-out-distillation-20260928T085109Z-b2f1d061
+  decision: reject
+- id: nonlinear-plane-logit-fusion
+  mechanism_id: plane-fusion
+  parent_idea_id: dense-readouts-learned-fusion
+  title: Add a small per-label MLP with a GELU between its layers on the detached
+    plane logits, as a residual on the learned fusion, with 20% triplet dropout in
+    training
+  opportunity: 'The incumbent''s learned fusion is linear in the plane logits: per
+    label, a softmax-weighted average of three detached logits with static weights,
+    no bias and weights summing to one. It can choose and mix planes but cannot express
+    interactions such as "positive only when two planes agree", nor rescale or shift
+    the fused confidence. A small nonlinear fusion per label can, while the backbones
+    stay isolated because the input logits are detached. Requested by the user on
+    2026-09-28 as an extension of learned fusion. The user also asked for 20% triplet
+    dropout in the same run, as a regularizer for training with series dropout at
+    0; this is the user''s explicit exception to the contract''s dropout exclusion,
+    for this idea only (decision recorded 2026-09-28 under outputs/autoresearch/plane-specialization/decisions/).'
+  mechanism: 'Keep the incumbent unchanged: dense plane-exclusive supervision and
+    the learned fusion (softmax weights over present planes on detached plane logits).
+    Add, per label c, an MLP on six inputs: the three detached plane logits z_cq with
+    absent planes set to 0, and the three plane-presence flags. Layers: Linear(6,
+    16), GELU, Linear(16, 1), one MLP per label (twelve in total), created under a
+    forked RNG, with the output layer''s weight and bias initialized at zero so the
+    run starts exactly at the incumbent''s fused logit. The model output becomes learned_fusion_c
+    + mlp_c(inputs). Both fusion modules train with the incumbent''s class-balanced
+    BCE on this output, on detached plane logits only, added to the loss with weight
+    1 in place of the incumbent''s fusion BCE; no gradient reaches the backbones,
+    heads or attention. The sum is the validation and inference output. Triplet dropout:
+    in training only, before the backbones, drop each valid triplet independently
+    with probability 0.2, keeping at least one triplet of every kept series (the one
+    with the highest draw when all are dropped), so every present plane still gets
+    dense supervision. Draws derive from the run seed and the global step. Validation
+    and inference keep every triplet.'
+  precedents:
+  - 'dense-readouts-learned-fusion: linear fusion +0.0009 over the present-plane mean;
+    random-partition-learned-fusion: +0.0041 over its mean twin.'
+  - 'Header stacker with cross-label logit inputs: -0.0029 (prior work); this MLP
+    sees only its own label''s plane logits.'
+  novelty: First nonlinear fusion of per-plane evidence in the campaign; per label,
+    no cross-label inputs.
+  coverage: All studies and labels; studies missing planes enter through the presence
+    flags; triplet dropout applies to every training study.
+  exploitation: Log per label and epoch the mean absolute MLP correction, its share
+    of the fused logit, the fusion softmax weights and each plane's own validation
+    macro AUC, and per epoch the realized triplet drop fraction and the series kept
+    by the floor. An MLP whose correction stays near zero is an idle mechanism. The
+    run bundles two changes at the user's request, so its result cannot be split between
+    them.
+  budget: About 1,550 parameters; triplet dropout removes about a fifth of training
+    backbone work, so the run gets faster.
+  implementation: model.plane_pooling.fusion_mlp_hidden 16 and model.plane_pooling.triplet_dropout
+    0.2 in config.py; the MLP in modeling/planes/fusion.py; triplet dropout in KneeAbnormalityModel.encode_batch
+    after the series selection; the fusion loss in the Lightning module under trainer.plane_pooling.
+  open_choices: None; hidden width 16, GELU, zero-initialized output layer, loss weight
+    1 and triplet dropout 0.2 with a one-triplet floor per series are fixed.
+  dependencies: []
+  priority_rationale: The user's request; the only fusion extension that adds nonlinearity
+    without touching backbone supervision.
+  status: completed
+  created_revision: 217
+  seeded: /home/claudio/src/knee-abnormality-plane-backbones/autoresearch/campaigns/plane-specialization/nonlinear-fusion-ideas.yaml
+  experiments:
+  - nonlinear-plane-logit-fusion-20260928T061956Z-33b3881c
+  decision: reject
+- id: nonlinear-plane-logit-fusion-no-dropout
+  mechanism_id: plane-fusion
+  parent_idea_id: dense-readouts-learned-fusion
+  title: Per-label MLP with a GELU on the detached plane logits as a residual on the
+    learned fusion, without triplet dropout
+  opportunity: 'nonlinear-plane-logit-fusion bundled the MLP fusion with 20% triplet
+    dropout and trailed the incumbent by about 0.005 at epoch 8 (x1). Its logs split
+    the loss: every plane''s own validation AUC fell (axial -0.0056, coronal -0.0031,
+    sagittal -0.0010), which the detached MLP cannot cause, and the fusion gain over
+    the best plane fell from +0.022 to +0.020. This run removes the triplet dropout
+    to measure the MLP alone. Requested by the user on 2026-09-28.'
+  mechanism: 'Keep the incumbent unchanged: dense plane-exclusive supervision and
+    the learned fusion (softmax weights over present planes on detached plane logits),
+    with every training triplet kept. Add, per label c, an MLP on six inputs: the
+    three detached plane logits z_cq with absent planes set to 0, and the three plane-presence
+    flags. Layers: Linear(6, 16), GELU, Linear(16, 1), one MLP per label (twelve in
+    total), created under a forked RNG, with the output layer''s weight and bias initialized
+    at zero so the run starts exactly at the incumbent''s fused logit. The model output
+    becomes learned_fusion_c + mlp_c(inputs). Both fusion modules train with the incumbent''s
+    class-balanced BCE on this output, on detached plane logits only, added to the
+    loss with weight 1 in place of the incumbent''s fusion BCE; no gradient reaches
+    the backbones, heads or attention. The sum is the validation and inference output.
+    No triplet dropout.'
+  precedents:
+  - 'nonlinear-plane-logit-fusion (MLP plus 20% triplet dropout): about -0.005 x1
+    at epoch 8 against the incumbent; MLP correction 15-29% of the fused logit.'
+  - 'dense-readouts-learned-fusion: linear fusion +0.0009 over the present-plane mean.'
+  novelty: Isolates nonlinear fusion from triplet dropout.
+  coverage: All studies and labels; studies missing planes enter through the presence
+    flags.
+  exploitation: Log per label and epoch the mean absolute MLP correction, its share
+    of the fused logit, the fusion softmax weights and each plane's own validation
+    macro AUC; per-plane AUCs should match the incumbent's, since nothing upstream
+    of the fusion changes.
+  budget: About 1,550 parameters; negligible compute.
+  implementation: model.plane_pooling.fusion_mlp_hidden 16 in config.py; the MLP in
+    modeling/planes/fusion.py; the fusion loss in the Lightning module under trainer.plane_pooling.
+    Reuse the MLP from nonlinear-plane-logit-fusion's source if convenient, without
+    its triplet dropout.
+  open_choices: None; hidden width 16, GELU, zero-initialized output layer and loss
+    weight 1 are fixed.
+  dependencies: []
+  priority_rationale: The user's request; separates the two changes bundled in nonlinear-plane-logit-fusion.
+  status: completed
+  created_revision: 248
+  seeded: /home/claudio/src/knee-abnormality-plane-backbones/autoresearch/campaigns/plane-specialization/nonlinear-fusion-no-dropout-ideas.yaml
+  experiments:
+  - nonlinear-plane-logit-fusion-no-dropout-20260928T065806Z-6a9bba14
+  decision: reject
+- id: cross-label-plane-logit-fusion
+  mechanism_id: plane-fusion
+  parent_idea_id: dense-readouts-learned-fusion
+  title: One MLP with a GELU over all 36 detached plane logits predicting a residual
+    for all 12 labels on top of the learned fusion
+  opportunity: Every fusion so far combines each label's own three plane logits, so
+    no label can use another label's evidence. Radiologists use secondary signs across
+    findings (effusion or bone bruises around an ACL tear). A cross-label fusion over
+    all plane logits can learn such relations while the backbones stay isolated, because
+    its inputs are detached. Requested by the user on 2026-09-28, after nonlinear-plane-logit-fusion-no-dropout,
+    whose per-label MLP it extends.
+  mechanism: 'Keep the incumbent''s dense plane-exclusive supervision and learned
+    fusion, with every training triplet kept. Add one MLP shared by all labels on
+    39 inputs: the 36 detached plane logits z_cq (12 labels x 3 planes) with absent
+    planes set to 0, and the three plane-presence flags. Layers: Linear(39, 32), GELU,
+    Linear(32, 12), created under a forked RNG, with the output layer''s weight and
+    bias initialized at zero so the run starts exactly at the incumbent''s fused logits.
+    The output for label c becomes learned_fusion_c + mlp(inputs)_c. The learned fusion
+    and the MLP train with the incumbent''s class-balanced BCE on these outputs, on
+    detached plane logits only, added to the loss with weight 1 in place of the incumbent''s
+    fusion BCE; no gradient reaches the backbones, heads or attention. If a per-label
+    MLP fusion was adopted before this run, this cross-label MLP replaces it.'
+  precedents:
+  - 'Header stacker with all 12 disease logits as co-occurrence features, post-hoc
+    on out-of-fold logits: -0.0029 (prior work).'
+  - 'nonlinear-plane-logit-fusion (per-label MLP plus 20% triplet dropout): -0.0066;
+    the no-dropout per-label MLP runs just before this idea.'
+  novelty: First fusion in the campaign where a label's output reads other labels'
+    plane logits.
+  coverage: All studies and labels; studies missing planes enter through the presence
+    flags.
+  exploitation: Log per label and epoch the mean absolute MLP correction and its share
+    of the fused logit, the first-layer weight norm per input label, the fusion softmax
+    weights and each plane's own validation macro AUC. Local labels are report-derived,
+    so a gain from report co-occurrence may not transfer to image-derived test labels;
+    the user decides on public evidence.
+  budget: About 1,700 parameters; negligible compute.
+  implementation: model.plane_pooling.fusion_cross_label_hidden 32 in config.py; the
+    MLP in modeling/planes/fusion.py; the fusion loss in the Lightning module under
+    trainer.plane_pooling.
+  open_choices: None; 39 inputs, hidden width 32, GELU, zero-initialized output layer
+    and loss weight 1 are fixed.
+  dependencies: []
+  priority_rationale: The user's request; the only fusion that can use evidence across
+    labels.
+  status: completed
+  created_revision: 262
+  seeded: /home/claudio/src/knee-abnormality-plane-backbones/autoresearch/campaigns/plane-specialization/cross-label-fusion-ideas.yaml
+  experiments:
+  - cross-label-plane-logit-fusion-20260928T081652Z-c8df9e44
+  decision: reject
+- id: plane-attention-entropy-auxiliary
+  mechanism_id: plane-attention-regularization
+  parent_idea_id: null
+  title: Regularize attention concentration within each plane while retaining dense
+    supervision and learned fusion
+  opportunity: Dense supervision improved the plane-backbone baseline, but the incumbent
+    remains 0.005698 below ReXNet. Its active plane readouts do not establish whether
+    attention extracts evidence broadly enough within each plane. Excessive attention
+    concentration is an unmeasured hypothesis with a relevant MIL research precedent.
+    A training-only regularizer can investigate this without changing pooling definitions,
+    plane assignments, heads or inference.
+  mechanism: For each observed study-label and present plane, use the attention probabilities
+    already computed after anatomical bias, meniscus masking and fallback. Let N be
+    the number of allowed tokens and H=-sum(alpha*log(alpha)). Define R=1-H/log(N)
+    for N>1 and R=0 for N=1. Add 0.05 times the observed-cell mean of the original-target
+    class weight multiplied by the present-plane mean of R. Compute entropy in float32
+    with zero-probability contributions defined as zero. Backpropagate through the
+    existing attention computation. Retain dense BCE and detached-logit fusion BCE
+    unchanged. The added objective encourages broader evidence extraction within each
+    allowed plane; its normalized contribution is bounded between zero and 0.05 times
+    the cell weight.
+  precedents:
+  - '[AEM, MICCAI 2025](https://papers.miccai.org/miccai-2025/0056-Paper5183.html)
+    introduces attention-entropy regularization for histopathology MIL and reports
+    improvements across several settings. This proposal adapts that principle to masked
+    plane-exclusive attention. Token-count normalization and the fixed coefficient
+    are proposed choices; the published results do not establish knee-MRI benefit.'
+  - "[Incumbent metrics](/home/claudio/src/knee-abnormality/outputs/autoresearch/plane-specialization/experiments/dense-readouts-learned-fusion-20260927T231847Z-33417f97/training/fold_4/logs/version_0/metrics.csv):\
+    \ selected-epoch \xD71 axial/coronal/sagittal AUCs 0.87470/0.87785/0.87334; uniform\
+    \ dense assignment, zero fallbacks and movement in all twelve fusion rows. Selected\
+    \ fusion weights span 0.1869\u20130.5809."
+  - The supplied family ledger records dense supervision's qualifying +0.004699 macro
+    gain, central 80% interval [+0.002409,+0.006904]. Its mixed label changes included
+    MCL +0.0220, Contusion +0.0121 and PF OA -0.0079; these do not identify labels
+    for different treatment.
+  - '[Current pooling implementation](/home/claudio/src/knee-abnormality/outputs/autoresearch/plane-specialization/experiments/dense-readouts-learned-fusion-20260927T231847Z-33417f97/source/src/knee_abnormality/modeling/model.py:344)
+    already computes the required masked attention probabilities. Entropy is not recorded
+    in the inspected metrics.'
+  novelty: Adds a within-plane attention objective, distinct from plane assignment,
+    independent heads, inference fusion, peer prediction matching and prediction diversity.
+    It uses existing attention probabilities without removing tokens, adding modules
+    or changing inference pooling. No measured attempt appears in the supplied campaign
+    history or precedent table.
+  coverage: Apply the same formula and coefficient to all twelve labels. Average present
+    planes within each observed study-label cell. Count tokens after the incumbent's
+    actual label-specific mask and fallback. Exclude absent-plane fallback computations
+    from the objective. Preserve targets, class weights, gold overrides, anatomical
+    rules, OA correction and every fixed auxiliary objective.
+  exploitation: "Retains the strongest measured campaign improvement\u2014dense coverage\u2014\
+    and addresses evidence extraction before fusion. Active plane predictions and\
+    \ moving fusion weights rule out simple inactivity as the incumbent's limitation,\
+    \ but do not diagnose attention concentration. The historical +0.0049 and -0.0063\
+    \ macro seed shifts limit confidence in small effects; they do not alter the fixed\
+    \ adoption rule."
+  budget: "Supervisor classification: docs/backlog/small-changes.md. Reuse existing\
+    \ attention tensors and the single encoder execution; return reduced entropy statistics\
+    \ rather than retaining additional attention maps. No inference cost or additional\
+    \ forward pass. Incremental training cost is unmeasured. Preserve the supervisor's\
+    \ incumbent seed, presently 703791404, ten epochs, 2,220 steps, 947,240 encoded\
+    \ training triplets and the 1,806-second cap. Adopt only for valid \xD74 macro\
+    \ gain >=0.001 and central 80% bootstrap lower bound >0. Report each run's \xD7\
+    4 macro AUC and gap to ReXNet 0.909733."
+  implementation: Add one trainer.plane_pooling option within authorized files. Compute
+    the regularizer only during the existing plane-exclusive disease pooling calls;
+    do not apply it to half-knee or other auxiliary pooling. Retain both active incumbent
+    ideas, shared heads and all unrelated behavior. Log raw and weighted entropy loss,
+    normalized entropy, maximum attention mass, allowed-token counts and singleton
+    counts by label and plane, alongside assignment shares, fallbacks, fusion weights,
+    plane AUCs and anatomical strengths. Turning this option off must reproduce the
+    complete incumbent, not the inherited joint-only disabled path. If a new incumbent
+    is accepted during development, rebase onto it and retain unrelated improvements,
+    including accepted radiology or peer objectives. If dense plane readouts are replaced,
+    reconcile the prerequisite with the supervisor rather than silently dropping it.
+    Remove superseded experimental branches after adoption.
+  open_choices: Fix coefficient 0.05 with no sweep or annealing. Normalization prevents
+    token count from setting the objective's scale. Broader attention may dilute small
+    lesions or shrink learned anatomical strengths; inspect these diagnostics without
+    adding an adoption threshold. Attention concentration and its relationship to
+    errors remain unmeasured in this campaign.
+  dependencies:
+  - dense-plane-readouts
+  priority_rationale: 'First new direction: inexpensive, supported by a primary MIL
+    precedent and compatible with the incumbent and ongoing objectives. Potential
+    is uncertain because the suspected attention weakness has not been measured.'
+  status: completed
+  created_revision: 313
+  ranking_rationale: 'Admit the attention objective: proposal_admission confirms its
+    dense-readout dependency is satisfied, and the targeted results search found no
+    measured equivalent. The full ranking keeps the prepared, reserved distillation
+    idea first and includes the admitted idea, correcting the prior rejected report.
+    Leave probability diversity proposed because useful plane-error complementarity
+    is unmeasured and its disagreement objective competes with distillation. Leave
+    shared-classifier-plane-auxiliaries proposed: its measured parent missed adoption,
+    and its joint-primary design would replace both active incumbent methods.'
+  experiments:
+  - plane-attention-entropy-auxiliary-20260928T091910Z-9d19c8f0
+  decision: invalid
+- id: dense-plane-probability-diversity
+  mechanism_id: plane-prediction-diversity
+  parent_idea_id: null
+  title: Encourage complementary plane predictions with a bounded training-only objective
+  opportunity: 'Retain this unregistered proposal''s stable ID from the rejected refill;
+    direct inspection confirms it is absent from the linked registry. Existing plane
+    predictions could make unnecessarily similar errors despite differing image evidence.
+    Error correlation remains unmeasured: saved prediction CSVs contain fused outputs
+    only. This objective investigates interaction between the existing readouts while
+    preserving dense supervision and inference.'
+  mechanism: For each observed study-label cell, compute p_q=sigmoid(z_q) over present
+    planes, m=mean_q(p_q), and V=mean_q((p_q-m)^2). Add L_div=-0.5*mean_observed(w(y)*V),
+    using the incumbent's original-target class weight and observed-cell reduction.
+    Differentiate through probabilities and their mean in float32. Singleton cells
+    contribute zero. Since V<=0.25, the added contribution is bounded below by -0.125*w(y)
+    per cell. Retain dense BCE and the live inference-training objective without changing
+    targets or supervision assignments.
+  precedents:
+  - '[Previous research report](/home/claudio/src/knee-abnormality/outputs/autoresearch/plane-specialization/jobs/researcher-20260928T085104Z-de0adfae/report.json)
+    specifies this mechanism. The current rejection names shared-classifier-plane-auxiliaries
+    as the duplicate; that existing registry record is omitted here.'
+  - '[Deep Negative Correlation Classification](https://arxiv.org/abs/2212.07070)
+    motivates jointly considering predictive accuracy and diversity. This bounded
+    Bernoulli-variance objective is an adaptation, not a reproduction of its method
+    or results.'
+  - "[Incumbent metrics](/home/claudio/src/knee-abnormality/outputs/autoresearch/plane-specialization/experiments/dense-readouts-learned-fusion-20260927T231847Z-33417f97/training/fold_4/logs/version_0/metrics.csv)\
+    \ show active plane AUCs of 0.87470/0.87785/0.87334, uniform coverage, zero fallbacks\
+    \ and twelve moving fusion rows. Incumbent \xD74 macro AUC is 0.904035, a -0.005698\
+    \ gap to ReXNet."
+  - Prepared leave-one-plane-out-distillation encourages prediction agreement. Diversity
+    investigates the opposite interaction and must replace that competing term if
+    it becomes accepted. Neither proposal has measured evidence of useful plane-error
+    complementarity.
+  novelty: Changes training interactions among existing plane predictions without
+    reopening assignment, head or inference-fusion families. Unlike excluded embedding-redundancy
+    penalties, prediction-preserving feature transformations cannot satisfy it. It
+    adds neither another model nor an inference ensemble.
+  coverage: Use the same coefficient and formula for every label. Mask absent planes
+    and unobserved labels; preserve original class weights and targets. Retain anatomical
+    pooling, meniscus masks and fallbacks, OA correction, fixed auxiliary objectives
+    and full-triplet encoding.
+  exploitation: Dense supervision's +0.004699 macro gain supports preserving individual
+    plane accuracy. Its mixed per-label effects and the learned-fusion changes, including
+    PF OA +0.009483 and Lateral OA -0.005836, do not establish correlated errors or
+    justify label-specific treatment. Analytically, coefficient 0.5 cannot reverse
+    dense BCE's logit-gradient direction for hard targets; that limited property provides
+    no protection for soft targets or guarantee about parameter updates.
+  budget: "Supervisor classification: docs/backlog/small-changes.md. Adds arithmetic\
+    \ over batch \xD7 three planes \xD7 twelve labels, with no extra encoder or pooling\
+    \ pass and no inference cost. Incremental runtime is unmeasured. Preserve the\
+    \ current incumbent's supervisor-assigned seed, presently 703791404, ten epochs,\
+    \ 2,220 steps, 947,240 encoded triplets and the 1,806-second cap. Use only the\
+    \ fixed macro adoption rule and report \xD74 AUC beside ReXNet 0.909733; no confirmation\
+    \ run."
+  implementation: 'Add one trainer.plane_pooling option using existing logits and
+    presence masks. Retain dense BCE, shared heads, live inference and unrelated accepted
+    improvements. Log variance, signed weighted loss, per-label-plane contributions,
+    singleton counts and probability disagreement alongside existing activity diagnostics.
+    Disabled behavior must reproduce the complete incumbent. Rebase onto any newly
+    accepted incumbent: retain radiology emphasis or attention regularization if accepted;
+    explicitly remove peer distillation''s competing agreement term if it becomes
+    active, recording that replacement. If dense-plane-readouts ceases to be active,
+    reconcile the dependency with the supervisor instead of silently dropping it.
+    Remove superseded branches after adoption.'
+  open_choices: Fix coefficient 0.5; no sweep. Variance can reward calibration offsets
+    or harmful disagreement rather than complementary errors, and zero variance gives
+    zero diversity gradient. Similar aggregate plane AUCs cannot resolve this concern.
+    Historical macro seed shifts of +0.0049 and -0.0063 further limit interpretation
+    without changing the adoption rule.
+  dependencies:
+  - dense-plane-readouts
+  priority_rationale: 'Second: very low computational cost and distinct from queued
+    peer agreement, but weaker empirical support than attention regularization because
+    useful error complementarity is unmeasured.'
+  status: proposed
+  created_revision: 313
+- id: plane-backbone-dsu
+  mechanism_id: plane-feature-statistics
+  parent_idea_id: dense-readouts-learned-fusion
+  title: DSU feature-statistics augmentation at the stride-8 map inside each plane's
+    EfficientNet-B0
+  opportunity: DSU is off in this campaign only because its code splits a single ReXNet
+    by hand; the ReXNet control uses it at probability 0.5. On ReXNet it gained +0.0022
+    and, rerun, +0.0012 (augmentation campaign), and it is one of the recipe differences
+    between the incumbent and the ReXNet control, which the incumbent trails by 0.0057
+    locally and 0.003 publicly (S74 0.943 against S73 0.946). The user authorized
+    this exception to the contract's fixed-augmentation rule on 2026-09-28 (decision
+    under outputs/autoresearch/plane-specialization/decisions/).
+  mechanism: 'Keep the incumbent unchanged (dense plane-exclusive supervision, learned
+    fusion, every triplet kept). In training only, inside PlaneBackbones, run each
+    plane''s EfficientNet-B0 as conv_stem, bn1 and blocks[0:3] (the stride-8 map:
+    40 channels, 28 x 28 at 224 px), apply the existing apply_feature_statistics_augmentation
+    to that plane''s features with the acquisition indices and acquisition types of
+    the images routed to that plane (reordered with them), then run blocks[3:], conv_head
+    and bn2. Use a FeatureStatisticsAugmentationConfig with probability 0.5 and the
+    other fields at their defaults, the ReXNet recipe''s setting. The switch is model.plane_pooling.feature_statistics_probability
+    0.5; the global model.feature_statistics_augmentation.probability stays 0, and
+    the ReXNet-only DSU path is untouched. Validation and inference run the backbones
+    unchanged.'
+  precedents:
+  - 'DSU on ReXNet-200: +0.0022, rerun +0.0012 (docs/validation/results/2026-09-26-augmentation-campaign.md).'
+  - The ReXNet control scanner-confusion-control uses DSU at 0.5; the campaign reference
+    had it off.
+  novelty: First DSU on EfficientNet and on plane-specific backbones.
+  coverage: All training studies and every plane backbone.
+  exploitation: Log DSU activity per plane per epoch (acquisitions perturbed, mean
+    absolute feature-statistic shift) and each plane's own validation macro AUC.
+  budget: Two per-acquisition reductions on a 40-channel map per plane; negligible
+    compute.
+  implementation: model.plane_pooling.feature_statistics_probability in config.py
+    (allowed with plane_backbones, unlike the global DSU switch); the split forward
+    and DSU call in PlaneBackbones in modeling/model.py, importing apply_feature_statistics_augmentation
+    from modeling/augmentation.py unchanged; pass acquisition_index and acquisition_type
+    into the plane-backbone forward.
+  open_choices: None; stride-8 split after blocks[2], probability 0.5, default DSU
+    fields.
+  dependencies: []
+  priority_rationale: The best-evidenced remaining difference from the ReXNet control.
+  status: completed
+  created_revision: 342
+  seeded: /home/claudio/src/knee-abnormality-plane-backbones/autoresearch/campaigns/plane-specialization/dsu-and-oa-detector-ideas.yaml
+  experiments:
+  - plane-backbone-dsu-20260928T114131Z-eeae02cd
+  decision: reject
+- id: plane-oa-detector
+  mechanism_id: plane-oa-detector
+  parent_idea_id: dense-readouts-learned-fusion
+  title: One three-compartment OA detector per plane instead of one shared across
+    planes
+  opportunity: 'OA is where the incumbent trails the ReXNet control most (medial,
+    lateral and PF OA about -0.011 each). The three-compartment OA detector scores
+    tokens with one evidence scorer and three region scales shared by all planes,
+    although OA evidence looks different by plane: tibiofemoral cartilage and osteophytes
+    on coronal, patellofemoral on axial and sagittal. No run has made the detector
+    plane-specific. Requested by the user on 2026-09-28.'
+  mechanism: Keep the incumbent unchanged except the OA-detector correction inside
+    plane-exclusive pooling. Replace the shared oa_detector (Linear(256, 1), no bias)
+    and oa_detector_scale (3) with one pair per plane (axial, coronal, sagittal),
+    each initialized as a copy of the shared module's initialization under a forked
+    RNG. Plane q's logits z_cq for the three OA labels take their correction from
+    plane q's detector over plane q's trusted tokens, with the incumbent's regions,
+    pooling and empty-region handling. Every other module, the dense loss and the
+    learned fusion stay unchanged.
+  precedents:
+  - Three-compartment OA detector adopted 2026-09-25 (0.944 public against 0.940);
+    shared by every plane in this campaign.
+  - Per-plane classifiers (-0.0006 and +0.0005) and full per-plane heads (-0.0002)
+    kept the OA detector shared.
+  novelty: First plane-specific OA evidence scorer.
+  coverage: The three OA labels in every study and plane.
+  exploitation: Log per plane per epoch the detector weight norm, the three region
+    scales and the mean absolute OA correction, and each plane's own OA validation
+    AUC.
+  budget: About 800 extra parameters; negligible compute.
+  implementation: model.plane_pooling.oa_detector per_plane in config.py and the per-plane
+    modules in modeling/model.py or modeling/planes/.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user's request; aims at the OA gap to the ReXNet control.
+  status: completed
+  created_revision: 342
+  seeded: /home/claudio/src/knee-abnormality-plane-backbones/autoresearch/campaigns/plane-specialization/dsu-and-oa-detector-ideas.yaml
+  experiments:
+  - plane-oa-detector-20260928T115134Z-4ea16e90
+  decision: reject
+- id: plane-report-attribute-heads
+  mechanism_id: plane-auxiliary-pooling
+  parent_idea_id: dense-readouts-learned-fusion
+  title: Apply the report-attribute heads to each plane's tokens separately and average
+    their loss over present planes
+  opportunity: 'The incumbent''s disease readouts are plane-exclusive, but the 35
+    training-only report-attribute heads still pool all planes'' tokens together,
+    so every backbone receives attribute gradients through a cross-plane pool: the
+    coupling that dense readouts removed for the disease loss, and the only gain of
+    this campaign (+0.0047). Per-plane attribute supervision is the attribute analogue
+    of dense readouts. Requested by the user on 2026-09-28 as an exception to the
+    contract''s fixed report-attribute heads (decision under outputs/autoresearch/plane-specialization/decisions/).'
+  mechanism: 'Keep the incumbent unchanged (dense plane-exclusive disease readouts,
+    learned fusion). In the Lightning module, call the existing report-attribute heads
+    once per plane with the valid-token mask restricted to that plane''s tokens (visual_valid
+    and image_plane == q), over the studies that hold at least one valid token in
+    that plane. Compute the existing attribute loss per plane with the unchanged targets,
+    weights and observation masks, then average it over each study''s present planes
+    so studies with more planes gain no extra weight, and multiply by the unchanged
+    report_attribute_loss_weight 0.1. The heads'' parameters stay shared across planes;
+    the training/report_attributes.py module is called, not changed. The heads'' attention
+    has no empty-study guard: a study without valid tokens in a plane would softmax
+    over an empty set and produce NaN, so before each per-plane call drop those studies
+    and reindex the remaining study indices, targets, weights and masks to them. Switch:
+    trainer.plane_pooling.report_attributes per_plane.'
+  precedents:
+  - 'dense-plane-readouts: +0.0047 from plane-exclusive disease supervision.'
+  - 'Report-attribute heads adopted 2026-09-25: +0.00105, public 0.940 against 0.938.'
+  novelty: First plane-exclusive auxiliary supervision in the campaign.
+  coverage: All training studies with attribute targets and every present plane.
+  exploitation: Log the attribute loss and per-question divergence per plane per epoch,
+    studies covered per plane, and each plane's own validation macro AUC.
+  budget: Three attention pools of the attribute heads instead of one; negligible.
+  implementation: trainer.plane_pooling.report_attributes in config.py; the per-plane
+    call and loss averaging in training/lightning.py.
+  open_choices: None; shared head parameters, present-plane averaging, weight 0.1.
+  dependencies: []
+  priority_rationale: The largest auxiliary still pooling across planes.
+  status: completed
+  created_revision: 343
+  seeded: /home/claudio/src/knee-abnormality-plane-backbones/autoresearch/campaigns/plane-specialization/plane-auxiliary-ideas.yaml
+  experiments:
+  - plane-report-attribute-heads-20260928T122005Z-e3adffab
+  decision: reject
+- id: plane-half-knee-mil
+  mechanism_id: plane-auxiliary-pooling
+  parent_idea_id: dense-readouts-learned-fusion
+  title: Run the half-knee meniscus MIL loss within each plane's tokens and average
+    it over present planes
+  opportunity: The training-only half-knee MIL loss pools each study's medial and
+    lateral half over all planes' tokens, so the meniscus tear detector's gradient
+    reaches every backbone through a cross-plane pool. The midline split is geometric,
+    so it applies within any plane that shows both halves. Requested by the user on
+    2026-09-28 as an exception to the contract's fixed half-knee loss.
+  mechanism: 'Keep the incumbent unchanged. In the Lightning module, compute the existing
+    half-knee MIL loss once per plane with its groups restricted to that plane''s
+    selected tokens (group = study x half, within plane q), keeping the shared half_knee_detector,
+    the midline band, the smooth maximum and the class-balanced BCE. A study and plane
+    count only when both halves hold tokens in that plane and both meniscus targets
+    are observed. Average the per-plane losses over each study''s usable planes and
+    multiply by the unchanged half_knee_loss_weight 0.075. Switch: trainer.plane_pooling.half_knee
+    per_plane.'
+  precedents:
+  - 'Half-knee MIL adopted in the knee-geometry campaign: +0.0031, public 0.944 against
+    0.942.'
+  novelty: Plane-exclusive meniscus MIL.
+  coverage: Studies whose planes show both knee halves; the meniscus labels.
+  exploitation: Log per plane per epoch the half-knee loss and the studies used, and
+    the meniscus validation AUC of each plane's own logits.
+  budget: Three smooth-maximum pools instead of one; negligible.
+  implementation: trainer.plane_pooling.half_knee in config.py; the per-plane grouping
+    in training/lightning.py.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Removes the second cross-plane auxiliary coupling.
+  status: completed
+  created_revision: 343
+  seeded: /home/claudio/src/knee-abnormality-plane-backbones/autoresearch/campaigns/plane-specialization/plane-auxiliary-ideas.yaml
+  experiments:
+  - plane-half-knee-mil-20260928T124820Z-2069dd07
+  - plane-half-knee-mil-20260928T125832Z-2d72bf1e
+  decision: reject
+- id: shared-stem-plane-backbones
+  mechanism_id: plane-backbone-sharing
+  parent_idea_id: dense-readouts-learned-fusion
+  title: Share each backbone's layers up to the stride-8 map across planes and keep
+    separate plane towers above it
+  opportunity: Low-level features such as edges and textures are the same in every
+    plane, while anatomy is plane-specific. Sharing the early layers lets them learn
+    from all images while the upper towers stay specialized, at the same compute and
+    with fewer parameters. Each plane still has its own backbone above the stride-8
+    map. Requested by the user on 2026-09-28.
+  mechanism: 'Keep the incumbent unchanged except the backbones. Inside PlaneBackbones,
+    run one shared EfficientNet-B0 stem on every image: conv_stem, bn1 and blocks[0:3]
+    (the stride-8 map, 40 channels, 28 x 28 at 224 px), taken from the first plane
+    backbone. Then route each image''s stride-8 features to its plane''s tower: blocks[3:],
+    conv_head and bn2 of that plane''s backbone, all initialized from the same pretrained
+    weights as now. Replace the unused early layers of the second and third backbones
+    with identities so no parameter is left without gradient. The output feature maps,
+    feature mapping, projection and everything after are unchanged. If DSU per plane
+    was adopted, apply it to each plane''s stride-8 features before its tower. Keep
+    PlaneBackbones.planes as three modules whose forward_features(images) computes
+    the shared stem followed by that plane''s tower (the stem module registered once
+    and referenced by all three), and give them set_grad_checkpointing, pretrained_cfg
+    and num_features: the FP16 Kaggle path in inference/engine.py captures one CUDA
+    graph per entry of planes from its forward_features, so each entry must reproduce
+    the full plane backbone. Training may run the stem once on all images and then
+    the towers. Switch: model.plane_pooling.shared_stem stride_8.'
+  precedents:
+  - 'Three separate B0 backbones: the incumbent; no run shared any backbone layer.'
+  novelty: Partial sharing between plane backbones.
+  coverage: All images and planes.
+  exploitation: Log each plane's own validation macro AUC, and the backbone parameter
+    count.
+  budget: Same compute; fewer backbone parameters (the shared stem replaces two copies).
+  implementation: model.plane_pooling.shared_stem in config.py; the shared stem and
+    per-plane towers in PlaneBackbones in modeling/model.py.
+  open_choices: None; split after blocks[2].
+  dependencies: []
+  priority_rationale: Tests how much of each backbone needs to be plane-specific.
+  status: blocked
+  created_revision: 343
+  seeded: /home/claudio/src/knee-abnormality-plane-backbones/autoresearch/campaigns/plane-specialization/plane-auxiliary-ideas.yaml
+  experiments:
+  - shared-stem-plane-backbones-20260928T131804Z-88a168e3
+  blocked_reason: The candidate changes the fixed plane-specific backbone architecture.
+    Its shared stem learns from images of all planes, contrary to the campaign's fixed
+    backbone routing and the user's stated aim that each backbone learn from its own
+    plane. Removing that stem would remove the proposed mechanism, so a bounded repair
+    cannot bring this idea into scope. The ranking lists the two remaining live queue
+    entries after parking the blocked idea, addressing the prior ranking rejection.
+- id: plane-scanner-confusion
+  mechanism_id: plane-auxiliary-pooling
+  parent_idea_id: dense-readouts-learned-fusion
+  title: Apply the scanner confusion head to each plane's tokens separately so every
+    backbone becomes scanner-invariant
+  opportunity: The scanner confusion head pools all planes' tokens together, so it
+    only asks the mix to hide the scanner, not each backbone. Per-plane confusion
+    makes every plane backbone scanner-invariant on its own. The confusion head was
+    adopted on public evidence (0.948 against 0.947). Requested by the user on 2026-09-28
+    as an exception to the contract's fixed scanner confusion head.
+  mechanism: 'Keep the incumbent unchanged. In the Lightning module, run the existing
+    scanner confusion step once per plane with the valid-token mask restricted to
+    that plane''s tokens, over the studies that hold valid tokens in that plane: the
+    detached head''s cross-entropy and the bounded KL confusion toward the group frequencies,
+    with the unchanged ramp. Average both terms over each study''s present planes
+    and multiply by the unchanged scanner_confusion_weight 0.1. The head''s parameters
+    stay shared across planes; training/auxiliary/scanner_confusion.py is called,
+    not changed. The head raises "A study has no visually valid spatial tokens" for
+    a study without tokens in the pool, so before each per-plane call drop the studies
+    without valid tokens in that plane and reindex study indices, study UIDs and scanner
+    targets to the remaining ones. Switch: trainer.plane_pooling.scanner_confusion
+    per_plane.'
+  precedents:
+  - 'Scanner confusion head adopted 2026-09-27 on public evidence: S67 0.948 against
+    S68 0.947; local -0.00076.'
+  novelty: Plane-level scanner invariance.
+  coverage: All training studies with scanner groups and every present plane.
+  exploitation: Log per plane per epoch the head accuracy and the confusion KL; the
+    local rule may understate it, as for the adopted head.
+  budget: Three pools instead of one; negligible.
+  implementation: trainer.plane_pooling.scanner_confusion in config.py; the per-plane
+    step in training/lightning.py.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Removes the last cross-plane auxiliary coupling; judged mainly
+    on public evidence.
+  status: completed
+  created_revision: 343
+  seeded: /home/claudio/src/knee-abnormality-plane-backbones/autoresearch/campaigns/plane-specialization/plane-auxiliary-ideas.yaml
+  ranking_rationale: The candidate changes the fixed plane-specific backbone architecture.
+    Its shared stem learns from images of all planes, contrary to the campaign's fixed
+    backbone routing and the user's stated aim that each backbone learn from its own
+    plane. Removing that stem would remove the proposed mechanism, so a bounded repair
+    cannot bring this idea into scope. The ranking lists the two remaining live queue
+    entries after parking the blocked idea, addressing the prior ranking rejection.
+  experiments:
+  - plane-scanner-confusion-20260928T132702Z-d9d36a95
+  decision: reject
+- id: plane-evidence-statistics-fusion
+  mechanism_id: plane-evidence-fusion
+  parent_idea_id: dense-readouts-learned-fusion
+  title: Feed the fusion detached evidence statistics from inside each plane's pooling
+    (attention shape, token-score distribution, slice consistency, coverage) through
+    a per-label residual MLP
+  opportunity: 'Every fusion so far saw only the three plane logits, and more capacity
+    on those logits tied (per-label MLP -0.0008, cross-label MLP -0.0007): a fixed
+    function of three numbers adds little once each plane predicts well. How a plane
+    reached its logit is hidden from the fusion: whether it rests on one focal spot
+    or diffuse evidence, on one slice or several, and on how much of the knee the
+    plane covers. These statistics carry information the logits do not, and they are
+    computed from the detached pooling, so the backbones stay isolated. Requested
+    by the user on 2026-09-28.'
+  mechanism: 'Keep the incumbent unchanged (dense plane-exclusive readouts, learned
+    linear fusion). For each label c and present plane q, from the incumbent''s plane-exclusive
+    pooling (attention after the anatomical bias, meniscus mask and fallback, over
+    the allowed tokens of plane q) and its value tokens, compute on detached tensors:
+    (1) normalized attention entropy H/log(N), 0 when N=1; (2) maximum attention weight;
+    (3) token scores s_i = w_c . h_i + b_c with the shared classifier on every allowed
+    token, and from them the maximum, the mean of the top 5 (all when fewer), the
+    attention-weighted variance and the fraction with s_i > 0; (4) slice consistency:
+    the standard deviation over the plane''s triplets of each triplet''s maximum token
+    score, 0 with one triplet; (5) coverage: log(1 + allowed tokens) and log(1 + triplets);
+    (6) the absolute OA-detector correction of that plane for the three OA labels,
+    0 otherwise. With the detached logit z_cq this gives 11 features per plane; absent
+    planes give zeros. Per label, a residual MLP reads the 33 plane features plus
+    the 3 presence flags: Linear(36, 16), GELU, Linear(16, 1), one MLP per label,
+    created under a forked RNG with the output layer''s weight and bias initialized
+    at zero, so the run starts exactly at the incumbent''s fused logit. Output: learned_fusion_c
+    + mlp_c(features). The learned fusion and the MLPs train with the incumbent''s
+    class-balanced fusion BCE on detached inputs, weight 1; no gradient reaches the
+    backbones, projection, attention or classifier. The sum is the validation and
+    inference output. Switch: model.plane_pooling.fusion_evidence true.'
+  precedents:
+  - 'nonlinear-plane-logit-fusion-no-dropout (per-label MLP on plane logits): -0.0008;
+    cross-label-plane-logit-fusion: -0.0007.'
+  - 'dense-readouts-learned-fusion (linear fusion): the incumbent, 0.904035.'
+  novelty: First fusion input beyond the plane logits; per label, no cross-label inputs.
+  coverage: All studies and labels; absent planes enter as zeros with their presence
+    flag.
+  exploitation: Log per label and epoch the mean absolute MLP correction and its share
+    of the fused logit, and per plane the mean of each evidence statistic; check that
+    no statistic is NaN or constant. An MLP whose correction stays near zero is an
+    idle mechanism.
+  budget: Token scores for 12 labels over all tokens and a top-5 per study, label
+    and plane; well under a second per step at batch 16. About 12 x 609 parameters.
+  implementation: model.plane_pooling.fusion_evidence in config.py; the statistics
+    inside the plane-exclusive pooling in modeling/model.py or modeling/planes/, returned
+    alongside the plane logits; the MLP in modeling/planes/fusion.py. Guard every
+    statistic against empty or single-token planes (entropy, variance, top-k, triplet
+    spread) so no NaN reaches the loss.
+  open_choices: None; the eleven features, top 5, hidden width 16, GELU, zero-initialized
+    output layer and loss weight 1 are fixed.
+  dependencies: []
+  priority_rationale: The only fusion change that adds information the plane logits
+    do not carry.
+  status: launched
+  created_revision: 349
+  seeded: /home/claudio/src/knee-abnormality-plane-backbones/autoresearch/campaigns/plane-specialization/evidence-fusion-ideas.yaml
+  ranking_rationale: The candidate changes the fixed plane-specific backbone architecture.
+    Its shared stem learns from images of all planes, contrary to the campaign's fixed
+    backbone routing and the user's stated aim that each backbone learn from its own
+    plane. Removing that stem would remove the proposed mechanism, so a bounded repair
+    cannot bring this idea into scope. The ranking lists the two remaining live queue
+    entries after parking the blocked idea, addressing the prior ranking rejection.
+  experiments:
+  - plane-evidence-statistics-fusion-20260928T134622Z-9bf90361

@@ -35,12 +35,12 @@ def difference(candidate, reference):
     )
 
 
-def saved_auc(root, run, fold):
+def saved_auc(root, run, fold, key="prediction_macro_auc"):
     if not run:
         return None
     try:
         selected = read_json(fold_dir(root / run, fold) / "selected_checkpoint.json")
-        return number(selected["prediction_macro_auc"])
+        return number(selected[key])
     except (OSError, ValueError, KeyError, TypeError):
         return None
 
@@ -202,7 +202,10 @@ def progress_lines(state, root, output):
     anchor, retained = retained_lineage(state, decisions)
     lines = [
         f"Starting reference AUC: {score_text(baseline)} (historical-control)",
-        f"Incumbent: {incumbent['id']} | AUC {score_text(current)}",
+        (
+            f"Incumbent: {incumbent['id']} | AUC {score_text(current)} "
+            f"(x1 {score_text(saved_auc(root, incumbent['run'], fold, 'score'))})"
+        ),
     ]
     changed_reference = anchor is not None and (
         (root / anchor["run"]).resolve() != (root / state["reference"]).resolve()

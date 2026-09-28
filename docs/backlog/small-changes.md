@@ -64,32 +64,6 @@ attention temperature τ 0.75 is adopted at inference and carries the best submi
   override through prediction, export and the bundle; whether training should use it has never been
   tested, and a shared temperature can be absorbed into the scorer's last layer.
 
-### Attention-token dropout
-
-**Tested and rejected, 2026-09-25.** Random masking at 5% of valid tokens lost to the OA-detector
-control at every inference τ; top-attention masking lost in the near-misses campaign
-([results](../validation/results/2026-09-25-near-misses-campaign.md#follow-up-on-main)).
-
-### Plane/contrast-specific readouts
-
-**Untried; preferred small architecture comparison from the 2026-09-20 agenda review.** Current
-[pooling](../../src/knee_abnormality/modeling/model.py) collapses all acquisition types before the
-linear classifier. Retain six partial vectors per label: `u_cq = sum_{i:type(i)=q} alpha_ci * h_i`.
-Compare `z_c = sum_q w_cq · u_cq + b_c` with the current shared `w_c`, keeping the same global
-attention denominator. Initialize every `w_cq` from `w_c`, reproducing the original predictions
-apart from summation order; missing types contribute zero. Keep image and token budgets unchanged.
-
-- Screen shared and type-specific heads on identical cached partial vectors with a refitted
-  shared-head control. Record parent weights, input view, preprocessing and split identities;
-  supervised feature learning must exclude confirmation studies. Stop if retaining type identity
-  does not improve held-out ranking beyond refitting the original head.
-- Confirm a useful screen in a normal-budget run behind one option. Compute type-specific token
-  contributions without a large six-way pooling tensor; profile actual overhead before adoption.
-- Check per-label AUC, missing-type studies and vendor strata, including a presence/attention-mass
-  diagnostic: [acquisition availability tracks prevalence](../validation/results/2026-09-17-plane-contrast-importance.md#availability-and-prevalence-shift).
-  Count normalization, gated attention and residual readouts above are different, measured changes;
-  do not add separate within-type normalization or a nonlinear stack to this comparison.
-
 ### Plane/contrast-specific feature adapters
 
 **Accepted for the backlog on 2026-09-21; unimplemented and untested.** The
@@ -101,8 +75,8 @@ trainable ReXNet is a project adaptation of that idea, not a reproduction or a m
   selected by the token's plane/contrast type, before adding embeddings and computing attention.
   Use the adapted features for both scoring and pooling, and initialize the residual output at
   zero. Keep one backbone pass, the existing type metadata, image/token budgets and disease heads.
-  These adapters can change which evidence is selected; the
-  [type-specific readouts](#planecontrast-specific-readouts) operate after pooling.
+  These adapters can change which evidence is selected; type-specific readouts after pooling
+  lost −0.0006 ([near-misses campaign](../validation/results/2026-09-25-near-misses-campaign.md)).
 - **Comparison:** one adapter-mode option for the current model, a shared-adapter control and
   type-specific adapters. Match the shared control's total adapter parameter budget to separate
   specialization from extra capacity, and record actual runtime because equal parameter counts

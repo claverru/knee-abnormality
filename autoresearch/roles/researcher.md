@@ -32,7 +32,7 @@ while its detail is in front of you:
   change is not a retry.
 - **close:** a negative result without a diagnosis, or a line with no credible next step.
 
-Open lines (extend or retry without a queued or running idea) take refill slots first:
+Open lines (extend or retry without a proposed, queued or running idea) take refill slots first:
 propose each one's next step, with its `mechanism_id` and `parent_idea_id`, before new
 directions. Code enforces this, requires `close` after two consecutive rejected
 follow-ups (an adoption resets the count), and refuses proposals in closed families.
@@ -50,7 +50,8 @@ follow-ups (an adoption resets the count), and refuses proposals in closed famil
   replaced methods are precedents. When a direction needs an undecided result, record
   the missing evidence instead of a dependency, and never drop a real dependency to make
   an idea executable.
-- Use unique, stable lowercase-hyphen IDs. Recommend a priority order with potential,
+- Use unique, stable lowercase-hyphen IDs. An ID already in the registry is rejected, even for
+  a proposal still awaiting admission: leave existing proposals to the orchestrator. Recommend a priority order with potential,
   uncertainty, novelty and cost; the orchestrator ranks.
 - Fewer ideas are fine. When credible ideas run out, record the exhausted directions and
   the missing evidence.

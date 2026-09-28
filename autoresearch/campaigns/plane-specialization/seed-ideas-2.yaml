@@ -1,0 +1,99 @@
+ideas:
+- id: radiology-plane-mapping
+  mechanism_id: label-plane-mask
+  parent_idea_id: null
+  title: Each label pools only over the planes a radiologist reads it in, in training and inference
+  opportunity: >-
+    Radiologists read each finding on specific planes: ACL on sagittal, MCL on coronal, Baker's
+    cysts on axial. Restricting each label's attention to those planes removes cross-plane
+    shortcuts and has no train/inference mismatch, because the same mask applies in both.
+  mechanism: >-
+    The incumbent's joint attention pooling with a fixed label-to-plane mask: label c attends only
+    to the study's tokens of the planes the contract's radiology mapping lists for it, in one
+    softmax over their union. A study with none of a label's mapped planes pools that label over
+    all its present planes. Loss, head and output as in the incumbent.
+  precedents:
+  - 'Knee MRI reading practice; the user fixed the mapping on 2026-09-27 and allowed label-to-plane routing for it.'
+  - 'Single-plane inference: ACL sagittal +0.003, MCL coronal -0.008, Baker''s axial -0.001 against the full ReXNet model (prior-work.md).'
+  novelty: The only campaign scheme with a prior mapping instead of a random or learned one.
+  coverage: All studies; every label keeps at least one plane.
+  exploitation: Log fallback counts per label and each plane's attention mass per label.
+  budget: One mask on the incumbent's pooling; negligible.
+  implementation: model.plane_pooling.mask radiology with the table in modeling/planes/.
+  open_choices: None; the mapping is the contract's.
+  dependencies: []
+  priority_rationale: Tests the radiology prior directly and keeps inference identical to training.
+- id: plane-auxiliary-readouts
+  mechanism_id: plane-auxiliary-objective
+  parent_idea_id: null
+  title: Keep the joint pooled output and add a training-only loss where every plane predicts every label on its own
+  opportunity: >-
+    The joint model may combine planes well at inference but let backbones co-adapt. A
+    training-only per-plane objective makes every backbone stand alone without changing the
+    output path.
+  mechanism: >-
+    The incumbent's joint pooling, head and loss stay the output. Add plane-exclusive pooling with
+    training-only per-plane heads (12 x 3, forked-RNG initialization) and the class-balanced BCE
+    on every z_cq, averaged over the study's present planes per label, times
+    trainer.plane_pooling.auxiliary_weight 0.5, added to the loss. The auxiliary heads are dropped
+    at inference.
+  precedents:
+  - 'Per-view disease classifiers as auxiliaries (RSNA 2024 lumbar winner; bundled with other objectives in its ablation).'
+  novelty: The only seed that keeps the incumbent's output and adds per-plane pressure.
+  coverage: All studies and labels.
+  exploitation: Log the auxiliary loss, the joint loss and each plane's auxiliary validation macro AUC per epoch; the auxiliary term must stay active (not orders of magnitude below the main loss).
+  budget: Three masked attention pools during training; none at inference.
+  implementation: trainer.plane_pooling.auxiliary_weight in config.py; heads and loss in the Lightning module.
+  open_choices: None; weight 0.5 fixed.
+  dependencies: []
+  priority_rationale: Adds specialization pressure with the smallest change to inference.
+- id: winner-take-all-plane-routing
+  mechanism_id: label-plane-assignment
+  parent_idea_id: null
+  title: For each study and label, train only the plane whose own logit fits best, and fuse with learned weights
+  opportunity: >-
+    A learned routing can settle near the radiologist's mapping without writing it down: the
+    plane that predicts a label best keeps receiving that label's gradient and specializes in it.
+  mechanism: >-
+    Plane-exclusive pooling gives z_cq. For each study and label, compute the class-balanced BCE of
+    every present plane's logit and apply the loss only to the plane with the lowest value
+    (selection without gradient; ties to the lower plane index). Learned fusion as defined in the
+    contract (detached z_cq, weight 1) is the validation and inference output. Shared head.
+  precedents:
+  - 'Hard mixture-of-experts routing; no project precedent.'
+  novelty: The only learned hard routing among the seeds.
+  coverage: All studies and labels; a study with one present plane always routes to it.
+  exploitation: Log win shares per label and plane per epoch; a plane that never wins any label is a lock-in failure to report.
+  budget: Three masked attention pools; negligible.
+  implementation: trainer.plane_pooling.assignment winner_take_all in the Lightning module; fusion as in random-partition-learned-fusion.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Label-agnostic routing that can learn specialization; known risk is early lock-in.
+- id: dense-plane-full-heads
+  mechanism_id: plane-heads
+  parent_idea_id: null
+  title: One independent head per plane (projection, token norm, attention scorer, classifier) with dense readouts and learned fusion
+  opportunity: >-
+    Per-plane classifiers still leave the projection, token norm and attention scorer shared,
+    so the three planes keep one token space and one rule for which tokens matter. A full head
+    per plane makes each plane an independent model up to the fusion: its own features, its own
+    token selection and its own classifier.
+  mechanism: >-
+    The dense-readouts-learned-fusion scheme, with every token going through its plane's own
+    projection (backbone features -> 256), token LayerNorm, attention scorer (256 -> 128 -> 12)
+    and classifier. Each per-plane module starts as a copy of the corresponding shared module's
+    initialization. Position, plane and contrast embeddings, anatomical strengths, the meniscus
+    mask, the OA detector and the training-only heads stay shared. Learned fusion as defined in
+    the contract is the validation and inference output.
+  precedents:
+  - 'dense-plane-heads (seed 5) makes only the classifier per plane.'
+  novelty: The strictest plane separation in the campaign; only the fusion is shared.
+  coverage: All studies and labels.
+  exploitation: Log each plane's own validation macro AUC, fusion weights and per-plane attention entropy per epoch.
+  budget: About 330k extra parameters per plane; three smaller projections instead of one, same compute.
+  implementation: model.plane_pooling.heads per_plane_full in config.py and modeling/planes/.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user's request for a full head per backbone and plane.
+exhausted_directions: >-
+  See seed-ideas.yaml.

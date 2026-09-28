@@ -1,0 +1,45 @@
+ideas:
+- id: plane-evidence-statistics-fusion
+  mechanism_id: plane-evidence-fusion
+  parent_idea_id: dense-readouts-learned-fusion
+  title: Feed the fusion detached evidence statistics from inside each plane's pooling (attention shape, token-score distribution, slice consistency, coverage) through a per-label residual MLP
+  opportunity: >-
+    Every fusion so far saw only the three plane logits, and more capacity on those logits tied
+    (per-label MLP -0.0008, cross-label MLP -0.0007): a fixed function of three numbers adds little
+    once each plane predicts well. How a plane reached its logit is hidden from the fusion: whether
+    it rests on one focal spot or diffuse evidence, on one slice or several, and on how much of the
+    knee the plane covers. These statistics carry information the logits do not, and they are
+    computed from the detached pooling, so the backbones stay isolated. Requested by the user on
+    2026-09-28.
+  mechanism: >-
+    Keep the incumbent unchanged (dense plane-exclusive readouts, learned linear fusion). For each
+    label c and present plane q, from the incumbent's plane-exclusive pooling (attention after the
+    anatomical bias, meniscus mask and fallback, over the allowed tokens of plane q) and its value
+    tokens, compute on detached tensors: (1) normalized attention entropy H/log(N), 0 when N=1;
+    (2) maximum attention weight; (3) token scores s_i = w_c . h_i + b_c with the shared classifier
+    on every allowed token, and from them the maximum, the mean of the top 5 (all when fewer), the
+    attention-weighted variance and the fraction with s_i > 0; (4) slice consistency: the standard
+    deviation over the plane's triplets of each triplet's maximum token score, 0 with one triplet;
+    (5) coverage: log(1 + allowed tokens) and log(1 + triplets); (6) the absolute OA-detector
+    correction of that plane for the three OA labels, 0 otherwise. With the detached logit z_cq this
+    gives 11 features per plane; absent planes give zeros. Per label, a residual MLP reads the 33
+    plane features plus the 3 presence flags: Linear(36, 16), GELU, Linear(16, 1), one MLP per label,
+    created under a forked RNG with the output layer's weight and bias initialized at zero, so the
+    run starts exactly at the incumbent's fused logit. Output: learned_fusion_c + mlp_c(features).
+    The learned fusion and the MLPs train with the incumbent's class-balanced fusion BCE on detached
+    inputs, weight 1; no gradient reaches the backbones, projection, attention or classifier. The
+    sum is the validation and inference output. Switch: model.plane_pooling.fusion_evidence true.
+  precedents:
+  - 'nonlinear-plane-logit-fusion-no-dropout (per-label MLP on plane logits): -0.0008; cross-label-plane-logit-fusion: -0.0007.'
+  - 'dense-readouts-learned-fusion (linear fusion): the incumbent, 0.904035.'
+  novelty: First fusion input beyond the plane logits; per label, no cross-label inputs.
+  coverage: All studies and labels; absent planes enter as zeros with their presence flag.
+  exploitation: Log per label and epoch the mean absolute MLP correction and its share of the fused logit, and per plane the mean of each evidence statistic; check that no statistic is NaN or constant. An MLP whose correction stays near zero is an idle mechanism.
+  budget: Token scores for 12 labels over all tokens and a top-5 per study, label and plane; well under a second per step at batch 16. About 12 x 609 parameters.
+  implementation: model.plane_pooling.fusion_evidence in config.py; the statistics inside the plane-exclusive pooling in modeling/model.py or modeling/planes/, returned alongside the plane logits; the MLP in modeling/planes/fusion.py. Guard every statistic against empty or single-token planes (entropy, variance, top-k, triplet spread) so no NaN reaches the loss.
+  open_choices: None; the eleven features, top 5, hidden width 16, GELU, zero-initialized output layer and loss weight 1 are fixed.
+  dependencies: []
+  priority_rationale: The only fusion change that adds information the plane logits do not carry.
+exhausted_directions: >-
+  Fusion capacity on the plane logits alone (linear, per-label MLP, cross-label MLP, joint
+  attention) is closed with ties; cross-label fusion inputs lost as a post-hoc stacker (-0.0029).

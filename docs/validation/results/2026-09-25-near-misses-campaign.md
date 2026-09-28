@@ -28,7 +28,7 @@ Hard and soft Δ are macro AUC at ×4 against the incumbent at the time.
 | 8 | **Three-compartment OA detector** | **+0.0013** | +0.0014 | PF OA **+0.0102** (95% above zero); medial and lateral OA flat |
 | 9 | **Token dropout, random** | **+0.0025** | +0.0019 | Adopted, 80% [+0.0005, +0.0044]; fresh-seed control 0.905246 |
 | 10 | Token dropout, top-attention | −0.0007 | +0.0003 | |
-| 11 | Plane/contrast readouts | −0.0006 | −0.0004 | |
+| 11 | Plane/contrast readouts | −0.0006 | −0.0004 | Six per-type heads replacing the shared readout; Baker's −0.0103 |
 | 12 | Any-OA auxiliary | −0.0021 | −0.0011 | PF OA +0.0118, Lateral OA −0.0081 |
 | 13 | 3D position + slice orientation | −0.0017 | +0.0011 | PF OA +0.0156 |
 | 14 | Plane-negative half-knee MIL | −0.0017 | −0.0015 | Lateral Meniscus −0.0060 |

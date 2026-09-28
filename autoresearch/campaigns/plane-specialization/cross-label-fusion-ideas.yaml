@@ -1,0 +1,36 @@
+ideas:
+- id: cross-label-plane-logit-fusion
+  mechanism_id: plane-fusion
+  parent_idea_id: dense-readouts-learned-fusion
+  title: One MLP with a GELU over all 36 detached plane logits predicting a residual for all 12 labels on top of the learned fusion
+  opportunity: >-
+    Every fusion so far combines each label's own three plane logits, so no label can use another
+    label's evidence. Radiologists use secondary signs across findings (effusion or bone bruises
+    around an ACL tear). A cross-label fusion over all plane logits can learn such relations while
+    the backbones stay isolated, because its inputs are detached. Requested by the user on
+    2026-09-28, after nonlinear-plane-logit-fusion-no-dropout, whose per-label MLP it extends.
+  mechanism: >-
+    Keep the incumbent's dense plane-exclusive supervision and learned fusion, with every training
+    triplet kept. Add one MLP shared by all labels on 39 inputs: the 36 detached plane logits z_cq
+    (12 labels x 3 planes) with absent planes set to 0, and the three plane-presence flags. Layers:
+    Linear(39, 32), GELU, Linear(32, 12), created under a forked RNG, with the output layer's
+    weight and bias initialized at zero so the run starts exactly at the incumbent's fused logits.
+    The output for label c becomes learned_fusion_c + mlp(inputs)_c. The learned fusion and the
+    MLP train with the incumbent's class-balanced BCE on these outputs, on detached plane logits
+    only, added to the loss with weight 1 in place of the incumbent's fusion BCE; no gradient
+    reaches the backbones, heads or attention. If a per-label MLP fusion was adopted before this
+    run, this cross-label MLP replaces it.
+  precedents:
+  - 'Header stacker with all 12 disease logits as co-occurrence features, post-hoc on out-of-fold logits: -0.0029 (prior work).'
+  - 'nonlinear-plane-logit-fusion (per-label MLP plus 20% triplet dropout): -0.0066; the no-dropout per-label MLP runs just before this idea.'
+  novelty: First fusion in the campaign where a label's output reads other labels' plane logits.
+  coverage: All studies and labels; studies missing planes enter through the presence flags.
+  exploitation: Log per label and epoch the mean absolute MLP correction and its share of the fused logit, the first-layer weight norm per input label, the fusion softmax weights and each plane's own validation macro AUC. Local labels are report-derived, so a gain from report co-occurrence may not transfer to image-derived test labels; the user decides on public evidence.
+  budget: About 1,700 parameters; negligible compute.
+  implementation: model.plane_pooling.fusion_cross_label_hidden 32 in config.py; the MLP in modeling/planes/fusion.py; the fusion loss in the Lightning module under trainer.plane_pooling.
+  open_choices: None; 39 inputs, hidden width 32, GELU, zero-initialized output layer and loss weight 1 are fixed.
+  dependencies: []
+  priority_rationale: The user's request; the only fusion that can use evidence across labels.
+exhausted_directions: >-
+  Out-of-fold stacking (needs five-fold training outside the harness) and fusion gradients into the
+  backbones.

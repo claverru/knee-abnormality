@@ -63,8 +63,10 @@ patient points. Remaining (hypotheses), from the
 - **Phase 0 diagnostics:** report laterality read for the persistent wrong-side studies,
   attention and token-position dumps, and frozen token probes. Plane-restricted inference on the
   champion was skipped by user decision.
-- **Common knee orientation** (approach 4) and **learned landmarks or localization supervision**
-  (approach 7, which depends on a rules-compatible knee segmenter).
+- **Learned landmarks or localization supervision** (approach 7, which depends on a
+  rules-compatible knee segmenter). Common knee orientation (approach 4) ran in the
+  [knee-geometry campaign](../validation/results/2026-09-24-knee-geometry-campaign.md) as the
+  sagittal-normal (+0.0006) and coronal condylar (−0.0022) frames, neither adopted.
 - **Side-conditioned sagittal sampling centre** (measured premise, unmeasured payoff). Sagittal
   slices step along patient L, and the compartment labels sit about 31 mm off the study centre
   while the sagittal draw is centred on it. The [spatial importance
@@ -79,6 +81,10 @@ patient points. Remaining (hypotheses), from the
   implemented in preprocessing for anatomical attention, so side plumbing is no longer
   missing; abstentions must take no offset. The 96.14% coverage is the historical audit,
   not a fresh coverage measurement.
+
+The [knee-geometry campaign](../../autoresearch/campaigns/knee-geometry/INDEX.md), stopped
+2026-09-24, left the curve-density sampler and the fallback-safe OA readout untried, and
+`meniscus-core-band-contrast-readout` trained but was never compared.
 
 Approaches 2 and 3 act through the 3D coordinate branch that approach 1's checkpoint barely used;
 the user also declined approach 3 on 2026-09-14. Image-based side inference is deferred by user
@@ -152,12 +158,11 @@ hypothesis: no auxiliary objective has trained active in this project. The GPU i
 - **Seed candidates** (all would transfer to the campaign when it is defined):
   [report-state prediction](small-changes.md#auxiliary-report-state-prediction) (hypothesis, with
   a measured judge risk: it teaches reporting behaviour that fold 0 rewards and the leaderboard
-  may not), [report attributes](../ongoing/report-attribute-extraction.md) (implemented
-  2026-09-25 as [report-attribute heads](../modeling/report-attribute-heads.md), first run
-  +0.00075 ([result](../validation/results/2026-09-25-report-attribute-heads.md)); agreed severity is already in the targets, but
-  location, confusers and extra findings are not) and per-view disease classifiers
-  (below). Acquisition or geometry pretext tasks (plane, contrast, slice position, knee side) are
-  guesses with no measured premise.
+  may not) and per-view disease classifiers (below). Acquisition or geometry pretext tasks
+  (plane, contrast, slice position, knee side) are guesses with no measured premise. Already done:
+  [report-attribute heads](../modeling/report-attribute-heads.md) were adopted on 2026-09-25, and
+  the [auxiliary-signals campaign](../validation/results/2026-09-27-auxiliary-signals-campaign.md)
+  tested attribute-target variants and scanner heads, adopting the scanner confusion head.
 - **Per-view disease classifiers** (guess, low-to-moderate confidence; added 2026-09-23 from the
   RSNA 2024 lumbar winner's modality-classifier auxiliaries, whose
   [ablation](https://files.speakerdeck.com/presentations/3a7b5a2c84e14df2a1bce0b41dd609d0/slide_29.jpg)
