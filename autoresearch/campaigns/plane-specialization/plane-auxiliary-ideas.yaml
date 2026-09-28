@@ -1,0 +1,133 @@
+ideas:
+- id: plane-report-attribute-heads
+  mechanism_id: plane-auxiliary-pooling
+  parent_idea_id: dense-readouts-learned-fusion
+  title: Apply the report-attribute heads to each plane's tokens separately and average their loss over present planes
+  opportunity: >-
+    The incumbent's disease readouts are plane-exclusive, but the 35 training-only
+    report-attribute heads still pool all planes' tokens together, so every backbone receives
+    attribute gradients through a cross-plane pool: the coupling that dense readouts removed for the
+    disease loss, and the only gain of this campaign (+0.0047). Per-plane attribute supervision is
+    the attribute analogue of dense readouts. Requested by the user on 2026-09-28 as an exception
+    to the contract's fixed report-attribute heads (decision under
+    outputs/autoresearch/plane-specialization/decisions/).
+  mechanism: >-
+    Keep the incumbent unchanged (dense plane-exclusive disease readouts, learned fusion). In the
+    Lightning module, call the existing report-attribute heads once per plane with the valid-token
+    mask restricted to that plane's tokens (visual_valid and image_plane == q), over the studies
+    that hold at least one valid token in that plane. Compute the existing attribute loss per plane
+    with the unchanged targets, weights and observation masks, then average it over each study's
+    present planes so studies with more planes gain no extra weight, and multiply by the unchanged
+    report_attribute_loss_weight 0.1. The heads' parameters stay shared across planes; the
+    training/report_attributes.py module is called, not changed. The heads' attention has no
+    empty-study guard: a study without valid tokens in a plane would softmax over an empty set and
+    produce NaN, so before each per-plane call drop those studies and reindex the remaining study
+    indices, targets, weights and masks to them. Switch:
+    trainer.plane_pooling.report_attributes per_plane.
+  precedents:
+  - 'dense-plane-readouts: +0.0047 from plane-exclusive disease supervision.'
+  - 'Report-attribute heads adopted 2026-09-25: +0.00105, public 0.940 against 0.938.'
+  novelty: First plane-exclusive auxiliary supervision in the campaign.
+  coverage: All training studies with attribute targets and every present plane.
+  exploitation: Log the attribute loss and per-question divergence per plane per epoch, studies covered per plane, and each plane's own validation macro AUC.
+  budget: Three attention pools of the attribute heads instead of one; negligible.
+  implementation: trainer.plane_pooling.report_attributes in config.py; the per-plane call and loss averaging in training/lightning.py.
+  open_choices: None; shared head parameters, present-plane averaging, weight 0.1.
+  dependencies: []
+  priority_rationale: The largest auxiliary still pooling across planes.
+- id: plane-half-knee-mil
+  mechanism_id: plane-auxiliary-pooling
+  parent_idea_id: dense-readouts-learned-fusion
+  title: Run the half-knee meniscus MIL loss within each plane's tokens and average it over present planes
+  opportunity: >-
+    The training-only half-knee MIL loss pools each study's medial and lateral half over all
+    planes' tokens, so the meniscus tear detector's gradient reaches every backbone through a
+    cross-plane pool. The midline split is geometric, so it applies within any plane that shows
+    both halves. Requested by the user on 2026-09-28 as an exception to the contract's fixed
+    half-knee loss.
+  mechanism: >-
+    Keep the incumbent unchanged. In the Lightning module, compute the existing half-knee MIL
+    loss once per plane with its groups restricted to that plane's selected tokens (group = study x
+    half, within plane q), keeping the shared half_knee_detector, the midline band, the smooth
+    maximum and the class-balanced BCE. A study and plane count only when both halves hold tokens
+    in that plane and both meniscus targets are observed. Average the per-plane losses over each
+    study's usable planes and multiply by the unchanged half_knee_loss_weight 0.075. Switch:
+    trainer.plane_pooling.half_knee per_plane.
+  precedents:
+  - 'Half-knee MIL adopted in the knee-geometry campaign: +0.0031, public 0.944 against 0.942.'
+  novelty: Plane-exclusive meniscus MIL.
+  coverage: Studies whose planes show both knee halves; the meniscus labels.
+  exploitation: Log per plane per epoch the half-knee loss and the studies used, and the meniscus validation AUC of each plane's own logits.
+  budget: Three smooth-maximum pools instead of one; negligible.
+  implementation: trainer.plane_pooling.half_knee in config.py; the per-plane grouping in training/lightning.py.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Removes the second cross-plane auxiliary coupling.
+- id: shared-stem-plane-backbones
+  mechanism_id: plane-backbone-sharing
+  parent_idea_id: dense-readouts-learned-fusion
+  title: Share each backbone's layers up to the stride-8 map across planes and keep separate plane towers above it
+  opportunity: >-
+    Low-level features such as edges and textures are the same in every plane, while anatomy is
+    plane-specific. Sharing the early layers lets them learn from all images while the upper
+    towers stay specialized, at the same compute and with fewer parameters. Each plane still has
+    its own backbone above the stride-8 map. Requested by the user on 2026-09-28.
+  mechanism: >-
+    Keep the incumbent unchanged except the backbones. Inside PlaneBackbones, run one shared
+    EfficientNet-B0 stem on every image: conv_stem, bn1 and blocks[0:3] (the stride-8 map, 40
+    channels, 28 x 28 at 224 px), taken from the first plane backbone. Then route each image's
+    stride-8 features to its plane's tower: blocks[3:], conv_head and bn2 of that plane's backbone,
+    all initialized from the same pretrained weights as now. Replace the unused early layers of the
+    second and third backbones with identities so no parameter is left without gradient. The
+    output feature maps, feature mapping, projection and everything after are unchanged. If DSU
+    per plane was adopted, apply it to each plane's stride-8 features before its tower. Keep
+    PlaneBackbones.planes as three modules whose forward_features(images) computes the shared stem
+    followed by that plane's tower (the stem module registered once and referenced by all three),
+    and give them set_grad_checkpointing, pretrained_cfg and num_features: the FP16 Kaggle path in
+    inference/engine.py captures one CUDA graph per entry of planes from its forward_features, so
+    each entry must reproduce the full plane backbone. Training may run the stem once on all images
+    and then the towers. Switch: model.plane_pooling.shared_stem stride_8.
+  precedents:
+  - 'Three separate B0 backbones: the incumbent; no run shared any backbone layer.'
+  novelty: Partial sharing between plane backbones.
+  coverage: All images and planes.
+  exploitation: Log each plane's own validation macro AUC, and the backbone parameter count.
+  budget: Same compute; fewer backbone parameters (the shared stem replaces two copies).
+  implementation: model.plane_pooling.shared_stem in config.py; the shared stem and per-plane towers in PlaneBackbones in modeling/model.py.
+  open_choices: None; split after blocks[2].
+  dependencies: []
+  priority_rationale: Tests how much of each backbone needs to be plane-specific.
+- id: plane-scanner-confusion
+  mechanism_id: plane-auxiliary-pooling
+  parent_idea_id: dense-readouts-learned-fusion
+  title: Apply the scanner confusion head to each plane's tokens separately so every backbone becomes scanner-invariant
+  opportunity: >-
+    The scanner confusion head pools all planes' tokens together, so it only asks the mix to hide
+    the scanner, not each backbone. Per-plane confusion makes every plane backbone
+    scanner-invariant on its own. The confusion head was adopted on public evidence (0.948 against
+    0.947). Requested by the user on 2026-09-28 as an exception to the contract's fixed scanner
+    confusion head.
+  mechanism: >-
+    Keep the incumbent unchanged. In the Lightning module, run the existing scanner confusion step
+    once per plane with the valid-token mask restricted to that plane's tokens, over the studies
+    that hold valid tokens in that plane: the detached head's cross-entropy and the bounded KL
+    confusion toward the group frequencies, with the unchanged ramp. Average both terms over each
+    study's present planes and multiply by the unchanged scanner_confusion_weight 0.1. The head's
+    parameters stay shared across planes; training/auxiliary/scanner_confusion.py is called, not
+    changed. The head raises "A study has no visually valid spatial tokens" for a study without
+    tokens in the pool, so before each per-plane call drop the studies without valid tokens in that
+    plane and reindex study indices, study UIDs and scanner targets to the remaining ones. Switch:
+    trainer.plane_pooling.scanner_confusion per_plane.
+  precedents:
+  - 'Scanner confusion head adopted 2026-09-27 on public evidence: S67 0.948 against S68 0.947; local -0.00076.'
+  novelty: Plane-level scanner invariance.
+  coverage: All training studies with scanner groups and every present plane.
+  exploitation: Log per plane per epoch the head accuracy and the confusion KL; the local rule may understate it, as for the adopted head.
+  budget: Three pools instead of one; negligible.
+  implementation: trainer.plane_pooling.scanner_confusion in config.py; the per-plane step in training/lightning.py.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Removes the last cross-plane auxiliary coupling; judged mainly on public evidence.
+exhausted_directions: >-
+  Fusion capacity, label-to-plane routing and partitions, triplet dropout and leave-one-plane-out
+  distillation are closed with results in this campaign.

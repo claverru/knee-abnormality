@@ -73,6 +73,7 @@ findings doc holds the question, method, command and result.
 
 | Script | Question | Findings |
 |---|---|---|
+| [score_axial_only.py](score_axial_only.py) | How much does a trained model lose when it sees only one plane's series? | [Single-plane inference](../../docs/validation/results/2026-09-27-single-plane-inference.md) |
 | [diagnose_fusion_branches.py](diagnose_fusion_branches.py) | Which branch of the stride-16/stride-32 fusion do predictions use? | [Stride-16 fusion](../../docs/validation/results/2026-09-22-stride16-fusion-result.md#branch-ablation) |
 | [score_sibling_masking.py](score_sibling_masking.py) | Do compartment tokens use the sibling knee side? | [Sibling masking](../../docs/validation/results/2026-09-23-sibling-masking.md) |
 | [score_tilted_slot_policies.py](score_tilted_slot_policies.py) | How should slots holding tilted and standard series be handled at inference? | [Oblique groups](../../docs/history/oblique-groups.md) |

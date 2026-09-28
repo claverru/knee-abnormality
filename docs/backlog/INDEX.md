@@ -5,8 +5,6 @@
 | Planning hyperparameter-only runs | [Overnight queue](overnight.md) |
 | Finding proposed small code changes | [Small changes](small-changes.md) |
 | Comparing AdamP with AdamW on ReXNet | [AdamP optimizer](small-changes.md#adamp-for-rexnet) |
-| Why attention-token dropout (random or top-attention masking) was rejected | [Attention-token dropout](small-changes.md#attention-token-dropout) |
-| Keeping acquisition types separate through the classifier | [Plane/contrast-specific readouts](small-changes.md#planecontrast-specific-readouts) |
 | Adapting acquisition features before attention selects evidence | [Plane/contrast-specific feature adapters](small-changes.md#planecontrast-specific-feature-adapters) |
 | Planning larger investigations | [Big bets](big-bets.md) |
 | Planning an autoresearch campaign on training-only auxiliary losses and heads (report state, OA attributes, per-view classifiers, pretext tasks) | [Auxiliary-loss campaign](big-bets.md#auxiliary-loss-campaign) |

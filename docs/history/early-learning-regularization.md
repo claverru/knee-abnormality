@@ -1,8 +1,9 @@
 # Early-learning regularization on the current recipe
 
-**Status, 2026-09-24:** queued as seed #5 of the
-[near-misses campaign](../../autoresearch/campaigns/near-misses/INDEX.md), ported unchanged
-(λ 0.075, momentum 0.7) and compared against `knee-geometry-merged-2` at seed 638120755.
+**Closed, 2026-09-25: not adopted.** Ported unchanged (λ 0.075, momentum 0.7) as seed #5 of the
+[near-misses campaign](../validation/results/2026-09-25-near-misses-campaign.md), it scored
++0.0002 hard and +0.0004 soft ×4 macro against `knee-geometry-merged-2` at seed 638120755. The
+analysis below motivated that run.
 
 ## Candidate
 

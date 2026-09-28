@@ -1,0 +1,59 @@
+id: plane-specialization
+recipe: configs/training.yaml
+reference_run: outputs/training/20260927-210053-b0-plane-backbones
+reference_equivalences: {}
+additional_evidence_runs:
+  - outputs/training/scanner-confusion-control
+backlog:
+  refill_below: 3
+  refill_to: 5
+  seed_order: forced
+policy:
+  editable_files:
+    - configs/training.yaml
+    - src/knee_abnormality/config.py
+    - src/knee_abnormality/modeling/model.py
+    - src/knee_abnormality/training/lightning.py
+  editable_directories:
+    - src/knee_abnormality/modeling/planes
+  config_keys: []
+  config_prefixes:
+    - model.plane_pooling
+    - trainer.plane_pooling
+  list_item_fields: {}
+  input_identity_keys:
+    - preprocessing_identity
+  require_source_change: true
+  developer_instructions: >-
+    Implement exactly the assigned idea on the current incumbent and switch it on in
+    configs/training.yaml with the idea's fixed settings. Inference-time behavior (per-plane
+    pooling, fusion, per-plane heads, label-to-plane masks) goes under model.plane_pooling and
+    lives in KneeAbnormalityModel, because validation prediction and export run the model's
+    forward; training-only losses and label-to-plane assignment go under trainer.plane_pooling
+    in the Lightning module. New helper modules go in src/knee_abnormality/modeling/planes/.
+    Each seed defines a complete pooling and supervision scheme: where it conflicts with a scheme
+    the incumbent already adopted, it replaces it and the integration plan lists the removed
+    components. Keep the plane-exclusive pooling definition of the contract: the existing
+    anatomical score bias, meniscus own-side mask and three-compartment OA-detector correction
+    apply within the plane's tokens, and every fallback is per study and label. The three
+    backbones, their plane routing, the half-knee loss, report-attribute
+    heads, scanner confusion head, disease targets, class-balanced BCE weights, augmentation,
+    series dropout 0 and the optimizer stay untouched. New parameters initialize under a forked
+    RNG; with the option off the run reproduces the incumbent. Every random draw derives from the
+    run seed and the global step. Log per epoch: every new loss term, the realized label-to-plane
+    assignment shares, fallback counts, fusion weights per label and plane, and the validation
+    macro AUC of each plane's own logits. Return prepared or blocked. Use the existing Python
+    environment for static checks. No tests.
+  researcher_instructions: >-
+    Research starts only after the user's forced seeds finish. The question is whether
+    plane-specialized backbones outperform a shared one when each backbone must extract the most
+    from its own plane. Work on how per-plane evidence is pooled, supervised, routed and fused:
+    plane-exclusive pooling, label-to-plane assignment (random, dense, learned, competitive or
+    the fixed radiology mapping of the contract), fusion at inference, per-plane or shared heads,
+    and training-only per-plane objectives. Build every proposal on the seeds' diagnostics:
+    per-plane logit AUCs, fusion weights, assignment shares and per-label deltas against the
+    seed-noise yardstick in prior-work.md, and report each run's gap to the ReXNet control
+    (0.909733). Any label-to-plane rule other than the contract's radiology mapping must be
+    label-agnostic or learned in training, never chosen from label results. No backbone,
+    image-size, epoch, batch, learning-rate or augmentation changes, no series dropout, no
+    coefficient sweeps, no extra forward passes and no test-time augmentation.

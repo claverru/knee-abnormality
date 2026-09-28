@@ -2,6 +2,8 @@
 
 | Read when | Document |
 |---|---|
+| Reviewing the plane-specialization campaign (one EfficientNet-B0 per plane: label-to-plane partitions and routing, dense per-plane readouts, fusion variants, per-plane heads and auxiliaries, DSU per plane), its transfer to three ReXNet-200s (S73/S74/S77), the τ sweep on plane models and the averaging of tied runs | [2026-09-28 plane-specialization campaign](2026-09-28-plane-specialization-campaign.md) |
+| Checking how much the control loses when it sees one plane only (axial −0.061, coronal −0.043, sagittal −0.039 macro), which plane each label relies on (ACL sagittal, MCL coronal, Effusion and Baker's axial), without retraining | [2026-09-27 single-plane inference](2026-09-27-single-plane-inference.md) |
 | Reviewing EfficientNet-B3 on the current recipe (weight-scaled backbone LR, LR, epoch and augmentation-removal arms; second round of head-rate, warmup and cosine-floor arms), its gap to ReXNet, the two-epoch warmup that edges past it and the +0.0029 B3 + ReXNet pair | [2026-09-27 B3 overnight queues](2026-09-27-b3-overnight-queue.md) |
 | Reviewing the auxiliary-signals campaign (JevK5 attribute-target variants, scanner gradient reversal versus the bounded confusion head, per-site and per-model logit biases, public S67–S72) and why the scanner confusion head was adopted on 0.948 against 0.947 | [2026-09-27 auxiliary-signals campaign](2026-09-27-auxiliary-signals-campaign.md) |
 | Reviewing the ConvNeXt-Atto (−0.0192, closed; batch padding for GPU utilization) and ReXNet-R (−0.0053, over-large learning rate, 8e-5 follow-up) backbone swaps run from the `convnext-atto` worktree | [2026-09-25 backbone swap runs](2026-09-25-backbone-swap-runs.md) |

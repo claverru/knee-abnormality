@@ -1,0 +1,44 @@
+ideas:
+- id: nonlinear-plane-logit-fusion
+  mechanism_id: plane-fusion
+  parent_idea_id: dense-readouts-learned-fusion
+  title: Add a small per-label MLP with a GELU between its layers on the detached plane logits, as a residual on the learned fusion, with 20% triplet dropout in training
+  opportunity: >-
+    The incumbent's learned fusion is linear in the plane logits: per label, a softmax-weighted
+    average of three detached logits with static weights, no bias and weights summing to one.
+    It can choose and mix planes but cannot express interactions such as "positive only when two
+    planes agree", nor rescale or shift the fused confidence. A small nonlinear fusion per label
+    can, while the backbones stay isolated because the input logits are detached. Requested by
+    the user on 2026-09-28 as an extension of learned fusion. The user also asked for 20%
+    triplet dropout in the same run, as a regularizer for training with series dropout at 0;
+    this is the user's explicit exception to the contract's dropout exclusion, for this idea only
+    (decision recorded 2026-09-28 under outputs/autoresearch/plane-specialization/decisions/).
+  mechanism: >-
+    Keep the incumbent unchanged: dense plane-exclusive supervision and the learned fusion
+    (softmax weights over present planes on detached plane logits). Add, per label c, an MLP on
+    six inputs: the three detached plane logits z_cq with absent planes set to 0, and the three
+    plane-presence flags. Layers: Linear(6, 16), GELU, Linear(16, 1), one MLP per label (twelve
+    in total), created under a forked RNG, with the output layer's weight and bias initialized
+    at zero so the run starts exactly at the incumbent's fused logit. The model output becomes
+    learned_fusion_c + mlp_c(inputs). Both fusion modules train with the incumbent's
+    class-balanced BCE on this output, on detached plane logits only, added to the loss with
+    weight 1 in place of the incumbent's fusion BCE; no gradient reaches the backbones, heads or
+    attention. The sum is the validation and inference output. Triplet dropout: in training
+    only, before the backbones, drop each valid triplet independently with probability 0.2,
+    keeping at least one triplet of every kept series (the one with the highest draw when all
+    are dropped), so every present plane still gets dense supervision. Draws derive from the run
+    seed and the global step. Validation and inference keep every triplet.
+  precedents:
+  - 'dense-readouts-learned-fusion: linear fusion +0.0009 over the present-plane mean; random-partition-learned-fusion: +0.0041 over its mean twin.'
+  - 'Header stacker with cross-label logit inputs: -0.0029 (prior work); this MLP sees only its own label''s plane logits.'
+  novelty: First nonlinear fusion of per-plane evidence in the campaign; per label, no cross-label inputs.
+  coverage: All studies and labels; studies missing planes enter through the presence flags; triplet dropout applies to every training study.
+  exploitation: Log per label and epoch the mean absolute MLP correction, its share of the fused logit, the fusion softmax weights and each plane's own validation macro AUC, and per epoch the realized triplet drop fraction and the series kept by the floor. An MLP whose correction stays near zero is an idle mechanism. The run bundles two changes at the user's request, so its result cannot be split between them.
+  budget: About 1,550 parameters; triplet dropout removes about a fifth of training backbone work, so the run gets faster.
+  implementation: model.plane_pooling.fusion_mlp_hidden 16 and model.plane_pooling.triplet_dropout 0.2 in config.py; the MLP in modeling/planes/fusion.py; triplet dropout in KneeAbnormalityModel.encode_batch after the series selection; the fusion loss in the Lightning module under trainer.plane_pooling.
+  open_choices: None; hidden width 16, GELU, zero-initialized output layer, loss weight 1 and triplet dropout 0.2 with a one-triplet floor per series are fixed.
+  dependencies: []
+  priority_rationale: The user's request; the only fusion extension that adds nonlinearity without touching backbone supervision.
+exhausted_directions: >-
+  Cross-label fusion inputs (header-stacker precedent), out-of-fold stacking (needs five-fold
+  training outside the harness) and gradient flow from the fusion into the backbones.

@@ -1,0 +1,66 @@
+ideas:
+- id: plane-backbone-dsu
+  mechanism_id: plane-feature-statistics
+  parent_idea_id: dense-readouts-learned-fusion
+  title: DSU feature-statistics augmentation at the stride-8 map inside each plane's EfficientNet-B0
+  opportunity: >-
+    DSU is off in this campaign only because its code splits a single ReXNet by hand; the
+    ReXNet control uses it at probability 0.5. On ReXNet it gained +0.0022 and, rerun, +0.0012
+    (augmentation campaign), and it is one of the recipe differences between the incumbent and the
+    ReXNet control, which the incumbent trails by 0.0057 locally and 0.003 publicly (S74 0.943
+    against S73 0.946). The user authorized this exception to the contract's fixed-augmentation
+    rule on 2026-09-28 (decision under outputs/autoresearch/plane-specialization/decisions/).
+  mechanism: >-
+    Keep the incumbent unchanged (dense plane-exclusive supervision, learned fusion, every triplet
+    kept). In training only, inside PlaneBackbones, run each plane's EfficientNet-B0 as
+    conv_stem, bn1 and blocks[0:3] (the stride-8 map: 40 channels, 28 x 28 at 224 px), apply the
+    existing apply_feature_statistics_augmentation to that plane's features with the acquisition
+    indices and acquisition types of the images routed to that plane (reordered with them), then
+    run blocks[3:], conv_head and bn2. Use a FeatureStatisticsAugmentationConfig with probability
+    0.5 and the other fields at their defaults, the ReXNet recipe's setting. The switch is
+    model.plane_pooling.feature_statistics_probability 0.5; the global
+    model.feature_statistics_augmentation.probability stays 0, and the ReXNet-only DSU path is
+    untouched. Validation and inference run the backbones unchanged.
+  precedents:
+  - 'DSU on ReXNet-200: +0.0022, rerun +0.0012 (docs/validation/results/2026-09-26-augmentation-campaign.md).'
+  - 'The ReXNet control scanner-confusion-control uses DSU at 0.5; the campaign reference had it off.'
+  novelty: First DSU on EfficientNet and on plane-specific backbones.
+  coverage: All training studies and every plane backbone.
+  exploitation: Log DSU activity per plane per epoch (acquisitions perturbed, mean absolute feature-statistic shift) and each plane's own validation macro AUC.
+  budget: Two per-acquisition reductions on a 40-channel map per plane; negligible compute.
+  implementation: model.plane_pooling.feature_statistics_probability in config.py (allowed with plane_backbones, unlike the global DSU switch); the split forward and DSU call in PlaneBackbones in modeling/model.py, importing apply_feature_statistics_augmentation from modeling/augmentation.py unchanged; pass acquisition_index and acquisition_type into the plane-backbone forward.
+  open_choices: None; stride-8 split after blocks[2], probability 0.5, default DSU fields.
+  dependencies: []
+  priority_rationale: The best-evidenced remaining difference from the ReXNet control.
+- id: plane-oa-detector
+  mechanism_id: plane-oa-detector
+  parent_idea_id: dense-readouts-learned-fusion
+  title: One three-compartment OA detector per plane instead of one shared across planes
+  opportunity: >-
+    OA is where the incumbent trails the ReXNet control most (medial, lateral and PF OA about
+    -0.011 each). The three-compartment OA detector scores tokens with one evidence scorer and
+    three region scales shared by all planes, although OA evidence looks different by plane:
+    tibiofemoral cartilage and osteophytes on coronal, patellofemoral on axial and sagittal. No
+    run has made the detector plane-specific. Requested by the user on 2026-09-28.
+  mechanism: >-
+    Keep the incumbent unchanged except the OA-detector correction inside plane-exclusive pooling.
+    Replace the shared oa_detector (Linear(256, 1), no bias) and oa_detector_scale (3) with one
+    pair per plane (axial, coronal, sagittal), each initialized as a copy of the shared module's
+    initialization under a forked RNG. Plane q's logits z_cq for the three OA labels take their
+    correction from plane q's detector over plane q's trusted tokens, with the incumbent's
+    regions, pooling and empty-region handling. Every other module, the dense loss and the learned
+    fusion stay unchanged.
+  precedents:
+  - 'Three-compartment OA detector adopted 2026-09-25 (0.944 public against 0.940); shared by every plane in this campaign.'
+  - 'Per-plane classifiers (-0.0006 and +0.0005) and full per-plane heads (-0.0002) kept the OA detector shared.'
+  novelty: First plane-specific OA evidence scorer.
+  coverage: The three OA labels in every study and plane.
+  exploitation: Log per plane per epoch the detector weight norm, the three region scales and the mean absolute OA correction, and each plane's own OA validation AUC.
+  budget: About 800 extra parameters; negligible compute.
+  implementation: model.plane_pooling.oa_detector per_plane in config.py and the per-plane modules in modeling/model.py or modeling/planes/.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user's request; aims at the OA gap to the ReXNet control.
+exhausted_directions: >-
+  Fusion capacity, label-to-plane routing and partitions, triplet dropout and leave-one-plane-out
+  distillation are closed with results in this campaign.

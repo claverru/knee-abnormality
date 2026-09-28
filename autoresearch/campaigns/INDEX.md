@@ -2,6 +2,7 @@
 
 | Read when | Document |
 |---|---|
+| Recovering the stopped plane-specialization campaign (one EfficientNet-B0 per plane: label-to-plane partitions and routing, dense per-plane readouts, linear, MLP, joint and evidence fusion, per-plane heads, radiology mapping, per-plane OA detector, attribute heads, half-knee MIL and scanner confusion, DSU per plane; dense readouts accepted, learned fusion adopted, the line closed without adoption into the recipe) | [Plane specialization](plane-specialization/INDEX.md) |
 | Recovering the stopped auxiliary-signals campaign (JevK5 attribute-target variants, scanner gradient reversal, the bounded scanner confusion head, per-site and per-model logit biases, forced ideas added on the fly; confusion head adopted, 18 rejected, 2 invalid) | [Auxiliary signals](auxiliary-signals/INDEX.md) |
 | Recovering the closed augmentation campaign (13 user-ordered seeds, reruns and researcher refills: GIN, k-space resolution, sharpening, image/token/pooled MixUp, late affine shutdown, bias field, channel reversal, bilateral smoothing, intra-study contrast mixing, DSU and follow-ups, stochastic depth; smoothing and DSU adopted, the half stack adopted on main) | [Augmentation](augmentation/INDEX.md) |
 | Recovering the stopped near-misses campaign (15 user-ordered seeds, then researcher ideas: meniscus readouts, early-learning regularization, 3D position, PF OA bias and three-compartment detector, token dropout, plane readouts, half-knee refinements; token dropout adopted, 18 rejected) | [Near misses](near-misses/INDEX.md) |

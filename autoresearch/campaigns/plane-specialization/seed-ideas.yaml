@@ -1,0 +1,123 @@
+ideas:
+- id: random-label-plane-partition
+  mechanism_id: label-plane-assignment
+  parent_idea_id: null
+  title: Each training step, split the twelve labels at random into three groups of four and train each group only on one plane's pooled logits
+  opportunity: >-
+    With joint attention over all planes, the three backbones co-adapt: a backbone can stay weak
+    on a label another plane covers, and the pooled features spread knowledge across planes. If
+    every label's training logit comes from a single plane, no backbone can lean on another, and
+    each has to extract as much as its own plane holds. This is the user's idea.
+  mechanism: >-
+    Plane-exclusive pooling as defined in the contract gives z_cq for every label c and present
+    plane q. At each training step draw one uniform random permutation of the twelve labels
+    (seeded by the run seed and the global step) and assign labels 1-4 to Axial, 5-8 to Coronal
+    and 9-12 to Sagittal, the same partition for every study in the batch. Label c's training
+    logit is z_{c,q(c)}; when the study lacks q(c), it uses a present plane drawn uniformly at
+    random for that study and label. The disease loss is the incumbent's class-balanced BCE on
+    these logits. Validation and inference output the present-plane mean of z_cq. Shared head
+    (w_c, b_c) across planes.
+  precedents:
+  - 'Single-plane inference on the ReXNet control: fusion adds 0.008 or less over the best single plane for five labels (prior-work.md).'
+  - 'Plane/contrast readouts with a shared backbone: -0.0006 (near-misses #11).'
+  novelty: First scheme in the project where no label's training logit mixes planes.
+  coverage: All studies and labels; each backbone receives about four labels per step and every label about a third of the steps.
+  exploitation: Log realized assignment shares per label and plane, fallback counts per epoch and the validation macro AUC of each plane's own logits.
+  budget: Three masked attention pools instead of one; negligible against the backbones.
+  implementation: model.plane_pooling (plane-exclusive pooling, present-plane mean) in config.py and a helper in modeling/planes/; trainer.plane_pooling.assignment random_partition in the Lightning module.
+  open_choices: None; groups of four, one partition per step, present-plane mean.
+  dependencies: []
+  priority_rationale: The user's idea and the purest test of per-plane isolation.
+- id: random-partition-learned-fusion
+  mechanism_id: plane-fusion
+  parent_idea_id: null
+  title: Random label-to-plane partition in training with a learned per-label plane fusion at inference
+  opportunity: >-
+    The present-plane mean weights a plane that barely sees a finding the same as the plane that
+    shows it (axial and sagittal for ACL). A fusion learned on detached plane logits can weight
+    planes by how well they predict each label without letting fusion gradients reach the
+    backbones, so the isolation of the partition is kept.
+  mechanism: >-
+    The random-label-plane-partition scheme for training the backbones, unchanged. Add learned
+    fusion as defined in the contract: weights a_cq (12 x 3, zero init), fused logit = softmax of
+    a_c over the study's present planes applied to the detached z_cq, trained with the
+    class-balanced BCE on every study and label and added to the loss with weight 1. The fused
+    logit is the validation and inference output.
+  precedents:
+  - 'Radiologists weight planes by finding: ACL sagittal, MCL coronal, Baker''s axial.'
+  novelty: Separates what each backbone learns from how the planes are combined.
+  coverage: All studies and labels.
+  exploitation: Log the fusion weights per label and plane per epoch and each plane's own validation macro AUC.
+  budget: 36 parameters; negligible.
+  implementation: model.plane_pooling.fusion learned in config.py and modeling/planes/; the fusion loss in the Lightning module under trainer.plane_pooling.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Fixes the mean's known weakness at the same training signal as seed 1.
+- id: dense-plane-readouts
+  mechanism_id: label-plane-assignment
+  parent_idea_id: null
+  title: Every step, every present plane predicts every label from its own pooled tokens
+  opportunity: >-
+    The random partition gives each backbone four labels per step. The backbone forward pass is
+    the same whatever the labels, so each plane can predict all twelve every step with the same
+    isolation and three times the label signal, which matters at a fixed ten epochs.
+  mechanism: >-
+    Plane-exclusive pooling gives z_cq for every label and present plane. The disease loss is the
+    incumbent's class-balanced BCE on every z_cq, averaged over the study's present planes for
+    each label so studies with more planes gain no extra weight. Validation and inference output
+    the present-plane mean. Shared head.
+  precedents:
+  - 'Per-view disease classifiers (RSNA 2024 lumbar winner, as auxiliaries): docs/backlog/big-bets.md#auxiliary-loss-campaign.'
+  novelty: Dense counterpart of the random partition; isolates the effect of subsampling labels.
+  coverage: All studies and labels.
+  exploitation: Log each plane's own validation macro AUC and the per-plane loss per epoch.
+  budget: Three masked attention pools; negligible.
+  implementation: trainer.plane_pooling.assignment dense in the Lightning module; pooling as in seed 1.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The natural comparison for the random partition.
+- id: dense-readouts-learned-fusion
+  mechanism_id: plane-fusion
+  parent_idea_id: null
+  title: Dense per-plane readouts in training with a learned per-label plane fusion at inference
+  opportunity: Same fusion argument as random-partition-learned-fusion, on the dense training signal.
+  mechanism: >-
+    The dense-plane-readouts scheme for training the backbones, plus learned fusion as defined in
+    the contract (zero-initialized a_cq on detached z_cq, class-balanced BCE, weight 1). The fused
+    logit is the validation and inference output.
+  precedents:
+  - 'See random-partition-learned-fusion.'
+  novelty: Completes the two-by-two of assignment (random, dense) and fusion (mean, learned).
+  coverage: All studies and labels.
+  exploitation: Log fusion weights per label and plane and each plane's own validation macro AUC.
+  budget: Negligible.
+  implementation: trainer.plane_pooling.assignment dense and model.plane_pooling.fusion learned.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Completes the assignment-by-fusion grid.
+- id: dense-plane-heads
+  mechanism_id: plane-heads
+  parent_idea_id: null
+  title: Dense per-plane readouts with one classifier per plane and learned fusion
+  opportunity: >-
+    A classifier shared across planes forces the three backbones into one feature space, which
+    brings back some coupling. One head per plane lets each backbone's features mean what its
+    plane needs.
+  mechanism: >-
+    The dense-readouts-learned-fusion scheme with plane-specific heads: z_cq = w_cq . u_cq + b_cq,
+    where w_cq and b_cq start as copies of the shared head's initialization. Attention scorer,
+    anatomical bias, meniscus mask and OA correction stay shared. Learned fusion as defined in the
+    contract is the validation and inference output.
+  precedents:
+  - 'Plane/contrast readouts with a shared backbone: six per-type heads, -0.0006 (near-misses #11); here the backbones are separate.'
+  novelty: Per-plane heads on top of separate backbones.
+  coverage: All studies and labels.
+  exploitation: Log each plane's own validation macro AUC, the fusion weights and the head weight norms per plane.
+  budget: 2 x 12 x 257 extra parameters; negligible.
+  implementation: model.plane_pooling.heads per_plane in config.py and modeling/planes/.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Tests whether the shared classifier limits specialization.
+exhausted_directions: >-
+  Backbone, hyperparameter, series-dropout and augmentation changes are outside the campaign.
+  Redundancy penalties between plane embeddings are closed (contract exclusions).

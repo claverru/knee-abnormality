@@ -251,6 +251,12 @@ class ResultMixin:
     def apply_research(self, job, report):
         research = self.state["research"]
         ideas = self.state["ideas"]
+        reused = sorted({idea["id"] for idea in report["ideas"]} & ideas.keys())
+        if reused:
+            raise ValueError(
+                "Idea IDs already exist in the registry; give new proposals new IDs and "
+                f"leave existing proposals to the orchestrator: {reused}"
+            )
         verdicts = {item["mechanism_id"]: item for item in report["family_verdicts"]}
         if len(verdicts) != len(report["family_verdicts"]):
             raise ValueError("Give each family at most one verdict")
@@ -300,7 +306,8 @@ class ResultMixin:
         live = {
             idea["mechanism_id"]
             for idea in ideas.values()
-            if idea["status"] in {"queued", "developing", "prepared", "launched"}
+            if idea["status"]
+            in {"proposed", "queued", "developing", "prepared", "launched"}
         }
         uncovered = {
             family

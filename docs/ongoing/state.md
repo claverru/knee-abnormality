@@ -5,6 +5,13 @@ Active lines of development have their own documents in [this folder](INDEX.md).
 coverage diagnostics live in [data preparation](../data-preparation/peripheral-coverage.md);
 pending experiments are classified in the [backlog](../backlog/INDEX.md).
 
+- **Plane-specific backbones closed, 2026-09-28 (user decision, not adopted):** one backbone per
+  plane gained only from dense per-plane readouts; on three ReXNet-200s it ties the ReXNet control
+  (×4 0.9117 against 0.9097, public 0.945 against 0.946 as S77 against S73) at about 35% more
+  training and twice the inference time. The recipe is unchanged
+  ([result](../validation/results/2026-09-28-plane-specialization-campaign.md),
+  [history](../history/plane-backbones.md)).
+
 - **Near-miss review, 2026-09-24 (user decisions):** early-learning regularization scored
   0.943 public (S57) against 0.942 for its paired control S48; `trainer.max_epochs: 12` queued in the [overnight queue](../backlog/overnight.md);
   loss variants that gain on soft AUC parked on a
@@ -107,7 +114,7 @@ pending experiments are classified in the [backlog](../backlog/INDEX.md).
 - **Literature shortlist accepted, 2026-09-21:**
   [richer report supervision through OA attributes](report-attribute-extraction.md)
   is an unstarted big bet;
-  [attention-token dropout](../backlog/small-changes.md#attention-token-dropout) was later tested
+  [attention-token dropout](../validation/results/2026-09-25-near-misses-campaign.md#follow-up-on-main) was later tested
   and rejected (2026-09-25).
   Feature-space augmentation (DSU) was also accepted; it was later adopted in the
   [augmentation campaign](../validation/results/2026-09-26-augmentation-campaign.md).
@@ -251,12 +258,12 @@ pending experiments are classified in the [backlog](../backlog/INDEX.md).
 - **Per-label loss research completed, 2026-09-20:** the
   [research note](../research/per-label-losses.md) develops the trusted ACL-ranking/MCL-focal
   observation into a shared-feature classifier comparison, per-label selection, joint
-  continuation and learned mixtures. Dropped from the backlog on 2026-09-23 by user decision: no
-  per-label selection or tuning; the note remains as research.
+  continuation and learned mixtures. Dropped from the backlog on 2026-09-23; the note remains as
+  research. The no-per-label-tuning rule behind that drop was lifted on 2026-09-28.
 - **Research-agenda review completed, 2026-09-20:** the retained unstarted priorities are
-  per-label attention temperatures (dropped 2026-09-23: no per-label tuning),
+  per-label attention temperatures (dropped 2026-09-23),
   [OA-only label repair](../backlog/big-bets.md#oa-only-rubric-aligned-label-repair) and
-  [plane/contrast-specific readouts](../backlog/small-changes.md#planecontrast-specific-readouts).
+  [plane/contrast-specific readouts](../validation/results/2026-09-25-near-misses-campaign.md) (later rejected, −0.0006).
   [Balance damping](../backlog/small-changes.md#weighting-strength-exponent-and-prevalence-definition)
   is now implemented as `trainer.class_balance_exponent` (default 1.0) and
   [measured](../validation/results/2026-09-21-class-balance-exponent.md). Per-label loss selection and
