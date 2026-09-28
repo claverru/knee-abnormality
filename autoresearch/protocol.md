@@ -44,7 +44,8 @@ Campaign contracts link to this section instead of restating it and cannot overr
 it. Changing either is a user decision that applies to all campaigns at once.
 
 - **Metric:** macro AUC over the twelve labels on the sealed recipe's single fold of
-  `all_5fold_scanner_v1`, with the `combined_v1` labels. Deterministic, unaugmented
+  `all_5fold_scanner_v2`, with the `rebuild_state_v2` labels (since 2026-09-28; campaigns
+  sealed before used `all_5fold_scanner_v1` and `combined_v1`). Deterministic, unaugmented
   epoch validation at image multiplier 1 selects the checkpoint; that checkpoint's
   saved predictions on that fold at image multiplier 4 and attention temperature 1
   are scored (since 2026-09-22; campaigns sealed before used the ×1 predictions).

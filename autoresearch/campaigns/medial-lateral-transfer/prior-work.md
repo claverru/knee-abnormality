@@ -198,8 +198,8 @@ sharing-versus-capacity questions.
 
 The [disagreement audit](../../../docs/history/sharing/oa-and-meniscus-disagreement-audit.md)
 found OA annotation issues and acquisition sensitivity. These are interpretation
-limits, not proof of the cause of earlier sharing failures. OA label repair remains
-owned by [its separate plan](../../../docs/backlog/big-bets.md#oa-only-rubric-aligned-label-repair).
+limits, not proof of the cause of earlier sharing failures. OA label repair was later
+superseded by the [label rebuild](../../../docs/public-labels/label-rebuild.md).
 Generic shared-loss and triplet-selection work remain in their respective
 campaigns. Anatomical routing belongs here only when it serves the transfer
 hypothesis and fits this campaign's fixed data and compute rules.

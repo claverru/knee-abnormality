@@ -88,6 +88,6 @@ together under ordinary BCE and partly cancel under balanced BCE.
 that plausibly moves every label the same way, so part of the three-fold gap belongs to the arms
 rather than the loss. The within-run and per-target rows are the parts that survive that
 objection, and the within-run gap is small. The working rule in
-[project state](../../ongoing/state.md) — pooled standard deviation 0.00175, single-run
+[project state](../validation-strategy.md#what-a-comparison-can-resolve) — pooled standard deviation 0.00175, single-run
 differences below about 0.003 uninformative — stands until more controls land on this recipe.
 Every future queue adds one for free.

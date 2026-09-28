@@ -11,7 +11,7 @@ local metric ranks them.
 What follows from that:
 
 - Keep full-fold macro AUC as the selection metric; use BCE only as supporting evidence inside one
-  label table, and do not let eleven-study gold diagnostics influence a decision.
+  label table, and do not let the fold's 11–13-study gold diagnostics influence a decision.
 - Treat a local difference below about 0.005 macro AUC in a single run as unresolved regardless of
   which metric agrees, and prefer a leaderboard result over a sub-0.005 fold-0 difference when the
   two disagree ([validation strategy](validation-strategy.md#what-a-comparison-can-resolve)).

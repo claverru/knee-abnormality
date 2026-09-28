@@ -39,8 +39,7 @@ runs before the machine or WSL stopped; the run list below replaces it.
 
 The launcher snapshots the training config into validated YAML files under a unique
 `outputs/training/overnight-<UTC timestamp>-<suffix>/configs/` directory. Split, fold and seed come
-from the config, so every run shares the incumbent's fold and seed (`all_5fold_scanner_v1` fold 3,
-seed 2617320043 since 2026-09-26). Same seed and same training sources reproduce bit-identically,
+from the config, so every run shares the control config's split, fold and seed. Same seed and same training sources reproduce bit-identically,
 so the control is an already-trained run (`CONTROL_RUN`), not retrained: the launcher refuses to
 prepare a queue whose base config differs from the control's saved `input_config.yaml` in anything
 but `name` and `paths.output_root`. Each candidate differs from it only by its listed override.

@@ -2,7 +2,8 @@
 
 ## ReXNet-100 runtime
 
-The maintained config uses BF16 mixed precision and processes an effective
+Historical ReXNet-100 measurements; the current ReXNet-200 recipe's time and memory are in
+its run records. The config of the time used BF16 mixed precision and processed an effective
 batch of eight as one physical batch. A bounded maximum-load run on the local
 RTX 3090 peaked at 8.40 GiB with `batch_size: 8`; the earlier physical batch of
 four with two-step accumulation peaked at 4.55 GiB and did twice as many

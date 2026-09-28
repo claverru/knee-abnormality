@@ -1,0 +1,127 @@
+{
+  "prepared_at": "2026-09-28T07:50:08.597238+00:00",
+  "competition": "rsna-knee-abnormality-detection",
+  "method": "For silver Lateral OA with a Bhavesh LLM value, use half combined_v1 and half Bhavesh LLM; otherwise retain combined_v1. Preserve every other target and gold source row. The loader applies official gold overrides and uses the existing frozen split evaluation targets.",
+  "preparer": {
+    "path": "/home/claudio/src/knee-abnormality-qwen-lateral-labels/scripts/tools/prepare_lateral_oa_blend_labels.py",
+    "bytes": 8371,
+    "sha256": "f68ca5bed0d7109f2c456a0c4f6cc24e569b87316c956f22792b77e0ece21cba"
+  },
+  "inputs": {
+    "combined_v1": {
+      "path": "data/labels/prepared/combined-v1/labels.csv",
+      "bytes": 872602,
+      "sha256": "1e586b574511fa1c67434e174681eee9a3aafe0d6db8f84cb829fdae5be215fb",
+      "label_table": "combined_v1"
+    },
+    "base_manifest": {
+      "path": "configs/labels/combined-label-sources.json",
+      "bytes": 5622,
+      "sha256": "1cbe97d262dae5950b81fcf188281776864163baa78963e36ac17ff675af6527"
+    },
+    "source_manifest": {
+      "path": "configs/labels/bhavesh-label-input.json",
+      "bytes": 1082,
+      "sha256": "0845d7dd9bfd744f1ccabaec2f43e966db994502394b208197b6b64870fcc408"
+    },
+    "source": {
+      "name": "Bhavesh LLM",
+      "label_table": "bhavesh_lateral_v1",
+      "column": "Lateral OA",
+      "competition": "rsna-knee-abnormality-detection",
+      "dataset": "bhaveshkolhe/knee-llm-labels",
+      "dataset_id": 12167421,
+      "dataset_version": 2,
+      "updated_at": "2026-09-24T14:14:39.993Z",
+      "checked_at": "2026-09-28",
+      "url": "https://www.kaggle.com/datasets/bhaveshkolhe/knee-llm-labels/versions/2",
+      "license": "unknown",
+      "download_command": "rtk proxy uv run --locked kaggle datasets download bhaveshkolhe/knee-llm-labels/2 -p data/labels/public/bhaveshkolhe/knee-llm-labels/downloaded-20260928 --unzip -q",
+      "files": [
+        {
+          "path": "data/labels/public/bhaveshkolhe/knee-llm-labels/downloaded-20260928/labels_full_shard0.csv",
+          "bytes": 487546,
+          "sha256": "8708667df0e70bea23d74e5b63628b3bfd14f2e25c96df30c2a522a233e92212"
+        },
+        {
+          "path": "data/labels/public/bhaveshkolhe/knee-llm-labels/downloaded-20260928/labels_full_shard1.csv",
+          "bytes": 477852,
+          "sha256": "34dcac1569a359c174bd33fb9831618011255f5c5fa343114000e309bbe74738"
+        }
+      ]
+    },
+    "official": {
+      "path": "data/raw/train.csv",
+      "bytes": 5690007,
+      "sha256": "8ca2203c0e9d61c080c7a314c7cdb51c1b03a1d9eb4770819f7f34af53ef4e33"
+    }
+  },
+  "target": "Lateral OA",
+  "source_weight": 0.5,
+  "rows": 4407,
+  "sources": [
+    {
+      "dataset": "stevenleehans/rsna-knee-llm-report-labels",
+      "dataset_id": 11549447,
+      "dataset_version": 6,
+      "url": "https://www.kaggle.com/datasets/stevenleehans/rsna-knee-llm-report-labels/versions/6",
+      "license": "CC0: Public Domain",
+      "api_metadata_url": "https://www.kaggle.com/api/v1/datasets/view/stevenleehans/rsna-knee-llm-report-labels",
+      "download_command": "rtk proxy uv run --locked kaggle datasets download stevenleehans/rsna-knee-llm-report-labels/6 -p data/labels/public/stevenleehans/version-6 --unzip -q",
+      "files": [
+        {
+          "path": "data/labels/public/stevenleehans/version-6/dataset-metadata.json",
+          "bytes": 5720,
+          "sha256": "4fc5a8bb3fb2e837ac9f47af3365c48660d8b70722e82bdaa37bfc1911f50fa8"
+        },
+        {
+          "path": "data/labels/public/stevenleehans/version-6/dataset-view.json",
+          "bytes": 18034,
+          "sha256": "d590d331f855d8f3d8803cc55cc1fb276b98b5cb2af34fbc0ef2e756b514c240"
+        },
+        {
+          "path": "data/labels/public/stevenleehans/version-6/llm_labels_full.csv",
+          "bytes": 534442,
+          "sha256": "96444cd3c7d396bae4a71454317d9cbe0689759b5278b30939781e04d0774537",
+          "label_table": "steven_v1"
+        },
+        {
+          "path": "data/labels/public/stevenleehans/version-6/llm_labels_v2.csv",
+          "bytes": 548231,
+          "sha256": "3c082a987939528a55202028f655bd6f9dc5c9e28eff5058bbae7ef088a9f144",
+          "label_table": "steven_v2"
+        },
+        {
+          "path": "data/labels/public/stevenleehans/version-6/llm_labels_v4_blend.csv",
+          "bytes": 630153,
+          "sha256": "eb4c2b29e7e84adbb4b5ccee825ca20ade6a43dbe295f13be442d549e4f5dca4",
+          "label_table": "steven_v4"
+        }
+      ]
+    },
+    {
+      "dataset": "local/combined-labels",
+      "dataset_version": 1,
+      "files": [
+        {
+          "path": "data/labels/prepared/combined-v1/labels.csv",
+          "bytes": 872602,
+          "sha256": "1e586b574511fa1c67434e174681eee9a3aafe0d6db8f84cb829fdae5be215fb",
+          "label_table": "combined_v1"
+        }
+      ]
+    },
+    {
+      "dataset": "local/bhavesh_lateral_v1",
+      "dataset_version": 1,
+      "files": [
+        {
+          "path": "data/labels/prepared/bhavesh-lateral-v1/labels.csv",
+          "bytes": 906992,
+          "sha256": "f5d3f54b16db30960634126fc456ea6779b6f712cd74eba672db827f1dc86a9b",
+          "label_table": "bhavesh_lateral_v1"
+        }
+      ]
+    }
+  ]
+}

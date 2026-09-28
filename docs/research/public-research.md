@@ -168,7 +168,7 @@ stored at 336 px.
 - The most-upvoted advice in the [plateau thread](https://www.kaggle.com/competitions/rsna-knee-abnormality-detection/discussion/740610)
   is to rank changes on report-label CV rather than on gold or the board, with a
   **0.003 threshold** for a genuine improvement — the same floor our replicate
-  spread gives ([state](../ongoing/state.md)).
+  spread gives ([state](../validation/validation-strategy.md#what-a-comparison-can-resolve)).
 - That thread also reports two more nulls from a 20-checkpoint DINOv2 pipeline at
   0.903: explicit 2×2 spatial region tokens appended to the label-query attention
   (+0.000003 over two folds) and swapping in another public label table.

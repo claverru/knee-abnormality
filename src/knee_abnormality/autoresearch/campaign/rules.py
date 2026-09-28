@@ -2,9 +2,9 @@ CALIBRATION_EPOCHS = 2
 CALIBRATION_VALIDATION_PASSES = 2
 SEED_TERMINAL = {"completed", "blocked", "retired"}
 EVALUATION = {
-    "labels_source": "combined_v1",
+    "labels_source": "rebuild_state_v2",
     "validation": {
-        "split": "all_5fold_scanner_v1",
+        "split": "all_5fold_scanner_v2",
         "prediction_image_multiplier": 4,
     },
     "validation_image_multiplier": 1,

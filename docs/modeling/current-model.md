@@ -1,10 +1,11 @@
 # Current model
 
 The code carries one model: the full-slice spatial-token recipe with learned anatomical
-family strengths, defined by [`configs/training.yaml`](../../configs/training.yaml).
-The [adoption evidence](../validation/results/2026-09-21-anatomical-attention-result.md) records the closed
-position/knee-side experiments. The current control is `scanner-confusion-control` (seed
-703791404, fold 4), ×4 0.909733.
+family strengths, defined by [`configs/training.yaml`](../../configs/training.yaml). Since
+2026-09-28 it trains on the rebuilt labels `rebuild_state_v2` and the split
+`all_5fold_scanner_v2`; the current control and what candidates pair with are in the
+[project state](../ongoing/state.md#current-control), and each adoption is listed in the
+[adoption history](#adoption-history).
 
 - **Inputs:** ReXNet-200 reads every sampled triplet at 224 px, 0.625 mm spacing and a 140 mm
   field.
@@ -26,51 +27,37 @@ position/knee-side experiments. The current control is `scanner-confusion-contro
   one-axis resolution degradation, gamma/contrast, GIN, noise and DSU feature statistics
   ([pipeline](schedule-and-augmentation.md#ten-epoch-schedule-and-augmentation)).
 
-Adopted 2026-09-27 by user decision: the scanner confusion head from the
-[auxiliary-signals campaign](../../autoresearch/campaigns/auxiliary-signals/INDEX.md). On fold 3 at
-seed 2617320043 it scored ×4 0.904442 (−0.00076, 80% [−0.0027, +0.0011]) against
-`half-stack-control` and 0.948 public (S67) against 0.947 (S68), one rounding step
-([evidence](scanner-confusion-head.md#evidence)). The new control, `scanner-confusion-control`
-(seed 703791404, fold 4), scored ×4 0.909733 (×1 0.902061, epoch 9; scanner head accuracy 0.311,
-loss 1.732); fold 4 scores are not comparable with earlier folds.
-
-Adopted 2026-09-26 by user decision: the half stack from the
-[augmentation campaign](../validation/results/2026-09-26-augmentation-campaign.md), bilateral
-smoothing, DSU, intra-study contrast mixing, GIN and resolution degradation. On fold 2 at seed
-1704794368 it scored +0.0011 ×4 macro (0.899054, 80% [−0.0015, +0.0038]) against smoothing + DSU
-and 0.943 public (S64, epoch 7; S65, epoch 9, also 0.943) against 0.940 (S63). The new control,
-`half-stack-control` (seed 2617320043, fold 3), scored ×4 0.905205 (×1 0.90207, epoch 9); fold 3
-scores are not comparable with earlier folds.
-
-Adopted 2026-09-25 by user decision: the report-attribute heads on target set 3.1
-([result](../validation/results/2026-09-25-report-attribute-heads.md)). Against
-`oa-detector-control` (seed 1485198267, fold 1) they scored +0.00105 ×4 macro, 95%
-[−0.0012, +0.0035], and 0.940 public (S62) against the control's 0.938 (S60). The new control,
-`report-attributes-control` (seed 2464012069, fold 2), scored ×4 0.898663 (best epoch 7, ×1
-0.890335); its public score is pending. Fold 2 scores are not comparable with fold 1 scores.
-
-Adopted 2026-09-25 by user decision: the three-compartment OA detector from the
-[near-misses campaign](../validation/results/2026-09-25-near-misses-campaign.md). It narrowly
-missed the local rule (+0.0013, 80% [−0.0002, +0.0029]) but scored 0.944 public (S58) against
-0.940 for its same-seed reference (S55). Its control, `oa-detector-control` (seed 1485198267,
-fold 1), scored ×4 0.900568 and 0.938 public (S60).
-
-Adopted 2026-09-24 from the [knee-geometry campaign](../../autoresearch/campaigns/knee-geometry/INDEX.md)
-(`meniscus-half-knee-mil`): ×4 macro 0.905834 against `k05-clean`'s 0.902760, +0.00307, 80%
-[+0.00152, +0.00476]; public 0.944 (S54) against 0.942 (S48).
-
-The current control, `knee-geometry-merged-2` (2026-09-24), adds the robust centre and bilateral
-rule below and draws a fresh seed, 638120755: ×4 macro 0.900955, public 0.940 (S55). At that seed
-the robust centre and bilateral rule measured +0.0014 (95% [−0.0022, +0.0053]) against the same
-model without them (`adopted-new-seed`, 0.899547); publicly both scored 0.940 (S55 with them,
-S56 without), so the drop from S54's 0.944 is the seed, not the robust centre or bilateral rule.
-
-There is no additive 3D embedding or token graph. The best submitted bundle is distinct
-from the local research incumbent; submission status lives in
-[project state](../ongoing/state.md) and the [inference overview](../inference/inference-overview.md).
+There is no additive 3D embedding or token graph. Submission status lives in
+[project state](../ongoing/state.md#best-public-submissions) and the
+[inference overview](../inference/inference-overview.md).
 The [model lineage](../history/model-lineage.md) records how the recipe came about and the
 retired variants. [Model shapes](model-shapes.md) traces the tensors, and
 [swapping a backbone](backbone-swaps.md#current-budget) gives the parameter and compute budget.
+
+## Adoption history
+
+Newest first. Each row is a user decision unless noted; "control" is the run retrained after the
+adoption, which later candidates paired with. Local scores on different folds or splits are not
+comparable.
+
+| Adopted | Change | Evidence | Control after adoption |
+|---|---|---|---|
+| 2026-09-28 | Rebuilt labels `rebuild_state_v2` and split `all_5fold_scanner_v2` | A, the pre-fix version of A2, 0.947 public (S76) against 0.946 (S73) on fold 4; A2 unsubmitted ([label rebuild](../public-labels/label-rebuild.md)) | `rebuild-state-v2-control`, seed 1533697213, v2 fold 0: ×4 0.928288 |
+| 2026-09-27 | Scanner confusion head | Fold 3, seed 2617320043: ×4 0.904442 against `half-stack-control` (−0.00076, 80% [−0.0027, +0.0011]); 0.948 public (S67) against 0.947 (S68), one rounding step ([evidence](scanner-confusion-head.md#evidence)) | `scanner-confusion-control`, seed 703791404, fold 4: ×4 0.909733 (×1 0.902061, epoch 9; scanner head accuracy 0.311, loss 1.732); 0.946 public (S73) |
+| 2026-09-26 | Half-stack augmentation: bilateral smoothing, DSU, intra-study contrast mixing, GIN, one-axis resolution degradation | Fold 2, seed 1704794368: +0.0011 ×4 (0.899054, 80% [−0.0015, +0.0038]) against smoothing + DSU; 0.943 public (S64, epoch 7; S65, epoch 9, also 0.943) against 0.940 (S63). The full stack (plus channel reversal and stochastic depth) added only +0.0005 and was not adopted ([campaign](../validation/results/2026-09-26-augmentation-campaign.md)) | `half-stack-control`, seed 2617320043, fold 3: ×4 0.905205 (×1 0.90207, epoch 9); 0.947 public (S68) |
+| 2026-09-25 | Report-attribute heads on target set 3.1 | Against `oa-detector-control`: +0.00105 ×4 (95% [−0.0012, +0.0035]); 0.940 public (S62) against 0.938 (S60); the first version on raw v3 targets tied at 0.938 (S61) ([result](../validation/results/2026-09-25-report-attribute-heads.md)) | `report-attributes-control`, seed 2464012069, fold 2: ×4 0.898663 (best epoch 7, ×1 0.890335) |
+| 2026-09-25 | Three-compartment OA detector | Narrowly missed the local rule (+0.0013, 80% [−0.0002, +0.0029]) but scored 0.944 public (S58) against 0.940 for its same-seed reference (S55) ([campaign](../validation/results/2026-09-25-near-misses-campaign.md)) | `oa-detector-control`, seed 1485198267, fold 1, the first fold rotation: ×4 τ 1 0.900568; 0.938 public (S60) |
+| 2026-09-24 | Robust study centre and per-knee geometry for bilateral studies, with a fresh seed | At the new seed +0.0014 (95% [−0.0022, +0.0053]) against the same model without them (`adopted-new-seed`, 0.899547); both 0.940 public (S55 with them, S56 without), so the drop from S54's 0.944 is the seed | `knee-geometry-merged-2`, seed 638120755, v1 fold 0: ×4 0.900955; 0.940 public (S55) |
+| 2026-09-24 | Knee-geometry model `meniscus-half-knee-mil`: medial-lateral midline at the fitted study centre, meniscus-only own-side attention mask, training-only half-knee MIL loss (autoresearch adoption) | ×4 0.905834 against `k05-clean`'s 0.902760, +0.00307 (80% [+0.00152, +0.00476]); 0.944 public (S54) against 0.942 (S48) ([campaign](../validation/results/2026-09-24-knee-geometry-campaign.md)) | Retrained in the row above |
+| 2026-09-23 | Oblique groups and the group embedding removed | Three paired submissions level or lower with them ([history](../history/oblique-groups.md)) | — |
+| 2026-09-22 | `trainer.class_balance_exponent: 0.5` | Public curve peaks at k=0.5 (0.945, S41) while fold 0 rises with k ([result](../validation/results/2026-09-21-class-balance-exponent.md)) | — |
+| 2026-09-22 | Saved predictions at ×4, τ 1 (`validation.prediction_image_multiplier: 4`) | Measurement change ([validation strategy](../validation/validation-strategy.md#what-a-comparison-can-resolve)) | — |
+| 2026-09-21 | Combined labels `combined_v1` and split `all_5fold_scanner_v1` | Labels 0.9075 against 0.8927 on gold; first run 0.940 public (S40) against 0.933 for the last single models on Steven v4 ([result](../validation/results/2026-09-21-combined-labels-first-run.md)) | `fold0-combined-scanner`: 0.9020 at ×1 τ 1, 0.9079 at ×4 τ 0.75 |
+| 2026-09-21 | Learned anatomical family strengths with fixed 20 mm width; appearance-only pooling, learned widths and the pooled compartment adapter removed | Seed 2263738815: 0.897443 against the matched-seed control's 0.895112 (+0.002331; 80% [+0.000103, +0.004518]) ([result](../validation/results/2026-09-21-anatomical-attention-result.md)) | — |
+| 2026-09-19 | Class-balanced BCE | `balanced-bce` 0.895282, replicated by the next queue's control at 0.894037 ([result](../validation/results/2026-09-19-balanced-bce-result.md), [queue](../validation/results/2026-09-19-untried-hyperparameter-queue.md)) | — |
+| 2026-09-19 | `data.sampling_sigma_fraction: 0.867` replaces `data.sampling_sigma_mm: 40` | Kept for being free: 0.88649 between its two controls and +0.00016 at ×4 ([result](../validation/results/2026-09-19-relative-sampler-width-result.md)) | — |
+| 2026-09-18 | `data.study_triplet_total: 26` | +0.0033 over the control mean, inside the control spread ([queue](../validation/results/2026-09-18-overnight-results.md)); adopted as structural: it only adds triplets, for 5.5% more compute, and studies missing two types stop being under-sampled | — |
+| 2026-09-17 | Epoch validation at ×1 | Measurement change; scores sit about 0.0035 below ×2 ([validation strategy](../validation/validation-strategy.md#what-a-comparison-can-resolve)) | — |
 
 ## Recipe
 
@@ -85,7 +72,7 @@ bands; the experimental ten-epoch schedule was reverted. Historical
 | Inputs | Three adjacent slices per input (`SLICES_PER_INPUT`, a constant) |
 | `data.image_size`, `data.spacing_mm` | 224, 0.625 (140 mm) |
 | `data.sampling_sigma_fraction`, `data.validation_image_multiplier` | 0.867, 1 (×2 before 2026-09-17; scores differ by about 0.0035, and submissions set their own count) |
-| Training targets | One independent random draw per probability band at each epoch; [implemented sampler](../data-preparation/physical-sampling/implemented-sampler.md) |
+| Training triplet draws | One independent random draw per probability band at each epoch; [implemented sampler](../data-preparation/physical-sampling/implemented-sampler.md) |
 | `trainer.class_balance_exponent` | `0.5` |
 | `data.study_triplet_total` | 26: a study whose per-type budgets sum below 26 training triplets is scaled up to it, proportionally over the types it has |
 | `data.reflection_augmentation.probability` | 0.5 |
@@ -98,7 +85,9 @@ bands; the experimental ten-epoch schedule was reverted. Historical
 | `trainer.half_knee_loss_weight` | 0.075 |
 | `trainer.report_attribute_loss_weight`, `paths.report_attribute_manifest` | 0.1, `labels/jevk5-report-attribute-targets-v3.1.json` |
 | `trainer.scanner_confusion_weight` | 0.1 |
-| Training seed, fold | 703791404 on fold 4 (`configs/training.yaml`), inherited by new research candidates from the control |
+| `labels.source`, `validation.split` | `rebuild_state_v2`, `all_5fold_scanner_v2` |
+| `validation.prediction_image_multiplier` | 4: saved predictions score the ×1-selected checkpoint at ×4, τ 1 |
+| `seed`, `validation.folds` | 1533697213, `[0]`: the control's seed and fold, inherited by new candidates ([rotation rule](../validation/validation-strategy.md#controlled-comparisons)) |
 | Precision | BF16 mixed on one automatically selected device (`PRECISION`, a constant) |
 
 The optimizer, schedule and trainer settings are described in
@@ -139,8 +128,9 @@ Tokens receive four additive embeddings:
    [acquisition eligibility](../data-preparation/reflection-geometry-and-previews.md#reflection-geometry-and-eligibility).
    Axial and coronal triplets reverse columns. Sagittal triplets reverse channels and negate the
    1D position.
-3. **Augmentation:** affine, gamma/contrast and noise, drawn once per acquisition. See the
-   [schedule and augmentation](schedule-and-augmentation.md) page.
+3. **Augmentation:** the training families after reflection, in their fixed order and mostly
+   drawn once per acquisition; DSU acts later, on backbone features. See the
+   [schedule and augmentation](schedule-and-augmentation.md#ten-epoch-schedule-and-augmentation) page.
 4. **Backbone:** normalization, then one ReXNet-200 `forward_features` pass over all retained
    triplets (`[N, 2560, 7, 7]`), then the shared 2560→256 projection.
 5. **Geometry,** in float32 outside autocast:

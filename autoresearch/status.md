@@ -4,20 +4,22 @@ Current state and pending work only. Finished changes live in git history; campa
 in the [campaigns](campaigns/INDEX.md) and the
 [validation results](../docs/validation/results/INDEX.md).
 
-## Current state (2026-09-25)
+## Current state (2026-09-28)
 
-- **No campaign is running.** All eleven campaigns under `outputs/autoresearch/` are stopped, and
-  the watchdog is stopped. The last one, [near-misses](campaigns/near-misses/INDEX.md), was stopped
-  by the user on 2026-09-25.
-- **Main recipe:** `configs/training.yaml` carries the three-compartment OA detector at seed
-  1485198267 on fold 1 of `all_5fold_scanner_v1`
-  ([current model](../docs/modeling/current-model.md)).
+- **No campaign is running.** Every campaign under `outputs/autoresearch/` is stopped, and the
+  watchdog is stopped. The last one, [plane-specialization](campaigns/plane-specialization/INDEX.md),
+  was stopped by the user on 2026-09-28 and its line closed.
+- **Main recipe:** `configs/training.yaml` trains on the rebuilt labels `rebuild_state_v2` with
+  seed 1533697213 on fold 0 of `all_5fold_scanner_v2`
+  ([current model](../docs/modeling/current-model.md)); the evaluation gate in
+  [`campaign/rules.py`](../src/knee_abnormality/autoresearch/campaign/rules.py) requires both, so
+  campaigns sealed on `all_5fold_scanner_v1` or `combined_v1` cannot resume.
 - **Fold:** the runner takes the fold from the sealed recipe instead of assuming fold 0
   ([protocol](protocol.md#training-seed-policy)).
 
 ## Pending
 
-- **Next campaign reference:** because the runner now takes the fold from the sealed recipe and
-  `configs/training.yaml` is on fold 1, the next campaign needs a fold-1 reference run.
+- **Next campaign reference:** `rebuild-state-v2-control` (fold 0 of `all_5fold_scanner_v2`, seed
+  1533697213), ×4 0.928288, trained 2026-09-28; a new campaign can start from it.
 - **Near-misses cannot resume:** its sealed recipe no longer validates against its historical
   control on the current main. Its outputs stay a read-only record.

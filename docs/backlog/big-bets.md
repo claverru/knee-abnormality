@@ -6,42 +6,6 @@ move its entry to [ongoing work](../ongoing/INDEX.md) and remove it from this fi
 Entries under [parked](#parked-until-a-specific-need) wait for a concrete need before they become
 candidates. Each entry says whether its motivation is measured or a hypothesis.
 
-## OA-only rubric-aligned label repair
-
-**Defect observed; repair and image-model benefit untested.** Prioritized in the 2026-09-20 agenda
-review. The [blinded report audit](../history/sharing/oa-and-meniscus-disagreement-audit.md) found
-19 report-derived OA cells from 16 studies with explicitly below-threshold report findings but
-frozen targets of 0.80–0.93. The sample was deliberately selected: it does not estimate population
-error prevalence or establish image-adjudicated truth. No labels were changed. The full-table
-[Tonylin swap](../validation/results/2026-09-13-tonylin-label-comparison.md) and
-[unmentioned-cell mask](../history/sharing/2026-09-13-label-masking-result.md) were different,
-measured interventions and are not candidates for repetition here.
-
-1. **Bounded training-only pilot:** review medial, lateral and patellofemoral OA reports, including
-   high-confidence positives. Keep a random panel separate from severity-term enrichment; do not
-   restrict review to probabilities in `[0.3, 0.8]`, which misses most known conflicts.
-2. **Lock the extraction policy:** distinguish qualifying disease, explicitly below-threshold
-   disease, explicit negative, uncertain and unmentioned. Version the mapping to revised soft
-   targets and preserve gold labels, the other nine targets and insufficiently supported cells.
-   Keep an untouched report panel to assess the fixed rule; do not tune it to flip the known cases.
-3. **Compare supervision only:** revised versus original OA targets with identical imaging,
-   sampling and the normal training budget, using frozen validation targets. Record the label
-   manifest, revision, split, seed, per-label AUC and changed class counts/weights. If weights move
-   materially, an original-weight sensitivity separates target repair from altered emphasis.
-
-Use report terms for initial triage. Model-disagreement triage is optional only with a predictor
-whose supervised learning excludes outer validation studies; do not train a new triage model.
-Advance after independent report review supports the policy and a controlled image-model result
-supports adoption. A more faithful report extraction alone is not a score gain. Record disagreement
-between frozen-target AUC and rubric diagnostics without rewriting evaluation targets. Stop after
-an uninformative bounded pilot; no broad label rewrite, auxiliary severity head or extra epochs.
-This entry owns the investigation; training remains user-launched when the user starts it.
-
-Since 2026-09-21, PF OA in both training and evaluation comes from the
-[combined labels'](../public-labels/combined-labels.md) consensus, which is stricter than Steven v4.
-The split's evaluation targets were rewritten by user decision. Medial and lateral OA are still
-Steven v4.
-
 ## Position and knee side
 
 **The supervised anatomical-attention sequence is closed:** learned family strengths
@@ -136,7 +100,7 @@ validation bag. The variability may also act as useful augmentation.
 
 ## Leave-one-scanner-out diagnostic
 
-**Diagnostic, unmeasured.** `all_5fold_scanner_v1` balances scanners across folds, which is right
+**Diagnostic, unmeasured.** The scanner-stratified splits balance scanners across folds, which is right
 if the test set shares the training scanners. A split that holds out whole scanner groups would
 measure how much the model leans on scanner or site shortcuts. The gap between the two splits is
 the estimate. An unverified competitor README claims a random split inflates AUC by about 0.05
@@ -147,8 +111,7 @@ scanner-specific failure is suspected.
 
 **Requested by the user on 2026-09-22; undefined and unstarted.** An autoresearch campaign on
 training-only auxiliary objectives added beside the unchanged disease loss. Its premise is a
-hypothesis: no auxiliary objective has trained active in this project. The GPU is free since the
-[oblique line](../history/oblique-groups.md) closed on 2026-09-23.
+hypothesis: no auxiliary objective had trained active in this project when it was requested.
 
 - **Scope:** extra heads or loss terms on the shared features, discarded at inference, so the
   submission's runtime does not change. The class-balanced soft BCE, its twelve targets, gold
@@ -204,7 +167,7 @@ are unknown; ask for both before designing anything.
 - **Design constraints:** one mining rule shared by all twelve labels; mine only training studies;
   training-set scores partly reflect memorization, so the hardness source is an open choice; hard
   pairs under soft labels can be label noise rather than signal, the
-  [OA audit](#oa-only-rubric-aligned-label-repair) found such cells.
+  [OA audit](../history/sharing/oa-and-meniscus-disagreement-audit.md) found such cells.
 - **Test:** the incumbent recipe plus a final mined phase against a fresh control at the same
   total budget.
 

@@ -75,8 +75,8 @@ throughout.
 ## What to try
 
 1. **Target repair toward the image criteria** (evidence-backed; open work in the
-   [extraction doc](../ongoing/report-attribute-extraction.md), related to the
-   [OA-only label-repair big bet](../backlog/big-bets.md#oa-only-rubric-aligned-label-repair)). The v3 answers encode severity
+   [extraction doc](../ongoing/report-attribute-extraction.md), the OA-only repair plan it relates to was
+   superseded by the [label rebuild](label-rebuild.md)). The v3 answers encode severity
    at the official thresholds. Blend each study's silver target toward "the finding is at or above
    the official threshold" with one label-agnostic rule, instead of a hard cut, since the gold
    check favors the threshold for PF OA and Effusion and "any finding" for Baker's and Medial OA.

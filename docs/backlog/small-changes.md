@@ -3,9 +3,8 @@
 Small code additions an agent can implement in one sitting, each behind one new option on the
 [current recipe](../modeling/current-model.md) (read-only diagnostics need none). The user
 supervises them: implement one only when the user asks. Once it is implemented, queue its run in the
-[overnight queue](overnight.md) (one change against the incumbent, fold 0, the incumbent's recorded
-training seed) and
-remove the entry from this file. Runs follow the
+[overnight queue](overnight.md) (one change against the incumbent, at its fold and recorded
+training seed) and remove the entry from this file. Runs follow the
 [controlled-comparison rules](../validation/validation-strategy.md#controlled-comparisons). Each
 entry says whether its motivation is measured or a hypothesis.
 
@@ -121,7 +120,7 @@ owns the measured motivation, missingness semantics and limits of the three-stat
   a separate softmax per label. In the order above, use `(1, 0, 0)` when the original Steven
   v1 score is exactly `0.5`; otherwise use `(0, 1 - v1, v1)`. This preserves soft polarity
   within addressed findings. Pin v1 through the source manifest; v4 cannot recover coverage.
-- **Disease supervision:** retain current class-balanced v4 BCE, all nonmissing disease
+- **Disease supervision:** retain the current class-balanced BCE, all nonmissing disease
   targets and official gold overrides. Reporting targets continue to describe v1 even on
   eligible gold training studies: a gold-positive finding can be unreported. Use only the
   original twelve disease outputs for validation scoring and submission.
@@ -129,8 +128,8 @@ owns the measured motivation, missingness semantics and limits of the three-stat
   fixed auxiliary coefficient specified before launch. That coefficient remains to be chosen;
   do not automatically transfer binary disease class weights to the reporting states. Record
   per-label state counts and both loss components to expose unreported-state dominance.
-- **Comparison:** implement behind one option only when requested, then compare with a fresh
-  current-recipe control on fold 0, preserving membership, frozen validation targets, image
+- **Comparison:** implement behind one option only when requested, then compare with the current
+  control at its fold and seed, preserving membership, frozen validation targets, image
   workload and training budget. Record seeds and source/config identities. Select by frozen
   disease macro ROC-AUC and inspect all twelve label AUCs; reporting accuracy is diagnostic.
   Repeat a promising result under the existing controlled-comparison rules before adoption.
@@ -181,11 +180,11 @@ Feedback-driven allocation ran in the
 
 ### Weighting strength: exponent and prevalence definition
 
-**Damping exponent implemented, 2026-09-21; soft-prevalence comparison untested.** The
-implemented weights set `w_pos/w_neg = (1 - r_c) / r_c` at the default
-`trainer.class_balance_exponent = 1`, on the thresholded positive fraction; see
+**Damping exponent implemented, 2026-09-21, and set to 0.5 in the recipe; soft-prevalence
+comparison untested.** The implemented weights set `w_pos/w_neg = ((1 - r_c) / r_c) ** k` with
+`k = trainer.class_balance_exponent`, on the thresholded positive fraction; see
 [supervision](../modeling/supervision.md#fixed-class-balanced-bce) for the exact formula. Full
-balancing reaches 12.9:1 on Fracture and 6.8:1 on Synovitis, whose report-derived targets are
+balancing (k = 1) reaches 12.9:1 on Fracture and 6.8:1 on Synovitis, whose report-derived targets are
 among the least reliable. The [k=0.5 and unweighted runs](../validation/results/2026-09-21-class-balance-exponent.md)
 lost on fold-0 validation but beat k=1 on the public leaderboard. An external
 recipe seen on 2026-09-19 uses the square root of that ratio, computed on soft prevalence, as a
@@ -200,7 +199,7 @@ and mean-weight-one normalisation. One change per run against a fresh control.
   Lateral Meniscus 0.228 against 0.158), and it damps their weights accordingly. It confounds
   with the exponent, so run it only against the same control, never in the same arm.
 
-A 1→0 ramped exponent tied on fold 0; its public score is pending
+A 1→0 ramped exponent tied on fold 0 and scored 0.941 public (S53) against 0.942 for S48
 ([noisy-labels campaign](../validation/results/2026-09-23-noisy-labels-campaign.md#class-weighting-changes-need-the-public-board)).
 
 Later [soft-mass weighting](../../autoresearch/campaigns/losses/findings.md#completion-20260920t161203z-14ae6e65)

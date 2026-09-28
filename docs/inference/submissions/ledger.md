@@ -1,6 +1,6 @@
 # Submission ledger
 
-All 65 Kaggle competition submissions, newest first, with submission times in UTC. The table is
+All 77 Kaggle competition submissions, newest first, with submission times in UTC. The table is
 regenerated from the live submission list and the local bundles by
 [`update_submission_ledger`](../../../scripts/tools/update_submission_ledger.py),
 which also writes `outputs/submission/kaggle-ledger.json`. The dated records in this folder cover
@@ -68,17 +68,34 @@ come from a table in the script; later ones are recovered from the notebook slug
 
 ## Ledger
 
+S numbers follow the live submission order. From S66 to S71 the permanent Kaggle labels run one
+higher, and S72 carries "S66": the reliability-filter submission was first labelled S66, failed,
+and was resubmitted later. Other documents cite the Kaggle labels (S67 for the scanner confusion
+head); the Label column gives the Kaggle label wherever it differs.
+
 | S | Submitted (UTC) | Label | Inference | Fold 0 | Public | ID | Record |
 |---|---|---|---|---|---:|---:|---|
+| S77 | 2026-09-28 11:46 | 3xReXNet plane dense fusion fold4 ep09 | x4 tau0.75 bs4 | (x1, fold 4) 0.907878 | 0.945 | 56639652 | [Plane-specialization campaign](../../validation/results/2026-09-28-plane-specialization-campaign.md) |
+| S76 | 2026-09-28 11:00 | rexnet rebuild-state labels fold4 ep09 | x4 tau0.75 bs4 | (x1, fold 4) 0.897726 | 0.947 | 56638577 | [Label rebuild](../../public-labels/label-rebuild.md) |
+| S75 | 2026-09-28 10:26 | rexnet rebuild-mean labels fold4 ep09 | x4 tau0.75 bs4 | (x1, fold 4) 0.901624 | 0.946 | 56637797 | [Label rebuild](../../public-labels/label-rebuild.md) |
+| S74 | 2026-09-28 09:51 | 3xB0 plane dense learned fusion fold4 ep08 | x4 tau0.75 bs4 | (x1, fold 4) 0.900042 | 0.943 | 56636971 | [Plane-specialization campaign](../../validation/results/2026-09-28-plane-specialization-campaign.md) |
+| S73 | 2026-09-28 06:43 | rexnet scanner confusion control fold4 ep09 | x4 tau0.75 bs4 | (x1, fold 4) 0.902061 | 0.946 | 56632006 | [Plane-specialization campaign](../../validation/results/2026-09-28-plane-specialization-campaign.md) |
+| S72 | 2026-09-27 11:47 | attr reliability filter fold3 epoch 09 retry (Kaggle label S66) | x4 tau0.75 bs4 | (x1, fold 3) 0.902138 | 0.943 | 56607593 | [Auxiliary-signals campaign](../../validation/results/2026-09-27-auxiliary-signals-campaign.md) |
+| S71 | 2026-09-27 10:20 | B3 lr4.5e-4 + ReXNet half-stack fold3 (Kaggle label S70) | x5 tau0.75 bs4 +mirrorTTA | (x1, fold 3) 2x mean 0.900756 | 0.946 | 56605776 | [B3 overnight queues](../../validation/results/2026-09-27-b3-overnight-queue.md) |
+| S70 | 2026-09-27 10:16 | scanner confusion stronger head fold3 (Kaggle label S71) | x4 tau0.75 bs4 | (x1, fold 3) 0.895089 | 0.943 | 56605710 | [Auxiliary-signals campaign](../../validation/results/2026-09-27-auxiliary-signals-campaign.md) |
+| S69 | 2026-09-27 10:04 | scanner-model confusion fold3 epoch 09 (Kaggle label S70) | x4 tau0.75 bs4 | (x1, fold 3) 0.898365 | 0.944 | 56605445 | [Auxiliary-signals campaign](../../validation/results/2026-09-27-auxiliary-signals-campaign.md) |
+| S68 | 2026-09-27 00:07 | per-site bias fold3 epoch 09 (Kaggle label S69) | x4 tau0.75 bs4 | (x1, fold 3) 0.901322 | 0.947 | 56592463 | [Auxiliary-signals campaign](../../validation/results/2026-09-27-auxiliary-signals-campaign.md) |
+| S67 | 2026-09-26 18:33 | half-stack control fold3 epoch 09 (Kaggle label S68) | x4 tau0.75 bs4 | (x1, fold 3) 0.902067 | 0.947 | 56586402 | [Auxiliary-signals campaign](../../validation/results/2026-09-27-auxiliary-signals-campaign.md) |
+| S66 | 2026-09-26 18:15 | scanner confusion head fold3 epoch 09 (Kaggle label S67) | x4 tau0.75 bs4 | (x1, fold 3) 0.900348 | 0.948 | 56586087 | [Auxiliary-signals campaign](../../validation/results/2026-09-27-auxiliary-signals-campaign.md) |
 | S65 | 2026-09-26 11:41 | half-stack augmentation fold2 epoch 09 | x4 tau0.75 bs4 | (x1, fold 2) 0.893525 | 0.943 | 56578320 | [Augmentation campaign](../../validation/results/2026-09-26-augmentation-campaign.md) |
 | S64 | 2026-09-26 10:45 | half-stack augmentation fold2 epoch 07 | x4 tau0.75 bs4 | (x1, fold 2) 0.893622 | 0.943 | 56577204 | [Augmentation campaign](../../validation/results/2026-09-26-augmentation-campaign.md) |
 | S63 | 2026-09-26 09:15 | smoothing + DSU augmentation fold2 | x4 tau0.75 bs4 | (x1, fold 2) 0.891370 | 0.940 | 56575386 | [Augmentation campaign](../../validation/results/2026-09-26-augmentation-campaign.md) |
 | S62 | 2026-09-25 19:45 | report-attribute heads v3.1 fold1 | x4 tau0.75 bs4 | (x1, fold 1) 0.895294 | 0.940 | 56559056 | [Report-attribute heads](../../validation/results/2026-09-25-report-attribute-heads.md) |
 | S61 | 2026-09-25 18:29 | report-attribute heads fold1 | x4 tau0.75 bs4 | (x1, fold 1) 0.896116 | 0.938 | 56557729 | [Report-attribute heads](../../validation/results/2026-09-25-report-attribute-heads.md) |
-| S60 | 2026-09-25 08:44 | OA detector control fold1 | x4 tau0.75 bs4 | (x1, fold 1) 0.895202 | 0.938 | 56546031 | [Project state](../../ongoing/state.md) |
+| S60 | 2026-09-25 08:44 | OA detector control fold1 | x4 tau0.75 bs4 | (x1, fold 1) 0.895202 | 0.938 | 56546031 | [Adoption history](../../modeling/current-model.md#adoption-history) |
 | S59 | 2026-09-25 07:29 | token dropout random fold0 | x4 tau0.75 bs4 | (x1, scanner split) 0.900029 | 0.939 | 56544445 | [Near-misses campaign](../../validation/results/2026-09-25-near-misses-campaign.md) |
 | S58 | 2026-09-25 07:30 | three-compartment OA detector fold0 | x4 tau0.75 bs4 | (x1, scanner split) 0.897369 | 0.944 | 56544456 | [Near-misses campaign](../../validation/results/2026-09-25-near-misses-campaign.md) |
-| S57 | 2026-09-24 17:05 | early learning reg fold0 | x4 tau0.75 bs4 | (x1, scanner split) 0.900934 | 0.943 | 56527174 | [Near-miss review](../../ongoing/state.md) |
+| S57 | 2026-09-24 17:05 | early learning reg fold0 | x4 tau0.75 bs4 | (x1, scanner split) 0.900934 | 0.943 | 56527174 | [Early-learning regularization](../../history/early-learning-regularization.md) |
 | S56 | 2026-09-24 11:14 | knee-geometry adopted new seed fold0 | x4 tau0.75 bs4 | (x1, scanner split) 0.896343 | 0.940 | 56519764 | [Current model](../../modeling/current-model.md) |
 | S55 | 2026-09-24 09:34 | knee-geometry merged new seed fold0 | x4 tau0.75 bs4 | (x1, scanner split) 0.897581 | 0.940 | 56517876 | [Knee-geometry findings](../../../autoresearch/campaigns/knee-geometry/findings.md) |
 | S54 | 2026-09-24 08:08 | knee-geometry half-knee MIL fold0 | x4 tau0.75 bs4 | (x1, scanner split) 0.900879 | 0.944 | 56516135 | [Knee-geometry findings](../../../autoresearch/campaigns/knee-geometry/findings.md) |

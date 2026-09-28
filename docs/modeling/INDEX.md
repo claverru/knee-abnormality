@@ -2,7 +2,7 @@
 
 | Read when | Document |
 |---|---|
-| Understanding and reproducing the current model recipe | [Current model](current-model.md) |
+| Understanding and reproducing the current model recipe, and when each part was adopted | [Current model](current-model.md) |
 | Tracing model tensor shapes | [Model shape diagram](model-shapes.md) |
 | Using the CoAtNet backbone and its spatial anchors | [CoAtNet 224 spatial backbone](coatnet-224-spatial-backbone.md) |
 | Understanding triplet channels, normalization and sampling | [Triplet inputs and sampling](triplet-inputs-and-sampling.md) |
@@ -22,6 +22,7 @@
 | Read when | Section |
 |---|---|
 | Checking current backbone, input and training settings | [Model recipe](current-model.md#recipe) |
+| Finding when a recipe change was adopted, its paired evidence and the control retrained after it (seeds, folds) | [Adoption history](current-model.md#adoption-history) |
 | Reproducing the current model run | [Model reproduction](current-model.md#reproduce) |
 | Checking per-label positive and negative BCE weights | [Class-balanced BCE](supervision.md#fixed-class-balanced-bce) |
 | Checking reflection augmentation across imaging planes | [Study-level knee reflection](schedule-and-augmentation.md#study-level-knee-reflection) |
