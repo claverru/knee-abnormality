@@ -38,6 +38,9 @@ measured outcomes are in the [validation results](../validation/results/INDEX.md
 
 ## Best public submissions
 
+- **0.949:** S80, a 50/50 ensemble of the ReXNet `rebuild-state-v2-control` (τ 0.75) and the
+  RadImageNet ResNet-18 (τ 0.9), both fold 0 at ×4 and 36 triplets, run as two bundles in one notebook
+  ([RadImageNet backbones](radimagenet-backbone.md)).
 - **0.948:** S67, the scanner confusion head candidate, a single fold-3 model at ×4 and τ 0.75
   ([evidence](../modeling/scanner-confusion-head.md#evidence)).
 - **0.947:** S68 (`half-stack-control`), S69 (per-site bias,
@@ -47,10 +50,11 @@ measured outcomes are in the [validation results](../validation/results/INDEX.md
   models with mirror TTA scored 0.943 at ×4 and τ 0.75; the five-B0 bundle without TTA scored 0.940
   at 27% of the runtime and is the efficiency entry. Every member trained with ordinary BCE
   ([submissions](../inference/submissions/2026-09-19-ensemble-submissions.md)).
-- Keep attention temperature 0.75 in later bundles; its
+- Keep attention temperature 0.75 in ReXNet bundles; its
   [inference gain](../inference/submissions/2026-09-18-temperature-and-count-submissions.md) is
-  adopted. The [ledger](../inference/submissions/ledger.md) lists submissions up to S65; later
-  ones are in the results records linked here.
+  adopted. The RadImageNet ResNet-18 peaks at τ 0.9–1.0
+  ([τ sweep](../validation/results/2026-09-29-rn18-attention-temperature.md)). The
+  [ledger](../inference/submissions/ledger.md) lists every submission.
 
 ## Measurement and adoption rules in force
 
@@ -84,7 +88,9 @@ measured outcomes are in the [validation results](../validation/results/INDEX.md
 ## Active lines
 
 - [Label rebuild](../public-labels/label-rebuild.md): adopted; its control scored ×4 0.928288 and
-  awaits submission.
+  0.944 public (S78).
+- [RadImageNet backbones](radimagenet-backbone.md): the ResNet-18 recipe ties the ReXNet control
+  publicly at about 60% of its training time, and the two ensemble to 0.949.
 - [Report attribute extraction](report-attribute-extraction.md): the JevK5 heads are in the recipe;
   a v4 question set is open.
 - [Loading speedup](loading-speedup.md): the `inference-opt` branch awaits a decision.
@@ -93,6 +99,12 @@ measured outcomes are in the [validation results](../validation/results/INDEX.md
 
 ## Recently closed
 
+- **2026-09-29:** the `radimagenet-rn18` autoresearch campaign: 23 decided, no series dropout and 36
+  training triplets adopted; 36 triplets deferred to the endgame for iteration speed
+  ([campaign](../../autoresearch/campaigns/radimagenet-rn18/INDEX.md)). The loop's next topic,
+  `mri-signal-preservation`, was stopped by the user after 8 runs without an adoption: intensity
+  preprocessing mostly exceeded the training-time ceiling
+  ([campaign](../../autoresearch/campaigns/mri-signal-preservation/INDEX.md)).
 - **2026-09-28:** the Qwen Lateral OA half-blend pilot, not adopted: it tied the control and was
   superseded by the [label rebuild](../public-labels/label-rebuild.md)
   ([history](../history/qwen-lateral-labels.md)).

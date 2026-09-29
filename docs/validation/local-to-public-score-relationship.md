@@ -8,6 +8,13 @@ soft-target BCE at +0.833, while **gold-only AUC and gold-only BCE carry no sign
 2026-09-13 the submitted models' local scores differ by less than one training run's noise, so no
 local metric ranks them.
 
+The [2026-09-28 update](results/2026-09-18-local-public-metric-comparison.md#2026-09-28-update)
+covers S23–S77 in eight cohorts: on public differences of at least 0.003, predictions scored
+against `rebuild_state_v2` agree with the leaderboard on 78–83% of pairs, against 71–73% for
+`combined_v1`; ×1 and ×4 track equally; gold-only AUC stays below chance; and each label set
+favors models trained on labels like itself by about ±0.005, so a change of training labels needs
+a submission.
+
 What follows from that:
 
 - Keep full-fold macro AUC as the selection metric; use BCE only as supporting evidence inside one

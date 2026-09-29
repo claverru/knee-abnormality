@@ -130,6 +130,17 @@ Counts above ×4 were dropped by user decision on 2026-09-24; the one submission
 ([history](../history/oblique-groups.md)). External evidence on density is in
 [public research](../research/public-research.md#slice-density-and-the-board-2026-09-18-re-sweep).
 
+**More training triplets per study are deferred here for iteration speed** (user decision,
+2026-09-29). In the `radimagenet-rn18` campaign, `data.study_triplet_total` 26 → 36 on the
+RadImageNet ResNet-18 without series dropout gained +0.0018 macro AUC at ×4
+(0.927806 → 0.929586; 80% [+0.0002, +0.0034], 95% [−0.0005, +0.0041]; one pair, weak). The gain
+moved between labels: OA rose (lateral +0.0094, medial +0.0026, PF +0.0036) and both menisci fell
+(medial −0.0033, lateral −0.0049). Training time rose 23% (1,202 → 1,477 s), leaving later
+campaigns about 10% headroom under their 1,627 s ceiling. A 40-triplet, 9-epoch follow-up scored
+−0.0015 against 36, confounded by the lost epoch. The 36-triplet model scored 0.944 public (S79);
+no 26-triplet version was submitted, and a 0.002 gap is below one submission's resolution. The
+committed recipe (`configs/radimagenet-resnet18.yaml`) therefore keeps 26. Revisit training at 36 with the final recipe.
+
 ## Weight averaging
 
 **EMA or SWA as the final recipe's default** (measured on fold 0; moved here on 2026-09-17, the
