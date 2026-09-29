@@ -1,4 +1,4 @@
-# Project state (2026-09-28)
+# Project state (2026-09-29)
 
 What is in force now: the recipe, the control candidates pair with, the best public submissions and
 the rules every comparison depends on. Pending work is in [next](next.md), active lines have their
@@ -14,11 +14,14 @@ measured outcomes are in the [validation results](../validation/results/INDEX.md
   (A2 of the label rebuild) and the label-stratified split
   [`all_5fold_scanner_v2`](../validation/project-validation-protocol.md#all_5fold_scanner_v2), fold 0,
   fresh seed 1533697213 (`configs/training.yaml`). The evidence is one fold-4 pair: A, the pre-fix
-  version of A2, scored 0.947 public (S76) against 0.946 for S73, one rounding step; A2 itself is
-  unsubmitted. The autoresearch gate requires both the label source and the split.
-- **Model:** the [current model](../modeling/current-model.md): ReXNet-200 spatial tokens with
-  knee geometry, the three-compartment OA detector, training-only report-attribute and scanner
-  confusion heads, the half-stack augmentation and class-balanced BCE at exponent 0.5.
+  version of A2, scored 0.947 public (S76) against 0.946 for S73, one rounding step; A2's fold-0
+  control scored 0.944 (S78), not comparable with those fold-4 runs. The autoresearch gate requires both the label source and the split.
+- **Model:** the [current model](../modeling/current-model.md), since 2026-09-29 on a
+  RadImageNet ResNet-18 (`configs/training.yaml`): repeated middle slice, `backbone_lr` 5e-5, no
+  series dropout, 26 triplets, spatial tokens with knee geometry, the three-compartment OA
+  detector, training-only report-attribute and scanner confusion heads, the half-stack
+  augmentation and class-balanced BCE at exponent 0.5. The ReXNet-200 recipe it replaced is
+  `configs/rexnet-200.yaml`; submit ResNet-18 bundles at τ 0.9 and ReXNet at τ 0.75.
 - **Preprocessing identity:** hashed-source changes apply to fresh runs only. A new export or local
   prediction from a checkpoint trained under an earlier identity is refused by
   `validate_preprocessing_identity` and needs that checkpoint's archived sources; already-exported
@@ -28,9 +31,14 @@ measured outcomes are in the [validation results](../validation/results/INDEX.md
 
 ## Current control
 
-- **`rebuild-state-v2-control`** (`outputs/training/20260928-150724-rebuild-state-v2-control`), from
-  `configs/training.yaml`: ×4 0.928288 (×1 0.924637, epoch 9 of 10, 912 validation studies). Not yet submitted; submit at ×4, τ 0.75, batch 4.
-  Every candidate pairs with it at its fold and seed.
+- **`rn18-no-series-dropout`**
+  (`outputs/autoresearch/radimagenet-rn18/experiments/rn18-no-series-dropout-20260928T213320Z-0b780262/training`),
+  the `configs/training.yaml` recipe apart from name and paths: ×4 0.927806 (×1 0.92384, epoch 9 of
+  10, fold 0, seed 1533697213). Unsubmitted; its 36-triplet successor scored 0.944 (S79). It was
+  trained in the campaign, so exports use its archived `source/`. Every candidate pairs with it at
+  its fold and seed.
+- **`rebuild-state-v2-control`** (`outputs/training/20260928-150724-rebuild-state-v2-control`), the
+  `configs/rexnet-200.yaml` control: ×4 0.928288, 0.944 public (S78) at ×4, τ 0.75.
 - **No local score on `all_5fold_scanner_v1` is comparable** with a run on the new split
   ([validation strategy](../validation/validation-strategy.md)). The last v1 control,
   `scanner-confusion-control` (fold 4, seed 703791404, ×4 0.909733, 0.946 public as S73), stays the

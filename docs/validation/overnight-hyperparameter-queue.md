@@ -68,8 +68,8 @@ hypothesis.
 | `07-epochs-20` | `trainer.max_epochs: 20` | +0.0011 ×1 at 3e-4 (×4 −0.0002); last, so the deadline cannot cut a shorter run |
 
 Not queued: further backbone-rate values (3e-4 to 6e-4 lie within 0.0006), 15 epochs (−0.0012),
-and augmentation strengths. The ReXNet `trainer.max_epochs: 12` run in
-the [overnight queue](../backlog/overnight.md) needs its own queue afterwards.
+and augmentation strengths. The ReXNet `trainer.max_epochs: 12` run once queued in
+the [overnight queue](../backlog/overnight.md) was dropped on 2026-09-29 with the switch to ResNet-18.
 
 Each queue has `runs/<name>/` for normal training artifacts, `logs/<name>.log` for training
 output, `status.tsv` for per-run timing and exit codes, and `summary.tsv` for per-run metrics,

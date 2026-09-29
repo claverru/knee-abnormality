@@ -2,7 +2,7 @@
 
 **ResNet-18 is the working RadImageNet recipe (2026-09-29).** The code is on main. ResNet-50
 lost to the control (×1 0.91223 against 0.924637). The Refined-RadImageNet ResNet-18
-(`configs/radimagenet-resnet18.yaml`) ran as the `radimagenet-rn18` autoresearch campaign. It
+(now `configs/training.yaml`) ran as the `radimagenet-rn18` autoresearch campaign. It
 adopted no series dropout (+0.0023) and 36 training triplets (+0.0018, weak, deferred to the
 [endgame](../backlog/endgame.md#test-time-augmentation) for iteration speed), so the committed recipe is
 26 triplets without series dropout ([campaign](../../autoresearch/campaigns/radimagenet-rn18/INDEX.md)).
@@ -83,8 +83,8 @@ separately if the lower rate does not close the gap.
 
 ## Refined-RadImageNet ResNet-18 and ResNet-10t (integrated 2026-09-28)
 
-`configs/radimagenet-resnet18.yaml` (`resnet18.a1_in1k`) and `configs/radimagenet-resnet10t.yaml`
-(`resnet10t.c3_in1k`) load the pinned [Refined-RadImageNet](../research/radimagenet-weights.md#refined-radimagenet-resnets)
+The ResNet-18 (`resnet18.a1_in1k`, since 2026-09-29 `configs/training.yaml`) and ResNet-10t
+(`resnet10t.c3_in1k`, config removed 2026-09-29 after it lost in the campaign) load the pinned [Refined-RadImageNet](../research/radimagenet-weights.md#refined-radimagenet-resnets)
 checkpoints through the same `pretrained_weights: radimagenet` option. `RADIMAGENET_WEIGHTS` maps each
 backbone to its file, hash and source. The configs keep the repeated middle slice, use ImageNet
 mean/std (the torchvision recipe that trained them) and set `backbone_lr` by the overall
@@ -101,15 +101,3 @@ the control's 0.924637; it fell behind from epoch 3 while its training loss stay
 the control's. Its final prediction step failed because the worktree sources were edited during
 training, which changes the preprocessing identity. The validation predictions were recovered
 from the run's own `source_snapshot.zip` (`recovered.json` in the run folder).
-
-## Comparisons
-
-- **Against the current control** (`rebuild-state-v2-control`, fold 0, seed 1533697213,
-  [state](state.md#current-control)): this is the decision-relevant one, since a RadImageNet model
-  is only useful if it competes with, or ensembles well with, ReXNet-200. It changes backbone,
-  pretraining, input format, normalization and learning rate together.
-- **Pretraining alone:** the same config with ImageNet weights, at their own normalization and
-  learning-rate scale:
-  `just train configs/radimagenet-resnet50.yaml --model.pretrained-weights timm
-  --data.mean '[0.485,0.456,0.406]' --data.std '[0.229,0.224,0.225]'
-  --optimizer.backbone-lr 0.0000627`. It is needed only to attribute a result to the pretraining.
