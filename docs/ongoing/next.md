@@ -10,8 +10,6 @@ current control at its fold and seed.
 
 Pending:
 
-- **Overnight queue:** the ReXNet `trainer.max_epochs: 12` run against the current control
-  ([overnight queue](../backlog/overnight.md#next-queue)).
 - **Decide on the `inference-opt` branch.** It runs the Kaggle command in about 270 s against
   429.5 s with bit-identical prepared images, but its GPU preparation changes hashed sources, so
   the next submission needs a checkpoint trained on it; check local training memory first

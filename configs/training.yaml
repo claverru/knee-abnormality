@@ -1,4 +1,4 @@
-name: training
+name: radimagenet-resnet18
 seed: 1533697213
 
 paths:
@@ -61,18 +61,20 @@ data:
   std: [0.229, 0.224, 0.225]
 
 model:
-  backbone: rexnet_200.nav_in1k
+  backbone: resnet18.a1_in1k
   pretrained: true
+  pretrained_weights: radimagenet
+  slice_channels: repeated_middle
   channels_last: false
   checkpoint_backbone: false
   backbone_eval: false
   dropout: 0.0
-  series_dropout: 0.2
+  series_dropout: 0.0
   feature_statistics_augmentation:
     probability: 0.5
 
 optimizer:
-  backbone_lr: 0.0002
+  backbone_lr: 0.00005
   head_lr: 0.0006
   weight_decay: 0.01
   beta1: 0.9

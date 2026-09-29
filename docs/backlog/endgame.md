@@ -139,7 +139,9 @@ moved between labels: OA rose (lateral +0.0094, medial +0.0026, PF +0.0036) and 
 campaigns about 10% headroom under their 1,627 s ceiling. A 40-triplet, 9-epoch follow-up scored
 −0.0015 against 36, confounded by the lost epoch. The 36-triplet model scored 0.944 public (S79);
 no 26-triplet version was submitted, and a 0.002 gap is below one submission's resolution. The
-committed recipe (`configs/radimagenet-resnet18.yaml`) therefore keeps 26. Revisit training at 36 with the final recipe.
+committed recipe (`configs/training.yaml`) therefore keeps 26. Denser per-type budgets (`max_images` above 18/18/15/15/15/15) belong to the same
+deferral; on ReXNet the cheaper side lost monotonically (−0.0041, −0.0051). Revisit training at 36
+with the final recipe.
 
 ## Weight averaging
 

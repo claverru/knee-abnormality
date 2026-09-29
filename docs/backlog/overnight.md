@@ -13,51 +13,19 @@ from this file.
 
 ## Next queue
 
-- **`trainer.max_epochs: 12`** (queued 2026-09-24, user decision) against the
-  [current control](../ongoing/state.md#current-control). The heavier augmentation
-  makes it more pressing: both augmentation stacks learned slower and were still improving in soft
-  AUC at epoch 9 ([augmentation campaign](../validation/results/2026-09-26-augmentation-campaign.md)). Under ordinary BCE, 15 epochs gained
-  +0.0023 and +0.0025 on ReXNet and +0.0029 on B0, all inside seed noise
-  ([overnight results](../validation/results/2026-09-18-overnight-results.md),
-  [epoch arms](../validation/results/2026-09-19-fold-ensembles-and-sigma-sweep.md)). Under
-  class-balanced BCE several runs selected their last or second-to-last epoch, and the
-  [noisy-labels campaign](../validation/results/2026-09-23-noisy-labels-campaign.md) found the
-  model does not memorize its labels within ten epochs.
+Empty. The ReXNet-era entries were cleared on 2026-09-29, when the champion became the RadImageNet
+ResNet-18 ([state](../ongoing/state.md#recipe-in-force)). More epochs gained about +0.001 on
+ResNet-18 at 14 epochs for 40% more time. More input per study, meaning denser per-type budgets
+or more triplets, is [deferred to the endgame](endgame.md#test-time-augmentation) for iteration
+speed. The augmentation families were searched by the
+[augmentation campaign](../validation/results/2026-09-26-augmentation-campaign.md), and the batch
+and weight-decay candidates rested on B0 and 2026-09-12 evidence.
 
 **No delta recorded before 2026-09-19 is a prior for a new queue.** Those historical runs used
 ordinary BCE; the recipe in force uses class-balanced BCE, which by itself moves fold 0 by about
-0.008. The [result links](#already-measured) also include the newer balanced-BCE comparisons.
+0.008. ReXNet-200 and earlier backbones measured everything below; ResNet-18 measurements are in
+the [RadImageNet campaigns](../../autoresearch/campaigns/radimagenet-rn18/findings.md).
 Keep `validation_image_multiplier: 1` in comparisons.
-
-## Candidates for later queues
-
-- **Denser per-type budgets** (hypothesis; the only untested side of a measured axis). Raise
-  `data.series_types[*].max_images` above today's 18/18/15/15/15/15 at a fixed sampler width and
-  crop. Only the cheaper side has been measured and it loses monotonically: 15/15/12/12/12/12
-  −0.0041 and 12/12/9/9/9/9 −0.0051, 20% and 37% faster
-  ([runs](../validation/results/2026-09-16-restored-code-hyperparameter-runs.md)). Public evidence
-  points the same way, with a CoAtNet pipeline gaining 0.917 → 0.926 → 0.928 → 0.932 as slice
-  density rose at a fixed reach
-  ([public research](../research/public-research.md#slice-density-and-the-board-2026-09-18-re-sweep)),
-  but a second team whose pipeline pools per-series slots through masked attention — our structure,
-  not the window-scoring one — measured **−0.0045** going denser on the same axis
-  ([counter-report](../research/public-research.md#the-2026-09-20-re-sweep)), so the public evidence
-  no longer points one way and our own cheaper-side losses carry this candidate on their own.
-  **Memory rules it out as a one-change run:** `sigma-fraction-0867` already peaks at 20.8 GiB
-  with `study_triplet_total: 26`, well above the 18.9 GiB of the era that produced the 23.5 GiB
-  estimate, so 21/21/18/18/18/18 exceeds the card. It needs a second change (accumulation, or
-  `model.checkpoint_backbone`) to fit, and stops being a one-change run.
-  `data.study_triplet_total` is the
-  other knob on the same axis and 32 is already measured (+0.0036, inside the control spread).
-- **Other values of the existing augmentation families**, after `07-affine-off` (hypothesis):
-  probabilities and strengths of the intensity, affine and noise families, one per run, such as
-  the milder side of the strong affine that lost −0.0024, and reflection probabilities other than
-  0.5. Ordering, interactions and new families are
-  [small changes](small-changes.md#augmentation-families).
-- **`trainer.accumulate_grad_batches: 2`** (untried; two-sided). It buys an effective batch of 16
-  at unchanged memory but halves optimizer steps to 2,190, the axis the b0 queue says helps.
-- **Low value:** `optimizer.weight_decay: 0.001`, since 0.003 and 0.03 are settled, 0.05 lost
-  −0.0008 and 0.003 gained only +0.0002 on the 2026-09-12 recipe.
 
 ## Already measured
 
@@ -69,7 +37,7 @@ as untried settings:
 - Shared sampler scale 0.60–1.10 and the two sampler-shape proposals have been measured; no
   fraction or shape repeat is queued here.
 - More epochs under ordinary BCE, fixed-width sigma 50, and rejected attention/readout variants
-  are not fresh queue candidates. The epoch question under balanced BCE remains open above.
+  are not fresh queue candidates.
 - User decisions of 2026-09-16, on the ordinary-BCE recipe: `min_lr 0.1` dropped after three
   unestablished measurements ([result](../validation/results/2026-09-16-restored-code-hyperparameter-runs.md));
   series dropout 0.1 dropped, since 0.2 and 0.3 are flat; reflection 0.25, intensity-off and batch

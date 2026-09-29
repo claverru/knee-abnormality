@@ -68,8 +68,8 @@ rtk proxy uv run --locked python -m scripts.tools.prepare_lateral_oa_blend_label
 For a clean machine, first use the version-pinned download command in the Qwen input manifest
 and provide the existing combined labels and frozen split. Keep datasets out of Git.
 
-[Control](../../configs/qwen-lateral-control.yaml) snapshots the current main recipe.
-[Candidate](../../configs/training.yaml) differs only in experiment name, training-label
+The control config, `configs/qwen-lateral-control.yaml` (removed 2026-09-29; in git history),
+snapshotted the main recipe of the time, and the candidate, then `configs/training.yaml`, differed only in experiment name, training-label
 manifest and source. Both use the same fold, seed, model, augmentation, ten-epoch budget and
 ×4 prediction setting. Output directories are shared with main through the `outputs` symlink.
 
