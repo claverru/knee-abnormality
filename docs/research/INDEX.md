@@ -4,6 +4,7 @@
 |---|---|
 | Reviewing the competition research recommendations | [Research overview](research-overview.md) |
 | Comparing public notebooks and discussion findings | [Public discussion and notebook findings](public-research.md) |
+| Checking the late-September board, the public 0.945 rank blend of the public stack with a private model, per-target ensemble weights, Qwen VLM and pseudo-label reports, RadImageNet input format, OAI ruling and T4 queue stalls | [2026-09-28 public re-sweep](2026-09-28-public-resweep.md) |
 | Checking research coverage and evidence types | [Evidence and coverage](evidence-and-coverage.md) |
 | Tracing sources and interpreting unverified notes | [Provenance](provenance.md) |
 | Choosing input resolution, field of view and slice density | [Input resolution](input-resolution.md) |
@@ -22,6 +23,7 @@
 | Judging multi-scale features, branch dominance and fine-detail levers (token pitch vs pixels vs crops) | [Multiscale features for knee MRI](multiscale-features-knee-mri.md) |
 | Comparing backbone evidence from MRI tasks | [Backbone MRI evidence](backbone-mri-evidence.md) |
 | Choosing reusable Hugging Face, radiology and knee-MRI checkpoints and checking integration costs | [Image and MRI encoders](huggingface-image-encoders.md#practical-2d-shortlist) |
+| Finding RadImageNet-pretrained weights: original CNNs and mirrors, Refined-RadImageNet ResNet-10t/18/50 recipe and hashes, RadioDINO and OmniRad ViTs, RadInSight LoRA adapters | [RadImageNet weights](radimagenet-weights.md) |
 | Investigating volumetric CNNs | [Volumetric CNNs](volumetric-cnns.md) |
 | Researching pretrained EfficientNet training | [EfficientNet training](efficientnet-training.md) |
 | Revisiting scout backbone candidates | [Scout backbone candidates](scout-backbones.md) |

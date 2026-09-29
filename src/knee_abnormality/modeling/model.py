@@ -21,6 +21,10 @@ from knee_abnormality.modeling.augmentation import (
     sample_contrast_mixing_parameters,
     sample_reflection_parameters,
 )
+from knee_abnormality.modeling.radimagenet import (
+    RADIMAGENET_WEIGHTS,
+    radimagenet_state_dict,
+)
 from knee_abnormality.modeling.spatial_tokens import (
     COATNET_BACKBONE,
     SpatialTokens,
@@ -72,10 +76,18 @@ class KneeAbnormalityModel(nn.Module):
             "std", torch.tensor(data.std).reshape(1, -1, 1, 1), persistent=False
         )
         self.channels_last = model.channels_last
+        self.repeated_middle_slice = model.slice_channels == "repeated_middle"
         self.checkpoint_backbone = model.checkpoint_backbone
         self.backbone_eval = model.backbone_eval
         pretrained = model.pretrained if load_pretrained is None else load_pretrained
         self.feature_mapping_identity = backbone_mapping_identity(model.backbone)
+        if (
+            model.pretrained_weights == "radimagenet"
+            and model.backbone not in RADIMAGENET_WEIGHTS
+        ):
+            raise ValueError(
+                f"RadImageNet weights require one of {sorted(RADIMAGENET_WEIGHTS)}"
+            )
         backbone_kwargs = {}
         if model.backbone == COATNET_BACKBONE:
             if data.image_size % 32:
@@ -85,21 +97,29 @@ class KneeAbnormalityModel(nn.Module):
             backbone_kwargs["img_size"] = data.image_size
         self.backbone = timm.create_model(
             model.backbone,
-            pretrained=pretrained,
+            pretrained=pretrained and model.pretrained_weights == "timm",
             in_chans=SLICES_PER_INPUT,
             num_classes=0,
             global_pool="",
             **backbone_kwargs,
         )
+        if pretrained and model.pretrained_weights == "radimagenet":
+            self.backbone.load_state_dict(
+                radimagenet_state_dict(model.backbone), strict=True
+            )
         self.feature_mapping = backbone_mapping(model.backbone, self.backbone)
+        self.resnet_stages = hasattr(self.backbone, "layer2")
         if self.feature_statistics_settings.probability > 0 and not (
-            hasattr(self.backbone, "stem")
-            and hasattr(self.backbone, "features")
-            and len(self.backbone.features) > REXNET_STRIDE_8_BLOCK_COUNT
+            self.resnet_stages
+            or (
+                hasattr(self.backbone, "stem")
+                and hasattr(self.backbone, "features")
+                and len(self.backbone.features) > REXNET_STRIDE_8_BLOCK_COUNT
+            )
         ):
             raise ValueError(
-                "Feature statistics augmentation requires a ReXNet backbone with a "
-                "stride-8 block to resample"
+                "Feature statistics augmentation requires a ReXNet or ResNet backbone "
+                "with a stride-8 stage to resample"
             )
         backbone_training = self.backbone.training
         self.backbone.eval()
@@ -196,9 +216,7 @@ class KneeAbnormalityModel(nn.Module):
             )
         if not self.training or self.feature_statistics_settings.probability == 0:
             return self.backbone.forward_features(images)
-        features = self.backbone.features[:REXNET_STRIDE_8_BLOCK_COUNT](
-            self.backbone.stem(images)
-        )
+        features = self._backbone_to_stride_8(images)
         features, self.feature_statistics_activity = (
             apply_feature_statistics_augmentation(
                 features,
@@ -207,7 +225,20 @@ class KneeAbnormalityModel(nn.Module):
                 self.feature_statistics_settings,
             )
         )
-        return self.backbone.features[REXNET_STRIDE_8_BLOCK_COUNT:](features)
+        return self._backbone_from_stride_8(features)
+
+    def _backbone_to_stride_8(self, images: torch.Tensor) -> torch.Tensor:
+        backbone = self.backbone
+        if self.resnet_stages:
+            stem = backbone.maxpool(backbone.act1(backbone.bn1(backbone.conv1(images))))
+            return backbone.layer2(backbone.layer1(stem))
+        return backbone.features[:REXNET_STRIDE_8_BLOCK_COUNT](backbone.stem(images))
+
+    def _backbone_from_stride_8(self, features: torch.Tensor) -> torch.Tensor:
+        backbone = self.backbone
+        if self.resnet_stages:
+            return backbone.layer4(backbone.layer3(features))
+        return backbone.features[REXNET_STRIDE_8_BLOCK_COUNT:](features)
 
     def _effective_presence(self, presence: torch.Tensor) -> torch.Tensor:
         if not presence.any(dim=1).all():
@@ -425,6 +456,9 @@ class KneeAbnormalityModel(nn.Module):
         inverse_affine = reflection_inverse(
             inverse_affine, reflected, sagittal, valid_images.shape[-1]
         )
+        if self.repeated_middle_slice:
+            valid_images = valid_images[:, 1:2].expand(-1, SLICES_PER_INPUT, -1, -1)
+            channels = channels[:, 1:2].expand_as(channels)
         valid_images = valid_images.sub(self.mean).div_(self.std)
         if self.channels_last:
             valid_images = valid_images.contiguous(memory_format=torch.channels_last)

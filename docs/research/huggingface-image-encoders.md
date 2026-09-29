@@ -44,6 +44,10 @@ can construct the architecture. [Backbone swap requirements](../modeling/backbon
 
 ### RadioDINO and OmniRad
 
+Every RadImageNet-pretrained release found, including the S/8 and B/16 variants and the
+supervised CNNs, is catalogued in [RadImageNet weights](radimagenet-weights.md).
+
+
 Both expose patch features compatible in principle with the current MIL head after reshaping.
 At 224 pixels, RadioDINO's patch size 16 gives 196 spatial tokens and OmniRad's patch size 14
 gives 256, versus the current ReXNet's 49. These are derived counts, respectively 4× and about

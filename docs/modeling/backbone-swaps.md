@@ -69,8 +69,12 @@ parameters, and 256 multiply-adds per token.
 In `KneeAbnormalityModel.__init__`:
 
 - **Mapping:** the name must have a `BACKBONE_MAPPINGS` entry, and `backbone_mapping` must
-  reproduce it. `_rexnet_mapping`, `_coatnet_mapping` and `_efficientnet_mapping` exist, so any
-  other family needs its own mapping function. `_efficientnet_mapping` walks `conv_stem`, then
+  reproduce it. `_rexnet_mapping`, `_coatnet_mapping`, `_efficientnet_mapping` and
+  `_resnet_mapping` exist, so any other family needs its own mapping function. `_resnet_mapping`
+  covers `resnet50.tv_in1k`, `resnet18.a1_in1k` and `resnet10t.c3_in1k`, the backbones with
+  [RadImageNet weights](../ongoing/radimagenet-backbone.md): single or deep stem, max pool,
+  bottleneck or basic blocks, checking each residual shortcut (ResNet-D average-pool shortcuts sit
+  half a stride off), origin 0 and stride 32. `_efficientnet_mapping` walks `conv_stem`, then
   each block by type (`DepthwiseSeparableConv`, `InvertedResidual`, `ConvBnAct`, `EdgeResidual`),
   then `conv_head`, naming the convolutions explicitly so squeeze-excite is excluded. Registered
   EfficientNets: `efficientnet_b3.ra2_in1k`, `efficientnet_b0.ra_in1k` and
@@ -83,6 +87,8 @@ In `KneeAbnormalityModel.__init__`:
   of 32.
 - **Anchors:** token anchors come from the mapping, so any verified origin works.
 - **Activation checkpointing:** `model.checkpoint_backbone` requires `model.backbone_eval: true`.
+- **DSU:** `model.feature_statistics_augmentation` splits the backbone at stride 8, which is
+  implemented for ReXNet (after block 5) and ResNet (after `layer2`) only.
 
 ## Checkpoint weight scale
 

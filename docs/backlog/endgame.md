@@ -51,6 +51,18 @@ the [validation strategy](../validation/validation-strategy.md), then combine mo
   exists only in their run's `source_snapshot.zip`
   ([pair ensembles](../validation/results/2026-09-22-stride16-fusion-result.md#pair-ensembles),
   [history](../history/stride16-feature-fusion.md#implementation-notes)).
+- *Public-stack blend (external evidence, 2026-09-28):* the top public notebooks reach 0.945 by
+  rank-blending the free 0.943 public stack with one independent private model at weight 0.45–0.6,
+  and a participant's 0.942 CoAtNet did the same. Each blended model scored at or below the stack
+  alone; ours (0.948) scores above it. Candidate: our final bundle rank-blended with the stack, at
+  one global weight fixed in advance. The stack needs roughly 1.5 h or more on 2×T4, and prize
+  eligibility of submissions using other participants' public weights was unanswered on 2026-09-28
+  ([re-sweep](../research/2026-09-28-public-resweep.md#public-0945-the-public-stack-rank-blended-with-a-private-model)).
+- *Per-target member weights (external evidence, 2026-09-28):* one public pipeline measured
+  per-target top-3 member selection at +0.0034 over a flat mean on held-out halves of 84
+  out-of-fold files, mostly on MCL, Synovitis and ACL. That disagrees with our loss-ensemble
+  simulation above; per-label choices are allowed again, fixed before the run
+  ([re-sweep](../research/2026-09-28-public-resweep.md#measurements-embedded-in-the-s75-private-model)).
 
 ## Bigger images
 
@@ -218,6 +230,10 @@ same option also serves speed (*Speed* below).
   No measured gain was found for multi-label AUC on report-derived labels; the closest setting,
   [chest X-rays with NLP labels](https://link.springer.com/chapter/10.1007/978-3-030-87358-5_57),
   is paywalled.
+- *Forum reports (2026-09-28, mixed):* one participant says only truly out-of-fold teachers help
+  and that more than 50% teacher weight helped more. Another calls multi-source teachers at 50/50
+  their main lever. Two others saw gold and local gains with no public gain, as S50 did
+  ([re-sweep](../research/2026-09-28-public-resweep.md#pseudo-labels-and-out-of-fold-label-blending)).
 - *Why an independent teacher (2026-09-23):* teachers from the same run add nothing here. The
   model does not memorize its labels in ten epochs, so bootstrapped, running-average and EMA targets
   tied or lost, while two independent seeds averaged gained +0.0028

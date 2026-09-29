@@ -30,7 +30,7 @@ slice channels.
 | 7 | `intensity_augmentation` | p 0.5; gamma 0.85–1.15, contrast 0.9–1.1 | Global gamma and contrast |
 | 8 | `gin_augmentation` | p 0.3; blend up to 0.5 | Random 4-layer conv net remaps intensities, blended with the input and renormalized |
 | 9 | `noise_augmentation` | p 0.15; std 0.005–0.02 | Gaussian noise; pixels differ per triplet |
-| 10 | `model.feature_statistics_augmentation` | p 0.5 | DSU: resamples feature-channel means and standard deviations at ReXNet's stride-8 stage, per acquisition |
+| 10 | `model.feature_statistics_augmentation` | p 0.5 | DSU: resamples feature-channel means and standard deviations at the backbone's stride-8 stage (ReXNet block 5, ResNet `layer2`), per acquisition |
 
 Filtering families (5, 6, 8) use the geometric valid region, and padding stays zero. Contrast
 mixing draws from the global generator before the image families; the image families draw in

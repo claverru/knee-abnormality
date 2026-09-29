@@ -171,24 +171,6 @@ are unknown; ask for both before designing anything.
 - **Test:** the incumbent recipe plus a final mined phase against a fresh control at the same
   total budget.
 
-## RadImageNet-pretrained backbone
-
-**Evidence-backed (one external report), untested here; moved from small changes on 2026-09-23 because it needs an off-recipe backbone pair.** Load a RadImageNet-pretrained
-ResNet-50 in place of its ImageNet weights, behind one option naming the pretraining source, and
-compare the two at identical architecture, normalization and recipe. A participant reports that
-going the other way — RadImageNet to ImageNet ResNet-50, same architecture, per-corpus
-normalization corrected — cost them **−0.063**, the largest in-competition number anyone has
-published on medical pretraining ([sweep](../research/public-research.md#the-2026-09-20-re-sweep));
-the public 0.942 stack also carries RadImageNet heads as one of five families. It disagrees with
-the [benchmark ranking](../research/backbone-mri-evidence.md) that put RadImageNet ResNet-50 19th
-and MedDINOv3 25th, which is what makes it worth one measurement rather than an adoption.
-
-Two caveats price the work. RadImageNet publishes ResNet-50, DenseNet-121, InceptionV3 and
-IRV2 only, so neither of our backbones (EfficientNet-B0, ReXNet-200) can take these weights; the
-comparison needs a ResNet-50 pair that is off the current recipe, and a win would then have to be
-re-measured on a backbone we would actually submit. The weights are a third-party download, so
-they need a pinned source, hash and licence check before any run.
-
 ## Parked until a specific need
 
 ### Fused study volume and 3D model

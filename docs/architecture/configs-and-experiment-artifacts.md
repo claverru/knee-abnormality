@@ -20,7 +20,11 @@ Unknown or missing keys fail clearly, so configs and checkpoints that still carr
 fields must be used with their archived source; seeds must be integers in `[0, 2**32)`
 and fold selections must be nonempty, distinct nonnegative integers.
 `model.checkpoint_backbone` requires `model.backbone_eval: true`, because activation
-checkpointing would otherwise rerun training-mode BatchNorm during recomputation. The models
+checkpointing would otherwise rerun training-mode BatchNorm during recomputation.
+`model.pretrained_weights: radimagenet` requires a backbone listed in `RADIMAGENET_WEIGHTS`
+(`resnet50.tv_in1k`, `resnet18.a1_in1k`, `resnet10t.c3_in1k`), and
+`model.slice_channels: repeated_middle` feeds each triplet's middle slice on all three channels
+([RadImageNet backbone](../ongoing/radimagenet-backbone.md)). The models
 are frozen after validation. Their nesting matches the YAML, for example
 `config.labels.source` and `config.validation.folds`.
 

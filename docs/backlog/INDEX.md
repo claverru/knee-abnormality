@@ -9,7 +9,6 @@
 | Planning larger investigations | [Big bets](big-bets.md) |
 | Planning an autoresearch campaign on training-only auxiliary losses and heads (report state, OA attributes, per-view classifiers, pretext tasks) | [Auxiliary-loss campaign](big-bets.md#auxiliary-loss-campaign) |
 | Replacing ReXNet-200 with a same-cost timm backbone (ReXNet-R 12k, ConvNeXt-nano, HGNetV2-B3) | [Same-cost backbone candidates](small-changes.md#same-cost-backbone-candidates) |
-| Comparing RadImageNet with ImageNet weights on a ResNet-50 pair | [RadImageNet backbone](big-bets.md#radimagenet-pretrained-backbone) |
 | Filling empty sagittal/coronal fluid slots with reformats (MPR) of a study's 3D DESS or 3D PD FS series | [Reformatted fluid planes](big-bets.md#reformatted-fluid-planes-from-3d-series) |
 | Fusing a study's 2D stacks into one registered volume for a 3D model, and its frozen-model reslice gate | [Fused study volume](big-bets.md#fused-study-volume-and-3d-model) |
 | Finding inference loading investigations and candidates | [Loading speedup](loading-speedup/INDEX.md) |
