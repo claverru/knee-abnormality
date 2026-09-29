@@ -105,6 +105,9 @@ Remaining website steps and monitoring limits:
 - No final-submission selection or team-management operation was found in
   the inspected supported CLI/public competition API. Plan to use the website
   to choose the two final submissions and manage any team changes.
+- Since about 2026-09-20, participants report GPU kernels stuck in `QUEUED` for hours. One says
+  re-pushing after 10–15 minutes works and waiting does not. Leave margin before the final
+  deadline ([re-sweep](../research/2026-09-28-public-resweep.md#rules-and-logistics)).
 - Notebook status/log/output calls address the latest ordinary session by
   owner/slug. Avoid overlapping pushes to the same notebook when collecting
   evidence. They do not establish access to a hidden scoring rerun's full logs.

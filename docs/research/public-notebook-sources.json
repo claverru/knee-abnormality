@@ -1,6 +1,6 @@
 {
   "checked_on": "2026-09-09",
-  "method": "Kaggle CLI 2.0.2 kernels pull with metadata; source read without executing. Kernel IDs are not source-version IDs. Attached data, weights and their provenance were not audited. Hashes identify downloaded source bytes; later pulls may differ. The 2026-09-20 entries were re-pulled the same way; a source whose URL already appears carries the newest pull's hash, replacing the earlier one.",
+  "method": "Kaggle CLI 2.0.2 kernels pull with metadata; source read without executing. Kernel IDs are not source-version IDs. Attached data, weights and their provenance were not audited. Hashes identify downloaded source bytes; later pulls may differ. The 2026-09-20 entries were re-pulled the same way; a source whose URL already appears carries the newest pull's hash, replacing the earlier one. The 2026-09-28 entries were pulled the same way.",
   "sources": [
     {
       "url": "https://www.kaggle.com/code/dreaddevelopment/knee-mri-training-the-twelve-finding-model",
@@ -93,6 +93,38 @@
       "source_filename": "bend-the-knee-to-the-dinosaurs.ipynb",
       "sha256": "5e03fc9f7799b2e46bcf67395d1ad5177d1e9f19b58cc93825c9fc02da6d0155",
       "checked_on": "2026-09-20"
+    },
+    {
+      "url": "https://www.kaggle.com/code/pjmathematician/rsna-knee-d4-lite",
+      "kernel_id": 135912251,
+      "source_version_id": null,
+      "source_filename": "rsna-knee-d4-lite.ipynb",
+      "sha256": "b131ab872fb42fa94aaf4684b21bba7c0d1c6c7f1af0a2a0ac3031bc73a00db7",
+      "checked_on": "2026-09-28"
+    },
+    {
+      "url": "https://www.kaggle.com/code/aastikrajan15/knee-s75-w50",
+      "kernel_id": 136151447,
+      "source_version_id": null,
+      "source_filename": "knee-s75-w50.ipynb",
+      "sha256": "ce6ea0f8b64d9ea50808f8fa36a588fc760fbc4aa1dcc14eb1f83d5469c0de8a",
+      "checked_on": "2026-09-28"
+    },
+    {
+      "url": "https://www.kaggle.com/code/amanatar/rsna-knee-super-ensemble-0920",
+      "kernel_id": 131135298,
+      "source_version_id": null,
+      "source_filename": "rsna-knee-super-ensemble-0920.ipynb",
+      "sha256": "bee1b2e48d744b7c046d408175e2263a51d40b671f594e6d2606fe2123827ecc",
+      "checked_on": "2026-09-28"
+    },
+    {
+      "url": "https://www.kaggle.com/code/fuadmuhammad/rsna-knee-fast-parent-0-957-v2",
+      "kernel_id": 135464071,
+      "source_version_id": null,
+      "source_filename": "rsna-knee-fast-parent-0-957-v2.ipynb",
+      "sha256": "9748cef7eaceaf6e6c4572037e8b02cb94000c212e17242f1e82313b0984075c",
+      "checked_on": "2026-09-28"
     }
   ]
 }

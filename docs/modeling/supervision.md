@@ -204,6 +204,10 @@ do not disqualify a dataset under the competition's rules.
 of its institutional agreement requirement. The host allows for reconsideration
 if access terms change; no reversal appeared in the retrieved thread.
 [KneeCoT ruling](https://www.kaggle.com/competitions/rsna-knee-abnormality-detection/discussion/734109).
+The host applied the same test to OAI on 2026-09-21: it is allowed only if it is free and needs no
+institutional review or sign-off, which its data use certification does
+([OAI answer](https://www.kaggle.com/competitions/rsna-knee-abnormality-detection/discussion/741819)).
+A per-dataset ruling for MRNet, SKM-TEA, fastMRI(+) and KneeMRI was still unanswered on 2026-09-28.
 
 For actual public label-table comparisons, missing-label experiments and
 negative results, read [public supervision evidence](../research/public-research.md#report-derived-supervision).

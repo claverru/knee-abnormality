@@ -7,4 +7,5 @@
 | Extracting report attributes with JevK5 (status with hedging and not-mentioned, grades, meniscal tear location, cartilage, contusion location, extra findings) for training-only supervision | [Report attribute extraction](report-attribute-extraction.md) |
 | Checking inference loading work, the `inference-opt` branch and the `control-check` loading reference | [Loading speedup status](loading-speedup.md) |
 | Following EfficientNet-B0/B3 efficiency experiments against ReXNet-200 | [EfficientNet backbones](efficientnet-backbones.md) |
+| Checking the RadImageNet ResNet-18 recipe, its public scores and ReXNet ensemble, or the ResNet-50 runs: weights pin and download, normalization and learning-rate scale evidence, DSU hook | [RadImageNet backbones](radimagenet-backbone.md) |
 | Checking work-tracking rules | [Project guidance](../../AGENTS.md#work-tracking) |

@@ -7,6 +7,7 @@ from timm.models._efficientnet_blocks import (
     InvertedResidual,
 )
 from timm.models.maxxvit import Downsample2d, MbConvBlock, TransformerBlock2d
+from timm.models.resnet import BasicBlock, Bottleneck
 from torch import nn
 
 COATNET_BACKBONE = "coatnet_rmlp_2_rw_224.sw_in12k_ft_in1k"
@@ -41,6 +42,15 @@ BACKBONE_MAPPINGS = {
         "origin": [12.0, 12.0],
         "stride": [32.0, 32.0],
         "anchors": "mbconv_main_branch_and_attention_pool_centers",
+    },
+    **{
+        name: {
+            "layout": "NCHW",
+            "origin": [0.0, 0.0],
+            "stride": [32.0, 32.0],
+            "anchors": "convolution_centers",
+        }
+        for name in ("resnet50.tv_in1k", "resnet18.a1_in1k", "resnet10t.c3_in1k")
     },
 }
 
@@ -77,12 +87,12 @@ def _spatial_mapping(
     for layer in layers:
         if isinstance(layer, nn.Identity):
             continue
-        if not isinstance(layer, (nn.Conv2d, nn.AvgPool2d)):
+        if not isinstance(layer, (nn.Conv2d, nn.AvgPool2d, nn.MaxPool2d)):
             raise TypeError(
                 f"Unsupported spatial mapping layer: {type(layer).__name__}"
             )
         if isinstance(layer.padding, str) or (
-            isinstance(layer, nn.AvgPool2d) and layer.ceil_mode
+            isinstance(layer, (nn.AvgPool2d, nn.MaxPool2d)) and layer.ceil_mode
         ):
             raise ValueError("Spatial anchors require fixed padding and floor pooling")
         kernel = to_2tuple(layer.kernel_size)
@@ -90,7 +100,11 @@ def _spatial_mapping(
         step = to_2tuple(
             layer.stride if layer.stride is not None else layer.kernel_size
         )
-        dilation = to_2tuple(layer.dilation) if isinstance(layer, nn.Conv2d) else (1, 1)
+        dilation = (
+            to_2tuple(layer.dilation)
+            if isinstance(layer, (nn.Conv2d, nn.MaxPool2d))
+            else (1, 1)
+        )
         for axis in range(2):
             origin[axis] += (
                 (kernel[axis] - 1) * dilation[axis] / 2 - padding[axis]
@@ -177,12 +191,72 @@ def _coatnet_mapping(backbone: nn.Module) -> tuple[float, float, float, float]:
     return mapping
 
 
+def _resnet_mapping(backbone: nn.Module) -> tuple[float, float, float, float]:
+    stem = (
+        backbone.conv1
+        if isinstance(backbone.conv1, nn.Sequential)
+        else [backbone.conv1]
+    )
+    mapping = _spatial_mapping(
+        [layer for layer in stem if isinstance(layer, nn.Conv2d)] + [backbone.maxpool]
+    )
+    for stage in (backbone.layer1, backbone.layer2, backbone.layer3, backbone.layer4):
+        for block in stage:
+            if isinstance(block, Bottleneck):
+                layers = [block.conv1, block.aa, block.conv2, block.conv3]
+            elif isinstance(block, BasicBlock):
+                layers = [block.conv1, block.aa, block.conv2]
+            else:
+                raise TypeError(
+                    f"Unsupported ResNet spatial block: {type(block).__name__}"
+                )
+            previous = mapping
+            mapping = _spatial_mapping(layers, previous)
+            if block.downsample is None:
+                shortcut, expected = previous, mapping
+            else:
+                layers = list(block.downsample)
+                expected = mapping
+                if isinstance(layers[0], nn.AvgPool2d):
+                    pool = layers.pop(0)
+                    if (
+                        to_2tuple(pool.kernel_size) != (2, 2)
+                        or to_2tuple(pool.stride) != (2, 2)
+                        or to_2tuple(pool.padding) != (0, 0)
+                    ):
+                        raise ValueError("Unsupported ResNet average-pool shortcut")
+                    previous = (
+                        previous[0] + previous[2] / 2,
+                        previous[1] + previous[3] / 2,
+                        previous[2] * 2,
+                        previous[3] * 2,
+                    )
+                    expected = (
+                        mapping[0] + previous[2] / 4,
+                        mapping[1] + previous[3] / 4,
+                        mapping[2],
+                        mapping[3],
+                    )
+                shortcut = _spatial_mapping(
+                    [layer for layer in layers if isinstance(layer, nn.Conv2d)],
+                    previous,
+                )
+            if shortcut != expected:
+                raise ValueError(
+                    "ResNet residual geometry differs from verified anchors"
+                )
+    return mapping
+
+
 _BACKBONE_MAPPING_FUNCTIONS = {
     "rexnet_200.nav_in1k": _rexnet_mapping,
     "efficientnet_b3.ra2_in1k": _efficientnet_mapping,
     "efficientnet_b0.ra4_e3600_r224_in1k": _efficientnet_mapping,
     "efficientnet_b0.ra_in1k": _efficientnet_mapping,
     COATNET_BACKBONE: _coatnet_mapping,
+    "resnet50.tv_in1k": _resnet_mapping,
+    "resnet18.a1_in1k": _resnet_mapping,
+    "resnet10t.c3_in1k": _resnet_mapping,
 }
 
 

@@ -23,6 +23,11 @@ by date, the public leaderboard, and five notebook snapshots — and additionall
 re-downloaded the two corrupted competition DICOMs plus a seeded eight-file
 sample to check the host's repair
 ([data contract](../data-preparation/public-data-contract-and-decoding.md)).
+The [2026-09-28 re-sweep](2026-09-28-public-resweep.md) used the same two forum calls, read only
+threads and comments dated from 2026-09-20, listed notebooks by score through
+`kernels.KernelsService/ListKernels` (`SCORE_DESCENDING`), downloaded the leaderboard with the CLI
+and pinned the four cited notebooks in the manifest. It decoded, without running, the base64
+inference script embedded in one of them.
 
 The [public-label audit](../public-labels/INDEX.md), completed on 2026-09-10,
 downloads and fingerprints the Steven Lee and Pilkwang label datasets plus

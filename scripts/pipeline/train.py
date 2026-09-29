@@ -37,6 +37,7 @@ from knee_abnormality.inference.checkpoint import (
     read_checkpoint,
 )
 from knee_abnormality.inference.engine import predict_loader, resolve_device
+from knee_abnormality.modeling.radimagenet import RADIMAGENET_WEIGHTS
 from knee_abnormality.provenance import git_revision, sha256_file
 from knee_abnormality.training.checkpoints import (
     CheckpointRelocation,
@@ -210,7 +211,12 @@ def run_fold(
     )
     initialized_identity = (
         {
-            "pretrained_config": module.model.backbone.pretrained_cfg,
+            "pretrained_config": {
+                "source": RADIMAGENET_WEIGHTS[config.model.backbone].source,
+                "sha256": RADIMAGENET_WEIGHTS[config.model.backbone].sha256,
+            }
+            if config.model.pretrained_weights == "radimagenet"
+            else module.model.backbone.pretrained_cfg,
             "initialized_state_sha256": _state_sha256(
                 module.model.backbone.state_dict()
             ),
@@ -226,6 +232,7 @@ def run_fold(
             {
                 "name": config.model.backbone,
                 "pretrained": config.model.pretrained,
+                "pretrained_weights": config.model.pretrained_weights,
                 "feature_mapping": module.model.feature_mapping_identity,
                 **initialized_identity,
             },

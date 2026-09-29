@@ -220,6 +220,8 @@ class FeatureStatisticsAugmentationConfig(AugmentationConfig):
 class ModelConfig(ConfigModel):
     backbone: Identifier
     pretrained: bool
+    pretrained_weights: Literal["timm", "radimagenet"] = "timm"
+    slice_channels: Literal["adjacent", "repeated_middle"] = "adjacent"
     channels_last: bool = False
     checkpoint_backbone: bool = False
     backbone_eval: bool = False

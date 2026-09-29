@@ -23,6 +23,8 @@ canonical review of public evidence from the current knee competition.
   notebook and dataset listings sorted by date and by votes, both leaderboards
   pulled, and one inference notebook downloaded. The findings are collected in
   [the 2026-09-18 section](#slice-density-and-the-board-2026-09-18-re-sweep).
+- **Re-swept on 2026-09-28** for what was new since 09-20; that sweep has its own
+  document, [2026-09-28 public re-sweep](2026-09-28-public-resweep.md).
 - Inspected downloaded source for six public Kaggle code entries: five
   notebooks and one training script. Selection covered the popular baseline,
   higher-resolution DINO, large ensembles, and a different backbone family.
@@ -206,7 +208,7 @@ per-corpus normalization cost **−0.063**, and replacing their attention head
 with masked mean pooling cost **−0.014**. The first is the largest in-competition
 number we have on medical pretraining and disagrees with the
 [benchmark ranking](backbone-mri-evidence.md) that put RadImageNet ResNet-50
-19th; it is filed as a [big bet](../backlog/big-bets.md#radimagenet-pretrained-backbone).
+19th; it is now [ongoing work](../ongoing/radimagenet-backbone.md).
 The public 0.942 stack also carries RadImageNet heads as one of five families.
 
 ### Labels are the reported lever at the top, and extractor tuning is not

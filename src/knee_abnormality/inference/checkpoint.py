@@ -60,6 +60,7 @@ def validate_checkpoint(
         for name, value in actual.items():
             if section == "model" and name in {
                 "pretrained",
+                "pretrained_weights",
                 "channels_last",
                 "checkpoint_backbone",
             }:
