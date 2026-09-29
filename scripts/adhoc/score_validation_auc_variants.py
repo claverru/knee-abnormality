@@ -11,7 +11,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import roc_auc_score
 
 from knee_abnormality.cli import CLISettings
-from knee_abnormality.data.labels import STUDY, load_split
+from knee_abnormality.data.splits import STUDY, load_split
 from scripts.tools.prepare_combined_labels import consensus_sources
 from scripts.tools.validation import scanner_groups
 

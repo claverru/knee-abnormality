@@ -16,7 +16,7 @@ from knee_abnormality.cli import CLISettings
 from knee_abnormality.config import INFERENCE_IO_THREADS, load_config
 from knee_abnormality.data import dataset as dataset_module
 from knee_abnormality.data.dataset import KneeStudyDataset, build_data_loader
-from knee_abnormality.data.labels import STUDY, TARGET_THRESHOLD, load_fold_labels
+from knee_abnormality.data.labels import load_fold_labels
 from knee_abnormality.data.preprocessing.sampling import (
     CandidatePool,
     Selection,
@@ -28,6 +28,7 @@ from knee_abnormality.data.preprocessing.sampling import (
     union_support,
 )
 from knee_abnormality.data.sources import build_series_index
+from knee_abnormality.data.splits import STUDY, TARGET_THRESHOLD
 from knee_abnormality.evaluation.metrics import aucs, bootstrap_auc
 from knee_abnormality.inference.checkpoint import load_checkpoint_model
 from knee_abnormality.inference.engine import move_batch

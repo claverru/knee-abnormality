@@ -1,0 +1,99 @@
+ideas:
+- id: rn18-no-series-dropout
+  mechanism_id: regularization
+  parent_idea_id: null
+  title: Series dropout 0.2 to 0
+  opportunity: 'The model underfits: training loss sits above the control''s from epoch 2.'
+  mechanism: model.series_dropout 0.
+  precedents:
+  - Training-loss curves (prior-work.md).
+  novelty: Not yet tried on RadImageNet ResNets.
+  coverage: All studies and labels.
+  exploitation: Per-epoch curves, per-stage drift and gradient RMS against the incumbent and the ReXNet
+    control.
+  budget: Same as the ResNet-18 base run (1,085 s).
+  implementation: Configuration-only change to the incumbent recipe.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Removes a regularizer from an underfitting model.
+- id: rn18-lighter-dsu
+  mechanism_id: regularization
+  parent_idea_id: null
+  title: DSU probability 0.5 to 0.25
+  opportunity: Feature-statistics perturbation at stride 8 is strong for an 11M-parameter ResNet that
+    already underfits.
+  mechanism: model.feature_statistics_augmentation.probability 0.25.
+  precedents:
+  - DSU adopted on ReXNet in the augmentation campaign; its support weakened on rebuild_state_v2 (campaign
+    re-scoring).
+  novelty: Not yet tried on RadImageNet ResNets.
+  coverage: All studies and labels.
+  exploitation: Per-epoch curves, per-stage drift and gradient RMS against the incumbent and the ReXNet
+    control.
+  budget: Same as the ResNet-18 base run (1,085 s).
+  implementation: Configuration-only change to the incumbent recipe.
+  open_choices: 0 if 0.25 helps.
+  dependencies: []
+  priority_rationale: Regularization suspect specific to the small backbone.
+- id: rn18-layerwise-lr-decay
+  mechanism_id: per-layer-rate
+  parent_idea_id: null
+  title: 'Layer-wise learning-rate decay: each ResNet stage below layer4 gets half the rate of the stage
+    above'
+  opportunity: First five convs drift 8.1% from the pretrained start against 3.2% for ReXNet; last five
+    match (prior-work.md).
+  mechanism: Parameter groups per stage (stem, layer1-4, head); backbone rate x 0.5^k for stage k counted
+    down from layer4; head unchanged.
+  precedents:
+  - Standard in fine-tuning pretrained encoders (BEiT, ELECTRA).
+  - Measured early-layer drift (prior-work.md).
+  novelty: Not yet tried on RadImageNet ResNets.
+  coverage: All studies and labels.
+  exploitation: Per-epoch curves, per-stage drift and gradient RMS against the incumbent and the ReXNet
+    control.
+  budget: Same as the ResNet-18 base run (1,085 s).
+  implementation: New option optimizer.layer_decay in config.py and the parameter groups in the Lightning
+    module's optimizer setup; log each group's rate.
+  open_choices: 0.3 or 0.7 after the first result.
+  dependencies: []
+  priority_rationale: Targets the measured early-layer overwriting directly.
+- id: rn18-linear-probe-then-finetune
+  mechanism_id: head-first
+  parent_idea_id: null
+  title: Train only the head and tokens for one epoch with the backbone frozen, then fine-tune
+  opportunity: The model starts strong because the pretrained features are good; fine-tuning with a random
+    head distorts them early (LP-FT, arXiv 2202.10054).
+  mechanism: 'Epoch 0: backbone parameters frozen and BatchNorm in eval mode; from epoch 1 the usual schedule.'
+  precedents:
+  - Kumar et al. 2022, LP-FT.
+  novelty: Not yet tried on RadImageNet ResNets.
+  coverage: All studies and labels.
+  exploitation: Per-epoch curves, per-stage drift and gradient RMS against the incumbent and the ReXNet
+    control.
+  budget: Slightly cheaper than the incumbent.
+  implementation: New option trainer.backbone_frozen_epochs in config.py and the freezing in the Lightning
+    module.
+  open_choices: Two frozen epochs.
+  dependencies: []
+  priority_rationale: Evidence-backed way to keep a good pretrained backbone's features.
+- id: rn18-l2-sp
+  mechanism_id: anchored-decay
+  parent_idea_id: null
+  title: Weight decay toward the pretrained weights instead of toward zero
+  opportunity: First five convs drift 8.1% from the pretrained start against 3.2% for ReXNet; last five
+    match (prior-work.md).
+  mechanism: Replace AdamW decay on backbone weights by alpha * ||w - w0||^2 (L2-SP), stronger on the
+    stem and layer1.
+  precedents:
+  - Li et al. 2018, L2-SP (arXiv 1802.01483).
+  novelty: Not yet tried on RadImageNet ResNets.
+  coverage: All studies and labels.
+  exploitation: Per-epoch curves, per-stage drift and gradient RMS against the incumbent and the ReXNet
+    control.
+  budget: Small extra memory.
+  implementation: Keep w0 as a frozen buffer copy; add the penalty in the Lightning module; option optimizer.anchor_decay.
+  open_choices: alpha 1e-3 and 1e-2.
+  dependencies: []
+  priority_rationale: Keeps what RadImageNet learned while letting the top move.
+exhausted_directions: None yet; follows the radimagenet campaign, whose first two seeds ran against the
+  ReXNet control.

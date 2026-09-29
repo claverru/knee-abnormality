@@ -74,6 +74,9 @@ findings doc holds the question, method, command and result.
 
 | Script | Question | Findings |
 |---|---|---|
+| [check_reference_source_parity.py](check_reference_source_parity.py) | Does a run's checkpoint predict bit-identically under its recorded source snapshot and the current source, so a `sources_sha256` difference can be declared a reference exception? | [RadImageNet campaign](../../autoresearch/campaigns/radimagenet/INDEX.md#reference-parity) |
+| [estimate_repeat_pair_noise.py](estimate_repeat_pair_noise.py) | How much training noise does a paired Δ carry beyond the report-group bootstrap? | [Literature mechanisms](../../autoresearch/literature-mechanisms.md#3-calibration-against-repeat-pairs-keep-the-rule) |
+| [analyze_campaign_screening.py](analyze_campaign_screening.py) | Do early-epoch deltas predict autoresearch verdicts, where do adoptions arrive, which stop rules lose nothing, and do follow-ups beat new families? | [ScientistTwo lessons](../../autoresearch/scientisttwo-lessons.md#measured-against-our-campaign-records), [literature mechanisms](../../autoresearch/literature-mechanisms.md) |
 | [score_axial_only.py](score_axial_only.py) | How much does a trained model lose when it sees only one plane's series? | [Single-plane inference](../../docs/validation/results/2026-09-27-single-plane-inference.md) |
 | [diagnose_fusion_branches.py](diagnose_fusion_branches.py) | Which branch of the stride-16/stride-32 fusion do predictions use? | [Stride-16 fusion](../../docs/validation/results/2026-09-22-stride16-fusion-result.md#branch-ablation) |
 | [score_sibling_masking.py](score_sibling_masking.py) | Do compartment tokens use the sibling knee side? | [Sibling masking](../../docs/validation/results/2026-09-23-sibling-masking.md) |

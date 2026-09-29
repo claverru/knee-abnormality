@@ -9,8 +9,8 @@ from pydantic import Field
 from pydantic_settings import SettingsError
 
 from knee_abnormality.cli import CLISettings
-from knee_abnormality.data.labels import STUDY
 from knee_abnormality.data.sources import SERIES
+from knee_abnormality.data.splits import STUDY
 from knee_abnormality.provenance import copy_sources, sha256_file
 
 TAGS = [
@@ -201,6 +201,7 @@ def run(settings: Settings) -> dict:
         source,
         Path("src/knee_abnormality/cli.py"),
         Path("src/knee_abnormality/data/labels.py"),
+        Path("src/knee_abnormality/data/splits.py"),
         Path("src/knee_abnormality/data/sources.py"),
         Path("src/knee_abnormality/provenance.py"),
         Path("uv.lock"),

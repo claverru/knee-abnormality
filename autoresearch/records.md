@@ -5,9 +5,14 @@ Every state update carries a revision and event identifier so a resumed supervis
 can recognize work already completed. Structured agent report schemas live in
 [campaign/reports.py](../src/knee_abnormality/autoresearch/campaign/reports.py); the runtime state and
 immutable job artifacts preserve the mechanical transitions and exact evidence.
-Runtime state also stores the sealed campaign policy from `campaign.yaml`; each
+Runtime state also stores the sealed campaign policy from `campaign.yaml`, its backlog
+settings (`refill_below`, `refill_to`, `seed_order`, `rotate_after`) and its `budget`; each
 role assignment includes its permissions. A changed definition cannot silently
 widen a running or resumed campaign's scope.
+
+A chained topic's `campaign.yaml` carries its `chain` block and its sealed `limits.json`
+repeats it under `chain`, with the runtime ceiling inherited from the predecessor
+([chaining](topic-rotation.md#chaining)).
 
 ## Ideas
 
@@ -24,6 +29,9 @@ orchestrator from agent reports. Each entry records:
   historical evidence links remain precedents.
 - Creation state revision and any claimed experiment identifier.
 - The researcher's priority recommendation and the orchestrator's ranking rationale.
+- For researcher proposals (`ResearchIdea`): `source_change`, whether the idea needs a Python
+  source change, and `targeted_curve`, the curve behaviour in `run_curves` it targets. Seeds and
+  imported ideas use the plain idea schema.
 
 Idea statuses are `proposed`, `queued`, `developing`, `prepared`, `launched`,
 `completed`, `blocked`, and `retired`. Their experiment references and outcomes stay
@@ -41,11 +49,27 @@ Launch removal never deletes the permanent idea record.
 State `research.verdicts` holds one standing verdict per `mechanism_id` (`extend`,
 `retry` or `close`, with reason, next step and a miss count), written by the researcher
 for every family in its `new_results` and validated in code: a missing verdict, a
-non-`close` verdict after two consecutive rejected follow-ups, a proposal in a closed
+non-`close` verdict after two consecutive rejected follow-ups (only `reject` counts; an
+adoption resets the count and `invalid` runs, failed activation checks included,
+leave it unchanged), a proposal in a closed
 family, or an open line left without a follow-up while slots allow is rejected and the
 refill retried, up to the report-rejection limit. `research.reviewed` lists the results
 already given verdicts. The researcher and proposal-admission contexts receive these as
 `family_ledger`, one row per family with attempts, decided results and verdict.
+
+## Run curves
+
+Each researcher refill writes `curves.json` in its job directory: for the campaign reference and
+every decided run, the per-epoch ×1 `val_macro_auc`, `train_loss_epoch`, per-label ×1 AUC (from
+`epochs/metrics_epoch_*.json`), every non-constant epoch-level `metrics.csv` column (`other`;
+step-level columns such as `grad_norm` stay in `metrics.csv`), `training_seconds`, the paths of
+`metrics.csv` and the epoch metrics, and the run's configuration changes against the sealed recipe
+as `[recipe, candidate]` pairs without logistical keys. Values have four decimals. The assignment's
+`run_curves` repeats it compactly: every curve for the reference, the incumbent and the
+last four `new_results`; the standard curves without `other` for the last eight other decided runs; only
+configuration changes for older runs, whose curves stay in the file `full_detail` points to
+([`reporting/curves.py`](../src/knee_abnormality/autoresearch/reporting/curves.py)). The topic
+packet carries the incumbent's curves under `incumbent.curves`.
 
 ## Experiments
 
@@ -53,7 +77,20 @@ Use one immutable directory per attempt in
 `outputs/autoresearch/<campaign-id>/experiments/<experiment-id>/`.
 An attempt records its idea, implementation parent, launch-time reference incumbent,
 source snapshot and hash, effective configuration, data/split/label identities, incumbent-matched training seed,
-agent assignments, and artifact paths. Pin these before launch.
+activation signature, agent assignments, and artifact paths. Pin these before launch.
+
+`run_checks` (also `run-checks.json` in the attempt directory) holds each mid-run
+check's outcome with its `check` name, `passed`, `reason`, the `metrics` path, `evaluated_at`
+and `at_training_end`: for the [activation check](lifecycle.md#activation-check), the bound
+signature, `observed_maximum` (null when never logged) and `logged_values`; for the budget check
+of a range campaign, `training_seconds` and `max_training_seconds`. Every
+`evaluation.json` and evaluation evidence repeats it under `run_checks`. A failed check
+records `decision` and `eligible_decision` `invalid` with the stage `repair_requested`,
+or an invalid completion after two repairs.
+
+`run-limits.json` in the attempt directory holds the counts the training's accounting enforces,
+derived at launch from the sealed limits and the candidate's epochs (`mode`, `input_slices`, null
+for counts and steps a range budget leaves free).
 
 After completion, append observed triplet totals and study-visit counts, coverage
 diagnostics, preparation/training/evaluation time, peak memory, selected epoch,
@@ -78,13 +115,14 @@ attempts remain addressable; they are not counted as trained failures.
 `implementation_reference` records the parent ID, source tree digest, saved recipe,
 input identity and prediction hash. Prepared developer reports require
 `integration`: `retained_components`, `added_components`, `removed_components`,
-`removed_idea_ids`, and `rationale`; blocked reports use null. Its rules are in the
-[lifecycle](lifecycle.md#development-and-gates).
+`removed_idea_ids`, and `rationale`, and `activation`: `metric`, `comparison` (`>` or
+`>=`), `threshold`, `epoch` and `rationale`; blocked reports use null for both. Their
+rules are in the [lifecycle](lifecycle.md#development-and-gates).
 
-Approval requires a nonempty `integration_review`; other orchestrator responses
-use null. Each review writes `review-<event-id>.json` in the attempt directory.
-`implementation_review.binding` fixes its exact parent, candidate source/config,
-integration, resulting `active_idea_ids`, external evidence and frozen evaluation
+Approval requires a nonempty `integration_review` and `activation_review`; other
+orchestrator responses use null. Each review writes `review-<event-id>.json` in the
+attempt directory. `implementation_review.binding` fixes its exact parent, candidate
+source/config, integration, activation signature, resulting `active_idea_ids`, external evidence and frozen evaluation
 inputs. `launch_binding` records what authorized the launch. Evidence changes
 invalidate approval without changing past reports. An accepted replacement updates
 the active inventory without erasing any earlier experimental acceptance or result.
@@ -175,3 +213,15 @@ costs make recorded cost totals and cost per valid experiment incomplete.
 Reporter outcomes and routing counts appear under `completion_reporting`, alongside
 per-experiment records. An escalated completion includes both reporter and
 orchestrator costs in its attribution and the campaign total.
+
+## Topic loop
+
+The loop's records live in `outputs/autoresearch/.loop/`: `loop.json` (state, topic records
+with origin and outcome, rotations, taken pool seeds, `attention`), `rotations/<id>/` (the
+topic packet, drafts with `checks.json`, staged campaigns and the final `rotation.json`) and
+`jobs/<id>/` (topic-draft and pick assignments, prompts, reports and usage, as for campaign
+jobs). A campaign under rotation also has `rotation.json` in its own output directory, the
+mark its supervisor obeys. Field meanings are in [topic rotation](topic-rotation.md#records).
+Topic drafts use `TopicDraftReport` and picks `TopicPick` in
+[campaign/reports.py](../src/knee_abnormality/autoresearch/campaign/reports.py); the seed
+pool uses the same topic-seed schema plus `evidence`.

@@ -10,7 +10,7 @@ from scipy.stats import spearmanr
 from sklearn.metrics import cohen_kappa_score, roc_auc_score
 
 from knee_abnormality.cli import CLISettings
-from knee_abnormality.data.labels import STUDY, TARGET_THRESHOLD
+from knee_abnormality.data.splits import STUDY, TARGET_THRESHOLD
 from knee_abnormality.provenance import copy_sources, sha256_file
 from scripts.tools.prepare_combined_labels import CONSENSUS_TARGETS
 

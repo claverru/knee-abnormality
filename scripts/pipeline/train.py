@@ -25,7 +25,7 @@ from knee_abnormality.config import (
     parse_experiment_arguments,
 )
 from knee_abnormality.data.dataset import KneeStudyDataset, build_data_loader
-from knee_abnormality.data.labels import STUDY
+from knee_abnormality.data.splits import STUDY
 from knee_abnormality.evaluation.predictions import (
     fold_prediction_macro_auc,
     make_prediction_frame,

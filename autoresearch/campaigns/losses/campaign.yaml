@@ -8,6 +8,9 @@ additional_evidence_runs:
 backlog:
   refill_below: 4
   refill_to: 5
+  rotate_after: 6
+budget:
+  mode: sealed
 policy:
   editable_files:
     - configs/training.yaml
@@ -22,6 +25,7 @@ policy:
   list_item_fields: {}
   input_identity_keys: []
   require_source_change: true
+  configuration_only_ideas: false
   developer_instructions: >-
     Implement the shared loss mechanism and update configs/training.yaml only if
     needed. New objective settings belong under trainer.loss. Use one formula,

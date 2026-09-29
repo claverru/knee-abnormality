@@ -16,8 +16,8 @@ from pydantic_settings import CliPositionalArg
 from knee_abnormality.cli import CLISettings, describe
 from knee_abnormality.config import SLICES_PER_INPUT, load_config
 from knee_abnormality.data.dataset import collate_studies
-from knee_abnormality.data.labels import STUDY
 from knee_abnormality.data.preprocessing.device import prepare_images
+from knee_abnormality.data.splits import STUDY
 from knee_abnormality.identity import preprocessing_identity
 from knee_abnormality.inference.engine import prediction_data
 from knee_abnormality.modeling.augmentation import (

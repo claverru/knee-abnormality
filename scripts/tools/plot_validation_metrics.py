@@ -12,7 +12,7 @@ from pydantic import Field
 from pydantic_settings import CliPositionalArg
 
 from knee_abnormality.cli import CLISettings, describe
-from knee_abnormality.data.labels import STUDY, load_split
+from knee_abnormality.data.splits import STUDY, load_split
 from knee_abnormality.evaluation.metrics import soft_aucs
 
 matplotlib.use("Agg")

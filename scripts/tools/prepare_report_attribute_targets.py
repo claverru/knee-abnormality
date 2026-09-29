@@ -6,7 +6,6 @@ import polars as pl
 from pydantic import Field
 
 from knee_abnormality.cli import CLISettings, describe
-from knee_abnormality.data.labels import STUDY, require_unique_ids
 from knee_abnormality.data.report_attributes import (
     FileRecord,
     Gate,
@@ -18,6 +17,7 @@ from knee_abnormality.data.report_attributes import (
     value_column,
     weight_column,
 )
+from knee_abnormality.data.splits import STUDY, require_unique_ids
 
 EXCLUDED = (
     "study_side",

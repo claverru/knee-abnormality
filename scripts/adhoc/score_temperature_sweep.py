@@ -9,7 +9,7 @@ from pydantic import Field
 from pydantic_settings import SettingsError
 
 from knee_abnormality.cli import CLISettings
-from knee_abnormality.data.labels import STUDY, TARGET_THRESHOLD
+from knee_abnormality.data.splits import STUDY, TARGET_THRESHOLD
 from knee_abnormality.evaluation.metrics import aucs, bootstrap_auc
 
 NAME = re.compile(r"x(?P<multiplier>\d+)-tau(?P<tau>\d+\.\d+)\.csv")

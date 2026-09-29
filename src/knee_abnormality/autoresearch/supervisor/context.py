@@ -8,6 +8,10 @@ from knee_abnormality.autoresearch.campaign.gates import (
     flatten,
 )
 from knee_abnormality.autoresearch.campaign.reports import REPORTS
+from knee_abnormality.autoresearch.reporting.curves import (
+    campaign_curves,
+    compact_curves,
+)
 from knee_abnormality.autoresearch.runtime.layout import (
     campaign_fold,
     comparison_path,
@@ -17,6 +21,7 @@ from knee_abnormality.autoresearch.runtime.layout import (
 )
 from knee_abnormality.autoresearch.runtime.storage import read_json, sha256, write_json
 from knee_abnormality.autoresearch.scoring.diagnostics import INTERPRETATION
+from knee_abnormality.autoresearch.supervisor.monitoring import run_failure
 
 
 def select(value, keys):
@@ -57,6 +62,8 @@ def experiment_card(exp):
             "implementation_parent",
             "implementation_reference",
             "integration",
+            "activation",
+            "run_checks",
             "active_idea_ids",
             "repair_of",
             "repair_count",
@@ -83,8 +90,8 @@ def family_ledger(state):
         if not exp.get("decision"):
             continue
         idea = state["ideas"][exp["idea"]]
-        scores = exp["evidence"].get("macro_auc")
-        bounds = (exp["evidence"].get("adoption_bootstrap") or {}).get(
+        scores = exp.get("evidence", {}).get("macro_auc")
+        bounds = (exp.get("evidence", {}).get("adoption_bootstrap") or {}).get(
             "delta_percentile_80"
         )
         families[idea["mechanism_id"]].setdefault("results", []).append(
@@ -98,7 +105,7 @@ def family_ledger(state):
                 "adoption_interval_80": bounds,
             }
         )
-    for family, verdict in state["research"]["verdicts"].items():
+    for family, verdict in state.get("research", {}).get("verdicts", {}).items():
         families[family]["verdict"] = select(
             verdict, ("verdict", "reason", "next_step", "misses")
         )
@@ -117,6 +124,7 @@ def experiment_evidence(state, exp):
                 "changes.diff",
                 "manifest.json",
                 "config.yaml",
+                "run-limits.json",
                 "evaluation.json",
                 "comparison/comparison.json",
                 "comparison/per_label.json",
@@ -209,9 +217,9 @@ def campaign_defects(state, exclude):
             continue
         if value.get("repair_instruction"):
             text = value["repair_instruction"]
-        elif value.get("decision") == "invalid" and not value.get(
-            "training_receipt", {}
-        ).get("cancelled"):
+        elif value.get("decision") == "invalid" and (
+            run_failure(value) or not value.get("training_receipt", {}).get("cancelled")
+        ):
             text = "; ".join(value.get("evidence", {}).get("reasons", [])) + (
                 f" Log: {logs[value['id']]}" if value["id"] in logs else ""
             )
@@ -326,6 +334,7 @@ def build_context(state, role, assignment, directory, docs, state_path):
     ]
     context = {
         "role": role,
+        "budget": state["budget"],
         "limits": state["limits"],
         "incumbent": state["incumbent"],
         "active_incumbent_ideas": active_incumbent_ideas(state),
@@ -373,6 +382,13 @@ def build_context(state, role, assignment, directory, docs, state_path):
         context["campaign_defects"] = campaign_defects(state, exp_id)
     if role == "researcher" or event.get("kind") == "proposals":
         context["family_ledger"] = family_ledger(state)
+    if role == "researcher":
+        curves = campaign_curves(state)
+        curves_path = directory / "curves.json"
+        write_json(curves_path, curves)
+        context["run_curves"] = compact_curves(
+            curves, set(assignment["new_results"]), curves_path
+        )
     if role == "orchestrator":
         context["proposal_admission"] = [
             {
@@ -403,6 +419,8 @@ def build_context(state, role, assignment, directory, docs, state_path):
                 "implementation",
                 "open_choices",
                 "dependencies",
+                "source_change",
+                "targeted_curve",
             ),
         )
     if event:

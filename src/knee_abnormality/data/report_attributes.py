@@ -5,7 +5,7 @@ import numpy as np
 import polars as pl
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from knee_abnormality.data.labels import STUDY, require_unique_ids
+from knee_abnormality.data.splits import STUDY, require_unique_ids
 from knee_abnormality.provenance import sha256_file
 
 PROBABILITY_TOLERANCE = 1e-4

@@ -13,7 +13,8 @@ from knee_abnormality.config import (
     DataConfig,
     ExperimentConfig,
 )
-from knee_abnormality.data.labels import STUDY, load_fold_labels
+from knee_abnormality.data.labels import load_fold_labels
+from knee_abnormality.data.splits import STUDY
 
 SERIES = "SeriesInstanceUID"
 

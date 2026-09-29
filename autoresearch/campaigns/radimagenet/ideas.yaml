@@ -1,0 +1,385 @@
+revision: 43
+ideas:
+- id: rn18-fourteen-epochs
+  mechanism_id: schedule-length
+  parent_idea_id: null
+  title: Train 14 epochs instead of 10 with the same warmup and cosine shape
+  opportunity: ResNet-18 leads the control through epoch 5, then gains only +0.0039
+    over epochs 5-9 against +0.0087, with training loss above the control's from epoch
+    2 (prior-work.md). The cosine reaches its floor at epoch 9 while the curve still
+    rises.
+  mechanism: trainer.max_epochs 14; warmup and cosine scale with the run as today.
+  precedents:
+  - RadImageNet base run curve (prior-work.md).
+  novelty: Not yet tried on RadImageNet ResNets.
+  coverage: All studies and labels.
+  exploitation: Per-epoch curves, per-stage drift and gradient RMS against the RadImageNet
+    base run and the ReXNet control.
+  budget: About 1,520 s, 140% of the RadImageNet base run.
+  implementation: 'Configuration-only: the RadImageNet base (contract) plus this change.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Cheapest test of whether flattening is the schedule running
+    out.
+  status: completed
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality/autoresearch/campaigns/radimagenet/seed-ideas.yaml
+  experiments:
+  - rn18-fourteen-epochs-20260928T203926Z-edcce1c4
+  decision: reject
+- id: rn18-two-warmup-epochs
+  mechanism_id: warmup
+  parent_idea_id: null
+  title: Two warmup epochs instead of one
+  opportunity: The peak rate arrives when the model is already ahead; a gentler start
+    may protect the early layers (First five convs drift 8.1% from the pretrained
+    start against 3.2% for ReXNet; last five match (prior-work.md).)
+  mechanism: optimizer.warmup_epochs 2.
+  precedents:
+  - 'EfficientNet-B3 two-epoch warmup: +0.0012 over its control, fold 3 (B3 overnight
+    queues).'
+  novelty: Not yet tried on RadImageNet ResNets.
+  coverage: All studies and labels.
+  exploitation: Per-epoch curves, per-stage drift and gradient RMS against the RadImageNet
+    base run and the ReXNet control.
+  budget: Same as the RadImageNet base run, about 57% of the ReXNet reference.
+  implementation: 'Configuration-only: the RadImageNet base (contract) plus this change.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Only schedule change with a local precedent.
+  status: launched
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality/autoresearch/campaigns/radimagenet/seed-ideas.yaml
+  experiments:
+  - rn18-two-warmup-epochs-20260928T204343Z-5a06510a
+- id: rn18-no-series-dropout
+  mechanism_id: regularization
+  parent_idea_id: null
+  title: Series dropout 0.2 to 0
+  opportunity: 'The model underfits: training loss sits above the control''s from
+    epoch 2.'
+  mechanism: model.series_dropout 0.
+  precedents:
+  - Training-loss curves (prior-work.md).
+  novelty: Not yet tried on RadImageNet ResNets.
+  coverage: All studies and labels.
+  exploitation: Per-epoch curves, per-stage drift and gradient RMS against the RadImageNet
+    base run and the ReXNet control.
+  budget: Same as the RadImageNet base run, about 57% of the ReXNet reference.
+  implementation: 'Configuration-only: the RadImageNet base (contract) plus this change.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Removes a regularizer from an underfitting model.
+  status: prepared
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality/autoresearch/campaigns/radimagenet/seed-ideas.yaml
+  experiments:
+  - rn18-no-series-dropout-20260928T211021Z-64e7f65c
+- id: rn18-lighter-dsu
+  mechanism_id: regularization
+  parent_idea_id: null
+  title: DSU probability 0.5 to 0.25
+  opportunity: Feature-statistics perturbation at stride 8 is strong for an 11M-parameter
+    ResNet that already underfits.
+  mechanism: model.feature_statistics_augmentation.probability 0.25.
+  precedents:
+  - DSU adopted on ReXNet in the augmentation campaign; its support weakened on rebuild_state_v2
+    (campaign re-scoring).
+  novelty: Not yet tried on RadImageNet ResNets.
+  coverage: All studies and labels.
+  exploitation: Per-epoch curves, per-stage drift and gradient RMS against the RadImageNet
+    base run and the ReXNet control.
+  budget: Same as the RadImageNet base run, about 57% of the ReXNet reference.
+  implementation: 'Configuration-only: the RadImageNet base (contract) plus this change.'
+  open_choices: 0 if 0.25 helps.
+  dependencies: []
+  priority_rationale: Regularization suspect specific to the small backbone.
+  status: queued
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality/autoresearch/campaigns/radimagenet/seed-ideas.yaml
+- id: rn18-layerwise-lr-decay
+  mechanism_id: per-layer-rate
+  parent_idea_id: null
+  title: 'Layer-wise learning-rate decay: each ResNet stage below layer4 gets half
+    the rate of the stage above'
+  opportunity: First five convs drift 8.1% from the pretrained start against 3.2%
+    for ReXNet; last five match (prior-work.md).
+  mechanism: Parameter groups per stage (stem, layer1-4, head); backbone rate x 0.5^k
+    for stage k counted down from layer4; head unchanged.
+  precedents:
+  - Standard in fine-tuning pretrained encoders (BEiT, ELECTRA).
+  - Measured early-layer drift (prior-work.md).
+  novelty: Not yet tried on RadImageNet ResNets.
+  coverage: All studies and labels.
+  exploitation: Per-epoch curves, per-stage drift and gradient RMS against the RadImageNet
+    base run and the ReXNet control.
+  budget: Same as the RadImageNet base run, about 57% of the ReXNet reference.
+  implementation: New option optimizer.layer_decay in config.py and the parameter
+    groups in the Lightning module's optimizer setup; log each group's rate.
+  open_choices: 0.3 or 0.7 after the first result.
+  dependencies: []
+  priority_rationale: Targets the measured early-layer overwriting directly.
+  status: queued
+  created_revision: 1
+  seeded: /home/claudio/src/knee-abnormality/autoresearch/campaigns/radimagenet/seed-ideas-2.yaml
+- id: rn18-linear-probe-then-finetune
+  mechanism_id: head-first
+  parent_idea_id: null
+  title: Train only the head and tokens for one epoch with the backbone frozen, then
+    fine-tune
+  opportunity: The model starts strong because the pretrained features are good; fine-tuning
+    with a random head distorts them early (LP-FT, arXiv 2202.10054).
+  mechanism: 'Epoch 0: backbone parameters frozen and BatchNorm in eval mode; from
+    epoch 1 the usual schedule.'
+  precedents:
+  - Kumar et al. 2022, LP-FT.
+  novelty: Not yet tried on RadImageNet ResNets.
+  coverage: All studies and labels.
+  exploitation: Per-epoch curves, per-stage drift and gradient RMS against the RadImageNet
+    base run and the ReXNet control.
+  budget: Slightly cheaper than the RadImageNet base run.
+  implementation: New option trainer.backbone_frozen_epochs in config.py and the freezing
+    in the Lightning module.
+  open_choices: Two frozen epochs.
+  dependencies: []
+  priority_rationale: Evidence-backed way to keep a good pretrained backbone's features.
+  status: queued
+  created_revision: 1
+  seeded: /home/claudio/src/knee-abnormality/autoresearch/campaigns/radimagenet/seed-ideas-2.yaml
+- id: rn18-l2-sp
+  mechanism_id: anchored-decay
+  parent_idea_id: null
+  title: Weight decay toward the pretrained weights instead of toward zero
+  opportunity: First five convs drift 8.1% from the pretrained start against 3.2%
+    for ReXNet; last five match (prior-work.md).
+  mechanism: Replace AdamW decay on backbone weights by alpha * ||w - w0||^2 (L2-SP),
+    stronger on the stem and layer1.
+  precedents:
+  - Li et al. 2018, L2-SP (arXiv 1802.01483).
+  novelty: Not yet tried on RadImageNet ResNets.
+  coverage: All studies and labels.
+  exploitation: Per-epoch curves, per-stage drift and gradient RMS against the RadImageNet
+    base run and the ReXNet control.
+  budget: Small extra memory.
+  implementation: Keep w0 as a frozen buffer copy; add the penalty in the Lightning
+    module; option optimizer.anchor_decay.
+  open_choices: alpha 1e-3 and 1e-2.
+  dependencies: []
+  priority_rationale: Keeps what RadImageNet learned while letting the top move.
+  status: queued
+  created_revision: 1
+  seeded: /home/claudio/src/knee-abnormality/autoresearch/campaigns/radimagenet/seed-ideas-2.yaml
+- id: rn18-mean-init-adjacent-slices
+  mechanism_id: slice-channels
+  parent_idea_id: null
+  title: Three adjacent slices with a mean-initialized first convolution
+  opportunity: Repeated middle slice throws away depth context, but adjacent slices
+    through the unchanged pretrained conv1 lost 0.0059 at x4 (0.919531 against 0.925476,
+    radimagenet-resnet18-adjacent), consistent with a public report that repeated
+    middle beats adjacent for RadImageNet. Replacing conv1 weights by their channel
+    mean /3 copied to each channel reproduces the pretrained response on uniform input
+    while letting slices differ.
+  mechanism: model.slice_channels adjacent plus conv1 weight = mean over input channels
+    / 3, repeated.
+  precedents:
+  - I3D inflation (arXiv 1705.07750).
+  - 'radimagenet-resnet18-adjacent: -0.0059 with the unchanged conv1 (prior-work.md).'
+  novelty: Not yet tried on RadImageNet ResNets.
+  coverage: All studies and labels.
+  exploitation: Per-epoch curves, per-stage drift and gradient RMS against the RadImageNet
+    base run and the ReXNet control.
+  budget: Same as the RadImageNet base run, about 57% of the ReXNet reference.
+  implementation: New option model.first_conv_init channel_mean applied after loading
+    pretrained weights.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Keeps the pretrained start and adds depth context.
+  status: queued
+  created_revision: 1
+  seeded: /home/claudio/src/knee-abnormality/autoresearch/campaigns/radimagenet/seed-ideas-2.yaml
+- id: rn18-freeze-stem-layer1
+  mechanism_id: freezing
+  parent_idea_id: null
+  title: Freeze the stem and layer1 for the whole run
+  opportunity: First five convs drift 8.1% from the pretrained start against 3.2%
+    for ReXNet; last five match (prior-work.md).
+  mechanism: requires_grad False and BatchNorm eval for the stem and layer1.
+  precedents:
+  - Gradual unfreezing (ULMFiT, arXiv 1801.06146).
+  - Measured early-layer drift (prior-work.md).
+  novelty: Not yet tried on RadImageNet ResNets.
+  coverage: All studies and labels.
+  exploitation: Per-epoch curves, per-stage drift and gradient RMS against the RadImageNet
+    base run and the ReXNet control.
+  budget: Cheaper than the RadImageNet base run.
+  implementation: New option model.frozen_stages 2 in config.py and the model.
+  open_choices: Unfreeze at epoch 3.
+  dependencies: []
+  priority_rationale: Simplest structural test of the overwriting hypothesis.
+  status: queued
+  created_revision: 1
+  seeded: /home/claudio/src/knee-abnormality/autoresearch/campaigns/radimagenet/seed-ideas-2.yaml
+- id: rn18-more-triplets
+  mechanism_id: input-amount
+  parent_idea_id: null
+  title: 36 triplets per study instead of 26
+  opportunity: ResNet-18 costs 57% of the control; more slices per study give more
+    evidence per step within the budget.
+  mechanism: data.study_triplet_total 36.
+  precedents:
+  - Earlier triplet-count work on ReXNet (study_triplet_total 26 adoption).
+  novelty: Not yet tried on RadImageNet ResNets.
+  coverage: All studies and labels.
+  exploitation: Per-epoch curves, per-stage drift and gradient RMS against the RadImageNet
+    base run and the ReXNet control.
+  budget: About 1,500 s, 138% of the RadImageNet base run.
+  implementation: 'Configuration-only: the RadImageNet base (contract) plus this change.'
+  open_choices: 32 if 36 helps but costs too much.
+  dependencies: []
+  priority_rationale: User-allowed input increase inside the budget.
+  status: queued
+  created_revision: 2
+  seeded: /home/claudio/src/knee-abnormality/autoresearch/campaigns/radimagenet/seed-ideas-3.yaml
+- id: rn18-backbone-lr-1e-4
+  mechanism_id: backbone-rate
+  parent_idea_id: null
+  title: Backbone learning rate 5e-5 to 1e-4
+  opportunity: Underfitting with a rate set by a weight-scale rule; the late layers
+    may need more movement.
+  mechanism: optimizer.backbone_lr 1e-4.
+  precedents:
+  - Weight-scale rule for backbone swaps (backbone-swaps.md).
+  novelty: Not yet tried on RadImageNet ResNets.
+  coverage: All studies and labels.
+  exploitation: Per-epoch curves, per-stage drift and gradient RMS against the RadImageNet
+    base run and the ReXNet control.
+  budget: Same as the RadImageNet base run, about 57% of the ReXNet reference.
+  implementation: 'Configuration-only: the RadImageNet base (contract) plus this change.'
+  open_choices: 2.5e-5 in the opposite direction.
+  dependencies: []
+  priority_rationale: Locates the rate before per-layer rules; watch early-layer drift.
+  status: queued
+  created_revision: 2
+  seeded: /home/claudio/src/knee-abnormality/autoresearch/campaigns/radimagenet/seed-ideas-3.yaml
+- id: rn18-multiscale-tokens
+  mechanism_id: token-readout
+  parent_idea_id: null
+  title: Add layer3 (stride-16) tokens next to layer4 tokens
+  opportunity: ResNet-18's final 512-channel 7x7 map may limit what attention can
+    pool; stride-16 tokens add detail at small cost.
+  mechanism: Project layer3 features to the token width and pool them with the layer4
+    tokens, with their own position embeddings.
+  precedents:
+  - Stride-16 fusion on ReXNet (validation results).
+  novelty: Not yet tried on RadImageNet ResNets.
+  coverage: All studies and labels.
+  exploitation: Per-epoch curves, per-stage drift and gradient RMS against the RadImageNet
+    base run and the ReXNet control.
+  budget: More tokens; within the budget.
+  implementation: New option model.token_stages in model.py and spatial_tokens.py;
+    spatial mapping for layer3.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Capacity test aimed at the flattening.
+  status: queued
+  created_revision: 2
+  seeded: /home/claudio/src/knee-abnormality/autoresearch/campaigns/radimagenet/seed-ideas-3.yaml
+- id: rn18-warmup-stable-decay
+  mechanism_id: schedule-shape
+  parent_idea_id: null
+  title: Warmup, constant rate until 80% of training, then linear decay
+  opportunity: ResNet-18 leads the control through epoch 5, then gains only +0.0039
+    over epochs 5-9 against +0.0087, with training loss above the control's from epoch
+    2 (prior-work.md).
+  mechanism: Replace cosine by warmup-stable-decay at the same peak and floor.
+  precedents:
+  - MiniCPM warmup-stable-decay (arXiv 2404.06395).
+  novelty: Not yet tried on RadImageNet ResNets.
+  coverage: All studies and labels.
+  exploitation: Per-epoch curves, per-stage drift and gradient RMS against the RadImageNet
+    base run and the ReXNet control.
+  budget: Same as the RadImageNet base run, about 57% of the ReXNet reference.
+  implementation: New option optimizer.schedule wsd in config.py and the scheduler.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Keeps the backbone at its peak rate for most of the run.
+  status: queued
+  created_revision: 2
+  seeded: /home/claudio/src/knee-abnormality/autoresearch/campaigns/radimagenet/seed-ideas-3.yaml
+- id: rn10t-double-batch-and-rates
+  mechanism_id: batch-and-rate
+  parent_idea_id: null
+  title: ResNet-10t with batch size 16 and both learning rates doubled
+  opportunity: ResNet-10t trails ResNet-18 at every epoch (x4 0.922579 against 0.925476)
+    at nearly the same wall-clock cost, since training is loader-bound. A larger batch
+    gives BatchNorm and the gradient more studies per step, and doubling the rates
+    keeps the per-study update size (linear scaling); the smaller backbone leaves
+    GPU memory for it.
+  mechanism: The RadImageNet base with model.backbone resnet10t.c3_in1k, trainer.batch_size
+    16, optimizer.backbone_lr 1.2e-4 (twice the 6e-5 of the ResNet-10t run) and optimizer.head_lr
+    1.2e-3 (twice 6e-4); everything else as the base.
+  precedents:
+  - 'radimagenet-resnet10t: x4 0.922579 at batch 8, backbone LR 6e-5 (prior-work.md).'
+  - Linear learning-rate scaling with batch size (Goyal et al. 2017, arXiv 1706.02677).
+  novelty: First batch-size change in the project; first ResNet-10t seed.
+  coverage: All studies and labels.
+  exploitation: Per-epoch curves, per-stage drift and gradient RMS against the ResNet-10t
+    run and the ReXNet control.
+  budget: Half the optimizer steps per epoch; expected at or below the ResNet-10t
+    run (1,048 s), inside the range. GPU memory at batch 16 is unmeasured.
+  implementation: 'Configuration-only: the RadImageNet base (contract) with the ResNet-10t
+    backbone, batch 16 and both rates doubled.'
+  open_choices: Batch 12 with 1.5x rates if batch 16 does not fit in memory.
+  dependencies: []
+  priority_rationale: User-requested; tests whether ResNet-10t is held back by its
+    step size rather than its capacity.
+  status: queued
+  created_revision: 2
+  seeded: /home/claudio/src/knee-abnormality/autoresearch/campaigns/radimagenet/seed-ideas-3.yaml
+- id: rn18-plane-backbones-dense-fusion
+  mechanism_id: plane-backbones
+  parent_idea_id: null
+  title: One RadImageNet ResNet-18 per plane with dense per-plane readouts and learned
+    fusion, at the ResNet-18 settings
+  opportunity: The plane-specialization campaign found its best structure in one backbone
+    per plane with dense per-plane readouts and learned per-label fusion (dense readouts
+    adopted in the campaign; S77, three ReXNet-200s, 0.945 public). Each RadImageNet
+    backbone then sees a single plane, closer to how RadImageNet was pretrained (single
+    slices), and the three smaller backbones cost less than three ReXNets.
+  mechanism: 'Port the plane structure onto the current code: model.plane_backbones
+    true (one backbone per plane, series routed by plane), trainer.plane_pooling.assignment
+    dense (every present plane predicts every label from its own pooled tokens), model.plane_pooling.fusion
+    learned (softmax weights over present planes on detached plane logits, the fused
+    logit is the output) and model.series_dropout 0, as in S77. Each of the three
+    backbones is the RadImageNet base: resnet18.a1_in1k with RadImageNet weights,
+    repeated middle slice, ImageNet mean/std, backbone LR 5e-5 and head LR 6e-4; the
+    rest of the recipe as the base.'
+  precedents:
+  - 'Plane-specialization dense readouts + learned fusion (B0 x3): outputs/autoresearch/plane-specialization/experiments/dense-readouts-learned-fusion-20260927T231847Z-33417f97,
+    source under source/ (modeling/planes/exclusive.py, fusion.py; plane options in
+    config.py, model.py, training/lightning.py).'
+  - 'S77 three ReXNet-200s with the same structure: outputs/training/20260928-105516-rexnet-plane-dense-fusion
+    (config and source_snapshot.zip), 0.945 public, 2,600 s training against 1,912
+    s for one ReXNet.'
+  - 'RadImageNet ResNet-18 base settings: outputs/training/20260928-185524-radimagenet-resnet18.'
+  novelty: First plane-specific RadImageNet backbones.
+  coverage: All studies and labels; each backbone trains on its plane only.
+  exploitation: Per-plane logit AUCs and fusion weights per label as in the plane
+    campaign, plus per-stage drift and gradient RMS for each plane backbone against
+    the RadImageNet base run.
+  budget: Unmeasured. Three ReXNets took 1.36x one ReXNet (2,600 s against 1,912 s);
+    the same factor on ResNet-18 gives about 1,480 s, inside the 1,627 s ceiling.
+    If it runs over, cut epochs, not the structure.
+  implementation: 'Code: port the plane options and modeling/planes/ from the plane-specialization
+    source above onto the current tree, adapted to the current config, spatial-token
+    mapping (one mapping per plane backbone) and RadImageNet loading (each plane backbone
+    loads the RadImageNet state dict); keep the per-stage logging per backbone (prefix
+    the stage names by plane). The activation signature can be the logged fusion weights
+    or per-plane logit counts.'
+  open_choices: None; the S77 structure as it was, with ResNet-18 settings.
+  dependencies: []
+  priority_rationale: User-requested; combines the previous campaign best structure
+    with the RadImageNet backbone.
+  status: queued
+  created_revision: 3
+  seeded: /home/claudio/src/knee-abnormality/autoresearch/campaigns/radimagenet/seed-ideas-4.yaml

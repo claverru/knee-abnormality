@@ -7,14 +7,18 @@ import polars as pl
 from pydantic import Field
 
 from knee_abnormality.cli import CLISettings, describe
-from knee_abnormality.config import INFERENCE_BATCH_SIZE, INFERENCE_IO_THREADS, load_config
+from knee_abnormality.config import (
+    INFERENCE_BATCH_SIZE,
+    INFERENCE_IO_THREADS,
+    load_config,
+)
 from knee_abnormality.data.dataset import KneeStudyDataset, build_data_loader
-from knee_abnormality.data.labels import STUDY, TARGET_THRESHOLD
 from knee_abnormality.data.sources import (
     StudySeries,
     build_series_index,
     prediction_studies,
 )
+from knee_abnormality.data.splits import STUDY, TARGET_THRESHOLD
 from knee_abnormality.evaluation.metrics import bootstrap_auc, validation_metrics
 from knee_abnormality.evaluation.predictions import make_prediction_frame
 from knee_abnormality.inference.checkpoint import load_checkpoint_model

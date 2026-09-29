@@ -1,0 +1,101 @@
+ideas:
+- id: rn18-more-triplets
+  mechanism_id: input-amount
+  parent_idea_id: null
+  title: 36 triplets per study instead of 26
+  opportunity: ResNet-18 costs 57% of the control; more slices per study give more evidence per step within
+    the budget.
+  mechanism: data.study_triplet_total 36.
+  precedents:
+  - Earlier triplet-count work on ReXNet (study_triplet_total 26 adoption).
+  novelty: Not yet tried on RadImageNet ResNets.
+  coverage: All studies and labels.
+  exploitation: Per-epoch curves, per-stage drift and gradient RMS against the RadImageNet base run and
+    the ReXNet control.
+  budget: About 1,500 s, 138% of the RadImageNet base run.
+  implementation: 'Configuration-only: the RadImageNet base (contract) plus this change.'
+  open_choices: 32 if 36 helps but costs too much.
+  dependencies: []
+  priority_rationale: User-allowed input increase inside the budget.
+- id: rn18-backbone-lr-1e-4
+  mechanism_id: backbone-rate
+  parent_idea_id: null
+  title: Backbone learning rate 5e-5 to 1e-4
+  opportunity: Underfitting with a rate set by a weight-scale rule; the late layers may need more movement.
+  mechanism: optimizer.backbone_lr 1e-4.
+  precedents:
+  - Weight-scale rule for backbone swaps (backbone-swaps.md).
+  novelty: Not yet tried on RadImageNet ResNets.
+  coverage: All studies and labels.
+  exploitation: Per-epoch curves, per-stage drift and gradient RMS against the RadImageNet base run and
+    the ReXNet control.
+  budget: Same as the RadImageNet base run, about 57% of the ReXNet reference.
+  implementation: 'Configuration-only: the RadImageNet base (contract) plus this change.'
+  open_choices: 2.5e-5 in the opposite direction.
+  dependencies: []
+  priority_rationale: Locates the rate before per-layer rules; watch early-layer drift.
+- id: rn18-multiscale-tokens
+  mechanism_id: token-readout
+  parent_idea_id: null
+  title: Add layer3 (stride-16) tokens next to layer4 tokens
+  opportunity: ResNet-18's final 512-channel 7x7 map may limit what attention can pool; stride-16 tokens
+    add detail at small cost.
+  mechanism: Project layer3 features to the token width and pool them with the layer4 tokens, with their
+    own position embeddings.
+  precedents:
+  - Stride-16 fusion on ReXNet (validation results).
+  novelty: Not yet tried on RadImageNet ResNets.
+  coverage: All studies and labels.
+  exploitation: Per-epoch curves, per-stage drift and gradient RMS against the RadImageNet base run and
+    the ReXNet control.
+  budget: More tokens; within the budget.
+  implementation: New option model.token_stages in model.py and spatial_tokens.py; spatial mapping for
+    layer3.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Capacity test aimed at the flattening.
+- id: rn18-warmup-stable-decay
+  mechanism_id: schedule-shape
+  parent_idea_id: null
+  title: Warmup, constant rate until 80% of training, then linear decay
+  opportunity: ResNet-18 leads the control through epoch 5, then gains only +0.0039 over epochs 5-9 against
+    +0.0087, with training loss above the control's from epoch 2 (prior-work.md).
+  mechanism: Replace cosine by warmup-stable-decay at the same peak and floor.
+  precedents:
+  - MiniCPM warmup-stable-decay (arXiv 2404.06395).
+  novelty: Not yet tried on RadImageNet ResNets.
+  coverage: All studies and labels.
+  exploitation: Per-epoch curves, per-stage drift and gradient RMS against the RadImageNet base run and
+    the ReXNet control.
+  budget: Same as the RadImageNet base run, about 57% of the ReXNet reference.
+  implementation: New option optimizer.schedule wsd in config.py and the scheduler.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Keeps the backbone at its peak rate for most of the run.
+- id: rn10t-double-batch-and-rates
+  mechanism_id: batch-and-rate
+  parent_idea_id: null
+  title: ResNet-10t with batch size 16 and both learning rates doubled
+  opportunity: ResNet-10t trails ResNet-18 at every epoch (x4 0.922579 against 0.925476) at nearly the
+    same wall-clock cost, since training is loader-bound. A larger batch gives BatchNorm and the gradient
+    more studies per step, and doubling the rates keeps the per-study update size (linear scaling); the
+    smaller backbone leaves GPU memory for it.
+  mechanism: The RadImageNet base with model.backbone resnet10t.c3_in1k, trainer.batch_size 16, optimizer.backbone_lr
+    1.2e-4 (twice the 6e-5 of the ResNet-10t run) and optimizer.head_lr 1.2e-3 (twice 6e-4); everything
+    else as the base.
+  precedents:
+  - 'radimagenet-resnet10t: x4 0.922579 at batch 8, backbone LR 6e-5 (prior-work.md).'
+  - Linear learning-rate scaling with batch size (Goyal et al. 2017, arXiv 1706.02677).
+  novelty: First batch-size change in the project; first ResNet-10t seed.
+  coverage: All studies and labels.
+  exploitation: Per-epoch curves, per-stage drift and gradient RMS against the ResNet-10t run and the
+    ReXNet control.
+  budget: Half the optimizer steps per epoch; expected at or below the ResNet-10t run (1,048 s), inside
+    the range. GPU memory at batch 16 is unmeasured.
+  implementation: 'Configuration-only: the RadImageNet base (contract) with the ResNet-10t backbone, batch
+    16 and both rates doubled.'
+  open_choices: Batch 12 with 1.5x rates if batch 16 does not fit in memory.
+  dependencies: []
+  priority_rationale: User-requested; tests whether ResNet-10t is held back by its step size rather than
+    its capacity.
+exhausted_directions: None yet; first campaign on RadImageNet ResNets.

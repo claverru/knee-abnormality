@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field
 from pydantic_settings import CliApp, CliSubCommand
 
 from knee_abnormality.cli import CLISettings, command, describe
-from knee_abnormality.data.labels import STUDY
+from knee_abnormality.data.splits import STUDY
 from knee_abnormality.evaluation.metrics import validation_metrics
 from knee_abnormality.inference.bundle import verify_bundle
 from knee_abnormality.kaggle import COMPETITION, KaggleId, NotebookRun

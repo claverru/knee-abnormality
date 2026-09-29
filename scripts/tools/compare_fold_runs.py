@@ -10,7 +10,7 @@ from pydantic import Field
 from knee_abnormality.autoresearch.campaign.gates import without_fields
 from knee_abnormality.cli import Bootstrap, CLISettings, RunFold, describe
 from knee_abnormality.config import STUDY_HEADERS
-from knee_abnormality.data.labels import STUDY, TARGET_THRESHOLD
+from knee_abnormality.data.splits import STUDY, TARGET_THRESHOLD
 from knee_abnormality.evaluation.metrics import (
     COMPARTMENT_PAIRS,
     aucs,
@@ -199,14 +199,18 @@ def compare(settings: CompareCLI) -> None:
     predictions = {name: run["predictions"] for name, run in loaded.items()}
     runs = {name: run["record"] for name, run in loaded.items()}
     identity_diff = differences(
-        without_fields(
-            loaded["reference"]["input_identity"],
-            settings.reference_identity_exceptions,
+        flatten(
+            without_fields(
+                loaded["reference"]["input_identity"],
+                settings.reference_identity_exceptions,
+            )
         ),
-        without_fields(
-            loaded["candidate"]["input_identity"],
-            settings.reference_identity_exceptions,
-            required=False,
+        flatten(
+            without_fields(
+                loaded["candidate"]["input_identity"],
+                settings.reference_identity_exceptions,
+                required=False,
+            )
         ),
     )
     if rejected := unexpected(

@@ -1,0 +1,483 @@
+revision: 148
+ideas:
+- id: sig-foreground-quantile-bounds
+  mechanism_id: foreground-supported-acquisition-quantiles
+  parent_idea_id: null
+  title: Estimate intensity bounds from tissue support rather than all valid-rectangle
+    pixels
+  opportunity: Vendor slices differ markedly, including Philips PF OA at 0.842669.
+    Current quantiles exclude padding but include air within valid rectangles. Air
+    fraction can change with field of view and acquisition, potentially changing tissue
+    contrast independently of pathology; this has not yet been measured.
+  mechanism: 'Build an acquisition-local foreground support estimate from the histogram
+    of its selected unique valid pixels, using an Otsu split and simple spatial cleanup.
+    Recompute the incumbent quantile probabilities on supported tissue, then apply
+    the resulting affine mapping to every valid pixel. The mask selects statistics
+    only: do not erase background pixels or alter geometry. Use the original all-valid
+    bounds for acquisitions with inadequate or degenerate support.'
+  precedents:
+  - 'src/knee_abnormality/data/preprocessing/device.py: _region_values includes all
+    pixels inside valid rectangles.'
+  - 'src/knee_abnormality/data/preprocessing/intensity.py: quantile_bounds and normalize_pixels
+    provide the current global mapping.'
+  - The packet's intensity-normalization family contains a proposed learned calibration,
+    not this deterministic support estimator.
+  novelty: Changes which pixels define acquisition scale while retaining quantile
+    probabilities, output geometry and the augmentation recipe.
+  coverage: Every acquisition type and vendor; no label- or vendor-specific threshold.
+    Fallback is per acquisition.
+  exploitation: Target persistent vendor heterogeneity and the late macro plateau.
+    Log foreground fraction, bound displacement, clipping fraction and fallback rate;
+    inspect whether the operation preserves useful dynamic range.
+  budget: Reuse existing acquisition histograms with low-resolution mask cleanup.
+    No extra frames or model passes. Retain ten epochs initially and measure both
+    CPU preparation and training time.
+  implementation: Add data.signal_normalization.foreground_bounds, transport it through
+    dataset/collation, and implement equivalent CPU/device processing. Replace the
+    final global-bound estimator; retain active continuous storage or upstream corrections
+    if a new incumbent adopts them. Remove any superseded bound-estimation branch.
+    Keep labels, sampler, valid rectangles and constant-series behavior unchanged.
+  open_choices: Fix minimum support and degeneracy rules before launch using image-only
+    numerical considerations. Do not tune them against vendor or label AUC.
+  dependencies: []
+  priority_rationale: 'First priority: directly addresses a verified source behavior
+    with modest cost and a readily measurable activation signature.'
+  status: completed
+  created_revision: 4
+  ranking_rationale: All five imported seeds have no dependencies and address distinct,
+    permitted mechanisms. Foreground-supported bounds rank first because they directly
+    change a verified source behavior with modest expected cost. Continuous normalization
+    follows as a precise isolation of rounding loss. Magnitude correction has plausible
+    low-signal relevance but depends on unverified reconstruction assumptions. Local
+    histograms and receive-field estimation have greater implementation cost and greater
+    risk of changing useful contrast. The historical quantile-clipping runs changed
+    probabilities, not foreground support; noise-referenced smoothing and synthetic
+    bias fields also differ materially from the proposed deterministic corrections.
+  experiments:
+  - sig-foreground-quantile-bounds-20260929T065412Z-29198b44
+  - sig-foreground-quantile-bounds-20260929T075748Z-244325dd
+  decision: invalid
+- id: sig-continuous-normalization
+  mechanism_id: continuous-preaugmentation-intensity-preservation
+  parent_idea_id: null
+  title: Preserve fractional normalized intensities instead of rounding them to uint8
+  opportunity: Both preparation paths irreversibly round resampled intensities before
+    the model converts them back to float. PF OA and synovitis remain weak, but the
+    amount of useful information lost at this step is unknown. This seed directly
+    isolates that information bottleneck.
+  mechanism: "Keep the existing bounds, clipping and 0\u2013255 scaling, but return\
+    \ float32 normalized pixels without round or uint8 conversion. Preserve fractional\
+    \ interpolation and normalization values through collation and transfer. The model's\
+    \ existing division by 255 then produces the same scale with greater precision."
+  precedents:
+  - 'src/knee_abnormality/data/preprocessing/intensity.py: normalize_pixels uses np.rint
+    followed by uint8 conversion.'
+  - 'src/knee_abnormality/data/preprocessing/device.py: device preparation uses torch.round
+    and uint8 output.'
+  - No direct quantization-ablation measurement appears in the packet.
+  novelty: Changes representation precision before augmentation, not image count,
+    resolution, gamma or augmentation strength.
+  coverage: All valid pixels and acquisitions. Padding remains zero and invalid/constant
+    acquisitions retain the incumbent handling.
+  exploitation: Log mean absolute discarded-fraction error relative to the old rounding
+    operation and the fraction of valid pixels with noninteger output. Target the
+    same late PF OA/synovitis plateau without asserting quantization is its cause.
+  budget: Normalized image storage grows from one to four bytes per pixel. Backbone
+    compute is unchanged, but transfer and memory costs must be measured; use the
+    sealed range rather than assuming negligible overhead.
+  implementation: "Replace normalized buffers and gathered image tensors with float32\
+    \ in both preparation paths. Remove rounding from the active route. Pass the new\
+    \ setting through config and dataset only as required for candidate construction,\
+    \ and log diagnostics through Lightning. Preserve any newly accepted mapping or\
+    \ upstream correction; precision is an independent stage. No model or inference-engine\
+    \ change is needed because the numeric scale stays 0\u2013255."
+  open_choices: Use float32 initially for an unambiguous isolation of quantization.
+    Do not bundle half precision, clipping changes or image-size changes.
+  dependencies: []
+  priority_rationale: 'Second priority: clean, cheap implementation with uncertain
+    effect size; may clarify whether more elaborate normalization can preserve additional
+    signal.'
+  status: blocked
+  created_revision: 4
+  ranking_rationale: All five imported seeds have no dependencies and address distinct,
+    permitted mechanisms. Foreground-supported bounds rank first because they directly
+    change a verified source behavior with modest expected cost. Continuous normalization
+    follows as a precise isolation of rounding loss. Magnitude correction has plausible
+    low-signal relevance but depends on unverified reconstruction assumptions. Local
+    histograms and receive-field estimation have greater implementation cost and greater
+    risk of changing useful contrast. The historical quantile-clipping runs changed
+    probabilities, not foreground support; noise-referenced smoothing and synthetic
+    bias fields also differ materially from the proposed deterministic corrections.
+  experiments:
+  - sig-continuous-normalization-20260929T073030Z-14590eaa
+  - sig-continuous-normalization-20260929T082516Z-df231785
+  - sig-continuous-normalization-20260929T090846Z-b41ad944
+  blocked_reason: 'Block and park the candidate. The activation gate can pass even
+    if gathered model images are rounded back to integers: it measures the separate
+    normalized tensor before gathering. The idea has already used its bounded repairs
+    (repair_count 2). The ranked list contains the two remaining live queue ideas
+    after parking the reserved head.'
+- id: sig-magnitude-power-debiasing
+  mechanism_id: magnitude-noise-power-debiasing
+  parent_idea_id: null
+  title: Correct supported magnitude-noise power bias before acquisition normalization
+  opportunity: Synovitis AUC is 0.896563 and vendor slices remain heterogeneous despite
+    active noise augmentation and smoothing. A magnitude noise floor can compress
+    low-signal contrast before global normalization. Reconstruction details are unknown,
+    so a universal Rician assumption would be unjustified.
+  mechanism: "For nonnegative acquisitions with identifiable nonpadding background,\
+    \ estimate the background second moment from low-variation air support. Apply\
+    \ sqrt(max(x\xB2 - estimated_background_power, 0)) before the retained normalization\
+    \ mapping. This is a power-bias correction, not an unbiased amplitude estimator.\
+    \ Unsupported, signed, degenerate or insufficient-background acquisitions receive\
+    \ identity correction. Estimate and apply one correction per acquisition using\
+    \ unique selected frames."
+  precedents:
+  - '[Gudbjartsson and Patz](https://pmc.ncbi.nlm.nih.gov/articles/PMC2254141/) describe
+    magnitude-noise bias and image-based estimation under explicit noise assumptions.'
+  - noise-referenced-bilateral-smoothing gained 0.001813 but missed adoption with
+    80% [-0.000342, +0.004002]; it adjusted a random smoothing kernel, not signal-power
+    bias.
+  novelty: Adds deterministic signal-power correction before scaling, with support
+    diagnostics and explicit unsupported-acquisition handling.
+  coverage: Shared image-only eligibility rules across types and vendors. No acquisition
+    is removed because correction is unavailable.
+  exploitation: Log estimated background power relative to tissue scale, supported
+    acquisition fraction, corrected-pixel magnitude and clamped fraction. Check whether
+    activity is concentrated in plausible low-signal regions, not just whether the
+    loss decreases.
+  budget: A background estimator and pointwise transform on existing pixels. No spatial
+    denoising kernel, extra frames or model pass. Expected small overhead remains
+    a hypothesis until measured.
+  implementation: Add the estimator and transform to intensity.py/device.py, pass
+    settings through dataset, and log aggregated activity in Lightning. Supply the
+    required support estimator independently of the foreground-quantile seed. Apply
+    before an accepted receive-field correction or final mapping; preserve any newly
+    accepted continuous output and all unrelated incumbent changes.
+  open_choices: Fix background support and validity criteria before launch. Multi-coil
+    reconstruction and spatially varying noise may invalidate the approximation; report
+    these limitations rather than interpreting every vendor gap as Rician bias.
+  dependencies: []
+  priority_rationale: 'Third priority: a distinct acquisition-physics mechanism with
+    low runtime cost, tempered by unknown reconstruction assumptions.'
+  status: completed
+  created_revision: 4
+  ranking_rationale: All five imported seeds have no dependencies and address distinct,
+    permitted mechanisms. Foreground-supported bounds rank first because they directly
+    change a verified source behavior with modest expected cost. Continuous normalization
+    follows as a precise isolation of rounding loss. Magnitude correction has plausible
+    low-signal relevance but depends on unverified reconstruction assumptions. Local
+    histograms and receive-field estimation have greater implementation cost and greater
+    risk of changing useful contrast. The historical quantile-clipping runs changed
+    probabilities, not foreground support; noise-referenced smoothing and synthetic
+    bias fields also differ materially from the proposed deterministic corrections.
+  experiments:
+  - sig-magnitude-power-debiasing-20260929T085205Z-92583a5c
+  - sig-magnitude-power-debiasing-20260929T090230Z-d82c2c7c
+  - sig-magnitude-power-debiasing-20260929T091719Z-bf8a2b31
+  decision: invalid
+- id: sig-slice-coherent-local-histograms
+  mechanism_id: slice-coherent-local-histogram-normalization
+  parent_idea_id: null
+  title: Use contrast-limited local histograms shared across an acquisition's selected
+    slices
+  opportunity: A single acquisition-wide affine map cannot compensate for spatially
+    varying contrast. Philips PF OA is 0.842669, but the source and packet do not
+    establish whether local contrast is responsible. Local histogram mapping offers
+    a distinct representation change with measurable risks.
+  mechanism: Build coarse in-plane tile histograms over valid foreground support,
+    aggregating the same tile across all selected unique slices of an acquisition.
+    Clip histogram counts, redistribute excess and bilinearly interpolate monotone
+    tile mappings. Share the mapping across slices to avoid artificial slice-to-slice
+    flicker. Empty tiles use the acquisition-global mapping; padding remains zero.
+  precedents:
+  - '[Pizer et al.](https://www.sciencedirect.com/science/article/pii/S0734189X8780186X)
+    describe adaptive histogram methods and contrast limiting to reduce noise overenhancement.'
+  - src/knee_abnormality/data/preprocessing/intensity.py currently applies one global
+    affine mapping.
+  - The closed sharpening family changes high-frequency image content; this seed uses
+    monotone local intensity mappings without a sharpening filter.
+  novelty: Introduces deterministic, slice-coherent spatial adaptation of intensity
+    contrast rather than another global nonlinear augmentation or independent per-slice
+    equalization.
+  coverage: One shared tile/mapping procedure for all types and labels. No learned
+    vendor templates or validation-cohort statistics.
+  exploitation: Log mapping deviation from global normalization, tile support, histogram
+    clipping and local noise amplification. Inspect PF OA and synovitis only as exploratory
+    diagnostics alongside all-label macro.
+  budget: Use a coarse tile grid and bounded histogram bins with NumPy/Torch implementations.
+    Avoid per-pixel histogram construction. Measure preparation and prediction overhead
+    as well as training time.
+  implementation: Replace the final global mapping with the local histogram mapping
+    in both preparation routes. Supply its own support estimator. If foreground-global
+    normalization has been accepted, replace that final mapping and remove its obsolete
+    controls; retain accepted continuous output and upstream noise/field corrections.
+    Preserve geometry, sampled paths and all new-incumbent model improvements.
+  open_choices: "Initially a 4\xD74 tile grid and 128 bins, with a fixed contrast\
+    \ limit specified before launch. Noise amplification and loss of absolute tissue\
+    \ contrast are material risks; do not rescue a rejection with a strength-only\
+    \ sweep."
+  dependencies: []
+  priority_rationale: 'Fourth priority: potentially larger contrast change than global
+    bounds, but with more risk of amplifying noise or erasing useful tissue relationships.'
+  status: developing
+  created_revision: 4
+  ranking_rationale: "Both proposals have satisfied dependencies and materially change\
+    \ their invalid predecessors. The foreground retry keeps the all-valid lower bound,\
+    \ addressing the earlier two-sided mapping\u2019s excessive clipping, and moves\
+    \ ahead of receive-field estimation. Compact float16 storage and measurement at\
+    \ model entry address the continuous retry\u2019s cost and activation defects.\
+    \ It ranks last because its earlier macro curve stayed close to control and its\
+    \ budget feasibility is unmeasured. The developing local-histogram idea remains\
+    \ the reserved head."
+  experiments:
+  - sig-slice-coherent-local-histograms-20260929T092506Z-6119ed04
+  - sig-slice-coherent-local-histograms-20260929T100528Z-788aa1de
+- id: sig-coarse-receive-field-correction
+  mechanism_id: deterministic-receive-field-estimation
+  parent_idea_id: null
+  title: Estimate a coarse receive-field correction from each acquisition before normalization
+  opportunity: The large Siemens slice has macro AUC 0.917681 versus GE's 0.958428,
+    although case mix is a substantial confounder. Global quantiles cannot remove
+    within-image gain variation. Residual shading has not been measured, making this
+    a high-uncertainty investigation rather than a diagnosed repair.
+  mechanism: On downsampled positive foreground pixels, alternate a small log-intensity
+    mixture model with fitting a very low-frequency two-dimensional field shared across
+    the acquisition's selected slices. Fit residuals relative to tissue-component
+    means, constrain the field to zero mean, regularize curvature and bound correction
+    gain. Divide by the estimated field before the retained final mapping. Degenerate
+    fits receive identity correction per acquisition. This is a bounded mixture/field
+    approximation inspired by bias-correction literature, not an implementation claim
+    for N4.
+  precedents:
+  - '[Tustison et al.](https://iacl.ece.jhu.edu/proceedings/isbi2010/pdfs/0000708.pdf)
+    motivate estimation of smooth intensity nonuniformity.'
+  - smooth-bias-field-augmentation gained 0.000571, 80% [-0.001339, +0.002414], and
+    its family is closed. It injected synthetic fields; no residual-field measurement
+    established a correction effect.
+  novelty: Estimates and removes an observed acquisition-local nuisance at both training
+    and inference. It does not inject random fields, change augmentation amplitude
+    or use vendor metadata.
+  coverage: Same estimator for every supported acquisition. All studies remain in
+    training and evaluation; failed estimates leave that acquisition's correction
+    at identity.
+  exploitation: Log field amplitude, gain clipping, fit residual, foreground support
+    and identity-fallback rate. Broad pathology or anatomy can be mistaken for shading,
+    so inspect preservation of local contrast and avoid interpreting fit reduction
+    as clinical improvement.
+  budget: Fit on a coarse grid with a small fixed number of alternating updates and
+    NumPy/Torch linear algebra; install nothing. Bound memory and iteration count.
+    A permitted epoch reduction may accommodate cost, but all work must remain within
+    the supervisor's sealed range.
+  implementation: Add the field estimator and correction before final normalization
+    in intensity.py/device.py, transport settings via dataset, and log diagnostics
+    in Lightning. Supply its own support estimation without depending on another seed.
+    Retain an accepted continuous representation, final mapping and optional preceding
+    noise-power correction. Preserve unrelated behavior from every new incumbent and
+    remove superseded field-estimation code rather than accumulating variants.
+  open_choices: "Start with three log-intensity components, a very coarse smooth basis\
+    \ and gain bounded to 0.5\u20132.0. Fix support and convergence rules before launch.\
+    \ The shared two-dimensional field is an approximation; through-plane coil variation\
+    \ remains unmodeled."
+  dependencies: []
+  priority_rationale: 'Fifth priority: addresses a nuisance that global normalization
+    cannot represent, with the greatest implementation cost and risk of removing genuine
+    anatomical signal.'
+  status: queued
+  created_revision: 4
+  ranking_rationale: "Both proposals have satisfied dependencies and materially change\
+    \ their invalid predecessors. The foreground retry keeps the all-valid lower bound,\
+    \ addressing the earlier two-sided mapping\u2019s excessive clipping, and moves\
+    \ ahead of receive-field estimation. Compact float16 storage and measurement at\
+    \ model entry address the continuous retry\u2019s cost and activation defects.\
+    \ It ranks last because its earlier macro curve stayed close to control and its\
+    \ budget feasibility is unmeasured. The developing local-histogram idea remains\
+    \ the reserved head."
+- id: sig-black-anchored-foreground-upper
+  mechanism_id: foreground-supported-acquisition-quantiles
+  parent_idea_id: sig-foreground-quantile-bounds
+  title: Preserve the original black point and estimate only the upper bound from
+    foreground support
+  opportunity: The clipping diagnosis supports separating background exclusion from
+    black-point selection. Bright-tissue support may help estimate the upper landmark
+    while being unsuitable for the lower landmark. This candidate preserves low-intensity
+    ordering and asks whether a foreground-supported upper bound improves acquisition
+    normalization. Useful dark-tissue information being lost is a hypothesis; the
+    recorded clipped pixels include air.
+  mechanism: "Keep the incumbent all-valid lower quantile and constant-series decision.\
+    \ Estimate only the upper quantile from acquisition-local bright support. Use\
+    \ a deterministic stride-four lattice anchored at each valid rectangle's top-left,\
+    \ traversing every selected unique frame once. Construct a 256-bin Otsu histogram\
+    \ from sampled intensities, with float64 histogram arithmetic and the lowest threshold\
+    \ on ties. Require at least 4,096 sampled valid pixels, finite samples, dynamic\
+    \ range >1e-6, separability >=0.5, and above-threshold support containing at least\
+    \ 1,024 samples and 5\u201398% of samples. Compute its upper quantile using the\
+    \ incumbent probability and float32 rank interpolation. Invalid support or a nonfinite/nonordered\
+    \ bound yields the incumbent mapping. Apply the resulting linear mapping to all\
+    \ original valid pixels, preserving padding and output precision. Record sampled\
+    \ support separately from full-resolution valid support, upper-landmark displacement,\
+    \ lower/upper clipping separately, fallback reasons, and final changed-pixel counts\
+    \ with unique-frame weighting."
+  precedents:
+  - "run_curves/full_detail: sig-foreground-quantile-bounds-20260929T065412Z-29198b44,\
+    \ epochs 0\u20134, supplies the clipping and learning-curve diagnosis summarized\
+    \ in the family verdict."
+  - 'Original foreground source, src/knee_abnormality/data/preprocessing/intensity.py:
+    foreground_support selects above-Otsu pixels with majority cleanup; supported_quantile_bounds
+    uses that support for both endpoints.'
+  - "Incumbent configs/training.yaml and preprocessing/intensity.py: retained quantile\
+    \ probabilities are 0.005 and 0.995; normalization clips, scales to 0\u2013255\
+    \ and rounds."
+  - prior-work.md reserves learned intensity calibration and smoothing work for their
+    existing owners. This proposal changes deterministic bound estimation only.
+  novelty: 'Replaces symmetric foreground endpoint estimation with an asymmetric estimator:
+    the black point remains supported by all valid pixels, while only the upper endpoint
+    uses foreground support. Sparse estimation removes the full-resolution spatial
+    cleanup and additional foreground sort. This is a structural response to clipping
+    and runtime, not an Otsu-strength sweep.'
+  coverage: All acquisitions and labels use the same rules, without vendor conditioning
+    or label-specific objectives. Statistics use selected unique frames only; repeated
+    triplet channels never increase their weight. Failed support retains the acquisition
+    through the incumbent normalization. Diagnostics distinguish clipping of all valid
+    pixels from any unproven loss of anatomical signal.
+  exploitation: 'Use one candidate at the supervisor''s incumbent-matched seed, currently
+    1533697213. Evaluate the fixed all-label macro rule: valid gain >=0.001 and central
+    80% paired-bootstrap lower bound >0. Per-label recovery and clipping movement
+    explain behavior but cannot authorize adoption.'
+  budget: "Retain ten epochs, 4,370 optimizer steps and 36 triplets. Training must\
+    \ remain within 542.440\u20131,627.320 seconds and the inherited 1,834-second\
+    \ run cap. The original foreground attempt consumed 1,628.9 seconds by its fifth\
+    \ recorded epoch; it was not a completed ten-epoch run with a marginal overrun.\
+    \ Keep the incumbent bound computation, add only sampled histogram/support work,\
+    \ and aggregate diagnostics without per-acquisition device synchronization. Record\
+    \ preparation, training and prediction costs; feasibility is unmeasured."
+  implementation: Implement within intensity.py, device.py, dataset.py, config.py,
+    training/lightning.py and allowed configuration paths. Supply this proposal's
+    own support helper. Replace the rejected two-sided foreground mapping and its
+    settings; retain the all-valid estimator for the lower endpoint and fallback.
+    Preserve geometry, selected-frame accounting, model, augmentation and constant-series
+    handling. Measure final changed pixels from gathered images using one representative
+    destination per unique frame, with int64 counts and epoch-wide denominators. Against
+    a newly accepted incumbent, retain continuous storage and upstream noise/field
+    corrections. If local-histogram mapping has won, explicitly replace that alternative
+    mapping and remove its branches rather than stacking equalizations. Preserve truthful
+    source identity.
+  open_choices: The upper landmark may move too little to improve AUC, or may reflect
+    bright pathology rather than nuisance. Sparse upper-tail estimates and CPU/device
+    agreement remain unmeasured. Freeze and log the specified support rules before
+    launch. The historical comparator rejected the permitted nested source-hash change;
+    whether that infrastructure discrepancy is resolved is unknown.
+  dependencies: []
+  priority_rationale: 'First: the strongest actionable diagnosis is excessive clipping
+    with persistently slower learning. The asymmetric estimator directly removes the
+    suspected destructive operation while substantially simplifying support estimation.
+    Benefit remains uncertain because the foreground upper endpoint itself has no
+    valid classification evidence.'
+  source_change: true
+  targeted_curve: "Foreground 065412 epochs 0\u20134: clipping stays 0.526\u20130.527\
+    \ and macro trails reference by 0.0176\u20130.0074; epoch-4 ACL/LM are 0.9261/0.8833\
+    \ versus 0.9457/0.9057. Target lower clipping and recovery of the macro trajectory,\
+    \ without making those labels objectives."
+  status: launched
+  created_revision: 107
+  ranking_rationale: "Both proposals have satisfied dependencies and materially change\
+    \ their invalid predecessors. The foreground retry keeps the all-valid lower bound,\
+    \ addressing the earlier two-sided mapping\u2019s excessive clipping, and moves\
+    \ ahead of receive-field estimation. Compact float16 storage and measurement at\
+    \ model entry address the continuous retry\u2019s cost and activation defects.\
+    \ It ranks last because its earlier macro curve stayed close to control and its\
+    \ budget feasibility is unmeasured. The developing local-histogram idea remains\
+    \ the reserved head."
+  experiments:
+  - sig-black-anchored-foreground-upper-20260929T095517Z-94ab3701
+- id: sig-compact-fractional-intensities
+  mechanism_id: continuous-preaugmentation-intensity-preservation
+  parent_idea_id: sig-continuous-normalization
+  title: Retain fractional intensities in float16 buffers and measure activation at
+    model entry
+  opportunity: Continuous normalization reached a reference-like learning trajectory
+    but exhausted the runtime budget. Source inspection shows float32 normalized and
+    gathered buffers on the CPU preparation path, increasing image storage and transfer
+    volume fourfold versus uint8. Compact fractional storage addresses that identifiable
+    cost without shortening training. The blocked repair also exposed an activation
+    measurement that could miss rounding after gathering.
+  mechanism: "Compute bounds and normalized 0\u2013255 values in float32, then store\
+    \ normalized frames and gathered images in float16 on both CPU and device paths.\
+    \ Do not round to integers. The existing model converts images to float32 before\
+    \ division by 255, so augmentation still receives fractional values. Float16 has\
+    \ a maximum rounding error of 0.0625 in this range, versus 0.5 for integer rounding;\
+    \ it is a bounded approximation to the earlier float32 proposal. Immediately before\
+    \ encode_batch in Lightning, measure fractional values from actual batch['images'],\
+    \ using one representative gathered destination for each unique frame and its\
+    \ original valid rectangle. Accumulate integer fractional-pixel and valid-pixel\
+    \ counts across the epoch. Record storage error versus float32 normalization,\
+    \ parent-mapping changed pixels, nonfinite counts, constant-series fallback and\
+    \ image bytes. Zero padding and incumbent constant handling remain exact."
+  precedents:
+  - "run_curves: sig-continuous-normalization-20260929T073030Z-14590eaa supplies the\
+    \ near-reference epochs 0\u20137 and stable fractional-pixel activity; its metrics.csv\
+    \ reports batch-averaged rounding error around 0.2382 on the 0\u2013255 scale."
+  - 'Original continuous source, preprocessing/device.py: both normalized and gathered
+    image arrays are float32; CPU collation prepares images before transfer.'
+  - 'Incumbent modeling/model.py, encode_batch: gathered images are converted to float32
+    and divided by 255 before augmentation, allowing compact fractional storage without
+    changing modeling source.'
+  - 'jobs/orchestrator-20260929T091609Z-84a88aed/report.json: the later b41ad944 repair
+    was parked because its pre-gather activation gate could pass even if model images
+    were subsequently integer-rounded. That repair changed raw-buffer transport/device
+    preparation; it did not implement float16 image storage.'
+  novelty: Introduces compact fractional image storage while retaining float32 normalization
+    arithmetic and the incumbent CPU preparation route. It halves image-buffer bytes
+    relative to the failed float32 implementation and moves activation measurement
+    to the consumed image tensor. It is not another epoch-count repair or a renamed
+    rerun of the parked device-preparation implementation.
+  coverage: Applies uniformly to every acquisition, with unchanged selected frames,
+    bounds, clipping and augmentation. No learned or cross-acquisition statistics
+    are introduced. Diagnostics count each selected frame once after gathering, preventing
+    repeated channels from inflating activation. Constant-series support is reported
+    separately from nonconstant valid pixels.
+  exploitation: Run independently from the live incumbent at its recorded seed, currently
+    1533697213. Require the unchanged valid macro gain and 80% interval rule. Fractional
+    activation establishes implementation behavior, not benefit. Do not interpret
+    small epoch-level or per-label differences as an adoption result.
+  budget: "Retain ten epochs, 4,370 optimizer steps and 36 triplets. Respect training\
+    \ bounds of 542.440\u20131,627.320 seconds and the 1,834-second run cap. Float16\
+    \ buffers occupy half the float32 proposal's bytes but twice the incumbent uint8\
+    \ bytes; conversion and diagnostic costs could offset savings. Retain CPU preparation\
+    \ instead of importing the parked repair's broader transport changes. Record preparation/training/prediction\
+    \ time and buffer memory. Runtime compliance remains unmeasured."
+  implementation: Replace integer rounding and uint8 normalized/gathered allocations
+    with float16 storage in intensity.py and device.py; retain float32 arithmetic
+    and finite/constant safeguards. Use dataset.py to carry representative gather
+    positions and original valid rectangles for diagnostics. In training/lightning.py,
+    inspect actual images immediately before encode_batch and aggregate counts without
+    per-batch host synchronization. Remove superseded pre-gather-only activation reporting
+    and batch-averaged fraction aggregation. No modeling-source change is required.
+    On a newly accepted incumbent, preserve its deterministic intensity mapping, upstream
+    corrections and all unrelated behavior; replace only image storage precision.
+    Do not inherit rejected transport branches or shorten the schedule.
+  open_choices: Transport volume is a plausible runtime contributor, not a measured
+    bottleneck. The observed discarded error is small relative to active intensity
+    augmentation, so a >=0.001 gain is uncertain. Float16 adds its own quantization
+    and needs logged error measurements. CPU/device agreement and the unresolved historical
+    identity-comparison issue remain material limitations.
+  dependencies: []
+  priority_rationale: 'Second: a concrete storage change addresses runtime and a concrete
+    logging change addresses the blocked activation gate. Implementation is bounded,
+    but expected classification upside is less compelling because the available continuous-intensity
+    macro curve nearly matches the reference.'
+  source_change: true
+  targeted_curve: "Continuous 073030 epochs 0\u20137: macro differences versus reference\
+    \ range from -0.0006 to +0.0009 while losses nearly coincide. Target a budget-valid\
+    \ completion through epochs 8\u20139, with fractional activity measured at model\
+    \ entry and a possible improvement over the reference's 0.9244 plateau."
+  status: queued
+  created_revision: 107
+  ranking_rationale: "Both proposals have satisfied dependencies and materially change\
+    \ their invalid predecessors. The foreground retry keeps the all-valid lower bound,\
+    \ addressing the earlier two-sided mapping\u2019s excessive clipping, and moves\
+    \ ahead of receive-field estimation. Compact float16 storage and measurement at\
+    \ model entry address the continuous retry\u2019s cost and activation defects.\
+    \ It ranks last because its earlier macro curve stayed close to control and its\
+    \ budget feasibility is unmeasured. The developing local-histogram idea remains\
+    \ the reserved head."

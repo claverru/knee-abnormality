@@ -3,7 +3,7 @@ from pathlib import Path
 import numpy as np
 import polars as pl
 
-from knee_abnormality.data.labels import STUDY, load_split, require_unique_ids
+from knee_abnormality.data.splits import STUDY, load_split, require_unique_ids
 from knee_abnormality.evaluation.metrics import validation_metrics
 from knee_abnormality.provenance import sha256_file
 

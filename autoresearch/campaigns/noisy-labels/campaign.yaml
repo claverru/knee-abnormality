@@ -12,6 +12,9 @@ additional_evidence_runs:
 backlog:
   refill_below: 4
   refill_to: 5
+  rotate_after: 6
+budget:
+  mode: sealed
 policy:
   editable_files:
     - configs/training.yaml
@@ -24,6 +27,7 @@ policy:
   list_item_fields: {}
   input_identity_keys: []
   require_source_change: true
+  configuration_only_ideas: false
   developer_instructions: >-
     Implement the label-noise mechanism and update configs/training.yaml only to
     enable it. New settings belong under trainer.label_noise in config.py; the

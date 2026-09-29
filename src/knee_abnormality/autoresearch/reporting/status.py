@@ -25,6 +25,12 @@ from knee_abnormality.autoresearch.runtime.storage import (
 )
 from knee_abnormality.autoresearch.runtime.usage import campaign_usage
 
+ROTATION = {
+    "retiring": "retiring; no new claims or research refills, prepared work still trains",
+    "handover": "handing over; no launches, the loop stops this topic once the running training is decided",
+    "successor": "successor; launches wait until the previous topic has stopped",
+}
+
 
 def status(supervisor):
     state = optional_json(supervisor.state_path)
@@ -40,6 +46,7 @@ def status(supervisor):
         "claimed": state["claimed"] if state else None,
         "running": state["running"] if state else None,
         "incumbent": state["incumbent"]["id"] if state else None,
+        "rotation": supervisor.rotation_phase(),
         "limits": state["limits"] if state else None,
         "artifacts": str(supervisor.output),
     }
@@ -72,12 +79,25 @@ def job_line(job, state):
         ledger = fold / "triplet_accounting.json"
         if ledger.exists():
             detail += (
-                f", epoch {len(read_json(ledger)['train'])}/{state['limits']['epochs']}"
+                f", epoch {len(read_json(ledger)['train'])}/"
+                f"{exp['config']['trainer']['max_epochs']}"
             )
         metrics = sorted((fold / "epochs").glob("metrics_epoch_*.json"))
         if metrics:
             try:
-                detail += f", val AUC {read_json(metrics[-1])['macro_auc']:.6f}"
+                score = read_json(metrics[-1])["macro_auc"]
+                detail += f", val AUC {score:.6f}"
+                incumbent = (
+                    fold_dir(state["incumbent"]["run"], campaign_fold(state))
+                    / "epochs"
+                    / metrics[-1].name
+                )
+                if incumbent.exists():
+                    reference = read_json(incumbent)["macro_auc"]
+                    detail += (
+                        f" (incumbent {reference:.6f} at this epoch, "
+                        f"{score - reference:+.4f})"
+                    )
             except (OSError, ValueError, KeyError):
                 pass
     text = (
@@ -120,6 +140,11 @@ def status_summary(supervisor):
     lines.append(
         f"Budget {duration_text(limits['max_run_seconds'])} per experiment · "
         f"{limits['epochs']} epochs · fold {campaign_fold(state)}"
+        if state["budget"]["mode"] == "sealed"
+        else f"Budget {duration_text(limits['min_training_seconds'])}–"
+        f"{duration_text(limits['max_training_seconds'])} training, "
+        f"{duration_text(limits['max_run_seconds'])} per experiment · epochs free · "
+        f"fold {campaign_fold(state)}"
     )
     warnings = []
     if current["reason"]:
@@ -140,6 +165,8 @@ def status_summary(supervisor):
         )
     if rejected:
         warnings.append(f"Inbox: {rejected} rejected request(s) in {inbox / 'rejected'}.")
+    if phase := supervisor.rotation_phase():
+        warnings.append(f"Topic rotation: {ROTATION[phase]}.")
     if (supervisor.output / "stop.json").exists() and current["status"] != "stopped":
         warnings.append(
             "Stop requested; waiting for the supervisor to finish stopping."

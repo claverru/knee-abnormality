@@ -2,8 +2,8 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 
-from knee_abnormality.data.labels import STUDY
 from knee_abnormality.data.report_attributes import ReportAttributeTargets
+from knee_abnormality.data.splits import STUDY
 from knee_abnormality.modeling.model import MIL_ATTENTION_WIDTH, PROJECTION_WIDTH
 
 

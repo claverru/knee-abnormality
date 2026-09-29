@@ -12,8 +12,9 @@ import torch
 
 from knee_abnormality.config import SLICES_PER_INPUT, ExperimentConfig
 from knee_abnormality.data.dataset import KneeStudyDataset
-from knee_abnormality.data.labels import STUDY, FoldLabels, load_fold_labels
+from knee_abnormality.data.labels import FoldLabels, load_fold_labels
 from knee_abnormality.data.sources import build_series_index
+from knee_abnormality.data.splits import STUDY
 from knee_abnormality.provenance import copy_sources, sha256_file
 from knee_abnormality.training.cuda import configure_cuda_allocator
 from knee_abnormality.training.lightning import masked_binary_cross_entropy_with_logits

@@ -8,7 +8,7 @@ from pydantic_settings import CliApp, CliSubCommand
 from sklearn.metrics import roc_auc_score
 
 from knee_abnormality.cli import CLISettings, command, describe
-from knee_abnormality.data.labels import STUDY
+from knee_abnormality.data.splits import STUDY
 
 TARGETS = (
     "ACL",

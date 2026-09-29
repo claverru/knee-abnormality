@@ -9,6 +9,7 @@ from knee_abnormality.autoresearch.campaign.gates import (
     active_incumbent_ideas,
     dependency_blockers,
     evaluate,
+    run_limits,
     validate_config,
     verdict,
 )
@@ -36,7 +37,13 @@ from knee_abnormality.autoresearch.supervisor.common import (
     trained_epochs,
     work_item,
 )
+from knee_abnormality.autoresearch.supervisor.monitoring import run_failure
 from knee_abnormality.autoresearch.supervisor.prompts import COMPLETION_RATIONALE
+
+REPAIRS = {
+    "activation": "Make the declared mechanism act during training, or correct a signature that does not measure it",
+    "budget": "Fit the training inside the campaign's wall-clock range with fewer epochs or less input per study",
+}
 
 
 class ResultMixin:
@@ -97,6 +104,11 @@ class ResultMixin:
             return
         self.dequeue_launched(exp)
         exp["training_receipt"] = receipt
+        clean = (
+            receipt["exit_code"] == 0
+            and not receipt.get("error")
+            and not receipt.get("cancelled")
+        )
         if (
             exp["launched"]
             and exp["repair_count"] < 2
@@ -105,17 +117,18 @@ class ResultMixin:
             and not receipt.get("cancelled")
             and trained_epochs(Path(exp["directory"]), campaign_fold(self.state)) == 0
         ):
-            self.state["running"] = None
-            self.state["crash_repair"] = exp["id"]
-            exp.update(
-                stage="repair_requested",
-                repair_instruction=(
-                    f"Training exited with code {receipt['exit_code']} before completing an epoch; "
-                    "no result was recorded. Fix the cause within the same idea; the repaired candidate "
-                    f"returns to review. Full log: {directory / 'stderr.log'}. Stderr tail:\n"
-                    f"{tail(directory / 'stderr.log')}"
-                ),
+            self.training_repair(
+                exp,
+                f"Training exited with code {receipt['exit_code']} before completing an epoch; "
+                "no result was recorded. Fix the cause within the same idea; the repaired candidate "
+                f"returns to review. Full log: {directory / 'stderr.log'}. Stderr tail:\n"
+                f"{tail(directory / 'stderr.log')}",
             )
+            return
+        if exp["launched"] and clean:
+            self.check_run(exp, final=True)
+        if failure := run_failure(exp):
+            self.stopped_run(exp, failure, directory)
             return
         measured = {
             **receipt,
@@ -126,7 +139,7 @@ class ResultMixin:
         reasons = evaluate(
             Path(exp["directory"]),
             campaign_fold(self.state),
-            self.state["limits"],
+            run_limits(self.state, exp["config"]["trainer"]["max_epochs"]),
             measured,
         )
         try:
@@ -148,6 +161,26 @@ class ResultMixin:
             self.completion(exp, "invalid", {"reasons": reasons})
         else:
             exp["stage"] = "needs_comparison"
+
+    def training_repair(self, exp, instruction):
+        self.state["running"] = None
+        self.state["training_repairs"].append(exp["id"])
+        exp.update(stage="repair_requested", repair_instruction=instruction)
+
+    def stopped_run(self, exp, failure, directory):
+        evidence = {"reasons": [failure["reason"]]}
+        if exp["repair_count"] >= 2:
+            self.completion(exp, "invalid", evidence)
+            return
+        self.training_repair(
+            exp,
+            f"{failure['reason']}. The supervisor stopped the run and recorded it invalid; "
+            f"it is no evidence against the idea. {REPAIRS[failure['check']]}; the repaired "
+            f"candidate returns to review. Metrics: {failure['metrics']}. Full log: "
+            f"{directory / 'stderr.log'}.",
+        )
+        self.record_evaluation(exp, "invalid", evidence)
+        exp["decision"] = "invalid"
 
     def comparison_result(self, exp, receipt, directory, failed):
         total_seconds = (
@@ -209,7 +242,15 @@ class ResultMixin:
             config.pop("config_file")
             config.pop("overrides")
             config.pop("split_dir")
-            validate_config(self.state["config"], config, self.policy)
+            validate_config(
+                self.state["config"], config, self.policy, self.state["budget"]
+            )
+            epochs = config["trainer"]["max_epochs"]
+            if exp["activation"]["epoch"] >= epochs:
+                raise ValueError(
+                    f"Activation epoch {exp['activation']['epoch']} is not below the "
+                    f"candidate's {epochs} epochs"
+                )
             exp["config"] = config
             if not parent_changed(self.state, exp):
                 self.review_binding(exp)
@@ -234,6 +275,7 @@ class ResultMixin:
             exp.pop("previous_rejection", None)
             exp["developer_report"] = report
             exp["integration"] = report["integration"]
+            exp["activation"] = report["activation"]
             if report["status"] == "blocked":
                 self.request_review(exp, report["blocker"] or "Developer blocked")
             elif self.state["status"] != "running":
@@ -319,6 +361,15 @@ class ResultMixin:
                 "Open extend/retry lines take refill slots first; propose their next steps "
                 f"or close them: {sorted(uncovered - proposed)}"
             )
+        if (
+            self.policy.configuration_only_ideas
+            and report["ideas"]
+            and not any(idea["source_change"] for idea in report["ideas"])
+        ):
+            raise ValueError(
+                "Every proposal is configuration-only; this campaign allows them only "
+                "alongside at least one idea that needs a source change"
+            )
         research["reviewed"].extend(job["payload"]["new_results"])
         research.update(rejections=0, previous_rejection=None)
 
@@ -363,6 +414,7 @@ class ResultMixin:
                 "park_ids": [],
                 "review": "none",
                 "integration_review": None,
+                "activation_review": None,
                 "rationale": COMPLETION_RATIONALE,
                 "finding": report["summary"],
                 "concerns": concerns,
@@ -545,6 +597,7 @@ class ResultMixin:
                 "decision": report["review"],
                 "concerns": report["concerns"],
                 "integration_review": report["integration_review"],
+                "activation_review": report["activation_review"],
                 "binding": binding,
             }
             write_json(

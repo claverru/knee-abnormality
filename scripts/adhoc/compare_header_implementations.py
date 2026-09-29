@@ -21,9 +21,9 @@ from knee_abnormality.data.dataset import (
     build_data_loader,
     collate_studies,
 )
-from knee_abnormality.data.labels import STUDY
 from knee_abnormality.data.preprocessing import series as series_module
 from knee_abnormality.data.preprocessing.dicom import PREFIX_BYTES, pydicom_read_header
+from knee_abnormality.data.splits import STUDY
 from knee_abnormality.profiling import (
     finish_profile,
     profile_manifest,

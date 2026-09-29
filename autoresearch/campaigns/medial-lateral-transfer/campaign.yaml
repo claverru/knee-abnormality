@@ -15,6 +15,9 @@ additional_evidence_runs:
 backlog:
   refill_below: 4
   refill_to: 5
+  rotate_after: 6
+budget:
+  mode: sealed
 policy:
   editable_files:
   - configs/training.yaml
@@ -37,6 +40,7 @@ policy:
   input_identity_keys:
   - preprocessing_identity
   require_source_change: false
+  configuration_only_ideas: false
   developer_instructions: Improve meniscus and medial/lateral OA compartment predictions through disease-pattern
     sharing, anatomical assignment, knee-side/position encoding, or an assigned attribution control. Both
     meniscus and medial/lateral OA are in scope. Classifier tying is allowed for an assigned proposal,

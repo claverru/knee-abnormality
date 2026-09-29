@@ -11,7 +11,7 @@ from pydantic_settings import SettingsError
 from scipy.stats import spearmanr
 
 from knee_abnormality.cli import CLISettings
-from knee_abnormality.data.labels import STUDY, require_unique_ids
+from knee_abnormality.data.splits import STUDY, require_unique_ids
 from knee_abnormality.evaluation.metrics import aucs, bootstrap_auc
 from knee_abnormality.provenance import sha256_file
 

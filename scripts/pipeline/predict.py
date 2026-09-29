@@ -20,11 +20,11 @@ from knee_abnormality.config import (
     PositiveFiniteFloat,
     load_config,
 )
-from knee_abnormality.data.labels import STUDY
 from knee_abnormality.data.sources import (
     prediction_image_multiplier,
     prediction_studies,
 )
+from knee_abnormality.data.splits import STUDY
 from knee_abnormality.inference.bundle import discover_kaggle_data_root, verify_bundle
 from knee_abnormality.inference.processes import (
     PredictionRequest,

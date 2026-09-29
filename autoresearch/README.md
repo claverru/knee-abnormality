@@ -1,8 +1,8 @@
 # Autoresearch
 
-Topic-scoped, autonomous experimentation. The user starts one campaign; a detached supervisor
-then coordinates research, implementation, training and evaluation within the campaign's fixed
-contract. Every campaign uses the
+Topic-scoped, autonomous experimentation. The user starts one campaign, or the topic loop; a
+detached supervisor then coordinates research, implementation, training and evaluation within the
+campaign's fixed contract, and the loop moves to a new topic on its own when one stops paying. Every campaign uses the
 [shared evaluation and adoption rule](protocol.md#shared-evaluation-and-adoption).
 
 **Only local training and validation are authorized. No submissions, uploads, publication or
@@ -11,8 +11,11 @@ remote evaluation jobs.**
 ## Where to start
 
 - [Index](INDEX.md): every document in this folder.
-- [Runtime operation](runtime.md): start, inspect, stop and resume a campaign with either
-  provider (Codex or Claude subscription CLI), before the first launch.
+- [Runtime operation](runtime.md): start, inspect, stop and resume a campaign or the
+  [topic loop](runtime.md#topic-loop) with either provider (Codex or Claude subscription CLI),
+  before the first launch.
+- [Topic rotation](topic-rotation.md): how the loop rotates and chains topics;
+  [topics](topics/INDEX.md) for its queue and seed pool.
 - [Protocol](protocol.md): evaluation, adoption, seeds, roles and ownership.
 - [Campaigns](campaigns/INDEX.md): each topic's contract, ideas and findings.
 - [Campaign setup](campaign-setup.md): add a topic through configuration, without runner edits.
@@ -22,7 +25,7 @@ when subscription quota runs out.
 
 ## Current state
 
-No campaign is running; all campaigns are stopped. Pending runner work is in
+No campaign or topic loop is running; all campaigns are stopped. Pending runner work is in
 [status](status.md).
 
 ## Ownership

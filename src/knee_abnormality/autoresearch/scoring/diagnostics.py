@@ -39,7 +39,7 @@ def write_diagnostics(comparison, root):
     import numpy as np
     import polars as pl
 
-    from knee_abnormality.data import labels
+    from knee_abnormality.data import splits
     from knee_abnormality.evaluation import metrics
 
     comparison = comparison.resolve()
@@ -65,17 +65,17 @@ def write_diagnostics(comparison, root):
         frame = (
             pl.read_csv(inputs["studies.csv"])
             .filter(pl.col("fold") == report["fold"])
-            .join(pl.read_csv(inputs["targets.csv"]), on=labels.STUDY, how="inner")
-            .sort(labels.STUDY)
+            .join(pl.read_csv(inputs["targets.csv"]), on=splits.STUDY, how="inner")
+            .sort(splits.STUDY)
         )
         if (
             frame.height != report["studies"]
-            or frame[labels.STUDY].n_unique() != frame.height
+            or frame[splits.STUDY].n_unique() != frame.height
             or frame["report_group"].null_count()
         ):
             raise ValueError("Comparison cohort or report groups cannot be reproduced")
         soft_targets = frame.select(targets).to_numpy().astype(float)
-        hard = (soft_targets >= labels.TARGET_THRESHOLD).astype(int)
+        hard = (soft_targets >= splits.TARGET_THRESHOLD).astype(int)
         predictions = {}
         prediction_inputs = {}
         point_scores = {}
@@ -87,8 +87,8 @@ def write_diagnostics(comparison, root):
                 if Path(item["path"]).name == "validation_predictions.csv"
             )
             path = checked_path(record, root)
-            prediction = pl.read_csv(path).sort(labels.STUDY)
-            if prediction[labels.STUDY].to_list() != frame[labels.STUDY].to_list():
+            prediction = pl.read_csv(path).sort(splits.STUDY)
+            if prediction[splits.STUDY].to_list() != frame[splits.STUDY].to_list():
                 raise ValueError(f"Prediction membership differs from the fold: {path}")
             predictions[name] = prediction.select(targets).to_numpy().astype(float)
             if not np.isfinite(predictions[name]).all():
@@ -165,7 +165,7 @@ def write_diagnostics(comparison, root):
                 "Label resamples do not reproduce the recorded macro bootstrap"
             )
         sources = []
-        for source in (Path(__file__), Path(metrics.__file__), Path(labels.__file__)):
+        for source in (Path(__file__), Path(metrics.__file__), Path(splits.__file__)):
             destination = comparison.parent / "per_label_source" / source.name
             destination.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(source, destination)
@@ -177,7 +177,7 @@ def write_diagnostics(comparison, root):
             "fold": report["fold"],
             "studies": frame.height,
             "targets": targets,
-            "target_threshold": labels.TARGET_THRESHOLD,
+            "target_threshold": splits.TARGET_THRESHOLD,
             "inputs": [
                 {"path": str(path), "sha256": sha256(path)} for path in inputs.values()
             ],

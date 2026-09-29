@@ -11,13 +11,13 @@ from pydantic_settings import CliPositionalArg
 
 from knee_abnormality.cli import CLISettings, describe
 from knee_abnormality.config import INFERENCE_LOADER_NICENESS
-from knee_abnormality.data.labels import STUDY
 from knee_abnormality.data.sources import (
     StudySeries,
     build_series_index,
     prediction_studies,
     select_studies,
 )
+from knee_abnormality.data.splits import STUDY
 from knee_abnormality.inference.processes import PredictionRequest, use_blocking_sync
 
 

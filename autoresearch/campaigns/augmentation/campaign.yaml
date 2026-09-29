@@ -7,6 +7,9 @@ backlog:
   refill_below: 3
   refill_to: 5
   seed_order: forced
+  rotate_after: 6
+budget:
+  mode: sealed
 policy:
   editable_files:
     - configs/training.yaml
@@ -34,6 +37,7 @@ policy:
   input_identity_keys:
     - preprocessing_identity
   require_source_change: true
+  configuration_only_ideas: false
   developer_instructions: >-
     Implement exactly the assigned idea on the current incumbent and switch it on in
     configs/training.yaml with the idea's fixed settings; never change the values of the existing

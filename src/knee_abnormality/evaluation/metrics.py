@@ -1,7 +1,7 @@
 import numpy as np
 from sklearn.metrics import roc_auc_score
 
-from knee_abnormality.data.labels import TARGET_THRESHOLD
+from knee_abnormality.data.splits import TARGET_THRESHOLD
 
 COMPARTMENT_PAIRS = {
     "meniscus": ("Medial Meniscus", "Lateral Meniscus"),

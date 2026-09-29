@@ -1,0 +1,91 @@
+id: radimagenet-rn18
+recipe: configs/radimagenet-resnet18.yaml
+reference_run: outputs/training/20260928-185524-radimagenet-resnet18
+reference_equivalences: {}
+reference_config_exceptions:
+  - paths.label_manifest
+  - paths.report_attribute_manifest
+reference_identity_exceptions:
+  - preprocessing_identity.sources_sha256
+additional_evidence_runs:
+  - outputs/training/20260928-150724-rebuild-state-v2-control
+  - outputs/training/20260928-183517-radimagenet-resnet10t
+  - outputs/training/20260928-192554-radimagenet-resnet18-adjacent
+  - outputs/training/20260928-195321-radimagenet-resnet18-minlr0.1
+  - outputs/autoresearch/radimagenet/experiments/rn18-fourteen-epochs-20260928T203926Z-edcce1c4/training
+  - outputs/autoresearch/radimagenet/experiments/rn18-two-warmup-epochs-20260928T204343Z-5a06510a/training
+backlog:
+  refill_below: 3
+  refill_to: 5
+  seed_order: forced
+  rotate_after: 6
+budget:
+  mode: range
+  min_fraction: 0.5
+  max_fraction: 1.5
+policy:
+  editable_files:
+    - configs/training.yaml
+    - src/knee_abnormality/config.py
+    - src/knee_abnormality/data/dataset.py
+    - src/knee_abnormality/training/lightning.py
+  editable_directories:
+    - src/knee_abnormality/modeling
+  config_keys:
+    - trainer.max_epochs
+    - trainer.batch_size
+    - trainer.accumulate_grad_batches
+    - trainer.gradient_clip_val
+    - trainer.backbone_frozen_epochs
+    - trainer.disease_loss
+    - data.study_triplet_total
+    - data.mean
+    - data.std
+    - data.lower_quantile
+    - data.upper_quantile
+  config_prefixes:
+    - model
+    - optimizer
+    - data.intensity_augmentation
+    - data.affine_augmentation
+    - data.noise_augmentation
+    - data.smoothing_augmentation
+    - data.resolution_augmentation
+    - data.gin_augmentation
+    - data.contrast_mixing_augmentation
+    - data.reflection_augmentation
+  list_item_fields:
+    data.series_types: [max_images]
+  input_identity_keys:
+    - preprocessing_identity
+  require_source_change: false
+  configuration_only_ideas: true
+  developer_instructions: >-
+    The incumbent is the RadImageNet ResNet-18 recipe (resnet18.a1_in1k, RadImageNet weights,
+    repeated middle slice, backbone LR 5e-5); every idea applies exactly its own change to it. Configuration-only ideas change configs/training.yaml only. New options go in
+    config.py with the incumbent's behavior as the value that reproduces it; per-stage learning
+    rates, freezing and anchored decay live in the Lightning module's optimizer setup and steps;
+    first-convolution initialization, slice channels, token readouts and backbone loading live in
+    modeling/. Keep the per-stage backbone drift and gradient logging the Lightning module already
+    writes (backbone_drift_stage*, backbone_grad_rms_stage*, head_grad_rms), and log every new
+    mechanism's own scalar per epoch for the activation signature. Keep the image size 224, the crop
+    and sampling geometry, the studies seen per epoch, the loss terms and their weights (except the
+    two user seeds on the disease loss and head), and the evaluation untouched. The training time must stay within the campaign's range (543-1,628 s at
+    about 108 s per ResNet-18 epoch with 26 triplets per study); set the epoch count and triplets
+    accordingly. New parameters initialize under a forked RNG; every random draw derives from the run
+    seed and the global step. No weight averaging (SWA or EMA). Return prepared or blocked. Use the
+    existing Python environment for static checks. No tests.
+  researcher_instructions: >-
+    Research starts after the forced seeds. The question is how to keep RadImageNet ResNets
+    learning: they start far ahead of ReXNet and flatten from about epoch 5 while underfitting, and
+    their early layers drift 2-2.5 times more than ReXNet's (prior-work.md). Start every refill from
+    run_curves: per-epoch x1 validation, training loss, per-label AUC and the per-stage drift and
+    gradient columns of every decided run against the incumbent and the ReXNet control, and
+    name the curve behaviour each proposal targets. Configuration-only ideas (a learning rate, an
+    epoch count, a regularization strength) are welcome, but every refill also carries at least one
+    idea that needs a source change: per-stage rates, freezing and unfreezing, head-first training,
+    anchored decay, BatchNorm handling, slice-channel initialization, more slices per triplet,
+    multi-scale tokens, token projection, or the backbone within the Refined-RadImageNet family.
+    Stay inside the training-time range (543-1,628 s). No weight averaging, no image size above
+    224, no ensembling or test-time augmentation, no other backbone families or ImageNet weights,
+    no label changes, no multi-seed runs.

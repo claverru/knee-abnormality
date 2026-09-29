@@ -1,5 +1,10 @@
 import json
 
+from knee_abnormality.autoresearch.campaign.definition import (
+    PROTECTED_CONFIG,
+    PROTECTED_SOURCES,
+    RANGE_BUDGET_CONFIG,
+)
 from knee_abnormality.autoresearch.campaign.rules import acceptance_text
 
 
@@ -58,3 +63,36 @@ FORCED_SEED_INSTRUCTIONS = (
     "never park them, except by blocking a seed at its own implementation review. Admit other "
     "proposals only behind the remaining seeds."
 )
+
+
+def topic_rules(streak):
+    sources = ", ".join(f"`{path}`" for path in PROTECTED_SOURCES)
+    config = ", ".join(f"`{path}`" for path in PROTECTED_CONFIG)
+    range_config = " and ".join(f"`{path}`" for path in RANGE_BUDGET_CONFIG)
+    return f"""# Topic rotation
+
+The current topic produced {streak} consecutive researcher-origin decided runs without an
+adoption, or the loop needs its first topic. The next topic is a new campaign sealed on the
+incumbent in the topic packet: its effective configuration, frozen source, seed and fold. It
+runs until it stops paying; nothing waits for the user.
+
+- **Scope.** Any Python file under `src/knee_abnormality/` and `configs/training.yaml`, except
+  {sources} and the config paths {config}; {range_config} are editable only when the assignment's
+  `budget` is a wall-clock range. Training-label code is in scope: training-target
+  construction in `src/knee_abnormality/data/labels.py`, target processing and losses on
+  targets; the label source itself stays the recipe's. Declare a narrow policy inside that
+  space.
+- **Grounded.** Cite at least one weakness of the incumbent by JSON pointer and value from the
+  packet; code resolves each pointer and compares the value at the precision you give (at
+  least three decimals, integers exactly).
+- **New.** The scope and the mechanism families must not both fall inside one past topic's;
+  closed families stay closed.
+- **Substantive seeds.** At least five seeds spanning the low, medium and high complexity
+  tiers, at least two structural, each with a source change inside the scope, no
+  dependencies, a closest precedent (packet idea ID, existing repository path or URL) and a
+  concrete difference. Every untaken seed-pool idea whose source and config paths fall inside
+  the scope must be among the seeds.
+- **Researched.** At least two distinct primary-literature links on the cited weakness.
+- **Valid.** The generated campaign passes the same validation as a user campaign.
+
+A draft that fails any check returns to the researcher with the reasons."""

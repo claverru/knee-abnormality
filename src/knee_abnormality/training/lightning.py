@@ -8,6 +8,7 @@ import numpy as np
 import polars as pl
 import pytorch_lightning as L
 import torch
+from timm.models import group_parameters
 from torch.func import functional_call
 from torch.nn import functional as F
 from torch.nn.modules.batchnorm import _BatchNorm
@@ -136,6 +137,11 @@ def validated_class_balance_weights(
     ] != list(targets):
         raise ValueError("Class-balanced BCE statistics targets differ from the model")
     return class_balance_weight_tensor(class_balance)
+
+
+def _gradient_rms(gradients: list[torch.Tensor]) -> torch.Tensor:
+    squares = torch.stack([gradient.float().square().sum() for gradient in gradients])
+    return (squares.sum() / sum(gradient.numel() for gradient in gradients)).sqrt()
 
 
 def masked_binary_cross_entropy_with_logits(
@@ -364,6 +370,18 @@ class KneeModule(L.LightningModule):
                 },
             }
         )
+        backbone = self.model.backbone
+        self.backbone_stages = {
+            f"stage{index}": tuple(names)
+            for index, names in group_parameters(
+                backbone, backbone.group_matcher(coarse=True)
+            ).items()
+        }
+        self.backbone_origin = {
+            name: parameter.detach().float().cpu().clone()
+            for name, parameter in backbone.named_parameters()
+            if parameter.ndim > 1
+        }
 
     def forward(self, batch: dict) -> torch.Tensor:
         return self.model(batch)
@@ -448,6 +466,23 @@ class KneeModule(L.LightningModule):
             on_epoch=True,
             batch_size=1,
         )
+        parameters = dict(self.model.backbone.named_parameters())
+        for stage, names in self.backbone_stages.items():
+            moved = origin = 0.0
+            for name in names:
+                if name in self.backbone_origin:
+                    start = self.backbone_origin[name]
+                    current = parameters[name].detach().float().cpu()
+                    moved += float((current - start).square().sum())
+                    origin += float(start.square().sum())
+            if origin:
+                self.log(
+                    f"backbone_drift_{stage}",
+                    math.sqrt(moved / origin),
+                    on_step=False,
+                    on_epoch=True,
+                    batch_size=1,
+                )
 
     def _log_epoch_metric(
         self,
@@ -695,6 +730,22 @@ class KneeModule(L.LightningModule):
                 on_epoch=False,
                 batch_size=1,
             )
+        backbone = dict(self.model.backbone.named_parameters())
+        for stage, names in self.backbone_stages.items():
+            stage_gradients = [
+                backbone[name].grad for name in names if backbone[name].grad is not None
+            ]
+            if stage_gradients:
+                self._log_epoch_metric(
+                    f"backbone_grad_rms_{stage}", _gradient_rms(stage_gradients), 1
+                )
+        head_gradients = [
+            parameter.grad
+            for name, parameter in self.model.named_parameters()
+            if not name.startswith("backbone.") and parameter.grad is not None
+        ]
+        if head_gradients:
+            self._log_epoch_metric("head_grad_rms", _gradient_rms(head_gradients), 1)
 
     def _averaging_weight(self, step: int) -> float:
         averaging = self.weight_averaging

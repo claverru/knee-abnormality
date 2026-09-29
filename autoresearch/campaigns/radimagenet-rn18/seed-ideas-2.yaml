@@ -1,0 +1,99 @@
+ideas:
+- id: rn18-mean-init-adjacent-slices
+  mechanism_id: slice-channels
+  parent_idea_id: null
+  title: Three adjacent slices with a mean-initialized first convolution
+  opportunity: Repeated middle slice throws away depth context, but adjacent slices through the unchanged
+    pretrained conv1 lost 0.0059 at x4 (0.919531 against 0.925476, radimagenet-resnet18-adjacent), consistent
+    with a public report that repeated middle beats adjacent for RadImageNet. Replacing conv1 weights
+    by their channel mean /3 copied to each channel reproduces the pretrained response on uniform input
+    while letting slices differ.
+  mechanism: model.slice_channels adjacent plus conv1 weight = mean over input channels / 3, repeated.
+  precedents:
+  - I3D inflation (arXiv 1705.07750).
+  - 'radimagenet-resnet18-adjacent: -0.0059 with the unchanged conv1 (prior-work.md).'
+  novelty: Not yet tried on RadImageNet ResNets.
+  coverage: All studies and labels.
+  exploitation: Per-epoch curves, per-stage drift and gradient RMS against the incumbent and the ReXNet
+    control.
+  budget: Same as the ResNet-18 base run (1,085 s).
+  implementation: New option model.first_conv_init channel_mean applied after loading pretrained weights.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Keeps the pretrained start and adds depth context.
+- id: rn18-freeze-stem-layer1
+  mechanism_id: freezing
+  parent_idea_id: null
+  title: Freeze the stem and layer1 for the whole run
+  opportunity: First five convs drift 8.1% from the pretrained start against 3.2% for ReXNet; last five
+    match (prior-work.md).
+  mechanism: requires_grad False and BatchNorm eval for the stem and layer1.
+  precedents:
+  - Gradual unfreezing (ULMFiT, arXiv 1801.06146).
+  - Measured early-layer drift (prior-work.md).
+  novelty: Not yet tried on RadImageNet ResNets.
+  coverage: All studies and labels.
+  exploitation: Per-epoch curves, per-stage drift and gradient RMS against the incumbent and the ReXNet
+    control.
+  budget: Cheaper than the incumbent.
+  implementation: New option model.frozen_stages 2 in config.py and the model.
+  open_choices: Unfreeze at epoch 3.
+  dependencies: []
+  priority_rationale: Simplest structural test of the overwriting hypothesis.
+- id: rn18-more-triplets
+  mechanism_id: input-amount
+  parent_idea_id: null
+  title: 36 triplets per study instead of 26
+  opportunity: ResNet-18 costs 57% of the control; more slices per study give more evidence per step within
+    the budget.
+  mechanism: data.study_triplet_total 36.
+  precedents:
+  - Earlier triplet-count work on ReXNet (study_triplet_total 26 adoption).
+  novelty: Not yet tried on RadImageNet ResNets.
+  coverage: All studies and labels.
+  exploitation: Per-epoch curves, per-stage drift and gradient RMS against the incumbent and the ReXNet
+    control.
+  budget: About 1,500 s, 138% of the reference.
+  implementation: Configuration-only change to the incumbent recipe.
+  open_choices: 32 if 36 helps but costs too much.
+  dependencies: []
+  priority_rationale: User-allowed input increase inside the budget.
+- id: rn18-backbone-lr-1e-4
+  mechanism_id: backbone-rate
+  parent_idea_id: null
+  title: Backbone learning rate 5e-5 to 1e-4
+  opportunity: Underfitting with a rate set by a weight-scale rule; the late layers may need more movement.
+  mechanism: optimizer.backbone_lr 1e-4.
+  precedents:
+  - Weight-scale rule for backbone swaps (backbone-swaps.md).
+  novelty: Not yet tried on RadImageNet ResNets.
+  coverage: All studies and labels.
+  exploitation: Per-epoch curves, per-stage drift and gradient RMS against the incumbent and the ReXNet
+    control.
+  budget: Same as the ResNet-18 base run (1,085 s).
+  implementation: Configuration-only change to the incumbent recipe.
+  open_choices: 2.5e-5 in the opposite direction.
+  dependencies: []
+  priority_rationale: Locates the rate before per-layer rules; watch early-layer drift.
+- id: rn18-multiscale-tokens
+  mechanism_id: token-readout
+  parent_idea_id: null
+  title: Add layer3 (stride-16) tokens next to layer4 tokens
+  opportunity: ResNet-18's final 512-channel 7x7 map may limit what attention can pool; stride-16 tokens
+    add detail at small cost.
+  mechanism: Project layer3 features to the token width and pool them with the layer4 tokens, with their
+    own position embeddings.
+  precedents:
+  - Stride-16 fusion on ReXNet (validation results).
+  novelty: Not yet tried on RadImageNet ResNets.
+  coverage: All studies and labels.
+  exploitation: Per-epoch curves, per-stage drift and gradient RMS against the incumbent and the ReXNet
+    control.
+  budget: More tokens; within the budget.
+  implementation: New option model.token_stages in model.py and spatial_tokens.py; spatial mapping for
+    layer3.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Capacity test aimed at the flattening.
+exhausted_directions: None yet; follows the radimagenet campaign, whose first two seeds ran against the
+  ReXNet control.
