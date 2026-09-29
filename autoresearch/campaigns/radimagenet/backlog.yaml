@@ -1,0 +1,15 @@
+revision: 43
+queue:
+- rn18-no-series-dropout
+- rn18-lighter-dsu
+- rn18-layerwise-lr-decay
+- rn18-linear-probe-then-finetune
+- rn18-l2-sp
+- rn18-mean-init-adjacent-slices
+- rn18-freeze-stem-layer1
+- rn18-more-triplets
+- rn18-backbone-lr-1e-4
+- rn18-multiscale-tokens
+- rn18-warmup-stable-decay
+- rn10t-double-batch-and-rates
+- rn18-plane-backbones-dense-fusion

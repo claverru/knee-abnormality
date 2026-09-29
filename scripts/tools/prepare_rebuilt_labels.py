@@ -10,7 +10,7 @@ from scipy.optimize import minimize
 from scipy.special import expit, logit, logsumexp
 
 from knee_abnormality.cli import CLISettings, describe
-from knee_abnormality.data.labels import STUDY, TARGET_THRESHOLD, require_unique_ids
+from knee_abnormality.data.splits import STUDY, TARGET_THRESHOLD, require_unique_ids
 from knee_abnormality.kaggle import COMPETITION
 from scripts.tools.prepare_combined_labels import fingerprint
 from scripts.tools.prepare_image_blend_labels import base_labels

@@ -1,0 +1,40 @@
+ideas:
+- id: rn18-plane-backbones-dense-fusion
+  mechanism_id: plane-backbones
+  parent_idea_id: null
+  title: One RadImageNet ResNet-18 per plane with dense per-plane readouts and learned fusion, at the
+    ResNet-18 settings
+  opportunity: The plane-specialization campaign found its best structure in one backbone per plane with
+    dense per-plane readouts and learned per-label fusion (dense readouts adopted in the campaign; S77,
+    three ReXNet-200s, 0.945 public). Each RadImageNet backbone then sees a single plane, closer to how
+    RadImageNet was pretrained (single slices), and the three smaller backbones cost less than three ReXNets.
+  mechanism: 'Port the plane structure onto the current code: model.plane_backbones true (one backbone
+    per plane, series routed by plane), trainer.plane_pooling.assignment dense (every present plane predicts
+    every label from its own pooled tokens), model.plane_pooling.fusion learned (softmax weights over
+    present planes on detached plane logits, the fused logit is the output) and model.series_dropout 0,
+    as in S77. Each of the three backbones is the RadImageNet base: resnet18.a1_in1k with RadImageNet
+    weights, repeated middle slice, ImageNet mean/std, backbone LR 5e-5 and head LR 6e-4; the rest of
+    the recipe as the base.'
+  precedents:
+  - 'Plane-specialization dense readouts + learned fusion (B0 x3): outputs/autoresearch/plane-specialization/experiments/dense-readouts-learned-fusion-20260927T231847Z-33417f97,
+    source under source/ (modeling/planes/exclusive.py, fusion.py; plane options in config.py, model.py,
+    training/lightning.py).'
+  - 'S77 three ReXNet-200s with the same structure: outputs/training/20260928-105516-rexnet-plane-dense-fusion
+    (config and source_snapshot.zip), 0.945 public, 2,600 s training against 1,912 s for one ReXNet.'
+  - 'RadImageNet ResNet-18 base settings: outputs/training/20260928-185524-radimagenet-resnet18.'
+  novelty: First plane-specific RadImageNet backbones.
+  coverage: All studies and labels; each backbone trains on its plane only.
+  exploitation: Per-plane logit AUCs and fusion weights per label as in the plane campaign, plus per-stage
+    drift and gradient RMS for each plane backbone against the RadImageNet base run.
+  budget: Unmeasured. Three ReXNets took 1.36x one ReXNet (2,600 s against 1,912 s); the same factor on
+    ResNet-18 gives about 1,480 s, inside the 1,627 s ceiling. If it runs over, cut epochs, not the structure.
+  implementation: 'Code: port the plane options and modeling/planes/ from the plane-specialization source
+    above onto the current tree, adapted to the current config, spatial-token mapping (one mapping per
+    plane backbone) and RadImageNet loading (each plane backbone loads the RadImageNet state dict); keep
+    the per-stage logging per backbone (prefix the stage names by plane). The activation signature can
+    be the logged fusion weights or per-plane logit counts.'
+  open_choices: None; the S77 structure as it was, with ResNet-18 settings.
+  dependencies: []
+  priority_rationale: User-requested; combines the previous campaign best structure with the RadImageNet
+    backbone.
+exhausted_directions: None yet; first campaign on RadImageNet ResNets.

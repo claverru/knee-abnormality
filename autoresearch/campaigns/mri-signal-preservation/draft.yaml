@@ -1,0 +1,382 @@
+id: mri-signal-preservation
+title: Preserve and normalize MRI signal before augmentation
+weaknesses:
+- pointer: /incumbent/slices/vendor/Philips/per_label/PF OA
+  value: 0.842669
+  reading: PF OA is particularly weak in the 267-study Philips slice. Scanner-dependent appearance is
+    a hypothesis; prevalence and case mix also differ.
+- pointer: /incumbent/slices/vendor/Siemens/macro_over_defined_labels
+  value: 0.917681
+  reading: The largest vendor group, Siemens with 396 studies, has lower macro AUC than GE. Deterministic
+    signal normalization upstream of augmentation remains unexplored.
+- pointer: /incumbent/slices/vendor/GE/macro_over_defined_labels
+  value: 0.958428
+  reading: GE's 198-study macro AUC contrasts with Siemens and Philips. This is descriptive evidence of
+    heterogeneous difficulty, not an adjusted scanner effect.
+- pointer: /incumbent/per_label/Synovitis
+  value: 0.896563
+  reading: Synovitis remains weak despite active smoothing, intensity augmentation and scanner confusion.
+    Preserving low-intensity and local contrast information is an untested alternative.
+literature:
+- https://pmc.ncbi.nlm.nih.gov/articles/PMC2254141/
+- https://www.sciencedirect.com/science/article/pii/S0734189X8780186X
+- https://iacl.ece.jhu.edu/proceedings/isbi2010/pdfs/0000708.pdf
+mechanism_families:
+- continuous-preaugmentation-intensity-preservation
+- foreground-supported-acquisition-quantiles
+- magnitude-noise-power-debiasing
+- slice-coherent-local-histogram-normalization
+- deterministic-receive-field-estimation
+scope:
+  editable_files:
+  - configs/training.yaml
+  - src/knee_abnormality/config.py
+  - src/knee_abnormality/data/dataset.py
+  - src/knee_abnormality/data/preprocessing/intensity.py
+  - src/knee_abnormality/data/preprocessing/device.py
+  - src/knee_abnormality/training/lightning.py
+  editable_directories: []
+  config_keys:
+  - trainer.max_epochs
+  config_prefixes:
+  - data.signal_normalization
+  list_item_fields: []
+  input_identity_keys:
+  - preprocessing_identity.sources_sha256
+  developer_instructions: "Limit changes to deterministic acquisition-local intensity processing before\
+    \ existing augmentation, configuration transport through dataset/collation, and scalar logging in\
+    \ Lightning. Implement matching CPU and device semantics in the existing preparation paths. Keep images\
+    \ in the existing numeric 0\u2013255 scale so model.py's division by 255 remains correct; continuous\
+    \ output may use floating dtype. Preserve image shape, valid rectangles, physical geometry, sampled\
+    \ paths, series membership, targets and all augmentation settings. Use only the current study's selected\
+    \ unique frames; never pool normalization statistics across validation studies or use labels/vendor\
+    \ IDs to select transforms. Permit only preprocessing_identity.sources_sha256 to change. No new libraries,\
+    \ external assets, tests, comments, docstrings, GPU use or training launches. Epoch changes are only\
+    \ for mechanism cost inside the supervisor's sealed range."
+  researcher_instructions: Distinguish measured vendor difficulty from hypotheses about quantization,
+    foreground statistics, noise floor and receive-field variation. Start with foreground statistics and
+    continuous intensities before local histogram or field estimation. Require pixel-level activity and
+    support diagnostics, not just configured probabilities. Do not reopen augmentation-strength sweeps,
+    scanner confusion, learned affine calibration, sharpening or closed bias-field augmentation. Existing
+    queued intensity-normalization and smoothing work retains its ownership. Every proposal must change
+    source and execute independently of other seeds.
+contract: "# Objective\nImprove all-label macro AUC through deterministic acquisition-local signal processing\
+  \ before augmentation. The inspected source computes intensity bounds from every pixel inside valid\
+  \ rectangles and rounds normalized values to uint8 on both CPU and device paths. Padding is excluded\
+  \ from the bounds, but air inside valid rectangles is not. The magnitude of clinically relevant quantization\
+  \ loss, residual shading and noise-floor bias has not been measured.\n\n## Permitted mechanisms\nPermit\
+  \ continuous normalized intensities, foreground-supported quantile bounds, supported magnitude-noise\
+  \ power correction, slice-coherent contrast-limited local histogram mapping, and coarse acquisition-local\
+  \ receive-field estimation. [Gudbjartsson and Patz](https://pmc.ncbi.nlm.nih.gov/articles/PMC2254141/)\
+  \ establish magnitude-noise bias under their acquisition assumptions. [Pizer et al.](https://www.sciencedirect.com/science/article/pii/S0734189X8780186X)\
+  \ motivate contrast-limited adaptive histogram processing. [Tustison et al.](https://iacl.ece.jhu.edu/proceedings/isbi2010/pdfs/0000708.pdf)\
+  \ motivate estimation of smooth intensity nonuniformity. These are mechanism precedents, not evidence\
+  \ of a knee-classification gain or universal validity of a Rician model.\n\n## Fixed behavior and exclusions\n\
+  Retain the live incumbent's backbone, readout, objectives, label source, folds, cohorts, 36-triplet\
+  \ recipe, 224-pixel images, 0.625-mm spacing, sampling, geometry and augmentation stack. No cropping,\
+  \ resampling change, extra frames, learned vendor-specific transform, new label processing or transductive\
+  \ fitting. Keep original selected-frame and valid-pixel support accounting. Treat only the existing\
+  \ unique frames once when estimating acquisition statistics; gathering repeated triplet channels must\
+  \ not reweight them.\n\nIntensity transforms use the same code semantics in training and prediction,\
+  \ before randomized augmentation. Each acquisition estimates its own statistics. Invalid foreground,\
+  \ noise or field estimates yield an identity correction for that acquisition, followed by the retained\
+  \ normalization mapping; they do not drop an acquisition or study. Preserve the incumbent constant-series\
+  \ handling. Zero padding remains zero. Numerical support rules must be specified before launch and logged.\n\
+  \n## Evidence and budget\nUse the supervisor's incumbent-matched seed, fixed evaluation and sealed range\
+  \ budget, with assignment fractions 0.5\u20131.5 and inherited absolute limits authoritative. Initially\
+  \ retain ten epochs. Record preparation/training/prediction cost, configuration, source identity and\
+  \ full epoch curves. Diagnostics include changed-pixel fraction, normalization error or landmark movement,\
+  \ valid support, fallback fraction and transform-specific activity. Vendor and availability slices are\
+  \ exploratory; small vendors are not suitable optimization targets.\n\nFollow [shared evaluation and\
+  \ adoption](../../protocol.md#shared-evaluation-and-adoption): valid macro improvement >= 0.001 and\
+  \ central 80% paired-bootstrap lower bound strictly above zero. No per-label objective, extra threshold\
+  \ or confirmation run. The supervisor owns scheduling, launches, verdicts and records.\n\n## Integration\n\
+  Preserve unrelated accepted improvements. Continuous storage is compatible with later mappings. Noise\
+  \ and receive-field correction precede the final intensity mapping. Foreground-global and local-histogram\
+  \ mappings are alternatives: a replacement removes superseded mapping branches and settings rather than\
+  \ stacking arbitrary equalizations. Each seed supplies any support-estimation helper it needs and has\
+  \ no dependency on another adoption. Reconcile these semantics with every newly accepted incumbent."
+prior_work: "# Source findings and measured precedents\n\n`data/preprocessing/device.py` obtains bounds\
+  \ from selected unique-frame pixels inside valid rectangles, then rounds to uint8. `data/preprocessing/intensity.py`\
+  \ implements the corresponding CPU normalization. `modeling/model.py` later divides these values by\
+  \ 255 before augmentation. Foreground tissue support, continuous normalized intensities and deterministic\
+  \ receive-field estimation are absent from these inspected paths.\n\nThe table contains adjacent augmentation\
+  \ evidence, not measurements of the proposed deterministic transforms. Historical configuration files\
+  \ preserve the actual seeds.\n\n| Mechanism | Setting | Run | Macro delta and 80% interval | Source\
+  \ |\n|---|---|---|---|---|\n| Bilateral smoothing augmentation | ReXNet; combined_v1; scanner_v1 fold\
+  \ 2; seed 2464012069 | bilateral-smoothing-augmentation-20260926T021107Z-ea5abbac | +0.002039; [+0.000184,\
+  \ +0.003854] | outputs/autoresearch/augmentation/experiments/bilateral-smoothing-augmentation-20260926T021107Z-ea5abbac\
+  \ |\n| Noise-referenced smoothing | ReXNet; combined_v1; scanner_v1 fold 2; seed 1704794368 | noise-referenced-bilateral-smoothing-20260926T081854Z-5c6c595c\
+  \ | +0.001813; [-0.000342, +0.004002] | outputs/autoresearch/augmentation/experiments/noise-referenced-bilateral-smoothing-20260926T081854Z-5c6c595c\
+  \ |\n| Synthetic multiplicative bias fields | ReXNet; combined_v1; scanner_v1 fold 2; seed 2464012069\
+  \ | smooth-bias-field-augmentation-20260926T011026Z-b7fa0f09 | +0.000571; [-0.001339, +0.002414] | outputs/autoresearch/augmentation/experiments/smooth-bias-field-augmentation-20260926T011026Z-b7fa0f09\
+  \ |\n| Global nonlinear intensity augmentation | ReXNet; combined_v1; scanner_v1 fold 2; seed 1704794368\
+  \ | gin-intensity-augmentation-v3-20260926T074639Z-0d98d2fa | +0.001332; [-0.001163, +0.003813] | outputs/autoresearch/augmentation/experiments/gin-intensity-augmentation-v3-20260926T074639Z-0d98d2fa\
+  \ |\n\n`docs/validation/results/2026-09-28-campaign-rescoring.md` reports that smoothing's saved comparison\
+  \ becomes approximately +0.0008, 80% [-0.0009, +0.0027], on rebuild_state_v2. It also reports the external\
+  \ `half-stack-vs-smoothing-dsu` comparison at approximately +0.0011 originally and +0.0020 after re-scoring,\
+  \ with the latter interval [-0.0005, +0.0046]. That is a bundled main-recipe result, not attribution\
+  \ to a specific normalization transform; its seed is not supplied by that table.\n\n## Current curve\
+  \ interpretation\nThe incumbent's final \xD71 macro AUC is 0.9244 despite training loss falling to 2.2860.\
+  \ Feature-statistics, GIN, contrast mixing and smoothing activity remain nonzero. Their activation does\
+  \ not establish that preaugmentation normalization preserves useful signal or removes acquisition-specific\
+  \ nuisance. Vendor differences are confounded by pathology prevalence and case mix.\n\n## Closed directions\
+  \ and ownership\nThe packet closes multiplicative-bias-field augmentation, k-space-resolution degradation,\
+  \ sharpening, feature-statistics uncertainty and the RN18 regularization family. They stay closed. Estimating\
+  \ and removing a field deterministically is a different operation from injecting random fields, and\
+  \ must not become another augmentation-amplitude retry. `rn18-learned-intensity-calibration` is already\
+  \ proposed in the intensity-normalization family; leave it to its owner. The present topic has no learned\
+  \ affine calibration, smoothing-strength retry or metadata adversary. The plane-readout pool seed is\
+  \ outside this scope. No direct measured result for these five deterministic signal mechanisms is supplied."
+seeds:
+- id: sig-foreground-quantile-bounds
+  mechanism_id: foreground-supported-acquisition-quantiles
+  parent_idea_id: null
+  title: Estimate intensity bounds from tissue support rather than all valid-rectangle pixels
+  opportunity: Vendor slices differ markedly, including Philips PF OA at 0.842669. Current quantiles exclude
+    padding but include air within valid rectangles. Air fraction can change with field of view and acquisition,
+    potentially changing tissue contrast independently of pathology; this has not yet been measured.
+  mechanism: 'Build an acquisition-local foreground support estimate from the histogram of its selected
+    unique valid pixels, using an Otsu split and simple spatial cleanup. Recompute the incumbent quantile
+    probabilities on supported tissue, then apply the resulting affine mapping to every valid pixel. The
+    mask selects statistics only: do not erase background pixels or alter geometry. Use the original all-valid
+    bounds for acquisitions with inadequate or degenerate support.'
+  precedents:
+  - 'src/knee_abnormality/data/preprocessing/device.py: _region_values includes all pixels inside valid
+    rectangles.'
+  - 'src/knee_abnormality/data/preprocessing/intensity.py: quantile_bounds and normalize_pixels provide
+    the current global mapping.'
+  - The packet's intensity-normalization family contains a proposed learned calibration, not this deterministic
+    support estimator.
+  novelty: Changes which pixels define acquisition scale while retaining quantile probabilities, output
+    geometry and the augmentation recipe.
+  coverage: Every acquisition type and vendor; no label- or vendor-specific threshold. Fallback is per
+    acquisition.
+  exploitation: Target persistent vendor heterogeneity and the late macro plateau. Log foreground fraction,
+    bound displacement, clipping fraction and fallback rate; inspect whether the operation preserves useful
+    dynamic range.
+  budget: Reuse existing acquisition histograms with low-resolution mask cleanup. No extra frames or model
+    passes. Retain ten epochs initially and measure both CPU preparation and training time.
+  implementation: Add data.signal_normalization.foreground_bounds, transport it through dataset/collation,
+    and implement equivalent CPU/device processing. Replace the final global-bound estimator; retain active
+    continuous storage or upstream corrections if a new incumbent adopts them. Remove any superseded bound-estimation
+    branch. Keep labels, sampler, valid rectangles and constant-series behavior unchanged.
+  open_choices: Fix minimum support and degeneracy rules before launch using image-only numerical considerations.
+    Do not tune them against vendor or label AUC.
+  dependencies: []
+  priority_rationale: 'First priority: directly addresses a verified source behavior with modest cost
+    and a readily measurable activation signature.'
+  complexity: low
+  structural: true
+  source_paths:
+  - src/knee_abnormality/config.py
+  - src/knee_abnormality/data/dataset.py
+  - src/knee_abnormality/data/preprocessing/intensity.py
+  - src/knee_abnormality/data/preprocessing/device.py
+  - src/knee_abnormality/training/lightning.py
+  config_prefixes:
+  - data.signal_normalization.foreground_bounds
+  closest_precedent: src/knee_abnormality/data/preprocessing/intensity.py
+  difference: Compute bounds on estimated tissue support instead of every valid-rectangle pixel, while
+    applying the mapping to the same unchanged image support.
+- id: sig-continuous-normalization
+  mechanism_id: continuous-preaugmentation-intensity-preservation
+  parent_idea_id: null
+  title: Preserve fractional normalized intensities instead of rounding them to uint8
+  opportunity: Both preparation paths irreversibly round resampled intensities before the model converts
+    them back to float. PF OA and synovitis remain weak, but the amount of useful information lost at
+    this step is unknown. This seed directly isolates that information bottleneck.
+  mechanism: "Keep the existing bounds, clipping and 0\u2013255 scaling, but return float32 normalized\
+    \ pixels without round or uint8 conversion. Preserve fractional interpolation and normalization values\
+    \ through collation and transfer. The model's existing division by 255 then produces the same scale\
+    \ with greater precision."
+  precedents:
+  - 'src/knee_abnormality/data/preprocessing/intensity.py: normalize_pixels uses np.rint followed by uint8
+    conversion.'
+  - 'src/knee_abnormality/data/preprocessing/device.py: device preparation uses torch.round and uint8
+    output.'
+  - No direct quantization-ablation measurement appears in the packet.
+  novelty: Changes representation precision before augmentation, not image count, resolution, gamma or
+    augmentation strength.
+  coverage: All valid pixels and acquisitions. Padding remains zero and invalid/constant acquisitions
+    retain the incumbent handling.
+  exploitation: Log mean absolute discarded-fraction error relative to the old rounding operation and
+    the fraction of valid pixels with noninteger output. Target the same late PF OA/synovitis plateau
+    without asserting quantization is its cause.
+  budget: Normalized image storage grows from one to four bytes per pixel. Backbone compute is unchanged,
+    but transfer and memory costs must be measured; use the sealed range rather than assuming negligible
+    overhead.
+  implementation: "Replace normalized buffers and gathered image tensors with float32 in both preparation\
+    \ paths. Remove rounding from the active route. Pass the new setting through config and dataset only\
+    \ as required for candidate construction, and log diagnostics through Lightning. Preserve any newly\
+    \ accepted mapping or upstream correction; precision is an independent stage. No model or inference-engine\
+    \ change is needed because the numeric scale stays 0\u2013255."
+  open_choices: Use float32 initially for an unambiguous isolation of quantization. Do not bundle half
+    precision, clipping changes or image-size changes.
+  dependencies: []
+  priority_rationale: 'Second priority: clean, cheap implementation with uncertain effect size; may clarify
+    whether more elaborate normalization can preserve additional signal.'
+  complexity: low
+  structural: false
+  source_paths:
+  - src/knee_abnormality/config.py
+  - src/knee_abnormality/data/dataset.py
+  - src/knee_abnormality/data/preprocessing/intensity.py
+  - src/knee_abnormality/data/preprocessing/device.py
+  - src/knee_abnormality/training/lightning.py
+  config_prefixes:
+  - data.signal_normalization.continuous
+  closest_precedent: src/knee_abnormality/data/preprocessing/device.py
+  difference: "Retain the exact normalization mapping and 0\u2013255 scale but remove rounding and uint8\
+    \ storage on both CPU and device paths."
+- id: sig-magnitude-power-debiasing
+  mechanism_id: magnitude-noise-power-debiasing
+  parent_idea_id: null
+  title: Correct supported magnitude-noise power bias before acquisition normalization
+  opportunity: Synovitis AUC is 0.896563 and vendor slices remain heterogeneous despite active noise augmentation
+    and smoothing. A magnitude noise floor can compress low-signal contrast before global normalization.
+    Reconstruction details are unknown, so a universal Rician assumption would be unjustified.
+  mechanism: "For nonnegative acquisitions with identifiable nonpadding background, estimate the background\
+    \ second moment from low-variation air support. Apply sqrt(max(x\xB2 - estimated_background_power,\
+    \ 0)) before the retained normalization mapping. This is a power-bias correction, not an unbiased\
+    \ amplitude estimator. Unsupported, signed, degenerate or insufficient-background acquisitions receive\
+    \ identity correction. Estimate and apply one correction per acquisition using unique selected frames."
+  precedents:
+  - '[Gudbjartsson and Patz](https://pmc.ncbi.nlm.nih.gov/articles/PMC2254141/) describe magnitude-noise
+    bias and image-based estimation under explicit noise assumptions.'
+  - noise-referenced-bilateral-smoothing gained 0.001813 but missed adoption with 80% [-0.000342, +0.004002];
+    it adjusted a random smoothing kernel, not signal-power bias.
+  novelty: Adds deterministic signal-power correction before scaling, with support diagnostics and explicit
+    unsupported-acquisition handling.
+  coverage: Shared image-only eligibility rules across types and vendors. No acquisition is removed because
+    correction is unavailable.
+  exploitation: Log estimated background power relative to tissue scale, supported acquisition fraction,
+    corrected-pixel magnitude and clamped fraction. Check whether activity is concentrated in plausible
+    low-signal regions, not just whether the loss decreases.
+  budget: A background estimator and pointwise transform on existing pixels. No spatial denoising kernel,
+    extra frames or model pass. Expected small overhead remains a hypothesis until measured.
+  implementation: Add the estimator and transform to intensity.py/device.py, pass settings through dataset,
+    and log aggregated activity in Lightning. Supply the required support estimator independently of the
+    foreground-quantile seed. Apply before an accepted receive-field correction or final mapping; preserve
+    any newly accepted continuous output and all unrelated incumbent changes.
+  open_choices: Fix background support and validity criteria before launch. Multi-coil reconstruction
+    and spatially varying noise may invalidate the approximation; report these limitations rather than
+    interpreting every vendor gap as Rician bias.
+  dependencies: []
+  priority_rationale: 'Third priority: a distinct acquisition-physics mechanism with low runtime cost,
+    tempered by unknown reconstruction assumptions.'
+  complexity: medium
+  structural: true
+  source_paths:
+  - src/knee_abnormality/config.py
+  - src/knee_abnormality/data/dataset.py
+  - src/knee_abnormality/data/preprocessing/intensity.py
+  - src/knee_abnormality/data/preprocessing/device.py
+  - src/knee_abnormality/training/lightning.py
+  config_prefixes:
+  - data.signal_normalization.noise_power
+  closest_precedent: noise-referenced-bilateral-smoothing
+  difference: Estimate and subtract background signal power deterministically before normalization instead
+    of using noise to scale a stochastic bilateral-smoothing kernel.
+- id: sig-slice-coherent-local-histograms
+  mechanism_id: slice-coherent-local-histogram-normalization
+  parent_idea_id: null
+  title: Use contrast-limited local histograms shared across an acquisition's selected slices
+  opportunity: A single acquisition-wide affine map cannot compensate for spatially varying contrast.
+    Philips PF OA is 0.842669, but the source and packet do not establish whether local contrast is responsible.
+    Local histogram mapping offers a distinct representation change with measurable risks.
+  mechanism: Build coarse in-plane tile histograms over valid foreground support, aggregating the same
+    tile across all selected unique slices of an acquisition. Clip histogram counts, redistribute excess
+    and bilinearly interpolate monotone tile mappings. Share the mapping across slices to avoid artificial
+    slice-to-slice flicker. Empty tiles use the acquisition-global mapping; padding remains zero.
+  precedents:
+  - '[Pizer et al.](https://www.sciencedirect.com/science/article/pii/S0734189X8780186X) describe adaptive
+    histogram methods and contrast limiting to reduce noise overenhancement.'
+  - src/knee_abnormality/data/preprocessing/intensity.py currently applies one global affine mapping.
+  - The closed sharpening family changes high-frequency image content; this seed uses monotone local intensity
+    mappings without a sharpening filter.
+  novelty: Introduces deterministic, slice-coherent spatial adaptation of intensity contrast rather than
+    another global nonlinear augmentation or independent per-slice equalization.
+  coverage: One shared tile/mapping procedure for all types and labels. No learned vendor templates or
+    validation-cohort statistics.
+  exploitation: Log mapping deviation from global normalization, tile support, histogram clipping and
+    local noise amplification. Inspect PF OA and synovitis only as exploratory diagnostics alongside all-label
+    macro.
+  budget: Use a coarse tile grid and bounded histogram bins with NumPy/Torch implementations. Avoid per-pixel
+    histogram construction. Measure preparation and prediction overhead as well as training time.
+  implementation: Replace the final global mapping with the local histogram mapping in both preparation
+    routes. Supply its own support estimator. If foreground-global normalization has been accepted, replace
+    that final mapping and remove its obsolete controls; retain accepted continuous output and upstream
+    noise/field corrections. Preserve geometry, sampled paths and all new-incumbent model improvements.
+  open_choices: "Initially a 4\xD74 tile grid and 128 bins, with a fixed contrast limit specified before\
+    \ launch. Noise amplification and loss of absolute tissue contrast are material risks; do not rescue\
+    \ a rejection with a strength-only sweep."
+  dependencies: []
+  priority_rationale: 'Fourth priority: potentially larger contrast change than global bounds, but with
+    more risk of amplifying noise or erasing useful tissue relationships.'
+  complexity: medium
+  structural: true
+  source_paths:
+  - src/knee_abnormality/config.py
+  - src/knee_abnormality/data/dataset.py
+  - src/knee_abnormality/data/preprocessing/intensity.py
+  - src/knee_abnormality/data/preprocessing/device.py
+  - src/knee_abnormality/training/lightning.py
+  config_prefixes:
+  - data.signal_normalization.local_histograms
+  closest_precedent: https://www.sciencedirect.com/science/article/pii/S0734189X8780186X
+  difference: Aggregate tile histograms across selected unique slices of one MRI acquisition and share
+    their mappings through depth, with valid-support handling and the incumbent's fixed image geometry.
+- id: sig-coarse-receive-field-correction
+  mechanism_id: deterministic-receive-field-estimation
+  parent_idea_id: null
+  title: Estimate a coarse receive-field correction from each acquisition before normalization
+  opportunity: The large Siemens slice has macro AUC 0.917681 versus GE's 0.958428, although case mix
+    is a substantial confounder. Global quantiles cannot remove within-image gain variation. Residual
+    shading has not been measured, making this a high-uncertainty investigation rather than a diagnosed
+    repair.
+  mechanism: On downsampled positive foreground pixels, alternate a small log-intensity mixture model
+    with fitting a very low-frequency two-dimensional field shared across the acquisition's selected slices.
+    Fit residuals relative to tissue-component means, constrain the field to zero mean, regularize curvature
+    and bound correction gain. Divide by the estimated field before the retained final mapping. Degenerate
+    fits receive identity correction per acquisition. This is a bounded mixture/field approximation inspired
+    by bias-correction literature, not an implementation claim for N4.
+  precedents:
+  - '[Tustison et al.](https://iacl.ece.jhu.edu/proceedings/isbi2010/pdfs/0000708.pdf) motivate estimation
+    of smooth intensity nonuniformity.'
+  - smooth-bias-field-augmentation gained 0.000571, 80% [-0.001339, +0.002414], and its family is closed.
+    It injected synthetic fields; no residual-field measurement established a correction effect.
+  novelty: Estimates and removes an observed acquisition-local nuisance at both training and inference.
+    It does not inject random fields, change augmentation amplitude or use vendor metadata.
+  coverage: Same estimator for every supported acquisition. All studies remain in training and evaluation;
+    failed estimates leave that acquisition's correction at identity.
+  exploitation: Log field amplitude, gain clipping, fit residual, foreground support and identity-fallback
+    rate. Broad pathology or anatomy can be mistaken for shading, so inspect preservation of local contrast
+    and avoid interpreting fit reduction as clinical improvement.
+  budget: Fit on a coarse grid with a small fixed number of alternating updates and NumPy/Torch linear
+    algebra; install nothing. Bound memory and iteration count. A permitted epoch reduction may accommodate
+    cost, but all work must remain within the supervisor's sealed range.
+  implementation: Add the field estimator and correction before final normalization in intensity.py/device.py,
+    transport settings via dataset, and log diagnostics in Lightning. Supply its own support estimation
+    without depending on another seed. Retain an accepted continuous representation, final mapping and
+    optional preceding noise-power correction. Preserve unrelated behavior from every new incumbent and
+    remove superseded field-estimation code rather than accumulating variants.
+  open_choices: "Start with three log-intensity components, a very coarse smooth basis and gain bounded\
+    \ to 0.5\u20132.0. Fix support and convergence rules before launch. The shared two-dimensional field\
+    \ is an approximation; through-plane coil variation remains unmodeled."
+  dependencies: []
+  priority_rationale: 'Fifth priority: addresses a nuisance that global normalization cannot represent,
+    with the greatest implementation cost and risk of removing genuine anatomical signal.'
+  complexity: high
+  structural: true
+  source_paths:
+  - src/knee_abnormality/config.py
+  - src/knee_abnormality/data/dataset.py
+  - src/knee_abnormality/data/preprocessing/intensity.py
+  - src/knee_abnormality/data/preprocessing/device.py
+  - src/knee_abnormality/training/lightning.py
+  config_prefixes:
+  - data.signal_normalization.receive_field
+  closest_precedent: smooth-bias-field-augmentation
+  difference: Estimate a field from the current acquisition and divide it out deterministically before
+    normalization; do not add synthetic fields or retry their rejected augmentation strength.

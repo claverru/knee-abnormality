@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Annotated, Literal
 
 import yaml
-from pydantic import BaseModel, Field, StringConstraints
+from pydantic import BaseModel, Field, StringConstraints, model_validator
 from pydantic_settings import CliApp, CliPositionalArg, CliSubCommand
 
 from knee_abnormality.autoresearch.campaign.reports import IdeaReport
@@ -20,15 +20,22 @@ from knee_abnormality.autoresearch.runtime.storage import (
 )
 from knee_abnormality.autoresearch.runtime.usage import campaign_usage
 from knee_abnormality.autoresearch.scoring.diagnostics import backfill, compare
-from knee_abnormality.autoresearch.supervisor import Supervisor, seed_files
+from knee_abnormality.autoresearch.supervisor import Supervisor
+from knee_abnormality.autoresearch.topics.loop import TopicLoop
+from knee_abnormality.autoresearch.topics.status import loop_status, loop_summary
 from knee_abnormality.cli import CLISettings, command, describe
 
 ROOT = Path(__file__).resolve().parents[3]
 CampaignId = Annotated[str, StringConstraints(pattern=r"^[a-z][a-z0-9-]*$")]
+Provider = Literal["codex", "claude"]
 
 
 class RootCommand(BaseModel):
     root: Path = Field(default=ROOT, description="Repository root")
+
+
+class GpuChoice(BaseModel):
+    gpu: str = Field(default="0", description="GPU index or UUID for training")
 
 
 class CampaignCommand(RootCommand):
@@ -53,46 +60,10 @@ def started(supervisor: Supervisor) -> Supervisor:
     return supervisor
 
 
-def validate_campaign(supervisor: Supervisor):
-    _, _, limits = supervisor.recipe_limits()
-    for name in supervisor.policy.editable_files:
-        if not (supervisor.root / name).is_file():
-            raise ValueError(f"Missing editable file: {name}")
-    contract = supervisor.docs / "contract.md"
-    if not contract.read_text().strip():
-        raise ValueError("Campaign contract is empty")
-    ideas = [
-        idea
-        for path in seed_files(supervisor.docs)
-        for idea in IdeaReport.model_validate(yaml.safe_load(path.read_text())).ideas
-    ]
-    if len({idea.id for idea in ideas}) != len(ideas):
-        raise ValueError("Seed idea IDs must be unique")
-    seed_order = supervisor.campaign["backlog"]["seed_order"]
-    if seed_order == "forced" and any(idea.dependencies for idea in ideas):
-        raise ValueError(
-            "Forced seeds cannot declare dependencies; their file order sets the sequence"
-        )
-    print(
-        json.dumps(
-            {
-                "campaign": supervisor.campaign["id"],
-                "valid": True,
-                "seed_ideas": len(ideas),
-                "seed_order": seed_order,
-                "limits_from_reference": limits,
-                "policy_sealed": supervisor.state is not None,
-            },
-            indent=2,
-        )
-    )
-
-
-class Start(CampaignCommand):
+class Start(CampaignCommand, GpuChoice):
     model_config = describe("Seal the campaign policy and launch its supervisor")
 
-    provider: Literal["codex", "claude"] = Field(description="Agent subscription")
-    gpu: str = Field(default="0", description="GPU index or UUID for training")
+    provider: Provider = Field(description="Agent subscription")
 
     def cli_cmd(self) -> None:
         def action(supervisor, current):
@@ -107,7 +78,7 @@ class Validate(CampaignCommand):
     model_config = describe("Check the campaign files and seed ideas without starting")
 
     def cli_cmd(self) -> None:
-        validate_campaign(self.supervisor())
+        print(json.dumps(self.supervisor().validate(), indent=2))
 
 
 class Status(CampaignCommand):
@@ -240,6 +211,115 @@ class Supervise(CampaignCommand):
         self.supervisor().run()
 
 
+class LoopCommand(RootCommand):
+    def loop(self) -> TopicLoop:
+        return TopicLoop(self.root.resolve())
+
+
+def loop_control(name: str, command: LoopCommand, action) -> None:
+    loop = command.loop()
+    loop.output.mkdir(parents=True, exist_ok=True)
+    with lock(loop.output / "control.lock"):
+        extra = action(loop, loop.alive()) or {}
+    print(
+        json.dumps(
+            {"requested": name, **extra, **loop_status(command.loop())}, indent=2
+        )
+    )
+
+
+def loop_started(loop: TopicLoop) -> TopicLoop:
+    if loop.state is None:
+        raise ValueError("The topic loop has not been started")
+    return loop
+
+
+class LoopStart(LoopCommand, GpuChoice):
+    model_config = describe(
+        "Start the topic loop: it runs the first topic and rotates topics until stopped"
+    )
+
+    provider: Provider = Field(description="Agent subscription for every topic")
+    campaign: CampaignId | None = Field(
+        default=None,
+        description="Existing campaign to run as the first topic, started or resumed if needed",
+    )
+    reference_run: Path | None = Field(
+        default=None,
+        description="Starting reference run on the main recipe; the first topic comes from the queue or a researcher draft",
+    )
+
+    @model_validator(mode="after")
+    def one_start(self):
+        if (self.campaign is None) == (self.reference_run is None):
+            raise ValueError("Give exactly one of --campaign and --reference-run")
+        return self
+
+    def cli_cmd(self) -> None:
+        def action(loop, running):
+            preflight(self.provider, loop.root)
+            loop.initialize(
+                self.provider, gpu_uuid(self.gpu), self.campaign, self.reference_run
+            )
+            loop.launch()
+
+        loop_control("loop-start", self, action)
+
+
+class LoopStatus(LoopCommand):
+    model_config = describe(
+        "Summarize the topic loop: current topic, streak, rotation, topics and queue"
+    )
+
+    def cli_cmd(self) -> None:
+        print(loop_summary(self.loop()))
+
+
+class LoopStop(LoopCommand):
+    model_config = describe(
+        "Stop the topic loop and its topics after their current jobs"
+    )
+
+    abort: bool = Field(default=False, description="Cancel running training too")
+
+    def cli_cmd(self) -> None:
+        def action(loop, running):
+            loop_started(loop)
+            write_json(loop.output / "stop.json", {"abort": self.abort})
+            if not running:
+                loop.launch()
+
+        loop_control("loop-stop", self, action)
+
+
+class LoopResume(LoopCommand):
+    model_config = describe(
+        "Resume a stopped topic loop, the topics it stopped and the watchdog that the stop ended"
+    )
+
+    def cli_cmd(self) -> None:
+        from knee_abnormality.autoresearch.watchdog import resume_loop_watchdog
+
+        def action(loop, running):
+            preflight(loop_started(loop).state["provider"], loop.root)
+            write_json(loop.output / "resume.json", {})
+            if not running:
+                loop.launch()
+            try:
+                return {"watchdog": resume_loop_watchdog(loop.root)}
+            except (OSError, ValueError, RuntimeError) as error:
+                return {"watchdog": f"not restarted: {error}"}
+
+        loop_control("loop-resume", self, action)
+
+
+class LoopSupervise(LoopCommand):
+    model_config = describe("Run the topic loop in the foreground")
+
+    def cli_cmd(self) -> None:
+        loop_started(self.loop()).run()
+
+
 class Job(BaseModel):
     model_config = describe("Run one queued supervisor job")
 
@@ -250,7 +330,9 @@ class Job(BaseModel):
 
 
 class Calibrate(BaseModel):
-    model_config = describe("Measure the reference recipe's runtime limits")
+    model_config = describe(
+        "Replay a recipe's data pipeline on CPU to measure its triplet and visit counts"
+    )
 
     config: Path = Field(description="Experiment YAML to calibrate")
     destination: Path = Field(description="Output directory for the calibration run")
@@ -274,7 +356,7 @@ class Compare(RootCommand):
 
 class AutoresearchCLI(CLISettings):
     model_config = describe(
-        "Validate, run, stop and inspect local autoresearch campaigns"
+        "Validate, run, stop and inspect local autoresearch campaigns and the topic loop"
     )
 
     start: CliSubCommand[Start] = command(Start)
@@ -288,6 +370,11 @@ class AutoresearchCLI(CLISettings):
     import_ideas: CliSubCommand[ImportIdeas] = command(ImportIdeas)
     adopt: CliSubCommand[Adopt] = command(Adopt)
     supervise: CliSubCommand[Supervise] = command(Supervise)
+    loop_start: CliSubCommand[LoopStart] = command(LoopStart)
+    loop_status: CliSubCommand[LoopStatus] = command(LoopStatus)
+    loop_stop: CliSubCommand[LoopStop] = command(LoopStop)
+    loop_resume: CliSubCommand[LoopResume] = command(LoopResume)
+    loop_supervise: CliSubCommand[LoopSupervise] = command(LoopSupervise)
     job: CliSubCommand[Job] = command(Job)
     calibrate: CliSubCommand[Calibrate] = command(Calibrate)
     compare: CliSubCommand[Compare] = command(Compare)

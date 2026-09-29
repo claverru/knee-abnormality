@@ -1,0 +1,46 @@
+seeds:
+- id: plane-contrast-readouts
+  mechanism_id: plane-contrast-specific-readouts
+  parent_idea_id: null
+  title: Give each plane/contrast type its own readout weights before summing, initialized from the shared
+    readout
+  opportunity: Current pooling collapses all acquisition types before one linear classifier per label. PF
+    OA draws its evidence from axial fluid (29%) and sagittal (54%) and almost none from coronal; other
+    labels have different profiles. The near-misses run was rejected at -0.0006 on combined_v1 but passes
+    when its saved predictions are re-scored on rebuild_state_v2 (+0.0018, 80% [+0.0001, +0.0035]), the
+    only re-scored near miss with a live retry case.
+  mechanism: Keep six partial vectors per label, u_cq = sum over tokens of type q of alpha_ci * h_i, and
+    compute z_c = sum_q w_cq . u_cq + b_c with the same global attention denominator. Initialize every w_cq
+    from the current w_c, reproducing the original predictions apart from summation order; missing types
+    contribute zero. Image and token budgets unchanged.
+  precedents:
+  - 'Near-misses run: outputs/autoresearch/near-misses/experiments/plane-contrast-readouts-20260925T020628Z-2efb517d
+    (source/ holds the implementation), macro delta -0.0006, 80% [-0.0023, +0.0011] on combined_v1'
+  - 'Re-scoring on rebuild_state_v2: docs/validation/results/2026-09-28-campaign-rescoring.md'
+  - 'Spec: docs/backlog/small-changes.md#planecontrast-specific-readouts'
+  - 'Per-type contribution: docs/validation/results/2026-09-17-type-contribution.md'
+  novelty: First per-type readout on the rebuild_state_v2 recipe; count normalization, gated attention and
+    residual readouts were different changes.
+  coverage: All labels.
+  exploitation: Check missing-type studies and vendor strata in the diagnostics.
+  budget: Six times the readout weights; compute type contributions without a large pooling tensor.
+  implementation: Adds model.plane_readout to config.py and the per-type readout to modeling/model.py,
+    switched on in configs/training.yaml; the rejected near-misses implementation never reached main, so
+    it is re-implemented on the incumbent. Log the divergence of w_cq from w_c per epoch as the activation
+    signature.
+  open_choices: None; initialization is fixed.
+  dependencies: []
+  priority_rationale: Label-agnostic, suits PF OA's plane profile, costs no images, and is the one re-scored
+    near miss with a retry case.
+  complexity: low
+  structural: true
+  source_paths:
+  - src/knee_abnormality/config.py
+  - src/knee_abnormality/modeling/model.py
+  config_prefixes:
+  - model.plane_readout
+  closest_precedent: plane-contrast-readouts
+  difference: Same mechanism re-run on the current incumbent with the rebuild_state_v2 labels and the
+    all_5fold_scanner_v2 split, where its saved near-misses predictions already pass the adoption rule.
+  evidence: 'Re-scored +0.0018, 80% [+0.0001, +0.0035] on rebuild_state_v2 (+0.0010 net of the near-misses
+    reference shift); weak, one run, no public check. docs/validation/results/2026-09-28-campaign-rescoring.md'

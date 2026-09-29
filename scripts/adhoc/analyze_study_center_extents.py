@@ -14,12 +14,12 @@ from pydantic_settings import SettingsError
 
 from knee_abnormality.cli import CLISettings
 from knee_abnormality.config import SLICES_PER_INPUT, load_config
-from knee_abnormality.data.labels import STUDY
 from knee_abnormality.data.preprocessing.dicom import PREPARATION_ERRORS
 from knee_abnormality.data.preprocessing.filtering import clean_series
 from knee_abnormality.data.preprocessing.geometry import estimate_reference
 from knee_abnormality.data.preprocessing.series import index_series
 from knee_abnormality.data.sources import SERIES, StudySeries, build_series_index
+from knee_abnormality.data.splits import STUDY
 from knee_abnormality.provenance import copy_sources, git_revision, sha256_file
 
 PLANE_AXIS = {"Axial": 2, "Coronal": 1, "Sagittal": 0}

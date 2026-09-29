@@ -8,7 +8,7 @@ from pydantic import Field
 from sklearn.metrics import roc_auc_score
 
 from knee_abnormality.cli import CLISettings, describe
-from knee_abnormality.data.labels import STUDY, TARGET_THRESHOLD, require_unique_ids
+from knee_abnormality.data.splits import STUDY, TARGET_THRESHOLD, require_unique_ids
 from knee_abnormality.kaggle import COMPETITION
 from knee_abnormality.provenance import sha256_file
 from scripts.tools.prepare_combined_labels import fingerprint

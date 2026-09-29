@@ -8,7 +8,6 @@ import torch
 from torch.utils.data import DataLoader, Dataset
 
 from knee_abnormality.config import SLICES_PER_INPUT, DataConfig, TrainerConfig
-from knee_abnormality.data.labels import STUDY
 from knee_abnormality.data.preprocessing.device import prepare_images
 from knee_abnormality.data.preprocessing.dicom import PREPARATION_ERRORS
 from knee_abnormality.data.preprocessing.filtering import clean_series
@@ -38,6 +37,7 @@ from knee_abnormality.data.preprocessing.sampling import (
 )
 from knee_abnormality.data.preprocessing.series import IndexedSeries, index_series
 from knee_abnormality.data.sources import SeriesCandidate, StudySeries
+from knee_abnormality.data.splits import STUDY
 
 
 class KneeStudyDataset(Dataset):

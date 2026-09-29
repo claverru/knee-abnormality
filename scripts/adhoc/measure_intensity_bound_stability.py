@@ -11,8 +11,9 @@ from pydantic_settings import SettingsError
 from knee_abnormality.cli import CLISettings
 from knee_abnormality.config import load_config
 from knee_abnormality.data.dataset import KneeStudyDataset
-from knee_abnormality.data.labels import STUDY, load_fold_labels
+from knee_abnormality.data.labels import load_fold_labels
 from knee_abnormality.data.sources import build_series_index
+from knee_abnormality.data.splits import STUDY
 from knee_abnormality.identity import preprocessing_identity
 from knee_abnormality.provenance import copy_sources, sha256_file
 

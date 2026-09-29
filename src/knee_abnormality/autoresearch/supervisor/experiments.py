@@ -17,7 +17,9 @@ from knee_abnormality.autoresearch.campaign.binding import (
     reference_snapshot,
 )
 from knee_abnormality.autoresearch.campaign.gates import (
+    chained_counts,
     config_differences,
+    run_limits,
     validate_config,
     without_fields,
 )
@@ -94,11 +96,18 @@ class ExperimentMixin:
         for path in changed:
             if path.endswith(".py") and (workspace / path).exists():
                 ast.parse((workspace / path).read_text(), filename=path)
-        if self.policy.require_source_change and not any(
-            path.startswith("src/") for path in changed
-        ):
+        source_change = any(path.startswith("src/") for path in changed)
+        if self.policy.require_source_change and not source_change:
             raise ValueError(
                 "Candidate has no source change; scalar sweeps are outside this campaign"
+            )
+        if (
+            self.policy.configuration_only_ideas
+            and self.state["ideas"][exp["idea"]].get("source_change") is True
+            and not source_change
+        ):
+            raise ValueError(
+                "The idea declares a source change, but the candidate changes only configuration"
             )
         source = Path(exp["source"])
         snapshot(workspace, source)
@@ -123,6 +132,7 @@ class ExperimentMixin:
         atomic_write(Path(exp["directory"]) / "changes.diff", "".join(diff))
         exp["developer_report"] = report
         exp["integration"] = parsed.integration.model_dump(mode="json")
+        exp["activation"] = parsed.activation.model_dump(mode="json")
         self.config_gate(exp)
 
     def config_gate(self, exp):
@@ -265,26 +275,29 @@ class ExperimentMixin:
             raise ValueError(
                 "Baseline per-epoch training counts vary; totals cannot be sealed from a partial replay"
             )
-        steps = (
-            math.ceil(
-                math.ceil(
-                    first["visits"] / self.state["config"]["trainer"]["batch_size"]
-                )
-                / self.state["config"]["trainer"]["accumulate_grad_batches"]
-            )
-            * limits["epochs"]
+        epoch_steps = math.ceil(
+            math.ceil(first["visits"] / self.state["config"]["trainer"]["batch_size"])
+            / self.state["config"]["trainer"]["accumulate_grad_batches"]
         )
-        if steps != limits["optimizer_steps"]:
+        if epoch_steps * limits["epochs"] != limits["optimizer_steps"]:
             raise ValueError(
                 "Historical optimizer steps differ from the sealed schedule"
             )
-        limits.update(
-            training_triplets=first["triplets"] * limits["epochs"],
-            training_visits=first["visits"] * limits["epochs"],
-            training_cohort_sha256=first["cohort_sha256"],
-            validation_cohort_sha256=ledger["validation"][0]["cohort_sha256"],
-            validation_triplets=ledger["validation"][0]["triplets"],
-        )
+        cohorts = {
+            "training_cohort_sha256": first["cohort_sha256"],
+            "validation_cohort_sha256": ledger["validation"][0]["cohort_sha256"],
+        }
+        if self.state["budget"]["mode"] == "sealed":
+            limits.update(
+                training_triplets=first["triplets"] * limits["epochs"],
+                training_visits=first["visits"] * limits["epochs"],
+                **cohorts,
+                validation_triplets=ledger["validation"][0]["triplets"],
+            )
+        else:
+            limits.update(**cohorts)
+        if self.chain:
+            chained_counts(self.root, self.chain, limits, self.state["budget"])
         write_json(self.output / "limits.json", limits)
         self.state["sealed_sha256"] = sha256(self.output / "limits.json")
         self.state["status"] = "running"
@@ -333,7 +346,10 @@ class ExperimentMixin:
             "name": exp["id"],
             "paths": {**exp["config"]["paths"], "output_root": exp["directory"]},
         }
-        validate_config(self.state["config"], config, self.policy)
+        validate_config(self.state["config"], config, self.policy, self.state["budget"])
+        epochs = config["trainer"]["max_epochs"]
+        limits_path = Path(exp["directory"]) / "run-limits.json"
+        write_json(limits_path, run_limits(self.state, epochs))
         exp.update(
             reference=dict(reference),
             seed=config["seed"],
@@ -353,9 +369,12 @@ class ExperimentMixin:
             source,
             {"experiment": exp["id"]},
             self.state["limits"]["max_run_seconds"] - exp["preparation_seconds"],
+            limits_path,
         )
 
-    def submit_training(self, kind, config, directory, source, payload, timeout):
+    def submit_training(
+        self, kind, config, directory, source, payload, timeout, limits_path
+    ):
         config_path = directory / "config.yaml"
         atomic_write(config_path, yaml.safe_dump(config, sort_keys=False))
         writable = [directory]
@@ -381,12 +400,12 @@ class ExperimentMixin:
                 source,
                 writable,
                 gpu=True,
-                readonly=[source, config_path],
+                readonly=[source, config_path, limits_path],
             ),
             payload=payload,
             timeout=timeout,
             gpu=self.state["gpu"],
-            extra_env={"KNEE_AUTORESEARCH_LIMITS": str(self.output / "limits.json")},
+            extra_env={"KNEE_AUTORESEARCH_LIMITS": str(limits_path)},
         )
 
     def dequeue_launched(self, exp):
@@ -442,11 +461,13 @@ class ExperimentMixin:
                 "--allowed-input-identity-differences",
                 ",".join(identity_keys),
             ]
-        exceptions = self.state["limits"]["reference_identity_exceptions"]
-        if (
-            exceptions
-            and reference.resolve() == Path(self.state["reference"]).resolve()
-        ):
+        exceptions = (
+            list(self.state["limits"]["reference_identity_exceptions"])
+            if reference.resolve() == Path(self.state["reference"]).resolve()
+            else []
+        )
+        exceptions += [key for key in identity_keys if key not in exceptions]
+        if exceptions:
             command += ["--reference-identity-exceptions", ",".join(exceptions)]
         remaining = (
             self.state["limits"]["max_run_seconds"]
@@ -493,15 +514,22 @@ class ExperimentMixin:
             timeout=remaining,
         )
 
-    def completion(self, exp, decision, evidence):
-        evidence = {**evidence, "acceptance_rule": dict(ACCEPTANCE_RULE)}
-        exp.update(
-            stage="awaiting_decision", eligible_decision=decision, evidence=evidence
-        )
+    def record_evaluation(self, exp, decision, evidence):
+        evidence = {
+            **evidence,
+            "run_checks": exp.get("run_checks", {}),
+            "acceptance_rule": dict(ACCEPTANCE_RULE),
+        }
+        exp.update(eligible_decision=decision, evidence=evidence)
         write_json(
             Path(exp["directory"]) / "evaluation.json",
             {"eligible_decision": decision, **evidence},
         )
+        return evidence
+
+    def completion(self, exp, decision, evidence):
+        evidence = self.record_evaluation(exp, decision, evidence)
+        exp["stage"] = "awaiting_decision"
         self.event(
             "completion",
             {

@@ -1,0 +1,76 @@
+ideas:
+- id: rn18-fourteen-epochs
+  mechanism_id: schedule-length
+  parent_idea_id: null
+  title: Train 14 epochs instead of 10 with the same warmup and cosine shape
+  opportunity: ResNet-18 leads the control through epoch 5, then gains only +0.0039 over epochs 5-9 against
+    +0.0087, with training loss above the control's from epoch 2 (prior-work.md). The cosine reaches its
+    floor at epoch 9 while the curve still rises.
+  mechanism: trainer.max_epochs 14; warmup and cosine scale with the run as today.
+  precedents:
+  - RadImageNet base run curve (prior-work.md).
+  novelty: Not yet tried on RadImageNet ResNets.
+  coverage: All studies and labels.
+  exploitation: Per-epoch curves, per-stage drift and gradient RMS against the RadImageNet base run and
+    the ReXNet control.
+  budget: About 1,520 s, 140% of the RadImageNet base run.
+  implementation: 'Configuration-only: the RadImageNet base (contract) plus this change.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Cheapest test of whether flattening is the schedule running out.
+- id: rn18-two-warmup-epochs
+  mechanism_id: warmup
+  parent_idea_id: null
+  title: Two warmup epochs instead of one
+  opportunity: The peak rate arrives when the model is already ahead; a gentler start may protect the
+    early layers (First five convs drift 8.1% from the pretrained start against 3.2% for ReXNet; last
+    five match (prior-work.md).)
+  mechanism: optimizer.warmup_epochs 2.
+  precedents:
+  - 'EfficientNet-B3 two-epoch warmup: +0.0012 over its control, fold 3 (B3 overnight queues).'
+  novelty: Not yet tried on RadImageNet ResNets.
+  coverage: All studies and labels.
+  exploitation: Per-epoch curves, per-stage drift and gradient RMS against the RadImageNet base run and
+    the ReXNet control.
+  budget: Same as the RadImageNet base run, about 57% of the ReXNet reference.
+  implementation: 'Configuration-only: the RadImageNet base (contract) plus this change.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Only schedule change with a local precedent.
+- id: rn18-no-series-dropout
+  mechanism_id: regularization
+  parent_idea_id: null
+  title: Series dropout 0.2 to 0
+  opportunity: 'The model underfits: training loss sits above the control''s from epoch 2.'
+  mechanism: model.series_dropout 0.
+  precedents:
+  - Training-loss curves (prior-work.md).
+  novelty: Not yet tried on RadImageNet ResNets.
+  coverage: All studies and labels.
+  exploitation: Per-epoch curves, per-stage drift and gradient RMS against the RadImageNet base run and
+    the ReXNet control.
+  budget: Same as the RadImageNet base run, about 57% of the ReXNet reference.
+  implementation: 'Configuration-only: the RadImageNet base (contract) plus this change.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Removes a regularizer from an underfitting model.
+- id: rn18-lighter-dsu
+  mechanism_id: regularization
+  parent_idea_id: null
+  title: DSU probability 0.5 to 0.25
+  opportunity: Feature-statistics perturbation at stride 8 is strong for an 11M-parameter ResNet that
+    already underfits.
+  mechanism: model.feature_statistics_augmentation.probability 0.25.
+  precedents:
+  - DSU adopted on ReXNet in the augmentation campaign; its support weakened on rebuild_state_v2 (campaign
+    re-scoring).
+  novelty: Not yet tried on RadImageNet ResNets.
+  coverage: All studies and labels.
+  exploitation: Per-epoch curves, per-stage drift and gradient RMS against the RadImageNet base run and
+    the ReXNet control.
+  budget: Same as the RadImageNet base run, about 57% of the ReXNet reference.
+  implementation: 'Configuration-only: the RadImageNet base (contract) plus this change.'
+  open_choices: 0 if 0.25 helps.
+  dependencies: []
+  priority_rationale: Regularization suspect specific to the small backbone.
+exhausted_directions: None yet; first campaign on RadImageNet ResNets.

@@ -105,6 +105,11 @@ def candidate_binding(state, exp, evidence):
     integration = report.integration.model_dump(mode="json")
     if exp.get("integration") != integration:
         raise ValueError("Recorded integration differs from the developer report")
+    activation = report.activation.model_dump(mode="json")
+    if exp.get("activation") != activation:
+        raise ValueError(
+            "Recorded activation signature differs from the developer report"
+        )
     active = set(active_incumbent_ideas(state))
     removed = set(integration["removed_idea_ids"])
     if not removed <= active:
@@ -139,6 +144,7 @@ def candidate_binding(state, exp, evidence):
         "candidate_source_sha256": digest(actual),
         "candidate_config_sha256": digest(exp["config"]),
         "integration": integration,
+        "activation": activation,
         "active_idea_ids": sorted(retained | {exp["idea"]}),
         "external_evidence": evidence,
         "headers_sha256": state["headers_sha256"],

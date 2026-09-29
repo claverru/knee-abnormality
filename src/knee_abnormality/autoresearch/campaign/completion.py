@@ -1,7 +1,7 @@
 import math
 from pathlib import Path
 
-from knee_abnormality.autoresearch.campaign.gates import evaluate, verdict
+from knee_abnormality.autoresearch.campaign.gates import evaluate, run_limits, verdict
 from knee_abnormality.autoresearch.runtime.layout import (
     campaign_fold,
     comparison_path,
@@ -34,7 +34,7 @@ def completion_blockers(state, event):
         reasons = evaluate(
             directory,
             campaign_fold(state),
-            state["limits"],
+            run_limits(state, exp["config"]["trainer"]["max_epochs"]),
             {**exp["training_receipt"], "seconds": seconds},
         )
         if reasons:

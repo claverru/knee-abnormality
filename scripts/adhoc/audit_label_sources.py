@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 from pydantic_settings import CliApp, CliSubCommand
 
 from knee_abnormality.cli import CLISettings, command, describe
-from knee_abnormality.data.labels import STUDY
+from knee_abnormality.data.splits import STUDY
 from scripts.tools.prepare_rebuilt_labels import PrepareCLI, families, load_roots
 
 NOT_MENTIONED = {"nm", "M", "not_mentioned", "unk"}

@@ -2,23 +2,35 @@
 
 ## Authority and scope
 
-Creating a campaign is not starting it. The user launches the supervisor once; that
-active campaign authorizes detached experiments within its sealed contract without
-approval for each run. Ordinary training outside it remains user-launched. The
+Creating a campaign is not starting it. The user launches the supervisor once, or the
+[topic loop](topic-rotation.md) that starts each topic's supervisor; that active campaign
+authorizes detached experiments within its sealed contract without approval for each run. Ordinary training outside it remains user-launched. The
 numeric resource limits, baseline identity, evaluation rule and data identity are
 sealed before the first candidate; an adopted candidate never raises the original
 budget, and missing limits or failed constraints prevent a launch.
 
-Each campaign researches one topic indefinitely. Creative mechanisms and combined
-changes within that topic are welcome; a one-variable experiment is not required.
-Supporting plumbing is allowed when necessary for the mechanism. The developer
-does not modify the supervisor, evaluator, acceptance policy or campaign limits.
-Changing the topic or limits requires a new user decision.
+Each campaign researches one topic until it is stopped or the topic loop rotates it.
+Creative mechanisms and combined changes within that topic are welcome; a one-variable
+experiment is not required. Supporting plumbing is allowed when necessary for the
+mechanism. The developer does not modify the supervisor, evaluator, acceptance policy or
+campaign limits. The user seals the scope once: the protected list of the campaign policy,
+the shared evaluation and the sealed limits. Within it the topic loop changes topic on its
+own after a per-campaign streak of researcher runs without an adoption, chaining each new topic on the
+incumbent ([topic rotation](topic-rotation.md)); nothing in it waits for user approval, and
+only the user stops it. Changing the protected list, the evaluation or the limits requires
+a new user decision.
 
 Each campaign declares source/configuration permissions and topic-specific role
 guidance in `campaign.yaml`; the shared runner validates and seals that policy, so a
 new topic needs campaign files, not runner branches
-([campaign setup](campaign-setup.md)). The numerical acceptance and resource gates
+([campaign setup](campaign-setup.md)). Its training budget is one of two sealed modes: the
+reference's fixed epochs, optimizer steps and triplet totals with a 115% runtime ceiling, or a
+wall-clock range of the reference's training time that is the only budget rule: epochs, batch
+size, optimizer steps and the input per study may change inside it
+([training budget](campaign-setup.md#training-budget)). Either way the training and validation
+cohorts and deterministic ×1 validation stay fixed. A
+campaign may also allow configuration-only ideas, provided every research refill still carries an
+idea that needs a source change. The numerical acceptance and resource gates
 remain shared code and cannot be disabled by a topic policy.
 
 No submissions or publication are authorized. Experiments are limited to local
@@ -115,7 +127,9 @@ main ([project rule](../docs/validation/validation-strategy.md#controlled-compar
 fold. A campaign runs on that fold from start to end; fold rotation happens only when
 the user merges an adoption into main
 ([project rule](../docs/validation/validation-strategy.md#controlled-comparisons)).
-Training, comparison, accounting and reporting all use it.
+Training, comparison, accounting and reporting all use it. A topic the loop chains on an
+incumbent takes that incumbent's recipe, fold and seed
+([chaining](topic-rotation.md#chaining)).
 
 ## Supervisor and agents
 
@@ -125,7 +139,9 @@ claim to completion. Agents exit when their assignment is complete. They never p
 training, sleep through a run, or repeatedly invoke tools to discover whether
 another agent is done. A failure produces one event with evidence, not an unlimited
 retry loop; [automatic recovery](runtime.md#inspect-stop-and-resume) bounds rejected
-reports, provider errors and early training crashes. Do not tune the harness
+reports, provider errors, early training crashes and failed activation checks.
+Whether a candidate's mechanism ran is decided by code from its declared
+[activation signature](lifecycle.md#activation-check), not by agent judgment. Do not tune the harness
 recursively during a campaign.
 
 The researcher returns proposals and priority recommendations; the developer returns
@@ -201,8 +217,9 @@ experiment cards, and its concrete input and completion condition. Do not inject
 the last twelve full reports or duplicate ranking rationales into assignments.
 An immutable per-job history index links the complete record. Developers receive
 their own idea and relevant predecessors; researchers receive the family ledger
-([records](records.md#family-verdicts)) and full detail only for results decided since
-their last report; orchestrators receive event-specific evidence and queue cards.
+([records](records.md#family-verdicts)), full detail only for results decided since
+their last report, and `run_curves`: every decided run's and the reference's per-epoch
+curves with its configuration changes ([records](records.md#run-curves)); orchestrators receive event-specific evidence and queue cards.
 Developers and candidate reviews also receive `campaign_defects`, the last twelve
 repair instructions and invalid-run reasons of other attempts
 ([lifecycle](lifecycle.md#development-and-gates)). Keep full source, configs, logs

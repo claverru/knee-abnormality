@@ -9,7 +9,7 @@ from pydantic_settings import SettingsError
 from sklearn.metrics import roc_auc_score
 
 from knee_abnormality.cli import CLISettings
-from knee_abnormality.data.labels import STUDY, TARGET_THRESHOLD
+from knee_abnormality.data.splits import STUDY, TARGET_THRESHOLD
 from knee_abnormality.provenance import copy_sources
 from scripts.adhoc.screen_public_label_tables import ScreenCLI, load_tables
 from scripts.tools.prepare_combined_labels import (

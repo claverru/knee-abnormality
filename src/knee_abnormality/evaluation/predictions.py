@@ -4,7 +4,7 @@ import numpy as np
 import polars as pl
 import torch
 
-from knee_abnormality.data.labels import STUDY
+from knee_abnormality.data.splits import STUDY
 from knee_abnormality.evaluation.metrics import validation_metrics
 
 

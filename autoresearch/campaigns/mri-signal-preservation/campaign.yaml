@@ -1,0 +1,55 @@
+id: mri-signal-preservation
+recipe: outputs/autoresearch/radimagenet-rn18/experiments/rn18-more-triplets-20260928T235020Z-fd2c7bef/training/effective_config.json
+reference_run: outputs/autoresearch/radimagenet-rn18/experiments/rn18-more-triplets-20260928T235020Z-fd2c7bef/training
+reference_equivalences: {}
+additional_evidence_runs: []
+backlog:
+  refill_below: 3
+  refill_to: 5
+  seed_order: ranked
+  rotate_after: 6
+budget:
+  mode: range
+  min_fraction: 0.5
+  max_fraction: 1.5
+policy:
+  editable_files:
+  - configs/training.yaml
+  - src/knee_abnormality/config.py
+  - src/knee_abnormality/data/dataset.py
+  - src/knee_abnormality/data/preprocessing/intensity.py
+  - src/knee_abnormality/data/preprocessing/device.py
+  - src/knee_abnormality/training/lightning.py
+  editable_directories: []
+  config_keys:
+  - trainer.max_epochs
+  config_prefixes:
+  - data.signal_normalization
+  list_item_fields: {}
+  input_identity_keys:
+  - preprocessing_identity.sources_sha256
+  require_source_change: true
+  configuration_only_ideas: false
+  developer_instructions: "Limit changes to deterministic acquisition-local intensity processing before\
+    \ existing augmentation, configuration transport through dataset/collation, and scalar logging in\
+    \ Lightning. Implement matching CPU and device semantics in the existing preparation paths. Keep images\
+    \ in the existing numeric 0\u2013255 scale so model.py's division by 255 remains correct; continuous\
+    \ output may use floating dtype. Preserve image shape, valid rectangles, physical geometry, sampled\
+    \ paths, series membership, targets and all augmentation settings. Use only the current study's selected\
+    \ unique frames; never pool normalization statistics across validation studies or use labels/vendor\
+    \ IDs to select transforms. Permit only preprocessing_identity.sources_sha256 to change. No new libraries,\
+    \ external assets, tests, comments, docstrings, GPU use or training launches. Epoch changes are only\
+    \ for mechanism cost inside the supervisor's sealed range."
+  researcher_instructions: Distinguish measured vendor difficulty from hypotheses about quantization,
+    foreground statistics, noise floor and receive-field variation. Start with foreground statistics and
+    continuous intensities before local histogram or field estimation. Require pixel-level activity and
+    support diagnostics, not just configured probabilities. Do not reopen augmentation-strength sweeps,
+    scanner confusion, learned affine calibration, sharpening or closed bias-field augmentation. Existing
+    queued intensity-normalization and smoothing work retains its ownership. Every proposal must change
+    source and execute independently of other seeds.
+chain:
+  predecessor: radimagenet-rn18
+  incumbent: rn18-more-triplets-20260928T235020Z-fd2c7bef
+  source: outputs/autoresearch/radimagenet-rn18/experiments/rn18-more-triplets-20260928T235020Z-fd2c7bef/source
+  run: outputs/autoresearch/radimagenet-rn18/experiments/rn18-more-triplets-20260928T235020Z-fd2c7bef/training
+  predictions_sha256: 5e06a4dbf32c9ecfcaf8151fd5f3620548907ab78380f73d80d28667dbf40e6b

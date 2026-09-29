@@ -9,6 +9,9 @@ from knee_abnormality.autoresearch.supervisor.prompts import (
     FORCED_SEED_INSTRUCTIONS,
 )
 
+CLAIM_HOLDS = {"retiring", "handover"}
+LAUNCH_HOLDS = {"handover", "successor"}
+
 
 class SchedulingMixin:
     def schedule(self):
@@ -34,11 +37,14 @@ class SchedulingMixin:
         if self.next_event():
             self.schedule_event()
             return
-        if self.advance_claimed():
+        phase = self.rotation_phase()
+        if self.advance_claimed(phase not in LAUNCH_HOLDS):
             return
-        self.claim_next()
+        if phase not in CLAIM_HOLDS:
+            self.claim_next()
         self.start_developer()
-        self.refill()
+        if phase not in CLAIM_HOLDS:
+            self.refill()
 
     def schedule_calibration(self):
         if self.active("calibration"):
@@ -112,7 +118,7 @@ class SchedulingMixin:
             payload={"event": event},
         )
 
-    def advance_claimed(self):
+    def advance_claimed(self, launch=True):
         running = self.state["experiments"].get(self.state["running"])
         claimed = self.state["experiments"].get(self.state["claimed"])
         if (
@@ -149,7 +155,8 @@ class SchedulingMixin:
                 self.save()
                 return True
         if (
-            claimed
+            launch
+            and claimed
             and claimed["stage"] == "prepared"
             and running is None
             and gpu_available(self.state["gpu"])
@@ -160,15 +167,15 @@ class SchedulingMixin:
     def claim_next(self):
         if (
             self.state["claimed"] is None
-            and self.state.get("crash_repair")
+            and self.state["training_repairs"]
             and (
                 len(self.state["queue"]) < self.state["refill_to"]
                 or self.state["seed_ideas"]
             )
         ):
-            crashed = self.state["experiments"][self.state.pop("crash_repair")]
-            self.state["queue"].insert(0, crashed["idea"])
-            self.claim(repair=crashed)
+            stopped = self.state["experiments"][self.state["training_repairs"].pop(0)]
+            self.state["queue"].insert(0, stopped["idea"])
+            self.claim(repair=stopped)
         if self.state["claimed"] is None and self.state["queue"]:
             self.claim()
 
@@ -205,7 +212,7 @@ class SchedulingMixin:
             or self.active("researcher")
             or self.waiting()
             or self.state["last_refill_revision"] == self.state["evidence_revision"]
-            or self.seeds_pending()
+            or self.seeds_unlaunched()
         ):
             return
         self.state["last_refill_revision"] = self.state["evidence_revision"]

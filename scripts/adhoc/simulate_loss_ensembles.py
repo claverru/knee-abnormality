@@ -10,7 +10,7 @@ from pydantic_settings import SettingsError
 from scipy.stats import rankdata, spearmanr
 
 from knee_abnormality.cli import CLISettings
-from knee_abnormality.data.labels import STUDY, TARGET_THRESHOLD
+from knee_abnormality.data.splits import STUDY, TARGET_THRESHOLD
 from knee_abnormality.evaluation.metrics import aucs, bootstrap_auc
 from knee_abnormality.provenance import copy_sources, sha256_file
 

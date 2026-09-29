@@ -13,7 +13,6 @@ from knee_abnormality.config import (
     RuntimePrecision,
 )
 from knee_abnormality.data.dataset import KneeStudyDataset
-from knee_abnormality.data.labels import STUDY
 from knee_abnormality.data.preprocessing.device import with_images
 from knee_abnormality.data.sources import (
     build_series_index,
@@ -21,6 +20,7 @@ from knee_abnormality.data.sources import (
     prediction_studies,
     select_studies,
 )
+from knee_abnormality.data.splits import STUDY
 from knee_abnormality.inference.reflection import reflect_batch, sagittal_types
 from knee_abnormality.modeling.model import KneeAbnormalityModel
 

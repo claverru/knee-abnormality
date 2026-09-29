@@ -1,4 +1,5 @@
 import os
+import shutil
 import signal
 import subprocess
 import threading
@@ -15,6 +16,7 @@ from knee_abnormality.autoresearch.campaign.definition import (
     load_campaign,
 )
 from knee_abnormality.autoresearch.campaign.gates import (
+    chained_limits,
     initial_limits,
     validate_config,
 )
@@ -48,19 +50,21 @@ from knee_abnormality.autoresearch.supervisor.common import (
 )
 from knee_abnormality.autoresearch.supervisor.experiments import ExperimentMixin
 from knee_abnormality.autoresearch.supervisor.jobs import JobMixin
+from knee_abnormality.autoresearch.supervisor.monitoring import MonitorMixin
 from knee_abnormality.autoresearch.supervisor.prompts import IMPORT_INSTRUCTIONS
 from knee_abnormality.autoresearch.supervisor.results import ResultMixin
 from knee_abnormality.autoresearch.supervisor.scheduling import SchedulingMixin
 from knee_abnormality.config import STUDY_HEADERS, load_config
 
 
-class Supervisor(JobMixin, ExperimentMixin, ResultMixin, SchedulingMixin):
-    def __init__(self, root: Path, campaign: str):
+class Supervisor(JobMixin, ExperimentMixin, ResultMixin, SchedulingMixin, MonitorMixin):
+    def __init__(self, root: Path, campaign: str, docs: Path | None = None):
         self.root = root
-        self.docs = root / "autoresearch/campaigns" / campaign
+        self.docs = docs or root / "autoresearch/campaigns" / campaign
         definition = load_campaign(self.docs / "campaign.yaml")
         self.campaign = definition.model_dump(mode="json")
         self.policy = definition.policy
+        self.chain = self.campaign["chain"]
         if self.campaign["id"] != campaign:
             raise ValueError(f"Mismatched campaign: {campaign}")
         self.output = (root / self.campaign["artifacts_root"]).resolve()
@@ -73,6 +77,10 @@ class Supervisor(JobMixin, ExperimentMixin, ResultMixin, SchedulingMixin):
             if sealed != self.policy:
                 raise ValueError(
                     "Campaign policy differs from its seal; create a new campaign"
+                )
+            if self.state["budget"] != self.campaign["budget"]:
+                raise ValueError(
+                    "Campaign budget differs from its seal; create a new campaign"
                 )
             self.policy = sealed
         self.wakeup = threading.Event()
@@ -143,20 +151,64 @@ class Supervisor(JobMixin, ExperimentMixin, ResultMixin, SchedulingMixin):
             environment(self.root),
         )
 
+    def rotation_phase(self):
+        return (optional_json(self.output / "rotation.json") or {}).get("phase")
+
+    def source_root(self):
+        return (self.root / self.chain["source"]).resolve() if self.chain else self.root
+
     def recipe_limits(self):
-        config = load_config(self.root / self.campaign["recipe"]).model_dump(
-            mode="json"
+        recipe = self.root / self.campaign["recipe"]
+        config = (
+            read_json(recipe)
+            if self.chain
+            else load_config(recipe).model_dump(mode="json")
         )
         reference = (self.root / self.campaign["reference_run"]).resolve()
+        budget = self.campaign["budget"]
         limits = initial_limits(
             reference,
             config,
             self.campaign["reference_equivalences"],
             self.campaign["reference_config_exceptions"],
             self.campaign["reference_identity_exceptions"],
+            budget,
         )
-        validate_config(config, config, self.policy)
+        if self.chain:
+            limits = chained_limits(self.root, self.chain, limits, budget)
+        validate_config(config, config, self.policy, budget)
         return config, reference, limits
+
+    def validate(self):
+        _, _, limits = self.recipe_limits()
+        for name in self.policy.editable_files:
+            if not (self.source_root() / name).is_file():
+                raise ValueError(f"Missing editable file: {name}")
+        if not (self.docs / "contract.md").read_text().strip():
+            raise ValueError("Campaign contract is empty")
+        ideas = [
+            idea
+            for path in seed_files(self.docs)
+            for idea in IdeaReport.model_validate(
+                yaml.safe_load(path.read_text())
+            ).ideas
+        ]
+        if len({idea.id for idea in ideas}) != len(ideas):
+            raise ValueError("Seed idea IDs must be unique")
+        seed_order = self.campaign["backlog"]["seed_order"]
+        if seed_order == "forced" and any(idea.dependencies for idea in ideas):
+            raise ValueError(
+                "Forced seeds cannot declare dependencies; their file order sets the sequence"
+            )
+        return {
+            "campaign": self.campaign["id"],
+            "valid": True,
+            "seed_ideas": len(ideas),
+            "seed_order": seed_order,
+            "budget": self.campaign["budget"],
+            "limits_from_reference": limits,
+            "policy_sealed": self.state is not None,
+        }
 
     def initialize(self, provider: str, gpu: str):
         if self.state is not None:
@@ -178,7 +230,11 @@ class Supervisor(JobMixin, ExperimentMixin, ResultMixin, SchedulingMixin):
         headers = self.root / STUDY_HEADERS
         if not headers.is_file():
             raise ValueError(f"Missing bootstrap acquisition metadata: {headers}")
-        snapshot(self.root, base)
+        snapshot(self.source_root(), base)
+        if self.chain:
+            shutil.copytree(
+                self.docs, base / "autoresearch/campaigns" / self.campaign["id"]
+            )
         config["seed"] = reference_seed({"run": str(reference)})
         atomic_write(
             base / "configs/training.yaml", yaml.safe_dump(config, sort_keys=False)
@@ -218,6 +274,7 @@ class Supervisor(JobMixin, ExperimentMixin, ResultMixin, SchedulingMixin):
             "findings": [],
             "claimed": None,
             "running": None,
+            "training_repairs": [],
             "evidence_revision": 0,
             "last_refill_revision": -1,
             "research": {
@@ -229,6 +286,8 @@ class Supervisor(JobMixin, ExperimentMixin, ResultMixin, SchedulingMixin):
             "refill_below": self.campaign["backlog"]["refill_below"],
             "refill_to": self.campaign["backlog"]["refill_to"],
             "seed_order": self.campaign["backlog"]["seed_order"],
+            "rotate_after": self.campaign["backlog"]["rotate_after"],
+            "budget": self.campaign["budget"],
             "seed_ideas": [],
         }
         seeds = seed_files(self.docs)
@@ -283,6 +342,12 @@ class Supervisor(JobMixin, ExperimentMixin, ResultMixin, SchedulingMixin):
     def seeds_pending(self):
         return any(
             self.state["ideas"][idea_id]["status"] not in SEED_TERMINAL
+            for idea_id in self.state["seed_ideas"]
+        )
+
+    def seeds_unlaunched(self):
+        return any(
+            self.state["ideas"][idea_id]["status"] not in {*SEED_TERMINAL, "launched"}
             for idea_id in self.state["seed_ideas"]
         )
 

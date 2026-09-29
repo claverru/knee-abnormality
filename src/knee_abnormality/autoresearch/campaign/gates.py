@@ -5,11 +5,42 @@ from pathlib import Path
 
 from knee_abnormality.autoresearch.campaign.definition import CampaignPolicy
 from knee_abnormality.autoresearch.campaign.rules import ACCEPTANCE_RULE, EVALUATION
-from knee_abnormality.autoresearch.runtime.layout import PREDICTIONS, fold_dir
+from knee_abnormality.autoresearch.runtime.layout import (
+    PREDICTIONS,
+    fold_dir,
+)
 from knee_abnormality.autoresearch.runtime.storage import read_json, sha256
 
 LOGISTICAL_KEYS = {"name", "seed", "paths.output_root"}
 RUNTIME_FACTOR = 1.15
+INPUT_SLICES = 3
+INHERITED_LIMITS = {
+    "sealed": ("runtime_factor", "historical_recorded_seconds", "max_run_seconds"),
+    "range": (
+        "runtime_factor",
+        "historical_recorded_seconds",
+        "max_run_seconds",
+        "min_training_seconds",
+        "max_training_seconds",
+    ),
+}
+CHAINED_LIMITS = {
+    "sealed": ("epochs", "optimizer_steps", "bootstrap_draws", "bootstrap_seed"),
+    "range": ("bootstrap_draws", "bootstrap_seed"),
+}
+SEALED_COUNTS = {
+    "sealed": (
+        "training_triplets",
+        "training_visits",
+        "training_cohort_sha256",
+        "validation_cohort_sha256",
+        "validation_triplets",
+    ),
+    "range": (
+        "training_cohort_sha256",
+        "validation_cohort_sha256",
+    ),
+}
 
 
 def active_incumbent_ideas(state):
@@ -77,7 +108,7 @@ def config_differences(reference, candidate):
     )
 
 
-def validate_config(reference, candidate, policy: CampaignPolicy):
+def validate_config(reference, candidate, policy: CampaignPolicy, budget: dict):
     changed = config_differences(reference, candidate)
     allowed = LOGISTICAL_KEYS | set(policy.config_keys) | set(policy.list_item_fields)
     rejected = [
@@ -99,7 +130,10 @@ def validate_config(reference, candidate, policy: CampaignPolicy):
             for a, b in zip(left, right, strict=True)
         ):
             raise ValueError(f"Protected list-item fields changed: {key}")
-    if candidate["trainer"]["max_epochs"] != reference["trainer"]["max_epochs"]:
+    if (
+        budget["mode"] == "sealed"
+        and candidate["trainer"]["max_epochs"] != reference["trainer"]["max_epochs"]
+    ):
         raise ValueError("Epoch budget must remain fixed")
     if (
         candidate["data"]["validation_image_multiplier"]
@@ -126,6 +160,7 @@ def initial_limits(
     equivalences: dict,
     config_exceptions: list[str],
     identity_exceptions: list[str],
+    budget: dict,
 ):
     reference_fold = fold_dir(reference, config["validation"]["folds"][0])
     if not reference_fold.is_dir():
@@ -161,11 +196,12 @@ def initial_limits(
             "validation_prediction_seconds",
         )
     )
-    return {
+    epochs = config["trainer"]["max_epochs"]
+    limits = {
         "runtime_factor": RUNTIME_FACTOR,
         "historical_recorded_seconds": seconds,
         "max_run_seconds": math.ceil(seconds * RUNTIME_FACTOR),
-        "epochs": config["trainer"]["max_epochs"],
+        "epochs": epochs,
         "optimizer_steps": timing["optimizer_steps"],
         "reference_predictions_sha256": sha256(reference_fold / PREDICTIONS),
         "reference_equivalences": dict(equivalences),
@@ -173,6 +209,94 @@ def initial_limits(
         "reference_identity_exceptions": list(identity_exceptions),
         "bootstrap_draws": EVALUATION["bootstrap_draws"],
         "bootstrap_seed": EVALUATION["bootstrap_seed"],
+    }
+    if budget["mode"] == "sealed":
+        return limits
+    training = timing["training_seconds"]
+    return {
+        **limits,
+        "max_run_seconds": math.ceil(
+            seconds * RUNTIME_FACTOR + (budget["max_fraction"] - 1) * training
+        ),
+        "reference_training_seconds": training,
+        "min_training_seconds": budget["min_fraction"] * training,
+        "max_training_seconds": budget["max_fraction"] * training,
+    }
+
+
+def predecessor_limits(root: Path, chain: dict, budget: dict):
+    output = root / "outputs/autoresearch" / chain["predecessor"]
+    state = read_json(output / "state.json")
+    expected = {
+        "id": chain["incumbent"],
+        "source": str((root / chain["source"]).resolve()),
+        "run": str((root / chain["run"]).resolve()),
+        "predictions_sha256": chain["predictions_sha256"],
+    }
+    recorded = {
+        key: str(Path(value).resolve()) if key in {"source", "run"} else value
+        for key, value in state["incumbent"].items()
+        if key in expected
+    }
+    if recorded != expected:
+        raise ValueError(
+            f"Chain incumbent is not the incumbent of {chain['predecessor']}: {recorded}"
+        )
+    if not (root / chain["source"]).is_dir():
+        raise ValueError(f"Chain incumbent source is missing: {chain['source']}")
+    if sha256(output / "limits.json") != state["sealed_sha256"]:
+        raise ValueError(f"Sealed limits of {chain['predecessor']} changed")
+    if state["budget"] != budget:
+        raise ValueError(
+            f"A chained campaign keeps the budget of {chain['predecessor']}: {state['budget']}"
+        )
+    return read_json(output / "limits.json")
+
+
+def chained_limits(root: Path, chain: dict, limits: dict, budget: dict):
+    sealed = predecessor_limits(root, chain, budget)
+    if limits["reference_predictions_sha256"] != chain["predictions_sha256"]:
+        raise ValueError("Chain incumbent predictions changed")
+    for key in CHAINED_LIMITS[budget["mode"]]:
+        if limits[key] != sealed[key]:
+            raise ValueError(f"Chain incumbent changes the sealed {key}")
+    return {
+        **limits,
+        **{key: sealed[key] for key in INHERITED_LIMITS[budget["mode"]]},
+        "chain": dict(chain),
+    }
+
+
+def chained_counts(root: Path, chain: dict, limits: dict, budget: dict):
+    sealed = predecessor_limits(root, chain, budget)
+    changed = [
+        key for key in SEALED_COUNTS[budget["mode"]] if limits[key] != sealed[key]
+    ]
+    if changed:
+        raise ValueError(
+            f"Baseline replay differs from the chain's sealed counts: {changed}"
+        )
+
+
+def run_limits(state, epochs: int):
+    limits = state["limits"]
+    if state["budget"]["mode"] == "sealed":
+        if epochs != limits["epochs"]:
+            raise ValueError("Epoch budget must remain fixed")
+        return {**limits, "mode": "sealed", "input_slices": INPUT_SLICES}
+    return {
+        "mode": "range",
+        "input_slices": None,
+        "epochs": epochs,
+        "optimizer_steps": None,
+        "training_visits": None,
+        "training_triplets": None,
+        "validation_triplets": None,
+        "training_cohort_sha256": limits["training_cohort_sha256"],
+        "validation_cohort_sha256": limits["validation_cohort_sha256"],
+        "max_run_seconds": limits["max_run_seconds"],
+        "min_training_seconds": limits["min_training_seconds"],
+        "max_training_seconds": limits["max_training_seconds"],
     }
 
 
@@ -189,9 +313,12 @@ def evaluate(experiment: Path, fold: int, limits: dict, receipt: dict):
         if not ledger["complete"]:
             reasons.append("Triplet accounting is incomplete")
         for key in ("training_triplets", "training_visits"):
-            if ledger[key] != limits[key]:
+            if limits[key] is not None and ledger[key] != limits[key]:
                 reasons.append(f"Changed {key}")
-        if timing["optimizer_steps"] != limits["optimizer_steps"]:
+        if (
+            limits["optimizer_steps"] is not None
+            and timing["optimizer_steps"] != limits["optimizer_steps"]
+        ):
             reasons.append("Optimizer step count changed")
         if len(ledger["train"]) != limits["epochs"]:
             reasons.append("Epoch count changed")
@@ -207,11 +334,21 @@ def evaluate(experiment: Path, fold: int, limits: dict, receipt: dict):
             ]
             if any(row["cohort_sha256"] != expected for row in ledger[phase]):
                 reasons.append(f"Changed {phase} cohort")
-        if any(
+        if limits["validation_triplets"] is not None and any(
             row["triplets"] != limits["validation_triplets"]
             for row in ledger["validation"]
         ):
             reasons.append("Validation x1 budget changed")
+        if limits["mode"] == "range" and not (
+            limits["min_training_seconds"]
+            <= timing["training_seconds"]
+            <= limits["max_training_seconds"]
+        ):
+            reasons.append(
+                f"Training time {timing['training_seconds']:.0f} s is outside the "
+                f"campaign's range {limits['min_training_seconds']:.0f}-"
+                f"{limits['max_training_seconds']:.0f} s"
+            )
     except (OSError, KeyError, ValueError) as error:
         reasons.append(f"Missing or malformed accounting: {error}")
     return reasons

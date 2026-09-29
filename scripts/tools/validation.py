@@ -11,12 +11,8 @@ from pydantic_settings import CliApp, CliSubCommand
 
 from knee_abnormality.cli import CLISettings, command, describe
 from knee_abnormality.config import STUDY_HEADERS, ExperimentConfig, load_config
-from knee_abnormality.data.labels import (
-    STUDY,
-    TARGET_THRESHOLD,
-    load_source,
-    require_unique_ids,
-)
+from knee_abnormality.data.labels import load_source
+from knee_abnormality.data.splits import STUDY, TARGET_THRESHOLD, require_unique_ids
 from knee_abnormality.evaluation.scoring import score
 from knee_abnormality.provenance import sha256_file
 
@@ -245,10 +241,14 @@ def prepare(
         ).hexdigest(),
         "generator_sha256": {
             "validation.py": sha256_file(Path(__file__)),
-            "labels.py": sha256_file(
-                Path(__file__).resolve().parents[2]
-                / "src/knee_abnormality/data/labels.py"
-            ),
+            **{
+                name: sha256_file(
+                    Path(__file__).resolve().parents[2]
+                    / "src/knee_abnormality/data"
+                    / name
+                )
+                for name in ("labels.py", "splits.py")
+            },
         },
         "versions": {
             name: version(name)

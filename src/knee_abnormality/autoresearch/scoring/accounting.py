@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytorch_lightning as L
 
+from knee_abnormality.autoresearch.campaign.gates import INPUT_SLICES
 from knee_abnormality.autoresearch.campaign.rules import (
     CALIBRATION_EPOCHS,
     CALIBRATION_VALIDATION_PASSES,
@@ -18,8 +19,11 @@ def digest(value) -> str:
 
 
 class TripletLedger:
-    def __init__(self, destination: Path, limits: dict | None = None):
+    def __init__(
+        self, destination: Path, input_slices: int | None, limits: dict | None = None
+    ):
         self.destination = destination
+        self.input_slices = input_slices
         self.limits = limits
         self.rows = {}
         self.history = {"train": [], "validation": []}
@@ -33,8 +37,13 @@ class TripletLedger:
         counts = batch["slice_mask"].sum(dim=1).cpu().tolist()
         indices = batch["series_study_index"].cpu().tolist()
         types = batch["series_type_index"].cpu().tolist()
-        if batch["valid_rects"].shape[2] != 3:
-            raise ValueError("A valid input must contain exactly three slices")
+        if (
+            self.input_slices is not None
+            and batch["valid_rects"].shape[2] != self.input_slices
+        ):
+            raise ValueError(
+                f"A valid input must contain exactly {self.input_slices} slices"
+            )
         for index, uid in enumerate(batch["study_uid"]):
             if uid in self.rows:
                 raise ValueError(f"Duplicate study visit within one epoch: {uid}")
@@ -83,7 +92,7 @@ class TripletLedger:
             }
         )
         self.save(False)
-        if self.limits is not None:
+        if self.limits is not None and self.limits["training_triplets"] is not None:
             total = sum(row["triplets"] for row in self.history["train"])
             if total > self.limits["training_triplets"]:
                 raise ValueError("Original campaign training triplet budget exceeded")
@@ -110,11 +119,14 @@ class TripletLedger:
             actual = sum(row["triplets"] for row in self.history["train"])
             visits = sum(row["visits"] for row in self.history["train"])
             if (
-                actual != expected["training_triplets"]
-                or visits != expected["training_visits"]
+                expected["training_triplets"] is not None
+                and actual != expected["training_triplets"]
+            ) or (
+                expected["training_visits"] is not None
+                and visits != expected["training_visits"]
             ):
                 raise ValueError(
-                    "Average realized training triplets changed from the sealed baseline"
+                    "Average realized training triplets or visits changed from the sealed baseline"
                 )
             if len(self.history["train"]) != expected["epochs"]:
                 raise ValueError("Training did not complete the fixed epoch schedule")
@@ -126,17 +138,18 @@ class TripletLedger:
             for row in self.history["validation"]:
                 if row["cohort_sha256"] != expected["validation_cohort_sha256"]:
                     raise ValueError("Validation cohort changed")
-                if row["triplets"] != expected["validation_triplets"]:
+                if (
+                    expected["validation_triplets"] is not None
+                    and row["triplets"] != expected["validation_triplets"]
+                ):
                     raise ValueError("Validation x1 triplet count changed")
         self.save(True)
 
 
 class TripletAccounting(L.Callback):
     def __init__(self, destination: Path):
-        path = os.environ.get("KNEE_AUTORESEARCH_LIMITS")
-        self.ledger = TripletLedger(
-            destination, read_json(Path(path)) if path else None
-        )
+        limits = read_json(Path(os.environ["KNEE_AUTORESEARCH_LIMITS"]))
+        self.ledger = TripletLedger(destination, limits["input_slices"], limits)
 
     def on_fit_start(self, trainer, pl_module):
         data = trainer.datamodule
@@ -184,7 +197,7 @@ def calibrate(config_path: Path, destination: Path):
     config = load_config(config_path)
     data = KneeDataModule(config, config.validation.folds[0])
     data.setup("fit")
-    ledger = TripletLedger(destination / "triplet_accounting.json")
+    ledger = TripletLedger(destination / "triplet_accounting.json", INPUT_SLICES)
     train_loader = build_data_loader(
         data.train_dataset, config.trainer, config.trainer.batch_size
     )

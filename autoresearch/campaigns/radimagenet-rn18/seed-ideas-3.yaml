@@ -1,0 +1,85 @@
+ideas:
+- id: rn18-warmup-stable-decay
+  mechanism_id: schedule-shape
+  parent_idea_id: null
+  title: Warmup, constant rate until 80% of training, then linear decay
+  opportunity: ResNet-18 leads the control through epoch 5, then gains only +0.0039 over epochs 5-9 against
+    +0.0087, with training loss above the control's from epoch 2 (prior-work.md).
+  mechanism: Replace cosine by warmup-stable-decay at the same peak and floor.
+  precedents:
+  - MiniCPM warmup-stable-decay (arXiv 2404.06395).
+  novelty: Not yet tried on RadImageNet ResNets.
+  coverage: All studies and labels.
+  exploitation: Per-epoch curves, per-stage drift and gradient RMS against the incumbent and the ReXNet
+    control.
+  budget: Same as the ResNet-18 base run (1,085 s).
+  implementation: New option optimizer.schedule wsd in config.py and the scheduler.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Keeps the backbone at its peak rate for most of the run.
+- id: rn10t-double-batch-and-rates
+  mechanism_id: batch-and-rate
+  parent_idea_id: null
+  title: ResNet-10t with batch size 16 and both learning rates doubled
+  opportunity: ResNet-10t trails ResNet-18 at every epoch (x4 0.922579 against 0.925476) at nearly the
+    same wall-clock cost, since training is loader-bound. A larger batch gives BatchNorm and the gradient
+    more studies per step, and doubling the rates keeps the per-study update size (linear scaling); the
+    smaller backbone leaves GPU memory for it.
+  mechanism: The incumbent with model.backbone resnet10t.c3_in1k, trainer.batch_size 16, optimizer.backbone_lr
+    1.2e-4 (twice the 6e-5 of the ResNet-10t run) and optimizer.head_lr 1.2e-3 (twice 6e-4); everything
+    else as the base.
+  precedents:
+  - 'radimagenet-resnet10t: x4 0.922579 at batch 8, backbone LR 6e-5 (prior-work.md).'
+  - Linear learning-rate scaling with batch size (Goyal et al. 2017, arXiv 1706.02677).
+  novelty: First batch-size change in the project; first ResNet-10t seed.
+  coverage: All studies and labels.
+  exploitation: Per-epoch curves, per-stage drift and gradient RMS against the ResNet-10t run and the
+    ReXNet control.
+  budget: Half the optimizer steps per epoch; expected at or below the ResNet-10t run (1,048 s), inside
+    the range. GPU memory at batch 16 is unmeasured.
+  implementation: 'Configuration-only: the incumbent with the ResNet-10t backbone, batch 16 and both rates
+    doubled.'
+  open_choices: Batch 12 with 1.5x rates if batch 16 does not fit in memory.
+  dependencies: []
+  priority_rationale: User-requested; tests whether ResNet-10t is held back by its step size rather than
+    its capacity.
+- id: rn18-plane-backbones-dense-fusion
+  mechanism_id: plane-backbones
+  parent_idea_id: null
+  title: One RadImageNet ResNet-18 per plane with dense per-plane readouts and learned fusion, at the
+    ResNet-18 settings
+  opportunity: The plane-specialization campaign found its best structure in one backbone per plane with
+    dense per-plane readouts and learned per-label fusion (dense readouts adopted in the campaign; S77,
+    three ReXNet-200s, 0.945 public). Each RadImageNet backbone then sees a single plane, closer to how
+    RadImageNet was pretrained (single slices), and the three smaller backbones cost less than three ReXNets.
+  mechanism: 'Port the plane structure onto the current code: model.plane_backbones true (one backbone
+    per plane, series routed by plane), trainer.plane_pooling.assignment dense (every present plane predicts
+    every label from its own pooled tokens), model.plane_pooling.fusion learned (softmax weights over
+    present planes on detached plane logits, the fused logit is the output) and model.series_dropout 0,
+    as in S77. Each of the three backbones keeps the incumbent''s backbone settings: resnet18.a1_in1k
+    with RadImageNet weights, repeated middle slice, ImageNet mean/std, backbone LR 5e-5 and head LR 6e-4;
+    the rest of the recipe as the base.'
+  precedents:
+  - 'Plane-specialization dense readouts + learned fusion (B0 x3): outputs/autoresearch/plane-specialization/experiments/dense-readouts-learned-fusion-20260927T231847Z-33417f97,
+    source under source/ (modeling/planes/exclusive.py, fusion.py; plane options in config.py, model.py,
+    training/lightning.py).'
+  - 'S77 three ReXNet-200s with the same structure: outputs/training/20260928-105516-rexnet-plane-dense-fusion
+    (config and source_snapshot.zip), 0.945 public, 2,600 s training against 1,912 s for one ReXNet.'
+  - 'RadImageNet ResNet-18 base settings: outputs/training/20260928-185524-radimagenet-resnet18.'
+  novelty: First plane-specific RadImageNet backbones.
+  coverage: All studies and labels; each backbone trains on its plane only.
+  exploitation: Per-plane logit AUCs and fusion weights per label as in the plane campaign, plus per-stage
+    drift and gradient RMS for each plane backbone against the incumbent.
+  budget: Unmeasured. Three ReXNets took 1.36x one ReXNet (2,600 s against 1,912 s); the same factor on
+    ResNet-18 gives about 1,480 s, inside the 1,627 s ceiling. If it runs over, cut epochs, not the structure.
+  implementation: 'Code: port the plane options and modeling/planes/ from the plane-specialization source
+    above onto the current tree, adapted to the current config, spatial-token mapping (one mapping per
+    plane backbone) and RadImageNet loading (each plane backbone loads the RadImageNet state dict); keep
+    the per-stage logging per backbone (prefix the stage names by plane). The activation signature can
+    be the logged fusion weights or per-plane logit counts.'
+  open_choices: None; the S77 structure as it was, with ResNet-18 settings.
+  dependencies: []
+  priority_rationale: User-requested; combines the previous campaign best structure with the RadImageNet
+    backbone.
+exhausted_directions: None yet; follows the radimagenet campaign, whose first two seeds ran against the
+  ReXNet control.

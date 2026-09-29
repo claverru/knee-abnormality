@@ -14,11 +14,12 @@ from pydantic_settings import SettingsError
 from knee_abnormality.cli import CLISettings
 from knee_abnormality.config import INFERENCE_IO_THREADS, load_config
 from knee_abnormality.data.dataset import KneeStudyDataset, build_data_loader
-from knee_abnormality.data.labels import STUDY, TARGET_THRESHOLD, load_fold_labels
+from knee_abnormality.data.labels import load_fold_labels
 from knee_abnormality.data.preprocessing.device import with_images
 from knee_abnormality.data.preprocessing.dicom import read_frame, read_header
 from knee_abnormality.data.preprocessing.series import index_series
 from knee_abnormality.data.sources import SERIES, StudySeries, build_series_index
+from knee_abnormality.data.splits import STUDY, TARGET_THRESHOLD
 from knee_abnormality.evaluation.metrics import aucs, bootstrap_auc
 from knee_abnormality.inference.checkpoint import load_checkpoint_model
 from knee_abnormality.provenance import copy_sources, sha256_file

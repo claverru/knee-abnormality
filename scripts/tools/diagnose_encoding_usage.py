@@ -18,9 +18,10 @@ import knee_abnormality
 from knee_abnormality.cli import Bootstrap, CLISettings, Runtime, describe
 from knee_abnormality.config import load_config
 from knee_abnormality.data.dataset import build_data_loader
-from knee_abnormality.data.labels import STUDY, TARGET_THRESHOLD, load_fold_labels
+from knee_abnormality.data.labels import load_fold_labels
 from knee_abnormality.data.preprocessing.device import with_images
 from knee_abnormality.data.sources import prediction_image_multiplier
+from knee_abnormality.data.splits import STUDY, TARGET_THRESHOLD
 from knee_abnormality.evaluation.metrics import (
     COMPARTMENT_PAIRS,
     compartment_metrics,

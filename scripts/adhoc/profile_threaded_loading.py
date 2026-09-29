@@ -25,7 +25,6 @@ from knee_abnormality.data.dataset import (
     build_data_loader,
     collate_studies,
 )
-from knee_abnormality.data.labels import STUDY
 from knee_abnormality.data.preprocessing import preparation as preparation_module
 from knee_abnormality.data.preprocessing.device import with_images
 from knee_abnormality.data.preprocessing.dicom import (
@@ -33,6 +32,7 @@ from knee_abnormality.data.preprocessing.dicom import (
     read_frame,
 )
 from knee_abnormality.data.preprocessing.preparation import decode_slice
+from knee_abnormality.data.splits import STUDY
 from knee_abnormality.inference.engine import move_batch
 from knee_abnormality.modeling.model import KneeAbnormalityModel
 from knee_abnormality.profiling import (

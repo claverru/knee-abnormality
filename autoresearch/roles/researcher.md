@@ -1,11 +1,18 @@
 # Researcher
 
 Refill the backlog toward the campaign target with distinct, worthwhile mechanisms
-within the campaign topic.
+within the campaign topic, or, when the assignment is `topic_draft`, draft the next topic
+for the topic loop (last section).
 
 ## Finding ideas
 
-- Start from `family_ledger`: every mechanism family with its attempts, decided results
+- Start every refill from `run_curves`: the per-epoch ×1 macro AUC, training loss, per-label AUC
+  and other epoch-level scalars of the reference and every decided run, with each run's
+  configuration changes against the recipe. Read where each curve rises, flattens or falls, which
+  labels move, whether training loss and validation diverge, and what the logged mechanism scalars
+  did, against the reference and the incumbent. Only the reference, the incumbent and
+  `new_results` carry `other` scalars inline; `full_detail` and the `metrics` paths hold the rest.
+- Then use `family_ledger`: every mechanism family with its attempts, decided results
   (macro delta, 80% adoption interval) and standing verdict. Only `new_results` carry
   full detail; the ledger is your memory of everything older. Open older reports through
   `history_index` only when a decision depends on a detail the ledger lacks.
@@ -39,6 +46,16 @@ follow-ups (an adoption resets the count), and refuses proposals in closed famil
 
 ## Proposals
 
+- Each proposal names in `targeted_curve` the curve behaviour it targets (run, epochs, metric or
+  labels, and the change it should cause), and declares `source_change`: true when it needs a
+  Python source change, false when it only sets values in `configs/training.yaml`. When the
+  campaign policy has `configuration_only_ideas`, configuration-only ideas (a learning rate, a
+  schedule, the epoch count, a regularization strength) are welcome, but a refill with proposals
+  must carry at least one idea that needs a source change; code rejects one that does not.
+  Otherwise the policy's `require_source_change` decides whether configuration-only candidates
+  survive development. With a range `budget`, the epoch count and input per study may change
+  inside the training-time range; judge a schedule from the curves and each run's
+  `training_seconds`.
 - Each proposal is a complete [idea record](../records.md#ideas). A renamed old
   experiment or a list of parameter values is not an idea; diverse or combined
   mechanisms are welcome.
@@ -55,3 +72,29 @@ follow-ups (an adoption resets the count), and refuses proposals in closed famil
   uncertainty, novelty and cost; the orchestrator ranks.
 - Fewer ideas are fine. When credible ideas run out, record the exhausted directions and
   the missing evidence.
+
+## Topic drafts
+
+A `topic_draft` assignment has no campaign: the current topic stopped paying (or the loop
+needs its first), and you return two or three complete topics in `TopicDraftReport`. The
+rules above the assignment list what code checks; a rejected draft comes back with the
+reasons in `previous_rejection`.
+
+- Start from the packet: the incumbent's per-label AUC, its per-epoch curves and its vendor, plane
+  and compartment slices, near misses never retried on it, every family ledger and closed family, past topics
+  with their scopes and outcomes, and the unexplored modules and config sections. Cite the
+  weakness a topic attacks by pointer and value; read the incumbent source you are given
+  before choosing files.
+- Make the drafts genuinely different directions, each narrow enough to review: declare only
+  the files, directories and config paths its seeds need. `trainer.max_epochs` is in scope only
+  when the assignment's `budget` is a range. Training-label code is in scope,
+  including training-target construction in `data/labels.py`; the label source, the split and
+  evaluation targets (`data/splits.py`) and other protected code are not.
+- Seeds are complete idea records plus complexity, structural flag, the source and config
+  paths they change, and their closest precedent with the difference. Take every untaken
+  seed-pool idea inside the scope. Prefer mechanisms that could matter over value sweeps; a
+  seed without a source change is rejected.
+- Write the contract and prior work as for a user campaign
+  ([campaign setup](../campaign-setup.md#files-and-startup)); code appends the cited
+  weaknesses, literature and starting point.
+

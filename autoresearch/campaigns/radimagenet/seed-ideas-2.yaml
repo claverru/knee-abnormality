@@ -1,0 +1,103 @@
+ideas:
+- id: rn18-layerwise-lr-decay
+  mechanism_id: per-layer-rate
+  parent_idea_id: null
+  title: 'Layer-wise learning-rate decay: each ResNet stage below layer4 gets half the rate of the stage
+    above'
+  opportunity: First five convs drift 8.1% from the pretrained start against 3.2% for ReXNet; last five
+    match (prior-work.md).
+  mechanism: Parameter groups per stage (stem, layer1-4, head); backbone rate x 0.5^k for stage k counted
+    down from layer4; head unchanged.
+  precedents:
+  - Standard in fine-tuning pretrained encoders (BEiT, ELECTRA).
+  - Measured early-layer drift (prior-work.md).
+  novelty: Not yet tried on RadImageNet ResNets.
+  coverage: All studies and labels.
+  exploitation: Per-epoch curves, per-stage drift and gradient RMS against the RadImageNet base run and
+    the ReXNet control.
+  budget: Same as the RadImageNet base run, about 57% of the ReXNet reference.
+  implementation: New option optimizer.layer_decay in config.py and the parameter groups in the Lightning
+    module's optimizer setup; log each group's rate.
+  open_choices: 0.3 or 0.7 after the first result.
+  dependencies: []
+  priority_rationale: Targets the measured early-layer overwriting directly.
+- id: rn18-linear-probe-then-finetune
+  mechanism_id: head-first
+  parent_idea_id: null
+  title: Train only the head and tokens for one epoch with the backbone frozen, then fine-tune
+  opportunity: The model starts strong because the pretrained features are good; fine-tuning with a random
+    head distorts them early (LP-FT, arXiv 2202.10054).
+  mechanism: 'Epoch 0: backbone parameters frozen and BatchNorm in eval mode; from epoch 1 the usual schedule.'
+  precedents:
+  - Kumar et al. 2022, LP-FT.
+  novelty: Not yet tried on RadImageNet ResNets.
+  coverage: All studies and labels.
+  exploitation: Per-epoch curves, per-stage drift and gradient RMS against the RadImageNet base run and
+    the ReXNet control.
+  budget: Slightly cheaper than the RadImageNet base run.
+  implementation: New option trainer.backbone_frozen_epochs in config.py and the freezing in the Lightning
+    module.
+  open_choices: Two frozen epochs.
+  dependencies: []
+  priority_rationale: Evidence-backed way to keep a good pretrained backbone's features.
+- id: rn18-l2-sp
+  mechanism_id: anchored-decay
+  parent_idea_id: null
+  title: Weight decay toward the pretrained weights instead of toward zero
+  opportunity: First five convs drift 8.1% from the pretrained start against 3.2% for ReXNet; last five
+    match (prior-work.md).
+  mechanism: Replace AdamW decay on backbone weights by alpha * ||w - w0||^2 (L2-SP), stronger on the
+    stem and layer1.
+  precedents:
+  - Li et al. 2018, L2-SP (arXiv 1802.01483).
+  novelty: Not yet tried on RadImageNet ResNets.
+  coverage: All studies and labels.
+  exploitation: Per-epoch curves, per-stage drift and gradient RMS against the RadImageNet base run and
+    the ReXNet control.
+  budget: Small extra memory.
+  implementation: Keep w0 as a frozen buffer copy; add the penalty in the Lightning module; option optimizer.anchor_decay.
+  open_choices: alpha 1e-3 and 1e-2.
+  dependencies: []
+  priority_rationale: Keeps what RadImageNet learned while letting the top move.
+- id: rn18-mean-init-adjacent-slices
+  mechanism_id: slice-channels
+  parent_idea_id: null
+  title: Three adjacent slices with a mean-initialized first convolution
+  opportunity: Repeated middle slice throws away depth context, but adjacent slices through the unchanged
+    pretrained conv1 lost 0.0059 at x4 (0.919531 against 0.925476, radimagenet-resnet18-adjacent), consistent
+    with a public report that repeated middle beats adjacent for RadImageNet. Replacing conv1 weights
+    by their channel mean /3 copied to each channel reproduces the pretrained response on uniform input
+    while letting slices differ.
+  mechanism: model.slice_channels adjacent plus conv1 weight = mean over input channels / 3, repeated.
+  precedents:
+  - I3D inflation (arXiv 1705.07750).
+  - 'radimagenet-resnet18-adjacent: -0.0059 with the unchanged conv1 (prior-work.md).'
+  novelty: Not yet tried on RadImageNet ResNets.
+  coverage: All studies and labels.
+  exploitation: Per-epoch curves, per-stage drift and gradient RMS against the RadImageNet base run and
+    the ReXNet control.
+  budget: Same as the RadImageNet base run, about 57% of the ReXNet reference.
+  implementation: New option model.first_conv_init channel_mean applied after loading pretrained weights.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Keeps the pretrained start and adds depth context.
+- id: rn18-freeze-stem-layer1
+  mechanism_id: freezing
+  parent_idea_id: null
+  title: Freeze the stem and layer1 for the whole run
+  opportunity: First five convs drift 8.1% from the pretrained start against 3.2% for ReXNet; last five
+    match (prior-work.md).
+  mechanism: requires_grad False and BatchNorm eval for the stem and layer1.
+  precedents:
+  - Gradual unfreezing (ULMFiT, arXiv 1801.06146).
+  - Measured early-layer drift (prior-work.md).
+  novelty: Not yet tried on RadImageNet ResNets.
+  coverage: All studies and labels.
+  exploitation: Per-epoch curves, per-stage drift and gradient RMS against the RadImageNet base run and
+    the ReXNet control.
+  budget: Cheaper than the RadImageNet base run.
+  implementation: New option model.frozen_stages 2 in config.py and the model.
+  open_choices: Unfreeze at epoch 3.
+  dependencies: []
+  priority_rationale: Simplest structural test of the overwriting hypothesis.
+exhausted_directions: None yet; first campaign on RadImageNet ResNets.

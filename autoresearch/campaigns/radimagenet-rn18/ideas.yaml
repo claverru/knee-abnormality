@@ -1,0 +1,1458 @@
+revision: 410
+ideas:
+- id: rn18-no-series-dropout
+  mechanism_id: regularization
+  parent_idea_id: null
+  title: Series dropout 0.2 to 0
+  opportunity: 'The model underfits: training loss sits above the control''s from
+    epoch 2.'
+  mechanism: model.series_dropout 0.
+  precedents:
+  - Training-loss curves (prior-work.md).
+  novelty: Not yet tried on RadImageNet ResNets.
+  coverage: All studies and labels.
+  exploitation: Per-epoch curves, per-stage drift and gradient RMS against the incumbent
+    and the ReXNet control.
+  budget: Same as the ResNet-18 base run (1,085 s).
+  implementation: Configuration-only change to the incumbent recipe.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Removes a regularizer from an underfitting model.
+  status: completed
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality/autoresearch/campaigns/radimagenet-rn18/seed-ideas.yaml
+  experiments:
+  - rn18-no-series-dropout-20260928T213320Z-0b780262
+  decision: provisional_accept
+- id: rn18-lighter-dsu
+  mechanism_id: regularization
+  parent_idea_id: null
+  title: DSU probability 0.5 to 0.25
+  opportunity: Feature-statistics perturbation at stride 8 is strong for an 11M-parameter
+    ResNet that already underfits.
+  mechanism: model.feature_statistics_augmentation.probability 0.25.
+  precedents:
+  - DSU adopted on ReXNet in the augmentation campaign; its support weakened on rebuild_state_v2
+    (campaign re-scoring).
+  novelty: Not yet tried on RadImageNet ResNets.
+  coverage: All studies and labels.
+  exploitation: Per-epoch curves, per-stage drift and gradient RMS against the incumbent
+    and the ReXNet control.
+  budget: Same as the ResNet-18 base run (1,085 s).
+  implementation: Configuration-only change to the incumbent recipe.
+  open_choices: 0 if 0.25 helps.
+  dependencies: []
+  priority_rationale: Regularization suspect specific to the small backbone.
+  status: completed
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality/autoresearch/campaigns/radimagenet-rn18/seed-ideas.yaml
+  experiments:
+  - rn18-lighter-dsu-20260928T213732Z-86b18a77
+  - rn18-lighter-dsu-20260928T215955Z-a2317733
+  decision: reject
+- id: rn18-layerwise-lr-decay
+  mechanism_id: per-layer-rate
+  parent_idea_id: null
+  title: 'Layer-wise learning-rate decay: each ResNet stage below layer4 gets half
+    the rate of the stage above'
+  opportunity: First five convs drift 8.1% from the pretrained start against 3.2%
+    for ReXNet; last five match (prior-work.md).
+  mechanism: Parameter groups per stage (stem, layer1-4, head); backbone rate x 0.5^k
+    for stage k counted down from layer4; head unchanged.
+  precedents:
+  - Standard in fine-tuning pretrained encoders (BEiT, ELECTRA).
+  - Measured early-layer drift (prior-work.md).
+  novelty: Not yet tried on RadImageNet ResNets.
+  coverage: All studies and labels.
+  exploitation: Per-epoch curves, per-stage drift and gradient RMS against the incumbent
+    and the ReXNet control.
+  budget: Same as the ResNet-18 base run (1,085 s).
+  implementation: New option optimizer.layer_decay in config.py and the parameter
+    groups in the Lightning module's optimizer setup; log each group's rate.
+  open_choices: 0.3 or 0.7 after the first result.
+  dependencies: []
+  priority_rationale: Targets the measured early-layer overwriting directly.
+  status: completed
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality/autoresearch/campaigns/radimagenet-rn18/seed-ideas.yaml
+  experiments:
+  - rn18-layerwise-lr-decay-20260928T220252Z-82deef4a
+  decision: reject
+- id: rn18-linear-probe-then-finetune
+  mechanism_id: head-first
+  parent_idea_id: null
+  title: Train only the head and tokens for one epoch with the backbone frozen, then
+    fine-tune
+  opportunity: The model starts strong because the pretrained features are good; fine-tuning
+    with a random head distorts them early (LP-FT, arXiv 2202.10054).
+  mechanism: 'Epoch 0: backbone parameters frozen and BatchNorm in eval mode; from
+    epoch 1 the usual schedule.'
+  precedents:
+  - Kumar et al. 2022, LP-FT.
+  novelty: Not yet tried on RadImageNet ResNets.
+  coverage: All studies and labels.
+  exploitation: Per-epoch curves, per-stage drift and gradient RMS against the incumbent
+    and the ReXNet control.
+  budget: Slightly cheaper than the incumbent.
+  implementation: New option trainer.backbone_frozen_epochs in config.py and the freezing
+    in the Lightning module.
+  open_choices: Two frozen epochs.
+  dependencies: []
+  priority_rationale: Evidence-backed way to keep a good pretrained backbone's features.
+  status: completed
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality/autoresearch/campaigns/radimagenet-rn18/seed-ideas.yaml
+  experiments:
+  - rn18-linear-probe-then-finetune-20260928T222408Z-54c0d432
+  decision: reject
+- id: rn18-l2-sp
+  mechanism_id: anchored-decay
+  parent_idea_id: null
+  title: Weight decay toward the pretrained weights instead of toward zero
+  opportunity: First five convs drift 8.1% from the pretrained start against 3.2%
+    for ReXNet; last five match (prior-work.md).
+  mechanism: Replace AdamW decay on backbone weights by alpha * ||w - w0||^2 (L2-SP),
+    stronger on the stem and layer1.
+  precedents:
+  - Li et al. 2018, L2-SP (arXiv 1802.01483).
+  novelty: Not yet tried on RadImageNet ResNets.
+  coverage: All studies and labels.
+  exploitation: Per-epoch curves, per-stage drift and gradient RMS against the incumbent
+    and the ReXNet control.
+  budget: Small extra memory.
+  implementation: Keep w0 as a frozen buffer copy; add the penalty in the Lightning
+    module; option optimizer.anchor_decay.
+  open_choices: alpha 1e-3 and 1e-2.
+  dependencies: []
+  priority_rationale: Keeps what RadImageNet learned while letting the top move.
+  status: completed
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality/autoresearch/campaigns/radimagenet-rn18/seed-ideas.yaml
+  experiments:
+  - rn18-l2-sp-20260928T224608Z-2aab3aaf
+  decision: reject
+- id: rn18-mean-init-adjacent-slices
+  mechanism_id: slice-channels
+  parent_idea_id: null
+  title: Three adjacent slices with a mean-initialized first convolution
+  opportunity: Repeated middle slice throws away depth context, but adjacent slices
+    through the unchanged pretrained conv1 lost 0.0059 at x4 (0.919531 against 0.925476,
+    radimagenet-resnet18-adjacent), consistent with a public report that repeated
+    middle beats adjacent for RadImageNet. Replacing conv1 weights by their channel
+    mean /3 copied to each channel reproduces the pretrained response on uniform input
+    while letting slices differ.
+  mechanism: model.slice_channels adjacent plus conv1 weight = mean over input channels
+    / 3, repeated.
+  precedents:
+  - I3D inflation (arXiv 1705.07750).
+  - 'radimagenet-resnet18-adjacent: -0.0059 with the unchanged conv1 (prior-work.md).'
+  novelty: Not yet tried on RadImageNet ResNets.
+  coverage: All studies and labels.
+  exploitation: Per-epoch curves, per-stage drift and gradient RMS against the incumbent
+    and the ReXNet control.
+  budget: Same as the ResNet-18 base run (1,085 s).
+  implementation: New option model.first_conv_init channel_mean applied after loading
+    pretrained weights.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Keeps the pretrained start and adds depth context.
+  status: completed
+  created_revision: 1
+  seeded: /home/claudio/src/knee-abnormality/autoresearch/campaigns/radimagenet-rn18/seed-ideas-2.yaml
+  experiments:
+  - rn18-mean-init-adjacent-slices-20260928T230716Z-9d2cc440
+  - rn18-mean-init-adjacent-slices-20260928T231138Z-296de741
+  decision: reject
+- id: rn18-freeze-stem-layer1
+  mechanism_id: freezing
+  parent_idea_id: null
+  title: Freeze the stem and layer1 for the whole run
+  opportunity: First five convs drift 8.1% from the pretrained start against 3.2%
+    for ReXNet; last five match (prior-work.md).
+  mechanism: requires_grad False and BatchNorm eval for the stem and layer1.
+  precedents:
+  - Gradual unfreezing (ULMFiT, arXiv 1801.06146).
+  - Measured early-layer drift (prior-work.md).
+  novelty: Not yet tried on RadImageNet ResNets.
+  coverage: All studies and labels.
+  exploitation: Per-epoch curves, per-stage drift and gradient RMS against the incumbent
+    and the ReXNet control.
+  budget: Cheaper than the incumbent.
+  implementation: New option model.frozen_stages 2 in config.py and the model.
+  open_choices: Unfreeze at epoch 3.
+  dependencies: []
+  priority_rationale: Simplest structural test of the overwriting hypothesis.
+  status: completed
+  created_revision: 1
+  seeded: /home/claudio/src/knee-abnormality/autoresearch/campaigns/radimagenet-rn18/seed-ideas-2.yaml
+  experiments:
+  - rn18-freeze-stem-layer1-20260928T232856Z-b20dcbee
+  decision: reject
+- id: rn18-more-triplets
+  mechanism_id: input-amount
+  parent_idea_id: null
+  title: 36 triplets per study instead of 26
+  opportunity: ResNet-18 costs 57% of the control; more slices per study give more
+    evidence per step within the budget.
+  mechanism: data.study_triplet_total 36.
+  precedents:
+  - Earlier triplet-count work on ReXNet (study_triplet_total 26 adoption).
+  novelty: Not yet tried on RadImageNet ResNets.
+  coverage: All studies and labels.
+  exploitation: Per-epoch curves, per-stage drift and gradient RMS against the incumbent
+    and the ReXNet control.
+  budget: About 1,500 s, 138% of the reference.
+  implementation: Configuration-only change to the incumbent recipe.
+  open_choices: 32 if 36 helps but costs too much.
+  dependencies: []
+  priority_rationale: User-allowed input increase inside the budget.
+  status: completed
+  created_revision: 1
+  seeded: /home/claudio/src/knee-abnormality/autoresearch/campaigns/radimagenet-rn18/seed-ideas-2.yaml
+  experiments:
+  - rn18-more-triplets-20260928T235020Z-fd2c7bef
+  decision: provisional_accept
+- id: rn18-backbone-lr-1e-4
+  mechanism_id: backbone-rate
+  parent_idea_id: null
+  title: Backbone learning rate 5e-5 to 1e-4
+  opportunity: Underfitting with a rate set by a weight-scale rule; the late layers
+    may need more movement.
+  mechanism: optimizer.backbone_lr 1e-4.
+  precedents:
+  - Weight-scale rule for backbone swaps (backbone-swaps.md).
+  novelty: Not yet tried on RadImageNet ResNets.
+  coverage: All studies and labels.
+  exploitation: Per-epoch curves, per-stage drift and gradient RMS against the incumbent
+    and the ReXNet control.
+  budget: Same as the ResNet-18 base run (1,085 s).
+  implementation: Configuration-only change to the incumbent recipe.
+  open_choices: 2.5e-5 in the opposite direction.
+  dependencies: []
+  priority_rationale: Locates the rate before per-layer rules; watch early-layer drift.
+  status: completed
+  created_revision: 1
+  seeded: /home/claudio/src/knee-abnormality/autoresearch/campaigns/radimagenet-rn18/seed-ideas-2.yaml
+  experiments:
+  - rn18-backbone-lr-1e-4-20260929T000947Z-bcacc7ff
+  - rn18-backbone-lr-1e-4-20260929T003754Z-61e670bb
+  decision: reject
+- id: rn18-multiscale-tokens
+  mechanism_id: token-readout
+  parent_idea_id: null
+  title: Add layer3 (stride-16) tokens next to layer4 tokens
+  opportunity: ResNet-18's final 512-channel 7x7 map may limit what attention can
+    pool; stride-16 tokens add detail at small cost.
+  mechanism: Project layer3 features to the token width and pool them with the layer4
+    tokens, with their own position embeddings.
+  precedents:
+  - Stride-16 fusion on ReXNet (validation results).
+  novelty: Not yet tried on RadImageNet ResNets.
+  coverage: All studies and labels.
+  exploitation: Per-epoch curves, per-stage drift and gradient RMS against the incumbent
+    and the ReXNet control.
+  budget: More tokens; within the budget.
+  implementation: New option model.token_stages in model.py and spatial_tokens.py;
+    spatial mapping for layer3.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Capacity test aimed at the flattening.
+  status: completed
+  created_revision: 1
+  seeded: /home/claudio/src/knee-abnormality/autoresearch/campaigns/radimagenet-rn18/seed-ideas-2.yaml
+  experiments:
+  - rn18-multiscale-tokens-20260929T004051Z-31370f29
+  decision: reject
+- id: rn18-warmup-stable-decay
+  mechanism_id: schedule-shape
+  parent_idea_id: null
+  title: Warmup, constant rate until 80% of training, then linear decay
+  opportunity: ResNet-18 leads the control through epoch 5, then gains only +0.0039
+    over epochs 5-9 against +0.0087, with training loss above the control's from epoch
+    2 (prior-work.md).
+  mechanism: Replace cosine by warmup-stable-decay at the same peak and floor.
+  precedents:
+  - MiniCPM warmup-stable-decay (arXiv 2404.06395).
+  novelty: Not yet tried on RadImageNet ResNets.
+  coverage: All studies and labels.
+  exploitation: Per-epoch curves, per-stage drift and gradient RMS against the incumbent
+    and the ReXNet control.
+  budget: Same as the ResNet-18 base run (1,085 s).
+  implementation: New option optimizer.schedule wsd in config.py and the scheduler.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Keeps the backbone at its peak rate for most of the run.
+  status: completed
+  created_revision: 2
+  seeded: /home/claudio/src/knee-abnormality/autoresearch/campaigns/radimagenet-rn18/seed-ideas-3.yaml
+  experiments:
+  - rn18-warmup-stable-decay-20260929T010731Z-0d857bcf
+  decision: reject
+- id: rn10t-double-batch-and-rates
+  mechanism_id: batch-and-rate
+  parent_idea_id: null
+  title: ResNet-10t with batch size 16 and both learning rates doubled
+  opportunity: ResNet-10t trails ResNet-18 at every epoch (x4 0.922579 against 0.925476)
+    at nearly the same wall-clock cost, since training is loader-bound. A larger batch
+    gives BatchNorm and the gradient more studies per step, and doubling the rates
+    keeps the per-study update size (linear scaling); the smaller backbone leaves
+    GPU memory for it.
+  mechanism: The incumbent with model.backbone resnet10t.c3_in1k, trainer.batch_size
+    16, optimizer.backbone_lr 1.2e-4 (twice the 6e-5 of the ResNet-10t run) and optimizer.head_lr
+    1.2e-3 (twice 6e-4); everything else as the base.
+  precedents:
+  - 'radimagenet-resnet10t: x4 0.922579 at batch 8, backbone LR 6e-5 (prior-work.md).'
+  - Linear learning-rate scaling with batch size (Goyal et al. 2017, arXiv 1706.02677).
+  novelty: First batch-size change in the project; first ResNet-10t seed.
+  coverage: All studies and labels.
+  exploitation: Per-epoch curves, per-stage drift and gradient RMS against the ResNet-10t
+    run and the ReXNet control.
+  budget: Half the optimizer steps per epoch; expected at or below the ResNet-10t
+    run (1,048 s), inside the range. GPU memory at batch 16 is unmeasured.
+  implementation: 'Configuration-only: the incumbent with the ResNet-10t backbone,
+    batch 16 and both rates doubled.'
+  open_choices: Batch 12 with 1.5x rates if batch 16 does not fit in memory.
+  dependencies: []
+  priority_rationale: User-requested; tests whether ResNet-10t is held back by its
+    step size rather than its capacity.
+  status: completed
+  created_revision: 2
+  seeded: /home/claudio/src/knee-abnormality/autoresearch/campaigns/radimagenet-rn18/seed-ideas-3.yaml
+  experiments:
+  - rn10t-double-batch-and-rates-20260929T013432Z-e8c84daa
+  decision: reject
+- id: rn18-plane-backbones-dense-fusion
+  mechanism_id: plane-backbones
+  parent_idea_id: null
+  title: One RadImageNet ResNet-18 per plane with dense per-plane readouts and learned
+    fusion, at the ResNet-18 settings
+  opportunity: The plane-specialization campaign found its best structure in one backbone
+    per plane with dense per-plane readouts and learned per-label fusion (dense readouts
+    adopted in the campaign; S77, three ReXNet-200s, 0.945 public). Each RadImageNet
+    backbone then sees a single plane, closer to how RadImageNet was pretrained (single
+    slices), and the three smaller backbones cost less than three ReXNets.
+  mechanism: 'Port the plane structure onto the current code: model.plane_backbones
+    true (one backbone per plane, series routed by plane), trainer.plane_pooling.assignment
+    dense (every present plane predicts every label from its own pooled tokens), model.plane_pooling.fusion
+    learned (softmax weights over present planes on detached plane logits, the fused
+    logit is the output) and model.series_dropout 0, as in S77. Each of the three
+    backbones keeps the incumbent''s backbone settings: resnet18.a1_in1k with RadImageNet
+    weights, repeated middle slice, ImageNet mean/std, backbone LR 5e-5 and head LR
+    6e-4; the rest of the recipe as the base.'
+  precedents:
+  - 'Plane-specialization dense readouts + learned fusion (B0 x3): outputs/autoresearch/plane-specialization/experiments/dense-readouts-learned-fusion-20260927T231847Z-33417f97,
+    source under source/ (modeling/planes/exclusive.py, fusion.py; plane options in
+    config.py, model.py, training/lightning.py).'
+  - 'S77 three ReXNet-200s with the same structure: outputs/training/20260928-105516-rexnet-plane-dense-fusion
+    (config and source_snapshot.zip), 0.945 public, 2,600 s training against 1,912
+    s for one ReXNet.'
+  - 'RadImageNet ResNet-18 base settings: outputs/training/20260928-185524-radimagenet-resnet18.'
+  novelty: First plane-specific RadImageNet backbones.
+  coverage: All studies and labels; each backbone trains on its plane only.
+  exploitation: Per-plane logit AUCs and fusion weights per label as in the plane
+    campaign, plus per-stage drift and gradient RMS for each plane backbone against
+    the incumbent.
+  budget: Unmeasured. Three ReXNets took 1.36x one ReXNet (2,600 s against 1,912 s);
+    the same factor on ResNet-18 gives about 1,480 s, inside the 1,627 s ceiling.
+    If it runs over, cut epochs, not the structure.
+  implementation: 'Code: port the plane options and modeling/planes/ from the plane-specialization
+    source above onto the current tree, adapted to the current config, spatial-token
+    mapping (one mapping per plane backbone) and RadImageNet loading (each plane backbone
+    loads the RadImageNet state dict); keep the per-stage logging per backbone (prefix
+    the stage names by plane). The activation signature can be the logged fusion weights
+    or per-plane logit counts.'
+  open_choices: None; the S77 structure as it was, with ResNet-18 settings.
+  dependencies: []
+  priority_rationale: User-requested; combines the previous campaign best structure
+    with the RadImageNet backbone.
+  status: completed
+  created_revision: 2
+  seeded: /home/claudio/src/knee-abnormality/autoresearch/campaigns/radimagenet-rn18/seed-ideas-3.yaml
+  experiments:
+  - rn18-plane-backbones-dense-fusion-20260929T020109Z-d390b8cb
+  decision: reject
+- id: asymmetric-focal-loss
+  mechanism_id: disease-loss
+  parent_idea_id: null
+  title: 'Asymmetric focal loss for the disease targets: gamma+ 0, gamma- 2, negative
+    probability shift 0.05'
+  opportunity: User seed, unrelated to RadImageNet, meant to transfer to the champion
+    recipe. Most label-study pairs are easy negatives; the class-balanced BCE spends
+    much of its gradient on them. ASL down-weights easy negatives and drops near-zero
+    negatives, which the multi-label literature reports helps ranking metrics such
+    as AUC.
+  mechanism: 'Replace the disease BCE with ASL on the soft targets y: loss = -[y *
+    (1-p)^g+ * log p + (1-y) * p_m^g- * log(1-p_m)] with p = sigmoid(logit), g+ =
+    0, g- = 2 and p_m = max(p - 0.05, 0), per label and study, keeping the incumbent''s
+    class-balance weights and masking exactly as the BCE does. Auxiliary losses (half-knee,
+    report attributes, scanner confusion) are unchanged.'
+  precedents:
+  - 'Ridnik et al. 2021, Asymmetric Loss for multi-label classification (arXiv 2009.14119):
+    g+ 0, g- 4, shift 0.05 as defaults.'
+  - Class-balanced BCE adoption and exponent 0.5 (current recipe).
+  novelty: First focal-type loss in the project.
+  coverage: All studies and the twelve disease labels.
+  exploitation: Log the mean ASL positive and negative terms per epoch and the share
+    of negatives with p below the shift (zero loss); per-label AUC against the incumbent.
+  budget: Same as the incumbent.
+  implementation: New option trainer.disease_loss (bce | asymmetric_focal with gamma_positive,
+    gamma_negative, negative_shift) in config.py and the loss in the Lightning module;
+    the incumbent keeps bce.
+  open_choices: 'None for the first run: g+ 0, g- 2, shift 0.05 (user).'
+  dependencies: []
+  priority_rationale: User seed; runs after the RadImageNet seeds.
+  status: completed
+  created_revision: 3
+  seeded: /home/claudio/src/knee-abnormality/autoresearch/campaigns/radimagenet-rn18/seed-ideas-4.yaml
+  experiments:
+  - asymmetric-focal-loss-20260929T022453Z-6ce5b3fb
+  decision: reject
+- id: soft-label-101-bins
+  mechanism_id: disease-head
+  parent_idea_id: null
+  title: Predict 101 bins per label and train each to the bin of its soft label
+  opportunity: User seed, unrelated to RadImageNet, meant to transfer to the champion
+    recipe. The soft targets encode graded confidence (0.85 is not 1); a sigmoid with
+    BCE regresses toward them, while a distribution over bins can represent uncertain
+    and multimodal cases and gives the ranking a finer signal.
+  mechanism: 'Each disease label gets a 101-way softmax over bins 0..100 (bin k means
+    probability k/100) instead of one sigmoid logit. Training: cross-entropy to the
+    bin round(100 * y) of the soft target y (0.85 -> bin 85), with the incumbent''s
+    class-balance weights and masking per label and study. The output probability
+    used for validation, prediction and AUC is the expected value sum_k softmax_k
+    * k/100. Auxiliary heads and losses unchanged.'
+  precedents:
+  - Distributional or ordinal-bin heads for probabilistic targets (e.g. label distribution
+    learning).
+  - Soft rebuild_state_v2 targets (current labels).
+  novelty: First distributional head in the project.
+  coverage: All studies and the twelve disease labels.
+  exploitation: Log the mean bin entropy and the mean absolute gap between expected
+    value and soft target per epoch; per-label AUC against the incumbent.
+  budget: Same as the incumbent; 12 x 101 outputs instead of 12.
+  implementation: New option model.disease_head (sigmoid | bins with count 101) in
+    config.py and model.py, the bin cross-entropy in the Lightning module, and the
+    expected value wherever the model output becomes a probability (validation, prediction,
+    export).
+  open_choices: 'None for the first run: nearest bin, expected value (user defaults).'
+  dependencies: []
+  priority_rationale: User seed; runs after the RadImageNet seeds.
+  status: completed
+  created_revision: 3
+  seeded: /home/claudio/src/knee-abnormality/autoresearch/campaigns/radimagenet-rn18/seed-ideas-4.yaml
+  experiments:
+  - soft-label-101-bins-20260929T024748Z-d5b4a653
+  decision: reject
+- id: rn18-early-stage-anchor
+  mechanism_id: anchored-decay
+  parent_idea_id: rn18-l2-sp
+  title: Anchor only the stem and layer1; leave upper stages free to adapt
+  opportunity: Whole-backbone anchoring pulled layer4 drift backward from 0.11768
+    at epoch 4 to 0.11342 at epoch 9. Training loss excluding the anchor term ended
+    at 2.31418, above its parent's 2.28815. This suggests that constraining upper-stage
+    adaptation may offset the benefit of preserving early features; it does not establish
+    causality.
+  mechanism: "Keep the historical 0.01 squared-distance penalty on pretrained conv1\
+    \ and layer1 matrix weights. Apply no anchor penalty to layers2\u20134, restoring\
+    \ their incumbent AdamW decay. Early weights remain trainable, including normal\
+    \ BatchNorm adaptation. This changes the support of the regularizer rather than\
+    \ sweeping its strength. Log early-stage penalties, analytical anchor-gradient\
+    \ RMS, and task loss separately from the penalty."
+  precedents:
+  - 'rn18-l2-sp-20260928T224608Z-2aab3aaf: full-backbone anchoring with tenfold early-stage
+    strength. Its metrics.csv supplies the late contraction and penalty-adjusted loss
+    diagnosis.'
+  - rn18-freeze-stem-layer1 and rn18-layerwise-lr-decay restricted adaptation through
+    freezing or learning rates. This proposal preserves ordinary gradient updates
+    and applies a soft reference-weight penalty only to early matrix weights.
+  - Pretrained-reference L2 regularization is supported as a transfer-learning mechanism
+    by [Li et al., Explicit Inductive Bias for Transfer Learning](https://arxiv.org/abs/1802.01483).
+    That work does not establish the proposed stage selection.
+  novelty: Removes the upper-stage constraint implicated by the recorded contraction
+    while retaining the original early-stage anchor coefficient. It is neither whole-backbone
+    L2-SP with a different coefficient nor frozen early layers.
+  coverage: Retain every study visit, the current input count, all present series,
+    fixed sampling geometry, labels, losses and evaluation multipliers. No label-specific
+    optimization.
+  exploitation: Preserve reusable early RadImageNet features while allowing later
+    stages to learn knee-specific representations at incumbent learning rates.
+  budget: "At the current 36-triplet, ten-epoch recipe, expect approximately 1,480\u2013\
+    1,520 training seconds versus 1,476.7 for the incumbent. Only early weights need\
+    \ device-resident anchors, substantially less than the previous full-backbone\
+    \ copy. Use seed 1533697213; measured training must remain within 542.44\u2013\
+    1,627.32 seconds."
+  implementation: Add selective anchoring through config.py, configs/training.yaml
+    and training/lightning.py. In build_optimizer, remove zero-directed decay only
+    from anchored conv1/layer1 matrices; retain upper-stage and head decay. Save immutable
+    anchors and retain stage drift and gradient logging, completing required head-origin
+    instrumentation if absent. Do not import the rejected full-backbone anchoring
+    mode. Develop from the live incumbent, retaining no-series-dropout, its input
+    allocation and any newly accepted unrelated changes; recompute the time estimate
+    after rebasing.
+  open_choices: Use a fixed stem/layer1 scope and coefficient 0.01 for this attempt.
+    Whether upper-stage freedom recovers task fitting without losing useful early
+    preservation remains the central uncertainty.
+  dependencies: []
+  priority_rationale: 'Priority 1: a positive near miss with a measurable mechanism-specific
+    restriction and an inexpensive structural correction.'
+  source_change: true
+  targeted_curve: "rn18-l2-sp, epochs 4\u20139: reverse layer4 drift contraction (0.11768\u2192\
+    0.11342) and reduce penalty-excluded training loss, while improving late macro\
+    \ AUC over the live incumbent."
+  status: completed
+  created_revision: 259
+  ranking_rationale: "All five dependencies are satisfied, and each proposal differs\
+    \ materially from its measured precedent. Prioritize native contrast preservation\
+    \ as the follow-up to the stronger open information-retention line. Put selective\
+    \ anchoring next because it addresses the observed late upper-stage contraction\
+    \ in the near-miss L2-SP run. The 40-triplet allocation follows: it extends an\
+    \ accepted result, but that result\u2019s 80% lower bound of 0.000237 is small\
+    \ relative to the documented seed-noise yardstick. The head-first retry has specific\
+    \ transition defects to address; gated adjacency ranks last after two negative\
+    \ adjacent-input attempts."
+  experiments:
+  - rn18-early-stage-anchor-20260929T035808Z-d167cde0
+  decision: reject
+- id: rn18-gated-adjacent-residuals
+  mechanism_id: slice-channels
+  parent_idea_id: rn18-mean-init-adjacent-slices
+  title: Introduce adjacent slices through zero-initialized residual gates
+  opportunity: The rejected mean-initialized run starts with approximately 0.705 stem
+    drift and ends with stem-gradient RMS 0.00932 versus 0.00243 for its parent. Source
+    inspection confirms an extra division by three after taking the channel mean.
+    Channel-specific normalization further complicates response preservation. Adjacent
+    information has therefore not been tested with an initially unchanged middle-slice
+    response.
+  mechanism: "Retain the original pretrained convolution and normalization. Immediately\
+    \ before normalization, construct channels [c+tanh(a)(l\u2212c), c, c+tanh(b)(r\u2212\
+    c)], with a=b=0. This initially reproduces the incumbent's repeated-middle input\
+    \ exactly and lets training introduce neighboring-slice information. Use existing\
+    \ validity masks to substitute c wherever a neighbor is unavailable; retain middle-slice\
+    \ token geometry. Train the two gates at the head rate without weight decay."
+  precedents:
+  - The initialization at [model.py:117]( /home/claudio/src/knee-abnormality/outputs/autoresearch/radimagenet-rn18/experiments/rn18-mean-init-adjacent-slices-20260928T231138Z-296de741/source/src/knee_abnormality/modeling/model.py:117)
+    uses original.mean(...).div(SLICES_PER_INPUT).
+  - 'rn18-mean-init-adjacent-slices-20260928T231138Z-296de741: substantial initialization
+    drift and persistently elevated stem gradients despite task loss similar to its
+    parent.'
+  - The unchanged-convolution adjacent-slice attempt in prior-work.md also underperformed.
+    This proposal avoids its immediate input-distribution change as well as the later
+    attempt's convolution reinitialization.
+  novelty: Learns access to adjacent information from the exact repeated-middle starting
+    function, rather than replacing channels or convolution weights abruptly.
+  coverage: Use the already loaded triplets, unchanged centers, crops, spatial token
+    geometry and study coverage. Preserve the current bag size and all series.
+  exploitation: Protect the pretrained middle-slice representation at initialization
+    while allowing neighboring evidence to become useful through supervised learning.
+  budget: "No extra backbone pass or source slices. Two scalar gates and input arithmetic\
+    \ should keep ten epochs near the incumbent's 1,476.7 seconds, with some masking\
+    \ overhead. Preserve seed 1533697213 and the measured 542.44\u20131,627.32-second\
+    \ range."
+  implementation: Change config.py, modeling/model.py, training/lightning.py and the
+    recipe. Replace the repeated-middle transformation with the residual construction;
+    retain loaded conv1 weights, normalization, augmentations, heads and central geometry.
+    Initialize gates without consuming random draws. Log source-channel differences
+    before augmentation, gate values and gradients, and gate-induced residual RMS
+    on valid source-distinct pixels; nonzero residual activity must establish that
+    adjacency actually entered the backbone. Retain drift/gradient diagnostics. Rebase
+    onto any newly accepted incumbent, preserving unrelated winners; do not restore
+    historical channel-mean initialization.
+  open_choices: Two shared tanh gates are sufficient for the first attempt; avoid
+    per-plane or per-label gates. Neighbor validity must use existing geometric masks,
+    not an intensity threshold. Learned gates may remain effectively inactive, which
+    must be reported.
+  dependencies: []
+  priority_rationale: 'Priority 2: addresses a verified initialization problem with
+    negligible backbone cost, although both previous adjacent-input approaches were
+    negative.'
+  source_change: true
+  targeted_curve: "rn18-mean-init-adjacent-slices, epochs 0\u20139: eliminate initialization-induced\
+    \ stem drift and excessive stem gradients, then improve its early and late macro-AUC\
+    \ deficit without sacrificing the incumbent starting representation."
+  status: completed
+  created_revision: 259
+  ranking_rationale: 'Admit independent module clipping: frequent pre-clipping norms
+    above 1.0 give it a measured trigger, and prior cap changes did not test clipping
+    granularity. Admit upper-stage Batch Renormalization as a distinct, instrumented
+    test of a plausible but unmeasured train/inference mismatch. Preserve the reserved
+    head and queued slice-channel retry ahead of both new directions. Leave rn18-adam-short-second-moment
+    proposed: the same beta2=0.99 change lost 0.0025 in the earlier 06-beta2-0.99
+    run. The different backbone and split permit reconsideration, but gradient trends
+    alone do not establish moment lag or enough expected yield to queue it now.'
+  experiments:
+  - rn18-gated-adjacent-residuals-20260929T051525Z-a0d2fd9e
+  - rn18-gated-adjacent-residuals-20260929T052058Z-e70cda3a
+  decision: reject
+- id: rn18-native-contrast-preservation
+  mechanism_id: regularization
+  parent_idea_id: rn18-no-series-dropout
+  title: Preserve native acquisition content by removing contrast mixing
+  opportunity: "The incumbent retains every series, but contrast mixing still affects\
+    \ approximately 29% of eligible acquisitions, with logged pixel changes around\
+    \ 0.051\u20130.054 throughout training. Whole-series retention helped, whereas\
+    \ halving DSU frequency barely changed fitting. Preserving native contrast content\
+    \ is a distinct hypothesis; lower regularization is not generally justified by\
+    \ the current loss curve."
+  mechanism: Set contrast-mixing probability to zero while retaining both acquired
+    contrasts, DSU at 0.5 and every other augmentation. Add an executed-bypass metric
+    because the current logger omits disabled contrast mixing. This directly asks
+    whether synthetic cross-acquisition blending reduces useful information for this
+    small pretrained backbone.
+  precedents:
+  - "rn18-no-series-dropout: the accepted content-retention change. rn18-lighter-dsu:\
+    \ realized DSU probability was 0.245\u20130.252, confirming the near-null result\
+    \ was not failure to activate."
+  - The incumbent metrics.csv records contrast_mixing_effective_probability and contrast_mixing_pixel_change
+    throughout all ten epochs.
+  - External intra-study-contrast-mixing-20260926T034254Z-ac1de092 actually gained
+    0.001503 on its older recipe, but its 80% interval was [-0.000539, 0.003475].
+    This is contrary evidence against assuming removal will help, not evidence that
+    mixing was harmful.
+  novelty: Extends preservation of available information from acquisition presence
+    to acquisition content. It changes a different regularizer from the rejected DSU-frequency
+    reduction.
+  coverage: Keep every present acquisition and the incumbent triplet budget. Remove
+    only synthetic blending; native contrast diversity, sampling, geometry and validation
+    remain intact.
+  exploitation: Let the backbone learn directly from each acquisition's native appearance
+    while the existing DSU, GIN and other augmentations continue providing variability.
+  budget: Removing blending should reduce or approximately preserve the incumbent's
+    1,476.7-second training cost. Logging needs no additional forward pass. Retain
+    current epochs and seed 1533697213; the same measured training-time range applies.
+  implementation: Set data.contrast_mixing_augmentation.probability to 0.0. In modeling/model.py
+    and training/lightning.py, record the actual bypass branch and explicit zero mixing
+    counts rather than treating missing columns as evidence of inactivity. Require
+    the executed unmixed-batch fraction to be 1.0. Retain all other behavior and required
+    drift/gradient logs. Python changes are for observability; the ablation itself
+    uses an existing configuration field. On a new incumbent, retain unrelated accepted
+    changes and remove only its active contrast mixing.
+  open_choices: The old positive contrast-mixing result limits confidence. Do not
+    combine this attempt with weaker DSU, GIN removal or augmentation shutdown. Disabled
+    mixing also changes subsequent RNG consumption in the existing implementation;
+    retain the required seed and record this limitation.
+  dependencies:
+  - rn18-no-series-dropout
+  priority_rationale: 'Priority 3: follows the strongest accepted family with a cheap,
+    interpretable ablation, tempered by contrary evidence from another recipe.'
+  source_change: true
+  targeted_curve: "rn18-more-triplets, epochs 5\u20139: macro AUC rises only 0.923240\u2192\
+    0.924370 while contrast mixing remains active. Seek stronger late macro improvement\
+    \ with native content preserved; do not use individual labels as acceptance objectives."
+  status: completed
+  created_revision: 259
+  ranking_rationale: "All five dependencies are satisfied, and each proposal differs\
+    \ materially from its measured precedent. Prioritize native contrast preservation\
+    \ as the follow-up to the stronger open information-retention line. Put selective\
+    \ anchoring next because it addresses the observed late upper-stage contraction\
+    \ in the near-miss L2-SP run. The 40-triplet allocation follows: it extends an\
+    \ accepted result, but that result\u2019s 80% lower bound of 0.000237 is small\
+    \ relative to the documented seed-noise yardstick. The head-first retry has specific\
+    \ transition defects to address; gated adjacency ranks last after two negative\
+    \ adjacent-input attempts."
+  experiments:
+  - rn18-native-contrast-preservation-20260929T035445Z-ea7464f5
+  decision: reject
+- id: rn18-forty-triplets-nine-epochs
+  mechanism_id: input-amount
+  parent_idea_id: rn18-more-triplets
+  title: Trade one late epoch for 40-triplet study bags
+  opportunity: "The incumbent's final epoch adds only 0.000049 in \xD71 macro AUC.\
+    \ Increasing to 36 triplets helped the fixed \xD74 objective, but ten epochs already\
+    \ consume 1,476.7 seconds. Denser bags over nine epochs exchange weak late revisiting\
+    \ for more simultaneous evidence per study without increasing nominal total training\
+    \ input."
+  mechanism: "Set data.study_triplet_total to 40 and trainer.max_epochs to 9. Nominal\
+    \ triplet exposure remains 40\xD79=36\xD710=360 per study. Keep the existing one-epoch\
+    \ warmup and cosine schedule, recalculated over nine epochs. The intended mechanism\
+    \ is denser within-study aggregation under approximately constant input compute."
+  precedents:
+  - rn18-more-triplets-20260928T235020Z-fd2c7bef supplies the accepted input-count
+    result, measured 36.0 train_triplets_per_study and the nearly flat final epoch.
+  - Measured ten-epoch costs were 1,202.46 seconds at 26 triplets and 1,476.67 seconds
+    at 36 triplets, both with series dropout disabled.
+  - The historical 14-epoch attempt used seed 1 and gained little late in training.
+    This proposal changes bag density rather than repeating longer training; it is
+    also distinct from the external epoch-paced-bag-size curriculum.
+  novelty: Tests allocation of a fixed nominal input budget between simultaneous bag
+    coverage and repeated study visits. It does not simply increase both input and
+    compute.
+  coverage: "All training studies remain present in every epoch, with unchanged allocation\
+    \ proportions and sampling geometry. There are nine visits per study instead of\
+    \ ten and 40 triplets per visit. Existing \xD71 and \xD74 multipliers stay fixed."
+  exploitation: Build directly on the accepted benefit of larger bags while sacrificing
+    the epoch with the smallest observed incremental validation gain.
+  budget: "A linear fit to the two measured input-count costs predicts about 1,428\
+    \ seconds; pure input-proportional scaling predicts 1,477 seconds. These are estimates,\
+    \ not guarantees. Expect 3,933 optimizer steps at the current batch settings.\
+    \ Use seed 1533697213 and require measured training within 542.44\u20131,627.32\
+    \ seconds."
+  implementation: 'Change only configs/training.yaml: study_triplet_total=40 and max_epochs=9.
+    Retain no-series-dropout, optimizer rates, regularizers, heads and existing train_triplets_per_study/drift/gradient
+    logging. Replace the incumbent''s 36-triplet/ten-epoch allocation, preserving
+    any newly accepted unrelated behavior. Reassess runtime on the live recipe before
+    scheduling. Since the input count is shared with validation, report this as a
+    joint training/evaluation-input change, not isolated training improvement.'
+  open_choices: "Fewer updates may offset denser bags, and a flatter final epoch does\
+    \ not prove it is dispensable after rescheduling. Keep this single 40\xD79 allocation\
+    \ rather than proposing a count/epoch sweep."
+  dependencies:
+  - rn18-no-series-dropout
+  priority_rationale: 'Priority 4: an inexpensive extension of an accepted but relatively
+    uncertain win; equal nominal input exposure keeps the budget plausible.'
+  source_change: false
+  targeted_curve: "rn18-more-triplets, epochs 7\u20139: \xD71 macro AUC is 0.924076,\
+    \ 0.924322, 0.924370. Seek a higher endpoint from denser study bags while reallocating\
+    \ the nearly unproductive final epoch."
+  status: completed
+  created_revision: 259
+  ranking_rationale: "All five dependencies are satisfied, and each proposal differs\
+    \ materially from its measured precedent. Prioritize native contrast preservation\
+    \ as the follow-up to the stronger open information-retention line. Put selective\
+    \ anchoring next because it addresses the observed late upper-stage contraction\
+    \ in the near-miss L2-SP run. The 40-triplet allocation follows: it extends an\
+    \ accepted result, but that result\u2019s 80% lower bound of 0.000237 is small\
+    \ relative to the documented seed-noise yardstick. The head-first retry has specific\
+    \ transition defects to address; gated adjacency ranks last after two negative\
+    \ adjacent-input attempts."
+  experiments:
+  - rn18-forty-triplets-nine-epochs-20260929T042341Z-8a2cc45c
+  decision: reject
+- id: rn18-bn-adapted-head-start
+  mechanism_id: head-first
+  parent_idea_id: rn18-linear-probe-then-finetune
+  title: Adapt BatchNorm during head-first training and warm up the backbone after
+    unfreezing
+  opportunity: "The frozen epoch scored only 0.63404 \xD71 AUC, versus 0.88569 for\
+    \ its parent. DSU's mean absolute feature change was 0.09665 versus 0.02491, then\
+    \ returned to 0.02496 after unfreezing. Source inspection confirms pretrained\
+    \ BatchNorm statistics were frozen and the backbone consumed its entire warmup\
+    \ without updates. A feature-distribution mismatch is plausible but unproven."
+  mechanism: "During epoch 0, freeze backbone parameters while keeping BatchNorm in\
+    \ training mode so its running statistics adapt on ordinary training batches.\
+    \ Train the existing downstream modules. At epoch 1, unfreeze the backbone and\
+    \ begin its own one-epoch warmup from 0.1\xD7 to the incumbent peak rate, then\
+    \ cosine decay over the remaining run. Keep the head's ordinary schedule. Preserve\
+    \ DSU and other augmentations."
+  precedents:
+  - 'rn18-linear-probe-then-finetune-20260928T222408Z-54c0d432: freeze activation
+    was complete in epoch 0 and ended in epoch 1; the issue was not failure to unfreeze.'
+  - Its training/lightning.py:427 freezes both parameters and backbone training mode;
+    configure_optimizers advances one shared schedule through the frozen phase.
+  - '[Kumar et al., Fine-Tuning can Distort Pretrained Features](https://arxiv.org/abs/2202.10054)
+    motivates adapting a head before full fine-tuning. Its distribution-shift results
+    do not establish that this MRI recipe benefits from head-first training or the
+    proposed BatchNorm repair.'
+  novelty: Repairs both feature-statistics adaptation and the optimizer clock at the
+    transition. It retains the same one-epoch head-first duration rather than changing
+    its strength or reseeding.
+  coverage: Use the ordinary training cohort and input allocation during the head-first
+    phase. BatchNorm adaptation requires no extra pass and never uses validation images.
+    All fixed objectives remain active.
+  exploitation: Allow downstream modules to adapt before convolutional weights move,
+    using target-domain BatchNorm statistics and a controlled first backbone update.
+  budget: "Retain the live incumbent's epoch count and input count. With the current\
+    \ ten-epoch recipe, one frozen backward phase should place training around 1,450\u2013\
+    1,520 seconds. Use seed 1533697213; no additional calibration epoch or data pass.\
+    \ The measured 542.44\u20131,627.32-second range remains binding."
+  implementation: Modify config.py, configs/training.yaml and training/lightning.py,
+    with model training-mode handling if needed. Keep all backbone optimizer groups
+    present before freezing so unfreezing needs no optimizer reconstruction. Replace
+    the rejected eval-mode freeze and shared clock with parameter-only freezing, training-mode
+    BatchNorm, and separate backbone/head schedules. Log frozen-parameter fraction,
+    BatchNorm update counts and buffer drift, live group rates, DSU magnitude, and
+    stage/head gradients. Preserve unrelated incumbent improvements after rebasing
+    and fit the delayed warmup inside its existing duration.
+  open_choices: The unusually large frozen-phase DSU perturbation may reflect feature
+    scale rather than the cause of poor AUC. Logs must distinguish parameter freezing,
+    BatchNorm adaptation and resumed updates. Do not add a DSU ablation to this attempt.
+  dependencies: []
+  priority_rationale: 'Priority 5: concrete implementation-level transition problems
+    justify one retry, but the original run''s severe early deficit makes this less
+    certain than the other follow-ups.'
+  source_change: true
+  targeted_curve: "rn18-linear-probe-then-finetune, epochs 0\u20132: eliminate the\
+    \ 0.63404 frozen-phase AUC collapse and 0.09665 DSU magnitude spike; reduce the\
+    \ abrupt first-unfreeze drift and improve the eventual macro endpoint."
+  status: completed
+  created_revision: 259
+  ranking_rationale: 'Admit independent module clipping: frequent pre-clipping norms
+    above 1.0 give it a measured trigger, and prior cap changes did not test clipping
+    granularity. Admit upper-stage Batch Renormalization as a distinct, instrumented
+    test of a plausible but unmeasured train/inference mismatch. Preserve the reserved
+    head and queued slice-channel retry ahead of both new directions. Leave rn18-adam-short-second-moment
+    proposed: the same beta2=0.99 change lost 0.0025 in the earlier 06-beta2-0.99
+    run. The different backbone and split permit reconsideration, but gradient trends
+    alone do not establish moment lag or enough expected yield to queue it now.'
+  experiments:
+  - rn18-bn-adapted-head-start-20260929T045000Z-6d0d6230
+  decision: reject
+- id: rn18-separate-module-clipping
+  mechanism_id: optimizer-clipping
+  parent_idea_id: null
+  title: Clip backbone and head gradients independently
+  opportunity: "The incumbent's logged model gradient norm exceeds the configured\
+    \ 1.0 cap in 69/87 sampled steps, including 37/44 during epochs 5\u20139. ReXNet\
+    \ exceeds it in 4/87 samples. Both log before clipping and exclude separate auxiliary\
+    \ heads, so these are sufficient evidence of clipping in those samples, not complete\
+    \ clipping rates. A single optimizer-wide scale couples backbone, disease/readout,\
+    \ report-attribute and scanner-head updates. Whether that coupling limits learning\
+    \ remains a hypothesis."
+  mechanism: Partition trainable parameters into backbone, remaining model parameters,
+    report-attribute heads and scanner head. Apply independent L2-norm clipping at
+    the existing 1.0 cap to each partition after gradient unscaling. Preserve all
+    loss gradients before partitioning; introduce no label-specific treatment. Replace
+    the single global clipping operation. Log each partition's pre/post norm, clipping
+    scale and clipped-step fraction, plus the fraction of steps whose applied scales
+    differ from the counterfactual global scale. That difference provides the activation
+    signature.
+  precedents:
+  - "Original incumbent metrics: outputs/autoresearch/radimagenet-rn18/experiments/rn18-more-triplets-20260928T235020Z-fd2c7bef/training/fold_0/logs/version_0/metrics.csv.\
+    \ During epochs 5\u20139, sampled model norm averages 1.44558."
+  - 'ReXNet control metrics: outputs/training/20260928-150724-rebuild-state-v2-control/fold_0/logs/version_0/metrics.csv.
+    Corresponding sampled norm averages 0.57856. Its source_snapshot.zip confirms
+    the same logging scope; effective_config.json confirms cap 1.0.'
+  - 'Incumbent training/lightning.py: build_optimizer combines backbone and auxiliary
+    parameters in one AdamW optimizer. on_before_optimizer_step logs gradients before
+    Lightning''s clipping hook.'
+  - The closed backbone-rate family increased nominal LR and lost macro AUC. This
+    proposal changes gradient-dependent coupling while retaining nominal rates.
+  novelty: No registered attempt changes clipping granularity. This tests whether
+    large gradients in one module unnecessarily suppress other modules, rather than
+    changing stage learning rates, freezing weights or altering losses.
+  coverage: Applies uniformly across all labels and studies. The strongest evidence
+    is frequent clipping; neither module dominance nor harmful cross-module coupling
+    has yet been measured.
+  exploitation: Preserves the incumbent's larger study bags and complete acquisition
+    retention. It uses existing gradients and one optimizer step, leaving the successful
+    input recipe intact.
+  budget: "Retain ten epochs, 36 triplets and batch size eight at the supplied incumbent.\
+    \ Against its 1,476.7 seconds, estimate roughly 1,480\u20131,535 seconds, unmeasured.\
+    \ Cache parameter partitions and aggregate diagnostics on device. No extra forward/backward\
+    \ pass. Use supervisor seed 1533697213 and the unchanged 542.44\u20131,627.32-second\
+    \ training range and adoption rule."
+  implementation: Change src/knee_abnormality/training/lightning.py through configure_gradient_clipping,
+    replacing its default global operation without applying global clipping again
+    afterward. Include every trainable optimizer parameter exactly once, including
+    biases and normalization parameters. Retain inherited stage drift and pre-clipping
+    RMS; add initialization-relative head drift and explicit auxiliary-head diagnostics.
+    Keep losses, AdamW, schedules, DSU, contrast mixing and accepted input behavior.
+    If another incumbent is accepted, rebuild partitions from its actual modules and
+    retain unrelated improvements; do not restore the old recipe.
+  open_choices: Fix the first candidate to four semantic partitions and cap 1.0 each.
+    Their combined norm may exceed 1.0 by design. Sparse historical logging cannot
+    identify which partition dominates, and Adam's moment normalization means less
+    clipping need not produce proportional parameter movement.
+  dependencies: []
+  priority_rationale: 'Priority 1: the strongest newly retrieved diagnostic, a small
+    implementation, and little expected runtime overhead. Improvement is uncertain,
+    but activation and module coupling will be directly observable.'
+  source_change: true
+  targeted_curve: "rn18-more-triplets, epochs 5\u20139: \xD71 macro AUC rises only\
+    \ 0.9232\u21920.9244 while loss falls 2.3467\u21922.2860 and 37/44 sampled model\
+    \ norms exceed 1.0. Seek continued late macro improvement with independently measured\
+    \ module updates."
+  status: completed
+  created_revision: 310
+  ranking_rationale: 'Correct the rejected report by supplying the full eligible queue
+    order: the reserved clipping head, queued Batch Renormalization, then the two
+    admitted proposals. Their dependencies are satisfied, and neither repeats a measured
+    mechanism. Leave learned intensity calibration and shorter Adam second-moment
+    memory proposed because their expected yield is less supported; the earlier beta2=0.99
+    run lost 0.0025 on a different recipe.'
+  experiments:
+  - rn18-separate-module-clipping-20260929T054103Z-194ab554
+  decision: reject
+- id: rn18-upper-stage-batch-renorm
+  mechanism_id: batch-renormalization
+  parent_idea_id: null
+  title: Reduce upper-stage dependence on correlated study batches with Batch Renormalization
+  opportunity: The incumbent flattens after epoch 5 despite continuing loss reduction.
+    Its backbone processes many correlated slices from eight studies, and DSU perturbs
+    stride-8 features before layer3. Training uses batch statistics whereas inference
+    uses running statistics. This creates a plausible representation mismatch in upper
+    stages, but its magnitude has not been measured. Larger image counts do not establish
+    independent normalization samples.
+  mechanism: "Replace BatchNorm in layer3 and layer4, including downsample branches,\
+    \ with bounded Batch Renormalization. Correct batch-normalized activations using\
+    \ detached r=batch_std/running_std and d=(batch_mean-running_mean)/running_std\
+    \ before the learned affine transform. Begin with r=1,d=0 for the first 10% of\
+    \ optimizer steps; relax bounds linearly to r in [1/3,3] and d in [-5,5] by 30%.\
+    \ Retain ordinary running-variance updates and inference normalization. Log applied\
+    \ |r\u22121|, |d|, bound-hit fractions and batch/running moment discrepancies.\
+    \ Nonzero applied correction after the ramp starts establishes activation."
+  precedents:
+  - "run_curves.full_detail, rn18-more-triplets: epochs 5\u20139 macro AUC 0.9232\u2192\
+    0.9244, loss 2.3467\u21922.2860, with DSU still affecting approximately half of\
+    \ acquisitions."
+  - 'Incumbent modeling/model.py: _encode_images applies DSU between layer2 and layer3;
+    encode_batch flattens sampled acquisitions into one backbone batch.'
+  - '[Ioffe, Batch Renormalization](https://arxiv.org/html/1702.03275v2): detached,
+    bounded corrections address differences between batch-dependent training representations
+    and inference representations, including non-independent minibatches.'
+  - The head-first retry already owns frozen-backbone BN adaptation and unfreeze warmup.
+    This proposal instead changes upper-stage normalization during ordinary joint
+    optimization.
+  novelty: A new normalization family. It retains shared convolutional weights, joint
+    readout and all augmentations; it neither repeats plane-specific backbones nor
+    revisits DSU-strength reductions.
+  coverage: Targets a shared representation problem across labels. PF OA and MCL fluctuations
+    are exploratory diagnostics, not separate objectives. Batch/running moment discrepancies
+    must be measured rather than inferred from AUC alone.
+  exploitation: Preserve pretrained affine parameters and running moments, with an
+    initial ordinary-BN phase. Keep the accepted acquisition coverage and the existing
+    DSU perturbations while changing how upper layers normalize them.
+  budget: "Keep the current ten-epoch, 36-triplet allocation. Only low-resolution\
+    \ layer3/layer4 normalization changes; no additional image pass. A provisional\
+    \ estimate is 1,500\u20131,600 seconds, with unfused normalization kernels the\
+    \ main runtime risk. The supervisor's measured training time must satisfy the\
+    \ existing range. Use its incumbent seed and unchanged macro adoption rule."
+  implementation: Implement the normalization module under src/knee_abnormality/modeling
+    and install it in modeling/model.py after loading pretrained weights. Copy affine
+    parameters and running buffers; compute corrections from pre-update running moments
+    in FP32. Preserve training/evaluation mode handling and update buffers only from
+    training inputs. Add progress control and epoch diagnostics in training/lightning.py,
+    retaining stage drift/RMS and adding head drift. Replace upper-stage BN behavior
+    without duplicating inference paths. Rebase on a newly accepted incumbent, retaining
+    its inputs and any head-first transition; normalization must respect its freeze/unfreeze
+    handling.
+  open_choices: Fix the upper-stage scope and ramp for this candidate. Historical
+    artifacts do not establish the size of normalization mismatch. Corrections can
+    amplify gradients or weaken useful batch regularization; record these effects
+    alongside clipping and AUC. Running-statistic updates do not average model weights.
+  dependencies: []
+  priority_rationale: 'Priority 2: a distinct, literature-supported mechanism with
+    a concrete source-level rationale. Higher implementation and runtime uncertainty
+    than clipping, but it tests an unexplored cause of the plateau.'
+  source_change: true
+  targeted_curve: "rn18-more-triplets, epochs 5\u20139: macro AUC stalls near 0.9244\
+    \ while upper-stage gradients remain active and loss declines. Seek a stronger\
+    \ late validation slope and reduced measured batch/running-statistic discrepancies\
+    \ without an early AUC collapse."
+  status: launched
+  created_revision: 310
+  ranking_rationale: 'Correct the rejected report by supplying the full eligible queue
+    order: the reserved clipping head, queued Batch Renormalization, then the two
+    admitted proposals. Their dependencies are satisfied, and neither repeats a measured
+    mechanism. Leave learned intensity calibration and shorter Adam second-moment
+    memory proposed because their expected yield is less supported; the earlier beta2=0.99
+    run lost 0.0025 on a different recipe.'
+  experiments:
+  - rn18-upper-stage-batch-renorm-20260929T060824Z-abe19cf4
+- id: rn18-adam-short-second-moment
+  mechanism_id: optimizer-memory
+  parent_idea_id: null
+  title: Shorten Adam's second-moment memory to track changing gradient scales
+  opportunity: In the incumbent, head gradient RMS decreases from 0.001311 at epoch
+    0 to 0.000730 at epoch 9, while layer4 RMS increases from 0.000133 to 0.000279.
+    AdamW uses beta2=0.999, an approximately 1,000-update memory scale, or 2.29 epochs
+    at 437 updates per epoch. A slowly adapting denominator could respond differently
+    to these opposing trends. Actual moment lag is unmeasured, and the logged RMS
+    values precede clipping.
+  mechanism: Set optimizer.beta2 to 0.99 for all AdamW groups, reducing its approximate
+    memory scale to 100 updates, or 0.23 epochs. Retain beta1, epsilon, rates, decay,
+    warmup and cosine schedule. Add sampled per-stage and head diagnostics for bias-corrected
+    second-moment RMS and the preconditioned update RMS, with clearly identified post-clipping
+    inputs. Log the actual beta2 of optimizer groups receiving gradients as the activation
+    signature. Do not reset moments or change the objective.
+  precedents:
+  - Original rn18-more-triplets metrics.csv supplies the unrounded head and layer4
+    gradient RMS endpoints. Its effective recipe uses beta1=0.9, beta2=0.999 and 437
+    optimizer updates per epoch.
+  - 'Incumbent training/lightning.py: build_optimizer passes one beta pair to AdamW;
+    configure_optimizers supplies the shared cosine multiplier.'
+  - '[Kingma and Ba, Adam](https://arxiv.org/pdf/1412.6980): adaptive first- and second-moment
+    estimates define the preconditioner. The shorter-memory choice here is a campaign
+    hypothesis, not a result established by that paper.'
+  - The closed backbone-rate and schedule-shape families changed nominal rates or
+    their timing. This candidate changes the timescale of gradient normalization while
+    preserving both.
+  novelty: No registered candidate isolates optimizer moment memory. Its motivation
+    is the measured divergence between head and backbone gradient trajectories, rather
+    than a general claim that a different beta value is better.
+  coverage: Applies identically to all optimizer groups and labels. It can affect
+    both declining head gradients and growing upper-backbone gradients. Per-label
+    results remain descriptive; adoption uses only the fixed macro rule.
+  exploitation: Keep the incumbent's architecture, larger bags, no-series-dropout
+    setting and nominal optimization schedule. This is a low-cost way to test whether
+    the existing gradients can produce more useful adaptation.
+  budget: "Retain the incumbent's epochs, batch size and study inputs. Changing beta2\
+    \ adds no optimizer arithmetic; sample moment diagnostics every 50 updates and\
+    \ aggregate per epoch. Estimate approximately 1,477\u20131,525 seconds at the\
+    \ supplied recipe, unmeasured. Use the supervisor's recorded seed and existing\
+    \ budget/adoption rules without confirmation runs."
+  implementation: Change optimizer.beta2 in configs/training.yaml and add evidence
+    logging in src/knee_abnormality/training/lightning.py. The behavioral change is
+    configuration-only, but required mechanism diagnostics make this a source-change
+    proposal. Read initialized optimizer states without copying whole checkpoints
+    or synchronizing every step. Retain stage drift/RMS and include head initialization
+    drift. Preserve unrelated accepted changes, including separate clipping if it
+    becomes incumbent. Rebase the beta change onto the newly accepted AdamW recipe
+    rather than overwriting its other optimizer settings.
+  open_choices: Use beta2=0.99 as one candidate, not a sweep. Shorter memory may make
+    the preconditioner noisier. Compare state statistics with post-clipping gradients;
+    historical pre-clipping epoch RMS alone cannot diagnose denominator over- or underestimation.
+  dependencies: []
+  priority_rationale: 'Priority 3: inexpensive and distinct from clipping, but supported
+    by gradient trends rather than measured optimizer-state lag. Instrumentation makes
+    a negative result informative.'
+  source_change: true
+  targeted_curve: "rn18-more-triplets, epochs 1\u20139: head RMS declines while layer4\
+    \ RMS grows, followed by the epochs 7\u20139 macro plateau. Seek better late macro\
+    \ AUC through faster preconditioner adaptation, without increasing nominal learning\
+    \ rates."
+  status: proposed
+  created_revision: 310
+- id: rn18-full-width-projection
+  mechanism_id: token-projection-width
+  parent_idea_id: null
+  title: Preserve all 512 layer4 channels in the shared token projection
+  opportunity: "The incumbent gains only 0.000294 in \xD71 macro AUC between epochs\
+    \ 7 and 9 while training loss falls from 2.3080 to 2.2860. Its shared projection\
+    \ compresses 512 backbone channels into 256 dimensions before disease, anatomical\
+    \ and auxiliary readouts. A shared representation bottleneck is a plausible remaining\
+    \ limitation, although projection rank and discarded information have not been\
+    \ measured."
+  mechanism: "Replace the 512-to-256 projection with a learned 512-to-512 projection.\
+    \ Propagate width 512 through token embeddings, LayerNorm and readout input dimensions,\
+    \ retaining attention hidden width 128, the existing pooling equations and every\
+    \ loss. Keep exactly the current layer4 tokens and geometry. Log realized token\
+    \ width, projection gradient RMS and gradient RMS for projection rows 256\u2013\
+    511; positive extra-row gradient RMS at epoch 0 establishes that the additional\
+    \ channels participate in learning."
+  precedents:
+  - "run_curves: rn18-more-triplets, epochs 7\u20139, \xD71 AUC 0.924076\u21920.924370\
+    \ and loss 2.307987\u21922.286022; report-attribute loss also continues falling."
+  - Incumbent src/knee_abnormality/modeling/model.py defines PROJECTION_WIDTH=256.
+    The auxiliary modules import this constant, so their input dimensions follow it
+    without edits to protected auxiliary source.
+  - The closed token-readout attempt added layer3 tokens and lost 0.002260. This proposal
+    changes channel capacity at the existing token locations, without reintroducing
+    another stage or altering competition between token populations.
+  novelty: Tests the channel bottleneck independently of spatial resolution, token
+    count, additional stages or a different disease head. No supplied registry attempt
+    changes the shared projection width.
+  coverage: Uses every existing study, series and label. Broad representation capacity
+    is the hypothesis; no label receives preferential supervision or a separate adoption
+    objective.
+  exploitation: Builds on the incumbent's successful input coverage while keeping
+    its 36-triplet bags and zero series dropout. It spends additional computation
+    after the backbone rather than increasing image exposure.
+  budget: "Keep ten epochs, batch size eight and the supervisor's incumbent seed 1533697213.\
+    \ The parent took 1,476.7 s, leaving 150.7 s below the exact 1,627.32 s ceiling.\
+    \ Backbone work is unchanged, but token activation memory and readout computation\
+    \ increase. A planning estimate is 1,480\u20131,600 s; this is unmeasured, and\
+    \ the fixed training-time range remains binding."
+  implementation: Replace PROJECTION_WIDTH in modeling/model.py and update the width
+    descriptions in modeling/spatial_tokens.py so preprocessing identity remains truthful.
+    Existing imports should propagate dimensions to auxiliary heads; retain their
+    topology, targets and losses. Add activation telemetry in training/lightning.py,
+    retain stem/stage gradient and pretrained-drift measurements, and add head drift
+    from initialization. Retain both accepted incumbent ideas and all unrelated later
+    winners. If a newly accepted incumbent already removes this bottleneck, withdraw
+    this proposal as redundant; otherwise apply the width replacement to that incumbent
+    without restoring rejected components.
+  open_choices: Use width 512 for this candidate, with the existing initialization
+    policy and optimizer recipe. The main unknown is whether information lost through
+    compression limits discrimination; increasing capacity could instead worsen generalization.
+    Auxiliary input dimensions necessarily widen too, limiting attribution to the
+    projection alone.
+  dependencies: []
+  priority_rationale: 'First: a direct, inexpensive structural hypothesis within the
+    permitted scope, with modest implementation work and no extra backbone passes.
+    Evidence for an actual rank bottleneck remains indirect.'
+  source_change: true
+  targeted_curve: "rn18-more-triplets epochs 7\u20139: improve on the \xD71 macro\
+    \ plateau of 0.924076\u21920.924370 while loss falls 2.307987\u21922.286022. Seek\
+    \ further validation improvement from the existing layer4 representation; final\
+    \ adoption remains the fixed \xD74 macro rule."
+  status: completed
+  created_revision: 353
+  ranking_rationale: 'Keep the reserved full-width projection first. Put the clipping
+    retry next: the rejected four-partition run measured unequal scaling within the
+    task network, and the proposed two-partition change directly addresses that confound
+    without repeating the run. Queue plane-conditioned statistics after the existing
+    gradient-centralization idea; it changes normalization within a shared backbone,
+    unlike the measured independent-plane-backbone run. Leave periodic backbone sharpness
+    proposed: its local sharpness hypothesis is unmeasured, replay is complex, and
+    its estimated runtime has only about 67 seconds of headroom. All admitted proposals
+    have satisfied admission dependencies. No queued idea is parked.'
+  experiments:
+  - rn18-full-width-projection-20260929T063454Z-a3f9c000
+  - rn18-full-width-projection-20260929T065008Z-843e72f8
+  decision: reject
+- id: rn18-convolution-gradient-centralization
+  mechanism_id: optimizer-gradient-centralization
+  parent_idea_id: null
+  title: Centralize convolution gradients before AdamW moment updates
+  opportunity: Incumbent stem gradient RMS remains about 0.0024 after epoch 2, and
+    layer4 gradient RMS rises from 0.000198 to 0.000279, while validation gains become
+    very small. Higher global rates and lower early-stage movement both failed elsewhere
+    in the ledger. Changing gradient direction is an inexpensive alternative hypothesis;
+    these measurements do not establish that gradient means are harmful.
+  mechanism: For each backbone Conv2d weight gradient, subtract its mean over input-channel
+    and spatial dimensions independently for each output filter. Apply this once after
+    gradient accumulation and precision unscaling, before clipping and AdamW moment
+    updates. Leave biases, normalization parameters and all head gradients untouched.
+    Preserve the incumbent's rates, betas, decay and schedule. Log removed-gradient
+    RMS and removed-energy fraction by stage, alongside raw and centralized gradient
+    RMS. A positive removed-gradient RMS at epoch 0 demonstrates activation.
+  precedents:
+  - "run_curves and original incumbent metrics.csv: layer4 gradient RMS rises 0.00019795\u2192\
+    0.00027877 between epochs 2 and 9, despite the late macro plateau."
+  - The backbone-rate attempt increased final layer4 drift to approximately 0.3825
+    and lost 0.001720; selective anchoring also failed. Neither tested a direction-changing
+    gradient transformation.
+  - Yong et al. introduce zero-mean gradient centralization and report applications
+    to pretrained-network fine-tuning. Their results motivate this experiment, without
+    establishing benefit for this recipe. [Gradient Centralization](https://arxiv.org/abs/2004.01461)
+  novelty: Changes convolution-gradient direction rather than learning-rate magnitude,
+    clipping scope, moment-memory duration or attraction toward pretrained weights.
+    It does not duplicate the developing clipping candidate or the already proposed
+    shorter-second-moment candidate.
+  coverage: Applies to every trainable backbone convolution across all studies and
+    labels. Existing normalization and auxiliary objectives remain intact.
+  exploitation: Preserves the successful input recipe and pretrained initialization.
+    Tests whether a cheap optimizer transformation can improve useful learning within
+    the existing ten-epoch allocation.
+  budget: "Keep ten epochs, 36 triplets and the incumbent seed. Requires tensor reductions\
+    \ and subtraction over convolution gradients, with no additional forward/backward\
+    \ pass or persistent optimizer state. Planning estimate: approximately 1,480\u2013\
+    1,540 s from the 1,476.7 s parent; actual training must satisfy 542.44\u20131,627.32\
+    \ s."
+  implementation: Implement the transformation in training/lightning.py within on_before_optimizer_step,
+    after recording comparable raw-gradient telemetry and before the active clipping
+    implementation. Replace the raw-gradient path for eligible convolution weights;
+    retain AdamW and all unrelated behavior. Log per-stage activation, existing pretrained
+    drift, raw head gradients and head drift from initialization. If separate-module
+    clipping or another unrelated optimizer improvement becomes incumbent, retain
+    it and centralize before its clipping operation. No undecided result is required
+    for execution.
+  open_choices: Use all backbone Conv2d kernels and exact mean subtraction, with no
+    strength sweep. AdamW's coordinatewise preconditioning means centralized raw gradients
+    do not guarantee constant filter means or zero-mean parameter updates. Activation
+    magnitude and validation benefit are both unknown.
+  dependencies: []
+  priority_rationale: 'Second: very low compute cost, clear activation evidence and
+    primary-research precedent. Transfer to this already strong incumbent is uncertain,
+    but the mechanism differs from exhausted rate and drift-control attempts.'
+  source_change: true
+  targeted_curve: "rn18-more-triplets epochs 2\u20139: persistent stem gradients and\
+    \ increasing layer4 gradient RMS coexist with flattening \xD71 AUC. Target more\
+    \ useful validation improvement from those gradients, without reproducing the\
+    \ excess drift of rn18-backbone-lr-1e-4."
+  status: queued
+  created_revision: 353
+  ranking_rationale: 'Keep the reserved full-width projection first. Put the clipping
+    retry next: the rejected four-partition run measured unequal scaling within the
+    task network, and the proposed two-partition change directly addresses that confound
+    without repeating the run. Queue plane-conditioned statistics after the existing
+    gradient-centralization idea; it changes normalization within a shared backbone,
+    unlike the measured independent-plane-backbone run. Leave periodic backbone sharpness
+    proposed: its local sharpness hypothesis is unmeasured, replay is complex, and
+    its estimated runtime has only about 67 seconds of headroom. All admitted proposals
+    have satisfied admission dependencies. No queued idea is parked.'
+- id: rn18-learned-intensity-calibration
+  mechanism_id: intensity-normalization
+  parent_idea_id: null
+  title: Learn an identity-initialized monotone intensity map for each series type
+  opportunity: The six configured series types share one fixed input standardization
+    before the backbone; their type embeddings enter only after feature extraction.
+    This leaves the backbone responsible for accommodating sequence-dependent intensity
+    relationships. The incumbent's early lead still becomes a late plateau. Trainable
+    input calibration could reduce that burden, but no supplied histogram or per-type
+    feature analysis proves a normalization mismatch.
+  mechanism: Add one monotone piecewise-linear intensity map per configured series
+    type, shared across its slices and channels. Use fixed input knots [0, 0.25, 0.5,
+    0.75, 1]; four softmax-normalized positive output increments define each map.
+    Zero-initialize their logits, producing the exact identity mapping, with endpoints
+    fixed at zero and one. Apply after augmentation and the active slice-channel transformation,
+    immediately before existing mean/std standardization. Train through the unchanged
+    objectives using the inherited head-rate parameter grouping. Log per-type slopes,
+    parameter-gradient RMS and applied image-change RMS against the identity map on
+    the identical input tensor.
+  precedents:
+  - 'Incumbent modeling/model.py, encode_batch: augmented images pass through the
+    slice-channel transformation and fixed channel mean/std before _encode_images;
+    token_type is already available at this point.'
+  - The native-contrast ablation failed adoption. This proposal retains contrast mixing
+    and all other augmentations, adding a deterministic learned calibration instead
+    of reducing augmentation strength.
+  - Drozdzal et al. study a low-capacity learned preprocessor for medical-image normalization.
+    Their segmentation results are conceptual precedent; the proposed small monotone
+    maps are a different, unvalidated adaptation. [Learning Normalized Inputs](https://arxiv.org/abs/1702.05174)
+  novelty: Introduces trainable intensity normalization while preserving the pretrained
+    input function at initialization. It changes neither augmentation probabilities
+    nor backbone specialization, and differs from the queued upper-stage Batch Renormalization
+    mechanism.
+  coverage: All configured series types receive the same map architecture. Conditioning
+    uses existing series-type metadata only, with no scanner identity, new labels
+    or validation-fitted statistics. Padding stays zero before standardization.
+  exploitation: Retains 36-triplet coverage, zero series dropout, DSU and the fixed
+    losses. Identity initialization avoids deliberately perturbing the useful pretrained
+    starting representation.
+  budget: "Keep ten epochs, batch size eight and seed 1533697213. Adds 24 trainable\
+    \ logits, pointwise interpolation and input-gradient propagation through the stem.\
+    \ No additional images or model passes are needed. A planning estimate is 1,500\u2013\
+    1,610 s, but interpolation and stem-backward overhead are unmeasured; the exact\
+    \ 1,627.32 s ceiling remains binding."
+  implementation: Add the calibration module under modeling/ and insert it in model.py
+    before standardization. Retain quantile preparation, geometry, mean/std and augmentation
+    behavior. Add telemetry in training/lightning.py; positive applied calibration
+    RMS at epoch 0 is the activation signature, measured by comparing mapped and unmapped
+    versions of the same tensor so augmentation cannot create a false positive. Retain
+    stage drift/gradient logging and add calibration gradients plus head drift from
+    initialization. Compose with any newly accepted slice transformation at this same
+    boundary and preserve unrelated incumbent improvements. If normalization itself
+    is superseded during development, explicitly reconcile that overlap rather than
+    stacking competing calibration stages.
+  open_choices: Use four intervals per type for this candidate. Maps may remain nearly
+    identity, collapse useful contrast into narrow intervals or fit sequence-specific
+    artifacts; log minimum/maximum slopes and per-type image changes. Their benefit
+    is a hypothesis, not evidence of an existing preprocessing defect.
+  dependencies: []
+  priority_rationale: 'Third: a distinct permitted input mechanism with little parameter
+    overhead and an unchanged initial input function. It has more implementation and
+    causal uncertainty than the projection and optimizer proposals.'
+  source_change: true
+  targeted_curve: "rn18-more-triplets epochs 5\u20139: \xD71 macro AUC 0.923239\u2192\
+    0.924370 despite loss 2.346678\u21922.286022 and continuing stem gradients. Target\
+    \ sustained validation learning through adaptable input normalization while preserving\
+    \ the epoch-0 starting behavior."
+  status: proposed
+  created_revision: 353
+- id: rn18-task-coupled-scanner-clipping
+  mechanism_id: optimizer-clipping
+  parent_idea_id: rn18-separate-module-clipping
+  title: Clip the shared task network jointly while isolating the detached scanner
+    classifier
+  opportunity: 'The rejected four-partition implementation changed scaling within
+    the task network: backbone clipping scale declined from 0.927 to 0.702, while
+    the model head and report-attribute heads were effectively unclipped. Scanner
+    gradients dominated norms and were clipped on every step. Thus scanner isolation
+    was confounded with changing the relative task-gradient components. Keeping those
+    components coupled supplies a specific structural retry; the measurements identify
+    the confound, not its causal contribution to the AUC loss.'
+  mechanism: Use exactly two clipping partitions. The task partition contains every
+    trainable model parameter, including the backbone, pooling/readouts and detectors,
+    plus report-attribute heads. The second contains only the detached scanner classifier
+    parameters. Apply norm cap 1.0 independently to each partition after unscaling
+    and any incumbent gradient transformation, before AdamW updates. This preserves
+    the concatenated task-gradient direction during clipping while removing scanner-classifier
+    norm coupling. Keep the scanner loss, confusion path, rates, moments and schedule
+    unchanged.
+  precedents:
+  - "run_curves/full_detail, rn18-separate-module-clipping: backbone clipped-step\
+    \ fraction rose from 0.316 to 0.886; head scale was 1.0 throughout epochs 1\u2013\
+    9; report-head scale was always 1.0; scanner scale ranged approximately 0.269\u2013\
+    0.322."
+  - The decided clipping source, training/lightning.py:configure_gradient_clipping
+    and configure_optimizers, confirms four independently capped partitions. The incumbent
+    _scanner_confusion_step detaches features for classifier fitting and classifier
+    parameters for the confusion gradient.
+  novelty: Changes partition membership rather than cap strength. It retains one scaling
+    factor across all parameters jointly learning the disease and auxiliary representation,
+    while separating only the classifier whose fitting gradient does not reach that
+    representation.
+  coverage: Every optimizer update and all labels. No label-specific objective, supervision
+    change or scanner-head architecture change.
+  exploitation: 'Log both partitions'' pre/post norms, scales and clipped fractions;
+    scanner squared-norm share; and task-scale differences from counterfactual global
+    and four-partition clipping. Activation: positive task-scale difference from global
+    clipping at epoch 0. Verify identical applied scale across task modules. Retain
+    per-stage drift/gradient RMS and add initialization-relative head drift. Only
+    the fixed macro adoption rule decides the outcome.'
+  budget: "Keep 10 epochs, 36 triplets, batch 8 and the supervisor's incumbent seed,\
+    \ currently 1533697213. The four-partition run took 1,489.8 s and the incumbent\
+    \ 1,476.7 s. Two partitions should have comparable overhead; estimated training\
+    \ time is approximately 1,480\u20131,520 s, unmeasured until execution. Required\
+    \ range remains 542.44\u20131,627.32 s."
+  implementation: In src/knee_abnormality/training/lightning.py, replace optimizer-wide
+    clipping with the two partitions and validate exact, nonoverlapping optimizer-parameter
+    coverage. Reuse the rejected implementation's diagnostics as source material,
+    but remove its four-partition execution. Retain accepted 36-triplet sampling,
+    zero series dropout, all losses and evaluation behavior. Develop from the current
+    incumbent, not the rejected candidate. If another incumbent is accepted, preserve
+    its unrelated optimizer/model improvements and replace only its clipping partitioning.
+  open_choices: Partition membership and cap are fixed for this attempt. Adam's normalization
+    means larger raw gradients do not necessarily imply larger parameter updates;
+    log update RMS periodically to distinguish this. Whether the observed task-scale
+    mismatch caused the rejection remains unknown.
+  dependencies: []
+  priority_rationale: 'First: an open-family retry with a measured clipping pattern,
+    a concrete repair and little additional cost. Its purpose is to isolate the original
+    scanner-coupling hypothesis without repeating four-way clipping.'
+  source_change: true
+  targeted_curve: "rn18-separate-module-clipping, epochs 2\u20139: recover the widening\
+    \ macro-AUC deficit, final \xD71 AUC 0.9212 versus incumbent 0.9244, and final\
+    \ loss 2.2955 versus 2.2860 while eliminating unequal task-module clipping scales."
+  status: queued
+  created_revision: 385
+  ranking_rationale: 'Keep the reserved full-width projection first. Put the clipping
+    retry next: the rejected four-partition run measured unequal scaling within the
+    task network, and the proposed two-partition change directly addresses that confound
+    without repeating the run. Queue plane-conditioned statistics after the existing
+    gradient-centralization idea; it changes normalization within a shared backbone,
+    unlike the measured independent-plane-backbone run. Leave periodic backbone sharpness
+    proposed: its local sharpness hypothesis is unmeasured, replay is complex, and
+    its estimated runtime has only about 67 seconds of headroom. All admitted proposals
+    have satisfied admission dependencies. No queued idea is parked.'
+- id: rn18-plane-conditioned-upper-statistics
+  mechanism_id: plane-conditioned-normalization
+  parent_idea_id: null
+  title: Separate upper-stage normalization statistics by plane while sharing convolution
+    and affine parameters
+  opportunity: "The incumbent's macro AUC barely changes across epochs 7\u20139 despite\
+    \ falling loss and persistent gradients. Its source combines all planes in each\
+    \ upper-stage BatchNorm calculation; plane identity is available before encoding.\
+    \ Mixed plane distributions may compromise normalization even when convolutional\
+    \ features should remain shared. Plane-conditioned feature moments have not been\
+    \ measured, so this is a hypothesis. The rejected independent-backbone experiment\
+    \ does not isolate it because it also changed convolutional parameters, readouts,\
+    \ supervision and duration."
+  mechanism: Partition minibatch and running mean/variance by axial, coronal and sagittal
+    plane in every layer3/layer4 normalizer, including downsample branches. Keep one
+    shared affine weight/bias and one shared convolutional backbone. Initialize all
+    three running-statistic copies from the loaded pretrained state. Convolutions
+    still process the combined image batch; only normalization gathers and scatters
+    by plane. Training updates each present plane's statistics; evaluation uses its
+    corresponding stored statistics. Empty planes receive no update. Preserve the
+    incumbent normalization equation and its coefficients.
+  precedents:
+  - "run_curves/full_detail, rn18-more-triplets: epochs 7\u20139 \xD71 macro AUC 0.9241\u2192\
+    0.9244, loss 2.3080\u21922.2860; stage4 gradient RMS remains approximately 0.0003."
+  - modeling/model.py:encode_batch already constructs token_plane before _encode_images;
+    _backbone_from_stride_8 currently executes shared layer3/layer4 normalization
+    over the combined batch.
+  - "rn18-plane-backbones-dense-fusion was rejected at \u0394\u22120.003292; it used\
+    \ independent plane backbones, additional plane supervision and eight epochs.\
+    \ Those changes are absent here."
+  - The external plane-backbone-dsu idea adds stochastic feature-statistics augmentation
+    inside independent EfficientNet backbones; it does not separate deterministic
+    normalization statistics in a shared backbone.
+  - '[Chang et al., Domain-Specific Batch Normalization](https://arxiv.org/abs/1906.03950)
+    separates domain-specific normalization while sharing other parameters. Using
+    acquisition plane as the domain and retaining shared affine parameters are adaptations
+    proposed here.'
+  novelty: Separates statistical populations without duplicating learned convolutional
+    features or adding plane heads. It differs from pooled Batch Renormalization,
+    which addresses batch-versus-running discrepancies while still combining planes.
+  coverage: All studies and all existing planes, using existing acquisition metadata.
+    Sampling, geometry, token count, losses and evaluation multipliers remain unchanged.
+  exploitation: Log plane image counts, upper-stage running-mean/variance separation,
+    normalization-output RMS difference from counterfactual pooled statistics on sampled
+    training batches, and normalizer affine-gradient RMS. Positive output difference
+    at epoch 0 establishes activation. Retain stem/stage drift and gradient RMS, plus
+    head drift. Plane statistics and per-label curves remain diagnostics; macro adoption
+    is unchanged.
+  budget: "Keep 10 epochs, 36 triplets and batch 8 at the current incumbent seed.\
+    \ No extra convolution or token pass is required. The 1,476.7 s incumbent leaves\
+    \ 150.7 s for indexed normalization and diagnostics. Rough estimate: 1,500\u2013\
+    1,620 s, with material implementation uncertainty. Restrict counterfactual output\
+    \ diagnostics to sampled batches and retain the fixed training-time range."
+  implementation: Add the normalizer under src/knee_abnormality/modeling, replace
+    layer3/layer4 normalizers after pretrained loading, and pass the existing plane
+    vector through the encoding path. Keep lower-stage normalization, DSU, shared
+    affine parameters, projection and all heads. Add diagnostics in training/lightning.py.
+    Retain both accepted incumbent ideas. If pooled Batch Renormalization becomes
+    incumbent, partition its statistics and corrections by plane while retaining its
+    accepted equation and ramp; do not restore a rejected normalization method. Remove
+    the superseded pooled-statistic execution for affected modules.
+  open_choices: Upper-stage scope and three plane groups are fixed. The unresolved
+    questions are whether their feature moments differ usefully and whether separating
+    them introduces excessive sampling noise. The running Batch Renormalization result
+    is not a prerequisite.
+  dependencies: []
+  priority_rationale: 'Second: a distinct normalization hypothesis with direct source
+    support and broad label coverage. It preserves shared feature learning and avoids
+    the compute and supervision changes of the rejected plane-backbone family.'
+  source_change: true
+  targeted_curve: "rn18-more-triplets, epochs 5\u20139: improve the 0.9232\u21920.9244\
+    \ macro-AUC tail despite continuing loss reduction. Diagnose whether plane-conditioned\
+    \ moments make upper-stage learning more useful; PF OA and lateral-meniscus plateaus\
+    \ are exploratory indicators."
+  status: queued
+  created_revision: 385
+  ranking_rationale: 'Keep the reserved full-width projection first. Put the clipping
+    retry next: the rejected four-partition run measured unequal scaling within the
+    task network, and the proposed two-partition change directly addresses that confound
+    without repeating the run. Queue plane-conditioned statistics after the existing
+    gradient-centralization idea; it changes normalization within a shared backbone,
+    unlike the measured independent-plane-backbone run. Leave periodic backbone sharpness
+    proposed: its local sharpness hypothesis is unmeasured, replay is complex, and
+    its estimated runtime has only about 67 seconds of headroom. All admitted proposals
+    have satisfied admission dependencies. No queued idea is parked.'
+- id: rn18-periodic-backbone-sharpness
+  mechanism_id: optimizer-sharpness
+  parent_idea_id: null
+  title: Use occasional backbone sharpness-aware updates within the existing ten-epoch
+    budget
+  opportunity: The incumbent's loss continues falling after epoch 5 while macro AUC
+    gains only about 0.0012. Larger backbone rates and prolonged high-rate training
+    increased drift without improving adoption. This motivates changing update direction
+    using local loss geometry rather than increasing movement. Sharpness has not been
+    measured. The incumbent also has lower logged final loss than ReXNet, although
+    their input and dropout settings differ, so persistent underfitting alone is insufficient
+    justification.
+  mechanism: After the first warmup epoch, perform one backbone-only SAM perturbation
+    every 16 optimizer steps. On those steps, compute the normal fixed loss and unscaled
+    gradients, perturb trainable backbone parameters by epsilon=0.05*g/(||g||2+1e-12),
+    and recompute the same loss on the same stochastic realization. Restore backbone
+    parameters exactly, then make one ordinary AdamW update using second-pass task-network
+    gradients and first-pass scanner-classifier gradients. Other steps use the incumbent
+    update. Apply incumbent gradient transformations consistently and clipping once
+    to the final update gradients. Optimizer moments and scheduler advance once per
+    batch.
+  precedents:
+  - "run_curves/full_detail, rn18-more-triplets: epochs 5\u20139 loss 2.3467\u2192\
+    2.2860, \xD71 macro AUC 0.9232\u21920.9244; layer4 drift nearly stops at 0.2214\
+    \ despite nonzero gradients."
+  - The backbone-rate and schedule-shape ledgers record unsuccessful increases in
+    movement. Neither candidate measured local loss sensitivity or used a perturbed-gradient
+    update.
+  - '[Foret et al., Sharpness-Aware Minimization](https://arxiv.org/abs/2010.01412)
+    optimizes loss in a parameter neighborhood and reports generalization gains, including
+    fine-tuning experiments. Sparse scheduling and backbone-only perturbations are
+    proposed adaptations, not established results from that paper.'
+  novelty: Introduces a local parameter-space ascent/descent calculation. It neither
+    averages weights nor duplicates the registered second-moment-memory and gradient-centralization
+    proposals. Its sparse cadence makes a two-pass mechanism plausible within the
+    runtime ceiling.
+  coverage: All studies retain their ordinary update and all labels retain the same
+    objectives. Approximately one in sixteen post-warmup batches receives an additional
+    evaluation; no additional studies are sampled.
+  exploitation: Log executed SAM-step count, perturbation norm, paired non-scanner-classifier
+    loss increase, and RMS difference between first- and second-pass backbone gradients.
+    Positive applied descent-gradient difference at epoch 1 establishes activation.
+    Log exact-restoration residual and normalization update counts. Report ordinary
+    first-pass loss once, alongside existing per-stage/head drift and gradients. Sharpness
+    diagnostics cannot alter the macro adoption rule.
+  budget: Keep 10 epochs, batch 8 and 36 triplets at the supervisor's incumbent seed.
+    Approximately 246 extra forward/backward passes add about 5.6% to batch computation.
+    Scaling the 1,476.7 s parent gives roughly 1,560 s before implementation overhead,
+    leaving about 67 s below 1,627.32 s. This is an estimate, not a measured runtime;
+    ordinary every-step SAM would not fit.
+  implementation: Implement the two-pass optimizer-step control in training/lightning.py,
+    with small state/perturbation helpers under modeling if needed. Replay CPU/device
+    RNG and augmentation/dropout draws; restore pre-first-pass normalization state
+    before replay, then retain only the first pass's running-statistic updates. Suppress
+    duplicate metrics and restore original weights before clipping, updating or checkpointing.
+    Preserve the detached scanner-classifier update from the first pass. Retain accepted
+    input, dropout, normalization, projection and optimizer transformations from any
+    newly accepted incumbent; this method adds sparse perturbation steps rather than
+    replacing those improvements.
+  open_choices: Fix radius 0.05, cadence 16 and backbone-only perturbation for this
+    attempt. Sparse perturbations may be too infrequent to matter, and sharpness control
+    may impair fitting. Replay bookkeeping and compatibility with any newly accepted
+    normalization require careful implementation within the existing precision/harness
+    behavior.
+  dependencies: []
+  priority_rationale: 'Third: a genuinely different optimizer mechanism with plausible
+    generalization value, but weaker local evidence and greater implementation/runtime
+    uncertainty than the clipping retry or plane statistics.'
+  source_change: true
+  targeted_curve: "rn18-more-triplets, epochs 5\u20139: improve macro AUC beyond its\
+    \ nearly flat late tail while ordinary loss continues declining. Target better\
+    \ validation return from nonzero gradients without reproducing the excessive drift\
+    \ of rn18-backbone-lr-1e-4."
+  status: proposed
+  created_revision: 385

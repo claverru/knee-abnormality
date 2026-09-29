@@ -13,10 +13,10 @@ from pydantic import Field
 from pydantic_settings import SettingsError
 
 from knee_abnormality.cli import CLISettings
-from knee_abnormality.data.labels import STUDY
 from knee_abnormality.data.preprocessing.dicom import PREPARATION_ERRORS, read_frame
 from knee_abnormality.data.preprocessing.series import index_series
 from knee_abnormality.data.sources import SERIES
+from knee_abnormality.data.splits import STUDY
 from knee_abnormality.provenance import copy_sources, sha256_file
 
 TYPE = ["Anatomical_Plane", "Fluid_Sensitive", "Fat_Suppression"]

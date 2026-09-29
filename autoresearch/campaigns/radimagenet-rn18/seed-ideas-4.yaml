@@ -1,0 +1,56 @@
+ideas:
+- id: asymmetric-focal-loss
+  mechanism_id: disease-loss
+  parent_idea_id: null
+  title: 'Asymmetric focal loss for the disease targets: gamma+ 0, gamma- 2, negative probability shift
+    0.05'
+  opportunity: User seed, unrelated to RadImageNet, meant to transfer to the champion recipe. Most label-study
+    pairs are easy negatives; the class-balanced BCE spends much of its gradient on them. ASL down-weights
+    easy negatives and drops near-zero negatives, which the multi-label literature reports helps ranking
+    metrics such as AUC.
+  mechanism: 'Replace the disease BCE with ASL on the soft targets y: loss = -[y * (1-p)^g+ * log p +
+    (1-y) * p_m^g- * log(1-p_m)] with p = sigmoid(logit), g+ = 0, g- = 2 and p_m = max(p - 0.05, 0), per
+    label and study, keeping the incumbent''s class-balance weights and masking exactly as the BCE does.
+    Auxiliary losses (half-knee, report attributes, scanner confusion) are unchanged.'
+  precedents:
+  - 'Ridnik et al. 2021, Asymmetric Loss for multi-label classification (arXiv 2009.14119): g+ 0, g- 4,
+    shift 0.05 as defaults.'
+  - Class-balanced BCE adoption and exponent 0.5 (current recipe).
+  novelty: First focal-type loss in the project.
+  coverage: All studies and the twelve disease labels.
+  exploitation: Log the mean ASL positive and negative terms per epoch and the share of negatives with
+    p below the shift (zero loss); per-label AUC against the incumbent.
+  budget: Same as the incumbent.
+  implementation: New option trainer.disease_loss (bce | asymmetric_focal with gamma_positive, gamma_negative,
+    negative_shift) in config.py and the loss in the Lightning module; the incumbent keeps bce.
+  open_choices: 'None for the first run: g+ 0, g- 2, shift 0.05 (user).'
+  dependencies: &id001 []
+  priority_rationale: User seed; runs after the RadImageNet seeds.
+- id: soft-label-101-bins
+  mechanism_id: disease-head
+  parent_idea_id: null
+  title: Predict 101 bins per label and train each to the bin of its soft label
+  opportunity: User seed, unrelated to RadImageNet, meant to transfer to the champion recipe. The soft
+    targets encode graded confidence (0.85 is not 1); a sigmoid with BCE regresses toward them, while
+    a distribution over bins can represent uncertain and multimodal cases and gives the ranking a finer
+    signal.
+  mechanism: 'Each disease label gets a 101-way softmax over bins 0..100 (bin k means probability k/100)
+    instead of one sigmoid logit. Training: cross-entropy to the bin round(100 * y) of the soft target
+    y (0.85 -> bin 85), with the incumbent''s class-balance weights and masking per label and study. The
+    output probability used for validation, prediction and AUC is the expected value sum_k softmax_k *
+    k/100. Auxiliary heads and losses unchanged.'
+  precedents:
+  - Distributional or ordinal-bin heads for probabilistic targets (e.g. label distribution learning).
+  - Soft rebuild_state_v2 targets (current labels).
+  novelty: First distributional head in the project.
+  coverage: All studies and the twelve disease labels.
+  exploitation: Log the mean bin entropy and the mean absolute gap between expected value and soft target
+    per epoch; per-label AUC against the incumbent.
+  budget: Same as the incumbent; 12 x 101 outputs instead of 12.
+  implementation: New option model.disease_head (sigmoid | bins with count 101) in config.py and model.py,
+    the bin cross-entropy in the Lightning module, and the expected value wherever the model output becomes
+    a probability (validation, prediction, export).
+  open_choices: 'None for the first run: nearest bin, expected value (user defaults).'
+  dependencies: *id001
+  priority_rationale: User seed; runs after the RadImageNet seeds.
+exhausted_directions: None; user seeds outside the RadImageNet topic.

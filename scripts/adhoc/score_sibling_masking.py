@@ -13,8 +13,8 @@ from sklearn.metrics import roc_auc_score
 from knee_abnormality.cli import CLISettings
 from knee_abnormality.config import INFERENCE_BATCH_SIZE, load_config
 from knee_abnormality.data.dataset import build_data_loader
-from knee_abnormality.data.labels import STUDY, TARGET_THRESHOLD, load_split
 from knee_abnormality.data.preprocessing.device import with_images
+from knee_abnormality.data.splits import STUDY, TARGET_THRESHOLD, load_split
 from knee_abnormality.evaluation.metrics import bootstrap_auc
 from knee_abnormality.inference.checkpoint import checkpoint_model, read_checkpoint
 from knee_abnormality.inference.engine import (

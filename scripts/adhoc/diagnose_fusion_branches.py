@@ -14,7 +14,7 @@ from pydantic_settings import SettingsError
 from knee_abnormality.cli import CLISettings
 from knee_abnormality.config import INFERENCE_BATCH_SIZE, load_config
 from knee_abnormality.data.dataset import build_data_loader
-from knee_abnormality.data.labels import STUDY
+from knee_abnormality.data.splits import STUDY
 from knee_abnormality.evaluation.metrics import validation_metrics
 from knee_abnormality.evaluation.predictions import make_prediction_frame
 from knee_abnormality.inference.checkpoint import load_checkpoint_model

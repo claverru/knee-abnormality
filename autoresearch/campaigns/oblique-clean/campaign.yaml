@@ -7,6 +7,9 @@ additional_evidence_runs:
 backlog:
   refill_below: 4
   refill_to: 5
+  rotate_after: 6
+budget:
+  mode: sealed
 policy:
   editable_files:
     - configs/training.yaml
@@ -25,6 +28,7 @@ policy:
     data.series_types: [max_images]
   input_identity_keys: [preprocessing_identity]
   require_source_change: true
+  configuration_only_ideas: false
   developer_instructions: >-
     Implement the mechanism and update configs/training.yaml only to enable it.
     New data settings belong under data.oblique and new model settings under

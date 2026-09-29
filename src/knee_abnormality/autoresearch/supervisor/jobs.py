@@ -265,6 +265,8 @@ class JobMixin:
             owner_path = directory / "owner.json"
             launcher_path = directory / "launcher.json"
             if alive(optional_json(owner_path)) or alive(optional_json(launcher_path)):
+                if job["kind"] == "training":
+                    self.watch_training(job)
                 continue
             if time.time() - job["created_at"] < 10:
                 continue

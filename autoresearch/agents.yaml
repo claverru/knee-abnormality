@@ -25,5 +25,5 @@ claude:
     model: claude-opus-5-5
     effort: xhigh
   developer:
-    model: claude-sonnet-5
+    model: claude-sonnet-5-5
     effort: high

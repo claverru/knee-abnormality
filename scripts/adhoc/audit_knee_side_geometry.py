@@ -13,8 +13,8 @@ from pydantic_settings import SettingsError
 from sklearn.metrics import roc_auc_score
 
 from knee_abnormality.cli import CLISettings
-from knee_abnormality.data.labels import STUDY
 from knee_abnormality.data.sources import SERIES
+from knee_abnormality.data.splits import STUDY
 from knee_abnormality.provenance import copy_sources, sha256_file
 from scripts.adhoc.audit_knee_laterality import text_sides
 
@@ -393,6 +393,7 @@ def analyze(settings):
         Path(__file__),
         Path("src/knee_abnormality/cli.py"),
         Path("src/knee_abnormality/data/labels.py"),
+        Path("src/knee_abnormality/data/splits.py"),
         Path("src/knee_abnormality/data/sources.py"),
         Path("src/knee_abnormality/provenance.py"),
         Path("scripts/adhoc/audit_knee_laterality.py"),

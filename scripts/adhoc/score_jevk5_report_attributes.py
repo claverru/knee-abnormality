@@ -12,7 +12,7 @@ from pydantic import Field
 from tqdm import tqdm
 
 from knee_abnormality.cli import CLISettings, describe
-from knee_abnormality.data.labels import STUDY
+from knee_abnormality.data.splits import STUDY
 from knee_abnormality.provenance import copy_sources, sha256_file
 
 MODEL = "alibiserikbay/JevK5"

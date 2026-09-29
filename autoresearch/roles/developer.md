@@ -15,6 +15,13 @@ reserved until training launches.
   intact, and never read validation labels into a training mechanism.
 - Do not choose, sweep or randomize seeds; the supervisor sets the incumbent's seed.
 - Check `campaign_defects` so the candidate does not repeat earlier failures.
+- Under a range `budget`, fit the training-time ceiling by making the mechanism cheaper, not by
+  shortening the run: vectorize it, keep it on the GPU without per-series Python loops, keep
+  uint8 image transfer, and keep diagnostics out of the per-batch preparation path. Change
+  `trainer.max_epochs`, batch size or input per study only when the proposed idea is that
+  schedule or input change. A run projected more than 2% over the ceiling after its second
+  epoch is stopped as invalid; a mechanism that cannot fit at the incumbent's schedule is
+  blocked, not shortened.
 
 ## Integration plan
 
@@ -29,7 +36,26 @@ Describe the final diff relative to `parent_source`:
   behavior has no idea ID.
 - Do not remove a prerequisite of a retained accepted method; replace that method
   explicitly if the mechanism requires it.
-- A blocked report uses `integration: null`.
+- A blocked report uses `integration: null` and `activation: null`.
+
+## Activation signature
+
+A prepared report declares `activation`, the code-checked proof that the mechanism ran
+([activation check](../lifecycle.md#activation-check)):
+
+- `metric` is the exact column the candidate writes to `metrics.csv` through Lightning's
+  CSV logger. If no existing column proves the mechanism acted, log one with `self.log`
+  in the Lightning module, or an equivalent logging path, as part of the source change.
+  Prefer an epoch-level aggregate (`on_epoch=True`), which is always written; with
+  `on_step=True` as well the column gains an `_epoch` or `_step` suffix.
+- Measure the mechanism itself: masked tokens, applied-batch fraction, auxiliary loss or
+  a gradient norm on new parameters. A generic loss or a configuration value does not
+  prove a code path ran.
+- `comparison` and `threshold` separate a run where the mechanism acted from one where
+  it did not; the check uses the largest finite value logged through `epoch`.
+- `epoch` is 0 unless the mechanism is gated by a warm-up, and below the sealed epochs.
+- A failed signature stops the run as invalid and returns it to you as a repair; fix
+  the mechanism, or a signature that does not measure it.
 
 ## Checks and report
 
