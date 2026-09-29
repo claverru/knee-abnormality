@@ -269,9 +269,15 @@ the fix keep the old shape, and `loading_summary` no longer reads them.
 
 ## Only inference benefits
 
-Headers are parsed once per worker per series and cached for the run (`_slice_index`,
-`persistent_workers: true`), local disk has no NFS round trip to hide, and loader wait was under
-0.06% of GPU step time
+Headers are parsed once per worker that meets a series and cached in that worker's dataset for the
+rest of the run (`_slice_index`, `persistent_workers: true`); the cache is not shared between
+workers. Shuffling moves studies between workers, so a synthetic probe with the training settings
+(16 workers, 10 epochs, one visit per study per epoch) reached 7.6 distinct workers per study, with
+the per-epoch miss fraction falling from 0.94 in epoch 1 to 0.55 in epoch 9. That duplicated metadata
+work stays off the critical path: epoch 1–9 durations (validation included) of the 2026-09-28
+fold-0 runs are flat while the miss fraction falls, 103–106 s for `radimagenet-resnet10t` and 107–113 s
+for `radimagenet-resnet18` and `-adjacent`. Local disk has no NFS round trip to hide, and loader wait
+was under 0.06% of GPU step time on the older ResNeXt recipe
 ([threading profile](../../data-preparation/threading-inside-dataset-loading.md#results-and-decision)).
 
 Re-measured on the current recipe, 2026-09-18 (`compare-header-implementations`, 256 studies, batch

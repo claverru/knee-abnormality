@@ -63,6 +63,8 @@ findings doc holds the question, method, command and result.
 | Script | Question | Findings |
 |---|---|---|
 | [compare_local_and_public_scores.py](compare_local_and_public_scores.py) | Which local metric tracks the public score across comparable submissions? | [Local and public metrics](../../docs/validation/results/2026-09-18-local-public-metric-comparison.md) |
+| [rescore_campaign_comparisons.py](rescore_campaign_comparisons.py) | Which autoresearch verdicts change when past comparisons are re-scored against another frozen label set? | [2026-09-28 campaign re-scoring](../../docs/validation/results/2026-09-28-campaign-rescoring.md) |
+| [correlate_submission_metrics.py](correlate_submission_metrics.py) | Which local metric and label set track the public score across S23–S77, and do fixed labels judge label changes? | [2026-09-28 update](../../docs/validation/results/2026-09-18-local-public-metric-comparison.md#2026-09-28-update) |
 | [compare_across_splits.py](compare_across_splits.py) | How does a run on a new split compare with runs on the old one? | [Combined labels first run](../../docs/validation/results/2026-09-21-combined-labels-first-run.md) |
 | [score_temperature_sweep.py](score_temperature_sweep.py) | Which attention temperature and image multiplier score best? | [Combined labels first run](../../docs/validation/results/2026-09-21-combined-labels-first-run.md) |
 | [simulate_loss_ensembles.py](simulate_loss_ensembles.py) | Would ensembling the losses-campaign runs beat seeds? | [Loss ensembles](../../docs/validation/results/2026-09-21-loss-ensemble-simulation.md) |

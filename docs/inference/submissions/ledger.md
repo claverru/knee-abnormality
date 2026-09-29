@@ -1,6 +1,6 @@
 # Submission ledger
 
-All 77 Kaggle competition submissions, newest first, with submission times in UTC. The table is
+All 80 Kaggle competition submissions, newest first, with submission times in UTC. The table is
 regenerated from the live submission list and the local bundles by
 [`update_submission_ledger`](../../../scripts/tools/update_submission_ledger.py),
 which also writes `outputs/submission/kaggle-ledger.json`. The dated records in this folder cover
@@ -75,6 +75,9 @@ head); the Label column gives the Kaggle label wherever it differs.
 
 | S | Submitted (UTC) | Label | Inference | Fold 0 | Public | ID | Record |
 |---|---|---|---|---|---:|---:|---|
+| S80 | 2026-09-29 07:33 | ens ReXNet v2 control (τ 0.75) + RadImageNet RN18 (τ 0.9), both 36 triplets, fold 0; two bundles, two passes | x4 36trip bs4 | (x1, fold 0) 0.924637 / 0.924370 | 0.949 | — | [Single-pass mixed-source ensembles](../../backlog/refactors/single-pass-mixed-source-ensembles.md) |
+| S79 | 2026-09-29 07:13 | RadImageNet RN18 36trip no-SD fold0 (Kaggle description says S78) | x4 tau0.9 bs4 | (x1, fold 0) 0.924370 | 0.944 | 56666712 | [RN18 attention temperature](../../validation/results/2026-09-29-rn18-attention-temperature.md) |
+| S78 | 2026-09-29 06:37 | rexnet rebuild-state-v2 control fold0 ep09 (Kaggle description says S79) | x4 tau0.75 bs4 | (x1, fold 0) 0.924637 | 0.944 | 56665597 | [Label rebuild](../../public-labels/label-rebuild.md) |
 | S77 | 2026-09-28 11:46 | 3xReXNet plane dense fusion fold4 ep09 | x4 tau0.75 bs4 | (x1, fold 4) 0.907878 | 0.945 | 56639652 | [Plane-specialization campaign](../../validation/results/2026-09-28-plane-specialization-campaign.md) |
 | S76 | 2026-09-28 11:00 | rexnet rebuild-state labels fold4 ep09 | x4 tau0.75 bs4 | (x1, fold 4) 0.897726 | 0.947 | 56638577 | [Label rebuild](../../public-labels/label-rebuild.md) |
 | S75 | 2026-09-28 10:26 | rexnet rebuild-mean labels fold4 ep09 | x4 tau0.75 bs4 | (x1, fold 4) 0.901624 | 0.946 | 56637797 | [Label rebuild](../../public-labels/label-rebuild.md) |

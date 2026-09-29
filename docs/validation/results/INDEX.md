@@ -2,6 +2,7 @@
 
 | Read when | Document |
 |---|---|
+| Checking which autoresearch verdicts change when every past comparison is re-scored on `rebuild_state_v2` (5 of 151 flip; the OA detector flip matches S58; token-dropout passes are noise; plane-contrast readouts is the retry candidate), and which main adoptions lose their local support (anatomical strengths, smoothing, DSU; none turns harmful) | [2026-09-28 campaign re-scoring](2026-09-28-campaign-rescoring.md) |
 | Reviewing the plane-specialization campaign (one EfficientNet-B0 per plane: label-to-plane partitions and routing, dense per-plane readouts, fusion variants, per-plane heads and auxiliaries, DSU per plane), its transfer to three ReXNet-200s (S73/S74/S77), the τ sweep on plane models and the averaging of tied runs | [2026-09-28 plane-specialization campaign](2026-09-28-plane-specialization-campaign.md) |
 | Checking how much the control loses when it sees one plane only (axial −0.061, coronal −0.043, sagittal −0.039 macro), which plane each label relies on (ACL sagittal, MCL coronal, Effusion and Baker's axial), without retraining | [2026-09-27 single-plane inference](2026-09-27-single-plane-inference.md) |
 | Reviewing EfficientNet-B3 on the current recipe (weight-scaled backbone LR, LR, epoch and augmentation-removal arms; second round of head-rate, warmup and cosine-floor arms), its gap to ReXNet, the two-epoch warmup that edges past it and the +0.0029 B3 + ReXNet pair | [2026-09-27 B3 overnight queues](2026-09-27-b3-overnight-queue.md) |
@@ -36,9 +37,10 @@
 | Reviewing per-plane sampler widths on cached tokens | [2026-09-18 per-plane sigma on the cache](2026-09-18-per-plane-sigma-cache.md) |
 | Comparing EfficientNet backbones | [2026-09-18 EfficientNet backbone results](2026-09-18-efficientnet-backbone-results.md) |
 | Comparing EfficientNet-B0 batch-size and learning-rate queues | [2026-09-18 b0 hyperparameter queues](2026-09-18-b0-hyperparameter-queues.md) |
-| Comparing local metrics with public scores | [2026-09-18 local-public metric comparison](2026-09-18-local-public-metric-comparison.md) |
+| Comparing local metrics with public scores: which label set and multiplier track the leaderboard (updated 2026-09-28 through S77), gold-only AUC, label-switch home advantage | [Local-public metric comparison](2026-09-18-local-public-metric-comparison.md) |
 | Reviewing count-normalized attention | [2026-09-17 count-normalised attention](2026-09-17-count-normalized-attention-result.md) |
 | Comparing validation-x1 controls and unseeded sampler and hyperparameter runs | [2026-09-18 overnight results](2026-09-18-overnight-results.md) |
+| Choosing τ for the RadImageNet ResNet-18 incumbent (peak 0.9–1.0, not 0.75) | [2026-09-29 RN18 attention temperature](2026-09-29-rn18-attention-temperature.md) |
 | Reviewing attention temperature and bag size | [2026-09-17 attention temperature](2026-09-17-attention-temperature.md) |
 | Reviewing random per-type triplet allocation | [2026-09-17 random per-type allocation](2026-09-17-allocation-concentration-result.md) |
 | Reviewing test-time triplet allocation | [2026-09-17 test-time allocation](2026-09-17-test-time-allocation.md) |

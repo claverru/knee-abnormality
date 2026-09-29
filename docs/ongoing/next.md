@@ -10,9 +10,6 @@ current control at its fold and seed.
 
 Pending:
 
-- **Submit the new control:** `rebuild-state-v2-control` (`rebuild_state_v2`,
-  `all_5fold_scanner_v2`, fold 0, seed 1533697213, ×4 0.928288); export and submit it at ×4,
-  τ 0.75, batch 4 ([state](state.md#current-control)).
 - **Overnight queue:** the ReXNet `trainer.max_epochs: 12` run against the current control
   ([overnight queue](../backlog/overnight.md#next-queue)).
 - **Decide on the `inference-opt` branch.** It runs the Kaggle command in about 270 s against
