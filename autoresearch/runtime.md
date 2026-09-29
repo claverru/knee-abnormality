@@ -15,7 +15,11 @@ its YAML policy and contract. The first successful start seals the provider, rol
 profiles, source, recipe, campaign policy, GPU and resource limits. The launcher
 returns immediately; closing the terminal or interactive agent session does not
 stop the supervisor or its jobs. [agents.yaml](agents.yaml) determines each role's
-model and effort, including the restricted completion reporter. Both CLIs must use
+model and effort, including the restricted completion reporter. Models are families, so
+each job gets the newest one: Claude resolves its `opus`, `sonnet` and `haiku` aliases
+itself, and Codex families resolve at job launch to the highest listed `gpt-<version>-<family>`
+in `~/.codex/models_cache.json`, which every `codex exec` refreshes; the job's
+`assignment.json` records the resolved slug. Both CLIs must use
 subscription authentication; API credentials and provider overrides are removed
 from child environments. There is no API fallback.
 

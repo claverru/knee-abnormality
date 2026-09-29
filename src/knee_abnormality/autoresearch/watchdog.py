@@ -26,7 +26,11 @@ from knee_abnormality.autoresearch.runtime.layout import (
     campaign_fold,
     fold_dir,
 )
-from knee_abnormality.autoresearch.runtime.providers import codex_command, preflight
+from knee_abnormality.autoresearch.runtime.providers import (
+    codex_command,
+    preflight,
+    resolved,
+)
 from knee_abnormality.autoresearch.runtime.storage import (
     alive,
     atomic_write,
@@ -158,9 +162,12 @@ def run_repair(root, attempt, incident, permitted):
 """
     )
     atomic_write(attempt / "stdin.txt", prompt)
-    profile = yaml.safe_load((root / "autoresearch/agents.yaml").read_text())["codex"][
-        "watchdog"
-    ]
+    profile = resolved(
+        "codex",
+        yaml.safe_load((root / "autoresearch/agents.yaml").read_text())["codex"][
+            "watchdog"
+        ],
+    )
     write_json(
         attempt / "assignment.json",
         {

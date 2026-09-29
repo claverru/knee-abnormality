@@ -63,6 +63,23 @@ MONTHS = (
 WEEKDAYS = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
 UNITS = {"d": 86400, "h": 3600, "m": 60, "s": 1}
 LIMIT_FALLBACK_SECONDS = 3600
+CODEX_SLUG = re.compile(r"gpt-(?P<version>\d+(?:\.\d+)*)-(?P<family>[a-z]+)")
+
+
+def codex_model(family):
+    return max(
+        (tuple(int(part) for part in match["version"].split(".")), model["slug"])
+        for model in read_json(Path.home() / ".codex/models_cache.json")["models"]
+        if model["visibility"] == "list"
+        and (match := CODEX_SLUG.fullmatch(model["slug"]))
+        and match["family"] == family
+    )[1]
+
+
+def resolved(provider, profile):
+    if provider == "codex":
+        return {**profile, "model": codex_model(profile["model"])}
+    return dict(profile)
 
 
 def codex_command(profile, schema: Path, output: Path, sandbox_mode, *options):

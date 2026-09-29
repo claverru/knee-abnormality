@@ -116,7 +116,10 @@ class JobMixin:
             self.route_completion(
                 payload["event"], {"status": "assigned", "job": job_id}
             )
-        profile = dict(self.state["profiles"][self.state["provider"]][role])
+        profile = providers.resolved(
+            self.state["provider"],
+            self.state["profiles"][self.state["provider"]][role],
+        )
         command = providers.invocation(
             self.state["provider"],
             REPORTS[role],

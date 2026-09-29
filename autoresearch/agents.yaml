@@ -1,29 +1,29 @@
 codex:
   orchestrator:
-    model: gpt-6-sol
+    model: sol
     effort: medium
   completion_reporter:
-    model: gpt-6-luna
+    model: luna
     effort: low
   researcher:
-    model: gpt-6-astra
+    model: astra
     effort: xhigh
   developer:
-    model: gpt-6-sol
+    model: sol
     effort: high
   watchdog:
-    model: gpt-6-luna
+    model: luna
     effort: medium
 claude:
   orchestrator:
-    model: claude-opus-5-5
+    model: opus
     effort: medium
   completion_reporter:
-    model: claude-haiku-4-5
+    model: haiku
     effort: null
   researcher:
-    model: claude-opus-5-5
+    model: opus
     effort: xhigh
   developer:
-    model: claude-sonnet-5-5
+    model: sonnet
     effort: high

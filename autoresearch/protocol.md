@@ -179,8 +179,8 @@ campaign ideas.
 
 ## Restricted completion reporting
 
-Use Haiku 4.5 with no effort override for Claude and GPT-6 Luna at low effort for
-Codex, as recorded in [agents.yaml](agents.yaml). Eligibility is code-owned:
+Use the newest Haiku with no effort override for Claude and the newest Luna at low effort
+for Codex, as recorded in [agents.yaml](agents.yaml). Eligibility is code-owned:
 
 - The fixed decision is `reject`, with a recorded implementation approval, and the
   attempt still awaits its decision against the current incumbent.
