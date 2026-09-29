@@ -463,7 +463,10 @@ class TopicLoop(JobMixin):
         job_id, directory = self.create_job(
             role, source, [], payload={"rotation": rotation["id"]}
         )
-        profile = dict(self.state["profiles"][self.state["provider"]][role])
+        profile = providers.resolved(
+            self.state["provider"],
+            self.state["profiles"][self.state["provider"]][role],
+        )
         command = providers.invocation(
             self.state["provider"], TOPIC_REPORTS[role], profile, source, directory
         )

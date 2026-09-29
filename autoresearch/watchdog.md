@@ -4,7 +4,7 @@ The optional watchdog checks the [topic loop](topic-rotation.md) and the campaig
 or one campaign run outside the loop, once a minute using ordinary Python. Healthy checks
 make no model requests. A paused campaign or dead supervisor triggers recovery: a plain
 resume for a rejected-report pause, otherwise one Codex repair session using the Codex
-`watchdog` profile in [agents.yaml](agents.yaml), GPT-6 Luna at medium effort. A dead loop
+`watchdog` profile in [agents.yaml](agents.yaml), the newest Luna at medium effort. A dead loop
 process, or a live one stuck on the same error for 30 minutes, gets a plain relaunch, then the
 same repair flow. Each campaign keeps its own
 research provider; a Claude campaign remains Claude.
