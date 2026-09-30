@@ -77,6 +77,9 @@ up to 0.008 for the Bulgarian cluster.
 
 - **Losing 23% of the training data cost almost nothing on seen sites** (−0.0009, inside
   noise). Nearly all of the held-out loss is the site being unseen.
+- **It replaces the leave-one-scanner-out diagnostic** once proposed in the big-bets backlog.
+  An unverified competitor README claimed a random split inflates AUC by about 0.05 through
+  scanner memorization; holding out whole sites costs about 0.01 here.
 - **The bootstrap covers evaluation noise only.** Training-seed noise for macro AUC on a full
   fold is about 0.0017. On 224 studies it is likely larger, and it enters the held-out Δ
   directly, so the true interval is wider than shown.
