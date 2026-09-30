@@ -6,7 +6,7 @@ codex:
     model: luna
     effort: low
   researcher:
-    model: astra
+    model: sol
     effort: xhigh
   developer:
     model: sol
