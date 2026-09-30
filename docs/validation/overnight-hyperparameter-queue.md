@@ -41,8 +41,9 @@ The launcher snapshots the training config into validated YAML files under a uni
 `outputs/training/overnight-<UTC timestamp>-<suffix>/configs/` directory. Split, fold and seed come
 from the config, so every run shares the control config's split, fold and seed. Same seed and same training sources reproduce bit-identically,
 so the control is an already-trained run (`CONTROL_RUN`), not retrained: the launcher refuses to
-prepare a queue whose base config differs from the control's saved `input_config.yaml` in anything
-but `name` and `paths.output_root`. Each candidate differs from it only by its listed override.
+prepare a queue whose base config differs from the control's saved `effective_config.json` in
+anything but `name` and `paths.output_root`; the two manifest paths are compared from their
+`configs/` directory on, so a control trained from a worktree still matches. Each candidate differs from it only by its listed override.
 
 ### EfficientNet-B3, second round (ran 2026-09-27)
 

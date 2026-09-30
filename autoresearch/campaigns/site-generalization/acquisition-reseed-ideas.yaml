@@ -1,0 +1,20 @@
+ideas:
+- id: site-acquisition-channel-selective-reseed
+  mechanism_id: acquisition-channel-selective-normalization
+  parent_idea_id: site-acquisition-channel-selective-normalization
+  title: Re-run the channel-selective acquisition normalization unchanged against the fresh-seed incumbent
+  opportunity: 'site-acquisition-channel-selective-normalization was rejected only by the seen-site guard (held-out +0.001475, 80% [+0.000148, +0.002802]; seen -0.002323) against the adopted ArcFace run. That run was a lucky draw: its fresh-seed rerun with identical source and config (site-incumbent-reseed-20260930T082402Z, now the incumbent by user decision) scores -0.0022 held-out and -0.0033 seen against it, and all 14 candidates on it lost seen-site AUC (median -0.0022). Against the rerun, the channel-selective candidate is about +0.0037 held-out and +0.0010 seen (cross-seed, weak), and its sibling site-acquisition-half-channel-normalization about +0.0032 and +0.0008. This is the only family with a repeatable held-out gain; it needs a same-seed comparison against the unbiased reference.'
+  mechanism: 'Exactly the mechanism of site-acquisition-channel-selective-normalization, unchanged: at bn1 in each of the two layer1 blocks, keep the ordinary BN output B and compute the masked acquisition-normalized output A for the same first 32 channels with the shared pretrained affine parameters; output B + a_c (A - B) with one learned coefficient per affected channel and block, initialized to 1, bounded to [0, 1] in the forward pass and projected after optimizer updates, trained at the head learning rate without weight decay or L2-SP; ordinary BN for the remaining channels. No new choices.'
+  precedents:
+  - 'site-acquisition-channel-selective-normalization, this campaign (held-out +0.001475 [+0.000148, +0.002802], seen -0.002323 against the adopted run).'
+  - 'site-acquisition-half-channel-normalization, this campaign (held-out +0.000995, seen -0.0025 against the adopted run).'
+  - 'site-incumbent-reseed-20260930T082402Z, this campaign (same recipe, fresh seed: -0.0022 held-out, -0.0033 seen against the adopted run).'
+  novelty: None in mechanism; the first same-seed measurement of the family against an unselected reference.
+  coverage: All training studies.
+  exploitation: Held-out-site AUC and seen-site guard against the fresh-seed incumbent, plus the learned coefficients per block and channel at the end of training, as logged by the original run.
+  budget: Identical to site-acquisition-channel-selective-normalization.
+  implementation: 'Port the candidate diff unchanged: outputs/autoresearch/site-generalization/experiments/site-acquisition-channel-selective-normalization-20260930T070754Z-4f07a19f/changes.diff (its source directory holds the full files). The parent source is identical to that run''s parent apart from the seed, so the diff applies as is; change nothing else.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: 'Forced by Claude under the user''s delegation after the user-ordered fresh-seed reference replacement showed that the seen-site guard rejected this family against a lucky draw.'
+exhausted_directions: Linear scanner erasure (learned subspace and LEACE) and DRO variants are measured and hurt held-out sites.

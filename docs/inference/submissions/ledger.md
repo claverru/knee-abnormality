@@ -1,6 +1,6 @@
 # Submission ledger
 
-All 80 Kaggle competition submissions, newest first, with submission times in UTC. The table is
+All 86 Kaggle competition submissions, newest first, with submission times in UTC. The table is
 regenerated from the live submission list and the local bundles by
 [`update_submission_ledger`](../../../scripts/tools/update_submission_ledger.py),
 which also writes `outputs/submission/kaggle-ledger.json`. The dated records in this folder cover
@@ -75,6 +75,12 @@ head); the Label column gives the Kaggle label wherever it differs.
 
 | S | Submitted (UTC) | Label | Inference | Fold 0 | Public | ID | Record |
 |---|---|---|---|---|---:|---:|---|
+| S86 | 2026-09-30 17:27 | RN18 L2-SP no confusion f0 t0.9 | x4 tau0.9 bs4 | (x1, fold 0) 0.924507 | 0.943 | 56714526 | [RN18 L2-SP without confusion head](../../validation/results/2026-09-30-rn18-l2sp-no-confusion.md) |
+| S85 | 2026-09-30 12:20 | RN18 sites-out L2-SP+ArcFace f0 t0.9 (sites-out split) | x4 tau0.9 bs4 | (x1, fold 0 seen sites) 0.924518 | 0.940 | 56707163 | [Site-generalization prior work](../../../autoresearch/campaigns/site-generalization/prior-work.md) |
+| S84 | 2026-09-30 12:18 | RN18 sites-out L2-SP f0 t0.9 (sites-out split) | x4 tau0.9 bs4 | (x1, fold 0 seen sites) 0.925349 | 0.943 | 56707112 | [Site-generalization prior work](../../../autoresearch/campaigns/site-generalization/prior-work.md) |
+| S83 | 2026-09-30 12:18 | RN18 sites-out control f0 t0.9 (sites-out split) | x4 tau0.9 bs4 | (x1, fold 0 seen sites) 0.925173 | 0.941 | 56707111 | [Site-generalization prior work](../../../autoresearch/campaigns/site-generalization/prior-work.md) |
+| S82 | 2026-09-29 21:00 | RN18 control no-SD 26trip f0 t0.9 | x4 tau0.9 bs4 | (x1, fold 0) 0.923840 | 0.943 | 56687489 | [RN18 L2-SP without confusion head](../../validation/results/2026-09-30-rn18-l2sp-no-confusion.md) |
+| S81 | 2026-09-29 16:52 | RN18 attributes v4 f0 t0.9 | x4 tau0.9 bs4 | (x1, fold 0) 0.922590 | 0.942 | 56682502 | [Report attribute extraction](../../ongoing/report-attribute-extraction.md) |
 | S80 | 2026-09-29 07:33 | ens ReXNet v2 control (τ 0.75) + RadImageNet RN18 (τ 0.9), both 36 triplets, fold 0; two bundles, two passes | x4 36trip bs4 | (x1, fold 0) 0.924637 / 0.924370 | 0.949 | — | [Single-pass mixed-source ensembles](../../backlog/refactors/single-pass-mixed-source-ensembles.md) |
 | S79 | 2026-09-29 07:13 | RadImageNet RN18 36trip no-SD fold0 (Kaggle description says S78) | x4 tau0.9 bs4 | (x1, fold 0) 0.924370 | 0.944 | 56666712 | [RN18 attention temperature](../../validation/results/2026-09-29-rn18-attention-temperature.md) |
 | S78 | 2026-09-29 06:37 | rexnet rebuild-state-v2 control fold0 ep09 (Kaggle description says S79) | x4 tau0.75 bs4 | (x1, fold 0) 0.924637 | 0.944 | 56665597 | [Label rebuild](../../public-labels/label-rebuild.md) |

@@ -1,0 +1,19 @@
+ideas:
+- id: site-arcface-per-label-pooled
+  mechanism_id: cross-site-metric-learning
+  parent_idea_id: site-arcface-prototypes
+  title: Angular-margin prototypes on each label's own attention-pooled feature, the one the disease head classifies
+  opportunity: 'site-arcface-prototypes (reject, held-out -0.00003) applied the margin to one mean-pooled token vector per study that had to sit near the true prototype of all 12 labels at once. That geometry is infeasible: the logged angle to the true prototype ended near 1.85 rad, on the far side of the sphere. It also shaped a representation the disease head does not use, since each label attention-pools its own feature. The idea was not tested on the representation where site-specific evidence would affect decisions.'
+  mechanism: 'For each label t, take the disease head''s attention-pooled study feature for t (the pooled[b, t] the head multiplies by its weight row), L2-normalize it, and score it against two learned per-label prototypes (present, absent): logits s cos(theta), with the additive angular margin on the true prototype, s cos(theta + m), s 16, m 0.2. Cross-entropy on hard targets at 0.5, each study weighted by |2y - 1| of its soft target, weight 0.3 beside the unchanged disease loss; dropped at inference.'
+  precedents:
+  - Deng et al. 2019, ArcFace.
+  - site-arcface-prototypes, this campaign, and its logged angles (true-prototype angle 1.48 to 1.85 rad over training).
+  novelty: The first test on the per-label pooled features.
+  coverage: All training studies and labels.
+  exploitation: Held-out-site AUC, seen-site guard, and per epoch the cosine to the true prototype per site cluster, separately for positives and negatives, and its across-cluster spread.
+  budget: One extra normalization and 24 prototype products per study; negligible.
+  implementation: 'Expose the per-label pooled features from modeling/model.py''s attention pooling (return them alongside the logits in training only, leaving prediction unchanged); an auxiliary head in training/auxiliary with site_generalization.arcface_weight, margin and scale; log the positive and negative true-prototype cosines per site cluster.'
+  open_choices: None; weight, margin and scale are fixed before the run.
+  dependencies: []
+  priority_rationale: 'User request after the first run''s diagnosis: the mechanism was mis-targeted, not refuted.'
+exhausted_directions: The mean-pooled token variant (site-arcface-prototypes) is done; this is its per-label retake.

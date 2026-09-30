@@ -59,6 +59,7 @@ def build_optimizer(
     model: KneeAbnormalityModel,
     settings: OptimizerConfig,
     heads: tuple[torch.nn.Module, ...],
+    anchored_backbone_names: frozenset[str],
 ) -> AdamW:
     groups: dict[tuple[float, float], list[torch.nn.Parameter]] = {}
     named = [
@@ -75,7 +76,11 @@ def build_optimizer(
         learning_rate = (
             settings.backbone_lr if name.startswith("backbone.") else settings.head_lr
         )
-        weight_decay = 0.0 if parameter.ndim < 2 else settings.weight_decay
+        weight_decay = (
+            0.0
+            if parameter.ndim < 2 or name in anchored_backbone_names
+            else settings.weight_decay
+        )
         groups.setdefault((learning_rate, weight_decay), []).append(parameter)
     return AdamW(
         [
@@ -327,14 +332,19 @@ class KneeModule(L.LightningModule):
         )
         with torch.random.fork_rng(devices=[]):
             self.report_attribute_heads = ReportAttributeHeads(attributes)
-        self.scanner_targets = load_scanner_groups(
-            config.paths.data_root.parent / STUDY_HEADERS
-        )
-        prior, counts = scanner_group_prior(config.split_dir, fold, self.scanner_targets)
-        self.register_buffer("scanner_prior", prior, persistent=False)
-        self.scanner_group_counts = counts
-        with torch.random.fork_rng(devices=[]):
-            self.scanner_confusion_head = ScannerConfusionHead()
+        self.scanner_confusion_head = None
+        self.scanner_group_counts = None
+        if config.trainer.scanner_confusion_weight > 0:
+            self.scanner_targets = load_scanner_groups(
+                config.paths.data_root.parent / STUDY_HEADERS
+            )
+            prior, counts = scanner_group_prior(
+                config.split_dir, fold, self.scanner_targets
+            )
+            self.register_buffer("scanner_prior", prior, persistent=False)
+            self.scanner_group_counts = counts
+            with torch.random.fork_rng(devices=[]):
+                self.scanner_confusion_head = ScannerConfusionHead()
         self.weight_averaging = config.optimizer.weight_averaging
         self._last_averaged_step = -1
         self.batch_norm_refresh_seconds = 0.0
@@ -367,7 +377,9 @@ class KneeModule(L.LightningModule):
                     "table_sha256": SCANNER_TABLE_SHA256,
                     "groups": list(SCANNER_GROUPS),
                     "training_group_counts": self.scanner_group_counts,
-                },
+                }
+                if self.scanner_confusion_head is not None
+                else None,
             }
         )
         backbone = self.model.backbone
@@ -377,11 +389,27 @@ class KneeModule(L.LightningModule):
                 backbone, backbone.group_matcher(coarse=True)
             ).items()
         }
-        self.backbone_origin = {
-            name: parameter.detach().float().cpu().clone()
-            for name, parameter in backbone.named_parameters()
-            if parameter.ndim > 1
-        }
+        settings = config.optimizer
+        self.anchor_parameters: list[tuple[str, torch.nn.Parameter, str, float]] = []
+        self.backbone_origin = {}
+        early_anchors = 0
+        for index, (name, parameter) in enumerate(backbone.named_parameters()):
+            if parameter.ndim < 2:
+                continue
+            early = name.startswith(("conv1.", "bn1.", "layer1."))
+            early_anchors += early
+            alpha = settings.anchor_alpha_early if early else settings.anchor_alpha_late
+            if alpha > 0:
+                buffer_name = f"anchor_weight_{index}"
+                self.register_buffer(buffer_name, parameter.detach().float().clone())
+                self.anchor_parameters.append((name, parameter, buffer_name, alpha))
+            else:
+                self.backbone_origin[name] = parameter.detach().float().cpu().clone()
+        if settings.anchor_alpha_early > 0 and not early_anchors:
+            raise ValueError(
+                "optimizer.anchor_alpha_early matches no backbone layer; the early "
+                "anchor is defined by ResNet stem and layer1 names"
+            )
 
     def forward(self, batch: dict) -> torch.Tensor:
         return self.model(batch)
@@ -467,11 +495,18 @@ class KneeModule(L.LightningModule):
             batch_size=1,
         )
         parameters = dict(self.model.backbone.named_parameters())
+        anchor_buffers = {
+            name: buffer_name for name, _, buffer_name, _ in self.anchor_parameters
+        }
         for stage, names in self.backbone_stages.items():
             moved = origin = 0.0
             for name in names:
-                if name in self.backbone_origin:
-                    start = self.backbone_origin[name]
+                if name in self.backbone_origin or name in anchor_buffers:
+                    start = (
+                        getattr(self, anchor_buffers[name]).detach().float().cpu()
+                        if name in anchor_buffers
+                        else self.backbone_origin[name]
+                    )
                     current = parameters[name].detach().float().cpu()
                     moved += float((current - start).square().sum())
                     origin += float(start.square().sum())
@@ -613,7 +648,17 @@ class KneeModule(L.LightningModule):
         )
         loss = loss + self.config.trainer.half_knee_loss_weight * auxiliary
         loss = loss + self._report_attribute_step(encoded, batch)
-        loss = loss + self._scanner_confusion_step(encoded, batch)
+        if self.scanner_confusion_head is not None:
+            loss = loss + self._scanner_confusion_step(encoded, batch)
+        if self.anchor_parameters:
+            anchor_penalty = sum(
+                alpha * (parameter.float() - getattr(self, buffer_name)).square().sum()
+                for _, parameter, buffer_name, alpha in self.anchor_parameters
+            )
+            loss = loss + anchor_penalty
+            self._log_epoch_metric(
+                "anchor_penalty", anchor_penalty, len(batch["study_uid"])
+            )
         self.log(
             "half_knee_loss",
             auxiliary,
@@ -901,7 +946,12 @@ class KneeModule(L.LightningModule):
         optimizer = build_optimizer(
             self.model,
             settings,
-            (self.report_attribute_heads, self.scanner_confusion_head),
+            tuple(
+                head
+                for head in (self.report_attribute_heads, self.scanner_confusion_head)
+                if head is not None
+            ),
+            frozenset(f"backbone.{name}" for name, _, _, _ in self.anchor_parameters),
         )
         total_steps = self.trainer.estimated_stepping_batches
         steps_per_epoch = max(

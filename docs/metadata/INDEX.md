@@ -12,4 +12,5 @@
 | Investigating coordinate-based knee-side inference | [Knee-side coordinate investigation](knee-side-coordinate-investigation.md) |
 | Reviewing knee-side assignment and abstention rules | [Knee-side policy audit](knee-side-policy-audit.md) |
 | Comparing label rates across scanner vendors | [Vendor label associations](vendor-label-associations.md) |
+| Judging whether the hidden test holds sites or vendors absent from training, and which training sites can be inferred from report language and scanner (the 19 plus 3 contributing institutions, the Italian and Mongolian gap) | [Sites and test composition](sites-and-test-composition.md) |
 | Auditing series exclusions and plane or contrast labels | [Series filtering and cleaning census](series-filtering-census.md) |

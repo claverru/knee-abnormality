@@ -45,33 +45,16 @@ SUMMARY_HEADER = [
 
 QUEUE_SECONDS = 5 * 60 * 60
 RUN_ALLOWANCE_SECONDS = 35 * 60
-CONTROL_RUN = (
-    ROOT
-    / "outputs/training/overnight-20260927T003247Z-kdc9bncm/runs/02-backbone-lr-0.00045"
-)
+CONTROL_RUN = ROOT / "outputs/training/rn18-l2sp-no-confusion"
 
-BASE_CHANGES = {
-    "model": {
-        "backbone": "efficientnet_b3.ra2_in1k",
-        "feature_statistics_augmentation": {"probability": 0.0},
-    },
-    "optimizer": {"backbone_lr": 0.00045},
-}
+BASE_CHANGES = {}
 
-EXPERIMENTS = (
-    ("01-head-lr-0.0009", {"optimizer": {"head_lr": 0.0009}}),
-    ("02-head-lr-0.0004", {"optimizer": {"head_lr": 0.0004}}),
-    ("03-warmup-2", {"optimizer": {"warmup_epochs": 2}}),
-    ("04-warmup-0", {"optimizer": {"warmup_epochs": 0}}),
-    ("05-minimum-lr-ratio-0.1", {"optimizer": {"minimum_lr_ratio": 0.1}}),
-    ("06-minimum-lr-ratio-0.001", {"optimizer": {"minimum_lr_ratio": 0.001}}),
-    ("07-epochs-20", {"trainer": {"max_epochs": 20}}),
-)
+EXPERIMENTS = ()
 
 
 class OvernightCLI(CLISettings):
     model_config = describe(
-        "Run the queued EfficientNet-B3 experiments against a saved control run on the "
+        "Run the queued ResNet-18 experiments against a saved control run on the "
         "control config's fold and seed within a five-hour budget"
     )
 
@@ -134,6 +117,9 @@ def comparable(values: dict) -> dict:
     values = deepcopy(values)
     values.pop("name")
     values["paths"].pop("output_root")
+    for key in ("label_manifest", "report_attribute_manifest"):
+        parts = Path(values["paths"][key]).parts
+        values["paths"][key] = "/".join(parts[len(parts) - 1 - parts[::-1].index("configs") :])
     return values
 
 
@@ -141,7 +127,7 @@ def prepare_queue(
     config_path: Path,
 ) -> tuple[Path, list[Path], dict[str, list[str]]]:
     base = merge(load_config(config_path).model_dump(mode="json"), BASE_CHANGES)
-    control = load_config(CONTROL_RUN / "input_config.yaml").model_dump(mode="json")
+    control = json.loads((CONTROL_RUN / "effective_config.json").read_text())
     if comparable(control) != comparable(base):
         raise ValueError(
             f"Control run {CONTROL_RUN} differs from the queue base config"

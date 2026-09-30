@@ -1,4 +1,4 @@
-# Project state (2026-09-29)
+# Project state (2026-09-30)
 
 What is in force now: the recipe, the control candidates pair with, the best public submissions and
 the rules every comparison depends on. Pending work is in [next](next.md), active lines have their
@@ -13,14 +13,15 @@ measured outcomes are in the [validation results](../validation/results/INDEX.md
   [`rebuild_state_v2`](../public-labels/label-rebuild.md#a2-common-state-scale-and-the-zhen-lineage-fix-2026-09-28)
   (A2 of the label rebuild) and the label-stratified split
   [`all_5fold_scanner_v2`](../validation/project-validation-protocol.md#all_5fold_scanner_v2), fold 0,
-  fresh seed 1533697213 (`configs/training.yaml`). The evidence is one fold-4 pair: A, the pre-fix
+  seed 1533697213 (`configs/training.yaml`); the 2026-09-30 adoption kept both (user decision). The evidence is one fold-4 pair: A, the pre-fix
   version of A2, scored 0.947 public (S76) against 0.946 for S73, one rounding step; A2's fold-0
   control scored 0.944 (S78), not comparable with those fold-4 runs. The autoresearch gate requires both the label source and the split.
 - **Model:** the [current model](../modeling/current-model.md), since 2026-09-29 on a
   RadImageNet ResNet-18 (`configs/training.yaml`): repeated middle slice, `backbone_lr` 5e-5, no
   series dropout, 26 triplets, spatial tokens with knee geometry, the three-compartment OA
-  detector, training-only report-attribute and scanner confusion heads, the half-stack
-  augmentation and class-balanced BCE at exponent 0.5. The ReXNet-200 recipe it replaced is
+  detector, training-only report-attribute heads, L2-SP weight anchoring (since 2026-09-30, which
+  also removed the scanner confusion head), the half-stack augmentation and class-balanced BCE at
+  exponent 0.5. The ReXNet-200 recipe it replaced is
   `configs/rexnet-200.yaml`; submit ResNet-18 bundles at τ 0.9 and ReXNet at τ 0.75.
 - **Preprocessing identity:** hashed-source changes apply to fresh runs only. A new export or local
   prediction from a checkpoint trained under an earlier identity is refused by
@@ -31,12 +32,16 @@ measured outcomes are in the [validation results](../validation/results/INDEX.md
 
 ## Current control
 
+- **`rn18-l2sp-no-confusion`** (`outputs/training/rn18-l2sp-no-confusion`), the
+  `configs/training.yaml` recipe since 2026-09-30: ×4 0.928062 (×1 0.92451, epoch 9 of 10, fold 0,
+  seed 1533697213), 0.943 public (S86). Every candidate pairs with it at its fold and seed; the
+  adoption did not rotate fold or seed (user decision)
+  ([result](../validation/results/2026-09-30-rn18-l2sp-no-confusion.md)).
 - **`rn18-no-series-dropout`**
   (`outputs/autoresearch/radimagenet-rn18/experiments/rn18-no-series-dropout-20260928T213320Z-0b780262/training`),
   the `configs/training.yaml` recipe apart from name and paths: ×4 0.927806 (×1 0.92384, epoch 9 of
-  10, fold 0, seed 1533697213). Unsubmitted; its 36-triplet successor scored 0.944 (S79). It was
-  trained in the campaign, so exports use its archived `source/`. Every candidate pairs with it at
-  its fold and seed.
+  10, fold 0, seed 1533697213), 0.943 public (S82), the control before the 2026-09-30 adoption.
+  It was trained in the campaign, so exports use its archived `source/`.
 - **`rebuild-state-v2-control`** (`outputs/training/20260928-150724-rebuild-state-v2-control`), the
   `configs/rexnet-200.yaml` control: ×4 0.928288, 0.944 public (S78) at ×4, τ 0.75.
 - **No local score on `all_5fold_scanner_v1` is comparable** with a run on the new split
@@ -72,7 +77,8 @@ measured outcomes are in the [validation results](../validation/results/INDEX.md
   adoptions were decided by the user on paired public scores
   ([adoption history](../modeling/current-model.md#adoption-history)).
 - **Fold and seed rotation:** candidates use their control's fold and seed; each adoption merged
-  into main retrains the control with a fresh seed on the next fold. Never compare scores across
+  into main retrains the control with a fresh seed on the next fold, except the 2026-09-30
+  adoption, which kept fold 0 and its seed (user decision). Never compare scores across
   folds or splits ([rule](../validation/validation-strategy.md#controlled-comparisons)).
 - **Validation and prediction density:** epoch validation at ×1 (since 2026-09-17) selects the
   checkpoint on hard `val_macro_auc`; saved predictions, comparisons and the autoresearch rule score
@@ -107,6 +113,12 @@ measured outcomes are in the [validation results](../validation/results/INDEX.md
 
 ## Recently closed
 
+- **2026-09-30:** the `site-generalization` autoresearch campaign on the sites-out split, stopped
+  by the user, and its manual follow-up: L2-SP weight anchoring was the only mechanism that
+  reproducibly helped held-out sites and was adopted with the confusion head's removal; the
+  unseen-site cost is mostly between-site label-rate offsets, which image-feature debiasing does
+  not address ([mechanism audit](../../autoresearch/campaigns/site-generalization/mechanism-audit.md),
+  [campaign](../../autoresearch/campaigns/site-generalization/INDEX.md)).
 - **2026-09-29:** the `radimagenet-rn18` autoresearch campaign: 23 decided, no series dropout and 36
   training triplets adopted; 36 triplets deferred to the endgame for iteration speed
   ([campaign](../../autoresearch/campaigns/radimagenet-rn18/INDEX.md)). The loop's next topic,

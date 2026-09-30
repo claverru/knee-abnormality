@@ -20,6 +20,7 @@ findings doc holds the question, method, command and result.
 |---|---|---|
 | [audit_metadata.py](audit_metadata.py) | What do the official CSVs contain (schemas, coverage, report duplicates, gold labels)? | [Official CSV audit](../../docs/metadata/official-csv-audit.md) |
 | [normalize_reports.py](normalize_reports.py) | How many distinct reports remain after multilingual normalization? | [Report normalization](../../docs/metadata/report-normalization.md) |
+| [infer_training_sites.py](infer_training_sites.py) | Which report languages and sites does training contain, and are the officially listed Italian and Mongolian sites absent? (needs `--with langdetect`) | [Sites and test composition](../../docs/metadata/sites-and-test-composition.md) |
 | [audit_knee_laterality.py](audit_knee_laterality.py) | What explicit and textual knee-side evidence do the DICOMs carry? | [Knee-side metadata audit](../../docs/metadata/2026-09-14-knee-side-metadata-audit.md) |
 | [audit_knee_side_geometry.py](audit_knee_side_geometry.py) | Can physical geometry alone resolve the knee side? | [Knee-side coordinates](../../docs/metadata/knee-side-coordinate-investigation.md) |
 

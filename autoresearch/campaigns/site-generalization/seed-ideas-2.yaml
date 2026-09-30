@@ -1,0 +1,72 @@
+ideas:
+- id: site-augmix-consistency
+  mechanism_id: augmentation-consistency
+  parent_idea_id: null
+  title: Two appearance-augmented views of each training study and a Jensen-Shannon consistency penalty
+    between their predictions
+  opportunity: Augmentation exposes the model to styles but does not ask it to ignore them. A consistency
+    term makes predictions invariant to appearance, the property an unseen site tests.
+  mechanism: Each training study is encoded twice with independent draws of the recipe's appearance augmentations
+    (intensity, noise, smoothing, resolution, GIN; same geometry and sampling), the disease loss is applied
+    to the first view, and a Jensen-Shannon divergence between the two views' per-label sigmoid outputs
+    is added with weight 1. Epochs are reduced to keep training inside the range.
+  precedents:
+  - Hendrycks et al. 2020, AugMix (robustness and uncertainty under distribution shift).
+  novelty: No consistency term has been tried.
+  coverage: All training studies.
+  exploitation: Held-out-site AUC, seen-site guard, the consistency term per epoch and the epoch count
+    used.
+  budget: About twice the forward cost per study; 6-7 epochs keep training inside 458-1,374 s.
+  implementation: A site_generalization.consistency_weight option; the second view in the Lightning module's
+    training step with the augmentation module re-drawn; log the divergence; set trainer.max_epochs to
+    fit the range.
+  open_choices: Weight 0.5 or 2; the second view without GIN.
+  dependencies: []
+  priority_rationale: Solid robustness evidence, but it costs epochs.
+- id: site-confusion-retarget
+  mechanism_id: site-confusion
+  parent_idea_id: null
+  title: Retarget the scanner confusion head from the 8 scanner groups to the training site clusters
+  opportunity: The confusion head removes scanner-group information, but the site signal the held-out
+    sites carry mixes vendor, protocol and language-bound conventions. Site clusters are the closer target,
+    and the bounded KL keeps the head from bending features.
+  mechanism: The existing detached confusion head predicts the 12 site clusters plus other instead of
+    the 8 scanner groups; the bounded KL toward the training cluster frequencies and its weight 0.1 and
+    ramp stay as they are.
+  precedents:
+  - Scanner confusion head, adopted at 0.948 against 0.947 (prior-work.md); the finer scanner-model target
+    lost publicly, the stronger head too.
+  novelty: The confusion target has never been a site proxy.
+  coverage: All training studies.
+  exploitation: Held-out-site AUC, seen-site guard, the head's accuracy against the cluster majority rate
+    and entropy, and the confusion KL per epoch.
+  budget: Unchanged.
+  implementation: A site_generalization.confusion_target option (scanner_group or site_cluster) in config.py;
+    the targets and prior from the pinned table in training/auxiliary/scanner_confusion.py and the Lightning
+    module; log the head's accuracy and loss against the cluster baselines.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The one adopted site mechanism, pointed at the variable the held-out cost is about.
+- id: site-group-dro
+  mechanism_id: robust-objective-over-sites
+  parent_idea_id: null
+  title: GroupDRO over training site clusters on the disease loss
+  opportunity: Large clusters (English Philips 589, English GE 479) dominate the loss; a model that does
+    well on the worst training site should transfer better to an unseen one.
+  mechanism: Keep an exponentiated-gradient weight per site cluster (step 0.01), updated from each cluster's
+    running disease loss, and weight each study's disease loss by its cluster weight normalized to mean
+    one. Class-balance weights stay as they are.
+  precedents:
+  - Sagawa et al. 2020, GroupDRO.
+  novelty: No robust objective over sites has been tried.
+  coverage: All training studies.
+  exploitation: Held-out-site AUC, seen-site guard, per-cluster weights and losses per epoch.
+  budget: No extra forward passes.
+  implementation: site_generalization.group_dro_step in config.py, the weights in the Lightning module's
+    training step, clusters from the pinned table; log each cluster's weight and loss.
+  open_choices: Step 0.001 or 0.1.
+  dependencies: []
+  priority_rationale: A standard robust objective, low cost, distinct from feature-level methods.
+exhausted_directions: Gradient reversal, stronger or finer scanner removal, output-level site offsets
+  and centering, confusion-weight sweeps, generic DSU and conditioning on vendor or site are closed or
+  excluded (prior-work.md).

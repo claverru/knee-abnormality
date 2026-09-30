@@ -1,0 +1,38 @@
+ideas:
+- id: site-scanner-subspace-projection
+  mechanism_id: scanner-subspace-erasure
+  parent_idea_id: null
+  title: Learn an angular-margin scanner-identity embedding on detached, unprojected tokens and erase its 8-dimensional subspace from every token the model pools
+  opportunity: 'Removing site information helps unseen sites: site-confusion-retarget gave the largest held-out gain so far (+0.0016) but cost seen sites (-0.0017), because its KL pressure acts on the whole backbone. Site identity stays linearly decodable from the pooling tokens (a detached head reached 0.267 accuracy on 13 clusters against 0.180 majority, still rising at the last epoch). Erasing a small, learned scanner subspace from the tokens removes the style the disease head can read, without an adversarial push on the backbone; the seen-site guard measures any case-mix cost.'
+  mechanism: 'Full erasure, no orthogonalization against the disease head (user decision): the disease logit is linear in the pooled tokens, so a subspace orthogonal to the head rows would leave the direct readout unchanged. (1) Identity head: a training-only linear map W (256 to 8, no bias) reads the normalized pooling tokens BEFORE projection, detached; the embeddings are mean-pooled over each studys visually valid tokens, L2-normalized and scored by ArcFace (s 16, m 0.2) against learned prototypes of the scanner-model x field-strength identities with at least 30 studies in the runs training folds; studies of other identities are excluded from this loss only. (2) Basis: each training step, with no gradient, Q = orthonormal basis of Ws row space by QR of W^T (256 x 8); log its rank. (3) Projection: P = I - r Q Q^T, with r rising linearly from 0 to 1 over epoch 0 (per step) and 1 afterwards. P is applied in _pooling_tokens right after mil_norm, so attention scores, pooled values, the OA detector and every auxiliary that reads half_knee_tokens (half-knee, report attributes, scanner confusion) and the incumbents per-label ArcFace pooled feature all see projected tokens. (4) Inference: P is a persistent, non-trainable buffer inside KneeAbnormalityModel, saved in the checkpoint and used by validation, held-out prediction and export, with no scanner input. The disease loss and all incumbent options are unchanged.'
+  precedents:
+  - Deng et al. 2019, ArcFace (identity embeddings that transfer to unseen identities).
+  - Ravfogel et al. 2020, INLP, and Belrose et al. 2023, LEACE (linear concept erasure by projection; LEACE is least-squares optimal).
+  - Dinsdale et al. 2021, unlearning scanner information for MRI harmonisation, which improves unseen scanners; its per-block extension suppresses domain features at several depths.
+  - site-confusion-retarget, this campaign (+0.0016 held-out, -0.0017 seen; site head 0.267 against 0.180 majority).
+  novelty: No erasure by projection has been tried; the confusion variants push the backbone instead of removing a fixed subspace.
+  coverage: All training studies; the head learns from the 93% on well-populated scanners.
+  exploitation: Held-out-site AUC and seen-site guard; per epoch the identity heads accuracy against majority, the accuracy of a separate detached linear probe on the projected tokens (should fall to majority), the mean norm of the removed token component relative to the token norm, the rank of Q, and the largest cosine between Q and the 12 disease-head rows (diagnostic only, not constrained).
+  budget: One 256 x 8 map, the identity prototypes, one QR of 256 x 8 and a 256 x 256 projection per step; negligible.
+  implementation: 'Options under site_generalization: subspace_rank (8; 0 disables everything and keeps P the identity), subspace_margin (0.2), subspace_scale (16), subspace_minimum_studies (30). Identity head and probe in training/auxiliary; identities from outputs/analysis/sharing-disagreement-20260914/study_headers.parquet (ManufacturerModelName x field group: MagneticFieldStrength >= 2 is 3T, < 2 is 1.5T, missing is unknown), counted on the splits training folds only (fold != 0 of all_5fold_scanner_v2_sites_out). The P buffer and its application in modeling/model.py: _pooling_tokens returns projected tokens, and a separate accessor returns the unprojected normalized tokens for the identity head. The buffer is registered persistent (identity at rank 0) so prediction of other runs is unchanged; the Lightning module writes P in place under no_grad each training step and never at validation or prediction. Do not change the incumbents scanner confusion, per-label ArcFace or L2-SP code.'
+  open_choices: None; rank 8, margin 0.2, scale 16 and the 30-study minimum are fixed before the run.
+  dependencies: []
+  priority_rationale: 'User proposal after the ArcFace and confusion results: learn scanner identity with ArcFace, then remove that information from the disease path. Built on top of the incumbent, so it measures what the erasure adds to the per-label ArcFace head.'
+- id: site-scanner-subspace-instead-of-arcface
+  mechanism_id: scanner-subspace-erasure
+  parent_idea_id: site-scanner-subspace-projection
+  title: 'Substitution: the scanner-subspace projection replacing the per-label ArcFace head in the incumbent'
+  opportunity: 'User request for a head-to-head: the incumbent carries the per-label ArcFace head (site-arcface-per-label-pooled, +0.0018 held-out). Both mechanisms aim at site-independent disease evidence, one by shaping each label''s pooled feature, the other by removing scanner-style directions before pooling. Measuring the projection without the ArcFace head shows whether it can replace it, or whether the two are complementary.'
+  mechanism: 'Remove the per-label ArcFace auxiliary from the incumbent by setting site_generalization.arcface_weight to 0 (its head is then not built, trained or logged; L2-SP anchoring and scanner confusion stay), and add the scanner-subspace erasure exactly as specified in site-scanner-subspace-projection: same code, options and values, full erasure without orthogonalization against the disease head, P applied after mil_norm to all pooling tokens, identity head on detached unprojected tokens, ramp over epoch 0, P saved as a model buffer and used at inference.'
+  precedents:
+  - site-arcface-per-label-pooled, this campaign (provisional_accept, +0.0018 held-out, +0.0002 seen).
+  - The precedents of site-scanner-subspace-projection.
+  novelty: The first run of the projection without the ArcFace head.
+  coverage: All training studies.
+  exploitation: 'Held-out-site AUC and seen-site guard against the incumbent, read together with site-scanner-subspace-projection: projection plus ArcFace against projection alone against ArcFace alone (the incumbent). Same per-epoch logs as the projection idea.'
+  budget: Negligible.
+  implementation: Identical code and options to site-scanner-subspace-projection; the only config difference from it is site_generalization.arcface_weight 0. If that ideas code is not in the incumbent, implement it as specified there.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: User request, to run after site-scanner-subspace-projection so the pair separates the two mechanisms.
+exhausted_directions: Unconditional confusion over scanner groups, scanner models and site clusters, gradient reversal and per-site logit offsets are measured; this is the first subspace-erasure variant.
