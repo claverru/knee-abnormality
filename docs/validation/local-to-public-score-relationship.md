@@ -15,6 +15,11 @@ against `rebuild_state_v2` agree with the leaderboard on 78–83% of pairs, agai
 favors models trained on labels like itself by about ±0.005, so a change of training labels needs
 a submission.
 
+The [2026-09-29 grouped-AUC search](results/2026-09-18-local-public-metric-comparison.md#2026-09-29-grouped-auc)
+found no better tracker that holds up out of sample. Averaging AUC over sites, scanner groups,
+scanner models, vendors or field strengths either overfits or hinges on an arbitrary
+group-size threshold. The scanner adversarial runs rank the same on every metric.
+
 What follows from that:
 
 - Keep full-fold macro AUC as the selection metric; use BCE only as supporting evidence inside one

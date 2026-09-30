@@ -98,15 +98,6 @@ validation bag. The variability may also act as useful augmentation.
 - *Stop if* the variability is negligible, the runtime cost is disproportionate, or a controlled
   run gains nothing.
 
-## Leave-one-scanner-out diagnostic
-
-**Diagnostic, unmeasured.** The scanner-stratified splits balance scanners across folds, which is right
-if the test set shares the training scanners. A split that holds out whole scanner groups would
-measure how much the model leans on scanner or site shortcuts. The gap between the two splits is
-the estimate. An unverified competitor README claims a random split inflates AUC by about 0.05
-through scanner memorization. Run it once, never as a development split, and only if a
-scanner-specific failure is suspected.
-
 ## Auxiliary-loss campaign
 
 **Requested by the user on 2026-09-22; undefined and unstarted.** An autoresearch campaign on
@@ -213,8 +204,8 @@ same architecture's general-image weights. OmniRad-S is an alternative after its
 license metadata is resolved. These require spatial mappings or patch-token adapters; they are
 not hyperparameter-only runs. Hold the current balanced-BCE recipe and data contract fixed,
 compare fresh controls, and record per-label AUC, ensemble contribution, time and memory.
-The [RadImageNet comparison](#radimagenet-pretrained-backbone) is the one medical-pretraining
-measurement with an in-competition claim behind it.
+The [RadImageNet comparison](../ongoing/radimagenet-backbone.md), now implemented, is the one
+medical-pretraining measurement with an in-competition claim behind it.
 
 OrthoFoundation-L is the strongest direct 2D knee-pretraining lead; MRI-CORE and the released
 three-plane OrthoDiffusion weights are higher-cost alternatives within this investigation.
