@@ -1,0 +1,18 @@
+ideas:
+- id: site-no-scanner-confusion
+  mechanism_id: site-confusion
+  parent_idea_id: null
+  title: 'Ablation: remove the scanner confusion head and its term from the incumbent'
+  opportunity: The scanner confusion head is the recipe's only site mechanism. It was adopted on one public rounding step (0.948 against 0.947) while losing 0.0008 locally, and its effect on unseen sites has never been measured. This campaign's held-out-site metric measures it directly.
+  mechanism: Train the incumbent without the detached scanner-group head and without its bounded KL confusion term; everything else unchanged.
+  precedents:
+  - 'Scanner confusion head adoption: S67 0.948 against S68 0.947, local -0.00076 (prior-work.md).'
+  novelty: The first measurement of the confusion head on unseen sites.
+  coverage: All training studies.
+  exploitation: 'Held-out-site AUC and seen-site guard against the incumbent. Held-out drops: the head helps unseen sites. Held-out rises: it costs generalization and should also leave the main recipe. Flat: it is dead weight.'
+  budget: Slightly cheaper than the incumbent.
+  implementation: A site_generalization.scanner_confusion option (default true, the incumbent's behaviour) in config.py; when false, the Lightning module skips building the head, its optimizer group and its loss term, and logs nothing for it. Set it to false in configs/training.yaml.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: User request. It measures the one existing site mechanism on the metric that matters for it; every other candidate is built with it present.
+exhausted_directions: None; this is a single ablation.

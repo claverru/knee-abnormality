@@ -1,0 +1,20 @@
+ideas:
+- id: site-scanner-unlearning-kl
+  mechanism_id: scanner-adversarial-unlearning
+  parent_idea_id: site-scanner-unlearning-grl
+  title: 'Bounded unlearning module: a scanner head on detached features plus a KL-toward-prior term on the live features, weight 1.0, on the L2-SP incumbent'
+  opportunity: 'site-scanner-unlearning-grl collapsed: with a gradient-reversal cross-entropy adversary at weight 1.0, the reversed gradient reached 1.8 times the disease gradient at the backbone by epoch 1, the adversary fell to 0.049 accuracy (anti-predictive, far below the 0.208 majority), training loss rose from 5.6 to 6.6 and held-out AUC fell 0.065. Reversed cross-entropy rewards the backbone for making the adversary ever more wrong. A KL term toward the training-group prior is minimal exactly when the features carry no scanner information, so it cannot reward anti-prediction. The old confusion head used this objective but was inert at weight 0.1 (about 0.1% of the loss). An earlier version of this idea (site-scanner-unlearning-bounded) asked to change trainer.scanner_confusion_weight, which the sealed campaign policy does not allow; this version adds its own module under site_generalization instead, like site-scanner-unlearning-grl did.'
+  mechanism: 'New unlearning module on the incumbent, independent of the old confusion code (which stays disabled): (1) a linear scanner head reads the study mean of the pooling tokens detached and is trained with cross-entropy on the 8 scanner groups of the existing confusion machinery, so its accuracy measures how much scanner identity the features still carry; (2) the same head, with its parameters frozen for this term, is applied to the non-detached study features, and the backbone is trained to bring the head''s predicted distribution to the training-group prior with KL(prior || prediction), weight 1.0, ramped with the existing confusion ramp. No gradient-reversal layer. Everything else is unchanged.'
+  precedents:
+  - 'site-scanner-unlearning-grl, this campaign (unbounded reversed cross-entropy collapsed).'
+  - 'Alvi et al. 2018, Turning a Blind Eye (confusion loss toward uniform predictions); Dinsdale et al. 2021, scanner unlearning with a confusion loss.'
+  - 'Mechanism audit of this campaign: the same objective at weight 0.1 never engaged.'
+  novelty: First confusion unlearning at a weight where the KL term is a meaningful share of the loss.
+  coverage: All training studies.
+  exploitation: 'Activation criterion, required before reading the AUC: the scanner head''s accuracy on detached features must fall and end within 0.03 of the 0.208 majority rate over the last two epochs (the old head rose to 0.33), and the weighted KL term must be at least 1% of the training loss. Stability check: training loss must not rise between epochs 1 and 3 and seen-site validation AUC at epoch 2 must be within 0.02 of the incumbent''s. Log per epoch: head accuracy and loss, KL, weighted KL share of the loss, ramp, and the KL gradient norm at the backbone relative to the disease gradient norm. Then held-out-site AUC and the seen-site guard.'
+  budget: One linear head; negligible.
+  implementation: 'New module in training/auxiliary with an option under site_generalization (for example site_generalization.scanner_prior_confusion_weight, 1.0), wired in training/lightning.py; reuse the scanner-group targets, prior and ramp from training/auxiliary/scanner_confusion.py. Leave site_generalization.scanner_confusion false and every trainer field unchanged. Do not reuse or keep the gradient-reversal code of site-scanner-unlearning-grl. Change nothing else.'
+  open_choices: None; weight 1.0, the existing ramp, the 8 scanner groups and the study-mean features are fixed before the run.
+  dependencies: []
+  priority_rationale: 'Forced by Claude under the user''s instruction (2026-09-30) to test unlearning properly, after the unbounded gradient-reversal attempt collapsed and the first bounded version was blocked by the configuration policy.'
+exhausted_directions: Unbounded gradient reversal on a cross-entropy scanner adversary collapses the representation.

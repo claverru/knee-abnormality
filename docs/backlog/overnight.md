@@ -13,7 +13,9 @@ from this file.
 
 ## Next queue
 
-Empty. The ReXNet-era entries were cleared on 2026-09-29, when the champion became the RadImageNet
+Empty. The no-confusion-head and L2-SP runs were answered together by one combined run and
+adopted on 2026-09-30 ([result](../validation/results/2026-09-30-rn18-l2sp-no-confusion.md)).
+The ReXNet-era entries were cleared on 2026-09-29, when the champion became the RadImageNet
 ResNet-18 ([state](../ongoing/state.md#recipe-in-force)). More epochs gained about +0.001 on
 ResNet-18 at 14 epochs for 40% more time. More input per study, meaning denser per-type budgets
 or more triplets, is [deferred to the endgame](endgame.md#test-time-augmentation) for iteration

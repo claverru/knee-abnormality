@@ -1,0 +1,20 @@
+ideas:
+- id: site-l2-sp-without-arcface
+  mechanism_id: per-label-arcface-removal
+  parent_idea_id: site-arcface-per-label-pooled
+  title: 'Leave-one-out: remove the per-label ArcFace auxiliary from the incumbent, keeping L2-SP'
+  opportunity: 'Leave-one-out validation of the incumbent at the fresh seed. Removing L2-SP (site-arcface-without-l2-sp) cost -0.0014 held-out [80% -0.0022, -0.0005] with seen-site +0.0002, reproducing its adoption gain (+0.0015) at a different seed. Per-label ArcFace was adopted at +0.0018 held-out, the same size as seed noise (a fresh-seed rerun of the final recipe moved held-out -0.0022, and the same-seed retake of channel-selective normalization did not reproduce a +0.0015 gain); it has never been removed at the fresh seed. If removing it costs about 0.0015 or more on held-out sites it stays; if it costs about nothing, the simpler recipe is preferred.'
+  mechanism: 'Remove the per-label ArcFace auxiliary from the incumbent entirely: the ArcFacePrototypes head and its construction, the training-site cluster loading it uses, its loss term, its per-site cosine buffers and logging, the pool_encoded_with_features path used only to feed it, and the site_generalization.arcface_weight, arcface_margin and arcface_scale options. Everything else is unchanged: L2-SP anchoring with its weight-decay exemption, the scanner confusion head and all optimizer settings.'
+  precedents:
+  - 'site-arcface-per-label-pooled, this campaign (held-out +0.001841 [80% +0.000152, +0.003453] on top of L2-SP at the old seed).'
+  - 'site-arcface-without-l2-sp, this campaign (removing L2-SP at the fresh seed: held-out -0.0014, reproducing its adoption gain).'
+  - 'site-incumbent-reseed-20260930T082402Z, this campaign (fresh-seed rerun of the final recipe: held-out -0.0022, seen -0.0033).'
+  novelty: First removal of per-label ArcFace at the fresh seed.
+  coverage: All training studies.
+  exploitation: Held-out-site AUC and seen-site guard against the fresh-seed incumbent; read as a leave-one-out test, where a held-out cost of about 0.0015 or more confirms ArcFace and a cost near zero favours the simpler recipe.
+  budget: Slightly cheaper than the incumbent.
+  implementation: 'Revert the per-label ArcFace change of outputs/autoresearch/site-generalization/experiments/site-arcface-per-label-pooled-20260929T203545Z-12aa2855/changes.diff: its parent source (outputs/autoresearch/site-generalization/experiments/site-l2-sp-anchor-20260929T182106Z-c1840b9a/source) shows the exact pre-ArcFace code for configs/training.yaml, src/knee_abnormality/config.py, src/knee_abnormality/modeling/model.py and src/knee_abnormality/training/lightning.py, and delete src/knee_abnormality/training/auxiliary/arcface.py. The ArcFace head was built inside torch.random.fork_rng, so removing it leaves the rest of the model initialization unchanged. Do not leave a disabled branch; change nothing else.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: 'Forced by Claude on the user''s instruction (2026-09-30) to finish the leave-one-out validation of the incumbent.'
+exhausted_directions: Removing L2-SP costs held-out AUC (reproduced); linear scanner erasure and DRO variants hurt; single-run gains near 0.0015 did not reproduce at a new seed.

@@ -1,0 +1,137 @@
+ideas:
+- id: site-arcface-prototypes
+  mechanism_id: cross-site-metric-learning
+  parent_idea_id: null
+  title: Training-only angular-margin head with present and absent prototypes per label shared across
+    all sites
+  opportunity: Shared prototypes pull every positive of a label toward one direction whatever the scanner,
+    and push negatives away by a fixed angle, compacting each label class across sites without erasing
+    the scanner.
+  mechanism: For each of the 12 labels, L2-normalize the pooled study feature and two learned prototypes
+    (present, absent); logits s cos(theta), with an additive angular margin on the true prototype, s cos(theta
+    + m), s 16, m 0.2. Cross-entropy on hard targets at 0.5, each study weighted by |2y - 1| of its soft
+    target, weight 0.1 beside the unchanged disease loss; dropped at inference.
+  precedents:
+  - Deng et al. 2019, ArcFace.
+  novelty: No margin-based or prototype auxiliary has been tried on this project.
+  coverage: All training studies and labels.
+  exploitation: Held-out-site AUC, seen-site guard, the angle to the true prototype per site cluster and
+    its spread across clusters per epoch.
+  budget: Twelve small heads; negligible.
+  implementation: An auxiliary head in training/auxiliary with site_generalization.arcface_weight, margin
+    and scale options; log the per-cluster angle and its across-cluster spread.
+  open_choices: Margin 0.1 or 0.3 after the first result.
+  dependencies: []
+  priority_rationale: The user's proposal; a class-conditional route to the same alignment as CORAL, by
+    a different mechanism.
+- id: site-l2-sp-anchor
+  mechanism_id: pretrained-feature-protection
+  parent_idea_id: null
+  title: Anchor the backbone to its RadImageNet weights (L2-SP) instead of decaying it toward zero
+  opportunity: Full fine-tuning distorts general pretrained features, which helps in-distribution but
+    hurts out-of-distribution accuracy (Kumar et al. 2022). The ResNet-18's early layers drift 2-2.5 times
+    more from their pretrained start than ReXNet's. On seen sites, L2-SP was the best of this family in
+    the RadImageNet-ResNet-18 campaign (+0.0006, rejected there); its purpose is the unseen-site metric
+    this campaign judges.
+  mechanism: Replace AdamW weight decay on backbone weights by alpha * ||w - w0||^2 toward the pretrained
+    weights w0, alpha 1e-2 on the stem and layer1 and 1e-3 on layer2-4; head and token parameters keep
+    their decay.
+  precedents:
+  - Li et al. 2018, L2-SP (arXiv 1802.01483).
+  - Kumar et al. 2022, fine-tuning distorts pretrained features and underperforms out of distribution
+    (arXiv 2202.10054).
+  - rn18-l2-sp, +0.000626 seen-site ×4 macro AUC, 80% [-0.000322, +0.001631] (radimagenet-rn18 campaign).
+  novelty: Never judged on unseen sites.
+  coverage: All studies and labels.
+  exploitation: Held-out-site AUC, seen-site guard, per-stage drift from the pretrained start and the
+    anchor penalty per epoch.
+  budget: One extra elementwise penalty per step; within the reference time.
+  implementation: Keep w0 as a frozen buffer copy; add the penalty in the Lightning module and remove
+    decay from anchored backbone groups in the optimizer setup; options site_generalization.anchor_alpha_early
+    and anchor_alpha_late; log the penalty and per-stage drift.
+  open_choices: Linear-probe then fine-tune if L2-SP helps; alpha x10 or /10.
+  dependencies: []
+  priority_rationale: The best-evidenced out-of-distribution mechanism in the list, and cheap.
+- id: site-fourier-amplitude-swap
+  mechanism_id: cross-site-appearance-randomization
+  parent_idea_id: null
+  title: Swap the low-frequency Fourier amplitude of training slices with a slice from a study of another
+    training site
+  opportunity: The held-out sites cost about 0.01 macro AUC and the lost data almost nothing, so the model
+    leans on site-specific appearance. Contrast, noise texture and intensity profile differ by scanner
+    and protocol, and low-frequency amplitude carries most of that style.
+  mechanism: During training only, with probability 0.5 per acquisition, replace the centred low-frequency
+    block (beta 0.01 of the spectrum side) of each slice's 2D Fourier amplitude with that of a slice from
+    a study of a different training site cluster, keeping the phase; apply after intensity normalization
+    and before the other image augmentations. The partner comes from the same batch when one of another
+    cluster exists, otherwise the slice is left unchanged.
+  precedents:
+  - Yang and Soatto 2020, FDA (Fourier Domain Adaptation), and FACT (Xu et al. 2021) amplitude mixing
+    for domain generalization.
+  - Augmentation-based methods are the most reliable domain-generalization baselines under honest model
+    selection (Gulrajani and Lopez-Paz 2021, DomainBed).
+  novelty: Generic DSU and GIN randomize statistics without site partners; nothing exchanges appearance
+    across sites.
+  coverage: All training studies with a partner from another site cluster in the batch.
+  exploitation: Held-out-site AUC per site, seen-site guard, and the logged fraction of acquisitions swapped
+    per epoch.
+  budget: A 2D FFT per slice on the GPU; within the reference time.
+  implementation: A new augmentation in modeling/augmentation.py driven by site_generalization.fourier_swap
+    (probability, beta), the site clusters loaded from the pinned table in the Lightning module and passed
+    with the batch; log swapped acquisitions per epoch.
+  open_choices: Beta 0.005 or 0.02 after the first result.
+  dependencies: []
+  priority_rationale: The strongest prior of the family and a direct attack on site appearance.
+- id: site-cross-mixstyle
+  mechanism_id: cross-site-feature-style-mixing
+  parent_idea_id: null
+  title: Mix instance-normalization statistics between studies of different training sites after the stem
+    and layer1 (cross-site MixStyle)
+  opportunity: Site style lives in low-level feature statistics. The recipe's DSU perturbs those statistics
+    randomly; it never moves a study toward another real site's style.
+  mechanism: During training only, with probability 0.5, replace each acquisition's channel means and
+    standard deviations after the stem and after layer1 by a Beta(0.1, 0.1) mix of its own and those of
+    an acquisition from a study of a different training site cluster in the batch; no change at inference.
+  precedents:
+  - Zhou et al. 2021, MixStyle (domain generalization with mixed feature statistics).
+  novelty: DSU is generic; no cross-site statistic exchange has been tried.
+  coverage: Acquisitions with a partner from another site cluster in the batch; logged per epoch.
+  exploitation: Held-out-site AUC, seen-site guard, the fraction of acquisitions mixed and the mean lambda
+    per epoch.
+  budget: Negligible.
+  implementation: A module in modeling/ hooked after the stem and layer1 like DSU, driven by site_generalization.mixstyle
+    (probability, alpha); the site clusters come from the pinned table through the batch; log mixed acquisitions
+    and lambda.
+  open_choices: After layer2 as well; alpha 0.3.
+  dependencies: []
+  priority_rationale: The feature-level twin of the Fourier swap, with strong domain-generalization results,
+    at no cost.
+- id: site-conditional-coral
+  mechanism_id: class-conditional-alignment
+  parent_idea_id: null
+  title: Align pooled study features across training sites within each label state (class-conditional
+    CORAL)
+  opportunity: Unconditional scanner removal (the stronger confusion variants) also erased real case mix
+    and lost publicly. Aligning features only between studies that share a label removes site style without
+    asking sites to have the same prevalence.
+  mechanism: For each label and each of its two hard states, compute the mean and covariance of the pooled
+    study embedding per training site cluster over a running buffer of recent batches, and add the average
+    squared Frobenius distance of each cluster's statistics to the pooled statistics, weight 0.05 with
+    the confusion head's ramp. The disease loss is unchanged.
+  precedents:
+  - Sun and Saenko 2016, Deep CORAL; class-conditional alignment as in conditional DG methods (Li et al.
+    2018, CIDDG).
+  novelty: No class-conditional alignment has been tried; the confusion head is unconditional.
+  coverage: Studies whose clusters have enough examples in the buffer; logged per epoch.
+  exploitation: Held-out-site AUC, seen-site guard, the alignment loss and the number of active cluster-state
+    cells per epoch.
+  budget: Covariances on 256-dimensional pooled embeddings; negligible.
+  implementation: An auxiliary module in training/auxiliary with a site_generalization.coral_weight option,
+    reading the pooled embedding the disease head uses; clusters from the pinned table; log the loss and
+    active cells.
+  open_choices: Weight 0.02 or 0.1; means only if covariances are unstable.
+  dependencies: []
+  priority_rationale: Targets the diagnosed failure of unconditional scanner removal.
+exhausted_directions: Gradient reversal, stronger or finer scanner removal, output-level site offsets
+  and centering, confusion-weight sweeps, generic DSU and conditioning on vendor or site are closed or
+  excluded (prior-work.md).

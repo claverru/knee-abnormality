@@ -1,0 +1,78 @@
+id: site-generalization
+recipe: configs/sites-out.yaml
+reference_run: outputs/training/sites-out-control
+reference_equivalences: {}
+additional_evidence_runs: []
+evaluation: held_out_sites
+backlog:
+  refill_below: 3
+  refill_to: 5
+  seed_order: forced
+  rotate_after: 1000
+budget:
+  mode: range
+  min_fraction: 0.5
+  max_fraction: 1.5
+policy:
+  editable_files:
+    - configs/training.yaml
+    - src/knee_abnormality/config.py
+    - src/knee_abnormality/data/dataset.py
+    - src/knee_abnormality/training/lightning.py
+  editable_directories:
+    - src/knee_abnormality/modeling
+    - src/knee_abnormality/training/auxiliary
+  config_keys:
+    - trainer.max_epochs
+    - trainer.batch_size
+    - trainer.accumulate_grad_batches
+  config_prefixes:
+    - model
+    - optimizer
+    - site_generalization
+    - data.intensity_augmentation
+    - data.affine_augmentation
+    - data.noise_augmentation
+    - data.smoothing_augmentation
+    - data.resolution_augmentation
+    - data.gin_augmentation
+    - data.contrast_mixing_augmentation
+    - data.reflection_augmentation
+  list_item_fields: {}
+  input_identity_keys:
+    - preprocessing_identity
+  require_source_change: true
+  configuration_only_ideas: false
+  developer_instructions: >-
+    The incumbent is the RadImageNet ResNet-18 recipe trained on all_5fold_scanner_v2_sites_out, a
+    split that removes five inferred training sites; every idea applies exactly its own change to
+    it. New options go in config.py under a new top-level site_generalization section, with the
+    incumbent's behaviour as the value that reproduces it. Training-site labels, where an idea needs
+    them, come only from the pinned table
+    outputs/analysis/training-sites-20260929/study_languages.parquet (SHA-256 8cc7d562...), as the
+    cluster language/vendor with Toshiba, Canon, FUJIFILM and Hitachi pooled as minor and clusters
+    under 30 training studies pooled as other; check its hash at load, use it in training only,
+    and never read it at prediction. Losses and auxiliaries go in the Lightning module and
+    training/auxiliary; image-space augmentation in modeling/augmentation.py; token or feature
+    changes in modeling/. Keep the disease loss, its class-balance weights, the half-knee,
+    report-attribute and scanner-confusion terms and their weights, the image size 224, the crop
+    and sampling geometry, the studies seen per epoch and the evaluation untouched, unless the
+    idea is itself the scanner-confusion retargeting. Log every new mechanism's own scalar per
+    epoch for the activation signature. New parameters initialize under a forked RNG; every random
+    draw derives from the run seed and the global step. The training time must stay within the
+    campaign's range. No weight averaging (SWA or EMA). Return prepared or blocked. Use the
+    existing Python environment for static checks. No tests.
+  researcher_instructions: >-
+    Research starts after the forced seeds. The question is how to make the model generalize to
+    imaging sites it never trained on: the incumbent loses about 0.01 macro AUC on held-out sites
+    while losing almost nothing from 23% less training data (prior-work.md). Every refill starts
+    from each decided run's held-out-site and seen-site AUC, per-held-out-site AUC and per-epoch
+    curves, and names the site-generalization failure each proposal targets. Families: appearance
+    randomization across sites, class-conditional feature alignment, cross-site metric or
+    contrastive terms, robust objectives over training sites, per-study normalization of feature
+    statistics, protection of pretrained features, consistency between augmented views, and
+    scanner or site confusion variants. Every idea needs a source change. Stay
+    inside the training-time range. Never feed site, vendor, scanner or field strength to the model
+    at prediction, and never condition on them: an unseen site has no value to condition on. No
+    weight averaging, no image size above 224, no ensembling or test-time augmentation, no label
+    changes, no gold weighting, no multi-seed runs, no confusion-weight sweeps.

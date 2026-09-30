@@ -1,0 +1,55 @@
+ideas:
+- id: site-scanner-unlearning-grl
+  mechanism_id: scanner-adversarial-unlearning
+  parent_idea_id: site-no-scanner-confusion-reseed
+  title: 'A real unlearning test: gradient-reversal scanner adversary strong enough to suppress scanner identity, on the L2-SP incumbent'
+  opportunity: 'The mechanism audit found that no unlearning ever engaged in this campaign: the base scanner-confusion head reached 0.33 accuracy on 8 scanner groups against a 0.21 majority rate and kept rising after its ramp saturated, because its KL term was about 0.1% of the loss; the site-cluster retarget and site-unlearning-only behaved the same. Removal versus unlearning is therefore still open. This idea makes unlearning actually happen and checks that it did.'
+  mechanism: 'On the incumbent (L2-SP alone, scanner confusion disabled): (1) an adversary head, a linear layer on the study mean of the pooling tokens (the same features the old confusion head read), predicts the 8 scanner groups of the existing confusion machinery; (2) its input passes through a gradient-reversal layer, so the adversary minimizes its cross-entropy while the backbone receives the negated gradient scaled by lambda, with the standard DANN schedule lambda = 2 / (1 + exp(-10 p)) - 1, p the training progress from 0 to 1, and adversary loss weight 1.0; (3) a separate probe head of the same shape reads the same features detached (no gradient to the backbone) and measures how much scanner identity remains. Everything else is unchanged.'
+  precedents:
+  - 'Ganin et al. 2016, Domain-Adversarial Training of Neural Networks (gradient reversal with the lambda schedule above).'
+  - 'Dinsdale et al. 2021, unlearning scanner information for MRI harmonisation.'
+  - 'Mechanism audit of this campaign (mechanism-audit.md): every earlier confusion head was inert.'
+  novelty: First unlearning in this campaign whose adversarial term is large enough to act.
+  coverage: All training studies.
+  exploitation: 'Activation criterion, required before reading the AUC: the detached probe''s scanner-group accuracy in the last two epochs must fall to within 0.03 of the 0.208 majority rate (the old confusion head reached 0.33), and the adversary loss must stay near the prior entropy (1.90 nats). Log per epoch: adversary accuracy and loss, probe accuracy and loss, lambda, and the reversed-gradient norm reaching the backbone relative to the disease-loss gradient norm. Then held-out-site AUC and the seen-site guard against the incumbent.'
+  budget: Two linear heads; negligible.
+  implementation: 'New module in training/auxiliary for the gradient-reversal adversary and the detached probe, wired in training/lightning.py, with options under site_generalization for the adversary weight (1.0) and the lambda schedule; reuse the existing scanner-group targets and table from training/auxiliary/scanner_confusion.py. Keep site_generalization.scanner_confusion false (the old KL head stays off). Change nothing else.'
+  open_choices: None; weight 1.0, the DANN schedule, the 8 scanner groups and the study-mean features are fixed before the run.
+  dependencies: []
+  priority_rationale: 'Forced by Claude on the user''s instruction (2026-09-30) after the mechanism audit and the public-leaderboard check: settles whether unlearning, once actually active, helps unseen sites.'
+- id: site-frozen-backbone-batchnorm
+  mechanism_id: pretrained-batchnorm-anchoring
+  parent_idea_id: site-l2-sp-anchor
+  title: 'Anchor the backbone''s BatchNorm too: keep its running statistics and affine parameters at the pretrained values throughout training'
+  opportunity: 'L2-SP is the one mechanism that reproduced (+0.0015 held-out; −0.0014 when removed; +0.002 on the public leaderboard). The audit showed it anchors only the conv weights: the backbone BatchNorm statistics and affine parameters drift freely, and the features the model computes with its own BatchNorm are as far from the pretrained ones with L2-SP as without it (1 − cosine 0.46 at layer1 and 0.68 at layer2 in every run, 0.34 to 0.43 at layer1 from the BatchNorm statistics alone). site-lp-ft, which froze BatchNorm for its first epoch, gave +0.0016 held-out. Freezing BatchNorm extends the anchoring to the part L2-SP leaves free.'
+  mechanism: 'Every BatchNorm module inside model.backbone stays in eval mode for the whole run (running statistics fixed at the RadImageNet values) and its weight and bias receive no updates. L2-SP on the conv weights, the heads, the augmentations and all other settings are unchanged.'
+  precedents:
+  - 'Mechanism audit of this campaign: L2-SP protects conv weights, not the inference-time features, because BatchNorm is not anchored.'
+  - 'site-lp-ft, this campaign (BatchNorm frozen for one epoch: held-out +0.0016).'
+  - 'Common practice in detection and segmentation fine-tuning (frozen BatchNorm) when batches are small and the pretrained statistics are trusted.'
+  novelty: First run that keeps the backbone's BatchNorm at its pretrained state.
+  coverage: All training studies.
+  exploitation: 'Activation criterion: backbone BatchNorm num_batches_tracked, running statistics, weight and bias identical to the pretrained values at the end of training (verify from the checkpoint), and the layer1/layer2 feature distance to the pretrained backbone measured with the model''s own statistics falls well below the 0.46 / 0.68 of the incumbent. Then held-out-site AUC and the seen-site guard.'
+  budget: Slightly cheaper than the incumbent.
+  implementation: 'Set the existing model.backbone_eval option to true in configs/training.yaml (it keeps backbone BatchNorm in eval mode) and add the source change that freezes the backbone BatchNorm weight and bias (requires_grad False before the optimizer is built, so they are excluded from it), behind one option such as model.freeze_backbone_batchnorm; log the checkpoint check. Change nothing else.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: 'Forced by Claude on the user''s instruction (2026-09-30): extends the only reproduced mechanism to the part the audit showed it leaves free.'
+- id: site-lp-ft-on-l2-sp
+  mechanism_id: linear-probe-then-fine-tune
+  parent_idea_id: site-lp-ft
+  title: 'LP-FT on the L2-SP-only incumbent'
+  opportunity: 'site-lp-ft worked as specified (backbone and BatchNorm frozen in epoch 0, backbone learning-rate ramp in epoch 1, final drift 5 to 14% below its parent) and gave held-out +0.0016 [80% +0.00003, +0.0032] with seen −0.0013, but it ran on the L2-SP + per-label ArcFace recipe, and the audit and the public leaderboard (S85 0.940 vs S84 0.943) show ArcFace works against L2-SP. This measures LP-FT on the recipe that would be transferred.'
+  mechanism: 'Exactly the LP-FT of site-lp-ft (one probe epoch with the backbone receiving no updates and its BatchNorm in eval mode, then fine-tuning with a one-epoch backbone learning-rate warmup), on the L2-SP-only incumbent.'
+  precedents:
+  - 'site-lp-ft, this campaign.'
+  - 'Kumar et al. 2022, Fine-Tuning can Distort Pretrained Features and Underperform Out-of-Distribution.'
+  novelty: First LP-FT run without ArcFace.
+  coverage: All training studies.
+  exploitation: 'Activation criterion as in site-lp-ft: backbone drift exactly 0 after epoch 0, backbone learning rate 0 in epoch 0 and ramping in epoch 1, final drift below the incumbent''s. Then held-out-site AUC and the seen-site guard.'
+  budget: Same as the incumbent.
+  implementation: 'Port outputs/autoresearch/site-generalization/experiments/site-lp-ft-20260930T103602Z-0f049bcd/changes.diff onto the incumbent; its only contact with the ArcFace code is surrounding context in on_train_epoch_start, so drop those ArcFace lines and change nothing else.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: 'Forced by Claude on the user''s instruction (2026-09-30): the one open lead, tested on the recipe to transfer.'
+exhausted_directions: Label-blind erasure (learned subspaces, LEACE), DRO reweighting, feature-space anchors, compactness heads that clash with L2-SP (per-label ArcFace), and weak style or contrast augmentation variants.

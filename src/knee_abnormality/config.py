@@ -264,6 +264,8 @@ class OptimizerConfig(ConfigModel):
     warmup_start_ratio: Annotated[float, Field(gt=0, le=1)]
     minimum_lr_ratio: Annotated[float, Field(gt=0, le=1)]
     weight_averaging: WeightAveragingConfig | None
+    anchor_alpha_early: Annotated[float, Field(ge=0, allow_inf_nan=False)] = 0.0
+    anchor_alpha_late: Annotated[float, Field(ge=0, allow_inf_nan=False)] = 0.0
 
 
 class TrainerConfig(ConfigModel):
@@ -280,7 +282,7 @@ class TrainerConfig(ConfigModel):
     class_balance_exponent: Annotated[float, Field(ge=0, le=1)]
     half_knee_loss_weight: PositiveFiniteFloat = 0.075
     report_attribute_loss_weight: PositiveFiniteFloat
-    scanner_confusion_weight: PositiveFiniteFloat
+    scanner_confusion_weight: Annotated[float, Field(ge=0, allow_inf_nan=False)]
 
 
 class ValidationConfig(ConfigModel):

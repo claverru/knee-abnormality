@@ -8,6 +8,20 @@ training seed) and remove the entry from this file. Runs follow the
 [controlled-comparison rules](../validation/validation-strategy.md#controlled-comparisons). Each
 entry says whether its motivation is measured or a hypothesis.
 
+## L2-SP for ReXNet
+
+**Proposed 2026-09-30; unimplemented.** Carry the adopted L2-SP anchoring to
+`configs/rexnet-200.yaml`, which keeps the scanner confusion head and no anchoring. Motivation is
+measured on ResNet-18 only (four consistent unseen-site measurements,
+[result](../validation/results/2026-09-30-rn18-l2sp-no-confusion.md)); whether it transfers to
+ReXNet is a hypothesis.
+
+- **Implementation:** the early anchor is defined by ResNet names (`conv1.`, `bn1.`, `layer1.`)
+  and refuses other backbones; add ReXNet's stem and first stage to that mapping. The alphas were
+  set for ResNet-18 weight magnitudes; keep them for the first comparison.
+- **Comparison:** one run against the ReXNet control at its fold and seed; the sites-out split
+  measures the unseen-site effect this change is for.
+
 ## AdamP for ReXNet
 
 **Accepted for the backlog on 2026-09-21; unimplemented and untested.** Compare AdamP with

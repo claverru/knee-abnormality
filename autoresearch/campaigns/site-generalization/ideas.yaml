@@ -1,0 +1,2527 @@
+revision: 768
+ideas:
+- id: site-arcface-prototypes
+  mechanism_id: cross-site-metric-learning
+  parent_idea_id: null
+  title: Training-only angular-margin head with present and absent prototypes per
+    label shared across all sites
+  opportunity: Shared prototypes pull every positive of a label toward one direction
+    whatever the scanner, and push negatives away by a fixed angle, compacting each
+    label class across sites without erasing the scanner.
+  mechanism: For each of the 12 labels, L2-normalize the pooled study feature and
+    two learned prototypes (present, absent); logits s cos(theta), with an additive
+    angular margin on the true prototype, s cos(theta + m), s 16, m 0.2. Cross-entropy
+    on hard targets at 0.5, each study weighted by |2y - 1| of its soft target, weight
+    0.1 beside the unchanged disease loss; dropped at inference.
+  precedents:
+  - Deng et al. 2019, ArcFace.
+  novelty: No margin-based or prototype auxiliary has been tried on this project.
+  coverage: All training studies and labels.
+  exploitation: Held-out-site AUC, seen-site guard, the angle to the true prototype
+    per site cluster and its spread across clusters per epoch.
+  budget: Twelve small heads; negligible.
+  implementation: An auxiliary head in training/auxiliary with site_generalization.arcface_weight,
+    margin and scale options; log the per-cluster angle and its across-cluster spread.
+  open_choices: Margin 0.1 or 0.3 after the first result.
+  dependencies: []
+  priority_rationale: The user's proposal; a class-conditional route to the same alignment
+    as CORAL, by a different mechanism.
+  status: completed
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality-sites-out/autoresearch/campaigns/site-generalization/seed-ideas.yaml
+  experiments:
+  - site-arcface-prototypes-20260929T180913Z-4ebbfbed
+  - site-arcface-prototypes-20260929T181659Z-762d68f0
+  decision: reject
+- id: site-l2-sp-anchor
+  mechanism_id: pretrained-feature-protection
+  parent_idea_id: null
+  title: Anchor the backbone to its RadImageNet weights (L2-SP) instead of decaying
+    it toward zero
+  opportunity: Full fine-tuning distorts general pretrained features, which helps
+    in-distribution but hurts out-of-distribution accuracy (Kumar et al. 2022). The
+    ResNet-18's early layers drift 2-2.5 times more from their pretrained start than
+    ReXNet's. On seen sites, L2-SP was the best of this family in the RadImageNet-ResNet-18
+    campaign (+0.0006, rejected there); its purpose is the unseen-site metric this
+    campaign judges.
+  mechanism: Replace AdamW weight decay on backbone weights by alpha * ||w - w0||^2
+    toward the pretrained weights w0, alpha 1e-2 on the stem and layer1 and 1e-3 on
+    layer2-4; head and token parameters keep their decay.
+  precedents:
+  - Li et al. 2018, L2-SP (arXiv 1802.01483).
+  - Kumar et al. 2022, fine-tuning distorts pretrained features and underperforms
+    out of distribution (arXiv 2202.10054).
+  - "rn18-l2-sp, +0.000626 seen-site \xD74 macro AUC, 80% [-0.000322, +0.001631] (radimagenet-rn18\
+    \ campaign)."
+  novelty: Never judged on unseen sites.
+  coverage: All studies and labels.
+  exploitation: Held-out-site AUC, seen-site guard, per-stage drift from the pretrained
+    start and the anchor penalty per epoch.
+  budget: One extra elementwise penalty per step; within the reference time.
+  implementation: Keep w0 as a frozen buffer copy; add the penalty in the Lightning
+    module and remove decay from anchored backbone groups in the optimizer setup;
+    options site_generalization.anchor_alpha_early and anchor_alpha_late; log the
+    penalty and per-stage drift.
+  open_choices: Linear-probe then fine-tune if L2-SP helps; alpha x10 or /10.
+  dependencies: []
+  priority_rationale: The best-evidenced out-of-distribution mechanism in the list,
+    and cheap.
+  status: completed
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality-sites-out/autoresearch/campaigns/site-generalization/seed-ideas.yaml
+  experiments:
+  - site-l2-sp-anchor-20260929T182106Z-c1840b9a
+  decision: provisional_accept
+- id: site-fourier-amplitude-swap
+  mechanism_id: cross-site-appearance-randomization
+  parent_idea_id: null
+  title: Swap the low-frequency Fourier amplitude of training slices with a slice
+    from a study of another training site
+  opportunity: The held-out sites cost about 0.01 macro AUC and the lost data almost
+    nothing, so the model leans on site-specific appearance. Contrast, noise texture
+    and intensity profile differ by scanner and protocol, and low-frequency amplitude
+    carries most of that style.
+  mechanism: During training only, with probability 0.5 per acquisition, replace the
+    centred low-frequency block (beta 0.01 of the spectrum side) of each slice's 2D
+    Fourier amplitude with that of a slice from a study of a different training site
+    cluster, keeping the phase; apply after intensity normalization and before the
+    other image augmentations. The partner comes from the same batch when one of another
+    cluster exists, otherwise the slice is left unchanged.
+  precedents:
+  - Yang and Soatto 2020, FDA (Fourier Domain Adaptation), and FACT (Xu et al. 2021)
+    amplitude mixing for domain generalization.
+  - Augmentation-based methods are the most reliable domain-generalization baselines
+    under honest model selection (Gulrajani and Lopez-Paz 2021, DomainBed).
+  novelty: Generic DSU and GIN randomize statistics without site partners; nothing
+    exchanges appearance across sites.
+  coverage: All training studies with a partner from another site cluster in the batch.
+  exploitation: Held-out-site AUC per site, seen-site guard, and the logged fraction
+    of acquisitions swapped per epoch.
+  budget: A 2D FFT per slice on the GPU; within the reference time.
+  implementation: A new augmentation in modeling/augmentation.py driven by site_generalization.fourier_swap
+    (probability, beta), the site clusters loaded from the pinned table in the Lightning
+    module and passed with the batch; log swapped acquisitions per epoch.
+  open_choices: Beta 0.005 or 0.02 after the first result.
+  dependencies: []
+  priority_rationale: The strongest prior of the family and a direct attack on site
+    appearance.
+  status: completed
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality-sites-out/autoresearch/campaigns/site-generalization/seed-ideas.yaml
+  experiments:
+  - site-fourier-amplitude-swap-20260929T183846Z-625f9b3d
+  - site-fourier-amplitude-swap-20260929T185715Z-d7890ed7
+  decision: reject
+- id: site-cross-mixstyle
+  mechanism_id: cross-site-feature-style-mixing
+  parent_idea_id: null
+  title: Mix instance-normalization statistics between studies of different training
+    sites after the stem and layer1 (cross-site MixStyle)
+  opportunity: Site style lives in low-level feature statistics. The recipe's DSU
+    perturbs those statistics randomly; it never moves a study toward another real
+    site's style.
+  mechanism: During training only, with probability 0.5, replace each acquisition's
+    channel means and standard deviations after the stem and after layer1 by a Beta(0.1,
+    0.1) mix of its own and those of an acquisition from a study of a different training
+    site cluster in the batch; no change at inference.
+  precedents:
+  - Zhou et al. 2021, MixStyle (domain generalization with mixed feature statistics).
+  novelty: DSU is generic; no cross-site statistic exchange has been tried.
+  coverage: Acquisitions with a partner from another site cluster in the batch; logged
+    per epoch.
+  exploitation: Held-out-site AUC, seen-site guard, the fraction of acquisitions mixed
+    and the mean lambda per epoch.
+  budget: Negligible.
+  implementation: A module in modeling/ hooked after the stem and layer1 like DSU,
+    driven by site_generalization.mixstyle (probability, alpha); the site clusters
+    come from the pinned table through the batch; log mixed acquisitions and lambda.
+  open_choices: After layer2 as well; alpha 0.3.
+  dependencies: []
+  priority_rationale: The feature-level twin of the Fourier swap, with strong domain-generalization
+    results, at no cost.
+  status: completed
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality-sites-out/autoresearch/campaigns/site-generalization/seed-ideas.yaml
+  experiments:
+  - site-cross-mixstyle-20260929T190217Z-e94ea48e
+  decision: reject
+- id: site-conditional-coral
+  mechanism_id: class-conditional-alignment
+  parent_idea_id: null
+  title: Align pooled study features across training sites within each label state
+    (class-conditional CORAL)
+  opportunity: Unconditional scanner removal (the stronger confusion variants) also
+    erased real case mix and lost publicly. Aligning features only between studies
+    that share a label removes site style without asking sites to have the same prevalence.
+  mechanism: For each label and each of its two hard states, compute the mean and
+    covariance of the pooled study embedding per training site cluster over a running
+    buffer of recent batches, and add the average squared Frobenius distance of each
+    cluster's statistics to the pooled statistics, weight 0.05 with the confusion
+    head's ramp. The disease loss is unchanged.
+  precedents:
+  - Sun and Saenko 2016, Deep CORAL; class-conditional alignment as in conditional
+    DG methods (Li et al. 2018, CIDDG).
+  novelty: No class-conditional alignment has been tried; the confusion head is unconditional.
+  coverage: Studies whose clusters have enough examples in the buffer; logged per
+    epoch.
+  exploitation: Held-out-site AUC, seen-site guard, the alignment loss and the number
+    of active cluster-state cells per epoch.
+  budget: Covariances on 256-dimensional pooled embeddings; negligible.
+  implementation: An auxiliary module in training/auxiliary with a site_generalization.coral_weight
+    option, reading the pooled embedding the disease head uses; clusters from the
+    pinned table; log the loss and active cells.
+  open_choices: Weight 0.02 or 0.1; means only if covariances are unstable.
+  dependencies: []
+  priority_rationale: Targets the diagnosed failure of unconditional scanner removal.
+  status: completed
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality-sites-out/autoresearch/campaigns/site-generalization/seed-ideas.yaml
+  experiments:
+  - site-conditional-coral-20260929T192012Z-116cb0e5
+  decision: reject
+- id: site-augmix-consistency
+  mechanism_id: augmentation-consistency
+  parent_idea_id: null
+  title: Two appearance-augmented views of each training study and a Jensen-Shannon
+    consistency penalty between their predictions
+  opportunity: Augmentation exposes the model to styles but does not ask it to ignore
+    them. A consistency term makes predictions invariant to appearance, the property
+    an unseen site tests.
+  mechanism: Each training study is encoded twice with independent draws of the recipe's
+    appearance augmentations (intensity, noise, smoothing, resolution, GIN; same geometry
+    and sampling), the disease loss is applied to the first view, and a Jensen-Shannon
+    divergence between the two views' per-label sigmoid outputs is added with weight
+    1. Epochs are reduced to keep training inside the range.
+  precedents:
+  - Hendrycks et al. 2020, AugMix (robustness and uncertainty under distribution shift).
+  novelty: No consistency term has been tried.
+  coverage: All training studies.
+  exploitation: Held-out-site AUC, seen-site guard, the consistency term per epoch
+    and the epoch count used.
+  budget: About twice the forward cost per study; 6-7 epochs keep training inside
+    458-1,374 s.
+  implementation: A site_generalization.consistency_weight option; the second view
+    in the Lightning module's training step with the augmentation module re-drawn;
+    log the divergence; set trainer.max_epochs to fit the range.
+  open_choices: Weight 0.5 or 2; the second view without GIN.
+  dependencies: []
+  priority_rationale: Solid robustness evidence, but it costs epochs.
+  status: completed
+  created_revision: 1
+  seeded: /home/claudio/src/knee-abnormality-sites-out/autoresearch/campaigns/site-generalization/seed-ideas-2.yaml
+  experiments:
+  - site-augmix-consistency-20260929T193801Z-d007734a
+  - site-augmix-consistency-20260929T194514Z-91d1ad0b
+  decision: reject
+- id: site-confusion-retarget
+  mechanism_id: site-confusion
+  parent_idea_id: null
+  title: Retarget the scanner confusion head from the 8 scanner groups to the training
+    site clusters
+  opportunity: The confusion head removes scanner-group information, but the site
+    signal the held-out sites carry mixes vendor, protocol and language-bound conventions.
+    Site clusters are the closer target, and the bounded KL keeps the head from bending
+    features.
+  mechanism: The existing detached confusion head predicts the 12 site clusters plus
+    other instead of the 8 scanner groups; the bounded KL toward the training cluster
+    frequencies and its weight 0.1 and ramp stay as they are.
+  precedents:
+  - Scanner confusion head, adopted at 0.948 against 0.947 (prior-work.md); the finer
+    scanner-model target lost publicly, the stronger head too.
+  novelty: The confusion target has never been a site proxy.
+  coverage: All training studies.
+  exploitation: Held-out-site AUC, seen-site guard, the head's accuracy against the
+    cluster majority rate and entropy, and the confusion KL per epoch.
+  budget: Unchanged.
+  implementation: A site_generalization.confusion_target option (scanner_group or
+    site_cluster) in config.py; the targets and prior from the pinned table in training/auxiliary/scanner_confusion.py
+    and the Lightning module; log the head's accuracy and loss against the cluster
+    baselines.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The one adopted site mechanism, pointed at the variable the
+    held-out cost is about.
+  status: completed
+  created_revision: 1
+  seeded: /home/claudio/src/knee-abnormality-sites-out/autoresearch/campaigns/site-generalization/seed-ideas-2.yaml
+  experiments:
+  - site-confusion-retarget-20260929T195554Z-55f2c9e6
+  decision: reject
+- id: site-group-dro
+  mechanism_id: robust-objective-over-sites
+  parent_idea_id: null
+  title: GroupDRO over training site clusters on the disease loss
+  opportunity: Large clusters (English Philips 589, English GE 479) dominate the loss;
+    a model that does well on the worst training site should transfer better to an
+    unseen one.
+  mechanism: Keep an exponentiated-gradient weight per site cluster (step 0.01), updated
+    from each cluster's running disease loss, and weight each study's disease loss
+    by its cluster weight normalized to mean one. Class-balance weights stay as they
+    are.
+  precedents:
+  - Sagawa et al. 2020, GroupDRO.
+  novelty: No robust objective over sites has been tried.
+  coverage: All training studies.
+  exploitation: Held-out-site AUC, seen-site guard, per-cluster weights and losses
+    per epoch.
+  budget: No extra forward passes.
+  implementation: site_generalization.group_dro_step in config.py, the weights in
+    the Lightning module's training step, clusters from the pinned table; log each
+    cluster's weight and loss.
+  open_choices: Step 0.001 or 0.1.
+  dependencies: []
+  priority_rationale: A standard robust objective, low cost, distinct from feature-level
+    methods.
+  status: completed
+  created_revision: 1
+  seeded: /home/claudio/src/knee-abnormality-sites-out/autoresearch/campaigns/site-generalization/seed-ideas-2.yaml
+  experiments:
+  - site-group-dro-20260929T201803Z-abf7bd6f
+  decision: reject
+- id: site-arcface-per-label-pooled
+  mechanism_id: cross-site-metric-learning
+  parent_idea_id: site-arcface-prototypes
+  title: Angular-margin prototypes on each label's own attention-pooled feature, the
+    one the disease head classifies
+  opportunity: 'site-arcface-prototypes (reject, held-out -0.00003) applied the margin
+    to one mean-pooled token vector per study that had to sit near the true prototype
+    of all 12 labels at once. That geometry is infeasible: the logged angle to the
+    true prototype ended near 1.85 rad, on the far side of the sphere. It also shaped
+    a representation the disease head does not use, since each label attention-pools
+    its own feature. The idea was not tested on the representation where site-specific
+    evidence would affect decisions.'
+  mechanism: 'For each label t, take the disease head''s attention-pooled study feature
+    for t (the pooled[b, t] the head multiplies by its weight row), L2-normalize it,
+    and score it against two learned per-label prototypes (present, absent): logits
+    s cos(theta), with the additive angular margin on the true prototype, s cos(theta
+    + m), s 16, m 0.2. Cross-entropy on hard targets at 0.5, each study weighted by
+    |2y - 1| of its soft target, weight 0.3 beside the unchanged disease loss; dropped
+    at inference.'
+  precedents:
+  - Deng et al. 2019, ArcFace.
+  - site-arcface-prototypes, this campaign, and its logged angles (true-prototype
+    angle 1.48 to 1.85 rad over training).
+  novelty: The first test on the per-label pooled features.
+  coverage: All training studies and labels.
+  exploitation: Held-out-site AUC, seen-site guard, and per epoch the cosine to the
+    true prototype per site cluster, separately for positives and negatives, and its
+    across-cluster spread.
+  budget: One extra normalization and 24 prototype products per study; negligible.
+  implementation: Expose the per-label pooled features from modeling/model.py's attention
+    pooling (return them alongside the logits in training only, leaving prediction
+    unchanged); an auxiliary head in training/auxiliary with site_generalization.arcface_weight,
+    margin and scale; log the positive and negative true-prototype cosines per site
+    cluster.
+  open_choices: None; weight, margin and scale are fixed before the run.
+  dependencies: []
+  priority_rationale: 'User request after the first run''s diagnosis: the mechanism
+    was mis-targeted, not refuted.'
+  status: completed
+  created_revision: 41
+  seeded: /home/claudio/src/knee-abnormality-sites-out/autoresearch/campaigns/site-generalization/arcface-retake-ideas.yaml
+  experiments:
+  - site-arcface-per-label-pooled-20260929T203545Z-12aa2855
+  - site-incumbent-reseed-20260930T082402Z
+  decision: provisional_accept
+- id: site-no-scanner-confusion
+  mechanism_id: site-confusion
+  parent_idea_id: null
+  title: 'Ablation: remove the scanner confusion head and its term from the incumbent'
+  opportunity: The scanner confusion head is the recipe's only site mechanism. It
+    was adopted on one public rounding step (0.948 against 0.947) while losing 0.0008
+    locally, and its effect on unseen sites has never been measured. This campaign's
+    held-out-site metric measures it directly.
+  mechanism: Train the incumbent without the detached scanner-group head and without
+    its bounded KL confusion term; everything else unchanged.
+  precedents:
+  - 'Scanner confusion head adoption: S67 0.948 against S68 0.947, local -0.00076
+    (prior-work.md).'
+  novelty: The first measurement of the confusion head on unseen sites.
+  coverage: All training studies.
+  exploitation: 'Held-out-site AUC and seen-site guard against the incumbent. Held-out
+    drops: the head helps unseen sites. Held-out rises: it costs generalization and
+    should also leave the main recipe. Flat: it is dead weight.'
+  budget: Slightly cheaper than the incumbent.
+  implementation: A site_generalization.scanner_confusion option (default true, the
+    incumbent's behaviour) in config.py; when false, the Lightning module skips building
+    the head, its optimizer group and its loss term, and logs nothing for it. Set
+    it to false in configs/training.yaml.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: User request. It measures the one existing site mechanism on
+    the metric that matters for it; every other candidate is built with it present.
+  status: completed
+  created_revision: 65
+  seeded: /home/claudio/src/knee-abnormality-sites-out/autoresearch/campaigns/site-generalization/confusion-ablation-ideas.yaml
+  experiments:
+  - site-no-scanner-confusion-20260929T205346Z-15fe5232
+  - site-no-scanner-confusion-20260929T211300Z-33bae11b
+  - site-no-scanner-confusion-20260929T212341Z-14015088
+  - site-no-scanner-confusion-20260929T215822Z-14d0d71d
+  ranking_rationale: 'Admit all four: proposal_admission reports satisfied dependencies,
+    and both prerequisite ideas remain provisionally accepted and active. Registry,
+    family ledger, prior-work precedents and targeted searches of source-copy and
+    campaign documentation reveal no measured duplicate of these constructions. Preserve
+    the reserved head and remaining user seed ahead of admissions. Rank balanced ArcFace
+    first for its direct extension of an accepted mechanism and negligible encoding
+    cost; feature-direction protection second as a distinct extension of accepted
+    L2-SP, with greater implementation uncertainty. Both wins are modest against the
+    0.0012 hardware yardstick, so their follow-ups remain hypotheses. Matched Fourier
+    merits a structural retry because donor matching and spectral preservation materially
+    differ from site-fourier-amplitude-swap-20260929T185715Z-d7890ed7. Fresh bounded
+    DRO merits a lower-priority structural retry: source confirms the estimator and
+    normalization mismatch, but site-group-dro-20260929T201803Z-abf7bd6f lost 0.006930.
+    Four admissions fit the five non-seed idea limit.'
+  decision: reject
+- id: site-scanner-subspace-projection
+  mechanism_id: scanner-subspace-erasure
+  parent_idea_id: null
+  title: Learn an angular-margin scanner-identity embedding on detached, unprojected
+    tokens and erase its 8-dimensional subspace from every token the model pools
+  opportunity: 'Removing site information helps unseen sites: site-confusion-retarget
+    gave the largest held-out gain so far (+0.0016) but cost seen sites (-0.0017),
+    because its KL pressure acts on the whole backbone. Site identity stays linearly
+    decodable from the pooling tokens (a detached head reached 0.267 accuracy on 13
+    clusters against 0.180 majority, still rising at the last epoch). Erasing a small,
+    learned scanner subspace from the tokens removes the style the disease head can
+    read, without an adversarial push on the backbone; the seen-site guard measures
+    any case-mix cost.'
+  mechanism: 'Full erasure, no orthogonalization against the disease head (user decision):
+    the disease logit is linear in the pooled tokens, so a subspace orthogonal to
+    the head rows would leave the direct readout unchanged. (1) Identity head: a training-only
+    linear map W (256 to 8, no bias) reads the normalized pooling tokens BEFORE projection,
+    detached; the embeddings are mean-pooled over each studys visually valid tokens,
+    L2-normalized and scored by ArcFace (s 16, m 0.2) against learned prototypes of
+    the scanner-model x field-strength identities with at least 30 studies in the
+    runs training folds; studies of other identities are excluded from this loss only.
+    (2) Basis: each training step, with no gradient, Q = orthonormal basis of Ws row
+    space by QR of W^T (256 x 8); log its rank. (3) Projection: P = I - r Q Q^T, with
+    r rising linearly from 0 to 1 over epoch 0 (per step) and 1 afterwards. P is applied
+    in _pooling_tokens right after mil_norm, so attention scores, pooled values, the
+    OA detector and every auxiliary that reads half_knee_tokens (half-knee, report
+    attributes, scanner confusion) and the incumbents per-label ArcFace pooled feature
+    all see projected tokens. (4) Inference: P is a persistent, non-trainable buffer
+    inside KneeAbnormalityModel, saved in the checkpoint and used by validation, held-out
+    prediction and export, with no scanner input. The disease loss and all incumbent
+    options are unchanged.'
+  precedents:
+  - Deng et al. 2019, ArcFace (identity embeddings that transfer to unseen identities).
+  - Ravfogel et al. 2020, INLP, and Belrose et al. 2023, LEACE (linear concept erasure
+    by projection; LEACE is least-squares optimal).
+  - Dinsdale et al. 2021, unlearning scanner information for MRI harmonisation, which
+    improves unseen scanners; its per-block extension suppresses domain features at
+    several depths.
+  - site-confusion-retarget, this campaign (+0.0016 held-out, -0.0017 seen; site head
+    0.267 against 0.180 majority).
+  novelty: No erasure by projection has been tried; the confusion variants push the
+    backbone instead of removing a fixed subspace.
+  coverage: All training studies; the head learns from the 93% on well-populated scanners.
+  exploitation: Held-out-site AUC and seen-site guard; per epoch the identity heads
+    accuracy against majority, the accuracy of a separate detached linear probe on
+    the projected tokens (should fall to majority), the mean norm of the removed token
+    component relative to the token norm, the rank of Q, and the largest cosine between
+    Q and the 12 disease-head rows (diagnostic only, not constrained).
+  budget: One 256 x 8 map, the identity prototypes, one QR of 256 x 8 and a 256 x
+    256 projection per step; negligible.
+  implementation: 'Options under site_generalization: subspace_rank (8; 0 disables
+    everything and keeps P the identity), subspace_margin (0.2), subspace_scale (16),
+    subspace_minimum_studies (30). Identity head and probe in training/auxiliary;
+    identities from outputs/analysis/sharing-disagreement-20260914/study_headers.parquet
+    (ManufacturerModelName x field group: MagneticFieldStrength >= 2 is 3T, < 2 is
+    1.5T, missing is unknown), counted on the splits training folds only (fold !=
+    0 of all_5fold_scanner_v2_sites_out). The P buffer and its application in modeling/model.py:
+    _pooling_tokens returns projected tokens, and a separate accessor returns the
+    unprojected normalized tokens for the identity head. The buffer is registered
+    persistent (identity at rank 0) so prediction of other runs is unchanged; the
+    Lightning module writes P in place under no_grad each training step and never
+    at validation or prediction. Do not change the incumbents scanner confusion, per-label
+    ArcFace or L2-SP code.'
+  open_choices: None; rank 8, margin 0.2, scale 16 and the 30-study minimum are fixed
+    before the run.
+  dependencies: []
+  priority_rationale: 'User proposal after the ArcFace and confusion results: learn
+    scanner identity with ArcFace, then remove that information from the disease path.
+    Built on top of the incumbent, so it measures what the erasure adds to the per-label
+    ArcFace head.'
+  status: completed
+  created_revision: 179
+  seeded: /home/claudio/src/knee-abnormality-sites-out/autoresearch/campaigns/site-generalization/scanner-subspace-ideas.yaml
+  ranking_rationale: 'Block and park the idea because its one bounded repair has failed:
+    independent inspection confirms 690 populated parent files remain truncated, and
+    the prepared source, changes.diff and manifest.json remain absent. The failed
+    gate prevents approval. The explicit ranking contains every remaining eligible
+    queue entry once, preserving their existing order after removing the blocked head;
+    it resolves the previous report''s ranking rejection.'
+  experiments:
+  - site-scanner-subspace-projection-20260929T212713Z-3cb5e8f8
+  decision: reject
+- id: site-scanner-subspace-instead-of-arcface
+  mechanism_id: scanner-subspace-erasure
+  parent_idea_id: site-scanner-subspace-projection
+  title: 'Substitution: the scanner-subspace projection replacing the per-label ArcFace
+    head in the incumbent'
+  opportunity: 'User request for a head-to-head: the incumbent carries the per-label
+    ArcFace head (site-arcface-per-label-pooled, +0.0018 held-out). Both mechanisms
+    aim at site-independent disease evidence, one by shaping each label''s pooled
+    feature, the other by removing scanner-style directions before pooling. Measuring
+    the projection without the ArcFace head shows whether it can replace it, or whether
+    the two are complementary.'
+  mechanism: 'Remove the per-label ArcFace auxiliary from the incumbent by setting
+    site_generalization.arcface_weight to 0 (its head is then not built, trained or
+    logged; L2-SP anchoring and scanner confusion stay), and add the scanner-subspace
+    erasure exactly as specified in site-scanner-subspace-projection: same code, options
+    and values, full erasure without orthogonalization against the disease head, P
+    applied after mil_norm to all pooling tokens, identity head on detached unprojected
+    tokens, ramp over epoch 0, P saved as a model buffer and used at inference.'
+  precedents:
+  - site-arcface-per-label-pooled, this campaign (provisional_accept, +0.0018 held-out,
+    +0.0002 seen).
+  - The precedents of site-scanner-subspace-projection.
+  novelty: The first run of the projection without the ArcFace head.
+  coverage: All training studies.
+  exploitation: 'Held-out-site AUC and seen-site guard against the incumbent, read
+    together with site-scanner-subspace-projection: projection plus ArcFace against
+    projection alone against ArcFace alone (the incumbent). Same per-epoch logs as
+    the projection idea.'
+  budget: Negligible.
+  implementation: Identical code and options to site-scanner-subspace-projection;
+    the only config difference from it is site_generalization.arcface_weight 0. If
+    that ideas code is not in the incumbent, implement it as specified there.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: User request, to run after site-scanner-subspace-projection
+    so the pair separates the two mechanisms.
+  status: completed
+  created_revision: 179
+  seeded: /home/claudio/src/knee-abnormality-sites-out/autoresearch/campaigns/site-generalization/scanner-subspace-ideas.yaml
+  ranking_rationale: 'Block and park the idea because its one bounded repair has failed:
+    independent inspection confirms 690 populated parent files remain truncated, and
+    the prepared source, changes.diff and manifest.json remain absent. The failed
+    gate prevents approval. The explicit ranking contains every remaining eligible
+    queue entry once, preserving their existing order after removing the blocked head;
+    it resolves the previous report''s ranking rejection.'
+  experiments:
+  - site-scanner-subspace-instead-of-arcface-20260929T214102Z-b88f1967
+  decision: reject
+- id: site-scanner-leace-token-erasure
+  mechanism_id: scanner-leace-erasure
+  parent_idea_id: site-scanner-subspace-projection
+  title: Erase scanner identity from every pooling token with a closed-form LEACE
+    eraser computed from running token statistics, replacing the learned ArcFace subspace
+  opportunity: 'site-scanner-subspace-projection erased the wrong directions. Its
+    study-mean ArcFace identity head barely learned scanners (0.177 accuracy against
+    0.129 majority at epoch 6), so its 8-dimensional subspace landed on the dominant
+    token directions: the erased component was 65% of the token norm, and the run
+    was rejected (held-out -0.0005, 80% [-0.0016, +0.0007]; seen-site guard -0.0023),
+    while a linear probe on the erased tokens still decoded scanner identity above
+    majority (0.186, rising). The erasure idea itself is untested. LEACE (Belrose
+    et al. 2023) gives the least-squares-optimal linear eraser in closed form: it
+    removes exactly the directions along which the class-conditional means differ,
+    measured in whitened space, so no linear classifier can decode identity from the
+    erased tokens, and it touches nothing else. It needs no learned head and no margin.'
+  mechanism: '(1) Statistics, every training step, no gradient, float32, from the
+    normalized pooling tokens BEFORE erasure (the output of mil_norm), detached, over
+    visually valid tokens of studies whose scanner identity is populated: each token
+    is centered by the running mean of its series type (the token_type index already
+    computed in encode_batch; expose it in the encoded dict), then running exponential
+    moving averages (decay 0.995 per step, bias-corrected by the running weight) of
+    the centered second moment S (256 x 256) and of each identity''s centered mean
+    m_k with its token share p_k. Identities: scanner model x field strength with
+    at least 30 studies in the run''s training folds, exactly as in site-scanner-subspace-projection
+    (24 identities; other studies are excluded from the statistics but still erased).
+    (2) Eraser, recomputed each step from the statistics: whitening W = (S + eps I)^(-1/2)
+    by symmetric eigendecomposition, eps = 1e-4 times the largest eigenvalue; D =
+    columns sqrt(p_k) (m_k - sum_j p_j m_j); U = orthonormal basis of the column space
+    of W D (SVD, singular values above 1e-6 times the largest; rank at most 23); E
+    = W^+ U U^T W (256 x 256, oblique). (3) Application: x'' = x - r (x - c_t) E^T,
+    where x is the normalized token, c_t the running mean of its series type and r
+    ramps linearly from 0 to 1 over epoch 0. Applied in _pooling_tokens right after
+    mil_norm, so attention scores, pooled values, the OA detector and every auxiliary
+    that reads half_knee_tokens, and the incumbent''s per-label ArcFace pooled feature,
+    all see erased tokens. (4) Inference: E and the per-type means are persistent,
+    non-trainable buffers inside KneeAbnormalityModel (E zero and the means zero when
+    disabled), saved in the checkpoint and used by validation, held-out prediction
+    and export, with no scanner input; they are written only in training_step. The
+    disease loss and all incumbent options, including the per-label ArcFace head,
+    L2-SP and scanner confusion, are unchanged.'
+  precedents:
+  - Belrose et al. 2023, LEACE (least-squares concept erasure; closed-form, provably
+    removes linear decodability of the concept).
+  - Ravfogel et al. 2020, INLP (iterative nullspace projection).
+  - Dinsdale et al. 2021, unlearning scanner information for MRI harmonisation, which
+    improves unseen scanners.
+  - 'site-scanner-subspace-projection, this campaign (reject: held-out -0.0005, seen-site
+    -0.0023; identity head near majority, 65% of token norm erased, probe on erased
+    tokens above majority).'
+  novelty: First closed-form erasure; the previous subspace came from a weak learned
+    head and erased dominant, not scanner-specific, directions.
+  coverage: All training tokens of the 93% of training studies on well-populated scanners;
+    all tokens are erased.
+  exploitation: 'Held-out-site AUC and seen-site guard against the incumbent. Per
+    epoch, all computed in closed form under no_grad with no trainable parameters:
+    eraser rank; mean fraction of the token norm removed (expected far below the previous
+    65%); the whitened between-identity scatter of the identity means, trace(W D D^T
+    W), before erasure and recomputed from the same running statistics after applying
+    the eraser (should fall to near zero); and the largest cosine between the erasers
+    row space and the 12 disease-head rows (diagnostic only).'
+  budget: One 256 x 256 eigendecomposition, one 256 x 24 SVD and a 256 x 256 matrix
+    product per step; negligible against the backbone.
+  implementation: 'Options under site_generalization: leace_decay (0.995; 0 disables,
+    leaving E zero) and leace_minimum_studies (30). Remove the site-scanner-subspace-projection
+    code and options (subspace_rank, subspace_margin, subspace_scale, subspace_minimum_studies,
+    the ScannerIdentityHead and its buffer) if present in the parent, keeping its
+    identity loader. Add no trainable parameters and no loss term: the eraser has
+    no learned head or probe, so the optimizer, its parameter groups and gradient
+    clipping are identical to the incumbent''s. The eraser buffers and their application
+    in modeling/model.py (_pooling_tokens returns erased tokens; a separate accessor
+    returns the unerased normalized tokens for the statistics); the running statistics,
+    eraser computation and diagnostics in training/auxiliary; the Lightning module
+    updates them under no_grad at the start of each training step and never at validation
+    or prediction. Do not change the incumbent''s scanner confusion, per-label ArcFace
+    or L2-SP code.'
+  open_choices: None; decay 0.995, eps 1e-4, the 1e-6 rank cut, series-type centering
+    and the 30-study minimum are fixed before the run.
+  dependencies: []
+  priority_rationale: 'Retake forced by Claude under the user''s delegation after
+    the first subspace run: the erasure idea targets the campaign goal (remove every
+    trace of site bias) and was not actually tested, because the learned subspace
+    missed scanner identity. Built on top of the incumbent.'
+  status: completed
+  created_revision: 226
+  seeded: /home/claudio/src/knee-abnormality-sites-out/autoresearch/campaigns/site-generalization/leace-erasure-ideas.yaml
+  ranking_rationale: 'Admit all four: proposal_admission reports satisfied dependencies,
+    and both prerequisite ideas remain provisionally accepted and active. Registry,
+    family ledger, prior-work precedents and targeted searches of source-copy and
+    campaign documentation reveal no measured duplicate of these constructions. Preserve
+    the reserved head and remaining user seed ahead of admissions. Rank balanced ArcFace
+    first for its direct extension of an accepted mechanism and negligible encoding
+    cost; feature-direction protection second as a distinct extension of accepted
+    L2-SP, with greater implementation uncertainty. Both wins are modest against the
+    0.0012 hardware yardstick, so their follow-ups remain hypotheses. Matched Fourier
+    merits a structural retry because donor matching and spectral preservation materially
+    differ from site-fourier-amplitude-swap-20260929T185715Z-d7890ed7. Fresh bounded
+    DRO merits a lower-priority structural retry: source confirms the estimator and
+    normalization mismatch, but site-group-dro-20260929T201803Z-abf7bd6f lost 0.006930.
+    Four admissions fit the five non-seed idea limit.'
+  experiments:
+  - site-scanner-leace-token-erasure-20260929T221558Z-74f57366
+  decision: reject
+- id: site-arcface-balanced-site-states
+  mechanism_id: cross-site-metric-learning
+  parent_idea_id: site-arcface-per-label-pooled
+  title: Balance training-site contributions within each ArcFace label state
+  opportunity: 'The incumbent''s ArcFace loss falls from 0.8250 to 0.2795, but positive-state
+    cosine dispersion across sites grows from 0.0160 to 0.0300. MCL dispersion reaches
+    0.0705 while its validation AUC stalls late. Source inspection shows that sites
+    affect diagnostics only: prototype learning remains dominated by the observed
+    confidence mass of larger sites. Unequal contributions are a plausible explanation,
+    although the logged dispersions lack support counts and do not establish causality.'
+  mechanism: Replace the ArcFace reduction with training-cohort weights within each
+    label and absent/present state. Let n_g be the sum of observed target confidence
+    in site g for that state. Set a_g=1/(n_g+10), then normalize a so sum(n_g*a_g)=sum(n_g).
+    Multiply existing confidence-weighted ArcFace cells by a_g, retaining the original
+    observed-cell denominator. This approximately equalizes well-supported sites,
+    shrinks sparse-site influence, and preserves each state's aggregate confidence
+    mass. Keep margin 0.2, scale 16 and auxiliary weight 0.3. Disease targets, disease
+    class weights and sampling remain unchanged.
+  precedents:
+  - 'site-arcface-per-label-pooled: the accepted mechanism attaches prototypes to
+    the actual label-specific disease features; its source currently uses no site
+    weighting.'
+  - 'site-conditional-coral: distribution alignment with rolling covariance estimates
+    was rejected. This proposal changes prototype contributions without estimating
+    feature covariances or retaining stale embeddings.'
+  - '[ArcFace](https://arxiv.org/abs/1801.07698) supplies the angular-margin construction;
+    the site-conditional reduction is a campaign-specific extension.'
+  novelty: Changes which sites shape each shared prototype while preserving the incumbent's
+    representation, margin and state mass. It is neither a margin sweep nor a replacement
+    disease objective.
+  coverage: All twelve labels and both states use the same rule. Counts come exclusively
+    from existing training targets and the checksum-verified training-site table.
+    Empty cells contribute nothing. Log confidence mass and effective contribution
+    by site/state; sparse positive groups remain a concern.
+  exploitation: Log the absolute change between weighted and incumbent ArcFace loss
+    on identical features, actual margin shifts, contribution shares and support-aware
+    cosine dispersion. A positive loss-change scalar establishes that reweighting
+    acted. Judge adoption exclusively by the fixed held-out macro rule and seen-site
+    guard.
+  budget: "Keep ten epochs, batch size eight, accumulation one and the incumbent seed\
+    \ 1533697213. A small site\xD7label\xD7state table and elementwise weights require\
+    \ no additional encoding. Expected training time is close to the incumbent's 951\
+    \ s, comfortably within the planning range of 458\u20131,374 s; actual timing\
+    \ remains authoritative."
+  implementation: Replace the ArcFace reduction in training/auxiliary/arcface.py and
+    pass training-only site indices from training/lightning.py. Compute fixed counts
+    from existing training targets during setup and record their provenance. Retain
+    label-specific pooling, L2-SP, current augmentations and unrelated incumbent losses.
+    Remove the superseded unweighted reduction rather than adding a legacy mode. Rebase
+    onto any newly accepted incumbent. If ArcFace has been replaced, this proposal
+    loses its prerequisite and must not silently restore it.
+  open_choices: Use confidence pseudocount 10 for this candidate. Training-site/state
+    support and resulting maximum weights must be recorded before launch; their distribution
+    is presently unknown. No label-specific settings or held-out-driven weighting.
+  dependencies:
+  - site-arcface-per-label-pooled
+  priority_rationale: 'First: directly extends the accepted metric mechanism, addresses
+    a visible divergence between auxiliary loss and site dispersion, and costs almost
+    no additional compute. Sparse-state noise is the principal uncertainty.'
+  source_change: true
+  targeted_curve: "site-arcface-per-label-pooled, epochs 3\u20139: ArcFace loss decreases\
+    \ while positive-site cosine dispersion remains elevated and \xD71 macro stalls\
+    \ near 0.9245. Seek lower support-aware dispersion and continued macro improvement\
+    \ without changing label objectives."
+  status: completed
+  created_revision: 234
+  ranking_rationale: 'Admit all four: proposal_admission reports satisfied dependencies,
+    and both prerequisite ideas remain provisionally accepted and active. Registry,
+    family ledger, prior-work precedents and targeted searches of source-copy and
+    campaign documentation reveal no measured duplicate of these constructions. Preserve
+    the reserved head and remaining user seed ahead of admissions. Rank balanced ArcFace
+    first for its direct extension of an accepted mechanism and negligible encoding
+    cost; feature-direction protection second as a distinct extension of accepted
+    L2-SP, with greater implementation uncertainty. Both wins are modest against the
+    0.0012 hardware yardstick, so their follow-ups remain hypotheses. Matched Fourier
+    merits a structural retry because donor matching and spectral preservation materially
+    differ from site-fourier-amplitude-swap-20260929T185715Z-d7890ed7. Fresh bounded
+    DRO merits a lower-priority structural retry: source confirms the estimator and
+    normalization mismatch, but site-group-dro-20260929T201803Z-abf7bd6f lost 0.006930.
+    Four admissions fit the five non-seed idea limit.'
+  experiments:
+  - site-arcface-balanced-site-states-20260929T223333Z-406d2a2f
+  decision: reject
+- id: site-pretrained-feature-direction-anchor
+  mechanism_id: pretrained-feature-protection
+  parent_idea_id: site-l2-sp-anchor
+  title: Complement L2-SP with a frozen pretrained feature-direction anchor before
+    DSU
+  opportunity: Against the anchor-only run, the incumbent ends with greater stage-1
+    drift (0.0366 versus 0.0289), stage-2 drift (0.0851 versus 0.0799), and anchor
+    penalty (0.0246 versus 0.0186), while validation macro flattens. Parameter proximity
+    does not directly preserve feature outputs. A function-space constraint could
+    protect transferable early features while permitting upper-stage adaptation. No
+    stored feature comparison currently establishes the size or importance of this
+    functional drift.
+  mechanism: "Add a frozen RadImageNet teacher containing the stem through layer2.\
+    \ For every training study, select one already-sampled triplet by choosing an\
+    \ available acquisition uniformly and then a triplet uniformly. Feed the identical\
+    \ prepared image to the teacher in eval/no-grad mode. Compare its stride-8 feature\
+    \ map with the student's corresponding map immediately before DSU. Normalize feature\
+    \ vectors across channels and penalize mean 1\u2212cosine over geometrically valid\
+    \ locations, averaged equally over studies. Use weight 0.05, ramped over the first\
+    \ two epochs. Keep the existing parameter anchor and allow all student stages\
+    \ to train."
+  precedents:
+  - site-l2-sp-anchor established that pretrained-weight protection can transfer on
+    this sites-out split.
+  - External rn18-freeze-stem-layer1 and rn18-bn-adapted-head-start were rejected.
+    They froze optimization or changed its schedule; this proposal keeps continuous
+    adaptation and constrains feature direction.
+  - '[DELTA](https://arxiv.org/abs/1901.09229) motivates regularizing pretrained feature
+    outputs. This proposal uses a lightweight directional constraint without DELTA''s
+    learned attention selection.'
+  novelty: Adds an input-dependent functional constraint that matrix-weight distance
+    cannot express. It preserves student plasticity and operates before the existing
+    DSU transform, avoiding a direct penalty against DSU perturbations.
+  coverage: Every training study contributes one existing view per visit, with acquisitions
+    sampled independently of site and disease. All disease labels benefit or lose
+    through the same backbone. Teacher weights are the pinned pretrained initialization,
+    never an incumbent checkpoint or averaged model.
+  exploitation: Log the actual weighted feature-direction penalty, valid compared
+    locations, study coverage and student stage drift. The positive penalty establishes
+    activation, not useful transfer. Keep the fixed macro adoption rule and seen-site
+    guard; teacher disagreement is diagnostic only.
+  budget: "Retain ten epochs, the current seed, batch size and 26 sampled triplets\
+    \ per study. The teacher processes only one existing triplet per study through\
+    \ the early backbone, without backward computation or additional image loading.\
+    \ Plan roughly 970\u20131,050 s versus 951 s incumbent training; this is an estimate,\
+    \ not measured compliance."
+  implementation: Add the frozen teacher and penalty under training/auxiliary, expose
+    selected pre-DSU student maps through modeling/model.py, and integrate in training/lightning.py
+    with settings in config.py and training.yaml. Keep teacher BatchNorm buffers fixed
+    and teacher parameters outside optimization. Prediction uses only the student.
+    Retain L2-SP, ArcFace when active, and unrelated accepted behavior. Integrate
+    against the supervisor's new incumbent without restoring mechanisms that it removed.
+  open_choices: Use the layer2 output, one triplet per study and weight 0.05 for the
+    first candidate. Reuse existing geometry mapping for valid locations. Pretrained
+    teacher BatchNorm may create disagreement unrelated to harmful drift; log the
+    early penalty and avoid interpreting activation as evidence of that diagnosis.
+  dependencies:
+  - site-l2-sp-anchor
+  priority_rationale: 'Second: supplies the required follow-up to the successful protection
+    family while avoiding already-rejected freezing and learning-rate mechanisms.
+    More implementation work than reweighting, but modest expected compute overhead.'
+  source_change: true
+  targeted_curve: "Anchor-only versus incumbent, epochs 2\u20139: stage-1/2 drift\
+    \ and anchor penalty increase under ArcFace while late \xD71 macro flattens. Seek\
+    \ better late validation ranking with restrained functional drift, without freezing\
+    \ the backbone."
+  status: completed
+  created_revision: 234
+  ranking_rationale: 'Admit all four: proposal_admission reports satisfied dependencies,
+    and both prerequisite ideas remain provisionally accepted and active. Registry,
+    family ledger, prior-work precedents and targeted searches of source-copy and
+    campaign documentation reveal no measured duplicate of these constructions. Preserve
+    the reserved head and remaining user seed ahead of admissions. Rank balanced ArcFace
+    first for its direct extension of an accepted mechanism and negligible encoding
+    cost; feature-direction protection second as a distinct extension of accepted
+    L2-SP, with greater implementation uncertainty. Both wins are modest against the
+    0.0012 hardware yardstick, so their follow-ups remain hypotheses. Matched Fourier
+    merits a structural retry because donor matching and spectral preservation materially
+    differ from site-fourier-amplitude-swap-20260929T185715Z-d7890ed7. Fresh bounded
+    DRO merits a lower-priority structural retry: source confirms the estimator and
+    normalization mismatch, but site-group-dro-20260929T201803Z-abf7bd6f lost 0.006930.
+    Four admissions fit the five non-seed idea limit.'
+  experiments:
+  - site-pretrained-feature-direction-anchor-20260929T225133Z-5d44a48f
+  decision: reject
+- id: site-fourier-matched-shape-exchange
+  mechanism_id: cross-site-appearance-randomization
+  parent_idea_id: site-fourier-amplitude-swap
+  title: Exchange matched Fourier amplitude shape while preserving recipient DC and
+    low-band power
+  opportunity: The rejected Fourier run showed a persistent pixel-change signature
+    near 0.129 and worse seen-site ranking, especially MCL, despite some held-out
+    gains. Its source samples cross-site donors without matching plane or contrast
+    and replaces the DC component along with low frequencies before clipping. Thus
+    acquisition content and brightness changes can accompany the intended site appearance
+    exchange. This is a concrete construction problem to address, although its causal
+    contribution to the result remains unmeasured.
+  mechanism: 'Choose donors from a different training site but the same existing series
+    type: plane, fluid sensitivity and fat suppression. Select donor studies uniformly
+    before selecting an eligible acquisition. Keep the recipient phase and DC coefficient.
+    Within the existing non-DC low-frequency mask, normalize the donor amplitude vector
+    to the recipient''s low-band L2 power before replacement. Retain probability 0.5
+    and beta 0.01. Skip recipients lacking a matched donor or usable non-DC donor
+    power; never fall back to an unmatched donor.'
+  precedents:
+  - 'site-fourier-amplitude-swap source: unmatched acquisition donors, DC replacement,
+    reconstruction clipping and recipient background restoration.'
+  - site-cross-mixstyle also exchanged unmatched acquisition statistics and was rejected;
+    this proposal concentrates the appearance retry on a single, explicitly controlled
+    transform.
+  - '[FDA](https://arxiv.org/abs/2004.05498) motivates low-frequency amplitude exchange.
+    Matching acquisition type and preserving recipient DC/power are proposed safeguards,
+    not findings established by that paper.'
+  novelty: Changes donor eligibility and the transferred spectral quantity. It preserves
+    brightness and total low-band power rather than merely reducing augmentation strength.
+  coverage: Applies across all disease labels and all training sites with matched
+    donors. Use only the pinned site table for site identity and existing series-type
+    metadata for matching. Log availability by type and site; reduced matched coverage
+    is an explicit uncertainty. Prediction receives no site information.
+  exploitation: Log actual middle-channel pixel change after clipping and background
+    restoration, matched donor coverage, clipping fraction, DC error and low-band
+    power error. Activation must reflect delivered image changes, not donor eligibility.
+    Evaluate all labels and held-out sites under the unchanged macro rule.
+  budget: "Keep ten epochs, batch size eight, current sampling and seed. The original\
+    \ Fourier candidate took 939 s on the anchor parent; adding its FFT work to the\
+    \ 951 s incumbent suggests roughly 980\u20131,030 s. Matching and normalization\
+    \ add small tensor operations, with no second encoder pass."
+  implementation: Implement the matched transform in modeling/augmentation.py and
+    wire existing acquisition type and training-only site indices through modeling/model.py
+    and training/lightning.py. Start from the active incumbent; the rejected unrestricted
+    Fourier implementation is a precedent to replace, not behavior to retain. Keep
+    L2-SP, active ArcFace, DSU and other accepted augmentations. If the incumbent
+    changes, retain its unrelated improvements and integrate this one transform without
+    restoring rejected components.
+  open_choices: Use the existing six series types and fixed probability/beta. Match
+    slice positions within an acquisition by relative sampled position without changing
+    recipient sampling geometry. The amount of eligible cross-site coverage is unknown
+    until logged; do not widen donor matching in response to held-out scores.
+  dependencies: []
+  priority_rationale: 'Third: a positive but rejected result has a specific, source-supported
+    repair. It offers a clearer follow-up than another generic style transform, with
+    limited additional training cost.'
+  source_change: true
+  targeted_curve: "site-fourier-amplitude-swap, epochs 3\u20139: \xD71 macro remains\
+    \ below the anchor and MCL ends at 0.9078 versus 0.9296, with sustained pixel\
+    \ change near 0.129. Seek recovery of seen-site ranking while retaining useful\
+    \ cross-site appearance variation."
+  status: completed
+  created_revision: 234
+  ranking_rationale: 'Admit antipodal prototypes: proposal_admission confirms its
+    accepted, active per-label pooling dependency. It replaces prototype geometry
+    rather than repeating rejected site/state weighting. Rank it ahead of bounded
+    DRO because it directly modifies a useful incumbent pathway at little additional
+    cost; the geometric explanation remains uncertain. Admit acquisition normalization
+    behind both retries: it explores a permitted family and differs materially from
+    closed cross-site MixStyle by using only recipient acquisition statistics during
+    training and prediction. Leave Rician noise proposed: it has weaker campaign-specific
+    support and changes both noise formation and sigma range, complicating attribution.
+    Ledger and prior-work checks, plus mechanism searches in docs/validation/results
+    and docs/history in both source and linked project trees, found no exact measured
+    duplicate of these proposals.'
+  experiments:
+  - site-fourier-matched-shape-exchange-20260929T230915Z-dfc618e6
+  decision: reject
+- id: site-dro-fresh-bounded-risk
+  mechanism_id: robust-objective-over-sites
+  parent_idea_id: site-group-dro
+  title: Replace cumulative GroupDRO updates with fresh epoch risks and bounded population-corrected
+    weights
+  opportunity: "GroupDRO's nominal mass on en/minor rises to 0.5299 and hr/Siemens\
+    \ to 0.2003 while \xD71 validation macro stalls near 0.9207. The implementation\
+    \ repeatedly exponentiates cumulative historical losses, including groups absent\
+    \ from the current batch, and then normalizes multipliers within each batch without\
+    \ correcting group frequency. Those weights therefore do not implement the intended\
+    \ mixture of group-average risks. This diagnosed estimator and update mismatch\
+    \ warrants one structural retry despite the substantial rejection."
+  mechanism: "Accumulate detached sums of the unchanged class-balanced disease cell\
+    \ losses and observed-cell counts separately for each complete epoch. Epoch 0\
+    \ uses the incumbent reduction. Thereafter derive group risks only from the preceding\
+    \ epoch, discarding older statistics. Let p be each group's fixed share of observed\
+    \ training cells. Once per epoch solve max_q sum(q_g R_g)\u22120.1 KL(q||p), subject\
+    \ to sum(q)=1 and 0.5p_g\u2264q_g\u22642p_g. Apply detached cell multipliers q_g/p_g\
+    \ during the next epoch, retaining the existing observed-cell denominator and\
+    \ removing minibatch multiplier normalization. Reset epoch statistics after each\
+    \ update."
+  precedents:
+  - site-group-dro source confirms cumulative loss estimates, repeated updates for
+    absent groups and batch-normalized study multipliers.
+  - '[Sagawa et al.](https://arxiv.org/abs/1911.08731) establish group-risk optimization
+    and the importance of regularization for worst-group generalization. The fresh,
+    bounded update here specifically addresses this campaign''s implementation and
+    concentration pattern.'
+  novelty: Changes risk estimation, update timescale and population correction rather
+    than sweeping the old adversarial step size. Density-ratio bounds preserve substantial
+    contribution from every training group.
+  coverage: All observed disease cells and all pinned training-site clusters participate.
+    Site identities affect training reduction only. Targets, class-balance weights,
+    auxiliary objectives and study sampling remain fixed. Different report uncertainty
+    and prevalence can still produce different group risks.
+  exploitation: Log the actual change in disease loss caused by site multipliers,
+    q/p ranges, effective group contributions, previous-epoch risks and group support.
+    Activation begins in epoch 1. Risk concentration and per-site AUC are diagnostics;
+    adoption still requires the unchanged held-out macro rule and seen-site guard.
+  budget: "Keep ten epochs, batch size eight, accumulation one and seed 1533697213.\
+    \ Requires small per-group buffers and one bounded scalar optimization per epoch,\
+    \ with no additional model pass. Expected runtime stays close to the 951 s incumbent;\
+    \ measured training must remain within 458\u20131,374 s."
+  implementation: Add the replacement reducer under training/auxiliary and integrate
+    it at the disease-loss reduction in training/lightning.py. Obtain training cell
+    counts from existing targets and site mapping, without changing label construction.
+    Remove the historical cumulative-log-weight and batch-renormalization algorithm
+    wherever inherited. Retain L2-SP, active ArcFace and unrelated accepted behavior.
+    Reconcile against a newly accepted incumbent rather than using the rejected GroupDRO
+    source as the parent.
+  open_choices: Fix temperature 0.1 and density-ratio bounds [0.5, 2] for this candidate.
+    Use observed-cell shares consistently in both risks and population correction.
+    Fresh risks lag one epoch and may still emphasize intrinsically difficult report
+    groups; no label-specific corrections are proposed.
+  dependencies: []
+  priority_rationale: 'Fourth: the largest negative result lowers expected payoff,
+    but the update mismatch is concrete and the retry is inexpensive. This earns one
+    corrected attempt, not further strength sweeps.'
+  source_change: true
+  targeted_curve: "site-group-dro, epochs 2\u20139: weight-change grows from 0.274\
+    \ to 0.997, two groups accumulate 73% nominal mass, and \xD71 macro stalls near\
+    \ 0.9207. Seek stable effective contributions and recovery toward the incumbent's\
+    \ late macro trajectory."
+  status: completed
+  created_revision: 234
+  ranking_rationale: 'Admit both proposals: proposal_admission reports satisfied dependencies,
+    and both materially change the construction used in their matching rejected runs.
+    The canonical anchor replaces the train/eval normalization mismatch in site-pretrained-feature-direction-anchor-20260929T225133Z-5d44a48f.
+    The feasible Fourier residual replaces clamp-and-restore delivery in site-fourier-matched-shape-exchange-20260929T230915Z-dfc618e6.
+    Neither repeats those measurements or reverses their rejection. The prior-work
+    table and targeted searches of docs/validation/results and docs/history in both
+    the source copy and campaign repository found no additional matching measured
+    construction. Preserve the reserved DRO head. Rank the canonical anchor next as
+    a precise follow-up to accepted L2-SP, then the inexpensive Fourier delivery correction;
+    both have concrete source diagnoses supporting priority over the unmeasured normalization
+    direction. Leave Rician noise proposed: the queue has sufficient stronger, evidence-backed
+    work.'
+  experiments:
+  - site-dro-fresh-bounded-risk-20260929T234509Z-e2ffe686
+  decision: reject
+- id: site-arcface-antipodal-prototypes
+  mechanism_id: cross-site-metric-learning
+  parent_idea_id: site-arcface-balanced-site-states
+  title: Constrain each label's absent and present ArcFace prototypes to opposite
+    directions
+  opportunity: The incumbent's auxiliary loss falls from 0.8250 to 0.2795 while true-class
+    cosines become increasingly negative. For English/GE PF OA, negative-state cosine
+    moves from 0.0459 to -0.7353 and positive-state cosine from -0.1383 to -0.7672.
+    CPU inspection of the selected checkpoint found absent/present prototype cosine
+    similarities of 0.7880 for PF OA and 0.6412 for medial meniscus; the balanced-site
+    checkpoint retains similar geometry, 0.7835 and 0.6061. Thus falling loss does
+    not establish compact state clusters around shared prototypes. Removing their
+    shared directional component is a concrete structural hypothesis, not proof that
+    this geometry caused the rejected result.
+  mechanism: Replace two independently learned prototypes per label with one learned
+    unit direction d, using absent prototype -d and present prototype +d. Initialize
+    d from the normalized present-minus-absent difference of the incumbent initialization's
+    two random draws, without loading trained candidate weights. Retain label-specific
+    pooled features, target confidence, observed-cell reduction, weight 0.3, margin
+    0.2 and scale 16. Use a monotone angular-margin tail when theta+margin exceeds
+    pi; no existing wraparound activation has been established. Use the incumbent's
+    unweighted reduction, not rejected site/state importance weights. This forces
+    the auxiliary objective to learn state separation without moving both prototypes
+    together toward a shared antipode.
+  precedents:
+  - site-arcface-per-label-pooled established the useful label-specific feature pathway.
+    Its independent binary prototypes are implemented in src/knee_abnormality/training/auxiliary/arcface.py.
+  - 'New CPU checkpoint analysis: site-arcface-per-label-pooled-20260929T203545Z-12aa2855/training/fold_0/best-epoch=09-val_macro_auc=0.92452.ckpt
+    and site-arcface-balanced-site-states-20260929T223333Z-406d2a2f/training/fold_0/best-epoch=07-val_macro_auc=0.92264.ckpt
+    contain the prototype similarities reported above.'
+  - '[ArcFace](https://arxiv.org/abs/1801.07698) supplies the angular-margin precedent.
+    The antipodal binary constraint is a proposed campaign-specific modification.'
+  novelty: Changes prototype geometry rather than site importance, loss strength or
+    sampling. It tests a measured geometric pattern shared by the incumbent and rejected
+    follow-up, while preserving the accepted pooling pathway.
+  coverage: Apply the identical construction to all twelve labels and both states.
+    Preserve disease targets, disease class weights and auxiliary confidence handling.
+    Training-site clusters remain diagnostic only; prediction uses no prototypes or
+    site metadata.
+  exploitation: Log actual margin-induced logit change and contributing-cell count
+    each epoch. Also log prototype pair cosine, true-class cosine, unmargined state
+    gap and support-aware site dispersion. Positive margin-induced change establishes
+    objective activation; pair cosine -1 establishes the constraint. These diagnostics
+    do not alter the fixed macro adoption rule or seen-site guard.
+  budget: "Retain ten epochs, batch size eight, accumulation one, 26 triplets per\
+    \ study and supervisor seed 1533697213. One direction replaces two prototypes,\
+    \ with no extra backbone pass or feature queue. Expected training time is approximately\
+    \ 930\u2013980 seconds, an estimate within the 457.8\u20131373.5-second range."
+  implementation: Replace the prototype parameterization and margin calculation in
+    training/auxiliary/arcface.py; extend diagnostics in training/lightning.py. Retain
+    the accepted per-label pooled feature pathway, L2-SP, scanner confusion and every
+    unrelated objective and augmentation. Do not import the rejected site/state weighting
+    table or retain an independent-prototype compatibility mode. Develop against the
+    newly assigned incumbent if it changes. Preserve unrelated accepted improvements;
+    if the required per-label pooling pathway has been superseded, report that prerequisite
+    change rather than silently reinstating it.
+  open_choices: Opposite prototypes remove flexibility that may be useful with uncertain
+    targets. Common-direction drift is measured, but its causal connection to site
+    generalization remains uncertain. Keep geometry identical across labels; do not
+    choose labels or margins from exploratory AUC movements.
+  dependencies:
+  - site-arcface-per-label-pooled
+  priority_rationale: 'First: fills the uncovered metric-learning retry with a specific
+    source-supported mechanism. It is inexpensive and builds on an accepted pathway,
+    although its geometric diagnosis remains a hypothesis about the remaining generalization
+    gap.'
+  source_change: true
+  targeted_curve: "Incumbent and balanced-site runs, epochs 2\u20139: declining ArcFace\
+    \ loss accompanies increasingly negative true-class cosines and late macro flattening\
+    \ around 0.9245 and 0.9226. Seek improving state separation without shared negative\
+    \ drift, alongside better late macro AUC."
+  status: completed
+  created_revision: 298
+  ranking_rationale: 'Admit antipodal prototypes: proposal_admission confirms its
+    accepted, active per-label pooling dependency. It replaces prototype geometry
+    rather than repeating rejected site/state weighting. Rank it ahead of bounded
+    DRO because it directly modifies a useful incumbent pathway at little additional
+    cost; the geometric explanation remains uncertain. Admit acquisition normalization
+    behind both retries: it explores a permitted family and differs materially from
+    closed cross-site MixStyle by using only recipient acquisition statistics during
+    training and prediction. Leave Rician noise proposed: it has weaker campaign-specific
+    support and changes both noise formation and sigma range, complicating attribution.
+    Ledger and prior-work checks, plus mechanism searches in docs/validation/results
+    and docs/history in both source and linked project trees, found no exact measured
+    duplicate of these proposals.'
+  experiments:
+  - site-arcface-antipodal-prototypes-20260929T232702Z-3ca26877
+  - site-arcface-antipodal-prototypes-20260929T233255Z-5a3f3aa7
+  decision: reject
+- id: site-acquisition-half-channel-normalization
+  mechanism_id: per-study-feature-normalization
+  parent_idea_id: null
+  title: Normalize half the early feature channels within each study acquisition
+  opportunity: The incumbent's scanner-head accuracy rises from 0.1841 to 0.3194 while
+    validation macro AUC largely flattens after epoch 5 despite continued loss reduction.
+    Source inspection shows ordinary batch normalization in the ResNet stages and
+    training-only DSU at stride eight. A possible remaining shortcut is dependence
+    on acquisition-level feature moments and the training mixture's population statistics.
+    No normalization-specific failure has been measured, so this is an independent
+    hypothesis rather than a diagnosis of the scanner-erasure failures.
+  mechanism: At the first normalization layer of each layer1 residual block, normalize
+    the first half of channels using moments pooled over the valid sampled slices
+    and spatial positions of that acquisition. Keep ordinary batch normalization on
+    the remaining half. Preserve the pretrained affine parameters and their names
+    for L2-SP anchoring. Use the same within-acquisition rule during training and
+    prediction, without accumulating statistics across prediction studies. Keep other
+    normalization layers unchanged and retain stride-eight DSU downstream. Half the
+    channels preserve population-normalized intensity information while the other
+    half provide features less dependent on acquisition appearance.
+  precedents:
+  - '[IBN-Net](https://arxiv.org/abs/1807.09441) combines instance and batch normalization
+    to balance appearance invariance and content preservation. Pooling moments across
+    an acquisition''s sampled slices is the proposed adaptation here.'
+  - Current modeling/model.py routes images through ResNet batch normalization and
+    applies DSU only during training. Its acquisition_index already identifies the
+    slices belonging to each acquisition.
+  - Closed cross-site MixStyle exchanged moments with other studies. This proposal
+    uses only the current acquisition and changes deployed normalization, without
+    donor selection or feature exchange.
+  - The external RN18 ledger records rejected BN-adapted head starts and an invalid
+    upper-stage batch-renormalization attempt. Neither establishes an outcome for
+    this shallow within-acquisition construction.
+  novelty: 'An untried normalization family: deterministic current-study statistics
+    in a limited early-channel subset. It neither erases learned scanner directions
+    nor reopens the closed donor-style mixing mechanism.'
+  coverage: All studies, acquisition types and labels follow the same rule. Group
+    slices by existing acquisition membership, keeping different acquisitions separate.
+    Exclude padded slices and geometrically invalid pixels from moment estimation;
+    protect zero variance with a numerical epsilon. No site, vendor, scanner or field-strength
+    values enter prediction.
+  exploitation: Log hybrid-normalization output change against the ordinary BN calculation
+    on identical activations, affected acquisitions, valid moment support and channel
+    variance. A positive epoch-0 output-change scalar establishes activation. Examine
+    late macro curves and all held-out sites; only the campaign macro rule and seen-site
+    guard decide adoption.
+  budget: "Retain the ten-epoch schedule, current study sampling, batch size and supervisor\
+    \ seed. Two shallow moment reductions add no backbone pass. Estimated training\
+    \ time is 980\u20131100 seconds; masked reductions need implementation-level runtime\
+    \ accounting within the existing 1373.5-second ceiling."
+  implementation: Add the normalization helper under modeling/ and integrate acquisition
+    grouping and geometric masks through modeling/model.py's ResNet traversal. Preserve
+    pretrained affine values and parameter names before Lightning captures L2-SP anchors.
+    Ensure the prediction path executes the same normalization even though DSU is
+    disabled there. Add epoch diagnostics in training/lightning.py. Replace the specified
+    channel normalization directly, retaining all other incumbent behavior. Rebase
+    onto a newly accepted incumbent and retain unrelated winners, including any feature-direction
+    anchor; document interactions rather than dropping objectives.
+  open_choices: "Normalization can suppress real tissue-intensity evidence. Masking\
+    \ and the restricted channel/stage scope limit, but do not eliminate, that risk.\
+    \ The fixed \xD71 and \xD74 sampling counts produce different moment-estimation\
+    \ precision. A newly accepted pretrained feature-direction anchor may oppose the\
+    \ representation change."
+  dependencies: []
+  priority_rationale: 'Second: explores a permitted family absent from the campaign
+    ledger, with modest compute and a direct implementation path. Its potential is
+    broader than another scanner-removal variant, but evidence for this particular
+    bottleneck is indirect.'
+  source_change: true
+  targeted_curve: "Incumbent epochs 5\u20139: macro AUC stays near 0.9240\u20130.9245\
+    \ while loss falls 2.5356\u21922.4542 and scanner accuracy rises 0.2818\u2192\
+    0.3194. Seek improved late macro generalization; scanner accuracy is only a secondary\
+    \ diagnostic."
+  status: completed
+  created_revision: 298
+  ranking_rationale: 'Admit entropy-corrected site risk: proposal_admission reports
+    dependencies satisfied, and the inspected BCE formula supports subtracting w(y)H(y)
+    from the site score. This materially differs from rejected site-dro-fresh-bounded-risk-20260929T234509Z-e2ffe686
+    by removing unequal parameter-independent offsets, while preserving its bounds,
+    temperature and complete-epoch accounting. The family ledger permits this diagnosed
+    retry; the prior-work precedent table and targeted rg search of docs/validation/results/
+    and docs/history/ revealed no measured entropy-corrected site objective. Append
+    it behind acquisition normalization: the diagnosis supports a cheap experiment,
+    but two unsuccessful raw-risk formulations temper its expected yield. Leave Rician
+    noise proposed.'
+  experiments:
+  - site-acquisition-half-channel-normalization-20260930T003900Z-acb7e919
+  decision: reject
+- id: site-acquisition-rician-noise
+  mechanism_id: magnitude-noise-randomization
+  parent_idea_id: null
+  title: Replace additive Gaussian augmentation with acquisition-coherent magnitude-noise
+    simulation
+  opportunity: The current augmentation adds Gaussian noise and clips to [0,1], using
+    one standard deviation per acquisition. It does not model the signal-dependent
+    positive floor produced by magnitude formation. The incumbent still carries scanner
+    information late in training, and fracture validation AUC falls from 0.9359 at
+    epoch 4 to 0.9261 at epoch 9 while total loss improves. Reconstruction-noise sensitivity
+    is a plausible site shortcut, but no noise-stratified performance or sensitivity
+    measurement in the packet establishes it.
+  mechanism: Replace the selected acquisitions' additive-noise operation with y=sqrt((x+n_real)^2+n_imag^2),
+    using independent zero-mean Gaussian components and one sampled sigma shared across
+    an acquisition's slices. Keep application probability 0.15; use sigma range [0.005,0.04]
+    in the existing normalized intensity units to include stronger low-signal perturbations.
+    Retain the augmentation's placement after intensity and GIN transforms, final
+    clipping and original zero-background restoration. Noise realizations remain independent
+    across pixels and slices; only acquisition noise level is shared. This is magnitude-inspired
+    augmentation, not an estimate of native SNR or scanner field strength.
+  precedents:
+  - '[Gudbjartsson and Patz, The Rician distribution of noisy MRI data](https://pubmed.ncbi.nlm.nih.gov/8598820/?dopt=Abstract)
+    establishes the magnitude-noise distribution and low-signal bias. It does not
+    demonstrate classification gains for this dataset.'
+  - modeling/augmentation.py currently uses sample_noise_parameters, sample_noise_values
+    and ImageAugmentation._add_noise for acquisition-level sigma and clipped Gaussian
+    addition.
+  - The external sig-magnitude-power-debiasing attempt estimated and removed background
+    power before normalization; its completed run had an invalid comparison and no
+    paired AUC verdict. This proposal instead adds stochastic training-only noise
+    after the fixed preprocessing.
+  - The developing Fourier repair changes donor amplitude shape. Magnitude-noise simulation
+    changes the stochastic signal/noise relationship without donor studies or spectral
+    exchange.
+  novelty: 'A distinct appearance mechanism requiring Python changes: nonlinear magnitude
+    formation with two noise components. Its effect cannot be obtained by a Gaussian-noise
+    strength setting alone.'
+  coverage: Apply the same randomization independently of label and training site.
+    Preserve sampling geometry, labels, preprocessing identity semantics and all evaluation
+    transforms. The operation is absent at prediction. Retain the recipe's repeated-middle-channel
+    behavior.
+  exploitation: Log affected acquisitions, realized sigma, changed-pixel fraction,
+    clipping fraction and mean absolute difference from clipped Gaussian addition
+    using the same real noise draw. Positive magnitude-versus-Gaussian difference
+    on surviving valid pixels establishes activation beyond the sigma change. Use
+    the unchanged macro adoption rule and seen-site guard.
+  budget: "Retain ten epochs, batch size eight, 26 triplets per study and supervisor\
+    \ seed 1533697213. One additional random tensor and magnitude operation on selected\
+    \ acquisitions require no additional model pass. Estimated training time is 950\u2013\
+    1030 seconds, subject to measured budget compliance."
+  implementation: Replace Gaussian generation/application in modeling/augmentation.py
+    and remove the superseded RandomGaussianNoise path. Update data.noise_augmentation.std_range
+    in configs/training.yaml and expose activity through training/lightning.py. Preserve
+    background restoration, acquisition-level sampling and every unrelated augmentation
+    and accepted objective. Apply the replacement to the incumbent assigned during
+    development, retaining any newly accepted Fourier or pretrained-feature mechanism.
+    If another accepted mechanism has already replaced noise semantics, report the
+    overlap before implementing a stale replacement.
+  open_choices: Quantile-normalized uint8 intensities are not physical magnitude measurements,
+    and reconstructed multi-coil noise need not be Rician. The approximation may be
+    too weak to matter or may obscure subtle findings. Existing zero-background restoration
+    deliberately prevents a realistic air-noise floor. No native-noise estimation
+    or label-specific policy is proposed.
+  dependencies: []
+  priority_rationale: 'Third: inexpensive and mechanistically distinct from the queued
+    Fourier exchange. It has a primary-research basis but the weakest campaign-specific
+    evidence, so prioritize the geometry retry and normalization candidate ahead of
+    it.'
+  source_change: true
+  targeted_curve: "Incumbent epochs 4\u20139: fracture \xD71 AUC declines 0.9359\u2192\
+    0.9261 while total loss decreases and macro AUC plateaus late. Seek less late\
+    \ deterioration and better macro transfer through one label-independent noise\
+    \ policy; noise sensitivity itself remains unmeasured."
+  status: retired
+  created_revision: 298
+  retired_reason: 'User decision 2026-09-30: the campaign runs only the final list
+    (ArcFace removal and LP-FT).'
+- id: site-pretrained-canonical-feature-anchor
+  mechanism_id: pretrained-feature-protection
+  parent_idea_id: site-pretrained-feature-direction-anchor
+  title: Compare pretrained and student features under identical frozen BatchNorm
+    statistics
+  opportunity: "The rejected feature anchor's directional disagreement falls from\
+    \ 0.6275 to 0.4794, yet its epochs 5\u20139 \xD71 macro remains below the incumbent.\
+    \ Source inspection identifies a confound: the frozen teacher uses pretrained\
+    \ BatchNorm statistics, while the attached student maps use training-batch statistics.\
+    \ Thus the penalty can oppose normalization differences unrelated to parameter\
+    \ drift. A comparison under shared normalization would isolate the intended constraint.\
+    \ This explains a defect in the measurement, not the observed AUC loss conclusively."
+  mechanism: 'Select one existing prepared triplet per study, as in the rejected attempt.
+    Compute two auxiliary early-encoder passes through layer2: a frozen pretrained
+    teacher and a differentiable functional evaluation using the student''s live convolution
+    and affine parameters. Both passes use the same pinned pretrained BatchNorm running
+    means, variances and epsilon, with no buffer updates. Compare channel-normalized
+    feature directions over the existing valid-location mask, averaging within studies
+    and then across studies. Retain weight 0.05 and the two-epoch ramp to isolate
+    the construction change. Identical initial parameters should produce approximately
+    zero disagreement algebraically; subsequent disagreement measures parameter-induced
+    response changes under common normalization. Log the actual weighted canonical_feature_penalty
+    each epoch, unweighted disagreement and valid-study/location counts. Activation
+    requires a positive realized training penalty.'
+  precedents:
+  - site-pretrained-feature-direction-anchor-20260929T225133Z-5d44a48f/source/src/knee_abnormality/training/auxiliary/feature_direction.py
+    explicitly forces the teacher into eval mode; its student maps come from the ordinary
+    training forward before DSU.
+  - 'run_curves.full_detail, site-pretrained-feature-direction-anchor: penalty peaks
+    at 0.0278 in epoch 2 and ends at 0.0240; disagreement decreases throughout training
+    without recovering the incumbent''s late validation curve.'
+  - The accepted site-l2-sp-anchor constrains parameter displacement. This proposal
+    retains that behavior and addresses the separate interpretation of feature-output
+    displacement.
+  - '[DELTA](https://arxiv.org/abs/1901.09229) provides a precedent for regularizing
+    transfer through pretrained feature maps. It does not establish that shared BatchNorm
+    statistics will improve this campaign.'
+  novelty: Changes the comparison operator rather than increasing anchor strength,
+    freezing the prediction backbone or extending training. The auxiliary student
+    and teacher have identical normalization statistics and input composition, eliminating
+    the known train/eval normalization mismatch. No moving teacher or weight averaging
+    is introduced.
+  coverage: Apply uniformly across training studies and all disease labels. Saved
+    held-out predictions show the rejected anchor improved Bulgarian AUC by 0.001964
+    but declined on German, Greek, French and Dutch sites. Philips improved while
+    Siemens declined. Effusion and Synovitis losses motivate protecting useful adaptation,
+    but do not authorize label-specific penalties. Neither site nor scanner metadata
+    enters prediction.
+  exploitation: Preserve the accepted parameter anchor while making the proposed output
+    anchor respond to actual parameter changes under a controlled normalization operator.
+    The hypothesis is that this avoids spending gradient on batch-composition differences
+    and preserves transferable features without suppressing ordinary training-mode
+    adaptation.
+  budget: "One candidate at the supervisor-assigned incumbent seed, currently 1533697213.\
+    \ Retain 10 epochs, batch size, sampled triplets, optimizer steps and every study\
+    \ per epoch. The rejected teacher-only addition trained in 932.6 s; this adds\
+    \ a differentiable early pass for approximately one of 26 triplets per study.\
+    \ Estimate 950\u20131,100 s, unmeasured and within the 457.8\u20131,373.5 s allowance.\
+    \ No additional dataset pass or full-backbone teacher is required."
+  implementation: Add the corrected auxiliary mechanism to the development incumbent
+    through training/auxiliary/feature_direction.py, training/lightning.py, the prepared-image
+    selection interface in modeling/model.py, config.py and configs/training.yaml.
+    Use a functional parameter mapping to the live student so auxiliary gradients
+    reach the existing parameters without registering a second trainable encoder.
+    Fixed auxiliary BatchNorm buffers must never mutate the ordinary backbone's buffers
+    or mode. Replace the rejected comparison against attached training-mode maps;
+    retain no compatibility branch for it. Preserve L2-SP, accepted ArcFace behavior,
+    DSU, existing augmentations, fixed losses and inference. If another incumbent
+    is accepted during development, retain its accepted changes and reconcile the
+    auxiliary early-stage operator explicitly with that source rather than restoring
+    this assignment's snapshot.
+  open_choices: Pinned pretrained normalization may itself be poorly matched to knee
+    MRI, and the auxiliary response is not the ordinary training-mode response. The
+    one-triplet coverage, discarded feature magnitudes and feature-center validity
+    mask remain limitations. Keep weight, ramp and sampling fixed in this retry; document
+    any required adjustment to the auxiliary tap after an intervening incumbent change.
+  dependencies: []
+  priority_rationale: 'First: a precise implementation confound can be removed with
+    modest compute and without changing prediction. The strongly negative previous
+    result limits confidence, but the normalization mismatch supplies a structural
+    final retry beyond a strength sweep.'
+  source_change: true
+  targeted_curve: "site-pretrained-feature-direction-anchor, epochs 5\u20139: \xD7\
+    1 macro 0.9220\u21920.9227 versus incumbent 0.9240\u21920.9245 while disagreement\
+    \ falls. Seek recovery of late macro performance with a penalty that measures\
+    \ parameter-induced feature change, rather than merely reducing the original disagreement\
+    \ scalar."
+  status: completed
+  created_revision: 339
+  ranking_rationale: 'Admit both proposals: proposal_admission reports satisfied dependencies,
+    and both materially change the construction used in their matching rejected runs.
+    The canonical anchor replaces the train/eval normalization mismatch in site-pretrained-feature-direction-anchor-20260929T225133Z-5d44a48f.
+    The feasible Fourier residual replaces clamp-and-restore delivery in site-fourier-matched-shape-exchange-20260929T230915Z-dfc618e6.
+    Neither repeats those measurements or reverses their rejection. The prior-work
+    table and targeted searches of docs/validation/results and docs/history in both
+    the source copy and campaign repository found no additional matching measured
+    construction. Preserve the reserved DRO head. Rank the canonical anchor next as
+    a precise follow-up to accepted L2-SP, then the inexpensive Fourier delivery correction;
+    both have concrete source diagnoses supporting priority over the unmeasured normalization
+    direction. Leave Rician noise proposed: the queue has sufficient stronger, evidence-backed
+    work.'
+  experiments:
+  - site-pretrained-canonical-feature-anchor-20260930T000319Z-6f47eb60
+  decision: reject
+- id: site-fourier-feasible-residual-exchange
+  mechanism_id: cross-site-appearance-randomization
+  parent_idea_id: site-fourier-matched-shape-exchange
+  title: Deliver matched Fourier exchange through a bounded, mean-preserving image
+    residual
+  opportunity: "Matched Fourier exchange activates throughout training, but delivery\
+    \ breaks its spectral safeguards: clipping affects 11.7\u201311.9% of reconstructed\
+    \ pixels, delivered mean error remains about 0.0038 and relative low-band power\
+    \ error about 0.060. Source confirms reconstruction is clamped and then zero-background\
+    \ pixels are restored. The clipping statistic includes background, so foreground\
+    \ damage is not established. Nevertheless, the delivered mean error identifies\
+    \ a concrete failure of the intended preservation property."
+  mechanism: "Retain matched cross-site donor selection, probability 0.5, beta 0.01,\
+    \ recipient phases and the DC/power-normalized spectral proposal z. For recipient\
+    \ x in [0,1], form d=z\u2212x and w=4x(1\u2212x) on its existing nonzero support.\
+    \ Set c=sum(w*d)/sum(w), then r=w*(d\u2212c). This gives a zero-sum residual that\
+    \ vanishes at zero and saturated pixels. Choose one acquisition-wide alpha, at\
+    \ most 1, from the tightest pixel bound ensuring 0\u2264x+alpha*r\u22641 across\
+    \ its selected triplets, with a fixed numerical safety factor. Deliver x+alpha*r\
+    \ directly, without clipping or subsequent background restoration; degenerate\
+    \ residuals remain unchanged. Log actual delivered pixel change, alpha, nonzero\
+    \ coverage, mean error, range violations, delivered low-band power error and residual\
+    \ energy outside the proposed band. Use delivered pixel change, including skipped\
+    \ triplets as zero, as the epoch activation scalar."
+  precedents:
+  - 'site-fourier-matched-shape-exchange-20260929T230915Z-dfc618e6/source/src/knee_abnormality/modeling/augmentation.py:
+    reconstruction is followed by clamp(0,1) and masked_fill(source == 0, 0), after
+    spectral DC and low-band power have been preserved.'
+  - "run_curves.full_detail, site-fourier-matched-shape-exchange: applied-acquisition\
+    \ fraction 0.486\u20130.495, pixel change 0.0261\u20130.0266, clipping 0.1172\u2013\
+    0.1193 and delivered power error 0.0591\u20130.0606. These establish sustained\
+    \ delivery distortion rather than nonactivation."
+  - '[Fourier Domain Adaptation](https://arxiv.org/abs/2004.05498) motivates low-frequency
+    amplitude exchange. The proposed bounded residual is a training-to-training adaptation,
+    not a preservation guarantee supplied by that paper.'
+  novelty: Replaces nonlinear clipping and background restoration with an explicitly
+    feasible, zero-mean residual. This is a construction change with a data-derived
+    feasibility limit, not a lower-probability or lower-strength sweep. Spatial tapering
+    sacrifices exact final spectral preservation; the proposal measures that tradeoff
+    explicitly.
+  coverage: "Use the pinned training-site clusters only for donor eligibility and\
+    \ diagnostics. Retain acquisition-type and relative-position matching. The rejected\
+    \ attempt's site deltas were bg +0.003140, de +0.001534, el \u22120.000337, fr\
+    \ \u22120.005100 and nl \u22120.001280; Siemens aggregate declined slightly despite\
+    \ the Bulgarian/Philips gain. All labels remain equally eligible. These exploratory\
+    \ differences motivate preserving recipient content, not site- or label-specific\
+    \ optimization."
+  exploitation: Keep the repaired donor matching and transfer low-frequency appearance
+    while preserving each recipient image's support, bounds and mean through delivery.
+    The hypothesis is that avoiding clipping-generated changes retains useful variation
+    without worsening the seen-site guard.
+  budget: "One candidate at the current incumbent's recorded seed, retaining 10 epochs,\
+    \ batch size, sampling and study accounting. The previous matched exchange took\
+    \ 944.6 s. The new operation adds elementwise arithmetic and segmented reductions\
+    \ to the existing FFT path; estimate 950\u20131,050 s, unmeasured. Keep the same\
+    \ donor search and avoid iterative projection, additional model forwards or dataset\
+    \ passes. The hard training range remains 457.8\u20131,373.5 s."
+  implementation: Add the revised exchange to the development incumbent using modeling/augmentation.py,
+    modeling/model.py, training/lightning.py, config.py and configs/training.yaml.
+    Reuse the rejected attempt's matched donor and spectral-proposal construction,
+    replacing its clamp-and-restore delivery entirely. Compute weighted centering
+    and acquisition-wide feasible steps in float32 with explicit degenerate no-ops.
+    Preserve the training-only integration point, independent run-seeded RNG, existing
+    augmentations, L2-SP, ArcFace and prediction behavior. Retain the original coverage
+    diagnostics and add delivered-image diagnostics; do not retain the rejected delivery
+    as a configurable alternative. Rebase onto any newly accepted incumbent and preserve
+    unrelated accepted changes. Site metadata must remain absent from prediction.
+  open_choices: The logged 12% clipping rate does not distinguish foreground from
+    background, so clipping is not proven to explain the rejection. Tapering can introduce
+    frequencies outside the exchanged band and alter final low-band power; log both.
+    A small feasible alpha could make the mechanism ineffective despite high donor
+    eligibility, so report delivered change and alpha distributions rather than selection
+    counts alone.
+  dependencies: []
+  priority_rationale: 'Second: inexpensive repair supported by measured delivery errors
+    and an almost neutral macro result. Uncertainty remains substantial because matching
+    does not ensure anatomical correspondence and the spatial taper changes the spectrum.
+    It merits one structural follow-up, not a parameter sweep.'
+  source_change: true
+  targeted_curve: "site-fourier-matched-shape-exchange, epochs 0\u20139: eliminate\
+    \ delivered mean error \u22480.0038 and clipping \u22480.118 while maintaining\
+    \ nontrivial pixel change. Target the epochs 5\u20139 \xD71 macro lag versus the\
+    \ incumbent, seeking useful appearance variation without the observed seen-site\
+    \ loss."
+  status: completed
+  created_revision: 339
+  ranking_rationale: 'Admit entropy-corrected site risk: proposal_admission reports
+    dependencies satisfied, and the inspected BCE formula supports subtracting w(y)H(y)
+    from the site score. This materially differs from rejected site-dro-fresh-bounded-risk-20260929T234509Z-e2ffe686
+    by removing unequal parameter-independent offsets, while preserving its bounds,
+    temperature and complete-epoch accounting. The family ledger permits this diagnosed
+    retry; the prior-work precedent table and targeted rg search of docs/validation/results/
+    and docs/history/ revealed no measured entropy-corrected site objective. Append
+    it behind acquisition normalization: the diagnosis supports a cheap experiment,
+    but two unsuccessful raw-risk formulations temper its expected yield. Leave Rician
+    noise proposed.'
+  experiments:
+  - site-fourier-feasible-residual-exchange-20260930T002045Z-78abce78
+  decision: reject
+- id: site-dro-entropy-corrected-risk
+  mechanism_id: robust-objective-over-sites
+  parent_idea_id: site-dro-fresh-bounded-risk
+  title: Score bounded site reweighting using BCE above each site's fixed soft-target
+    entropy
+  opportunity: 'New analysis identifies a measurable confound in the rejected bounded-DRO
+    run. Its site risks include different, fixed soft-target entropy floors. English/minor
+    has a weighted floor of 0.402779; English/Philips has 0.272285. At epoch 8, their
+    raw risks were 0.512290 and 0.386234, but subtracting those floors reverses their
+    ordering: 0.109511 versus 0.113950. Nevertheless, epoch 9 applied multipliers
+    of 1.848556 and 0.524057. The hypothesis is that raw-risk weighting emphasizes
+    differences in target uncertainty instead of reducible prediction error, weakening
+    transfer across acquisition sites.'
+  mechanism: 'For each training site g, precompute F_g = sum_observed[w(y) H(y)] /
+    N_g, using the actual training targets, existing gold overrides, observed masks
+    and unchanged class-balance weights. H(y) is binary entropy with zero at either
+    endpoint. Accumulate complete-epoch raw weighted BCE risk R_g and score the next
+    epoch with E_g = R_g - F_g. This equals mean weighted Bernoulli KL to the fixed
+    targets, although it is not an estimate of attainable model risk. Retain uniform
+    epoch 0, temperature 0.1, multipliers bounded to [0.5, 2], population normalization
+    and previous-complete-epoch updates. Optimize the existing weighted BCE cells
+    with the resulting detached site multiplier; subtraction affects risk scoring
+    only. Log floors, raw and excess risks, ratios, site contribution mass, and entropy_dro_applied_loss_difference:
+    the observed-cell mean absolute loss contribution difference between applied ratios
+    and diagnostic raw-risk ratios computed from the same preceding epoch. Require
+    positive activation at epoch 1; the raw-risk comparator is diagnostic only.'
+  precedents:
+  - 'site-dro-fresh-bounded-risk: complete-epoch risks and bounded population-corrected
+    multipliers activated, but its existing numerical verdict remains reject. This
+    proposal changes the risk being ranked while retaining those algorithmic repairs.'
+  - 'New CPU analysis of all 2,683 training studies and 32,196 observed cells, with
+    input hashes and exact formulas: [entropy-risk-analysis.json](/home/claudio/src/knee-abnormality/outputs/autoresearch/site-generalization/jobs/researcher-20260930T002046Z-a51cee6f/scratch/entropy-risk-analysis.json).
+    Replaying epoch-8 risks with entropy subtraction changes English/minor''s epoch-9
+    ratio from 1.848556 to 1.004946 and English/Philips from 0.524057 to 1.050554.
+    These are counterfactual ratios, not trained-model results.'
+  - The incumbent's training/lightning.py selects a fixed class weight by target >=
+    0.5 and multiplies the entire soft-target BCE cell. Consequently, its matching
+    entropy floor is w(y)H(y), rather than the entropy formula for positive-term-only
+    weighting.
+  - '[Yu et al., ICML 2024](https://proceedings.mlr.press/v235/yu24a.html) study minimax
+    excess risk alongside group DRO. This supplies conceptual precedent for subtracting
+    group baselines; the proposed analytic target-entropy baseline is different from
+    their group-optimal risk baseline, and their guarantees are not claimed here.'
+  novelty: The previous repair addressed cumulative updates, normalization and concentration.
+    This repair removes a proven, parameter-independent offset from the site score.
+    It neither changes target values nor adds label-specific objectives, confidence
+    filtering or gold-specific weighting. The measured reversal of site-risk ordering
+    distinguishes it from another multiplier-strength sweep.
+  coverage: Apply the same calculation to every observed cell of every disease label
+    and every cluster produced by the pinned training-site loader. Preserve all training
+    studies and their existing sampling frequency. Site metadata is used only during
+    training. Held-out sites, validation labels and vendor results must not determine
+    floors, ratios or parameters.
+  exploitation: Use the exact BCE decomposition to redirect the existing robust objective
+    toward prediction discrepancy. On the recorded trajectory, entropy correction
+    substantially changes site allocation without changing the temperature or bounds.
+    The anticipated benefit is less emphasis on reporting-uncertainty differences
+    and better unseen-site discrimination; neither that causal explanation nor a performance
+    gain has been established.
+  budget: "Keep 10 epochs, batch size 8, 3,360 optimizer steps and the existing inputs\
+    \ per study. Floor computation processes only 32,196 target cells once; subsequent\
+    \ changes require small site-level reductions and ratio calculations, with no\
+    \ additional encoder pass. Expect cost near the measured 922.85 s bounded-DRO\
+    \ run and 951.27 s incumbent, within 457.84\u20131,373.51 s; realized compliance\
+    \ remains the supervisor's check. Train at the incumbent seed assigned by the\
+    \ supervisor, currently 1533697213."
+  implementation: Develop from the latest accepted incumbent. Add an auxiliary site-risk
+    module under training/auxiliary and integrate initialization, loss multipliers
+    and epoch diagnostics in training/lightning.py, with the candidate setting in
+    config.py and configs/training.yaml. Reuse the rejected bounded run's complete-epoch
+    accounting and ratio solver, replacing raw-risk scoring with entropy-corrected
+    scoring. Do not retain a selectable raw-risk or cumulative-update mode; any raw-risk
+    calculation serves diagnostics only. Compute floors from the already loaded training
+    targets in float64, respecting endpoint entropy and observed masks, and preserve
+    necessary buffers across checkpoints. Retain accepted pooled ArcFace, L2-SP, all
+    unrelated newly accepted improvements, disease cell formulas, auxiliary losses,
+    augmentation, sampling and inference. If another incumbent is accepted during
+    development, rebase this scoring change onto it and recompute floors from its
+    actual training loss weights. No labels.py or evaluation changes are required.
+  open_choices: Implementation placement and buffer serialization remain engineering
+    choices. Keep the predecessor's temperature, bounds and warm-up fixed to isolate
+    the scoring change. Target entropy is an exact cellwise lower bound, not Bayes
+    error; remaining excess risk still mixes prevalence, label weights, acquisition
+    difficulty and model fit. Small proxy clusters remain noisy. These limitations
+    prevent interpreting corrected ratios as proof of acquisition-specific robustness.
+  dependencies: []
+  priority_rationale: 'First and only proposed refill: a cheap structural retry supported
+    by a newly measured scoring confound and an exact mathematical correction. Expected
+    benefit remains uncertain after two unsuccessful raw-risk formulations, but this
+    diagnosis is stronger than proposing additional variants without evidence.'
+  source_change: true
+  targeted_curve: "Fresh bounded DRO: English/minor stays at ratio 2 during epochs\
+    \ 1\u20137 while late \xD71 macro stalls around 0.9194\u20130.9223, below incumbent\
+    \ 0.9231\u20130.9245. Target entropy-driven concentration and recover the late\
+    \ macro curve while retaining genuine differences in excess risk."
+  status: completed
+  created_revision: 373
+  ranking_rationale: 'Admit the dependency-free selective-normalization proposal behind
+    the reserved entropy-corrected DRO attempt. proposal_admission reports its dependencies
+    satisfied, and the normalization family remains open for a structural retry. Learned
+    channel restoration materially differs from the measured fixed-half normalization
+    run: initialization reproduces that transformation, but supervision can restore
+    ordinary BN statistics channel by channel. The prior-work precedent table and
+    targeted searches of docs/validation/results/ and docs/history/ revealed no measured
+    duplicate. Its modest estimated cost and direct restoration diagnostic justify
+    one follow-up despite weak transfer evidence and the parent''s failed seen-site
+    guard. Leave Rician noise proposed; this event supplies no new evidence warranting
+    its admission.'
+  experiments:
+  - site-dro-entropy-corrected-risk-20260930T005706Z-7e4360b3
+  - site-dro-entropy-corrected-risk-20260930T065923Z-382b3b10
+  decision: reject
+- id: site-acquisition-channel-selective-normalization
+  mechanism_id: per-study-feature-normalization
+  parent_idea_id: site-acquisition-half-channel-normalization
+  title: Learn which early channels retain their statistics during acquisition normalization
+  opportunity: "The normalization candidate's epochs 5\u20139 \xD71 macro AUC remained\
+    \ around 0.921\u20130.922 while training loss and ArcFace loss closely tracked\
+    \ the incumbent. Its seen-site deficit therefore cannot be explained solely by\
+    \ different slice support at \xD74 prediction. Forced normalization may remove\
+    \ useful tissue statistics alongside acquisition style. This is a hypothesis,\
+    \ not an established cause. Learn channel-specific restoration using the unchanged\
+    \ training objectives."
+  mechanism: "At bn1 in each of the two layer1 blocks, retain the ordinary BN output\
+    \ B and compute the rejected candidate's masked acquisition-normalized output\
+    \ A for the same first 32 channels, sharing the pretrained affine parameters.\
+    \ Output B + a_c(A\u2212B), with one learned coefficient per affected channel\
+    \ and block; retain ordinary BN for the remaining channels. Initialize all 64\
+    \ coefficients to 1, reproducing the parent's full normalization rather than starting\
+    \ with a weaker setting. Bound coefficients to [0,1] in the forward computation\
+    \ and project them after optimizer updates. Train these model-level vectors at\
+    \ the existing head learning rate without weight decay or L2-SP. Coefficients\
+    \ are global learned parameters, independent of site, label and prediction metadata.\
+    \ This lets supervision restore useful statistics selectively."
+  precedents:
+  - 'site-acquisition-half-channel-normalization-20260930T003900Z-acb7e919: curves,
+    comparison/comparison.json and saved held_out_site_predictions.csv motivate the
+    retry; the family verdict below records its measured outcome.'
+  - '[Batch-Instance Normalization](https://arxiv.org/abs/1805.07925) learns channel-wise
+    control over retaining versus removing style information. This proposal adapts
+    that principle to masked acquisition moments; the paper does not establish MRI
+    transfer gains.'
+  - '[IBN-Net](https://arxiv.org/abs/1807.09441) combines instance and batch normalization
+    to balance appearance invariance and content preservation. The rejected candidate
+    used a fixed channel partition; this follow-up learns restoration within that
+    partition.'
+  - 'Inspected modeling/acquisition_normalization.py and modeling/model.py in the
+    rejected source: acquisition moments replace the first half of channels at both
+    layer1 bn1 locations. The incumbent''s training/lightning.py excludes one-dimensional
+    parameters from decay and L2-SP.'
+  novelty: Replaces mandatory statistics removal with learned channel selection. Initialization
+    matches the rejected transformation, so this is not a lower-strength rerun. The
+    distinguishing activation diagnostic measures the actual output contribution of
+    learned departures from that initialization.
+  coverage: Apply the same architecture to every study and all labels. Acquisition
+    membership groups slices only; no site, vendor, scanner or field-strength input
+    is introduced. Retain the remaining BN channels, stride-eight DSU, disease targets
+    and class weights, auxiliary terms, sampling geometry and evaluation multipliers.
+    The mechanism does not require either accepted idea as a behavioral prerequisite.
+  exploitation: "Log valid-pixel means of |a_c(A\u2212B)| and |(a_c\u22121)(A\u2212\
+    B)| each epoch. The latter must become positive to demonstrate learned restoration\
+    \ beyond the fixed parent. Also log coefficient mean, range, channel dispersion,\
+    \ gradient norm and supported acquisition counts. Evaluate with the unchanged\
+    \ macro adoption rule and seen-site guard; retain all five site and both vendor\
+    \ diagnostics without creating label-specific objectives."
+  budget: "Keep ten epochs, batch size eight, accumulation one, 26 triplets per study\
+    \ and the supervisor's seed 1533697213. The rejected normalization took 969 seconds\
+    \ versus the incumbent's 951 seconds. Sixty-four coefficients and an elementwise\
+    \ blend add no backbone pass; estimated training is 970\u20131,050 seconds, not\
+    \ a measurement. The fixed 457.84\u20131,373.51 second training range remains\
+    \ binding."
+  implementation: Add the gated normalization to the development incumbent through
+    modeling/model.py and a modeling helper; add diagnostics and coefficient projection
+    in training/lightning.py. Reuse the rejected candidate's moment calculation and
+    layer1 locations, but do not introduce its fixed-half mode or private runtime
+    flag. Use one serialized model setting in config.py and configs/training.yaml
+    so training and prediction construct the same architecture. Keep coefficient vectors
+    outside the backbone parameter namespace, persist them in checkpoints, and preserve
+    pretrained BN state names. Retain accepted pooled ArcFace, L2-SP and unrelated
+    incumbent improvements. If another incumbent is accepted during development, apply
+    this change to that source and retain its unrelated behavior; reconcile any overlapping
+    normalization replacement explicitly. Do not stack the rejected implementation
+    as a second normalization stage.
+  open_choices: Gates could remain at their initialization or restore almost all BN
+    behavior; diagnostics must distinguish those outcomes from selective learning.
+    Acquisition moments still depend on sampled slice coverage, and geometric masks
+    do not exclude every padding-contaminated receptive field. Those inherited limitations
+    remain unresolved. Preserve acquisition grouping across prediction chunks and
+    account for its memory cost. No label-specific gates, extra loss, strength sweep
+    or confirmation run is proposed.
+  dependencies: []
+  priority_rationale: 'First and only new proposal: it follows an open near-miss with
+    a concrete structural change, modest cost and a direct activation signature. Evidence
+    is uncertain, especially the seen-site loss, so it merits one diagnostic follow-up
+    rather than several normalization variants.'
+  source_change: true
+  targeted_curve: "Normalization candidate epochs 5\u20139: \xD71 macro 0.9215\u2192\
+    0.9222 versus incumbent 0.9240\u21920.9245 despite similar declining losses. Seek\
+    \ recovery of the seen-site plateau while retaining transfer benefit; log learned\
+    \ channel restoration throughout."
+  status: completed
+  created_revision: 437
+  ranking_rationale: 'Admit the dependency-free selective-normalization proposal behind
+    the reserved entropy-corrected DRO attempt. proposal_admission reports its dependencies
+    satisfied, and the normalization family remains open for a structural retry. Learned
+    channel restoration materially differs from the measured fixed-half normalization
+    run: initialization reproduces that transformation, but supervision can restore
+    ordinary BN statistics channel by channel. The prior-work precedent table and
+    targeted searches of docs/validation/results/ and docs/history/ revealed no measured
+    duplicate. Its modest estimated cost and direct restoration diagnostic justify
+    one follow-up despite weak transfer evidence and the parent''s failed seen-site
+    guard. Leave Rician noise proposed; this event supplies no new evidence warranting
+    its admission.'
+  experiments:
+  - site-acquisition-channel-selective-normalization-20260930T070754Z-4f07a19f
+  decision: reject
+- id: site-acquisition-channel-selective-reseed
+  mechanism_id: acquisition-channel-selective-normalization
+  parent_idea_id: site-acquisition-channel-selective-normalization
+  title: Re-run the channel-selective acquisition normalization unchanged against
+    the fresh-seed incumbent
+  opportunity: 'site-acquisition-channel-selective-normalization was rejected only
+    by the seen-site guard (held-out +0.001475, 80% [+0.000148, +0.002802]; seen -0.002323)
+    against the adopted ArcFace run. That run was a lucky draw: its fresh-seed rerun
+    with identical source and config (site-incumbent-reseed-20260930T082402Z, now
+    the incumbent by user decision) scores -0.0022 held-out and -0.0033 seen against
+    it, and all 14 candidates on it lost seen-site AUC (median -0.0022). Against the
+    rerun, the channel-selective candidate is about +0.0037 held-out and +0.0010 seen
+    (cross-seed, weak), and its sibling site-acquisition-half-channel-normalization
+    about +0.0032 and +0.0008. This is the only family with a repeatable held-out
+    gain; it needs a same-seed comparison against the unbiased reference.'
+  mechanism: 'Exactly the mechanism of site-acquisition-channel-selective-normalization,
+    unchanged: at bn1 in each of the two layer1 blocks, keep the ordinary BN output
+    B and compute the masked acquisition-normalized output A for the same first 32
+    channels with the shared pretrained affine parameters; output B + a_c (A - B)
+    with one learned coefficient per affected channel and block, initialized to 1,
+    bounded to [0, 1] in the forward pass and projected after optimizer updates, trained
+    at the head learning rate without weight decay or L2-SP; ordinary BN for the remaining
+    channels. No new choices.'
+  precedents:
+  - site-acquisition-channel-selective-normalization, this campaign (held-out +0.001475
+    [+0.000148, +0.002802], seen -0.002323 against the adopted run).
+  - site-acquisition-half-channel-normalization, this campaign (held-out +0.000995,
+    seen -0.0025 against the adopted run).
+  - 'site-incumbent-reseed-20260930T082402Z, this campaign (same recipe, fresh seed:
+    -0.0022 held-out, -0.0033 seen against the adopted run).'
+  novelty: None in mechanism; the first same-seed measurement of the family against
+    an unselected reference.
+  coverage: All training studies.
+  exploitation: Held-out-site AUC and seen-site guard against the fresh-seed incumbent,
+    plus the learned coefficients per block and channel at the end of training, as
+    logged by the original run.
+  budget: Identical to site-acquisition-channel-selective-normalization.
+  implementation: 'Port the candidate diff unchanged: outputs/autoresearch/site-generalization/experiments/site-acquisition-channel-selective-normalization-20260930T070754Z-4f07a19f/changes.diff
+    (its source directory holds the full files). The parent source is identical to
+    that run''s parent apart from the seed, so the diff applies as is; change nothing
+    else.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Forced by Claude under the user's delegation after the user-ordered
+    fresh-seed reference replacement showed that the seen-site guard rejected this
+    family against a lucky draw.
+  status: completed
+  created_revision: 477
+  seeded: /home/claudio/src/knee-abnormality-sites-out/autoresearch/campaigns/site-generalization/acquisition-reseed-ideas.yaml
+  ranking_rationale: 'Admit image-dependent restoration behind the user-ordered selective-normalization
+    reseed. proposal_admission reports its dependencies satisfied. The inspected predecessor
+    implements globally shared channel coefficients; acquisition-specific residual
+    gates are a material architectural difference from that measured run. The family
+    ledger permits a structural retry, and the prior-work precedent table plus targeted
+    searches of docs/validation/results/ and docs/history/ revealed no measured duplicate.
+    The predecessor''s primary gain supports this bounded follow-up, although fresh-seed
+    evidence weakens the claim that restricted restitution caused its guard failure.
+    Leave Rician noise proposed: the restoration follow-up has more direct campaign
+    evidence, without needing to fill the queue.'
+  experiments:
+  - site-acquisition-channel-selective-reseed-20260930T084420Z-2da9166b
+  decision: reject
+- id: site-acquisition-image-dependent-restoration
+  mechanism_id: per-study-feature-normalization
+  parent_idea_id: site-acquisition-channel-selective-normalization
+  title: Restore acquisition-normalization residuals through image-dependent channel
+    gates
+  opportunity: "The selective-normalization run's epochs 7\u20139 \xD71 macro AUC\
+    \ stayed at 0.9223\u20130.9224 versus the incumbent's 0.9245, despite similar\
+    \ final training loss. Its static normalization coefficients finished at means\
+    \ 0.9578 and 0.9852: learned restoration changed activations by only about 0.0014\
+    \ against a 0.0464 normalization effect. Static channel coefficients cannot distinguish\
+    \ acquisitions where removed statistics contain useful disease evidence from acquisitions\
+    \ where those statistics mainly encode appearance. That restriction is measured;\
+    \ its contribution to the seen-site deficit remains a hypothesis."
+  mechanism: "At the same first 32 channels of bn1 in both layer1 blocks, compute\
+    \ ordinary BN output B and masked acquisition-normalized output N with the existing\
+    \ pretrained affine parameters. Form residual R=B\u2212N. Pool each acquisition's\
+    \ masked channel means and RMS values of R, producing 64 image-derived descriptors.\
+    \ A separate 64\u219216\u219232 MLP per block produces sigmoid restitution gates\
+    \ g; deliver N+gR, retaining ordinary BN on the other channels. Initialize final\
+    \ weights to zero and biases to logit(0.05), so acquisition-dependent restoration\
+    \ must be learned. Use the unchanged training objectives, without an additional\
+    \ restitution loss. Log restoration magnitude, gate variation and saturation,\
+    \ and restoration_conditioning_effect=mean(abs((g(descriptors)\u2212g(0))*R))\
+    \ over supported pixels. Positivity after training starts demonstrates an actual\
+    \ image-dependent contribution rather than movement of a constant coefficient."
+  precedents:
+  - site-acquisition-half-channel-normalization and its selective follow-up establish
+    the normalization/restoration tradeoff. The latter's coefficient and restoration
+    trajectories are recorded in [run curves](/home/claudio/src/knee-abnormality/outputs/autoresearch/site-generalization/jobs/researcher-20260930T081050Z-59e74e4c/curves.json).
+  - The rejected selective implementation uses one static coefficient vector per block,
+    shared across all acquisitions. Its [normalization implementation](/home/claudio/src/knee-abnormality/outputs/autoresearch/site-generalization/experiments/site-acquisition-channel-selective-normalization-20260930T070754Z-4f07a19f/source/src/knee_abnormality/modeling/acquisition_normalization.py)
+    supplies the masked moments and residual decomposition to adapt.
+  - '[Jin et al., Style Normalization and Restitution for Domain Generalization and
+    Adaptation](https://arxiv.org/abs/2101.00588) motivates recovering discriminative
+    information from normalization residuals. This proposal borrows that architectural
+    principle, omits the paper''s additional causality objective, and makes no claim
+    that its published gains transfer to this MRI task.'
+  novelty: Replaces globally shared channel blending with a learned function of each
+    acquisition's image features. This changes which residual information can be restored,
+    rather than merely increasing normalization strength, gate learning rate or training
+    duration. It introduces neither domain-specific parameters nor metadata conditioning.
+  coverage: "Apply the same mechanism and unchanged objectives to all 12 labels and\
+    \ every supported acquisition. Saved predictions confirm selective-normalization\
+    \ site deltas bg +0.002021, de \u22120.000196, el +0.000335, fr \u22120.003210\
+    \ and nl +0.003532. Held-out Philips and Siemens improved by +0.002021 and +0.000894,\
+    \ while seen-site GE, Philips and Siemens declined. These exploratory differences\
+    \ motivate preserving discriminative information broadly; they do not select labels\
+    \ or vendors for optimization."
+  exploitation: Use the remaining structural follow-up in the normalization family.
+    Its primary improvement and persistent seen-site deficit justify testing whether
+    acquisition-dependent restitution can improve the tradeoff. Evaluate once against
+    the supervisor's current incumbent using the unchanged macro adoption rule and
+    seen-site guard.
+  budget: "Keep 10 epochs, batch size 8, accumulation 1, current input per study and\
+    \ supervisor-assigned seed 1533697213. The predecessor trained in 1,000.6 seconds.\
+    \ Two small MLPs and pooled residual statistics require no additional backbone\
+    \ pass; approximately 1,000\u20131,100 seconds is a planning estimate, within\
+    \ the fixed 457.8\u20131,373.5-second range. Preserve prediction chunking and\
+    \ account for the predecessor's retained layer1 feature maps; realized runtime\
+    \ and memory remain unmeasured."
+  implementation: Add this normalization path to the current incumbent, adapting the
+    historical acquisition-moment implementation and replacing its static coefficient
+    vectors with image-dependent gates. Changes belong in modeling/acquisition_normalization.py,
+    modeling/model.py, training/lightning.py, config.py and configs/training.yaml.
+    Retain accepted pooled ArcFace and L2-SP, existing BN affine parameters, remaining
+    BN channels, stride-eight DSU, all losses and weights, geometry, sampling and
+    evaluation. Serialize one setting needed to reconstruct the new path; do not retain
+    historical fixed-half or static-gate modes or their projection hook. Initialize
+    new modules inside an isolated RNG context and include their parameters in the
+    existing optimizer. Unsupported acquisitions retain ordinary BN. Prediction uses
+    only image features and existing acquisition grouping, with no site table or scanner
+    metadata. If a new incumbent is accepted during development, rebase onto it, retain
+    unrelated improvements, and reconcile any overlapping normalization path rather
+    than stacking competing implementations.
+  open_choices: Use one fixed 16-unit bottleneck and 5% initial restitution, without
+    a parameter sweep. The principal uncertainty is whether image-dependent gates
+    recover disease information or restore acquisition shortcuts. Gate variation alone
+    cannot resolve that question. Masked moments also retain the predecessor's receptive-field
+    contamination and sampled-slice coverage limitations; inspect their diagnostics
+    without changing the evaluator or adding acceptance conditions.
+  dependencies: []
+  priority_rationale: 'Priority 1: this is the only newly proposed follow-up with
+    direct positive primary evidence and a specific structural limitation to address.
+    Expected compute is modest, but uncertainty remains substantial because the predecessor
+    failed the guard and its primary interval was narrow near zero.'
+  source_change: true
+  targeted_curve: "Selective-normalization epochs 5\u20139: restore continued \xD7\
+    1 macro improvement beyond 0.9223\u20130.9224 toward incumbent 0.9245 while loss\
+    \ falls. Target the late MCL decline and broad seen-site deficit through the shared\
+    \ mechanism, with measurable acquisition-dependent restitution instead of nearly\
+    \ static normalization."
+  status: completed
+  created_revision: 480
+  ranking_rationale: 'Admit image-dependent restoration behind the user-ordered selective-normalization
+    reseed. proposal_admission reports its dependencies satisfied. The inspected predecessor
+    implements globally shared channel coefficients; acquisition-specific residual
+    gates are a material architectural difference from that measured run. The family
+    ledger permits a structural retry, and the prior-work precedent table plus targeted
+    searches of docs/validation/results/ and docs/history/ revealed no measured duplicate.
+    The predecessor''s primary gain supports this bounded follow-up, although fresh-seed
+    evidence weakens the claim that restricted restitution caused its guard failure.
+    Leave Rician noise proposed: the restoration follow-up has more direct campaign
+    evidence, without needing to fill the queue.'
+  experiments:
+  - site-acquisition-image-dependent-restoration-20260930T084958Z-bb37708b
+  decision: reject
+- id: site-arcface-without-l2-sp
+  mechanism_id: l2-sp-anchor-removal
+  parent_idea_id: site-l2-sp-anchor
+  title: 'Simplification: remove the L2-SP anchor from the incumbent, keeping per-label
+    ArcFace'
+  opportunity: 'User concern (2026-09-30): stacked mechanisms may interfere, and one
+    proper mechanism may suffice. The two adoptions are the same size as seed noise
+    (site-l2-sp-anchor +0.0015 held-out, site-arcface-per-label-pooled +0.0018 on
+    top of it; a fresh-seed rerun of the final recipe moved held-out -0.0022, and
+    the same-seed retake site-acquisition-channel-selective-reseed failed to reproduce
+    a +0.0015 single-run gain). Per-label ArcFace has never run without L2-SP. If
+    this simpler recipe lands within about 0.001 of the incumbent, it is the safer
+    recipe to transfer.'
+  mechanism: 'Remove the L2-SP anchoring from the incumbent entirely: the site_generalization.anchor_alpha_early
+    and anchor_alpha_late options, the anchor buffers registered in the Lightning
+    module, the anchor penalty added to the loss and its per-stage drift logging.
+    Everything else in the incumbent is unchanged, including the per-label ArcFace
+    head (arcface_weight 0.3, margin 0.2, scale 16), the scanner confusion head and
+    all optimizer settings.'
+  precedents:
+  - site-l2-sp-anchor, this campaign (held-out +0.001514 against the control).
+  - site-arcface-per-label-pooled, this campaign (held-out +0.001841 on top of L2-SP).
+  - 'site-incumbent-reseed-20260930T082402Z, this campaign (fresh-seed rerun of the
+    final recipe: held-out -0.0022, seen -0.0033).'
+  - Gulrajani and Lopez-Paz 2021, In Search of Lost Domain Generalization (well-tuned
+    ERM rarely beaten by added mechanisms).
+  novelty: First run of per-label ArcFace without L2-SP.
+  coverage: All training studies.
+  exploitation: Held-out-site AUC and seen-site guard against the fresh-seed incumbent;
+    read as a simplification test, where a result within about 0.001 favours the simpler
+    recipe.
+  budget: Slightly cheaper than the incumbent (no anchor penalty).
+  implementation: 'Delete the anchor code paths and the two options from configs/training.yaml,
+    src/knee_abnormality/config.py and src/knee_abnormality/training/lightning.py;
+    do not leave a disabled branch. Restore the optimizer exactly as it was before
+    site-l2-sp-anchor: site-l2-sp-anchor also exempted the anchored backbone weights
+    from weight decay (the anchored_backbone_names argument), so remove that argument
+    and use weight_decay = 0.0 if parameter.ndim < 2 else settings.weight_decay for
+    every parameter, which gives backbone weight matrices optimizer.weight_decay (0.01)
+    again. Do not exempt backbone parameters from weight decay in any other way. Change
+    nothing else.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Forced by Claude on the user's instruction (2026-09-30) to test
+    whether one mechanism is enough.
+  status: completed
+  created_revision: 510
+  seeded: /home/claudio/src/knee-abnormality-sites-out/autoresearch/campaigns/site-generalization/simplification-ideas.yaml
+  experiments:
+  - site-arcface-without-l2-sp-20260930T091044Z-17dee8fb
+  - site-arcface-without-l2-sp-20260930T092902Z-c98e22c3
+  decision: reject
+- id: site-no-scanner-confusion-reseed
+  mechanism_id: scanner-confusion-removal
+  parent_idea_id: site-no-scanner-confusion
+  title: 'Simplification: remove the scanner confusion head from the incumbent, at
+    the fresh seed'
+  opportunity: 'site-no-scanner-confusion removed the head from the same source at
+    the old seed: held-out -0.0001 [-0.0012, +0.0011], seen -0.0012 against the adopted
+    run, whose seen-site score was later shown to be about 0.003 above a fresh-seed
+    rerun. On unseen sites the head contributes nothing measurable. Same user concern
+    as site-arcface-without-l2-sp: fewer stacked mechanisms, less room for interference.'
+  mechanism: 'Exactly the change of site-no-scanner-confusion: the scanner confusion
+    head is not built, trained or logged, and its loss term is removed; everything
+    else in the incumbent (L2-SP, per-label ArcFace, all settings) is unchanged.'
+  precedents:
+  - site-no-scanner-confusion, this campaign (held-out -0.000098, seen -0.0012 against
+    the adopted run at the old seed).
+  - 'site-incumbent-reseed-20260930T082402Z, this campaign (fresh-seed rerun of the
+    final recipe: held-out -0.0022, seen -0.0033).'
+  novelty: First measurement at the fresh seed against the unselected reference.
+  coverage: All training studies.
+  exploitation: Held-out-site AUC and seen-site guard against the fresh-seed incumbent;
+    read as a simplification test, where a result within about 0.001 favours the simpler
+    recipe.
+  budget: Slightly cheaper than the incumbent.
+  implementation: 'Port the candidate diff unchanged: outputs/autoresearch/site-generalization/experiments/site-no-scanner-confusion-20260929T215822Z-14d0d71d/changes.diff
+    (its source directory holds the full files). Its parent source is identical to
+    the current incumbent''s source; change nothing else.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Forced by Claude on the user's instruction (2026-09-30) to test
+    whether one mechanism is enough.
+  status: completed
+  created_revision: 510
+  seeded: /home/claudio/src/knee-abnormality-sites-out/autoresearch/campaigns/site-generalization/simplification-ideas.yaml
+  experiments:
+  - site-no-scanner-confusion-reseed-20260930T093811Z-78253adf
+  ranking_rationale: Admit acquisition-fitted mixture contrast behind the reserved
+    scanner-removal head. Dependencies are satisfied. The recipient-fitted pointwise
+    transformation is materially distinct from closed donor Fourier exchange, MixStyle
+    and feature normalization, and from measured random-convolution GIN. Targeted
+    searches of docs/validation/results/ and docs/history/ found GIN and contrast-mixing
+    precedents but no measured acquisition-fitted mixture replacement. Its bounded
+    fit, shared lookup and absence of another backbone pass make one implementation
+    attempt reasonable. Leave Rician noise proposed while prioritizing this fully
+    specified replacement; do not fill the queue merely to reach five ideas.
+  decision: provisional_accept
+- id: site-acquisition-mixture-contrast
+  mechanism_id: acquisition-mixture-contrast-randomization
+  parent_idea_id: null
+  title: Replace GIN with acquisition-fitted mixture contrast augmentation
+  opportunity: "The sites-out diagnostic measures approximately 0.01 macro AUC lost\
+    \ through unseen-site exposure. In the current reseeded incumbent, epochs 7\u2013\
+    9 \xD71 macro AUC rises only 0.9211\u21920.9219 while training loss falls 2.4639\u2192\
+    2.4428. Fracture AUC falls from 0.9356 at epoch 2 to 0.9185 at epoch 9. These\
+    \ observations motivate a label-independent appearance mechanism, but do not establish\
+    \ contrast sensitivity as the cause. Existing GIN uses random convolutions rather\
+    \ than adapting its intensity transformations to the recipient acquisition's distribution."
+  mechanism: Replace GIN with a stochastic pointwise transformation fitted independently
+    to each selected acquisition. Fit a three-component Gaussian mixture to a bounded
+    sample of valid, nonzero center-channel pixels across its sampled slices. Initialize
+    from histogram quantiles and perform eight fixed EM iterations with a variance
+    floor. Sample independent component mean shifts in [-0.05,0.05] and standard-deviation
+    multipliers in [0.9,1.1]. Form a 256-entry lookup from the original soft responsibilities
+    and transformed within-component residuals; clamp it to [0,1] and project it to
+    nondecreasing values. Blend with the original using a draw in [0,0.5], sharing
+    the lookup across all channels and slices of that acquisition. Retain probability
+    0.3. Preserve original zero-background restoration. Degenerate fits produce identity
+    transformations and are counted. The method uses image statistics without assigning
+    tissue labels.
+  precedents:
+  - '[Meyer et al., A Contrast Augmentation Approach to Improve Multi-Scanner Generalization
+    in MRI](https://www.frontiersin.org/journals/neuroscience/articles/10.3389/fnins.2021.708196/full)
+    uses image-fitted Gaussian mixtures to randomize component contrast without supplied
+    tissue maps, reporting improved multi-scanner brain segmentation. This supports
+    the mechanism hypothesis; it does not establish benefit for knee classification.'
+  - 'Incumbent modeling/augmentation.py: sample_gin_parameters, apply_gin_filter and
+    ImageAugmentation.forward implement acquisition-shared random convolutional GIN
+    after intensity augmentation and before noise. Replace this stage while retaining
+    its placement and application probability.'
+  - 'run_curves.full_detail, site-incumbent-reseed-20260930T082402Z: late macro AUC
+    plateaus despite falling loss, while fracture validation AUC deteriorates after
+    epoch 2. These are targets for diagnosis, not evidence that mixture contrast augmentation
+    will improve transfer.'
+  - The external sig-slice-coherent-local-histograms attempt exceeded its projected
+    training budget; its repair remains unresolved. That method changes deterministic
+    local preprocessing. This proposal uses a bounded, global histogram fit solely
+    during augmentation.
+  - Closed Fourier and MixStyle families exchanged donor appearance. This proposal
+    fits the recipient acquisition and uses no donor study, cross-site feature exchange
+    or prediction-time normalization.
+  novelty: The transformation independently varies acquisition-fitted intensity bands
+    while preserving spatial coordinates and intensity ordering. It replaces random
+    spatial convolutions rather than adding another donor-style exchange. Its conditional
+    component transformations cannot be expressed through existing gamma, contrast
+    or GIN strength settings.
+  coverage: Apply one policy across every training label and site. Use only the currently
+    sampled images and existing valid-region masks; preserve sampling geometry, preprocessing
+    identity, labels and evaluation. Ordinary prediction receives no fitted transform,
+    site identifier or conditioning signal.
+  exploitation: Log mixture_contrast_pixel_change as the actual valid-pixel mean absolute
+    change after lookup projection, blending and clipping; positive epoch-0 change
+    establishes activation. Also log affected acquisitions, successful-fit coverage,
+    component separation, lookup slope variation and clipping fraction. These distinguish
+    useful contrast diversity from degenerate fits or an almost-global offset. Evaluate
+    exclusively with the fixed macro adoption rule and seen-site guard.
+  budget: "Keep ten epochs, batch size eight, 26 triplets per study and every study\
+    \ seen per epoch. Use the supervisor-bound incumbent seed, currently 3843979352.\
+    \ Fit from at most 4,096 pixels per selected acquisition using a compact histogram,\
+    \ then apply a lookup in one image pass. No additional backbone pass or model\
+    \ is required. The parent trained in 902.9 seconds; runtime remains unmeasured\
+    \ and must satisfy the existing 457.8\u20131,373.5-second training range. Avoid\
+    \ full-volume fitting and repeated pixelwise EM passes."
+  implementation: Replace GIN sampling/application in modeling/augmentation.py and
+    update its model constructor binding in modeling/model.py. Remove superseded GIN
+    kernels, configuration fields, activity entries and logging; add numeric mixture-contrast
+    settings under model.acquisition_mixture_contrast in config.py and configs/training.yaml,
+    with epoch activity reporting in training/lightning.py. Retain intensity, noise,
+    smoothing, resolution, contrast mixing, reflection and DSU behavior, plus the
+    incumbent's disease and auxiliary objectives. Retain pooled ArcFace and L2-SP
+    unless a newly accepted incumbent has removed them. Rebase this single augmentation
+    replacement onto the incumbent assigned during development; preserve unrelated
+    newly accepted improvements. If that incumbent already replaces GIN, report the
+    overlap rather than reinstalling a stale path.
+  open_choices: Three intensity components are a modeling approximation, not verified
+    knee tissue classes. Fat suppression, pathology and sampled slice coverage can
+    change the fitted distribution. Monotone projection or clipping may substantially
+    attenuate sampled contrast changes, so activation diagnostics must describe the
+    delivered transform. Histogram fitting may synchronize devices or introduce excessive
+    overhead if implemented per image. No supplied contrast-stratified analysis demonstrates
+    that this mechanism addresses the remaining site gap.
+  dependencies: []
+  priority_rationale: 'First and only new proposal: a source-level replacement with
+    a primary MRI precedent and modest expected compute. It addresses a distinct recipient-image
+    contrast mechanism while avoiding closed donor-exchange and normalization families.
+    Campaign-specific evidence remains weak, so the fixed paired comparison must decide
+    its value.'
+  source_change: true
+  targeted_curve: "site-incumbent-reseed-20260930T082402Z: target the epochs 7\u2013\
+    9 macro plateau, 0.9211\u21920.9219 despite falling loss, and fracture deterioration\
+    \ from epoch 2 to 9, 0.9356\u21920.9185. Seek better late macro transfer through\
+    \ one label-independent augmentation while satisfying the seen-site guard."
+  status: retired
+  created_revision: 556
+  ranking_rationale: Admit acquisition-fitted mixture contrast behind the reserved
+    scanner-removal head. Dependencies are satisfied. The recipient-fitted pointwise
+    transformation is materially distinct from closed donor Fourier exchange, MixStyle
+    and feature normalization, and from measured random-convolution GIN. Targeted
+    searches of docs/validation/results/ and docs/history/ found GIN and contrast-mixing
+    precedents but no measured acquisition-fitted mixture replacement. Its bounded
+    fit, shared lookup and absence of another backbone pass make one implementation
+    attempt reasonable. Leave Rician noise proposed while prioritizing this fully
+    specified replacement; do not fill the queue merely to reach five ideas.
+  experiments:
+  - site-acquisition-mixture-contrast-20260930T095539Z-68ceca26
+  - site-acquisition-mixture-contrast-20260930T101019Z-ed14b39e
+  - site-acquisition-mixture-contrast-20260930T101558Z-0ed1dc94
+  retired_reason: 'User decision 2026-09-30: the campaign runs only the final list
+    (ArcFace removal and LP-FT).'
+- id: site-l2-sp-without-arcface
+  mechanism_id: per-label-arcface-removal
+  parent_idea_id: site-arcface-per-label-pooled
+  title: 'Leave-one-out: remove the per-label ArcFace auxiliary from the incumbent,
+    keeping L2-SP'
+  opportunity: Leave-one-out validation of the incumbent at the fresh seed. Removing
+    L2-SP (site-arcface-without-l2-sp) cost -0.0014 held-out [80% -0.0022, -0.0005]
+    with seen-site +0.0002, reproducing its adoption gain (+0.0015) at a different
+    seed. Per-label ArcFace was adopted at +0.0018 held-out, the same size as seed
+    noise (a fresh-seed rerun of the final recipe moved held-out -0.0022, and the
+    same-seed retake of channel-selective normalization did not reproduce a +0.0015
+    gain); it has never been removed at the fresh seed. If removing it costs about
+    0.0015 or more on held-out sites it stays; if it costs about nothing, the simpler
+    recipe is preferred.
+  mechanism: 'Remove the per-label ArcFace auxiliary from the incumbent entirely:
+    the ArcFacePrototypes head and its construction, the training-site cluster loading
+    it uses, its loss term, its per-site cosine buffers and logging, the pool_encoded_with_features
+    path used only to feed it, and the site_generalization.arcface_weight, arcface_margin
+    and arcface_scale options. Everything else is unchanged: L2-SP anchoring with
+    its weight-decay exemption, the scanner confusion head and all optimizer settings.'
+  precedents:
+  - site-arcface-per-label-pooled, this campaign (held-out +0.001841 [80% +0.000152,
+    +0.003453] on top of L2-SP at the old seed).
+  - 'site-arcface-without-l2-sp, this campaign (removing L2-SP at the fresh seed:
+    held-out -0.0014, reproducing its adoption gain).'
+  - 'site-incumbent-reseed-20260930T082402Z, this campaign (fresh-seed rerun of the
+    final recipe: held-out -0.0022, seen -0.0033).'
+  novelty: First removal of per-label ArcFace at the fresh seed.
+  coverage: All training studies.
+  exploitation: Held-out-site AUC and seen-site guard against the fresh-seed incumbent;
+    read as a leave-one-out test, where a held-out cost of about 0.0015 or more confirms
+    ArcFace and a cost near zero favours the simpler recipe.
+  budget: Slightly cheaper than the incumbent.
+  implementation: 'Revert the per-label ArcFace change of outputs/autoresearch/site-generalization/experiments/site-arcface-per-label-pooled-20260929T203545Z-12aa2855/changes.diff:
+    its parent source (outputs/autoresearch/site-generalization/experiments/site-l2-sp-anchor-20260929T182106Z-c1840b9a/source)
+    shows the exact pre-ArcFace code for configs/training.yaml, src/knee_abnormality/config.py,
+    src/knee_abnormality/modeling/model.py and src/knee_abnormality/training/lightning.py,
+    and delete src/knee_abnormality/training/auxiliary/arcface.py. The ArcFace head
+    was built inside torch.random.fork_rng, so removing it leaves the rest of the
+    model initialization unchanged. Do not leave a disabled branch; change nothing
+    else.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Forced by Claude on the user's instruction (2026-09-30) to finish
+    the leave-one-out validation of the incumbent.
+  status: completed
+  created_revision: 565
+  seeded: /home/claudio/src/knee-abnormality-sites-out/autoresearch/campaigns/site-generalization/arcface-removal-ideas.yaml
+  experiments:
+  - site-l2-sp-without-arcface-20260930T102231Z-507e2e97
+  decision: provisional_accept
+- id: site-lp-ft
+  mechanism_id: linear-probe-then-fine-tune
+  parent_idea_id: site-l2-sp-anchor
+  title: 'LP-FT: train only the non-backbone parts for the first epoch with the pretrained
+    backbone frozen, then fine-tune everything'
+  opportunity: 'The only mechanism that reproduced in this campaign keeps the backbone
+    near its pretrained weights: site-l2-sp-anchor gained +0.0015 held-out at the
+    old seed and removing it cost -0.0014 at the fresh seed, while feature-space anchors,
+    erasure, DRO and style augmentations did not help unseen sites. Early fine-tuning
+    through randomly initialized heads distorts pretrained features most (Kumar et
+    al. 2022, Fine-Tuning can Distort Pretrained Features and Underperform Out-of-Distribution);
+    a linear-probe phase first removes that early distortion and improves out-of-distribution
+    accuracy, complementing L2-SP, which only penalizes the distance.'
+  mechanism: '(1) Probe phase, epoch 0 only (site_generalization.probe_epochs = 1):
+    the backbone (model.backbone, the RadImageNet ResNet-18) receives no updates;
+    every other part trains as usual (projection, spatial tokens, attention pooling,
+    disease head, OA detector, per-label ArcFace head and the other auxiliaries).
+    Implement the freeze by setting every backbone parameter''s .grad to None before
+    each optimizer step during the probe epochs (AdamW then skips them: no update,
+    no weight decay, no optimizer state). Do NOT use requires_grad=False: the optimizer
+    builder skips parameters that do not require gradients when it is built, which
+    would exclude the backbone for the whole run. During the probe epochs put the
+    backbone''s BatchNorm modules in eval mode after every train() call so their running
+    statistics stay at the pretrained values; after the probe they follow the recipe''s
+    normal mode (backbone_eval false). (2) Fine-tune phase, epochs 1 to 9: everything
+    trains exactly as in the incumbent, with L2-SP anchoring to the pretrained weights
+    unchanged (the backbone still equals them at the start of epoch 1). The backbone
+    parameter groups get their own linear warmup over epoch 1, from warmup_start_ratio
+    to the scheduled value, so the backbone does not start at the full post-warmup
+    rate with fresh AdamW state; implement it with LambdaLR per-group lambdas (backbone
+    groups: incumbent schedule multiplied by the warmup ramp during epoch 1 and by
+    0 during the probe; other groups: the incumbent schedule unchanged). The total
+    number of epochs (10), the other learning rates, weight decay, batch size and
+    all other settings are unchanged.'
+  precedents:
+  - Kumar et al. 2022, Fine-Tuning can Distort Pretrained Features and Underperform
+    Out-of-Distribution (ICLR), LP-FT.
+  - site-l2-sp-anchor and its removal test site-arcface-without-l2-sp, this campaign
+    (keeping the backbone near its pretrained weights helps unseen sites, reproduced
+    at two seeds).
+  - site-pretrained-feature-direction-anchor and site-pretrained-canonical-feature-anchor,
+    this campaign (feature-space anchors hurt), which is why this idea acts on the
+    optimization schedule, not on features.
+  novelty: First change to how the backbone enters training; no previous idea delayed
+    or ramped backbone updates.
+  coverage: All training studies.
+  exploitation: 'Held-out-site AUC and seen-site guard against the incumbent. Per
+    epoch: backbone L2 distance from the pretrained weights (the existing L2-SP drift
+    logging), which must be exactly 0 after epoch 0 and grow afterwards, and the backbone
+    learning rate, which must be 0 in epoch 0 and ramp during epoch 1.'
+  budget: About the incumbent's cost; the probe epoch still runs the backbone forward
+    and backward.
+  implementation: 'Option site_generalization.probe_epochs (StrictInt, default 0,
+    set to 1 in configs/training.yaml; 0 must leave training exactly as the incumbent).
+    All changes in src/knee_abnormality/config.py, src/knee_abnormality/training/lightning.py
+    and configs/training.yaml: the grad-dropping hook (on_before_optimizer_step),
+    the BatchNorm eval switch during probe epochs, and the per-group LambdaLR. Do
+    not change the optimizer builder''s parameter selection, weight decay rules, L2-SP
+    code or any other mechanism.'
+  open_choices: None; one probe epoch and a one-epoch backbone warmup are fixed before
+    the run.
+  dependencies: []
+  priority_rationale: 'Chosen by Claude and the user (2026-09-30) as one of the two
+    final runs of the campaign: the best-supported new idea, extending the only mechanism
+    that reproduced.'
+  status: completed
+  created_revision: 603
+  seeded: /home/claudio/src/knee-abnormality-sites-out/autoresearch/campaigns/site-generalization/lp-ft-ideas.yaml
+  experiments:
+  - site-lp-ft-20260930T103602Z-0f049bcd
+  decision: reject
+- id: site-acquisition-mixture-contrast-final
+  mechanism_id: acquisition-mixture-contrast-randomization
+  parent_idea_id: site-acquisition-mixture-contrast
+  title: Replace GIN with acquisition-fitted mixture contrast augmentation
+  opportunity: "The sites-out diagnostic measures approximately 0.01 macro AUC lost\
+    \ through unseen-site exposure. In the current reseeded incumbent, epochs 7\u2013\
+    9 \xD71 macro AUC rises only 0.9211\u21920.9219 while training loss falls 2.4639\u2192\
+    2.4428. Fracture AUC falls from 0.9356 at epoch 2 to 0.9185 at epoch 9. These\
+    \ observations motivate a label-independent appearance mechanism, but do not establish\
+    \ contrast sensitivity as the cause. Existing GIN uses random convolutions rather\
+    \ than adapting its intensity transformations to the recipient acquisition's distribution."
+  mechanism: Replace GIN with a stochastic pointwise transformation fitted independently
+    to each selected acquisition. Fit a three-component Gaussian mixture to a bounded
+    sample of valid, nonzero center-channel pixels across its sampled slices. Initialize
+    from histogram quantiles and perform eight fixed EM iterations with a variance
+    floor. Sample independent component mean shifts in [-0.05,0.05] and standard-deviation
+    multipliers in [0.9,1.1]. Form a 256-entry lookup from the original soft responsibilities
+    and transformed within-component residuals; clamp it to [0,1] and project it to
+    nondecreasing values. Blend with the original using a draw in [0,0.5], sharing
+    the lookup across all channels and slices of that acquisition. Retain probability
+    0.3. Preserve original zero-background restoration. Degenerate fits produce identity
+    transformations and are counted. The method uses image statistics without assigning
+    tissue labels.
+  precedents:
+  - '[Meyer et al., A Contrast Augmentation Approach to Improve Multi-Scanner Generalization
+    in MRI](https://www.frontiersin.org/journals/neuroscience/articles/10.3389/fnins.2021.708196/full)
+    uses image-fitted Gaussian mixtures to randomize component contrast without supplied
+    tissue maps, reporting improved multi-scanner brain segmentation. This supports
+    the mechanism hypothesis; it does not establish benefit for knee classification.'
+  - 'Incumbent modeling/augmentation.py: sample_gin_parameters, apply_gin_filter and
+    ImageAugmentation.forward implement acquisition-shared random convolutional GIN
+    after intensity augmentation and before noise. Replace this stage while retaining
+    its placement and application probability.'
+  - 'run_curves.full_detail, site-incumbent-reseed-20260930T082402Z: late macro AUC
+    plateaus despite falling loss, while fracture validation AUC deteriorates after
+    epoch 2. These are targets for diagnosis, not evidence that mixture contrast augmentation
+    will improve transfer.'
+  - The external sig-slice-coherent-local-histograms attempt exceeded its projected
+    training budget; its repair remains unresolved. That method changes deterministic
+    local preprocessing. This proposal uses a bounded, global histogram fit solely
+    during augmentation.
+  - Closed Fourier and MixStyle families exchanged donor appearance. This proposal
+    fits the recipient acquisition and uses no donor study, cross-site feature exchange
+    or prediction-time normalization.
+  novelty: The transformation independently varies acquisition-fitted intensity bands
+    while preserving spatial coordinates and intensity ordering. It replaces random
+    spatial convolutions rather than adding another donor-style exchange. Its conditional
+    component transformations cannot be expressed through existing gamma, contrast
+    or GIN strength settings.
+  coverage: Apply one policy across every training label and site. Use only the currently
+    sampled images and existing valid-region masks; preserve sampling geometry, preprocessing
+    identity, labels and evaluation. Ordinary prediction receives no fitted transform,
+    site identifier or conditioning signal.
+  exploitation: Log mixture_contrast_pixel_change as the actual valid-pixel mean absolute
+    change after lookup projection, blending and clipping; positive epoch-0 change
+    establishes activation. Also log affected acquisitions, successful-fit coverage,
+    component separation, lookup slope variation and clipping fraction. These distinguish
+    useful contrast diversity from degenerate fits or an almost-global offset. Evaluate
+    exclusively with the fixed macro adoption rule and seen-site guard.
+  budget: "Keep ten epochs, batch size eight, 26 triplets per study and every study\
+    \ seen per epoch. Use the supervisor-bound incumbent seed, currently 3843979352.\
+    \ Fit from at most 4,096 pixels per selected acquisition using a compact histogram,\
+    \ then apply a lookup in one image pass. No additional backbone pass or model\
+    \ is required. The parent trained in 902.9 seconds; runtime remains unmeasured\
+    \ and must satisfy the existing 457.8\u20131,373.5-second training range. Avoid\
+    \ full-volume fitting and repeated pixelwise EM passes."
+  implementation: 'Port the reviewed candidate diff unchanged: outputs/autoresearch/site-generalization/experiments/site-acquisition-mixture-contrast-20260930T101558Z-0ed1dc94/changes.diff
+    (its source directory holds the full files). It was reconciled onto the current
+    incumbent site-no-scanner-confusion-reseed-20260930T093811Z-78253adf and approved;
+    its training was cancelled only because the user briefly limited the campaign.
+    Change nothing else.'
+  open_choices: Three intensity components are a modeling approximation, not verified
+    knee tissue classes. Fat suppression, pathology and sampled slice coverage can
+    change the fitted distribution. Monotone projection or clipping may substantially
+    attenuate sampled contrast changes, so activation diagnostics must describe the
+    delivered transform. Histogram fitting may synchronize devices or introduce excessive
+    overhead if implemented per image. No supplied contrast-stratified analysis demonstrates
+    that this mechanism addresses the remaining site gap.
+  dependencies: []
+  priority_rationale: 'User decision 2026-09-30: keep mixture contrast as the third
+    and last run of the final list, after the ArcFace removal and LP-FT.'
+  status: completed
+  created_revision: 607
+  seeded: /home/claudio/src/knee-abnormality-sites-out/autoresearch/campaigns/site-generalization/mixture-contrast-final-ideas.yaml
+  experiments:
+  - site-acquisition-mixture-contrast-final-20260930T105320Z-1094fc80
+  - site-acquisition-mixture-contrast-final-20260930T111043Z-ab78b506
+  decision: reject
+- id: site-unlearning-only
+  mechanism_id: unlearning-instead-of-removal
+  parent_idea_id: site-confusion-retarget
+  title: 'Recipe B: site-cluster unlearning instead of the removal family (no L2-SP,
+    no per-label ArcFace, no scanner-appearance augmentations)'
+  opportunity: 'User question (2026-09-30): the recipe only contains removal and avoidance
+    of scanner signal (scanner-appearance augmentations, L2-SP, per-label ArcFace);
+    adversarial unlearning was only tested on top of that family, where the two clash,
+    because appearance randomization already scrambles the signal the unlearning head
+    must predict. Removing the old scanner-group confusion head was neutral at two
+    seeds, which says only that unlearning adds nothing on top of removal. site-confusion-retarget
+    (site-cluster unlearning) gave the strongest unlearning signal (+0.0016 held-out,
+    seen -0.0017, one run, old seed, on top of the removal family). This run measures
+    unlearning alone against the removal family alone.'
+  mechanism: 'Starting from the incumbent: (1) remove L2-SP anchoring and restore
+    the pre-L2-SP optimizer (weight decay 0.01 on backbone weight matrices); (2) remove
+    the per-label ArcFace auxiliary; (3) turn off the scanner-appearance augmentations:
+    data.gin_augmentation.probability 0, data.contrast_mixing_augmentation.probability
+    0 and model.feature_statistics_augmentation.probability 0; (4) turn on site-cluster
+    unlearning exactly as in site-confusion-retarget: the detached confusion head
+    predicts the 12 training-site clusters plus other (instead of the 8 scanner groups),
+    and the backbone is trained with the existing bounded KL toward the training cluster
+    frequencies, weight 0.1 (trainer.scanner_confusion_weight) with the existing ramp.
+    Geometry (affine, reflection) and the generic intensity gamma, noise, smoothing
+    and resolution augmentations stay as in the incumbent, as do all other settings.'
+  precedents:
+  - 'site-confusion-retarget, this campaign (site-cluster unlearning: held-out +0.001559
+    [80% -0.000068, +0.003209], seen -0.0017, on top of the removal family at the
+    old seed).'
+  - site-no-scanner-confusion and site-no-scanner-confusion-reseed, this campaign
+    (removing scanner-group unlearning from the removal family is neutral at two seeds).
+  - Dinsdale et al. 2021, unlearning scanner information for MRI harmonisation.
+  - site-arcface-without-l2-sp and site-l2-sp-without-arcface, this campaign (the
+    removal parts measured one at a time).
+  novelty: First run of unlearning without any removal or avoidance mechanism.
+  coverage: All training studies.
+  exploitation: 'Held-out-site AUC and seen-site guard against the incumbent, read
+    as removal family versus unlearning family: a win means unlearning alone beats
+    the removal recipe; a loss means it does not, without saying which removal part
+    matters. Per epoch: the confusion head''s accuracy against the cluster majority
+    rate and its KL loss, as logged by site-confusion-retarget.'
+  budget: Cheaper than the incumbent (fewer augmentations and auxiliaries).
+  implementation: 'Combine three existing, reviewed changes on the incumbent source
+    and set three probabilities to 0 in configs/training.yaml. (a) L2-SP removal exactly
+    as in outputs/autoresearch/site-generalization/experiments/site-arcface-without-l2-sp-20260930T092902Z-c98e22c3/changes.diff,
+    including the restored weight-decay rule weight_decay = 0.0 if parameter.ndim
+    < 2 else settings.weight_decay. (b) Per-label ArcFace removal: revert outputs/autoresearch/site-generalization/experiments/site-arcface-per-label-pooled-20260929T203545Z-12aa2855/changes.diff
+    (the pre-ArcFace code is in outputs/autoresearch/site-generalization/experiments/site-l2-sp-anchor-20260929T182106Z-c1840b9a/source)
+    and delete training/auxiliary/arcface.py. (c) Site-cluster targets for the confusion
+    head as in outputs/autoresearch/site-generalization/experiments/site-confusion-retarget-20260929T195554Z-55f2c9e6/changes.diff
+    (its site_generalization.confusion_target option set to site_cluster, targets
+    and prior from the pinned training-site table), and set site_generalization.scanner_confusion
+    true so the head is built and trained. That diff was written against an older
+    parent, so apply its intent to the current files without changing anything else.
+    Do not leave disabled branches for the removed L2-SP and ArcFace code.'
+  open_choices: None; weight 0.1, the site-cluster targets and the three disabled
+    augmentations are fixed before the run.
+  dependencies: []
+  priority_rationale: 'User decision 2026-09-30: fourth run of the final list, to
+    test unlearning against removal without the two clashing.'
+  status: completed
+  created_revision: 621
+  seeded: /home/claudio/src/knee-abnormality-sites-out/autoresearch/campaigns/site-generalization/unlearning-only-ideas.yaml
+  experiments:
+  - site-unlearning-only-20260930T111656Z-86a5d9c1
+  decision: reject
+- id: site-scanner-unlearning-grl
+  mechanism_id: scanner-adversarial-unlearning
+  parent_idea_id: site-no-scanner-confusion-reseed
+  title: 'A real unlearning test: gradient-reversal scanner adversary strong enough
+    to suppress scanner identity, on the L2-SP incumbent'
+  opportunity: 'The mechanism audit found that no unlearning ever engaged in this
+    campaign: the base scanner-confusion head reached 0.33 accuracy on 8 scanner groups
+    against a 0.21 majority rate and kept rising after its ramp saturated, because
+    its KL term was about 0.1% of the loss; the site-cluster retarget and site-unlearning-only
+    behaved the same. Removal versus unlearning is therefore still open. This idea
+    makes unlearning actually happen and checks that it did.'
+  mechanism: 'On the incumbent (L2-SP alone, scanner confusion disabled): (1) an adversary
+    head, a linear layer on the study mean of the pooling tokens (the same features
+    the old confusion head read), predicts the 8 scanner groups of the existing confusion
+    machinery; (2) its input passes through a gradient-reversal layer, so the adversary
+    minimizes its cross-entropy while the backbone receives the negated gradient scaled
+    by lambda, with the standard DANN schedule lambda = 2 / (1 + exp(-10 p)) - 1,
+    p the training progress from 0 to 1, and adversary loss weight 1.0; (3) a separate
+    probe head of the same shape reads the same features detached (no gradient to
+    the backbone) and measures how much scanner identity remains. Everything else
+    is unchanged.'
+  precedents:
+  - Ganin et al. 2016, Domain-Adversarial Training of Neural Networks (gradient reversal
+    with the lambda schedule above).
+  - Dinsdale et al. 2021, unlearning scanner information for MRI harmonisation.
+  - 'Mechanism audit of this campaign (mechanism-audit.md): every earlier confusion
+    head was inert.'
+  novelty: First unlearning in this campaign whose adversarial term is large enough
+    to act.
+  coverage: All training studies.
+  exploitation: 'Activation criterion, required before reading the AUC: the detached
+    probe''s scanner-group accuracy in the last two epochs must fall to within 0.03
+    of the 0.208 majority rate (the old confusion head reached 0.33), and the adversary
+    loss must stay near the prior entropy (1.90 nats). Log per epoch: adversary accuracy
+    and loss, probe accuracy and loss, lambda, and the reversed-gradient norm reaching
+    the backbone relative to the disease-loss gradient norm. Then held-out-site AUC
+    and the seen-site guard against the incumbent.'
+  budget: Two linear heads; negligible.
+  implementation: New module in training/auxiliary for the gradient-reversal adversary
+    and the detached probe, wired in training/lightning.py, with options under site_generalization
+    for the adversary weight (1.0) and the lambda schedule; reuse the existing scanner-group
+    targets and table from training/auxiliary/scanner_confusion.py. Keep site_generalization.scanner_confusion
+    false (the old KL head stays off). Change nothing else.
+  open_choices: None; weight 1.0, the DANN schedule, the 8 scanner groups and the
+    study-mean features are fixed before the run.
+  dependencies: []
+  priority_rationale: 'Forced by Claude on the user''s instruction (2026-09-30) after
+    the mechanism audit and the public-leaderboard check: settles whether unlearning,
+    once actually active, helps unseen sites.'
+  status: completed
+  created_revision: 686
+  seeded: /home/claudio/src/knee-abnormality-sites-out/autoresearch/campaigns/site-generalization/post-audit-ideas.yaml
+  experiments:
+  - site-scanner-unlearning-grl-20260930T123100Z-88456cc5
+  decision: reject
+- id: site-frozen-backbone-batchnorm
+  mechanism_id: pretrained-batchnorm-anchoring
+  parent_idea_id: site-l2-sp-anchor
+  title: 'Anchor the backbone''s BatchNorm too: keep its running statistics and affine
+    parameters at the pretrained values throughout training'
+  opportunity: "L2-SP is the one mechanism that reproduced (+0.0015 held-out; \u2212\
+    0.0014 when removed; +0.002 on the public leaderboard). The audit showed it anchors\
+    \ only the conv weights: the backbone BatchNorm statistics and affine parameters\
+    \ drift freely, and the features the model computes with its own BatchNorm are\
+    \ as far from the pretrained ones with L2-SP as without it (1 \u2212 cosine 0.46\
+    \ at layer1 and 0.68 at layer2 in every run, 0.34 to 0.43 at layer1 from the BatchNorm\
+    \ statistics alone). site-lp-ft, which froze BatchNorm for its first epoch, gave\
+    \ +0.0016 held-out. Freezing BatchNorm extends the anchoring to the part L2-SP\
+    \ leaves free."
+  mechanism: Every BatchNorm module inside model.backbone stays in eval mode for the
+    whole run (running statistics fixed at the RadImageNet values) and its weight
+    and bias receive no updates. L2-SP on the conv weights, the heads, the augmentations
+    and all other settings are unchanged.
+  precedents:
+  - 'Mechanism audit of this campaign: L2-SP protects conv weights, not the inference-time
+    features, because BatchNorm is not anchored.'
+  - 'site-lp-ft, this campaign (BatchNorm frozen for one epoch: held-out +0.0016).'
+  - Common practice in detection and segmentation fine-tuning (frozen BatchNorm) when
+    batches are small and the pretrained statistics are trusted.
+  novelty: First run that keeps the backbone's BatchNorm at its pretrained state.
+  coverage: All training studies.
+  exploitation: 'Activation criterion: backbone BatchNorm num_batches_tracked, running
+    statistics, weight and bias identical to the pretrained values at the end of training
+    (verify from the checkpoint), and the layer1/layer2 feature distance to the pretrained
+    backbone measured with the model''s own statistics falls well below the 0.46 /
+    0.68 of the incumbent. Then held-out-site AUC and the seen-site guard.'
+  budget: Slightly cheaper than the incumbent.
+  implementation: Set the existing model.backbone_eval option to true in configs/training.yaml
+    (it keeps backbone BatchNorm in eval mode) and add the source change that freezes
+    the backbone BatchNorm weight and bias (requires_grad False before the optimizer
+    is built, so they are excluded from it), behind one option such as model.freeze_backbone_batchnorm;
+    log the checkpoint check. Change nothing else.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: 'Forced by Claude on the user''s instruction (2026-09-30): extends
+    the only reproduced mechanism to the part the audit showed it leaves free.'
+  status: completed
+  created_revision: 686
+  seeded: /home/claudio/src/knee-abnormality-sites-out/autoresearch/campaigns/site-generalization/post-audit-ideas.yaml
+  experiments:
+  - site-frozen-backbone-batchnorm-20260930T124244Z-bb04329b
+  decision: reject
+- id: site-lp-ft-on-l2-sp
+  mechanism_id: linear-probe-then-fine-tune
+  parent_idea_id: site-lp-ft
+  title: LP-FT on the L2-SP-only incumbent
+  opportunity: "site-lp-ft worked as specified (backbone and BatchNorm frozen in epoch\
+    \ 0, backbone learning-rate ramp in epoch 1, final drift 5 to 14% below its parent)\
+    \ and gave held-out +0.0016 [80% +0.00003, +0.0032] with seen \u22120.0013, but\
+    \ it ran on the L2-SP + per-label ArcFace recipe, and the audit and the public\
+    \ leaderboard (S85 0.940 vs S84 0.943) show ArcFace works against L2-SP. This\
+    \ measures LP-FT on the recipe that would be transferred."
+  mechanism: Exactly the LP-FT of site-lp-ft (one probe epoch with the backbone receiving
+    no updates and its BatchNorm in eval mode, then fine-tuning with a one-epoch backbone
+    learning-rate warmup), on the L2-SP-only incumbent.
+  precedents:
+  - site-lp-ft, this campaign.
+  - Kumar et al. 2022, Fine-Tuning can Distort Pretrained Features and Underperform
+    Out-of-Distribution.
+  novelty: First LP-FT run without ArcFace.
+  coverage: All training studies.
+  exploitation: 'Activation criterion as in site-lp-ft: backbone drift exactly 0 after
+    epoch 0, backbone learning rate 0 in epoch 0 and ramping in epoch 1, final drift
+    below the incumbent''s. Then held-out-site AUC and the seen-site guard.'
+  budget: Same as the incumbent.
+  implementation: Port outputs/autoresearch/site-generalization/experiments/site-lp-ft-20260930T103602Z-0f049bcd/changes.diff
+    onto the incumbent; its only contact with the ArcFace code is surrounding context
+    in on_train_epoch_start, so drop those ArcFace lines and change nothing else.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: 'Forced by Claude on the user''s instruction (2026-09-30): the
+    one open lead, tested on the recipe to transfer.'
+  status: completed
+  created_revision: 686
+  seeded: /home/claudio/src/knee-abnormality-sites-out/autoresearch/campaigns/site-generalization/post-audit-ideas.yaml
+  experiments:
+  - site-lp-ft-on-l2-sp-20260930T130016Z-7320c9b2
+  decision: reject
+- id: site-scanner-unlearning-bounded
+  mechanism_id: scanner-adversarial-unlearning
+  parent_idea_id: site-scanner-unlearning-grl
+  title: 'Bounded unlearning: the existing scanner-confusion KL toward the training
+    prior at a weight strong enough to suppress the head, on the L2-SP incumbent'
+  opportunity: 'site-scanner-unlearning-grl collapsed: with a gradient-reversal cross-entropy
+    adversary at weight 1.0, the reversed gradient reached 1.8 times the disease gradient
+    at the backbone by epoch 1, the adversary fell to 0.049 accuracy (anti-predictive,
+    far below the 0.208 majority), the detached probe to 0.099 with loss 2.56 above
+    the 1.90 prior entropy, training loss rose from 5.6 to 6.6 and seen-site validation
+    AUC fell to 0.52. Reversed cross-entropy is unbounded: the backbone is rewarded
+    for making the adversary ever more wrong. The earlier KL-to-prior confusion head
+    was bounded (minimal when the features carry no scanner information) but inert
+    at weight 0.1 (about 0.1% of the loss; head accuracy rose to 0.33). The unlearning
+    question therefore still needs a bounded objective at a weight that acts.'
+  mechanism: 'Re-enable the existing scanner-group confusion machinery on the incumbent
+    (site_generalization.scanner_confusion true, 8 scanner groups): the head is trained
+    on detached study features to predict the groups, and the backbone is trained
+    with the existing KL between the head''s predictions on the non-detached features
+    and the training-group prior, with the existing ramp. Set its weight (trainer.scanner_confusion_weight)
+    to 1.0 instead of 0.1. Nothing else changes.'
+  precedents:
+  - site-scanner-unlearning-grl, this campaign (unbounded reversed cross-entropy collapsed).
+  - Alvi et al. 2018, Turning a Blind Eye (confusion loss toward uniform predictions);
+    Dinsdale et al. 2021, scanner unlearning with a confusion loss.
+  - 'Mechanism audit of this campaign: the same KL head at weight 0.1 never engaged.'
+  novelty: First confusion unlearning at a weight where the KL term is a meaningful
+    share of the loss.
+  coverage: All training studies.
+  exploitation: 'Activation criterion, required before reading the AUC: the confusion
+    head''s scanner-group accuracy (trained on detached features, so it measures what
+    the features still carry) must fall and end within 0.03 of the 0.208 majority
+    rate over the last two epochs, instead of rising to 0.33, and the weighted KL
+    term must be at least 1% of the training loss. Stability check: training loss
+    must not rise between epochs 1 and 3 and seen-site validation AUC at epoch 2 must
+    be within 0.02 of the incumbent''s. Then held-out-site AUC and the seen-site guard.'
+  budget: Same as the incumbent.
+  implementation: 'Configuration change plus the smallest source change the policy
+    requires: the confusion code already exists behind site_generalization.scanner_confusion,
+    so set it true and trainer.scanner_confusion_weight 1.0 in configs/training.yaml,
+    and add per-epoch logging of the weighted KL share of the training loss in training/lightning.py.
+    Do not reuse or keep the gradient-reversal code of site-scanner-unlearning-grl.
+    Change nothing else.'
+  open_choices: None; weight 1.0 and the existing ramp are fixed before the run.
+  dependencies: []
+  priority_rationale: Forced by Claude under the user's instruction (2026-09-30) to
+    test unlearning properly, after the unbounded gradient-reversal attempt collapsed.
+  status: blocked
+  created_revision: 700
+  seeded: /home/claudio/src/knee-abnormality-sites-out/autoresearch/campaigns/site-generalization/bounded-unlearning-ideas.yaml
+  experiments:
+  - site-scanner-unlearning-bounded-20260930T131646Z-1b86182f
+  - site-scanner-unlearning-bounded-20260930T132040Z-a86c170c
+  blocked_reason: 'Block and park the candidate: its one bounded repair is exhausted
+    and the policy gate remains unresolved. The prescribed trainer.scanner_confusion_weight=1.0
+    remains outside the sealed policy. Independent inspection confirms 708 workspace
+    files are byte-identical to the parent; prepared source, changes.diff and manifest
+    are absent. Supply the complete remaining queue after parking to resolve the previous
+    report''s ranking rejection; the remaining seed retains its position.'
+- id: site-scanner-unlearning-kl
+  mechanism_id: scanner-adversarial-unlearning
+  parent_idea_id: site-scanner-unlearning-grl
+  title: 'Bounded unlearning module: a scanner head on detached features plus a KL-toward-prior
+    term on the live features, weight 1.0, on the L2-SP incumbent'
+  opportunity: 'site-scanner-unlearning-grl collapsed: with a gradient-reversal cross-entropy
+    adversary at weight 1.0, the reversed gradient reached 1.8 times the disease gradient
+    at the backbone by epoch 1, the adversary fell to 0.049 accuracy (anti-predictive,
+    far below the 0.208 majority), training loss rose from 5.6 to 6.6 and held-out
+    AUC fell 0.065. Reversed cross-entropy rewards the backbone for making the adversary
+    ever more wrong. A KL term toward the training-group prior is minimal exactly
+    when the features carry no scanner information, so it cannot reward anti-prediction.
+    The old confusion head used this objective but was inert at weight 0.1 (about
+    0.1% of the loss). An earlier version of this idea (site-scanner-unlearning-bounded)
+    asked to change trainer.scanner_confusion_weight, which the sealed campaign policy
+    does not allow; this version adds its own module under site_generalization instead,
+    like site-scanner-unlearning-grl did.'
+  mechanism: 'New unlearning module on the incumbent, independent of the old confusion
+    code (which stays disabled): (1) a linear scanner head reads the study mean of
+    the pooling tokens detached and is trained with cross-entropy on the 8 scanner
+    groups of the existing confusion machinery, so its accuracy measures how much
+    scanner identity the features still carry; (2) the same head, with its parameters
+    frozen for this term, is applied to the non-detached study features, and the backbone
+    is trained to bring the head''s predicted distribution to the training-group prior
+    with KL(prior || prediction), weight 1.0, ramped with the existing confusion ramp.
+    No gradient-reversal layer. Everything else is unchanged.'
+  precedents:
+  - site-scanner-unlearning-grl, this campaign (unbounded reversed cross-entropy collapsed).
+  - Alvi et al. 2018, Turning a Blind Eye (confusion loss toward uniform predictions);
+    Dinsdale et al. 2021, scanner unlearning with a confusion loss.
+  - 'Mechanism audit of this campaign: the same objective at weight 0.1 never engaged.'
+  novelty: First confusion unlearning at a weight where the KL term is a meaningful
+    share of the loss.
+  coverage: All training studies.
+  exploitation: 'Activation criterion, required before reading the AUC: the scanner
+    head''s accuracy on detached features must fall and end within 0.03 of the 0.208
+    majority rate over the last two epochs (the old head rose to 0.33), and the weighted
+    KL term must be at least 1% of the training loss. Stability check: training loss
+    must not rise between epochs 1 and 3 and seen-site validation AUC at epoch 2 must
+    be within 0.02 of the incumbent''s. Log per epoch: head accuracy and loss, KL,
+    weighted KL share of the loss, ramp, and the KL gradient norm at the backbone
+    relative to the disease gradient norm. Then held-out-site AUC and the seen-site
+    guard.'
+  budget: One linear head; negligible.
+  implementation: New module in training/auxiliary with an option under site_generalization
+    (for example site_generalization.scanner_prior_confusion_weight, 1.0), wired in
+    training/lightning.py; reuse the scanner-group targets, prior and ramp from training/auxiliary/scanner_confusion.py.
+    Leave site_generalization.scanner_confusion false and every trainer field unchanged.
+    Do not reuse or keep the gradient-reversal code of site-scanner-unlearning-grl.
+    Change nothing else.
+  open_choices: None; weight 1.0, the existing ramp, the 8 scanner groups and the
+    study-mean features are fixed before the run.
+  dependencies: []
+  priority_rationale: Forced by Claude under the user's instruction (2026-09-30) to
+    test unlearning properly, after the unbounded gradient-reversal attempt collapsed
+    and the first bounded version was blocked by the configuration policy.
+  status: completed
+  created_revision: 735
+  seeded: /home/claudio/src/knee-abnormality-sites-out/autoresearch/campaigns/site-generalization/bounded-unlearning-ideas.yaml
+  ranking_rationale: 'Block and park the candidate: its one bounded repair is exhausted
+    and the policy gate remains unresolved. The prescribed trainer.scanner_confusion_weight=1.0
+    remains outside the sealed policy. Independent inspection confirms 708 workspace
+    files are byte-identical to the parent; prepared source, changes.diff and manifest
+    are absent. Supply the complete remaining queue after parking to resolve the previous
+    report''s ranking rejection; the remaining seed retains its position.'
+  experiments:
+  - site-scanner-unlearning-kl-20260930T132427Z-f58e2cd1
+  decision: reject

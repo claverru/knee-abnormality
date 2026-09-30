@@ -21,9 +21,10 @@ family strengths, defined by [`configs/training.yaml`](../../configs/training.ya
 - **Report-attribute heads (training only):** 35 auxiliary heads predict the JevK5 report
   attributes (grades, hedging, silence, tear and contusion location, extra findings) from the
   shared tokens, weighted 0.1 ([design](report-attribute-heads.md)).
-- **Scanner confusion head (training only):** a detached head learns the scanner group and a
-  bounded confusion loss, weighted 0.1, keeps the tokens from carrying more scanner information
-  than the group frequencies ([design](scanner-confusion-head.md)).
+- **L2-SP weight anchoring (training only):** the backbone conv weights are pulled toward the
+  RadImageNet weights, stem and layer1 at 0.01 and the rest at 0.001, and are exempt from weight
+  decay ([result](../validation/results/2026-09-30-rn18-l2sp-no-confusion.md)). The ReXNet
+  recipe keeps the [scanner confusion head](scanner-confusion-head.md) instead.
 - **Augmentation (training only):** reflection, contrast mixing, affine, bilateral smoothing,
   one-axis resolution degradation, gamma/contrast, GIN, noise and DSU feature statistics
   ([pipeline](schedule-and-augmentation.md#ten-epoch-schedule-and-augmentation)).
@@ -43,6 +44,7 @@ comparable.
 
 | Adopted | Change | Evidence | Control after adoption |
 |---|---|---|---|
+| 2026-09-30 | L2-SP weight anchoring added and the scanner confusion head removed, on ResNet-18 only | Fold-0 tie, ×4 +0.00026 (95% [−0.0013, +0.0018]), and 0.943 public (S86) against 0.943 (S82); adopted for unseen-site robustness, measured on the sites-out splits: +0.0015, +0.0009 and +0.0023 held-out ([result](../validation/results/2026-09-30-rn18-l2sp-no-confusion.md)) | No retrain: the adopted run `rn18-l2sp-no-confusion` (`outputs/training/rn18-l2sp-no-confusion`), seed 1533697213, v2 fold 0: ×4 0.928062; fold and seed kept by user decision |
 | 2026-09-29 | RadImageNet ResNet-18 with the repeated middle slice, `backbone_lr` 5e-5 and no series dropout replaces ReXNet-200 (kept as `configs/rexnet-200.yaml`) | Ties ReXNet publicly (0.944, S79, the 36-triplet version, against S78) at 63% of the training time; no series dropout +0.0023 in the [campaign](../../autoresearch/campaigns/radimagenet-rn18/INDEX.md); the two ensemble to 0.949 (S80) | `rn18-no-series-dropout` (`outputs/autoresearch/radimagenet-rn18/experiments/rn18-no-series-dropout-20260928T213320Z-0b780262`), seed 1533697213, v2 fold 0: ×4 0.927806 |
 | 2026-09-28 | Rebuilt labels `rebuild_state_v2` and split `all_5fold_scanner_v2` | A, the pre-fix version of A2, 0.947 public (S76) against 0.946 (S73) on fold 4; A2's control 0.944 (S78) ([label rebuild](../public-labels/label-rebuild.md)) | `rebuild-state-v2-control`, seed 1533697213, v2 fold 0: ×4 0.928288 |
 | 2026-09-27 | Scanner confusion head | Fold 3, seed 2617320043: ×4 0.904442 against `half-stack-control` (−0.00076, 80% [−0.0027, +0.0011]); 0.948 public (S67) against 0.947 (S68), one rounding step ([evidence](scanner-confusion-head.md#evidence)) | `scanner-confusion-control`, seed 703791404, fold 4: ×4 0.909733 (×1 0.902061, epoch 9; scanner head accuracy 0.311, loss 1.732); 0.946 public (S73) |
@@ -81,13 +83,14 @@ bands; the experimental ten-epoch schedule was reverted. Historical
 | Other augmentation | Contrast mixing 0.3, affine 0.7, smoothing 0.2, resolution 0.25, gamma/contrast 0.5, GIN 0.3, noise 0.15, DSU 0.5 ([pipeline](schedule-and-augmentation.md#ten-epoch-schedule-and-augmentation)) |
 | `model.backbone`, `model.pretrained_weights`, `model.slice_channels` | `resnet18.a1_in1k`, `radimagenet` ([Refined-RadImageNet](../research/radimagenet-weights.md#refined-radimagenet-resnets)), `repeated_middle` |
 | `optimizer.backbone_lr` | 5e-5 (weight-RMS rule; 2e-4 for ReXNet-200) |
+| `optimizer.anchor_alpha_early`, `optimizer.anchor_alpha_late` | 0.01 (`conv1`, `bn1`, `layer1`), 0.001 (the rest): L2-SP toward the pretrained backbone weights; 0 in the ReXNet recipe |
 | Projection and attention widths | 256 and 128 (`PROJECTION_WIDTH`, `MIL_ATTENTION_WIDTH`, constants) |
 | `model.dropout`, `model.series_dropout` | 0.0, 0.0 |
 | Anatomical attention | Fixed `sign * exp(log_strength) * tanh(medial_mm / 20)` for medial/lateral meniscus and OA; two trainable strengths start at 1 |
 | Meniscus side mask | Medial/Lateral Meniscus attend only to own-side tokens plus the ±10 mm band (`COMPARTMENT_MIDLINE_BAND_MM`); unknown side, invalid geometry or no own-side token keep all tokens |
 | `trainer.half_knee_loss_weight` | 0.075 |
 | `trainer.report_attribute_loss_weight`, `paths.report_attribute_manifest` | 0.1, `labels/jevk5-report-attribute-targets-v3.1.json` |
-| `trainer.scanner_confusion_weight` | 0.1 |
+| `trainer.scanner_confusion_weight` | 0: the head is not built (0.1 in the ReXNet recipe) |
 | `labels.source`, `validation.split` | `rebuild_state_v2`, `all_5fold_scanner_v2` |
 | `validation.prediction_image_multiplier` | 4: saved predictions score the ×1-selected checkpoint at ×4, τ 1 |
 | `seed`, `validation.folds` | 1533697213, `[0]`: the control's seed and fold, inherited by new candidates ([rotation rule](../validation/validation-strategy.md#controlled-comparisons)) |
@@ -166,10 +169,10 @@ Tokens receive four additive embeddings:
   normalized tokens and a softmax over its options. The reliability-weighted soft cross-entropy
   against the JevK5 targets is added with weight 0.1. Prediction never uses the heads
   ([report-attribute heads](report-attribute-heads.md)).
-- **Scanner confusion head:** `ScannerConfusionHead` in the Lightning module learns the 8 scanner
-  groups from detached tokens; a second pass with detached head parameters adds
-  `0.1 × ramp × KL(frequencies ‖ prediction)` to the backbone's loss. Prediction never uses it
-  ([scanner confusion head](scanner-confusion-head.md)).
+- **L2-SP:** the Lightning module keeps a copy of each pretrained backbone conv weight as a buffer
+  and adds `alpha × ‖w − w₀‖²` per weight to the loss, with the early alpha for names starting
+  `conv1.`, `bn1.` or `layer1.`; a positive early alpha on a backbone without those names fails.
+  Anchored weights are excluded from weight decay. Prediction never uses the buffers.
 
 The plane and contrast lookup buffers derive from the configured metadata, not from slot order.
 The ReXNet adapter derives stride 32 and origin 0 from its convolutions. The

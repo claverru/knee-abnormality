@@ -1,9 +1,12 @@
 # Scanner confusion head
 
-**Part of the recipe since 2026-09-27** (user decision): a training-only head learns the study's
+**Part of the ReXNet recipe (`configs/rexnet-200.yaml`) since 2026-09-27; removed from the
+ResNet-18 recipe on 2026-09-30** (user decisions): a training-only head learns the study's
 scanner group from detached tokens, and a bounded confusion loss pushes the backbone's tokens
 toward carrying no more scanner information than the group frequencies. It is dropped at
-inference. The evidence and the rejected variants are in [bias_free.md](../../bias_free.md).
+inference. At `trainer.scanner_confusion_weight: 0` the head is not built. It never engaged: its
+accuracy kept rising and its KL term stayed about 0.1% of the loss on both backbones, and removing
+it was neutral ([removal](../validation/results/2026-09-30-rn18-l2sp-no-confusion.md)). The evidence and the rejected variants are in [bias_free.md](../../bias_free.md).
 
 ## Why
 
@@ -14,7 +17,7 @@ the site.
 
 ## Configuration
 
-Required in every experiment config:
+Required in every experiment config; 0 disables the head:
 
 ```yaml
 trainer:

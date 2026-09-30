@@ -77,6 +77,8 @@ optimizer:
   backbone_lr: 0.00005
   head_lr: 0.0006
   weight_decay: 0.01
+  anchor_alpha_early: 0.01
+  anchor_alpha_late: 0.001
   beta1: 0.9
   beta2: 0.999
   epsilon: 0.00000001
@@ -99,4 +101,4 @@ trainer:
   class_balance_exponent: 0.5
   half_knee_loss_weight: 0.075
   report_attribute_loss_weight: 0.1
-  scanner_confusion_weight: 0.1
+  scanner_confusion_weight: 0.0

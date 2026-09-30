@@ -1,0 +1,38 @@
+ideas:
+- id: site-arcface-without-l2-sp
+  mechanism_id: l2-sp-anchor-removal
+  parent_idea_id: site-l2-sp-anchor
+  title: 'Simplification: remove the L2-SP anchor from the incumbent, keeping per-label ArcFace'
+  opportunity: 'User concern (2026-09-30): stacked mechanisms may interfere, and one proper mechanism may suffice. The two adoptions are the same size as seed noise (site-l2-sp-anchor +0.0015 held-out, site-arcface-per-label-pooled +0.0018 on top of it; a fresh-seed rerun of the final recipe moved held-out -0.0022, and the same-seed retake site-acquisition-channel-selective-reseed failed to reproduce a +0.0015 single-run gain). Per-label ArcFace has never run without L2-SP. If this simpler recipe lands within about 0.001 of the incumbent, it is the safer recipe to transfer.'
+  mechanism: 'Remove the L2-SP anchoring from the incumbent entirely: the site_generalization.anchor_alpha_early and anchor_alpha_late options, the anchor buffers registered in the Lightning module, the anchor penalty added to the loss and its per-stage drift logging. Everything else in the incumbent is unchanged, including the per-label ArcFace head (arcface_weight 0.3, margin 0.2, scale 16), the scanner confusion head and all optimizer settings.'
+  precedents:
+  - 'site-l2-sp-anchor, this campaign (held-out +0.001514 against the control).'
+  - 'site-arcface-per-label-pooled, this campaign (held-out +0.001841 on top of L2-SP).'
+  - 'site-incumbent-reseed-20260930T082402Z, this campaign (fresh-seed rerun of the final recipe: held-out -0.0022, seen -0.0033).'
+  - 'Gulrajani and Lopez-Paz 2021, In Search of Lost Domain Generalization (well-tuned ERM rarely beaten by added mechanisms).'
+  novelty: First run of per-label ArcFace without L2-SP.
+  coverage: All training studies.
+  exploitation: Held-out-site AUC and seen-site guard against the fresh-seed incumbent; read as a simplification test, where a result within about 0.001 favours the simpler recipe.
+  budget: Slightly cheaper than the incumbent (no anchor penalty).
+  implementation: 'Delete the anchor code paths and the two options from configs/training.yaml, src/knee_abnormality/config.py and src/knee_abnormality/training/lightning.py; do not leave a disabled branch. Restore the optimizer exactly as it was before site-l2-sp-anchor: site-l2-sp-anchor also exempted the anchored backbone weights from weight decay (the anchored_backbone_names argument), so remove that argument and use weight_decay = 0.0 if parameter.ndim < 2 else settings.weight_decay for every parameter, which gives backbone weight matrices optimizer.weight_decay (0.01) again. Do not exempt backbone parameters from weight decay in any other way. Change nothing else.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: 'Forced by Claude on the user''s instruction (2026-09-30) to test whether one mechanism is enough.'
+- id: site-no-scanner-confusion-reseed
+  mechanism_id: scanner-confusion-removal
+  parent_idea_id: site-no-scanner-confusion
+  title: 'Simplification: remove the scanner confusion head from the incumbent, at the fresh seed'
+  opportunity: 'site-no-scanner-confusion removed the head from the same source at the old seed: held-out -0.0001 [-0.0012, +0.0011], seen -0.0012 against the adopted run, whose seen-site score was later shown to be about 0.003 above a fresh-seed rerun. On unseen sites the head contributes nothing measurable. Same user concern as site-arcface-without-l2-sp: fewer stacked mechanisms, less room for interference.'
+  mechanism: 'Exactly the change of site-no-scanner-confusion: the scanner confusion head is not built, trained or logged, and its loss term is removed; everything else in the incumbent (L2-SP, per-label ArcFace, all settings) is unchanged.'
+  precedents:
+  - 'site-no-scanner-confusion, this campaign (held-out -0.000098, seen -0.0012 against the adopted run at the old seed).'
+  - 'site-incumbent-reseed-20260930T082402Z, this campaign (fresh-seed rerun of the final recipe: held-out -0.0022, seen -0.0033).'
+  novelty: First measurement at the fresh seed against the unselected reference.
+  coverage: All training studies.
+  exploitation: Held-out-site AUC and seen-site guard against the fresh-seed incumbent; read as a simplification test, where a result within about 0.001 favours the simpler recipe.
+  budget: Slightly cheaper than the incumbent.
+  implementation: 'Port the candidate diff unchanged: outputs/autoresearch/site-generalization/experiments/site-no-scanner-confusion-20260929T215822Z-14d0d71d/changes.diff (its source directory holds the full files). Its parent source is identical to the current incumbent''s source; change nothing else.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: 'Forced by Claude on the user''s instruction (2026-09-30) to test whether one mechanism is enough.'
+exhausted_directions: Linear scanner erasure (learned subspace and LEACE), DRO variants and cross-seed readings of single-run gains; a same-seed retake of channel-selective acquisition normalization did not reproduce.
