@@ -1,0 +1,26 @@
+ideas:
+- id: refined-rn50-scaled-backbone-lr
+  mechanism_id: backbone-refined-resnet50
+  parent_idea_id: refined-rn50-incumbent-recipe
+  title: Refined-RadImageNet ResNet-50 with the backbone LR scaled to its weight size, 5.5e-5, ten
+    epochs (user seed)
+  opportunity: 'User decision, 2026-10-01: as refined-rn50-incumbent-recipe, with the backbone learning
+    rate set by the project''s weight-RMS rule instead of copied from ResNet-18. The Refined ResNet-50
+    has median convolution RMS 0.0136 against ResNet-18''s 0.0124, so 5e-5 x 0.0136 / 0.0124 = 5.5e-5.'
+  mechanism: 'Exactly refined-rn50-incumbent-recipe (model.backbone resnet50.a1_in1k with the Refined
+    RadImageNet weights, ten epochs, every other setting as the incumbent) with optimizer.backbone_lr
+    5.5e-5.'
+  precedents:
+  - 'refined-resnet50-ideas.yaml: checkpoint hash, inspection and median convolution RMS 0.0136.'
+  - 'docs/ongoing/radimagenet-backbone.md: the weight-RMS rule (ResNet-18 5e-5 at RMS 0.0124).'
+  novelty: First Refined-RadImageNet ResNet-50 run at its own scaled rate.
+  coverage: All studies and labels.
+  exploitation: Per-epoch x1 and per-stage drift against the incumbent and refined-rn50-incumbent-recipe.
+  budget: About 1,870 s for ten epochs, inside the raised 611-2,016 s range.
+  implementation: Reuse the reviewed refined-rn50-incumbent-recipe source (the resnet50.a1_in1k
+    weights entry and spatial-token registration) and set optimizer.backbone_lr 5.5e-5 in
+    configs/training.yaml. Runs against the incumbent at its turn, independent of the 5e-5 verdict.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: User seed.
+exhausted_directions: None.

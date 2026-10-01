@@ -2,6 +2,7 @@
 
 | Read when | Document |
 |---|---|
+| Reviewing the revisits campaign on ResNet-18 (re-tested plane readouts and removals, plane-contrast readouts and no anatomical bias accepted, EMA, 18 hyperparameter runs), the Refined-RadImageNet ResNet-50 (+0.0046, S88 0.948), one backbone per plane on ResNet-18/10t, and the ReXNet + ResNet-50 blend (S89 0.951) | [2026-10-01 revisits campaign](2026-10-01-revisits-campaign.md) |
 | Checking the 2026-09-30 adoption on ResNet-18 of L2-SP weight anchoring and removal of the inert scanner confusion head (fold-0 tie +0.00026, public tie S86 0.943 against S82), and the unseen-site evidence from the sites-out splits that motivated it | [2026-09-30 ResNet-18 L2-SP without confusion head](2026-09-30-rn18-l2sp-no-confusion.md) |
 | Checking what an unseen site costs the current recipe: the Kaggle sites-out run without five inferred training sites (site cost −0.0092 hard, −0.0059 soft; 23% less data costs −0.0009 on seen sites) | [2026-09-29 sites-out diagnostic](2026-09-29-sites-out-diagnostic.md) |
 | Checking which autoresearch verdicts change when every past comparison is re-scored on `rebuild_state_v2` (5 of 151 flip; the OA detector flip matches S58; token-dropout passes are noise; plane-contrast readouts is the retry candidate), and which main adoptions lose their local support (anatomical strengths, smoothing, DSU; none turns harmful) | [2026-09-28 campaign re-scoring](2026-09-28-campaign-rescoring.md) |

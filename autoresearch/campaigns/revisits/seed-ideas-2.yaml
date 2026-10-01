@@ -1,0 +1,94 @@
+ideas:
+- id: no-resolution-degradation
+  mechanism_id: regularization-removal
+  parent_idea_id: null
+  title: Remove one-axis resolution degradation augmentation (probability 0.25 to 0)
+  opportunity: 'The only half-stack augmentation not yet checked on ResNet-18: removing contrast
+    mixing scored +0.0006 (rn18-native-contrast-preservation), a run that in effect removed GIN
+    scored -0.0015, and halving DSU changed nothing. ResNet-18 underfits and gained from removing
+    series dropout (+0.0023).'
+  mechanism: data.resolution_augmentation.probability 0.
+  precedents:
+  - 'Half stack adoption: docs/validation/results/2026-09-26-augmentation-campaign.md.'
+  - 'radimagenet-rn18 and site-generalization findings for the other half-stack members.'
+  novelty: First removal on ResNet-18.
+  coverage: All studies and labels.
+  exploitation: Training loss and per-label AUC against the incumbent.
+  budget: Slightly cheaper than the incumbent.
+  implementation: Configuration-only change to configs/training.yaml.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Completes the ResNet-18 check of the half stack; guess, low confidence.
+- id: plane-contrast-feature-adapters
+  mechanism_id: plane-contrast-feature-adapters
+  parent_idea_id: null
+  title: Zero-initialized residual bottleneck adapter per plane/contrast type on the projected tokens
+  opportunity: 'Readouts after pooling cannot change which evidence attention selects. An adapter per
+    acquisition type before attention can, while the backbone stays shared (AnyMC3D''s view-specific
+    adapters, adapted here). Accepted for the backlog on 2026-09-21, never implemented.'
+  mechanism: 'After the shared 256-wide token projection and before the embeddings and attention,
+    add h + U_q(GELU(D_q h)) where q is the token''s plane/contrast type (six types), D_q 256 to 32,
+    U_q 32 to 256 and zero-initialized so the candidate starts as the incumbent. The adapted tokens
+    feed scoring, pooling and every head.'
+  precedents:
+  - 'docs/backlog/small-changes.md#planecontrast-specific-feature-adapters.'
+  - 'docs/research/pretraining-and-external-data.md#adapting-2d-foundation-models-to-volumes.'
+  novelty: Untested; the pre-pooling sibling of plane-contrast readouts.
+  coverage: All studies and labels; types missing from a study add nothing.
+  exploitation: Log each type's adapter output RMS relative to h per epoch; per-label AUC and
+    missing-type strata against the incumbent.
+  budget: 6 x 2 x 256 x 32 parameters and one small matmul per token; negligible.
+  implementation: A new model.type_adapters option in config.py and modeling/model.py; head learning
+    rate for the adapter parameters.
+  open_choices: None; bottleneck 32 and the six types are fixed.
+  dependencies: []
+  priority_rationale: Specializes where attention chooses evidence, which the readout ideas cannot.
+- id: plane-conditioned-batchnorm
+  mechanism_id: plane-conditioned-normalization
+  parent_idea_id: null
+  title: Separate layer3/layer4 BatchNorm statistics by plane while sharing convolutions and affine
+    parameters
+  opportunity: 'Every upper-stage BatchNorm mixes axial, coronal and sagittal images in one set of
+    batch and running statistics, although the planes differ in appearance. Queued in the
+    radimagenet-rn18 backlog as rn18-plane-conditioned-upper-statistics and never run.'
+  mechanism: 'Partition the batch and the running mean/variance by plane in every layer3 and layer4
+    BatchNorm, including downsample branches. Keep one shared affine weight and bias and one shared
+    convolutional backbone. Initialize all three running-statistic copies from the pretrained state.
+    Training updates each present plane''s statistics; evaluation uses that plane''s stored
+    statistics. Empty planes receive no update. Lower stages, DSU and L2-SP stay as in the incumbent.'
+  precedents:
+  - 'autoresearch/campaigns/radimagenet-rn18/ideas.yaml, rn18-plane-conditioned-upper-statistics.'
+  - 'Chang et al., Domain-Specific Batch Normalization, arXiv 1906.03950.'
+  novelty: Plane specialization inside the shared backbone without extra convolutions or heads.
+  coverage: All studies and planes.
+  exploitation: Log per-plane image counts, the separation of the per-plane running means, and the
+    output RMS difference from pooled statistics on sampled batches.
+  budget: No extra convolution; indexed normalization only.
+  implementation: A new model.plane_batchnorm option in config.py; the normalizer in modeling/,
+    swapped in after pretrained loading; pass the existing plane vector to the backbone call.
+  open_choices: None; layer3/layer4 scope and three plane groups are fixed.
+  dependencies: []
+  priority_rationale: Guess, low to moderate confidence; the one plane-specialization point inside
+    the backbone.
+- id: rn18-stochastic-depth
+  mechanism_id: stochastic-depth
+  parent_idea_id: null
+  title: Stochastic depth (drop path) in ResNet-18 at rate 0.1
+  opportunity: '+0.0011 on ReXNet-200 (re-scored +0.0006), never tried on ResNet-18. Against it:
+    ResNet-18 gained from removing series dropout, so extra regularization may hurt.'
+  mechanism: Pass drop_path_rate 0.1 to timm.create_model for the backbone; training randomly skips
+    residual branches per sample with the rate rising linearly with depth to 0.1; validation and
+    inference run every block.
+  precedents:
+  - 'augmentation campaign: rexnet-stochastic-depth-20260926T045526Z-1de7a03e.'
+  novelty: First run on ResNet-18.
+  coverage: All studies and labels.
+  exploitation: Training loss, per-stage drift and per-label AUC against the incumbent; confirm
+    DropPath modules are active in training mode.
+  budget: None measurable.
+  implementation: A new model.drop_path_rate option (0 reproduces the incumbent) in config.py and
+    modeling/model.py.
+  open_choices: None; the rate is not swept.
+  dependencies: []
+  priority_rationale: Cheap and untested on this backbone; lowest expected value of the seeds.
+exhausted_directions: See seed-ideas.yaml.

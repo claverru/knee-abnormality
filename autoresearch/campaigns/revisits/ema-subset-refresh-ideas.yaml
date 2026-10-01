@@ -1,0 +1,55 @@
+ideas:
+- id: ema-0999-subset-refresh
+  mechanism_id: weight-averaging-ema
+  parent_idea_id: ema-0999
+  title: EMA of the weights at decay 0.999 with a BatchNorm refresh on a fixed quarter of the training
+    studies (user seed, runtime retake)
+  opportunity: 'User seed ema-0999 never produced a result: three runs stopped on the training-time
+    projection (1,884, 1,870 and, by review, a blocked second repair), because the per-epoch BatchNorm
+    refresh over all 3,495 training studies costs 67-73 s on top of a 122 s epoch. The reviewer
+    blocked the final repair on the one-repair review allowance, a harness limit, not on evidence
+    against EMA (forced by Claude as campaign keeper, under the user''s 2026-09-30 EMA order).'
+  mechanism: 'optimizer.weight_averaging {method: ema, decay: 0.999}, as in ema-0999: the average
+    updates every optimizer step after warmup with weight 1 - decay, and the averaged weights are
+    validated, selected and scored at x4. The only change from the reviewed EMA code: before each
+    validation, the averaged model''s BatchNorm statistics are refreshed on a fixed subset of 25% of
+    the training studies, drawn once per run from the run seed, through the same training-mode input
+    path, instead of on every training study. Keep the refresh''s other behaviour (reset running
+    statistics, no gradients, RNG state restored).'
+  precedents:
+  - 'Runtime-invalid runs ema-0999-20260930T232339Z-88802fe2 and ema-0999-20260930T235148Z-01fd5427;
+    blocked repair ema-0999-20261001T001421Z-8b292e94 (outputs/autoresearch/revisits/experiments/).'
+  - 'BatchNorm statistics converge on a few hundred batches; a quarter of the studies is about 870 studies.'
+  novelty: First EMA run on this recipe that can finish inside the budget.
+  coverage: All studies and labels; the refresh subset only affects BatchNorm statistics.
+  exploitation: Log the refresh seconds per epoch and the refresh study count.
+  budget: Refresh about 18 s instead of about 70 s per epoch, so about 140 s per epoch and 1,400 s in
+    all, inside the 611-1,833 s range.
+  implementation: Start from the reviewed EMA refresh in the blocked repair's source and add a
+    seeded subset of training studies for the refresh loader under optimizer.weight_averaging
+    (refresh_fraction 0.25, with 1.0 reproducing the full refresh).
+  open_choices: None; the fraction is fixed at 0.25.
+  dependencies: []
+  priority_rationale: User seed retake; the earlier attempts are invalid on runtime only.
+- id: ema-09995-subset-refresh
+  mechanism_id: weight-averaging-ema
+  parent_idea_id: ema-09995
+  title: EMA of the weights at decay 0.9995 with a BatchNorm refresh on a fixed quarter of the
+    training studies (user seed, runtime retake)
+  opportunity: 'As ema-0999-subset-refresh: user seed ema-09995 was stopped twice on the training-time
+    projection (1,896 and 1,874 s) by the same full-training-set refresh.'
+  mechanism: 'optimizer.weight_averaging {method: ema, decay: 0.9995} with the 25% refresh subset of
+    ema-0999-subset-refresh. Runs against the incumbent at its turn, independent of the 0.999
+    verdict; if ema-0999-subset-refresh was accepted, this candidate replaces its decay rather than
+    stacking a second average.'
+  precedents:
+  - 'Runtime-invalid runs ema-09995-20260930T234509Z-49eff0c7 and ema-09995-20260930T235826Z-d8f8d20c.'
+  novelty: Longer EMA window than any earlier run, inside the budget.
+  coverage: As ema-0999-subset-refresh.
+  exploitation: As ema-0999-subset-refresh.
+  budget: As ema-0999-subset-refresh.
+  implementation: As ema-0999-subset-refresh, decay 0.9995.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: User seed retake.
+exhausted_directions: None.

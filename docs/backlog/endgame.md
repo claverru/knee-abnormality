@@ -230,6 +230,13 @@ same option also serves speed (*Speed* below).
   [`prepare_image_blend_labels`](../../scripts/tools/prepare_image_blend_labels.py), whose teacher
   runs, split and blend weight are constants to point at the new folds. Fix the weight before the
   first run: 0.7/0.3 per the precedent below, or the tested 0.5/0.5. Do not choose it on gold.
+- *Per-label teacher weights (user, 2026-09-30):* when several teachers are blended, weight each
+  label by that teacher's measured per-label strength rather than one global weight. Models trade
+  labels: plane-contrast readouts gained Lateral OA +0.0054 (95% [+0.0009, +0.0104]) and lost
+  Fracture −0.0024 against the control in the `revisits` campaign. Every campaign comparison saves
+  the per-label ×4 AUCs in `comparison/per_label.json`; the campaign monitor
+  (`scripts/tools/serve_campaign_monitor.py`) shows them per run. Fix the per-label weights from
+  out-of-fold AUCs before the child run, never from fold-0 or gold results.
 
 - *External evidence:* the Plant Pathology 2020 first-place solution used this recipe: five-fold
   out-of-fold predictions and 0.7 truth + 0.3 prediction

@@ -1,0 +1,2343 @@
+revision: 787
+ideas:
+- id: dense-plane-readouts
+  mechanism_id: dense-plane-readouts
+  parent_idea_id: null
+  title: Dense per-plane readouts on the shared backbone, with a learned per-label
+    plane fusion
+  opportunity: 'Each label leans on one plane (single-plane inference: ACL sagittal,
+    MCL coronal, Effusion and Baker''s axial), yet one joint attention pool mixes
+    all planes before the classifier. In the plane-specialization campaign, making
+    every plane predict every label from its own tokens was the one change that helped
+    (+0.0047, +0.0032 re-scored on rebuild_state_v2), but only with one backbone per
+    plane. It was never tried on the shared backbone.'
+  mechanism: For every label c and present plane p (axial, coronal, sagittal), pool
+    plane p's tokens with the label's existing attention (scorer, anatomical bias,
+    meniscus mask and OA detector unchanged, softmax restricted to that plane's tokens)
+    and read z_cp with the shared classifier. Each z_cp takes the class-balanced BCE,
+    averaged over the planes present in the study, as the disease loss. A learned
+    per-label fusion, a softmax over present planes of zero-initialized weights a_cp
+    applied to detached z_cp and trained with class-balanced BCE at weight 1, gives
+    the validation and inference output. A study missing a plane fuses over the planes
+    it has.
+  precedents:
+  - 'plane-specialization campaign: dense-plane-readouts +0.0047 (re-scored +0.0032,
+    80% [+0.0010, +0.0053]) and dense-readouts-learned-fusion +0.0009 on top, on three
+    EfficientNet-B0s (docs/validation/results/2026-09-28-plane-specialization-campaign.md).'
+  - 'Code: frozen sources of outputs/autoresearch/plane-specialization/experiments/dense-readouts-learned-fusion-20260927T231847Z-33417f97/source/
+    (modeling/planes/, trainer.plane_pooling, model.plane_pooling).'
+  - 'Single-plane inference: docs/validation/results/2026-09-27-single-plane-inference.md.'
+  novelty: First dense per-plane readout on the shared backbone; the plane-backbone
+    runs changed the backbone at the same time.
+  coverage: All studies and labels.
+  exploitation: Log each plane's own validation macro AUC, the fusion weights per
+    label and plane, and per-epoch training loss per plane.
+  budget: Three masked attention pools per label on the existing tokens; negligible
+    against the 1,222 s reference.
+  implementation: Port the pooling and fusion from the plane-specialization source
+    under a new model.plane_readouts option in config.py and modeling/, with the per-plane
+    loss in the Lightning module. One shared backbone, no per-plane backbones.
+  open_choices: None; fusion and loss weighting are fixed as above.
+  dependencies: []
+  priority_rationale: Strongest measured effect on the list, with a mechanism that
+    does not depend on separate backbones.
+  status: completed
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality-revisits/autoresearch/campaigns/revisits/seed-ideas.yaml
+  experiments:
+  - dense-plane-readouts-20260930T201517Z-2053a753
+  decision: reject
+- id: plane-contrast-readouts
+  mechanism_id: plane-contrast-specific-readouts
+  parent_idea_id: null
+  title: Give each plane/contrast type its own readout weights before summing, initialized
+    from the shared readout
+  opportunity: 'The only clean flip of the campaign re-scoring: -0.0006 on its recorded
+    labels, +0.0018 (80% [+0.0001, +0.0035]) on rebuild_state_v2, +0.0010 net of the
+    near-misses reference shift. Labels draw on different acquisition types (PF OA:
+    axial fluid 29%, sagittal 54%), and one linear classifier per label collapses
+    them.'
+  mechanism: Keep six partial vectors per label, u_cq = sum over tokens of type q
+    of alpha_ci * h_i, with the same global attention denominator, and compute z_c
+    = sum_q w_cq . u_cq + b_c. Initialize every w_cq from the shared w_c, which reproduces
+    the original predictions apart from summation order; missing types contribute
+    zero. If the incumbent carries dense per-plane readouts, this candidate removes
+    them and restores the joint pool, so it tests the alternative, not a stack.
+  precedents:
+  - near-misses run plane-contrast-readouts-20260925T020628Z-2efb517d (frozen source
+    under outputs/autoresearch/near-misses/experiments/).
+  - 'Re-scoring: docs/validation/results/2026-09-28-campaign-rescoring.md.'
+  novelty: First run on ResNet-18 and the current labels.
+  coverage: All labels.
+  exploitation: Log the divergence of each w_cq from its initialization per epoch;
+    per-label AUC against the incumbent.
+  budget: Six times the readout weights; negligible.
+  implementation: A new model.plane_readout option in config.py and modeling/model.py;
+    compute the per-type contributions without a large pooling tensor.
+  open_choices: None; initialization is fixed.
+  dependencies: []
+  priority_rationale: Passes on the labels that track the public board best; cheap.
+  status: completed
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality-revisits/autoresearch/campaigns/revisits/seed-ideas.yaml
+  experiments:
+  - plane-contrast-readouts-20260930T202714Z-01be9ca5
+  decision: provisional_accept
+- id: no-dsu
+  mechanism_id: regularization-removal
+  parent_idea_id: null
+  title: Remove DSU feature-statistics augmentation (probability 0.5 to 0)
+  opportunity: DSU was adopted on ReXNet as a replicated near-miss; on rebuild_state_v2
+    neither replication holds (+0.0011 [-0.0014, +0.0035] and -0.0003 [-0.0020, +0.0015]).
+    On ResNet-18, halving it changed nothing (+0.00005), and removing another regularizer,
+    series dropout, gained +0.0023.
+  mechanism: model.feature_statistics_augmentation.probability 0.
+  precedents:
+  - 'Re-scoring, main adoptions: docs/validation/results/2026-09-28-campaign-rescoring.md#main-adoptions.'
+  - 'radimagenet-rn18: rn18-lighter-dsu +0.00005; rn18-no-series-dropout +0.0023.'
+  novelty: First removal on ResNet-18.
+  coverage: All studies and labels.
+  exploitation: Training loss, per-stage drift and per-label AUC against the incumbent.
+  budget: Slightly cheaper than the incumbent.
+  implementation: Configuration-only change to configs/training.yaml.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Adoption lost its support; a free simplification if it ties.
+  status: completed
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality-revisits/autoresearch/campaigns/revisits/seed-ideas.yaml
+  experiments:
+  - no-dsu-20260930T204913Z-9cde3669
+  decision: reject
+- id: no-anatomical-bias
+  mechanism_id: anatomical-bias-removal
+  parent_idea_id: null
+  title: Remove the side-aware anatomical attention bias and its two learned strengths
+  opportunity: The bias was adopted on learned strengths against a control without
+    it (+0.0023, 80% low +0.0001); re-scored on rebuild_state_v2 that becomes +0.0001
+    [-0.0019, +0.0023], and +0.0016 [-0.0008, +0.0039] against control B. The fixed-strength
+    bias was never supported. The meniscus own-side mask and half-knee loss, adopted
+    later, now carry the medial-lateral split for the menisci.
+  mechanism: 'Set the anatomical attention bias to zero for all labels: no tanh(medial_mm
+    / 20) term and no anatomical_log_strength parameters. The meniscus side mask,
+    the half-knee loss and the three-compartment OA detector stay unchanged.'
+  precedents:
+  - docs/validation/results/2026-09-21-anatomical-attention-result.md.
+  - 'Re-scoring: docs/validation/results/2026-09-28-campaign-rescoring.md#main-adoptions.'
+  novelty: First removal since adoption; the recipe has since gained the side mask
+    and OA detector.
+  coverage: The four compartment labels directly; all labels through shared training.
+  exploitation: Per-label AUC for Medial/Lateral Meniscus and Medial/Lateral/PF OA
+    against the incumbent; the incumbent's learned strengths for reference.
+  budget: Unchanged.
+  implementation: A new model.anatomical_bias option (true reproduces the incumbent)
+    in config.py and modeling/model.py.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Adoption lost its support and the side mask may have made it
+    redundant.
+  status: completed
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality-revisits/autoresearch/campaigns/revisits/seed-ideas.yaml
+  experiments:
+  - no-anatomical-bias-20260930T211057Z-44411132
+  - no-anatomical-bias-20260930T213145Z-58126164
+  decision: provisional_accept
+- id: no-bilateral-smoothing
+  mechanism_id: regularization-removal
+  parent_idea_id: null
+  title: Remove bilateral smoothing augmentation (probability 0.2 to 0)
+  opportunity: Adopted on a local pass (+0.0020, 80% low +0.0002) that re-scores to
+    +0.0008 [-0.0009, +0.0027] on rebuild_state_v2, partly through the augmentation
+    campaign's reference shift. ResNet-18 underfits and gained from removing series
+    dropout.
+  mechanism: data.smoothing_augmentation.probability 0.
+  precedents:
+  - 'Re-scoring: docs/validation/results/2026-09-28-campaign-rescoring.md.'
+  - 'Augmentation campaign: docs/validation/results/2026-09-26-augmentation-campaign.md.'
+  novelty: First removal on ResNet-18.
+  coverage: All studies and labels.
+  exploitation: Training loss and per-label AUC against the incumbent.
+  budget: Slightly cheaper than the incumbent.
+  implementation: Configuration-only change to configs/training.yaml.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Adoption lost its local support; a free simplification if it
+    ties.
+  status: completed
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality-revisits/autoresearch/campaigns/revisits/seed-ideas.yaml
+  experiments:
+  - no-bilateral-smoothing-20260930T213507Z-f3e1a6ba
+  decision: reject
+- id: no-resolution-degradation
+  mechanism_id: regularization-removal
+  parent_idea_id: null
+  title: Remove one-axis resolution degradation augmentation (probability 0.25 to
+    0)
+  opportunity: 'The only half-stack augmentation not yet checked on ResNet-18: removing
+    contrast mixing scored +0.0006 (rn18-native-contrast-preservation), a run that
+    in effect removed GIN scored -0.0015, and halving DSU changed nothing. ResNet-18
+    underfits and gained from removing series dropout (+0.0023).'
+  mechanism: data.resolution_augmentation.probability 0.
+  precedents:
+  - 'Half stack adoption: docs/validation/results/2026-09-26-augmentation-campaign.md.'
+  - radimagenet-rn18 and site-generalization findings for the other half-stack members.
+  novelty: First removal on ResNet-18.
+  coverage: All studies and labels.
+  exploitation: Training loss and per-label AUC against the incumbent.
+  budget: Slightly cheaper than the incumbent.
+  implementation: Configuration-only change to configs/training.yaml.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Completes the ResNet-18 check of the half stack; guess, low
+    confidence.
+  status: completed
+  created_revision: 1
+  seeded: /home/claudio/src/knee-abnormality-revisits/autoresearch/campaigns/revisits/seed-ideas-2.yaml
+  experiments:
+  - no-resolution-degradation-20260930T215626Z-d6bcc586
+  - no-resolution-degradation-20260930T221605Z-c6df1bdb
+  decision: reject
+- id: plane-contrast-feature-adapters
+  mechanism_id: plane-contrast-feature-adapters
+  parent_idea_id: null
+  title: Zero-initialized residual bottleneck adapter per plane/contrast type on the
+    projected tokens
+  opportunity: Readouts after pooling cannot change which evidence attention selects.
+    An adapter per acquisition type before attention can, while the backbone stays
+    shared (AnyMC3D's view-specific adapters, adapted here). Accepted for the backlog
+    on 2026-09-21, never implemented.
+  mechanism: After the shared 256-wide token projection and before the embeddings
+    and attention, add h + U_q(GELU(D_q h)) where q is the token's plane/contrast
+    type (six types), D_q 256 to 32, U_q 32 to 256 and zero-initialized so the candidate
+    starts as the incumbent. The adapted tokens feed scoring, pooling and every head.
+  precedents:
+  - docs/backlog/small-changes.md#planecontrast-specific-feature-adapters.
+  - docs/research/pretraining-and-external-data.md#adapting-2d-foundation-models-to-volumes.
+  novelty: Untested; the pre-pooling sibling of plane-contrast readouts.
+  coverage: All studies and labels; types missing from a study add nothing.
+  exploitation: Log each type's adapter output RMS relative to h per epoch; per-label
+    AUC and missing-type strata against the incumbent.
+  budget: 6 x 2 x 256 x 32 parameters and one small matmul per token; negligible.
+  implementation: A new model.type_adapters option in config.py and modeling/model.py;
+    head learning rate for the adapter parameters.
+  open_choices: None; bottleneck 32 and the six types are fixed.
+  dependencies: []
+  priority_rationale: Specializes where attention chooses evidence, which the readout
+    ideas cannot.
+  status: completed
+  created_revision: 1
+  seeded: /home/claudio/src/knee-abnormality-revisits/autoresearch/campaigns/revisits/seed-ideas-2.yaml
+  experiments:
+  - plane-contrast-feature-adapters-20260930T221932Z-17d787e9
+  decision: reject
+- id: plane-conditioned-batchnorm
+  mechanism_id: plane-conditioned-normalization
+  parent_idea_id: null
+  title: Separate layer3/layer4 BatchNorm statistics by plane while sharing convolutions
+    and affine parameters
+  opportunity: Every upper-stage BatchNorm mixes axial, coronal and sagittal images
+    in one set of batch and running statistics, although the planes differ in appearance.
+    Queued in the radimagenet-rn18 backlog as rn18-plane-conditioned-upper-statistics
+    and never run.
+  mechanism: Partition the batch and the running mean/variance by plane in every layer3
+    and layer4 BatchNorm, including downsample branches. Keep one shared affine weight
+    and bias and one shared convolutional backbone. Initialize all three running-statistic
+    copies from the pretrained state. Training updates each present plane's statistics;
+    evaluation uses that plane's stored statistics. Empty planes receive no update.
+    Lower stages, DSU and L2-SP stay as in the incumbent.
+  precedents:
+  - autoresearch/campaigns/radimagenet-rn18/ideas.yaml, rn18-plane-conditioned-upper-statistics.
+  - Chang et al., Domain-Specific Batch Normalization, arXiv 1906.03950.
+  novelty: Plane specialization inside the shared backbone without extra convolutions
+    or heads.
+  coverage: All studies and planes.
+  exploitation: Log per-plane image counts, the separation of the per-plane running
+    means, and the output RMS difference from pooled statistics on sampled batches.
+  budget: No extra convolution; indexed normalization only.
+  implementation: A new model.plane_batchnorm option in config.py; the normalizer
+    in modeling/, swapped in after pretrained loading; pass the existing plane vector
+    to the backbone call.
+  open_choices: None; layer3/layer4 scope and three plane groups are fixed.
+  dependencies: []
+  priority_rationale: Guess, low to moderate confidence; the one plane-specialization
+    point inside the backbone.
+  status: completed
+  created_revision: 1
+  seeded: /home/claudio/src/knee-abnormality-revisits/autoresearch/campaigns/revisits/seed-ideas-2.yaml
+  experiments:
+  - plane-conditioned-batchnorm-20260930T224005Z-3ab3f427
+  decision: reject
+- id: rn18-stochastic-depth
+  mechanism_id: stochastic-depth
+  parent_idea_id: null
+  title: Stochastic depth (drop path) in ResNet-18 at rate 0.1
+  opportunity: '+0.0011 on ReXNet-200 (re-scored +0.0006), never tried on ResNet-18.
+    Against it: ResNet-18 gained from removing series dropout, so extra regularization
+    may hurt.'
+  mechanism: Pass drop_path_rate 0.1 to timm.create_model for the backbone; training
+    randomly skips residual branches per sample with the rate rising linearly with
+    depth to 0.1; validation and inference run every block.
+  precedents:
+  - 'augmentation campaign: rexnet-stochastic-depth-20260926T045526Z-1de7a03e.'
+  novelty: First run on ResNet-18.
+  coverage: All studies and labels.
+  exploitation: Training loss, per-stage drift and per-label AUC against the incumbent;
+    confirm DropPath modules are active in training mode.
+  budget: None measurable.
+  implementation: A new model.drop_path_rate option (0 reproduces the incumbent) in
+    config.py and modeling/model.py.
+  open_choices: None; the rate is not swept.
+  dependencies: []
+  priority_rationale: Cheap and untested on this backbone; lowest expected value of
+    the seeds.
+  status: completed
+  created_revision: 1
+  seeded: /home/claudio/src/knee-abnormality-revisits/autoresearch/campaigns/revisits/seed-ideas-2.yaml
+  experiments:
+  - rn18-stochastic-depth-20260930T230129Z-7f45ea08
+  decision: reject
+- id: ema-0999
+  mechanism_id: weight-averaging-ema
+  parent_idea_id: null
+  title: Exponential moving average of the weights at decay 0.999 (user seed)
+  opportunity: 'User decision, 2026-09-30: test EMA weights on the ResNet-18 recipe
+    despite the campaign''s weight-averaging exclusion, which this idea and ema-09995
+    lift for themselves only. EMA was last measured on the ordinary-BCE ReXNet recipe
+    (2026-09-17, decay 0.999: +0.0001, 0.929 public), and the noisy-labels analysis
+    found EMA weights trailing the live model until epochs 8-9. ResNet-18 flattens
+    late with a low learning rate, where an average may still smooth the last epochs.'
+  mechanism: 'optimizer.weight_averaging {method: ema, decay: 0.999}: the existing
+    EMA option. The average updates every optimizer step after warmup with weight
+    1 - decay (half-life about 690 steps, 1.6 epochs at 437 steps per epoch), refreshes
+    its BatchNorm statistics before each validation, and the averaged weights are
+    validated, selected and scored at x4.'
+  precedents:
+  - 'docs/validation/results/2026-09-17-overnight-results.md: 03-ema-0.999, +0.0001
+    on the older recipe.'
+  - 'docs/validation/results/2026-09-23-noisy-labels-campaign.md: EMA trails the live
+    model until epochs 8-9.'
+  novelty: First EMA run on ResNet-18, L2-SP and rebuild_state_v2.
+  coverage: All studies and labels.
+  exploitation: Per-epoch x1 of the averaged model against the incumbent; the batch-norm
+    refresh time.
+  budget: About one extra BatchNorm-refresh pass per validation (+150 s on the older
+    recipe); inside the range.
+  implementation: Configuration-only change to configs/training.yaml.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: User seed.
+  status: blocked
+  created_revision: 36
+  seeded: /home/claudio/src/knee-abnormality-revisits/autoresearch/campaigns/revisits/ema-ideas.yaml
+  experiments:
+  - ema-0999-20260930T232339Z-88802fe2
+  - ema-0999-20260930T235148Z-01fd5427
+  - ema-0999-20261001T001421Z-8b292e94
+  blocked_reason: 'Block and park ema-0999: this candidate has repair_count=2 after
+    the first bounded repair also failed the runtime gate. The governing rule allows
+    one bounded repair per idea; user-seed status does not authorize another. Source
+    changes reduce refresh overhead without shortening training or reducing input,
+    but cannot override that limit. The empty ranking is the complete remaining live
+    queue after parking its sole entry, correcting the previous report''s rejected
+    queue representation.'
+- id: ema-09995
+  mechanism_id: weight-averaging-ema
+  parent_idea_id: null
+  title: Exponential moving average of the weights at decay 0.9995 (user seed)
+  opportunity: 'User decision, 2026-09-30, as for ema-0999: a longer average of the
+    late, low-rate epochs. Runs against the incumbent at its turn, independent of
+    ema-0999''s verdict.'
+  mechanism: 'optimizer.weight_averaging {method: ema, decay: 0.9995}: half-life about
+    1,390 steps, 3.2 epochs; otherwise as ema-0999.'
+  precedents:
+  - See ema-0999.
+  novelty: Longer EMA window than any earlier run.
+  coverage: All studies and labels.
+  exploitation: As ema-0999.
+  budget: As ema-0999.
+  implementation: Configuration-only change to configs/training.yaml. If ema-0999
+    was accepted, this candidate replaces its decay rather than stacking a second
+    average.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: User seed.
+  status: blocked
+  created_revision: 36
+  seeded: /home/claudio/src/knee-abnormality-revisits/autoresearch/campaigns/revisits/ema-ideas.yaml
+  experiments:
+  - ema-09995-20260930T234509Z-49eff0c7
+  - ema-09995-20260930T235826Z-d8f8d20c
+  - ema-09995-20261001T003810Z-b2a8a143
+  blocked_reason: 'Block and park ema-09995: this candidate has repair_count=2 after
+    its first bounded repair failed the runtime gate. The governing assignment permits
+    one bounded repair per idea. The developer cites lifecycle documentation allowing
+    two runtime repairs, but repository documentation cannot override the explicit
+    assignment rule. The complete remaining queue preserves its relative order and
+    user-seed positions; no other priority changes.'
+- id: rn18-plane-head-lr-3e-4
+  mechanism_id: plane-contrast-specific-readouts
+  parent_idea_id: plane-contrast-readouts
+  title: Lower the head learning rate from 0.0006 to 0.0003
+  opportunity: The specialized readout helped modestly, but retained substantial early
+    fluctuations. In the assigned incumbent, Fracture falls from 0.9452 to 0.9338
+    and Lateral Meniscus from 0.9055 to 0.8940 at epoch 3. MCL subsequently falls
+    from 0.9248 at epoch 6 to 0.9232 at epoch 9 while total loss continues decreasing.
+    These measurements motivate testing smaller head updates; they do not establish
+    that the head rate caused the fluctuations.
+  mechanism: Set only optimizer.head_lr=0.0003. This halves the scheduled rates for
+    the specialized disease readout, attention/projection parameters and auxiliary
+    heads while preserving the backbone rate and schedule shape. The hypothesis is
+    that gentler adaptation will retain specialization with less transient disruption
+    and late fitting.
+  precedents:
+  - "run_curves.full_detail, plane-contrast-readouts: \xD71 macro ends at 0.9254;\
+    \ readout gradient norm remains 0.1635 at epoch 9 despite flattening initialization\
+    \ drift."
+  - "run_curves.full_detail, no-anatomical-bias: \xD71 macro 0.9255\u21920.9260 over\
+    \ epochs 7\u20139; loss 0.5822\u21920.5733; exploratory MCL and Fracture regress\
+    \ late."
+  - prior_work.md#measured-on-resnet-18 lists backbone-rate and schedule experiments,
+    but no head-rate comparison.
+  novelty: First supplied ResNet-18 head-rate comparison. It tunes the active readout
+    rather than introducing another specialization architecture.
+  coverage: All training studies and heads; evaluation remains the unchanged macro
+    AUC across all 12 labels.
+  exploitation: Use existing plane_readout_grad_norm, plane_readout_drift, head_grad_rms
+    and per-stage diagnostics. Inspect early validation fluctuations and late macro/loss
+    divergence. Initialization drift is absolute RMS movement, not a direct measure
+    of separation between types; effective configuration establishes the applied rate.
+  budget: "No extra operations, inputs or passes. At the assigned 10 epochs and 4,370\
+    \ steps, expect approximately the incumbent's 1,197 s, within 611\u20131,833 s.\
+    \ Actual duration remains supervisor-measured."
+  implementation: 'Configuration-only: change optimizer.head_lr in configs/training.yaml.
+    Retain the six readout matrices, global attention denominator, bias-free pooling,
+    all losses, augmentations and diagnostics. On a newly accepted incumbent, apply
+    this fixed rate while retaining unrelated improvements; the specialized readout
+    remains a prerequisite. Do not repeat the value if already measured.'
+  open_choices: 'None: one value, 0.0003, with no opposite-direction sweep. Slower
+    auxiliary learning is a material uncertainty because this rate affects every non-backbone
+    parameter.'
+  dependencies:
+  - plane-contrast-readouts
+  priority_rationale: 'First: fulfills the open readout follow-up with a cheap, unmeasured
+    knob and an observable instability target. Expected benefit remains uncertain.'
+  source_change: false
+  targeted_curve: "Assigned incumbent, epochs 2\u20134: reduce the Fracture and Lateral\
+    \ Meniscus dips. Epochs 6\u20139: reduce late regression while improving macro\
+    \ beyond its 0.9255\u21920.9260 flattening."
+  status: completed
+  created_revision: 214
+  ranking_rationale: 'Admit all five: proposal_admission reports satisfied dependencies,
+    each changes one permitted scalar, and the family ledger, prior-work table and
+    searches of docs/validation/results and docs/history reveal no matching ResNet-18
+    measurement. The older 08-slower-head run measured head_lr=0.0003 and lost 0.0017;
+    the current RadImageNet backbone, specialized readout, anchoring and evaluation
+    constitute material differences. Fill the empty queue in the proposed order: two
+    inexpensive follow-ups of open extend lines, then upper-stage anchoring, report
+    supervision and head decay. The extend results are modest and do not establish
+    superiority over the new directions; this ordering rests on cost and actionable
+    hypotheses rather than strong prior wins.'
+  experiments:
+  - rn18-plane-head-lr-3e-4-20261001T003108Z-f5aae2b1
+  - rn18-plane-head-lr-3e-4-20261001T003337Z-e4d81d68
+  decision: reject
+- id: rn18-bias-free-half-knee-00375
+  mechanism_id: anatomical-bias-removal
+  parent_idea_id: no-anatomical-bias
+  title: Halve half-knee supervision weight to 0.0375 with anatomical bias absent
+  opportunity: "Removing the attention bias helped while retaining geometric masking\
+    \ and half-knee supervision. In the incumbent, half_knee_loss falls from 0.4659\
+    \ to 0.4479 over epochs 6\u20139, but Lateral Meniscus stays near 0.9155 and Medial\
+    \ Meniscus near 0.9478. Continued proxy-loss improvement without corresponding\
+    \ disease-ranking improvement suggests testing reduced pressure from this remaining\
+    \ anatomical objective. Gradient competition is a hypothesis, not a measured diagnosis."
+  mechanism: Set only trainer.half_knee_loss_weight=0.0375, down from 0.075. Keep
+    the detector, half-knee loss construction and meniscus masks intact. This extends
+    bias removal by reducing the remaining auxiliary objective's influence on shared
+    features without removing its supervision.
+  precedents:
+  - 'no-anatomical-bias comparison: measured macro delta +0.000855, central 80% interval
+    [+0.000185,+0.001569]; supplied active incumbent binding.'
+  - "run_curves.full_detail, no-anatomical-bias: half-knee loss 0.5725\u21920.4479;\
+    \ detector norm 0.6092\u21920.6258; meniscus validation curves flatten late."
+  - 'Incumbent training/lightning.py: half-knee BCE enters the total loss through
+    trainer.half_knee_loss_weight; the supplied prior-work table contains no ResNet-18
+    comparison of this weight.'
+  novelty: First supplied tuning of half-knee loss strength after anatomical attention-bias
+    removal.
+  coverage: Existing meniscus auxiliary supervision changes uniformly; all studies,
+    shared features and 12-label macro evaluation remain covered.
+  exploitation: Reuse half_knee_loss, half_knee_used_studies, half_knee_detector_norm
+    and per-stage drift/gradient columns. Interpret raw auxiliary loss separately
+    from total loss, whose scale changes mechanically. Exploratory meniscus curves
+    motivate the mechanism without creating label-specific adoption objectives.
+  budget: "Loss and detector computation are retained, so no meaningful runtime saving\
+    \ or addition is expected. Approximately 1,197 s at the assigned recipe; actual\
+    \ training must remain within 611\u20131,833 s."
+  implementation: 'Configuration-only: change trainer.half_knee_loss_weight in configs/training.yaml.
+    Retain anatomical_bias=false, own-side masks/fallback, OA correction, specialized
+    readouts and unrelated incumbent improvements. Rebind to any new incumbent with
+    bias removal retained and apply only this weight change.'
+  open_choices: 'None: weight 0.0375. The principal risk is weakening useful meniscus
+    supervision; no gradient-conflict measurement currently establishes that the existing
+    weight is excessive.'
+  dependencies:
+  - no-anatomical-bias
+  priority_rationale: 'Second: supplies the open anatomical-bias follow-up and tests
+    an inherited, unmeasured weight at unchanged cost. Evidence for the direction
+    is weaker than for the readout-rate proposal.'
+  source_change: false
+  targeted_curve: "Assigned incumbent, epochs 6\u20139: half-knee loss improves 0.4659\u2192\
+    0.4479 while meniscus AUCs flatten. Aim to improve macro ranking with less continued\
+    \ auxiliary fitting."
+  status: completed
+  created_revision: 214
+  ranking_rationale: 'Block and park ema-09995: this candidate has repair_count=2
+    after its first bounded repair failed the runtime gate. The governing assignment
+    permits one bounded repair per idea. The developer cites lifecycle documentation
+    allowing two runtime repairs, but repository documentation cannot override the
+    explicit assignment rule. The complete remaining queue preserves its relative
+    order and user-seed positions; no other priority changes.'
+  experiments:
+  - rn18-bias-free-half-knee-00375-20261001T015157Z-8a342b13
+  decision: reject
+- id: rn18-late-anchor-5e-4
+  mechanism_id: upper-stage-l2sp-strength
+  parent_idea_id: null
+  title: "Reduce the layer2\u2013layer4 L2-SP coefficient from 0.001 to 0.0005"
+  opportunity: The incumbent's stage3 drift peaks at 0.0993 at epoch 5 and contracts
+    to 0.0979; stage4 contracts from 0.1135 at epoch 4 to 0.1089. Their gradient RMS
+    remains approximately 0.0006 and 0.0003, while macro gains become small. This
+    suggests testing whether the upper-stage anchor limits useful adaptation. Persistent
+    gradients and contracting drift do not prove that explanation.
+  mechanism: "Set only optimizer.anchor_alpha_late=0.0005. In the current implementation,\
+    \ 'late' denotes layers outside the stem/layer1 group, not late training epochs.\
+    \ Halve anchoring for layer2\u2013layer4 throughout training, retaining optimizer.anchor_alpha_early=0.01\
+    \ and all optimizer rates."
+  precedents:
+  - "run_curves.full_detail, no-anatomical-bias: upper-stage drift contracts after\
+    \ epochs 4\u20135 while \xD71 macro approaches 0.9260."
+  - 'Incumbent training/lightning.py: anchor_alpha_early applies to conv1/bn1/layer1
+    names; anchor_alpha_late applies to remaining eligible backbone matrices.'
+  - prior_work.md distinguishes accepted L2-SP and the earlier early-stage-anchor
+    experiment; it supplies no measurement of late coefficient 0.0005.
+  - 'The original work supports regularization toward pretrained parameters, but does
+    not establish this coefficient for the current task: [Li et al., ICML 2018](https://proceedings.mlr.press/v80/li18a.html).'
+  novelty: Tunes upper-stage anchoring separately while preserving the current stronger
+    early-stage protection.
+  coverage: All studies and disease/auxiliary pathways through the shared backbone;
+    unchanged 12-label macro objective.
+  exploitation: Reuse anchor_penalty and backbone_drift_stage2/3/4 alongside their
+    gradient RMS and macro curves. The aggregate penalty includes early anchors, so
+    its change cannot isolate the late contribution. Reduced forgetting protection
+    is the main uncertainty.
+  budget: "Both coefficients remain positive, retaining the same anchor buffers, reductions\
+    \ and optimizer exclusions. Expect roughly 1,197 s at 10 epochs; actual duration\
+    \ must satisfy 611\u20131,833 s."
+  implementation: 'Configuration-only: set optimizer.anchor_alpha_late=0.0005. Retain
+    early anchoring, backbone/readout construction, bias removal, losses and augmentations.
+    Against a newly accepted incumbent, preserve unrelated changes and replace only
+    this coefficient; do not simultaneously adjust the early anchor or backbone rate.'
+  open_choices: 'None: coefficient 0.0005. No anchor removal, temporal schedule or
+    opposite-direction sweep.'
+  dependencies: []
+  priority_rationale: 'Third: directly targets a measured drift pattern with an unmeasured
+    plasticity knob and negligible implementation cost. Potential benefit competes
+    with loss of pretrained-feature protection.'
+  source_change: false
+  targeted_curve: "Assigned incumbent, epochs 4\u20139: stage4 drift 0.1135\u2192\
+    0.1089 and stage3 0.0993\u21920.0979 despite persistent gradients. Aim for useful\
+    \ adaptation and larger late macro gains."
+  status: completed
+  created_revision: 214
+  ranking_rationale: 'Block and park ema-09995: this candidate has repair_count=2
+    after its first bounded repair failed the runtime gate. The governing assignment
+    permits one bounded repair per idea. The developer cites lifecycle documentation
+    allowing two runtime repairs, but repository documentation cannot override the
+    explicit assignment rule. The complete remaining queue preserves its relative
+    order and user-seed positions; no other priority changes.'
+  experiments:
+  - rn18-late-anchor-5e-4-20261001T021332Z-2b2608a0
+  decision: reject
+- id: rn18-report-attributes-005
+  mechanism_id: report-attribute-loss-weight
+  parent_idea_id: null
+  title: Reduce report-attribute supervision weight from 0.1 to 0.05
+  opportunity: "The incumbent's report_attribute_loss decreases from 0.8493 to 0.8359\
+    \ over epochs 6\u20139 while macro moves only 0.9244\u21920.9260. At epoch 9 its\
+    \ weighted contribution is approximately 0.0836, compared with 0.0336 for half-knee\
+    \ supervision. These are loss-scale measurements, not gradient shares. Testing\
+    \ a smaller attribute weight could reserve more shared capacity for disease ranking."
+  mechanism: Set only trainer.report_attribute_loss_weight=0.05. Retain all attribute
+    targets, question weights, heads and loss construction. Halve the contribution
+    of the existing auxiliary task while leaving disease BCE and half-knee supervision
+    unchanged.
+  precedents:
+  - "run_curves.full_detail, no-anatomical-bias: report loss 0.9902\u21920.8359; total\
+    \ loss 0.6939\u21920.5733; late validation gains flatten."
+  - external_evidence records attribute-loss-weight-0-2 as rejected on the older auxiliary-signals
+    recipe; that opposite-direction, different-backbone result does not measure 0.05
+    on ResNet-18.
+  - Incumbent training/lightning.py logs raw report_attribute_loss and per-question
+    KL before multiplying by the configured weight.
+  novelty: First supplied reduction of report supervision strength on the current
+    ResNet-18 recipe, without changing training labels or attribute construction.
+  coverage: Every existing report question and observed training cell remains included.
+    Evaluation retains all 12 disease labels with unchanged weighting.
+  exploitation: Reuse report_attribute_loss, report_attribute_studies, per-question
+    KL and stage/head gradients. Compare raw auxiliary fitting and macro trajectories;
+    a lower total loss alone is expected from reweighting and provides no evidence
+    of benefit.
+  budget: "Attribute computation remains intact; no additional passes or inputs. Expect\
+    \ approximately 1,197 s at the assigned recipe, subject to the 611\u20131,833\
+    \ s measured range."
+  implementation: 'Configuration-only: set trainer.report_attribute_loss_weight=0.05.
+    Retain the manifest, heads, targets, fixed question weights, disease loss, half-knee
+    weight and active incumbent mechanisms. Rebind to a new incumbent by applying
+    only this scalar change and retaining unrelated improvements.'
+  open_choices: 'None: weight 0.05. Auxiliary-task competition is unmeasured, and
+    reducing useful representation supervision could hurt.'
+  dependencies: []
+  priority_rationale: 'Fourth: an untouched inherited knob with substantial measured
+    loss contribution and unchanged runtime. Lower confidence because loss magnitude
+    does not establish gradient competition.'
+  source_change: false
+  targeted_curve: "Assigned incumbent, epochs 6\u20139: report loss 0.8493\u21920.8359\
+    \ continues improving as macro flattens. Aim to improve disease macro ranking\
+    \ while accepting slower auxiliary fitting."
+  status: completed
+  created_revision: 214
+  ranking_rationale: 'Admit all three: proposal_admission reports satisfied dependencies,
+    each changes one permitted knob, and the ledger, precedent table and documentation
+    search reveal no measured repeat at the proposed value. Global cap 2.0 differs
+    materially from rejected partitioned clipping and historical caps 0.5/5.0; backbone
+    LR 2.5e-5 differs from measured 1e-4; early anchor 0.005 differs from historical
+    early-only anchoring at 0.01. Keep the reserved report-weight head first. Place
+    clipping ahead of queued head decay because verified frequent above-cap gradients
+    give it the clearest mechanism target. Rank reduced backbone rate before reduced
+    early anchoring: early stage4 drift provides a direct adaptation target, while
+    contracting stem/layer1 drift provides weaker causal evidence. The resulting queue
+    contains five ideas.'
+  experiments:
+  - rn18-report-attributes-005-20261001T023437Z-b46cd3a4
+  decision: reject
+- id: rn18-head-weight-decay-005
+  mechanism_id: head-weight-decay
+  parent_idea_id: null
+  title: Increase effective head weight decay from 0.01 to 0.05
+  opportunity: 'In the incumbent, MCL declines after epoch 6 and Fracture after epoch
+    7 while training loss continues decreasing. This motivates stronger head regularization
+    as a separate hypothesis from lowering the learning rate. Source inspection establishes
+    that optimizer.weight_decay already affects only non-backbone matrices in this
+    recipe: backbone matrices are anchored and vectors are exempt.'
+  mechanism: Set only optimizer.weight_decay=0.05. Retain the existing decay exclusions
+    and L2-SP coefficients. Increase decoupled shrinkage of projection, attention,
+    disease and auxiliary-head matrices without changing backbone anchoring. With
+    the assigned schedule, the first-order decay-only shrink estimate increases from
+    approximately 1.34% to 6.68%; this is an analytical estimate, not measured parameter
+    movement.
+  precedents:
+  - "run_curves.full_detail, no-anatomical-bias: epochs 6\u20139 MCL 0.9248\u2192\
+    0.9232; epochs 7\u20139 Fracture 0.9475\u21920.9453; total loss continues falling."
+  - 'Incumbent training/lightning.py build_optimizer: anchored_backbone_names and
+    parameter.ndim<2 receive zero weight decay.'
+  - The supplied prior-work table contains no ResNet-18 head weight-decay comparison.
+  novelty: First supplied head-decay tuning. Existing optimizer grouping makes a separate
+    configuration field or Python change unnecessary.
+  coverage: All eligible non-backbone matrices, including auxiliary heads; unchanged
+    data, labels and macro evaluation.
+  exploitation: Reuse plane_readout_drift, plane_readout_grad_norm, head_grad_rms
+    and auxiliary detector norms. Initialization drift includes learning and decay
+    and cannot isolate either. Check whether late ranking improves without losing
+    early learning; effective configuration records the decay value.
+  budget: "Identical optimizer operations and input counts. Approximately 1,197 s\
+    \ at the assigned 10 epochs, with actual duration required to remain within 611\u2013\
+    1,833 s."
+  implementation: 'Configuration-only: change optimizer.weight_decay in configs/training.yaml.
+    Retain positive early/late anchors and all zero-decay exclusions, rates, losses
+    and incumbent mechanisms. Rebind to any new incumbent and retain unrelated improvements;
+    if its optimizer grouping changes, reassess whether this remains a head-only change
+    before admission.'
+  open_choices: 'None: decay 0.05. Stronger shrinkage may impair specialization or
+    auxiliary learning; late per-label declines alone do not establish overfitting.'
+  dependencies: []
+  priority_rationale: 'Fifth: distinct, unmeasured regularization knob at unchanged
+    cost. Lower priority because macro still improves slightly late and stronger shrinkage
+    could suppress useful learning.'
+  source_change: false
+  targeted_curve: "Assigned incumbent, epochs 6\u20139: curb late MCL/Fracture regression\
+    \ while loss declines, and improve macro beyond its small final gains without\
+    \ depressing early learning."
+  status: completed
+  created_revision: 214
+  ranking_rationale: 'Admit all three: proposal_admission reports satisfied dependencies,
+    each changes one permitted knob, and the ledger, precedent table and documentation
+    search reveal no measured repeat at the proposed value. Global cap 2.0 differs
+    materially from rejected partitioned clipping and historical caps 0.5/5.0; backbone
+    LR 2.5e-5 differs from measured 1e-4; early anchor 0.005 differs from historical
+    early-only anchoring at 0.01. Keep the reserved report-weight head first. Place
+    clipping ahead of queued head decay because verified frequent above-cap gradients
+    give it the clearest mechanism target. Rank reduced backbone rate before reduced
+    early anchoring: early stage4 drift provides a direct adaptation target, while
+    contracting stem/layer1 drift provides weaker causal evidence. The resulting queue
+    contains five ideas.'
+  experiments:
+  - rn18-head-weight-decay-005-20261001T031716Z-b891fd9d
+  decision: reject
+- id: ema-0999-subset-refresh
+  mechanism_id: weight-averaging-ema
+  parent_idea_id: ema-0999
+  title: EMA of the weights at decay 0.999 with a BatchNorm refresh on a fixed quarter
+    of the training studies (user seed, runtime retake)
+  opportunity: 'User seed ema-0999 never produced a result: three runs stopped on
+    the training-time projection (1,884, 1,870 and, by review, a blocked second repair),
+    because the per-epoch BatchNorm refresh over all 3,495 training studies costs
+    67-73 s on top of a 122 s epoch. The reviewer blocked the final repair on the
+    one-repair review allowance, a harness limit, not on evidence against EMA (forced
+    by Claude as campaign keeper, under the user''s 2026-09-30 EMA order).'
+  mechanism: 'optimizer.weight_averaging {method: ema, decay: 0.999}, as in ema-0999:
+    the average updates every optimizer step after warmup with weight 1 - decay, and
+    the averaged weights are validated, selected and scored at x4. The only change
+    from the reviewed EMA code: before each validation, the averaged model''s BatchNorm
+    statistics are refreshed on a fixed subset of 25% of the training studies, drawn
+    once per run from the run seed, through the same training-mode input path, instead
+    of on every training study. Keep the refresh''s other behaviour (reset running
+    statistics, no gradients, RNG state restored).'
+  precedents:
+  - Runtime-invalid runs ema-0999-20260930T232339Z-88802fe2 and ema-0999-20260930T235148Z-01fd5427;
+    blocked repair ema-0999-20261001T001421Z-8b292e94 (outputs/autoresearch/revisits/experiments/).
+  - BatchNorm statistics converge on a few hundred batches; a quarter of the studies
+    is about 870 studies.
+  novelty: First EMA run on this recipe that can finish inside the budget.
+  coverage: All studies and labels; the refresh subset only affects BatchNorm statistics.
+  exploitation: Log the refresh seconds per epoch and the refresh study count.
+  budget: Refresh about 18 s instead of about 70 s per epoch, so about 140 s per epoch
+    and 1,400 s in all, inside the 611-1,833 s range.
+  implementation: Start from the reviewed EMA refresh in the blocked repair's source
+    and add a seeded subset of training studies for the refresh loader under optimizer.weight_averaging
+    (refresh_fraction 0.25, with 1.0 reproducing the full refresh).
+  open_choices: None; the fraction is fixed at 0.25.
+  dependencies: []
+  priority_rationale: User seed retake; the earlier attempts are invalid on runtime
+    only.
+  status: completed
+  created_revision: 226
+  seeded: /home/claudio/src/knee-abnormality-revisits/autoresearch/campaigns/revisits/ema-subset-refresh-ideas.yaml
+  ranking_rationale: 'Block and park ema-09995: this candidate has repair_count=2
+    after its first bounded repair failed the runtime gate. The governing assignment
+    permits one bounded repair per idea. The developer cites lifecycle documentation
+    allowing two runtime repairs, but repository documentation cannot override the
+    explicit assignment rule. The complete remaining queue preserves its relative
+    order and user-seed positions; no other priority changes.'
+  experiments:
+  - ema-0999-subset-refresh-20261001T004348Z-bc20827d
+  decision: reject
+- id: ema-09995-subset-refresh
+  mechanism_id: weight-averaging-ema
+  parent_idea_id: ema-09995
+  title: EMA of the weights at decay 0.9995 with a BatchNorm refresh on a fixed quarter
+    of the training studies (user seed, runtime retake)
+  opportunity: 'As ema-0999-subset-refresh: user seed ema-09995 was stopped twice
+    on the training-time projection (1,896 and 1,874 s) by the same full-training-set
+    refresh.'
+  mechanism: 'optimizer.weight_averaging {method: ema, decay: 0.9995} with the 25%
+    refresh subset of ema-0999-subset-refresh. Runs against the incumbent at its turn,
+    independent of the 0.999 verdict; if ema-0999-subset-refresh was accepted, this
+    candidate replaces its decay rather than stacking a second average.'
+  precedents:
+  - Runtime-invalid runs ema-09995-20260930T234509Z-49eff0c7 and ema-09995-20260930T235826Z-d8f8d20c.
+  novelty: Longer EMA window than any earlier run, inside the budget.
+  coverage: As ema-0999-subset-refresh.
+  exploitation: As ema-0999-subset-refresh.
+  budget: As ema-0999-subset-refresh.
+  implementation: As ema-0999-subset-refresh, decay 0.9995.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: User seed retake.
+  status: blocked
+  created_revision: 226
+  seeded: /home/claudio/src/knee-abnormality-revisits/autoresearch/campaigns/revisits/ema-subset-refresh-ideas.yaml
+  ranking_rationale: 'Block and park ema-09995: this candidate has repair_count=2
+    after its first bounded repair failed the runtime gate. The governing assignment
+    permits one bounded repair per idea. The developer cites lifecycle documentation
+    allowing two runtime repairs, but repository documentation cannot override the
+    explicit assignment rule. The complete remaining queue preserves its relative
+    order and user-seed positions; no other priority changes.'
+  experiments:
+  - ema-09995-subset-refresh-20261001T005931Z-ba9d63e4
+- id: ema-0999-buffer-average
+  mechanism_id: weight-averaging-ema
+  parent_idea_id: ema-0999
+  title: EMA of the weights and BatchNorm statistics at decay 0.999 through the existing
+    EMA option, with no BatchNorm refresh (user seed, timm-style retake)
+  opportunity: 'User decision, 2026-10-01: run EMA the timm way. The earlier EMA runs
+    were invalid only because the ema-0999 seed text asked for a BatchNorm refresh
+    before each validation, a full extra pass over the training data (about 70 s per
+    epoch) that pushed every run over the time budget. The existing EMA option needs
+    no refresh.'
+  mechanism: 'optimizer.weight_averaging {method: ema, decay: 0.999}, configuration
+    only, through the existing code path: Lightning on_train_batch_end averages every
+    floating-point state tensor, BatchNorm running means and variances included, after
+    warmup; the averaged model is validated, selected and scored at x4, and the live
+    model gets its own validation pass for diagnostics. No BatchNorm refresh and no
+    other extra pass over training data.'
+  precedents:
+  - src/knee_abnormality/training/lightning.py, on_train_batch_end and validation_step
+    (existing EMA path).
+  - 'timm ModelEmaV2/V3: buffers averaged with the weights, no refresh.'
+  - 'Runtime-invalid refresh runs: ema-0999 and ema-09995 experiments in outputs/autoresearch/revisits/experiments/.'
+  novelty: First EMA run on this recipe without the refresh pass.
+  coverage: All studies and labels.
+  exploitation: Per-epoch x1 of the averaged and the live model (val_ and val_live_
+    metrics).
+  budget: About 122 s per epoch plus the live validation pass, about 1,350 s in all,
+    inside the 611-1,833 s range.
+  implementation: Configuration-only change to configs/training.yaml; no source change.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: User seed.
+  status: completed
+  created_revision: 271
+  seeded: /home/claudio/src/knee-abnormality-revisits/autoresearch/campaigns/revisits/ema-timm-ideas.yaml
+  experiments:
+  - ema-0999-buffer-average-20261001T012620Z-113b4bb6
+  decision: reject
+- id: ema-09995-buffer-average
+  mechanism_id: weight-averaging-ema
+  parent_idea_id: ema-09995
+  title: EMA of the weights and BatchNorm statistics at decay 0.9995 through the existing
+    EMA option, with no BatchNorm refresh (user seed, timm-style retake)
+  opportunity: As ema-0999-buffer-average, with the longer average. Runs against the
+    incumbent at its turn, independent of the 0.999 verdicts; if an EMA run was accepted,
+    this candidate replaces its decay rather than stacking a second average.
+  mechanism: 'optimizer.weight_averaging {method: ema, decay: 0.9995}, configuration
+    only, through the existing EMA path; no BatchNorm refresh and no other extra pass
+    over training data.'
+  precedents:
+  - See ema-0999-buffer-average.
+  novelty: Longer EMA window than any earlier run, without the refresh pass.
+  coverage: All studies and labels.
+  exploitation: As ema-0999-buffer-average.
+  budget: As ema-0999-buffer-average.
+  implementation: Configuration-only change to configs/training.yaml; no source change.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: User seed.
+  status: completed
+  created_revision: 271
+  seeded: /home/claudio/src/knee-abnormality-revisits/autoresearch/campaigns/revisits/ema-timm-ideas.yaml
+  experiments:
+  - ema-09995-buffer-average-20261001T013022Z-c893f5f0
+  decision: reject
+- id: rn18-global-clip-2
+  mechanism_id: global-gradient-clip-cap
+  parent_idea_id: null
+  title: Raise the global gradient clipping cap from 1.0 to 2.0
+  opportunity: "The incumbent's metrics.csv contains 87 sampled model-gradient norms:\
+    \ 72 exceed 1.0 and only seven exceed 2.0. At epochs 6\u20139, sampled means remain\
+    \ 1.36\u20131.63 while \xD71 macro approaches 0.9260 and training loss continues\
+    \ falling. Clipping therefore appears to affect ordinary gradients frequently.\
+    \ These samples exclude the separate report heads and are not an all-step clipping\
+    \ census; they establish a lower bound on the full optimizer norm. Excessive clipping\
+    \ limiting useful adaptation is a hypothesis."
+  mechanism: Set only trainer.gradient_clip_val=2.0. Retain a single global norm clip
+    over the existing optimizer parameters. This reduces clipping of moderate gradients
+    while preserving protection against larger excursions. Keep backbone/head rates,
+    anchors, losses and schedule fixed. AdamW's adaptive normalization means reduced
+    gradient shrinkage need not translate proportionally into larger parameter updates.
+  precedents:
+  - "Incumbent training/fold_0/logs/version_0/metrics.csv: read-only Polars analysis\
+    \ of non-null grad_norm rows found n=87, 72 values >1.0, seven >2.0, range 0.351802\u2013\
+    2.459291. Source training/lightning.py:783\u2013802 logs norms from model parameters."
+  - "prior_work.md records separate module clipping as rejected (\u22120.0024). Its\
+    \ original source clips partitions separately at cap 1.0; this proposal retains\
+    \ global clipping and changes its cap."
+  - Clipping combines the supplied parameter gradients into a total norm and modifies
+    gradients in place. [PyTorch documentation](https://docs.pytorch.org/docs/2.14/generated/torch.nn.utils.clip_grad_norm_.html).
+  novelty: First supplied measurement of global cap 2.0 on ResNet-18. It changes clipping
+    frequency without introducing the previously rejected module partitions.
+  coverage: All existing optimizer parameters, including auxiliary heads, receive
+    the same global clipping rule. Studies, inputs and the 12-label macro objective
+    remain fixed.
+  exploitation: Add epoch-level full-optimizer pre-clip norm, applied scale and clipped
+    fraction. Log global_clip_scale_gain as the observed applied scale minus the counterfactual
+    scale at cap 1.0, using the same pre-clip gradients. Positive epoch-0 gain proves
+    relaxation acted. Retain stage/head gradient and drift diagnostics; compare macro
+    learning rather than treating less clipping as a quality win.
+  budget: "Keep 10 epochs, batch size 8 and accumulation 1. Existing training takes\
+    \ about 1,197 s. Detached norm diagnostics add small, unmeasured overhead; avoid\
+    \ per-step host synchronization. Actual training must remain within 610.997\u2013\
+    1,832.990 s. Use the supervisor's incumbent seed, currently 1533697213."
+  implementation: Change trainer.gradient_clip_val in configs/training.yaml and add
+    diagnostic-only logging in src/knee_abnormality/training/lightning.py around the
+    existing global clipping operation. Clip exactly once and cover the actual optimizer
+    parameters, including report heads. Retain plane-contrast readouts, bias removal,
+    all losses, augmentations, anchors and unrelated improvements. If a new incumbent
+    is accepted, apply this single cap change to it and adapt diagnostics to its optimizer
+    grouping. Do not repeat an already measured cap.
+  open_choices: Fixed cap 2.0; no opposite-direction sweep or partitioned clipping.
+    The sampled norms suggest activation, but actual all-step clipping frequency and
+    predictive benefit remain unknown.
+  dependencies: []
+  priority_rationale: 'First: new artifact analysis identifies frequent clipping,
+    giving this untouched knob a concrete activation target. Cost is low; benefit
+    remains uncertain because of AdamW''s normalization.'
+  source_change: true
+  targeted_curve: "no-anatomical-bias incumbent, epochs 4\u20139: persistent gradients\
+    \ accompany slowing macro gains and falling loss. Reduce routine clipping and\
+    \ improve late macro progress beyond 0.9255\u21920.9260."
+  status: completed
+  created_revision: 340
+  ranking_rationale: 'Admit all three: proposal_admission reports satisfied dependencies,
+    each changes one permitted knob, and the ledger, precedent table and documentation
+    search reveal no measured repeat at the proposed value. Global cap 2.0 differs
+    materially from rejected partitioned clipping and historical caps 0.5/5.0; backbone
+    LR 2.5e-5 differs from measured 1e-4; early anchor 0.005 differs from historical
+    early-only anchoring at 0.01. Keep the reserved report-weight head first. Place
+    clipping ahead of queued head decay because verified frequent above-cap gradients
+    give it the clearest mechanism target. Rank reduced backbone rate before reduced
+    early anchoring: early stage4 drift provides a direct adaptation target, while
+    contracting stem/layer1 drift provides weaker causal evidence. The resulting queue
+    contains five ideas.'
+  experiments:
+  - rn18-global-clip-2-20261001T025601Z-7270b2b5
+  decision: reject
+- id: rn18-backbone-lr-2p5e-5
+  mechanism_id: backbone-learning-rate
+  parent_idea_id: null
+  title: Halve the backbone learning rate from 5e-5 to 2.5e-5
+  opportunity: "In the incumbent, stage4 drift reaches 0.1012 by epoch 1 and 0.1135\
+    \ by epoch 4. Epoch 2\u21923 brings simultaneous Fracture, Lateral Meniscus and\
+    \ Lateral OA dips while training loss falls 0.6226\u21920.6135. This suggests\
+    \ testing gentler pretrained-feature adaptation. The rejected head-rate reduction\
+    \ instead reduced readout drift substantially without reducing backbone drift,\
+    \ leaving backbone rate a distinct intervention. Curve fluctuations do not establish\
+    \ overshooting."
+  mechanism: Set only optimizer.backbone_lr=0.000025. Retain head_lr=0.0006, both
+    L2-SP strengths, global clipping and the one-epoch warmup/cosine schedule. Reduce
+    the backbone update scale throughout training while preserving the current head
+    adaptation rate.
+  precedents:
+  - "run_curves.full_detail, incumbent: stage4 drift 0.0736\u21920.1012\u21920.1094\
+    \ in epochs 0\u20132; epoch 2\u21923 Fracture 0.9452\u21920.9338, Lateral Meniscus\
+    \ 0.9055\u21920.8940 and Lateral OA 0.8925\u21920.8817."
+  - "prior_work.md records backbone LR 1e-4 as rejected (\u22120.0017). Original effective_config.json\
+    \ for rn18-backbone-lr-1e-4-20260929T003754Z-61e670bb confirms that rate; it does\
+    \ not measure 2.5e-5."
+  - The new head-rate run ends with readout drift 0.0107 versus incumbent 0.0170,
+    but stage4 drift 0.1098 versus 0.1089. Its outcome is assessed in family_verdicts.
+  novelty: First supplied lower-backbone-rate measurement. This preserves the head
+    rate and current anchoring instead of repeating higher LR, layer-wise decay or
+    freezing.
+  coverage: Every trainable backbone stage and all disease/auxiliary pathways through
+    it. Input counts, labels and macro evaluation remain unchanged.
+  exploitation: Add backbone_reduced_lr_steps as an epoch sum of completed optimizer
+    steps with a nonzero backbone gradient and schedule-normalized backbone LR 0.000025.
+    Positive epoch-0 count proves actual reduced-rate updates. Retain stage drift/gradient
+    columns and inspect whether early dips shrink without delaying overall learning.
+  budget: "Identical epochs, batches, inputs and optimizer operations; expect roughly\
+    \ the incumbent's 1,197 s plus negligible counter overhead. Actual training must\
+    \ satisfy 610.997\u20131,832.990 s. Train once at the supervisor's current incumbent\
+    \ seed, presently 1533697213."
+  implementation: Change optimizer.backbone_lr in configs/training.yaml. Add only
+    the required completed-update counter in src/knee_abnormality/training/lightning.py,
+    using actual optimizer-group rates and the current schedule multiplier. Retain
+    specialized readouts, bias removal, anchors, losses, augmentation and optimizer
+    grouping. Rebind to a newly accepted incumbent while retaining unrelated improvements
+    and changing only this rate. Do not combine it with the running late-anchor candidate
+    or assume that candidate wins.
+  open_choices: Fixed rate 2.5e-5. Slower adaptation may underfit within 10 epochs;
+    do not compensate by changing epochs or head LR in this run.
+  dependencies: []
+  priority_rationale: 'Second: directly tests early backbone drift and validation
+    fluctuations with an unmeasured rate. Runtime cost is unchanged, but the slower-learning
+    risk is substantial.'
+  source_change: true
+  targeted_curve: "Incumbent epochs 0\u20134: moderate rapid stage4 drift and the\
+    \ epoch-3 macro/Fracture/meniscus/OA dip while loss falls. Preserve late macro\
+    \ learning at the unchanged head rate."
+  status: completed
+  created_revision: 340
+  ranking_rationale: 'Admit all three dependency-satisfied proposals, filling the
+    five-idea queue without displacing existing work. The family ledger, prior-work
+    table and targeted searches of validation/results and history establish no matching
+    measured ResNet-18 value. Rank twelve epochs first among additions: it targets
+    continuing late incumbent macro progress, with projected duration inside the budget.
+    GIN blend 0.25 follows because it explores an unmeasured strength at unchanged
+    expected cost, although distortion magnitude alone gives weak causal evidence.
+    Warmup starting ratio 0.5 ranks last: early learning sensitivity motivates it,
+    but the clipping precedent shows that early advantages can disappear. These mechanisms
+    do not reopen the closed removal, head-rate or clipping families.'
+  experiments:
+  - rn18-backbone-lr-2p5e-5-20261001T033825Z-3ed88954
+  decision: reject
+- id: rn18-early-anchor-5e-3
+  mechanism_id: early-stage-l2sp-strength
+  parent_idea_id: null
+  title: Reduce stem/layer1 L2-SP strength from 0.01 to 0.005
+  opportunity: "The incumbent's stage1 drift contracts from 0.0328 at epoch 2 to 0.0260\
+    \ at epoch 9, while its gradient RMS remains about 0.0011\u20130.0012. Stage0\
+    \ drift also contracts after its early peak. Meanwhile, late training loss keeps\
+    \ improving but macro gains shrink. This motivates testing whether strong early\
+    \ anchoring restricts useful low-level adaptation. Persistent gradients and contracting\
+    \ drift do not isolate the anchor's causal contribution."
+  mechanism: Set only optimizer.anchor_alpha_early=0.005. The early group is the existing
+    eligible conv1/layer1 backbone matrices, not early training epochs. Preserve upper-stage
+    anchoring at the incumbent value and retain all anchor buffers, penalty reductions
+    and weight-decay exclusions.
+  precedents:
+  - "run_curves.full_detail, incumbent: stage1 drift 0.0328\u21920.0260 over epochs\
+    \ 2\u20139; stage0 0.0147\u21920.0124 over epochs 1\u20139. Early-stage gradient\
+    \ RMS stays active as late macro flattens."
+  - Original rn18-early-stage-anchor-20260929T035808Z-d167cde0 effective configuration
+    uses anchor_decay=0.01; its source anchors conv1/layer1 and leaves upper matrices
+    outside that anchor. It does not measure 0.005 with the current two-group L2-SP
+    recipe.
+  - Regularization toward pretrained parameters is supported as a transfer-learning
+    baseline; this does not establish the proposed coefficient. [Li et al., ICML 2018](https://proceedings.mlr.press/v80/li18a.html).
+  novelty: First supplied tuning of early coefficient 0.005 under the current two-group
+    anchor. Distinct from the running upper-stage coefficient reduction and the historical
+    early-only anchor.
+  coverage: Existing eligible stem/layer1 matrices across every training study. All
+    labels and auxiliary pathways remain included.
+  exploitation: 'Log the detached early squared displacement and its actual weighted
+    penalty, plus anchor_early_inverse_strength: displacement divided by applied early
+    penalty when displacement is nonzero. The candidate yields approximately 200 versus
+    parent 100. Retain per-stage drift/gradients; increased drift alone is not evidence
+    of benefit.'
+  budget: "Both anchor coefficients remain positive, preserving the existing buffers\
+    \ and reductions. Expect about 1,197 s at 10 epochs with small diagnostic overhead.\
+    \ Actual training must remain within 610.997\u20131,832.990 s. Use the supervisor's\
+    \ current incumbent seed, presently 1533697213."
+  implementation: Change optimizer.anchor_alpha_early in configs/training.yaml and
+    add detached early-anchor diagnostics in src/knee_abnormality/training/lightning.py
+    using distances already computed for the penalty. Preserve the penalty's numerical
+    reduction order, upper-stage coefficient, decay exclusions, readouts, bias removal
+    and unrelated improvements. On a newly accepted incumbent, replace only the early
+    coefficient and retain its upper-stage setting. The undecided late-anchor result
+    is not a prerequisite or evidence of benefit.
+  open_choices: Fixed coefficient 0.005. Reduced pretrained-feature protection may
+    hurt generalization. Keep backbone rate and upper-stage strength unchanged within
+    this candidate.
+  dependencies: []
+  priority_rationale: 'Third: an untouched coefficient with a measured contraction
+    target and little added cost. Causal evidence is weaker than the clipping-frequency
+    evidence, and the late-anchor outcome remains unknown.'
+  source_change: true
+  targeted_curve: "Incumbent epochs 2\u20139: stage1 drift contracts 0.0328\u2192\
+    0.0260 despite persistent gradients. Permit useful early-stage adaptation and\
+    \ improve late macro progress while retaining upper-stage protection."
+  status: completed
+  created_revision: 340
+  ranking_rationale: 'Admit all three dependency-satisfied proposals, filling the
+    five-idea queue without displacing existing work. The family ledger, prior-work
+    table and targeted searches of validation/results and history establish no matching
+    measured ResNet-18 value. Rank twelve epochs first among additions: it targets
+    continuing late incumbent macro progress, with projected duration inside the budget.
+    GIN blend 0.25 follows because it explores an unmeasured strength at unchanged
+    expected cost, although distortion magnitude alone gives weak causal evidence.
+    Warmup starting ratio 0.5 ranks last: early learning sensitivity motivates it,
+    but the clipping precedent shows that early advantages can disappear. These mechanisms
+    do not reopen the closed removal, head-rate or clipping families.'
+  experiments:
+  - rn18-early-anchor-5e-3-20261001T035942Z-1e1254e8
+  decision: reject
+- id: rn18-twelve-epochs
+  mechanism_id: training-horizon
+  parent_idea_id: null
+  title: Extend the existing cosine training horizon from 10 to 12 epochs
+  opportunity: "The incumbent\u2019s \xD71 macro rises from 0.9244 to 0.9260 over\
+    \ epochs 6\u20139 while training loss falls from 0.5895 to 0.5733. PF OA, Baker\u2019\
+    s and contusion continue improving, although MCL declines. Stage4 drift contracts\
+    \ from 0.1114 to 0.1089 while gradients remain active. These measurements suggest\
+    \ some remaining learning opportunity, without establishing that more epochs will\
+    \ improve the evaluated \xD74 macro."
+  mechanism: Set only trainer.max_epochs=12. The existing scheduler automatically
+    extends its cosine decay over the additional optimizer steps while retaining one
+    warmup epoch, the current peak rates and floor. This tests additional exposure
+    and slower decay together as the existing epoch-count knob; it does not append
+    a separately designed schedule.
+  precedents:
+  - "run_curves.full_detail: incumbent epochs 6\u20139 macro 0.9244\u21920.9260, loss\
+    \ 0.5895\u21920.5733; reference macro 0.9236\u21920.9244. Both show diminishing\
+    \ late gains."
+  - "The linked historical rn18-fourteen-epochs-20260928T203926Z-edcce1c4 comparison\
+    \ measured \u0394\u22120.001824, 80% [\u22120.004349,+0.000692], at seed 1533697213.\
+    \ Its effective_config.json uses 26 triplets and the same evaluation identities,\
+    \ but lacks L2-SP."
+  - prior_work summarizes a 14-epoch gain of +0.0010. That value does not match the
+    retrieved linked campaign comparison; it is not used as evidence of benefit.
+  novelty: Twelve epochs is absent from the supplied registry and measured-value list.
+    It tests a smaller extension on the current anchored, bias-free recipe rather
+    than repeating the measured 14-epoch value.
+  coverage: Every training study and all disease and auxiliary objectives. Studies
+    per epoch, 26 triplets, image counts, sampling geometry and evaluation remain
+    fixed.
+  exploitation: Log the actual optimizer LR divided by its group peak at each epoch
+    end, plus cumulative completed updates. At epoch 1, the 12-epoch schedule predicts
+    approximately 0.97995 versus 0.97015 for ten epochs; completing epoch 10 demonstrates
+    additional exposure. Retain all drift, gradient and augmentation diagnostics.
+  budget: "Linear projections are 1,436 s from the incumbent\u2019s 1,197 s and 1,466\
+    \ s from the reference\u2019s 1,222 s, both within 610.997\u20131,832.990 s. Expected\
+    \ steps rise from 4,370 to 5,244 at unchanged batch size. These are projections;\
+    \ actual training duration must satisfy the range. Use the supervisor\u2019s current\
+    \ incumbent seed, presently 1533697213."
+  implementation: Replace max_epochs=10 with 12 in configs/training.yaml. Add observational
+    epoch LR-ratio and completed-update logging in src/knee_abnormality/training/lightning.py,
+    without changing optimizer or scheduler calculations. Retain active readouts,
+    bias removal, anchors, losses and augmentations. Rebase onto any newly accepted
+    incumbent and retain unrelated improvements; change only its epoch count.
+  open_choices: Fixed count 12. Late MCL decline and the historical 14-epoch rejection
+    are counterevidence; longer exposure may add overfitting rather than useful learning.
+    Keep rates, warmup, clipping and regularization unchanged. The historical +0.0010
+    summary remains unresolved.
+  dependencies: []
+  priority_rationale: 'First: directly targets continuing incumbent macro progress,
+    with substantial budget headroom and an unmeasured value. It costs about 20% more
+    training time, and historical longer-training evidence lowers confidence.'
+  source_change: true
+  targeted_curve: "no-anatomical-bias incumbent, epochs 6\u20139: \xD71 macro still\
+    \ rises 0.9244\u21920.9260 as loss falls and drift contracts. Extend useful learning\
+    \ into epochs 10\u201311; judge benefit solely by the fixed \xD74 macro rule."
+  status: completed
+  created_revision: 389
+  ranking_rationale: 'Admit all three dependency-satisfied proposals, filling the
+    five-idea queue without displacing existing work. The family ledger, prior-work
+    table and targeted searches of validation/results and history establish no matching
+    measured ResNet-18 value. Rank twelve epochs first among additions: it targets
+    continuing late incumbent macro progress, with projected duration inside the budget.
+    GIN blend 0.25 follows because it explores an unmeasured strength at unchanged
+    expected cost, although distortion magnitude alone gives weak causal evidence.
+    Warmup starting ratio 0.5 ranks last: early learning sensitivity motivates it,
+    but the clipping precedent shows that early advantages can disappear. These mechanisms
+    do not reopen the closed removal, head-rate or clipping families.'
+  experiments:
+  - rn18-twelve-epochs-20261001T042051Z-aecbd75a
+  decision: reject
+- id: rn18-gin-blend-max-025
+  mechanism_id: gin-blend-strength
+  parent_idea_id: null
+  title: Reduce GIN maximum blend from 0.5 to 0.25 while retaining its probability
+  opportunity: "The incumbent logs GIN mean absolute pixel changes of approximately\
+    \ 0.060\u20130.063 at effective probability near 0.30, versus approximately 0.0074\
+    \ for smoothing and 0.0022 for resolution degradation on their respective supports.\
+    \ GIN is a plausible source of excessive appearance distortion while lateral-meniscus\
+    \ AUC remains nearly flat after epoch 6. Pixel-change magnitude does not establish\
+    \ harmful corruption; that is the hypothesis."
+  mechanism: Set only data.gin_augmentation.blend_max=0.25. Retain probability 0.3,
+    random convolution construction, acquisition coherence, support masks and RMS
+    normalization. This reduces the sampled mixture coefficient without removing GIN
+    or replacing its transformation. RMS normalization and clipping mean the resulting
+    pixel change need not halve.
+  precedents:
+  - "run_curves.full_detail, incumbent: GIN effective probability 0.294\u20130.302\
+    \ and mean pixel change 0.0604\u20130.0634; lateral-meniscus \xD71 AUC 0.9155\u2192\
+    0.9154 over epochs 6\u20139."
+  - 'src/knee_abnormality/modeling/augmentation.py: sample_gin_parameters multiplies
+    the uniform blend draw by blend_max; apply_gin_filter then applies acquisition-level
+    RMS normalization. Existing Lightning logging reports affected acquisitions and
+    realized pixel change.'
+  - "site-acquisition-mixture-contrast-final-20260930T111043Z-ab78b506 replaced GIN\
+    \ with a different, much weaker transformation and lost held-out-site macro: \u0394\
+    \u22120.001487, 80% [\u22120.002861,\u22120.000052]. This is counterevidence against\
+    \ excessive weakening, not a measurement of blend_max=0.25."
+  novelty: First supplied tuning of GIN blend_max on this recipe. It retains the existing
+    operator, unlike the historical replacement, and does not reopen the closed DSU,
+    smoothing or resolution-removal family.
+  coverage: All acquisitions eligible for existing GIN augmentation, across all labels.
+    Preserve augmentation frequency and all input accounting.
+  exploitation: Use existing gin_affected_acquisitions, gin_effective_probability
+    and gin_mean_absolute_pixel_change columns each epoch. Confirm continued activation
+    and measure whether realized distortion decreases. Smaller distortion alone is
+    not a success criterion.
+  budget: "The same acquisitions execute the same convolutions and normalization,\
+    \ so expect approximately the incumbent\u2019s 1,197 s at ten epochs. Actual training\
+    \ must remain within 610.997\u20131,832.990 s. Train once at the supervisor\u2019\
+    s current incumbent seed, presently 1533697213."
+  implementation: Replace blend_max=0.5 with 0.25 only in configs/training.yaml. Existing
+    Python behavior and mechanism diagnostics suffice; no source edit is required.
+    Retain GIN, DSU, smoothing, resolution degradation, contrast mixing, active readouts
+    and bias removal. Apply the same single-field replacement to a newly accepted
+    incumbent while preserving unrelated improvements.
+  open_choices: Fixed blend_max 0.25. Weaker GIN may reduce acquisition robustness,
+    as the historical replacement warns. The normalization makes the strength-to-distortion
+    relation nonlinear; assess the logged effect rather than assuming a 50% reduction.
+  dependencies: []
+  priority_rationale: 'Second: explores an untouched augmentation-strength knob with
+    existing activation evidence and unchanged cost. The measured distortion motivates
+    it, but attribution to validation limitations is uncertain and historical weakening
+    gives counterevidence.'
+  source_change: false
+  targeted_curve: "no-anatomical-bias incumbent, epochs 0\u20139: GIN pixel change\
+    \ remains about 0.062. Reduce realized distortion and improve the late macro plateau,\
+    \ including lateral-meniscus stagnation after epoch 6, without label-specific\
+    \ objectives."
+  status: completed
+  created_revision: 389
+  ranking_rationale: 'Admit all three: proposal_admission reports satisfied dependencies;
+    each changes one permitted augmentation endpoint or magnitude, and none repeats
+    a measured setting in the family ledger, prior-work table or searched results/history.
+    Preserve the reserved GIN head and existing warmup position, then append contrast
+    mixing, affine rotation and noise. Contrast attenuation has the closest ResNet-18
+    precedent, although complete removal''s +0.000551 was inconclusive. Affine affects
+    more acquisitions than noise, giving it higher potential within similar execution
+    cost. The historical seven-degree rotation and stronger-noise runs are materially
+    different settings and recipes, so they do not bar admission. All five queued
+    ideas fit the queue limit.'
+  experiments:
+  - rn18-gin-blend-max-025-20261001T044159Z-067741a9
+  - rn18-gin-blend-max-025-20261001T044448Z-45e86395
+  decision: reject
+- id: rn18-warmup-start-ratio-05
+  mechanism_id: warmup-starting-rate
+  parent_idea_id: null
+  title: Raise the warmup starting LR ratio from 0.1 to 0.5
+  opportunity: "The incumbent\u2019s first-epoch macro is 0.8806, followed by 0.9059\
+    \ at epoch 1; first-epoch loss is 0.6939. Halving the head rate previously lowered\
+    \ first-epoch macro to 0.8751 and raised loss to 0.7061. This suggests early learning\
+    \ may be sensitive to insufficient update size. Faster initialization could help,\
+    \ but the clipping relaxation\u2019s early advantage disappeared by training end,\
+    \ so an early gain alone is weak evidence."
+  mechanism: Set only optimizer.warmup_start_ratio=0.5. Keep the one-epoch linear
+    warmup, peak backbone/head rates and subsequent cosine schedule unchanged. At
+    437 steps, the mean first-epoch schedule multiplier increases from approximately
+    0.54897 to 0.74943. Later scheduled multipliers are unchanged at equal epoch counts.
+  precedents:
+  - 'run_curves.full_detail: incumbent epoch-0 macro/loss 0.8806/0.6939; rn18-plane-head-lr-3e-4
+    records 0.8751/0.7061. That rate attempt remains rejected and its family remains
+    closed.'
+  - Retrieved rn18-two-warmup-epochs-20260928T204343Z-5a06510a effective_config.json
+    uses warmup_start_ratio=0.1 and warmup_epochs=2, at seed 1533697213 without L2-SP.
+    It does not measure starting ratio 0.5.
+  - rn18-global-clip-2 improves epoch-0 macro to 0.8852 but ends at 0.9258 versus
+    incumbent 0.9260. This limits confidence that accelerating early learning will
+    improve final evaluated macro.
+  novelty: The starting ratio 0.5 is absent from the supplied registry and measured-value
+    list. It changes initial warmup amplitude rather than repeating two warmup epochs,
+    changing a peak rate or retrying clipping.
+  coverage: All optimizer groups during the existing warmup epoch. No group-specific
+    rates, losses, data or evaluation objectives are introduced.
+  exploitation: Add an epoch scalar measuring applied LR divided by the group peak
+    for completed warmup updates, and the corresponding completed-update count. Epoch
+    0 should average approximately 0.749 rather than 0.549. Log zero warmup updates
+    in later epochs and retain per-stage drift and gradients.
+  budget: "Unchanged epoch count, batch size and optimizer steps; expect approximately\
+    \ 1,197 s plus negligible diagnostic overhead. Actual training must satisfy 610.997\u2013\
+    1,832.990 s. Use the supervisor\u2019s current incumbent seed, presently 1533697213."
+  implementation: "Replace warmup_start_ratio=0.1 with 0.5 in configs/training.yaml.\
+    \ Add observational accounting in src/knee_abnormality/training/lightning.py using\
+    \ the actual rates of completed optimizer updates; preserve the schedule formula\
+    \ and clipping. Retain all active and unrelated incumbent improvements. On rebasing,\
+    \ use the new incumbent\u2019s peak rates and change only this starting ratio."
+  open_choices: Fixed ratio 0.5. Larger initial backbone updates may destabilize pretrained
+    features; stage4 already reaches drift 0.0736 in epoch 0. An early macro improvement
+    must persist into the unchanged final evaluation to matter. Do not compensate
+    with another rate, clipping or epoch change.
+  dependencies: []
+  priority_rationale: 'Third: an inexpensive, unmeasured warmup knob targeting observed
+    early learning sensitivity. Potential is lower because early clipping gains did
+    not translate into adoption and faster initial backbone movement may hurt.'
+  source_change: true
+  targeted_curve: "no-anatomical-bias incumbent, epochs 0\u20131: accelerate the first-epoch\
+    \ loss decrease and macro rise while preserving late macro. Monitor the epoch-0\
+    \ stage4 drift of 0.0736 for excessive movement."
+  status: completed
+  created_revision: 389
+  ranking_rationale: 'Admit all three: proposal_admission reports satisfied dependencies;
+    each changes one permitted augmentation endpoint or magnitude, and none repeats
+    a measured setting in the family ledger, prior-work table or searched results/history.
+    Preserve the reserved GIN head and existing warmup position, then append contrast
+    mixing, affine rotation and noise. Contrast attenuation has the closest ResNet-18
+    precedent, although complete removal''s +0.000551 was inconclusive. Affine affects
+    more acquisitions than noise, giving it higher potential within similar execution
+    cost. The historical seven-degree rotation and stronger-noise runs are materially
+    different settings and recipes, so they do not bar admission. All five queued
+    ideas fit the queue limit.'
+  experiments:
+  - rn18-warmup-start-ratio-05-20261001T050703Z-2660b704
+  decision: reject
+- id: rn18-contrast-mixing-target-min-075
+  mechanism_id: contrast-mixing-strength
+  parent_idea_id: null
+  title: Raise the minimum retained target-contrast weight from 0.5 to 0.75
+  opportunity: "The incumbent's lateral-meniscus \xD71 AUC plateaus at 0.9155\u2013\
+    0.9154 over epochs 6\u20139 while training loss falls from 0.5895 to 0.5733. Contrast\
+    \ mixing remains active throughout, with mean target weight 0.7351\u20130.7518\
+    \ and mean pixel change 0.0523\u20130.0545. Mixing may dilute the contrast identity\
+    \ used by the accepted readouts. Earlier complete removal produced a positive\
+    \ but rejected macro delta; partial attenuation could preserve useful variation\
+    \ while reducing that dilution. This is a hypothesis, not a diagnosed cause of\
+    \ the plateau."
+  mechanism: Set data.contrast_mixing_augmentation.target_weight_range=[0.75,1.0],
+    changing only its lower endpoint. Retain probability 0.3, target selection, acquisition
+    matching and support handling. The expected donor contribution decreases from
+    0.25 to 0.125. With identical draws and upstream inputs, the existing linear mixture
+    halves its perturbation. Existing contrast_mixing_lambda, contrast_mixing_pixel_change
+    and acquisition-count logging provide mechanism evidence.
+  precedents:
+  - "[Full curves](/home/claudio/src/knee-abnormality/outputs/autoresearch/revisits/jobs/researcher-20261001T044200Z-a3b75052/curves.json):\
+    \ incumbent epochs 6\u20139 show the meniscus plateau, continuing loss reduction\
+    \ and persistent contrast mixing."
+  - "[Earlier removal comparison](/home/claudio/src/knee-abnormality/outputs/autoresearch/radimagenet-rn18/experiments/rn18-native-contrast-preservation-20260929T035445Z-ea7464f5/comparison/comparison.json):\
+    \ macro \u0394 +0.000551, 80% interval [\u22120.001057,+0.002199], rejected. Seed\
+    \ 1533697213, rebuild_state_v2, scanner_v2 fold 0; its recipe lacked L2-SP and\
+    \ retained scanner confusion."
+  - 'src/knee_abnormality/modeling/augmentation.py: sample_contrast_mixing_lambda
+    samples the configured interval; mix_matched_slices applies the linear mixture.
+    training/lightning.py already logs realized mixture weights and pixel changes.'
+  novelty: Tests the previously unmeasured mixture-strength bound. Earlier work removed
+    mixing completely; this retains its frequency and matching mechanism. It is distinct
+    from the queued GIN-strength intervention, which changes a random-convolution
+    transformation.
+  coverage: Applies to every eligible within-study plane/contrast pair and retains
+    all twelve targets. Label curves motivate the hypothesis but do not define a selective
+    objective.
+  exploitation: "Test whether partial attenuation converts the historical positive\
+    \ near miss into an incumbent-relative macro improvement. Score the unchanged\
+    \ \xD74 evaluator at the supervisor's incumbent seed; apply only the fixed macro\
+    \ gain and central 80% bootstrap rule."
+  budget: "No additional operations, images or optimizer steps. Project approximately\
+    \ the incumbent's 1,197 s at ten epochs. If twelve epochs becomes incumbent, simple\
+    \ scaling gives approximately 1,436 s. These are projections; actual training\
+    \ must remain within 610.997\u20131,832.990 s."
+  implementation: Replace only the range's lower endpoint in configs/training.yaml.
+    Retain existing Python behavior and diagnostics, plane/contrast readouts, anatomical-bias
+    removal and unrelated incumbent improvements. No component is removed. Rebase
+    onto a newly accepted incumbent and apply this same target bound; retire the proposal
+    if that bound is already present.
+  open_choices: No behavioral choices remain. Verify that logged target weight increases
+    and mixing still executes; realized pixel change is diagnostic rather than an
+    additional adoption criterion.
+  dependencies: []
+  priority_rationale: 'First: strongest relevant historical signal, an untouched knob,
+    existing activation telemetry and negligible implementation cost. Confidence remains
+    limited by the historical recipe differences and its wide interval.'
+  source_change: false
+  targeted_curve: "Incumbent epochs 6\u20139: lateral-meniscus \xD71 AUC 0.9155\u2192\
+    0.9154 despite loss 0.5895\u21920.5733. Reduce persistent contrast perturbation\
+    \ and seek renewed late macro progress, while contrast_mixing_lambda rises from\
+    \ its roughly 0.74 baseline."
+  status: completed
+  created_revision: 445
+  ranking_rationale: 'Admit all three: proposal_admission reports satisfied dependencies;
+    each changes one permitted augmentation endpoint or magnitude, and none repeats
+    a measured setting in the family ledger, prior-work table or searched results/history.
+    Preserve the reserved GIN head and existing warmup position, then append contrast
+    mixing, affine rotation and noise. Contrast attenuation has the closest ResNet-18
+    precedent, although complete removal''s +0.000551 was inconclusive. Affine affects
+    more acquisitions than noise, giving it higher potential within similar execution
+    cost. The historical seven-degree rotation and stronger-noise runs are materially
+    different settings and recipes, so they do not bar admission. All five queued
+    ideas fit the queue limit.'
+  experiments:
+  - rn18-contrast-mixing-target-min-075-20261001T052822Z-a0a25560
+  decision: reject
+- id: rn18-affine-rotation-5deg
+  mechanism_id: affine-rotation-amplitude
+  parent_idea_id: null
+  title: Reduce affine rotation magnitude from ten degrees to five
+  opportunity: "The incumbent's early \xD71 macro curve stalls at epochs 2\u20133\
+    \ (0.9139\u21920.9135); lateral-meniscus AUC falls 0.9055\u21920.8940 before recovering.\
+    \ Affine augmentation currently applies with probability 0.7 and permits rotations\
+    \ up to ten degrees. Smaller rotations may reduce the learning burden and geometric\
+    \ interpolation disturbance within the short training horizon. The curves do not\
+    \ identify rotation as the cause, and the incumbent has no applied-angle telemetry."
+  mechanism: Set only data.affine_augmentation.rotation_degrees=5.0. Retain probability
+    0.7, translation_fraction=0.04, scale_range=[0.95,1.05], bilinear interpolation
+    and coordinate propagation. The existing uniform angle draw then has expected
+    absolute magnitude 2.5 degrees instead of 5. Add observational acquisition-count
+    and applied absolute-angle logging after the affine operation, using the parameters
+    or matrices actually consumed.
+  precedents:
+  - '[Full curves](/home/claudio/src/knee-abnormality/outputs/autoresearch/revisits/jobs/researcher-20261001T044200Z-a3b75052/curves.json):
+    incumbent epoch-3 macro stall and lateral-meniscus dip; several decided runs show
+    similar early fluctuations.'
+  - "[Late affine shutdown comparison](/home/claudio/src/knee-abnormality/outputs/autoresearch/augmentation/experiments/late-affine-shutdown-20260926T004000Z-0fee047d/comparison/comparison.json):\
+    \ removing all affine augmentation in epochs 8\u20139 was rejected, macro \u0394\
+    \ \u22120.000545. It used ReXNet-200, combined_v1, scanner_v1 fold 2 and seed\
+    \ 2464012069; this is weak counterevidence against removal, not a measurement\
+    \ of five-degree rotation."
+  - 'src/knee_abnormality/modeling/augmentation.py: sample_affine_parameters scales
+    a uniform draw by rotation_degrees. affine_matrices, apply_affine_augmentation
+    and augmented_to_prepared already propagate the sampled transform.'
+  novelty: An unmeasured constant rotation-amplitude setting, retaining affine augmentation
+    throughout training. It differs from historical late shutdown in timing, retained
+    transforms, backbone, labels and fold.
+  coverage: Changes rotation severity for all supplied acquisitions without altering
+    crop placement, sampling geometry, labels or evaluation inputs. All twelve labels
+    remain equally subject to the macro objective.
+  exploitation: "Seek better early learning that persists into the late macro curve.\
+    \ Historical clipping improvements disappeared late, so an early curve advantage\
+    \ alone provides no adoption evidence. Use the fixed \xD74 macro/bootstrap rule."
+  budget: The same images pass through the same affine kernel. Only scalar observational
+    telemetry is added. Project training near 1,197 s at the current horizon, or approximately
+    1,436 s if twelve epochs is adopted; actual duration and telemetry overhead remain
+    unmeasured.
+  implementation: Change rotation_degrees in configs/training.yaml. Add observational
+    activity reporting in src/knee_abnormality/modeling/augmentation.py and epoch
+    logging in training/lightning.py, without new random draws or changes to augmentation
+    ordering. Retain translations, scaling, masks, inverse-coordinate handling, active
+    readouts and bias removal. Preserve unrelated improvements when rebasing; retire
+    if five degrees is already incumbent.
+  open_choices: Choose a lightweight telemetry representation for present acquisitions.
+    Record zero when no affine operation occurs and aggregate applied angles by acquisition.
+    No additional behavioral flag or amplitude sweep.
+  dependencies: []
+  priority_rationale: 'Second: affects a frequent augmentation and targets an observed
+    early learning weakness. The intervention is inexpensive, but its causal premise
+    is uncertain and historical affine removal offers counterevidence.'
+  source_change: true
+  targeted_curve: "Incumbent epochs 2\u20134: macro 0.9139\u21920.9135\u21920.9209\
+    \ and lateral-meniscus AUC 0.9055\u21920.8940\u21920.9091. Seek a smaller early\
+    \ dip and a sustained late macro gain; new applied-angle telemetry should reflect\
+    \ the five-degree bound."
+  status: completed
+  created_revision: 445
+  ranking_rationale: Admit all three dependency-satisfied proposals, filling the five-idea
+    queue without displacing its reserved head. Each uses permitted hyperparameters
+    and has a material difference from measured precedents. Floor 0.05 differs from
+    the measured ResNet-18 floor 0.1; batch 12 on ResNet-18 differs from the rejected
+    ResNet-10t batch-16 intervention. Intensity probability 0.75 was previously measured
+    on ReXNet-200, but the backbone, labels and current augmentation stack make this
+    a distinct comparison. Among additions, rank floor first for its direct late-curve
+    target and negligible compute cost, batch second for its distinct optimization
+    mechanism, and intensity last because its motivation is indirect and the historical
+    result adds doubt. None reopens a closed ledger family.
+  experiments:
+  - rn18-affine-rotation-5deg-20261001T054935Z-14822974
+  decision: reject
+- id: rn18-noise-std-max-001
+  mechanism_id: gaussian-noise-amplitude
+  parent_idea_id: null
+  title: Reduce the Gaussian-noise standard-deviation ceiling from 0.02 to 0.01
+  opportunity: "Late incumbent loss continues falling while meniscus AUC changes little;\
+    \ stem gradient RMS remains approximately 0.0026 during epochs 6\u20139. Gaussian\
+    \ noise is added after smoothing, resolution degradation, intensity changes and\
+    \ GIN. Its current standard-deviation range is 0.005\u20130.02 at probability\
+    \ 0.15. Reducing the upper tail may preserve subtle image evidence while retaining\
+    \ noise exposure. Actual supported-pixel disturbance is absent from incumbent\
+    \ telemetry, so excess noise remains an unverified hypothesis."
+  mechanism: Set data.noise_augmentation.std_range=[0.005,0.01], changing only the
+    upper endpoint and retaining probability 0.15. Expected sampled standard deviation
+    decreases from 0.0125 to 0.0075; expected variance before clipping decreases by
+    two thirds. Selection and Gaussian draw shapes remain unchanged at equal inputs
+    and seed. Add actual selected-acquisition, sampled-standard-deviation and post-clipping
+    foreground pixel-change telemetry.
+  precedents:
+  - "[Full curves](/home/claudio/src/knee-abnormality/outputs/autoresearch/revisits/jobs/researcher-20261001T044200Z-a3b75052/curves.json):\
+    \ incumbent epochs 6\u20139 loss 0.5895\u21920.5733, lateral-meniscus AUC 0.9155\u2192\
+    0.9154 and continuing stem gradients."
+  - 'src/knee_abnormality/modeling/augmentation.py: sample_noise_parameters samples
+    the configured standard-deviation interval; sample_noise_values scales Gaussian
+    draws. ImageAugmentation.forward adds noise after GIN, clips to [0,1] and restores
+    background.'
+  - '[Prior-work table](/home/claudio/src/knee-abnormality-revisits/autoresearch/campaigns/revisits/prior-work.md#measured-on-resnet-18)
+    and the assignment registry contain no measurement of this noise ceiling. DSU,
+    smoothing and resolution-removal results do not isolate additive-noise amplitude.'
+  novelty: Tests an untouched measurement-noise magnitude knob. It retains noise frequency
+    and differs from changing contrast mixtures, nonlinear intensity transforms or
+    spatial filtering.
+  coverage: Applies uniformly to selected acquisitions across all planes and contrast
+    types. Retains clipping, background restoration and all twelve evaluation targets;
+    no label-specific loss or selection is introduced.
+  exploitation: "Test whether weaker additive corruption improves the late macro trajectory\
+    \ while maintaining stochastic noise exposure. Pixel-change and gradient measurements\
+    \ explain activation only; adoption remains governed by the unchanged \xD74 macro\
+    \ and 80% interval rule."
+  budget: "Noise selection, draw count and image accounting remain unchanged. Foreground-change\
+    \ reductions add observational overhead only. Project approximately the current\
+    \ 1,197 s training duration; preserve any newly adopted horizon and require measured\
+    \ duration within the existing 611\u20131,833 s range."
+  implementation: Replace only std_range's upper endpoint in configs/training.yaml.
+    Add observational noise activity in src/knee_abnormality/modeling/augmentation.py
+    and log it through training/lightning.py. Measure changes after clipping and background
+    restoration without modifying returned pixels, RNG calls or operation order. Retain
+    active incumbent mechanisms and all other augmentations. Rebase while preserving
+    unrelated improvements; retire if the target ceiling is already present.
+  open_choices: Use lightweight reductions over selected foreground pixels and present
+    acquisitions. Report zero activity for empty selections. Clipping means realized
+    pixel change need not follow the theoretical variance ratio; no alternative ceiling
+    is proposed.
+  dependencies: []
+  priority_rationale: 'Third: inexpensive and distinct, with an untouched knob. Potential
+    is lower because noise affects only 15% of acquisitions and its realized disturbance
+    has not been measured.'
+  source_change: true
+  targeted_curve: "Incumbent epochs 6\u20139: loss falls 0.5895\u21920.5733 while\
+    \ lateral-meniscus AUC remains near 0.915 and stem gradient RMS near 0.0026. Seek\
+    \ stronger late macro progress with lower measured additive pixel disturbance."
+  status: completed
+  created_revision: 445
+  ranking_rationale: Admit all three dependency-satisfied proposals, filling the five-idea
+    queue without displacing its reserved head. Each uses permitted hyperparameters
+    and has a material difference from measured precedents. Floor 0.05 differs from
+    the measured ResNet-18 floor 0.1; batch 12 on ResNet-18 differs from the rejected
+    ResNet-10t batch-16 intervention. Intensity probability 0.75 was previously measured
+    on ReXNet-200, but the backbone, labels and current augmentation stack make this
+    a distinct comparison. Among additions, rank floor first for its direct late-curve
+    target and negligible compute cost, batch second for its distinct optimization
+    mechanism, and intensity last because its motivation is indirect and the historical
+    result adds doubt. None reopens a closed ledger family.
+  experiments:
+  - rn18-noise-std-max-001-20261001T061043Z-48e9a2c0
+  decision: reject
+- id: rn18-cosine-floor-005
+  mechanism_id: cosine-ending-rate
+  parent_idea_id: null
+  title: Raise the cosine learning-rate floor from 0.01 to 0.05
+  opportunity: "The incumbent's \xD71 macro rises only 0.9255\u21920.9260 over epochs\
+    \ 7\u20139 while training loss falls 0.5822\u21920.5733. Head gradient RMS remains\
+    \ about 0.0006, but readout drift stops growing at 0.0170. Useful gradients may\
+    \ remain when the learning rate becomes very small. The linked prior-work table\
+    \ records floor 0.1 as already measured; 0.05 is an unmeasured, smaller increase."
+  mechanism: "Change only optimizer.minimum_lr_ratio from 0.01 to 0.05. Preserve peak\
+    \ rates, one-epoch warmup and the incumbent horizon. At ten epochs, calculated\
+    \ end-of-epoch LR ratios become 0.161129, 0.078646 and 0.05 at epochs 7\u2013\
+    9, versus 0.125808, 0.039852 and 0.01. This concentrates the increase late in\
+    \ training rather than adding optimizer updates. Log actual post-warmup LR/peak\
+    \ ratios and completed updates; configuration values alone do not establish activation."
+  precedents:
+  - "run_curves: no-anatomical-bias incumbent, epochs 7\u20139, \xD71 macro 0.9255\u2192\
+    0.9260, loss 0.5822\u21920.5733, readout drift 0.0169\u21920.0170; reference macro\
+    \ peaks at epoch 8 and then falls slightly."
+  - "[Revisits prior work](/home/claudio/src/knee-abnormality-revisits/autoresearch/campaigns/revisits/prior-work.md#measured-on-resnet-18)\
+    \ records cosine floor 0.1 with a \u22120.0002 result. That value is excluded;\
+    \ its result limits confidence in this smaller increase."
+  - "Incumbent training/lightning.py:969\u20131001 implements linear warmup followed\
+    \ by floor + (1 \u2212 floor) \xD7 cosine."
+  novelty: Tests the previously unmeasured ending ratio 0.05 on the bound incumbent.
+    It changes the schedule endpoint, with the number of updates fixed; it does not
+    repeat the rejected horizon extension or floor 0.1.
+  coverage: Applies equally to existing optimizer groups and all labels. Cohorts,
+    study inputs, class balancing, validation and prediction multipliers remain fixed.
+  exploitation: "Compare late \xD71 macro and loss, actual LR ratios, readout drift,\
+    \ stage drift and gradient RMS against the implementation parent. Use \xD74 macro\
+    \ and the existing paired-bootstrap rule for the numerical decision."
+  budget: "Retain ten epochs, batch eight, accumulation one and seed 1533697213. The\
+    \ incumbent trained in 1,197.0 s; changing the scheduler scalar adds negligible\
+    \ behavioral compute. Observational logging should be small, but realized training\
+    \ must satisfy 611\u20131,833 s."
+  implementation: Set optimizer.minimum_lr_ratio=0.05 in configs/training.yaml. Add
+    observational LR/update logging in training/lightning.py without changing the
+    scheduler formula, optimizer groups or random draws. Retain plane-contrast-readouts,
+    anatomical-bias removal, both anchors, losses and augmentations. Remove no incumbent
+    component. Rebase onto any newly accepted incumbent, retain unrelated improvements
+    and recompute expected ratios for its horizon; omit the proposal if that incumbent
+    already uses 0.05.
+  open_choices: The value and direction are fixed. Historical floor 0.1 failed, so
+    expected benefit is uncertain. Persistent gradients do not prove that more late
+    learning will generalize.
+  dependencies: []
+  priority_rationale: 'Priority 1: directly targets the measured late plateau, costs
+    almost no additional training compute and isolates an untouched value. Historical
+    floor evidence reduces confidence.'
+  source_change: true
+  targeted_curve: "Incumbent epochs 7\u20139: improve the \xD71 macro plateau at 0.9255\u2192\
+    0.9260 while loss continues falling, with actual late LR ratios higher and readout\
+    \ drift still able to change."
+  status: completed
+  created_revision: 494
+  ranking_rationale: Admit all three dependency-satisfied proposals, filling the five-idea
+    queue without displacing its reserved head. Each uses permitted hyperparameters
+    and has a material difference from measured precedents. Floor 0.05 differs from
+    the measured ResNet-18 floor 0.1; batch 12 on ResNet-18 differs from the rejected
+    ResNet-10t batch-16 intervention. Intensity probability 0.75 was previously measured
+    on ReXNet-200, but the backbone, labels and current augmentation stack make this
+    a distinct comparison. Among additions, rank floor first for its direct late-curve
+    target and negligible compute cost, batch second for its distinct optimization
+    mechanism, and intensity last because its motivation is indirect and the historical
+    result adds doubt. None reopens a closed ledger family.
+  experiments:
+  - rn18-cosine-floor-005-20261001T063205Z-aa8a4069
+  decision: reject
+- id: rn18-batch-12-scaled-rates
+  mechanism_id: study-batch-rate-scaling
+  parent_idea_id: null
+  title: Increase the study batch to twelve with learning rates scaled by 1.5
+  opportunity: "The incumbent's macro gains flatten late while MCL peaks at epoch\
+    \ 6 and subsequently declines. In the decided clip-2 run, pre-clip norms grow\
+    \ 0.8614\u21921.4823 across training; raising the cap did not provide a qualifying\
+    \ improvement. A larger study batch could change gradient variability and BatchNorm\
+    \ estimates instead of changing the clipping threshold. This explanation is a\
+    \ hypothesis; the incumbent's gradient variance was not measured."
+  mechanism: 'Use the explicitly permitted batch-with-scaled-rates intervention: trainer.batch_size=12,
+    optimizer.backbone_lr=7.5e-5 and optimizer.head_lr=0.0009, retaining accumulation
+    one. This is one logical batch-size knob with deterministic rate scaling. The
+    3,495-study cohort yields 292 rather than 437 updates per epoch, with the final
+    partial batch retained. Larger joint batches change gradient averaging and BatchNorm
+    statistics; scaling rates approximately offsets the reduced update count, without
+    guaranteeing equivalent Adam dynamics.'
+  precedents:
+  - "run_curves: incumbent epochs 6\u20139, \xD71 macro 0.9244\u21920.9260, MCL 0.9248\u2192\
+    0.9232 and head RMS about 0.0006. The label trajectory motivates an optimization\
+    \ hypothesis, not a label-specific objective."
+  - "Historical rn10t-double-batch-and-rates rejected with \u0394\u22120.003689, 80%\
+    \ [\u22120.006099,\u22120.001439]. Its recorded recipe used ResNet-10t, batch\
+    \ 16 and doubled rates; this proposal uses RadImageNet ResNet-18 and batch 12."
+  - '[Goyal et al., Accurate, Large Minibatch SGD](https://arxiv.org/abs/1706.02677)
+    supports linear rate scaling with batch size for ImageNet SGD. Applying that convention
+    to this Adam recipe remains an extrapolation.'
+  - Incumbent data/dataset.py:508 retains partial batches; timing.json records 3,495
+    training studies, 1,197.0 s training and peak CUDA allocation of 10,068,416,000
+    bytes.
+  novelty: The inspected historical batch intervention was on ResNet-10t at batch
+    16. Batch 12 with scaled rates is unmeasured on this ResNet-18 incumbent. It changes
+    update aggregation rather than reopening constant clipping or independent learning-rate
+    families.
+  coverage: All 3,495 studies still appear each epoch, with the same triplets and
+    images per study. All labels participate in the unchanged losses and macro objective.
+  exploitation: "Log completed updates, actual studies per update and applied LR peaks\
+    \ per epoch. Compare stage/head gradients, drift and late macro against the parent.\
+    \ Report memory and training duration alongside the fixed \xD74 macro decision."
+  budget: "Keep ten epochs and seed 1533697213. Plan for roughly 800\u20131,300 s,\
+    \ based on unchanged study processing and one-third fewer optimizer updates; this\
+    \ is an estimate. Linear extrapolation of the incumbent's peak allocation suggests\
+    \ about 15.1 GB, but actual batch-12 memory and device capacity are unknown. The\
+    \ candidate must satisfy the existing 611\u20131,833 s range; no fallback batch\
+    \ value is proposed."
+  implementation: Change the batch and its two tied peak rates in configs/training.yaml.
+    Add observational executed-batch/update/LR logging in training/lightning.py; retain
+    the final partial batch and existing scheduler recalculation. Retain the shared
+    ResNet-18, active readouts, bias removal, anchors, clipping, losses, augmentations
+    and cohort. Rebase onto a newly accepted incumbent, scaling its current peak rates
+    by 12/current_batch_size and preserving unrelated improvements. Omit if batch
+    12 is already active.
+  open_choices: Memory fit, realized throughput and Adam's response to linear scaling
+    remain unknown. No GPU inspection or execution was performed. The larger historical
+    batch failure warrants lower priority.
+  dependencies: []
+  priority_rationale: 'Priority 2: tests a distinct optimization mechanism with possible
+    runtime savings. Historical batch evidence and unmeasured memory make it riskier
+    than the floor change.'
+  source_change: true
+  targeted_curve: "Incumbent epochs 6\u20139: improve late \xD71 macro while reducing\
+    \ unstable update behavior associated with persistent gradients and exploratory\
+    \ MCL decline. Seek a different gradient/drift trajectory with 292 updates per\
+    \ epoch."
+  status: completed
+  created_revision: 494
+  ranking_rationale: 'Admit all three dependency-free proposals: proposal_admission
+    reports each satisfied, their fields are permitted, and the ledger, registry,
+    prior-work table and documentation searches reveal no measured duplicate at these
+    values. Append them behind the existing queue, preserving the reserved head and
+    user-seed order; this yields five non-seed ideas. Rank GIN coverage first because
+    reduced blend worsened evaluated AUC despite easier fitting, providing limited
+    directional support for retaining strength while increasing coverage. Smoothing
+    width follows with unchanged kernel dimensions and inexpensive development. Translation
+    ranks last because boundary loss is unmeasured and telemetry requires code. These
+    interventions vary distinct coordinates from the closed GIN-blend, smoothing-removal
+    and affine-rotation families; they do not reopen those attempts.'
+  experiments:
+  - rn18-batch-12-scaled-rates-20261001T065340Z-076ea50a
+  decision: reject
+- id: rn18-intensity-probability-075
+  mechanism_id: gamma-contrast-augmentation-frequency
+  parent_idea_id: null
+  title: Increase gamma/contrast augmentation probability from 0.5 to 0.75
+  opportunity: "The reduced-GIN run lowers terminal loss to 0.5713 versus 0.5733,\
+    \ yet its late \xD71 macro loses the initial advantage. That pattern weakens the\
+    \ case for broadly reducing appearance regularization. The separate gamma/contrast\
+    \ operator remains at an inherited probability of 0.5. More frequent mild transformations\
+    \ could discourage intensity shortcuts without increasing their magnitude. Its\
+    \ realized incumbent activity is currently unlogged."
+  mechanism: Set only data.intensity_augmentation.probability=0.75. Retain gamma_range=[0.85,1.15]
+    and contrast_range=[0.9,1.1]. Existing acquisition-level draws keep triplets coherent,
+    and the operator preserves zero background. Add activity logging for selected
+    and total represented acquisitions, actual effective probability and sampled nonzero
+    pixel change immediately around this operator, before GIN/noise. Gate sampling-probability
+    provenance on observed transformation activity.
+  precedents:
+  - 'run_curves: incumbent late macro continues slowly upward; the reduced-GIN candidate''s
+    early advantage disappears while its training loss remains lower. This motivates
+    testing regularization frequency, without establishing a causal diagnosis.'
+  - "Incumbent modeling/augmentation.py:292\u2013306 samples gamma and contrast per\
+    \ acquisition; :357\u2013379 applies the transformations and restores zero background."
+  - configs/training.yaml retains intensity probability 0.5, gamma [0.85,1.15] and
+    contrast [0.9,1.1]. The linked registry contains no attempt for this probability.
+  novelty: Changes frequency of the existing mild gamma/contrast operator. It is distinct
+    from the closed GIN blend-strength family and the owned contrast-mixing, affine-rotation
+    and Gaussian-noise proposals.
+  coverage: Applies across acquisitions and labels under existing eligibility and
+    support handling. Geometry, cohorts, supervision and evaluation targets remain
+    fixed.
+  exploitation: "Establish realized intensity activity, then compare epochs 5\u2013\
+    9 macro/loss divergence and drift/gradient trajectories against the parent. Pixel-change\
+    \ measurements must isolate this operator. Only the existing \xD74 macro adoption\
+    \ rule decides acceptance."
+  budget: "Retain ten epochs, batch eight, accumulation one and seed 1533697213. More\
+    \ selected acquisitions increase pointwise transformation work, with no added\
+    \ backbone passes or study inputs. Plan near the incumbent's 1,197 s, with an\
+    \ uncertain modest increase; keep diagnostics bounded and require the existing\
+    \ 611\u20131,833 s range."
+  implementation: Set the existing probability field in configs/training.yaml. Add
+    bounded observational activity capture in modeling/augmentation.py and epoch logging
+    in training/lightning.py; use existing draws and preserve transform order, parameter
+    ranges and support handling. Retain active readouts, bias removal, anchors, losses
+    and other augmentations. Remove no incumbent component. Rebase onto a newly accepted
+    incumbent and preserve unrelated improvements; omit if intensity probability 0.75
+    is already active.
+  open_choices: The probability is fixed at 0.75. Incumbent pixel-change magnitude
+    and effective activity are unknown; stronger appearance regularization may impair
+    learning. No additional value or confirmation run is proposed.
+  dependencies: []
+  priority_rationale: 'Priority 3: an untouched, inexpensive knob with a plausible
+    generalization mechanism. Its motivation is indirect and stronger augmentation
+    may trade away useful appearance information.'
+  source_change: true
+  targeted_curve: "Incumbent and reduced-GIN epochs 5\u20139: improve late \xD71 macro\
+    \ when lower training loss alone fails to translate into validation gain. Log\
+    \ intensity activity near the proposed 0.75 frequency."
+  status: completed
+  created_revision: 494
+  ranking_rationale: 'Admit all three dependency-free proposals: proposal_admission
+    reports each satisfied, their fields are permitted, and the ledger, registry,
+    prior-work table and documentation searches reveal no measured duplicate at these
+    values. Append them behind the existing queue, preserving the reserved head and
+    user-seed order; this yields five non-seed ideas. Rank GIN coverage first because
+    reduced blend worsened evaluated AUC despite easier fitting, providing limited
+    directional support for retaining strength while increasing coverage. Smoothing
+    width follows with unchanged kernel dimensions and inexpensive development. Translation
+    ranks last because boundary loss is unmeasured and telemetry requires code. These
+    interventions vary distinct coordinates from the closed GIN-blend, smoothing-removal
+    and affine-rotation families; they do not reopen those attempts.'
+  experiments:
+  - rn18-intensity-probability-075-20261001T082612Z-abcd789d
+  - rn18-intensity-probability-075-20261001T090125Z-ec87ec7d
+  - rn18-intensity-probability-075-20261001T090421Z-8b6fa015
+  decision: reject
+- id: rn10t-incumbent-recipe
+  mechanism_id: backbone-resnet10t
+  parent_idea_id: null
+  title: RadImageNet ResNet-10t in place of ResNet-18 with the incumbent recipe unchanged,
+    backbone LR 5e-5 (user seed)
+  opportunity: 'User decision, 2026-10-01: compare the smaller Refined-RadImageNet
+    ResNet-10t on exactly the current incumbent recipe. Its only earlier runs used
+    an older recipe: 0.922579 against ResNet-18''s 0.925476 at backbone LR 6e-5 (series
+    dropout 0.2, no L2-SP), and -0.0037 with batch 16 and doubled rates (radimagenet-rn18
+    campaign).'
+  mechanism: model.backbone resnet10t.c3_in1k with model.pretrained_weights radimagenet;
+    every other setting exactly as the incumbent, including backbone_lr 5e-5, head_lr
+    6e-4, L2-SP anchoring at 0.01 (stem and layer1) and 0.001 (the rest), plane-contrast
+    readouts, no anatomical bias, augmentation, 26 triplets and 10 epochs.
+  precedents:
+  - outputs/training/20260928-183517-radimagenet-resnet10t (older recipe, x4 0.922579).
+  - 'docs/ongoing/radimagenet-backbone.md: RadImageNet ResNet backbones and the weight-RMS
+    rule.'
+  novelty: First ResNet-10t run on the current recipe.
+  coverage: All studies and labels.
+  exploitation: Per-epoch x1 and per-stage drift against the incumbent; training seconds.
+  budget: About 105 s per epoch (1,048 s for the earlier 10-epoch run), inside the
+    611-1,833 s range.
+  implementation: Configuration-only change to configs/training.yaml (model.backbone).
+    Confirm the L2-SP early-anchor layer names match ResNet-10t's stem and layer1.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: User seed.
+  status: completed
+  created_revision: 541
+  seeded: /home/claudio/src/knee-abnormality-revisits/autoresearch/campaigns/revisits/resnet10t-ideas.yaml
+  ranking_rationale: 'Admit all three dependency-free proposals: proposal_admission
+    reports each satisfied, their fields are permitted, and the ledger, registry,
+    prior-work table and documentation searches reveal no measured duplicate at these
+    values. Append them behind the existing queue, preserving the reserved head and
+    user-seed order; this yields five non-seed ideas. Rank GIN coverage first because
+    reduced blend worsened evaluated AUC despite easier fitting, providing limited
+    directional support for retaining strength while increasing coverage. Smoothing
+    width follows with unchanged kernel dimensions and inexpensive development. Translation
+    ranks last because boundary loss is unmeasured and telemetry requires code. These
+    interventions vary distinct coordinates from the closed GIN-blend, smoothing-removal
+    and affine-rotation families; they do not reopen those attempts.'
+  experiments:
+  - rn10t-incumbent-recipe-20261001T071508Z-39f6cd51
+  decision: reject
+- id: rn10t-scaled-backbone-lr
+  mechanism_id: backbone-resnet10t
+  parent_idea_id: rn10t-incumbent-recipe
+  title: RadImageNet ResNet-10t with the backbone LR scaled to its weight size, 6e-5
+    (user seed)
+  opportunity: 'User decision, 2026-10-01: as rn10t-incumbent-recipe, with the backbone
+    learning rate set by the project''s weight-RMS rule instead of copied from ResNet-18:
+    ResNet-10t''s convolution weight RMS is 0.0158 against ResNet-18''s 0.0124, which
+    gives 6e-5 against 5e-5.'
+  mechanism: model.backbone resnet10t.c3_in1k, RadImageNet weights, optimizer.backbone_lr
+    6e-5; every other setting exactly as the incumbent.
+  precedents:
+  - 'docs/ongoing/radimagenet-backbone.md: weight-RMS rule, 5e-5 (RMS 0.0124) and
+    6e-5 (RMS 0.0158).'
+  novelty: First ResNet-10t run on the current recipe at its own scaled rate.
+  coverage: All studies and labels.
+  exploitation: As rn10t-incumbent-recipe.
+  budget: As rn10t-incumbent-recipe.
+  implementation: Configuration-only change to configs/training.yaml (model.backbone
+    and optimizer.backbone_lr). Runs against the incumbent at its turn, independent
+    of the other ResNet-10t verdict.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: User seed.
+  status: completed
+  created_revision: 541
+  seeded: /home/claudio/src/knee-abnormality-revisits/autoresearch/campaigns/revisits/resnet10t-ideas.yaml
+  ranking_rationale: 'Admit all three dependency-free proposals: proposal_admission
+    reports each satisfied, their fields are permitted, and the ledger, registry,
+    prior-work table and documentation searches reveal no measured duplicate at these
+    values. Append them behind the existing queue, preserving the reserved head and
+    user-seed order; this yields five non-seed ideas. Rank GIN coverage first because
+    reduced blend worsened evaluated AUC despite easier fitting, providing limited
+    directional support for retaining strength while increasing coverage. Smoothing
+    width follows with unchanged kernel dimensions and inexpensive development. Translation
+    ranks last because boundary loss is unmeasured and telemetry requires code. These
+    interventions vary distinct coordinates from the closed GIN-blend, smoothing-removal
+    and affine-rotation families; they do not reopen those attempts.'
+  experiments:
+  - rn10t-scaled-backbone-lr-20261001T073530Z-caa95dce
+  decision: reject
+- id: rn18-gin-probability-05
+  mechanism_id: gin-augmentation-frequency
+  parent_idea_id: null
+  title: Increase GIN augmentation probability from 0.3 to 0.5
+  opportunity: "The incumbent\u2019s late \xD71 macro rises slowly from 0.9231 to\
+    \ 0.9260 while training loss falls from 0.5973 to 0.5733. Reducing GIN blend strength\
+    \ made fitting easier but did not improve evaluated macro AUC. More frequent transformations\
+    \ at the retained conditional strength could improve appearance invariance. This\
+    \ is a hypothesis, not a diagnosis of insufficient regularization."
+  mechanism: "Set only data.gin_augmentation.probability=0.5. Retain the incumbent\u2019\
+    s blend_max, currently 0.5, random-network distribution, acquisition coherence,\
+    \ support handling and energy normalization. This changes how many acquisitions\
+    \ receive GIN rather than the perturbation distribution conditional on application.\
+    \ Both probabilities are positive, so the existing sampler retains its random-call\
+    \ shapes. Reuse gin_effective_probability, gin_affected_acquisitions and gin_mean_absolute_pixel_change\
+    \ as epoch mechanism scalars."
+  precedents:
+  - "run_curves.full_detail: incumbent GIN effective probability remains 0.2940\u2013\
+    0.3022; terminal pixel change is 0.0623."
+  - "run_curves, rn18-gin-blend-max-025: terminal loss 0.5713 and \xD71 macro 0.9255,\
+    \ versus incumbent 0.5733 and 0.9260. The closed blend-strength family remains\
+    \ closed."
+  - "Incumbent modeling/augmentation.py:637\u2013719 implements acquisition selection,\
+    \ random-network blending and energy normalization; training/lightning.py:565\u2013\
+    576 already logs GIN activity."
+  novelty: The linked registry contains no attempt at GIN probability 0.5. This tests
+    acquisition coverage with conditional strength retained; it does not reopen blend-strength
+    tuning or duplicate the queued gamma/contrast probability proposal.
+  coverage: Applies across existing acquisitions and labels. Study exposure, triplets,
+    sampling geometry, losses, cohorts and evaluation remain fixed.
+  exploitation: "Use existing effective-probability logging to establish changed coverage\
+    \ and positive pixel disturbance. Compare epochs 5\u20139 macro/loss trajectories,\
+    \ stage gradients and drift against the bound incumbent. Pixel telemetry precedes\
+    \ repeated-middle-channel selection and does not establish feature invariance.\
+    \ Decide only through the fixed \xD74 macro rule."
+  budget: "Retain incumbent epochs, batch and accumulation, currently 10/8/1, and\
+    \ its supervisor-recorded seed, currently 1533697213. Additional selected acquisitions\
+    \ require more grouped GIN convolutions but no extra backbone passes. Expect an\
+    \ increase over the incumbent\u2019s 1,197 s; its magnitude is unknown. Realized\
+    \ training must remain within 611\u20131,833 s."
+  implementation: Replace only data.gin_augmentation.probability in configs/training.yaml.
+    No Python change is needed because mechanism activity is already logged. Retain
+    active readouts, anatomical-bias removal, anchors, losses and other augmentations.
+    On a newly accepted incumbent, apply the absolute probability 0.5 while preserving
+    its other settings and improvements; omit if already active.
+  open_choices: The value is fixed. Greater coverage may impair learning, and interaction
+    with a subsequently accepted intensity-frequency change is unknown. The reduced-blend
+    result motivates exploration but does not prove that increasing frequency will
+    help.
+  dependencies: []
+  priority_rationale: 'Priority 1: directly tests whether coverage matters while preserving
+    conditional perturbation strength. Existing diagnostics make development inexpensive;
+    increased convolution work and indirect motivation reduce confidence.'
+  source_change: false
+  targeted_curve: "Incumbent and reduced-GIN epochs 5\u20139: improve the late \xD7\
+    1 macro trajectory when easier fitting fails to improve validation. Move logged\
+    \ GIN coverage from about 0.30 toward 0.50 while retaining conditional strength."
+  status: completed
+  created_revision: 544
+  ranking_rationale: 'Admit all three dependency-free proposals: proposal_admission
+    reports each satisfied, their fields are permitted, and the ledger, registry,
+    prior-work table and documentation searches reveal no measured duplicate at these
+    values. Append them behind the existing queue, preserving the reserved head and
+    user-seed order; this yields five non-seed ideas. Rank GIN coverage first because
+    reduced blend worsened evaluated AUC despite easier fitting, providing limited
+    directional support for retaining strength while increasing coverage. Smoothing
+    width follows with unchanged kernel dimensions and inexpensive development. Translation
+    ranks last because boundary loss is unmeasured and telemetry requires code. These
+    interventions vary distinct coordinates from the closed GIN-blend, smoothing-removal
+    and affine-rotation families; they do not reopen those attempts.'
+  experiments:
+  - rn18-gin-probability-05-20261001T093113Z-299f6d3c
+  - rn18-gin-probability-05-20261001T100654Z-aeb44e1f
+  - rn18-gin-probability-05-20261001T100915Z-2ddde7ab
+  decision: reject
+- id: rn18-smoothing-spatial-sigma-15
+  mechanism_id: bilateral-smoothing-spatial-width
+  parent_idea_id: null
+  title: "Widen bilateral smoothing\u2019s spatial sigma from 1.0 to 1.5"
+  opportunity: "Incumbent smoothing changes pixels by approximately 0.0073\u20130.0074\
+    \ throughout training while late validation gains flatten. Its early-stage gradients\
+    \ persist despite limited terminal drift. A wider spatial kernel could discourage\
+    \ reliance on fine texture while retaining intensity-boundary protection. Removing\
+    \ smoothing did not earn adoption, but that earlier comparison predates anatomical-bias\
+    \ removal and is weak evidence for the live recipe."
+  mechanism: Set only data.smoothing_augmentation.spatial_sigma=1.5. Keep probability
+    0.2, range_sigma_range=[0.05,0.1], the five-by-five window and existing support
+    masks. Increasing spatial sigma raises the relative contribution of more distant
+    neighbors; bilateral intensity weights still limit averaging across sufficiently
+    different intensities. Reuse smoothing_mean_absolute_pixel_change and smoothing_effective_probability
+    as epoch mechanism scalars.
+  precedents:
+  - "run_curves, incumbent: terminal \xD71 macro 0.9260, loss 0.5733, stage0 gradient\
+    \ RMS 0.0026 and drift 0.0124; smoothing pixel change stays near 0.0074."
+  - "family_ledger, regularization-removal: smoothing bypass rejected at \u0394\u2212\
+    0.000026, 80% [\u22120.001087,+0.001069]. Its bound parent was the earlier plane/contrast-readout\
+    \ incumbent."
+  - "Incumbent modeling/augmentation.py:536\u2013581 multiplies spatial Gaussian weights\
+    \ by intensity and support weights. Existing Lightning logging measures the resulting\
+    \ smoothing pixel disturbance."
+  novelty: Spatial sigma 1.5 is absent from the linked attempts. This changes spatial
+    weighting inside retained bilateral smoothing, rather than repeating or rescuing
+    the closed bypass intervention.
+  coverage: Uses the existing smoothing selections across all labels and acquisitions.
+    Kernel dimensions, training inputs, sampling, target construction and evaluation
+    remain fixed.
+  exploitation: "Compare the existing isolated smoothing pixel-change scalar with\
+    \ the parent while checking that effective probability remains near 0.2. Examine\
+    \ late macro/loss divergence and stage gradients without interpreting lower loss\
+    \ as success. The fixed \xD74 macro adoption rule alone decides acceptance."
+  budget: "Keep incumbent epochs, batch, accumulation and recorded seed, currently\
+    \ 10/8/1 and 1533697213. The filter retains identical tensor and kernel dimensions,\
+    \ so changing Gaussian coefficients should add negligible compute. Plan near the\
+    \ incumbent\u2019s 1,197 s; require realized training within 611\u20131,833 s."
+  implementation: Replace only data.smoothing_augmentation.spatial_sigma in configs/training.yaml.
+    Reuse existing activity logging; add no Python behavior or option. Retain smoothing,
+    degradation, active readouts, anatomical-bias removal and unrelated improvements.
+    Rebase onto any new incumbent and change only this field to 1.5; omit if already
+    active.
+  open_choices: The value is fixed. Wider averaging could suppress useful lesion texture.
+    Existing pixel telemetry measures image disturbance before repeated-middle-channel
+    selection; it does not prove downstream regularization. No causal link between
+    spatial width and the late plateau is established.
+  dependencies: []
+  priority_rationale: 'Priority 2: an untouched spatial parameter with essentially
+    unchanged compute and existing diagnostics. The mechanism is distinct, but its
+    curve-based motivation and historical bypass evidence are weak.'
+  source_change: false
+  targeted_curve: "Incumbent epochs 6\u20139: improve the \xD71 macro plateau at 0.9244\u2192\
+    0.9260 while loss falls 0.5895\u21920.5733. Seek greater smoothing disturbance\
+    \ at unchanged frequency, with a beneficial validation trajectory."
+  status: blocked
+  created_revision: 544
+  ranking_rationale: 'Parked by the campaign keeper at the user''s close of the campaign
+    (2026-10-01): the user ended the campaign after the forced seeds.'
+  experiments:
+  - rn18-smoothing-spatial-sigma-15-20261001T120509Z-163d9015
+- id: rn18-affine-translation-002
+  mechanism_id: affine-translation-amplitude
+  parent_idea_id: null
+  title: Reduce affine translation fraction from 0.04 to 0.02
+  opportunity: "The incumbent\u2019s epoch-2\u21923 \xD71 macro dips from 0.9139 to\
+    \ 0.9135; Fracture and Lateral Meniscus also fluctuate during this period. Smaller\
+    \ translations might preserve more peripheral image evidence while retaining rotation\
+    \ and scale augmentation. No artifact establishes translation-induced clipping,\
+    \ so this is a low-confidence hypothesis. The rejected rotation reduction provides\
+    \ no reason to reduce rotation again."
+  mechanism: Set only data.affine_augmentation.translation_fraction=0.02. Retain probability
+    0.7, rotation amplitude 10 degrees, scale range [0.95,1.05], interpolation and
+    coordinate propagation. At 224 pixels, the per-axis translation bound becomes
+    4.48 rather than 8.96 pixels. Add observational logging of applied translation
+    mean/max fractions and represented translated-acquisition counts, derived from
+    the parameters consumed by the existing warp.
+  precedents:
+  - "run_curves, incumbent epochs 2\u21923: Fracture 0.9452\u21920.9338 and Lateral\
+    \ Meniscus 0.9055\u21920.8940. These are exploratory trajectories, not label-specific\
+    \ objectives or proof of clipping."
+  - "Incumbent modeling/augmentation.py:309\u2013324 samples translation independently\
+    \ of rotation and scale; :381\u2013397 converts fractional translations to pixel-space\
+    \ matrices."
+  - The current affine-rotation family is assessed separately in family_verdicts.
+    This proposal retains its incumbent rotation setting and tests a different, unmeasured
+    affine coordinate.
+  novelty: Translation fraction 0.02 is absent from the linked registry and precedent
+    table. It changes displacement and potential boundary loss, rather than orientation
+    tolerance or crop/sampling geometry.
+  coverage: Applies through existing acquisition-coherent affine augmentation across
+    all labels. Prepared crops, study sampling, inputs, supervision and validation
+    are unchanged.
+  exploitation: "Log consumed translation magnitudes and active acquisition counts\
+    \ each epoch without new random draws. Compare early macro fluctuations and terminal\
+    \ macro/loss, drift and gradients against the parent. Translation activity establishes\
+    \ execution, not evidence clipping or predictive benefit. Use only the fixed \xD7\
+    4 macro adoption rule."
+  budget: "Retain incumbent epochs, batch, accumulation and recorded seed, currently\
+    \ 10/8/1 and 1533697213. The same warps execute at the same frequency; bounded\
+    \ scalar telemetry should add little overhead. Expect training near 1,197 s, with\
+    \ realized duration required within 611\u20131,833 s."
+  implementation: Change the existing translation field in configs/training.yaml.
+    Add only observational parameter/activity capture in modeling/augmentation.py
+    and epoch logging in training/lightning.py; preserve RNG calls, matrices, warp
+    order and mask propagation. Retain both active incumbent ideas and unrelated improvements.
+    Rebase onto a new incumbent, changing only translation to 0.02; omit if already
+    active.
+  open_choices: The value is fixed. Actual evidence lost at image boundaries is unmeasured,
+    and less displacement may weaken useful invariance. Repeated early fluctuations
+    across runs may have another cause. Telemetry must distinguish applied translation
+    from unapplied or absent acquisitions.
+  dependencies: []
+  priority_rationale: 'Priority 3: cheap behavioral change with a distinct spatial
+    hypothesis, but no measured clipping diagnosis. It needs a small telemetry addition
+    and has weaker support than the first two proposals.'
+  source_change: true
+  targeted_curve: "Incumbent epochs 2\u20134: reduce early \xD71 macro fluctuations\
+    \ without sacrificing terminal macro. Log a consumed per-axis translation bound\
+    \ of 0.02 and nonzero applications while retaining incumbent rotation and scale."
+  status: blocked
+  created_revision: 544
+  ranking_rationale: 'Parked by the campaign keeper at the user''s close of the campaign
+    (2026-10-01): the user ended the campaign after the forced seeds.'
+- id: rn50-incumbent-recipe
+  mechanism_id: backbone-resnet50
+  parent_idea_id: null
+  title: RadImageNet ResNet-50 in place of ResNet-18 with the incumbent recipe, backbone
+    LR 5e-5, nine epochs to fit the budget (user seed)
+  opportunity: 'User decision, 2026-10-01: compare the original RadImageNet ResNet-50
+    on the current incumbent recipe. Its earlier runs used an older recipe: backbone
+    LR 1.23e-3 overwrote the early layers and was stopped after epoch 3; 3e-4 finished
+    at x1 0.91223 against 0.924637 (docs/ongoing/radimagenet-backbone.md).'
+  mechanism: 'model.backbone resnet50.tv_in1k with model.pretrained_weights radimagenet;
+    optimizer.backbone_lr 5e-5 and every other setting as the incumbent (head_lr 6e-4,
+    L2-SP 0.01 on conv1/bn1/layer1 and 0.001 on the rest, plane-contrast readouts,
+    no anatomical bias, augmentation, 26 triplets, batch 8), except two backbone-specific
+    requirements. (1) Input scaling: this checkpoint was trained on inputs in [-1,
+    1] (mean 0.5, std 0.5); with the recipe''s ImageNet normalization its conv1 activations
+    come out about 6x too large. data.mean and data.std are not editable in this campaign,
+    so the model converts its ImageNet-normalized input to [-1, 1] (undo the ImageNet
+    mean and std, then subtract 0.5 and divide by 0.5) before the backbone, for resnet50.tv_in1k
+    with RadImageNet weights only; every other backbone is unchanged. (2) trainer.max_epochs
+    9: the earlier ResNet-50 run took about 170 s per epoch with series dropout 0.2,
+    and the recipe without series dropout costs about 11% more, so ten epochs would
+    project about 1,870 s against the 1,833 s limit; nine epochs project about 1,690
+    s. The cosine schedule scales to the nine epochs as it does for any epoch count.'
+  precedents:
+  - 'outputs/training/20260928-180252-radimagenet-resnet50-lr3e-4: about 170 s per
+    epoch at series dropout 0.2.'
+  - 'docs/ongoing/radimagenet-backbone.md: [-1, 1] normalization measured against
+    the checkpoint''s bn1 statistics.'
+  novelty: First ResNet-50 run on the current recipe.
+  coverage: All studies and labels.
+  exploitation: Per-epoch x1 and per-stage drift against the incumbent; training seconds
+    per epoch.
+  budget: About 1,690 s for nine epochs, inside the 611-1,833 s range.
+  implementation: configs/training.yaml (model.backbone, trainer.max_epochs 9) and
+    the input conversion in modeling/ keyed to the backbone and its weights. Confirm
+    the L2-SP early-anchor names match torchvision's conv1, bn1 and layer1.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: User seed.
+  status: blocked
+  created_revision: 545
+  seeded: /home/claudio/src/knee-abnormality-revisits/autoresearch/campaigns/revisits/resnet50-ideas.yaml
+  experiments:
+  - rn50-incumbent-recipe-20261001T075559Z-2d104c32
+- id: rn50-scaled-backbone-lr
+  mechanism_id: backbone-resnet50
+  parent_idea_id: rn50-incumbent-recipe
+  title: RadImageNet ResNet-50 with the backbone LR scaled to its weight size, 1.27e-3,
+    nine epochs (user seed)
+  opportunity: 'User decision, 2026-10-01: as rn50-incumbent-recipe, with the backbone
+    learning rate set by the weight-RMS rule from the ResNet-18 recipe: RadImageNet
+    ResNet-50 convolution weights have RMS 0.314 against 0.0124, so 5e-5 x 0.314 /
+    0.0124 = 1.27e-3. The nearly identical 1.23e-3 overwrote the early layers on the
+    older recipe, which had no L2-SP anchoring.'
+  mechanism: As rn50-incumbent-recipe, including the [-1, 1] input conversion and
+    nine epochs, with optimizer.backbone_lr 1.27e-3.
+  precedents:
+  - outputs/training/20260928-174920-radimagenet-resnet50 (backbone LR 1.23e-3, stopped
+    after epoch 3).
+  novelty: First run of the weight-scaled ResNet-50 rate under L2-SP.
+  coverage: All studies and labels.
+  exploitation: As rn50-incumbent-recipe; per-stage drift shows whether L2-SP holds
+    the early layers.
+  budget: As rn50-incumbent-recipe.
+  implementation: As rn50-incumbent-recipe, with optimizer.backbone_lr 1.27e-3. Runs
+    against the incumbent at its turn, independent of the other ResNet-50 verdict.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: User seed.
+  status: blocked
+  created_revision: 545
+  seeded: /home/claudio/src/knee-abnormality-revisits/autoresearch/campaigns/revisits/resnet50-ideas.yaml
+- id: refined-rn50-incumbent-recipe
+  mechanism_id: backbone-refined-resnet50
+  parent_idea_id: null
+  title: Refined-RadImageNet ResNet-50 in place of ResNet-18 with the incumbent recipe,
+    backbone LR 5e-5, ten epochs (user seed)
+  opportunity: 'User decision, 2026-10-01: the Refined-RadImageNet family reports
+    RadImageNet macro F1 0.3998 (ResNet-10t), 0.4545 (ResNet-18) and 0.5097 (ResNet-50),
+    and the ResNet-10t loss on this recipe (-0.0053) tracks its weaker checkpoint.
+    ResNet-50 from the same source, trained with the same torchvision recipe, is the
+    stronger checkpoint. It replaces the withdrawn original-RadImageNet ResNet-50
+    seeds.'
+  mechanism: model.backbone resnet50.a1_in1k with model.pretrained_weights radimagenet,
+    loading the Refined-RadImageNet ResNet-50 checkpoint; every other setting as the
+    incumbent (backbone_lr 5e-5, head_lr 6e-4, L2-SP 0.01 on conv1/bn1/layer1 and
+    0.001 on the rest, plane-contrast readouts, no anatomical bias, ImageNet mean/std
+    as for the other Refined checkpoints, augmentation, 26 triplets, batch 8, ten
+    epochs). Ten epochs are kept so the comparison is fair (user, 2026-10-01); the
+    user raised the campaign's training-time limit to 1.65 x the reference (about
+    2,016 s) for it. ResNet-50 cost about 170 s per epoch on the older recipe with
+    series dropout 0.2 and about 11% more without it, so ten epochs project about
+    1,870 s.
+  precedents:
+  - 'Checkpoint: https://huggingface.co/convergedmachine/RadImagenet/resolve/7fa62dccee2b14e49188d11c4b0e66d88c29b41e/resnet50.pth,
+    saved as ~/.cache/torch/hub/checkpoints/refined_radimagenet_resnet50.pth, 191,145,887
+    bytes, SHA-256 b6daa90de92589c404e9da30f4c0ce49182763d4a952f1222caeec647237bacf.
+    A training checkpoint (model, optimizer, lr_scheduler, epoch 89, args: torchvision
+    recipe, SGD lr 0.1, 90 epochs, AutoAugment imagenet, CutMix 1.0); model keys carry
+    the _orig_mod. prefix and load strictly into timm resnet50 with num_classes 165
+    (checked 2026-10-01). Median convolution RMS 0.0136.'
+  - docs/research/radimagenet-weights.md#refined-radimagenet-resnets.
+  - 'outputs/training/20260928-180252-radimagenet-resnet50-lr3e-4: about 170 s per
+    epoch for ResNet-50.'
+  novelty: First Refined-RadImageNet ResNet-50 run.
+  coverage: All studies and labels.
+  exploitation: Per-epoch x1 and per-stage drift against the incumbent; training seconds
+    per epoch.
+  budget: About 1,870 s for ten epochs, inside the raised 611-2,016 s range.
+  implementation: Add a "resnet50.a1_in1k" entry to RADIMAGENET_WEIGHTS in modeling/radimagenet.py
+    (file refined_radimagenet_resnet50.pth, the SHA-256 above, the URL above, layout
+    refined); add resnet50.a1_in1k wherever resnet50.tv_in1k is registered for spatial-token
+    mapping and the DSU stride-8 split (modeling/spatial_tokens.py and the DSU hook);
+    configs/training.yaml sets model.backbone resnet50.a1_in1k; trainer.max_epochs
+    stays 10. The original resnet50.tv_in1k entry and its loading stay unchanged.
+    Confirm the L2-SP early-anchor names match conv1, bn1 and layer1.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: User seed.
+  status: completed
+  created_revision: 596
+  seeded: /home/claudio/src/knee-abnormality-revisits/autoresearch/campaigns/revisits/refined-resnet50-ideas.yaml
+  experiments:
+  - refined-rn50-incumbent-recipe-20261001T081909Z-71e68a1d
+  decision: provisional_accept
+- id: refined-rn50-scaled-backbone-lr
+  mechanism_id: backbone-refined-resnet50
+  parent_idea_id: refined-rn50-incumbent-recipe
+  title: Refined-RadImageNet ResNet-50 with the backbone LR scaled to its weight size,
+    5.5e-5, ten epochs (user seed)
+  opportunity: 'User decision, 2026-10-01: as refined-rn50-incumbent-recipe, with
+    the backbone learning rate set by the project''s weight-RMS rule instead of copied
+    from ResNet-18. The Refined ResNet-50 has median convolution RMS 0.0136 against
+    ResNet-18''s 0.0124, so 5e-5 x 0.0136 / 0.0124 = 5.5e-5.'
+  mechanism: Exactly refined-rn50-incumbent-recipe (model.backbone resnet50.a1_in1k
+    with the Refined RadImageNet weights, ten epochs, every other setting as the incumbent)
+    with optimizer.backbone_lr 5.5e-5.
+  precedents:
+  - 'refined-resnet50-ideas.yaml: checkpoint hash, inspection and median convolution
+    RMS 0.0136.'
+  - 'docs/ongoing/radimagenet-backbone.md: the weight-RMS rule (ResNet-18 5e-5 at
+    RMS 0.0124).'
+  novelty: First Refined-RadImageNet ResNet-50 run at its own scaled rate.
+  coverage: All studies and labels.
+  exploitation: Per-epoch x1 and per-stage drift against the incumbent and refined-rn50-incumbent-recipe.
+  budget: About 1,870 s for ten epochs, inside the raised 611-2,016 s range.
+  implementation: Reuse the reviewed refined-rn50-incumbent-recipe source (the resnet50.a1_in1k
+    weights entry and spatial-token registration) and set optimizer.backbone_lr 5.5e-5
+    in configs/training.yaml. Runs against the incumbent at its turn, independent
+    of the 5e-5 verdict.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: User seed.
+  status: completed
+  created_revision: 616
+  seeded: /home/claudio/src/knee-abnormality-revisits/autoresearch/campaigns/revisits/refined-resnet50-scaled-ideas.yaml
+  experiments:
+  - refined-rn50-scaled-backbone-lr-20261001T090925Z-3593bd5d
+  decision: provisional_accept
+- id: rn18-plane-backbones-joint
+  mechanism_id: plane-backbones
+  parent_idea_id: null
+  title: One Refined-RadImageNet ResNet-18 per plane under the incumbent recipe, keeping
+    the joint attention pool and plane-contrast readouts (user seed A)
+  opportunity: 'User decision, 2026-10-01: retry plane-specific backbones on the current
+    incumbent. The only ResNet-18 attempt (rn18-plane-backbones-dense-fusion, -0.003292)
+    trained eight epochs to fit the old limit and changed the readout at the same
+    time. Three ReXNet-200s with dense readouts tied their control (+0.0020, public
+    0.945 vs 0.946). This seed isolates the backbone split: everything after the backbones
+    stays as in the incumbent.'
+  mechanism: 'model.plane_backbones: three Refined-RadImageNet ResNet-18s (resnet18.a1_in1k),
+    one each for axial, coronal and sagittal, all loaded from the same pretrained
+    checkpoint; each triplet goes to its plane''s backbone and the feature maps return
+    in the original order, so tokens, embeddings, the joint attention pool, plane-contrast
+    readouts, half-knee loss, report-attribute heads and three-compartment OA detector
+    are unchanged. DSU (p 0.5) runs inside each backbone at its own stride-8 split
+    (end of layer2). L2-SP anchors every backbone to the same pretrained weights at
+    the incumbent strengths (0.01 for conv1/bn1/layer1, 0.001 for the rest) with the
+    same weight-decay exemption. Every other setting as the incumbent: backbone LR
+    5e-5, head LR 6e-4, batch 8, 10 epochs, 26 triplets, no anatomical bias.'
+  precedents:
+  - 'outputs/autoresearch/radimagenet-rn18/experiments/rn18-plane-backbones-dense-fusion-20260929T020109Z-d390b8cb
+    (changes.diff and frozen code): PlaneBackbones for ResNet with RadImageNet loading.'
+  - 'outputs/autoresearch/plane-specialization/experiments/dense-readouts-learned-fusion-20260927T231847Z-33417f97
+    (modeling/planes/ in its frozen code): the plane-backbone routing and per-plane
+    DSU.'
+  - docs/history/plane-backbones.md and docs/validation/results/2026-09-28-plane-specialization-campaign.md.
+  novelty: First plane-backbone run on the current recipe at ten epochs, with the
+    readout unchanged.
+  coverage: All studies and labels.
+  exploitation: Each plane backbone's per-stage drift and gradient RMS; per-label
+    AUC against the incumbent; training seconds.
+  budget: About 1,650 s (one ResNet-18 costs 1,222 s; three ReXNets cost 35% more
+    than one), inside the 611-2,016 s range.
+  implementation: A model.plane_backbones option (false reproduces the incumbent)
+    in config.py and modeling/, porting the routing, per-backbone RadImageNet loading
+    and per-backbone DSU split from the precedent code, and making the L2-SP anchor
+    and parameter groups cover all three backbones in the Lightning module. Remove
+    nothing from the incumbent's heads.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: User seed.
+  status: completed
+  created_revision: 669
+  seeded: /home/claudio/src/knee-abnormality-revisits/autoresearch/campaigns/revisits/plane-backbone-ideas.yaml
+  experiments:
+  - rn18-plane-backbones-joint-20261001T101254Z-94f895a2
+  decision: reject
+- id: rn18-plane-backbones-dense-fusion
+  mechanism_id: plane-backbones
+  parent_idea_id: rn18-plane-backbones-joint
+  title: One Refined-RadImageNet ResNet-18 per plane with dense per-plane readouts
+    and learned fusion under the incumbent recipe, ten epochs (user seed B)
+  opportunity: 'User decision, 2026-10-01: the best plane design from the plane-specialization
+    campaign (dense readouts +0.0047 on three B0s; three ReXNets tied their control
+    with it) on the current incumbent, at the full ten epochs the earlier ResNet-18
+    attempt lacked.'
+  mechanism: 'rn18-plane-backbones-joint''s three backbones, DSU, L2-SP and settings,
+    with the readout replaced as in the plane-specialization contract. Plane-exclusive
+    pooling: for each label c and present plane q, the label''s attention pooling
+    over that plane''s tokens only (meniscus own-side mask falling back to the plane''s
+    tokens, OA detector correction within the plane), giving u_cq and z_cq = w_c .
+    u_cq + b_c plus the OA correction, with the classifier shared across planes. Dense
+    supervision: the class-balanced BCE on every z_cq, averaged over the study''s
+    present planes per label. Learned fusion: per-label weights a_cq initialized at
+    0, softmax over present planes applied to z_cq, trained with class-balanced BCE
+    on detached z_cq; the fused logit is the validation and inference output. Plane-contrast
+    readouts are removed (the fusion replaces that readout); half-knee loss, report-attribute
+    heads and the OA detector stay on the shared tokens.'
+  precedents:
+  - 'autoresearch/campaigns/plane-specialization/contract.md: definitions of plane-exclusive
+    pooling, dense supervision and learned fusion.'
+  - outputs/autoresearch/plane-specialization/experiments/dense-readouts-learned-fusion-20260927T231847Z-33417f97
+    (modeling/planes/exclusive.py and fusion.py in its frozen code).
+  - 'outputs/training/20260928-105516-rexnet-plane-dense-fusion: the three-ReXNet
+    transfer.'
+  novelty: First dense plane readouts on ResNet-18 plane backbones at ten epochs on
+    the current recipe.
+  coverage: All studies and labels.
+  exploitation: Each plane's own validation macro AUC, the fusion weights per label
+    and plane, and per-stage drift per backbone.
+  budget: About 1,650 s, inside the 611-2,016 s range.
+  implementation: rn18-plane-backbones-joint's implementation plus the plane-exclusive
+    pooling and learned fusion ported from modeling/planes/ of the precedent code,
+    under a model.plane_pooling option; the per-plane loss and fusion loss in the
+    Lightning module.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: User seed.
+  status: completed
+  created_revision: 669
+  seeded: /home/claudio/src/knee-abnormality-revisits/autoresearch/campaigns/revisits/plane-backbone-ideas.yaml
+  experiments:
+  - rn18-plane-backbones-dense-fusion-20261001T103449Z-5e7b4975
+  decision: reject
+- id: rn10t-plane-backbones-joint
+  mechanism_id: plane-backbones
+  parent_idea_id: rn18-plane-backbones-joint
+  title: One Refined-RadImageNet ResNet-10t per plane under the incumbent recipe,
+    keeping the joint attention pool and plane-contrast readouts (user seed A, ResNet-10t)
+  opportunity: 'User decision, 2026-10-01: seed A on ResNet-10t. A single ResNet-10t
+    lost 0.0046-0.0053 on this recipe, tracking its weaker checkpoint; three per-plane
+    ResNet-10ts give each plane its own capacity at a cost close to one ResNet-18.'
+  mechanism: Exactly rn18-plane-backbones-joint with three resnet10t.c3_in1k backbones
+    loaded from the Refined-RadImageNet ResNet-10t checkpoint and optimizer.backbone_lr
+    6e-5, the weight-RMS-scaled rate (the better of the two single ResNet-10t runs).
+    DSU at the end of layer2; L2-SP early anchor on conv1/bn1/layer1 of each backbone.
+  precedents:
+  - 'revisits: rn10t-scaled-backbone-lr (x4 0.925267) and rn10t-incumbent-recipe (0.924526).'
+  - As rn18-plane-backbones-joint.
+  novelty: First plane-backbone ResNet-10t run.
+  coverage: All studies and labels.
+  exploitation: As rn18-plane-backbones-joint.
+  budget: About 1,550 s (one ResNet-10t costs 1,144 s), inside the range.
+  implementation: The rn18-plane-backbones-joint implementation with model.backbone
+    resnet10t.c3_in1k and optimizer.backbone_lr 6e-5; confirm the stride-8 DSU split
+    and L2-SP early-anchor names on ResNet-10t's deep stem.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: User seed.
+  status: completed
+  created_revision: 669
+  seeded: /home/claudio/src/knee-abnormality-revisits/autoresearch/campaigns/revisits/plane-backbone-ideas.yaml
+  experiments:
+  - rn10t-plane-backbones-joint-20261001T105811Z-3d282e21
+  decision: reject
+- id: rn10t-plane-backbones-dense-fusion
+  mechanism_id: plane-backbones
+  parent_idea_id: rn18-plane-backbones-dense-fusion
+  title: One Refined-RadImageNet ResNet-10t per plane with dense per-plane readouts
+    and learned fusion under the incumbent recipe (user seed B, ResNet-10t)
+  opportunity: 'User decision, 2026-10-01: seed B on ResNet-10t.'
+  mechanism: Exactly rn18-plane-backbones-dense-fusion with three resnet10t.c3_in1k
+    backbones from the Refined-RadImageNet ResNet-10t checkpoint and optimizer.backbone_lr
+    6e-5.
+  precedents:
+  - As rn18-plane-backbones-dense-fusion and rn10t-plane-backbones-joint.
+  novelty: First dense plane readouts on ResNet-10t plane backbones.
+  coverage: All studies and labels.
+  exploitation: As rn18-plane-backbones-dense-fusion.
+  budget: About 1,550 s, inside the range.
+  implementation: The rn18-plane-backbones-dense-fusion implementation with model.backbone
+    resnet10t.c3_in1k and optimizer.backbone_lr 6e-5.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: User seed.
+  status: completed
+  created_revision: 669
+  seeded: /home/claudio/src/knee-abnormality-revisits/autoresearch/campaigns/revisits/plane-backbone-ideas.yaml
+  experiments:
+  - rn10t-plane-backbones-dense-fusion-20261001T112125Z-9ea053a8
+  decision: reject
+- id: no-report-attribute-heads
+  mechanism_id: report-attribute-removal
+  parent_idea_id: null
+  title: Remove the report-attribute auxiliary heads and their loss from the incumbent
+    (user seed)
+  opportunity: 'User decision, 2026-10-01: a removal check of the report-attribute
+    heads, the last seed of the campaign. They were adopted on ReXNet (+0.00105 locally,
+    0.940 public against 0.938) and never re-checked on ResNet-18; tonight halving
+    their weight (rn18-report-attributes-005, -0.0004) and the attributes-v4 variants
+    changed little.'
+  mechanism: 'Build no report-attribute heads and add no report-attribute loss: the
+    35 JevK5 attribute heads, their targets and the trainer.report_attribute_loss_weight
+    term are all absent. Everything else exactly as the incumbent at this seed''s
+    turn.'
+  precedents:
+  - docs/modeling/report-attribute-heads.md and docs/validation/results/2026-09-25-report-attribute-heads.md.
+  - 'revisits: rn18-report-attributes-005 (weight 0.05, -0.0004).'
+  novelty: First removal of the attribute heads on ResNet-18.
+  coverage: All studies and labels.
+  exploitation: Per-label AUC against the incumbent, in particular MCL and Contusion
+    (the labels that gained when the heads were adopted) and Fracture and Baker's
+    (the labels that lost).
+  budget: Slightly cheaper than the incumbent.
+  implementation: A model or trainer option that disables the report-attribute heads
+    (the incumbent's behaviour as the value that reproduces it), since report_attribute_loss_weight
+    must stay positive; with the option off, the heads are not constructed, the attribute
+    targets are not loaded into the loss, and no attribute metrics are logged.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: User seed; the last run before the campaign stops.
+  status: completed
+  created_revision: 711
+  seeded: /home/claudio/src/knee-abnormality-revisits/autoresearch/campaigns/revisits/no-report-attributes-ideas.yaml
+  experiments:
+  - no-report-attribute-heads-20261001T114326Z-c0a21a75
+  decision: reject

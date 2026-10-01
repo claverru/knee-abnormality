@@ -12,6 +12,14 @@ of the two scored 0.949 (S80), the best public score
 [ledger](../inference/submissions/ledger.md)). Its training takes 1,202 s against the ReXNet
 control's 1,912 s.
 
+**The Refined-RadImageNet ResNet-50 is the strongest single model (2026-10-01).** On the
+ResNet-18 recipe unchanged it scored ×4 0.934423 against 0.929835 (+0.0046, 80% [+0.0027,
++0.0064]) at 1,969 s against 1,197 s, and 0.948 public (S88). With the ReXNet control and reflection
+TTA it scored 0.951 (S89), the best public score. It ran in the
+[revisits campaign](../validation/results/2026-10-01-revisits-campaign.md#backbones) and is
+`configs/refined-resnet50.yaml` since 2026-10-01: the ResNet-18 recipe on `resnet50.a1_in1k`. It
+is the submission model; ResNet-18 stays the control for iteration speed (user decision).
+
 Other RadImageNet-pretrained weights are in
 [RadImageNet weights](../research/radimagenet-weights.md).
 

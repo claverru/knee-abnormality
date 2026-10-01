@@ -1,0 +1,119 @@
+ideas:
+- id: rn18-plane-backbones-joint
+  mechanism_id: plane-backbones
+  parent_idea_id: null
+  title: One Refined-RadImageNet ResNet-18 per plane under the incumbent recipe, keeping the joint
+    attention pool and plane-contrast readouts (user seed A)
+  opportunity: 'User decision, 2026-10-01: retry plane-specific backbones on the current incumbent.
+    The only ResNet-18 attempt (rn18-plane-backbones-dense-fusion, -0.003292) trained eight epochs
+    to fit the old limit and changed the readout at the same time. Three ReXNet-200s with dense
+    readouts tied their control (+0.0020, public 0.945 vs 0.946). This seed isolates the backbone
+    split: everything after the backbones stays as in the incumbent.'
+  mechanism: 'model.plane_backbones: three Refined-RadImageNet ResNet-18s (resnet18.a1_in1k), one each
+    for axial, coronal and sagittal, all loaded from the same pretrained checkpoint; each triplet
+    goes to its plane''s backbone and the feature maps return in the original order, so tokens,
+    embeddings, the joint attention pool, plane-contrast readouts, half-knee loss, report-attribute
+    heads and three-compartment OA detector are unchanged. DSU (p 0.5) runs inside each backbone at
+    its own stride-8 split (end of layer2). L2-SP anchors every backbone to the same pretrained
+    weights at the incumbent strengths (0.01 for conv1/bn1/layer1, 0.001 for the rest) with the
+    same weight-decay exemption. Every other setting as the incumbent: backbone LR 5e-5, head LR 6e-4,
+    batch 8, 10 epochs, 26 triplets, no anatomical bias.'
+  precedents:
+  - 'outputs/autoresearch/radimagenet-rn18/experiments/rn18-plane-backbones-dense-fusion-20260929T020109Z-d390b8cb
+    (changes.diff and frozen code): PlaneBackbones for ResNet with RadImageNet loading.'
+  - 'outputs/autoresearch/plane-specialization/experiments/dense-readouts-learned-fusion-20260927T231847Z-33417f97
+    (modeling/planes/ in its frozen code): the plane-backbone routing and per-plane DSU.'
+  - 'docs/history/plane-backbones.md and docs/validation/results/2026-09-28-plane-specialization-campaign.md.'
+  novelty: First plane-backbone run on the current recipe at ten epochs, with the readout unchanged.
+  coverage: All studies and labels.
+  exploitation: Each plane backbone's per-stage drift and gradient RMS; per-label AUC against the
+    incumbent; training seconds.
+  budget: About 1,650 s (one ResNet-18 costs 1,222 s; three ReXNets cost 35% more than one), inside
+    the 611-2,016 s range.
+  implementation: A model.plane_backbones option (false reproduces the incumbent) in config.py and
+    modeling/, porting the routing, per-backbone RadImageNet loading and per-backbone DSU split from
+    the precedent code, and making the L2-SP anchor and parameter groups cover all three backbones
+    in the Lightning module. Remove nothing from the incumbent's heads.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: User seed.
+- id: rn18-plane-backbones-dense-fusion
+  mechanism_id: plane-backbones
+  parent_idea_id: rn18-plane-backbones-joint
+  title: One Refined-RadImageNet ResNet-18 per plane with dense per-plane readouts and learned fusion
+    under the incumbent recipe, ten epochs (user seed B)
+  opportunity: 'User decision, 2026-10-01: the best plane design from the plane-specialization campaign
+    (dense readouts +0.0047 on three B0s; three ReXNets tied their control with it) on the current
+    incumbent, at the full ten epochs the earlier ResNet-18 attempt lacked.'
+  mechanism: 'rn18-plane-backbones-joint''s three backbones, DSU, L2-SP and settings, with the readout
+    replaced as in the plane-specialization contract. Plane-exclusive pooling: for each label c and
+    present plane q, the label''s attention pooling over that plane''s tokens only (meniscus own-side
+    mask falling back to the plane''s tokens, OA detector correction within the plane), giving u_cq
+    and z_cq = w_c . u_cq + b_c plus the OA correction, with the classifier shared across planes.
+    Dense supervision: the class-balanced BCE on every z_cq, averaged over the study''s present
+    planes per label. Learned fusion: per-label weights a_cq initialized at 0, softmax over present
+    planes applied to z_cq, trained with class-balanced BCE on detached z_cq; the fused logit is the
+    validation and inference output. Plane-contrast readouts are removed (the fusion replaces that
+    readout); half-knee loss, report-attribute heads and the OA detector stay on the shared tokens.'
+  precedents:
+  - 'autoresearch/campaigns/plane-specialization/contract.md: definitions of plane-exclusive pooling,
+    dense supervision and learned fusion.'
+  - 'outputs/autoresearch/plane-specialization/experiments/dense-readouts-learned-fusion-20260927T231847Z-33417f97
+    (modeling/planes/exclusive.py and fusion.py in its frozen code).'
+  - 'outputs/training/20260928-105516-rexnet-plane-dense-fusion: the three-ReXNet transfer.'
+  novelty: First dense plane readouts on ResNet-18 plane backbones at ten epochs on the current recipe.
+  coverage: All studies and labels.
+  exploitation: Each plane's own validation macro AUC, the fusion weights per label and plane, and
+    per-stage drift per backbone.
+  budget: About 1,650 s, inside the 611-2,016 s range.
+  implementation: rn18-plane-backbones-joint's implementation plus the plane-exclusive pooling and
+    learned fusion ported from modeling/planes/ of the precedent code, under a model.plane_pooling
+    option; the per-plane loss and fusion loss in the Lightning module.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: User seed.
+- id: rn10t-plane-backbones-joint
+  mechanism_id: plane-backbones
+  parent_idea_id: rn18-plane-backbones-joint
+  title: One Refined-RadImageNet ResNet-10t per plane under the incumbent recipe, keeping the joint
+    attention pool and plane-contrast readouts (user seed A, ResNet-10t)
+  opportunity: 'User decision, 2026-10-01: seed A on ResNet-10t. A single ResNet-10t lost 0.0046-0.0053
+    on this recipe, tracking its weaker checkpoint; three per-plane ResNet-10ts give each plane its
+    own capacity at a cost close to one ResNet-18.'
+  mechanism: 'Exactly rn18-plane-backbones-joint with three resnet10t.c3_in1k backbones loaded from the
+    Refined-RadImageNet ResNet-10t checkpoint and optimizer.backbone_lr 6e-5, the weight-RMS-scaled
+    rate (the better of the two single ResNet-10t runs). DSU at the end of layer2; L2-SP early anchor
+    on conv1/bn1/layer1 of each backbone.'
+  precedents:
+  - 'revisits: rn10t-scaled-backbone-lr (x4 0.925267) and rn10t-incumbent-recipe (0.924526).'
+  - 'As rn18-plane-backbones-joint.'
+  novelty: First plane-backbone ResNet-10t run.
+  coverage: All studies and labels.
+  exploitation: As rn18-plane-backbones-joint.
+  budget: About 1,550 s (one ResNet-10t costs 1,144 s), inside the range.
+  implementation: The rn18-plane-backbones-joint implementation with model.backbone resnet10t.c3_in1k
+    and optimizer.backbone_lr 6e-5; confirm the stride-8 DSU split and L2-SP early-anchor names on
+    ResNet-10t's deep stem.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: User seed.
+- id: rn10t-plane-backbones-dense-fusion
+  mechanism_id: plane-backbones
+  parent_idea_id: rn18-plane-backbones-dense-fusion
+  title: One Refined-RadImageNet ResNet-10t per plane with dense per-plane readouts and learned fusion
+    under the incumbent recipe (user seed B, ResNet-10t)
+  opportunity: 'User decision, 2026-10-01: seed B on ResNet-10t.'
+  mechanism: 'Exactly rn18-plane-backbones-dense-fusion with three resnet10t.c3_in1k backbones from the
+    Refined-RadImageNet ResNet-10t checkpoint and optimizer.backbone_lr 6e-5.'
+  precedents:
+  - 'As rn18-plane-backbones-dense-fusion and rn10t-plane-backbones-joint.'
+  novelty: First dense plane readouts on ResNet-10t plane backbones.
+  coverage: All studies and labels.
+  exploitation: As rn18-plane-backbones-dense-fusion.
+  budget: About 1,550 s, inside the range.
+  implementation: The rn18-plane-backbones-dense-fusion implementation with model.backbone
+    resnet10t.c3_in1k and optimizer.backbone_lr 6e-5.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: User seed.
+exhausted_directions: None.

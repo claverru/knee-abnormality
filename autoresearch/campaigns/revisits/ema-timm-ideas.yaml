@@ -1,0 +1,50 @@
+ideas:
+- id: ema-0999-buffer-average
+  mechanism_id: weight-averaging-ema
+  parent_idea_id: ema-0999
+  title: EMA of the weights and BatchNorm statistics at decay 0.999 through the existing EMA option,
+    with no BatchNorm refresh (user seed, timm-style retake)
+  opportunity: 'User decision, 2026-10-01: run EMA the timm way. The earlier EMA runs were invalid only
+    because the ema-0999 seed text asked for a BatchNorm refresh before each validation, a full extra
+    pass over the training data (about 70 s per epoch) that pushed every run over the time budget.
+    The existing EMA option needs no refresh.'
+  mechanism: 'optimizer.weight_averaging {method: ema, decay: 0.999}, configuration only, through
+    the existing code path: Lightning on_train_batch_end averages every floating-point state tensor,
+    BatchNorm running means and variances included, after warmup; the averaged model is validated,
+    selected and scored at x4, and the live model gets its own validation pass for diagnostics.
+    No BatchNorm refresh and no other extra pass over training data.'
+  precedents:
+  - 'src/knee_abnormality/training/lightning.py, on_train_batch_end and validation_step (existing EMA path).'
+  - 'timm ModelEmaV2/V3: buffers averaged with the weights, no refresh.'
+  - 'Runtime-invalid refresh runs: ema-0999 and ema-09995 experiments in outputs/autoresearch/revisits/experiments/.'
+  novelty: First EMA run on this recipe without the refresh pass.
+  coverage: All studies and labels.
+  exploitation: Per-epoch x1 of the averaged and the live model (val_ and val_live_ metrics).
+  budget: About 122 s per epoch plus the live validation pass, about 1,350 s in all, inside the
+    611-1,833 s range.
+  implementation: Configuration-only change to configs/training.yaml; no source change.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: User seed.
+- id: ema-09995-buffer-average
+  mechanism_id: weight-averaging-ema
+  parent_idea_id: ema-09995
+  title: EMA of the weights and BatchNorm statistics at decay 0.9995 through the existing EMA option,
+    with no BatchNorm refresh (user seed, timm-style retake)
+  opportunity: 'As ema-0999-buffer-average, with the longer average. Runs against the incumbent at
+    its turn, independent of the 0.999 verdicts; if an EMA run was accepted, this candidate replaces
+    its decay rather than stacking a second average.'
+  mechanism: 'optimizer.weight_averaging {method: ema, decay: 0.9995}, configuration only, through the
+    existing EMA path; no BatchNorm refresh and no other extra pass over training data.'
+  precedents:
+  - 'See ema-0999-buffer-average.'
+  novelty: Longer EMA window than any earlier run, without the refresh pass.
+  coverage: All studies and labels.
+  exploitation: As ema-0999-buffer-average.
+  budget: As ema-0999-buffer-average.
+  implementation: Configuration-only change to configs/training.yaml; no source change.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: User seed.
+exhausted_directions: 'EMA with a per-epoch BatchNorm refresh over the training data: four runs
+  invalid on runtime and the subset-refresh 0.9995 retake withdrawn by the user on 2026-10-01.'

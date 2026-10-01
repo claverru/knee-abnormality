@@ -1,0 +1,81 @@
+id: revisits
+recipe: configs/training.yaml
+reference_run: outputs/training/rn18-l2sp-no-confusion
+reference_equivalences: {}
+reference_config_exceptions:
+  - paths.label_manifest
+  - paths.report_attribute_manifest
+additional_evidence_runs:
+  - outputs/autoresearch/radimagenet-rn18/experiments/rn18-no-series-dropout-20260928T213320Z-0b780262/training
+backlog:
+  refill_below: 3
+  refill_to: 5
+  seed_order: forced
+  rotate_after: 1000
+budget:
+  mode: range
+  min_fraction: 0.5
+  max_fraction: 1.65
+policy:
+  editable_files:
+    - configs/training.yaml
+    - src/knee_abnormality/config.py
+    - src/knee_abnormality/training/lightning.py
+  editable_directories:
+    - src/knee_abnormality/modeling
+  config_keys:
+    - trainer.max_epochs
+    - trainer.batch_size
+    - trainer.accumulate_grad_batches
+    - trainer.gradient_clip_val
+    - trainer.half_knee_loss_weight
+    - trainer.report_attribute_loss_weight
+  config_prefixes:
+    - model
+    - optimizer
+    - data.intensity_augmentation
+    - data.affine_augmentation
+    - data.noise_augmentation
+    - data.smoothing_augmentation
+    - data.resolution_augmentation
+    - data.gin_augmentation
+    - data.contrast_mixing_augmentation
+    - data.reflection_augmentation
+  list_item_fields: {}
+  input_identity_keys:
+    - preprocessing_identity
+  require_source_change: false
+  configuration_only_ideas: false
+  developer_instructions: >-
+    The incumbent is the RadImageNet ResNet-18 recipe in configs/training.yaml (repeated middle
+    slice, backbone LR 5e-5, L2-SP anchoring, no scanner confusion head, half-stack augmentation);
+    every idea applies exactly its own change to the current incumbent. Configuration-only ideas
+    change configs/training.yaml only. New options go in config.py under model, with the
+    incumbent's behaviour as the value that reproduces it; readouts, adapters, normalization and
+    backbone construction live in modeling/, extra loss terms and their logging in the Lightning
+    module. Keep the disease loss and its class-balance weights, the half-knee and
+    report-attribute terms, the image size 224, the crop and sampling geometry, the studies seen per
+    epoch and the evaluation untouched unless the idea itself names one of them. Log every new
+    mechanism's own scalar per epoch for the activation signature. New parameters initialize under
+    a forked RNG; every random draw derives from the run seed and the global step. The training
+    time must stay within the campaign's range (611-2,016 s at about 122 s per epoch). No weight
+    averaging (SWA or EMA). Return prepared or blocked. Use the existing Python environment for
+    static checks. No tests.
+  researcher_instructions: >-
+    Research starts after the forced seeds. The question is which hyperparameters of the
+    RadImageNet ResNet-18 recipe are still at values inherited from ReXNet-200: only the backbone
+    rate (1e-4 lost), 14 epochs (+0.001 for 40% more time), warmup length, schedule shape,
+    layer-wise decay, separate clipping and the series-dropout, DSU and triplet amounts
+    were measured on ResNet-18 (prior-work.md). Never tuned there: head learning rate, lower
+    backbone learning rate, head weight decay, the two L2-SP strengths, the half-knee and
+    report-attribute loss weights, the augmentation probabilities and strengths, gradient clipping,
+    batch size with scaled rates, the learning-rate floor and epoch count within the range, and the
+    new options the forced seeds add. Start every refill from run_curves: per-epoch x1 validation,
+    training loss, per-label AUC and per-stage drift and gradients of every decided run against the
+    incumbent, and name the curve behaviour each proposal targets. One knob per run, one value,
+    its direction chosen from the curves; no two-sided sweeps of the same knob and no repeat of a
+    measured value. Configuration-only ideas are the default; a source change is allowed only
+    where a knob needs it. Stay inside the training-time range. Never change the class-balance
+    exponent (fold 0 and the public board disagree on it). No weight averaging, no image size
+    above 224, no more triplets or images per study (endgame), no sampling-geometry sweeps, no
+    ensembling or test-time augmentation, no label changes, no gold weighting, no multi-seed runs.

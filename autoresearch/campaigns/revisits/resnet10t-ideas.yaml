@@ -1,0 +1,48 @@
+ideas:
+- id: rn10t-incumbent-recipe
+  mechanism_id: backbone-resnet10t
+  parent_idea_id: null
+  title: RadImageNet ResNet-10t in place of ResNet-18 with the incumbent recipe unchanged, backbone LR
+    5e-5 (user seed)
+  opportunity: 'User decision, 2026-10-01: compare the smaller Refined-RadImageNet ResNet-10t on
+    exactly the current incumbent recipe. Its only earlier runs used an older recipe: 0.922579 against
+    ResNet-18''s 0.925476 at backbone LR 6e-5 (series dropout 0.2, no L2-SP), and -0.0037 with batch
+    16 and doubled rates (radimagenet-rn18 campaign).'
+  mechanism: 'model.backbone resnet10t.c3_in1k with model.pretrained_weights radimagenet; every other
+    setting exactly as the incumbent, including backbone_lr 5e-5, head_lr 6e-4, L2-SP anchoring at
+    0.01 (stem and layer1) and 0.001 (the rest), plane-contrast readouts, no anatomical bias,
+    augmentation, 26 triplets and 10 epochs.'
+  precedents:
+  - 'outputs/training/20260928-183517-radimagenet-resnet10t (older recipe, x4 0.922579).'
+  - 'docs/ongoing/radimagenet-backbone.md: RadImageNet ResNet backbones and the weight-RMS rule.'
+  novelty: First ResNet-10t run on the current recipe.
+  coverage: All studies and labels.
+  exploitation: Per-epoch x1 and per-stage drift against the incumbent; training seconds.
+  budget: About 105 s per epoch (1,048 s for the earlier 10-epoch run), inside the 611-1,833 s range.
+  implementation: Configuration-only change to configs/training.yaml (model.backbone). Confirm the
+    L2-SP early-anchor layer names match ResNet-10t's stem and layer1.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: User seed.
+- id: rn10t-scaled-backbone-lr
+  mechanism_id: backbone-resnet10t
+  parent_idea_id: rn10t-incumbent-recipe
+  title: RadImageNet ResNet-10t with the backbone LR scaled to its weight size, 6e-5 (user seed)
+  opportunity: 'User decision, 2026-10-01: as rn10t-incumbent-recipe, with the backbone learning rate
+    set by the project''s weight-RMS rule instead of copied from ResNet-18: ResNet-10t''s convolution
+    weight RMS is 0.0158 against ResNet-18''s 0.0124, which gives 6e-5 against 5e-5.'
+  mechanism: 'model.backbone resnet10t.c3_in1k, RadImageNet weights, optimizer.backbone_lr 6e-5; every
+    other setting exactly as the incumbent.'
+  precedents:
+  - 'docs/ongoing/radimagenet-backbone.md: weight-RMS rule, 5e-5 (RMS 0.0124) and 6e-5 (RMS 0.0158).'
+  novelty: First ResNet-10t run on the current recipe at its own scaled rate.
+  coverage: All studies and labels.
+  exploitation: As rn10t-incumbent-recipe.
+  budget: As rn10t-incumbent-recipe.
+  implementation: Configuration-only change to configs/training.yaml (model.backbone and
+    optimizer.backbone_lr). Runs against the incumbent at its turn, independent of the other
+    ResNet-10t verdict.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: User seed.
+exhausted_directions: None.

@@ -12,7 +12,7 @@ line; ViT integration costs are in the [encoder survey](huggingface-image-encode
 | Weights | Kind | Where | Licence | Fits our pipeline |
 |---|---|---|---|---|
 | Original ResNet-50, DenseNet-121, InceptionV3, InceptionResNetV2 | Supervised CNNs | Official Google Drive, mirrors below | MIT (repository) | ResNet-50 **in use** |
-| Refined-RadImageNet ResNet-10t, ResNet-18, ResNet-50 | Supervised CNNs, timm definitions | `convergedmachine/RadImagenet` | MIT (Hub), Apache-2.0 (GitHub) | ResNet-18/10t at ReXNet cost; need mappings |
+| Refined-RadImageNet ResNet-10t, ResNet-18, ResNet-50 | Supervised CNNs, timm definitions | `convergedmachine/RadImagenet` | MIT (Hub), Apache-2.0 (GitHub) | ResNet-18 **in use** (control), ResNet-50 **in use** (submissions) |
 | RadioDINO-S/16, S/8, B/16 | DINO self-supervised ViTs | `Snarcy/RadioDino-*` | CC BY 4.0 | Need a patch-token adapter |
 | OmniRad-small, OmniRad-base | DINOv2-style self-supervised ViTs | `Snarcy/OmniRad-*` | CC BY 4.0 | Need a patch-token adapter |
 | RadInSight | LoRA adapters for Llama-3.2-11B-Vision | `ahmetcangunay/RadInSight` | Apache-2.0 | Not a backbone; VLM uses only |
@@ -58,7 +58,11 @@ Inspected 2026-09-28: `resnet10t.pth` (40,126,400 bytes, SHA-256
 `f5219dff128ca752d47e8acd07817564c10bacbbc4241b3a31845e1a67a079ab`) and `resnet18.pth` (90,192,118
 bytes, SHA-256 `c8c9259ac24068d1986bce1d1828f32b396642fc5ac86d17ab86baa0a13d344f`). Each is a
 training checkpoint with `model`, `optimizer`, `lr_scheduler`, `epoch` and `args`; the optimizer
-state explains the file sizes.
+state explains the file sizes. Inspected 2026-10-01: `resnet50.pth` (191,145,887 bytes, SHA-256
+`b6daa90de92589c404e9da30f4c0ce49182763d4a952f1222caeec647237bacf`, epoch 89, same recipe,
+median convolution RMS 0.0136), loading strictly into timm `resnet50` the same way; it is
+`configs/refined-resnet50.yaml` (`resnet50.a1_in1k`, cached as
+`refined_radimagenet_resnet50.pth`).
 
 - **Loading:** `weights_only=True` works once `argparse.Namespace` is allow-listed. Model keys carry
   the `torch.compile` prefix `_orig_mod.`. Stripped, they load strictly into timm `resnet10t` and

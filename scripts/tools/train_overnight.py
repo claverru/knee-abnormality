@@ -45,7 +45,11 @@ SUMMARY_HEADER = [
 
 QUEUE_SECONDS = 5 * 60 * 60
 RUN_ALLOWANCE_SECONDS = 35 * 60
-CONTROL_RUN = ROOT / "outputs/training/rn18-l2sp-no-confusion"
+CONTROL_RUN = (
+    ROOT
+    / "outputs/autoresearch/revisits/experiments"
+    / "no-anatomical-bias-20260930T213145Z-58126164/training"
+)
 
 BASE_CHANGES = {}
 
@@ -119,7 +123,9 @@ def comparable(values: dict) -> dict:
     values["paths"].pop("output_root")
     for key in ("label_manifest", "report_attribute_manifest"):
         parts = Path(values["paths"][key]).parts
-        values["paths"][key] = "/".join(parts[len(parts) - 1 - parts[::-1].index("configs") :])
+        values["paths"][key] = "/".join(
+            parts[len(parts) - 1 - parts[::-1].index("configs") :]
+        )
     return values
 
 

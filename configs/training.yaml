@@ -68,8 +68,10 @@ model:
   channels_last: false
   checkpoint_backbone: false
   backbone_eval: false
+  anatomical_bias: false
   dropout: 0.0
   series_dropout: 0.0
+  plane_readout: true
   feature_statistics_augmentation:
     probability: 0.5
 

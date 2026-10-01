@@ -1,0 +1,47 @@
+ideas:
+- id: ema-0999
+  mechanism_id: weight-averaging-ema
+  parent_idea_id: null
+  title: Exponential moving average of the weights at decay 0.999 (user seed)
+  opportunity: 'User decision, 2026-09-30: test EMA weights on the ResNet-18 recipe despite the
+    campaign''s weight-averaging exclusion, which this idea and ema-09995 lift for themselves only.
+    EMA was last measured on the ordinary-BCE ReXNet recipe (2026-09-17, decay 0.999: +0.0001, 0.929
+    public), and the noisy-labels analysis found EMA weights trailing the live model until epochs 8-9.
+    ResNet-18 flattens late with a low learning rate, where an average may still smooth the last
+    epochs.'
+  mechanism: 'optimizer.weight_averaging {method: ema, decay: 0.999}: the existing EMA option. The
+    average updates every optimizer step after warmup with weight 1 - decay (half-life about 690
+    steps, 1.6 epochs at 437 steps per epoch), refreshes its BatchNorm statistics before each
+    validation, and the averaged weights are validated, selected and scored at x4.'
+  precedents:
+  - 'docs/validation/results/2026-09-17-overnight-results.md: 03-ema-0.999, +0.0001 on the older recipe.'
+  - 'docs/validation/results/2026-09-23-noisy-labels-campaign.md: EMA trails the live model until epochs 8-9.'
+  novelty: First EMA run on ResNet-18, L2-SP and rebuild_state_v2.
+  coverage: All studies and labels.
+  exploitation: Per-epoch x1 of the averaged model against the incumbent; the batch-norm refresh time.
+  budget: About one extra BatchNorm-refresh pass per validation (+150 s on the older recipe); inside
+    the range.
+  implementation: Configuration-only change to configs/training.yaml.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: User seed.
+- id: ema-09995
+  mechanism_id: weight-averaging-ema
+  parent_idea_id: null
+  title: Exponential moving average of the weights at decay 0.9995 (user seed)
+  opportunity: 'User decision, 2026-09-30, as for ema-0999: a longer average of the late, low-rate
+    epochs. Runs against the incumbent at its turn, independent of ema-0999''s verdict.'
+  mechanism: 'optimizer.weight_averaging {method: ema, decay: 0.9995}: half-life about 1,390 steps,
+    3.2 epochs; otherwise as ema-0999.'
+  precedents:
+  - 'See ema-0999.'
+  novelty: Longer EMA window than any earlier run.
+  coverage: All studies and labels.
+  exploitation: As ema-0999.
+  budget: As ema-0999.
+  implementation: Configuration-only change to configs/training.yaml. If ema-0999 was accepted, this
+    candidate replaces its decay rather than stacking a second average.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: User seed.
+exhausted_directions: None.
