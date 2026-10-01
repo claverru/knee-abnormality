@@ -4,7 +4,10 @@
 +0.00105 ×4 macro and 0.940 public against 0.938
 ([result](../validation/results/2026-09-25-report-attribute-heads.md)). Training only: one
 auxiliary prediction per report-attribute question beside the unchanged disease loss. The
-attributes come from the [JevK5 extraction](../ongoing/report-attribute-extraction.md).
+attributes come from the [JevK5 extraction](../ongoing/report-attribute-extraction.md). On the
+ResNet-18 recipe, removing them cost −0.0006 ×4 (80% [−0.0011, −0.0001]) and halving the
+coefficient to 0.05 cost −0.0004, so they stay
+([revisits campaign](../validation/results/2026-10-01-revisits-campaign.md#other-runs)).
 
 ## Configuration
 

@@ -225,8 +225,10 @@ class ModelConfig(ConfigModel):
     channels_last: bool = False
     checkpoint_backbone: bool = False
     backbone_eval: bool = False
+    anatomical_bias: bool = True
     dropout: Annotated[float, Field(ge=0, lt=1)]
     series_dropout: Annotated[float, Field(ge=0, lt=1)]
+    plane_readout: bool = False
     feature_statistics_augmentation: FeatureStatisticsAugmentationConfig = Field(
         default_factory=FeatureStatisticsAugmentationConfig
     )

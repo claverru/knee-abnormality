@@ -1,4 +1,4 @@
-# Project state (2026-09-30)
+# Project state (2026-10-01)
 
 What is in force now: the recipe, the control candidates pair with, the best public submissions and
 the rules every comparison depends on. Pending work is in [next](next.md), active lines have their
@@ -18,11 +18,14 @@ measured outcomes are in the [validation results](../validation/results/INDEX.md
   control scored 0.944 (S78), not comparable with those fold-4 runs. The autoresearch gate requires both the label source and the split.
 - **Model:** the [current model](../modeling/current-model.md), since 2026-09-29 on a
   RadImageNet ResNet-18 (`configs/training.yaml`): repeated middle slice, `backbone_lr` 5e-5, no
-  series dropout, 26 triplets, spatial tokens with knee geometry, the three-compartment OA
-  detector, training-only report-attribute heads, L2-SP weight anchoring (since 2026-09-30, which
-  also removed the scanner confusion head), the half-stack augmentation and class-balanced BCE at
-  exponent 0.5. The ReXNet-200 recipe it replaced is
-  `configs/rexnet-200.yaml`; submit ResNet-18 bundles at τ 0.9 and ReXNet at τ 0.75.
+  series dropout, 26 triplets, spatial tokens with knee geometry, plane-contrast readouts and no
+  anatomical attention bias (since 2026-10-01), the three-compartment OA detector, training-only
+  report-attribute heads, L2-SP weight anchoring (since 2026-09-30, which also removed the scanner
+  confusion head), the half-stack augmentation and class-balanced BCE at exponent 0.5.
+  `configs/refined-resnet50.yaml` is the same recipe on the Refined-RadImageNet ResNet-50, the
+  submission model; ResNet-18 stays the control for iteration speed (user decision, 2026-10-01).
+  The ReXNet-200 recipe it replaced is `configs/rexnet-200.yaml`, ResNet-50's ensemble partner;
+  submit ResNet bundles at τ 0.9 and ReXNet at τ 0.75.
 - **Preprocessing identity:** hashed-source changes apply to fresh runs only. A new export or local
   prediction from a checkpoint trained under an earlier identity is refused by
   `validate_preprocessing_identity` and needs that checkpoint's archived sources; already-exported
@@ -32,10 +35,19 @@ measured outcomes are in the [validation results](../validation/results/INDEX.md
 
 ## Current control
 
+- **`no-anatomical-bias`**
+  (`outputs/autoresearch/revisits/experiments/no-anatomical-bias-20260930T213145Z-58126164/training`),
+  the `configs/training.yaml` recipe since 2026-10-01 apart from name and paths: ×4 0.929835 (×1
+  0.925999, epoch 9 of 10, fold 0, seed 1533697213), no public score. Every candidate pairs with it
+  at its fold and seed. It was trained in the revisits campaign, so exports use its archived
+  `source/` ([result](../validation/results/2026-10-01-revisits-campaign.md)).
+- **`refined-rn50-incumbent-recipe`**
+  (`outputs/autoresearch/revisits/experiments/refined-rn50-incumbent-recipe-20261001T081909Z-71e68a1d/training`),
+  the `configs/refined-resnet50.yaml` recipe: ×4 0.934423, 0.948 public (S88), not a control.
 - **`rn18-l2sp-no-confusion`** (`outputs/training/rn18-l2sp-no-confusion`), the
-  `configs/training.yaml` recipe since 2026-09-30: ×4 0.928062 (×1 0.92451, epoch 9 of 10, fold 0,
-  seed 1533697213), 0.943 public (S86). Every candidate pairs with it at its fold and seed; the
-  adoption did not rotate fold or seed (user decision)
+  `configs/training.yaml` recipe from 2026-09-30: ×4 0.928062 (×1 0.92451, epoch 9 of 10, fold 0,
+  seed 1533697213), 0.943 public (S86), the control before the 2026-10-01 adoption; the
+  adoptions did not rotate fold or seed (user decision)
   ([result](../validation/results/2026-09-30-rn18-l2sp-no-confusion.md)).
 - **`rn18-no-series-dropout`**
   (`outputs/autoresearch/radimagenet-rn18/experiments/rn18-no-series-dropout-20260928T213320Z-0b780262/training`),
@@ -51,6 +63,10 @@ measured outcomes are in the [validation results](../validation/results/INDEX.md
 
 ## Best public submissions
 
+- **0.951:** S89, a 50/50 ensemble of the ReXNet `rebuild-state-v2-control` (τ 0.75) and the
+  Refined-RadImageNet ResNet-50 (τ 0.9), fold 0 at ×4 with reflection TTA, two bundles in one
+  notebook. The ResNet-50 alone scored 0.948 (S88)
+  ([revisits campaign](../validation/results/2026-10-01-revisits-campaign.md#ensembles-fold-0-4-equal-weights)).
 - **0.949:** S80, a 50/50 ensemble of the ReXNet `rebuild-state-v2-control` (τ 0.75) and the
   RadImageNet ResNet-18 (τ 0.9), both fold 0 at ×4 and 36 triplets, run as two bundles in one notebook
   ([RadImageNet backbones](radimagenet-backbone.md)).
@@ -104,7 +120,8 @@ measured outcomes are in the [validation results](../validation/results/INDEX.md
 - [Label rebuild](../public-labels/label-rebuild.md): adopted; its control scored ×4 0.928288 and
   0.944 public (S78).
 - [RadImageNet backbones](radimagenet-backbone.md): the ResNet-18 recipe ties the ReXNet control
-  publicly at about 60% of its training time, and the two ensemble to 0.949.
+  publicly at about 60% of its training time; the Refined ResNet-50 beats ResNet-18 by +0.0046 at
+  1.65× its training time, and with the ReXNet control scores 0.951 (S89).
 - [Report attribute extraction](report-attribute-extraction.md): the JevK5 heads are in the recipe;
   a v4 question set is open.
 - [Loading speedup](loading-speedup.md): the `inference-opt` branch awaits a decision.
@@ -113,6 +130,11 @@ measured outcomes are in the [validation results](../validation/results/INDEX.md
 
 ## Recently closed
 
+- **2026-10-01:** the `revisits` autoresearch campaign on ResNet-18, stopped by the user:
+  plane-contrast readouts and removal of the anatomical bias adopted, and the Refined ResNet-50
+  (+0.0046) added as `configs/refined-resnet50.yaml`; one backbone per plane ties; EMA and 18
+  hyperparameter runs gave nothing
+  ([result](../validation/results/2026-10-01-revisits-campaign.md)).
 - **2026-09-30:** the `site-generalization` autoresearch campaign on the sites-out split, stopped
   by the user, and its manual follow-up: L2-SP weight anchoring was the only mechanism that
   reproducibly helped held-out sites and was adopted with the confusion head's removal; the

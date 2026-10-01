@@ -33,6 +33,12 @@ RADIMAGENET_WEIGHTS = {
         "kaggle datasets download marwanmath/resnet-50-radimagenet-marwan --unzip",
         "sequential",
     ),
+    "resnet50.a1_in1k": RadImageNetWeights(
+        "refined_radimagenet_resnet50.pth",
+        "b6daa90de92589c404e9da30f4c0ce49182763d4a952f1222caeec647237bacf",
+        REFINED_RADIMAGENET_URL.format(name="resnet50.pth"),
+        "refined",
+    ),
     "resnet18.a1_in1k": RadImageNetWeights(
         "refined_radimagenet_resnet18.pth",
         "c8c9259ac24068d1986bce1d1828f32b396642fc5ac86d17ab86baa0a13d344f",

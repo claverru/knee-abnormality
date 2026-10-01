@@ -459,15 +459,20 @@ class KneeModule(L.LightningModule):
             dataset.set_epoch(self.current_epoch)
 
     def on_train_epoch_end(self) -> None:
-        strengths = self.model.anatomical_log_strength.detach().float().exp()
-        for family, strength in zip(("meniscus", "oa"), strengths, strict=True):
-            self.log(
-                f"anatomical_strength_{family}",
-                strength,
-                on_step=False,
-                on_epoch=True,
-                batch_size=1,
+        if self.config.model.plane_readout:
+            self._log_epoch_metric(
+                "plane_readout_drift", self.model.head.divergence().mean(), 1
             )
+        if self.model.anatomical_log_strength is not None:
+            strengths = self.model.anatomical_log_strength.detach().float().exp()
+            for family, strength in zip(("meniscus", "oa"), strengths, strict=True):
+                self.log(
+                    f"anatomical_strength_{family}",
+                    strength,
+                    on_step=False,
+                    on_epoch=True,
+                    batch_size=1,
+                )
         self.log(
             "half_knee_detector_norm",
             self.model.half_knee_detector.weight.detach().float().norm(),

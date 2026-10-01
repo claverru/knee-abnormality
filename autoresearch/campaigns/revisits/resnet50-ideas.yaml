@@ -1,0 +1,59 @@
+ideas:
+- id: rn50-incumbent-recipe
+  mechanism_id: backbone-resnet50
+  parent_idea_id: null
+  title: RadImageNet ResNet-50 in place of ResNet-18 with the incumbent recipe, backbone LR 5e-5,
+    nine epochs to fit the budget (user seed)
+  opportunity: 'User decision, 2026-10-01: compare the original RadImageNet ResNet-50 on the current
+    incumbent recipe. Its earlier runs used an older recipe: backbone LR 1.23e-3 overwrote the early
+    layers and was stopped after epoch 3; 3e-4 finished at x1 0.91223 against 0.924637
+    (docs/ongoing/radimagenet-backbone.md).'
+  mechanism: 'model.backbone resnet50.tv_in1k with model.pretrained_weights radimagenet;
+    optimizer.backbone_lr 5e-5 and every other setting as the incumbent (head_lr 6e-4, L2-SP 0.01 on
+    conv1/bn1/layer1 and 0.001 on the rest, plane-contrast readouts, no anatomical bias, augmentation,
+    26 triplets, batch 8), except two backbone-specific requirements. (1) Input scaling: this
+    checkpoint was trained on inputs in [-1, 1] (mean 0.5, std 0.5); with the recipe''s ImageNet
+    normalization its conv1 activations come out about 6x too large. data.mean and data.std are not
+    editable in this campaign, so the model converts its ImageNet-normalized input to [-1, 1]
+    (undo the ImageNet mean and std, then subtract 0.5 and divide by 0.5) before the backbone, for
+    resnet50.tv_in1k with RadImageNet weights only; every other backbone is unchanged. (2)
+    trainer.max_epochs 9: the earlier ResNet-50 run took about 170 s per epoch with series dropout
+    0.2, and the recipe without series dropout costs about 11% more, so ten epochs would project
+    about 1,870 s against the 1,833 s limit; nine epochs project about 1,690 s. The cosine schedule
+    scales to the nine epochs as it does for any epoch count.'
+  precedents:
+  - 'outputs/training/20260928-180252-radimagenet-resnet50-lr3e-4: about 170 s per epoch at series dropout 0.2.'
+  - 'docs/ongoing/radimagenet-backbone.md: [-1, 1] normalization measured against the checkpoint''s bn1 statistics.'
+  novelty: First ResNet-50 run on the current recipe.
+  coverage: All studies and labels.
+  exploitation: Per-epoch x1 and per-stage drift against the incumbent; training seconds per epoch.
+  budget: About 1,690 s for nine epochs, inside the 611-1,833 s range.
+  implementation: configs/training.yaml (model.backbone, trainer.max_epochs 9) and the input
+    conversion in modeling/ keyed to the backbone and its weights. Confirm the L2-SP early-anchor
+    names match torchvision's conv1, bn1 and layer1.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: User seed.
+- id: rn50-scaled-backbone-lr
+  mechanism_id: backbone-resnet50
+  parent_idea_id: rn50-incumbent-recipe
+  title: RadImageNet ResNet-50 with the backbone LR scaled to its weight size, 1.27e-3, nine epochs
+    (user seed)
+  opportunity: 'User decision, 2026-10-01: as rn50-incumbent-recipe, with the backbone learning rate set
+    by the weight-RMS rule from the ResNet-18 recipe: RadImageNet ResNet-50 convolution weights have
+    RMS 0.314 against 0.0124, so 5e-5 x 0.314 / 0.0124 = 1.27e-3. The nearly identical 1.23e-3
+    overwrote the early layers on the older recipe, which had no L2-SP anchoring.'
+  mechanism: 'As rn50-incumbent-recipe, including the [-1, 1] input conversion and nine epochs, with
+    optimizer.backbone_lr 1.27e-3.'
+  precedents:
+  - 'outputs/training/20260928-174920-radimagenet-resnet50 (backbone LR 1.23e-3, stopped after epoch 3).'
+  novelty: First run of the weight-scaled ResNet-50 rate under L2-SP.
+  coverage: All studies and labels.
+  exploitation: As rn50-incumbent-recipe; per-stage drift shows whether L2-SP holds the early layers.
+  budget: As rn50-incumbent-recipe.
+  implementation: As rn50-incumbent-recipe, with optimizer.backbone_lr 1.27e-3. Runs against the
+    incumbent at its turn, independent of the other ResNet-50 verdict.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: User seed.
+exhausted_directions: None.

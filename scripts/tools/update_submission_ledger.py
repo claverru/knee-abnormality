@@ -116,6 +116,8 @@ def _submissions(api: KaggleApi, competition: str) -> list[dict]:
 
 
 def _bundle_path(recorded: str, exports: Path) -> Path | None:
+    if not recorded:
+        return None
     candidate = Path(recorded)
     if candidate.is_dir():
         return candidate
@@ -133,10 +135,13 @@ def _local_records(records: Path, exports: Path) -> dict[object, dict]:
         notebook = value.get("notebook")
         if not notebook or not value.get("dataset"):
             continue
+        digest = value.get("bundle_manifest_sha256") or ""
+        if isinstance(digest, dict):
+            digest = "+".join(sorted(digest.values()))
         entry = {
             "dataset": value["dataset"],
             "bundle": _bundle_path(value.get("bundle") or "", exports),
-            "bundle_manifest_sha256": value.get("bundle_manifest_sha256") or "",
+            "bundle_manifest_sha256": digest,
         }
         found[notebook] = entry
         found[entry["dataset"]] = entry

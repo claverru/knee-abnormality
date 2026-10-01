@@ -50,7 +50,12 @@ BACKBONE_MAPPINGS = {
             "stride": [32.0, 32.0],
             "anchors": "convolution_centers",
         }
-        for name in ("resnet50.tv_in1k", "resnet18.a1_in1k", "resnet10t.c3_in1k")
+        for name in (
+            "resnet50.tv_in1k",
+            "resnet50.a1_in1k",
+            "resnet18.a1_in1k",
+            "resnet10t.c3_in1k",
+        )
     },
 }
 
@@ -255,6 +260,7 @@ _BACKBONE_MAPPING_FUNCTIONS = {
     "efficientnet_b0.ra_in1k": _efficientnet_mapping,
     COATNET_BACKBONE: _coatnet_mapping,
     "resnet50.tv_in1k": _resnet_mapping,
+    "resnet50.a1_in1k": _resnet_mapping,
     "resnet18.a1_in1k": _resnet_mapping,
     "resnet10t.c3_in1k": _resnet_mapping,
 }

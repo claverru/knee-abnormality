@@ -1,6 +1,6 @@
 # Submission ledger
 
-All 86 Kaggle competition submissions, newest first, with submission times in UTC. The table is
+All 89 Kaggle competition submissions, newest first, with submission times in UTC. The table is
 regenerated from the live submission list and the local bundles by
 [`update_submission_ledger`](../../../scripts/tools/update_submission_ledger.py),
 which also writes `outputs/submission/kaggle-ledger.json`. The dated records in this folder cover
@@ -75,6 +75,9 @@ head); the Label column gives the Kaggle label wherever it differs.
 
 | S | Submitted (UTC) | Label | Inference | Fold 0 | Public | ID | Record |
 |---|---|---|---|---|---:|---:|---|
+| S89 | 2026-10-01 09:25 | ens ReXNet v2 control (τ 0.75) + Refined RN50 (τ 0.9), fold 0, reflection TTA; two bundles, one notebook | x4 refl-TTA bs4 | (x4 blend, fold 0, no TTA) 0.935999 | 0.951 | 56748424 | [2026-10-01 revisits campaign](../../validation/results/2026-10-01-revisits-campaign.md) |
+| S88 | 2026-10-01 09:07 | Refined RN50 f0 t0.9 | x4 tau0.9 bs4 | (x1, fold 0) 0.929393 | 0.948 | 56748142 | [2026-10-01 revisits campaign](../../validation/results/2026-10-01-revisits-campaign.md) |
+| S87 | 2026-09-30 20:00 | RN18 OOF-blend 0.5 f0 t0.9 | x4 tau0.9 bs4 | (x1, fold 0) 0.926842 | 0.944 | 56717610 | [Next](../../ongoing/next.md) |
 | S86 | 2026-09-30 17:27 | RN18 L2-SP no confusion f0 t0.9 | x4 tau0.9 bs4 | (x1, fold 0) 0.924507 | 0.943 | 56714526 | [RN18 L2-SP without confusion head](../../validation/results/2026-09-30-rn18-l2sp-no-confusion.md) |
 | S85 | 2026-09-30 12:20 | RN18 sites-out L2-SP+ArcFace f0 t0.9 (sites-out split) | x4 tau0.9 bs4 | (x1, fold 0 seen sites) 0.924518 | 0.940 | 56707163 | [Site-generalization prior work](../../../autoresearch/campaigns/site-generalization/prior-work.md) |
 | S84 | 2026-09-30 12:18 | RN18 sites-out L2-SP f0 t0.9 (sites-out split) | x4 tau0.9 bs4 | (x1, fold 0 seen sites) 0.925349 | 0.943 | 56707112 | [Site-generalization prior work](../../../autoresearch/campaigns/site-generalization/prior-work.md) |

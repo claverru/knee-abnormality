@@ -1,0 +1,135 @@
+ideas:
+- id: dense-plane-readouts
+  mechanism_id: dense-plane-readouts
+  parent_idea_id: null
+  title: Dense per-plane readouts on the shared backbone, with a learned per-label plane fusion
+  opportunity: 'Each label leans on one plane (single-plane inference: ACL sagittal, MCL coronal,
+    Effusion and Baker''s axial), yet one joint attention pool mixes all planes before the
+    classifier. In the plane-specialization campaign, making every plane predict every label from
+    its own tokens was the one change that helped (+0.0047, +0.0032 re-scored on rebuild_state_v2),
+    but only with one backbone per plane. It was never tried on the shared backbone.'
+  mechanism: 'For every label c and present plane p (axial, coronal, sagittal), pool plane p''s
+    tokens with the label''s existing attention (scorer, anatomical bias, meniscus mask and OA
+    detector unchanged, softmax restricted to that plane''s tokens) and read z_cp with the shared
+    classifier. Each z_cp takes the class-balanced BCE, averaged over the planes present in the
+    study, as the disease loss. A learned per-label fusion, a softmax over present planes of
+    zero-initialized weights a_cp applied to detached z_cp and trained with class-balanced BCE at
+    weight 1, gives the validation and inference output. A study missing a plane fuses over the
+    planes it has.'
+  precedents:
+  - 'plane-specialization campaign: dense-plane-readouts +0.0047 (re-scored +0.0032, 80% [+0.0010,
+    +0.0053]) and dense-readouts-learned-fusion +0.0009 on top, on three EfficientNet-B0s
+    (docs/validation/results/2026-09-28-plane-specialization-campaign.md).'
+  - 'Code: frozen sources of outputs/autoresearch/plane-specialization/experiments/dense-readouts-learned-fusion-20260927T231847Z-33417f97/source/
+    (modeling/planes/, trainer.plane_pooling, model.plane_pooling).'
+  - 'Single-plane inference: docs/validation/results/2026-09-27-single-plane-inference.md.'
+  novelty: First dense per-plane readout on the shared backbone; the plane-backbone runs changed
+    the backbone at the same time.
+  coverage: All studies and labels.
+  exploitation: Log each plane's own validation macro AUC, the fusion weights per label and plane,
+    and per-epoch training loss per plane.
+  budget: Three masked attention pools per label on the existing tokens; negligible against the
+    1,222 s reference.
+  implementation: Port the pooling and fusion from the plane-specialization source under a new
+    model.plane_readouts option in config.py and modeling/, with the per-plane loss in the Lightning
+    module. One shared backbone, no per-plane backbones.
+  open_choices: None; fusion and loss weighting are fixed as above.
+  dependencies: []
+  priority_rationale: Strongest measured effect on the list, with a mechanism that does not depend
+    on separate backbones.
+- id: plane-contrast-readouts
+  mechanism_id: plane-contrast-specific-readouts
+  parent_idea_id: null
+  title: Give each plane/contrast type its own readout weights before summing, initialized from the
+    shared readout
+  opportunity: 'The only clean flip of the campaign re-scoring: -0.0006 on its recorded labels,
+    +0.0018 (80% [+0.0001, +0.0035]) on rebuild_state_v2, +0.0010 net of the near-misses reference
+    shift. Labels draw on different acquisition types (PF OA: axial fluid 29%, sagittal 54%), and one
+    linear classifier per label collapses them.'
+  mechanism: 'Keep six partial vectors per label, u_cq = sum over tokens of type q of alpha_ci * h_i,
+    with the same global attention denominator, and compute z_c = sum_q w_cq . u_cq + b_c. Initialize
+    every w_cq from the shared w_c, which reproduces the original predictions apart from summation
+    order; missing types contribute zero. If the incumbent carries dense per-plane readouts, this
+    candidate removes them and restores the joint pool, so it tests the alternative, not a stack.'
+  precedents:
+  - 'near-misses run plane-contrast-readouts-20260925T020628Z-2efb517d (frozen source under
+    outputs/autoresearch/near-misses/experiments/).'
+  - 'Re-scoring: docs/validation/results/2026-09-28-campaign-rescoring.md.'
+  novelty: First run on ResNet-18 and the current labels.
+  coverage: All labels.
+  exploitation: Log the divergence of each w_cq from its initialization per epoch; per-label AUC
+    against the incumbent.
+  budget: Six times the readout weights; negligible.
+  implementation: A new model.plane_readout option in config.py and modeling/model.py; compute the
+    per-type contributions without a large pooling tensor.
+  open_choices: None; initialization is fixed.
+  dependencies: []
+  priority_rationale: Passes on the labels that track the public board best; cheap.
+- id: no-dsu
+  mechanism_id: regularization-removal
+  parent_idea_id: null
+  title: Remove DSU feature-statistics augmentation (probability 0.5 to 0)
+  opportunity: 'DSU was adopted on ReXNet as a replicated near-miss; on rebuild_state_v2 neither
+    replication holds (+0.0011 [-0.0014, +0.0035] and -0.0003 [-0.0020, +0.0015]). On ResNet-18,
+    halving it changed nothing (+0.00005), and removing another regularizer, series dropout, gained
+    +0.0023.'
+  mechanism: model.feature_statistics_augmentation.probability 0.
+  precedents:
+  - 'Re-scoring, main adoptions: docs/validation/results/2026-09-28-campaign-rescoring.md#main-adoptions.'
+  - 'radimagenet-rn18: rn18-lighter-dsu +0.00005; rn18-no-series-dropout +0.0023.'
+  novelty: First removal on ResNet-18.
+  coverage: All studies and labels.
+  exploitation: Training loss, per-stage drift and per-label AUC against the incumbent.
+  budget: Slightly cheaper than the incumbent.
+  implementation: Configuration-only change to configs/training.yaml.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Adoption lost its support; a free simplification if it ties.
+- id: no-anatomical-bias
+  mechanism_id: anatomical-bias-removal
+  parent_idea_id: null
+  title: Remove the side-aware anatomical attention bias and its two learned strengths
+  opportunity: 'The bias was adopted on learned strengths against a control without it (+0.0023,
+    80% low +0.0001); re-scored on rebuild_state_v2 that becomes +0.0001 [-0.0019, +0.0023], and
+    +0.0016 [-0.0008, +0.0039] against control B. The fixed-strength bias was never supported. The
+    meniscus own-side mask and half-knee loss, adopted later, now carry the medial-lateral split for
+    the menisci.'
+  mechanism: 'Set the anatomical attention bias to zero for all labels: no tanh(medial_mm / 20) term
+    and no anatomical_log_strength parameters. The meniscus side mask, the half-knee loss and the
+    three-compartment OA detector stay unchanged.'
+  precedents:
+  - 'docs/validation/results/2026-09-21-anatomical-attention-result.md.'
+  - 'Re-scoring: docs/validation/results/2026-09-28-campaign-rescoring.md#main-adoptions.'
+  novelty: First removal since adoption; the recipe has since gained the side mask and OA detector.
+  coverage: The four compartment labels directly; all labels through shared training.
+  exploitation: Per-label AUC for Medial/Lateral Meniscus and Medial/Lateral/PF OA against the
+    incumbent; the incumbent's learned strengths for reference.
+  budget: Unchanged.
+  implementation: A new model.anatomical_bias option (true reproduces the incumbent) in config.py
+    and modeling/model.py.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Adoption lost its support and the side mask may have made it redundant.
+- id: no-bilateral-smoothing
+  mechanism_id: regularization-removal
+  parent_idea_id: null
+  title: Remove bilateral smoothing augmentation (probability 0.2 to 0)
+  opportunity: 'Adopted on a local pass (+0.0020, 80% low +0.0002) that re-scores to +0.0008
+    [-0.0009, +0.0027] on rebuild_state_v2, partly through the augmentation campaign''s reference
+    shift. ResNet-18 underfits and gained from removing series dropout.'
+  mechanism: data.smoothing_augmentation.probability 0.
+  precedents:
+  - 'Re-scoring: docs/validation/results/2026-09-28-campaign-rescoring.md.'
+  - 'Augmentation campaign: docs/validation/results/2026-09-26-augmentation-campaign.md.'
+  novelty: First removal on ResNet-18.
+  coverage: All studies and labels.
+  exploitation: Training loss and per-label AUC against the incumbent.
+  budget: Slightly cheaper than the incumbent.
+  implementation: Configuration-only change to configs/training.yaml.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Adoption lost its local support; a free simplification if it ties.
+exhausted_directions: 'Early-learning regularization was dropped: two runs (+0.0017 and +0.0008
+  re-scored) and no memorization phase to guard against. Token dropout variants, the OA-geometry
+  residual, the any-OA auxiliary and ACL-gated oblique tokens flipped on re-scoring only through
+  reference shifts or an inert mechanism.'

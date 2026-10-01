@@ -1,19 +1,27 @@
 # Current model
 
-The code carries one model: the full-slice spatial-token recipe with learned anatomical
-family strengths, defined by [`configs/training.yaml`](../../configs/training.yaml). Since
+The code carries one model: the full-slice spatial-token recipe with plane-contrast readouts,
+defined by [`configs/training.yaml`](../../configs/training.yaml). Since
 2026-09-28 it trains on the rebuilt labels `rebuild_state_v2` and the split
 `all_5fold_scanner_v2`; the current control and what candidates pair with are in the
 [project state](../ongoing/state.md#current-control), and each adoption is listed in the
 [adoption history](#adoption-history).
 
 - **Inputs:** a RadImageNet-pretrained ResNet-18 reads every sampled triplet's middle slice,
-  repeated on all three channels, at 224 px, 0.625 mm spacing and a 140 mm field. The previous
-  ReXNet-200 recipe is kept as [`configs/rexnet-200.yaml`](../../configs/rexnet-200.yaml).
+  repeated on all three channels, at 224 px, 0.625 mm spacing and a 140 mm field. The same
+  recipe on the Refined-RadImageNet ResNet-50 is
+  [`configs/refined-resnet50.yaml`](../../configs/refined-resnet50.yaml), the submission model
+  (+0.0046 ×4 at 1.65× the training time); ResNet-18 stays the control because what helps it has
+  carried over so far (user decision, 2026-10-01). The previous ReXNet-200 recipe is kept as
+  [`configs/rexnet-200.yaml`](../../configs/rexnet-200.yaml), ResNet-50's ensemble partner.
 - **Tokens:** every visually valid backbone location is a token with four additive embeddings.
-- **Pooling:** target-specific attention MIL pools position-rich tokens, with side-aware
-  anatomical bias and two learned positive strengths for meniscus and OA. The two meniscus
-  labels see only their own side of the knee; OA stays whole-knee.
+- **Pooling:** target-specific attention MIL pools position-rich tokens. The two meniscus
+  labels see only their own side of the knee; OA stays whole-knee. The side-aware anatomical
+  bias with learned meniscus and OA strengths is off (`model.anatomical_bias: false`, since
+  2026-10-01); the ReXNet recipe keeps it.
+- **Plane-contrast readouts:** each label scores every token with the classifier vector of the
+  token's series type (six plane/contrast types, initialized from one shared vector) and sums
+  the attention-weighted scores (`model.plane_readout: true`, since 2026-10-01).
 - **Half-knee loss (training only):** a shared meniscus tear detector is supervised on each
   half of the knee, so token features learn the medial-lateral split.
 - **Three-compartment OA detector:** one detector, shared by Medial, Lateral and PF OA, is read
@@ -44,6 +52,7 @@ comparable.
 
 | Adopted | Change | Evidence | Control after adoption |
 |---|---|---|---|
+| 2026-10-01 | Plane-contrast readouts added and the anatomical attention bias removed, on ResNet-18 and the new Refined ResNet-50 config; ResNet-18 stays the control | In the revisits campaign, one run each: +0.0009 ×4 (80% [+0.0001, +0.0017]) and +0.0009 (80% [+0.0002, +0.0016]), both just under the rule's +0.001 and adopted by the user; the Refined ResNet-50 on the result scored 0.948 public (S88) and 0.951 with ReXNet (S89) ([result](../validation/results/2026-10-01-revisits-campaign.md)) | `no-anatomical-bias` (campaign run, ×4 0.929835) |
 | 2026-09-30 | L2-SP weight anchoring added and the scanner confusion head removed, on ResNet-18 only | Fold-0 tie, ×4 +0.00026 (95% [−0.0013, +0.0018]), and 0.943 public (S86) against 0.943 (S82); adopted for unseen-site robustness, measured on the sites-out splits: +0.0015, +0.0009 and +0.0023 held-out ([result](../validation/results/2026-09-30-rn18-l2sp-no-confusion.md)) | No retrain: the adopted run `rn18-l2sp-no-confusion` (`outputs/training/rn18-l2sp-no-confusion`), seed 1533697213, v2 fold 0: ×4 0.928062; fold and seed kept by user decision |
 | 2026-09-29 | RadImageNet ResNet-18 with the repeated middle slice, `backbone_lr` 5e-5 and no series dropout replaces ReXNet-200 (kept as `configs/rexnet-200.yaml`) | Ties ReXNet publicly (0.944, S79, the 36-triplet version, against S78) at 63% of the training time; no series dropout +0.0023 in the [campaign](../../autoresearch/campaigns/radimagenet-rn18/INDEX.md); the two ensemble to 0.949 (S80) | `rn18-no-series-dropout` (`outputs/autoresearch/radimagenet-rn18/experiments/rn18-no-series-dropout-20260928T213320Z-0b780262`), seed 1533697213, v2 fold 0: ×4 0.927806 |
 | 2026-09-28 | Rebuilt labels `rebuild_state_v2` and split `all_5fold_scanner_v2` | A, the pre-fix version of A2, 0.947 public (S76) against 0.946 (S73) on fold 4; A2's control 0.944 (S78) ([label rebuild](../public-labels/label-rebuild.md)) | `rebuild-state-v2-control`, seed 1533697213, v2 fold 0: ×4 0.928288 |
@@ -149,12 +158,13 @@ Tokens receive four additive embeddings:
 
 - **Tokens:** add the embeddings to the projected features and apply the shared `mil_norm`
   LayerNorm.
-- **Attention:** add the anatomical term to the four compartment-label scores, then run one
+- **Attention:** with `anatomical_bias`, add the anatomical term to the four compartment-label scores; then run one
   float32 masked softmax per study and target over
   the study's visually valid tokens. For the two meniscus labels the mask also drops tokens on
   the sibling side beyond ±10 mm. A study without valid tokens fails before the softmax.
-- **Heads:** pool the weighted features, apply twelve independent classifier vectors and biases,
-  and train with the masked soft-target BCE plus the half-knee loss.
+- **Heads:** with `plane_readout`, score each token with its series type's classifier vector and
+  pool the scores with the attention weights; otherwise pool the weighted features and apply one
+  classifier vector per label. Twelve biases, and train with the masked soft-target BCE plus the half-knee loss.
 - **Half-knee loss:** one linear detector (`half_knee_detector`, shared by both menisci) scores
   the normalized tokens beyond ±10 mm; a float32 smooth-max per half is trained with soft BCE and
   the class-balance weights against the matching meniscus label, for studies with resolved side,

@@ -21,6 +21,7 @@ from knee_abnormality.modeling.augmentation import (
     sample_contrast_mixing_parameters,
     sample_reflection_parameters,
 )
+from knee_abnormality.modeling.plane_readout import PlaneContrastReadout
 from knee_abnormality.modeling.radimagenet import (
     RADIMAGENET_WEIGHTS,
     radimagenet_state_dict,
@@ -66,6 +67,7 @@ class KneeAbnormalityModel(nn.Module):
         super().__init__()
         target_count = len(targets)
         self.series_dropout = model.series_dropout
+        self.plane_readout = model.plane_readout
         self.augmentation_settings = data
         self.feature_statistics_settings = model.feature_statistics_augmentation
         self.image_augmentation = ImageAugmentation(data)
@@ -166,7 +168,11 @@ class KneeAbnormalityModel(nn.Module):
         self.register_buffer(
             "meniscus_mask_signs", meniscus_mask_signs, persistent=False
         )
-        self.anatomical_log_strength = nn.Parameter(torch.zeros(len(COMPARTMENT_PAIRS)))
+        self.anatomical_log_strength = (
+            nn.Parameter(torch.zeros(len(COMPARTMENT_PAIRS)))
+            if model.anatomical_bias
+            else None
+        )
         self.attention = nn.Sequential(
             nn.Linear(PROJECTION_WIDTH, MIL_ATTENTION_WIDTH),
             nn.Tanh(),
@@ -174,6 +180,9 @@ class KneeAbnormalityModel(nn.Module):
             nn.Linear(MIL_ATTENTION_WIDTH, target_count),
         )
         self.head = nn.Linear(PROJECTION_WIDTH, target_count)
+        if self.plane_readout:
+            with torch.random.fork_rng(devices=[]):
+                self.head = PlaneContrastReadout(self.head, len(data.series_types))
         self.spatial_tokens = SpatialTokens(PROJECTION_WIDTH, data.series_types)
         if data.contrast_mixing_augmentation.probability > 0:
             plane_lookup = self.spatial_tokens.plane_lookup.tolist()
@@ -333,6 +342,7 @@ class KneeAbnormalityModel(nn.Module):
         tokens: torch.Tensor,
         values: torch.Tensor,
         token_study: torch.Tensor,
+        image_type: torch.Tensor,
         token_valid: torch.Tensor,
         batch_size: int,
         medial_axis: torch.Tensor,
@@ -340,10 +350,11 @@ class KneeAbnormalityModel(nn.Module):
         trusted_geometry: torch.Tensor,
     ) -> torch.Tensor:
         scores = self.attention(tokens).transpose(0, 1)
-        strengths = self.anatomical_log_strength.float().exp()
-        signs = self.compartment_signs * strengths[self.compartment_families]
-        scaled_axis = medial_axis.float()[None] / 20.0
-        scores = scores.float() + signs[:, None] * torch.tanh(scaled_axis)
+        if self.anatomical_log_strength is not None:
+            strengths = self.anatomical_log_strength.float().exp()
+            signs = self.compartment_signs * strengths[self.compartment_families]
+            scaled_axis = medial_axis.float()[None] / 20.0
+            scores = scores.float() + signs[:, None] * torch.tanh(scaled_axis)
         membership = (
             torch.arange(batch_size, device=tokens.device)[:, None] == token_study[None]
         ) & token_valid[None]
@@ -360,10 +371,15 @@ class KneeAbnormalityModel(nn.Module):
         with torch.autocast(device_type=tokens.device.type, enabled=False):
             attention = scores.float().unsqueeze(0).expand(batch_size, -1, -1)
             attention = attention.masked_fill(~allowed, -torch.inf).softmax(-1)
-            pooled = torch.einsum("btn,nf->btf", attention, values.float())
-            logits = (pooled * self.head.weight.float()[None]).sum(
-                -1
-            ) + self.head.bias.float()
+            if self.plane_readout:
+                evidence = self.head(values, image_type)
+                logits = torch.einsum("btn,nt->bt", attention, evidence)
+                logits = logits + self.head.bias.float()
+            else:
+                pooled = torch.einsum("btn,nf->btf", attention, values.float())
+                logits = (pooled * self.head.weight.float()[None]).sum(
+                    -1
+                ) + self.head.bias.float()
             regions = (
                 torch.stack(
                     (
@@ -503,6 +519,7 @@ class KneeAbnormalityModel(nn.Module):
             **self.spatial_tokens(xy, token_type, features.dtype),
             "study": token_study,
             "image_plane": token_plane,
+            "image_type": token_type,
             "visual_valid": visual_valid,
             "medial_axis": medial_axis,
             "anterior_axis": anterior_axis,
@@ -530,6 +547,7 @@ class KneeAbnormalityModel(nn.Module):
             tokens,
             values,
             encoded["study"][:, None].expand_as(encoded["visual_valid"]).flatten(),
+            encoded["image_type"],
             encoded["visual_valid"].flatten(),
             encoded["batch_size"],
             encoded["medial_axis"].flatten(),

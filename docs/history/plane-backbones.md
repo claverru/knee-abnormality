@@ -35,6 +35,16 @@ Nothing entered `main`. The code is in:
   `outputs/autoresearch/plane-specialization/experiments/<run>/source/`, and the three-ReXNet run's
   `outputs/training/20260928-105516-rexnet-plane-dense-fusion/source_snapshot.zip`.
 
+## ResNet-18 and ResNet-10t retake (2026-10-01)
+
+The [revisits campaign](../validation/results/2026-10-01-revisits-campaign.md) rebuilt plane backbones on the RadImageNet ResNet-18 recipe: three
+copies of the pretrained backbone, each anchored by L2-SP and with DSU inside it. With the joint pool
+and plane-contrast readouts, three ResNet-18s tied one (×4 +0.0000, 9% more training time) and
+added nothing to a ReXNet-200 blend; three ResNet-10ts gained about +0.0023 over one ResNet-10t but
+stayed 0.0023 below one ResNet-18. Dense per-plane readouts with learned fusion lost on both
+(−0.0057, −0.0095). The code lives in the campaign's frozen sources,
+`outputs/autoresearch/revisits/experiments/*-plane-backbones-*/source/`.
+
 ## What carries forward
 
 - Averaging near-equal runs gained +0.0026 locally, a seed-ensemble effect for the

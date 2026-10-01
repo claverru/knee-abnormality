@@ -1,0 +1,44 @@
+ideas:
+- id: refined-rn50-incumbent-recipe
+  mechanism_id: backbone-refined-resnet50
+  parent_idea_id: null
+  title: Refined-RadImageNet ResNet-50 in place of ResNet-18 with the incumbent recipe, backbone LR
+    5e-5, ten epochs (user seed)
+  opportunity: 'User decision, 2026-10-01: the Refined-RadImageNet family reports RadImageNet macro F1
+    0.3998 (ResNet-10t), 0.4545 (ResNet-18) and 0.5097 (ResNet-50), and the ResNet-10t loss on this
+    recipe (-0.0053) tracks its weaker checkpoint. ResNet-50 from the same source, trained with the
+    same torchvision recipe, is the stronger checkpoint. It replaces the withdrawn original-RadImageNet
+    ResNet-50 seeds.'
+  mechanism: 'model.backbone resnet50.a1_in1k with model.pretrained_weights radimagenet, loading the
+    Refined-RadImageNet ResNet-50 checkpoint; every other setting as the incumbent (backbone_lr 5e-5,
+    head_lr 6e-4, L2-SP 0.01 on conv1/bn1/layer1 and 0.001 on the rest, plane-contrast readouts, no
+    anatomical bias, ImageNet mean/std as for the other Refined checkpoints, augmentation, 26
+    triplets, batch 8, ten epochs). Ten epochs are kept so the comparison is fair (user, 2026-10-01);
+    the user raised the campaign''s training-time limit to 1.65 x the reference (about 2,016 s) for
+    it. ResNet-50 cost about 170 s per epoch on the older recipe with series dropout 0.2 and about
+    11% more without it, so ten epochs project about 1,870 s.'
+  precedents:
+  - 'Checkpoint: https://huggingface.co/convergedmachine/RadImagenet/resolve/7fa62dccee2b14e49188d11c4b0e66d88c29b41e/resnet50.pth,
+    saved as ~/.cache/torch/hub/checkpoints/refined_radimagenet_resnet50.pth, 191,145,887 bytes,
+    SHA-256 b6daa90de92589c404e9da30f4c0ce49182763d4a952f1222caeec647237bacf. A training checkpoint
+    (model, optimizer, lr_scheduler, epoch 89, args: torchvision recipe, SGD lr 0.1, 90 epochs,
+    AutoAugment imagenet, CutMix 1.0); model keys carry the _orig_mod. prefix and load strictly into
+    timm resnet50 with num_classes 165 (checked 2026-10-01). Median convolution RMS 0.0136.'
+  - 'docs/research/radimagenet-weights.md#refined-radimagenet-resnets.'
+  - 'outputs/training/20260928-180252-radimagenet-resnet50-lr3e-4: about 170 s per epoch for ResNet-50.'
+  novelty: First Refined-RadImageNet ResNet-50 run.
+  coverage: All studies and labels.
+  exploitation: Per-epoch x1 and per-stage drift against the incumbent; training seconds per epoch.
+  budget: About 1,870 s for ten epochs, inside the raised 611-2,016 s range.
+  implementation: Add a "resnet50.a1_in1k" entry to RADIMAGENET_WEIGHTS in modeling/radimagenet.py
+    (file refined_radimagenet_resnet50.pth, the SHA-256 above, the URL above, layout refined); add
+    resnet50.a1_in1k wherever resnet50.tv_in1k is registered for spatial-token mapping and the DSU
+    stride-8 split (modeling/spatial_tokens.py and the DSU hook); configs/training.yaml sets
+    model.backbone resnet50.a1_in1k; trainer.max_epochs stays 10. The original resnet50.tv_in1k entry and
+    its loading stay unchanged. Confirm the L2-SP early-anchor names match conv1, bn1 and layer1.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: User seed.
+exhausted_directions: 'Original RadImageNet ResNet-50 (resnet50.tv_in1k): withdrawn by the user on
+  2026-10-01 in favour of the Refined checkpoint. A separate weight-RMS-scaled rate is not run:
+  the rule gives 5.5e-5, within 10% of 5e-5.'

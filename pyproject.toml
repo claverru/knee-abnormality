@@ -30,6 +30,7 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "plotly==7.1.0",
     "ruff==0.16.6",
     "rust-just==1.58.0",
 ]

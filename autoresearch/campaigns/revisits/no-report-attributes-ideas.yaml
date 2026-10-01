@@ -1,0 +1,28 @@
+ideas:
+- id: no-report-attribute-heads
+  mechanism_id: report-attribute-removal
+  parent_idea_id: null
+  title: Remove the report-attribute auxiliary heads and their loss from the incumbent (user seed)
+  opportunity: 'User decision, 2026-10-01: a removal check of the report-attribute heads, the last
+    seed of the campaign. They were adopted on ReXNet (+0.00105 locally, 0.940 public against 0.938)
+    and never re-checked on ResNet-18; tonight halving their weight (rn18-report-attributes-005,
+    -0.0004) and the attributes-v4 variants changed little.'
+  mechanism: 'Build no report-attribute heads and add no report-attribute loss: the 35 JevK5 attribute
+    heads, their targets and the trainer.report_attribute_loss_weight term are all absent. Everything
+    else exactly as the incumbent at this seed''s turn.'
+  precedents:
+  - 'docs/modeling/report-attribute-heads.md and docs/validation/results/2026-09-25-report-attribute-heads.md.'
+  - 'revisits: rn18-report-attributes-005 (weight 0.05, -0.0004).'
+  novelty: First removal of the attribute heads on ResNet-18.
+  coverage: All studies and labels.
+  exploitation: Per-label AUC against the incumbent, in particular MCL and Contusion (the labels that
+    gained when the heads were adopted) and Fracture and Baker's (the labels that lost).
+  budget: Slightly cheaper than the incumbent.
+  implementation: A model or trainer option that disables the report-attribute heads (the incumbent's
+    behaviour as the value that reproduces it), since report_attribute_loss_weight must stay positive;
+    with the option off, the heads are not constructed, the attribute targets are not loaded into the
+    loss, and no attribute metrics are logged.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: User seed; the last run before the campaign stops.
+exhausted_directions: None.
