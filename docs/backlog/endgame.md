@@ -71,6 +71,12 @@ has never been tested, see [input resolution](../research/input-resolution.md)).
 full-slice model at `data.spacing_mm: 0.5` and `data.image_size: 280`, which keeps the 140 mm field
 and the sampler's 70 mm in-plane radius.
 
+*Update, 2026-10-01:* the ResNet recipes now read 120 mm at 0.536 mm and 224 px, which took the
+resolution gain by narrowing the field (+0.004 public, S90 against S86). A bigger image would
+now buy the field back at that pixel size: 140 mm is 261 px and 160 mm is 299 px at 0.536 mm.
+At 224 px a 160 mm field added nothing in five designs, but there it cost resolution
+([result](../validation/results/2026-10-01-mixed-field-campaign.md)).
+
 - *Motivation:* per-label crops at 0.5 mm gained over `00-baseline` on ACL (+0.0111), synovitis
   (+0.0077) and medial OA (+0.0057)
   ([result](../validation/results/2026-09-16-per-label-crops-result.md#per-target-auc)). Learned

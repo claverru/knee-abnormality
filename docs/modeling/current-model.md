@@ -8,7 +8,8 @@ defined by [`configs/training.yaml`](../../configs/training.yaml). Since
 [adoption history](#adoption-history).
 
 - **Inputs:** a RadImageNet-pretrained ResNet-18 reads every sampled triplet's middle slice,
-  repeated on all three channels, at 224 px, 0.625 mm spacing and a 140 mm field. The same
+  repeated on all three channels, at 224 px, 0.536 mm spacing and a 120 mm field (since
+  2026-10-01; 0.625 mm and 140 mm before, which the ReXNet recipe keeps). The same
   recipe on the Refined-RadImageNet ResNet-50 is
   [`configs/refined-resnet50.yaml`](../../configs/refined-resnet50.yaml), the submission model
   (+0.0046 ×4 at 1.65× the training time); ResNet-18 stays the control because what helps it has
@@ -34,7 +35,9 @@ defined by [`configs/training.yaml`](../../configs/training.yaml). Since
   decay ([result](../validation/results/2026-09-30-rn18-l2sp-no-confusion.md)). The ReXNet
   recipe keeps the [scanner confusion head](scanner-confusion-head.md) instead.
 - **Augmentation (training only):** reflection, contrast mixing, affine, bilateral smoothing,
-  one-axis resolution degradation, gamma/contrast, GIN, noise and DSU feature statistics
+  one-axis resolution degradation, gamma/contrast, GIN, noise and DSU feature statistics, run
+  on the middle slice alone when the model reads only that slice (since 2026-10-01); mirror
+  TTA does the same at inference
   ([pipeline](schedule-and-augmentation.md#ten-epoch-schedule-and-augmentation)).
 
 There is no additive 3D embedding or token graph. Submission status lives in
@@ -52,6 +55,7 @@ comparable.
 
 | Adopted | Change | Evidence | Control after adoption |
 |---|---|---|---|
+| 2026-10-01 | 120 mm field at 224 px (`data.spacing_mm` 0.5357, from 0.625 and 140 mm) on ResNet-18 and the ResNet-50 config; reflection, contrast mixing, augmentation and mirror TTA run on the middle slice only in `repeated_middle` mode | On the 2026-09-30 recipe, one run each: 120 mm +0.0011 and +0.0012 ×4 (80% [−0.0004, +0.0026] and [−0.0003, +0.0028]); 0.947 public (S90) against 0.943 (S86) at the same inference settings; middle-slice augmentation neutral (+0.0001, −0.0004) and 6–8% faster per epoch, predictions bit-identical ([result](../validation/results/2026-10-01-mixed-field-campaign.md)) | Not retrained yet: both evidence runs predate the plane-contrast readouts ([next](../ongoing/next.md)) |
 | 2026-10-01 | Plane-contrast readouts added and the anatomical attention bias removed, on ResNet-18 and the new Refined ResNet-50 config; ResNet-18 stays the control | In the revisits campaign, one run each: +0.0009 ×4 (80% [+0.0001, +0.0017]) and +0.0009 (80% [+0.0002, +0.0016]), both just under the rule's +0.001 and adopted by the user; the Refined ResNet-50 on the result scored 0.948 public (S88) and 0.951 with ReXNet (S89) ([result](../validation/results/2026-10-01-revisits-campaign.md)) | `no-anatomical-bias` (campaign run, ×4 0.929835) |
 | 2026-09-30 | L2-SP weight anchoring added and the scanner confusion head removed, on ResNet-18 only | Fold-0 tie, ×4 +0.00026 (95% [−0.0013, +0.0018]), and 0.943 public (S86) against 0.943 (S82); adopted for unseen-site robustness, measured on the sites-out splits: +0.0015, +0.0009 and +0.0023 held-out ([result](../validation/results/2026-09-30-rn18-l2sp-no-confusion.md)) | No retrain: the adopted run `rn18-l2sp-no-confusion` (`outputs/training/rn18-l2sp-no-confusion`), seed 1533697213, v2 fold 0: ×4 0.928062; fold and seed kept by user decision |
 | 2026-09-29 | RadImageNet ResNet-18 with the repeated middle slice, `backbone_lr` 5e-5 and no series dropout replaces ReXNet-200 (kept as `configs/rexnet-200.yaml`) | Ties ReXNet publicly (0.944, S79, the 36-triplet version, against S78) at 63% of the training time; no series dropout +0.0023 in the [campaign](../../autoresearch/campaigns/radimagenet-rn18/INDEX.md); the two ensemble to 0.949 (S80) | `rn18-no-series-dropout` (`outputs/autoresearch/radimagenet-rn18/experiments/rn18-no-series-dropout-20260928T213320Z-0b780262`), seed 1533697213, v2 fold 0: ×4 0.927806 |
@@ -83,7 +87,7 @@ bands; the experimental ten-epoch schedule was reverted. Historical
 | Setting | Value |
 |---|---|
 | Inputs | Three adjacent slices per input (`SLICES_PER_INPUT`, a constant) |
-| `data.image_size`, `data.spacing_mm` | 224, 0.625 (140 mm) |
+| `data.image_size`, `data.spacing_mm` | 224, 0.5357 (120 mm; 0.625 and 140 mm in the ReXNet recipe) |
 | `data.sampling_sigma_fraction`, `data.validation_image_multiplier` | 0.867, 1 (×2 before 2026-09-17; scores differ by about 0.0035, and submissions set their own count) |
 | Training triplet draws | One independent random draw per probability band at each epoch; [implemented sampler](../data-preparation/physical-sampling/implemented-sampler.md) |
 | `trainer.class_balance_exponent` | `0.5` |

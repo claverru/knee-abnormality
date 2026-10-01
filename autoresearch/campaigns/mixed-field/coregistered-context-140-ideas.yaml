@@ -1,0 +1,39 @@
+ideas:
+- id: coregistered-context-140
+  mechanism_id: paired-two-stream
+  parent_idea_id: null
+  title: Two streams with the 140 mm features added to each 120 mm token at its position, plus the
+    ring as extra tokens
+  opportunity: >-
+    In two-stream-paired most of the 140 mm view repeats the 120 mm one as separate tokens and
+    competes with it in the pool. Adding the 140 mm features to the 120 mm token at the same place
+    gives each detail token its context once and keeps only the ring outside 120 mm as new tokens.
+    Conditional seed: it is forced only if two-stream-paired beat field-120-single (+0.001135).
+  mechanism: >-
+    Views, backbones and learning rates as two-stream-paired (ResNet-18 at 120 mm, ResNet-10t at
+    140 mm, every slice at both), but both views of a slice share every augmentation draw, so the
+    120 mm window is the central 86% of the 140 mm view. The 140 mm feature map is sampled
+    bilinearly at the millimetre position of each 120 mm token, projected by a zero-initialized
+    linear layer and added to that token. 140 mm tokens whose centre lies outside the 120 mm window
+    stay in the joint pool with the field embedding; the other 140 mm tokens are dropped.
+  precedents:
+  - 'two-stream-paired in this campaign (its result is the condition for this seed).'
+  - 'Multi-scale review: concatenation and mean fusion ignored the fine-only signal, per-location
+    fusion recovered it (docs/research/multiscale-features-knee-mri.md).'
+  - 'GLNet-style global and local branches fuse feature maps by position
+    (docs/research/learned-crop-selection.md).'
+  novelty: Position-wise fusion of two fields of one slice; no earlier run registered two views.
+  coverage: All studies and labels, every slice at both fields.
+  exploitation: The norm of the added context relative to the token per epoch; the share of
+    attention mass on ring tokens per label; per-label AUC against two-stream-paired.
+  budget: As two-stream-paired, with fewer tokens in the pool.
+  implementation: >-
+    As two-stream-paired, taken from its frozen source, with shared augmentation draws for the two
+    views of a slice, the position-wise sampling and projection in modeling/, and the ring selection
+    from the tokens' millimetre positions. Replaces the incumbent's field policy.
+  open_choices: The slice count two-stream-paired settled on for the time range.
+  dependencies: []
+  priority_rationale: Removes the redundancy that makes paired views expensive in the pool; only
+    worth a run if the paired design itself helped.
+exhausted_directions: Replaces the withdrawn coregistered-context seed, whose second stream was at
+  160 mm; 160 mm added nothing in any shared-backbone design.

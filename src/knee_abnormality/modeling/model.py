@@ -436,22 +436,27 @@ class KneeAbnormalityModel(nn.Module):
             flat_indices
         ] & torch.isfinite(patient_maps[:, 1]).all((-1, -2))
 
-        valid_images = (
-            batch["images"].flatten(0, 1)[flat_indices].to(torch.float32).div_(255.0)
-        )
+        images = batch["images"].flatten(0, 1)
+        source_valid_rects = valid_rects
+        if self.repeated_middle_slice:
+            images = images[:, 1:2]
+            valid_rects = valid_rects[:, 1:2]
+        valid_images = images[flat_indices].to(torch.float32).div_(255.0)
         acquisition_index = slice_mask.nonzero(as_tuple=True)[0]
         token_study = study_index[acquisition_index]
         token_type = type_index[acquisition_index]
         reflected = reflected_study[token_study]
         token_plane = self.spatial_tokens.plane_lookup[token_type]
         sagittal = token_plane == 2
+        channels = reflection_channels(reflected, sagittal)
+        if self.repeated_middle_slice:
+            channels = channels[:, 1:2]
         if (
             self.training
             and self.augmentation_settings.reflection_augmentation.probability > 0
         ):
             valid_images = apply_reflection(valid_images, reflected, sagittal)
         positions = reflection_positions(positions, reflected, sagittal)
-        channels = reflection_channels(reflected, sagittal)
         valid_images = self._mix_contrast(
             valid_images,
             effective,
@@ -473,15 +478,14 @@ class KneeAbnormalityModel(nn.Module):
             inverse_affine, reflected, sagittal, valid_images.shape[-1]
         )
         if self.repeated_middle_slice:
-            valid_images = valid_images[:, 1:2].expand(-1, SLICES_PER_INPUT, -1, -1)
-            channels = channels[:, 1:2].expand_as(channels)
+            valid_images = valid_images.expand(-1, SLICES_PER_INPUT, -1, -1)
         valid_images = valid_images.sub(self.mean).div_(self.std)
         if self.channels_last:
             valid_images = valid_images.contiguous(memory_format=torch.channels_last)
         maps = self._encode_images(valid_images, acquisition_index, token_type)
         features = self.projection(maps.flatten(2).transpose(1, 2))
         xy, visual_valid, prepared_xy = feature_geometry(
-            valid_rects,
+            source_valid_rects,
             inverse_affine,
             maps.shape[-2:],
             valid_images.shape[-2:],

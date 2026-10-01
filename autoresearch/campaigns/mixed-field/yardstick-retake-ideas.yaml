@@ -1,0 +1,43 @@
+ideas:
+- id: field-160-single-logged
+  mechanism_id: single-field
+  parent_idea_id: null
+  title: Single 160 mm field at 224 px (0.714 mm) for every slice, with the field-share columns
+    logged
+  opportunity: >-
+    The 140 mm window clips more than 10 mm of tissue in 34% of sagittal, 16% of axial and 9% of
+    coronal series; at 160 mm that falls to 2%, 6% and 0% (prior-work.md, Geometry). Nothing has
+    measured what the ring is worth on the current recipe, and a mixed result cannot be read
+    without it. Retake of field-160-single, which was blocked because its text restricted it to
+    configs/training.yaml while every prepared candidate needs a logged activation column.
+  mechanism: >-
+    data.spacing_mm 0.7142857142857143 (160/224) in training, validation and prediction, plus
+    logging-only instrumentation: the Lightning module logs field_share_120, field_share_140 and
+    field_share_160 per epoch for training and validation, the share of slices the model received
+    at each field, measured from the decoded pixel size the batch carries. No other change to
+    training behaviour.
+  precedents:
+  - '150 to 140 mm at 224 px gained +0.003 local and +0.007 public on ReXNet-200, confounded with
+    the sharper spacing (docs/research/input-resolution.md).'
+  - 'Learned zoom read every slice at 0.875 mm and lost 0.0228, almost all on detail labels;
+    effusion gained 0.006 (docs/history/crop-selection-investigation.md).'
+  - 'field-160-single: both attempts blocked on the activation-signature conflict; its
+    one-line configuration change was reviewed as correct.'
+  novelty: First field change on ResNet-18, rebuild_state_v2 and all_5fold_scanner_v2.
+  coverage: All studies and labels; expected to help Baker's cyst, MCL and fracture and to cost
+    ACL and the menisci.
+  exploitation: Per-label AUC against the incumbent, read by the periphery and detail groups of
+    prior-work.md; it is the width yardstick for every later seed.
+  budget: Same as the reference (1,222 s).
+  implementation: >-
+    configs/training.yaml sets the spacing. training/lightning.py logs the three field_share
+    columns, with data code touched only if the batch must carry its spacing; the logging changes
+    no random draw and no tensor the model trains on. Activation signature: field_share_160 >= 1
+    at epoch 0. The crop radius used for source ranking follows the field; that is accepted for
+    the two single-field yardsticks only. This is not a configuration-only idea: the logging
+    instrumentation is authorized (campaign keeper, 2026-10-01).
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Yardstick; needed to read the mixed-field seeds.
+exhausted_directions: None. This file only re-queues the width yardstick after a wording conflict in
+  its seed text; no result exists yet.

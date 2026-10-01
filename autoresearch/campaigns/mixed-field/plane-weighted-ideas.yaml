@@ -1,0 +1,51 @@
+ideas:
+- id: plane-weighted-fields
+  mechanism_id: mixed-field-shared-backbone
+  parent_idea_id: null
+  title: Mostly 120 mm, with 160 mm on half of the axial and a quarter of the sagittal slices and
+    none of the coronal ones
+  opportunity: >-
+    The two single-field runs say detail is worth more than width: 120 mm beats 160 mm by 0.0046
+    (95% [+0.0016, +0.0076]) and leads on nine labels, clearly on the lateral meniscus, ACL, medial
+    OA and effusion; 160 mm leads outside noise only on synovitis (+0.0097, [+0.0012, +0.0189]).
+    An even split wastes half the slices on the weaker field: mixed-field-140-160 lost 0.0013 and
+    its wide tokens alone scored below its narrow ones. So the wide field should get fewer slices,
+    placed in the planes where it can help and costs least. Axial contributes almost nothing to the
+    menisci and ACL and carries the fluid findings; synovitis is read equally from axial and
+    sagittal, and sagittal is the plane the 140 mm window clips most (34% of series); coronal
+    carries MCL, the medial meniscus and medial OA and is clipped least (9%).
+  mechanism: >-
+    Field policy: within each series type of a study the selected slices are ordered by depth.
+    Axial series: odd depth ranks are decoded at 160 mm, even ranks at 120 mm. Sagittal series:
+    ranks with rank modulo 4 equal to 2 at 160 mm, the others at 120 mm. Coronal series: every
+    slice at 120 mm. Validation and prediction use exactly these ranks; in training the rank
+    offset is drawn per study, series type and epoch, keeping each plane's share. Each token adds
+    the zero-initialized learned embedding of its slice's field. One shared backbone and the joint
+    attention pool, unchanged. About a fifth of the slices end up at 160 mm.
+  precedents:
+  - 'field-120-single +0.0011 (80% [-0.0004, +0.0026]), field-160-single-logged -0.0034,
+    mixed-field-140-160 -0.0013 with val_macro_auc_field_narrow 0.9079 against field_wide 0.9035
+    (this campaign).'
+  - 'Direct 120 against 160 comparison per label: outputs/analysis/mixed-field-120-vs-160.'
+  - 'Single-plane inference on the ReXNet control (older split and labels): axial alone loses
+    0.15-0.22 on the menisci and 0.084 on ACL but only 0.006 on effusion and 0.001 on Baker''s
+    cyst; synovitis loses 0.017 from axial or sagittal alone
+    (docs/validation/results/2026-09-27-single-plane-inference.md).'
+  novelty: Unequal field shares that differ by plane; the earlier mixes split every series evenly.
+  coverage: All studies and labels. Coronal and most sagittal slices keep full 120 mm detail; the
+    wide slices sit where effusion, Baker's cyst and synovitis are read.
+  exploitation: field_share_120 and field_share_160 overall and per plane; val_macro_auc_field_narrow
+    and val_macro_auc_field_wide per label; per-label AUC against field-120-single and
+    mixed-field-120-160, with synovitis, effusion and the lateral meniscus as the labels to watch.
+  budget: Same slices and epochs as the reference.
+  implementation: >-
+    Take the mixed-field loader, field embedding and per-field diagnostics from
+    mixed-field-120-160's frozen source if the incumbent lacks them, and make the wide ranks a
+    per-plane setting in data.field (config.py): every second rank for axial, every fourth for
+    sagittal, none for coronal. Log field_share_160 per plane. Slice selection keeps the 140 mm
+    radius. Replaces the incumbent's field policy.
+  open_choices: None; the shares are fixed by the user's request (fewer wide slices than narrow,
+    weighted to the planes that can use them), not swept.
+  dependencies: []
+  priority_rationale: User seed, 2026-10-01; the evidence-weighted version of the even mix.
+exhausted_directions: None. This file adds one user seed after the first four results.

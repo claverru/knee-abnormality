@@ -17,7 +17,8 @@ measured outcomes are in the [validation results](../validation/results/INDEX.md
   version of A2, scored 0.947 public (S76) against 0.946 for S73, one rounding step; A2's fold-0
   control scored 0.944 (S78), not comparable with those fold-4 runs. The autoresearch gate requires both the label source and the split.
 - **Model:** the [current model](../modeling/current-model.md), since 2026-09-29 on a
-  RadImageNet ResNet-18 (`configs/training.yaml`): repeated middle slice, `backbone_lr` 5e-5, no
+  RadImageNet ResNet-18 (`configs/training.yaml`): repeated middle slice at 224 px and 0.536 mm, a
+  120 mm field (since 2026-10-01, with augmentation on that slice only), `backbone_lr` 5e-5, no
   series dropout, 26 triplets, spatial tokens with knee geometry, plane-contrast readouts and no
   anatomical attention bias (since 2026-10-01), the three-compartment OA detector, training-only
   report-attribute heads, L2-SP weight anchoring (since 2026-09-30, which also removed the scanner
@@ -35,9 +36,14 @@ measured outcomes are in the [validation results](../validation/results/INDEX.md
 
 ## Current control
 
+- **No control on the recipe in force yet.** The 2026-10-01 field adoption (120 mm, middle-slice
+  augmentation) changed `configs/training.yaml` after `no-anatomical-bias` was trained, and its
+  evidence runs predate the plane-contrast readouts. Retrain the control before pairing
+  candidates ([next](next.md)).
 - **`no-anatomical-bias`**
   (`outputs/autoresearch/revisits/experiments/no-anatomical-bias-20260930T213145Z-58126164/training`),
-  the `configs/training.yaml` recipe since 2026-10-01 apart from name and paths: ×4 0.929835 (×1
+  the `configs/training.yaml` recipe of 2026-10-01 before the field adoption (140 mm), apart from
+  name and paths: ×4 0.929835 (×1
   0.925999, epoch 9 of 10, fold 0, seed 1533697213), no public score. Every candidate pairs with it
   at its fold and seed. It was trained in the revisits campaign, so exports use its archived
   `source/` ([result](../validation/results/2026-10-01-revisits-campaign.md)).
@@ -72,7 +78,9 @@ measured outcomes are in the [validation results](../validation/results/INDEX.md
   ([RadImageNet backbones](radimagenet-backbone.md)).
 - **0.948:** S67, the scanner confusion head candidate, a single fold-3 model at ×4 and τ 0.75
   ([evidence](../modeling/scanner-confusion-head.md#evidence)).
-- **0.947:** S68 (`half-stack-control`), S69 (per-site bias,
+- **0.947:** S90, the ResNet-18 at 120 mm with middle-slice augmentation on the 2026-09-30
+  recipe, ×4 and τ 0.9, against 0.943 for its reference S86; S91, the contrast split at 112 and
+  140 mm, scored 0.945 ([result](../validation/results/2026-10-01-mixed-field-campaign.md)). Also S68 (`half-stack-control`), S69 (per-site bias,
   [auxiliary-signals campaign](../validation/results/2026-09-27-auxiliary-signals-campaign.md)) and
   S76 (the label rebuild's state table A, [label rebuild](../public-labels/label-rebuild.md#status)).
 - **Ensembles:** the 2026-09-19 ten-member bundle of five EfficientNet-B0 and five ReXNet-200 fold
@@ -130,6 +138,11 @@ measured outcomes are in the [validation results](../validation/results/INDEX.md
 
 ## Recently closed
 
+- **2026-10-01:** the `mixed-field` autoresearch campaign (a 160 mm view beside a narrower one at
+  224 px), stopped by the user after its forced seeds, and two manual runs: 120 mm on every
+  series and middle-slice augmentation adopted; 160 mm added nothing in five designs; the
+  contrast split (T1/PD 112 mm, fluid 140 mm) ties 120 mm and was not adopted; two views per
+  slice stayed untested ([result](../validation/results/2026-10-01-mixed-field-campaign.md)).
 - **2026-10-01:** the `revisits` autoresearch campaign on ResNet-18, stopped by the user:
   plane-contrast readouts and removal of the anatomical bias adopted, and the Refined ResNet-50
   (+0.0046) added as `configs/refined-resnet50.yaml`; one backbone per plane ties; EMA and 18

@@ -1,0 +1,93 @@
+id: mixed-field
+recipe: configs/training.yaml
+reference_run: outputs/training/rn18-l2sp-no-confusion
+reference_equivalences: {}
+reference_config_exceptions:
+  - paths.label_manifest
+  - paths.report_attribute_manifest
+additional_evidence_runs: []
+backlog:
+  refill_below: 3
+  refill_to: 5
+  seed_order: forced
+  rotate_after: 6
+budget:
+  mode: range
+  min_fraction: 0.5
+  max_fraction: 1.5
+policy:
+  editable_files:
+    - configs/training.yaml
+    - src/knee_abnormality/config.py
+    - src/knee_abnormality/data/dataset.py
+    - src/knee_abnormality/training/lightning.py
+    - src/knee_abnormality/inference/engine.py
+  editable_directories:
+    - src/knee_abnormality/modeling
+    - src/knee_abnormality/data/preprocessing
+  config_keys:
+    - trainer.max_epochs
+    - trainer.batch_size
+    - trainer.accumulate_grad_batches
+    - data.spacing_mm
+    - data.study_triplet_total
+  config_prefixes:
+    - model
+    - data.field
+  list_item_fields: {}
+  input_identity_keys:
+    - preprocessing_identity
+  require_source_change: false
+  configuration_only_ideas: true
+  developer_instructions: >-
+    The incumbent is the RadImageNet ResNet-18 recipe in configs/training.yaml (repeated middle
+    slice, 224 px at 0.625 mm, a 140 mm field, 26 slices per study, L2-SP anchoring). Every idea
+    states a complete field policy (contract.md, Field policy) that replaces the incumbent's;
+    keep every non-field mechanism the incumbent has. Configuration-only ideas change
+    configs/training.yaml only. Fields are 120, 140 and 160 mm only (130 mm and, since the user's
+    decision of 2026-10-01, 112 mm only where the idea names them), each decoded from the native
+    image at 224 px and its own spacing (0.5 mm for 112 mm, 120/224, 0.625 and 160/224 mm),
+    image-centred; never rescale the 140 mm crop. Slice selection is untouched: pool building,
+    source ranking and triplet selection keep the 140 mm radius, so the candidate reads the
+    reference's slices and only their decoded field differs. The field policy lives in a new
+    data.field section of config.py, with the incumbent's single 140 mm field as the value that
+    reproduces it, and in data/dataset.py and data/preprocessing; do not touch DICOM decoding,
+    series filtering or cleaning. Each slice carries its field to the model, and the patient maps
+    and valid rectangles are built for that slice's spacing, so the millimetre axes of the OA
+    detector and half-knee masks stay correct. Token awareness, readouts, extra backbones and
+    fusion live in modeling/; the x4 prediction path in inference/engine.py changes only where a
+    second backbone or view needs it. Training fields may be random, drawn from the run seed, study,
+    series type, operation and epoch as the sampler does; validation and prediction fields are a
+    fixed function of study, series type and depth rank, and the validation dataset receives no
+    training seed. Log per epoch field_share_120, field_share_140 and field_share_160 (and
+    field_share_112 where the idea uses 112 mm) for training and validation, the idea's own mechanism scalar, and, when validation uses two fields,
+    val_macro_auc_field_narrow and val_macro_auc_field_wide (macro and per label, pooling only that
+    field's tokens of the same x1 validation input; diagnostics that select nothing). Keep the
+    image size 224, the series types, the augmentation settings, the loss terms and their weights
+    and the evaluation untouched. Keep 26 slices per study and ten epochs unless the idea reads
+    each slice twice; then lower data.study_triplet_total or trainer.max_epochs only as far as the
+    range needs. The training time must stay within 611-1,833 s (the reference takes 1,222 s, about
+    122 s per epoch, and peaks at 10.1 GiB). New parameters initialize under a forked RNG, and a new
+    embedding or added projection starts at zero so the first step reproduces the incumbent's
+    function of its input. No trained model in the loader, no weight averaging. Return prepared or
+    blocked. Use the existing Python environment for static checks. No tests.
+  researcher_instructions: >-
+    Research starts after the ten forced seeds. The question is how to give the model a wide
+    160 mm view for the periphery and a narrow one for detail at 224 px: which slices get which
+    field, how the tokens and readouts use the field, and whether a second backbone or a second
+    view of the same slice pays for its time. Start every refill from run_curves and the per-field
+    columns (field_share_*, val_macro_auc_field_narrow and _wide, per label) of every decided run
+    against the incumbent, read per label against the periphery group (Baker's cyst, MCL, fracture)
+    and the detail group (ACL, menisci, cartilage labels) of prior-work.md, and name the behaviour
+    each proposal targets. Extend mechanisms that helped and retry a failed one only with a named
+    change. Every proposal states its complete field policy. Fields are 120, 140 and 160 mm, plus
+    112 mm (0.5 mm, the most common acquired resolution; user decision, 2026-10-01): no other field
+    size, no sweep of the field or of the share of slices per field. The one allowed
+    field substitution is 130 mm for 120 mm in a design that shows each slice at a single field,
+    and only when its per-field AUC shows the periphery labels losing. Configuration-only ideas are
+    welcome, but every refill carries at least one idea that needs a source change. Stay inside the
+    training-time range (611-1,833 s). Excluded: image sizes above 224, more slices or images per
+    study, ensembling and test-time augmentation, foveated or non-uniform resampling, crops and
+    scout networks that choose where to look, dense per-field readouts with their own loss, trained
+    models in the loader, weight averaging, reflection-probability changes, the class-balance
+    exponent, label changes, gold weighting and multi-seed runs.

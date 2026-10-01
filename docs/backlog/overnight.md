@@ -13,7 +13,18 @@ from this file.
 
 ## Next queue
 
-Empty. The control is the revisits campaign's `no-anatomical-bias` run since 2026-10-01; that
+One entry, which waits for the control to be retrained on the recipe in force
+([next](../ongoing/next.md)):
+
+- **112 mm field** (`data.spacing_mm: 0.5`; guess, low to medium). 0.5 mm is the most common
+  acquired resolution: half of all series are fully resolved at it against 30% at the adopted
+  0.536 mm, and the contrast split, with T1/PD series at 112 mm, tied 120 mm alone. Against it:
+  112 mm cuts more than 20 mm from the front of the knee in about 15% of sagittal series (8% at
+  120 mm), and the medial meniscus already falls at 120 mm
+  ([result](../validation/results/2026-10-01-mixed-field-campaign.md#what-the-runs-established),
+  [geometry](../research/input-resolution.md#what-a-narrow-field-cuts)).
+
+The revisits
 campaign also ran 18 hyperparameter values on ResNet-18 without a gain
 ([result](../validation/results/2026-10-01-revisits-campaign.md#other-runs)), so do not repeat them.
 The ReXNet-era entries were cleared on 2026-09-29, when the champion became the RadImageNet

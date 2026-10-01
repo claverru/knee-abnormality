@@ -31,6 +31,7 @@ findings doc holds the question, method, command and result.
 | [analyze_physical_sampling.py](analyze_physical_sampling.py) | How does production physical sampling and its fallback behave on the geometry cohort? | [Physical sampling](../../docs/data-preparation/physical-sampling/implementation-verification.md) |
 | [audit_sampling_protocols.py](audit_sampling_protocols.py) | What sequence metadata separates repeated plane-contrast groups? | [Sampling cohort and rules](../../docs/data-preparation/physical-sampling/sampling-analysis-cohort-and-rules.md) |
 | [analyze_study_center_extents.py](analyze_study_center_extents.py) | How much of each plane lies on either side of the fitted study centre? | [Accurate sampling centres](../../docs/data-preparation/accurate-sampling-centers.md#cohort-wide-center-fit-and-plane-extents) |
+| [check_narrow_field_fit.py](check_narrow_field_fit.py) | What does an image-centred 120 or 130 mm field cut (tissue depth per side, tibia below the joint line, overlays)? | [What a narrow field cuts](../../docs/research/input-resolution.md#what-a-narrow-field-cuts) |
 | [measure_intensity_bound_stability.py](measure_intensity_bound_stability.py) | How far do intensity clipping bounds move between draws and triplets? | [Preprocessing profile](../../docs/data-preparation/preprocessing-implementation-and-profile.md) |
 
 ## Loading speed and profiling
