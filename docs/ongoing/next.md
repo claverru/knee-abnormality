@@ -22,9 +22,6 @@ Pending:
 - **Re-measure the B0 gap under class-balanced BCE** before pricing the next efficiency recipe:
   the [backbone and fold comparisons](efficientnet-backbones.md#established-evidence) used ordinary
   BCE.
-- **Retrain the ResNet-18 control on the recipe in force** (user launches): `configs/training.yaml`
-  now combines the plane-contrast readouts with the 2026-10-01 field adoption (120 mm,
-  middle-slice augmentation), a combination no run has trained. Decide the fold and seed first;
-  the last two adoptions kept fold 0 and seed 1533697213. The 120 mm spacing is also in
-  `configs/refined-resnet50.yaml`, untested on that backbone
+- **Train the Refined ResNet-50 at 120 mm** (user launches): the spacing adopted on 2026-10-01 is
+  also in `configs/refined-resnet50.yaml` and is untested on that backbone
   ([result](../validation/results/2026-10-01-mixed-field-campaign.md#adoption)).

@@ -36,16 +36,16 @@ measured outcomes are in the [validation results](../validation/results/INDEX.md
 
 ## Current control
 
-- **No control on the recipe in force yet.** The 2026-10-01 field adoption (120 mm, middle-slice
-  augmentation) changed `configs/training.yaml` after `no-anatomical-bias` was trained, and its
-  evidence runs predate the plane-contrast readouts. Retrain the control before pairing
-  candidates ([next](next.md)).
+- **`rn18-field-120-control`** (`outputs/training/rn18-field-120-control`), the
+  `configs/training.yaml` recipe in force: ×4 0.930666 (×1 0.927479, epoch 9 of 10, fold 0, seed
+  1533697213), 0.947 public (S92), trained on 2026-10-01 from `main` at `6a99439`. Every candidate
+  pairs with it at its fold and seed. Fold and seed were kept
+  ([result](../validation/results/2026-10-01-mixed-field-campaign.md#control-on-the-adopted-recipe)).
 - **`no-anatomical-bias`**
   (`outputs/autoresearch/revisits/experiments/no-anatomical-bias-20260930T213145Z-58126164/training`),
-  the `configs/training.yaml` recipe of 2026-10-01 before the field adoption (140 mm), apart from
-  name and paths: ×4 0.929835 (×1
-  0.925999, epoch 9 of 10, fold 0, seed 1533697213), no public score. Every candidate pairs with it
-  at its fold and seed. It was trained in the revisits campaign, so exports use its archived
+  the same recipe before the field adoption (140 mm), apart from name and paths: ×4 0.929835 (×1
+  0.925999, epoch 9 of 10, fold 0, seed 1533697213), no public score, the control before the
+  field adoption. It was trained in the revisits campaign, so exports use its archived
   `source/` ([result](../validation/results/2026-10-01-revisits-campaign.md)).
 - **`refined-rn50-incumbent-recipe`**
   (`outputs/autoresearch/revisits/experiments/refined-rn50-incumbent-recipe-20261001T081909Z-71e68a1d/training`),
@@ -78,9 +78,10 @@ measured outcomes are in the [validation results](../validation/results/INDEX.md
   ([RadImageNet backbones](radimagenet-backbone.md)).
 - **0.948:** S67, the scanner confusion head candidate, a single fold-3 model at ×4 and τ 0.75
   ([evidence](../modeling/scanner-confusion-head.md#evidence)).
-- **0.947:** S90, the ResNet-18 at 120 mm with middle-slice augmentation on the 2026-09-30
-  recipe, ×4 and τ 0.9, against 0.943 for its reference S86; S91, the contrast split at 112 and
-  140 mm, scored 0.945 ([result](../validation/results/2026-10-01-mixed-field-campaign.md)). Also S68 (`half-stack-control`), S69 (per-site bias,
+- **0.947:** S92, the current control (120 mm with plane-contrast readouts), and S90, the
+  ResNet-18 at 120 mm with middle-slice augmentation on the 2026-09-30 recipe, both at ×4 and
+  τ 0.9, against 0.943 for S86; S91, the contrast split at 112 and 140 mm, scored 0.945
+  ([result](../validation/results/2026-10-01-mixed-field-campaign.md)). Also S68 (`half-stack-control`), S69 (per-site bias,
   [auxiliary-signals campaign](../validation/results/2026-09-27-auxiliary-signals-campaign.md)) and
   S76 (the label rebuild's state table A, [label rebuild](../public-labels/label-rebuild.md#status)).
 - **Ensembles:** the 2026-09-19 ten-member bundle of five EfficientNet-B0 and five ReXNet-200 fold
