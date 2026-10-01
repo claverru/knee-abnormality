@@ -206,7 +206,15 @@ def predict_loader(
             if copy_events is not None:
                 copy_events[1].record()
             batch = with_images(batch)
-            mirrored = reflect_batch(batch, sagittal) if reflection_tta else None
+            mirrored = (
+                reflect_batch(
+                    batch,
+                    sagittal,
+                    all(model.repeated_middle_slice for model in models),
+                )
+                if reflection_tta
+                else None
+            )
             with torch.autocast(
                 device_type=device.type,
                 dtype=autocast_dtype,

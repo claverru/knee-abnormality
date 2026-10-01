@@ -5,19 +5,24 @@ def sagittal_types(series_types) -> torch.Tensor:
     return torch.tensor([kind.plane == "Sagittal" for kind in series_types])
 
 
-def reflect_batch(batch: dict, sagittal_lookup: torch.Tensor) -> dict:
+def reflect_batch(
+    batch: dict, sagittal_lookup: torch.Tensor, middle_only: bool
+) -> dict:
     reflected = batch["reflection_eligible"][batch["series_study_index"]]
     sagittal = sagittal_lookup.to(reflected.device)[batch["series_type_index"]]
     mirror = reflected & ~sagittal
     reverse = reflected & sagittal
-    images = batch["images"]
-    rects = batch["valid_rects"]
-    positions = batch["slice_positions"]
-    patient_maps = batch["patient_maps"]
-    if mirror.any() or reverse.any():
+    if not (mirror.any() or reverse.any()):
+        return batch
+    slices = batch["images"].shape[2]
+    kept = slice(1, 2) if middle_only else slice(None)
+    images = batch["images"][:, :, kept]
+    rects = batch["valid_rects"][:, :, kept]
+    positions = batch["slice_positions"].clone()
+    patient_maps = batch["patient_maps"][:, :, kept]
+    if mirror.any() or not middle_only:
         images = images.clone()
         rects = rects.clone()
-        positions = positions.clone()
         patient_maps = patient_maps.clone()
     if mirror.any():
         images[mirror] = images[mirror].flip(-1)
@@ -29,14 +34,15 @@ def reflect_batch(batch: dict, sagittal_lookup: torch.Tensor) -> dict:
         reversal[0, 2] = images.shape[-1] - 1
         patient_maps[mirror] = patient_maps[mirror] @ reversal
     if reverse.any():
-        images[reverse] = images[reverse].flip(2)
-        rects[reverse] = rects[reverse].flip(2)
         positions[reverse] = -positions[reverse]
-        patient_maps[reverse] = patient_maps[reverse].flip(2)
+        if not middle_only:
+            images[reverse] = images[reverse].flip(2)
+            rects[reverse] = rects[reverse].flip(2)
+            patient_maps[reverse] = patient_maps[reverse].flip(2)
     return {
         **batch,
-        "images": images,
-        "valid_rects": rects,
+        "images": images.expand(-1, -1, slices, -1, -1),
+        "valid_rects": rects.expand(-1, -1, slices, -1),
         "slice_positions": positions,
-        "patient_maps": patient_maps,
+        "patient_maps": patient_maps.expand(-1, -1, slices, -1, -1),
     }

@@ -9,7 +9,13 @@ controlled resolution test.
 
 ## Answer
 
-Today's 224 px / 0.625 mm / 140 mm input discards some real in-plane detail and clips
+**Since 2026-10-01 the ResNet recipes use 224 px / 0.536 mm / 120 mm**: every run with a
+narrower, finer field beat the 140 mm reference, 160 mm added nothing in five designs, and
+120 mm scored 0.947 public against 0.943
+([result](../validation/results/2026-10-01-mixed-field-campaign.md)). The measurements below
+were taken on the earlier input and explain why.
+
+The 224 px / 0.625 mm / 140 mm input discards some real in-plane detail and clips
 posterior soft tissue in a third of sagittal series. Finer than about 0.5 mm adds almost
 nothing, because the stored ~0.31 mm images are interpolated. Depth sampling, with triplets
 about 17 mm apart at 1×, is a larger gap than in-plane resolution.
@@ -73,6 +79,10 @@ the [end of the competition](../backlog/endgame.md#bigger-images).
   up–down, tissue in the other direction) at the fixed 140 mm / 0.625 mm window is in scope of the
   [sampling campaign](../../autoresearch/campaigns/sampling/contract.md). Spacing stays shared and
   unchanged; the field-of-view part of the decision below stands.
+- **Decision, 2026-10-01 (user): 120 mm on every series,** which supersedes the decision below
+  for the ResNet recipes. A wider field is closed at 224 px; placement stays image-centred and
+  no per-plane or per-contrast field is used
+  ([result](../validation/results/2026-10-01-mixed-field-campaign.md)).
 - **Decision, 2026-09-21: no field-of-view change on the current recipe.** Neither a
   tissue-centred crop nor a wider field, and no per-plane spacing, is pursued. Tissue centring
   moves the window a few millimetres and never vertically, because the leg crosses the top and
@@ -88,11 +98,72 @@ the [end of the competition](../backlog/endgame.md#bigger-images).
 - **Joint line:** a median 12.7 mm (sagittal) and 16.8 mm (coronal) below the native image
   centre, more than 25 mm off in 6% and 16%. The heuristic is cross-checked within 10 mm
   between planes in 96–98% of studies.
+- **Narrower than 140 mm:** [what a 120 or 130 mm field cuts](#what-a-narrow-field-cuts).
 - **Past crop results agree:**
   - 150 → 140 mm at 224 px (0.67 → 0.625 mm) gave +0.003 local and +0.007 public.
   - 130 and 128 mm crops tied overall but lost on MCL, Baker's, effusion and medial meniscus.
   - That 140-mm gain also raised resolution, so the two effects are confounded.
 - Resolution at a fixed field of view has never been tested here.
+
+### What a narrow field cuts
+
+Measured on 2026-10-01 for the mixed-field campaign draft (a 160 mm view beside a narrower one,
+both at 224 px), with [`check_narrow_field_fit`](../../scripts/adhoc/check_narrow_field_fit.py):
+
+```bash
+rtk proxy uv run --locked python -m scripts.adhoc.check_narrow_field_fit \
+  --output-dir outputs/analysis/narrow-field-fit-20261001
+```
+
+It reuses the tissue edges and joint-line offsets of the 300-series sample above (292 with a usable
+mask, middle slice, image-centred fields as the loader crops them) and draws 24 series per plane
+with the fields overlaid. Artifacts: `clip_depth.csv`, `joint_margin.csv` and three contact sheets
+in `outputs/analysis/narrow-field-fit-20261001/`. Shares are population-weighted; with 96–99 series
+per plane a share near 30% carries about ±9 points.
+
+**An image-centred 120 mm field (0.536 mm) holds the tibiofemoral joint and cuts the periphery.**
+
+| Tissue cut, measured from the skin | 120 mm | 130 mm | 140 mm |
+|---|---:|---:|---:|
+| Sagittal anterior (patella side), over 10 mm | 38% | 17% | 8% |
+| Sagittal anterior, over 20 mm | 8% | 1% | 0% |
+| Sagittal posterior (popliteal fossa), over 20 mm | 34% | 7% | 1% |
+| Coronal medial or lateral, over 10 mm | 30–31% | 13% | 5–6% |
+| Coronal medial or lateral, over 20 mm | 5–6% | 0–1% | 0% |
+| Axial anterior, over 10 mm | 11% | 4% | 3% |
+| Axial posterior, over 20 mm | 11% | 7% | 5% |
+
+| Tibia left below the joint line | 120 mm | 130 mm | 140 mm |
+|---|---:|---:|---:|
+| Median, sagittal / coronal | 47 / 45 mm | 52 / 50 mm | 57 / 55 mm |
+| Under 40 mm, sagittal / coronal | 22% / 28% | 8% / 13% | 3% / 4% |
+| Under 30 mm, sagittal / coronal | 3% / 4% | 1% / 3% | 0% / 2% |
+
+- **Contact sheets (qualitative, 72 tiles at about 320 px each).** On every knee-centred tile the
+  condyles, tibial plateau, menisci and cruciates lie inside the 120 mm window. Its anterior edge
+  runs at or through the front of the patella on a minority of sagittal and axial tiles, with the
+  patellar cartilage still inside, and it cuts the popliteal soft tissue on most. Five axial tiles
+  are not knee-centred (100 mm and 300 mm stored fields) and say nothing about the field.
+- **Reading the depths is a guess.** Which structure a given depth reaches (patellar cortex,
+  collateral ligaments, a popliteal cyst) depends on subcutaneous thickness, which is not
+  measured; no bone or ligament mask exists.
+- **Image-centred placement suits a narrow field.** With the joint line 13–15 mm below the image
+  centre, a 120 mm window keeps a median 73–75 mm above it, where the patella and suprapatellar
+  recess are, and 45–47 mm below; centring on the joint line would take room from the patella.
+- **Consequence for the campaign draft.** 120 mm is a detail view of the central joint (cruciates,
+  menisci, tibiofemoral and patellar cartilage). The labels read at the periphery (Baker's cyst,
+  MCL, fracture below the plateau) depend on the 160 mm view, so a design that shows a slice at
+  120 mm only loses them on that slice. 130 mm halves most of the cuts for 8% coarser pixels.
+- **Acquired resolution by field** (header audit, 23,173 series, counted 2026-10-01 from
+  `acquisition/series_acquisition.parquet`): the share of series whose finer acquired axis is
+  at or above the pixel size is 15% at 140 mm, 30% at 120 mm, 50% at 112 mm (0.5 mm exactly,
+  the most common value, 13% of series), 70% at 100 mm and 91% at 84 mm. T1/PD series are
+  acquired finer than fluid-sensitive ones: 36% against 61% resolved at 112 mm.
+- **Outcome:** 120 mm was the narrow field of the
+  [mixed-field campaign](../../autoresearch/campaigns/mixed-field/INDEX.md) and was adopted for
+  every series on 2026-10-01; the periphery labels moved little (MCL and fracture flat, Baker's
+  cyst −0.003 to −0.005, within noise), and the medial meniscus fell in every 120 mm run
+  ([result](../validation/results/2026-10-01-mixed-field-campaign.md#what-the-runs-established)).
 
 ## Evidence from the crop runs
 

@@ -139,6 +139,27 @@ hypothesis: no auxiliary objective had trained active in this project when it wa
   directory, `training/lightning.py`, `config.py`, `trainer.loss`) and add `modeling/model.py`
   for the heads, plus any label-source access the report-state targets need.
 
+## Two views per slice
+
+**Untested; the one attempt never switched its second stream on (added 2026-10-01).** Read every
+slice at the adopted 120 mm and again at 140 mm, so each label can use detail and the wider
+window on the same slice without halving depth density.
+
+- **Evidence for:** taking each label's better field from the single-field runs would be worth
+  about +0.002 over the 140 mm reference, against +0.0011 for 120 mm alone: synovitis, Baker's
+  cyst and the medial meniscus prefer 140 mm. The 120/160 mix scored well above the average of
+  its two fields ([result](../validation/results/2026-10-01-mixed-field-campaign.md#what-the-runs-established)).
+- **Evidence against:** the contrast split, which gives each series one of the two fields, only
+  tied 120 mm alone, and one backbone per field lost.
+- **What the attempt showed:** with the loader reading each slice once and augmentation on the
+  middle slice, a ResNet-18 at 120 mm plus a ResNet-10t at 140 mm takes about 173 s per epoch
+  (1.4× the reference). Its pool was `narrow + tanh(gate) × (joint − narrow)` with a zero gate,
+  which starved the second stream of gradient.
+- **Design constraint:** both streams feed the joint pool from the first step, with no gate; the
+  activation check must compare the joint score with the narrow-only score, not test for a
+  non-zero value.
+- **Test:** one run against the retrained control at its fold and seed.
+
 ## Hard-pair mining phase
 
 **One unverified external report; untested here (added 2026-09-25).** Another participant says

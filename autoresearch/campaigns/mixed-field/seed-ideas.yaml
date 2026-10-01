@@ -1,0 +1,166 @@
+ideas:
+- id: field-160-single
+  mechanism_id: single-field
+  parent_idea_id: null
+  title: Single 160 mm field at 224 px (0.714 mm) for every slice
+  opportunity: >-
+    The 140 mm window clips more than 10 mm of tissue in 34% of sagittal, 16% of axial and 9% of
+    coronal series; at 160 mm that falls to 2%, 6% and 0% (prior-work.md, Geometry). Nothing has
+    measured what the ring is worth on the current recipe, and a mixed result cannot be read
+    without it.
+  mechanism: >-
+    data.spacing_mm 0.7142857142857143 (160/224) in training, validation and prediction; nothing
+    else changes.
+  precedents:
+  - '150 to 140 mm at 224 px gained +0.003 local and +0.007 public on ReXNet-200, confounded with
+    the sharper spacing (docs/research/input-resolution.md).'
+  - 'Learned zoom read every slice at 0.875 mm and lost 0.0228, almost all on detail labels;
+    effusion gained 0.006 (docs/history/crop-selection-investigation.md).'
+  novelty: First field change on ResNet-18, rebuild_state_v2 and all_5fold_scanner_v2.
+  coverage: All studies and labels; expected to help Baker's cyst, MCL and fracture and to cost
+    ACL and the menisci.
+  exploitation: Per-label AUC against the incumbent, read by the periphery and detail groups of
+    prior-work.md; it is the width yardstick for every later seed.
+  budget: Same as the reference (1,222 s).
+  implementation: Configuration-only change to the incumbent recipe. The crop radius used for source
+    ranking follows the field; that is accepted for the two single-field yardsticks only.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Yardstick; free to build and needed to read seeds 3 to 10.
+- id: field-120-single
+  mechanism_id: single-field
+  parent_idea_id: null
+  title: Single 120 mm field at 224 px (0.536 mm) for every slice
+  opportunity: >-
+    Only 23% of series keep their full acquired detail at 0.625 mm against 59% at 0.5 mm, and
+    0.5 mm crops gained on ACL (+0.011), synovitis (+0.008) and medial OA (+0.006). The 120 mm
+    window keeps the central joint inside on every checked series but cuts the periphery
+    (prior-work.md, Geometry).
+  mechanism: >-
+    data.spacing_mm 0.5357142857142857 (120/224) in training, validation and prediction, plus
+    logging-only instrumentation: the Lightning module logs field_share_120, field_share_140 and
+    field_share_160 per epoch for training and validation, the share of slices the model received
+    at each field, measured from the decoded pixel size the batch carries. No other change to
+    training behaviour.
+  precedents:
+  - 'Per-label crops, 112 mm at 0.5 mm on 75% of slices: -0.0011 overall, ACL +0.0111, lateral
+    meniscus -0.0102, fracture -0.0085 (docs/history/crop-selection-investigation.md).'
+  - '130 mm at 224 px tied overall and lost on MCL, Baker''s cyst, effusion and medial meniscus
+    (docs/research/input-resolution.md).'
+  novelty: Resolution finer than 0.625 mm on every slice has never been run at any field.
+  coverage: All studies and labels; expected to help ACL, menisci and cartilage labels and to cost
+    Baker's cyst, MCL and fracture.
+  exploitation: Per-label AUC against the incumbent and against field-160-single; it is the detail
+    yardstick for every later seed.
+  budget: Same as the reference (1,222 s).
+  implementation: >-
+    configs/training.yaml sets the spacing. training/lightning.py logs the three field_share
+    columns, with data code touched only if the batch must carry its spacing; the logging changes
+    no random draw and no tensor the model trains on. Activation signature: field_share_120 >= 1
+    at epoch 0. The crop radius used for source ranking follows the field; that is accepted for
+    the two single-field yardsticks only. This is not a configuration-only idea: the logging
+    instrumentation is authorized (campaign keeper, 2026-10-01). If the incumbent source already
+    logs these columns, reuse them.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Yardstick; free to build and needed to read seeds 3 to 10.
+- id: field-jitter
+  mechanism_id: field-jitter
+  parent_idea_id: null
+  title: Random field per training slice from 120, 140 and 160 mm with real pixels; validation at
+    140 mm
+  opportunity: >-
+    The affine augmentation rescales the already-cropped 140 mm image by 0.95 to 1.05, so the model
+    never sees tissue outside 140 mm nor detail finer than 0.625 mm. Decoding training slices at
+    other fields adds both as augmentation while inference stays exactly the incumbent's.
+  mechanism: >-
+    Field policy: in training each selected slice is decoded at 120, 140 or 160 mm with equal
+    probability, one draw per slice from the run seed, study, series type, operation and epoch;
+    validation and prediction decode every slice at 140 mm. No field embedding and no other model
+    change. The affine augmentation keeps its scale range.
+  precedents:
+  - 'Scale augmentation by resampling is standard in multi-scale training of detectors; here the
+    wider draws add real anatomy instead of padding.'
+  - 'docs/research/input-resolution.md: the stored field of view is 160 mm at the median, so the
+    ring holds real pixels in about half the series.'
+  novelty: No run has varied the decoded field during training.
+  coverage: All studies and labels; inference inputs are unchanged.
+  exploitation: field_share_120, field_share_140 and field_share_160 per epoch; training loss and
+    x1 validation curves against the incumbent; per-label AUC.
+  budget: Same slices and epochs as the reference; decoding at three spacings may slow the loader
+    slightly.
+  implementation: >-
+    Add the field policy to a new data.field section of config.py with the single 140 mm field as
+    the value that reproduces the incumbent. data/dataset.py decodes each selected slice at its
+    drawn spacing with the patient maps and valid rectangles built for that spacing; slice
+    selection keeps the 140 mm radius. Replaces the incumbent's field policy.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Cheapest source change; leaves inference untouched and tells whether the model
+    tolerates the three fields before any seed mixes them at inference.
+- id: mixed-field-140-160
+  mechanism_id: mixed-field-shared-backbone
+  parent_idea_id: null
+  title: Alternate 140 mm and 160 mm slices by depth, with a field embedding on the tokens
+  opportunity: >-
+    Splitting the slice budget between the incumbent's field and the wide one gives the model the
+    clipped periphery at no extra compute. It differs from the reference only by the wide slices,
+    so it isolates what adding them is worth.
+  mechanism: >-
+    Field policy: within each series type of a study the selected slices are ordered by depth and
+    alternate between the narrow field (140 mm) and the wide field (160 mm). In validation and
+    prediction even depth ranks are narrow and odd ranks wide; in training the starting field is
+    drawn per study, series type and epoch. Each token adds a learned 256-wide embedding of its
+    slice's field, initialized at zero. One shared backbone and the joint attention pool, unchanged.
+  precedents:
+  - 'Tissue clipped at 140 mm: 34% of sagittal series, 2% at 160 mm (prior-work.md, Geometry).'
+  - 'position_2d is built from normalized image coordinates, so tokens need to be told their field
+    (prior-work.md, Code facts).'
+  novelty: No run has mixed fields in one study.
+  coverage: All studies and labels; each field is sampled at half the depth density, so x1
+    checkpoint selection sees about two slices per field and series type.
+  exploitation: field_share_140 and field_share_160; val_macro_auc_field_narrow and
+    val_macro_auc_field_wide per label; the norm of the field embedding per epoch.
+  budget: Same slices and epochs as the reference.
+  implementation: >-
+    Field policy in data.field (config.py), data/dataset.py and data/preprocessing; the field
+    embedding and the per-field diagnostic pooling in modeling/. Slice selection keeps the 140 mm
+    radius. Replaces the incumbent's field policy; if field-jitter was adopted, this policy
+    supersedes it.
+  open_choices: None; the two fields share the slices equally.
+  dependencies: []
+  priority_rationale: The user's base design and the smallest step from the reference that uses the
+    wide field at inference.
+- id: mixed-field-120-160
+  mechanism_id: mixed-field-shared-backbone
+  parent_idea_id: null
+  title: Alternate 120 mm and 160 mm slices by depth, with a field embedding on the tokens
+  opportunity: >-
+    140 and 160 mm differ by 14% in scale and show nearly the same content. A 120 mm narrow field
+    reaches 0.536 mm, where the acquired detail survives in most series, and leaves the periphery
+    to the 160 mm slices, so the two fields complement each other.
+  mechanism: >-
+    The field policy, field embedding and joint pool of mixed-field-140-160 with the narrow field at
+    120 mm: even depth ranks 120 mm and odd ranks 160 mm in validation and prediction, the starting
+    field drawn per study, series type and epoch in training.
+  precedents:
+  - '0.5 mm crops: ACL +0.0111, synovitis +0.0077, medial OA +0.0057
+    (docs/history/crop-selection-investigation.md).'
+  - 'What 120 mm cuts, measured 2026-10-01: the central joint stays inside; more than 20 mm of
+    popliteal tissue is cut in 34% of sagittal series
+    (docs/research/input-resolution.md#what-a-narrow-field-cuts).'
+  novelty: No run has paired a field narrower than 140 mm with a wider one.
+  coverage: All studies and labels; slices decoded at 120 mm carry no periphery, so Baker's cyst,
+    MCL and fracture rest on the 160 mm slices of each series.
+  exploitation: field_share_120 and field_share_160; val_macro_auc_field_narrow and
+    val_macro_auc_field_wide per label against field-120-single and field-160-single; the norm of
+    the field embedding per epoch.
+  budget: Same slices and epochs as the reference.
+  implementation: >-
+    As mixed-field-140-160 with the narrow field set to 120 mm. If that seed was rejected, take its
+    loader and embedding from its frozen source. Replaces the incumbent's field policy.
+  open_choices: 130 mm as the narrow field if the per-field AUC shows the periphery labels losing.
+  dependencies: []
+  priority_rationale: The complementary field pair at the reference's compute.
+exhausted_directions: None yet. No run has changed the field on the current recipe; the earlier
+  field and crop runs are on ReXNet-200 and older labels (prior-work.md).

@@ -9,7 +9,9 @@ Channels retain their slice order and use the selected ReXNet and historical
 RA2 checkpoints' ImageNet normalization: mean `[0.485, 0.456, 0.406]` and standard deviation
 `[0.229, 0.224, 0.225]` (`data.mean` and `data.std` take exactly three values), after dividing
 uint8 pixels by 255. The training config prepares 224 px
-triplets at 0.625 mm, covering **140 × 140 mm**, following the
+triplets at 0.536 mm, covering **120 × 120 mm** (since 2026-10-01,
+[result](../validation/results/2026-10-01-mixed-field-campaign.md); the ReXNet recipe keeps
+0.625 mm and 140 mm), after the
 [completed crop comparison](../validation/results/2026-09-12-140-mm-crop-result.md). The dropped
 [crop-selection investigation](../history/crop-selection-investigation.md#recipes) used 300 px
 canvases at 0.5 mm, and then 360 px canvases at 0.4167 mm for learned zoom.

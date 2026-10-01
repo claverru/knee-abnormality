@@ -1,0 +1,666 @@
+revision: 258
+ideas:
+- id: field-160-single
+  mechanism_id: single-field
+  parent_idea_id: null
+  title: Single 160 mm field at 224 px (0.714 mm) for every slice
+  opportunity: The 140 mm window clips more than 10 mm of tissue in 34% of sagittal,
+    16% of axial and 9% of coronal series; at 160 mm that falls to 2%, 6% and 0% (prior-work.md,
+    Geometry). Nothing has measured what the ring is worth on the current recipe,
+    and a mixed result cannot be read without it.
+  mechanism: data.spacing_mm 0.7142857142857143 (160/224) in training, validation
+    and prediction; nothing else changes.
+  precedents:
+  - 150 to 140 mm at 224 px gained +0.003 local and +0.007 public on ReXNet-200, confounded
+    with the sharper spacing (docs/research/input-resolution.md).
+  - Learned zoom read every slice at 0.875 mm and lost 0.0228, almost all on detail
+    labels; effusion gained 0.006 (docs/history/crop-selection-investigation.md).
+  novelty: First field change on ResNet-18, rebuild_state_v2 and all_5fold_scanner_v2.
+  coverage: All studies and labels; expected to help Baker's cyst, MCL and fracture
+    and to cost ACL and the menisci.
+  exploitation: Per-label AUC against the incumbent, read by the periphery and detail
+    groups of prior-work.md; it is the width yardstick for every later seed.
+  budget: Same as the reference (1,222 s).
+  implementation: Configuration-only change to the incumbent recipe. The crop radius
+    used for source ranking follows the field; that is accepted for the two single-field
+    yardsticks only.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Yardstick; free to build and needed to read seeds 3 to 10.
+  status: blocked
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality-mixed-field/autoresearch/campaigns/mixed-field/seed-ideas.yaml
+  experiments:
+  - field-160-single-20261001T122735Z-46fa33e9
+  - field-160-single-20261001T123110Z-095af0ac
+  blocked_reason: 'Block and park field-160-single at its own implementation review:
+    its one bounded repair is exhausted and the activation gate remains failed. No
+    authorization resolving the configuration-only instrumentation conflict appears
+    in the supplied evidence. The explicit ranking contains every remaining live queue
+    entry exactly once, preserving their order and placing the logged 160 mm replacement
+    first. No proposals are admitted.'
+- id: field-120-single
+  mechanism_id: single-field
+  parent_idea_id: null
+  title: Single 120 mm field at 224 px (0.536 mm) for every slice
+  opportunity: Only 23% of series keep their full acquired detail at 0.625 mm against
+    59% at 0.5 mm, and 0.5 mm crops gained on ACL (+0.011), synovitis (+0.008) and
+    medial OA (+0.006). The 120 mm window keeps the central joint inside on every
+    checked series but cuts the periphery (prior-work.md, Geometry).
+  mechanism: 'data.spacing_mm 0.5357142857142857 (120/224) in training, validation
+    and prediction, plus logging-only instrumentation: the Lightning module logs field_share_120,
+    field_share_140 and field_share_160 per epoch for training and validation, the
+    share of slices the model received at each field, measured from the decoded pixel
+    size the batch carries. No other change to training behaviour.'
+  precedents:
+  - 'Per-label crops, 112 mm at 0.5 mm on 75% of slices: -0.0011 overall, ACL +0.0111,
+    lateral meniscus -0.0102, fracture -0.0085 (docs/history/crop-selection-investigation.md).'
+  - 130 mm at 224 px tied overall and lost on MCL, Baker's cyst, effusion and medial
+    meniscus (docs/research/input-resolution.md).
+  novelty: Resolution finer than 0.625 mm on every slice has never been run at any
+    field.
+  coverage: All studies and labels; expected to help ACL, menisci and cartilage labels
+    and to cost Baker's cyst, MCL and fracture.
+  exploitation: Per-label AUC against the incumbent and against field-160-single;
+    it is the detail yardstick for every later seed.
+  budget: Same as the reference (1,222 s).
+  implementation: 'configs/training.yaml sets the spacing. training/lightning.py logs
+    the three field_share columns, with data code touched only if the batch must carry
+    its spacing; the logging changes no random draw and no tensor the model trains
+    on. Activation signature: field_share_120 >= 1 at epoch 0. The crop radius used
+    for source ranking follows the field; that is accepted for the two single-field
+    yardsticks only. This is not a configuration-only idea: the logging instrumentation
+    is authorized (campaign keeper, 2026-10-01). If the incumbent source already logs
+    these columns, reuse them.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Yardstick; free to build and needed to read seeds 3 to 10.
+  status: completed
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality-mixed-field/autoresearch/campaigns/mixed-field/seed-ideas.yaml
+  ranking_rationale: 'Block and park field-160-single at its own implementation review:
+    its one bounded repair is exhausted and the activation gate remains failed. No
+    authorization resolving the configuration-only instrumentation conflict appears
+    in the supplied evidence. The explicit ranking contains every remaining live queue
+    entry exactly once, preserving their order and placing the logged 160 mm replacement
+    first. No proposals are admitted.'
+  experiments:
+  - field-120-single-20261001T124248Z-36c2ff33
+  decision: reject
+- id: field-jitter
+  mechanism_id: field-jitter
+  parent_idea_id: null
+  title: Random field per training slice from 120, 140 and 160 mm with real pixels;
+    validation at 140 mm
+  opportunity: The affine augmentation rescales the already-cropped 140 mm image by
+    0.95 to 1.05, so the model never sees tissue outside 140 mm nor detail finer than
+    0.625 mm. Decoding training slices at other fields adds both as augmentation while
+    inference stays exactly the incumbent's.
+  mechanism: 'Field policy: in training each selected slice is decoded at 120, 140
+    or 160 mm with equal probability, one draw per slice from the run seed, study,
+    series type, operation and epoch; validation and prediction decode every slice
+    at 140 mm. No field embedding and no other model change. The affine augmentation
+    keeps its scale range.'
+  precedents:
+  - Scale augmentation by resampling is standard in multi-scale training of detectors;
+    here the wider draws add real anatomy instead of padding.
+  - 'docs/research/input-resolution.md: the stored field of view is 160 mm at the
+    median, so the ring holds real pixels in about half the series.'
+  novelty: No run has varied the decoded field during training.
+  coverage: All studies and labels; inference inputs are unchanged.
+  exploitation: field_share_120, field_share_140 and field_share_160 per epoch; training
+    loss and x1 validation curves against the incumbent; per-label AUC.
+  budget: Same slices and epochs as the reference; decoding at three spacings may
+    slow the loader slightly.
+  implementation: Add the field policy to a new data.field section of config.py with
+    the single 140 mm field as the value that reproduces the incumbent. data/dataset.py
+    decodes each selected slice at its drawn spacing with the patient maps and valid
+    rectangles built for that spacing; slice selection keeps the 140 mm radius. Replaces
+    the incumbent's field policy.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Cheapest source change; leaves inference untouched and tells
+    whether the model tolerates the three fields before any seed mixes them at inference.
+  status: completed
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality-mixed-field/autoresearch/campaigns/mixed-field/seed-ideas.yaml
+  ranking_rationale: 'Block and park field-160-single at its own implementation review:
+    its one bounded repair is exhausted and the activation gate remains failed. No
+    authorization resolving the configuration-only instrumentation conflict appears
+    in the supplied evidence. The explicit ranking contains every remaining live queue
+    entry exactly once, preserving their order and placing the logged 160 mm replacement
+    first. No proposals are admitted.'
+  experiments:
+  - field-jitter-20261001T130426Z-a1cbdc93
+  decision: reject
+- id: mixed-field-140-160
+  mechanism_id: mixed-field-shared-backbone
+  parent_idea_id: null
+  title: Alternate 140 mm and 160 mm slices by depth, with a field embedding on the
+    tokens
+  opportunity: Splitting the slice budget between the incumbent's field and the wide
+    one gives the model the clipped periphery at no extra compute. It differs from
+    the reference only by the wide slices, so it isolates what adding them is worth.
+  mechanism: 'Field policy: within each series type of a study the selected slices
+    are ordered by depth and alternate between the narrow field (140 mm) and the wide
+    field (160 mm). In validation and prediction even depth ranks are narrow and odd
+    ranks wide; in training the starting field is drawn per study, series type and
+    epoch. Each token adds a learned 256-wide embedding of its slice''s field, initialized
+    at zero. One shared backbone and the joint attention pool, unchanged.'
+  precedents:
+  - 'Tissue clipped at 140 mm: 34% of sagittal series, 2% at 160 mm (prior-work.md,
+    Geometry).'
+  - position_2d is built from normalized image coordinates, so tokens need to be told
+    their field (prior-work.md, Code facts).
+  novelty: No run has mixed fields in one study.
+  coverage: All studies and labels; each field is sampled at half the depth density,
+    so x1 checkpoint selection sees about two slices per field and series type.
+  exploitation: field_share_140 and field_share_160; val_macro_auc_field_narrow and
+    val_macro_auc_field_wide per label; the norm of the field embedding per epoch.
+  budget: Same slices and epochs as the reference.
+  implementation: Field policy in data.field (config.py), data/dataset.py and data/preprocessing;
+    the field embedding and the per-field diagnostic pooling in modeling/. Slice selection
+    keeps the 140 mm radius. Replaces the incumbent's field policy; if field-jitter
+    was adopted, this policy supersedes it.
+  open_choices: None; the two fields share the slices equally.
+  dependencies: []
+  priority_rationale: The user's base design and the smallest step from the reference
+    that uses the wide field at inference.
+  status: completed
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality-mixed-field/autoresearch/campaigns/mixed-field/seed-ideas.yaml
+  ranking_rationale: 'Block and park field-160-single at its own implementation review:
+    its one bounded repair is exhausted and the activation gate remains failed. No
+    authorization resolving the configuration-only instrumentation conflict appears
+    in the supplied evidence. The explicit ranking contains every remaining live queue
+    entry exactly once, preserving their order and placing the logged 160 mm replacement
+    first. No proposals are admitted.'
+  experiments:
+  - mixed-field-140-160-20261001T132509Z-95b83f62
+  decision: reject
+- id: mixed-field-120-160
+  mechanism_id: mixed-field-shared-backbone
+  parent_idea_id: null
+  title: Alternate 120 mm and 160 mm slices by depth, with a field embedding on the
+    tokens
+  opportunity: 140 and 160 mm differ by 14% in scale and show nearly the same content.
+    A 120 mm narrow field reaches 0.536 mm, where the acquired detail survives in
+    most series, and leaves the periphery to the 160 mm slices, so the two fields
+    complement each other.
+  mechanism: 'The field policy, field embedding and joint pool of mixed-field-140-160
+    with the narrow field at 120 mm: even depth ranks 120 mm and odd ranks 160 mm
+    in validation and prediction, the starting field drawn per study, series type
+    and epoch in training.'
+  precedents:
+  - '0.5 mm crops: ACL +0.0111, synovitis +0.0077, medial OA +0.0057 (docs/history/crop-selection-investigation.md).'
+  - 'What 120 mm cuts, measured 2026-10-01: the central joint stays inside; more than
+    20 mm of popliteal tissue is cut in 34% of sagittal series (docs/research/input-resolution.md#what-a-narrow-field-cuts).'
+  novelty: No run has paired a field narrower than 140 mm with a wider one.
+  coverage: All studies and labels; slices decoded at 120 mm carry no periphery, so
+    Baker's cyst, MCL and fracture rest on the 160 mm slices of each series.
+  exploitation: field_share_120 and field_share_160; val_macro_auc_field_narrow and
+    val_macro_auc_field_wide per label against field-120-single and field-160-single;
+    the norm of the field embedding per epoch.
+  budget: Same slices and epochs as the reference.
+  implementation: As mixed-field-140-160 with the narrow field set to 120 mm. If that
+    seed was rejected, take its loader and embedding from its frozen source. Replaces
+    the incumbent's field policy.
+  open_choices: 130 mm as the narrow field if the per-field AUC shows the periphery
+    labels losing.
+  dependencies: []
+  priority_rationale: The complementary field pair at the reference's compute.
+  status: completed
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality-mixed-field/autoresearch/campaigns/mixed-field/seed-ideas.yaml
+  ranking_rationale: 'Block and park field-160-single at its own implementation review:
+    its one bounded repair is exhausted and the activation gate remains failed. No
+    authorization resolving the configuration-only instrumentation conflict appears
+    in the supplied evidence. The explicit ranking contains every remaining live queue
+    entry exactly once, preserving their order and placing the logged 160 mm replacement
+    first. No proposals are admitted.'
+  experiments:
+  - mixed-field-120-160-20261001T134624Z-da64b1ee
+  decision: reject
+- id: mixed-field-readout-weights
+  mechanism_id: mixed-field-shared-backbone
+  parent_idea_id: null
+  title: Mixed 120/160 mm with per-field readout weights inside the joint attention
+    pool
+  opportunity: 'One linear readout per label collapses evidence from two fields that
+    serve different labels: the wide slices carry Baker''s cyst, MCL and fracture,
+    the narrow ones the central joint. Per-type readout weights in the joint pool
+    were accepted on ResNet-18 for plane and contrast, while dense readouts with their
+    own loss lost 0.0052.'
+  mechanism: The field policy and field embedding of mixed-field-120-160. For each
+    label keep one partial vector per field, u_cf = sum over tokens of field f of
+    alpha_ci * h_i, with the same global attention denominator, and compute z_c =
+    sum_f w_cf . u_cf + b_c. Initialize every w_cf from the shared w_c, which reproduces
+    the single readout at the start. No per-field loss.
+  precedents:
+  - 'revisits campaign, plane-contrast-readouts on ResNet-18: +0.0009, 80% [+0.0001,
+    +0.0017], accepted; dense-plane-readouts: -0.0052 (prior-work.md, Precedent table).'
+  - 'Multi-scale review: a secondary branch counts only with its own readout path
+    (docs/research/multiscale-features-knee-mri.md).'
+  novelty: Readout weights split by field of view, not by plane or contrast.
+  coverage: All studies and labels.
+  exploitation: The divergence of each w_cf from its initialization per epoch and
+    per label; val_macro_auc_field_narrow and val_macro_auc_field_wide per label against
+    mixed-field-120-160.
+  budget: Twice the readout weights; negligible. Same slices and epochs as the reference.
+  implementation: Field policy and embedding as mixed-field-120-160, taken from its
+    frozen source if it was rejected. A new model option in config.py and modeling/model.py
+    for the per-field readout weights; compute the per-field contributions without
+    a large pooling tensor. Replaces the incumbent's field policy and adds to its
+    readout.
+  open_choices: None; initialization is fixed.
+  dependencies: []
+  priority_rationale: The readout form with evidence on ResNet-18, applied where the
+    two token groups differ most.
+  status: completed
+  created_revision: 1
+  seeded: /home/claudio/src/knee-abnormality-mixed-field/autoresearch/campaigns/mixed-field/seed-ideas-2.yaml
+  ranking_rationale: 'Block and park field-160-single at its own implementation review:
+    its one bounded repair is exhausted and the activation gate remains failed. No
+    authorization resolving the configuration-only instrumentation conflict appears
+    in the supplied evidence. The explicit ranking contains every remaining live queue
+    entry exactly once, preserving their order and placing the logged 160 mm replacement
+    first. No proposals are admitted.'
+  experiments:
+  - mixed-field-readout-weights-20261001T140827Z-4be68530
+  decision: reject
+- id: extent-ruled-field
+  mechanism_id: extent-ruled-field
+  parent_idea_id: null
+  title: 140 mm by default, 160 mm for a series whose tissue overhangs the 140 mm
+    window
+  opportunity: Widening every slice costs resolution in series that fit in 140 mm.
+    A third of sagittal series do not fit; a rule on measured tissue extent widens
+    only those and keeps the full depth density at one field per series.
+  mechanism: 'Field policy: each series is decoded at 140 mm unless its tissue mask
+    on the middle slice extends more than 10 mm past the image-centred 140 mm window
+    on an in-plane side that is not along the leg (anterior or posterior in sagittal,
+    left or right in coronal, any side in axial); then all its slices are decoded
+    at 160 mm. The same rule runs in training, validation and prediction. The tissue
+    mask is a threshold rule: smooth by 1.5 mm, take the background from the border
+    strips, threshold at 8% of the way to the 99th percentile, keep the largest component
+    and fill it; a mask covering more than 90% of the image is unusable and keeps
+    140 mm. Tokens add the zero-initialized field embedding.'
+  precedents:
+  - 'Tissue more than 10 mm past 140 mm: 34% of sagittal, 16% of axial and 9% of coronal
+    series (prior-work.md, Geometry); only a wider field removes it, since the tissue
+    is already centred.'
+  - 'The mask and its checks: outputs/analysis/input-resolution-research-20260915/images/common.py
+    (tissue_mask) and scripts/adhoc/check_narrow_field_fit.py.'
+  novelty: A field chosen per series from measured extent; no trained model in the
+    loader.
+  coverage: About a third of sagittal series and a tenth of the others change; the
+    rest keep the reference input exactly.
+  exploitation: field_share_160 per plane and epoch; per-label AUC split by studies
+    with and without a widened series; val_macro_auc_field_narrow and val_macro_auc_field_wide
+    where both occur.
+  budget: One extra native decode of the middle slice per series; same slices and
+    epochs as the reference.
+  implementation: The rule in data/preprocessing, cached per series next to the slice
+    index; field policy in data.field (config.py) and data/dataset.py; field embedding
+    in modeling/. Slice selection keeps the 140 mm radius. Replaces the incumbent's
+    field policy.
+  open_choices: None; the 10 mm threshold is the one the clipping table uses.
+  dependencies: []
+  priority_rationale: The only design that keeps full depth density and follows the
+    measured clipping directly.
+  status: completed
+  created_revision: 1
+  seeded: /home/claudio/src/knee-abnormality-mixed-field/autoresearch/campaigns/mixed-field/seed-ideas-2.yaml
+  ranking_rationale: 'Block and park field-160-single at its own implementation review:
+    its one bounded repair is exhausted and the activation gate remains failed. No
+    authorization resolving the configuration-only instrumentation conflict appears
+    in the supplied evidence. The explicit ranking contains every remaining live queue
+    entry exactly once, preserving their order and placing the logged 160 mm replacement
+    first. No proposals are admitted.'
+  experiments:
+  - extent-ruled-field-20261001T145233Z-e5c2374a
+  decision: reject
+- id: field-backbones-routed
+  mechanism_id: field-backbones
+  parent_idea_id: null
+  title: Mixed 120/160 mm with one ResNet-18 per field, each slice through its field's
+    backbone
+  opportunity: A shared backbone must serve two pixel sizes 33% apart. Unshared weights
+    let each specialize, at the cost of each backbone training on half the slices;
+    against mixed-field-120-160 this measures what unsharing buys.
+  mechanism: The field policy and field embedding of mixed-field-120-160. Two ResNet-18
+    backbones start from the same RadImageNet weights, each anchored to them by L2-SP;
+    a slice goes through the backbone of its field and the feature maps return in
+    the original order to the shared projection and the joint attention pool. No per-field
+    readouts or losses.
+  precedents:
+  - One ResNet-18 per plane with the joint pool tied (+0.00005, revisits); with dense
+    readouts it lost 0.0033 (prior-work.md, Precedent table).
+  - 'Three ReXNet-200 plane backbones: +0.0020 local, tied publicly, +35% training
+    time and twice the Kaggle time (docs/history/plane-backbones.md).'
+  novelty: Backbones split by field of view of the same planes, not by plane.
+  coverage: All studies and labels.
+  exploitation: Per-backbone drift and gradient RMS per stage; val_macro_auc_field_narrow
+    and val_macro_auc_field_wide per label against mixed-field-120-160.
+  budget: Forward compute as the reference; expect up to about 35% more training time,
+    inside the range.
+  implementation: Field policy and embedding as mixed-field-120-160, taken from its
+    frozen source if it was rejected. A new model option for per-field backbones in
+    modeling/, the second backbone initialized under a forked RNG, both in the optimizer's
+    backbone group and the L2-SP term; inference/engine.py captures one fixed-chunk
+    graph per backbone. Replaces the incumbent's field policy.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Low prior (plane backbones tied), but it is the direct test
+    of the user's separate-backbone question at the reference's forward compute.
+  status: completed
+  created_revision: 1
+  seeded: /home/claudio/src/knee-abnormality-mixed-field/autoresearch/campaigns/mixed-field/seed-ideas-2.yaml
+  ranking_rationale: 'Block and park field-160-single at its own implementation review:
+    its one bounded repair is exhausted and the activation gate remains failed. No
+    authorization resolving the configuration-only instrumentation conflict appears
+    in the supplied evidence. The explicit ranking contains every remaining live queue
+    entry exactly once, preserving their order and placing the logged 160 mm replacement
+    first. No proposals are admitted.'
+  experiments:
+  - field-backbones-routed-20261001T151354Z-0c7e4217
+  decision: reject
+- id: two-stream-paired
+  mechanism_id: paired-two-stream
+  parent_idea_id: null
+  title: Every slice at 140 mm through a ResNet-10t and at 120 mm through the ResNet-18,
+    tokens of both in the joint pool
+  opportunity: 'Eight results say the useful pair is a narrow view and the reference
+    view, not 160 mm: 160 mm lost 0.0034 alone and added nothing in any shared-backbone
+    design (even mixes with 140 and 120 mm, plane-weighted, extent-ruled -0.0017),
+    while 120 mm alone gained 0.0011 and lost only on labels that prefer the reference
+    field (synovitis, Baker''s cyst, medial meniscus). Splitting slices between two
+    fields halves each field''s depth density; reading every slice at both 120 and
+    140 mm removes that cost and lets each label use its better field on every slice.
+    Taking each label''s better field from the single-field runs would be worth about
+    0.002.'
+  mechanism: 'Field policy: every selected slice is decoded twice, at 120 mm and at
+    140 mm, in training, validation and prediction. The ResNet-18 reads the 120 mm
+    view; a Refined-RadImageNet ResNet-10t (resnet10t.c3_in1k, backbone learning rate
+    6e-5, L2-SP anchored) reads the 140 mm view. Each stream has its own projection
+    to 256; the tokens of both enter the joint attention pool with the zero-initialized
+    field embedding. The two views of a slice are augmented independently. No per-stream
+    readouts or losses. No slice at 160 mm.'
+  precedents:
+  - 'This campaign: field-120-single +0.0011 (80% [-0.0004, +0.0026]); field-160-single-logged
+    -0.0034; mixed-field-140-160 -0.0013; extent-ruled-field -0.0017; 120 against
+    160 directly +0.0046 (95% [+0.0016, +0.0076]).'
+  - ResNet-10t as the only backbone lost 0.0053 (revisits); here it reads the reference
+    field as a second view beside the ResNet-18.
+  - Halving slice coverage tracked score in the crop runs, which is the case against
+    splitting slices between fields.
+  novelty: Two fields of the same slice through backbones of unequal size; first paired
+    design, and the first to pair 120 mm with the reference field.
+  coverage: All studies and labels, every slice at both fields.
+  exploitation: val_macro_auc_field_narrow (120 mm tokens) and val_macro_auc_field_wide
+    (140 mm tokens) per label; the share of attention mass on 140 mm tokens per label
+    and epoch; training seconds; per-label AUC against field-120-single, with synovitis,
+    Baker's cyst and the medial meniscus as the labels the 140 mm stream should recover.
+  budget: 'Ten epochs at 20 slices per study (user, 2026-10-01: fewer epochs is not
+    acceptable). Measured: the first attempt took 223 s per epoch, the read-once repair
+    two-stream-paired-20261001T164742Z-87f55a3b 194 s (projected 1,946 s against the
+    1,833 s limit). A profile of that repair on the GPU (30 training steps, synchronous
+    CUDA) shows the loader is not the bottleneck (0.02 s wait per batch); the step
+    is: augmentation 26% of step time (bilateral smoothing alone 14%), backward 25%,
+    the two backbones'' forward 13%, logging 5-9%. Augmentation runs once per view
+    on all three slice channels although model.slice_channels repeated_middle uses
+    only the middle one. Augmenting the middle channel alone should bring the epoch
+    to about 165-170 s.'
+  implementation: 'Second repair: keep the read-once loader, model, pooling gate and
+    field policy of attempt two-stream-paired-20261001T164742Z-87f55a3b. In the paired
+    encode path, when model.slice_channels is repeated_middle, select the middle slice
+    channel of the images, their valid rectangles and source-channel indices BEFORE
+    augmentation and reflection, run every augmentation on that single channel for
+    each view, and expand to three channels only for the backbone, so no augmentation,
+    mask or filter is computed for the two unused neighbour slices. Per-series augmentation
+    statistics (for example the GIN energy rescale) are then taken over the middle
+    slices, which is the only content the model sees; the random draws per series
+    and per slice stay as they are. Also make the per-step logging this idea added
+    (per-stream augmentation activity) accumulate on the device and log once per epoch
+    instead of calling the logger for every stream on every step; keep the activation
+    metric. Do not change epochs, slices, the loader, the non-paired path or any augmentation
+    setting. Replaces the incumbent''s field policy.'
+  open_choices: 'None: trainer.max_epochs stays 10 and data.study_triplet_total stays
+    20; the time comes from not augmenting unused slice channels.'
+  dependencies: []
+  priority_rationale: 'User decision, 2026-10-01: the second stream moved from 160
+    to 140 mm after eight results; the design with the highest ceiling at a cost the
+    1.5x range can hold.'
+  status: launched
+  created_revision: 1
+  seeded: /home/claudio/src/knee-abnormality-mixed-field/autoresearch/campaigns/mixed-field/seed-ideas-2.yaml
+  ranking_rationale: 'Block and park field-160-single at its own implementation review:
+    its one bounded repair is exhausted and the activation gate remains failed. No
+    authorization resolving the configuration-only instrumentation conflict appears
+    in the supplied evidence. The explicit ranking contains every remaining live queue
+    entry exactly once, preserving their order and placing the logged 160 mm replacement
+    first. No proposals are admitted.'
+  experiments:
+  - two-stream-paired-20261001T160123Z-8539d784
+  - two-stream-paired-20261001T161748Z-3c8232a3
+  - two-stream-paired-20261001T163136Z-d9118018
+  - two-stream-paired-20261001T164742Z-87f55a3b
+  - two-stream-paired-20261001T172835Z-5c197a3e
+- id: coregistered-context
+  mechanism_id: paired-two-stream
+  parent_idea_id: null
+  title: Two streams with the 160 mm features added to each 120 mm token at its position,
+    plus the ring as extra tokens
+  opportunity: In two-stream-paired three quarters of the wide view repeats the narrow
+    one as separate tokens and competes with it in the pool. Adding the wide features
+    to the narrow token at the same place gives each detail token its context once
+    and keeps only the ring as new tokens.
+  mechanism: Views, backbones and learning rates as two-stream-paired, but both views
+    of a slice share every augmentation draw, so the 120 mm window is the central
+    75% of the 160 mm view. The wide feature map is sampled bilinearly at the millimetre
+    position of each 120 mm token, projected by a zero-initialized linear layer and
+    added to that token. Wide tokens whose centre lies outside the 120 mm window stay
+    in the joint pool with the field embedding; the other wide tokens are dropped.
+  precedents:
+  - 'Multi-scale review: concatenation and mean fusion ignored the fine-only signal,
+    per-location fusion recovered it (docs/research/multiscale-features-knee-mri.md).'
+  - GLNet-style global and local branches fuse feature maps by position (docs/research/learned-crop-selection.md).
+  novelty: Position-wise fusion of two fields of one slice; no earlier run registered
+    two views.
+  coverage: All studies and labels, every slice at both fields.
+  exploitation: The norm of the added context relative to the token per epoch; the
+    share of attention mass on ring tokens per label; per-label AUC against two-stream-paired.
+  budget: As two-stream-paired, with fewer tokens in the pool.
+  implementation: As two-stream-paired, taken from its frozen source if it was rejected,
+    with shared augmentation draws for the two views of a slice, the position-wise
+    sampling and projection in modeling/, and the ring selection from the tokens'
+    millimetre positions. Replaces the incumbent's field policy.
+  open_choices: 20 slices per study if the time range requires it.
+  dependencies: []
+  priority_rationale: Removes the redundancy that makes paired views expensive in
+    the pool; last because it builds on the paired loader.
+  status: blocked
+  created_revision: 1
+  seeded: /home/claudio/src/knee-abnormality-mixed-field/autoresearch/campaigns/mixed-field/seed-ideas-2.yaml
+  ranking_rationale: 'Block and park field-160-single at its own implementation review:
+    its one bounded repair is exhausted and the activation gate remains failed. No
+    authorization resolving the configuration-only instrumentation conflict appears
+    in the supplied evidence. The explicit ranking contains every remaining live queue
+    entry exactly once, preserving their order and placing the logged 160 mm replacement
+    first. No proposals are admitted.'
+  blocked_reason: 'Withdrawn before launch by user decision, 2026-10-01: conditional
+    on two-stream-paired. It is re-forced as coregistered-context-140 (140 mm second
+    stream) only if two-stream-paired''s x4 macro delta exceeds field-120-single''s
+    +0.001135; otherwise it is skipped and research takes over.'
+- id: field-160-single-logged
+  mechanism_id: single-field
+  parent_idea_id: null
+  title: Single 160 mm field at 224 px (0.714 mm) for every slice, with the field-share
+    columns logged
+  opportunity: The 140 mm window clips more than 10 mm of tissue in 34% of sagittal,
+    16% of axial and 9% of coronal series; at 160 mm that falls to 2%, 6% and 0% (prior-work.md,
+    Geometry). Nothing has measured what the ring is worth on the current recipe,
+    and a mixed result cannot be read without it. Retake of field-160-single, which
+    was blocked because its text restricted it to configs/training.yaml while every
+    prepared candidate needs a logged activation column.
+  mechanism: 'data.spacing_mm 0.7142857142857143 (160/224) in training, validation
+    and prediction, plus logging-only instrumentation: the Lightning module logs field_share_120,
+    field_share_140 and field_share_160 per epoch for training and validation, the
+    share of slices the model received at each field, measured from the decoded pixel
+    size the batch carries. No other change to training behaviour.'
+  precedents:
+  - 150 to 140 mm at 224 px gained +0.003 local and +0.007 public on ReXNet-200, confounded
+    with the sharper spacing (docs/research/input-resolution.md).
+  - Learned zoom read every slice at 0.875 mm and lost 0.0228, almost all on detail
+    labels; effusion gained 0.006 (docs/history/crop-selection-investigation.md).
+  - 'field-160-single: both attempts blocked on the activation-signature conflict;
+    its one-line configuration change was reviewed as correct.'
+  novelty: First field change on ResNet-18, rebuild_state_v2 and all_5fold_scanner_v2.
+  coverage: All studies and labels; expected to help Baker's cyst, MCL and fracture
+    and to cost ACL and the menisci.
+  exploitation: Per-label AUC against the incumbent, read by the periphery and detail
+    groups of prior-work.md; it is the width yardstick for every later seed.
+  budget: Same as the reference (1,222 s).
+  implementation: 'configs/training.yaml sets the spacing. training/lightning.py logs
+    the three field_share columns, with data code touched only if the batch must carry
+    its spacing; the logging changes no random draw and no tensor the model trains
+    on. Activation signature: field_share_160 >= 1 at epoch 0. The crop radius used
+    for source ranking follows the field; that is accepted for the two single-field
+    yardsticks only. This is not a configuration-only idea: the logging instrumentation
+    is authorized (campaign keeper, 2026-10-01).'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Yardstick; needed to read the mixed-field seeds.
+  status: completed
+  created_revision: 17
+  seeded: /home/claudio/src/knee-abnormality-mixed-field/autoresearch/campaigns/mixed-field/yardstick-retake-ideas.yaml
+  ranking_rationale: 'Block and park field-160-single at its own implementation review:
+    its one bounded repair is exhausted and the activation gate remains failed. No
+    authorization resolving the configuration-only instrumentation conflict appears
+    in the supplied evidence. The explicit ranking contains every remaining live queue
+    entry exactly once, preserving their order and placing the logged 160 mm replacement
+    first. No proposals are admitted.'
+  experiments:
+  - field-160-single-logged-20261001T123626Z-d61f0fe9
+  decision: reject
+- id: plane-weighted-fields
+  mechanism_id: mixed-field-shared-backbone
+  parent_idea_id: null
+  title: Mostly 120 mm, with 160 mm on half of the axial and a quarter of the sagittal
+    slices and none of the coronal ones
+  opportunity: 'The two single-field runs say detail is worth more than width: 120
+    mm beats 160 mm by 0.0046 (95% [+0.0016, +0.0076]) and leads on nine labels, clearly
+    on the lateral meniscus, ACL, medial OA and effusion; 160 mm leads outside noise
+    only on synovitis (+0.0097, [+0.0012, +0.0189]). An even split wastes half the
+    slices on the weaker field: mixed-field-140-160 lost 0.0013 and its wide tokens
+    alone scored below its narrow ones. So the wide field should get fewer slices,
+    placed in the planes where it can help and costs least. Axial contributes almost
+    nothing to the menisci and ACL and carries the fluid findings; synovitis is read
+    equally from axial and sagittal, and sagittal is the plane the 140 mm window clips
+    most (34% of series); coronal carries MCL, the medial meniscus and medial OA and
+    is clipped least (9%).'
+  mechanism: 'Field policy: within each series type of a study the selected slices
+    are ordered by depth. Axial series: odd depth ranks are decoded at 160 mm, even
+    ranks at 120 mm. Sagittal series: ranks with rank modulo 4 equal to 2 at 160 mm,
+    the others at 120 mm. Coronal series: every slice at 120 mm. Validation and prediction
+    use exactly these ranks; in training the rank offset is drawn per study, series
+    type and epoch, keeping each plane''s share. Each token adds the zero-initialized
+    learned embedding of its slice''s field. One shared backbone and the joint attention
+    pool, unchanged. About a fifth of the slices end up at 160 mm.'
+  precedents:
+  - field-120-single +0.0011 (80% [-0.0004, +0.0026]), field-160-single-logged -0.0034,
+    mixed-field-140-160 -0.0013 with val_macro_auc_field_narrow 0.9079 against field_wide
+    0.9035 (this campaign).
+  - 'Direct 120 against 160 comparison per label: outputs/analysis/mixed-field-120-vs-160.'
+  - 'Single-plane inference on the ReXNet control (older split and labels): axial
+    alone loses 0.15-0.22 on the menisci and 0.084 on ACL but only 0.006 on effusion
+    and 0.001 on Baker''s cyst; synovitis loses 0.017 from axial or sagittal alone
+    (docs/validation/results/2026-09-27-single-plane-inference.md).'
+  novelty: Unequal field shares that differ by plane; the earlier mixes split every
+    series evenly.
+  coverage: All studies and labels. Coronal and most sagittal slices keep full 120
+    mm detail; the wide slices sit where effusion, Baker's cyst and synovitis are
+    read.
+  exploitation: field_share_120 and field_share_160 overall and per plane; val_macro_auc_field_narrow
+    and val_macro_auc_field_wide per label; per-label AUC against field-120-single
+    and mixed-field-120-160, with synovitis, effusion and the lateral meniscus as
+    the labels to watch.
+  budget: Same slices and epochs as the reference.
+  implementation: 'Take the mixed-field loader, field embedding and per-field diagnostics
+    from mixed-field-120-160''s frozen source if the incumbent lacks them, and make
+    the wide ranks a per-plane setting in data.field (config.py): every second rank
+    for axial, every fourth for sagittal, none for coronal. Log field_share_160 per
+    plane. Slice selection keeps the 140 mm radius. Replaces the incumbent''s field
+    policy.'
+  open_choices: None; the shares are fixed by the user's request (fewer wide slices
+    than narrow, weighted to the planes that can use them), not swept.
+  dependencies: []
+  priority_rationale: User seed, 2026-10-01; the evidence-weighted version of the
+    even mix.
+  status: completed
+  created_revision: 106
+  seeded: /home/claudio/src/knee-abnormality-mixed-field/autoresearch/campaigns/mixed-field/plane-weighted-ideas.yaml
+  experiments:
+  - plane-weighted-fields-20261001T143031Z-6b4e022b
+  decision: reject
+- id: contrast-split-112-140
+  mechanism_id: field-by-series-type
+  parent_idea_id: null
+  title: T1/PD series at 112 mm (0.5 mm), fluid-sensitive series at 140 mm, no 160
+    mm
+  opportunity: 'Seven results say the trade is between a narrower field and the reference,
+    not with 160 mm: 120 mm alone gained 0.0011 and plane-weighted-fields the same,
+    both a narrow miss, while 160 mm lost 0.0034 alone and added nothing in any mix.
+    The labels that gained at 120 mm (PF OA, ACL, lateral OA, medial OA, lateral meniscus)
+    rely 37-62% on the T1/PD series; the labels that lost (synovitis, Baker''s cyst,
+    medial meniscus, contusion) rely 76-100% on the fluid-sensitive ones (leave-one-type-out
+    on three ReXNet controls). T1/PD series are also acquired finer: 36% are fully
+    resolved at 0.5 mm against 11% at 0.625 mm, and 0.5 mm is the most common acquired
+    resolution (13% of all series), so 112 mm is the widest field that keeps that
+    group; at 120 mm the resolved share of all series falls from 50% to 30%.'
+  mechanism: 'Field policy: every slice of a series is decoded at one field chosen
+    by its series type, in training, validation and prediction alike. T1/PD series
+    (fluid_sensitive 0, fat_suppression 0) in all three planes at 112 mm, which is
+    0.5 mm at 224 px. Fluid-sensitive fat-suppressed series in all three planes at
+    140 mm (0.625 mm). No slice at 120 or 160 mm. Each token adds the zero-initialized
+    learned embedding of its slice''s field. One shared backbone and the joint attention
+    pool, unchanged. A typical study has 10 slices at 112 mm and 16 at 140 mm.'
+  precedents:
+  - 'This campaign: field-120-single +0.0011 (80% [-0.0004, +0.0026]), plane-weighted-fields
+    +0.0011 ([-0.0003, +0.0024]), field-160-single-logged -0.0034, mixed-field-140-160
+    -0.0013; 120 against 160 directly +0.0046 (95% [+0.0016, +0.0076]), outputs/analysis/mixed-field-120-vs-160.'
+  - 'Label reliance by series type: outputs/analysis/type-importance-20260917/label_type_importance.csv
+    (docs/validation/results/2026-09-17-plane-contrast-importance.md); older labels
+    and backbone, indicative only.'
+  - 'Acquired resolution by contrast: outputs/analysis/input-resolution-research-20260915/acquisition/series_acquisition.parquet
+    (23,173 series): finer-axis resolution at or above 0.5 mm in 50% of series, at
+    or above 0.536 mm in 30%.'
+  novelty: First field assignment by contrast, first use of 112 mm, and the first
+    mix without 160 mm.
+  coverage: All studies and labels. Sagittal and coronal each keep one series at 140
+    mm in most studies, so what the 112 mm window clips is still seen in the same
+    plane; axial is at 140 mm except in the fifth of studies with an axial T1/PD series.
+  exploitation: field_share_112 and field_share_140 overall and per plane; val_macro_auc_field_narrow
+    (112 mm tokens) and val_macro_auc_field_wide (140 mm tokens) per label; per-label
+    AUC against field-120-single and plane-weighted-fields, with synovitis, Baker's
+    cyst and the medial meniscus (the 120 mm losers) and PF OA, ACL and lateral OA
+    (its winners) as the labels to watch.
+  budget: Same slices and epochs as the reference.
+  implementation: 'Take the mixed-field loader, field embedding and per-field diagnostics
+    from plane-weighted-fields'' frozen source if the incumbent lacks them, and replace
+    its depth-rank rule by a field per series type in data.field (config.py): 112
+    mm for the three T1/PD types, 140 mm for the three fluid types. Decode 112 mm
+    slices from the native image at 0.5 mm; slice selection keeps the 140 mm radius.
+    Log field_share_112 next to the other field shares. Activation signature: field_share_112
+    above 0.25 at epoch 0. Replaces the incumbent''s field policy.'
+  open_choices: None. 112 mm is fixed by the measured acquisition resolution and the
+    split by the reliance table; neither is swept.
+  dependencies: []
+  priority_rationale: User seed, 2026-10-01; the assignment the per-label evidence
+    points to.
+  status: completed
+  created_revision: 157
+  seeded: /home/claudio/src/knee-abnormality-mixed-field/autoresearch/campaigns/mixed-field/contrast-split-ideas.yaml
+  experiments:
+  - contrast-split-112-140-20261001T153730Z-e26452f3
+  decision: provisional_accept

@@ -50,6 +50,17 @@ Widen any narrow local audit before shipping ([audit requirements](measuring.md#
 | **One file access per selected frame.** Indexing already records the payload offset, yet the payload read opens the file again and `fstat`s it to revalidate size and mtime | unquantified | low | M | The `fstat` is 1.6 µs/frame locally, 24 ms per 14,882 frames, so only the NFS round trip could justify it, and the attribute cache may already absorb it. Minimising reopens is the sanctioned small-file lever on network filesystems. A payload read must still fail closed when the file changed. No probe exists |
 | **Bounded ordered payload window** in `decode_series` — submit a window of reads, decode in record order, release consumed bytes (`preparation.py`) | unmeasured; −80% transient RAM | low-med | M | Refines the earlier prefetch-window proposal: `pool.map` submits eagerly and the tuple retains every payload through the decode loop, so peak live memory holds raw payloads and resampled outputs at once (~83 MB of payloads per worker at x4, ~1.3 GB across 16). `buffersize` is not available on the bundled Python, so the window must be explicit. May trade memory for waiting — measure throughput, not just RSS |
 
+## Unused neighbour slices (identity-changing, not bit-exact)
+
+With `model.slice_channels: repeated_middle` (both ResNet recipes) the model reads only the middle
+slice of each three-slice input. Since 2026-10-01 reflection, contrast mixing, augmentation and
+mirror TTA handle that slice alone, but the loader still reads and decodes all three slices and
+the device still resamples all three. Preparing only the middle slice would cut reads and GPU
+resampling by up to two thirds per input. It is not bit-exact: the per-series intensity bounds are
+computed over every decoded slice, so they would move, and `prepare_series` requires complete
+triplets. Unmeasured on Kaggle; needs a retrain and a prepared-image comparison
+([profile](../../validation/results/2026-10-01-mixed-field-campaign.md#middle-slice-augmentation)).
+
 ## Reading less per study (trades score for wall)
 
 Every candidate above preserves the prepared images. This one does not, and it is the largest lever on

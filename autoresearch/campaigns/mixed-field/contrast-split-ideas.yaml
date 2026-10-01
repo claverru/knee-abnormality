@@ -1,0 +1,59 @@
+ideas:
+- id: contrast-split-112-140
+  mechanism_id: field-by-series-type
+  parent_idea_id: null
+  title: T1/PD series at 112 mm (0.5 mm), fluid-sensitive series at 140 mm, no 160 mm
+  opportunity: >-
+    Seven results say the trade is between a narrower field and the reference, not with 160 mm:
+    120 mm alone gained 0.0011 and plane-weighted-fields the same, both a narrow miss, while 160 mm
+    lost 0.0034 alone and added nothing in any mix. The labels that gained at 120 mm (PF OA, ACL,
+    lateral OA, medial OA, lateral meniscus) rely 37-62% on the T1/PD series; the labels that lost
+    (synovitis, Baker's cyst, medial meniscus, contusion) rely 76-100% on the fluid-sensitive ones
+    (leave-one-type-out on three ReXNet controls). T1/PD series are also acquired finer: 36% are
+    fully resolved at 0.5 mm against 11% at 0.625 mm, and 0.5 mm is the most common acquired
+    resolution (13% of all series), so 112 mm is the widest field that keeps that group; at 120 mm
+    the resolved share of all series falls from 50% to 30%.
+  mechanism: >-
+    Field policy: every slice of a series is decoded at one field chosen by its series type, in
+    training, validation and prediction alike. T1/PD series (fluid_sensitive 0, fat_suppression 0)
+    in all three planes at 112 mm, which is 0.5 mm at 224 px. Fluid-sensitive fat-suppressed series
+    in all three planes at 140 mm (0.625 mm). No slice at 120 or 160 mm. Each token adds the
+    zero-initialized learned embedding of its slice's field. One shared backbone and the joint
+    attention pool, unchanged. A typical study has 10 slices at 112 mm and 16 at 140 mm.
+  precedents:
+  - 'This campaign: field-120-single +0.0011 (80% [-0.0004, +0.0026]), plane-weighted-fields
+    +0.0011 ([-0.0003, +0.0024]), field-160-single-logged -0.0034, mixed-field-140-160 -0.0013;
+    120 against 160 directly +0.0046 (95% [+0.0016, +0.0076]),
+    outputs/analysis/mixed-field-120-vs-160.'
+  - 'Label reliance by series type: outputs/analysis/type-importance-20260917/label_type_importance.csv
+    (docs/validation/results/2026-09-17-plane-contrast-importance.md); older labels and backbone,
+    indicative only.'
+  - 'Acquired resolution by contrast:
+    outputs/analysis/input-resolution-research-20260915/acquisition/series_acquisition.parquet
+    (23,173 series): finer-axis resolution at or above 0.5 mm in 50% of series, at or above
+    0.536 mm in 30%.'
+  novelty: First field assignment by contrast, first use of 112 mm, and the first mix without
+    160 mm.
+  coverage: All studies and labels. Sagittal and coronal each keep one series at 140 mm in most
+    studies, so what the 112 mm window clips is still seen in the same plane; axial is at 140 mm
+    except in the fifth of studies with an axial T1/PD series.
+  exploitation: field_share_112 and field_share_140 overall and per plane; val_macro_auc_field_narrow
+    (112 mm tokens) and val_macro_auc_field_wide (140 mm tokens) per label; per-label AUC against
+    field-120-single and plane-weighted-fields, with synovitis, Baker's cyst and the medial
+    meniscus (the 120 mm losers) and PF OA, ACL and lateral OA (its winners) as the labels to watch.
+  budget: Same slices and epochs as the reference.
+  implementation: >-
+    Take the mixed-field loader, field embedding and per-field diagnostics from
+    plane-weighted-fields' frozen source if the incumbent lacks them, and replace its depth-rank
+    rule by a field per series type in data.field (config.py): 112 mm for the three T1/PD types,
+    140 mm for the three fluid types. Decode 112 mm slices from the native image at 0.5 mm; slice
+    selection keeps the 140 mm radius. Log field_share_112 next to the other field shares.
+    Activation signature: field_share_112 above 0.25 at epoch 0. Replaces the incumbent's field
+    policy.
+  open_choices: None. 112 mm is fixed by the measured acquisition resolution and the split by the
+    reliance table; neither is swept.
+  dependencies: []
+  priority_rationale: User seed, 2026-10-01; the assignment the per-label evidence points to.
+exhausted_directions: 160 mm added nothing in a shared backbone wherever it was placed (alone, even
+  mixes with 140 and 120 mm, plane-weighted); the paired and extent-ruled seeds remain its open
+  tests.

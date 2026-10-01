@@ -1,7 +1,8 @@
 # Spatial-token model shapes
 
 This diagram traces the current [full-slice model](current-model.md) at the
-training config's 224 px triplets (0.625 mm, 140 mm). ReXNet-200 is the configured backbone and
+ReXNet recipe's 224 px triplets (0.625 mm, 140 mm; the ResNet recipes use 0.536 mm and 120 mm at
+the same 224 px since 2026-10-01). ReXNet-200 is the backbone traced here and
 CoAtNet a supported alternative. The three slices per input, the 256-wide projection and the
 128-wide attention scorer are code constants (`SLICES_PER_INPUT`, `PROJECTION_WIDTH`,
 `MIL_ATTENTION_WIDTH`), not config fields.

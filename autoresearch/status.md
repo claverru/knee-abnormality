@@ -50,6 +50,16 @@ in the [campaigns](campaigns/INDEX.md) and the
 
 ## Pending
 
+- **Harness gaps the mixed-field campaign exposed (2026-10-01), awaiting a user decision:**
+  - an activation signature of `> 0` passed a mechanism that never acted (`two-stream-paired`,
+    observed 0.0013); thresholds should separate an acting mechanism from numerical residue;
+  - `data.study_triplet_total` is a floor, not a cap, so a range-budget idea that lowers it to save
+    time changes almost nothing; cutting input needs `max_images` in `data.series_types`;
+  - a configuration-only idea cannot declare an activation column, so it blocks unless the idea
+    text allows logging-only instrumentation;
+  - developers have no way to estimate epoch time before launch; two paired-view builds were
+    stopped at epoch 2 for the budget
+    ([campaign](campaigns/mixed-field/INDEX.md#keeper-repairs)).
 - **Next campaign reference:** `rebuild-state-v2-control` (fold 0 of `all_5fold_scanner_v2`, seed
   1533697213), ×4 0.928288, trained 2026-09-28; a new campaign, or the topic loop with
   `--reference-run`, can start from it.

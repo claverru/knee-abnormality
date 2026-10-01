@@ -1,0 +1,166 @@
+ideas:
+- id: mixed-field-readout-weights
+  mechanism_id: mixed-field-shared-backbone
+  parent_idea_id: null
+  title: Mixed 120/160 mm with per-field readout weights inside the joint attention pool
+  opportunity: 'One linear readout per label collapses evidence from two fields that serve different labels:
+    the wide slices carry Baker''s cyst, MCL and fracture, the narrow ones the central joint. Per-type
+    readout weights in the joint pool were accepted on ResNet-18 for plane and contrast, while dense readouts
+    with their own loss lost 0.0052.'
+  mechanism: The field policy and field embedding of mixed-field-120-160. For each label keep one partial
+    vector per field, u_cf = sum over tokens of field f of alpha_ci * h_i, with the same global attention
+    denominator, and compute z_c = sum_f w_cf . u_cf + b_c. Initialize every w_cf from the shared w_c,
+    which reproduces the single readout at the start. No per-field loss.
+  precedents:
+  - 'revisits campaign, plane-contrast-readouts on ResNet-18: +0.0009, 80% [+0.0001, +0.0017], accepted;
+    dense-plane-readouts: -0.0052 (prior-work.md, Precedent table).'
+  - 'Multi-scale review: a secondary branch counts only with its own readout path (docs/research/multiscale-features-knee-mri.md).'
+  novelty: Readout weights split by field of view, not by plane or contrast.
+  coverage: All studies and labels.
+  exploitation: The divergence of each w_cf from its initialization per epoch and per label; val_macro_auc_field_narrow
+    and val_macro_auc_field_wide per label against mixed-field-120-160.
+  budget: Twice the readout weights; negligible. Same slices and epochs as the reference.
+  implementation: Field policy and embedding as mixed-field-120-160, taken from its frozen source if it
+    was rejected. A new model option in config.py and modeling/model.py for the per-field readout weights;
+    compute the per-field contributions without a large pooling tensor. Replaces the incumbent's field
+    policy and adds to its readout.
+  open_choices: None; initialization is fixed.
+  dependencies: []
+  priority_rationale: The readout form with evidence on ResNet-18, applied where the two token groups
+    differ most.
+- id: extent-ruled-field
+  mechanism_id: extent-ruled-field
+  parent_idea_id: null
+  title: 140 mm by default, 160 mm for a series whose tissue overhangs the 140 mm window
+  opportunity: Widening every slice costs resolution in series that fit in 140 mm. A third of sagittal
+    series do not fit; a rule on measured tissue extent widens only those and keeps the full depth density
+    at one field per series.
+  mechanism: 'Field policy: each series is decoded at 140 mm unless its tissue mask on the middle slice
+    extends more than 10 mm past the image-centred 140 mm window on an in-plane side that is not along
+    the leg (anterior or posterior in sagittal, left or right in coronal, any side in axial); then all
+    its slices are decoded at 160 mm. The same rule runs in training, validation and prediction. The tissue
+    mask is a threshold rule: smooth by 1.5 mm, take the background from the border strips, threshold
+    at 8% of the way to the 99th percentile, keep the largest component and fill it; a mask covering more
+    than 90% of the image is unusable and keeps 140 mm. Tokens add the zero-initialized field embedding.'
+  precedents:
+  - 'Tissue more than 10 mm past 140 mm: 34% of sagittal, 16% of axial and 9% of coronal series (prior-work.md,
+    Geometry); only a wider field removes it, since the tissue is already centred.'
+  - 'The mask and its checks: outputs/analysis/input-resolution-research-20260915/images/common.py (tissue_mask)
+    and scripts/adhoc/check_narrow_field_fit.py.'
+  novelty: A field chosen per series from measured extent; no trained model in the loader.
+  coverage: About a third of sagittal series and a tenth of the others change; the rest keep the reference
+    input exactly.
+  exploitation: field_share_160 per plane and epoch; per-label AUC split by studies with and without a
+    widened series; val_macro_auc_field_narrow and val_macro_auc_field_wide where both occur.
+  budget: One extra native decode of the middle slice per series; same slices and epochs as the reference.
+  implementation: The rule in data/preprocessing, cached per series next to the slice index; field policy
+    in data.field (config.py) and data/dataset.py; field embedding in modeling/. Slice selection keeps
+    the 140 mm radius. Replaces the incumbent's field policy.
+  open_choices: None; the 10 mm threshold is the one the clipping table uses.
+  dependencies: []
+  priority_rationale: The only design that keeps full depth density and follows the measured clipping
+    directly.
+- id: field-backbones-routed
+  mechanism_id: field-backbones
+  parent_idea_id: null
+  title: Mixed 120/160 mm with one ResNet-18 per field, each slice through its field's backbone
+  opportunity: A shared backbone must serve two pixel sizes 33% apart. Unshared weights let each specialize,
+    at the cost of each backbone training on half the slices; against mixed-field-120-160 this measures
+    what unsharing buys.
+  mechanism: The field policy and field embedding of mixed-field-120-160. Two ResNet-18 backbones start
+    from the same RadImageNet weights, each anchored to them by L2-SP; a slice goes through the backbone
+    of its field and the feature maps return in the original order to the shared projection and the joint
+    attention pool. No per-field readouts or losses.
+  precedents:
+  - One ResNet-18 per plane with the joint pool tied (+0.00005, revisits); with dense readouts it lost
+    0.0033 (prior-work.md, Precedent table).
+  - 'Three ReXNet-200 plane backbones: +0.0020 local, tied publicly, +35% training time and twice the
+    Kaggle time (docs/history/plane-backbones.md).'
+  novelty: Backbones split by field of view of the same planes, not by plane.
+  coverage: All studies and labels.
+  exploitation: Per-backbone drift and gradient RMS per stage; val_macro_auc_field_narrow and val_macro_auc_field_wide
+    per label against mixed-field-120-160.
+  budget: Forward compute as the reference; expect up to about 35% more training time, inside the range.
+  implementation: Field policy and embedding as mixed-field-120-160, taken from its frozen source if it
+    was rejected. A new model option for per-field backbones in modeling/, the second backbone initialized
+    under a forked RNG, both in the optimizer's backbone group and the L2-SP term; inference/engine.py
+    captures one fixed-chunk graph per backbone. Replaces the incumbent's field policy.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Low prior (plane backbones tied), but it is the direct test of the user's separate-backbone
+    question at the reference's forward compute.
+- id: two-stream-paired
+  mechanism_id: paired-two-stream
+  parent_idea_id: null
+  title: Every slice at 140 mm through a ResNet-10t and at 120 mm through the ResNet-18, tokens of both
+    in the joint pool
+  opportunity: 'Eight results say the useful pair is a narrow view and the reference view, not 160 mm:
+    160 mm lost 0.0034 alone and added nothing in any shared-backbone design (even mixes with 140 and
+    120 mm, plane-weighted, extent-ruled -0.0017), while 120 mm alone gained 0.0011 and lost only on labels
+    that prefer the reference field (synovitis, Baker''s cyst, medial meniscus). Splitting slices between
+    two fields halves each field''s depth density; reading every slice at both 120 and 140 mm removes
+    that cost and lets each label use its better field on every slice. Taking each label''s better field
+    from the single-field runs would be worth about 0.002.'
+  mechanism: 'Field policy: every selected slice is decoded twice, at 120 mm and at 140 mm, in training,
+    validation and prediction. The ResNet-18 reads the 120 mm view; a Refined-RadImageNet ResNet-10t (resnet10t.c3_in1k,
+    backbone learning rate 6e-5, L2-SP anchored) reads the 140 mm view. Each stream has its own projection
+    to 256; the tokens of both enter the joint attention pool with the zero-initialized field embedding.
+    The two views of a slice are augmented independently. No per-stream readouts or losses. No slice at
+    160 mm.'
+  precedents:
+  - 'This campaign: field-120-single +0.0011 (80% [-0.0004, +0.0026]); field-160-single-logged -0.0034;
+    mixed-field-140-160 -0.0013; extent-ruled-field -0.0017; 120 against 160 directly +0.0046 (95% [+0.0016,
+    +0.0076]).'
+  - ResNet-10t as the only backbone lost 0.0053 (revisits); here it reads the reference field as a second
+    view beside the ResNet-18.
+  - Halving slice coverage tracked score in the crop runs, which is the case against splitting slices
+    between fields.
+  novelty: Two fields of the same slice through backbones of unequal size; first paired design, and the
+    first to pair 120 mm with the reference field.
+  coverage: All studies and labels, every slice at both fields.
+  exploitation: val_macro_auc_field_narrow (120 mm tokens) and val_macro_auc_field_wide (140 mm tokens)
+    per label; the share of attention mass on 140 mm tokens per label and epoch; training seconds; per-label
+    AUC against field-120-single, with synovitis, Baker's cyst and the medial meniscus as the labels the
+    140 mm stream should recover.
+  budget: About one and a half backbones per slice and two decodes. Start at 26 slices and ten epochs;
+    if the projected time passes 1,833 s, lower data.study_triplet_total to 20.
+  implementation: Field policy in data.field (config.py), data/dataset.py and data/preprocessing, each
+    slice yielding two views with their own patient maps; the second backbone, its projection and its
+    optimizer group and L2-SP anchor in modeling/ and the Lightning module; inference/engine.py runs both
+    streams. Replaces the incumbent's field policy.
+  open_choices: 20 slices per study if the time range requires it.
+  dependencies: []
+  priority_rationale: 'User decision, 2026-10-01: the second stream moved from 160 to 140 mm after eight
+    results; the design with the highest ceiling at a cost the 1.5x range can hold.'
+- id: coregistered-context
+  mechanism_id: paired-two-stream
+  parent_idea_id: null
+  title: Two streams with the 160 mm features added to each 120 mm token at its position, plus the ring
+    as extra tokens
+  opportunity: In two-stream-paired three quarters of the wide view repeats the narrow one as separate
+    tokens and competes with it in the pool. Adding the wide features to the narrow token at the same
+    place gives each detail token its context once and keeps only the ring as new tokens.
+  mechanism: Views, backbones and learning rates as two-stream-paired, but both views of a slice share
+    every augmentation draw, so the 120 mm window is the central 75% of the 160 mm view. The wide feature
+    map is sampled bilinearly at the millimetre position of each 120 mm token, projected by a zero-initialized
+    linear layer and added to that token. Wide tokens whose centre lies outside the 120 mm window stay
+    in the joint pool with the field embedding; the other wide tokens are dropped.
+  precedents:
+  - 'Multi-scale review: concatenation and mean fusion ignored the fine-only signal, per-location fusion
+    recovered it (docs/research/multiscale-features-knee-mri.md).'
+  - GLNet-style global and local branches fuse feature maps by position (docs/research/learned-crop-selection.md).
+  novelty: Position-wise fusion of two fields of one slice; no earlier run registered two views.
+  coverage: All studies and labels, every slice at both fields.
+  exploitation: The norm of the added context relative to the token per epoch; the share of attention
+    mass on ring tokens per label; per-label AUC against two-stream-paired.
+  budget: As two-stream-paired, with fewer tokens in the pool.
+  implementation: As two-stream-paired, taken from its frozen source if it was rejected, with shared augmentation
+    draws for the two views of a slice, the position-wise sampling and projection in modeling/, and the
+    ring selection from the tokens' millimetre positions. Replaces the incumbent's field policy.
+  open_choices: 20 slices per study if the time range requires it.
+  dependencies: []
+  priority_rationale: Removes the redundancy that makes paired views expensive in the pool; last because
+    it builds on the paired loader.
+exhausted_directions: Dense per-field readouts with their own loss are excluded (the per-plane version
+  lost 0.0052 on ResNet-18). Foveated resampling, nested crops and a learned scout are kept for a separate
+  investigation with the user.
