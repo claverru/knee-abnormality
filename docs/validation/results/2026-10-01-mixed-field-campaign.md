@@ -93,8 +93,11 @@ frozen source.
 | S86 | reference, 140 mm | 0.928062 | 0.943 |
 | S90 | 120 mm, middle-slice augmentation | 0.929301 | **0.947** |
 | S91 | contrast split (T1/PD 112 mm, fluid 140 mm), middle-slice augmentation | 0.929212 | 0.945 |
+| S92 | the adopted recipe: 120 mm, middle-slice augmentation, plane-contrast readouts, no anatomical bias | 0.930666 | **0.947** |
 
 Earlier ResNet-18 variants of the reference recipe scored 0.942–0.944 (S81, S82, S84, S86, S87).
+S92 is the [control on the adopted recipe](#control-on-the-adopted-recipe), exported from the
+source it was trained on.
 
 ## Adoption
 
@@ -112,9 +115,31 @@ User decision, 2026-10-01, on the public pair S90 against S86:
   sources, so earlier checkpoints export from their archived sources.
 - **Not adopted:** the contrast split, any use of 160 mm, per-field readout weights, one backbone
   per field and field jitter.
-- **Control:** not retrained yet. Both evidence runs predate the plane-contrast readouts, so the
-  recipe now in `configs/training.yaml` has never been trained
-  ([next](../../ongoing/next.md)).
+- **Control:** retrained the same day, [below](#control-on-the-adopted-recipe). Both evidence runs
+  predate the plane-contrast readouts.
+
+## Control on the adopted recipe
+
+`rn18-field-120-control` (`outputs/training/rn18-field-120-control`), `configs/training.yaml` at
+`6a99439`, fold 0, seed 1533697213, trained on 2026-10-01: the first run to combine the 120 mm
+field and middle-slice augmentation with the plane-contrast readouts and no anatomical bias.
+
+| Run | Recipe | ×4 macro | Δ of the control (80%; 95%) | Training s | Public |
+|---|---|---:|---|---:|---:|
+| `rn18-field-120-control` | 120 mm, plane-contrast readouts | 0.930666 | | 1,149 | 0.947 (S92) |
+| `field-120-middle-slice-augmentation-20261001` | 120 mm, shared readout, anatomical bias | 0.929301 | +0.0014 ([+0.0006, +0.0022]; [+0.0001, +0.0027]) | 1,095 | 0.947 (S90) |
+| `no-anatomical-bias` | 140 mm, plane-contrast readouts | 0.929835 | +0.0008 ([−0.0006, +0.0022]; [−0.0014, +0.0030]) | 1,197 | |
+
+- **The two adoptions stack locally.** The control beats both parents on the point estimate; the
+  readouts' gain on top of 120 mm has its 95% interval above zero, the field's gain on top of the
+  readouts does not. One run each.
+- **Publicly it ties S90** at 0.947, so the readouts' local +0.0014 does not show at three
+  decimals.
+- **Against the 140 mm parent, per label:** lateral meniscus +0.0080, ACL +0.0046, PF OA +0.0041;
+  synovitis −0.0044, Baker's cyst −0.0030, medial meniscus −0.0018, the same labels that moved in
+  the campaign's 120 mm runs.
+- **Curves:** all three select epoch 10 of 10; the control's ×1 AUC is 0.9275 against 0.9256 and
+  0.9260. Peak GPU 3.4 GiB.
 
 ## Open
 
