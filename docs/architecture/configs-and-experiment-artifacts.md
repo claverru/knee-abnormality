@@ -225,24 +225,41 @@ predictions. See [validation](../validation/INDEX.md) and
 
 ### Checkpoint pruning
 
-On 2026-09-20, user-authorized cleanup removed **249 obsolete `.ckpt` files (33.412 GiB)**
-from completed superseded/rejected experiments, unused resume checkpoints and stale submission
-exports. The [cleanup manifest](../../outputs/archive/maintenance/checkpoint-pruning-20260920T191234Z/manifest.json)
-lists every removed and retained path, reason, size and file identity. It records 48 retained
-checkpoints (4.381 GiB); all other artifacts, including predictions, metrics, configs, source
-snapshots and submission manifests, were preserved.
-
-Retained weights cover the current control B, supporting control A and sealed historical baseline;
-the best score/efficiency bundles and their selected source models; pending submissions/loading
-benchmarks; attention-temperature cache parents; and the held unevaluated plane-coupling candidate
-with its parent. Retaining that parent's weights does not restore the withdrawn stratified-sampler
-acceptance. Both campaign states were stopped and unchanged by cleanup.
+Two user-authorized cleanups removed obsolete `.ckpt` files. Each manifest lists every removed and
+retained path with its reason, size and file identity; all other artifacts, including predictions,
+metrics, configs, source snapshots and submission manifests, were preserved, and the stopped
+campaign states were unchanged.
 
 Historical `selected_checkpoint.json` and bundle manifests retain their original provenance paths;
-they do not establish that pruned weights are still available. Consult the cleanup manifest before
+they do not establish that pruned weights are still available. Consult the latest manifest before
 attempting to resume, re-export or rerun inference on a historical experiment. Its saved predictions
-and metrics remain available for comparisons. Linux free space increased by 33.412 GiB; Windows C:
-free space remained about 52 GiB because the WSL virtual disk was not compacted.
+and metrics remain available for comparisons.
+
+**2026-10-01:** removed **435 files (63.336 GiB)** and retained 84 (10.567 GiB)
+([manifest](../../outputs/archive/maintenance/checkpoint-pruning-20261001T164846Z/manifest.json)).
+
+- **Removed:** every `last.ckpt` of a completed run, retained runs included (170 files, 27.8 GiB);
+  rejected, invalid and superseded experiments of the stopped campaigns (103, 17.6 GiB) and of
+  `outputs/training` and `outputs/kaggle-training` (85, 13.3 GiB); and superseded submission
+  exports with their two standalone sources (77, 4.6 GiB): timing, loading-arm and τ-sweep
+  bundles and candidates that lost publicly.
+- **Retained, selected checkpoint only:** the runs named in the
+  [project state](../ongoing/state.md#current-control) (`no-anatomical-bias`, both Refined
+  ResNet-50 runs, `plane-contrast-readouts`, `rn18-l2sp-no-confusion` with its fold 1–4 teachers,
+  `rn18-oof-blend`, `rn18-no-series-dropout`, `rn18-more-triplets`, `rebuild-state-v2-control`,
+  `scanner-confusion-control`); the v1-split models at 0.947–0.948 public
+  (`scanner-confusion-detached-head`, `half-stack-control`, `rebuild-state-candidate`); the ten
+  2026-09-19 ensemble members; `control-check`; the three `attributes-v4` candidates; and the 31
+  export checkpoints of those models, including `aux-site-bias-f3`, whose source was already gone.
+- **Not reviewed:** `outputs/autoresearch/mixed-field` (22 files, 4.2 GiB), an active campaign.
+- **Superseded retentions:** the held plane-coupling candidate with its parent, the
+  attention-temperature cache parents, control A, control B and the reflection reference kept on
+  2026-09-20 are gone; their campaigns cannot resume on the current split.
+
+**2026-09-20:** removed **249 files (33.412 GiB)** from completed superseded or rejected
+experiments, unused resume checkpoints and stale submission exports, retaining 48 (4.381 GiB)
+([manifest](../../outputs/archive/maintenance/checkpoint-pruning-20260920T191234Z/manifest.json)).
+Windows C: free space did not grow after either cleanup unless the WSL virtual disk is compacted.
 
 ## Current scope and next execution
 
