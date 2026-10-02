@@ -225,7 +225,37 @@ predictions. See [validation](../validation/INDEX.md) and
 
 ### Checkpoint pruning
 
-Two user-authorized cleanups removed obsolete `.ckpt` files. Each manifest lists every removed and
+Cleanups run through the [disk-cleanup skill](../../.agents/skills/disk-cleanup/SKILL.md), which
+holds the deletion rules, and
+[`free_disk`](../../scripts/tools/free_disk.py), which applies them and writes the manifest under
+`outputs/archive/maintenance/disk-cleanup-<UTC>/`. Record each run below.
+
+**2026-10-02:** the first run of the skill removed **180 entries (25.789 GiB)**
+([manifest](../../outputs/archive/maintenance/disk-cleanup-20261002T171047Z/manifest.json)); free
+space rose by 24.74 GiB while a training run was writing, and a separate `uv cache prune` removed
+1.4 GiB more. 81 `.ckpt` files (9.262 GiB) remain under `outputs/`.
+
+- **Checkpoints (16.606 GiB):** 50 `last.ckpt` of finished runs (8.889 GiB) and 42 selected
+  checkpoints of recorded runs named neither in `docs/ongoing/` nor by a submitted bundle
+  (7.717 GiB): the 28 remaining `smart-crops` and 11 `mixed-field` experiments,
+  `plane-contrast-readouts`, `refined-rn50-scaled-backbone-lr` and `rn18-stochastic-pooling-g05`.
+  The first two were retained on 2026-10-01 and are gone now.
+- **Other:** 29 analysis arrays (5.454 GiB: the `token-cache-20260917`,
+  `token-cache-allocation-20260917` and `site-probes-20260930` caches and two smaller files),
+  ten cached Hugging Face backbones (1.396 GiB), 23 scratchpads of finished sessions (1.021 GiB),
+  Codex build folders (0.866 GiB), the download chunk cache (0.375 GiB) and the wheels of 14
+  unsubmitted bundles (0.071 GiB).
+- **Retained:** the 25 source checkpoints of submitted bundles, the eight selected checkpoints
+  named in `docs/ongoing/` (`no-anatomical-bias`, `control-check`, `budget-learnable-recipe` and
+  the five view runs), and every submitted bundle's weights.
+- **Kept for a decision:** two crashed `two-stream-paired` attempts and
+  `views-budget-jitter-centre`, which have no selection record; the four
+  `rn18-l2sp-no-confusion-folds-1-4` teachers, `attributes-v4-w005-candidate` and
+  `attributes-v4-w02-candidate`, whose results are recorded nowhere in the docs; and
+  `outputs/analysis/slice-budget-20261002/scratch/bundle-copy/model.ckpt`, outside any run folder.
+
+The two cleanups below predate the skill and were user-authorized, hand-reviewed removals of
+obsolete `.ckpt` files. Each manifest lists every removed and
 retained path with its reason, size and file identity; all other artifacts, including predictions,
 metrics, configs, source snapshots and submission manifests, were preserved, and the stopped
 campaign states were unchanged.
