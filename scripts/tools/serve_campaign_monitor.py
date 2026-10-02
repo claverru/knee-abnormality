@@ -17,12 +17,17 @@ import yaml
 from plotly.offline import get_plotlyjs
 from pydantic import Field
 
-from knee_abnormality.autoresearch.runtime.layout import campaign_fold, fold_dir
+from knee_abnormality.autoresearch.runtime.layout import (
+    PREDICTIONS,
+    campaign_fold,
+    fold_dir,
+)
 from knee_abnormality.cli import CLISettings, describe
 
 CONTROL = "control"
 WATCHDOG = "watchdog"
 ADOPTION_DELTA = 0.001
+GAINS: dict[tuple, list[float]] = {}
 PLOTLY_JS = f"plotly-{plotly.__version__}.min.js"
 BANNER = {
     "RUNNING": "var(--good)",
@@ -44,24 +49,22 @@ LINE = {
     "control": {"width": 2},
     "incumbent": {"width": 1.5},
     "running": {"width": 1.5, "dash": "dash"},
-    "other": {"width": 1.5},
+    "latest": {"width": 1.5},
 }
-SERIES = [
-    "#2a78d6",
-    "#eb6834",
-    "#1baf7a",
-    "#eda100",
-    "#e87ba4",
-    "#008300",
-    "#4a3aa7",
-    "#e34948",
-]
+COLOR = {
+    "incumbent": "--s1",
+    "running": "--s2",
+    "latest": "--s2",
+    "other": "--other",
+}
 LIGHT = {
     "--ink": "#0b0b0b",
+    "--ink2": "#52514e",
     "--other": "#a8a79f",
-    **{f"--c{index}": color for index, color in enumerate(SERIES)},
+    "--s1": "#2a78d6",
+    "--s2": "#eb6834",
+    "--good": "#0ca30c",
 }
-DRAW_ORDER = {"other": 0, "control": 1, "incumbent": 2, "running": 3}
 PLOT_CONFIG = {
     "displaylogo": False,
     "responsive": True,
@@ -69,14 +72,12 @@ PLOT_CONFIG = {
 }
 STYLE = """
 :root { color-scheme: light; --bg: #fcfcfb; --card: #f0efec; --ink: #0b0b0b; --ink2: #52514e; --grid: #e4e3df;
-  --other: #a8a79f; --s1: #2a78d6; --s2: #eb6834; --good: #0ca30c; --warn: #eda100; --bad: #e34948;
-  --c0: #2a78d6; --c1: #eb6834; --c2: #1baf7a; --c3: #eda100; --c4: #e87ba4; --c5: #008300; --c6: #4a3aa7; --c7: #e34948; }
+  --other: #a8a79f; --s1: #2a78d6; --s2: #eb6834; --good: #0ca30c; --warn: #eda100; --bad: #e34948; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { color-scheme: dark; --bg: #1a1a19;
   --card: #262624; --ink: #ffffff; --ink2: #c3c2b7; --grid: #383835; --other: #75746e; --s1: #3987e5;
-  --s2: #d95926; --good: #1baf7a; --warn: #c98500; --bad: #e66767; --c0: #3987e5; --c1: #d95926; --c2: #199e70; --c3: #c98500; --c4: #d55181; --c5: #008300; --c6: #9085e9; --c7: #e66767; } }
+  --s2: #d95926; --good: #1baf7a; --warn: #c98500; --bad: #e66767; } }
 :root[data-theme="dark"] { color-scheme: dark; --bg: #1a1a19; --card: #262624; --ink: #ffffff; --ink2: #c3c2b7;
-  --grid: #383835; --other: #75746e; --s1: #3987e5; --s2: #d95926; --good: #1baf7a; --warn: #c98500; --bad: #e66767;
-  --c0: #3987e5; --c1: #d95926; --c2: #199e70; --c3: #c98500; --c4: #d55181; --c5: #008300; --c6: #9085e9; --c7: #e66767; }
+  --grid: #383835; --other: #75746e; --s1: #3987e5; --s2: #d95926; --good: #1baf7a; --warn: #c98500; --bad: #e66767; }
 body { margin: 0 auto; max-width: 1440px; padding: 12px 16px; background: var(--bg); color: var(--ink);
   font: 14px system-ui, sans-serif; }
 h1 { font-size: 18px; margin: 4px 0 8px; }
@@ -174,8 +175,8 @@ PAGE = """<!doctype html>
 class MonitorCLI(CLISettings):
     model_config = describe(
         "Serve an auto-refreshing page for one autoresearch campaign: its state, the decided runs "
-        "against the control, per-epoch validation AUC and loss curves of the control and every "
-        "experiment, and per-label deltas, regenerated on each page request"
+        "against the control, per-epoch validation AUC and loss curves of the control, the "
+        "incumbent and the current run, and per-label deltas, regenerated on each page request"
     )
 
     campaign: str = Field(description="Campaign ID")
@@ -223,8 +224,14 @@ def run_record(name: str, run: Path, fold: int) -> dict:
 def collect(state: dict) -> tuple[dict, list[dict]]:
     fold = campaign_fold(state)
     control = run_record(CONTROL, Path(state["reference"]), fold)
-    control.update(role=CONTROL, verdict="–", color="--ink")
+    control.update(
+        role=CONTROL, verdict="–", color="--ink", run=Path(state["reference"]).resolve()
+    )
     incumbent, running = state["incumbent"]["id"], state.get("running")
+    retained, link = set(), incumbent
+    while link in state["experiments"] and link not in retained:
+        retained.add(link)
+        link = (state["experiments"][link].get("reference") or {}).get("id")
     runs, seen = [], {}
     for key, exp in state["experiments"].items():
         training = Path(exp["directory"]) / "training"
@@ -236,9 +243,29 @@ def collect(state: dict) -> tuple[dict, list[dict]]:
             name if seen[name] == 1 else f"{name} #{seen[name]}", training, fold
         )
         verdict = exp.get("decision") or exp.get("eligible_decision")
+        if not verdict and exp.get("stage") == "repair_requested":
+            verdict = "failed"
+        withdrawn = (
+            bool(exp.get("decision"))
+            and "provisional_accept" in (verdict, exp.get("eligible_decision"))
+            and key not in retained
+        )
+        if withdrawn:
+            verdict += (
+                " (not retained)"
+                if verdict == "provisional_accept"
+                else " (acceptance withdrawn)"
+            )
         evidence = exp.get("evidence") or {}
         scores = evidence.get("macro_auc")
+        reference = exp.get("reference")
         record.update(
+            run=training.resolve(),
+            withdrawn=withdrawn,
+            comparison=evidence.get("comparison"),
+            level=scores["reference"] - control["x4"]
+            if scores and control["x4"] is not None
+            else None,
             verdict=verdict or ("training" if key == running else "pending"),
             role="incumbent"
             if key == incumbent
@@ -251,16 +278,15 @@ def collect(state: dict) -> tuple[dict, list[dict]]:
             ),
             soft=(evidence.get("soft_macro_auc") or {}).get("delta"),
             per_label=evidence.get("per_label"),
+            reference=Path(reference["run"]).resolve() if reference else None,
+            reference_name=label(reference["id"]) if reference else None,
         )
         runs.append(record)
-    for index, record in enumerate(runs):
-        record["color"] = (
-            f"--c{index % len(SERIES)}"
-            if index >= len(runs) - len(SERIES)
-            else "--other"
-        )
-        record["faded"] = record["role"] == "other"
-    control["faded"] = any(record["role"] == "incumbent" for record in runs)
+    trained = [record for record in runs if record["epochs"]]
+    if trained and trained[-1]["role"] == "other":
+        trained[-1]["role"] = "latest"
+    for record in runs:
+        record["color"] = COLOR[record["role"]]
     return control, runs
 
 
@@ -308,7 +334,7 @@ def figure_html(figure: go.Figure, css: str = "card") -> str:
 
 def curve(title: str, series: list[tuple[dict, dict[int, float]]]) -> str:
     figure = go.Figure()
-    for record, values in sorted(series, key=lambda item: DRAW_ORDER[item[0]["role"]]):
+    for record, values in series:
         if not values:
             continue
         epochs = sorted(values)
@@ -322,7 +348,6 @@ def curve(title: str, series: list[tuple[dict, dict[int, float]]]) -> str:
                 mode="lines+markers",
                 line={**LINE[role], "shape": "linear", "color": LIGHT[record["color"]]},
                 marker={"size": 5, "color": LIGHT[record["color"]]},
-                opacity=0.35 if record["faded"] else 1,
                 hovertemplate=f"<b>{html.escape(record['name'])}</b><br>epoch %{{x}}<br>%{{y:.4f}}<extra></extra>",
             )
         )
@@ -331,20 +356,107 @@ def curve(title: str, series: list[tuple[dict, dict[int, float]]]) -> str:
     return figure_html(figure)
 
 
-def per_label(run: dict) -> list[dict]:
+def per_label(run: dict) -> dict[str, dict]:
     path = Path(run["per_label"]) if run["per_label"] else None
-    return json.loads(path.read_text())["per_target"] if path and path.exists() else []
+    entries = (
+        json.loads(path.read_text())["per_target"] if path and path.exists() else []
+    )
+    return {entry["target"]: entry for entry in entries}
 
 
-def comparison(runs: list[dict]) -> str:
-    scored = [run for run in runs if run["delta"] is not None and run["interval"]]
+def control_gain(control: dict, run: Path, fold: int, runs: list[dict]) -> list | None:
+    report = next((r["comparison"] for r in runs if r["comparison"]), None)
+    files = [fold_dir(path, fold) / PREDICTIONS for path in (control["run"], run)]
+    key = (*files, report)
+    if run == control["run"] or not report or not all(f.is_file() for f in files):
+        return None
+    if key not in GAINS:
+        import numpy as np
+        import polars as pl
+
+        from knee_abnormality.data import splits
+        from knee_abnormality.evaluation import metrics
+
+        report = read_json(Path(report))
+        inputs = {Path(item["path"]).name: item["path"] for item in report["inputs"]}
+        if "studies.csv" not in inputs:
+            return None
+        frame = (
+            pl.read_csv(inputs["studies.csv"])
+            .filter(pl.col("fold") == fold)
+            .join(pl.read_csv(inputs["targets.csv"]), on=splits.STUDY, how="inner")
+            .sort(splits.STUDY)
+        )
+        targets = report["targets"]
+        hard = (frame.select(targets).to_numpy() >= splits.TARGET_THRESHOLD).astype(int)
+        scores = [pl.read_csv(file).sort(splits.STUDY) for file in files]
+        if frame.height != report["studies"] or any(
+            score[splits.STUDY].to_list() != frame[splits.STUDY].to_list()
+            for score in scores
+        ):
+            return None
+        bootstrap = report["paired_report_group_bootstrap"]
+        groups, inverse = np.unique(
+            frame["report_group"].to_numpy(), return_inverse=True
+        )
+        counts = np.random.default_rng(bootstrap["seed"]).multinomial(
+            len(groups), np.full(len(groups), 1 / len(groups)), size=bootstrap["draws"]
+        )[:, inverse]
+        positive = counts @ hard
+        weights = counts[
+            ((positive > 0) & (positive < counts.sum(axis=1, keepdims=True))).all(
+                axis=1
+            )
+        ]
+        if not len(weights):
+            return None
+        reference, candidate = (
+            metrics.bootstrap_auc(
+                hard, score.select(targets).to_numpy().astype(float), weights
+            )
+            for score in scores
+        )
+        GAINS[key] = np.percentile(candidate - reference, [10, 90]).tolist()
+    return GAINS[key]
+
+
+def segments(
+    levels: list[float], drawn: set[int], offset: float = 0, joined: bool = True
+) -> dict:
+    xs, ys = [], []
+    for row, level in enumerate(levels):
+        if row in drawn:
+            xs += [level + offset, level + offset, None]
+            ys += [row - 0.5, row + 0.5, None]
+        if joined and row + 1 < len(levels):
+            xs += [level + offset, levels[row + 1] + offset, None]
+            ys += [row + 0.5, row + 0.5, None]
+    return {"x": xs, "y": ys}
+
+
+def comparison(control: dict, runs: list[dict], fold: int) -> str:
+    scored = [
+        run
+        for run in runs
+        if run["delta"] is not None and run["interval"] and run["level"] is not None
+    ]
     if not scored:
         return "<div class='card'><div class='sub'>No scored run yet.</div></div>"
-    names = [run["name"] for run in scored]
-    labels = [per_label(run) for run in scored]
-    targets = next(
-        ([entry["target"] for entry in entries] for entries in labels if entries), []
+    names = [
+        ("<span style='color:#2a78d6'>★</span> " if run["role"] == "incumbent" else "")
+        + run["name"]
+        for run in scored
+    ]
+    cells = [per_label(run) for run in scored]
+    baseline = next(
+        (
+            {target: entry["reference"] for target, entry in row.items()}
+            for run, row in zip(scored, cells)
+            if row and run["reference"] == control["run"]
+        ),
+        {},
     )
+    targets = list(baseline)
     base = layout("")
     rows = {
         "height": max(220, 150 + 26 * len(scored)),
@@ -356,16 +468,59 @@ def comparison(runs: list[dict]) -> str:
             "autorange": "reversed",
         },
     }
+    campaign = {control["run"], *(run["run"] for run in runs)}
+    levels = [run["level"] for run in scored]
+    manual = {row for row, run in enumerate(scored) if run["reference"] not in campaign}
+    everything = set(range(len(scored)))
+    gains = {
+        reference: control_gain(control, reference, fold, runs)
+        for reference in {run["reference"] for run in scored}
+    }
     intervals = go.Figure()
-    for run in scored:
-        low, high = run["interval"]
+    for spans, style, color in (
+        (segments(levels, everything - manual), {"width": 1}, "--ink2"),
+        (
+            segments(levels, manual, joined=False),
+            {"width": 1, "dash": "dash"},
+            "--ink2",
+        ),
+        (
+            segments(levels, everything, ADOPTION_DELTA),
+            {"width": 1, "dash": "dot"},
+            "--good",
+        ),
+    ):
         intervals.add_trace(
             go.Scatter(
-                x=[run["delta"]],
-                y=[run["name"]],
+                **spans,
+                meta=color,
+                mode="lines",
+                line={**style, "color": LIGHT[color]},
+                showlegend=False,
+                hoverinfo="skip",
+            )
+        )
+    for row, (name, run) in enumerate(zip(names, scored)):
+        low, high = run["interval"]
+        position = run["level"] + run["delta"]
+        gain = gains[run["reference"]]
+        reference = (
+            CONTROL
+            if run["reference"] == control["run"]
+            else f"{run['reference_name']} {run['level']:+.4f} vs control"
+            + (f", 80% [{gain[0]:+.4f}, {gain[1]:+.4f}]" if gain else "")
+        )
+        intervals.add_trace(
+            go.Scatter(
+                x=[position],
+                y=[row],
                 meta=run["color"],
                 mode="markers",
-                marker={"size": 10, "symbol": "diamond", "color": LIGHT[run["color"]]},
+                marker={
+                    "size": 10,
+                    "symbol": "diamond-open" if run["withdrawn"] else "diamond",
+                    "color": LIGHT[run["color"]],
+                },
                 error_x={
                     "color": LIGHT[run["color"]],
                     "type": "data",
@@ -378,53 +533,48 @@ def comparison(runs: list[dict]) -> str:
                 showlegend=False,
                 hovertemplate=(
                     f"<b>{html.escape(run['name'])}</b><br>{html.escape(run['verdict'])}<br>"
-                    f"Δ {run['delta']:+.4f}<br>80% [{low:+.4f}, {high:+.4f}]<extra></extra>"
+                    f"Δ vs control {position:+.4f}<br>"
+                    f"Δ vs reference {run['delta']:+.4f}, 80% [{low:+.4f}, {high:+.4f}]<br>"
+                    f"reference: {html.escape(reference)}<extra></extra>"
                 ),
             )
         )
     intervals.update_layout(
         layout(
-            "×4 macro Δ vs reference, 80% interval<br><sup>dotted line: +0.001 adoption bar</sup>",
-            **rows,
-            shapes=[
-                {
-                    "type": "line",
-                    "yref": "paper",
-                    "y0": 0,
-                    "y1": 1,
-                    "x0": 0,
-                    "x1": 0,
-                    "name": "--ink2",
-                    "line": {"width": 1},
+            "×4 macro Δ vs control, 80% interval vs each run's reference"
+            "<br><sup>line: incumbent each run was judged against, dashed if set by hand"
+            " · green: +0.001 above it</sup>",
+            **{
+                **rows,
+                "yaxis": {
+                    **base["yaxis"],
+                    "tickformat": None,
+                    "showgrid": False,
+                    "tickmode": "array",
+                    "tickvals": list(range(len(scored))),
+                    "ticktext": names,
+                    "range": [len(scored) - 0.5, -0.5],
                 },
-                {
-                    "type": "line",
-                    "yref": "paper",
-                    "y0": 0,
-                    "y1": 1,
-                    "x0": ADOPTION_DELTA,
-                    "x1": ADOPTION_DELTA,
-                    "name": "--good",
-                    "line": {"width": 1, "dash": "dot"},
-                },
-            ],
+            },
             xaxis={**base["xaxis"], "tickformat": "+.3f", "automargin": False},
         )
     )
     boxes = figure_html(intervals)
     if targets:
-        cells = [{entry["target"]: entry for entry in entries} for entries in labels]
         heatmap = go.Figure(
             go.Heatmap(
                 x=targets,
                 y=names,
                 z=[
-                    [row[t]["delta"] * 1000 if t in row else None for t in targets]
+                    [
+                        (row[t]["candidate"] - baseline[t]) * 1000 if t in row else None
+                        for t in targets
+                    ]
                     for row in cells
                 ],
                 customdata=[
                     [
-                        f"{row[t]['reference']:.4f} → {row[t]['candidate']:.4f}"
+                        f"{baseline[t]:.4f} → {row[t]['candidate']:.4f}"
                         if t in row
                         else ""
                         for t in targets
@@ -444,7 +594,7 @@ def comparison(runs: list[dict]) -> str:
         )
         heatmap.update_layout(
             layout(
-                "Per-label ×4 Δ ×1000<br><sup>blue up, red down, full colour at ±10</sup>",
+                "Per-label ×4 Δ vs control ×1000<br><sup>blue up, red down, full colour at ±10</sup>",
                 **rows,
                 xaxis={
                     **base["xaxis"],
@@ -459,7 +609,7 @@ def comparison(runs: list[dict]) -> str:
 
 
 def curves(control: dict, runs: list[dict]) -> str:
-    everything = [control, *runs]
+    everything = [control, *(run for run in runs if run["role"] != "other")]
     validation = [
         (run, {e: m["macro_auc"] for e, m in run["epochs"].items()})
         for run in everything
@@ -487,9 +637,8 @@ def curves(control: dict, runs: list[dict]) -> str:
         for run in everything
     ]
     return (
-        "<div class='sub'>Black: control. Each run keeps its own colour; the run training now is dashed. "
-        "Only the incumbent and the run training now are at full strength; the rest are faded (hover or isolate one to read it). "
-        "Beyond eight runs the oldest turn grey. "
+        "<div class='sub'>Black: control. Blue: the incumbent. Orange: the run training now (dashed) or, "
+        "until the next one logs an epoch, the last run that finished. "
         "Click a legend entry to hide a run, double-click to isolate it.</div>"
         "<div class='grid'>"
         + curve("×1 validation macro AUC", validation)
@@ -499,9 +648,12 @@ def curves(control: dict, runs: list[dict]) -> str:
     )
 
 
-def tiles(control: dict, runs: list[dict]) -> str:
+def tiles(control: dict, runs: list[dict], fold: int) -> str:
     incumbent = next((run for run in runs if run["role"] == "incumbent"), control)
-    decided = [run for run in runs if run["verdict"] not in {"training", "pending"}]
+    bounds = control_gain(control, incumbent["run"], fold, runs)
+    decided = [
+        run for run in runs if run["verdict"] not in {"training", "pending", "failed"}
+    ]
     gain = (
         incumbent["x4"] - control["x4"]
         if incumbent["x4"] is not None and control["x4"] is not None
@@ -510,10 +662,18 @@ def tiles(control: dict, runs: list[dict]) -> str:
     items = [
         ("Control ×4", number(control["x4"])),
         ("Incumbent", html.escape(incumbent["name"])),
-        ("Gain over control", signed(gain)),
+        (
+            "Gain over control",
+            signed(gain)
+            + (
+                f"<div class='sub'>80% [{bounds[0]:+.4f}, {bounds[1]:+.4f}]</div>"
+                if bounds
+                else ""
+            ),
+        ),
         (
             "Decided · accepted",
-            f"{len(decided)} · {sum('accept' in run['verdict'] for run in decided)}",
+            f"{len(decided)} · {sum(run['verdict'] == 'provisional_accept' for run in decided)}",
         ),
     ]
     return (
@@ -535,10 +695,10 @@ def results(control: dict, runs: list[dict]) -> str:
     for run in [control, *runs]:
         verdict = run["verdict"]
         css = (
-            "accept"
-            if "accept" in verdict
-            else "reject"
-            if verdict in {"reject", "invalid"}
+            "reject"
+            if verdict.split()[0] in {"reject", "invalid", "failed"}
+            else "accept"
+            if verdict.endswith("accept")
             else ""
         )
         interval = run.get("interval")
@@ -728,6 +888,7 @@ def regenerate(settings: MonitorCLI) -> None:
         Path(f"outputs/autoresearch/{settings.campaign}/state.json").read_text()
     )
     control, runs = collect(state)
+    fold = campaign_fold(state)
     detail = state.get("reason") or {
         "RUNNING": f"working normally · agents on {state['provider']}",
         "CALIBRATING": "measuring the budget on CPU",
@@ -741,11 +902,11 @@ def regenerate(settings: MonitorCLI) -> None:
         else BANNER.get(state_name, "var(--ink2)")
     )
     body = (
-        tiles(control, runs)
+        tiles(control, runs, fold)
         + activity(status, state)
         + "<h2>Results</h2>"
         + results(control, runs)
-        + comparison(runs)
+        + comparison(control, runs, fold)
         + "<h2>Curves</h2>"
         + curves(control, runs)
     )

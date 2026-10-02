@@ -280,16 +280,19 @@ frozen. Each new agent job saves its exact brief, context, schema and evidence
 packet, so operational prompt changes remain attributable without changing old
 artifacts.
 
-## Importing ideas and manual adoption
+## Importing, moving and removing ideas, and manual adoption
 
 Startup imports the campaign's `seed-ideas*.yaml` files
-([lifecycle](lifecycle.md#startup-and-proposals)). Later additions and user adoptions go
-through the campaign inbox, `outputs/autoresearch/<campaign-id>/inbox/`, without
+([lifecycle](lifecycle.md#startup-and-proposals)). Later additions, queue changes and user
+adoptions go through the campaign inbox, `outputs/autoresearch/<campaign-id>/inbox/`, without
 stopping the campaign:
 
 ```bash
 rtk proxy uv run --locked python -m scripts.tools.autoresearch import-ideas CAMPAIGN --ideas-file autoresearch/campaigns/CAMPAIGN/IDEAS.yaml
 rtk proxy uv run --locked python -m scripts.tools.autoresearch import-ideas CAMPAIGN --ideas-file autoresearch/campaigns/CAMPAIGN/IDEAS.yaml --forced
+rtk proxy uv run --locked python -m scripts.tools.autoresearch move-idea CAMPAIGN --idea IDEA_ID --before OTHER_IDEA_ID
+rtk proxy uv run --locked python -m scripts.tools.autoresearch move-idea CAMPAIGN --idea IDEA_ID --after OTHER_IDEA_ID
+rtk proxy uv run --locked python -m scripts.tools.autoresearch remove-idea CAMPAIGN --idea IDEA_ID --rationale "..."
 rtk proxy uv run --locked python -m scripts.tools.autoresearch adopt CAMPAIGN --experiment EXPERIMENT_ID --rationale "..."
 ```
 
@@ -309,6 +312,16 @@ immediately under the supervisor lock. A request that fails when applied moves t
   of every other idea, and research waits until they are completed or blocked. They
   cannot declare dependencies. This works in ranked campaigns too; `seed_order` only
   decides how startup seed files are imported.
+- **Moving and removing** act only on an idea whose status is `queued`: once the developer
+  has taken an idea (developing, prepared, launched) the request is refused, as is a move
+  ahead of the reserved queue head.
+  - **Move** places the idea directly before or after another queued idea. The moved idea and
+    every idea ahead of it become user-ordered, like forced ideas: the orchestrator cannot
+    rerank or park them, and research waits until they are completed or blocked.
+  - **Remove** takes the idea out of the queue and marks it `retired` with the rationale; it
+    stays in the registry and a decision record is saved under
+    `outputs/autoresearch/<campaign-id>/decisions/`. A removed forced idea no longer holds
+    research back.
 - **Adoption** makes a valid completed experiment the incumbent by user decision. It
   waits until no training is running, so no launched candidate changes reference, then
   saves the state before the change and a decision record under

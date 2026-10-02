@@ -204,6 +204,51 @@ class Adopt(CampaignCommand):
         )
 
 
+class RemoveIdea(CampaignCommand):
+    model_config = describe(
+        "Take a queued idea out of the backlog by user decision; an idea the developer has taken cannot be removed"
+    )
+
+    idea: str = Field(description="Queued idea ID to remove")
+    rationale: str = Field(description="The user's reason for the removal")
+
+    def cli_cmd(self) -> None:
+        deliver(
+            "remove-idea",
+            self,
+            lambda supervisor: supervisor.request_removal(self.idea, self.rationale),
+        )
+
+
+class MoveIdea(CampaignCommand):
+    model_config = describe(
+        "Move a queued idea next to another queued idea by user decision; it and every idea ahead of it become user-ordered"
+    )
+
+    idea: str = Field(description="Queued idea ID to move")
+    before: str | None = Field(
+        default=None, description="Queued idea the moved one goes directly ahead of"
+    )
+    after: str | None = Field(
+        default=None, description="Queued idea the moved one goes directly behind"
+    )
+
+    @model_validator(mode="after")
+    def one_anchor(self):
+        if (self.before is None) == (self.after is None):
+            raise ValueError("Give exactly one of --before and --after")
+        return self
+
+    def cli_cmd(self) -> None:
+        deliver(
+            "move-idea",
+            self,
+            lambda supervisor: supervisor.request_move(
+                self.idea, self.before or self.after, self.after is not None
+            ),
+        )
+
+
 class Supervise(CampaignCommand):
     model_config = describe("Run the supervisor loop in the foreground")
 
@@ -369,6 +414,8 @@ class AutoresearchCLI(CLISettings):
     resume: CliSubCommand[Resume] = command(Resume)
     import_ideas: CliSubCommand[ImportIdeas] = command(ImportIdeas)
     adopt: CliSubCommand[Adopt] = command(Adopt)
+    remove_idea: CliSubCommand[RemoveIdea] = command(RemoveIdea)
+    move_idea: CliSubCommand[MoveIdea] = command(MoveIdea)
     supervise: CliSubCommand[Supervise] = command(Supervise)
     loop_start: CliSubCommand[LoopStart] = command(LoopStart)
     loop_status: CliSubCommand[LoopStatus] = command(LoopStatus)

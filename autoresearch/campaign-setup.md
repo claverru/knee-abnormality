@@ -80,7 +80,8 @@ permissions using the same runtime.
    ```
 
    Either configured subscription provider works. Every command, including status,
-   stop, resume, usage, import-ideas and adopt, takes the campaign ID; there is no default.
+   stop, resume, usage, import-ideas, move-idea, remove-idea and adopt, takes the campaign ID;
+   there is no default.
    To let autoresearch continue past this topic on its own, start it as the first topic of
    the loop instead: `just autoresearch loop-start --campaign CAMPAIGN --provider claude`
    ([runtime](runtime.md#topic-loop)).
