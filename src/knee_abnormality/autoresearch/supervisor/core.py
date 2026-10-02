@@ -429,6 +429,77 @@ class Supervisor(JobMixin, ExperimentMixin, ResultMixin, SchedulingMixin, Monito
         )
         self.save()
 
+    def free_idea(self, idea_id: str):
+        idea = self.state["ideas"].get(idea_id)
+        if (
+            idea is None
+            or idea["status"] != "queued"
+            or idea_id not in self.state["queue"]
+        ):
+            raise ValueError(
+                f"{idea_id} is not a queued idea; only ideas the developer has not taken can be moved or removed"
+            )
+        return idea
+
+    def moved_queue(self, idea_id: str, anchor: str, after: bool):
+        self.free_idea(idea_id)
+        queue = [item for item in self.state["queue"] if item != idea_id]
+        if anchor not in queue:
+            raise ValueError(f"{anchor} is not another idea in the queue")
+        position = queue.index(anchor) + after
+        if position == 0 and self.state["claimed"]:
+            raise ValueError("Reserved queue head cannot be displaced")
+        queue.insert(position, idea_id)
+        return queue
+
+    def request_removal(self, idea_id: str, rationale: str):
+        self.free_idea(idea_id)
+        write_json(
+            self.output / "inbox" / f"{identifier('remove')}.json",
+            {"kind": "remove", "idea": idea_id, "rationale": rationale},
+        )
+
+    def request_move(self, idea_id: str, anchor: str, after: bool):
+        self.moved_queue(idea_id, anchor, after)
+        write_json(
+            self.output / "inbox" / f"{identifier('move')}.json",
+            {"kind": "move", "idea": idea_id, "anchor": anchor, "after": after},
+        )
+
+    def remove_idea(self, request):
+        idea = self.free_idea(request["idea"])
+        event = identifier("user-remove")
+        write_json(
+            self.output / "decisions" / event / "decision.json",
+            {
+                "event": event,
+                "kind": "idea_removal",
+                "authority": "explicit_user_instruction",
+                "campaign": self.state["campaign"],
+                "revision_before": self.state["revision"],
+                "idea": request["idea"],
+                "rationale": request["rationale"],
+                "queue_before": self.state["queue"],
+            },
+        )
+        self.state["queue"].remove(request["idea"])
+        idea.update(status="retired", retired_reason=request["rationale"])
+        self.state["evidence_revision"] += 1
+        self.save()
+
+    def move_idea(self, request):
+        queue = self.moved_queue(request["idea"], request["anchor"], request["after"])
+        claimed = self.state["experiments"].get(self.state["claimed"])
+        reserved = claimed["idea"] if claimed else None
+        seeds = self.state["seed_ideas"]
+        seeds.extend(
+            item
+            for item in queue[: queue.index(request["idea"]) + 1]
+            if item not in seeds and item != reserved
+        )
+        self.state["queue"] = queue
+        self.save()
+
     def drain_inbox(self):
         if self.active("orchestrator"):
             return
@@ -440,6 +511,10 @@ class Supervisor(JobMixin, ExperimentMixin, ResultMixin, SchedulingMixin, Monito
             try:
                 if request["kind"] == "adopt":
                     self.adopt(request)
+                elif request["kind"] == "remove":
+                    self.remove_idea(request)
+                elif request["kind"] == "move":
+                    self.move_idea(request)
                 else:
                     report = IdeaReport.model_validate(request["report"])
                     source = Path(request["source"])

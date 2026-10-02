@@ -10,6 +10,7 @@
 | Checking which completions the cheap reporter handles and when it escalates | [Restricted completion reporting](protocol.md#restricted-completion-reporting) |
 | Following one idea from claim through development, gates, review, reconciliation, launch, comparison and completion | [Idea lifecycle](lifecycle.md) |
 | Starting, inspecting, stopping or resuming a campaign; reading results and usage; importing ideas, forced ideas or a manual adoption into a running campaign | [Runtime operation](runtime.md) |
+| Moving a queued idea to another place in a running campaign's backlog, or removing it, and what a move or removal is refused for | [Moving and removing ideas](runtime.md#importing-moving-and-removing-ideas-and-manual-adoption) |
 | Understanding which failures recover automatically and which pause | [Automatic recovery](runtime.md#running-pausing-and-resuming) |
 | Checking how the per-experiment triplet and time budgets are sealed | [Sealing and budget](runtime.md#initial-sealing-and-fixed-budget) |
 | Looking up idea, experiment, review, completion or usage record fields | [Records](records.md) |
