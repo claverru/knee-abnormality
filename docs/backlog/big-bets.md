@@ -183,6 +183,41 @@ are unknown; ask for both before designing anything.
 - **Test:** the incumbent recipe plus a final mined phase against a fresh control at the same
   total budget.
 
+## Patellofemoral OA evidence
+
+**Reported diagnosis, not reproduced here; payoff unmeasured (added 2026-10-01).** An analysis the
+user shared says the models rank PF OA mostly from correlated findings, not from the
+patellofemoral joint. Its scripts and outputs are not in this repository, so the first gate
+reproduces it.
+
+- **Reported, kept:**
+  - a coronal-only model scores 0.86 on PF OA against 0.84–0.87 for an axial-only one;
+  - once each model's Effusion, Medial OA and Lateral OA outputs are regressed out, its PF
+    ranking keeps an AUC of 0.71–0.78;
+  - PF OA AUC by scanner runs from 0.79 (MR 5300 1.5T) to 0.97 (Ingenia 1.5T, 71 positives), with
+    Skyra 3T and Vantage at 0.82–0.83; positives on the weak scanners were not given.
+- **Reported, dropped:** each family's PF prediction correlating more with its own effusion
+  prediction (ρ 0.32–0.42) than with the labels (ρ 0.25) compares two continuous predictions with a
+  rare binary label, whose correlation is capped by prevalence. Reading the report labels' Gold PF
+  score (0.933) and the flat public OA score (0.916 → 0.920) as consequences is speculation.
+- **Gate 1, existing fold predictions, no GPU:** the same residualisation for Medial and Lateral
+  OA, PF OA predicted from the true Effusion, Medial OA and Lateral OA labels alone, and positives
+  with paired intervals per scanner. OA is often multi-compartment, so part of the drop is
+  legitimate. Stop if PF's residual is in line with the other two compartments.
+- **Gate 2, labels before images:** the PF targets over-call low grades. Gold is positive for 3 of
+  11 low-grade or softened PF cartilage reports, and a rule at the official threshold scores 0.947
+  on gold against 0.842 for "any finding"
+  ([gold check](../ongoing/report-attribute-extraction.md), [measured gaps](../public-labels/gold-versus-silver.md#measured-gaps)).
+  If the label is the limit, the fix is the label rule and this entry closes.
+- **Gate 3, geometry, label-free:** measure how much of the patellofemoral joint the current axial
+  and sagittal inputs cover and the in-plane resolution over its cartilage.
+- **Bet (guess, low confidence), only if gates 1 and 3 agree:** a PF-targeted axial input, one run
+  against the control at its fold and seed. Evidence against: the
+  [OA detector](../modeling/current-model.md#architecture) already reads PF OA over tokens in
+  front of the knee centre, and
+  [per-label crops](../validation/results/2026-09-16-per-label-crops-result.md) moved PF OA by
+  +0.0018 against crop224 while trailing `00-baseline` by 0.0028.
+
 ## Parked until a specific need
 
 ### Fused study volume and 3D model

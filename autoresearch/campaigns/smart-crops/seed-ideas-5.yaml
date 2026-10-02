@@ -1,0 +1,80 @@
+ideas:
+- id: oa-routed-compartment-crops
+  mechanism_id: label-routed-crop
+  parent_idea_id: crop-compartments
+  title: The incumbent plus two rule-placed compartment crops per coronal T1/PD slice whose
+    tokens enter only the medial and lateral OA labels
+  opportunity: >-
+    Lateral OA rose in all six crop runs against the 120 mm control (+0.0032 to +0.0054 at x4;
+    crop-compartments +0.0054, crop-rule +0.0043), the most consistent per-label effect of the
+    campaign, while medial OA stayed flat (-0.0011 to +0.0023). The runs were rejected because
+    the crop tokens entered every label's pool and cost Baker's cyst (-0.0010 to -0.0095) and
+    contusion (-0.0019 to -0.0035). The incumbent keeps about a third of the lateral OA gain at
+    x4 (+0.0019). In crop-compartments at x1 the wide tokens alone scored 0.9055 on lateral OA
+    against 0.9020 for the control and the joint pool 0.908, with the crop tokens at 0.849 alone
+    and 15% of the attention: about half of the gain was a training effect on the shared
+    backbone and half came from the crop tokens at prediction. Routing the crop tokens to the OA
+    labels keeps every other label's pool exactly the incumbent's.
+  mechanism: >-
+    Complete view policy for training, x1 validation and x4 prediction: the incumbent's views,
+    unchanged, one per selected slice (coronal and sagittal T1/PD 84 mm at 0.375 mm and coronal
+    and sagittal fluid 93.33 mm at 5/12 mm at the rule position; axial at the incumbent's axial
+    view at launch). In addition, every coronal T1/PD slice has two crops, 60 mm at 160 px
+    (0.375 mm, 5x5 tokens), middle slice only: one centred 22 mm medial and one 22 mm lateral of
+    the fitted knee centre, both 10 mm below the image centre, in every epoch and at prediction
+    (no model placement). A series without trusted geometry has one crop centred horizontally on
+    the image centre. Crops are shifted, never shrunk, to stay inside the image-centred 120 mm
+    window and the stored image. Training jitter of the crop positions is the campaign's uniform
+    draw of up to 12 mm per axis, per series and step; validation and prediction are
+    deterministic. Routing, fixed: crop tokens are allowed in the per-label attention pool of
+    Medial OA and Lateral OA only, and are masked out of the pool of the other ten labels, as the
+    meniscus own-side mask removes tokens today. In the OA detector they count in the medial and
+    lateral regions and not in the anterior one, so PF OA does not see them. They are excluded
+    from the half-knee detector and its loss and from the report-attribute heads. No sagittal
+    crop, no fluid crop, no crop loss.
+  precedents:
+  - 'Lateral OA at x4 against rn18-field-120-control (0.9064): crop-compartments +0.0054,
+    crop-attention +0.0048, crop-rule +0.0043, crop-own-loss +0.0034,
+    crop-full-context-ranking-locator +0.0033, crop-evidence-utility-placement +0.0032;
+    t1pd-detail-84 -0.0017; fluid-detail-93-replacement +0.0019
+    (outputs/analysis/view-spacing-20261002/run_label_deltas.csv).'
+  - 'crop-compartments at x1, last epoch: lateral OA 0.9055 from the wide tokens alone, 0.849
+    from the crop tokens alone, attention mass on crop tokens 0.147; control 0.9020 (its
+    metrics.csv and epoch metrics).'
+  - 'Placement adds nothing over the rule: five placements within 0.0006 of each other
+    (findings.md), so the crops stay at the rule positions in every epoch.'
+  - 'Identical field changes differ by up to 0.0067 on one label between runs
+    (outputs/analysis/view-spacing-20261002/report.md), so one run reads the direction only.'
+  novelty: First crop whose tokens are routed to a label group, and first crop on top of the
+    zoomed views.
+  coverage: About 8 crops per study, on the 4.0 coronal T1/PD slices; the two crops reach 10 mm
+    further out on each side than the 84 mm view. Medial and lateral OA are the targets; the
+    other ten labels pool the incumbent's tokens.
+  exploitation: >-
+    Activation: attention_mass_view (crop tokens) for Medial OA and for Lateral OA of at least
+    0.05 at epoch 0, and exactly 0 for the other ten labels. Log per epoch, training and
+    validation: that attention mass per label; x1 AUC of Medial OA and Lateral OA with the crop
+    tokens removed and with the crop tokens alone; the OA detector's correction per region;
+    crop centre statistics and the clipped share. Read against the incumbent and
+    crop-compartments: lateral and medial OA first, then Baker's cyst, contusion and MCL, which
+    should stay at the incumbent's values.
+  budget: >-
+    8 crops of 160 px are 4.1 inputs of 224 px on 26, 1.16x the incumbent's backbone pixels,
+    about 1,320 s from its 1,134 s. crop-compartments, with 13 crops and model placement, took
+    1,410 s. Estimate 1,300-1,450 s, inside 575-1,724 s. The crop reuses the native rows read
+    for its slice.
+  implementation: >-
+    Builds on the incumbent's code. The crop cutting, its batch and token bookkeeping, the crop
+    embedding, jitter and inference graph can be taken from crop-rule's and crop-compartments'
+    frozen sources under outputs/autoresearch/smart-crops/experiments, without the model
+    placement and without the sagittal crop. The routing is a per-label token mask in the
+    attention pool (model.py, _attention_pool, where the own-side mask is applied) plus the
+    exclusions in the OA detector's anterior region, the half-knee path and the report-attribute
+    heads. Crop tokens keep their plane-contrast readout row, a zero-initialized additive crop
+    embedding and positions in the 120 mm frame; no gate and no zero-initialized projection.
+    Preprocessing identity updated.
+  open_choices: None. Both crops feed both OA labels; the 22 mm offsets and the 60 mm, 160 px
+    crop are those of crop-compartments. User seed, 2026-10-02.
+  dependencies: []
+  priority_rationale: User seed, forced, 2026-10-02; runs after the per-type variations.
+exhausted_directions: None added.

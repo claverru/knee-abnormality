@@ -1,0 +1,122 @@
+ideas:
+- id: two-views-fluid-140
+  mechanism_id: two-views-per-slice
+  parent_idea_id: null
+  title: Fluid-sensitive slices also read at 140 mm through a ResNet-10t that feeds the joint pool
+    from the first step, with no gate
+  opportunity: >-
+    The 120 mm field gains on the detail labels and costs the periphery: against the same recipe
+    at 140 mm the control loses on synovitis (-0.0044), Baker's cyst (-0.0030) and the medial
+    meniscus (-0.0018). Taking each label's better field from the single-field runs would be worth
+    about +0.002 over 140 mm, against +0.0011 for 120 mm alone. Two views of the same slice were
+    tried once, in mixed-field's two-stream-paired, but its second stream sat behind a gate
+    initialized at zero and never trained (0.506 alone, joint equal to narrow-only at every epoch),
+    so the idea is untested. The periphery labels look mostly at fluid-sensitive slices (1.0-1.4 of
+    a uniform share of attention, against 0.6-0.8 on T1/PD), so those are the slices that get the
+    second view.
+  mechanism: >-
+    View policy: every selected slice is read at the wide view (120 mm at 224 px, 0.536 mm)
+    through the ResNet-18, unchanged. Every slice of a fluid-sensitive series (fluid_sensitive 1,
+    fat_suppression 1), in all three planes, is also read at a context view, 140 mm at 224 px
+    (0.625 mm), image-centred, through a second backbone: a Refined-RadImageNet ResNet-10t
+    (resnet10t.c3_in1k), backbone learning rate 6e-5, L2-SP anchored like the first. The context
+    stream has its own projection to 256 at the default initialization, not zero. Context tokens
+    add a zero-initialized view embedding, take their 2D position in the wide view's frame, are
+    scored by the plane-contrast readout row of their series type and enter the joint pool
+    directly at full weight from the first step: no gate, no scaled residual. The two views of a
+    slice come from one file read and are augmented independently. No crop, no per-stream loss.
+  precedents:
+  - 'two-stream-paired (mixed-field): every slice at 120 mm (ResNet-18) and 140 mm (ResNet-10t),
+    pooled as narrow + tanh(gate) x (joint - narrow) with the gate at zero; the second stream
+    never trained and the run was in effect 120 mm alone. 51 inputs per study took 1,736 s
+    (docs/validation/results/2026-10-01-mixed-field-campaign.md).'
+  - 'Two views per slice, backlog: both streams must feed the pool from the first step, and the
+    activation check must compare the joint score with the narrow-only one
+    (docs/backlog/big-bets.md).'
+  - 'rn18-field-120-control against the same recipe at 140 mm: +0.0008 overall, synovitis -0.0044,
+    Baker''s cyst -0.0030, medial meniscus -0.0018 (prior-work.md, Precedent table).'
+  - 'One ResNet-18 per field lost 0.0017 to the shared-backbone mix; there each backbone saw half
+    the slices, here the second one only adds a view (prior-work.md, Precedent table).'
+  novelty: First run in which a second view of the same slice trains from the first step.
+  coverage: About 16.6 of a study's 26.8 slices get the context view (axial fluid 6.5, coronal
+    fluid 5.1, sagittal fluid 5.0). Targets synovitis, Baker's cyst, the medial meniscus, MCL and
+    fracture; the detail labels should hold.
+  exploitation: attention_mass_view_<label> on the context tokens; val_macro_auc_view_wide (the
+    120 mm tokens alone) and val_macro_auc_view_detail (the context tokens alone) per label and
+    epoch, which must differ from the joint AUC; the mean absolute difference between the joint
+    and the wide-only logits per epoch; per-label AUC against the reference, with synovitis,
+    Baker's cyst and the medial meniscus as the labels to watch.
+  budget: 43 inputs per study against 26.8. In two-stream-paired the second stream cost about
+    0.67 of the first, which puts this at about 1,630 s against the bound of 1,724 s. The same view
+    on every slice would be about 1,830-1,920 s and does not fit.
+  implementation: >-
+    Replaces the incumbent's view policy. The paired loader (one file read, two resample plans,
+    per-view patient maps and valid rectangles), the second backbone with its optimizer group and
+    L2-SP anchors, and the second fixed-chunk inference graph can be taken from
+    two-stream-paired's frozen source in outputs/autoresearch/mixed-field, with three changes: the
+    gate and the residual pooling are removed, the context projection is not zero-initialized, and
+    the second view is read on fluid-sensitive series only. Slice selection keeps the 60 mm radius
+    and 26 slices per study. Activation signature: attention_mass_view_mean of at least 0.05 at
+    epoch 0.
+  open_choices: None. The 140 mm field and the ResNet-10t are those of the earlier run; the fluid
+    series are where the periphery labels look and what the time bound allows.
+  dependencies: []
+  priority_rationale: User seed, 2026-10-01; independent of the crop seeds, so it runs after them.
+- id: two-views-112-fluid-140
+  mechanism_id: two-views-per-slice
+  parent_idea_id: null
+  title: As two-views-fluid-140 with the main view narrowed to 112 mm (0.5 mm) on every slice
+  opportunity: >-
+    If a second, wider view gives the periphery back, the main view no longer has to hold it and
+    can be finer. 112 mm at 224 px is 0.5 mm, the most common acquired resolution: it keeps the
+    full acquired detail of 35-37% of T1/PD and 60% of fluid coronal and sagittal series, against
+    18-23% and 37-44% at 0.536 mm. A 112 mm view on every series has never been run: the contrast
+    split gave it to T1/PD series only, with fluid at 140 mm, and tied 120 mm. Alone, 112 mm would
+    cut the periphery further; in September the centred 112 mm crop cost Baker's cyst 0.028
+    because the cyst lay outside 112 mm and inside 140 mm. Here the fluid slices keep a 140 mm
+    view.
+  mechanism: >-
+    View policy: every selected slice is read at a narrow view, 112 mm at 224 px (0.5 mm),
+    image-centred, through the ResNet-18, in place of the 120 mm wide view. Every slice of a
+    fluid-sensitive series (fluid_sensitive 1, fat_suppression 1), in all three planes, is also
+    read at the context view, 140 mm at 224 px (0.625 mm), image-centred, through the
+    Refined-RadImageNet ResNet-10t, exactly as in two-views-fluid-140: backbone learning rate
+    6e-5, L2-SP anchored, its own projection at the default initialization, a zero-initialized
+    view embedding, token positions in one shared frame, the plane-contrast readout row of the
+    series type, and the joint pool directly at full weight from the first step, with no gate.
+    Slice selection keeps the 60 mm radius. No crop, no per-stream loss.
+  precedents:
+  - 'contrast-split-112-140 (mixed-field): T1/PD at 112 mm and fluid at 140 mm scored +0.0015
+    against the 140 mm reference and -0.0003 against 120 mm on every series; its 112 mm tokens
+    alone scored 0.859 at x1 (prior-work.md, Precedent table).'
+  - 'Acquired resolution at 0.5 mm: coronal T1/PD 35%, sagittal T1/PD 37%, fluid 60% fully
+    resolved; at 0.536 mm 18%, 23% and 37-44% (prior-work.md, Acquired resolution).'
+  - 'Centred 112 mm crop, September: Baker''s cyst -0.028, the cyst outside 112 mm and inside
+    140 mm in two of three reviewed studies (docs/research/input-resolution.md).'
+  - 'The 120 mm field already cuts more than 10 mm of tissue on a coronal side in 30-31% of series
+    and more than 20 mm of popliteal tissue in 34% of sagittal ones (prior-work.md, What the
+    120 mm field already cuts).'
+  novelty: First 112 mm view on every series, and first main view narrower than 120 mm with a
+    wider view beside it.
+  coverage: Every slice changes its main view; about 16.6 of 26.8 slices per study get the context
+    view. T1/PD slices have the 112 mm view alone, so their periphery is seen only through the
+    fluid series of the same plane.
+  exploitation: As two-views-fluid-140, read against it label by label; the detail group (ACL,
+    menisci, OA labels) is where 112 mm should add, the periphery group and the medial meniscus
+    where it could cost. attention_mass_view_<label> on the context tokens against that seed's
+    values shows whether the model leans more on the wide view once the main one is narrower.
+  budget: As two-views-fluid-140, 43 inputs per study and about 1,630 s against the bound of
+    1,724 s.
+  implementation: >-
+    Replaces the incumbent's view policy; builds on two-views-fluid-140's frozen source if it was
+    rejected. The only change is the main view's spacing, 0.5 mm in place of 0.536 mm, in
+    data.views; slice selection keeps its 60 mm radius and does not follow the spacing. Both views
+    come from one file read of the 140 mm rows. Activation signature: attention_mass_view_mean of
+    at least 0.05 at epoch 0.
+  open_choices: None. 112 mm is 0.5 mm at 224 px, the most common acquired resolution, and was the
+    narrow field of the contrast split.
+  dependencies: []
+  priority_rationale: User seed, 2026-10-01; runs after two-views-fluid-140, which it differs from
+    by the main view alone.
+exhausted_directions: The gated pooling of two-stream-paired and a context projection initialized
+  at zero are closed, because they are why that run tested nothing.

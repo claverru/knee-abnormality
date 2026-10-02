@@ -9,6 +9,7 @@
 | Planning larger investigations | [Big bets](big-bets.md) |
 | Reading every slice at 120 mm and again at 140 mm through two streams (paired views; the first attempt's gate kept the second stream off) | [Two views per slice](big-bets.md#two-views-per-slice) |
 | Planning an autoresearch campaign on training-only auxiliary losses and heads (report state, OA attributes, per-view classifiers, pretext tasks) | [Auxiliary-loss campaign](big-bets.md#auxiliary-loss-campaign) |
+| Checking whether PF OA is ranked from correlated findings (effusion, tibiofemoral OA) instead of the patella, and the PF-targeted axial input bet | [Patellofemoral OA evidence](big-bets.md#patellofemoral-oa-evidence) |
 | Replacing ReXNet-200 with a same-cost timm backbone (ReXNet-R 12k, ConvNeXt-nano, HGNetV2-B3) | [Same-cost backbone candidates](small-changes.md#same-cost-backbone-candidates) |
 | Filling empty sagittal/coronal fluid slots with reformats (MPR) of a study's 3D DESS or 3D PD FS series | [Reformatted fluid planes](big-bets.md#reformatted-fluid-planes-from-3d-series) |
 | Fusing a study's 2D stacks into one registered volume for a 3D model, and its frozen-model reslice gate | [Fused study volume](big-bets.md#fused-study-volume-and-3d-model) |

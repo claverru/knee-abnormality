@@ -1,0 +1,85 @@
+ideas:
+- id: oa-compartment-readers
+  mechanism_id: label-routed-crop
+  parent_idea_id: oa-routed-compartment-crops
+  title: Compartment crops on coronal T1/PD and fluid slices, each routed to the OA label of its
+    own side and trained by its own loss
+  opportunity: >-
+    crop-compartments raised lateral OA by 0.0054 and left medial OA at -0.0007. Three readings of
+    the campaign say why and what to change. First, medial OA rose only in runs that changed a
+    fluid view (+0.0022 to +0.0036 in six runs, the incumbent among them) and never from T1/PD
+    crops (-0.0011 to +0.0023 in six runs); coronal fluid is the coronal type medial OA uses most
+    per slice (1.28 of a uniform share against 1.06 for coronal T1/PD), and the crops were cut
+    from T1/PD only. Second, the crop tokens were weak readers of medial OA: alone they scored
+    0.897 at x1 against 0.935 for the wide tokens, so adding them to the pool changed nothing.
+    crop-own-loss, which trained the crop tokens under their own loss, is the only crop run in
+    which both OA labels rose (medial +0.0023, lateral +0.0034). Third, each crop's tokens
+    entered every label's pool, which cost Baker's cyst and contusion; oa-routed-compartment-crops
+    tests the routing alone.
+  mechanism: >-
+    Complete view policy for training, x1 validation and x4 prediction. The incumbent's views are
+    unchanged, one per selected slice. In addition every coronal slice, T1/PD and
+    fluid-sensitive, has two crops, 60 mm at 160 px (0.375 mm, 5x5 tokens), middle slice only,
+    one centred 22 mm medial and one 22 mm lateral of the fitted knee centre, both 10 mm below
+    the image centre, rule-placed in every epoch and at prediction. A series without trusted
+    geometry has one crop centred horizontally on the image centre. Crops are shifted, never
+    shrunk, to stay inside the image-centred 120 mm window and the stored image. Training jitter
+    of the crop positions is the campaign's uniform draw of up to 12 mm per axis, per series and
+    step; validation and prediction are deterministic. Routing, fixed. Medial crop tokens are
+    allowed in the attention pool of Medial OA only, lateral crop tokens in that of Lateral OA
+    only, and the single crop of an untrusted series in both; they are masked out of the pool of
+    every other label. In the OA detector a crop token counts in the region of its own side and
+    not in the anterior one. Crop tokens are excluded from the half-knee path and from the
+    report-attribute heads. Own loss, fixed. Beside the joint pool, the medial crop tokens of a
+    study are pooled alone into a Medial OA logit and the lateral ones into a Lateral OA logit,
+    with the same attention scorer and readout rows, and these two logits take the
+    class-balanced soft BCE of the disease loss at trainer.crop_loss_weight 0.1, over studies
+    that have such tokens. Prediction uses the joint pool only. No sagittal crop.
+  precedents:
+  - 'Medial OA at x4 against rn18-field-120-control (0.9388): sagittal-fluid-detail-rectangle
+    +0.0036, two-views-112-fluid-140 +0.0034, sagittal-fluid-content-residual +0.0032,
+    two-views-fluid-140 +0.0028, fluid-detail-93-replacement +0.0022; the six T1/PD crop runs
+    -0.0011 to +0.0023 (outputs/analysis/view-spacing-20261002/run_label_deltas.csv).'
+  - 'crop-compartments at x1, last epoch, crop tokens alone against wide tokens alone: medial OA
+    0.897 against 0.935, lateral OA 0.849 against 0.906 (its metrics.csv).'
+  - 'crop-own-loss: crop-only logits under the disease loss at weight 0.1; medial OA +0.0023,
+    lateral OA +0.0034, macro -0.0003 (findings.md).'
+  - 'Coronal attention per slice against uniform: medial OA 1.28 on coronal fluid and 1.06 on
+    coronal T1/PD (outputs/analysis/view-spacing-20261002/report.md).'
+  novelty: First crops on fluid slices, first side-specific routing of crop tokens and first
+    crop loss restricted to the labels the crop is meant for.
+  coverage: About 18 crops per study, on the 4.0 coronal T1/PD and 5.1 coronal fluid slices.
+    Medial and lateral OA are the targets; the other ten labels pool the incumbent's tokens.
+  exploitation: >-
+    Activation, at epoch 0, attention mass on medial crop tokens for Medial OA and on lateral crop
+    tokens for Lateral OA of at least 0.05, exactly 0 for every other label and for the opposite
+    side, and a finite crop loss on at least 90% of studies. Log per epoch, training and
+    validation, that attention mass split by contrast; the x1 AUC of each OA label from its crop
+    tokens alone and from the joint pool with the crop tokens removed; the crop loss per label;
+    the OA detector's correction per region; crop centre statistics and the clipped share. Read
+    against the incumbent, oa-routed-compartment-crops and crop-compartments. Medial OA from the
+    crop tokens alone should pass the 0.897 of crop-compartments; Baker's cyst, contusion and MCL
+    should stay at the incumbent's values.
+  budget: >-
+    18 crops of 160 px are 9.2 inputs of 224 px on 26, 1.35x the incumbent's backbone pixels,
+    about 1,530 s from its 1,134 s. crop-compartments, with 13 crops, took 1,410 s where pixel
+    scaling predicted 1,442 s. Estimate 1,500-1,650 s against the bound of 1,724 s. Each crop
+    reuses the native rows read for its slice. If the projected time passes the bound, look for
+    duplicate reads and resamples first and return blocked rather than drop crops, slices or
+    epochs.
+  implementation: >-
+    Builds on oa-routed-compartment-crops' frozen source if it exists, else on the incumbent's
+    code with the crop machinery of crop-rule, crop-compartments and crop-own-loss from their
+    frozen sources under outputs/autoresearch/smart-crops/experiments. Changes against
+    oa-routed-compartment-crops are three. Coronal fluid slices also get the two crops. The
+    per-label token mask in the attention pool becomes side-specific. The crop-only pooling of
+    crop-own-loss is added for the two OA labels, per side, at trainer.crop_loss_weight 0.1.
+    Crop tokens keep their plane-contrast readout row, a zero-initialized additive crop embedding
+    and positions in the 120 mm frame; no gate and no zero-initialized projection. Preprocessing
+    identity updated.
+  open_choices: None. The crop geometry is that of crop-compartments and the loss weight that of
+    crop-own-loss. User seed, 2026-10-02; the user asked for a version that also lifts medial OA.
+  dependencies: []
+  priority_rationale: User seed, forced, 2026-10-02; runs after oa-routed-compartment-crops,
+    which is its routing-only reference.
+exhausted_directions: None added.

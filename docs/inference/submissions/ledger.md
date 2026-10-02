@@ -1,6 +1,6 @@
 # Submission ledger
 
-All 89 Kaggle competition submissions, newest first, with submission times in UTC. The table is
+All 93 Kaggle competition submissions, newest first, with submission times in UTC. The table is
 regenerated from the live submission list and the local bundles by
 [`update_submission_ledger`](../../../scripts/tools/update_submission_ledger.py),
 which also writes `outputs/submission/kaggle-ledger.json`. The dated records in this folder cover
@@ -75,6 +75,10 @@ head); the Label column gives the Kaggle label wherever it differs.
 
 | S | Submitted (UTC) | Label | Inference | Fold 0 | Public | ID | Record |
 |---|---|---|---|---|---:|---:|---|
+| S93 | 2026-10-02 07:11 | RN18 84mm T1PD 93mm fluid f0 t0.9 | x4 tau0.9 bs4 | (x1, fold 0) 0.929261 | 0.950 | 56768246 | [2026-10-02 smart-crops campaign](../../validation/results/2026-10-02-smart-crops-campaign.md) |
+| S92 | 2026-10-01 20:51 | RN18 120mm plane readouts f0 t0.9 | x4 tau0.9 bs4 | (x1, fold 0) 0.927479 | 0.947 | 56758831 | [2026-10-01 mixed-field campaign](../../validation/results/2026-10-01-mixed-field-campaign.md#control-on-the-adopted-recipe) |
+| S91 | 2026-10-01 19:18 | RN18 T1PD112 fluid140 mid-aug f0 t0.9 | x4 tau0.9 bs4 | (x1, fold 0) 0.924854 | 0.945 | 56757734 | [2026-10-01 mixed-field campaign](../../validation/results/2026-10-01-mixed-field-campaign.md) |
+| S90 | 2026-10-01 19:16 | RN18 120mm mid-slice aug f0 t0.9 | x4 tau0.9 bs4 | (x1, fold 0) 0.925649 | 0.947 | 56757704 | [2026-10-01 mixed-field campaign](../../validation/results/2026-10-01-mixed-field-campaign.md) |
 | S89 | 2026-10-01 09:25 | ens ReXNet v2 control (τ 0.75) + Refined RN50 (τ 0.9), fold 0, reflection TTA; two bundles, one notebook | x4 refl-TTA bs4 | (x4 blend, fold 0, no TTA) 0.935999 | 0.951 | 56748424 | [2026-10-01 revisits campaign](../../validation/results/2026-10-01-revisits-campaign.md) |
 | S88 | 2026-10-01 09:07 | Refined RN50 f0 t0.9 | x4 tau0.9 bs4 | (x1, fold 0) 0.929393 | 0.948 | 56748142 | [2026-10-01 revisits campaign](../../validation/results/2026-10-01-revisits-campaign.md) |
 | S87 | 2026-09-30 20:00 | RN18 OOF-blend 0.5 f0 t0.9 | x4 tau0.9 bs4 | (x1, fold 0) 0.926842 | 0.944 | 56717610 | [Next](../../ongoing/next.md) |

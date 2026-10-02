@@ -148,7 +148,12 @@ class GinAugmentationConfig(AugmentationConfig):
     blend_max: Annotated[float, Field(gt=0, le=1)] = 0.5
 
 
+class ViewsConfig(ConfigModel):
+    policy: Literal["wide", "detail_84_93"] = "wide"
+
+
 class DataConfig(ConfigModel):
+    views: ViewsConfig = Field(default_factory=ViewsConfig)
     reflection_augmentation: ReflectionAugmentationConfig = Field(
         default_factory=ReflectionAugmentationConfig
     )
