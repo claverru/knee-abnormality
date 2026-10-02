@@ -1,13 +1,14 @@
 # Submission ledger
 
-All 93 Kaggle competition submissions, newest first, with submission times in UTC. The table is
+All 97 Kaggle competition submissions, newest first, with submission times in UTC. The table is
 regenerated from the live submission list and the local bundles by
 [`update_submission_ledger`](../../../scripts/tools/update_submission_ledger.py),
 which also writes `outputs/submission/kaggle-ledger.json`. The dated records in this folder cover
 S01–S32; the baseline4 image-count comparisons are recorded in
 [Inference image count and memory](../inference-image-count-and-memory.md), and the 2026-09-19
 ensemble submissions S33–S37 are recorded in
-[2026-09-19 ensemble submissions](2026-09-19-ensemble-submissions.md).
+[2026-09-19 ensemble submissions](2026-09-19-ensemble-submissions.md); S94–S97 are recorded in
+[2026-10-02 learned-view and blend submissions](2026-10-02-blend-submissions.md).
 
 ## Naming
 
@@ -75,6 +76,10 @@ head); the Label column gives the Kaggle label wherever it differs.
 
 | S | Submitted (UTC) | Label | Inference | Fold 0 | Public | ID | Record |
 |---|---|---|---|---|---:|---:|---|
+| S97 | 2026-10-02 21:06 | ens of 28 networks in 13 bundles, mirror TTA on all, weighted by architecture: Refined RN50 f0 0.30; RN18 84/93 mm f0 0.18 + RN18 L2-SP folds 1–4 0.12; ReXNet f0, 3 × f3, 4 bundles f4 0.30; B3 + ReXNet f3 0.05; 5 B0 + 5 ReXNet of 2026-09-19 0.05 | x4 (B3 x5) mirror TTA bs4 | none (members of other folds) | **0.954** | 56782385 | [2026-10-02 blends](2026-10-02-blend-submissions.md#s97-members-and-weights) |
+| S96 | 2026-10-02 19:23 | ens ReXNet v2 control (τ 0.75) + Refined RN50 (τ 0.9), both with reflection TTA, + RN18 84/93 mm (τ 0.9), fold 0; three bundles, one notebook | x4 bs4 | (x4 blend, fold 0, τ 1, no TTA) 0.936926 | 0.953 | 56780901 | [2026-10-02 blends](2026-10-02-blend-submissions.md) |
+| S95 | 2026-10-02 19:23 | ens RN18 84/93 mm + RN18 learned views (τ 0.9), fold 0; two bundles, one notebook | x4 tau0.9 bs4 | (x4 blend, fold 0, τ 1) 0.933996 | 0.950 | 56780899 | [2026-10-02 blends](2026-10-02-blend-submissions.md) |
+| S94 | 2026-10-02 17:45 | RN18 learned views budget f0 t0.9 | x4 tau0.9 bs4 | (x1, fold 0) 0.927404 | 0.947 | 56779307 | [2026-10-02 blends](2026-10-02-blend-submissions.md#what-the-numbers-say) |
 | S93 | 2026-10-02 07:11 | RN18 84mm T1PD 93mm fluid f0 t0.9 | x4 tau0.9 bs4 | (x1, fold 0) 0.929261 | 0.950 | 56768246 | [2026-10-02 smart-crops campaign](../../validation/results/2026-10-02-smart-crops-campaign.md) |
 | S92 | 2026-10-01 20:51 | RN18 120mm plane readouts f0 t0.9 | x4 tau0.9 bs4 | (x1, fold 0) 0.927479 | 0.947 | 56758831 | [2026-10-01 mixed-field campaign](../../validation/results/2026-10-01-mixed-field-campaign.md#control-on-the-adopted-recipe) |
 | S91 | 2026-10-01 19:18 | RN18 T1PD112 fluid140 mid-aug f0 t0.9 | x4 tau0.9 bs4 | (x1, fold 0) 0.924854 | 0.945 | 56757734 | [2026-10-01 mixed-field campaign](../../validation/results/2026-10-01-mixed-field-campaign.md) |
