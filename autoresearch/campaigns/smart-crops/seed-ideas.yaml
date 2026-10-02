@@ -1,0 +1,250 @@
+ideas:
+- id: t1pd-detail-84
+  mechanism_id: detail-view
+  parent_idea_id: null
+  title: T1/PD coronal and sagittal series at 84 mm and 0.375 mm instead of 120 mm, no crop
+  opportunity: >-
+    The 120 mm input at 0.536 mm keeps the full acquired detail of 18-23% of T1/PD coronal and
+    sagittal series; 0.375 mm keeps it in 90-92%. Narrowing from 140 to 120 mm gained three times
+    (+0.0011 to +0.0023), and the periphery labels put only 0.6-0.8 of a uniform share of attention
+    on these series, so they are the ones that can give up more field. The evidence is mixed: the
+    contrast split, which narrowed T1/PD series alone to 112 mm, tied 120 mm on every series, and
+    the medial meniscus fell in every 120 mm run. Nothing has measured 0.375 mm, and a crop result
+    cannot be read without knowing what resolution alone gives.
+  mechanism: >-
+    View policy: every slice of a T1/PD coronal or sagittal series (fluid_sensitive 0,
+    fat_suppression 0) is read at the detail view, 84 mm at 224 px (0.375 mm), in training,
+    validation and prediction; axial series and fluid-sensitive series keep the wide view (120 mm
+    at 224 px). The window sits at the rule position of its series: coronal centred horizontally
+    on the fitted knee centre, sagittal 7 mm anterior of it, both 10 mm below the image centre; the
+    image centre horizontally for a series without trusted geometry; shifted to stay inside the
+    wide view's window and the stored image. Tokens of the detail view take their 2D position in
+    the wide view's frame and add a zero-initialized view embedding. One shared backbone, the
+    plane-contrast readouts and the joint pool, unchanged.
+  precedents:
+  - 'Mixed-field (reference rn18-l2sp-no-confusion, 140 mm): 120 mm alone +0.0011 and +0.0012,
+    0.947 public against 0.943; contrast-split-112-140 +0.0015 but -0.0003 against 120 mm alone
+    (80% [-0.0017, +0.0011]) and 0.945 public; the medial meniscus fell -0.002 to -0.007 in every
+    120 mm run (docs/validation/results/2026-10-01-mixed-field-campaign.md).'
+  - 'Acquired resolution: T1/PD coronal 92% and sagittal 90% fully resolved at 0.375 mm, 18% and
+    23% at 0.536 mm (prior-work.md, Acquired resolution).'
+  - 'Extent: the detail labels use 80-90 mm across a coronal slice and 60-70 mm across a sagittal
+    one; one fixed 80 mm window keeps 0.65-0.74 of ACL and meniscus attention on the 140 mm control
+    (prior-work.md, Where the model looks).'
+  novelty: First run at 0.375 mm, first rule-placed window on the fitted knee centre, and the
+    narrowest field tried.
+  coverage: All studies with a T1/PD coronal or sagittal series, about 9 of 26 slices per study.
+    Coronal is the tight case, where 84 mm leaves no margin around both compartments; the fluid
+    series of the same plane keep 120 mm.
+  exploitation: view_share_detail per plane; val_macro_auc_view_wide and val_macro_auc_view_detail
+    per label; the window centre's mean and spread per plane; per-label AUC against the reference
+    by the detail and periphery groups of prior-work.md, with the medial meniscus read on its own.
+    It is the resolution yardstick for every crop seed.
+  budget: 26 images per study as the reference; expected time as the reference (1,149 s).
+  implementation: >-
+    Replaces the incumbent's view policy. data.views in config.py with the incumbent's single wide
+    view as the default; the per-series spacing and window offset in data/dataset.py and
+    data/preprocessing (the offset enters the resample plan and output_to_native, so patient maps
+    and valid rectangles follow); the view index per series in the batch; the view embedding and
+    wide-frame token positions in modeling/; view_share_* and the per-view diagnostics in the
+    Lightning module. Slice selection keeps the 60 mm radius. Activation signature:
+    view_share_detail of at least 0.25 at epoch 0.
+  open_choices: None. The spacing comes from the acquired resolution, the size is what 224 px
+    gives at that spacing, and the position comes from the measured centres; none is swept.
+  dependencies: []
+  priority_rationale: First because it is free and is needed to read the crop seeds.
+- id: crop-rule
+  mechanism_id: crop-rule-placed
+  parent_idea_id: null
+  title: Every slice at the wide view, T1/PD coronal and sagittal slices also at a rule-placed
+    60 mm crop at 0.375 mm
+  opportunity: >-
+    A detail view that replaces the wide one gives up more of the periphery, which 120 mm already
+    cuts. A crop beside the wide view keeps it and adds the acquired detail where the detail labels
+    look. In September 0.5 mm crops gained on ACL (+0.011) and lost on the labels whose regions the
+    crops left out; here every slice keeps its wide view. This seed is also the control for learned
+    placement: the later seeds differ from it only in where the window sits.
+  mechanism: >-
+    View policy: every selected slice is read at the wide view (120 mm at 224 px); every slice of a
+    T1/PD coronal or sagittal series is also read at a crop, 60 mm at 160 px (0.375 mm, 5x5
+    tokens), in training, validation and prediction. The crop sits at the rule position of its
+    series (as t1pd-detail-84), with training jitter of up to 12 mm per axis, per series and step,
+    and none in validation and prediction. The crop is the middle slice only, reuses the native
+    rows read for the wide view and the wide view's intensity bounds, and is augmented as its own
+    acquisition, without contrast mixing. Crop tokens go through the shared backbone and
+    projection, take their 2D position in the wide view's frame, add a zero-initialized view
+    embedding and enter the joint pool directly at full weight, with no gate. No crop loss.
+  precedents:
+  - 'Per-label crops, 112 mm at 0.5 mm on 75% of slices replacing the full slice: -0.0011, ACL
+    +0.0111, synovitis +0.0077, medial OA +0.0057, lateral meniscus -0.0102, fracture -0.0085
+    (docs/history/crop-selection-investigation.md).'
+  - 'A 60 mm window at one position for all studies keeps 0.55 of ACL, 0.56 of medial-meniscus and
+    0.49 of lateral-meniscus attention on the 140 mm control (prior-work.md, Where the model
+    looks).'
+  - 'Crop jitter was called crucial by the RSNA lumbar winners
+    (docs/research/learned-crop-selection.md).'
+  - 'two-stream-paired: a second stream behind a zero-initialized gate never trained (0.506 alone);
+    views sharing the backbone were both used, 0.859 and 0.916 alone for the contrast split
+    (prior-work.md, Precedent table).'
+  novelty: First crop beside an unchanged wide view, first 60 mm window and first second input
+    shape on the current recipe.
+  coverage: About 9 crops per study on top of 26 wide slices. A 60 mm window cannot hold both
+    compartments of a coronal slice; at the knee centre it holds the notch and the inner halves.
+  exploitation: view_share_crop; attention_mass_view_<label> against the crop tokens' share of
+    tokens; val_macro_auc_view_wide and val_macro_auc_view_detail per label; the window centre's
+    mean and spread per plane; per-label AUC against the incumbent, the reference and
+    t1pd-detail-84.
+  budget: 35 images per study against 26 (1.35x) at 1.18x the backbone pixels. Mixed-field time
+    tracked backbone compute, so expect about 1,360-1,550 s; the bound is 1,724 s.
+  implementation: >-
+    Replaces the incumbent's view policy. The crop is a second input shape: its own image tensor
+    and per-series metadata in the batch, its own resample plan with the window offset, the wide
+    view's bounds; encoding of the two shapes and concatenation of their tokens in modeling/, with
+    the plane-contrast readout, half-knee and report-attribute paths taking tokens of both shapes
+    (a crop token is scored by the readout row of its series type); a second fixed-chunk
+    graph for 160 px in inference/engine.py. If t1pd-detail-84 was accepted, its loader offset,
+    view index and embedding are reused. Activation signature: attention_mass_view_mean of at
+    least 0.05 at epoch 0.
+  open_choices: None. Size and spacing are fixed by the contract; the jitter is one crop token.
+  dependencies: []
+  priority_rationale: Second because every learned placement is measured against it and it carries
+    the plumbing they share.
+- id: crop-attention
+  mechanism_id: crop-model-placed
+  parent_idea_id: null
+  title: The 60 mm crop placed by the model's own attention, after three epochs at the rule
+    position
+  opportunity: >-
+    The 140 mm control's attention is sharp enough to place a window (within-slice entropy
+    0.67-0.86 against 0.97-0.99 for the September scout), and a per-study position moves 0.02-0.19
+    of the detail labels' attention at 60 mm. September's placement failed with a scout trained
+    only by the final loss; here the locator is the main model, whose attention is trained by the
+    labels through the joint pool.
+  mechanism: >-
+    View policy as crop-rule; only the crop position differs. Epochs 0 to 2 use the rule position.
+    From epoch 3 on, in training, validation and prediction, a first pass over the wide tokens
+    gives each series its model position: for each of ACL, medial meniscus, lateral meniscus,
+    medial OA, lateral OA and PF OA the attention scores of the series' valid wide tokens are
+    turned into a softmax over those tokens, the six maps are summed over labels and over the
+    series' slices, and the centre of the best 3x3 block of the 7x7 grid is the window centre,
+    clipped so the crop stays inside the wide view's window. The scores come from detached tokens
+    and no gradient flows through the choice. The centre is mapped to prepared coordinates through
+    the wide view's inverse augmentation and the crop is cut from the 320 px canvas (the 120 mm
+    window at 0.375 mm, middle slice only). Training adds the same jitter as crop-rule; evaluation
+    takes the best block. A series without valid wide tokens takes the rule position.
+  precedents:
+  - 'Attention probe of the 140 mm control: a 60 mm window per study and plane keeps 0.59 of ACL,
+    0.75 of medial-meniscus and 0.60 of lateral-meniscus attention, against 0.55, 0.56 and 0.49 at
+    one position for all studies; one window per study and plane keeps within 0.02-0.07 of one per
+    slice (prior-work.md, Where the model looks).'
+  - 'AG-CNN (chest X-ray): sequential training with the global branch as locator 0.868 AUC, joint
+    training 0.849. AdaFocusV2: a stop-gradient from the placement into the global encoder was
+    worth +3.9 mAP (prior-work.md, Literature).'
+  - 'September: placement by a scout trained only by the final loss was worth about 0.005 over
+    fixed crops, and crop centres differed by at most 2 mm between positive and negative studies
+    (docs/history/crop-selection-investigation.md).'
+  novelty: First placement by the main model's own attention, first staged placement.
+  coverage: The same slices and crops as crop-rule; only their position changes, by up to 30 mm.
+  exploitation: The share of series at the model position per epoch; the window centre's mean and
+    spread per plane, its distance from the rule position and, per label, the distance between
+    positive and negative studies' centres; attention_mass_view_<label>; per-label AUC against
+    crop-rule, with the two meniscus labels as the ones to watch.
+  budget: As crop-rule, plus the 320 px canvas for about 9 slices per study in the loader and the
+    batch.
+  implementation: >-
+    Replaces the incumbent's view policy; builds on crop-rule's frozen source if it was rejected.
+    The loader ships the canvas instead of the cut crop; the model computes the wide tokens, takes
+    the placement from detached attention scores, cuts and augments the crops and encodes them. The switch from rule to model position is by
+    epoch, the same in the training and validation of an epoch. Activation signature: the share of
+    series at the model position of at least 0.9 at epoch 3.
+  open_choices: None. The six labels are the detail group; the three rule epochs follow the
+    staged-training precedent.
+  dependencies: []
+  priority_rationale: The direct test of the campaign's question, after its control.
+- id: crop-compartments
+  mechanism_id: crop-model-placed
+  parent_idea_id: null
+  title: Two model-placed crops per coronal T1/PD slice, one for the medial labels and one for the
+    lateral ones
+  opportunity: >-
+    Placement matters most for the menisci: at 60 mm a per-study position adds 0.19 of
+    medial-meniscus and 0.11 of lateral-meniscus attention over one position for all studies, and
+    their attention sits 20-28 mm either side of the fitted midline. One 60 mm window in a coronal
+    slice cannot hold both compartments, so one crop serves one side or neither. The medial
+    meniscus is also the label that fell with the 120 mm field.
+  mechanism: >-
+    View policy as crop-attention, except that every coronal T1/PD slice has two crops. From epoch
+    3 the first is placed by the summed attention of medial meniscus and medial OA and the second
+    by that of lateral meniscus and lateral OA, each as crop-attention places its window. In epochs
+    0 to 2 the two sit 22 mm medial and 22 mm lateral of the fitted knee centre, 10 mm below the
+    image centre, shifted to stay inside the wide view's window; a series without trusted geometry
+    has one crop at the rule position. Sagittal T1/PD slices keep one crop, placed as
+    crop-attention. Both crops of a slice enter the joint pool; the meniscus own-side mask already
+    removes opposite-side tokens.
+  precedents:
+  - 'Attention probe: medial meniscus 0.56 at one 60 mm position against 0.75 per study and plane,
+    lateral meniscus 0.49 against 0.60; attention-weighted medial position +22 to +28 mm for the
+    medial meniscus and -19 to -25 mm for the lateral one (prior-work.md, Where the model looks).'
+  - 'Tack 2021: a meniscus crop raised the medial anterior horn from 0.74 to 0.87 at the same
+    resolution, with different encoders (prior-work.md, Literature).'
+  - 'September per-label crops tied their shared-crop twin (-0.0011 both); there the crops replaced
+    the full slice.'
+  novelty: First placement per label group and first two crops on one slice.
+  coverage: About 4 extra crops per study, on coronal T1/PD slices; the two meniscus labels and
+    the medial and lateral OA labels are the targets.
+  exploitation: The two window centres per epoch against the midline; attention_mass_view_<label>
+    for the four compartment labels; their AUC against crop-attention and crop-rule.
+  budget: 39 images per study against 26 (1.5x) at 1.25x the backbone pixels; expect about
+    1,440-1,720 s against the bound of 1,724 s. Block if the projected time passes it.
+  implementation: >-
+    Replaces the incumbent's view policy; builds on crop-attention's frozen source if it was
+    rejected. A second crop entry per coronal detail slice in the model's crop cutting and in the
+    token bookkeeping; the two label groups as fixed lists. Activation signature:
+    attention_mass_view_mean of at least 0.05 at epoch 0.
+  open_choices: None. The 22 mm start offset is the measured attention position of the menisci.
+  dependencies: []
+  priority_rationale: Where the probe says placement has the most room; after the single
+    model-placed crop it builds on.
+- id: crop-own-loss
+  mechanism_id: crop-own-loss
+  parent_idea_id: null
+  title: Rule-placed crop whose tokens are also pooled alone under their own loss
+  opportunity: >-
+    Five side paths have been sidelined by the main one in this project, and the two-stream run
+    made it six. The literature's ablated cure is a loss on the crop alone (GFNet +2.0, TNet +7.9,
+    AdaFocusV2 +3.1 points). Local evidence is against it on one count and neutral on another:
+    dense per-plane readouts with their own loss lost 0.0052, per-scale readouts with their own
+    loss tied at +0.0006.
+  mechanism: >-
+    View policy and placement as crop-rule. Beside the joint pool, the crop tokens of a study are
+    pooled alone with the same attention scorer and readout rows, giving crop-only logits, which take
+    the class-balanced soft BCE of the disease loss at weight 0.1 (trainer.crop_loss_weight), over
+    studies that have crop tokens. Prediction uses the joint pool only.
+  precedents:
+  - 'Per-crop or per-branch losses: GFNet 75.93 against 73.94 without, TNet 73.12 against 65.21,
+    AdaFocusV2 +3.1 mAP (prior-work.md, Literature).'
+  - 'dense-plane-readouts on ResNet-18: -0.0052; fusion-scaleheads on ReXNet-200: +0.0006
+    (prior-work.md, Precedent table).'
+  - 'Existing auxiliary terms of the recipe run at 0.075 (half-knee) and 0.1 (report attributes).'
+  novelty: First loss on a second view of the same slices; the earlier per-view losses split the
+    slices between views.
+  coverage: Studies with a T1/PD coronal or sagittal series; all labels.
+  exploitation: The crop-only loss and val_macro_auc_view_detail per epoch against crop-rule;
+    attention_mass_view_<label>; per-label AUC against crop-rule, with the periphery group as the
+    labels a crop-only loss could hurt.
+  budget: As crop-rule; one more pooling per step.
+  implementation: >-
+    Replaces the incumbent's view policy; builds on crop-rule's frozen source if it was rejected.
+    The crop-only pooling reuses the diagnostic that already pools one kind of token; the loss term
+    and its weight in the Lightning module, logged per epoch. Activation signature: the crop-only
+    loss term's share of the total loss of at least 0.01 at epoch 0.
+  open_choices: None. The weight 0.1 is the scale of the recipe's existing auxiliary terms and is
+    not swept.
+  dependencies: []
+  priority_rationale: Last because it tests whether the crop is used, which the earlier seeds'
+    attention shares will already have shown.
+exhausted_directions: None is closed for the researcher beyond the contract's three limits. A
+  second backbone, a second stream behind a zero gate, readout weights per view and a wide view
+  beyond 120 mm at 224 px were measured against in mixed-field; random placement, a regressed
+  differentiable crop and removing the wide tokens under a crop were left out of the seeds as low
+  prior.

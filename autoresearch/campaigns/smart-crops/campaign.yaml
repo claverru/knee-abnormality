@@ -1,0 +1,141 @@
+id: smart-crops
+recipe: configs/training.yaml
+reference_run: outputs/training/rn18-field-120-control
+reference_equivalences: {}
+reference_config_exceptions:
+  - paths.label_manifest
+  - paths.report_attribute_manifest
+additional_evidence_runs: []
+backlog:
+  refill_below: 3
+  refill_to: 5
+  seed_order: forced
+  rotate_after: 1000
+budget:
+  mode: range
+  min_fraction: 0.5
+  max_fraction: 1.5
+policy:
+  editable_files:
+    - configs/training.yaml
+    - src/knee_abnormality/config.py
+    - src/knee_abnormality/data/dataset.py
+    - src/knee_abnormality/training/lightning.py
+    - src/knee_abnormality/inference/engine.py
+  editable_directories:
+    - src/knee_abnormality/modeling
+    - src/knee_abnormality/data/preprocessing
+  config_keys:
+    - trainer.crop_loss_weight
+  config_prefixes:
+    - model
+    - optimizer
+    - data.views
+    - trainer.views
+  list_item_fields: {}
+  input_identity_keys:
+    - preprocessing_identity
+  require_source_change: false
+  configuration_only_ideas: true
+  developer_instructions: >-
+    The incumbent is the RadImageNet ResNet-18 recipe in configs/training.yaml: repeated middle
+    slice, 224 px at 0.536 mm over 120 mm, augmentation on the middle slice only, 26 slices per
+    study, plane-contrast readouts, no anatomical attention bias, L2-SP anchoring. Every idea
+    states a complete view policy (contract.md, View policy) that replaces the incumbent's; keep
+    every non-view mechanism the incumbent has. Three limits bind every idea (contract.md, Limits):
+    the training time stays within 575-1,724 s (the reference takes 1,149 s, about 115 s per epoch,
+    and peaks at 3.4 GiB); a study has no more than its 26 selected slices, of which further views
+    or crops may be read; no backbone input exceeds 224 px on either side. Inside them an idea may
+    use the views, crops, placement, streams and losses it states; implement exactly what it
+    states and nothing beyond. The seeds' views: the wide view is the incumbent's input,
+    untouched; the detail view is 84 mm at 224 px (0.375 mm) in place of the wide view; the crop is
+    60 mm at 160 px (0.375 mm, 5x5 tokens) beside the wide view; both only on the T1/PD coronal and
+    sagittal series (fluid_sensitive 0, fat_suppression 0), with axial and fluid-sensitive series
+    at the wide view alone; the context view of the two-views seeds is 140 mm at 224 px
+    (0.625 mm), image-centred, on fluid-sensitive series, through a second ResNet-10t backbone,
+    and two-views-112-fluid-140 reads every slice at 112 mm (0.5 mm) in place of the wide view.
+    The view policy lives in a data.views section of config.py, with the
+    incumbent's single wide view as the value that reproduces it, and in data/dataset.py and
+    data/preprocessing; placement, embeddings, extra streams and losses live in modeling/ and the
+    Lightning module (model options, trainer.crop_loss_weight, trainer.views). Do not touch DICOM
+    decoding, series filtering or cleaning. Slice selection is untouched: pool building, source
+    ranking and triplet selection keep the incumbent's 60 mm radius. Geometry: every view is
+    resampled from the native image at its own spacing, never from another view. A window is
+    placed by an offset that enters the resample plan and output_to_native, so the patient maps and
+    valid rectangles are built for that view and the millimetre axes of the meniscus mask, the OA
+    detector and the half-knee loss stay correct. A second view of a slice reuses the native rows
+    already read for it; never read or decode a file twice. The seeds' rule position is per series:
+    coronal centred horizontally on the fitted knee centre, sagittal 7 mm anterior of it, both
+    10 mm below the image centre; a series without trusted geometry is centred horizontally on the
+    image centre; the window is shifted, never shrunk, to stay inside the wide view's 120 mm
+    window and the stored image. A crop is the middle slice only. A model-placed crop is cut by the
+    model from a canvas the loader ships (for the seeds, the wide view's 120 mm window at 0.375 mm,
+    320 px, middle slice only); a canvas is not a backbone input. The seeds' model position is per
+    series: the centre of the best 3x3 block of the wide view's 7x7 token grid (the anchor of its
+    middle cell) by the summed attention the idea names over the series' slices, computed from
+    detached tokens with the same mask the pool applies, mapped to prepared coordinates through
+    the wide view's inverse augmentation and clipped as the rule position is; no gradient flows
+    through the choice unless the idea says so. Training jitter of crop positions is a uniform
+    draw of up to 12 mm per axis, per series and step, derived from the run seed and the global
+    step; validation and prediction are deterministic and receive no training seed. Intensity: a
+    crop uses the bounds of its series' wide view; a view that replaces the wide one uses its own
+    prepared pixels as the loader does today. Augmentation: crops are their own acquisitions of
+    the same series type and take their own affine, intensity, noise, smoothing, resolution, GIN
+    and feature statistics draws, and no contrast mixing; contrast mixing between views of
+    different spacing keeps registering through the patient maps. Tokens: every view and every
+    stream feeds the joint pool directly at full weight from the first step. No gate, no scaled
+    residual and no zero-initialized projection in front of a view's or a stream's tokens: the
+    mixed-field two-stream run put its second stream behind a zero gate and it never trained. Only
+    an additive embedding may start at zero. Each token's 2D position is expressed in the wide
+    view's frame. A view's tokens are scored by the plane-contrast readout row of their series
+    type unless the idea states another readout. An input of another shape is carried through the
+    batch, the encoded tokens, the plane-contrast readout, the half-knee and report-attribute paths
+    and its own fixed-chunk inference graph in inference/engine.py without changing what the wide
+    view computes. A second backbone or locator is part of the model, has its optimizer group and
+    its L2-SP anchors where it starts from pretrained weights, and its own inference graph. Log
+    per epoch, for training and validation, view_share_wide, view_share_detail and view_share_crop
+    (shares of valid slices), the idea's own mechanism scalar, and, when the pool holds two kinds
+    of tokens, attention_mass_view_<label>, their mean attention_mass_view_mean, and
+    val_macro_auc_view_wide and val_macro_auc_view_detail (macro and per label, pooling only that
+    kind of token of the same x1 validation input; diagnostics that select nothing, and a study
+    without tokens of a kind takes the readout bias). The activation signature must show the
+    mechanism acting, never a value merely above zero. Ideas that place a window also log per plane
+    the mean and spread of the window centre in millimetres from the image centre, its mean
+    distance from the rule position and, per label, the distance between the mean centres of
+    positive and negative validation studies. Keep 26 slices per study, ten epochs, batch size 8,
+    the series types, the augmentation settings, the existing loss terms and their weights and the
+    evaluation untouched. If the projected time passes the upper bound, look for duplicate reads,
+    decodes and resamples first, and return blocked rather than cut epochs or slices. New
+    parameters initialize under a forked RNG. No trained model in the loader, no weight averaging.
+    Return prepared or blocked. Use the existing Python environment for static checks. No tests.
+  researcher_instructions: >-
+    Research starts after the five forced seeds and continues until the user stops the campaign.
+    The topic is smart crops: giving the model finer pixels where they matter and letting it
+    choose where to look. You are free to propose any idea on that topic inside three limits
+    (contract.md, Limits): the training time stays within 575-1,724 s; a study keeps its 26
+    selected slices, of which further views or crops may be read; no backbone input exceeds
+    224 px on either side. Inside them everything is open, including what the seeds leave out:
+    other window sizes, spacings and shapes, crops on fluid-sensitive and axial series (sagittal
+    fluid is the series the detail labels use most), several crops per slice, crops per label or
+    label group, per-slice placement, a locator head with its own loss, a ranking-trained or
+    regressed differentiable placement, random-placement controls, a second backbone or scout
+    network, removing or fusing the wide tokens under a crop, crop losses and their weights,
+    train-time crops distilled into the one-pass model. prior-work.md records what was already
+    measured against some of these (a second backbone, a second stream behind a zero gate, readout
+    weights per view, a 160 mm view); propose one again only with a named reason it should differ
+    here. Start every refill from run_curves and the view columns (view_share_*,
+    attention_mass_view_*, val_macro_auc_view_wide and _detail, the window-centre statistics) of
+    every decided run against the incumbent and against crop-rule, read per label against the
+    detail group (ACL, menisci, OA labels) and the periphery group of prior-work.md, with the
+    medial meniscus on its own, and name the behaviour each proposal targets. Extend what helped
+    and retry a failed mechanism only with a named change. Every proposal states its complete view
+    policy. Derive every spatial setting (window size, spacing, offset, share of slices) from
+    measured extent, acquired resolution or the logged window statistics, state the basis, and do
+    not sweep it. One run does not separate differences under about 0.002 macro, so argue from the
+    diagnostics and the meniscus labels as well. Configuration-only ideas are allowed, but every
+    refill carries at least one idea that needs a source change. Estimate each idea's time from
+    its backbone pixels against the reference (26 inputs of 224 px in 1,149 s) and keep it inside
+    the range at 26 slices and ten epochs. Standing rules, not open: no trained model in the
+    loader, no fewer epochs, no ensembling or test-time augmentation, no weight averaging, no
+    reflection-probability changes, no class-balance exponent change, no label changes, no gold
+    weighting, no multi-seed or confirmation runs.

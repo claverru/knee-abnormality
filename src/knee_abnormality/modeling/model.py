@@ -205,6 +205,8 @@ class KneeAbnormalityModel(nn.Module):
             self.oa_detector = nn.Linear(PROJECTION_WIDTH, 1, bias=False)
             nn.init.xavier_uniform_(self.oa_detector.weight)
         self.oa_detector_scale = nn.Parameter(torch.zeros(3))
+        with torch.random.fork_rng(devices=[]):
+            self.detail_view_embedding = nn.Parameter(torch.zeros(PROJECTION_WIDTH))
         self.train(self.training)
 
     def train(self, mode: bool = True) -> "KneeAbnormalityModel":
@@ -348,6 +350,8 @@ class KneeAbnormalityModel(nn.Module):
         medial_axis: torch.Tensor,
         anterior_axis: torch.Tensor,
         trusted_geometry: torch.Tensor,
+        token_view: torch.Tensor,
+        diagnostic: bool = False,
     ) -> torch.Tensor:
         scores = self.attention(tokens).transpose(0, 1)
         if self.anatomical_log_strength is not None:
@@ -358,7 +362,7 @@ class KneeAbnormalityModel(nn.Module):
         membership = (
             torch.arange(batch_size, device=tokens.device)[:, None] == token_study[None]
         ) & token_valid[None]
-        if not membership.any(-1).all():
+        if not diagnostic and not membership.any(-1).all():
             raise ValueError("A study has no visually valid spatial tokens")
         mask_signs = self.meniscus_mask_signs[:, None]
         own_side = (mask_signs == 0) | (
@@ -368,9 +372,22 @@ class KneeAbnormalityModel(nn.Module):
         allowed = torch.where(
             restricted.any(-1, keepdim=True), restricted, membership[:, None]
         )
+        empty_study = ~membership.any(-1)
+        if diagnostic:
+            allowed = allowed.clone()
+            allowed[..., 0] |= empty_study[:, None]
         with torch.autocast(device_type=tokens.device.type, enabled=False):
             attention = scores.float().unsqueeze(0).expand(batch_size, -1, -1)
             attention = attention.masked_fill(~allowed, -torch.inf).softmax(-1)
+            if diagnostic:
+                attention = attention.masked_fill(empty_study[:, None, None], 0.0)
+            else:
+                self.attention_mass_view = torch.stack(
+                    [
+                        (attention * (token_view == group)[None, None]).sum(-1)
+                        for group in (1, 2)
+                    ]
+                ).detach()
             if self.plane_readout:
                 evidence = self.head(values, image_type)
                 logits = torch.einsum("btn,nt->bt", attention, evidence)
@@ -492,7 +509,20 @@ class KneeAbnormalityModel(nn.Module):
             self.feature_mapping,
             channels,
         )
+        view_index = batch["view_index"][keep_series][acquisition_index]
+        view_group = view_index * (1 + self.spatial_tokens.contrast_lookup[token_type])
         with torch.autocast(device_type=features.device.type, enabled=False):
+            view_to_wide = batch["view_to_wide"].flatten(0, 1)[flat_indices].float()
+            prepared_homogeneous = torch.cat(
+                (prepared_xy.float(), torch.ones_like(prepared_xy[..., :1])), -1
+            )
+            wide_xy = torch.einsum("nij,nkj->nki", view_to_wide, prepared_homogeneous)[
+                ..., :2
+            ]
+            wide_xy = 2 * wide_xy / (valid_images.shape[-1] - 1) - 1
+            spatial_xy = torch.where(
+                (view_index == 1)[:, None, None], wide_xy, xy[None]
+            )
             middle_map = patient_maps[:, 1]
             homogeneous = torch.cat(
                 (prepared_xy.float(), torch.ones_like(prepared_xy[..., :1])), -1
@@ -520,7 +550,9 @@ class KneeAbnormalityModel(nn.Module):
             "position_1d": sinusoidal_positions(
                 positions, PROJECTION_WIDTH, features.dtype
             ),
-            **self.spatial_tokens(xy, token_type, features.dtype),
+            **self.spatial_tokens(spatial_xy, token_type, features.dtype),
+            "view_index": view_index,
+            "view_group": view_group,
             "study": token_study,
             "image_plane": token_plane,
             "image_type": token_type,
@@ -535,9 +567,11 @@ class KneeAbnormalityModel(nn.Module):
         tokens = (
             encoded["features"]
             + encoded["position_1d"][:, None]
-            + encoded["position_2d"][None]
+            + encoded["position_2d"]
             + encoded["plane"][:, None]
             + encoded["contrast"][:, None]
+            + (encoded["view_index"] == 1)[:, None, None]
+            * self.detail_view_embedding.to(encoded["features"].dtype)[None, None]
         ).flatten(0, 1)
         tokens = self.mil_norm(tokens)
         return tokens, tokens
@@ -545,18 +579,30 @@ class KneeAbnormalityModel(nn.Module):
     def half_knee_tokens(self, encoded: dict) -> torch.Tensor:
         return self._pooling_tokens(encoded)[0]
 
-    def pool_encoded(self, encoded: dict) -> torch.Tensor:
+    def pool_encoded(
+        self, encoded: dict, view_groups: tuple[int, ...] | None = None
+    ) -> torch.Tensor:
         tokens, values = self._pooling_tokens(encoded)
         return self._attention_pool(
             tokens,
             values,
             encoded["study"][:, None].expand_as(encoded["visual_valid"]).flatten(),
             encoded["image_type"],
-            encoded["visual_valid"].flatten(),
+            (
+                encoded["visual_valid"]
+                if view_groups is None
+                else encoded["visual_valid"]
+                & torch.isin(
+                    encoded["view_group"],
+                    torch.tensor(view_groups, device=encoded["view_group"].device),
+                )[:, None]
+            ).flatten(),
             encoded["batch_size"],
             encoded["medial_axis"].flatten(),
             encoded["anterior_axis"].flatten(),
             encoded["trusted_geometry"].flatten(),
+            encoded["view_group"][:, None].expand_as(encoded["visual_valid"]).flatten(),
+            diagnostic=view_groups is not None,
         )
 
     def forward(self, batch: dict) -> torch.Tensor:

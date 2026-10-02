@@ -1,0 +1,144 @@
+ideas:
+- id: coronal-t1pd-84-only
+  mechanism_id: t1pd-plane-split
+  parent_idea_id: fluid-detail-93-replacement
+  title: Requeue of coronal-t1pd-84-sagittal-t1pd-120 with the supersession stated, sagittal T1/PD
+    back at the image-centred 120 mm view and coronal T1/PD kept at 84 mm
+  opportunity: >-
+    t1pd-detail-84 zoomed coronal and sagittal T1/PD together and gained 0.0013, with fracture
+    +0.0078, synovitis +0.0036, ACL and the medial meniscus +0.0020, and lateral meniscus
+    -0.0020, lateral OA -0.0017 and PF OA -0.0017. The two planes have never been changed
+    separately, and the width regression has to tie them until they are. On fluid, the same split
+    located the Baker's cyst loss in one plane. The first attempt,
+    coronal-t1pd-84-sagittal-t1pd-120, was blocked at its implementation review by the
+    dependency gate and not by a result: its integration removed t1pd-detail-84 while retaining
+    fluid-detail-93-replacement, which declares a dependency on it.
+  mechanism: >-
+    Complete view policy for training, x1 validation and x4 prediction, one view per selected
+    slice. Sagittal T1/PD series take the wide view, 120 mm at 224 px (0.5357 mm), image-centred,
+    with no detail embedding, as in the 120 mm control. Coronal T1/PD keep 84 mm at 0.375 mm at
+    the rule position. Coronal and sagittal fluid keep 93.33 mm at 5/12 mm at the rule position.
+    Axial series keep the image-centred 120 mm view. Rule position, fallback and clipping as in
+    the incumbent. No jitter, no crop, no second view.
+  precedents:
+  - 't1pd-detail-84 against the 120 mm control, +0.0013, 80% [+0.0001, +0.0025] (findings.md).'
+  - 'Sagittal T1/PD at the 84 mm rule window, a median 43 mm above the joint line and under
+    40 mm in 36% of series (outputs/analysis/view-spacing-20261002/report.md).'
+  - 'coronal-fluid-93-sagittal-fluid-120 and sagittal-fluid-93-coronal-fluid-120 changed one
+    fluid plane of the incumbent''s policy and were approved with fluid-detail-93-replacement in
+    removed_idea_ids (their manifests).'
+  novelty: First run that zooms one T1/PD plane and not the other.
+  coverage: Sagittal T1/PD slices, 18.7% of a study's slices, return to the wide view; the rest
+    is the incumbent.
+  exploitation: >-
+    Activation, at epoch 0, the share of sagittal T1/PD slices at the detail view equal to 0 and
+    of coronal T1/PD slices equal to 1. Logs as the incumbent. Read against the incumbent and
+    sagittal-t1pd-84-only, label by label, PF OA, lateral OA and the lateral meniscus for what
+    the sagittal zoom cost, fracture, ACL and the medial meniscus for what it gave.
+  budget: 26 inputs of 224 px; the incumbent took 1,134 s. Estimate 1,100-1,200 s.
+  implementation: >-
+    One new view policy value on the incumbent's code, replacing the incumbent's policy value,
+    no legacy branch. The detail predicate takes coronal T1/PD and not sagittal T1/PD. Nothing
+    else changes. Preprocessing identity updated. Integration, by explicit user authorization
+    of 2026-10-02. This idea states a complete view policy that supersedes both accepted view
+    ideas, t1pd-detail-84 and fluid-detail-93-replacement. List both in removed_idea_ids, the
+    incumbent's view policy among removed_components and this policy among added_components.
+    The parts of those two ideas that this policy keeps (coronal T1/PD at 84 mm, coronal and
+    sagittal fluid at 93.33 mm) are stated by this idea itself and are not retained from them,
+    so the dependency of fluid-detail-93-replacement on t1pd-detail-84 does not bind it. The
+    frozen source of the blocked attempt can be reused.
+  open_choices: None. User seed, 2026-10-02.
+  dependencies: []
+  priority_rationale: User seed, forced, 2026-10-02; requeue after a review block that was not a
+    result.
+- id: sagittal-t1pd-84-only
+  mechanism_id: t1pd-plane-split
+  parent_idea_id: fluid-detail-93-replacement
+  title: Requeue of sagittal-t1pd-84-coronal-t1pd-120 with the supersession stated, coronal T1/PD
+    back at the image-centred 120 mm view and sagittal T1/PD kept at 84 mm
+  opportunity: >-
+    The other half of coronal-t1pd-84-only. With it and the incumbent it gives each T1/PD plane's
+    own share of the 0.0013 gain and of the costs on the lateral meniscus, lateral OA and PF OA.
+    The 84 mm coronal window cuts more than 20 mm of medial tissue in 58% of coronal T1/PD series
+    and of lateral tissue in 44%. Queued beside sagittal-t1pd-84-coronal-t1pd-120, which meets
+    the same dependency gate as its sibling did.
+  mechanism: >-
+    Complete view policy for training, x1 validation and x4 prediction, one view per selected
+    slice. Coronal T1/PD series take the wide view, 120 mm at 224 px (0.5357 mm), image-centred,
+    with no detail embedding. Sagittal T1/PD keep 84 mm at 0.375 mm at the rule position.
+    Coronal and sagittal fluid keep 93.33 mm at 5/12 mm at the rule position. Axial series keep
+    the image-centred 120 mm view. Rule position, fallback and clipping as in the incumbent. No
+    jitter, no crop, no second view.
+  precedents:
+  - 't1pd-detail-84 against the 120 mm control, +0.0013; lateral meniscus -0.0020, lateral OA
+    -0.0017, PF OA -0.0017 (findings.md).'
+  - 'All six runs that added a 60 mm T1/PD crop beside the 120 mm view raised lateral OA by
+    0.0032 to 0.0054 (findings.md), so lateral OA uses the wide T1/PD view.'
+  novelty: First run that zooms sagittal T1/PD and leaves coronal T1/PD wide.
+  coverage: Coronal T1/PD slices, 15.0% of a study's slices, return to the wide view; the rest
+    is the incumbent.
+  exploitation: >-
+    Activation, at epoch 0, the share of coronal T1/PD slices at the detail view equal to 0 and
+    of sagittal T1/PD slices equal to 1. Logs as the incumbent. Read against the incumbent and
+    coronal-t1pd-84-only, lateral OA, MCL and the menisci for what the coronal zoom cost or gave.
+  budget: As coronal-t1pd-84-only, an estimated 1,100-1,200 s.
+  implementation: >-
+    One new view policy value on the incumbent's code, replacing the incumbent's policy value,
+    no legacy branch. The detail predicate takes sagittal T1/PD and not coronal T1/PD. Nothing
+    else changes. Preprocessing identity updated. Integration, by explicit user authorization
+    of 2026-10-02. This idea states a complete view policy that supersedes both accepted view
+    ideas, t1pd-detail-84 and fluid-detail-93-replacement. List both in removed_idea_ids, the
+    incumbent's view policy among removed_components and this policy among added_components.
+    The parts of those two ideas that this policy keeps (sagittal T1/PD at 84 mm, coronal and
+    sagittal fluid at 93.33 mm) are stated by this idea itself and are not retained from them.
+    The frozen source of the earlier attempt can be reused.
+  open_choices: None. User seed, 2026-10-02.
+  dependencies: []
+  priority_rationale: User seed, forced, 2026-10-02; requeue for the same review block.
+- id: t1pd-detail-93-both
+  mechanism_id: t1pd-width
+  parent_idea_id: fluid-detail-93-replacement
+  title: Requeue of t1pd-detail-93 with the supersession stated, coronal and sagittal T1/PD at
+    93 mm (5/12 mm) in place of 84 mm
+  opportunity: >-
+    84 mm on T1/PD was never compared with a plain 93 mm view. Resolution favours 84 mm (92% and
+    90% of coronal and sagittal T1/PD series fully resolved at 0.375 mm, 76% and 73% at 5/12 mm),
+    and two runs that gave width back per series tied it (-0.0002, -0.0005). The 84 mm window
+    leaves under 40 mm above the joint line in 36% of sagittal T1/PD series and cuts more than
+    20 mm of medial tissue in 58% of coronal ones, against 18% and 42% at 93 mm. The width
+    regression has no T1/PD point between 84 and 120 mm in the current recipe. t1pd-detail-93
+    was withdrawn before development because it would have met the dependency gate that blocked
+    coronal-t1pd-84-sagittal-t1pd-120.
+  mechanism: >-
+    Complete view policy for training, x1 validation and x4 prediction, one view per selected
+    slice. Coronal and sagittal T1/PD take 93.33 mm at 224 px (5/12 mm) at the rule position, in
+    place of 84 mm. Coronal and sagittal fluid keep 93.33 mm at the rule position. Axial series
+    keep the image-centred 120 mm view. Rule position, fallback and clipping as in the
+    incumbent. No jitter, no crop, no second view.
+  precedents:
+  - 't1pd-detail-84 against the 120 mm control, +0.0013, 80% [+0.0001, +0.0025] (findings.md).'
+  - 't1pd-detail-acquisition-matched and t1pd-detail-acquired-matrix, 84 to 120 mm per series,
+    -0.0002 and -0.0005 against t1pd-detail-84 (findings.md).'
+  - 'Coronal and sagittal T1/PD resolution and tissue cut at 84 and 93.33 mm
+    (outputs/analysis/view-spacing-20261002/report.md).'
+  novelty: First fixed T1/PD detail view at a width other than 84 mm.
+  coverage: Coronal and sagittal T1/PD slices, 33.7% of a study's slices; the rest is the
+    incumbent.
+  exploitation: >-
+    Activation, at epoch 0, view_extent_coronal_t1pd_mm and view_extent_sagittal_t1pd_mm equal to
+    93.33. Logs as the incumbent. Read against the incumbent, fracture, ACL and the medial
+    meniscus for what 84 mm gained, the lateral meniscus, lateral OA and PF OA for what it cost.
+  budget: As the incumbent, an estimated 1,100-1,200 s.
+  implementation: >-
+    One new view policy value on the incumbent's code, replacing the incumbent's policy value,
+    no legacy branch. The T1/PD detail spacing becomes 5/12 mm. Nothing else changes.
+    Preprocessing identity updated. Integration, by explicit user authorization of 2026-10-02.
+    This idea states a complete view policy that supersedes both accepted view ideas,
+    t1pd-detail-84 and fluid-detail-93-replacement. List both in removed_idea_ids, the
+    incumbent's view policy among removed_components and this policy among added_components.
+    The part this policy keeps (coronal and sagittal fluid at 93.33 mm) is stated by this idea
+    itself and is not retained from fluid-detail-93-replacement.
+  open_choices: None. User seed, 2026-10-02.
+  dependencies: []
+  priority_rationale: User seed, forced, 2026-10-02; runs after the two plane splits.
+exhausted_directions: None added.

@@ -16,6 +16,8 @@ validation:
   prediction_image_multiplier: 4
 
 data:
+  views:
+    policy: detail_84_93
   reflection_augmentation:
     probability: 0.5
   contrast_mixing_augmentation:

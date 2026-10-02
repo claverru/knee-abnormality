@@ -1,0 +1,111 @@
+ideas:
+- id: axial-130-detail-84-93
+  mechanism_id: axial-wider-view
+  parent_idea_id: fluid-detail-93-replacement
+  title: As fluid-detail-93-replacement with the axial view widened from 120 mm to 130 mm
+  opportunity: >-
+    fluid-detail-93-replacement is the best run of the campaign (0.932880 at x4, +0.0022 against
+    the reference, 80% [+0.0007, +0.0037]; +0.0010 against the incumbent, 80% [-0.0000, +0.0020])
+    and was submitted as S93. Its cost is the periphery: Baker's cyst -0.0062 and MCL -0.0015
+    against the incumbent. Its axial series are the only ones still at 120 mm, 28.9% of the
+    slices, and in the attention probe axial fluid slices carried 47% of Baker's cyst, 41% of
+    effusion and 36% of synovitis. The detail labels that made 120 mm beat 140 mm (lateral
+    meniscus +0.0080, ACL +0.0046) are read on coronal and sagittal series, which now have their
+    own finer views, so the axial view no longer has to stay narrow for them.
+  mechanism: >-
+    Complete view policy for training, x1 validation and x4 prediction, one view per selected
+    slice. Axial series, any contrast: 130 mm at 224 px (0.5804 mm), image-centred, in place of
+    120 mm. Coronal and sagittal T1/PD: 84 mm at 224 px (0.375 mm) at the rule position. Coronal
+    and sagittal fluid-sensitive series: 93.33 mm at 224 px (5/12 mm) at the rule position. Rule
+    position, fallback and clipping exactly as in fluid-detail-93-replacement: coronal centred on
+    the fitted knee centre, sagittal 7 mm anterior of it, both 10 mm below the image centre;
+    untrusted geometry is centred horizontally on the image centre; the window is shifted, never
+    shrunk, to stay inside the image-centred 120 mm window and the stored image. The axial view
+    is the same view kind as before with its own spacing: no new embedding, no new parameter. No
+    jitter, no crop, no second view.
+  precedents:
+  - 'fluid-detail-93-replacement: 0.932880 at x4, 1,134 s; axial-wide tokens alone 0.838 at x1,
+    fluid detail alone 0.905, T1/PD detail alone 0.815; Baker''s cyst -0.0062 against the
+    incumbent (findings.md).'
+  - 'rn18-field-120-control against the same recipe at 140 mm on every series: +0.0008, 80%
+    [-0.0006, +0.0022]; synovitis -0.0044, Baker''s cyst -0.0030, medial meniscus -0.0018
+    (prior-work.md, Precedent table).'
+  - 'Attention probe: axial fluid carries 47% of Baker''s cyst, 41% of effusion and 36% of
+    synovitis (prior-work.md, Where the model looks).'
+  novelty: First run with a view wider than 120 mm on the axial series alone.
+  coverage: Axial slices, 28.9% of the slices of a study; the other 71.1% are unchanged from
+    fluid-detail-93-replacement.
+  exploitation: >-
+    Activation: view_extent_axial_mm equal to 130 and view_share_wide of at least 0.25 at epoch 0.
+    Log everything fluid-detail-93-replacement logs, plus the share of axial input pixels that
+    fall inside the stored image. Read per label against fluid-detail-93-replacement first, then
+    the incumbent and the reference: Baker's cyst, effusion, synovitis and PF OA are where a wider
+    axial view should show, and val_macro_auc_view_wide (axial tokens alone, 0.838 there) says
+    whether the axial tokens changed.
+  budget: 26 inputs of 224 px, the reference's backbone pixels. fluid-detail-93-replacement took
+    1,134 s; estimate 1,100-1,200 s, inside 575-1,724 s. One decode per slice at its own spacing.
+  implementation: >-
+    Builds on fluid-detail-93-replacement's frozen source
+    (outputs/autoresearch/smart-crops/experiments/fluid-detail-93-replacement-20261002T061326Z-c4e4d640/source),
+    which was rejected and is not in the incumbent: its view policy is reproduced exactly and
+    one new policy value replaces it, with no legacy branch. The only change is the axial view's
+    spacing. data.spacing_mm stays 0.5357 mm, because slice selection (its 60 mm radius), the
+    120 mm clipping window of the coronal and sagittal views and the frame of the token positions
+    are derived from it and must not move; the axial spacing is a setting of the view policy.
+    Axial token positions are expressed in the 120 mm frame through the transform the detail
+    views already use, with a zero offset, so the patient maps, valid rectangles and the
+    millimetre axes of the meniscus mask, the OA detector and the half-knee loss stay correct.
+    Intensity bounds stay quantiles of each series' own prepared pixels. Preprocessing identity
+    updated.
+  open_choices: None. The width is the user's, 2026-10-02; this and axial-140-detail-84-93 are two
+    user seeds, each run once, and the contract's rules on measured spatial settings and on sweeps
+    bind the researcher's proposals, not these.
+  dependencies: []
+  priority_rationale: User seed, forced, 2026-10-02.
+- id: axial-140-detail-84-93
+  mechanism_id: axial-wider-view
+  parent_idea_id: fluid-detail-93-replacement
+  title: As fluid-detail-93-replacement with the axial view widened from 120 mm to 140 mm
+  opportunity: >-
+    As axial-130-detail-84-93, at the width of the recipe before 120 mm was adopted. 140 mm on
+    every series lost 0.0008 to 120 mm through the detail labels and kept synovitis (+0.0044),
+    Baker's cyst (+0.0030) and the medial meniscus (+0.0018); here only the axial series take it,
+    and the coronal and sagittal ones keep their finer views.
+  mechanism: >-
+    Complete view policy for training, x1 validation and x4 prediction, one view per selected
+    slice. Axial series, any contrast: 140 mm at 224 px (0.625 mm), image-centred, in place of
+    120 mm. Coronal and sagittal T1/PD: 84 mm at 224 px (0.375 mm) at the rule position. Coronal
+    and sagittal fluid-sensitive series: 93.33 mm at 224 px (5/12 mm) at the rule position. Rule
+    position, fallback and clipping exactly as in fluid-detail-93-replacement: coronal centred on
+    the fitted knee centre, sagittal 7 mm anterior of it, both 10 mm below the image centre;
+    untrusted geometry is centred horizontally on the image centre; the window is shifted, never
+    shrunk, to stay inside the image-centred 120 mm window and the stored image. The axial view
+    is the same view kind as before with its own spacing: no new embedding, no new parameter. No
+    jitter, no crop, no second view.
+  precedents:
+  - 'fluid-detail-93-replacement: 0.932880 at x4, 1,134 s; axial-wide tokens alone 0.838 at x1;
+    Baker''s cyst -0.0062 against the incumbent (findings.md).'
+  - 'rn18-field-120-control against the same recipe at 140 mm on every series: +0.0008, 80%
+    [-0.0006, +0.0022]; synovitis -0.0044, Baker''s cyst -0.0030, medial meniscus -0.0018
+    (prior-work.md, Precedent table).'
+  - 'two-views-fluid-140 and contrast-split-112-140 read fluid series of all planes at 140 mm and
+    tied 120 mm; neither kept finer coronal and sagittal views beside a 140 mm axial one
+    (findings.md; prior-work.md, Precedent table).'
+  novelty: First run with 140 mm on the axial series alone, beside finer coronal and sagittal
+    views.
+  coverage: Axial slices, 28.9% of the slices of a study; the other 71.1% are unchanged from
+    fluid-detail-93-replacement.
+  exploitation: >-
+    Activation: view_extent_axial_mm equal to 140 and view_share_wide of at least 0.25 at epoch 0.
+    Logs and reading as axial-130-detail-84-93, and against that run label by label: the two
+    differ by the axial width alone.
+  budget: As axial-130-detail-84-93, 26 inputs of 224 px and an estimated 1,100-1,200 s.
+  implementation: >-
+    As axial-130-detail-84-93 with the axial spacing at 0.625 mm; builds on its frozen source if
+    it is not the incumbent, else on fluid-detail-93-replacement's. data.spacing_mm stays
+    0.5357 mm, so slice selection, the 120 mm clipping window of the coronal and sagittal views
+    and the frame of the token positions do not move.
+  open_choices: None. The width is the user's, 2026-10-02; see axial-130-detail-84-93.
+  dependencies: []
+  priority_rationale: User seed, forced, 2026-10-02; runs after axial-130-detail-84-93.
+exhausted_directions: None added.

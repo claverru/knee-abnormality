@@ -1,0 +1,194 @@
+ideas:
+- id: sagittal-fluid-wide-for-bakers
+  mechanism_id: fluid-two-views-routed
+  parent_idea_id: fluid-detail-93-replacement
+  title: The incumbent plus a 120 mm view of every sagittal fluid slice that only Baker's cyst
+    reads, in place of the zoomed one
+  opportunity: >-
+    The fluid two-by-two is complete (x4 macro, T1/PD at 84 mm in all four). No fluid plane
+    zoomed 0.931918, coronal only 0.932186, sagittal only 0.932461, both 0.932880. The sagittal
+    zoom carries most of the gain (synovitis +0.0060 and +0.0036, PF OA +0.0036 and +0.0024,
+    lateral OA, the lateral meniscus, medial OA) and costs Baker's cyst 0.0090 and 0.0047, in
+    both runs that isolate it. Baker's cyst x4 in the same four cells is 0.9476, 0.9460, 0.9386
+    and 0.9414. Scored alone at x1, axial tokens read Baker's cyst at 0.936, axial plus sagittal
+    fluid at 120 mm at 0.949, and the zoomed fluid tokens at 0.878. So sagittal fluid has to be
+    zoomed for five labels and wide for one, and no single view does both. Widening axial to 130
+    or 140 mm did not help (axial alone 0.935 at both).
+  mechanism: >-
+    Complete view policy for training, x1 validation and x4 prediction. The incumbent's views are
+    unchanged, one per selected slice. In addition every sagittal fluid-sensitive slice is also
+    read at the wide view, 120 mm at 224 px (0.5357 mm), image-centred, through the same shared
+    backbone. The wide tokens take the wide view's treatment (no detail embedding, their own
+    positions in the 120 mm frame, the readout row of their series type). Routing, fixed. In the
+    attention pool of Baker's cyst the wide sagittal fluid tokens are allowed and the zoomed
+    sagittal fluid tokens are masked out, so Baker's cyst pools exactly what it pooled in
+    coronal-fluid-93-sagittal-fluid-120. In the pool of every other label the wide sagittal
+    fluid tokens are masked out, so the other eleven labels pool exactly what the incumbent
+    pools. The wide sagittal fluid tokens are excluded from the OA detector, the half-knee path
+    and the report-attribute heads. The two views of a slice come from one file read and take
+    independent augmentation draws; the added wide view takes no contrast mixing. No gate, no
+    second backbone, no extra loss.
+  precedents:
+  - 'coronal-fluid-93-sagittal-fluid-120, sagittal fluid at 120 mm, Baker''s cyst 0.9460 at x4
+    and 0.9515 at x1, wide tokens alone 0.949; macro -0.0007 against the incumbent
+    (findings.md).'
+  - 'sagittal-fluid-93-coronal-fluid-120, sagittal fluid at 93 mm, Baker''s cyst 0.9386 at x4;
+    macro +0.0005 against t1pd-detail-84 (findings.md).'
+  - 'two-views-fluid-140, a second 140 mm view of fluid slices of all planes through a
+    ResNet-10t into every label''s pool, Baker''s cyst +0.0054, MCL -0.0049, lateral meniscus
+    -0.0053, macro +0.0001, 1,630 s (findings.md). Here one plane, the same backbone, and one
+    label reads the added tokens.'
+  - 'axial-130-detail-84-93 and axial-140-detail-84-93, Baker''s cyst -0.0018 and -0.0005, axial
+    tokens alone 0.935 at both widths (findings.md).'
+  novelty: First view read by one label only, and first series type shown at two widths with
+    each label routed to the width it needs.
+  coverage: About 5 extra inputs per study, the sagittal fluid slices (18.5% of the slices).
+    Baker's cyst is the target; the other eleven labels keep the incumbent's pools.
+  exploitation: >-
+    Activation, at epoch 0, attention mass of Baker's cyst on the wide sagittal fluid tokens of
+    at least 0.05, exactly 0 on the zoomed sagittal fluid tokens, and exactly 0 on the wide
+    sagittal fluid tokens for the other eleven labels. Log per epoch, training and validation,
+    those attention masses; the x1 AUC of Baker's cyst from the joint pool, from the axial tokens
+    alone and from the wide sagittal fluid tokens alone; and everything the incumbent logs. Read
+    Baker's cyst against the incumbent (0.9414 at x4) and coronal-fluid-93-sagittal-fluid-120
+    (0.9460), and every other label against the incumbent, where they should hold.
+  budget: >-
+    About 5 extra inputs of 224 px on 26, 1.19x the incumbent's backbone pixels, about 1,350 s
+    from its 1,134 s. Estimate 1,330-1,450 s, inside 575-1,724 s. The wide view reuses the native
+    rows read for its slice.
+  implementation: >-
+    Builds on the incumbent's code. A second view entry for sagittal fluid slices in the view
+    policy and the loader (one file read, two resample plans, per-view patient maps and valid
+    rectangles), a token-kind flag carried to the pool, and a per-label token mask in
+    _attention_pool where the meniscus own-side mask is applied, plus the exclusions named
+    above. The wide tokens must not enter the detail diagnostics as detail tokens. The fixed-chunk
+    inference graph takes the extra inputs at the same 224 px. Preprocessing identity updated.
+  open_choices: None. Only Baker's cyst is routed; MCL, effusion and synovitis stay on the
+    incumbent's pools. User seed, 2026-10-02.
+  dependencies: []
+  priority_rationale: User seed, forced, 2026-10-02; the user asked for it to train as soon as
+    possible.
+- id: coronal-t1pd-84-sagittal-t1pd-120
+  mechanism_id: t1pd-plane-split
+  parent_idea_id: fluid-detail-93-replacement
+  title: The incumbent with sagittal T1/PD back at the image-centred 120 mm view, coronal T1/PD
+    kept at 84 mm
+  opportunity: >-
+    t1pd-detail-84 zoomed coronal and sagittal T1/PD together and gained 0.0013, with fracture
+    +0.0078, synovitis +0.0036, ACL and the medial meniscus +0.0020, and lateral meniscus
+    -0.0020, lateral OA -0.0017 and PF OA -0.0017. The two planes have never been changed
+    separately. On fluid, the same split located the Baker's cyst loss in one plane. The 84 mm
+    sagittal window leaves under 40 mm above the joint line in 36% of series, where the kneecap
+    sits, so the sagittal plane is the likelier payer for PF OA.
+  mechanism: >-
+    Complete view policy for training, x1 validation and x4 prediction, one view per selected
+    slice. Sagittal T1/PD series take the wide view, 120 mm at 224 px (0.5357 mm), image-centred,
+    with no detail embedding, as in the 120 mm control. Coronal T1/PD keep 84 mm at 0.375 mm at
+    the rule position. Coronal and sagittal fluid keep 93.33 mm at 5/12 mm at the rule position.
+    Axial series keep the incumbent's axial view at launch. Rule position, fallback and clipping
+    as in the incumbent. No jitter, no crop, no second view.
+  precedents:
+  - 't1pd-detail-84 against the 120 mm control, +0.0013, 80% [+0.0001, +0.0025] (findings.md).'
+  - 'Sagittal T1/PD at the 84 mm rule window, a median 43 mm above the joint line and under
+    40 mm in 36% of series; coronal T1/PD, more than 20 mm of medial tissue cut in 58%
+    (outputs/analysis/view-spacing-20261002/report.md).'
+  - 'The fluid split, coronal zoom +0.0003 and sagittal zoom +0.0005 to +0.0007, additive
+    (findings.md).'
+  novelty: First run that zooms one T1/PD plane and not the other.
+  coverage: Sagittal T1/PD slices, 18.7% of a study's slices, return to the wide view; the rest
+    is the incumbent.
+  exploitation: >-
+    Activation, at epoch 0, the share of sagittal T1/PD slices at the detail view equal to 0 and
+    of coronal T1/PD slices equal to 1. Logs as the incumbent. Read against the incumbent and
+    sagittal-t1pd-84-coronal-t1pd-120, label by label, PF OA, lateral OA and the lateral meniscus
+    for what the sagittal zoom cost, fracture, ACL and the medial meniscus for what it gave.
+  budget: 26 inputs of 224 px; the incumbent took 1,134 s. Estimate 1,100-1,200 s.
+  implementation: >-
+    One new view policy value on the incumbent's code, no legacy branch. The detail predicate
+    takes coronal T1/PD and not sagittal T1/PD. Nothing else changes. Preprocessing identity
+    updated.
+  open_choices: None. User seed, 2026-10-02.
+  dependencies: []
+  priority_rationale: User seed, forced, 2026-10-02.
+- id: sagittal-t1pd-84-coronal-t1pd-120
+  mechanism_id: t1pd-plane-split
+  parent_idea_id: fluid-detail-93-replacement
+  title: The incumbent with coronal T1/PD back at the image-centred 120 mm view, sagittal T1/PD
+    kept at 84 mm
+  opportunity: >-
+    The other half of coronal-t1pd-84-sagittal-t1pd-120. With it and the incumbent it gives each
+    T1/PD plane's own share of the 0.0013 gain and of the costs on the lateral meniscus, lateral
+    OA and PF OA. The 84 mm coronal window cuts more than 20 mm of medial tissue in 58% of
+    coronal T1/PD series and of lateral tissue in 44%.
+  mechanism: >-
+    Complete view policy for training, x1 validation and x4 prediction, one view per selected
+    slice. Coronal T1/PD series take the wide view, 120 mm at 224 px (0.5357 mm), image-centred,
+    with no detail embedding. Sagittal T1/PD keep 84 mm at 0.375 mm at the rule position.
+    Coronal and sagittal fluid keep 93.33 mm at 5/12 mm at the rule position. Axial series keep
+    the incumbent's axial view at launch. Rule position, fallback and clipping as in the
+    incumbent. No jitter, no crop, no second view.
+  precedents:
+  - 't1pd-detail-84 against the 120 mm control, +0.0013; lateral meniscus -0.0020, lateral OA
+    -0.0017, PF OA -0.0017 (findings.md).'
+  - 'All six runs that added a 60 mm T1/PD crop beside the 120 mm view raised lateral OA by
+    0.0032 to 0.0054 (findings.md), so lateral OA uses the wide T1/PD view.'
+  novelty: First run that zooms sagittal T1/PD and leaves coronal T1/PD wide.
+  coverage: Coronal T1/PD slices, 15.0% of a study's slices, return to the wide view; the rest
+    is the incumbent.
+  exploitation: >-
+    Activation, at epoch 0, the share of coronal T1/PD slices at the detail view equal to 0 and
+    of sagittal T1/PD slices equal to 1. Logs as the incumbent. Read against the incumbent and
+    coronal-t1pd-84-sagittal-t1pd-120, lateral OA, MCL and the menisci for what the coronal zoom
+    cost or gave.
+  budget: As coronal-t1pd-84-sagittal-t1pd-120, an estimated 1,100-1,200 s.
+  implementation: >-
+    One new view policy value on the incumbent's code, no legacy branch. The detail predicate
+    takes sagittal T1/PD and not coronal T1/PD. Nothing else changes. Preprocessing identity
+    updated.
+  open_choices: None. User seed, 2026-10-02.
+  dependencies: []
+  priority_rationale: User seed, forced, 2026-10-02.
+- id: sagittal-no-vertical-shift
+  mechanism_id: sagittal-vertical-placement
+  parent_idea_id: fluid-detail-93-replacement
+  title: The incumbent with the sagittal windows centred vertically on the image, without the
+    10 mm downward shift
+  opportunity: >-
+    The rule puts every zoomed window 10 mm below the image centre, which centres it on the
+    joint line (a median 11 to 12 mm below the image centre on sagittal series). On sagittal
+    slices the kneecap and the fluid pouch above it lie above the joint line. The rule window
+    leaves under 40 mm above the joint line in 36% of sagittal T1/PD series (84 mm) and 16% of
+    sagittal fluid series (93 mm), and in reviewed cases it cuts the upper kneecap and the
+    suprapatellar fluid. PF OA lost 0.0017 with the T1/PD zoom. This is a guess from measured
+    margins; no run points at it.
+  mechanism: >-
+    Complete view policy for training, x1 validation and x4 prediction, one view per selected
+    slice. Sagittal T1/PD (84 mm at 0.375 mm) and sagittal fluid (93.33 mm at 5/12 mm) windows
+    are centred vertically on the image centre, with no downward shift; their horizontal rule is
+    unchanged, 7 mm anterior of the fitted knee centre. Coronal windows keep the rule position,
+    10 mm below the image centre. Axial series keep the incumbent's axial view at launch.
+    Fallback and clipping as in the incumbent. No jitter, no crop, no second view.
+  precedents:
+  - 'Sagittal margins at the rule window, T1/PD 84 mm a median 43 mm above and 41 mm below the
+    joint line, under 40 mm above in 36% and under 30 mm below in 13%; fluid 93.33 mm 48 mm above
+    and 45 mm below, 16% and 7% (outputs/analysis/view-spacing-20261002/report.md).'
+  - 'Image review, the sagittal detail window excludes the superior patella and the
+    suprapatellar fluid in some slices (docs/data-preparation/plane-fluid-spacing-review.md).'
+  novelty: First change of the vertical placement.
+  coverage: Sagittal T1/PD and sagittal fluid slices, 37% of a study's slices, move 10 mm up; the
+    rest is the incumbent.
+  exploitation: >-
+    Activation, at epoch 0, the mean vertical window centre of both sagittal types within 1 mm of
+    zero while the coronal ones stay within 1 mm of 10 mm. Logs as the incumbent. Read against
+    the incumbent, PF OA and effusion for what the upper field gives, contusion, fracture and the
+    menisci for what the lower 10 mm took.
+  budget: 26 inputs of 224 px; the incumbent took 1,134 s. Estimate 1,100-1,200 s.
+  implementation: >-
+    One new view policy value on the incumbent's code, no legacy branch. The vertical offset of
+    detail_position becomes a per-plane value, 10 mm for coronal and 0 for sagittal. Nothing
+    else changes. Preprocessing identity updated.
+  open_choices: None. Both sagittal contrasts change together. User seed, 2026-10-02.
+  dependencies: []
+  priority_rationale: User seed, forced, 2026-10-02; the least supported of the four, so it runs
+    last.
+exhausted_directions: None added.

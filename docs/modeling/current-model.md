@@ -9,8 +9,15 @@ defined by [`configs/training.yaml`](../../configs/training.yaml). Since
 
 - **Inputs:** a RadImageNet-pretrained ResNet-18 reads every sampled triplet's middle slice,
   repeated on all three channels, at 224 px, 0.536 mm spacing and a 120 mm field (since
-  2026-10-01; 0.625 mm and 140 mm before, which the ReXNet recipe keeps). The same
-  recipe on the Refined-RadImageNet ResNet-50 is
+  2026-10-01; 0.625 mm and 140 mm before, which the ReXNet recipe keeps). Coronal and sagittal
+  series are read through a narrower, finer window in place of that view: T1/PD at 84 mm
+  (0.375 mm) and fluid at 93.33 mm (5/12 mm), centred on the fitted knee centre on coronal
+  series and 7 mm anterior of it on sagittal ones, 10 mm below the image centre, shifted to stay
+  inside the 120 mm window and the stored image; a series without trusted geometry is centred
+  horizontally on the image. Axial series keep the image-centred 120 mm view. Tokens of the
+  narrower views carry their position in the 120 mm frame and a learned additive view embedding
+  (`data.views.policy: detail_84_93`, since 2026-10-02). The same
+  recipe without those views on the Refined-RadImageNet ResNet-50 is
   [`configs/refined-resnet50.yaml`](../../configs/refined-resnet50.yaml), the submission model
   (+0.0046 ×4 at 1.65× the training time); ResNet-18 stays the control because what helps it has
   carried over so far (user decision, 2026-10-01). The previous ReXNet-200 recipe is kept as
@@ -55,6 +62,7 @@ comparable.
 
 | Adopted | Change | Evidence | Control after adoption |
 |---|---|---|---|
+| 2026-10-02 | Coronal and sagittal T1/PD at 84 mm (0.375 mm) and fluid at 93.33 mm (5/12 mm) in place of the 120 mm view, rule-placed, on ResNet-18 only (`data.views.policy: detail_84_93`); axial stays at 120 mm | In the smart-crops campaign, one run each: T1/PD at 84 mm +0.0013 ×4 (80% [+0.0001, +0.0025]), fluid at 93 mm a further +0.0010 (80% [−0.0000, +0.0020], just under the rule and adopted by the user); together +0.0022 (80% [+0.0007, +0.0037]) and 0.950 public (S93) against 0.947 (S92) at the same inference settings. Known cost: Baker's cyst −0.0040 ([result](../validation/results/2026-10-02-smart-crops-campaign.md)) | No retrain yet: the adopted run `fluid-detail-93-replacement` (campaign run, ×4 0.932880, 0.950 public as S93); fold and seed kept |
 | 2026-10-01 | 120 mm field at 224 px (`data.spacing_mm` 0.5357, from 0.625 and 140 mm) on ResNet-18 and the ResNet-50 config; reflection, contrast mixing, augmentation and mirror TTA run on the middle slice only in `repeated_middle` mode | On the 2026-09-30 recipe, one run each: 120 mm +0.0011 and +0.0012 ×4 (80% [−0.0004, +0.0026] and [−0.0003, +0.0028]); 0.947 public (S90) against 0.943 (S86) at the same inference settings; middle-slice augmentation neutral (+0.0001, −0.0004) and 6–8% faster per epoch, predictions bit-identical ([result](../validation/results/2026-10-01-mixed-field-campaign.md)) | `rn18-field-120-control` (`outputs/training/rn18-field-120-control`), seed 1533697213, v2 fold 0: ×4 0.930666, 0.947 public (S92); fold and seed kept ([result](../validation/results/2026-10-01-mixed-field-campaign.md#control-on-the-adopted-recipe)) |
 | 2026-10-01 | Plane-contrast readouts added and the anatomical attention bias removed, on ResNet-18 and the new Refined ResNet-50 config; ResNet-18 stays the control | In the revisits campaign, one run each: +0.0009 ×4 (80% [+0.0001, +0.0017]) and +0.0009 (80% [+0.0002, +0.0016]), both just under the rule's +0.001 and adopted by the user; the Refined ResNet-50 on the result scored 0.948 public (S88) and 0.951 with ReXNet (S89) ([result](../validation/results/2026-10-01-revisits-campaign.md)) | `no-anatomical-bias` (campaign run, ×4 0.929835) |
 | 2026-09-30 | L2-SP weight anchoring added and the scanner confusion head removed, on ResNet-18 only | Fold-0 tie, ×4 +0.00026 (95% [−0.0013, +0.0018]), and 0.943 public (S86) against 0.943 (S82); adopted for unseen-site robustness, measured on the sites-out splits: +0.0015, +0.0009 and +0.0023 held-out ([result](../validation/results/2026-09-30-rn18-l2sp-no-confusion.md)) | No retrain: the adopted run `rn18-l2sp-no-confusion` (`outputs/training/rn18-l2sp-no-confusion`), seed 1533697213, v2 fold 0: ×4 0.928062; fold and seed kept by user decision |
@@ -88,6 +96,7 @@ bands; the experimental ten-epoch schedule was reverted. Historical
 |---|---|
 | Inputs | Three adjacent slices per input (`SLICES_PER_INPUT`, a constant) |
 | `data.image_size`, `data.spacing_mm` | 224, 0.5357 (120 mm; 0.625 and 140 mm in the ReXNet recipe) |
+| `data.views.policy` | `detail_84_93`: coronal and sagittal T1/PD at 0.375 mm (84 mm) and fluid at 5/12 mm (93.33 mm), rule-placed; `wide`, the default the other configs keep, reads every series at `data.spacing_mm` |
 | `data.sampling_sigma_fraction`, `data.validation_image_multiplier` | 0.867, 1 (×2 before 2026-09-17; scores differ by about 0.0035, and submissions set their own count) |
 | Training triplet draws | One independent random draw per probability band at each epoch; [implemented sampler](../data-preparation/physical-sampling/implemented-sampler.md) |
 | `trainer.class_balance_exponent` | `0.5` |

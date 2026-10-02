@@ -1,0 +1,66 @@
+ideas:
+- id: spacing-specific-batch-statistics
+  mechanism_id: spacing-routed-normalization
+  parent_idea_id: null
+  title: Separate BatchNorm statistics per view spacing in the early backbone stages, with every
+    weight shared
+  opportunity: >-
+    The incumbent shows one shared encoder the same anatomy at three pixel sizes, 0.375 mm on
+    coronal and sagittal T1/PD, 5/12 mm on coronal and sagittal fluid and 0.5357 mm on axial
+    series, a 1.43x spread, and the axial seeds widen it to 1.55x or 1.67x. The backbone trains
+    with BatchNorm in training mode (model.backbone_eval false), so every normalization layer
+    pools its batch and running moments over the three kinds of image, and prediction uses one
+    pooled set. Early filter responses depend on pixel size, so pooled moments may fit none of
+    the three well. This is a hypothesis; no feature-moment comparison has been logged. The
+    trained zoomed-view embedding stayed small (norm 0.10 against 0.35-0.43 for the plane and
+    contrast embeddings), so the token side does not ask for more scale information, and the
+    place where mixed scales can still interfere is the encoder.
+  mechanism: >-
+    Complete view policy for training, x1 validation and x4 prediction, the incumbent's,
+    unchanged. In the BatchNorm layers of the stem, layer1 and layer2, shortcuts included (the
+    backbone up to stride 8), batch moments in training and running moments at evaluation are
+    kept per spacing of the view policy, one bank per distinct spacing (three in the incumbent).
+    Affine parameters and every convolution are shared. All banks start from the pretrained
+    running moments; a training step computes each bank's batch moments over that spacing's
+    images of the batch and updates only the banks present; evaluation and prediction normalize
+    each image with the bank of its spacing. Layer3 and layer4 normalization stays shared. The
+    feature-statistics augmentation stays at its stride-8 boundary, unchanged.
+  precedents:
+  - 'plane-conditioned-batchnorm (revisits campaign), one bank per plane in the upper stages on
+    the single-scale 140 mm recipe, -0.0010, 80% [-0.0018, -0.0002], rejected; it took 1,247 s
+    (docs/validation/results/2026-10-01-revisits-campaign.md). This idea splits by pixel size, not
+    plane, and in the early stages, not the upper ones.'
+  - 'view-specific-early-batch-statistics, proposed by the researcher on t1pd-detail-84 with two
+    banks (zoomed and wide) and never queued (ideas.yaml).'
+  - 'Trained embedding norms in the incumbent checkpoint, zoomed-view 0.10, plane 0.35-0.41,
+    contrast 0.36-0.43 (measured 2026-10-02).'
+  novelty: First normalization split by pixel size, and first in the early stages.
+  coverage: Every image; three banks holding about 34% (0.375 mm), 37% (5/12 mm) and 29%
+    (0.5357 mm) of the images of a batch, 60 to 78 images each at batch size 8.
+  exploitation: >-
+    Activation, at epoch 0, the mean absolute difference between the outputs of the routed
+    normalization and of pooled moments on the same activations is above zero in every early
+    layer, and each bank's image count per batch is logged and nonzero. Log per epoch the
+    distance between the banks' running means and variances per layer, the per-view x1 AUCs the
+    incumbent logs, and the per-label AUCs. Read against the incumbent, all labels under the
+    macro rule; the spacing also partitions plane and contrast, so a gain would not isolate
+    scale alone.
+  budget: >-
+    26 inputs of 224 px, the reference's backbone pixels. The incumbent took 1,134 s; grouped
+    moment reductions add a little. Estimate 1,150-1,300 s, inside 575-1,724 s. Convolutions stay
+    batched over all images; only the moments are routed. Ten epochs, batch size 8, the incumbent
+    seed.
+  implementation: >-
+    Builds on the incumbent's code. A BatchNorm replacement for the stem, layer1 and layer2 that
+    holds one pair of running buffers per spacing and takes a per-image bank index; the bank
+    index comes from the view metadata already in the batch and is passed to _encode_images and
+    to the backbone-to-stride-8 path. Affine parameters keep their Parameter identity, so L2-SP
+    anchoring and the optimizer groups are unchanged. The same routing is registered in
+    inference/engine.py for the fixed-chunk prediction graph, and checkpoints carry the banks.
+    If a newly accepted incumbent changes a spacing, the banks follow its view policy.
+    Preprocessing identity is unchanged; the model identity records the banks.
+  open_choices: None. Banks per spacing and the early-stage scope are fixed; no stage subsets.
+    User seed, 2026-10-02.
+  dependencies: []
+  priority_rationale: User seed, forced, 2026-10-02; runs after the OA crop seeds.
+exhausted_directions: None added.

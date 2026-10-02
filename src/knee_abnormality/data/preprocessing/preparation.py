@@ -38,11 +38,12 @@ class PreparedFrame:
     shape: tuple[int, int]
     columns: tuple[int, int]
     signed: bool
-    plan_key: tuple[int, int, int, int, int] | None
+    plan_key: tuple[int, ...] | None
     slope: float
     intercept: float
     rect: tuple[int, int, int, int]
     output_to_native: np.ndarray
+    native_layout: tuple[int, int, float, float]
 
 
 def shared_empty(count: int, dtype: torch.dtype) -> torch.Tensor:
@@ -73,6 +74,10 @@ class PreparedSeries:
     knee_side_sign: float = 0.0
     knee_center_x_mm: float = 0.0
     knee_center_y_mm: float = 0.0
+    view_index: int = 0
+    view_to_wide: torch.Tensor | None = None
+    window_center_mm: tuple[float, float] = (0.0, 0.0)
+    window_rule_distance_mm: float = 0.0
 
     @property
     def triplet_count(self) -> int:
@@ -105,6 +110,8 @@ def _native_plan(
     intercept: float,
     spacing_mm: float,
     image_size: int,
+    offset_y: int = 0,
+    offset_x: int = 0,
 ) -> ResamplePlan | None:
     if not _native_rescale(slope, intercept):
         return None
@@ -113,11 +120,17 @@ def _native_plan(
         columns,
         *resample_targets(rows, columns, row_spacing, column_spacing, spacing_mm),
         image_size,
+        offset_y,
+        offset_x,
     )
 
 
 def _descriptor_plan(
-    descriptor: NativePixelDescriptor | None, spacing_mm: float, image_size: int
+    descriptor: NativePixelDescriptor | None,
+    spacing_mm: float,
+    image_size: int,
+    offset_y: int = 0,
+    offset_x: int = 0,
 ) -> ResamplePlan | None:
     if descriptor is None:
         return None
@@ -130,11 +143,17 @@ def _descriptor_plan(
         descriptor.intercept,
         spacing_mm,
         image_size,
+        offset_y,
+        offset_x,
     )
 
 
 def _stored_frame(
-    rows: np.ndarray, plan: ResamplePlan, slope: float, intercept: float
+    rows: np.ndarray,
+    plan: ResamplePlan,
+    slope: float,
+    intercept: float,
+    native_layout: tuple[int, int, float, float],
 ) -> PreparedFrame:
     signed = rows.dtype.kind == "i"
     stored = np.array(rows, dtype=np.int16 if signed else np.uint16)
@@ -149,11 +168,16 @@ def _stored_frame(
         intercept,
         plan.rect,
         plan.output_to_native,
+        native_layout,
     )
 
 
 def decode_slice(
-    record: SliceRecord, spacing_mm: float, image_size: int
+    record: SliceRecord,
+    spacing_mm: float,
+    image_size: int,
+    offset_y: int = 0,
+    offset_x: int = 0,
 ) -> DecodedSlice:
     path = record.path
     try:
@@ -169,6 +193,8 @@ def decode_slice(
                 frame.intercept,
                 spacing_mm,
                 image_size,
+                offset_y,
+                offset_x,
             )
             if frame.pixels.dtype in NATIVE_DTYPES
             else None
@@ -179,8 +205,9 @@ def decode_slice(
                 plan,
                 frame.slope,
                 frame.intercept,
+                (*frame.pixels.shape, frame.row_spacing, frame.column_spacing),
             )
-        value = resample_crop(frame, spacing_mm, image_size)
+        value = resample_crop(frame, spacing_mm, image_size, offset_y, offset_x)
     except PREPARATION_ERRORS as error:
         return f"{path}: {type(error).__name__}: {error}"
     top, left, rows, columns = value.rect
@@ -198,6 +225,7 @@ def decode_slice(
         0.0,
         value.rect,
         value.output_to_native,
+        (*frame.pixels.shape, frame.row_spacing, frame.column_spacing),
     )
 
 
@@ -217,9 +245,11 @@ def decode_series(
     spacing_mm: float,
     image_size: int,
     threads: int = 1,
+    offset_y: int = 0,
+    offset_x: int = 0,
 ) -> tuple[DecodedSlice, ...]:
     plans = [
-        _descriptor_plan(record.descriptor, spacing_mm, image_size)
+        _descriptor_plan(record.descriptor, spacing_mm, image_size, offset_y, offset_x)
         for record in records
     ]
     sizes = [
@@ -252,7 +282,9 @@ def decode_series(
         if not ok or np.count_nonzero(target) < NEAR_EMPTY_FRACTION * (
             record.descriptor.rows * record.descriptor.columns
         ):
-            decoded.append(decode_slice(record, spacing_mm, image_size))
+            decoded.append(
+                decode_slice(record, spacing_mm, image_size, offset_y, offset_x)
+            )
             continue
         decoded.append(
             PreparedFrame(
@@ -266,6 +298,12 @@ def decode_series(
                 record.descriptor.intercept,
                 plan.rect,
                 plan.output_to_native,
+                (
+                    record.descriptor.rows,
+                    record.descriptor.columns,
+                    record.descriptor.row_spacing,
+                    record.descriptor.column_spacing,
+                ),
             )
         )
     return tuple(decoded)

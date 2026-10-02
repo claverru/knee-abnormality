@@ -7,6 +7,7 @@
 | Checking the DICOM data contract and decoding issues | [Public data contract and decoding](public-data-contract-and-decoding.md) |
 | Reviewing unverified preprocessing ideas | [Unverified preprocessing notes and open questions](unverified-preprocessing-notes.md) |
 | Tracing field-of-view decisions | [Field-of-view selection history](field-of-view-selection-history.md) |
+| Choosing plane/fluid spacing from the smart-crops results, acquired detail and disease crop overlays | [Plane and fluid spacing review](plane-fluid-spacing-review.md) |
 | Generating augmentation previews | [Preview augmentations](preview-augmentations.md) |
 | Checking resampling, intensity clipping stability and preprocessing CPU profiles | [Preprocessing implementation and profile](preprocessing-implementation-and-profile.md) |
 | Comparing deferred and native DICOM readers and their edge cases | [DICOM descriptor experiment](dicom-descriptor-experiment.md) |

@@ -27,7 +27,9 @@ then researcher follow-ups on whichever mechanisms helped.
 
 ## Setup
 
-- **Branch and worktree:** `mixed-field` in `../knee-abnormality-mixed-field`, off `00f2f32`.
+- **Branch and worktree:** `mixed-field` in `../knee-abnormality-mixed-field`, off `00f2f32`; both
+  removed on 2026-10-01 after the campaign files were committed on main. Each run keeps its frozen
+  source under `outputs/autoresearch/mixed-field/`.
 - **Reference:** `rn18-l2sp-no-confusion` (×4 0.928062, 0.943 public as S86), the
   `configs/training.yaml` recipe. It was trained from the since-removed `rn18-l2sp-confusion`
   worktree, so its `paths.label_manifest` and `paths.report_attribute_manifest` are declared config

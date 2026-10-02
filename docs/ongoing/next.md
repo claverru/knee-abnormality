@@ -8,7 +8,32 @@ finished runs and decisions live in the [validation results](../validation/resul
 live under [autoresearch](../../autoresearch/campaigns/INDEX.md). New candidates pair with the
 current control at its fold and seed.
 
+Awaiting a public check:
+
+- **[Out-of-fold self-distillation](../backlog/endgame.md#out-of-fold-self-distillation) at
+  0.5/0.5** (user request 2026-09-30). Teachers: the five `rn18-l2sp-no-confusion` folds
+  (`outputs/training/rn18-l2sp-no-confusion` for fold 0, `…-folds-1-4` for folds 1–4; ×4 macro
+  0.928062, 0.919191, 0.929444, 0.919376, 0.922596). The `oof-blend` worktree repoints
+  `prepare_image_blend_labels` to build `oof_blend_v1` (half `rebuild_state_v2`, half the ×4
+  out-of-fold predictions); gold agreement 0.9397 against 0.9075 for the base (80% [+0.022,
+  +0.043]), teacher alone 0.9271. The fold-0 child `outputs/training/rn18-oof-blend` (control's
+  seed) scored ×4 0.929536 against 0.928062: +0.0015, 95% paired report-group [+0.0001, +0.0031],
+  epoch 9 (`outputs/analysis/rn18-oof-blend-vs-rn18-l2sp-no-confusion`). The fold-1–4 teachers
+  trained on fold 0, so that is an upper bound. Public: S87 0.944 at ×4 τ 0.9 (bundle `56787f47`)
+  against 0.943 for S86, one rounding step; pending a user decision.
+
 Pending:
+
+- **Build the learnable view setup** and start its campaign: spacing and shift of each series
+  type's views and the routing of labels to views as learned parameters, every value freezable
+  from the configuration, in a separate worktree off main
+  ([view optimisation](view-optimisation.md)).
+- **Retrain the recipe in force from main** (user launches): the 84/93 mm views were adopted
+  from a campaign run, and main's code for them is that run's archived source
+  ([result](../validation/results/2026-10-02-smart-crops-campaign.md#adoption-on-main)).
+- **Read the slice-budget sensitivity run on Kaggle** when it finishes: per-label AUC with each
+  series type's slices halved and doubled, on the S93 model
+  (`outputs/analysis/slice-budget-20261002/sensitivity/`).
 
 - **Decide on the `inference-opt` branch.** It runs the Kaggle command in about 270 s against
   429.5 s with bit-identical prepared images, but its GPU preparation changes hashed sources, so
@@ -24,4 +49,5 @@ Pending:
   BCE.
 - **Train the Refined ResNet-50 at 120 mm** (user launches): the spacing adopted on 2026-10-01 is
   also in `configs/refined-resnet50.yaml` and is untested on that backbone
-  ([result](../validation/results/2026-10-01-mixed-field-campaign.md#adoption)).
+  ([result](../validation/results/2026-10-01-mixed-field-campaign.md#adoption)). The 84/93 mm
+  views adopted on 2026-10-02 are not in that config and are untested on it too.

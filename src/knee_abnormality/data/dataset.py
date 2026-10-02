@@ -1,5 +1,6 @@
 import logging
 from dataclasses import replace
+from functools import partial
 from multiprocessing import Value
 from pathlib import Path
 
@@ -36,6 +37,12 @@ from knee_abnormality.data.preprocessing.sampling import (
     valid_runs,
 )
 from knee_abnormality.data.preprocessing.series import IndexedSeries, index_series
+from knee_abnormality.data.preprocessing.spatial import (
+    DETAIL_SPACINGS_MM,
+    detail_position,
+    fallback_window_center,
+    view_transforms,
+)
 from knee_abnormality.data.sources import SeriesCandidate, StudySeries
 from knee_abnormality.data.splits import STUDY
 
@@ -64,6 +71,7 @@ class KneeStudyDataset(Dataset):
         self.io_threads = io_threads
         self.epoch = Value("q", 0)
         self._slice_index: dict[Path, IndexedSeries] = {}
+        self._view_specs: dict[tuple[str, str, str], tuple] = {}
         self._study_references: dict[str, StudyReference] = {}
         self._study_sides: dict[str, KneeSide] = {}
         self._series_geometry: dict[
@@ -199,25 +207,65 @@ class KneeStudyDataset(Dataset):
         self._cleaned_studies[study.uid] = study
         return study
 
-    def _decode_series(self, records, spacing_mm, image_size):
-        return decode_series(records, spacing_mm, image_size, self.io_threads)
+    def _decode_series(self, records, spacing_mm, image_size, offset_y, offset_x):
+        return decode_series(
+            records, spacing_mm, image_size, self.io_threads, offset_y, offset_x
+        )
 
-    def _prepare_candidate(self, selected, cache) -> PreparedSeries:
+    def _prepare_candidate(
+        self, selected, cache, spacing, offset_y, offset_x
+    ) -> PreparedSeries:
         return prepare_series(
             selected,
-            self.data.spacing_mm,
+            spacing,
             self.data.image_size,
             self.data.lower_quantile,
             self.data.upper_quantile,
-            decoder=self._decode_series,
+            decoder=partial(self._decode_series, offset_y=offset_y, offset_x=offset_x),
             cache=cache,
         )
 
     def _try_prepare_candidate(
-        self, candidate, selected, cache, failures, physical, plane, study_uid
+        self, candidate, selected, cache, failures, physical, kind, study_uid
     ):
         try:
-            value = self._prepare_candidate(selected, cache)
+            plane = kind.plane
+            indexed = self._slice_index[candidate.directory]
+            series_geometry = self._series_geometry[study_uid].get(
+                candidate.uid, (0.0, 0.0, 0.0, False)
+            )
+            series_geometry = (
+                *series_geometry[:3],
+                series_geometry[3]
+                and indexed.geometry.native_poses_valid
+                and indexed.geometry.reason is None,
+            )
+            detail = self.data.views.policy == "detail_84_93" and plane in {
+                "Coronal",
+                "Sagittal",
+            }
+            detail_spacing = DETAIL_SPACINGS_MM[kind.fluid_sensitive]
+            key = (study_uid, candidate.uid, plane)
+            if detail and key not in self._view_specs:
+                self._view_specs[key] = detail_position(
+                    indexed.records,
+                    plane,
+                    series_geometry,
+                    self.data.spacing_mm,
+                    detail_spacing,
+                    self.data.image_size,
+                )
+            offset_y, offset_x, window_center, rule_distance = (
+                self._view_specs[key] if detail else (0, 0, (0.0, 0.0), 0.0)
+            )
+            spacing = detail_spacing if detail else self.data.spacing_mm
+            value = self._prepare_candidate(
+                selected, cache, spacing, offset_y, offset_x
+            )
+            if detail and window_center is None:
+                window_center, rule_distance = fallback_window_center(
+                    value, self.data.image_size
+                )
             failures.extend(value.failures)
             geometry = self._slice_index[candidate.directory].geometry
             eligible, reason = reflection_eligibility(geometry, plane)
@@ -239,6 +287,14 @@ class KneeStudyDataset(Dataset):
                 knee_side_sign=sign,
                 knee_center_x_mm=center,
                 knee_center_y_mm=center_y,
+                view_index=int(detail),
+                view_to_wide=(
+                    view_transforms(value, self.data.spacing_mm, self.data.image_size)
+                    if detail
+                    else torch.eye(3)[None].expand(value.triplet_count, -1, -1)
+                ),
+                window_center_mm=window_center,
+                window_rule_distance_mm=rule_distance,
             )
         except PREPARATION_ERRORS as error:
             failures.append(f"{candidate.uid}: {type(error).__name__}: {error}")
@@ -303,7 +359,7 @@ class KneeStudyDataset(Dataset):
                     cache,
                     failures,
                     pool.physical,
-                    kind.plane,
+                    kind,
                     study.uid,
                 )
                 if value is None:
@@ -416,6 +472,10 @@ def collate_studies(items: list[dict]) -> dict:
     valid_rects = torch.zeros((len(entries), max_slices, SLICES_PER_INPUT, 4))
     patient_maps = torch.zeros((len(entries), max_slices, SLICES_PER_INPUT, 3, 3))
     geometry_valid = torch.zeros((len(entries), max_slices), dtype=torch.bool)
+    view_index = torch.zeros(len(entries), dtype=torch.long)
+    view_to_wide = torch.eye(3).expand(len(entries), max_slices, 3, 3).clone()
+    window_center = torch.zeros((len(entries), 2))
+    window_rule_distance = torch.zeros(len(entries))
     knee_side_sign = torch.zeros(len(entries), dtype=torch.float32)
     knee_center_x_mm = torch.zeros(len(entries), dtype=torch.float32)
     knee_center_y_mm = torch.zeros(len(entries), dtype=torch.float32)
@@ -455,6 +515,10 @@ def collate_studies(items: list[dict]) -> dict:
             )
         )
         count = series.triplet_count
+        view_index[series_index] = series.view_index
+        view_to_wide[series_index, :count] = series.view_to_wide
+        window_center[series_index] = torch.tensor(series.window_center_mm)
+        window_rule_distance[series_index] = series.window_rule_distance_mm
         first = series_index * max_slices * SLICES_PER_INPUT
         image_positions.append(
             torch.arange(first, first + count * SLICES_PER_INPUT, dtype=torch.int64)
@@ -483,6 +547,10 @@ def collate_studies(items: list[dict]) -> dict:
         "valid_rects": valid_rects,
         "patient_maps": patient_maps,
         "geometry_valid": geometry_valid,
+        "view_index": view_index,
+        "view_to_wide": view_to_wide,
+        "window_center_mm": window_center,
+        "window_rule_distance_mm": window_rule_distance,
         "knee_side_sign": knee_side_sign,
         "knee_center_x_mm": knee_center_x_mm,
         "knee_center_y_mm": knee_center_y_mm,

@@ -1,4 +1,4 @@
-# Project state (2026-10-01)
+# Project state (2026-10-02)
 
 What is in force now: the recipe, the control candidates pair with, the best public submissions and
 the rules every comparison depends on. Pending work is in [next](next.md), active lines have their
@@ -18,13 +18,17 @@ measured outcomes are in the [validation results](../validation/results/INDEX.md
   control scored 0.944 (S78), not comparable with those fold-4 runs. The autoresearch gate requires both the label source and the split.
 - **Model:** the [current model](../modeling/current-model.md), since 2026-09-29 on a
   RadImageNet ResNet-18 (`configs/training.yaml`): repeated middle slice at 224 px and 0.536 mm, a
-  120 mm field (since 2026-10-01, with augmentation on that slice only), `backbone_lr` 5e-5, no
+  120 mm field (since 2026-10-01, with augmentation on that slice only), coronal and sagittal
+  T1/PD read at 84 mm (0.375 mm) and coronal and sagittal fluid at 93.33 mm (5/12 mm) in place
+  of the 120 mm view, placed by rule (since 2026-10-02, `data.views.policy: detail_84_93`; axial
+  stays at 120 mm), `backbone_lr` 5e-5, no
   series dropout, 26 triplets, spatial tokens with knee geometry, plane-contrast readouts and no
   anatomical attention bias (since 2026-10-01), the three-compartment OA detector, training-only
   report-attribute heads, L2-SP weight anchoring (since 2026-09-30, which also removed the scanner
   confusion head), the half-stack augmentation and class-balanced BCE at exponent 0.5.
   `configs/refined-resnet50.yaml` is the same recipe on the Refined-RadImageNet ResNet-50, the
-  submission model; ResNet-18 stays the control for iteration speed (user decision, 2026-10-01).
+  submission model, without the 84/93 mm views, which are untested on it; ResNet-18 stays the
+  control for iteration speed (user decision, 2026-10-01).
   The ReXNet-200 recipe it replaced is `configs/rexnet-200.yaml`, ResNet-50's ensemble partner;
   submit ResNet bundles at τ 0.9 and ReXNet at τ 0.75.
 - **Preprocessing identity:** hashed-source changes apply to fresh runs only. A new export or local
@@ -36,10 +40,19 @@ measured outcomes are in the [validation results](../validation/results/INDEX.md
 
 ## Current control
 
-- **`rn18-field-120-control`** (`outputs/training/rn18-field-120-control`), the
-  `configs/training.yaml` recipe in force: ×4 0.930666 (×1 0.927479, epoch 9 of 10, fold 0, seed
-  1533697213), 0.947 public (S92), trained on 2026-10-01 from `main` at `6a99439`. Every candidate
-  pairs with it at its fold and seed. Fold and seed were kept
+- **`fluid-detail-93-replacement`**
+  (`outputs/autoresearch/smart-crops/experiments/fluid-detail-93-replacement-20261002T061326Z-c4e4d640/training`),
+  the `configs/training.yaml` recipe in force apart from name and paths: ×4 0.932880 (×1
+  0.929261, epoch 9 of 10, fold 0, seed 1533697213), 0.950 public (S93). Every candidate pairs
+  with it at its fold and seed. It was trained in the smart-crops campaign; main's code for the
+  eight files it changed is its archived `source/`, and its checkpoint exports from main with
+  the same preprocessing identity
+  ([result](../validation/results/2026-10-02-smart-crops-campaign.md#adoption-on-main)). A
+  retrain from main is pending ([next](next.md)).
+- **`rn18-field-120-control`** (`outputs/training/rn18-field-120-control`), the recipe before
+  the 84/93 mm views: ×4 0.930666 (×1 0.927479, epoch 9 of 10, fold 0, seed 1533697213), 0.947
+  public (S92), trained on 2026-10-01 from `main` at `6a99439`; the control before the
+  2026-10-02 adoption
   ([result](../validation/results/2026-10-01-mixed-field-campaign.md#control-on-the-adopted-recipe)).
 - **`no-anatomical-bias`**
   (`outputs/autoresearch/revisits/experiments/no-anatomical-bias-20260930T213145Z-58126164/training`),
@@ -73,12 +86,16 @@ measured outcomes are in the [validation results](../validation/results/INDEX.md
   Refined-RadImageNet ResNet-50 (τ 0.9), fold 0 at ×4 with reflection TTA, two bundles in one
   notebook. The ResNet-50 alone scored 0.948 (S88)
   ([revisits campaign](../validation/results/2026-10-01-revisits-campaign.md#ensembles-fold-0-4-equal-weights)).
+- **0.950:** S93, the current control, a single ResNet-18 with the 84/93 mm views at ×4 and
+  τ 0.9, against 0.947 for S92, the same recipe at 120 mm on every series
+  ([smart-crops campaign](../validation/results/2026-10-02-smart-crops-campaign.md)). The best
+  single model so far.
 - **0.949:** S80, a 50/50 ensemble of the ReXNet `rebuild-state-v2-control` (τ 0.75) and the
   RadImageNet ResNet-18 (τ 0.9), both fold 0 at ×4 and 36 triplets, run as two bundles in one notebook
   ([RadImageNet backbones](radimagenet-backbone.md)).
 - **0.948:** S67, the scanner confusion head candidate, a single fold-3 model at ×4 and τ 0.75
   ([evidence](../modeling/scanner-confusion-head.md#evidence)).
-- **0.947:** S92, the current control (120 mm with plane-contrast readouts), and S90, the
+- **0.947:** S92, the previous control (120 mm with plane-contrast readouts), and S90, the
   ResNet-18 at 120 mm with middle-slice augmentation on the 2026-09-30 recipe, both at ×4 and
   τ 0.9, against 0.943 for S86; S91, the contrast split at 112 and 140 mm, scored 0.945
   ([result](../validation/results/2026-10-01-mixed-field-campaign.md)). Also S68 (`half-stack-control`), S69 (per-site bias,
@@ -126,6 +143,9 @@ measured outcomes are in the [validation results](../validation/results/INDEX.md
 
 ## Active lines
 
+- [View optimisation](view-optimisation.md): spacing, shift and label routing of each series
+  type's views as learned parameters, with configuration experiments as the fallback; nothing is
+  built yet.
 - [Label rebuild](../public-labels/label-rebuild.md): adopted; its control scored ×4 0.928288 and
   0.944 public (S78).
 - [RadImageNet backbones](radimagenet-backbone.md): the ResNet-18 recipe ties the ReXNet control
@@ -139,6 +159,12 @@ measured outcomes are in the [validation results](../validation/results/INDEX.md
 
 ## Recently closed
 
+- **2026-10-02:** the `smart-crops` autoresearch campaign (finer views and crops on the joint),
+  stopped by the user after 29 scored runs: coronal and sagittal T1/PD at 84 mm and fluid at
+  93.33 mm adopted (+0.0022, 0.950 public as S93); every added view or crop tied; learned
+  placement added nothing over a rule; the sagittal fluid zoom costs Baker's cyst and no tested
+  width, shift or routed view repaired it
+  ([result](../validation/results/2026-10-02-smart-crops-campaign.md)).
 - **2026-10-01:** the `mixed-field` autoresearch campaign (a 160 mm view beside a narrower one at
   224 px), stopped by the user after its forced seeds, and two manual runs: 120 mm on every
   series and middle-slice augmentation adopted; 160 mm added nothing in five designs; the
