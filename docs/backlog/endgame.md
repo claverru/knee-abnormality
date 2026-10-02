@@ -51,6 +51,15 @@ the [validation strategy](../validation/validation-strategy.md), then combine mo
   exists only in their run's `source_snapshot.zip`
   ([pair ensembles](../validation/results/2026-09-22-stride16-fusion-result.md#pair-ensembles),
   [history](../history/stride16-feature-fusion.md#implementation-notes)).
+- *Three architectures and many folds (measured, 2026-10-02):* ReXNet-200 + Refined ResNet-50 +
+  the ResNet-18 with the 84/93 mm views scores 0.936926 on fold 0 at ×4, +0.0009 over the S89
+  pair (80% [+0.0003, +0.0016]), and 0.953 public as S96 against 0.951 for the pair. A second
+  ResNet-18 with other views adds nothing on the public set (S95), and no other fold-0 model
+  improves the trio on fold 0. Adding models of other folds and two more architectures, 28
+  networks with mirror TTA and a fixed share per architecture, scored **0.954 public as S97**;
+  which addition carried the step is not separated, and members trained on different label
+  versions are averaged without calibration
+  ([blends](../inference/submissions/2026-10-02-blend-submissions.md)).
 - *Public-stack blend (external evidence, 2026-09-28):* the top public notebooks reach 0.945 by
   rank-blending the free 0.943 public stack with one independent private model at weight 0.45–0.6,
   and a participant's 0.942 CoAtNet did the same. Each blended model scored at or below the stack

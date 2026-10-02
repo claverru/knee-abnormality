@@ -82,6 +82,16 @@ measured outcomes are in the [validation results](../validation/results/INDEX.md
 
 ## Best public submissions
 
+- **0.954:** S97, the best so far: 28 networks in 13 bundles with mirror TTA on all, weighted
+  by architecture (Refined ResNet-50 0.30; ResNet-18 0.30 over the 84/93 mm fold-0 model and
+  four L2-SP models of folds 1 to 4; ReXNet-200 0.30 over folds 0, 3 and 4; 0.10 for an
+  EfficientNet-B3 + ReXNet pair and the ten models of 2026-09-19). It has no fold-0 score,
+  since most members trained on fold 0
+  ([blends](../inference/submissions/2026-10-02-blend-submissions.md#s97-members-and-weights)).
+- **0.953:** S96, an equal blend of the ReXNet `rebuild-state-v2-control` (τ 0.75) and the
+  Refined-RadImageNet ResNet-50 (τ 0.9), both with reflection TTA, and the ResNet-18 with the
+  84/93 mm views (τ 0.9), fold 0 at ×4: S89's pair plus the S93 model
+  ([blends](../inference/submissions/2026-10-02-blend-submissions.md)).
 - **0.951:** S89, a 50/50 ensemble of the ReXNet `rebuild-state-v2-control` (τ 0.75) and the
   Refined-RadImageNet ResNet-50 (τ 0.9), fold 0 at ×4 with reflection TTA, two bundles in one
   notebook. The ResNet-50 alone scored 0.948 (S88)

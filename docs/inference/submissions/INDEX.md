@@ -3,6 +3,7 @@
 | Read when | Document |
 |---|---|
 | Finding submission IDs, scores and naming conventions | [Submission ledger](ledger.md) |
+| Reviewing the learned-view ResNet-18 submission and the blends of existing bundles (two ResNet-18s, three architectures, 28 networks over five folds with mirror TTA), their fold-0 table, the S97 weights and how a multi-bundle notebook is built | [2026-10-02 learned views and blends](2026-10-02-blend-submissions.md) |
 | Reviewing fold ensembles and mirror TTA submissions | [2026-09-19 ensembles](2026-09-19-ensemble-submissions.md) |
 | Reviewing attention-temperature and image-count submissions | [2026-09-18 temperature and image count](2026-09-18-temperature-and-count-submissions.md) |
 | Reviewing the series-filtering and source-ranking submission | [2026-09-17 ranked and filtered sampling](2026-09-17-ranked-filtered-submission.md) |
