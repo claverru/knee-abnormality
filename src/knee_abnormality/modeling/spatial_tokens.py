@@ -66,6 +66,7 @@ SPATIAL_TOKEN_IDENTITY = {
     "position_2d": "wide_augmented_anchor_detail_inverse_augmented_anchor_in_wide_frame_linear2_64_gelu_linear64_256",
     "view_policy": "configured_views_per_series_type_frame_spacing_wide_else_detail_image_or_knee_anchor_offset_inside_frame_v3",
     "view_embedding": "zero_initialized_additive_detail_only",
+    "view_label_bias": "optional_zero_initialized_additive_attention_score_per_view_and_target",
     "geometry_dtype": "float32_outside_autocast",
     "plane_order": ["Axial", "Coronal", "Sagittal"],
     "contrast_order": [[0, 0], [1, 1]],

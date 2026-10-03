@@ -1,4 +1,4 @@
-# Project state (2026-10-02)
+# Project state (2026-10-03)
 
 What is in force now: the recipe, the control candidates pair with, the best public submissions and
 the rules every comparison depends on. Pending work is in [next](next.md), active lines have their
@@ -23,7 +23,8 @@ measured outcomes are in the [validation results](../validation/results/INDEX.md
   of the 120 mm view, placed by rule (since 2026-10-02, the [view table](../modeling/current-model.md#view-table); axial
   stays at 120 mm), `backbone_lr` 5e-5, no
   series dropout, 26 triplets, spatial tokens with knee geometry, plane-contrast readouts and no
-  anatomical attention bias (since 2026-10-01), the three-compartment OA detector, training-only
+  anatomical attention bias (since 2026-10-01), a learned attention bias per view and label
+  (since 2026-10-03), the three-compartment OA detector, training-only
   report-attribute heads, L2-SP weight anchoring (since 2026-09-30, which also removed the scanner
   confusion head), the half-stack augmentation and class-balanced BCE at exponent 0.5.
   `configs/refined-resnet50.yaml` is the same recipe on the Refined-RadImageNet ResNet-50, the
@@ -40,15 +41,19 @@ measured outcomes are in the [validation results](../validation/results/INDEX.md
 
 ## Current control
 
+- **`rn18-view-label-bias`** (`outputs/training/20261003-100844-rn18-view-label-bias`), the
+  `configs/training.yaml` recipe in force apart from name and paths, trained on 2026-10-03
+  from the adoption commit's source: ×4 0.932477 (×1 0.929026, epoch 9 of 10, fold 0, seed
+  1533697213, 1,181 s), 0.951 public (S101). Every candidate pairs with it at its fold and
+  seed ([adoption](../modeling/current-model.md#adoption-history)).
 - **`fluid-detail-93-replacement`**
   (`outputs/autoresearch/smart-crops/experiments/fluid-detail-93-replacement-20261002T061326Z-c4e4d640/training`),
   the `configs/training.yaml` recipe in force apart from name and paths: ×4 0.932880 (×1
-  0.929261, epoch 9 of 10, fold 0, seed 1533697213), 0.950 public (S93). Every candidate pairs
-  with it at its fold and seed. It was trained in the smart-crops campaign; main's code for the
+  0.929261, epoch 9 of 10, fold 0, seed 1533697213), 0.950 public (S93); the control before the
+  2026-10-03 adoption of the view label bias. It was trained in the smart-crops campaign; main's code for the
   eight files it changed is its archived `source/`, and its checkpoint exports from main with
   the same preprocessing identity
-  ([result](../validation/results/2026-10-02-smart-crops-campaign.md#adoption-on-main)). A
-  retrain from main is pending ([next](next.md)).
+  ([result](../validation/results/2026-10-02-smart-crops-campaign.md#adoption-on-main)).
 - **`rn18-field-120-control`** (`outputs/training/rn18-field-120-control`), the recipe before
   the 84/93 mm views: ×4 0.930666 (×1 0.927479, epoch 9 of 10, fold 0, seed 1533697213), 0.947
   public (S92), trained on 2026-10-01 from `main` at `6a99439`; the control before the

@@ -78,7 +78,9 @@ def build_optimizer(
         )
         weight_decay = (
             0.0
-            if parameter.ndim < 2 or name in anchored_backbone_names
+            if parameter.ndim < 2
+            or name in anchored_backbone_names
+            or name == "view_label_bias"
             else settings.weight_decay
         )
         groups.setdefault((learning_rate, weight_decay), []).append(parameter)
@@ -467,6 +469,18 @@ class KneeModule(L.LightningModule):
 
     def on_train_epoch_end(self) -> None:
         self._log_window_stats("", self.train_window_rows)
+        if self.model.view_label_bias is not None:
+            for name, bias in zip(
+                self.view_names,
+                self.model.view_label_bias.detach().float(),
+                strict=True,
+            ):
+                for label, value in zip(self.targets, bias, strict=True):
+                    self._log_epoch_metric(
+                        f"view_label_bias_{name}_{label.lower().replace(' ', '_')}",
+                        value,
+                        1,
+                    )
         if self.config.model.plane_readout:
             self._log_epoch_metric(
                 "plane_readout_drift", self.model.head.divergence().mean(), 1

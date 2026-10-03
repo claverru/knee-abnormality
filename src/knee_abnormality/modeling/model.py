@@ -214,6 +214,11 @@ class KneeAbnormalityModel(nn.Module):
             ),
             persistent=False,
         )
+        self.view_label_bias = (
+            nn.Parameter(torch.zeros(len(data.views), target_count))
+            if model.view_label_bias
+            else None
+        )
         self.train(self.training)
 
     def train(self, mode: bool = True) -> "KneeAbnormalityModel":
@@ -361,6 +366,10 @@ class KneeAbnormalityModel(nn.Module):
         diagnostic: bool = False,
     ) -> torch.Tensor:
         scores = self.attention(tokens).transpose(0, 1)
+        if self.view_label_bias is not None:
+            scores = scores.float() + self.view_label_bias.float()[
+                token_view
+            ].transpose(0, 1)
         if self.anatomical_log_strength is not None:
             strengths = self.anatomical_log_strength.float().exp()
             signs = self.compartment_signs * strengths[self.compartment_families]
