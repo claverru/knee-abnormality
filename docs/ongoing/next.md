@@ -24,13 +24,24 @@ Awaiting a public check:
 
 Pending:
 
+- **Train ReXNet-200 folds 1 to 4 on the 2026-10-03 recipe** (`configs/rexnet-200.yaml`, seed
+  1533697213). Trained so far on the recipes adopted that day: the Refined ResNet-50 on all five
+  folds (`outputs/training/20261003-110045-refined-rn50-views-label-bias` for fold 0, ×4 0.937129
+  and 0.954 public alone as S102; `outputs/training/20261003-122711-refined-rn50-views-label-bias-folds-1-4`,
+  ×4 0.929567, 0.935441, 0.931062, 0.927016; pooled out-of-fold 0.931720) and ReXNet-200 on fold
+  0 only (`outputs/training/20261003-114512-rexnet-200-views-label-bias`, ×4 0.932523). On fold 0
+  the pair blends to 0.939492 at equal weights (×4, τ 1, no TTA), +0.0024 over the ResNet-50
+  alone; the ResNet-18 control added to the pair costs 0.0007
+  ([adoption](../modeling/current-model.md#adoption-history)).
+- **ConvNeXt as a third blend family** (started 2026-10-03, worktree
+  `../knee-abnormality-convnext` off main, uncommitted): DINOv3 and supervised ImageNet
+  ConvNeXt-Tiny and ConvNeXt-Small on the ReXNet-style recipe, fold 0, one run each against the
+  ResNet-18 control (`rn18-view-label-bias`, ×4 0.932477). The rules allow pretrained models
+  under another licence (section 2.5.a) when reasonably accessible (2.6.b).
 - **Build the learnable view setup** and start its campaign: spacing and shift of each series
   type's views and the routing of labels to views as learned parameters, every value freezable
   from the configuration, in a separate worktree off main
   ([view optimisation](view-optimisation.md)).
-- **Retrain the recipe in force from main** (user launches): the 84/93 mm views were adopted
-  from a campaign run, and main's code for them is that run's archived source
-  ([result](../validation/results/2026-10-02-smart-crops-campaign.md#adoption-on-main)).
 - **Read the slice-budget sensitivity run on Kaggle** when it finishes: per-label AUC with each
   series type's slices halved and doubled, on the S93 model
   (`outputs/analysis/slice-budget-20261002/sensitivity/`).
@@ -47,7 +58,3 @@ Pending:
 - **Re-measure the B0 gap under class-balanced BCE** before pricing the next efficiency recipe:
   the [backbone and fold comparisons](efficientnet-backbones.md#established-evidence) used ordinary
   BCE.
-- **Train the Refined ResNet-50 at 120 mm** (user launches): the spacing adopted on 2026-10-01 is
-  also in `configs/refined-resnet50.yaml` and is untested on that backbone
-  ([result](../validation/results/2026-10-01-mixed-field-campaign.md#adoption)). The 84/93 mm
-  views adopted on 2026-10-02 are not in that config and are untested on it too.
