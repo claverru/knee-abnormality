@@ -1,6 +1,6 @@
 # Submission ledger
 
-All 97 Kaggle competition submissions, newest first, with submission times in UTC. The table is
+All 101 Kaggle competition submissions, newest first, with submission times in UTC. The table is
 regenerated from the live submission list and the local bundles by
 [`update_submission_ledger`](../../../scripts/tools/update_submission_ledger.py),
 which also writes `outputs/submission/kaggle-ledger.json`. The dated records in this folder cover
@@ -76,6 +76,10 @@ head); the Label column gives the Kaggle label wherever it differs.
 
 | S | Submitted (UTC) | Label | Inference | Fold 0 | Public | ID | Record |
 |---|---|---|---|---|---:|---:|---|
+| S101 | 2026-10-03 10:44 | RN18 main + label bias f0 t0.9 (`rn18-view-label-bias`, the control since 2026-10-03) | x4 tau0.9 bs4 | (x1) 0.929026, x4 0.932477 | 0.951 | 56796002 | [adoption](../../modeling/current-model.md#adoption-history) |
+| S100 | 2026-10-03 10:06 | RN18 hand views + label bias f0 t0.9, the same recipe on the branch's code | x4 tau0.9 bs4 | (x1) 0.929876, x4 0.933307 | 0.950 | 56795386 | `view-optimisation` branch, learnable-views campaign; [adoption](../../modeling/current-model.md#adoption-history) |
+| S99 | 2026-10-03 08:40 | ens of five RN18 learnable-views fold-0 runs, equal weights, own code each (oa3d, sagroute, centre, both3d, sagwidths) | x4 tau0.9 bs4, no TTA | (x4 blend) 0.935015 | 0.951 | not recorded | `view-optimisation` branch, learnable-views campaign |
+| S98 | 2026-10-03 08:22 | RN18 learned sagittal routing f0 t0.9 | x4 tau0.9 bs4 | (x1) 0.930065, x4 0.933143 | 0.947 | 56793440 | `view-optimisation` branch, learnable-views campaign |
 | S97 | 2026-10-02 21:06 | ens of 28 networks in 13 bundles, mirror TTA on all, weighted by architecture: Refined RN50 f0 0.30; RN18 84/93 mm f0 0.18 + RN18 L2-SP folds 1–4 0.12; ReXNet f0, 3 × f3, 4 bundles f4 0.30; B3 + ReXNet f3 0.05; 5 B0 + 5 ReXNet of 2026-09-19 0.05 | x4 (B3 x5) mirror TTA bs4 | none (members of other folds) | **0.954** | 56782385 | [2026-10-02 blends](2026-10-02-blend-submissions.md#s97-members-and-weights) |
 | S96 | 2026-10-02 19:23 | ens ReXNet v2 control (τ 0.75) + Refined RN50 (τ 0.9), both with reflection TTA, + RN18 84/93 mm (τ 0.9), fold 0; three bundles, one notebook | x4 bs4 | (x4 blend, fold 0, τ 1, no TTA) 0.936926 | 0.953 | 56780901 | [2026-10-02 blends](2026-10-02-blend-submissions.md) |
 | S95 | 2026-10-02 19:23 | ens RN18 84/93 mm + RN18 learned views (τ 0.9), fold 0; two bundles, one notebook | x4 tau0.9 bs4 | (x4 blend, fold 0, τ 1) 0.933996 | 0.950 | 56780899 | [2026-10-02 blends](2026-10-02-blend-submissions.md) |

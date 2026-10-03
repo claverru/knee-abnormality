@@ -281,6 +281,7 @@ class ModelConfig(ConfigModel):
     dropout: Annotated[float, Field(ge=0, lt=1)]
     series_dropout: Annotated[float, Field(ge=0, lt=1)]
     plane_readout: bool = False
+    view_label_bias: bool = False
     feature_statistics_augmentation: FeatureStatisticsAugmentationConfig = Field(
         default_factory=FeatureStatisticsAugmentationConfig
     )

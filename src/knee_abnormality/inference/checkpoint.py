@@ -85,6 +85,8 @@ def apply_attention_temperature(
         scorer.weight.div_(temperature)
         scorer.bias.div_(temperature)
         model.compartment_signs.div_(temperature)
+        if model.view_label_bias is not None:
+            model.view_label_bias.div_(temperature)
     return temperature
 
 
