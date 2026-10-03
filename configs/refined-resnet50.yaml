@@ -67,34 +67,34 @@ data:
       fluid_sensitive: 0
       fat_suppression: 0
       views:
-        - field_mm: 120.0
+        - field_mm: 84.0
           slices: 5
-          horizontal: {anchor: image, offset_mm: 0.0}
-          vertical: {anchor: image, offset_mm: 0.0}
+          horizontal: {anchor: knee, offset_mm: 0.0}
+          vertical: {anchor: image, offset_mm: 10.0}
     - plane: Coronal
       fluid_sensitive: 1
       fat_suppression: 1
       views:
-        - field_mm: 120.0
+        - field_mm: 93.33333333333334
           slices: 5
-          horizontal: {anchor: image, offset_mm: 0.0}
-          vertical: {anchor: image, offset_mm: 0.0}
+          horizontal: {anchor: knee, offset_mm: 0.0}
+          vertical: {anchor: image, offset_mm: 10.0}
     - plane: Sagittal
       fluid_sensitive: 0
       fat_suppression: 0
       views:
-        - field_mm: 120.0
+        - field_mm: 84.0
           slices: 5
-          horizontal: {anchor: image, offset_mm: 0.0}
-          vertical: {anchor: image, offset_mm: 0.0}
+          horizontal: {anchor: knee, offset_mm: 7.0}
+          vertical: {anchor: image, offset_mm: 10.0}
     - plane: Sagittal
       fluid_sensitive: 1
       fat_suppression: 1
       views:
-        - field_mm: 120.0
+        - field_mm: 93.33333333333334
           slices: 5
-          horizontal: {anchor: image, offset_mm: 0.0}
-          vertical: {anchor: image, offset_mm: 0.0}
+          horizontal: {anchor: knee, offset_mm: 7.0}
+          vertical: {anchor: image, offset_mm: 10.0}
   reference_field_mm: 120.0
   image_size: 224
   lower_quantile: 0.005
@@ -114,6 +114,7 @@ model:
   dropout: 0.0
   series_dropout: 0.0
   plane_readout: true
+  view_label_bias: true
   feature_statistics_augmentation:
     probability: 0.5
 
