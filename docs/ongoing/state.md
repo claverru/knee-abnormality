@@ -20,7 +20,7 @@ measured outcomes are in the [validation results](../validation/results/INDEX.md
   RadImageNet ResNet-18 (`configs/training.yaml`): repeated middle slice at 224 px and 0.536 mm, a
   120 mm field (since 2026-10-01, with augmentation on that slice only), coronal and sagittal
   T1/PD read at 84 mm (0.375 mm) and coronal and sagittal fluid at 93.33 mm (5/12 mm) in place
-  of the 120 mm view, placed by rule (since 2026-10-02, `data.views.policy: detail_84_93`; axial
+  of the 120 mm view, placed by rule (since 2026-10-02, the [view table](../modeling/current-model.md#view-table); axial
   stays at 120 mm), `backbone_lr` 5e-5, no
   series dropout, 26 triplets, spatial tokens with knee geometry, plane-contrast readouts and no
   anatomical attention bias (since 2026-10-01), the three-compartment OA detector, training-only

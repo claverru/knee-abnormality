@@ -39,8 +39,10 @@ See the [implemented sampler](../data-preparation/physical-sampling/implemented-
 The table below records historical validation x2 budgets; current training
 comparisons use x1, so validation counts match the training-density column.
 
-Updated on 2026-09-13. `max_images` counts **channel appearances**, including
-slices reused by overlapping triplets.
+Updated on 2026-09-13. Budgets are now set per view as `slices`, the "CNN inputs"
+column below ([view table](current-model.md#view-table)); until 2026-10-02 the setting was
+`max_images`, which counted **channel appearances**, including slices reused by overlapping
+triplets.
 Training limits round the previous half-median budgets up to multiples of
 three. `validation_image_multiplier: 2` doubles validation limits. Test
 prediction independently defaults to 2× (`TEST_IMAGE_MULTIPLIER` in `config.py`). Export can freeze a different inference

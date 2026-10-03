@@ -23,7 +23,7 @@ data:
     target_weight_range: [0.5, 1.0]
   sampling_sigma_fraction: 0.867
   validation_image_multiplier: 1
-  study_triplet_total: 26
+  study_slice_total: 26
   intensity_augmentation:
     probability: 0.5
     gamma_range: [0.85, 1.15]
@@ -47,13 +47,55 @@ data:
     probability: 0.3
     blend_max: 0.5
   series_types:
-    - {plane: Axial, fluid_sensitive: 0, fat_suppression: 0, max_images: 18}
-    - {plane: Axial, fluid_sensitive: 1, fat_suppression: 1, max_images: 18}
-    - {plane: Coronal, fluid_sensitive: 0, fat_suppression: 0, max_images: 15}
-    - {plane: Coronal, fluid_sensitive: 1, fat_suppression: 1, max_images: 15}
-    - {plane: Sagittal, fluid_sensitive: 0, fat_suppression: 0, max_images: 15}
-    - {plane: Sagittal, fluid_sensitive: 1, fat_suppression: 1, max_images: 15}
-  spacing_mm: 0.5357142857142857
+    - plane: Axial
+      fluid_sensitive: 0
+      fat_suppression: 0
+      views:
+        - field_mm: 120.0
+          slices: 6
+          horizontal: {anchor: image, offset_mm: 0.0}
+          vertical: {anchor: image, offset_mm: 0.0}
+    - plane: Axial
+      fluid_sensitive: 1
+      fat_suppression: 1
+      views:
+        - field_mm: 120.0
+          slices: 6
+          horizontal: {anchor: image, offset_mm: 0.0}
+          vertical: {anchor: image, offset_mm: 0.0}
+    - plane: Coronal
+      fluid_sensitive: 0
+      fat_suppression: 0
+      views:
+        - field_mm: 120.0
+          slices: 5
+          horizontal: {anchor: image, offset_mm: 0.0}
+          vertical: {anchor: image, offset_mm: 0.0}
+    - plane: Coronal
+      fluid_sensitive: 1
+      fat_suppression: 1
+      views:
+        - field_mm: 120.0
+          slices: 5
+          horizontal: {anchor: image, offset_mm: 0.0}
+          vertical: {anchor: image, offset_mm: 0.0}
+    - plane: Sagittal
+      fluid_sensitive: 0
+      fat_suppression: 0
+      views:
+        - field_mm: 120.0
+          slices: 5
+          horizontal: {anchor: image, offset_mm: 0.0}
+          vertical: {anchor: image, offset_mm: 0.0}
+    - plane: Sagittal
+      fluid_sensitive: 1
+      fat_suppression: 1
+      views:
+        - field_mm: 120.0
+          slices: 5
+          horizontal: {anchor: image, offset_mm: 0.0}
+          vertical: {anchor: image, offset_mm: 0.0}
+  reference_field_mm: 120.0
   image_size: 224
   lower_quantile: 0.005
   upper_quantile: 0.995

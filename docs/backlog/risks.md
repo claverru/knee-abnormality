@@ -80,7 +80,7 @@ code also completed ([submission](../inference/submissions/2026-09-17-ranked-fil
 - **Ensemble members share one loader** (inferred from code). A multi-checkpoint bundle decodes
   and samples each study once and runs every member on the same tensors, so the whole `data`
   section belongs to the bundle rather than to the member. A member trained under a different
-  `sampling_sigma_fraction`, `spacing_mm`, `image_size`, `series_types` or `study_triplet_total`
+  `sampling_sigma_fraction`, `reference_field_mm`, `image_size`, `series_types` or `study_slice_total`
   would run under another model's preprocessing and degrade **silently** — no crash, just a lower
   score indistinguishable from ordinary noise. Export validates that every member's `data` config
   matches and refuses a mismatch, so the guard is the only thing between a mixed bundle and an

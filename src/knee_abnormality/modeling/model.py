@@ -207,6 +207,13 @@ class KneeAbnormalityModel(nn.Module):
         self.oa_detector_scale = nn.Parameter(torch.zeros(3))
         with torch.random.fork_rng(devices=[]):
             self.detail_view_embedding = nn.Parameter(torch.zeros(PROJECTION_WIDTH))
+        self.register_buffer(
+            "detail_view",
+            torch.tensor(
+                [view.field_mm != data.reference_field_mm for _, view in data.views]
+            ),
+            persistent=False,
+        )
         self.train(self.training)
 
     def train(self, mode: bool = True) -> "KneeAbnormalityModel":
@@ -384,8 +391,8 @@ class KneeAbnormalityModel(nn.Module):
             else:
                 self.attention_mass_view = torch.stack(
                     [
-                        (attention * (token_view == group)[None, None]).sum(-1)
-                        for group in (1, 2)
+                        (attention * (token_view == view)[None, None]).sum(-1)
+                        for view in range(len(self.detail_view))
                     ]
                 ).detach()
             if self.plane_readout:
@@ -510,7 +517,7 @@ class KneeAbnormalityModel(nn.Module):
             channels,
         )
         view_index = batch["view_index"][keep_series][acquisition_index]
-        view_group = view_index * (1 + self.spatial_tokens.contrast_lookup[token_type])
+        detail_view = self.detail_view[view_index]
         with torch.autocast(device_type=features.device.type, enabled=False):
             view_to_wide = batch["view_to_wide"].flatten(0, 1)[flat_indices].float()
             prepared_homogeneous = torch.cat(
@@ -520,9 +527,7 @@ class KneeAbnormalityModel(nn.Module):
                 ..., :2
             ]
             wide_xy = 2 * wide_xy / (valid_images.shape[-1] - 1) - 1
-            spatial_xy = torch.where(
-                (view_index == 1)[:, None, None], wide_xy, xy[None]
-            )
+            spatial_xy = torch.where(detail_view[:, None, None], wide_xy, xy[None])
             middle_map = patient_maps[:, 1]
             homogeneous = torch.cat(
                 (prepared_xy.float(), torch.ones_like(prepared_xy[..., :1])), -1
@@ -552,7 +557,7 @@ class KneeAbnormalityModel(nn.Module):
             ),
             **self.spatial_tokens(spatial_xy, token_type, features.dtype),
             "view_index": view_index,
-            "view_group": view_group,
+            "detail_view": detail_view,
             "study": token_study,
             "image_plane": token_plane,
             "image_type": token_type,
@@ -570,7 +575,7 @@ class KneeAbnormalityModel(nn.Module):
             + encoded["position_2d"]
             + encoded["plane"][:, None]
             + encoded["contrast"][:, None]
-            + (encoded["view_index"] == 1)[:, None, None]
+            + encoded["detail_view"][:, None, None]
             * self.detail_view_embedding.to(encoded["features"].dtype)[None, None]
         ).flatten(0, 1)
         tokens = self.mil_norm(tokens)
@@ -579,9 +584,7 @@ class KneeAbnormalityModel(nn.Module):
     def half_knee_tokens(self, encoded: dict) -> torch.Tensor:
         return self._pooling_tokens(encoded)[0]
 
-    def pool_encoded(
-        self, encoded: dict, view_groups: tuple[int, ...] | None = None
-    ) -> torch.Tensor:
+    def pool_encoded(self, encoded: dict, view: int | None = None) -> torch.Tensor:
         tokens, values = self._pooling_tokens(encoded)
         return self._attention_pool(
             tokens,
@@ -590,19 +593,15 @@ class KneeAbnormalityModel(nn.Module):
             encoded["image_type"],
             (
                 encoded["visual_valid"]
-                if view_groups is None
-                else encoded["visual_valid"]
-                & torch.isin(
-                    encoded["view_group"],
-                    torch.tensor(view_groups, device=encoded["view_group"].device),
-                )[:, None]
+                if view is None
+                else encoded["visual_valid"] & (encoded["view_index"] == view)[:, None]
             ).flatten(),
             encoded["batch_size"],
             encoded["medial_axis"].flatten(),
             encoded["anterior_axis"].flatten(),
             encoded["trusted_geometry"].flatten(),
-            encoded["view_group"][:, None].expand_as(encoded["visual_valid"]).flatten(),
-            diagnostic=view_groups is not None,
+            encoded["view_index"][:, None].expand_as(encoded["visual_valid"]).flatten(),
+            diagnostic=view is not None,
         )
 
     def forward(self, batch: dict) -> torch.Tensor:

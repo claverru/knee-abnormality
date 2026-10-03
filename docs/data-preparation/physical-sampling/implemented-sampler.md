@@ -53,9 +53,11 @@ Gaussian masses and inverse quantiles use stable truncated-tail arithmetic.
 
 ## Triplet budgets and target draws
 
-The per-type triplet budget is `max_images / 3` times the image multiplier:
+The triplet budget of a view is its `slices` times the image multiplier:
 6 axial or 5 coronal/sagittal inputs per contrast before the study-total floor
-and capacity limits. The current recipe uses validation multiplier 1; prediction
+and capacity limits. A series type with several
+[views](../../modeling/current-model.md#view-table) selects once per view from the
+same pool, each with its own budget and its own training draws. The current recipe uses validation multiplier 1; prediction
 uses its separately selected multiplier. Gaussian probability over the union is
 divided into equal bands. Evaluation uses each band's midpoint.
 
@@ -86,7 +88,8 @@ both modes list covering acquisitions in this order. The first difference wins:
    on the projection of the accepted study centre that lies inside the middle
    slice's image;
 4. finer acquired in-plane resolution (worst axis of field of view ÷
-   `AcquisitionMatrix`), clipped at `data.spacing_mm` and rounded to 0.01 mm;
+   `AcquisitionMatrix`), clipped at the frame's pixel size (`data.reference_field_mm` over
+   `data.image_size`) and rounded to 0.01 mm;
 5. `SeriesInstanceUID`.
 
 A value that is missing for any ranked series (no accepted centre, no pose, no

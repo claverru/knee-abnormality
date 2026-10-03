@@ -16,7 +16,7 @@ from this file.
 One entry, which waits for the control to be retrained on the recipe in force
 ([next](../ongoing/next.md)):
 
-- **112 mm field** (`data.spacing_mm: 0.5`; guess, low to medium). 0.5 mm is the most common
+- **112 mm field** (`data.reference_field_mm: 112` with every view at 0.5 mm; guess, low to medium). 0.5 mm is the most common
   acquired resolution: half of all series are fully resolved at it against 30% at the adopted
   0.536 mm, and the contrast split, with T1/PD series at 112 mm, tied 120 mm alone. Against it:
   112 mm cuts more than 20 mm from the front of the knee in about 15% of sagittal series (8% at

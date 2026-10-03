@@ -73,8 +73,8 @@ builds an ensemble bundle instead:
   `experiment` section carries the first member's full config, since
   `ExperimentConfig` has one `model` section; each member's own config lives
   in its checkpoint and in the manifest.
-- Every member must agree on the whole `data` section (`spacing_mm`,
-  `image_size`, `series_types`, `study_triplet_total`,
+- Every member must agree on the whole `data` section (`reference_field_mm`,
+  `image_size`, `series_types`, `study_slice_total`,
   `sampling_sigma_fraction` and the rest) because they share one data loader
   and one decoded batch; export refuses a mismatch and names the differing
   field. The `model` section, including `backbone`, may differ per member —
