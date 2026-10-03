@@ -28,10 +28,11 @@ measured outcomes are in the [validation results](../validation/results/INDEX.md
   report-attribute heads, L2-SP weight anchoring (since 2026-09-30, which also removed the scanner
   confusion head), the half-stack augmentation and class-balanced BCE at exponent 0.5.
   `configs/refined-resnet50.yaml` is the same recipe on the Refined-RadImageNet ResNet-50, the
-  submission model, without the 84/93 mm views, which are untested on it; ResNet-18 stays the
-  control for iteration speed (user decision, 2026-10-01).
-  The ReXNet-200 recipe it replaced is `configs/rexnet-200.yaml`, ResNet-50's ensemble partner;
-  submit ResNet bundles at τ 0.9 and ReXNet at τ 0.75.
+  submission model (backbone only differs, since 2026-10-03); ResNet-18 stays the control for
+  iteration speed (user decision, 2026-10-01).
+  `configs/rexnet-200.yaml` is the same recipe on ReXNet-200 with its ImageNet weights, adjacent
+  slices, `backbone_lr` 2e-4 and no L2-SP (since 2026-10-03), ResNet-50's ensemble partner;
+  submit ResNet bundles at τ 0.9 and ReXNet at τ 0.75 (τ untested on the new ReXNet recipe).
 - **Preprocessing identity:** hashed-source changes apply to fresh runs only. A new export or local
   prediction from a checkpoint trained under an earlier identity is refused by
   `validate_preprocessing_identity` and needs that checkpoint's archived sources; already-exported
@@ -65,9 +66,17 @@ measured outcomes are in the [validation results](../validation/results/INDEX.md
   0.925999, epoch 9 of 10, fold 0, seed 1533697213), no public score, the control before the
   field adoption. It was trained in the revisits campaign, so exports use its archived
   `source/` ([result](../validation/results/2026-10-01-revisits-campaign.md)).
+- **`refined-rn50-views-label-bias`** (`outputs/training/20261003-110045-refined-rn50-views-label-bias`),
+  the `configs/refined-resnet50.yaml` recipe: ×4 0.937129 (×1 0.931222, fold 0, seed 1533697213),
+  0.954 public alone (S102), not a control. Folds 1 to 4 of the same recipe are in
+  `outputs/training/20261003-122711-refined-rn50-views-label-bias-folds-1-4`.
+- **`rexnet-200-views-label-bias`** (`outputs/training/20261003-114512-rexnet-200-views-label-bias`),
+  the `configs/rexnet-200.yaml` recipe: ×4 0.932523 (×1 0.928556, fold 0, seed 1533697213), not
+  submitted alone; with the ResNet-50 above 0.939492 on fold 0 (equal weights, ×4, τ 1, no TTA).
 - **`refined-rn50-incumbent-recipe`**
   (`outputs/autoresearch/revisits/experiments/refined-rn50-incumbent-recipe-20261001T081909Z-71e68a1d/training`),
-  the `configs/refined-resnet50.yaml` recipe: ×4 0.934423, 0.948 public (S88), not a control.
+  the `configs/refined-resnet50.yaml` recipe before 2026-10-03 (120 mm views, no label bias): ×4
+  0.934423, 0.948 public (S88).
 - **`rn18-l2sp-no-confusion`** (`outputs/training/rn18-l2sp-no-confusion`), the
   `configs/training.yaml` recipe from 2026-09-30: ×4 0.928062 (×1 0.92451, epoch 9 of 10, fold 0,
   seed 1533697213), 0.943 public (S86), the control before the 2026-10-01 adoption; the
@@ -79,7 +88,7 @@ measured outcomes are in the [validation results](../validation/results/INDEX.md
   10, fold 0, seed 1533697213), 0.943 public (S82), the control before the 2026-09-30 adoption.
   It was trained in the campaign, so exports use its archived `source/`.
 - **`rebuild-state-v2-control`** (`outputs/training/20260928-150724-rebuild-state-v2-control`), the
-  `configs/rexnet-200.yaml` control: ×4 0.928288, 0.944 public (S78) at ×4, τ 0.75.
+  `configs/rexnet-200.yaml` recipe before 2026-10-03: ×4 0.928288, 0.944 public (S78) at ×4, τ 0.75.
 - **No local score on `all_5fold_scanner_v1` is comparable** with a run on the new split
   ([validation strategy](../validation/validation-strategy.md)). The last v1 control,
   `scanner-confusion-control` (fold 4, seed 703791404, ×4 0.909733, 0.946 public as S73), stays the
@@ -87,7 +96,9 @@ measured outcomes are in the [validation results](../validation/results/INDEX.md
 
 ## Best public submissions
 
-- **0.954:** S97, the best so far: 28 networks in 13 bundles with mirror TTA on all, weighted
+- **0.954:** S102, the Refined-RadImageNet ResNet-50 with the 84/93 mm views and the view label
+  bias, alone, fold 0 at ×4, τ 0.9, no TTA (×4 0.937129): the best single model, level with S97.
+- **0.954:** S97: 28 networks in 13 bundles with mirror TTA on all, weighted
   by architecture (Refined ResNet-50 0.30; ResNet-18 0.30 over the 84/93 mm fold-0 model and
   four L2-SP models of folds 1 to 4; ReXNet-200 0.30 over folds 0, 3 and 4; 0.10 for an
   EfficientNet-B3 + ReXNet pair and the ten models of 2026-09-19). It has no fold-0 score,

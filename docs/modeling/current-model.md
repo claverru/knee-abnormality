@@ -9,7 +9,7 @@ defined by [`configs/training.yaml`](../../configs/training.yaml). Since
 
 - **Inputs:** a RadImageNet-pretrained ResNet-18 reads every sampled triplet's middle slice,
   repeated on all three channels, at 224 px, 0.536 mm spacing and a 120 mm field (since
-  2026-10-01; 0.625 mm and 140 mm before, which the ReXNet recipe keeps). Coronal and sagittal
+  2026-10-01; 0.625 mm and 140 mm before). Coronal and sagittal
   series are read through a narrower, finer window in place of that view: T1/PD at 84 mm
   (0.375 mm) and fluid at 93.33 mm (5/12 mm), centred on the fitted knee centre on coronal
   series and 7 mm anterior of it on sagittal ones, 10 mm below the image centre, shifted to stay
@@ -17,22 +17,24 @@ defined by [`configs/training.yaml`](../../configs/training.yaml). Since
   horizontally on the image. Axial series keep the image-centred 120 mm view. Tokens of the
   narrower views carry their position in the 120 mm frame and a learned additive view embedding
   (since 2026-10-02; written as the [view table](#view-table) of `configs/training.yaml`). The same
-  recipe without those views on the Refined-RadImageNet ResNet-50 is
+  recipe on the Refined-RadImageNet ResNet-50 is
   [`configs/refined-resnet50.yaml`](../../configs/refined-resnet50.yaml), the submission model
-  (+0.0046 ×4 at 1.65× the training time); ResNet-18 stays the control because what helps it has
-  carried over so far (user decision, 2026-10-01). The previous ReXNet-200 recipe is kept as
-  [`configs/rexnet-200.yaml`](../../configs/rexnet-200.yaml), ResNet-50's ensemble partner.
+  (backbone only differs; +0.0047 ×4 at 1.69× the training time); ResNet-18 stays the control
+  because what helps it has carried over so far (user decision, 2026-10-01).
+  [`configs/rexnet-200.yaml`](../../configs/rexnet-200.yaml) is the same recipe on ReXNet-200,
+  ResNet-50's ensemble partner, with the settings its ImageNet weights need: `timm` weights,
+  three adjacent slices, `backbone_lr` 2e-4 and no L2-SP anchoring (since 2026-10-03).
 - **Tokens:** every visually valid backbone location is a token with four additive embeddings.
 - **Pooling:** target-specific attention MIL pools position-rich tokens. The two meniscus
   labels see only their own side of the knee; OA stays whole-knee. The side-aware anatomical
   bias with learned meniscus and OA strengths is off (`model.anatomical_bias: false`, since
-  2026-10-01); the ReXNet recipe keeps it.
+  2026-10-01, and on ReXNet since 2026-10-03).
 - **Plane-contrast readouts:** each label scores every token with the classifier vector of the
   token's series type (six plane/contrast types, initialized from one shared vector) and sums
   the attention-weighted scores (`model.plane_readout: true`, since 2026-10-01).
 - **View label bias:** one learned number per view and label, starting at zero, is added to
   the attention score of every token of that view, so each label can favour the series
-  types that show it (`model.view_label_bias: true`, ResNet-18 only, since 2026-10-03).
+  types that show it (`model.view_label_bias: true`, since 2026-10-03).
 - **Half-knee loss (training only):** a shared meniscus tear detector is supervised on each
   half of the knee, so token features learn the medial-lateral split.
 - **Three-compartment OA detector:** one detector, shared by Medial, Lateral and PF OA, is read
@@ -65,6 +67,7 @@ comparable.
 
 | Adopted | Change | Evidence | Control after adoption |
 |---|---|---|---|
+| 2026-10-03 | The ResNet-18 recipe carried to the two other configs. `configs/refined-resnet50.yaml` gains the 84/93 mm views and the view label bias (backbone only differs from `configs/training.yaml`). `configs/rexnet-200.yaml` becomes the same recipe with ReXNet's backbone settings (ImageNet `timm` weights, adjacent slices, `backbone_lr` 2e-4, no L2-SP): 120 mm field, the views, label bias and plane-contrast readouts added; anatomical bias, scanner confusion head and series dropout removed | Fold 0, seed 1533697213, one run each. ResNet-50: ×4 0.937129 against 0.934423 for `refined-rn50-incumbent-recipe` (+0.0027, 80% [+0.0010, +0.0045]; ACL +0.007, MCL +0.008, lateral meniscus +0.006), 0.954 public alone (S102) against 0.948 (S88). ReXNet: ×4 0.932523 against 0.928288 for `rebuild-state-v2-control` (+0.0042, 80% [+0.0018, +0.0066]; MCL +0.021, contusion +0.011, synovitis +0.010, lateral meniscus −0.006), not submitted alone; its changes were made together and are not separated. Equal blend of the two at ×4, τ 1, no TTA: 0.939492, +0.0024 over the ResNet-50 alone (80% [+0.0010, +0.0037]); with the old ReXNet +0.0007; adding the ResNet-18 control to the pair −0.0007 | `refined-rn50-views-label-bias` (`outputs/training/20261003-110045-refined-rn50-views-label-bias`, ×1 0.931222, 1,995 s) and `rexnet-200-views-label-bias` (`outputs/training/20261003-114512-rexnet-200-views-label-bias`, ×1 0.928556, 2,349 s), both trained from main at `a5b8758` with command-line overrides equal to these configs |
 | 2026-10-03 | View label bias (`model.view_label_bias: true`) on ResNet-18 only; the view table moves from the view policy to the config in millimetres (`field_mm`, `data.reference_field_mm`) with unchanged outputs | On the `view-optimisation` branch, fold 0, one run each: the same hand views with the bias ×4 0.933307 (×1 0.9299) against 0.932627 (0.9290) without, +0.0007; the learned-view recipe without it 0.930803 against 0.932489 with, −0.0017 (80% interval excludes zero) and below from epoch 3; every learned run ends at the same bias table. Weak evidence on the hand views alone (+0.0007 is inside the 0.0008 spread of comparable runs); adopted by the user on the agreement across runs. Main's implementation equals the recipe in force at the zero start (outputs differ by 0.0); the run from main is in the last column | `rn18-view-label-bias` (`outputs/training/20261003-100844-rn18-view-label-bias`, fold 0, seed 1533697213): ×4 0.932477, ×1 0.929026, against `fluid-detail-93-replacement` 0.932880 and 0.929261: −0.0004 ×4 (95% [−0.0008, +0.0001], paired, 851 report groups), −0.0002 ×1. Lateral OA −0.0019, lateral meniscus −0.0017, ACL −0.0011, the other nine within ±0.0005. The learned table matches the branch run's (correlation 0.98 over 72 entries, largest ±0.10: Baker's cyst towards axial fluid and away from coronal T1/PD, effusion towards axial fluid). 1,181 s against 1,134 s. Public 0.951 (S101) against 0.950 for the control (S93) and 0.950 for the branch run of the same recipe (S100), one rounding step ([comparison](../../outputs/analysis/rn18-view-label-bias-vs-control-20261003/comparison.json)) |
 | 2026-10-02 | Coronal and sagittal T1/PD at 84 mm (0.375 mm) and fluid at 93.33 mm (5/12 mm) in place of the 120 mm view, rule-placed, on ResNet-18 only (`data.views.policy: detail_84_93`); axial stays at 120 mm | In the smart-crops campaign, one run each: T1/PD at 84 mm +0.0013 ×4 (80% [+0.0001, +0.0025]), fluid at 93 mm a further +0.0010 (80% [−0.0000, +0.0020], just under the rule and adopted by the user); together +0.0022 (80% [+0.0007, +0.0037]) and 0.950 public (S93) against 0.947 (S92) at the same inference settings. Known cost: Baker's cyst −0.0040 ([result](../validation/results/2026-10-02-smart-crops-campaign.md)) | No retrain yet: the adopted run `fluid-detail-93-replacement` (campaign run, ×4 0.932880, 0.950 public as S93); fold and seed kept |
 | 2026-10-01 | 120 mm field at 224 px (`data.spacing_mm` 0.5357, from 0.625 and 140 mm) on ResNet-18 and the ResNet-50 config; reflection, contrast mixing, augmentation and mirror TTA run on the middle slice only in `repeated_middle` mode | On the 2026-09-30 recipe, one run each: 120 mm +0.0011 and +0.0012 ×4 (80% [−0.0004, +0.0026] and [−0.0003, +0.0028]); 0.947 public (S90) against 0.943 (S86) at the same inference settings; middle-slice augmentation neutral (+0.0001, −0.0004) and 6–8% faster per epoch, predictions bit-identical ([result](../validation/results/2026-10-01-mixed-field-campaign.md)) | `rn18-field-120-control` (`outputs/training/rn18-field-120-control`), seed 1533697213, v2 fold 0: ×4 0.930666, 0.947 public (S92); fold and seed kept ([result](../validation/results/2026-10-01-mixed-field-campaign.md#control-on-the-adopted-recipe)) |
@@ -99,7 +102,7 @@ bands; the experimental ten-epoch schedule was reverted. Historical
 | Setting | Value |
 |---|---|
 | Inputs | Three adjacent slices per input (`SLICES_PER_INPUT`, a constant) |
-| `data.image_size`, `data.reference_field_mm` | 224, 120 (0.5357 mm per pixel; 140 and 0.625 mm in the ReXNet recipe) |
+| `data.image_size`, `data.reference_field_mm` | 224, 120 (0.5357 mm per pixel) |
 | `data.series_types[].views` | The [view table](#view-table): coronal and sagittal T1/PD at 0.375 mm (84 mm) and fluid at 5/12 mm (93.33 mm), knee-anchored horizontally (7 mm anterior on sagittal series) and 10 mm below the image centre; axial at `data.spacing_mm`. The other configs read every series at `data.spacing_mm` |
 | `data.sampling_sigma_fraction`, `data.validation_image_multiplier` | 0.867, 1 (×2 before 2026-09-17; scores differ by about 0.0035, and submissions set their own count) |
 | Training triplet draws | One independent random draw per probability band at each epoch; [implemented sampler](../data-preparation/physical-sampling/implemented-sampler.md) |
@@ -109,14 +112,14 @@ bands; the experimental ten-epoch schedule was reverted. Historical
 | Other augmentation | Contrast mixing 0.3, affine 0.7, smoothing 0.2, resolution 0.25, gamma/contrast 0.5, GIN 0.3, noise 0.15, DSU 0.5 ([pipeline](schedule-and-augmentation.md#ten-epoch-schedule-and-augmentation)) |
 | `model.backbone`, `model.pretrained_weights`, `model.slice_channels` | `resnet18.a1_in1k`, `radimagenet` ([Refined-RadImageNet](../research/radimagenet-weights.md#refined-radimagenet-resnets)), `repeated_middle` |
 | `optimizer.backbone_lr` | 5e-5 (weight-RMS rule; 2e-4 for ReXNet-200) |
-| `optimizer.anchor_alpha_early`, `optimizer.anchor_alpha_late` | 0.01 (`conv1`, `bn1`, `layer1`), 0.001 (the rest): L2-SP toward the pretrained backbone weights; 0 in the ReXNet recipe |
+| `optimizer.anchor_alpha_early`, `optimizer.anchor_alpha_late` | 0.01 (`conv1`, `bn1`, `layer1`), 0.001 (the rest): L2-SP toward the pretrained backbone weights; 0 in the ReXNet recipe, where it is untested |
 | Projection and attention widths | 256 and 128 (`PROJECTION_WIDTH`, `MIL_ATTENTION_WIDTH`, constants) |
 | `model.dropout`, `model.series_dropout` | 0.0, 0.0 |
 | Anatomical attention | Fixed `sign * exp(log_strength) * tanh(medial_mm / 20)` for medial/lateral meniscus and OA; two trainable strengths start at 1 |
 | Meniscus side mask | Medial/Lateral Meniscus attend only to own-side tokens plus the ±10 mm band (`COMPARTMENT_MIDLINE_BAND_MM`); unknown side, invalid geometry or no own-side token keep all tokens |
 | `trainer.half_knee_loss_weight` | 0.075 |
 | `trainer.report_attribute_loss_weight`, `paths.report_attribute_manifest` | 0.1, `labels/jevk5-report-attribute-targets-v3.1.json` |
-| `trainer.scanner_confusion_weight` | 0: the head is not built (0.1 in the ReXNet recipe) |
+| `trainer.scanner_confusion_weight` | 0: the head is not built |
 | `labels.source`, `validation.split` | `rebuild_state_v2`, `all_5fold_scanner_v2` |
 | `validation.prediction_image_multiplier` | 4: saved predictions score the ×1-selected checkpoint at ×4, τ 1 |
 | `seed`, `validation.folds` | 1533697213, `[0]`: the control's seed and fold, inherited by new candidates ([rotation rule](../validation/validation-strategy.md#controlled-comparisons)) |
