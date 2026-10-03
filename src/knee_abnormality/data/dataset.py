@@ -38,13 +38,14 @@ from knee_abnormality.data.preprocessing.sampling import (
 )
 from knee_abnormality.data.preprocessing.series import IndexedSeries, index_series
 from knee_abnormality.data.preprocessing.spatial import (
-    DETAIL_SPACINGS_MM,
-    detail_position,
     fallback_window_center,
+    view_position,
     view_transforms,
 )
 from knee_abnormality.data.sources import SeriesCandidate, StudySeries
 from knee_abnormality.data.splits import STUDY
+
+UNKNOWN_GEOMETRY = (0.0, (0.0, 0.0, 0.0), False)
 
 
 class KneeStudyDataset(Dataset):
@@ -71,11 +72,19 @@ class KneeStudyDataset(Dataset):
         self.io_threads = io_threads
         self.epoch = Value("q", 0)
         self._slice_index: dict[Path, IndexedSeries] = {}
-        self._view_specs: dict[tuple[str, str, str], tuple] = {}
+        self.slot_views = tuple(
+            tuple(
+                (index, view)
+                for index, (owner, view) in enumerate(data.views)
+                if owner == slot
+            )
+            for slot in range(len(data.series_types))
+        )
+        self._view_specs: dict[tuple[str, str, int], tuple] = {}
         self._study_references: dict[str, StudyReference] = {}
         self._study_sides: dict[str, KneeSide] = {}
         self._series_geometry: dict[
-            str, dict[str, tuple[float, float, float, bool]]
+            str, dict[str, tuple[float, tuple[float, float, float], bool]]
         ] = {}
         self._excluded_series: dict[str, frozenset[str]] = {}
         self._cleaned_studies: dict[str, StudySeries] = {}
@@ -174,12 +183,12 @@ class KneeStudyDataset(Dataset):
         series_geometry = {}
         for uid in indexed:
             if uid not in eligible_uids:
-                series_geometry[uid] = (0.0, 0.0, 0.0, False)
+                series_geometry[uid] = UNKNOWN_GEOMETRY
                 continue
             group = groups.get(uid, 0)
             own_reference = knee_references.get(group) if bilateral else reference
             if uid in strays or (bilateral and group == 0):
-                series_geometry[uid] = (0.0, 0.0, 0.0, False)
+                series_geometry[uid] = UNKNOWN_GEOMETRY
                 continue
             own_side = {1: LEFT, -1: RIGHT}.get(group, 0) if bilateral else side.value
             sign = {LEFT: -1.0, RIGHT: 1.0}.get(own_side, 0.0)
@@ -196,11 +205,10 @@ class KneeStudyDataset(Dataset):
                 and own_reference.point is not None
                 and own_reference.method in {"fit", "robust"}
             )
-            center_y = own_reference.point[1] if valid else 0.0
+            center_y, center_z = own_reference.point[1:] if valid else (0.0, 0.0)
             series_geometry[uid] = (
                 sign if valid else 0.0,
-                center or 0.0,
-                center_y,
+                (center or 0.0, center_y, center_z),
                 valid,
             )
         self._series_geometry[study.uid] = series_geometry
@@ -226,54 +234,55 @@ class KneeStudyDataset(Dataset):
         )
 
     def _try_prepare_candidate(
-        self, candidate, selected, cache, failures, physical, kind, study_uid
+        self,
+        candidate,
+        selected,
+        cache,
+        failures,
+        physical,
+        kind,
+        view_index,
+        view,
+        study_uid,
     ):
         try:
             plane = kind.plane
             indexed = self._slice_index[candidate.directory]
-            series_geometry = self._series_geometry[study_uid].get(
-                candidate.uid, (0.0, 0.0, 0.0, False)
-            )
-            series_geometry = (
-                *series_geometry[:3],
-                series_geometry[3]
-                and indexed.geometry.native_poses_valid
-                and indexed.geometry.reason is None,
-            )
-            detail = self.data.views.policy == "detail_84_93" and plane in {
-                "Coronal",
-                "Sagittal",
-            }
-            detail_spacing = DETAIL_SPACINGS_MM[kind.fluid_sensitive]
-            key = (study_uid, candidate.uid, plane)
+            geometry = indexed.geometry
+            sign, (center, center_y, center_z), valid = self._series_geometry[
+                study_uid
+            ].get(candidate.uid, UNKNOWN_GEOMETRY)
+            detail = view.field_mm != self.data.reference_field_mm
+            key = (study_uid, candidate.uid, view_index)
             if detail and key not in self._view_specs:
-                self._view_specs[key] = detail_position(
+                self._view_specs[key] = view_position(
                     indexed.records,
                     plane,
-                    series_geometry,
-                    self.data.spacing_mm,
-                    detail_spacing,
+                    view,
+                    sign,
+                    (center, center_y, center_z),
+                    valid and geometry.native_poses_valid and geometry.reason is None,
+                    self.data.reference_spacing_mm,
                     self.data.image_size,
                 )
             offset_y, offset_x, window_center, rule_distance = (
                 self._view_specs[key] if detail else (0, 0, (0.0, 0.0), 0.0)
             )
-            spacing = detail_spacing if detail else self.data.spacing_mm
             value = self._prepare_candidate(
-                selected, cache, spacing, offset_y, offset_x
+                selected,
+                cache,
+                view.field_mm / self.data.image_size,
+                offset_y,
+                offset_x,
             )
             if detail and window_center is None:
                 window_center, rule_distance = fallback_window_center(
-                    value, self.data.image_size
+                    value, view, self.data.image_size
                 )
             failures.extend(value.failures)
-            geometry = self._slice_index[candidate.directory].geometry
             eligible, reason = reflection_eligibility(geometry, plane)
             if not bool(value.geometry_valid.all()):
                 eligible, reason = False, "invalid_selected_pose"
-            sign, center, center_y, valid = self._series_geometry[study_uid].get(
-                candidate.uid, (0.0, 0.0, 0.0, False)
-            )
             return replace(
                 value,
                 uid=candidate.uid,
@@ -287,9 +296,11 @@ class KneeStudyDataset(Dataset):
                 knee_side_sign=sign,
                 knee_center_x_mm=center,
                 knee_center_y_mm=center_y,
-                view_index=int(detail),
+                view_index=view_index,
                 view_to_wide=(
-                    view_transforms(value, self.data.spacing_mm, self.data.image_size)
+                    view_transforms(
+                        value, self.data.reference_spacing_mm, self.data.image_size
+                    )
                     if detail
                     else torch.eye(3)[None].expand(value.triplet_count, -1, -1)
                 ),
@@ -313,73 +324,81 @@ class KneeStudyDataset(Dataset):
 
     def _study_budgets(self, slot_sources):
         multiplier = self.image_limit_multiplier
-        base = tuple(
-            kind.max_images * multiplier // 3 for kind in self.data.series_types
-        )
+        base = tuple(view.slices * multiplier for _, view in self.data.views)
         return study_budgets(
             base,
-            tuple(len(sources) for _, sources in slot_sources),
-            self.data.study_triplet_total * multiplier,
+            tuple(len(slot_sources[slot][1]) for slot, _ in self.data.views),
+            self.data.study_slice_total * multiplier,
         )
 
-    def _prepare_slot(self, study, slot, candidates, sources, budget, failures):
+    def _prepare_slot(self, study, slot, candidates, sources, budgets, failures):
         excluded = self._excluded_series[study.uid]
         kind = self.data.series_types[slot]
-        radius = self.data.image_size * self.data.spacing_mm / 2
-        failed_paths, failed_sources, cache = set(), set(), {}
+        kind_key = (kind.plane, kind.fluid_sensitive, kind.fat_suppression)
+        views = self.slot_views[slot]
+        radius = self.data.reference_field_mm / 2
+        failed_paths, failed_sources = set(), set()
+        caches = [{} for _ in views]
         attempts = 0
         while True:
             pool = build_pool(
                 tuple(sources),
                 kind.plane,
                 self._study_references[study.uid],
-                self.data.spacing_mm,
+                self.data.reference_spacing_mm,
                 radius,
                 failed_paths,
                 failed_sources,
             )
-            selection = select_triplets(
-                pool,
-                budget,
-                self.data.sampling_sigma_fraction,
-                radius,
-                study.uid,
-                (kind.plane, kind.fluid_sensitive, kind.fat_suppression),
-                self.training_seed,
-                self.epoch.value,
-            )
-            values, new_paths, new_sources = [], set(), set()
-            for uid in sorted({t.uid for t in selection.triplets}):
-                selected = tuple(
-                    r for t in selection.triplets if t.uid == uid for r in t.records
-                )
-                value = self._try_prepare_candidate(
-                    candidates[uid],
-                    selected,
-                    cache,
-                    failures,
-                    pool.physical,
-                    kind,
+            values, selections, new_paths, new_sources = [], [], set(), set()
+            for order, (view_index, view) in enumerate(views):
+                selection = select_triplets(
+                    pool,
+                    budgets[view_index],
+                    self.data.sampling_sigma_fraction,
+                    radius,
                     study.uid,
+                    (*kind_key, order) if order else kind_key,
+                    self.training_seed,
+                    self.epoch.value,
                 )
-                if value is None:
-                    new_sources.add(uid)
-                elif value.failed_paths:
-                    new_paths.update(value.failed_paths)
-                else:
-                    values.append(value)
+                selections.append(selection)
+                for uid in sorted({t.uid for t in selection.triplets}):
+                    selected = tuple(
+                        r for t in selection.triplets if t.uid == uid for r in t.records
+                    )
+                    value = self._try_prepare_candidate(
+                        candidates[uid],
+                        selected,
+                        caches[order],
+                        failures,
+                        pool.physical,
+                        kind,
+                        view_index,
+                        view,
+                        study.uid,
+                    )
+                    if value is None:
+                        new_sources.add(uid)
+                    elif value.failed_paths:
+                        new_paths.update(value.failed_paths)
+                    else:
+                        values.append(value)
             attempts += 1
             if not new_paths and not new_sources:
-                metadata = {
-                    **selection.metadata,
-                    "attempts": attempts,
-                    "failed_paths": sorted(map(str, failed_paths)),
-                    "failed_sources": sorted(failed_sources),
-                    "excluded_sources": sorted(
-                        c.uid for c in study.slots[slot] if c.uid in excluded
-                    ),
-                    "decoded_unique_paths": len(cache),
-                }
+                metadata = tuple(
+                    {
+                        **selection.metadata,
+                        "attempts": attempts,
+                        "failed_paths": sorted(map(str, failed_paths)),
+                        "failed_sources": sorted(failed_sources),
+                        "excluded_sources": sorted(
+                            c.uid for c in study.slots[slot] if c.uid in excluded
+                        ),
+                        "decoded_unique_paths": len(cache),
+                    }
+                    for selection, cache in zip(selections, caches, strict=True)
+                )
                 return tuple(values), metadata
             if not ((new_paths - failed_paths) or (new_sources - failed_sources)):
                 raise RuntimeError("Preparation retry made no progress")
@@ -400,10 +419,10 @@ class KneeStudyDataset(Dataset):
         for slot in range(len(study.slots)):
             candidates, sources = slot_sources[slot]
             values, metadata = self._prepare_slot(
-                study, slot, candidates, sources, budgets[slot], failures
+                study, slot, candidates, sources, budgets, failures
             )
             prepared.append(values)
-            sampling.append(metadata)
+            sampling.extend(metadata)
         if not any(prepared):
             logging.getLogger(__name__).error(
                 "Study %s has no decodable supported series after %d conditions: %s",

@@ -101,11 +101,34 @@ class LabelsConfig(ConfigModel):
     source: Identifier
 
 
+class ViewAxisConfig(ConfigModel):
+    anchor: Literal["image", "knee"]
+    offset_mm: FiniteFloat
+
+
+class ViewConfig(ConfigModel):
+    field_mm: PositiveFiniteFloat
+    slices: Annotated[StrictInt, Field(gt=0)]
+    horizontal: ViewAxisConfig
+    vertical: ViewAxisConfig
+
+    @property
+    def shifted(self) -> bool:
+        return any(
+            axis.anchor == "knee" or axis.offset_mm != 0
+            for axis in (self.horizontal, self.vertical)
+        )
+
+
 class SeriesTypeConfig(ConfigModel):
     plane: Literal["Axial", "Coronal", "Sagittal"]
     fluid_sensitive: Literal[0, 1]
     fat_suppression: Literal[0, 1]
-    max_images: Annotated[StrictInt, Field(gt=0)]
+    views: Annotated[tuple[ViewConfig, ...], Field(min_length=1)]
+
+    @property
+    def slices(self) -> int:
+        return sum(view.slices for view in self.views)
 
 
 class AugmentationConfig(ConfigModel):
@@ -148,12 +171,7 @@ class GinAugmentationConfig(AugmentationConfig):
     blend_max: Annotated[float, Field(gt=0, le=1)] = 0.5
 
 
-class ViewsConfig(ConfigModel):
-    policy: Literal["wide", "detail_84_93"] = "wide"
-
-
 class DataConfig(ConfigModel):
-    views: ViewsConfig = Field(default_factory=ViewsConfig)
     reflection_augmentation: ReflectionAugmentationConfig = Field(
         default_factory=ReflectionAugmentationConfig
     )
@@ -163,7 +181,7 @@ class DataConfig(ConfigModel):
     series_types: Annotated[tuple[SeriesTypeConfig, ...], Field(min_length=1)]
     sampling_sigma_fraction: PositiveFiniteFloat = 0.867
     validation_image_multiplier: Annotated[StrictInt, Field(gt=0)] = 1
-    study_triplet_total: Annotated[StrictInt, Field(gt=0)]
+    study_slice_total: Annotated[StrictInt, Field(gt=0)]
     intensity_augmentation: IntensityAugmentationConfig = Field(
         default_factory=IntensityAugmentationConfig
     )
@@ -182,7 +200,7 @@ class DataConfig(ConfigModel):
     gin_augmentation: GinAugmentationConfig = Field(
         default_factory=GinAugmentationConfig
     )
-    spacing_mm: Annotated[float, Field(gt=0)]
+    reference_field_mm: Annotated[float, Field(gt=0)]
     image_size: Annotated[StrictInt, Field(gt=0)]
     lower_quantile: Annotated[float, Field(ge=0, le=1)]
     upper_quantile: Annotated[float, Field(ge=0, le=1)]
@@ -190,12 +208,41 @@ class DataConfig(ConfigModel):
     std: tuple[PositiveFiniteFloat, PositiveFiniteFloat, PositiveFiniteFloat]
 
     @model_validator(mode="after")
-    def triplet_inputs(self) -> "DataConfig":
-        if any(kind.max_images % SLICES_PER_INPUT for kind in self.series_types):
+    def shifts_inside_frame(self) -> "DataConfig":
+        if any(
+            view.shifted and view.field_mm >= self.reference_field_mm
+            for _, view in self.views
+        ):
             raise ValueError(
-                "Triplet max_images limits count channel appearances and must be multiples of three"
+                "A view with an anchor or offset must be narrower than "
+                "data.reference_field_mm, which bounds every window"
             )
         return self
+
+    @property
+    def reference_spacing_mm(self) -> float:
+        return self.reference_field_mm / self.image_size
+
+    @property
+    def views(self) -> tuple[tuple[int, ViewConfig], ...]:
+        return tuple(
+            (slot, view)
+            for slot, kind in enumerate(self.series_types)
+            for view in kind.views
+        )
+
+    @property
+    def view_names(self) -> tuple[str, ...]:
+        names: list[str] = []
+        for slot, view in self.views:
+            kind = self.series_types[slot]
+            stem = (
+                f"{kind.plane.lower()}_{'fluid' if kind.fluid_sensitive else 't1pd'}"
+                f"_{round(view.field_mm)}mm"
+            )
+            repeats = sum(name.split("mm")[0] + "mm" == stem for name in names)
+            names.append(f"{stem}_{repeats + 1}" if repeats else stem)
+        return tuple(names)
 
     @field_validator("series_types")
     @classmethod

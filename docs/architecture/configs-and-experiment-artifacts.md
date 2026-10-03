@@ -180,8 +180,8 @@ in `modeling/model.py`, which is in `identity.PREPROCESSING_SOURCES`, it changes
 source digest and is a fresh-runs-only change; earlier checkpoints keep validating against their
 archived sources.
 
-**Study triplet total** (`data.study_triplet_total`, required, **26 in `configs/training.yaml`
-since 2026-09-18**) raises a study whose per-type budgets sum below that many training triplets to
+**Study slice total** (`data.study_slice_total`, required, **26 in `configs/training.yaml`
+since 2026-09-18**) raises a study whose per-type budgets sum below that many training slices to
 it, scaling the slots it has in proportion to their configured budgets, largest-remainder rounded
 and capped by each slot's capacity; a study already at or above the floor is untouched. On fold 0
 it lifts the ~29% of studies missing two types from about 21 triplets to 26 and leaves the rest

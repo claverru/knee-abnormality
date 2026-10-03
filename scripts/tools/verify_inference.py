@@ -10,7 +10,7 @@ from pydantic import Field
 
 import knee_abnormality
 from knee_abnormality.cli import CLISettings, describe
-from knee_abnormality.config import SLICES_PER_INPUT, ExperimentConfig
+from knee_abnormality.config import ExperimentConfig
 from knee_abnormality.data.dataset import build_data_loader
 from knee_abnormality.data.splits import STUDY
 from knee_abnormality.evaluation.predictions import make_prediction_frame
@@ -52,9 +52,7 @@ def _sample_batches(dataset, count: int, batch_size: int) -> list[int]:
             ):
                 inputs += min(
                     sum(max(candidate.image_count - 2, 0) for candidate in slot),
-                    kind.max_images
-                    * dataset.image_limit_multiplier
-                    // SLICES_PER_INPUT,
+                    kind.slices * dataset.image_limit_multiplier,
                 )
                 acquisitions += len(slot)
         return inputs, acquisitions
@@ -128,7 +126,7 @@ def verify_inference(bundle: Path, request: dict) -> None:
         uid: sum(
             min(
                 sum(max(candidate.image_count - 2, 0) for candidate in slot),
-                kind.max_images * dataset.image_limit_multiplier // SLICES_PER_INPUT,
+                kind.slices * dataset.image_limit_multiplier,
             )
             for slot, kind in zip(
                 dataset.series_index[uid].slots, dataset.data.series_types, strict=True

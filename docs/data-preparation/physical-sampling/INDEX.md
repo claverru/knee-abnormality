@@ -14,6 +14,6 @@
 | Read when | Section |
 |---|---|
 | Interpreting sampling_sigma_fraction and acquired reach | [Gaussian width](implemented-sampler.md#gaussian-width) |
-| Checking max_images, multipliers and within-band training draws | [Triplet budgets and target draws](implemented-sampler.md#triplet-budgets-and-target-draws) |
+| Checking slice budgets (`slices`), multipliers and within-band training draws | [Triplet budgets and target draws](implemented-sampler.md#triplet-budgets-and-target-draws) |
 | Checking original versus reformat, retake and resolution ordering | [Source ranking](implemented-sampler.md#source-ranking) |
 | Checking training randomness and seed-independent validation | [Seeds and deterministic evaluation](implemented-sampler.md#seeds-and-deterministic-evaluation) |

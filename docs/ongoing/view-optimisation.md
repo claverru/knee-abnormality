@@ -76,6 +76,29 @@ about +0.001 to +0.002, at the edge of what one run shows.
 
 ## Fallback: configuration experiments
 
+The view table is on main since 2026-10-03 (built on the `view-config` branch on 2026-10-02),
+independently of the learnable build and on main's loader-side cut, without a canvas. Every plane and contrast lists its views in the config:
+per view a spacing, a slice budget and a placement (image or knee anchor and an offset in
+millimetres per axis); a type may list several views, each with its own budget and slices.
+Settings and rules: [view table](../modeling/current-model.md#view-table).
+
+- **The control stands.** The recipe in force written as a view table gives bit-identical
+  loader output (CPU, 200 training studies, four sampling modes), and the model treats a
+  centred 120 mm view and a finer view exactly as before, so ×4 0.932880 stays the reference
+  and no control retrain is needed. Rechecked before the merge on the three configs
+  (ResNet-18, Refined ResNet-50, ReXNet-200; training, ×1 and ×4 validation studies): the
+  same slices, and images, geometry, features and outputs with a difference of 0.0 for the
+  same initial weights. A checkpoint for Kaggle still has to be trained on this
+  code, because the preprocessing identity hashes the sources.
+- **Checked on CPU only** beyond the control recipe: a config with a knee-anchored 100 mm
+  axial view, a second 84 mm sagittal T1/PD view 15 mm above the image centre and a second
+  120 mm sagittal fluid view of two slices runs through the loader and the model, with the
+  window centres where the rule puts them. No training run exists.
+- **Limits.** Every window stays inside the 120 mm frame, so a 120 mm view cannot shift and a
+  wider one is centred. Every view's tokens enter every label's pool: routing a view to
+  chosen labels (batch 3 below) is not built. A view table is set in the YAML, not by a
+  dotted flag.
+
 1. A balanced batch on widths (six to eight runs): each run gives every type one of four or five
    widths, arranged so each type's response curve per label comes out of the batch, including
    the untried cells. These runs inform; they are not candidates.

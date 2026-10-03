@@ -53,7 +53,7 @@ in the [campaigns](campaigns/INDEX.md) and the
 - **Harness gaps the mixed-field campaign exposed (2026-10-01), awaiting a user decision:**
   - an activation signature of `> 0` passed a mechanism that never acted (`two-stream-paired`,
     observed 0.0013); thresholds should separate an acting mechanism from numerical residue;
-  - `data.study_triplet_total` is a floor, not a cap, so a range-budget idea that lowers it to save
+  - `data.study_slice_total` is a floor, not a cap, so a range-budget idea that lowers it to save
     time changes almost nothing; cutting input needs `max_images` in `data.series_types`;
   - a configuration-only idea cannot declare an activation column, so it blocks unless the idea
     text allows logging-only instrumentation;

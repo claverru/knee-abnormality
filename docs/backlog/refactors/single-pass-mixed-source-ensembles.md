@@ -10,7 +10,7 @@ checkpoints out of that path when they come from different campaigns:
   `preprocessing_identity.sources_sha256` differs from the bundled source
   (`identity.validate_preprocessing_identity`), and one bundle carries one source tree.
 - **Data config.** `_validate_members` in `scripts/pipeline/export.py` and `load_ensemble_models`
-  require identical `data` sections, so members trained at different `data.study_triplet_total`
+  require identical `data` sections, so members trained at different `data.study_slice_total`
   cannot share a bundle.
 
 ## Why

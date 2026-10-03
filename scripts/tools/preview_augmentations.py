@@ -81,7 +81,7 @@ const acquisitions = new Map();
 data.studies.forEach((uid,i) => study.add(new Option(`Example ${i+1} · …${uid.slice(-8)}`,uid)));
 study.value = data.studies[0];
 data.seeds.forEach((seed,i) => variant.add(new Option(`Seed ${seed}`,i)));
-document.getElementById('intro').textContent = `${data.image_size} px · ${(data.image_size*data.spacing_mm).toFixed(1)} mm crop · ${data.sampling} slice sampling · three consecutive slices per input · Kornia · affine ${100*data.settings.affine.probability}% · gamma/contrast ${100*data.settings.intensity.probability}% · noise ${100*data.settings.noise.probability}%`;
+document.getElementById('intro').textContent = `${data.image_size} px · ${data.reference_field_mm.toFixed(1)} mm frame · ${data.sampling} slice sampling · three consecutive slices per input · Kornia · affine ${100*data.settings.affine.probability}% · gamma/contrast ${100*data.settings.intensity.probability}% · noise ${100*data.settings.noise.probability}%`;
 function render() {
   const draw = Number(variant.value);
   const cards = document.getElementById('cards');
@@ -131,7 +131,7 @@ function render() {
     if (active('noise')) effects.push(`Noise σ ${sample.noise.std.toFixed(4)}`);
     content.querySelector('.status').textContent = reflection.checked ? `Study reflection ${entry.study_reflection_eligible ? 'eligible' : 'rejected: '+entry.study_reflection_reasons.join(', ')} · Source laterality ${entry.source_lateralities.join(', ') || 'unavailable'} · Obliquity ${entry.obliquity_degrees.toFixed(1)}°` : effects.join(' · ') + ` · Reflection ${force.checked ? entry.study_reflection_eligible : sample.reflection_applied}`;
     content.querySelector('.caption').textContent = reflection.checked ? 'Forced eligible reflection' : (force.checked ? 'Forced enabled transforms' : 'Sampled training transforms');
-    content.querySelector('.identity').textContent = `Study: ${entry.study_uid}. Acquisition: ${entry.series_uid}. Gaussian σ ${entry.sampling_metadata.sampling_sigma_mm != null ? entry.sampling_metadata.sampling_sigma_mm.toFixed(1)+' mm' : 'n/a'} (fraction ${data.sampling_sigma_fraction} of pool reach); epoch ${data.epoch}. ${entry.sampling_path} sampling. This acquisition supplies ${entry.inputs} triplets, ${entry.slices} channel appearances, ${entry.unique_slices} unique source slices; the type budget is ${type.max_images/data.slices_per_input} inputs across acquisitions. ${entry.failures.length} preparation conditions.`;
+    content.querySelector('.identity').textContent = `Study: ${entry.study_uid}. Acquisition: ${entry.series_uid}. Gaussian σ ${entry.sampling_metadata.sampling_sigma_mm != null ? entry.sampling_metadata.sampling_sigma_mm.toFixed(1)+' mm' : 'n/a'} (fraction ${data.sampling_sigma_fraction} of pool reach); epoch ${data.epoch}. ${entry.sampling_path} sampling. This acquisition supplies ${entry.inputs} triplets, ${entry.slices} channel appearances, ${entry.unique_slices} unique source slices; the type budget is ${type.slices} inputs across acquisitions. ${entry.failures.length} preparation conditions.`;
     function update() {
       const index = Number(slider.value);
       positions.set(key,index);
@@ -516,7 +516,7 @@ def create_preview(args: PreviewCLI) -> dict:
                         "unique_slices": series.unique_slice_count,
                         "sampling_path": series.sampling_path,
                         "selected_paths": series.selected_paths,
-                        "sampling_metadata": item["sampling"][slot],
+                        "sampling_metadata": item["sampling"][series.view_index],
                         "positions": series.positions.tolist(),
                         "prepared_sha256": hashlib.sha256(
                             images.numpy().tobytes()
@@ -664,14 +664,17 @@ def create_preview(args: PreviewCLI) -> dict:
         "reflection_probability": config.data.reflection_augmentation.probability,
         "image_size": config.data.image_size,
         "slices_per_input": SLICES_PER_INPUT,
-        "spacing_mm": config.data.spacing_mm,
+        "reference_field_mm": config.data.reference_field_mm,
         "sampling_sigma_fraction": config.data.sampling_sigma_fraction,
         "sampling": args.sampling,
         "epoch": args.epoch,
         "settings": {
             name: setting.model_dump(mode="json") for name, setting in settings.items()
         },
-        "types": [kind.model_dump(mode="json") for kind in config.data.series_types],
+        "types": [
+            {**kind.model_dump(mode="json"), "slices": kind.slices}
+            for kind in config.data.series_types
+        ],
         "studies": dataset.studies[STUDY].gather(indices).to_list(),
         "seeds": seeds,
         "series": entries,

@@ -10,7 +10,7 @@ import polars as pl
 import pytorch_lightning as L
 import torch
 
-from knee_abnormality.config import SLICES_PER_INPUT, ExperimentConfig
+from knee_abnormality.config import ExperimentConfig
 from knee_abnormality.data.dataset import KneeStudyDataset
 from knee_abnormality.data.labels import FoldLabels, load_fold_labels
 from knee_abnormality.data.sources import build_series_index
@@ -31,7 +31,7 @@ def sample_dataset(
             -sum(
                 min(
                     sum(max(c.image_count - 2, 0) for c in values),
-                    kind.max_images // SLICES_PER_INPUT,
+                    kind.slices,
                 )
                 for values, kind in zip(
                     index[uid].slots, config.data.series_types, strict=True

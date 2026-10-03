@@ -243,7 +243,7 @@ def resample_crop(
     )
 
 
-DETAIL_SPACINGS_MM = {0: 0.375, 1: 5 / 12}
+PLANE_AXES = {"Axial": (0, 1), "Coronal": (0, 2), "Sagittal": (1, 2)}
 
 
 def record_layout(record):
@@ -268,45 +268,67 @@ def record_transform(record, spacing, size, offset_y=0, offset_x=0):
     )
 
 
-def detail_position(records, plane, geometry, wide_spacing, detail_spacing, size):
+def image_rule(view):
+    return tuple(
+        axis.offset_mm if axis.anchor == "image" else 0.0
+        for axis in (view.horizontal, view.vertical)
+    )
+
+
+def view_position(records, plane, view, side, knee, trusted, frame_spacing, size):
+    settings = (view.horizontal, view.vertical)
+    spacing = view.field_mm / size
     available = [record for record in records if record_layout(record) is not None]
     if not available:
-        return round(10.0 / detail_spacing), 0, None, 0.0
+        offset_x, offset_y = (round(offset / spacing) for offset in image_rule(view))
+        return offset_y, offset_x, None, 0.0
     record = available[len(available) // 2]
-    _, center_x, center_y, trusted = geometry
     rows, columns, row_spacing, column_spacing = record_layout(record)
-    detail = record_transform(record, detail_spacing, size)
+    detail = record_transform(record, spacing, size)
     output_center = np.array([(size - 1) / 2, (size - 1) / 2, 1])
     native_center = detail @ output_center
-    requested_y = round(
-        ((rows - 1) / 2 + 10.0 / row_spacing - native_center[1]) / detail[1, 1]
+    middle = ((columns - 1) / 2, (rows - 1) / 2)
+    pitch = (column_spacing, row_spacing)
+    directions = (
+        -1.0 if plane == "Sagittal" else side,
+        1.0 if plane == "Axial" else -1.0,
     )
-    rule_native_y = native_center[1] + requested_y * detail[1, 1]
-    offset_x_mm = 0.0
-    if trusted and record.pose is not None:
-        pose = record.pose
-        axis = 0 if plane == "Coronal" else 1
-        horizontal = pose.layout.orientation[axis] * column_spacing
-        vertical = pose.layout.orientation[3 + axis] * row_spacing
-        rule_axis_center = (
-            pose.position[axis]
-            + horizontal * (columns - 1) / 2
-            + vertical * rule_native_y
+    located = trusted and record.pose is not None
+    anchored = [axis for axis in (0, 1) if settings[axis].anchor == "knee"]
+    native = [native_center[0], native_center[1]]
+    rule = [0.0, 0.0]
+    requested = [0, 0]
+    for axis in (
+        *(axis for axis in (0, 1) if axis not in anchored),
+        *anchored * len(anchored),
+    ):
+        setting = settings[axis]
+        if setting.anchor == "image":
+            rule[axis] = setting.offset_mm
+        elif located:
+            pose = record.pose
+            patient = PLANE_AXES[plane][axis]
+            other = 1 - axis
+            along = pose.layout.orientation[3 * axis + patient] * pitch[axis]
+            across = pose.layout.orientation[3 * other + patient] * pitch[other]
+            reached = (
+                pose.position[patient] + along * middle[axis] + across * native[other]
+            )
+            target = knee[patient] + directions[axis] * setting.offset_mm
+            if abs(along) > 1e-6:
+                rule[axis] = (target - reached) * pitch[axis] / along
+        requested[axis] = round(
+            (middle[axis] + rule[axis] / pitch[axis] - native_center[axis])
+            / detail[axis, axis]
         )
-        target = center_x if plane == "Coronal" else center_y - 7.0
-        if abs(horizontal) > 1e-6:
-            offset_x_mm = (target - rule_axis_center) * column_spacing / horizontal
-    rule = np.array([offset_x_mm, 10.0], dtype=np.float64)
-    requested_x = round(
-        ((columns - 1) / 2 + offset_x_mm / column_spacing - native_center[0])
-        / detail[0, 0]
-    )
-    requested = np.array([requested_x, requested_y], dtype=np.int64)
+        native[axis] = native_center[axis] + requested[axis] * detail[axis, axis]
+    rule = np.array(rule, dtype=np.float64)
+    requested = np.array(requested, dtype=np.int64)
     lower = np.full(2, -np.inf)
     upper = np.full(2, np.inf)
     for item in available:
-        wide = record_transform(item, wide_spacing, size)
-        detail = record_transform(item, detail_spacing, size)
+        wide = record_transform(item, frame_spacing, size)
+        detail = record_transform(item, spacing, size)
         rows, columns, _, _ = record_layout(item)
         for axis, extent in enumerate((columns, rows)):
             wide_scale, detail_scale = wide[axis, axis], detail[axis, axis]
@@ -327,7 +349,7 @@ def detail_position(records, plane, geometry, wide_spacing, detail_spacing, size
         np.int64
     )
     offset_x, offset_y = map(int, applied)
-    transform = record_transform(record, detail_spacing, size, offset_y, offset_x)
+    transform = record_transform(record, spacing, size, offset_y, offset_x)
     rows, columns, row_spacing, column_spacing = record_layout(record)
     native_center = transform @ output_center
     center = np.array(
@@ -354,7 +376,7 @@ def frame_wide_transform(frame, wide_spacing, size):
     )
 
 
-def fallback_window_center(value, size):
+def fallback_window_center(value, view, size):
     if not value.triplet_count:
         return (0.0, 0.0), 0.0
     frame = value.frames[int(value.gather[1])]
@@ -366,7 +388,7 @@ def fallback_window_center(value, size):
             (native[1] - (rows - 1) / 2) * row_spacing,
         ]
     )
-    return tuple(map(float, center)), float(np.linalg.norm(center - [0.0, 10.0]))
+    return tuple(map(float, center)), float(np.linalg.norm(center - image_rule(view)))
 
 
 def view_transforms(value, wide_spacing, size):

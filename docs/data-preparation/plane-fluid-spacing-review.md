@@ -30,7 +30,7 @@ also changes the effective augmentation mismatch.
 
 The settings require the actual campaign placement: coronal at the fitted transverse knee centre,
 sagittal 7 mm anterior of the fitted centre, both 10 mm below the image centre, clipped into the
-120 mm window and native field. Axial stays image-centred. Retain `data.spacing_mm = 120/224`
+120 mm window and native field. Axial stays image-centred. Retain the 120 mm frame (`data.reference_field_mm`, then `data.spacing_mm = 120/224`)
 for slice selection; a view's in-plane spacing must not change sampling depth. Wider axial
 in-plane coverage cannot restore a superior or inferior slice that was never sampled.
 

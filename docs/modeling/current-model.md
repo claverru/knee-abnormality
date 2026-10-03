@@ -16,7 +16,7 @@ defined by [`configs/training.yaml`](../../configs/training.yaml). Since
   inside the 120 mm window and the stored image; a series without trusted geometry is centred
   horizontally on the image. Axial series keep the image-centred 120 mm view. Tokens of the
   narrower views carry their position in the 120 mm frame and a learned additive view embedding
-  (`data.views.policy: detail_84_93`, since 2026-10-02). The same
+  (since 2026-10-02; written as the [view table](#view-table) of `configs/training.yaml`). The same
   recipe without those views on the Refined-RadImageNet ResNet-50 is
   [`configs/refined-resnet50.yaml`](../../configs/refined-resnet50.yaml), the submission model
   (+0.0046 ×4 at 1.65× the training time); ResNet-18 stays the control because what helps it has
@@ -95,12 +95,12 @@ bands; the experimental ten-epoch schedule was reverted. Historical
 | Setting | Value |
 |---|---|
 | Inputs | Three adjacent slices per input (`SLICES_PER_INPUT`, a constant) |
-| `data.image_size`, `data.spacing_mm` | 224, 0.5357 (120 mm; 0.625 and 140 mm in the ReXNet recipe) |
-| `data.views.policy` | `detail_84_93`: coronal and sagittal T1/PD at 0.375 mm (84 mm) and fluid at 5/12 mm (93.33 mm), rule-placed; `wide`, the default the other configs keep, reads every series at `data.spacing_mm` |
+| `data.image_size`, `data.reference_field_mm` | 224, 120 (0.5357 mm per pixel; 140 and 0.625 mm in the ReXNet recipe) |
+| `data.series_types[].views` | The [view table](#view-table): coronal and sagittal T1/PD at 0.375 mm (84 mm) and fluid at 5/12 mm (93.33 mm), knee-anchored horizontally (7 mm anterior on sagittal series) and 10 mm below the image centre; axial at `data.spacing_mm`. The other configs read every series at `data.spacing_mm` |
 | `data.sampling_sigma_fraction`, `data.validation_image_multiplier` | 0.867, 1 (×2 before 2026-09-17; scores differ by about 0.0035, and submissions set their own count) |
 | Training triplet draws | One independent random draw per probability band at each epoch; [implemented sampler](../data-preparation/physical-sampling/implemented-sampler.md) |
 | `trainer.class_balance_exponent` | `0.5` |
-| `data.study_triplet_total` | 26: a study whose per-type budgets sum below 26 training triplets is scaled up to it, proportionally over the types it has |
+| `data.study_slice_total` | 26: a study whose per-type budgets sum below 26 training slices is scaled up to it, proportionally over the types it has |
 | `data.reflection_augmentation.probability` | 0.5 |
 | Other augmentation | Contrast mixing 0.3, affine 0.7, smoothing 0.2, resolution 0.25, gamma/contrast 0.5, GIN 0.3, noise 0.15, DSU 0.5 ([pipeline](schedule-and-augmentation.md#ten-epoch-schedule-and-augmentation)) |
 | `model.backbone`, `model.pretrained_weights`, `model.slice_channels` | `resnet18.a1_in1k`, `radimagenet` ([Refined-RadImageNet](../research/radimagenet-weights.md#refined-radimagenet-resnets)), `repeated_middle` |
@@ -130,6 +130,43 @@ stopping, logging and independent best and latest checkpoints. The saved checkpo
 configuration governs prediction; later edits to the YAML do not change an existing artifact.
 [CoAtNet](coatnet-224-spatial-backbone.md) is supported but is selected only by an explicit
 `model.backbone` change.
+
+### View table
+
+Every series type (plane and contrast) lists its views under `data.series_types[].views`. A
+view is one window size with its own slices:
+
+| Field | Meaning |
+|---|---|
+| `field_mm` | Width of the view's window in millimetres; its pixel size is `field_mm` over `data.image_size` (84 mm is 0.375 mm, 93.33 mm is 5/12 mm, 120 mm is 0.5357 mm) |
+| `slices` | The view's base slice budget: the inputs it selects, each a middle slice read with its two neighbours. A series with fewer positions supplies fewer; `data.study_slice_total` and the image multipliers scale it up |
+| `horizontal`, `vertical` | Placement per image axis, both fields written out: `anchor` (`image`, the image centre, or `knee`, the fitted knee centre) and `offset_mm` from it. A plain centred window is `{anchor: image, offset_mm: 0.0}` on both axes |
+
+- **Directions.** An offset from the image centre runs along the image axis (columns to the
+  right, rows downwards). An offset from the knee centre is anatomical, in patient
+  millimetres: horizontally medial on axial and coronal series and anterior on sagittal ones;
+  vertically posterior on axial series and inferior on coronal and sagittal ones.
+- **Fallback.** A series without trusted geometry treats a knee-anchored axis as the image
+  centre with no offset.
+- **Frame.** `data.reference_field_mm` (120 mm) is the frame, a centred square: the reference
+  for slice selection and token positions. It was `data.spacing_mm`, the frame's pixel size,
+  until 2026-10-03; the frame's pixel size is now derived as the field over `data.image_size`.
+  A view as wide as the frame is the plain centred frame and cannot carry an anchor or offset
+  (the config rejects it). A finer view is moved to stay
+  inside the frame and the stored image, never shrunk; when it cannot fit it is centred. Its
+  tokens carry their position in the frame and the shared additive view embedding.
+- **Several views per type.** Each view draws its own slices from the type's pool with its own
+  budget; the views are independent draws in training and independent band midpoints in
+  evaluation. `data.study_slice_total` and the image multipliers apply over all views.
+- **Logged per view** under the names `<plane>_<t1pd|fluid>_<width>mm` (a repeated name gets
+  `_2`, `_3`): `view_share_`, `attention_mass_<view>_<label>`, `window_center_`,
+  `window_rule_distance_`, `val_macro_auc_view_` and `val_auc_view_<view>_<label>` (the
+  view's tokens alone).
+
+The recipe in force written as this table gives loader output bit-identical to the
+`data.views.policy: detail_84_93` code it replaced (checked on CPU, 2026-10-02: 200 training
+studies, training draws at two epochs and evaluation at ×1 and ×4, every image and geometry
+tensor equal), so runs before and after the change are comparable.
 
 ## Architecture
 

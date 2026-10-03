@@ -152,7 +152,7 @@ mechanics are in [sealing](runtime.md#initial-sealing-and-fixed-budget).
   `max_fraction`; neither has to bracket 1, so a campaign of cheaper models can sit wholly below the
   reference, as RadImageNet does at 0.284–0.851 of its ReXNet reference). The range is the only
   budget rule: epochs, batch size, gradient accumulation, optimizer steps and the input per study
-  (`data.study_triplet_total`, `max_images` in `data.series_types`, slices per input) may change
+  (`data.study_slice_total`, `slices` of the views in `data.series_types`, slices per input) may change
   within the policy's config permissions; list `trainer.max_epochs`, `trainer.batch_size`,
   `trainer.accumulate_grad_batches` and dependent schedule keys there to let them vary. The
   training and validation cohorts and deterministic ×1 validation stay fixed. Training that runs

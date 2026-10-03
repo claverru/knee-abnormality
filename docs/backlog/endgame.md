@@ -77,7 +77,7 @@ the [validation strategy](../validation/validation-strategy.md), then combine mo
 
 **Finer resolution at the same field of view** (hypothesis; resolution at a fixed field of view
 has never been tested, see [input resolution](../research/input-resolution.md)). Train the
-full-slice model at `data.spacing_mm: 0.5` and `data.image_size: 280`, which keeps the 140 mm field
+full-slice model at 0.5 mm views and `data.image_size: 280`, which keeps the 140 mm field (`data.reference_field_mm: 140`)
 and the sampler's 70 mm in-plane radius.
 
 *Update, 2026-10-01:* the ResNet recipes now read 120 mm at 0.536 mm and 224 px, which took the
@@ -146,7 +146,7 @@ Counts above ×4 were dropped by user decision on 2026-09-24; the one submission
 [public research](../research/public-research.md#slice-density-and-the-board-2026-09-18-re-sweep).
 
 **More training triplets per study are deferred here for iteration speed** (user decision,
-2026-09-29). In the `radimagenet-rn18` campaign, `data.study_triplet_total` 26 → 36 on the
+2026-09-29). In the `radimagenet-rn18` campaign, `data.study_slice_total` 26 → 36 on the
 RadImageNet ResNet-18 without series dropout gained +0.0018 macro AUC at ×4
 (0.927806 → 0.929586; 80% [+0.0002, +0.0034], 95% [−0.0005, +0.0041]; one pair, weak). The gain
 moved between labels: OA rose (lateral +0.0094, medial +0.0026, PF +0.0036) and both menisci fell
@@ -154,7 +154,7 @@ moved between labels: OA rose (lateral +0.0094, medial +0.0026, PF +0.0036) and 
 campaigns about 10% headroom under their 1,627 s ceiling. A 40-triplet, 9-epoch follow-up scored
 −0.0015 against 36, confounded by the lost epoch. The 36-triplet model scored 0.944 public (S79);
 no 26-triplet version was submitted, and a 0.002 gap is below one submission's resolution. The
-committed recipe (`configs/training.yaml`) therefore keeps 26. Denser per-type budgets (`max_images` above 18/18/15/15/15/15) belong to the same
+committed recipe (`configs/training.yaml`) therefore keeps 26. Denser per-type budgets (`slices` above 6/6/5/5/5/5) belong to the same
 deferral; on ReXNet the cheaper side lost monotonically (−0.0041, −0.0051). Revisit training at 36
 with the final recipe.
 

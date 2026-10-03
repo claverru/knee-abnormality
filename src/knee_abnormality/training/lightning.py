@@ -53,13 +53,6 @@ from knee_abnormality.training.report_attributes import (
 
 PRECISION = "bf16-mixed"
 HALF_KNEE_TEMPERATURE = 1.0
-DETAIL_CONTRASTS = (("t1pd", 1), ("fluid", 2))
-VIEW_DIAGNOSTIC_GROUPS = {
-    "wide": (0,),
-    "detail": (1, 2),
-    "t1pd_detail": (1,),
-    "fluid_detail": (2,),
-}
 
 
 def build_optimizer(
@@ -363,8 +356,9 @@ class KneeModule(L.LightningModule):
         self.live_validation_rows: list[
             tuple[list[str], np.ndarray, np.ndarray, np.ndarray]
         ] = []
-        self.view_validation_rows = {name: [] for name in VIEW_DIAGNOSTIC_GROUPS}
-        self.view_missing_studies = dict.fromkeys(VIEW_DIAGNOSTIC_GROUPS, 0)
+        self.view_names = config.data.view_names
+        self.view_validation_rows = {name: [] for name in self.view_names}
+        self.view_missing_studies = dict.fromkeys(self.view_names, 0)
         self.train_window_rows = []
         self.validation_window_rows = []
         self.validation_window_studies = []
@@ -605,53 +599,14 @@ class KneeModule(L.LightningModule):
     def _log_views(self, batch: dict, encoded: dict, prefix: str) -> None:
         valid = encoded["visual_valid"].any(-1)
         count = int(valid.sum())
-        if count:
-            for name, index in (("wide", 0), ("detail", 1), ("crop", 2)):
+        mass = self.model.attention_mass_view.mean(1)
+        for view, (name, values) in enumerate(zip(self.view_names, mass, strict=True)):
+            if count:
                 self._log_epoch_metric(
                     f"{prefix}view_share_{name}",
-                    ((encoded["view_index"] == index) & valid).sum().float() / count,
+                    ((encoded["view_index"] == view) & valid).sum().float() / count,
                     count,
                 )
-            self._log_epoch_metric(
-                f"{prefix}detail_view_valid_slices",
-                ((encoded["view_index"] == 1) & valid).sum().float(),
-                1,
-                "sum",
-            )
-            for contrast_name, group in DETAIL_CONTRASTS:
-                self._log_epoch_metric(
-                    f"{prefix}view_share_detail_{contrast_name}",
-                    ((encoded["view_group"] == group) & valid).sum().float() / count,
-                    count,
-                )
-        for plane, plane_name in enumerate(("axial", "coronal", "sagittal")):
-            plane_valid = valid & (encoded["image_plane"] == plane)
-            plane_count = int(plane_valid.sum())
-            if plane_count:
-                self._log_epoch_metric(
-                    f"{prefix}view_share_detail_{plane_name}",
-                    ((encoded["view_index"] == 1) & plane_valid).sum().float()
-                    / plane_count,
-                    plane_count,
-                )
-                if count:
-                    for contrast_name, group in DETAIL_CONTRASTS:
-                        self._log_epoch_metric(
-                            f"{prefix}view_share_detail_{contrast_name}_{plane_name}",
-                            ((encoded["view_group"] == group) & plane_valid)
-                            .sum()
-                            .float()
-                            / count,
-                            count,
-                        )
-        mass = self.model.attention_mass_view.mean(1)
-        for name, values in (
-            ("view", mass.sum(0)),
-            *(
-                (f"{contrast_name}_detail", mass[group - 1])
-                for contrast_name, group in DETAIL_CONTRASTS
-            ),
-        ):
             for label, value in zip(self.targets, values, strict=True):
                 self._log_epoch_metric(
                     f"{prefix}attention_mass_{name}_{label.lower().replace(' ', '_')}",
@@ -663,16 +618,14 @@ class KneeModule(L.LightningModule):
                 values.mean(),
                 len(batch["study_uid"]),
             )
-        selected = (batch["view_index"] == 1) & batch["slice_mask"].any(-1)
-        planes = self.model.spatial_tokens.plane_lookup[batch["series_type_index"]]
-        contrasts = self.model.spatial_tokens.contrast_lookup[
-            batch["series_type_index"]
-        ]
+        selected = self.model.detail_view[batch["view_index"]] & batch[
+            "slice_mask"
+        ].any(-1)
+        views = batch["view_index"][selected]
         rows = (
             torch.cat(
                 (
-                    planes[selected, None].float(),
-                    contrasts[selected, None].float(),
+                    views[:, None].float(),
                     batch["window_center_mm"][selected],
                     batch["window_rule_distance_mm"][selected, None],
                 ),
@@ -687,17 +640,19 @@ class KneeModule(L.LightningModule):
         )
         destination.append(rows)
         if prefix:
-            study = batch["series_study_index"][selected]
-            group = (study * 3 + planes[selected]) * 2 + contrasts[selected]
-            total = torch.zeros((len(batch["study_uid"]) * 6, 2), device=self.device)
+            count = len(self.view_names)
+            group = batch["series_study_index"][selected] * count + views
+            total = torch.zeros(
+                (len(batch["study_uid"]) * count, 2), device=self.device
+            )
             number = torch.zeros(len(total), device=self.device)
             total.index_add_(0, group, batch["window_center_mm"][selected])
             number.index_add_(0, group, torch.ones_like(group, dtype=torch.float32))
-            means = (total / number.clamp_min(1)[:, None]).reshape(-1, 3, 2, 2)
+            means = (total / number.clamp_min(1)[:, None]).reshape(-1, count, 2)
             self.validation_window_studies.append(
                 (
                     means.cpu().numpy(),
-                    (number > 0).reshape(-1, 3, 2).cpu().numpy(),
+                    (number > 0).reshape(-1, count).cpu().numpy(),
                     batch["target"].cpu().numpy(),
                 )
             )
@@ -706,56 +661,49 @@ class KneeModule(L.LightningModule):
         if not rows:
             return
         values = np.concatenate(rows)
-        for plane, name in ((1, "coronal"), (2, "sagittal")):
-            for contrast, contrast_name in ((0, "t1pd"), (1, "fluid")):
-                selected = values[(values[:, 0] == plane) & (values[:, 1] == contrast)]
-                if not len(selected):
-                    continue
-                stem = f"{name}_{contrast_name}"
-                for axis, column in (("x", 2), ("y", 3)):
-                    self._log_epoch_metric(
-                        f"{prefix}window_center_{stem}_{axis}_mean_mm",
-                        float(selected[:, column].mean()),
-                        1,
-                    )
-                    self._log_epoch_metric(
-                        f"{prefix}window_center_{stem}_{axis}_std_mm",
-                        float(selected[:, column].std()),
-                        1,
-                    )
+        for view, name in enumerate(self.view_names):
+            selected = values[values[:, 0] == view]
+            if not len(selected):
+                continue
+            for axis, column in (("x", 1), ("y", 2)):
                 self._log_epoch_metric(
-                    f"{prefix}window_rule_distance_{stem}_mean_mm",
-                    float(selected[:, 4].mean()),
+                    f"{prefix}window_center_{name}_{axis}_mean_mm",
+                    float(selected[:, column].mean()),
                     1,
                 )
                 self._log_epoch_metric(
-                    f"{prefix}window_rule_displaced_share_{stem}",
-                    float((selected[:, 4] > 1.0).mean()),
+                    f"{prefix}window_center_{name}_{axis}_std_mm",
+                    float(selected[:, column].std()),
                     1,
                 )
+            self._log_epoch_metric(
+                f"{prefix}window_rule_distance_{name}_mean_mm",
+                float(selected[:, 3].mean()),
+                1,
+            )
+            self._log_epoch_metric(
+                f"{prefix}window_rule_displaced_share_{name}",
+                float((selected[:, 3] > 1.0).mean()),
+                1,
+            )
         if prefix and self.validation_window_studies:
             centers = np.concatenate([row[0] for row in self.validation_window_studies])
             present = np.concatenate([row[1] for row in self.validation_window_studies])
             targets = np.concatenate([row[2] for row in self.validation_window_studies])
-            for plane, name in ((1, "coronal"), (2, "sagittal")):
-                for contrast, contrast_name in ((0, "t1pd"), (1, "fluid")):
-                    for index, label in enumerate(self.targets):
-                        positive = present[:, plane, contrast] & (
-                            targets[:, index] >= 0.5
+            for view, name in enumerate(self.view_names):
+                for index, label in enumerate(self.targets):
+                    positive = present[:, view] & (targets[:, index] >= 0.5)
+                    negative = present[:, view] & (targets[:, index] < 0.5)
+                    if positive.any() and negative.any():
+                        distance = np.linalg.norm(
+                            centers[positive, view].mean(0)
+                            - centers[negative, view].mean(0)
                         )
-                        negative = present[:, plane, contrast] & (
-                            targets[:, index] < 0.5
+                        self._log_epoch_metric(
+                            f"val_window_center_group_distance_{name}_{label.lower().replace(' ', '_')}_mm",
+                            float(distance),
+                            1,
                         )
-                        if positive.any() and negative.any():
-                            distance = np.linalg.norm(
-                                centers[positive, plane, contrast].mean(0)
-                                - centers[negative, plane, contrast].mean(0)
-                            )
-                            self._log_epoch_metric(
-                                f"val_window_center_group_distance_{name}_{contrast_name}_{label.lower().replace(' ', '_')}_mm",
-                                float(distance),
-                                1,
-                            )
 
     def training_step(self, batch: dict, batch_index: int) -> torch.Tensor:
         encoded = self.model.encode_batch(batch)
@@ -1037,7 +985,7 @@ class KneeModule(L.LightningModule):
     def on_validation_epoch_start(self) -> None:
         for rows in self.view_validation_rows.values():
             rows.clear()
-        self.view_missing_studies.update(dict.fromkeys(VIEW_DIAGNOSTIC_GROUPS, 0))
+        self.view_missing_studies.update(dict.fromkeys(self.view_names, 0))
         self.validation_window_rows.clear()
         self.validation_window_studies.clear()
         self.validation_rows.clear()
@@ -1048,15 +996,11 @@ class KneeModule(L.LightningModule):
         encoded = saved_model.encode_batch(batch)
         prediction = torch.sigmoid(saved_model.pool_encoded(encoded).to(torch.float32))
         self._log_views(batch, encoded, "val_")
-        for view_name, rows in self.view_validation_rows.items():
-            groups = VIEW_DIAGNOSTIC_GROUPS[view_name]
+        for view, (view_name, rows) in enumerate(self.view_validation_rows.items()):
             view_prediction = torch.sigmoid(
-                saved_model.pool_encoded(encoded, groups).float()
+                saved_model.pool_encoded(encoded, view).float()
             )
-            present = encoded["visual_valid"].any(-1) & torch.isin(
-                encoded["view_group"],
-                torch.tensor(groups, device=encoded["view_group"].device),
-            )
+            present = encoded["visual_valid"].any(-1) & (encoded["view_index"] == view)
             self.view_missing_studies[view_name] += encoded["batch_size"] - len(
                 encoded["study"][present].unique()
             )
