@@ -26,7 +26,6 @@ from knee_abnormality.cli import CLISettings, describe
 
 CONTROL = "control"
 WATCHDOG = "watchdog"
-ADOPTION_DELTA = 0.001
 GAINS: dict[tuple, list[float]] = {}
 PLOTLY_JS = f"plotly-{plotly.__version__}.min.js"
 BANNER = {
@@ -484,11 +483,6 @@ def comparison(control: dict, runs: list[dict], fold: int) -> str:
             {"width": 1, "dash": "dash"},
             "--ink2",
         ),
-        (
-            segments(levels, everything, ADOPTION_DELTA),
-            {"width": 1, "dash": "dot"},
-            "--good",
-        ),
     ):
         intervals.add_trace(
             go.Scatter(
@@ -543,7 +537,7 @@ def comparison(control: dict, runs: list[dict], fold: int) -> str:
         layout(
             "×4 macro Δ vs control, 80% interval vs each run's reference"
             "<br><sup>line: incumbent each run was judged against, dashed if set by hand"
-            " · green: +0.001 above it</sup>",
+            " · adopted when the interval lies above it</sup>",
             **{
                 **rows,
                 "yaxis": {

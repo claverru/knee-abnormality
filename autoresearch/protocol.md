@@ -76,11 +76,11 @@ topics needs a new campaign sealed on the shared evaluation.
 
 ### Adoption policy
 
-For each valid new experiment, adopt the implementation when its unrounded macro
-AUC exceeds the pinned incumbent's by at least 0.001 **and** the central 80% paired
-report-group bootstrap interval has a strictly positive lower bound; otherwise
-discard it. Both conditions are required, using unrounded values. Code computes the
-verdict: `provisional_accept` when both hold, `reject` when either fails, `invalid`
+For each valid new experiment, adopt the implementation when the central 80% paired
+report-group bootstrap interval of its macro AUC change against the pinned incumbent
+has a strictly positive lower bound; otherwise discard it. This is the only
+condition, using unrounded values. Code computes the verdict: `provisional_accept`
+when it holds, `reject` when it fails, `invalid`
 for invalid evidence, leakage, seed mismatch, or contract or resource breaches.
 `provisional_accept` is a practical working-recipe choice, not statistical
 confirmation; `reject` means not retained under these engineering thresholds, not
@@ -93,10 +93,11 @@ the active recipe.
 The 80% macro interval uses the 10th and 90th percentiles of the same paired
 report-group draws as the retained 95% interval. Per-label and 95% intervals inform
 interpretation; they add no further adoption gate. Missing 80% evidence prevents
-adoption. The 0.001 threshold and 80% level are fixed engineering choices, not
+adoption. The 80% level is a fixed engineering choice, not
 independent confirmation, and repeated selection can still overfit the campaign's
-fold. This user-directed rule replaced a positive-95%-lower-bound gate and a briefly
-used gain-only rule. Review approvals bind the rule and evaluation records carry it;
+fold. This user-directed rule replaced a positive-95%-lower-bound gate, a briefly
+used gain-only rule and, on 2026-10-02, a rule that also required a gain of at least
+0.001; evaluation records written before that date carry the older rule. Review approvals bind the rule and evaluation records carry it;
 role prompts override older gates in frozen contracts without modifying archived
 source. Adopted methods become the next reference for both additions and replacements.
 

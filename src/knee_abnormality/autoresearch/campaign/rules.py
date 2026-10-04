@@ -13,7 +13,6 @@ EVALUATION = {
 }
 ACCEPTANCE_RULE = {
     "metric": "candidate_minus_incumbent_macro_auc",
-    "minimum_gain": 0.001,
     "bootstrap_confidence_level": 0.8,
     "bootstrap_lower_bound_strictly_above": 0.0,
     "reporting_confidence_level": 0.95,
@@ -22,8 +21,7 @@ ACCEPTANCE_RULE = {
 
 def acceptance_text():
     return (
-        f"adopt only when valid macro AUC improvement >= {ACCEPTANCE_RULE['minimum_gain']} "
-        f"AND the central {ACCEPTANCE_RULE['bootstrap_confidence_level']:.0%} "
-        "paired-bootstrap lower bound is strictly above "
+        f"adopt only when the central {ACCEPTANCE_RULE['bootstrap_confidence_level']:.0%} "
+        "paired-bootstrap lower bound of the valid macro AUC improvement is strictly above "
         f"{ACCEPTANCE_RULE['bootstrap_lower_bound_strictly_above']:g}; otherwise discard"
     )

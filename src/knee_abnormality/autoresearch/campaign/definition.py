@@ -203,7 +203,7 @@ class Campaign(BaseModel):
     id: str = Field(pattern=CAMPAIGN_ID)
     recipe: str
     reference_run: str
-    reference_equivalences: dict[str, bool | int | float | str]
+    reference_equivalences: dict[str, bool | int | float | str | list[str]]
     reference_config_exceptions: list[str] = Field(default_factory=list)
     reference_identity_exceptions: list[str] = Field(default_factory=list)
     additional_evidence_runs: list[str]
