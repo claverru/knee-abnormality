@@ -104,3 +104,10 @@ findings doc holds the question, method, command and result.
 [submission_public_scores.json](submission_public_scores.json) holds the public scores of the
 comparable submissions read by `compare_local_and_public_scores.py` and
 `validate_calibrated_judge.py`.
+
+## Out-of-fold distillation
+
+| Script | Question | Findings |
+|---|---|---|
+| [sweep_child_temperatures.py](sweep_child_temperatures.py) | What does each run predict on its validation fold at several image multipliers and attention temperatures, with and without reflection TTA? One backbone pass per fold and multiplier. | [Two-family out-of-fold distillation](../../docs/validation/results/2026-10-04-two-family-oof-distillation.md#attention-temperature-multiplier-and-weights) |
+| [score_child_blend.py](score_child_blend.py) | From the swept predictions of two families, which temperature per family and multiplier, which family weight and which multiplier give the best pooled out-of-fold blend, with paired report-group bootstrap intervals? | [Two-family out-of-fold distillation](../../docs/validation/results/2026-10-04-two-family-oof-distillation.md#attention-temperature-multiplier-and-weights) |

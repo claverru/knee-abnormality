@@ -1,0 +1,192 @@
+{
+  "prepared_at": "2026-10-04T01:24:38.681196+00:00",
+  "competition": "rsna-knee-abnormality-detection",
+  "method": "0.5 times rebuild_state_v2 plus 0.25 times each of two image teachers: the x4 out-of-fold probabilities of the Refined-RadImageNet ResNet-50 and of ReXNet-200 on the 2026-10-03 recipes (84/93 mm views, view label bias) on all_5fold_scanner_v2 (rebuild_state_v2 labels, seed 1533697213). Every study's teacher value comes from the model that held it out. Each fold's teachers trained on the other folds, so no fold's validation is clean for this table. Official gold labels still override these values in training and evaluation.",
+  "preparer": {
+    "path": "/home/claudio/src/knee-abnormality-oof-distill/scripts/tools/prepare_oof_blend_labels.py",
+    "bytes": 11943,
+    "sha256": "909f9010866fa2c8235052768060ae2f422ce781144f447b015c2ccfdf00db73"
+  },
+  "base_label_table": "rebuild_state_v2",
+  "blend_weight": 0.5,
+  "teacher_weight": 0.25,
+  "inputs": {
+    "base_manifest": {
+      "path": "configs/labels/rebuild-state-v2-label-sources.json",
+      "bytes": 10023,
+      "sha256": "08339ec50004a757bac35815b50cf981bf42a86264b4199f2e0857172f6709b1"
+    },
+    "rebuild_state_v2": {
+      "path": "data/labels/prepared/rebuild-state-v2/labels.csv",
+      "bytes": 1331630,
+      "sha256": "5877acaf902aa9d9a10b11ec8fe75b010abac82f861d0b134a01ee69d36ca8c5",
+      "label_table": "rebuild_state_v2"
+    },
+    "teacher_split": {
+      "path": "data/folds/all_5fold_scanner_v2/studies.csv",
+      "bytes": 608151,
+      "sha256": "4b4563c3887cefad3c81ed7c525ffdd64a15c4ba922f7e1e6f1d440716d94032"
+    },
+    "teachers": {
+      "refined_resnet50": {
+        "fold0": {
+          "run": "outputs/training/20261003-110045-refined-rn50-views-label-bias",
+          "predictions": {
+            "path": "outputs/training/20261003-110045-refined-rn50-views-label-bias/fold_0/validation_predictions.csv",
+            "bytes": 181365,
+            "sha256": "99d5f3b4d9d9d9e14db1a32a0382bfb6d61b8a57e44d1b4439e673739bb0abf2"
+          },
+          "selected_checkpoint": {
+            "path": "/home/claudio/src/knee-abnormality/outputs/training/20261003-110045-refined-rn50-views-label-bias/fold_0/best-epoch=09-val_macro_auc=0.93122.ckpt",
+            "score": 0.9312219619750977,
+            "prediction_image_multiplier": 4,
+            "prediction_macro_auc": 0.9371290576473313
+          }
+        },
+        "fold1": {
+          "run": "outputs/training/20261003-122711-refined-rn50-views-label-bias-folds-1-4",
+          "predictions": {
+            "path": "outputs/training/20261003-122711-refined-rn50-views-label-bias-folds-1-4/fold_1/validation_predictions.csv",
+            "bytes": 173751,
+            "sha256": "a432c63700574ce8aa9feab1591a558ba4905d11818984be4e089ceb1d8bf73e"
+          },
+          "selected_checkpoint": {
+            "path": "/home/claudio/src/knee-abnormality/outputs/training/20261003-122711-refined-rn50-views-label-bias-folds-1-4/fold_1/best-epoch=09-val_macro_auc=0.92168.ckpt",
+            "score": 0.9216792583465576,
+            "prediction_image_multiplier": 4,
+            "prediction_macro_auc": 0.9295673460264892
+          }
+        },
+        "fold2": {
+          "run": "outputs/training/20261003-122711-refined-rn50-views-label-bias-folds-1-4",
+          "predictions": {
+            "path": "outputs/training/20261003-122711-refined-rn50-views-label-bias-folds-1-4/fold_2/validation_predictions.csv",
+            "bytes": 173723,
+            "sha256": "6354b917cc24fc35697d6f455e028a4d3c4ef08829f41391a8bff47465ababff"
+          },
+          "selected_checkpoint": {
+            "path": "/home/claudio/src/knee-abnormality/outputs/training/20261003-122711-refined-rn50-views-label-bias-folds-1-4/fold_2/best-epoch=08-val_macro_auc=0.92699.ckpt",
+            "score": 0.9269869923591614,
+            "prediction_image_multiplier": 4,
+            "prediction_macro_auc": 0.9354412974403323
+          }
+        },
+        "fold3": {
+          "run": "outputs/training/20261003-122711-refined-rn50-views-label-bias-folds-1-4",
+          "predictions": {
+            "path": "outputs/training/20261003-122711-refined-rn50-views-label-bias-folds-1-4/fold_3/validation_predictions.csv",
+            "bytes": 175684,
+            "sha256": "287003c23ffed5463cd8d7733758fb730ea7b4d7c27e117d24bd9b80dd916eea"
+          },
+          "selected_checkpoint": {
+            "path": "/home/claudio/src/knee-abnormality/outputs/training/20261003-122711-refined-rn50-views-label-bias-folds-1-4/fold_3/best-epoch=09-val_macro_auc=0.92305.ckpt",
+            "score": 0.9230490922927856,
+            "prediction_image_multiplier": 4,
+            "prediction_macro_auc": 0.9310623162913632
+          }
+        },
+        "fold4": {
+          "run": "outputs/training/20261003-122711-refined-rn50-views-label-bias-folds-1-4",
+          "predictions": {
+            "path": "outputs/training/20261003-122711-refined-rn50-views-label-bias-folds-1-4/fold_4/validation_predictions.csv",
+            "bytes": 171656,
+            "sha256": "94b41006f02d3cc79c4f60bd7c69f1b3ae75be0c556b87848036d19679cb0186"
+          },
+          "selected_checkpoint": {
+            "path": "/home/claudio/src/knee-abnormality/outputs/training/20261003-122711-refined-rn50-views-label-bias-folds-1-4/fold_4/best-epoch=08-val_macro_auc=0.91982.ckpt",
+            "score": 0.9198199510574341,
+            "prediction_image_multiplier": 4,
+            "prediction_macro_auc": 0.927016108977949
+          }
+        }
+      },
+      "rexnet_200": {
+        "fold0": {
+          "run": "outputs/training/20261003-114512-rexnet-200-views-label-bias",
+          "predictions": {
+            "path": "outputs/training/20261003-114512-rexnet-200-views-label-bias/fold_0/validation_predictions.csv",
+            "bytes": 181616,
+            "sha256": "5db38dc27dc202ac4e386aaf042a872b0de0e6fe37b47fdc12fe5ddc17f709b9"
+          },
+          "selected_checkpoint": {
+            "path": "/home/claudio/src/knee-abnormality/outputs/training/20261003-114512-rexnet-200-views-label-bias/fold_0/best-epoch=09-val_macro_auc=0.92856.ckpt",
+            "score": 0.9285560250282288,
+            "prediction_image_multiplier": 4,
+            "prediction_macro_auc": 0.9325233211396936
+          }
+        },
+        "fold1": {
+          "run": "outputs/training/20261003-224423-rexnet-200-views-label-bias-folds-1-4",
+          "predictions": {
+            "path": "outputs/training/20261003-224423-rexnet-200-views-label-bias-folds-1-4/fold_1/validation_predictions.csv",
+            "bytes": 174122,
+            "sha256": "697721702fad571c6d71ad2ac912a8339aee973eb72e8929a3f2d1f952b1dcf9"
+          },
+          "selected_checkpoint": {
+            "path": "/home/claudio/src/knee-abnormality/outputs/training/20261003-224423-rexnet-200-views-label-bias-folds-1-4/fold_1/best-epoch=09-val_macro_auc=0.91905.ckpt",
+            "score": 0.9190457463264465,
+            "prediction_image_multiplier": 4,
+            "prediction_macro_auc": 0.9246938159468985
+          }
+        },
+        "fold2": {
+          "run": "outputs/training/20261003-224423-rexnet-200-views-label-bias-folds-1-4",
+          "predictions": {
+            "path": "outputs/training/20261003-224423-rexnet-200-views-label-bias-folds-1-4/fold_2/validation_predictions.csv",
+            "bytes": 174002,
+            "sha256": "52efb2b21deba700244a0027e294b4650ab3ce980b5077a3bc94648f5a8b4e89"
+          },
+          "selected_checkpoint": {
+            "path": "/home/claudio/src/knee-abnormality/outputs/training/20261003-224423-rexnet-200-views-label-bias-folds-1-4/fold_2/best-epoch=09-val_macro_auc=0.92446.ckpt",
+            "score": 0.9244588017463684,
+            "prediction_image_multiplier": 4,
+            "prediction_macro_auc": 0.9286683734622369
+          }
+        },
+        "fold3": {
+          "run": "outputs/training/20261003-224423-rexnet-200-views-label-bias-folds-1-4",
+          "predictions": {
+            "path": "outputs/training/20261003-224423-rexnet-200-views-label-bias-folds-1-4/fold_3/validation_predictions.csv",
+            "bytes": 174822,
+            "sha256": "e02c23775f9669294ddfa561fac41c3185c07f805414d6c772cd5d567793b7f6"
+          },
+          "selected_checkpoint": {
+            "path": "/home/claudio/src/knee-abnormality/outputs/training/20261003-224423-rexnet-200-views-label-bias-folds-1-4/fold_3/best-epoch=07-val_macro_auc=0.92386.ckpt",
+            "score": 0.923862099647522,
+            "prediction_image_multiplier": 4,
+            "prediction_macro_auc": 0.9270166746653081
+          }
+        },
+        "fold4": {
+          "run": "outputs/training/20261003-224423-rexnet-200-views-label-bias-folds-1-4",
+          "predictions": {
+            "path": "outputs/training/20261003-224423-rexnet-200-views-label-bias-folds-1-4/fold_4/validation_predictions.csv",
+            "bytes": 171745,
+            "sha256": "d352f46cf562b8c3d4c1449006eed2db68dd0de835556e0123e8d647814adf36"
+          },
+          "selected_checkpoint": {
+            "path": "/home/claudio/src/knee-abnormality/outputs/training/20261003-224423-rexnet-200-views-label-bias-folds-1-4/fold_4/best-epoch=07-val_macro_auc=0.91822.ckpt",
+            "score": 0.9182220697402954,
+            "prediction_image_multiplier": 4,
+            "prediction_macro_auc": 0.921976849221279
+          }
+        }
+      }
+    }
+  },
+  "rows": 4407,
+  "sources": [
+    {
+      "dataset": "local/oof-blend-labels",
+      "dataset_version": 1,
+      "files": [
+        {
+          "path": "data/labels/prepared/oof-blend-v2/labels.csv",
+          "bytes": 1326586,
+          "sha256": "78f4a3f69c10e0334dffdcda270ec80e1a71f95c46b266fc73ec9be766991560",
+          "label_table": "oof_blend_v2"
+        }
+      ]
+    }
+  ]
+}
