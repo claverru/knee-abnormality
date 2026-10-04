@@ -30,9 +30,11 @@ measured outcomes are in the [validation results](../validation/results/INDEX.md
   `configs/refined-resnet50.yaml` is the same recipe on the Refined-RadImageNet ResNet-50, the
   submission model (backbone only differs, since 2026-10-03); ResNet-18 stays the control for
   iteration speed (user decision, 2026-10-01).
-  `configs/rexnet-200.yaml` is the same recipe on ReXNet-200 with its ImageNet weights, adjacent
-  slices, `backbone_lr` 2e-4 and no L2-SP (since 2026-10-03), ResNet-50's ensemble partner;
-  submit ResNet bundles at τ 0.9 and ReXNet at τ 0.75 (τ untested on the new ReXNet recipe).
+  **The ReXNet-200 recipe is retired (2026-10-04, user decision): models stay on the
+  Refined-RadImageNet weights.** Its config is removed; the code paths remain because they are
+  part of the hashed sources, and the saved runs keep their own effective configs
+  ([adoption](../modeling/current-model.md#adoption-history)). Submit ResNet bundles at τ 0.9 at
+  ×4, or the swept τ 0.8 at ×6.
 - **Preprocessing identity:** hashed-source changes apply to fresh runs only. A new export or local
   prediction from a checkpoint trained under an earlier identity is refused by
   `validate_preprocessing_identity` and needs that checkpoint's archived sources; already-exported

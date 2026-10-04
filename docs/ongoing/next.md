@@ -37,7 +37,9 @@ Pending:
   `../knee-abnormality-convnext` off main, uncommitted): DINOv3 and supervised ImageNet
   ConvNeXt-Tiny and ConvNeXt-Small on the ReXNet-style recipe, fold 0, one run each against the
   ResNet-18 control (`rn18-view-label-bias`, ×4 0.932477). The rules allow pretrained models
-  under another licence (section 2.5.a) when reasonably accessible (2.6.b).
+  under another licence (section 2.5.a) when reasonably accessible (2.6.b). Paused 2026-10-04:
+  models stay on the Refined-RadImageNet weights; the worktree's notes hold the four runs (best
+  ×4 0.927235, no blend gain).
 - **Read the slice-budget sensitivity run on Kaggle** when it finishes: per-label AUC with each
   series type's slices halved and doubled, on the S93 model
   (`outputs/analysis/slice-budget-20261002/sensitivity/`).
