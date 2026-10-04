@@ -266,6 +266,59 @@ reproduces it.
   macro −0.0013 with contusion, MCL and fracture down
   ([learnable-views campaign](../validation/results/2026-10-03-learnable-views-campaign.md#details-of-the-runs-against-the-hand-reference)).
 
+## Pooling head at the inference bag size
+
+**Proposed 2026-10-04; hypotheses, nothing run.** The attention temperature compensates for a head
+trained on ×1 bags and used on ×4 to ×6 bags; these two remove the mismatch instead. Tuned τ is
+worth +0.0011 over τ 1 on the ten-children blend at ×6
+([result](../validation/results/2026-10-04-two-family-oof-distillation.md)), so the expected prize is of that order.
+The inference-only alternatives are in
+[small changes](small-changes.md#pooling-dense-bags-at-inference); the earlier measurements are
+on the `better-than-tau` branch (`docs/ongoing/dense-bag-pooling.md` there, uncommitted).
+
+1. **Refit only the pooling head on dense bags** (Touvron et al. 2019, "Fixing the train-test
+   resolution discrepancy"). Freeze the backbone, cache the training folds' tokens at ×4 to ×6
+   and retrain the attention scorer, view label bias and head, or in the small form only a
+   sharpness per label plus the view label bias (about a hundred parameters). Risk: the cached
+   training-fold features are ones the backbone has already fit, so the refit sees easier data
+   than the test set. Gate: the refit head at τ 1 against the original head at its tuned τ, on the
+   held-out fold.
+2. **Dense forward, gradient through a subset** (Bergner et al. 2023, Iterative Patch Selection;
+   Katharopoulos and Fleuret 2019, attention sampling). Encode the dense bag without gradient and
+   backpropagate through a ×1-sized subset, so the head sees inference-sized bags during training.
+   Full retraining at several times the cost; an earlier variable-bag attempt failed and was not
+   recorded. Only after item 1 shows the head is the bottleneck.
+
+Not pursued, with the reason: sparse attention (the effective share of attended tokens stays at
+about 13% at every bag size, so no tail grows), averaging training-sized sub-bags (worse than
+joint pooling here and in the whole-slide literature), further rules from token count to τ (the
+log-n rule already takes what the count explains), and dense-to-sparse distillation (the children
+already train ×1 bags against ×4 teacher predictions and still want τ 0.7 to 0.9).
+
+## Per-plane teacher readings
+
+**Proposed 2026-10-04 (user idea); hypotheses, nothing run.** With the plane-contrast readouts a
+label's logit is a sum over tokens of attention times the evidence of the token's series type,
+and `pool_encoded(encoded, view=...)` pools one view alone, so a teacher can give six readings
+per label instead of one. No run has saved them; every checkpoint of the
+[two-family distillation](../validation/results/2026-10-04-two-family-oof-distillation.md) can
+regenerate them at the cost of one ×4 prediction per fold.
+
+1. **First measurement:** the six single-type predictions of each teacher on its validation
+   fold: AUC per label and type, how often the types disagree, and whether disagreement marks
+   the cells where the silver label and the 58 gold studies differ.
+2. **A per-cell teacher weight:** trust the teacher where its planes agree against the silver
+   label and keep the silver label where they disagree, in place of the fixed 0.5. A label-table
+   change only.
+3. **A target per plane:** train each series type's readout alone against the teacher's reading
+   from that type, beside the joint target (72 soft targets per study). An auxiliary loss behind
+   one option; overlaps the per-view classifiers of the
+   [auxiliary-loss campaign](#auxiliary-loss-campaign).
+4. **Co-training between planes:** each type's target is the consensus of the other types.
+   Labels visible in one plane only have nothing to learn from the others.
+5. **Routing labels to their best planes** when building the teacher label; the view label bias
+   already learns a version of this.
+
 ## Parked until a specific need
 
 ### Fused study volume and 3D model

@@ -108,6 +108,16 @@ Remaining website steps and monitoring limits:
 - Since about 2026-09-20, participants report GPU kernels stuck in `QUEUED` for hours. One says
   re-pushing after 10–15 minutes works and waiting does not. Leave margin before the final
   deadline ([re-sweep](../research/2026-09-28-public-resweep.md#rules-and-logistics)).
+- **A GPU notebook can sit in `RUNNING` without executing (2026-10-04, S103 and S104).** Five of
+  eight GPU pushes that day showed "Running" for 7 to 45 minutes with an empty log, not even the
+  kernel's start-up warnings; the CPU notebook started at once. Neither the time limit (`-t 32400`
+  or `-t 3600`), the metadata fields, the age of the dataset version (40 s to 17 min) nor other
+  open sessions separates the stalls from the runs. Pushing a new version of the same notebook
+  replaced the stalled run and finished in under two minutes, so re-push after about four minutes
+  instead of waiting. An empty log from `kernels output` after cancelling tells a session that
+  never started from a slow run. A stalled notebook also blocks a push of another notebook under
+  the same title (`SaveKernel` 409), and listing submissions to find the sequence number can
+  return 429, so pass `--sequence`.
 - Notebook status/log/output calls address the latest ordinary session by
   owner/slug. Avoid overlapping pushes to the same notebook when collecting
   evidence. They do not establish access to a hidden scoring rerun's full logs.

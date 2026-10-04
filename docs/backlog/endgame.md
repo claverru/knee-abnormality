@@ -229,6 +229,14 @@ becomes `0.7 · label + 0.3 · teacher`, where the teacher is that study's out-o
 labels and the evaluation targets stay unblended. The aim is robustness to report-label noise; the
 same option also serves speed (*Speed* below).
 
+- *Two-family round ([result](../validation/results/2026-10-04-two-family-oof-distillation.md),
+  2026-10-04):* five Refined ResNet-50 and five ReXNet-200 children at 0.5 silver, 0.25 and 0.25
+  of the two families' out-of-fold predictions. Every child beats its teacher (pooled +0.0034 and
+  +0.0090, optimistic), and the ten together score 0.955 public (S103), the best. Open: a second
+  round with the children as teachers (their blend agrees with the 58 gold studies at 0.9375
+  against 0.9288 for the teachers'; one ResNet-50 on fold 0 first, against today's child), and
+  the teacher share of the labels (0.5 was a convention; the ResNet-50 teacher alone is 0.9354 on
+  gold against 0.9358 for the blended table and 0.9075 for the silver labels).
 - *First test ([result](../validation/results/2026-09-23-image-blend-labels-result.md)):* one
   fold-0 child at 0.5/0.5, with the on-hand teacher described below. It gave:
   - gold agreement of the label table +0.020 [+0.006, +0.036];

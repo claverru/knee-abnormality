@@ -24,15 +24,15 @@ Awaiting a public check:
 
 Pending:
 
-- **Train ReXNet-200 folds 1 to 4 on the 2026-10-03 recipe** (`configs/rexnet-200.yaml`, seed
-  1533697213). Trained so far on the recipes adopted that day: the Refined ResNet-50 on all five
-  folds (`outputs/training/20261003-110045-refined-rn50-views-label-bias` for fold 0, ×4 0.937129
-  and 0.954 public alone as S102; `outputs/training/20261003-122711-refined-rn50-views-label-bias-folds-1-4`,
-  ×4 0.929567, 0.935441, 0.931062, 0.927016; pooled out-of-fold 0.931720) and ReXNet-200 on fold
-  0 only (`outputs/training/20261003-114512-rexnet-200-views-label-bias`, ×4 0.932523). On fold 0
-  the pair blends to 0.939492 at equal weights (×4, τ 1, no TTA), +0.0024 over the ResNet-50
-  alone; the ResNet-18 control added to the pair costs 0.0007
-  ([adoption](../modeling/current-model.md#adoption-history)).
+- **Follow-ups of the [two-family out-of-fold distillation](../validation/results/2026-10-04-two-family-oof-distillation.md)**
+  (S106, the five ResNet-50 children alone, 0.957 public, the best; S103 with the ReXNets 0.955;
+  S104 with type share 0.951; S105 with τ 1.1 for effusion and synovitis 0.954). Open, in the backlog: the sharp side of the temperature and type share with
+  the tuned temperature ([small changes](../backlog/small-changes.md#pooling-dense-bags-at-inference)),
+  the pooling head refit and the per-plane teacher readings
+  ([big bets](../backlog/big-bets.md#pooling-head-at-the-inference-bag-size)), a second
+  distillation round and the teacher share of the labels
+  ([endgame](../backlog/endgame.md#out-of-fold-self-distillation)).
+
 - **ConvNeXt as a third blend family** (started 2026-10-03, worktree
   `../knee-abnormality-convnext` off main, uncommitted): DINOv3 and supervised ImageNet
   ConvNeXt-Tiny and ConvNeXt-Small on the ReXNet-style recipe, fold 0, one run each against the
