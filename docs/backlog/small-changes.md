@@ -77,6 +77,33 @@ attention temperature τ 0.75 is adopted at inference and carries the best submi
   override through prediction, export and the bundle; whether training should use it has never been
   tested, and a shared temperature can be absorbed into the scorer's last layer.
 
+### Pooling dense bags at inference
+
+The head trains on about 30 triplets per study and predicts on 115 to 160 at ×4 to ×6; the only
+correction in use is one attention temperature per model. Measured on the ten children of
+2026-10-04 ([result](../validation/results/2026-10-04-two-family-oof-distillation.md)); all three are inference-only on existing checkpoints.
+
+- **A softer temperature for effusion and synovitis** (measured, one sweep, labels chosen after
+  seeing it). With τ 1.1 on both families for those two labels and the S103 pair (0.7, 1.0) for
+  the other ten, the blend gains +0.0003 at ×4, ×5 and ×6 (80% [+0.0002, +0.0004] at each, four of
+  five folds). A free τ per label and family is not stable: cross-fitted it gives +0.0004 at ×6
+  and −0.0001 at ×4. τ 1.1 is the top of the grid, so softer values are untested. Needs a τ per
+  label in `apply_attention_temperature` (it divides the scorer's row, the compartment sign and
+  the view label bias of that label) and in export. **Submitted as S105: 0.954 public against
+  0.955 for S103**, one rounding step down, so the local gain is not confirmed. Open instead: the
+  sharp side, τ below 0.7 for the ResNet-50 and for ACL, MCL and the menisci, which sit on the
+  edge of the grid (needs one GPU pass).
+- **Type share together with the tuned temperature, at bags larger than ×6** (measured on one
+  ResNet-18: +0.0009 at full coverage with τ 0.9; untested on these models). S104 tested type
+  share with τ 1 and scored 0.951 against 0.955, which confounds the two. Score tuned τ or τ 1,
+  with and without type share, at ×6, ×8 and full coverage in one out-of-fold pass; also the
+  tempered form `λ · log(reference / count)` at λ 0.5 (Shimodaira 2000, hypothesis). The option
+  exists on the unmerged branch `pooling-options` (`export --type-share`), beside the per-target
+  temperature (`export --label-attention-temperature`).
+- **τ = ln N_train / ln N_test as the default for an unswept model or multiplier** (measured by
+  interpolation). It gives 0.84, 0.83 and 0.81 at ×4, ×5 and ×6 and sits 0.0001 below one tuned τ
+  per family and 0.0003 to 0.0004 below the joint pair. It replaces tuning; it does not beat it.
+
 ### Plane/contrast-specific feature adapters
 
 **Accepted for the backlog on 2026-09-21; unimplemented and untested.** The

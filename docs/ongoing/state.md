@@ -96,6 +96,13 @@ measured outcomes are in the [validation results](../validation/results/INDEX.md
 
 ## Best public submissions
 
+- **0.957:** S106, the five Refined ResNet-50 children of the
+  [two-family out-of-fold distillation](../validation/results/2026-10-04-two-family-oof-distillation.md#resnet-50-children-alone-s106)
+  alone, one bundle at ×6 with reflection TTA and τ 0.8; pooled out of fold 0.936272.
+- **0.955:** S103, ten children of the
+  [two-family out-of-fold distillation](../validation/results/2026-10-04-two-family-oof-distillation.md):
+  five Refined ResNet-50 and five ReXNet-200 of folds 0 to 4 trained on `oof_blend_v2`, one bundle
+  at ×6 with reflection TTA, τ 0.7 and 1.0, equal weights; pooled out of fold 0.938887.
 - **0.954:** S102, the Refined-RadImageNet ResNet-50 with the 84/93 mm views and the view label
   bias, alone, fold 0 at ×4, τ 0.9, no TTA (×4 0.937129): the best single model, level with S97.
 - **0.954:** S97: 28 networks in 13 bundles with mirror TTA on all, weighted
