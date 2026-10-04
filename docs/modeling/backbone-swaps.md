@@ -15,7 +15,7 @@ ReXNet-200) of the [full-slice model](current-model.md).
   - [EfficientNet training](../research/efficientnet-training.md) covers EfficientNet
     preprocessing and BatchNorm handling.
 - **Candidates:** proposed same-cost replacements are in the
-  [backlog](../backlog/small-changes.md#same-cost-backbone-candidates).
+  [section below](#same-cost-backbone-candidates).
 - **History:** the crop-era budget, with the MobileNetV3 scout, its delta formula and its code
   requirements, is in the
   learned-zoom snapshot (`f076a09:docs/history/crop-selection-sources/learned-zoom-backbone-swaps.md.txt`).
@@ -133,3 +133,38 @@ convolution in module order is exact only for single-path networks with static p
   - *Origin:* for unpadded patchification, 7.5 px at patch size 16 and 6.5 px at patch size 14.
   - *Output:* remove non-spatial prefix tokens and reshape patch tokens to NCHW.
   - *Position embeddings:* interpolated, and `img_size` or `dynamic_img_size` must be set.
+
+## Same-cost backbone candidates
+
+**Not pursued since 2026-10-04: models stay on the Refined-RadImageNet weights
+([adoption](current-model.md#adoption-history)). Kept as the record of the candidates and their
+mappings.** Proposed 2026-09-25; ReXNet-R is implemented in the `convnext-atto` worktree and lost its first
+run (−0.0053) with a measured over-large learning rate; its follow-up at `backbone_lr` 8e-5 is
+open. ConvNeXt-Atto, run outside this list, lost −0.0192 and is closed
+([backbone swap runs](../validation/results/2026-09-25-backbone-swap-runs.md)). ConvNeXt-nano and
+HGNetV2-B3 are unimplemented. Three timm backbones of about ReXNet-200's
+size (13.8M parameters, 1.53 GMACs at 224 px) that could replace it. Each needs only a
+`BACKBONE_MAPPINGS` entry with a verified origin; `model.backbone` is the option
+([swapping a backbone](#code-requirements)). All three checkpoints
+declare the configured ImageNet mean/std. Counts are backbone-only, measured on the meta device
+with `FlopCounterMode` (timm 1.0.26).
+
+| Candidate | Params | GMACs | Mapping | Motivation | Confidence |
+|---|---:|---:|---|---|---|
+| `rexnetr_200.sw_in12k_ft_in1k` | 14.0M | 1.56 | `_rexnet_mapping`, verified origin 0, stride 32, 2560 channels | Same family and cost, ImageNet-12k pretraining; lumbar 2024 7th place | Moderate, evidence-backed |
+| `convnext_nano.in12k_ft_in1k` | 15.0M | 2.44 | [Offset origin](#mapping-pitfalls); the `convnext-atto` worktree's `_convnext_mapping` should only need a registration | Best in lumbar 3rd place's comparison; DINOv3 ConvNeXt-T 2nd in the [backbone search](backbone-search.md#finished-model-comparison) | Moderate |
+| `hgnetv2_b3.ssld_stage2_ft_in1k` | 14.2M | 1.77 | Offset origin, reported 2 px, unverified | Dense and GPU-friendly; family evidence only as a lumbar localizer | Low, speculative |
+
+- **Excluded:** EfficientNet and EfficientNetV2 (measured losses on this dataset), `tf_` ports
+  and reparameterizable or fixed-size families (mapping), `regnetz_c16` (0.5 mean/std),
+  MobileNetV4, RepViT and small transformers (no MRI evidence), ResNet-18 (trailed ConvNeXt-nano
+  in lumbar 3rd's comparison). See [backbone MRI evidence](../research/backbone-mri-evidence.md).
+- **Cost:** GMACs do not predict wall time for depthwise-heavy families; ConvNeXt-nano's 1.6×
+  GMACs may cost less than that. Estimate time from the run's own logs, then time any winner on a
+  Kaggle T4 in FP16.
+- **Comparison:** one run per candidate against the incumbent control, same fold, seed and
+  budget. Scale `backbone_lr` by the checkpoint's convolution-weight RMS relative to ReXNet-200's
+  ([weight scale](#checkpoint-weight-scale)); leave other rates
+  unchanged. Record macro/per-label AUC, paired uncertainty, time and memory under the current
+  adoption rule. Ensemble contribution belongs to the
+  [endgame](../backlog/endgame.md#ensembling).

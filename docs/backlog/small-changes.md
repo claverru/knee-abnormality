@@ -8,40 +8,6 @@ training seed) and remove the entry from this file. Runs follow the
 [controlled-comparison rules](../validation/validation-strategy.md#controlled-comparisons). Each
 entry says whether its motivation is measured or a hypothesis.
 
-## L2-SP for ReXNet
-
-**Proposed 2026-09-30; unimplemented.** Carry the adopted L2-SP anchoring to
-`configs/rexnet-200.yaml`, which keeps the scanner confusion head and no anchoring. Motivation is
-measured on ResNet-18 only (four consistent unseen-site measurements,
-[result](../validation/results/2026-09-30-rn18-l2sp-no-confusion.md)); whether it transfers to
-ReXNet is a hypothesis.
-
-- **Implementation:** the early anchor is defined by ResNet names (`conv1.`, `bn1.`, `layer1.`)
-  and refuses other backbones; add ReXNet's stem and first stage to that mapping. The alphas were
-  set for ResNet-18 weight magnitudes; keep them for the first comparison.
-- **Comparison:** one run against the ReXNet control at its fold and seed; the sites-out split
-  measures the unseen-site effect this change is for.
-
-## AdamP for ReXNet
-
-**Accepted for the backlog on 2026-09-21; unimplemented and untested.** Compare AdamP with
-AdamW on the current ReXNet recipe. The [optimizer research](../research/optimizer-research.md#6-adamp-alternative-for-the-rexnet-branch)
-motivates projecting out norm-increasing updates on scale-invariant weights. Published gains
-are external evidence, not a measured knee-AUC improvement. AdamP uses one gradient evaluation
-per step and adds no inference work.
-
-- **Implementation:** one optimizer-choice option, retaining the backbone/head parameter groups,
-  no-decay exclusions, scheduler, clipping and checkpoint/resume behavior. The research proposes
-  `timm.optim.AdamP` with `delta=0.1` and `wd_ratio=0.1`; verify its installed implementation
-  before fixing the candidate. Do not expose an optimizer sweep or unrelated new settings.
-- **Comparison:** fresh AdamW control and AdamP candidate on the same current labels, split,
-  incumbent seed, image exposure and training budget. Keep learning rates and betas fixed for
-  the first comparison. AdamP's projected-weight decay is not numerically equivalent to AdamW's;
-  record the effective policy and treat any subsequent decay tuning as a separate comparison.
-- **Decision:** record macro/per-label AUC, paired uncertainty and training time, following the
-  current adoption rule. Implementation needs a separate user request; training remains
-  user-launched. Move the run to the overnight queue only after implementation.
-
 ## Per-slot budget split between its own series
 
 **Hypothesis; untested, no design yet.** Whether splitting a slot's own budget more evenly between
@@ -261,36 +227,3 @@ per-label total loss mass rises with rarity (1.01 to 1.20 across our labels) and
 scale with it. That is a third difference, deliberately not adopted here: our normalisation is
 what keeps the comparison to the control a change of emphasis rather than of effective learning
 rate.
-
-## Same-cost backbone candidates
-
-**Proposed 2026-09-25; ReXNet-R is implemented in the `convnext-atto` worktree and lost its first
-run (−0.0053) with a measured over-large learning rate; its follow-up at `backbone_lr` 8e-5 is
-open. ConvNeXt-Atto, run outside this list, lost −0.0192 and is closed
-([backbone swap runs](../validation/results/2026-09-25-backbone-swap-runs.md)). ConvNeXt-nano and
-HGNetV2-B3 are unimplemented.** Three timm backbones of about ReXNet-200's
-size (13.8M parameters, 1.53 GMACs at 224 px) that could replace it. Each needs only a
-`BACKBONE_MAPPINGS` entry with a verified origin; `model.backbone` is the option
-([swapping a backbone](../modeling/backbone-swaps.md#code-requirements)). All three checkpoints
-declare the configured ImageNet mean/std. Counts are backbone-only, measured on the meta device
-with `FlopCounterMode` (timm 1.0.26).
-
-| Candidate | Params | GMACs | Mapping | Motivation | Confidence |
-|---|---:|---:|---|---|---|
-| `rexnetr_200.sw_in12k_ft_in1k` | 14.0M | 1.56 | `_rexnet_mapping`, verified origin 0, stride 32, 2560 channels | Same family and cost, ImageNet-12k pretraining; lumbar 2024 7th place | Moderate, evidence-backed |
-| `convnext_nano.in12k_ft_in1k` | 15.0M | 2.44 | [Offset origin](../modeling/backbone-swaps.md#mapping-pitfalls); the `convnext-atto` worktree's `_convnext_mapping` should only need a registration | Best in lumbar 3rd place's comparison; DINOv3 ConvNeXt-T 2nd in the [backbone search](../modeling/backbone-search.md#finished-model-comparison) | Moderate |
-| `hgnetv2_b3.ssld_stage2_ft_in1k` | 14.2M | 1.77 | Offset origin, reported 2 px, unverified | Dense and GPU-friendly; family evidence only as a lumbar localizer | Low, speculative |
-
-- **Excluded:** EfficientNet and EfficientNetV2 (measured losses on this dataset), `tf_` ports
-  and reparameterizable or fixed-size families (mapping), `regnetz_c16` (0.5 mean/std),
-  MobileNetV4, RepViT and small transformers (no MRI evidence), ResNet-18 (trailed ConvNeXt-nano
-  in lumbar 3rd's comparison). See [backbone MRI evidence](../research/backbone-mri-evidence.md).
-- **Cost:** GMACs do not predict wall time for depthwise-heavy families; ConvNeXt-nano's 1.6×
-  GMACs may cost less than that. Estimate time from the run's own logs, then time any winner on a
-  Kaggle T4 in FP16.
-- **Comparison:** one run per candidate against the incumbent control, same fold, seed and
-  budget. Scale `backbone_lr` by the checkpoint's convolution-weight RMS relative to ReXNet-200's
-  ([weight scale](../modeling/backbone-swaps.md#checkpoint-weight-scale)); leave other rates
-  unchanged. Record macro/per-label AUC, paired uncertainty, time and memory under the current
-  adoption rule. Ensemble contribution belongs to the
-  [endgame](endgame.md#ensembling).

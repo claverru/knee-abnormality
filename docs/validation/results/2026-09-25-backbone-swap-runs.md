@@ -5,7 +5,7 @@
 planned follow-up at `backbone_lr` 8e-5.** Both ran from the `convnext-atto` worktree, whose
 backbone mappings, `model.backbone_batch_multiple` padding and configs are uncommitted there and
 not in `main`. The candidate list and rationale are in
-[same-cost backbone candidates](../../backlog/small-changes.md#same-cost-backbone-candidates);
+[same-cost backbone candidates](../../modeling/backbone-swaps.md#same-cost-backbone-candidates);
 code requirements for a swap are in [swapping a backbone](../../modeling/backbone-swaps.md).
 
 ## ConvNeXt-Atto
