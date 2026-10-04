@@ -9,7 +9,7 @@ free to try any smart-crop idea inside three limits (the time budget, no more th
 per study, no input above 224 px), and the user added 14 seeds on the fly. Outcome: the 84 mm
 T1/PD and 93 mm fluid views were adopted on main
 ([result](../../../docs/validation/results/2026-10-02-smart-crops-campaign.md)); the work
-continues as [view optimisation](../../../docs/ongoing/view-optimisation.md).
+continued as the [learnable-views campaign](../learnable-views/INDEX.md).
 
 | Read when | Document |
 |---|---|

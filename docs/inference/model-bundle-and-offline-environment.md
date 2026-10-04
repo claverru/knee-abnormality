@@ -224,6 +224,14 @@ and the second JPEG 2000 according to the
 Verify real images using the listed syntaxes; the tiny example set need not
 exercise every codec.
 
+**Kaggle's notebook image runs Python 3.13 since 2026-10-03** (S98's first attempts failed on the
+cp312 codec wheels, then on a missing `pydantic-settings`). The wheels that work are in
+`outputs/submission/dependencies/kaggle-py313`: `pylibjpeg` 2.1.0, `pylibjpeg-libjpeg` 2.4.0 and
+`pylibjpeg-openjpeg` 2.5.0 (cp313), `pydantic_settings` 2.15.0 and `python_dotenv` 1.2.3. S98 to
+S100 were exported with `--wheel-dir outputs/submission/dependencies/kaggle-py313
+--target-python 3.13`; the defaults in `src/knee_abnormality/kaggle.py` (`KAGGLE_PYTHON`,
+`KAGGLE_WHEELS`) still name 3.12.
+
 Inspect the notebook's Python, Torch/CUDA build, GPU compute capability and
 compiled architecture support before selecting wheels. A local RTX 3090
 bfloat16 run does not establish compatibility with another accelerator.

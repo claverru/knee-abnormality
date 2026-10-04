@@ -1,0 +1,219 @@
+ideas:
+- id: learned-slice-spread
+  mechanism_id: slice-spread
+  parent_idea_id: null
+  title: The spread of each view's slices along the stack learned per view from 0.867
+  opportunity: 'Slices are drawn from a truncated Gaussian along the stack whose width is one global
+    number, data.sampling_sigma_fraction 0.867 of the pool''s reach. Labels keep their evidence at
+    different depths: Baker''s cyst has 80% of its coronal fluid evidence beyond 20 mm from the centre,
+    the lateral meniscus 74% of its sagittal fluid evidence, and the sampler picks slices beyond 40
+    mm half as often as its supply. One global width cannot serve a type that needs the edges and
+    one that needs the joint line. A width per view, learned, lets each view settle its own, and with
+    two views on a type one can stay tight and the other spread. The run also tests the per-slice
+    estimator that learned-centre-fit uses for the centre.'
+  mechanism: 'Each view of the incumbent''s data.series_types has a sigma_fraction, 0.867 in the recipe,
+    in place of data.sampling_sigma_fraction, and sigma_fraction joins data.learn_views. The model
+    holds one log-fraction per view, initialised at the log of the configured value. The fractions
+    reach the loader through loader_state each epoch; a view''s target depths are drawn as today at
+    its fraction. Every selected slice carries its target depth from the centre and its pool''s support
+    intervals; the model computes the reach and the standard deviation at its view''s fraction and
+    adds the log-density of the target depth minus its detached value, zero in the forward pass, so
+    slices that help far from the centre widen the view''s spread and slices that help near it narrow
+    it. The density is the sampler''s own: target depths are drawn along the plane''s patient axis
+    from a Gaussian centred on the knee centre, truncated to the pool''s support intervals, with standard
+    deviation the width fraction times the pool''s reach, the reach being max(min(-lo, hi), 1 mm)
+    over the support measured from the centre (data/preprocessing/sampling.py: target_depths, limiting_reach,
+    interval_log_mass). The term is added to the slice''s existing pooling log-weight (slice_log_weight,
+    the path the slice budget uses), for every selected slice of a physical pool; a local pool gets
+    none. It is not a score-function estimator: the loss is never multiplied by the log-density. The
+    centre is the incumbent''s. Validation and prediction draw the band midpoints at the checkpoint''s
+    fractions. Pool building, source ranking, the 60 mm radius and the assignment of targets to slices
+    are unchanged.'
+  precedents:
+  - 'The overall scale of the Gaussian is inert on macro: 0.867 landed at the mean of its two controls
+    (+0.00016 at x4), and a five-point sweep from 0.60 to 1.10 was non-monotone with a span of 0.00674,
+    seed noise (docs/data-preparation/peripheral-coverage.md). That sweep moved all planes by one
+    factor on the September recipe; it says nothing about a width per view.'
+  - 'Evidence by depth: share of a label''s depth-weighted evidence beyond 20 mm from the centre:
+    Baker''s cyst in coronal fluid 80%, lateral meniscus in sagittal fluid 74%, synovitis in axial
+    fluid 67%, effusion in axial fluid 65%, MCL in axial fluid 56%; selection probability falls from
+    0.40 at the centre to 0.19 at 40 mm; 14-31% of a series'' slices are never sampled (same document,
+    fixed 40 mm sampler).'
+  - Per-plane widths scored a gain on the token cache with coronal inside a 12-35 mm plateau; a shape
+    change was trained once and came back inconclusive (same document).
+  - The slice budget is learned by the same kind of per-slice weight, zero in the forward pass (prior-work.md).
+  novelty: First learned sampling width, and first width per view.
+  coverage: The depth of every selected slice of every study with a physical pool.
+  exploitation: 'Activation: at step 0 the same slices selected as the incumbent; the fraction of
+    every view logged per epoch, non-zero gradient on it at epoch 0, and at least one view more than
+    0.03 from its start by epoch 3. Log per view and epoch the mean absolute depth of the selected
+    slices and the share beyond 40 mm. Read against the reference on macro at x4 and x1 and on the
+    labels read at the edges (Baker''s cyst, synovitis, effusion, MCL, the menisci) against the central
+    ones. A collapse of every fraction towards zero with falling validation would show the estimator
+    biased towards central slices, which also bears on learned-centre-fit.'
+  budget: The reference's backbone pixels and loader; estimate 1,050-1,150 s, inside 822-1,370 s.
+  implementation: 'config.py and configs/training.yaml: sigma_fraction in ViewConfig and in the literals
+    of data.learn_views; data.sampling_sigma_fraction removed. data/dataset.py and data/preprocessing:
+    each view drawn at the fraction from set_loader_state, and each slice shipped with its target
+    depth and its pool''s intervals. modeling/views.py: the log-fractions as parameters of the view
+    module (optimizer.view_lr, no weight decay, outside gradient clipping); modeling/model.py: the
+    per-slice term and the fractions in loader_state. training/lightning.py: the logging. If learned-centre-fit
+    was accepted, the same per-slice term carries both the centre and the fraction; otherwise this
+    idea builds it for the fraction alone.'
+  open_choices: None. The width is learned as a fraction of the pool's reach, as it is set today.
+  dependencies: []
+  priority_rationale: User direction, forced sixth, 2026-10-02.
+- id: views-learned-on-held-out-studies
+  mechanism_id: view-objective
+  parent_idea_id: null
+  title: The view values learned on a tenth of the training studies that the weights never train on
+  opportunity: 'The view values are trained on the training loss, together with the weights. That
+    moves them towards what makes the training studies easier to fit, not towards what generalises,
+    as with any setting of the input learned on the data it shapes. The frozen run agrees: the views
+    the model learned are worth no more than the centre crop they started from. Updating the views
+    only from studies the weights have not seen gives them the signal they lack: whether a view helps
+    on new studies.'
+  mechanism: 'The training studies of the fold are split once, by a hash of the study UID independent
+    of the run seed: one tenth are view studies, the rest weight studies. The validation fold is untouched.
+    The training loader, its batches and its epoch are the incumbent''s: every training study is visited
+    once per epoch, so the harness''s cohort and visit accounting are unchanged. Inside each step
+    the gradient is routed per study. The loss terms of the weight studies of the batch update the
+    weights (backbone, heads, label bias, every parameter that is not a learned view field) and give
+    nothing to the learned view fields: their windows and slice weights use the view values detached.
+    The loss terms of the view studies of the batch update only the learned view fields of data.learn_views
+    (spacing, offsets, slice budget), through a second backward pass that takes the gradient with
+    respect to those fields alone, and give nothing to the weights. Each loss is averaged over its
+    own studies. A batch without view studies gives the view fields no gradient at that step. First-order:
+    no gradient through the weight update. Batch-norm statistics still see every study of the batch.
+    Everything else as in the incumbent.'
+  precedents:
+  - 'frozen-learned-views-run4: the reference''s final views frozen from the start score 0.930609
+    at x4, -0.0019 against the reference and level with the plain 120 mm centre crop (0.930666); the
+    hand views frozen on the same build score 0.932627 (prior-work.md).'
+  - Learned view values do not reproduce between runs and the learned runs trail the hand recipe by
+    0.002 at x1 (prior-work.md).
+  - 'The cost is known in kind and not in size: the weights take gradient from 10% fewer studies,
+    and the view fields from about 0.8 studies per step in place of 8; 43% of the batches of eight
+    hold no view study.'
+  novelty: First run in which the view values and the weights learn from different studies.
+  coverage: Every update of the learned view fields; 10% of the training studies leave the weights'
+    data.
+  exploitation: 'Activation: the two study counts logged (about 350 and 3,145); at epoch 0, zero gradient
+    on the view fields from weight studies and on the weights from view studies, checked on one batch
+    by computing each alone; and at least one width more than 5 mm from its start by epoch 5. Log
+    the mean loss of view studies beside that of weight studies per epoch. Read against the reference
+    on macro at x4 and x1, knowing the weights saw 10% less data; on where the views end against the
+    reference''s and the hand recipe''s; and on how much they wander from epoch to epoch.'
+  budget: The reference's forward pass and one extra backward pass through the view studies of the
+    batch, about a tenth of it; estimate 1,150-1,300 s, inside 822-1,370 s.
+  implementation: 'One option, optimizer.view_holdout_fraction (0 in the incumbent''s behaviour, 0.1
+    here). training/lightning.py: the per-study flag from the hash, the two losses (each including
+    its studies'' half-knee and report-attribute terms), the weights'' backward pass on the weight-study
+    loss, and the view fields'' gradient taken from the view-study loss alone; modeling/model.py:
+    the view values and the slice-budget weight used detached for the studies flagged as weight studies.
+    Adds to the incumbent; nothing is removed, and the loaders are untouched.'
+  open_choices: 'The tenth: small enough to cost the weights little, large enough that most batches
+    hold a view study. Not derived from a measurement.'
+  dependencies: []
+  priority_rationale: Agreed with the user, forced seventh, 2026-10-02.
+- id: view-optimizer-long-average
+  mechanism_id: view-optimizer
+  parent_idea_id: null
+  title: The view values stepped on a gradient averaged over about a hundred steps (beta1 0.99 for
+    their group)
+  opportunity: 'The view values are stepped by AdamW with the same averaging as the weights, about
+    ten steps. AdamW divides each step by the gradient''s own size, so a gradient that is mostly noise
+    still moves a value by a sizeable step: with independent noise the expected step is about 0.23
+    of the learning rate at beta1 0.9. The views behave that way: they wander by several millimetres
+    from epoch to epoch until the schedule decays, and end elsewhere in each run. Averaging over about
+    a hundred steps cuts the noise-driven step to about 0.07 of the rate and leaves a consistent gradient
+    its full step.'
+  mechanism: The optimizer group of the view parameters (the view module's spacing, shift and any
+    other view value in that group) takes beta1 0.99 in place of 0.9; beta2, the rate, the schedule
+    and the absence of weight decay are unchanged, and so is every other group. Nothing else changes.
+  precedents:
+  - 'Reference, width per epoch: axial T1/PD 108, 102, 93, 93, 98, 95, 92, 92, 93, 93 mm; sagittal
+    T1/PD 119, 134, 138, 132, 126, 122, 122, 121, 122, 122 mm; sagittal fluid 116, 108, 108, 104,
+    103, 103, 110, 112, 112, 112 mm. End widths differ by up to 38 mm on one view between the three
+    learned runs of the build (prior-work.md).'
+  - view-learnable-centre at view rate 0.0006 moved the views about 1 mm per epoch, too slow; 0.006
+    was a tenfold guess and has been kept since (prior-work.md).
+  novelty: First change to how the view values are stepped other than their rate.
+  coverage: Every update of the view values.
+  exploitation: 'Activation: the view group''s beta1 logged as 0.99, and at least one width more than
+    5 mm from its start by epoch 5. Log per view the sum of absolute epoch-to-epoch changes of the
+    width beside its net change from start to end; the ratio is the wander. Read against the reference
+    on that ratio first, then on macro at x4 and x1 and on where the views end.'
+  budget: The reference's cost; estimate 1,050-1,150 s, inside 822-1,370 s.
+  implementation: One option, optimizer.view_beta1 (0.9 in the incumbent's behaviour, 0.99 here),
+    set as the betas of the view group in build_optimizer (training/lightning.py). Adds one setting;
+    nothing is removed.
+  open_choices: '0.99: an average over about a hundred steps, a quarter of an epoch. It follows from
+    the noise argument above, not from a measured signal-to-noise ratio of the view gradient.'
+  dependencies: []
+  priority_rationale: Agreed with the user, forced eighth, 2026-10-02.
+- id: views-start-late
+  mechanism_id: view-schedule
+  parent_idea_id: null
+  title: The view values kept at their start for three epochs and learned from the fourth
+  opportunity: 'In the reference most of each width''s movement happens in epochs 0 to 3, when the
+    heads are new and the backbone has barely adapted: the views are in effect decided by a model
+    that cannot yet read the images, and the backbone then adapts to wherever they went. Letting the
+    model learn on the starting views first means the gradient that moves a view comes from a model
+    that already knows what it reads.'
+  mechanism: The spacing and offsets of every view do not change during epochs 0 to 2 (no optimizer
+    step and no gradient) and are learned as in the incumbent from the start of epoch 3 to the end,
+    at the rate the schedule gives at that point. The jitter, the label bias and the slice budget
+    are unchanged throughout. Nothing else changes.
+  precedents:
+  - 'Reference, width per epoch: axial T1/PD 108, 102, 93, 93, 98, 95, 92, 92, 93, 93 mm; sagittal
+    T1/PD 119, 134, 138, 132, 126, 122, 122, 121, 122, 122 mm; sagittal fluid 116, 108, 108, 104,
+    103, 103, 110, 112, 112, 112 mm. End widths differ by up to 38 mm on one view between the three
+    learned runs of the build (prior-work.md).'
+  - views-frozen-late is the mirror image and uses the same option.
+  novelty: First run in which the views start moving after the model has trained.
+  coverage: Every window of the first three epochs is placed by the starting view values.
+  exploitation: 'Activation: the logged view values identical to their start through epoch 2 and at
+    least one width more than 5 mm from its start by epoch 6. Read against the reference on where
+    the views go once released and how much they wander, then on macro at x4 and x1.'
+  budget: The reference's cost; estimate 1,050-1,150 s, inside 822-1,370 s.
+  implementation: 'One option, optimizer.view_learning_epochs, the first epoch in which the view values
+    learn and the first in which they no longer do ([0, 10] in the incumbent''s behaviour, [3, 10]
+    here), read by the Lightning module: outside the window the view parameters take no gradient and
+    their group''s rate is zero. Adds to the incumbent; nothing is removed. views-frozen-late uses
+    the same option.'
+  open_choices: 'Three epochs: where the reference''s large moves end. Not derived from a measurement
+    of when the model reads the images well enough.'
+  dependencies: []
+  priority_rationale: Agreed with the user, forced ninth, 2026-10-02.
+- id: label-bias-off
+  mechanism_id: label-routing
+  parent_idea_id: null
+  title: The learnable recipe without the per-view label bias
+  opportunity: 'Every learned run of the build carried the label bias together with the learned views,
+    so its own effect has never been measured. Its values stay small (largest about 0.10, a 10% change
+    of a view''s attention weight), there is one view per series type, and the pool already has a
+    readout per plane and contrast. The bias and the views can also do part of each other''s work:
+    a label that cannot be routed by a bias has to be served by where the view sits.'
+  mechanism: model.view_label_bias false. Views and budget are learned exactly as in the incumbent,
+    from the 120 mm centre crop, with the same view rate, jitter and budget shift. Nothing else changes.
+  precedents:
+  - 'views-budget-shift-centre (reference): largest label biases coronal T1/PD for Baker''s cyst -0.10,
+    axial fluid for Baker''s cyst +0.10, sagittal T1/PD for effusion -0.09, axial T1/PD for ACL -0.09,
+    coronal fluid for MCL +0.09 (prior-work.md).'
+  - 'mixed-field-readout-weights: readout weights per view bought nothing (-0.0001) with two views
+    per slice (smart-crops prior work).'
+  novelty: First run of the learned views without the label bias.
+  coverage: Every token of every study loses its per-view, per-label attention offset.
+  exploitation: 'Activation: no view_label_bias parameter in the model and the view values moving
+    as in the reference (width of at least one view more than 10 mm from 120 mm by epoch 3). Read
+    against the reference on macro at x4 and x1, on the labels with the largest biases (Baker''s cyst,
+    MCL, ACL, effusion), and on where the views end compared with the reference''s.'
+  budget: The reference's backbone pixels and loader; estimate 1,050-1,150 s, inside 822-1,370 s.
+  implementation: 'Configuration only: model.view_label_bias false in configs/training.yaml. Removes
+    one mechanism of the incumbent and keeps the rest. If accepted, the bias option stays in the code
+    with false as the recipe value.'
+  open_choices: None. User seed, 2026-10-02.
+  dependencies: []
+  priority_rationale: User seed, forced, 2026-10-02.
+exhausted_directions: None yet.

@@ -1,0 +1,82 @@
+ideas:
+- id: hand-views-sagittal-fluid-pair-learned-budget
+  mechanism_id: hand-views-wide-second-view
+  parent_idea_id: hand-views-frozen-with-label-bias
+  title: The hand views with a second, wide sagittal-fluid view and the slice budget learned
+  opportunity: 'User seed relayed from the view-building session, 2026-10-03, the user''s pick if only
+    one of the last seeds runs; a user exception to the frozen-view exclusion, as the reference had.
+    The hand views trail the learned runs on Baker''s cyst and PF OA, the labels at the edge of the
+    knee that a zoomed view cuts; the learned label bias already sends Baker''s cyst towards wide
+    views (largest entries about +0.10 on axial fluid and -0.10 on coronal T1/PD); and the sagittal-fluid
+    pairs were the only learned runs at the hand recipe''s x1 (sagittal-fluid-ordered-view-widths 0.9291,
+    sagittal-fluid-evidence-conditioned-routing 0.9301). With the label bias, the slice budget is
+    the only other learned quantity that ends in the same place in every run. Note on the yardstick:
+    the same recipe as the reference trained from main scored x4 0.932477, x1 0.929026, so the reference''s
+    0.933307 is a high draw of its recipe.'
+  mechanism: 'The incumbent (the hand views frozen, label bias on) with two changes that belong together.
+    Sagittal fluid gets two views in place of one: view A is the hand view unchanged, 0.4166666666666667
+    mm (93.33 mm), horizontal anchor knee with offset 7 mm, vertical anchor image with offset 10 mm,
+    3 slices; view B is 0.5357142857142857 mm (120 mm), both axes anchored on the image with offset
+    0, 2 slices. data.learn_views is [slices]: the slice budget is learned as in the learned recipe
+    (one logit per view, random rounding with a fixed study total in training, data.slice_budget_shift
+    0.5, largest remainder in evaluation), so the split between A and B and the shares of the other
+    types are learned. Spacing and offsets stay frozen on every view and take no gradient. The label
+    bias has one row per view, A and B included. Unchanged: every other view, 26 slices per study,
+    the jitter of the incumbent (4 mm, 0.95-1.05), ten epochs, batch size 8.'
+  precedents:
+  - 'hand-views-frozen-with-label-bias (the incumbent): x4 0.933307, x1 0.929876, 0.950 public (S100);
+    the same recipe from main 0.932477 / 0.929026, 0.951 public (S101).'
+  - 'two-views-sagittal-fluid, sagittal-fluid-ordered-view-widths and sagittal-fluid-evidence-conditioned-routing
+    (this campaign): two sagittal-fluid views with slices 3 + 2 in the learned recipe; frozen sources
+    under outputs/autoresearch/learnable-views/experiments. The ordered pairs lost ACL (-0.0064 to
+    -0.0078) and gained lateral meniscus.'
+  - 'views-only-fixed-budget (this campaign): fixing the budget in the learned recipe, x4 -0.0005.'
+  novelty: First second view on the frozen hand recipe, and first learned budget on it.
+  coverage: Every study with a sagittal fluid series; the budget of every view.
+  exploitation: 'Activation: a non-zero attention mass on view B and a largest absolute change of a
+    slice share from its start above zero by the third epoch (logged epoch 2), with every spacing
+    and offset exactly at its configured value. Log the budget of every view per epoch, the bias
+    rows of A and B, and the attention per label on A and B. Read against the incumbent at x4 and
+    x1: Baker''s cyst and PF OA up with fracture, synovitis and contusion not down; ACL, which the
+    earlier pairs lost; the bias rows of A and B differing by label; the learned split between A and
+    B.'
+  budget: 26 slices per study as the incumbent; inside 822-1,370 s.
+  implementation: 'configs/training.yaml (the sagittal-fluid view pair, data.learn_views [slices],
+    data.slice_budget_shift 0.5). The two-view table and the learned budget exist in the build; no
+    source change is expected beyond logging.'
+  open_choices: 'data.slice_budget_shift 0.5 is the campaign keeper''s reading of a learned budget,
+    the value every learned run used; the relayed seed named only data.learn_views [slices].'
+  dependencies: []
+  priority_rationale: User seed relayed from the view-building session, 2026-10-03, forced; the user's
+    pick among the last seeds.
+- id: hand-views-learned-budget
+  mechanism_id: hand-views-learned-budget
+  parent_idea_id: hand-views-frozen-with-label-bias
+  title: The hand views with the slice budget learned and nothing else changed
+  opportunity: 'User seed relayed from the view-building session, 2026-10-03; a user exception to
+    the frozen-view exclusion. With the label bias, the slice budget is the only learned quantity
+    that ends in the same place in every run, and fixing it in the learned recipe cost 0.0005 (views-only-fixed-budget,
+    inside the noise, right sign). This run adds it alone to the incumbent; it also separates the
+    two parts of hand-views-sagittal-fluid-pair-learned-budget.'
+  mechanism: 'The incumbent (the hand views frozen, one view per series type, label bias on) with
+    data.learn_views [slices]: the slice budget is learned as in the learned recipe (one logit per
+    view, random rounding with a fixed study total in training, data.slice_budget_shift 0.5, largest
+    remainder in evaluation). Spacing and offsets stay frozen and take no gradient. Nothing else changes.'
+  precedents:
+  - 'hand-views-frozen-with-label-bias (the incumbent): x4 0.933307, x1 0.929876.'
+  - 'views-only-fixed-budget (this campaign): x4 0.931941 (-0.0005). In the learned runs the budget
+    moved fluid up and T1/PD down in every run.'
+  novelty: First learned budget on the frozen hand views.
+  coverage: Every study; six budget logits.
+  exploitation: 'Activation: a largest absolute change of a slice share from its start above zero by
+    the third epoch (logged epoch 2), with every spacing and offset exactly at its configured value.
+    Log the budget of every view per epoch. Read against the incumbent at x4 and x1: the same budget
+    shifts as in the learned runs and no loss at x1.'
+  budget: The incumbent's time; inside 822-1,370 s.
+  implementation: 'Configuration only (configs/training.yaml: data.learn_views [slices], data.slice_budget_shift
+    0.5).'
+  open_choices: 'data.slice_budget_shift 0.5, as in hand-views-sagittal-fluid-pair-learned-budget.'
+  dependencies: []
+  priority_rationale: User seed relayed from the view-building session, 2026-10-03, forced; second
+    of the last seeds.
+exhausted_directions: None.

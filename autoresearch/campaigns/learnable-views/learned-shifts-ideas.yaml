@@ -1,0 +1,50 @@
+ideas:
+- id: hand-sizes-learned-shifts
+  mechanism_id: view-shift-only
+  parent_idea_id: start-from-hand-recipe
+  title: Learn the view shifts only, with the sizes fixed at the hand recipe's
+  opportunity: 'User seed, 2026-10-03. Learned widths do not find the hand zoom: start-from-hand-recipe
+    began at 84/93 mm and its widths ended at 116/119 mm axial, 105/111 mm coronal and 88/95 mm sagittal
+    (x4 0.931728, x1 0.9265), while the same views frozen score 0.932627 / 0.9290 and, with the label
+    bias, 0.933307 / 0.9299 (hand-views-frozen-with-label-bias). In that learned run the shifts also
+    moved, 12 to 16 mm from their start on several views, but with the widths moving at the same time
+    the two are not separated: a window that grows needs a different centre. This run pins the sizes
+    at the values main uses and lets only the shifts learn, so it shows whether the placement gradient
+    finds something useful once the zoom is no longer free.'
+  mechanism: 'The view table of configs/hand-views.yaml, one view per series type, with its sizes
+    fixed for the whole training: axial T1/PD and axial fluid 0.5357142857142857 mm (120 mm), coronal
+    and sagittal T1/PD 0.375 mm (84 mm), coronal and sagittal fluid 0.4166666666666667 mm (93.33 mm);
+    slices 6/6/5/5/5/5, fixed. The offsets start at the hand recipe''s values on the hand recipe''s
+    anchors (axial: both axes on the image with offset 0; coronal: horizontal anchor knee with offset
+    0, vertical anchor image with offset 10 mm; sagittal: horizontal anchor knee with offset 7 mm,
+    vertical anchor image with offset 10 mm) and are learned as in the incumbent: data.learn_views
+    is [offset_mm], at optimizer.view_lr, clamped to data.view_shift_limit_mm. Spacing and slices
+    are left out of data.learn_views, so they stay at their configured values and take no gradient;
+    data.slice_budget_shift is 0.0. The label bias stays on. Jitter: the shift keeps the incumbent''s
+    8 mm, the exploration around a learned offset; the scale takes the frozen recipe''s 0.95-1.05,
+    since the size is not learned. Everything else is the incumbent''s.'
+  precedents:
+  - 'start-from-hand-recipe (this campaign): the same start with spacing, offsets and slices all learned;
+    x4 0.931728 (-0.0008), x1 0.9265. Frozen source outputs/autoresearch/learnable-views/experiments/start-from-hand-recipe-20261003T014857Z-c4c992ab/source.'
+  - 'hand-views-frozen-with-label-bias (this campaign): the same views with nothing learned but the
+    label bias; x4 0.933307 (+0.0008, 80% [-0.0007, +0.0023]), x1 0.9299, 0.950 public (S100).'
+  - 'views-only-fixed-budget (this campaign): spacing and offsets learned with the budget fixed, from
+    the centre crop; x4 0.931941 (-0.0005).'
+  novelty: First run that learns placement with the zoom pinned.
+  coverage: Every view of every series type; twelve offsets.
+  exploitation: 'Activation: the largest absolute change of an offset from its start, logged per epoch,
+    above 1 mm by the third epoch (logged epoch 2), and every spacing exactly at its configured value
+    at every epoch. Log both shifts per view and epoch and their gradients as usual. Read against hand-views-frozen-with-label-bias,
+    its control with the shifts frozen, against start-from-hand-recipe, and against the reference,
+    at x4 and x1: where each shift ends, whether it settles, and whether the ends agree with the
+    hand offsets.'
+  budget: The incumbent's time; no new computation. Inside 822-1,370 s.
+  implementation: 'Configuration only (configs/training.yaml: the view table, data.learn_views [offset_mm],
+    data.slice_budget_shift 0.0, data.affine_augmentation shift_mm 8.0 and scale_range 0.95-1.05);
+    add the offset-change scalar to the logging in training/lightning.py if it is not already logged.'
+  open_choices: The jitter split (8 mm shift, 0.95-1.05 scale) and the fixed slice budget are the
+    campaign keeper's reading of "learn the shifts but not the sizes"; the user named only the shifts
+    and the sizes.
+  dependencies: []
+  priority_rationale: User seed, 2026-10-03, forced.
+exhausted_directions: None.

@@ -1,0 +1,44 @@
+ideas:
+- id: hand-views-label-bias-faster-rate
+  mechanism_id: label-bias-rate
+  parent_idea_id: hand-views-frozen-with-label-bias
+  title: The label bias in its own optimizer group at ten times the head rate, on the hand views
+  opportunity: 'User seed relayed from the view-building session, 2026-10-03 (it replaces that session''s
+    duplicate of hand-sizes-learned-shifts); a user exception to the frozen-view exclusion, as the
+    reference had. Evidence that the label bias is rate-limited: in the reference its mean absolute
+    value per epoch is 0.016, 0.023, 0.029, 0.032, 0.034, 0.036, 0.0365, 0.037, 0.037, 0.037 and its
+    largest entry rises from 0.055 to 0.11. It grows every epoch and flattens only when the cosine
+    schedule has taken the rate down, so the table stops where the schedule stops it, not where the
+    loss does. The table has the same signs in every run (correlation 0.98 between the campaign run
+    and the same recipe trained from main), so a larger step should sharpen the same routing, not
+    randomise it. Guess, medium confidence: a bias of at most 0.1 in attention logits is a small routing
+    effect; the bias was worth +0.0017 in the learned recipe and about 0 to +0.0007 on the hand views,
+    and a stronger table may recover more of that.'
+  mechanism: 'The incumbent unchanged (the hand views, sizes and offsets frozen, label bias on), except
+    that view_label_bias trains in its own optimizer group at ten times optimizer.head_lr (0.006 against
+    0.0006), still without weight decay and on the same warm-up and cosine schedule. Nothing else
+    changes.'
+  precedents:
+  - 'hand-views-frozen-with-label-bias (the incumbent): x4 0.933307, x1 0.929876; the same recipe from
+    main 0.932477 / 0.929026. Its bias trajectory is quoted in the opportunity.'
+  - 'label-bias-off (this campaign): removing the bias from the learned recipe cost -0.0017, 80% interval
+    below zero.'
+  novelty: First change to how fast the label bias learns.
+  coverage: Every view and label; 6 by 12 bias entries.
+  exploitation: 'Activation: the mean absolute value of the label bias at the last epoch above 0.06
+    (the reference ends at 0.037), logged per epoch. Log per epoch the mean and the largest absolute
+    bias, the full table, and the attention mass per view and label. Read the trajectory (does it now
+    plateau before the rate decays, and at what size), the sign pattern against the reference''s (Baker''s
+    cyst towards axial fluid and away from coronal T1/PD, effusion towards axial fluid), and x4 and
+    x1 against the incumbent. If the table grows several-fold and the score drops, the routing was
+    already near its useful size; that closes the question.'
+  budget: The incumbent's time; one more optimizer group. Inside 822-1,370 s.
+  implementation: 'One new optimizer option, optimizer.view_label_bias_lr (0.006 here), and the group
+    split in configure_optimizers (training/lightning.py, where view_label_bias is grouped today);
+    config.py for the option. No change for a recipe that does not set it apart.'
+  open_choices: 'Ten times the head rate, the relayed value; it equals optimizer.view_lr. The activation
+    threshold 0.06 is the campaign keeper''s reading of "clearly above the reference''s 0.037".'
+  dependencies: []
+  priority_rationale: User seed relayed from the view-building session, 2026-10-03, forced; third of
+    the last seeds.
+exhausted_directions: None.

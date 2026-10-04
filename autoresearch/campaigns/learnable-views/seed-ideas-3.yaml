@@ -1,0 +1,136 @@
+ideas:
+- id: normal-jitter
+  mechanism_id: view-jitter
+  parent_idea_id: null
+  title: The learnable recipe with the hand recipe's jitter, 4 mm and 5% in place of 8 mm and 10%
+  opportunity: 'Both learned runs score 0.9273 at x1 against 0.9293 for the hand recipe and tie it
+    at x4, and S94 lost 0.003 on the public set, in line with x1. One untested cause is the wide training
+    jitter: the model is never trained on the framing it is validated on, so each slice is read less
+    sharply and only more slices recover it. The frozen run of the learned views with 4 mm jitter
+    did not recover x1 (0.9262), which points away from the jitter; this run tests the jitter with
+    the views still learned, where it also drives exploration.'
+  mechanism: data.affine_augmentation.shift_mm 4.0 and scale_range [0.95, 1.05], the values of the
+    frozen recipe, in place of 8.0 and [0.9, 1.1]. Views, label bias and budget are learned as in
+    the incumbent. Nothing else changes.
+  precedents:
+  - 'views-budget-jitter-centre-v2 and views-budget-shift-centre (8 mm, 10%): x1 0.9273 both, x4 0.932704
+    and 0.932489; hand recipe x1 0.9293 on main and 0.9290 frozen on this build (prior-work.md).'
+  - 'frozen-learned-views-run4: the reference''s final views frozen, 4 mm and 5% jitter: x1 0.9262,
+    x4 0.930609, below the reference on both (prior-work.md).'
+  - 'view-learnable-centre-sharp: views learned with the jitter still in the resampling affine at
+    4 mm, before the placement jitter existed: x4 0.931976 (prior-work.md).'
+  novelty: First run of the current build that learns the views under the narrow jitter.
+  coverage: Every training window; validation and prediction are unchanged.
+  exploitation: 'Activation: the logged jitter range at 4 mm and the view values moving (width of
+    at least one view more than 10 mm from 120 mm by epoch 3). Read against the reference on the x1
+    curve first, then x4, on how far and how fast the views move with less exploration, and on the
+    share of clipped windows.'
+  budget: The reference's backbone pixels and loader; estimate 1,050-1,150 s, inside 822-1,370 s.
+  implementation: 'Configuration only: the two values under data.affine_augmentation in configs/training.yaml.
+    Replaces the incumbent''s jitter range; nothing is added.'
+  open_choices: None. The values are the frozen recipe's.
+  dependencies: []
+  priority_rationale: Seed agreed with the user, forced, 2026-10-02.
+- id: views-only-fixed-budget
+  mechanism_id: slice-budget
+  parent_idea_id: null
+  title: The learnable recipe with the slice budget fixed at 6/6/5/5/5/5
+  opportunity: Once the flaws of the first version were fixed, the learned budget stayed within a
+    quarter of a slice of the configured one in two runs, and the budget shift did not make it move.
+    While it is learned, every study's slice counts are rounded at random and one slice per type is
+    marked, which changes what the model trains on. This run shows whether learning the budget costs
+    or adds anything beside the learned views.
+  mechanism: 'data.learn_views [spacing_mm, offset_mm] in place of [spacing_mm, offset_mm, slices],
+    and data.slice_budget_shift 0.0: every study takes the configured slices with largest-remainder
+    rounding, as a frozen recipe does. Views and label bias are learned as in the incumbent. Nothing
+    else changes.'
+  precedents:
+  - 'views-budget-jitter-centre-v2: budgets ended at 5.75, 5.99, 5.15, 5.21, 4.82, 5.12; views-budget-shift-centre:
+    5.79, 5.95, 5.13, 5.13, 4.87, 5.14 (prior-work.md).'
+  - 'budget-learnable-recipe (first version, budget alone on the hand views): x4 0.931051, -0.0016
+    against the frozen control, with flaws since fixed (prior-work.md).'
+  - 'view-learnable-centre-sharp (views alone, older jitter): x4 0.931976 (prior-work.md).'
+  novelty: First run of the current build that learns the views with the budget fixed.
+  coverage: The slice counts of every training study become deterministic.
+  exploitation: 'Activation: slice_budget_logits without gradient, the logged budgets constant at
+    6/6/5/5/5/5, and the view values moving. Read against the reference on macro at x4 and x1 and
+    on where the views end.'
+  budget: The reference's backbone pixels and loader; estimate 1,050-1,150 s, inside 822-1,370 s.
+  implementation: 'Configuration only: data.learn_views and data.slice_budget_shift in configs/training.yaml.
+    Removes one mechanism of the incumbent and keeps the rest.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Seed agreed with the user, forced, 2026-10-02.
+- id: start-from-hand-recipe
+  mechanism_id: view-start
+  parent_idea_id: null
+  title: The learnable recipe started from the hand views (84 and 93 mm, knee anchors) instead of
+    the 120 mm centre crop
+  opportunity: From the centre crop the views end at 91 to 135 mm, differently in each run, and score
+    0.002 under the hand recipe at x1. The view values and the backbone adapt to each other, so where
+    learning starts may decide where it ends. Started on the hand views, the run shows whether they
+    are a place the gradient stays at or leaves, and whether learning around a good start improves
+    on it.
+  mechanism: 'The view table of configs/hand-views.yaml replaces the incumbent''s, one view per series
+    type: axial T1/PD and fluid 0.5357 mm, both axes anchored on the image with offset 0; coronal
+    T1/PD 0.375 mm and coronal fluid 0.4167 mm, horizontal anchor knee with offset 0, vertical anchor
+    image with offset 10 mm; sagittal T1/PD 0.375 mm and sagittal fluid 0.4167 mm, horizontal anchor
+    knee with offset 7 mm, vertical anchor image with offset 10 mm; slices 6/6/5/5/5/5. data.learn_views
+    stays as in the incumbent, so each view''s spacing and its offsets on its anchors are learned
+    from these values. Label bias, budget, view rate, jitter and ranges as in the incumbent.'
+  precedents:
+  - 'fluid-detail-93-replacement (hand recipe on main): x4 0.932880, x1 0.9293, 0.950 public as S93;
+    view-frozen-control (the same views on this build): x4 0.932627, x1 0.9290 (prior-work.md).'
+  - 'Learned from the centre crop: axial T1/PD 93 and 108 mm, axial fluid 135 and 121 mm, coronal
+    T1/PD 91 and 107 mm, coronal fluid 120 and 117 mm, sagittal T1/PD 122 and 105 mm, sagittal fluid
+    112 and 108 mm in the reference and in views-budget-jitter-centre-v2 (prior-work.md).'
+  novelty: First learned run that starts from the hand views and from knee anchors.
+  coverage: Every window of the coronal and sagittal series starts 27 to 36 mm narrower and on the
+    knee anchor.
+  exploitation: 'Activation: the six starting widths and anchors logged at step 0 as stated, and non-zero
+    view gradients at epoch 0. Read against the reference and against view-frozen-control on macro
+    at x4 and x1, on how far each view moves from its start and in which direction, and on the share
+    of clipped windows (an 84 mm window with 8 mm jitter sits nearer the image edge).'
+  budget: The reference's backbone pixels and loader; estimate 1,050-1,150 s, inside 822-1,370 s.
+  implementation: 'Configuration only: the views of data.series_types in configs/training.yaml. Replaces
+    the incumbent''s starting values; the learning is unchanged.'
+  open_choices: None. The starting values are the recipe in force on main.
+  dependencies: []
+  priority_rationale: Seed agreed with the user, forced, 2026-10-02.
+- id: views-frozen-late
+  mechanism_id: view-schedule
+  parent_idea_id: null
+  title: The learnable recipe with the view values frozen after five of ten epochs
+  opportunity: 'In the reference most of the movement of the widths happens in the first three epochs,
+    they keep wandering by a few millimetres until epoch 6, and only stop around epoch 8 when the
+    cosine schedule has decayed. The backbone therefore trains on its final views for two epochs.
+    A guess, not measured: fixing the views at half time gives the backbone five epochs on stable
+    views and may recover part of the x1 gap.'
+  mechanism: 'The spacing and offsets of every view are learned as in the incumbent during epochs
+    0 to 4 and do not change from the start of epoch 5: their optimizer group takes no step and they
+    receive no gradient. The jitter, the label bias and the slice budget continue unchanged to the
+    end. Nothing else changes.'
+  precedents:
+  - 'views-budget-shift-centre (reference), width per epoch, axial T1/PD: 108, 102, 93, 93, 98, 95,
+    92, 92, 93, 93 mm; sagittal T1/PD: 119, 134, 138, 132, 126, 122, 122, 121, 122, 122 mm; sagittal
+    fluid: 116, 108, 108, 104, 103, 103, 110, 112, 112, 112 mm (prior-work.md).'
+  - 'frozen-learned-views-run4: the reference''s final views frozen for the whole training, with the
+    narrow jitter, no label bias and the fixed budget: x4 0.930609, -0.0019 against the reference,
+    so the final views alone do not carry its score (prior-work.md).'
+  novelty: First run that stops the view values before the schedule does.
+  coverage: Every window from epoch 5 on is placed by fixed view values.
+  exploitation: 'Activation: the logged view values identical from the end of epoch 4 to epoch 9 and
+    different from their start, and zero view gradient from epoch 5. Read against the reference on
+    the x1 curve of epochs 5 to 9, then x4, and on the views it stops at against the reference''s
+    at epoch 5 and at the end.'
+  budget: The reference's backbone pixels and loader; estimate 1,050-1,150 s, inside 822-1,370 s.
+  implementation: 'One option, optimizer.view_learning_epochs, the first epoch in which the view values
+    learn and the first in which they no longer do ([0, 10] in the incumbent''s behaviour, [0, 5]
+    here), read by the Lightning module: outside the window the view parameters take no gradient and
+    their group''s rate is zero. Adds to the incumbent; nothing is removed. views-start-late uses
+    the same option; if it was built first, reuse it.'
+  open_choices: The epoch. Five is half of the training and after the large moves of the reference;
+    it is not derived from a measurement of what the backbone needs.
+  dependencies: []
+  priority_rationale: Seed agreed with the user, forced, 2026-10-02; the only seed that is a guess.
+exhausted_directions: None yet.

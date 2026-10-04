@@ -291,6 +291,15 @@ experiments, unused resume checkpoints and stale submission exports, retaining 4
 ([manifest](../../outputs/archive/maintenance/checkpoint-pruning-20260920T191234Z/manifest.json)).
 Windows C: free space did not grow after either cleanup unless the WSL virtual disk is compacted.
 
+**2026-10-04:** by hand at the user's request, from the stopped `learnable-views` campaign only:
+removed **86 checkpoints (14.72 GiB)**, every `last.ckpt` and the selected checkpoint of every
+run that is not needed, retaining 10 selected checkpoints (1.70 GiB)
+([manifest](../../outputs/archive/maintenance/learnable-views-checkpoints-20261003T220314Z/manifest.json)).
+Kept: the campaign reference `hand-views-frozen-with-label-bias` (S100), the five members of S99
+(one of them S98), and the four runs above the reference at ×4 (size menu, label depth bias,
+label bias at ten times the rate, protected-strata depth transport). Predictions, metrics,
+configs, source snapshots and the campaign state are untouched.
+
 ## Current scope and next execution
 
 The config, fold-aware labels, on-the-fly image preparation, study dataset,

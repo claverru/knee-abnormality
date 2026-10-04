@@ -1,0 +1,58 @@
+ideas:
+- id: knee-frame-3d-position-with-1d-2d
+  mechanism_id: knee-frame-position
+  parent_idea_id: knee-frame-3d-position
+  title: The 3D position from the learned knee centre added to the 1D and 2D position embeddings
+    instead of replacing them
+  opportunity: 'The user asked for a run with both encodings (2026-10-02). learned-centre-fit keeps
+    the 1D and 2D position embeddings and has no 3D position; knee-frame-3d-position removes them
+    and gives every token one 3D position from the learned centre. The two answer different questions:
+    the 1D and 2D embeddings say where a token is in its own stack and canvas, the 3D position says
+    where it is in the knee, in one frame shared by the three planes. A run that removes the first
+    to add the second cannot tell whether a change comes from the frame gained or from the stack
+    and canvas positions lost. This run keeps both, so that with its two neighbours the three cells
+    are read together: 1D and 2D alone, 3D alone, and all three.'
+  mechanism: 'The complete recipe of knee-frame-3d-position (every view anchored on the knee centre
+    on both axes with learned offsets; the centre fit with a learned weight per series type; one
+    centre for window placement, slice selection and the medial, lateral and anterior axes; one 3D
+    position q in mm per token from the model''s centre, with gradient to the centre weights, through
+    that run''s encoder and its three branches), with one change: position_1d and position_2d are
+    kept exactly as the incumbent and learned-centre-fit have them, and the 3D encoding is added
+    to the token beside them. Nothing else of knee-frame-3d-position changes: the same coordinates,
+    wavelengths, encoder, initialisation, branches for unknown side and unknown position, behaviour
+    under reflection and scale embedding.'
+  precedents:
+  - knee-frame-3d-position (this campaign, forced fifth) is the same recipe with position_1d and position_2d
+    removed; learned-centre-fit (forced fourth) is the same recipe without the 3D position. Both are
+    this run's controls.
+  - The September champion's additive 3D embedding on raw centred coordinates, beside the other position
+    embeddings, was worth about zero and was removed (S21, same public score without it); it used
+    the computed centre as a fixed input and raw rather than side-normalized coordinates.
+  - 'near-misses #6, side-normalized 3D position in place of 1D and 2D, computed centre, ReXNet recipe:
+    +0.0008 hard, -0.0006 soft, PF OA +0.0061; rejected (docs/validation/results/2026-09-25-near-misses-campaign.md).'
+  novelty: First run with the side-normalized 3D position from a learned centre beside the 1D and
+    2D embeddings; completes the two-by-two with learned-centre-fit and knee-frame-3d-position.
+  coverage: Every token of every study; the full 3D branch for studies with an accepted fit and a
+    known side, as in knee-frame-3d-position.
+  exploitation: 'Activation: as knee-frame-3d-position, the share of tokens on the full, unknown-side
+    and unknown-position branches logged per epoch with the full branch above 0.9, and non-zero gradient
+    on the centre weights from the position path, logged apart from the window and slice paths at
+    epoch 0. Also log per epoch the mean norm of the 3D encoding and of the summed 1D and 2D embeddings
+    over valid tokens, to show that neither is negligible beside the other. Log what learned-centre-fit
+    logs (the weights, the distance between the learned and today''s centre). Read against knee-frame-3d-position
+    and learned-centre-fit, its two controls, and against the reference, on macro at x4 and x1 and
+    on PF OA, which rose in the earlier 3D runs.'
+  budget: The small position MLP of knee-frame-3d-position beside the two existing embeddings; the
+    same time as that run, estimate 1,050-1,200 s, inside 822-1,370 s.
+  implementation: modeling/spatial_tokens.py and modeling/model.py; record the change in SPATIAL_TOKEN_IDENTITY.
+    Take the whole implementation of knee-frame-3d-position from its frozen source under outputs/autoresearch/learnable-views/experiments
+    (the attempt that trained), apply it to the incumbent as it was built and reviewed, and restore
+    position_1d and position_2d from the incumbent beside the 3D encoding; do not redesign the encoder,
+    its branches or the learned centre. That source already carries the learned centre fit with the
+    corrected stable sort in modeling/center.py.
+  open_choices: None. The 3D encoding is knee-frame-3d-position's and the 1D and 2D embeddings are
+    the incumbent's.
+  dependencies: []
+  priority_rationale: User direction, 2026-10-02, forced; placed right after learned-centre-fit and
+    knee-frame-3d-position, which it is read with.
+exhausted_directions: None. User-ordered addition to the forced seeds.

@@ -1,0 +1,298 @@
+ideas:
+- id: two-views-sagittal-fluid
+  mechanism_id: two-views-per-type
+  parent_idea_id: null
+  title: 'Two learned views on sagittal fluid: the 120 mm centre crop and a 93 mm one, sharing the
+    type''s five slices'
+  opportunity: 'The user asked for two views on one series type as a direction of this campaign (2026-10-02).
+    Sagittal fluid is the type where one width cannot serve every label: zoomed to 93 mm it helps
+    ACL, PF OA and the lateral meniscus and costs Baker''s cyst and MCL, and no single width was a
+    compromise. With one view per type the gradient has to settle one width for all twelve labels;
+    in the reference sagittal fluid ended at 112 mm. Two views let it keep a wide and a narrow one,
+    the label bias send each label to the view it reads best, and the learned budget decide how many
+    slices each view gets, at the reference''s cost.'
+  mechanism: 'data.series_types, sagittal fluid: two views in place of one. First view: spacing 0.5357
+    mm (120 mm), 3 slices, both axes anchored on the image with offset 0, the incumbent''s start.
+    Second view: spacing 0.4167 mm (93.33 mm), 2 slices, both axes anchored on the image with offset
+    0. Each view selects its own slices of the series and has its own spacing, offsets, label-bias
+    row, scale embedding and budget logit, all learned as in the incumbent (data.learn_views unchanged).
+    The type keeps five slices at the start and the study keeps its total. The other five types are
+    unchanged.'
+  precedents:
+  - 'smart-crops, sagittal fluid zoomed to 93 mm: macro +0.0005 and +0.0007, Baker''s cyst -0.0090
+    and -0.0047, MCL -0.0025 to -0.0062 in four runs; a 100 mm width is no compromise (-0.0002, Baker''s
+    cyst -0.0020) (smart-crops/view-effects-by-target.md).'
+  - 'smart-crops, sagittal-fluid-wide-for-bakers: a 120 mm sagittal fluid view added beside the 93
+    mm one and routed to Baker''s cyst by a fixed mask: Baker''s cyst +0.0023, macro -0.0003, 26%
+    more time; the ledger carries routing into this campaign as a learned bias.'
+  - 'smart-crops, extra crops or views in every label''s pool: twelve runs, all ties. Those added
+    tokens to the same slices; here each view draws its own slices from the type''s budget, the views
+    and the split are learned, and the label bias routes.'
+  - 'Build check, 2026-10-02: two views on coronal T1/PD run through the loader and the model on CPU;
+    each view draws its own slices, the study total holds at 26 or 32, and the budget and view gradients
+    are non-zero (docs/ongoing/view-optimisation.md).'
+  novelty: First run with two views of one series type that share the type's slices and are learned;
+    smart-crops added views to the same slices and placed them by hand.
+  coverage: 'Sagittal fluid slices, about 19% of a study''s slices: two of the five start at 93 mm.'
+  exploitation: 'Activation: seven views logged, sagittal_fluid_0 and sagittal_fluid_1, with 3 and
+    2 slices at epoch 0 and a non-zero attention share for both on every label. Read against the reference
+    on macro at x4 and x1; on Baker''s cyst and MCL against ACL, PF OA and the lateral meniscus; on
+    the label bias of the two views (which labels each takes); on whether the two widths stay apart
+    or converge; and on how the budget splits the type between them.'
+  budget: The same 26 slices of 224 px per study as the reference; estimate 1,050-1,150 s, inside
+    822-1,370 s.
+  implementation: 'Configuration only: the views of the sagittal fluid entry of data.series_types
+    in configs/training.yaml. The build already selects slices, places windows, routes and learns
+    the budget per view. Replaces the type''s single view; nothing is added to the code. If accepted,
+    later ideas keep the two views unless they state another view table.'
+  open_choices: The 3 and 2 split at the start, which the learned budget then moves. The second view's
+    starting width is the hand recipe's width for fluid series.
+  dependencies: []
+  priority_rationale: User direction, forced first, 2026-10-02.
+- id: two-views-every-type
+  mechanism_id: two-views-per-type
+  parent_idea_id: null
+  title: 'Two learned views on every series type: the 120 mm centre crop and the hand recipe''s width
+    for the contrast'
+  opportunity: 'The same question as two-views-sagittal-fluid asked of all six types at once: whether
+    a learnable recipe that may keep a wide and a narrow view of each type, and decide by itself how
+    many slices each gets, beats one that must pick a single width per type. In the three learned
+    runs of the build the width of several types ended up to 38 mm apart between runs, which is what
+    a type pulled between two useful widths would look like.'
+  mechanism: 'data.series_types, every type: two views in place of one. First view: spacing 0.5357
+    mm (120 mm), image-centred, the incumbent''s start. Second view: spacing 0.375 mm (84 mm) on the
+    three T1/PD types and 0.4167 mm (93.33 mm) on the three fluid types, image-centred. Slices: 3
+    and 3 on the two axial types, 3 and 2 on the four others, so every type and the study keep their
+    totals. Twelve views, each selecting its own slices and with its own spacing, offsets, label-bias
+    row, scale embedding and budget logit, all learned as in the incumbent (data.learn_views unchanged).'
+  precedents:
+  - 'smart-crops, sagittal fluid zoomed to 93 mm: macro +0.0005 and +0.0007, Baker''s cyst -0.0090
+    and -0.0047, MCL -0.0025 to -0.0062 in four runs; a 100 mm width is no compromise (-0.0002, Baker''s
+    cyst -0.0020) (smart-crops/view-effects-by-target.md).'
+  - 'smart-crops, sagittal-fluid-wide-for-bakers: a 120 mm sagittal fluid view added beside the 93
+    mm one and routed to Baker''s cyst by a fixed mask: Baker''s cyst +0.0023, macro -0.0003, 26%
+    more time; the ledger carries routing into this campaign as a learned bias.'
+  - 'smart-crops, extra crops or views in every label''s pool: twelve runs, all ties. Those added
+    tokens to the same slices; here each view draws its own slices from the type''s budget, the views
+    and the split are learned, and the label bias routes.'
+  - 'Build check, 2026-10-02: two views on coronal T1/PD run through the loader and the model on CPU;
+    each view draws its own slices, the study total holds at 26 or 32, and the budget and view gradients
+    are non-zero (docs/ongoing/view-optimisation.md).'
+  - 'Learned widths from the centre crop, reference and the run before it: axial T1/PD 93 and 108
+    mm, axial fluid 135 and 121 mm, coronal T1/PD 91 and 107 mm, sagittal T1/PD 122 and 105 mm (prior-work.md).'
+  novelty: First run with two learned views on every series type.
+  coverage: 'Every slice of every study: about half start at the narrow width of their contrast.'
+  exploitation: 'Activation: twelve views logged with the starting slices stated and a non-zero attention
+    share for each on every label. Read against the reference and against two-views-sagittal-fluid
+    on macro at x4 and x1; per type, on whether the two widths stay apart, on the budget split, and
+    on which labels the label bias sends to which view.'
+  budget: The same 26 slices of 224 px per study as the reference; estimate 1,050-1,200 s, inside
+    822-1,370 s.
+  implementation: 'Configuration only: the views of the six entries of data.series_types in configs/training.yaml.
+    Replaces every type''s single view; nothing is added to the code. If two-views-sagittal-fluid
+    was accepted, this view table supersedes its.'
+  open_choices: The starting split of each type's slices, which the learned budget then moves. The
+    second views start at the hand recipe's widths; axial types have no hand width under 120 mm, so
+    they take their contrast's.
+  dependencies: []
+  priority_rationale: User direction, forced second, 2026-10-02.
+- id: knee-anchored-learned-offsets
+  mechanism_id: knee-centre
+  parent_idea_id: null
+  title: Every view anchored on the study's knee centre on both axes, with the offsets learned from
+    zero
+  opportunity: 'The recipe places every window on the image centre and learns one shift per view,
+    the same for every study. The hand recipe gained from placing coronal and sagittal windows on
+    each study''s fitted knee centre, which the learned runs from the centre crop cannot reach: a
+    shared shift cannot follow a joint that sits elsewhere in each study. Anchoring on the knee centre
+    gives the per-study part for free and leaves the learned offset to say where each view prefers
+    to look relative to the joint. It is also the control for learned-centre-fit.'
+  mechanism: 'Every view of the incumbent''s data.series_types takes horizontal {anchor: knee, offset_mm:
+    0.0} and vertical {anchor: knee, offset_mm: 0.0}; its spacing_mm and slices stay the incumbent''s.
+    data.learn_views unchanged, so the spacing, both offsets from the knee centre and the slices are
+    learned. A series without trusted geometry falls back to the image centre, per series, as the
+    build does. One window position per series, taken at the series'' middle record, as the build
+    does. Nothing else changes.'
+  precedents:
+  - 'smart-crops: T1/PD at 84 mm and fluid at 93 mm, horizontally on the knee centre (7 mm anterior
+    on sagittal series), adopted at +0.0022 over the 120 mm centre crop, 0.950 public; sagittal windows
+    centred instead of 7 mm forward: -0.0002, PF OA and lateral OA fall back (smart-crops/view-effects-by-target.md).'
+  - Learned from the image centre, the shifts of the reference stay within 6 mm and differ between
+    runs; the hand recipe's knee anchors were not found (prior-work.md).
+  - The knee centre of a study is the point closest to the centre lines of its series (each line runs
+    through the middle of a stack along its normal), every plane weighted equally; over 4,230 accepted
+    studies the lines disagree by 2.93 mm RMS at the median and 8.64 mm at the 95th percentile (docs/data-preparation/accurate-sampling-centers.md).
+  - No run has anchored the vertical axis or the axial views on the knee centre.
+  - 'Build check, 2026-10-02, 40 validation studies with every view knee-anchored on both axes: on
+    a series'' middle slice the window centre sits on the knee centre within 0.0-0.3 mm at the median
+    on both axes in axial, coronal and sagittal series; 17 of 928 trusted slices were clipped; the
+    knee centre lies 3.2-4.1 mm from the image centre at the median and 9.5-12.5 mm at the 95th percentile.
+    In a tilted stack the other slices drift from the knee centre by up to 0.07 mm per mm of depth,
+    because the window is placed once per series (docs/ongoing/view-optimisation.md).'
+  novelty: First learned run on knee anchors, and first use of the knee anchor on the vertical axis
+    and on axial views.
+  coverage: Every window of every series with trusted geometry moves from the image centre to the
+    knee centre, a few millimetres in most studies.
+  exploitation: 'Activation: the share of knee-anchored windows logged per view above 0.9, and the
+    mean and 95th percentile distance between the knee-anchored and the image-centred window centre
+    per view at epoch 0. Read against the reference on macro at x4 and x1, on the share of clipped
+    windows, and on the learned offsets against the hand recipe''s (7 mm forward on sagittal series,
+    10 mm down).'
+  budget: The reference's backbone pixels and loader; estimate 1,050-1,150 s, inside 822-1,370 s.
+  implementation: 'Configuration only: the anchors and offsets of every view in configs/training.yaml.
+    Replaces the incumbent''s image anchors; nothing is added to the code.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: User direction (a learnable centre), forced third as its control, 2026-10-02.
+- id: learned-centre-fit
+  mechanism_id: knee-centre
+  parent_idea_id: knee-anchored-learned-offsets
+  title: The knee centre fit with a learned weight per series type, used for window placement and
+    slice selection
+  opportunity: 'The user asked whether the model can learn the centre (2026-10-02). The centre differs
+    per study, so it cannot be a parameter; what can be learned is the rule that computes it. Today''s
+    rule trusts every plane equally. Where a study''s series disagree, a learned weight per series
+    type lets the model decide whose stack centre marks the joint, from the same inputs the rule uses
+    today. The design removes the two ways this could go wrong: the centre has no free offset, so
+    it cannot take over a view''s preferred shift (that stays in the per-view offsets) and always
+    stays inside what the study''s own series say; and slice selection, which also uses the centre,
+    gives its own gradient, so it is not dragged without feedback.'
+  mechanism: 'Views as in knee-anchored-learned-offsets: every view of the incumbent anchored on the
+    knee centre on both axes, offsets learned from zero. The fit: today the centre is the weighted
+    least-squares point closest to the centre lines of the study''s eligible series of the six series
+    types (per knee in a bilateral study), each series weighted by one over the number of retained
+    series of its plane (data/preprocessing/geometry.py: fit_center, estimate_reference). The loader
+    keeps deciding, with those equal weights, whether the fit is accepted and which series are retained
+    (the plain fit, or the robust refit that drops outliers); those decisions never depend on the
+    learned weights. For a reference of method fit or robust, each retained series'' weight is multiplied
+    by its type''s center_weight and the 3x3 system is solved again; a reference from the sagittal
+    fallbacks, or none, is unchanged and gives no gradient. center_weight is a field of each series
+    type, 1.0 in the recipe, and joins data.learn_views; the six weights are six times the softmax
+    of six logits initialised at the log of the configured values, so the recipe''s values reproduce
+    today''s centre exactly. Two computations of the same centre: the loader computes it in NumPy
+    from the weights it receives through set_loader_state, and uses it wherever it uses the centre
+    today (slice selection and the geometry it ships); the model computes it in torch from the retained
+    series'' lines, which the loader ships (centre point, unit normal, plane, series type), with gradient.
+    Their values agree; only the model''s carries gradient. Window path: on a knee-anchored axis the
+    model subtracts its own centre where the anatomical map now carries the loader''s, so the gradient
+    of the image samples reaches the logits as it reaches the view values. Slice path: every selected
+    slice carries its target depth from the loader''s centre along its plane''s patient axis and its
+    pool''s support intervals from the same centre. The model takes delta, the component along that
+    axis of its centre minus the loader''s (zero in value), shifts the depth and the intervals by
+    minus delta, recomputes the reach and the standard deviation, and adds the log-density at the
+    shifted values minus its detached value, zero in the forward pass. The density is the sampler''s
+    own: target depths are drawn along the plane''s patient axis from a Gaussian centred on the knee
+    centre, truncated to the pool''s support intervals, with standard deviation the width fraction
+    times the pool''s reach, the reach being max(min(-lo, hi), 1 mm) over the support measured from
+    the centre (data/preprocessing/sampling.py: target_depths, limiting_reach, interval_log_mass).
+    The term is added to the slice''s existing pooling log-weight (slice_log_weight, the path the
+    slice budget uses), for every selected slice of a physical pool; a local pool gets none. It is
+    not a score-function estimator: the loss is never multiplied by the log-density. One centre: the
+    medial and anterior positions of the meniscus mask, the OA detector regions and the half-knee
+    loss are measured from the model''s centre too; their cut-offs stay hard, with the 10 mm band
+    around the midline, so they follow the centre and give it no gradient. Validation and prediction
+    use the checkpoint''s weights through loader_state.'
+  precedents:
+  - The knee centre of a study is the point closest to the centre lines of its series (each line runs
+    through the middle of a stack along its normal), every plane weighted equally; over 4,230 accepted
+    studies the lines disagree by 2.93 mm RMS at the median and 8.64 mm at the 95th percentile (docs/data-preparation/accurate-sampling-centers.md).
+  - 'The slice budget is learned the same way: a per-slice log-weight that is zero in the forward
+    pass, a shared array the loader reads each epoch, the checkpoint read at prediction (prior-work.md).'
+  - 'smart-crops: five learned or attention placements per series ended within 0.0006 of the rule.
+    None started from the knee centre or was trained by the gradient through the resampling (smart-crops/view-effects-by-target.md).'
+  - 'Reach: the weights can move the centre only within the disagreement of a study''s series, a few
+    millimetres in most studies, so the expected effect is small; that it pays is a guess.'
+  - 'Follow-up left to the researcher: soft cut-offs in the meniscus mask, the OA detector regions
+    and the half-knee loss, so that the medial and lateral labels teach the left-right position of
+    the centre; it changes three mechanisms of the recipe and is not part of this seed.'
+  novelty: First learned centre rule; no earlier run changed how the knee centre is computed by gradient.
+  coverage: 'Every study with an accepted fit (about 96%): the windows of every knee-anchored view
+    and the slices selected in every series.'
+  exploitation: 'Activation: at step 0 and in every validation, the largest distance between the model''s
+    and the loader''s centre below 0.001 mm, and at step 0 the largest distance between the learned
+    and today''s centre below 0.001 mm with the same slices selected as the incumbent; the six weights
+    logged per epoch and at least one more than 0.05 from its start by epoch 3; non-zero gradient
+    on the logits from the window path and from the slice path, logged separately at epoch 0. Log
+    per epoch the mean and 95th percentile distance between the learned and today''s centre over the
+    training studies, the mean shift of the selected slices along each plane''s axis, and the share
+    of valid tokens whose side of the 10 mm midline band differs from today''s centre. Read against
+    knee-anchored-learned-offsets (its control: the same views with today''s centre) and against the
+    reference, on macro at x4 and x1.'
+  budget: A 3x3 solve per study on top of the reference; estimate 1,050-1,200 s, inside 822-1,370
+    s.
+  implementation: 'config.py: center_weight in SeriesTypeConfig and in the literals of data.learn_views.
+    data/dataset.py and data/preprocessing: the weighted fit in NumPy over the retained series, set_loader_state
+    taking the weights, and the batch carrying per study (per knee) the retained lines and per slice
+    the target depth and the pool''s intervals; the anatomical maps shipped so that the model can
+    subtract its centre on a knee-anchored axis. modeling/views.py: the logits, as parameters of the
+    view module so that they take optimizer.view_lr, no weight decay and stay outside gradient clipping
+    like the other view values; modeling/model.py: the torch solve, the placement, the medial and
+    anterior axes and the slice term from the model''s centre, and the weights returned by loader_state.
+    training/lightning.py: the logging. Adds to the incumbent; with center_weight out of data.learn_views
+    the logits take no gradient and the centre is today''s. If knee-anchored-learned-offsets was rejected,
+    this idea carries its anchors as stated above.'
+  open_choices: None on the mechanism (agreed with the user, 2026-10-02). The learning rate is optimizer.view_lr,
+    as for the other view values.
+  dependencies: []
+  priority_rationale: User direction, forced fourth, after its control, 2026-10-02.
+- id: knee-frame-3d-position
+  mechanism_id: knee-frame-position
+  parent_idea_id: learned-centre-fit
+  title: One side-normalized 3D position per token, measured from the learned knee centre, in place
+    of the 1D and 2D position embeddings
+  opportunity: 'The user asked to retake the 3D position encoding now that the centre is learned (2026-10-02).
+    Today a token carries its slice''s position along its own stack (1D) and its position in the canvas
+    (2D): neither says where the token is in the knee, and neither is comparable between planes or
+    between studies whose joint sits elsewhere in the image. Earlier 3D encodings measured from the
+    computed centre were worth about zero. With learned-centre-fit the centre becomes a quantity the
+    model can move, and a position measured from it gives the centre a gradient from every token of
+    every label, a far denser signal than window placement; in return the centre makes the positions
+    one frame shared by the three planes and by all studies.'
+  mechanism: 'The complete recipe of learned-centre-fit (every view anchored on the knee centre on
+    both axes with learned offsets; the centre fit with a learned weight per series type; one centre
+    for window placement, slice selection and the medial, lateral and anterior axes), with one change:
+    position_1d and position_2d are removed and every token takes one 3D position q in mm from the
+    model''s centre: q_x is today''s medial_axis (side times the token''s patient x minus the centre''s),
+    q_y today''s anterior_axis with its sign, and q_z the token''s patient z minus the centre''s,
+    built from the third row of the same patient map; all three from the model''s centre with gradient,
+    so the positions teach the centre weights. The encoder is the earlier run''s: sine and cosine
+    of each coordinate at seven wavelengths from 8 to 512 mm (42 features), linear 42 to 64, GELU,
+    linear 64 to 256, added to the token (outputs/autoresearch/near-misses/experiments/side-normalized-3d-position-20260924T230919Z-02c6579a/source,
+    modeling/spatial_tokens.py). Branches as there: a token whose geometry is trusted and whose side
+    is known (today''s located tokens) takes the full encoding; with trusted geometry and unknown
+    side, y and z are encoded and a learned vector replaces the x features; with untrusted geometry
+    or a study without an accepted fit, a learned unknown-position vector. Under reflection q is unchanged,
+    as medial_axis is today. The scale embedding of the view stays.'
+  precedents:
+  - 'near-misses #6, side-normalized 3D position in place of 1D and 2D, computed centre, ReXNet recipe:
+    +0.0008 hard, -0.0006 soft, PF OA +0.0061; rejected (docs/validation/results/2026-09-25-near-misses-campaign.md;
+    mechanism in autoresearch/campaigns/near-misses/seed-ideas-2.yaml, whose branches and fallbacks
+    this seed keeps).'
+  - 'near-misses #13, the same with each slice''s normal added: -0.0017 hard, +0.0011 soft, PF OA
+    +0.0156.'
+  - The September champion's additive 3D embedding on raw centred coordinates was worth about zero
+    and was removed (S21, same public score without it); a 3D rotary encoding inside a token-attention
+    block lost -0.0015 with the attention change confounded.
+  - All three used the computed centre as a fixed input. None let the position teach the centre.
+  - In this build position_2d is measured in the canvas frame, so with knee-anchored views the same
+    anatomical place has different codes in studies whose joint is off the image centre.
+  novelty: First position encoding measured from a learned centre and giving it gradient.
+  coverage: Every token of every study; the full branch for studies with an accepted fit and a known
+    side.
+  exploitation: 'Activation: the share of tokens on the full, unknown-side and unknown-position branches
+    logged per epoch, with the full branch above 0.9; non-zero gradient on the centre weights from
+    the position path, logged apart from the window and slice paths at epoch 0. Log what learned-centre-fit
+    logs (the weights, the distance between the learned and today''s centre). Read against learned-centre-fit,
+    its exact control, and against the reference, on macro at x4 and x1 and on PF OA, which rose in
+    both earlier 3D runs; and on whether the centre weights move more than in learned-centre-fit.'
+  budget: A small MLP in place of two embeddings; estimate 1,050-1,200 s, inside 822-1,370 s.
+  implementation: modeling/spatial_tokens.py and modeling/model.py; record the change in SPATIAL_TOKEN_IDENTITY.
+    Take the encoder and its branches from the frozen source named in the mechanism and adapt them
+    to this build's tokens; do not redesign them. Removes position_1d and position_2d; no option keeps
+    them. If learned-centre-fit was rejected, take its implementation from its frozen source under
+    outputs/autoresearch/learnable-views/experiments and apply it first.
+  open_choices: None. The wavelengths and the encoder are the earlier run's.
+  dependencies: []
+  priority_rationale: User direction, forced fifth, after its control learned-centre-fit, 2026-10-02.
+exhausted_directions: None yet. The flaws found and fixed while the build was made are listed in prior-work.md
+  and are not directions.
