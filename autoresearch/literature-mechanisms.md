@@ -102,7 +102,7 @@ It fills them from code-computed facts, not prose.
 
 ### 3. Calibration against repeat pairs: keep the rule
 
-**Sources and evidence.** Our rule adopts when Δ ≥ 0.001 and the lower end of the central 80% interval is above zero. That is a one-sided test at about 10% (z ≈ 1.28), a little stricter than the parameter-free Ladder's one-SE step, which works out to about 0.15 ([arXiv 1502.04585](https://arxiv.org/pdf/1502.04585)). So the literature endorses the shape of our rule. What it questions is the width of the interval.
+**Sources and evidence.** Our rule adopted when Δ ≥ 0.001 and the lower end of the central 80% interval is above zero (the 0.001 condition was dropped on 2026-10-02, leaving the interval alone: [protocol](protocol.md#shared-evaluation-and-adoption)). That is a one-sided test at about 10% (z ≈ 1.28), a little stricter than the parameter-free Ladder's one-SE step, which works out to about 0.15 ([arXiv 1502.04585](https://arxiv.org/pdf/1502.04585)). So the literature endorses the shape of our rule. What it questions is the width of the interval.
 
 The paired bootstrap models evaluation-sample noise only. Using the incumbent seed does not cancel training noise once the idea changes the trajectory: any perturbation, down to one bit, produces full run-to-run variance ([arXiv 2103.04514](https://arxiv.org/abs/2103.04514)). Jordan shows seed variance is mostly test-set noise for long, stable training: CIFAR-10 at 64 epochs has 0.15% test-set std against 0.033% distribution-wise. It is not for short or fine-tuning regimes: 0.56% against 0.52% at 4 epochs, and 2.24% against 2.08% for BERT-Large ([arXiv 2304.01910](https://arxiv.org/html/2304.01910)).
 

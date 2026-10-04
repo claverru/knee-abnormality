@@ -1,6 +1,5 @@
 import copy
 import math
-from decimal import Decimal
 from pathlib import Path
 
 from knee_abnormality.autoresearch.campaign.definition import CampaignPolicy
@@ -376,10 +375,6 @@ def verdict(report, macro_bootstrap):
         )
     ):
         return "invalid"
-    gain = Decimal(str(scores["candidate"])) - Decimal(str(scores["reference"]))
-    if (
-        gain >= Decimal(str(ACCEPTANCE_RULE["minimum_gain"]))
-        and adoption_bounds[0] > ACCEPTANCE_RULE["bootstrap_lower_bound_strictly_above"]
-    ):
+    if adoption_bounds[0] > ACCEPTANCE_RULE["bootstrap_lower_bound_strictly_above"]:
         return "provisional_accept"
     return "reject"

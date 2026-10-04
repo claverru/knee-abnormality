@@ -1,5 +1,4 @@
 import json
-from decimal import Decimal
 from pathlib import Path
 
 import numpy as np
@@ -51,7 +50,7 @@ def macro_delta(truth: np.ndarray, reference: np.ndarray, candidate: np.ndarray,
     valid = ((positive > 0) & (positive < counts.sum(axis=1, keepdims=True))).all(axis=1)
     draws = bootstrap_auc(truth, candidate, counts[valid]) - bootstrap_auc(truth, reference, counts[valid])
     low, high = np.percentile(draws, [10, 90])
-    accepted = Decimal(str(point)) >= Decimal(str(ACCEPTANCE_RULE["minimum_gain"])) and low > 0
+    accepted = low > ACCEPTANCE_RULE["bootstrap_lower_bound_strictly_above"]
     return {"delta": point, "low80": float(low), "high80": float(high), "accepted": bool(accepted)}
 
 

@@ -46,7 +46,7 @@ these rules, these rules win.
 def role_prompt(guidance, brief, contract, context):
     return (
         f"{guidance}\n\n{shared_rules()}\n\n{brief}\n\n{contract}\n\n"
-        f"# Assignment\n\n{json.dumps(context, indent=2)}"
+        f"# Assignment\n\n{json.dumps(context, ensure_ascii=False)}"
     )
 
 
