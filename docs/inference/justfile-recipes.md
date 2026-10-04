@@ -50,10 +50,10 @@ rtk proxy uv run --locked just submission-job status --record outputs/submission
 
 ## Runtime and resume behavior
 
-Export uses `outputs/submission/dependencies/kaggle-v170`, Python 3.12 and Linux x86-64 by
+Export uses `outputs/submission/dependencies/kaggle-py313`, Python 3.13 and Linux x86-64 by
 default (`knee_abnormality.kaggle`); `--wheel-dir`, `--target-python` and `--target-platform`
-override them. `prepare-codecs` is a separate one-time download of the pinned codec wheels for
-that runtime and includes no Lightning wheel. It is never invoked automatically by training or
+override them. `prepare-codecs` is a separate one-time download of the pinned offline wheels (the codecs,
+`pydantic-settings` and `python-dotenv`) for that runtime and includes no Lightning wheel. It is never invoked automatically by training or
 submission. Preparing five-fold membership does not train five models; development continues on
 fold 0. Resume requires a new run ID and saved config because training restores the checkpoint
 into a fresh directory, preserving existing run artifacts.
