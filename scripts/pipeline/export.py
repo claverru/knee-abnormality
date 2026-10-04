@@ -36,10 +36,10 @@ from knee_abnormality.inference.checkpoint import (
     validate_checkpoint,
 )
 from knee_abnormality.kaggle import (
-    CODEC_WHEELS,
     KAGGLE_PLATFORM,
     KAGGLE_PYTHON,
     KAGGLE_WHEELS,
+    OFFLINE_WHEELS,
 )
 from knee_abnormality.provenance import git_revision, sha256_file
 
@@ -65,7 +65,7 @@ INFERENCE_DISTRIBUTIONS = (
     "torch",
     "torchvision",
 )
-CODEC_DISTRIBUTIONS = tuple(wheel.split("==")[0] for wheel in CODEC_WHEELS)
+OFFLINE_DISTRIBUTIONS = tuple(wheel.split("==")[0] for wheel in OFFLINE_WHEELS)
 
 
 class ExportCLI(CLISettings):
@@ -80,7 +80,7 @@ class ExportCLI(CLISettings):
     output: Path = Field(description="New bundle directory; must not exist")
     wheel_dir: Path = Field(
         default=KAGGLE_WHEELS,
-        description="Offline wheels to bundle, such as the DICOM codecs from prepare-codecs",
+        description="Offline wheels to bundle, from prepare-codecs",
     )
     target_python: str = Field(
         default=KAGGLE_PYTHON,
@@ -573,12 +573,12 @@ def export_bundle(args: ExportCLI) -> dict:
             requirement.split("==", 1)[0].lower() for requirement in requirements
         }
         unmet = []
-        missing_codecs = [
-            name for name in CODEC_DISTRIBUTIONS if name not in supplied_names
+        missing_wheels = [
+            name for name in OFFLINE_DISTRIBUTIONS if name not in supplied_names
         ]
-        if missing_codecs:
+        if missing_wheels:
             unmet.append(
-                f"Offline codec wheels were not supplied: {', '.join(missing_codecs)}"
+                f"Offline wheels were not supplied: {', '.join(missing_wheels)}"
             )
         manifest = {
             **manifest_checkpoint_fields,

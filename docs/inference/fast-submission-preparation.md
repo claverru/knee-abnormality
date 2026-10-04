@@ -8,8 +8,8 @@ checkpoint directly, reusing the prepared codec wheel directory:
 rtk proxy uv run --locked python -m scripts.pipeline.export \
   --checkpoint outputs/training/overnight-20260914T220805Z-ozsz4qbu/runs/00-baseline/fold_0/best-epoch=09-val_macro_auc=0.89276.ckpt \
   --output outputs/submission/exports/00-baseline-fold0-2x \
-  --wheel-dir outputs/submission/dependencies/kaggle-v170 \
-  --target-python 3.12 --target-platform manylinux_x86_64 \
+  --wheel-dir outputs/submission/dependencies/kaggle-py313 \
+  --target-python 3.13 --target-platform manylinux_x86_64 \
   --image-multiplier 2 --inference-batch-size 4 --inference-num-workers 16
 ```
 
@@ -22,8 +22,9 @@ exported per-GPU batch size and total loader workers, which default to 4 and 16
 (`INFERENCE_BATCH_SIZE`, `INFERENCE_NUM_WORKERS` in `config.py`) with
 [one process per visible GPU](independent-gpu-inference-processes.md). Precision `auto`
 resolves to native CUDA BF16, otherwise CUDA FP16 with fixed 64-image channels-last backbone
-chunks (T4), and FP32 on CPU. The wheel directory contains only the three codecs;
-Kaggle provides `pytorch-lightning`, so no Lightning wheel is uploaded.
+chunks (T4), and FP32 on CPU. The wheel directory contains the three codecs,
+`pydantic-settings` and `python-dotenv`; Kaggle provides `pytorch-lightning`, so no Lightning
+wheel is uploaded.
 
 `manifest.json` records `preparation_seconds`, excluding Python process startup.
 The actual baseline4 2× and 3× v2 exports took **0.64 s** and **0.56 s**

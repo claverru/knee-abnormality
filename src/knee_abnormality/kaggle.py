@@ -4,13 +4,15 @@ from typing import Annotated
 from pydantic import BaseModel, Field, StringConstraints
 
 COMPETITION = "rsna-knee-abnormality-detection"
-KAGGLE_PYTHON = "3.12"
+KAGGLE_PYTHON = "3.13"
 KAGGLE_PLATFORM = "manylinux_x86_64"
-KAGGLE_WHEELS = Path("outputs/submission/dependencies/kaggle-v170")
-CODEC_WHEELS = (
+KAGGLE_WHEELS = Path("outputs/submission/dependencies/kaggle-py313")
+OFFLINE_WHEELS = (
     "pylibjpeg==2.1.0",
     "pylibjpeg-libjpeg==2.4.0",
     "pylibjpeg-openjpeg==2.5.0",
+    "pydantic-settings==2.15.0",
+    "python-dotenv==1.2.3",
 )
 KaggleId = Annotated[
     str, StringConstraints(pattern=r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")

@@ -4,12 +4,12 @@ from pathlib import Path
 from pydantic import Field
 
 from knee_abnormality.cli import CLISettings, describe
-from knee_abnormality.kaggle import CODEC_WHEELS, KAGGLE_PYTHON, KAGGLE_WHEELS
+from knee_abnormality.kaggle import KAGGLE_PYTHON, KAGGLE_WHEELS, OFFLINE_WHEELS
 
 
 class PrepareCodecsCLI(CLISettings):
     model_config = describe(
-        "Download the pinned offline DICOM codec wheels for the Kaggle Python runtime"
+        "Download the pinned offline wheels (DICOM codecs, pydantic-settings) for the Kaggle Python runtime"
     )
 
     output: Path = Field(
@@ -34,7 +34,7 @@ def main() -> None:
             "manylinux2014_x86_64",
             "--dest",
             str(args.output),
-            *CODEC_WHEELS,
+            *OFFLINE_WHEELS,
         ],
         check=True,
     )

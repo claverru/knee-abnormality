@@ -64,7 +64,10 @@ gcr.io/kaggle-gpu-images/python@sha256:37c64f7dd9c54116ecd1bcc88817c5469b8838738
 
 Image metadata identifies Ubuntu 22.04, CUDA toolkit 12.8.1, build date
 2026-06-29, and source commit `fc61d5cda7da39530055bae9bd0e92865f995cd9`.
-Python is 3.12; its exact patch version was not established by this inspection.
+Python is 3.12; its exact patch version was not established by this inspection. The notebook
+image that ran the submissions of 2026-10-03 was on Python 3.13
+([offline wheels](../inference/model-bundle-and-offline-environment.md)); its digest was not
+recorded.
 PyTorch's wheel build is CUDA 12.8 (`cu128`).
 
 Sources: [Kaggle's image repository](https://github.com/Kaggle/docker-python),
