@@ -160,6 +160,50 @@ window on the same slice without halving depth density.
   non-zero value.
 - **Test:** one run against the retrained control at its fold and seed.
 
+## View table and label routing
+
+**Configuration and small-mechanism runs on main's view table, after the learnable-views campaign
+closed without finding a better table by gradient (2026-10-03).** Results behind every item:
+[learnable-views campaign](../validation/results/2026-10-03-learnable-views-campaign.md); the
+view table itself: [current model](../modeling/current-model.md#view-table). Limits as in the
+last two campaigns: no image above 224 px, 26 slices per study, training time within 1.5 times
+the control's.
+
+- **Label bias per slice depth** (measured near miss): one zero-initialised attention offset per
+  view, depth bin and label beside the per-view bias. One run on the campaign's build: ×4
+  +0.0003, 80% [−0.0001, +0.0006], ×1 +0.0003, ten of twelve labels up. Needs porting to main's
+  model; frozen source under
+  `outputs/autoresearch/learnable-views/experiments/hand-views-label-depth-bias-20261003T201145Z-feb0600b/`.
+- **Wider coronal and sagittal sizes, set by hand** (measured lead, weak): the size menu's draws
+  settled on 93 to 120 mm and dropped 70 mm everywhere, and gradient-learned widths settle near
+  110 mm, yet frozen at those widths the model scores like the 120 mm crop. Untested between:
+  T1/PD at 93 mm, coronal fluid at 105 mm.
+- **A balanced batch on widths** (six to eight runs): each run gives every type one of four or
+  five widths, arranged so each type's response curve per label comes out of the batch,
+  including the untried cells. These runs inform; they are not candidates. The width regression
+  (`outputs/analysis/view-regression-20261002/report.md`, refit with
+  `scripts/adhoc/fit_view_width_regression.py`) proposes the combination; confirm it with a
+  rerun, then outside fold 0.
+- **A budget batch:** reallocations at 26 slices from the per-type sensitivity measured on
+  Kaggle (`outputs/analysis/slice-budget-20261002/sensitivity/`). Evidence against: the learned
+  budget moves a quarter of a slice and loses 0.0016 on the hand views.
+- **A view added on top of a type's slices, not carved out of them** (guess): a second
+  sagittal-fluid view and a zoomed patellofemoral axial-fluid view both lost on the slices they
+  took from the first view (−0.0020 and −0.0013), while the zoomed view moved PF OA by +0.0027
+  with the label bias routing it as designed. Untested: the same views with the type's six
+  slices kept, which raises the study's slice total and the run time.
+- **Routing a view to chosen labels** is not built on main: every view's tokens enter every
+  label's pool, and the label bias is the only routing. Checked on CPU only on main: a
+  knee-anchored 100 mm axial view, a second 84 mm sagittal T1/PD view 15 mm above the image
+  centre and a second 120 mm sagittal fluid view of two slices run through the loader and the
+  model.
+- **Carried over from smart-crops, not run:** coronal T1/PD back at 120 mm with sagittal kept
+  at 84 mm, compartment crops routed to the OA labels, the sagittal windows without the 10 mm
+  downward shift (with the sizes pinned, learned shifts dropped most of the coronal 10 mm offset and
+  kept it on sagittal fluid), separate normalisation statistics per pixel size.
+- **Not confirmed outside fold 0:** about 30 view choices have been made on the same 912
+  studies; a second fold or a public submission is the check.
+
 ## Hard-pair mining phase
 
 **One unverified external report; untested here (added 2026-09-25).** Another participant says
@@ -217,6 +261,10 @@ reproduces it.
   front of the knee centre, and
   [per-label crops](../validation/results/2026-09-16-per-label-crops-result.md) moved PF OA by
   +0.0018 against crop224 while trailing `00-baseline` by 0.0028.
+- **Tried once without the gates (2026-10-03):** an 84 mm axial-fluid view 21 mm anterior of the
+  knee centre, taking three of the type's six slices: PF OA +0.0027 (95% [−0.0038, +0.0097]),
+  macro −0.0013 with contusion, MCL and fracture down
+  ([learnable-views campaign](../validation/results/2026-10-03-learnable-views-campaign.md#details-of-the-runs-against-the-hand-reference)).
 
 ## Parked until a specific need
 

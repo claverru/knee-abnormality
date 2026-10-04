@@ -1,0 +1,137 @@
+ideas:
+- id: view-size-menu-uniform
+  mechanism_id: view-size-menu
+  parent_idea_id: null
+  title: Two view slots per coronal and sagittal type, each drawing its size uniformly from a fixed
+    menu at every step, with a label bias per slot and size (measurement)
+  opportunity: 'User seed relayed from the view-building session, 2026-10-03; a user exception to the
+    exclusion of recipes without gradient-learned views, as the hand-views seed was: here no width
+    or shift is set by hand for the result, the run measures which sizes the labels use. Learned widths
+    and shifts do not find the hand zoom: start-from-hand-recipe began at 84/93 mm and ended at 105-119
+    mm on coronal and axial views (x4 0.931728, x1 0.9265, against 0.932627 / 0.9290 for the same
+    views frozen). Working explanation (a guess, medium confidence): the width gradient is local,
+    greedy and weak next to its noise, and the pretrained backbone rewards the scale it already reads,
+    so a free model follows that; narrow-view runs start 0.005-0.007 behind at x1 and finish ahead.
+    The label bias is the one learned quantity that reaches the same table in every run, and it earns
+    its place (label-bias-off -0.0017, 80% interval below zero; hand-views-frozen-with-label-bias
+    x4 0.933307, x1 0.9299). If every size is trained equally, no size has a head start and nothing
+    is chosen greedily; the bias table then says which sizes each label attends to. The only learned
+    runs at the hand recipe''s x1 both had two views on one type (sagittal-fluid-evidence-conditioned-routing
+    0.933143 / 0.9301, sagittal-fluid-ordered-view-widths 0.932908 / 0.9291); two-views-every-type
+    (0.932373 / 0.9253) had widths and shifts still moving, so it does not separate the causes.'
+  mechanism: 'The complete recipe. Axial T1/PD and axial fluid: one view each, 0.5357142857142857 mm
+    (120 mm), 6 slices, both axes anchored on the image with offset 0, as in configs/hand-views.yaml.
+    Coronal T1/PD, coronal fluid, sagittal T1/PD and sagittal fluid: two view slots each, slot 1 with
+    3 slices and slot 2 with 2 slices, both with the anchors and offsets of configs/hand-views.yaml
+    for their type (coronal: horizontal anchor knee with offset 0, vertical anchor image with offset
+    10 mm; sagittal: horizontal anchor knee with offset 7 mm, vertical anchor image with offset 10
+    mm). Each slot has the same menu of five sizes, each 224 px at a spacing on the grid the existing
+    views use: 0.3125 mm (70 mm), 0.375 mm (84 mm), 0.4166666666666667 mm (93.33 mm), 0.46875 mm (105
+    mm) and 0.5357142857142857 mm (120 mm). At every training step each of the eight slots draws
+    one size from its menu, uniformly and independently, from a forked generator, and every study
+    of the batch uses that size for that slot; this holds for the whole run. data.learn_views is empty:
+    no spacing, offset or slice count is learned by gradient, and data.slice_budget_shift is 0.0.
+    Jitter as in the frozen hand recipe (data.affine_augmentation shift_mm 4.0, scale_range 0.95-1.05).
+    The label bias (model.view_label_bias) has one row per view of the axial types and one row per
+    slot and size of the coronal and sagittal types (2 + 8 x 5 = 42 rows by 12 labels), zero-initialised;
+    a window uses the row of its slot and its drawn size. The scale embedding follows the drawn spacing
+    as it follows a view''s spacing today. Validation and prediction are deterministic: each slot
+    uses the size whose bias row has the largest mean over the twelve labels in that checkpoint; while
+    rows are tied (all zero at the start) slot 1 uses its type''s hand size (84 mm for T1/PD, 93.33
+    mm for fluid) and slot 2 uses 120 mm. The chosen sizes are saved with the checkpoint and used unchanged
+    by the final prediction and the Kaggle worker. Everything else is the incumbent''s: ten epochs,
+    batch size 8, 26 slices per study, losses, photometric augmentations, optimizer.'
+  precedents:
+  - 'hand-views-frozen-with-label-bias (this campaign): frozen hand views with the label bias, x4 0.933307,
+    x1 0.9299; frozen source outputs/autoresearch/learnable-views/experiments/hand-views-frozen-with-label-bias-20261003T085657Z-6dd457aa/source
+    (the frozen-view path and its label-bias logging).'
+  - 'two-views-every-type, sagittal-fluid-ordered-view-widths and sagittal-fluid-evidence-conditioned-routing
+    (this campaign): two views per type with slices split 3 + 2; frozen sources under outputs/autoresearch/learnable-views/experiments.'
+  - 'smart-crops campaign (docs/validation/results/2026-10-02-smart-crops-campaign.md): 84 mm T1/PD
+    and 93.33 mm fluid adopted over 120 mm, one run each.'
+  novelty: First run that trains every size equally and reads the preferred sizes from the label bias
+    instead of learning or hand-picking a width.
+  coverage: Every coronal and sagittal series of every study; five sizes per slot.
+  exploitation: 'Activation: the draw frequency of every size in every slot over the first epoch, each
+    between 0.15 and 0.25, and a non-zero largest absolute label-bias value at epoch 0. Log per epoch
+    the full bias table (slot, size, label), the mean bias per slot and size, the size each slot uses
+    in validation, and the attention mass per slot and label. The result is the table: which sizes
+    each label attends to, per slot and type, and whether the two slots of a type prefer different
+    sizes. Read the score against the reference and against hand-views-frozen-with-label-bias at x4
+    and x1; the candidate is a later frozen run on the two preferred sizes per type, which needs the
+    user''s exception. Whether a larger bias means the size helps the label is untested.'
+  budget: 26 slices per study and 224 px inputs as the incumbent; one random draw per slot and step.
+    Estimate 1,000-1,150 s, inside 822-1,370 s.
+  implementation: 'config.py: the size menu per view slot and the draw rule; modeling/views.py and modeling/model.py:
+    the per-step draw, the window spacing of the drawn size, the bias row per slot and size, the evaluation
+    choice saved with the checkpoint; training/lightning.py: the logging; inference/engine.py if the
+    evaluation choice needs it. Take the frozen-view path from the frozen source of hand-views-frozen-with-label-bias
+    and the two-view slice split from the two-view runs named in the precedents, without redesigning
+    them.'
+  open_choices: 'Chosen by the campaign keeper where the relayed idea left placeholders: the menu
+    on the spacing grid of the existing views (70, 84, 93.33, 105, 120 mm) in place of 72/84/93/105/120;
+    the evaluation rule (largest mean bias per slot, hand size and 120 mm while tied); jitter of the
+    frozen hand recipe.'
+  dependencies: []
+  priority_rationale: User seed relayed from the view-building session, 2026-10-03, forced; a measurement.
+- id: view-size-menu-bias-guided
+  mechanism_id: view-size-menu
+  parent_idea_id: view-size-menu-uniform
+  title: The view-size menu with each slot's draws following its label bias after a uniform start,
+    the two slots of a type following the labels each already serves
+  opportunity: 'User seed relayed from the view-building session, 2026-10-03, the user''s preferred
+    form: a candidate in one run. As view-size-menu-uniform, but the draw probability of a size follows
+    its label bias, so training concentrates on the sizes the labels use and the backbone specialises
+    on them. Labels disagree on size (on the hand views fracture, synovitis, contusion and effusion
+    were ahead; Baker''s cyst and PF OA behind), so a plain sum over labels would settle on a compromise;
+    the two slots of a type should end up serving different labels. Guards against early lock-in
+    and self-reinforcement are part of the idea: uniform draws first, a gradual hand-over, and a minimum
+    probability for every size so that a dropped size can return.'
+  mechanism: 'The complete recipe of view-size-menu-uniform (axial at 120 mm with one view; two slots
+    of 3 and 2 slices on every coronal and sagittal type with the hand anchors and offsets; the menu
+    70, 84, 93.33, 105, 120 mm; a label-bias row per slot and size; no width, shift or slice count
+    learned by gradient; jitter 4 mm and 0.95-1.05) with one change: the draw probabilities. They
+    are recomputed once at the start of every epoch and held for the epoch. For a slot k of a type,
+    the weight of a label is the slot''s share of that type''s attention for the label over the previous
+    epoch, share_k(label) / (share_1(label) + share_2(label)), from the attention mass already logged
+    per view and label (0.5 for both slots while no epoch has run): each slot follows the labels it
+    already serves, which are the ones the other slot serves least. The score of a size in slot k
+    is the sum over labels of that weight times the bias of (slot k, size, label). The scores of the
+    five sizes of a slot are standardised (mean 0, standard deviation 1 across the five; all zero
+    when they are equal) and passed through a softmax; the bias-following distribution is 0.05 for
+    every size plus 0.75 times that softmax, so no size ever falls below 0.05. The draw distribution
+    is (1 - h) times uniform plus h times the bias-following distribution, with h = 0 in epochs 0
+    to 2, 1/3 in epoch 3, 2/3 in epoch 4 and 1 from epoch 5 on. Draws stay independent per slot and
+    step, from a forked generator. Validation and prediction are deterministic: each slot uses the
+    size with the largest draw probability of that checkpoint, with the tie rule of view-size-menu-uniform;
+    the probabilities and the chosen sizes are saved with the checkpoint. Nothing is added to the loss.'
+  precedents:
+  - view-size-menu-uniform (this campaign, forced just before this idea) is this recipe with uniform
+    draws throughout; take its implementation from its frozen source under outputs/autoresearch/learnable-views/experiments
+    once it has run, and add the probabilities.
+  - 'hand-views-frozen-with-label-bias (this campaign): x4 0.933307, x1 0.9299; label-bias-off: -0.0017,
+    80% interval below zero.'
+  novelty: First view selection driven by the label bias instead of the image-sample gradient, with
+    the two slots of a type made complementary.
+  coverage: Every coronal and sagittal series of every study.
+  exploitation: 'Activation: uniform draw frequencies (each 0.15-0.25) in epochs 0 to 2, and from epoch
+    5 a largest draw probability above 0.3 in at least one slot, with every size at or above 0.05
+    throughout. Log per epoch the draw probability of every size and slot, the label weights of each
+    slot, the bias table and the size each slot uses in validation, to see whether it locks in early
+    and whether the two slots of a type separate. Ten epochs leave about five on the final distribution.
+    Read against view-size-menu-uniform, its exact control, and against the reference and hand-views-frozen-with-label-bias,
+    at x4 and x1.'
+  budget: As view-size-menu-uniform; the probabilities are recomputed once per epoch. Inside 822-1,370
+    s.
+  implementation: 'The implementation of view-size-menu-uniform from its frozen source, plus modeling/model.py
+    or training/lightning.py for the per-epoch probabilities (label weights from the epoch''s attention
+    mass, scores, floor, hand-over) kept as a buffer saved in the checkpoint, and the logging. If view-size-menu-uniform
+    was blocked, build its recipe as that idea states it first.'
+  open_choices: 'The relayed idea left the complementarity rule and the hand-over undesigned; the campaign
+    keeper chose: label weights from each slot''s own attention share, standardised scores through
+    a softmax, a floor of 0.05 per size, uniform draws for three epochs and a linear hand-over by
+    epoch 5. These are design guesses, not measured settings.'
+  dependencies: []
+  priority_rationale: User seed relayed from the view-building session, 2026-10-03, forced; runs after
+    view-size-menu-uniform.
+exhausted_directions: None. User-ordered additions.

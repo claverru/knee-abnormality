@@ -73,7 +73,9 @@ blocked at review by the harness's dependency gate; one was requeued and run
 (`coronal-t1pd-84-only`). Not run when the user stopped the campaign: its mirror
 (`sagittal-t1pd-84-only`), T1/PD at 93 mm, compartment crops routed to the OA labels, the
 sagittal windows without the downward shift, and separate normalisation statistics per pixel
-size; these move to the [next campaign](../../ongoing/view-optimisation.md).
+size; these moved to the
+[view table backlog](../../backlog/big-bets.md#view-table-and-label-routing); the campaign that
+followed learned the views instead ([learnable views](2026-10-03-learnable-views-campaign.md)).
 
 ## What the runs established
 

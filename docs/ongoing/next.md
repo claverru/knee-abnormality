@@ -38,10 +38,6 @@ Pending:
   ConvNeXt-Tiny and ConvNeXt-Small on the ReXNet-style recipe, fold 0, one run each against the
   ResNet-18 control (`rn18-view-label-bias`, ×4 0.932477). The rules allow pretrained models
   under another licence (section 2.5.a) when reasonably accessible (2.6.b).
-- **Build the learnable view setup** and start its campaign: spacing and shift of each series
-  type's views and the routing of labels to views as learned parameters, every value freezable
-  from the configuration, in a separate worktree off main
-  ([view optimisation](view-optimisation.md)).
 - **Read the slice-budget sensitivity run on Kaggle** when it finishes: per-label AUC with each
   series type's slices halved and doubled, on the S93 model
   (`outputs/analysis/slice-budget-20261002/sensitivity/`).

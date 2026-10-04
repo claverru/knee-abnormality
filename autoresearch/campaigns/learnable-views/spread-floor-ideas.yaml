@@ -1,0 +1,57 @@
+ideas:
+- id: learned-centre-with-slice-spread-widen-only
+  mechanism_id: slice-spread-floor
+  parent_idea_id: learned-centre-with-slice-spread
+  title: The learned-centre-with-slice-spread recipe with each view's learned spread held at or above
+    its starting value, so it may widen but never narrow
+  opportunity: 'Added by the campaign keeper under the user''s standing permission (2026-10-03) for
+    one clear gap. Two runs that learned the slice spread show the same signature. learned-slice-spread:
+    coronal fluid 0.59 to 0.32 and coronal T1/PD 0.60 to 0.24, axial 0.75 to 1.11-1.37; x1 of the
+    selected checkpoint 0.9276 (level with the reference), x4 0.930075 (-0.0024, 80% interval below
+    zero): the step from x1 to x4 gains +0.0025 against +0.0051 for the reference. learned-centre-with-slice-spread:
+    coronal fluid 0.62 to 0.27 and coronal T1/PD 0.64 to 0.23, axial 0.78 to 1.32-1.72; x1 0.9294,
+    the best x1 of the campaign (+0.0020), x4 0.931480 (-0.0010): x1 to x4 gains +0.0021. learned-centre-fit,
+    the same recipe without a learned spread, gains about +0.0044 from x1 to x4. The spread is learned
+    at the training slice count; at x4 the prediction draws four times as many slices from the same
+    distribution, and with the coronal spread squeezed to about a quarter of the stack the extra
+    coronal slices land close together and add little. The narrowing helps x1 and costs the coverage
+    that x4 buys. A floor at the starting spread keeps what the learning found where it widens (axial,
+    sagittal T1/PD) and removes the narrowing.'
+  mechanism: 'The complete recipe of learned-centre-with-slice-spread (six 120 mm knee-anchored views
+    with learned offsets, learned spacing, budgets and centre weights, one learned sigma fraction
+    per view starting at 0.867, one joint truncated-Gaussian density for centre and spread added
+    once to slice pooling) with one change: after every optimizer step each view''s learned sigma
+    fraction is clamped to be at least its starting value, the same projection the build applies
+    to the view spacing after every step. The sigma fractions start at their starting value, so step
+    0 is that recipe exactly; the gradient, the density and everything else are unchanged. A spread
+    held at the floor still receives its gradient; it simply cannot step below it.'
+  precedents:
+  - 'learned-slice-spread and learned-centre-with-slice-spread (this campaign): the numbers in the
+    opportunity. Frozen source of the parent: outputs/autoresearch/learnable-views/experiments/learned-centre-with-slice-spread-20261003T044721Z-a90a30c8/source.'
+  - 'learned-centre-fit (this campaign): the same centre without a learned spread, x4 0.933105 (+0.0006),
+    x1 0.9287.'
+  - The build's projection of view_spacing_mm into data.view_spacing_range_mm after every step (modeling/views.py,
+    project).
+  novelty: First learned spread with a one-sided bound; tests whether the narrowing is what costs
+    the x4 coverage.
+  coverage: Every study and view; the floor binds where the spread would narrow (coronal in both earlier
+    runs).
+  exploitation: 'Activation: per epoch, the share of optimizer steps at which the floor bound at least
+    one view, above zero by the third epoch (logged epoch 2), and every learned sigma fraction at
+    or above its starting value at every logged epoch. Log the sigma fractions per view and per epoch
+    as the parent does. Read against learned-centre-with-slice-spread, its exact control, and against
+    the reference: the x1 to x4 gain (the parent gains +0.0021, the reference +0.0051), the x4 macro,
+    and the coronal labels (MCL, the menisci).'
+  budget: One clamp per step on six values; the parent's time, inside 822-1,370 s.
+  implementation: 'modeling/views.py (or wherever the parent keeps the sigma logits): the clamp to
+    the starting value inside the existing per-step projection; training/lightning.py: the floor-binding
+    share. Take the whole implementation of learned-centre-with-slice-spread from its frozen source
+    named in the precedents and apply it to the incumbent as it was built and reviewed, without redesigning
+    it; then add the floor. No option keeps a two-sided spread.'
+  open_choices: The floor is the starting value 0.867 for every view, the value both earlier runs started
+    from. Whether the x4 cost comes from the coronal narrowing or from the axial widening is not separated
+    by the earlier runs; this run keeps the widening, so a remaining x4 cost would point at the widening.
+  dependencies: []
+  priority_rationale: Campaign keeper, under the user's standing permission for one clear gap (2026-10-03);
+    forced, read with learned-centre-with-slice-spread.
+exhausted_directions: None.

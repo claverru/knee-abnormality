@@ -1,0 +1,49 @@
+ideas:
+- id: hand-start-views-held-early
+  mechanism_id: view-start-schedule
+  parent_idea_id: start-from-hand-recipe
+  title: Start the learned views from the hand recipe and hold them for the first three epochs
+  opportunity: 'User direction relayed from the view-building session, 2026-10-03 (diagnostic). Learned
+    widths and shifts do not find the hand zoom: start-from-hand-recipe began at 84 and 93 mm and
+    its widths ended at 116/119 mm axial, 105/111 mm coronal and 88/95 mm sagittal, with shifts 12
+    to 16 mm from their start on several views; x4 0.931728, x1 0.9265, against 0.932627 and 0.9290
+    for the same views frozen (view-frozen-control). The movement is jumpy in epochs 0 to 4 and stops
+    after epoch 7 when the rate has decayed. Working explanation (a guess, medium confidence): the
+    width gradient is local, greedy and weak next to its noise, and the pretrained backbone rewards
+    the scale it already reads, so early on a free model follows that. views-start-late held the
+    views for three epochs from the 120 mm centre crop and they still spread to 106-126 mm (x4 0.931843,
+    x1 0.9257), but it never started at the hand zoom. This run separates the two readings: if the
+    views stay near 84/93 mm after the hold, the early drift came from the unadapted backbone; if
+    they still wander, the width gradient is noise at any stage.'
+  mechanism: 'The view table of start-from-hand-recipe (configs/hand-views.yaml: axial T1/PD and fluid
+    0.5357 mm on the image centre; coronal T1/PD 0.375 mm and coronal fluid 0.4167 mm, horizontal
+    anchor knee with offset 0, vertical anchor image with offset 10 mm; sagittal T1/PD 0.375 mm and
+    sagittal fluid 0.4167 mm, horizontal anchor knee with offset 7 mm, vertical anchor image with
+    offset 10 mm; slices 6/6/5/5/5/5) with the schedule of views-start-late: the spacing and offsets
+    of every view do not change during epochs 0 to 2 (no optimizer step and no gradient) and are
+    learned as in the incumbent from the start of epoch 3 to the end, at the rate the schedule gives
+    at that point. Stated in full, because the incumbent is now the frozen hand recipe: data.learn_views
+    is [spacing_mm, offset_mm, slices], optimizer.view_lr 0.006, data.slice_budget_shift 0.5, data.affine_augmentation
+    shift_mm 8.0 and scale_range 0.9-1.1, ranges as in start-from-hand-recipe; the label bias stays on.'
+  precedents:
+  - 'start-from-hand-recipe (this campaign): x4 0.931728 (-0.0008), x1 0.9265; frozen source outputs/autoresearch/learnable-views/experiments/start-from-hand-recipe-20261003T014857Z-c4c992ab/source.'
+  - 'views-start-late (this campaign): x4 0.931843 (-0.0006), x1 0.9257; frozen source outputs/autoresearch/learnable-views/experiments/views-start-late-20261003T002905Z-78104d86/source.'
+  - 'view-frozen-control (same views frozen, before the campaign): x4 0.932627, x1 0.9290; hand-views-frozen-with-label-bias
+    (frozen with the label bias): x4 0.933307, x1 0.9299.'
+  novelty: First run that starts at the hand zoom and lets the views move only after the backbone
+    has adapted to it.
+  coverage: Every view of every series type.
+  exploitation: 'Activation: as views-start-late, every view''s spacing and offsets unchanged through
+    epoch 2 (largest absolute change exactly zero) and a non-zero view gradient in epoch 3. Log width
+    and both shifts per view and epoch as usual. The result is the direction and size of the movement
+    after epoch 3: read each view''s width at epochs 3, 5, 7 and 9 against 84/93 mm and against where
+    start-from-hand-recipe ended. Expected score between start-from-hand-recipe and the frozen hand
+    views; read at x4 and x1 against both.'
+  budget: Both parents ran inside the limits at the incumbent's time; inside 822-1,370 s.
+  implementation: 'Take the view table from the frozen source of start-from-hand-recipe and the hold
+    schedule from the frozen source of views-start-late, both named in the precedents, and apply them
+    to the incumbent as they were built and reviewed, without redesigning either.'
+  open_choices: None. Three held epochs, as in views-start-late.
+  dependencies: []
+  priority_rationale: User direction relayed from the view-building session, 2026-10-03; diagnostic.
+exhausted_directions: None.

@@ -7,8 +7,9 @@ in the [campaigns](campaigns/INDEX.md) and the
 ## Current state (2026-09-28)
 
 - **No campaign is running.** Every campaign under `outputs/autoresearch/` is stopped, and the
-  watchdog is stopped. The last one, [plane-specialization](campaigns/plane-specialization/INDEX.md),
-  was stopped by the user on 2026-09-28 and its line closed.
+  watchdog is stopped. The last one, [learnable-views](campaigns/learnable-views/INDEX.md),
+  was stopped by the user on 2026-10-03 and its line closed; it ran from the `view-optimisation`
+  branch's worktree, whose build is not on main.
 - **Main recipe:** `configs/training.yaml` trains on the rebuilt labels `rebuild_state_v2` with
   seed 1533697213 on fold 0 of `all_5fold_scanner_v2`
   ([current model](../docs/modeling/current-model.md)); the evaluation gate in

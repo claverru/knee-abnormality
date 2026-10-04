@@ -1,0 +1,57 @@
+ideas:
+- id: computed-centre-3d-position
+  mechanism_id: knee-frame-position
+  parent_idea_id: knee-frame-3d-position
+  title: One side-normalized 3D position per token from the computed knee centre in place of the 1D
+    and 2D position embeddings, with nothing about the centre learned
+  opportunity: 'User seed, 2026-10-02: the cell missing from the grid of centre and position encoding.
+    The incumbent has the computed centre with the 1D and 2D embeddings; learned-centre-fit has the
+    learned centre with 1D and 2D; knee-frame-3d-position has the learned centre with the 3D position
+    (x4 -0.0004 against the incumbent, a tie, rejected). No run of this campaign has the 3D position
+    without the learned centre, so the effect of the encoding cannot be told from the effect of the
+    centre it is measured from. This run changes the encoding alone.'
+  mechanism: 'The incumbent exactly (views on the image centre with learned spacing, offsets and slices;
+    the knee centre computed by the loader with equal weights per plane, as today; no knee anchors,
+    no centre weights, no learned centre fit) with one change: position_1d and position_2d are removed
+    and every token takes one 3D position q in mm from the loader''s computed centre: q_x is today''s
+    medial_axis (side times the token''s patient x minus the centre''s), q_y today''s anterior_axis
+    with its sign, and q_z the token''s patient z minus the centre''s, built from the third row of
+    the same patient map. The encoder and its branches are those of knee-frame-3d-position: sine
+    and cosine of each coordinate at seven wavelengths from 8 to 512 mm (42 features), linear 42
+    to 64, GELU, linear 64 to 256, added to the token; a token with trusted geometry and a known
+    side takes the full encoding; with trusted geometry and unknown side, y and z are encoded and
+    a learned vector replaces the x features; with untrusted geometry or a study without an accepted
+    fit, a learned unknown-position vector. Under reflection q is unchanged, as medial_axis is today.
+    The scale embedding of the view stays. The centre is an input: it has no parameter and takes
+    no gradient.'
+  precedents:
+  - 'knee-frame-3d-position (this campaign): the same encoding measured from the learned centre, with
+    knee-anchored views: x4 0.932077 against 0.932489, -0.0004, 80% [-0.0019, +0.0010]; x1 0.9270
+    at the last epoch; rejected. Its frozen source holds the encoder: outputs/autoresearch/learnable-views/experiments/knee-frame-3d-position-20261002T204955Z-1592c25c/source,
+    modeling/spatial_tokens.py and modeling/model.py.'
+  - 'near-misses #6, side-normalized 3D position in place of 1D and 2D, computed centre, ReXNet recipe:
+    +0.0008 hard, -0.0006 soft, PF OA +0.0061; rejected (docs/validation/results/2026-09-25-near-misses-campaign.md).'
+  - 'near-misses #13, the same with each slice''s normal added: -0.0017 hard, +0.0011 soft, PF OA
+    +0.0156.'
+  - The September champion's additive 3D embedding on raw centred coordinates was worth about zero
+    and was removed (S21, same public score without it).
+  novelty: First 3D position on the learnable recipe with the computed centre; separates the encoding
+    from the learned centre and the knee anchors of knee-frame-3d-position.
+  coverage: Every token of every study; the full branch for studies with an accepted fit and a known
+    side.
+  exploitation: 'Activation: the share of tokens on the full, unknown-side and unknown-position branches
+    logged per epoch, with the full branch above 0.9. Read against the incumbent, its exact control,
+    and against knee-frame-3d-position and learned-centre-fit, on macro at x4 and x1 and on PF OA,
+    which rose in the earlier 3D runs.'
+  budget: A small MLP in place of two embeddings; the incumbent's time, estimate 1,000-1,150 s, inside
+    822-1,370 s.
+  implementation: 'modeling/spatial_tokens.py and modeling/model.py; record the change in SPATIAL_TOKEN_IDENTITY.
+    Take the encoder and its branches from the frozen source of knee-frame-3d-position named in the
+    precedents and apply them to the incumbent without redesigning them, feeding them the loader''s
+    computed centre in place of the model''s learned one. Take nothing else from that source: no
+    centre weights, no torch centre solve, no knee anchors, no slice-density term, no change to loader_state.
+    Removes position_1d and position_2d; no option keeps them.'
+  open_choices: None. The wavelengths, the encoder and its branches are knee-frame-3d-position's.
+  dependencies: []
+  priority_rationale: User seed, 2026-10-02, forced; read with learned-centre-fit and knee-frame-3d-position.
+exhausted_directions: None. User-ordered addition to the forced seeds.

@@ -1,0 +1,61 @@
+ideas:
+- id: oa-detector-3d-with-sagittal-evidence-routing
+  mechanism_id: combination-oa-detector-3d-sagittal-routing
+  parent_idea_id: knee-frame-3d-position-first-order-oa-detector
+  title: Combine the first-order OA detector on the 3D knee-frame recipe with the ordered sagittal-fluid
+    pair and its evidence-conditioned routing
+  opportunity: 'User direction, 2026-10-03, after a keeper analysis of the near-winners. The two best
+    x4 runs of the campaign move different labels and change different parts of the model. knee-frame-3d-position-first-order-oa-detector
+    (x4 0.933443, +0.0010, 80% [-0.0004, +0.0023]) gains MCL +8.5, Baker''s +5.7, fracture +3.1 (x1e-3);
+    sagittal-fluid-evidence-conditioned-routing (x4 0.933143, +0.0007, 80% [-0.0006, +0.0019], x1
+    0.9301, the best x1 of the campaign) gains lateral meniscus +5.6, synovitis +5.9, contusion +2.3
+    and loses ACL -7.8. Their per-label delta profiles correlate 0.25, the lowest among the top runs,
+    while the learned centre, the photometric run and these two otherwise correlate 0.65-0.82. Averaging
+    their saved predictions gives x4 0.934772, +0.0013 over the better member, the best of fifteen
+    pairs; averaging the reference with any one of them gains +0.0005 to +0.0010, so the pair beats
+    that yardstick by about 0.0004 on one fold. A prediction average shows complementary information,
+    not that one model can hold both gains; this run tests that.'
+  mechanism: 'The complete recipe of knee-frame-3d-position-first-order-oa-detector (every view anchored
+    on the knee centre on both axes with learned offsets; the centre fit with a learned weight per
+    series type; one 3D position per token from the learned centre in place of position_1d and position_2d;
+    the OA detector with a zero-initialised readout and a positive gain exp(log_gain)), with one addition
+    taken from sagittal-fluid-evidence-conditioned-routing as it was built: sagittal fluid becomes
+    the ordered pair, a context view starting at 120 mm with 3 slices and a detail view starting at
+    93.333 mm with 2 slices, the detail width parameterised as 70 + (W - 70) sigmoid(g) of the learned
+    context width W so that it cannot exceed it; both views of the pair are knee-anchored with zero
+    starting offsets like every other view; and the evidence-conditioned routing adds to the attention
+    scores a shared label map W_r(h_v - mean over the views of the same type of h), with h_v the average
+    of a view''s encoded valid tokens and W_r initialised to zero, so a single-view type receives
+    no correction. Ownership: the learned centre owns the anchors of every window, the sagittal-fluid
+    pair included, and the token positions; the ordered-width parameterisation owns the two sagittal-fluid
+    widths; the routing owns the per-study label correction of the attention; the OA detector owns
+    the OA logit correction. Nothing else changes; the slices are 6/6/5/5/5 with sagittal fluid split
+    3 + 2.'
+  precedents:
+  - 'knee-frame-3d-position-first-order-oa-detector (this campaign): frozen source outputs/autoresearch/learnable-views/experiments/knee-frame-3d-position-first-order-oa-detector-20261002T232337Z-2116c5a3/source.'
+  - 'sagittal-fluid-evidence-conditioned-routing (this campaign): frozen source outputs/autoresearch/learnable-views/experiments/sagittal-fluid-evidence-conditioned-routing-20261003T042713Z-47715dc0/source;
+    it builds on sagittal-fluid-ordered-view-widths (outputs/autoresearch/learnable-views/experiments/sagittal-fluid-ordered-view-widths-20261003T032607Z-fd1843b9/source).'
+  - 'The ordered sagittal pair costs ACL in all three runs that used it (-0.0078, -0.0078, -0.0064,
+    95% intervals below zero); the two unordered two-view seeds lost about -0.003.'
+  novelty: First combination of two decided mechanisms of this campaign that act on different labels
+    and different components.
+  coverage: Every study; the routing acts where a study has both sagittal-fluid views, the detector
+    on the OA regions.
+  exploitation: 'Activation: the detector''s, the routing''s and the centre''s signatures from their
+    parent runs (the detector''s correction spread at least 0.05 for medial and lateral by the third
+    epoch, the routing''s correction variation across studies above zero at epoch 0, a non-zero centre-weight
+    gradient at epoch 0), and at step 0 the same slices and windows as the base recipe with the sagittal-fluid
+    pair in place. Read against both parents and the reference, at x4 and x1, per label: whether
+    MCL, Baker''s and fracture (detector run) and lateral meniscus, synovitis and contusion (routing
+    run) are kept together, and whether ACL is lost again.'
+  budget: Both parents ran inside the limits; one more view and the routing map; estimate 1,100-1,300
+    s, inside 822-1,370 s.
+  implementation: 'Take the whole implementation of knee-frame-3d-position-first-order-oa-detector
+    from its frozen source and apply it to the incumbent as it was built and reviewed; then add the
+    sagittal-fluid ordered pair and the evidence-conditioned routing from the frozen source of sagittal-fluid-evidence-conditioned-routing,
+    without redesigning either; anchor the pair on the knee centre as every other view of the base.
+    State the complete view table in configs/training.yaml.'
+  open_choices: None beyond the anchoring of the sagittal-fluid pair, which follows the base recipe.
+  dependencies: []
+  priority_rationale: User direction, 2026-10-03, forced; queued after the researcher's current ideas.
+exhausted_directions: None.

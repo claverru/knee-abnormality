@@ -1,0 +1,128 @@
+ideas:
+- id: hand-views-training-randomness
+  mechanism_id: hand-views-training-randomness
+  parent_idea_id: hand-views-frozen-with-label-bias
+  title: The hand views with the learned recipe's training randomness (wide jitter, random slice counts)
+    and nothing learned
+  opportunity: 'Campaign keeper''s seed, queued at the user''s request, 2026-10-03; a user exception
+    to the frozen-view exclusion, as the reference had. Measured: the incumbent gains +0.0034 from x1
+    to x4 (0.929876 to 0.933307), like the earlier frozen runs (+0.0032 to +0.0036), while the learned
+    recipe gains +0.0051 (0.927404 to 0.932489; +0.0052 and +0.0054 in the two learned runs before
+    the campaign). When the learned recipe''s jitter was narrowed (normal-jitter) its gain fell to about
+    +0.0041 with x1 unchanged, and its final views frozen with narrow jitter gain +0.0044. Guess, medium
+    confidence: the wide jitter and the random slice counts per type are what make a model profit from
+    the extra slices at x4. If the hand views kept their x1 and got the learned recipe''s gain, x4
+    would be near 0.935. Known risk: the same randomness may cost x1 (the learned runs sit about 0.002
+    lower there), so the net may be only +0.0005 to +0.0010.'
+  mechanism: 'The incumbent (the hand views frozen, label bias on, data.learn_views empty) with its
+    training randomness replaced by the learned recipe''s, and nothing learned. data.affine_augmentation
+    shift_mm 8.0 and scale_range 0.9-1.1 in place of 4.0 and 0.95-1.05. Slice counts: in training
+    the configured shares 6/6/5/5/5/5 go through the learned recipe''s randomisation, data.slice_budget_shift
+    0.5 of share moved between two random present views and then random rounding with the study total
+    fixed, although no budget logit is learned; validation and prediction use the configured counts
+    by largest remainder, as today. Spacing, offsets and the budget shares take no gradient.'
+  precedents:
+  - 'The x1-to-x4 gains quoted in the opportunity: the incumbent, the reference run views-budget-shift-centre,
+    normal-jitter and frozen-learned-views-run4 (prior-work.md and the campaign''s results).'
+  - 'normal-jitter (this campaign): the learned recipe at 4 mm and 0.95-1.05, x4 0.931724 (-0.0008),
+    x1 level.'
+  novelty: First run that puts the learned recipe's randomness on frozen hand views.
+  coverage: Every study and view in training.
+  exploitation: 'Activation: the share of training studies whose slice counts differ from the configured
+    ones, logged per epoch and above 0.2 at epoch 0, and every spacing, offset and share exactly at
+    its configured value at every epoch. Log the realised shift and scale jitter. Read against the
+    incumbent: x4, x1 of the selected checkpoint, and the gain between them (the incumbent''s is +0.0034).'
+  budget: The incumbent's time; inside 822-1,370 s.
+  implementation: 'configs/training.yaml for the jitter and data.slice_budget_shift; data/dataset.py
+    or training/lightning.py so that the training-time share shift and random rounding apply when
+    data.slice_budget_shift is above zero and slices are not learned.'
+  open_choices: 'The values are the learned recipe''s own (8 mm, 0.9-1.1, share shift 0.5); none is
+    tuned.'
+  dependencies: []
+  priority_rationale: Campaign keeper's best bet, queued at the user's request, 2026-10-03.
+- id: hand-views-patellofemoral-axial-zoom
+  mechanism_id: hand-views-axial-zoom
+  parent_idea_id: hand-views-frozen-with-label-bias
+  title: A zoomed second axial-fluid view on the patellofemoral joint beside the 120 mm one
+  opportunity: 'Campaign keeper''s seed, queued at the user''s request, 2026-10-03; a user exception
+    to the frozen-view exclusion. Zooming the coronal and sagittal views (84 mm T1/PD, 93 mm fluid in
+    place of 120 mm) was worth +0.0022 at x4 (80% [+0.0007, +0.0037], smart-crops campaign), the largest
+    view effect measured in this project; the axial views were only ever tried wider (130 and 140 mm,
+    no gain) and never zoomed, because one axial view must also hold Baker''s cyst at the back of the
+    knee. PF OA is the weakest label (about 0.885) with 292 positives, so a gain there is the most
+    likely to register, and patellofemoral cartilage is read on axial fluid-sensitive images. A second
+    view avoids the trade: the wide view keeps the whole knee, the zoomed one puts 1.4 times the resolution
+    on the patella and trochlea, and the label bias routes each label. Guess, low to medium confidence.'
+  mechanism: 'The incumbent with one change: axial fluid gets two views in place of one, 3 slices each.
+    View A is the incumbent''s view, 0.5357142857142857 mm (120 mm), both axes anchored on the image
+    with offset 0. View B is 0.375 mm (84 mm), horizontal anchor knee with offset 0, vertical anchor
+    knee with an offset of 21 mm towards anterior (the direction in which anterior_axis is positive),
+    so that it spans from 21 mm behind the knee centre to 63 mm in front of it. Both views select their
+    own slices with the incumbent''s rule. The label bias has one row per view, A and B included. Nothing
+    is learned but the label bias; data.learn_views stays empty. Everything else is the incumbent''s.'
+  precedents:
+  - 'docs/validation/results/2026-10-02-smart-crops-campaign.md: 84/93 mm against 120 mm, +0.0022;
+    axial at 130 and 140 mm, no gain; known cost of the zoom on Baker''s cyst, -0.0040.'
+  - 'two-views-sagittal-fluid and the sagittal-fluid pairs (this campaign): two views on one type with
+    slices split, the label bias with one row per view; frozen sources under outputs/autoresearch/learnable-views/experiments.'
+  novelty: First zoomed axial view, and first view placed on the patellofemoral joint.
+  coverage: Every study with an axial fluid series.
+  exploitation: 'Activation: a non-zero attention mass on view B at epoch 0, and the share of view-B
+    windows moved to stay inside the stored image logged per epoch (the 21 mm offset is from typical
+    anatomy; a share above 0.3 means the placement is not holding). Log the bias rows of A and B and
+    the attention per label on each. Read against the incumbent at x4 and x1: PF OA first, then medial
+    and lateral OA; Baker''s cyst and effusion, which rely on the wide view and lose three of its six
+    slices.'
+  budget: 26 slices per study as the incumbent; inside 822-1,370 s.
+  implementation: 'configs/training.yaml: the axial-fluid view pair. The two-view table and per-view
+    label bias exist in the build; no source change is expected beyond logging the clipped share
+    per view if it is not already logged.'
+  open_choices: 'The 21 mm anterior offset and the 3 + 3 slice split are the campaign keeper''s choices:
+    the offset from typical knee anatomy (patellar surface about 55 mm in front of the knee centre),
+    not from a measurement on this dataset.'
+  dependencies: []
+  priority_rationale: Campaign keeper's bet, queued at the user's request, 2026-10-03.
+- id: hand-views-label-depth-bias
+  mechanism_id: label-depth-bias
+  parent_idea_id: hand-views-frozen-with-label-bias
+  title: A label bias per view and slice depth beside the label bias per view
+  opportunity: 'Campaign keeper''s seed, queued at the user''s request, 2026-10-03; a user exception
+    to the frozen-view exclusion. The per-view label bias is the only learned quantity that paid in
+    this campaign (label-bias-off -0.0017 with the 80% interval below zero in the learned recipe; +0.0004
+    to +0.0007 on the hand views), and it paid although the tokens already carry the view''s plane
+    and contrast: a direct, zero-initialised prior on the attention was easier to learn than a content-based
+    one. Labels also differ in which slices of a stack matter (the ACL on central sagittal slices, the
+    menisci and the collateral ligaments towards the sides, Baker''s cyst on posterior coronal slices),
+    and the same shortcut may help there. Against it: the 3D-position runs showed that giving the tokens
+    more position information adds nothing. Guess, low to medium confidence.'
+  mechanism: 'The incumbent with one addition: model.view_label_depth_bias, one learned attention
+    offset per view, depth bin and label (6 views by 5 bins by 12 labels), zero-initialised, added to
+    the attention score of every token of a slice beside the per-view label bias. A slice''s bin comes
+    from its target depth from the knee centre along its stack axis, divided by the pool''s reach, with
+    bin edges at the 20th, 40th, 60th and 80th percentiles of the sampling law (the Gaussian of data.sampling_sigma_fraction
+    truncated to the support), so that the five bins hold equal shares of slices. The depth is signed:
+    superior positive on axial stacks, anterior positive on coronal stacks, medial positive on sagittal
+    stacks using the study''s side; a sagittal slice of a study whose side is unknown takes the mean
+    of the two mirrored bins. A slice from a pool without a physical depth takes no depth bias. It
+    trains in the optimizer group of view_label_bias (head rate, no weight decay). At step 0 the outputs
+    equal the incumbent''s. Validation and prediction apply the same rule at x1 and x4.'
+  precedents:
+  - 'hand-views-frozen-with-label-bias (the incumbent) and label-bias-off (this campaign): the per-view
+    label bias and its measured worth.'
+  - 'knee-frame-3d-position, computed-centre-3d-position and knee-frame-3d-position-with-1d-2d (this
+    campaign): token positions from the knee centre, no gain.'
+  novelty: First attention prior per label over the position of a slice in its stack.
+  coverage: Every slice of a physical pool in every study.
+  exploitation: 'Activation: the largest absolute entry of the depth bias above zero at epoch 0, and
+    its mean absolute value per epoch. Log the table per epoch (view, bin, label) and the share of
+    slices per bin. Read against the incumbent at x4 and x1 and per label: ACL, the menisci and MCL
+    first; whether the table has an anatomical pattern (ACL highest in the central sagittal bin).'
+  budget: 360 parameters and one gather per slice; the incumbent's time, inside 822-1,370 s.
+  implementation: 'modeling/model.py: the parameter, the bin of each slice from the target depth and
+    reach the loader already ships with the sampling geometry, the addition to the attention score;
+    data/dataset.py only if the per-slice target depth is not in the batch; training/lightning.py:
+    the optimizer group and the logging; config.py for the option.'
+  open_choices: 'Five equal-share bins and the sign conventions are the campaign keeper''s choices.'
+  dependencies: []
+  priority_rationale: Campaign keeper's bet, queued at the user's request, 2026-10-03.
+exhausted_directions: None.

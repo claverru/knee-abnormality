@@ -1,0 +1,64 @@
+ideas:
+- id: knee-frame-3d-position-ema
+  mechanism_id: weight-averaging-ema
+  parent_idea_id: knee-frame-3d-position
+  title: The knee-frame-3d-position recipe with an EMA of the weights, BatchNorm statistics and learned
+    view values at decay 0.999, through the existing EMA option with no BatchNorm refresh (user seed)
+  opportunity: 'User seed, 2026-10-02: the recipe of knee-frame-3d-position plus EMA, the fast version
+    that averages the BatchNorm statistics with the weights instead of recomputing them. This is
+    a user exception to the weight-averaging exclusion of the contract and of the developer instructions,
+    for this idea only; the researcher still proposes no weight averaging. In this recipe the learned
+    view values, slice budget and centre weights differ between runs and keep moving late in training;
+    an average over the last steps is one model at the mean of those values instead of at wherever
+    the last step left them.'
+  mechanism: 'The complete recipe of knee-frame-3d-position (every view anchored on the knee centre
+    on both axes with learned offsets; the centre fit with a learned weight per series type; one
+    3D position per token from the learned centre in place of position_1d and position_2d) with optimizer.weight_averaging
+    {method: ema, decay: 0.999} through the existing code path: Lightning on_train_batch_end averages
+    every floating-point state tensor after warmup, BatchNorm running means and variances included,
+    and with them the view spacings and offsets, the slice budget logits, the centre logits and the
+    label bias; the averaged model is validated, selected and scored at x4, and the live model gets
+    its diagnostic validation pass. No BatchNorm refresh and no other extra pass over training data.
+    One change the existing path needs on this recipe, because the loader reads learned values: the
+    loader state must come from the model that is evaluated. Today _share_loader_state hands the
+    validation dataset the live model''s loader_state() and on_save_checkpoint saves the live model''s,
+    while validation_step runs the averaged model. Under weight averaging the validation dataset
+    receives the averaged model''s loader_state() and the checkpoint saves the averaged model''s
+    as loader_state, so that epoch validation, the training script''s final prediction (which already
+    reads loader_state() from the loaded, averaged model) and the Kaggle worker (which reads the
+    checkpoint''s loader_state) all use the same slices, budgets and centre. The training dataset
+    keeps the live model''s loader state. The agreement between the model''s and the loader''s centre
+    is checked for the averaged model in validation; the live model''s diagnostic pass runs on the
+    same batches and is exempt from that check. Without weight averaging nothing changes.'
+  precedents:
+  - 'revisits, ema-0999-buffer-average (RadImageNet ResNet-18 recipe, existing option, BatchNorm statistics
+    averaged with the weights, no refresh): -0.0004 at decay 0.999 and -0.0032 at 0.9995, both rejected
+    (docs/validation/results/2026-10-01-revisits-campaign.md). The four earlier EMA runs with a BatchNorm
+    refresh were invalid on runtime; no refresh here.'
+  - 'src/knee_abnormality/training/lightning.py: on_train_batch_end, validation_step, on_save_checkpoint,
+    on_load_checkpoint and _share_loader_state (existing EMA path and loader-state hand-off).'
+  - 'timm ModelEmaV2/V3: buffers averaged with the weights, no refresh.'
+  - Neither earlier EMA run had learned view values, a learned slice budget or a learned centre; this
+    is the first average over them.
+  novelty: First EMA on the learnable recipe, and the first that averages learned view values, budgets
+    and centre weights and evaluates with the averaged loader state.
+  coverage: All studies and labels.
+  exploitation: 'Activation: the largest absolute difference between the averaged and the live model
+    over the view spacings, offsets, budgets and centre weights, logged per epoch, above zero from
+    the first epoch after warmup; and val_center_loader_error_mm of the averaged model at zero. Per-epoch
+    x1 of the averaged and the live model (val_ and val_live_ metrics) and the averaged view values
+    beside the live ones. Read against knee-frame-3d-position, its exact control, and against the
+    reference, at x4 and x1.'
+  budget: The time of knee-frame-3d-position plus the live model's validation pass and the per-step
+    average, about 20 to 40 s over ten epochs; inside 822-1,370 s. No refresh pass.
+  implementation: 'configs/training.yaml: optimizer.weight_averaging {method: ema, decay: 0.999}. training/lightning.py:
+    the loader state of the averaged model for the validation dataset and the checkpoint under weight
+    averaging, the centre check on the averaged model, and the logging. Take the whole implementation
+    of knee-frame-3d-position from its frozen source under outputs/autoresearch/learnable-views/experiments
+    (the attempt that trained) and apply it to the incumbent as it was built and reviewed, without
+    redesigning it; if knee-frame-3d-position is the incumbent, only the changes above remain.'
+  open_choices: None. Decay 0.999 is the better of the two earlier EMA runs.
+  dependencies: []
+  priority_rationale: User seed, 2026-10-02, forced; read with knee-frame-3d-position.
+exhausted_directions: 'EMA with a per-epoch BatchNorm refresh over the training data (revisits: four
+  runs invalid on runtime). Weight averaging stays excluded for research; this is a user seed.'

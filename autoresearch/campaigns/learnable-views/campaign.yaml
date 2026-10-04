@@ -1,0 +1,173 @@
+id: learnable-views
+recipe: configs/training.yaml
+reference_run: outputs/training/views-budget-shift-centre
+reference_equivalences:
+  data.study_slice_total: 26
+  data.learn_views: [spacing_mm, offset_mm, slices]
+reference_config_exceptions:
+  - data.series_types
+  - data.study_triplet_total
+  - model.learn_slice_budget
+reference_identity_exceptions:
+  - preprocessing_identity
+additional_evidence_runs:
+  - outputs/training/views-budget-jitter-centre-v2
+  - outputs/training/view-frozen-control
+  - outputs/training/frozen-learned-views-run4
+backlog:
+  refill_below: 3
+  refill_to: 5
+  seed_order: forced
+  rotate_after: 1000000
+budget:
+  mode: range
+  min_fraction: 0.75
+  max_fraction: 1.25
+policy:
+  editable_files:
+    - configs/training.yaml
+    - src/knee_abnormality/config.py
+    - src/knee_abnormality/data/dataset.py
+    - src/knee_abnormality/training/lightning.py
+    - src/knee_abnormality/inference/engine.py
+  editable_directories:
+    - src/knee_abnormality/modeling
+    - src/knee_abnormality/data/preprocessing
+  config_keys:
+    - data.learn_views
+    - data.sampling_sigma_fraction
+    - data.view_spacing_range_mm
+    - data.view_shift_limit_mm
+    - data.slice_budget_shift
+  config_prefixes:
+    - model
+    - optimizer
+    - data.affine_augmentation
+  list_item_fields:
+    data.series_types: [views, center_weight]
+  input_identity_keys:
+    - preprocessing_identity
+  require_source_change: false
+  configuration_only_ideas: true
+  developer_instructions: >-
+    The incumbent is the learnable recipe in configs/training.yaml: RadImageNet ResNet-18,
+    repeated middle slice, views cut by the model from a 384 px canvas at 0.375 mm. The view
+    table is data.series_types: each of the six series types lists its views, and a view states
+    spacing_mm, slices and, for the horizontal and the vertical axis, an anchor (image or knee)
+    and an offset_mm. A type may list several views; each view selects its own slices of the
+    type, and is one row of the label bias, one scale embedding and one budget logit. The
+    incumbent has one view per type, 0.5357 mm (120 mm) on the image centre, with 6/6/5/5/5/5
+    slices. data.learn_views [spacing_mm, offset_mm, slices] makes those three fields starting
+    values that the model learns (modeling/views.py and the slice budget logits in
+    modeling/model.py; optimizer.view_lr 0.006 for spacing and offsets, no weight decay, outside
+    gradient clipping, clamped after every step to data.view_spacing_range_mm and
+    data.view_shift_limit_mm); a field left out of the list stays at its configured value. The
+    recipe also learns an attention bias per view and label (model.view_label_bias) and moves
+    data.slice_budget_shift 0.5 of share between two views before the random rounding. Every
+    idea applies exactly its own change to the incumbent and keeps everything else: an idea
+    that changes one field applies it to every view the incumbent has at launch, and an idea
+    that states a view table replaces the incumbent's. A quantity that becomes learned
+    reproduces the incumbent exactly at its starting value: the same slices selected and the
+    same windows at step 0, logged as part of the activation signature. The training loader
+    visits every training study once per epoch, which the harness checks; an idea that treats
+    studies differently does so inside the step, never by changing which studies an epoch
+    loads. Three
+    limits bind every idea (contract.md, Limits): the training time stays within 822-1,370 s
+    (the reference takes 1,096 s, about 95 s of training and 10 s of validation per epoch); the
+    configured slices of all views sum to 32 and a study keeps its slice total (26, or the
+    configured sum of its present types when larger), however types and views share it; no
+    backbone input exceeds 224 px on either side. The canvas is not a backbone input and stays
+    384 px at 0.375 mm. Rules of the build that every idea keeps (contract.md, Learnable
+    recipe): the loader ships one middle-slice canvas per selected slice and never reads or
+    decodes a file twice; windows are cut with bicubic sampling and the matched low-pass of
+    modeling/views.py, and their intensity is rescaled per series and view from the window's own
+    quantiles; the gradient of a view value flows only through the image samples, never through
+    token positions or validity; training jitter (data.affine_augmentation shift_mm and
+    scale_range) moves the window placement, with only rotation left in the resampling affine; a
+    window is shifted, never shrunk, to stay inside the stored image; validation and prediction
+    are deterministic, use the learned values of the checkpoint and no jitter; the slice budget
+    reaches the loader through the dataset's shared budgets, is rounded at random with a fixed
+    study total while learned and by largest remainder in evaluation, and its gradient is
+    computed over the views present in the study. A learned quantity lives in the checkpoint as
+    a model parameter with its own optimizer group. A learned quantity the loader needs is
+    returned by the model's loader_state(), which the Lightning module hands to the datasets'
+    set_loader_state every epoch and saves in the checkpoint as loader_state; the training
+    script's final prediction and the Kaggle prediction worker pass it on unchanged, so an idea
+    adds its quantity to loader_state and set_loader_state and needs no script change. The
+    plane, contrast, number and order of the series types do not change; only their views do.
+    Do not touch DICOM decoding, series filtering or cleaning, or the pool building, source
+    ranking, 60 mm radius and 0.5357 mm resolution floor of slice selection; the centre and the
+    spread of the target depths change only where an idea states it. An idea that combines
+    decided experiments names their directories under
+    outputs/autoresearch/learnable-views/experiments: take each mechanism's implementation from
+    the frozen source there and apply it to the incumbent as it was built and reviewed, without
+    redesigning it. Keep ten epochs, batch size 8, the loss terms and their
+    weights, the photometric augmentations and the evaluation untouched. Log per epoch what the
+    build already logs for every view (spacing, width, both shifts, their gradients, the share
+    of clipped windows, the attention per label, the per-view validation AUC) and the budget of
+    every view, plus the idea's own mechanism scalar. The activation signature must show the
+    mechanism acting, never a value merely above zero. If the projected time passes the upper
+    bound, look for duplicate reads, decodes and resamples first, and return blocked rather than
+    cut epochs or slices. New parameters initialize under a forked RNG. No trained model in the
+    loader, no weight averaging. Return prepared or blocked. Use the existing Python environment
+    for static checks. No tests.
+  researcher_instructions: >-
+    Research starts after the fourteen forced seeds and never ends by itself: only the user
+    stops this campaign. Never return an empty refill and never leave the queue below its
+    target; the GPU must not idle. When a family is closed, open another with a new
+    mechanism_id: a combination of decided runs, a variant that changes what the diagnosis
+    names, or a new mechanism inside the campaign's scope. Record exhausted directions as
+    asked, and still propose. The goal is to improve the learnable recipe: a model that learns where and how
+    wide to look and how to share its slices, starting from the 120 mm centre crop. You are free
+    to propose any idea that changes how the views, the label routing or the slice budget are
+    learned, inside three limits (contract.md, Limits): the training time stays within
+    822-1,370 s; a study keeps its slice total; no backbone input exceeds 224 px. The user's
+    named direction is two views on one series type (2026-10-02): which types gain from a
+    second view, where the second view starts, how the type's slices are split and whether the
+    split is learned, how labels are routed between the two, and views that differ by more than
+    width (anchor, offset). The first two seeds open it; follow their results. The user's second
+    direction is the knee centre as a learned rule (seeds three and four): how a study's centre
+    is computed from its series' geometry and types, never a hard-coded bound and never a
+    quantity that could take over a view's own offset, and one centre for everything that uses
+    it; soft cut-offs in the meniscus mask, the OA detector regions and the half-knee loss, so
+    that the medial and lateral labels teach the centre's left-right position, are an open
+    follow-up to seed four; seed five measures every token's position from that centre in
+    3D. The third is the sampling along the stack as a learned quantity (seed six). Combine: every seed changes one thing against the
+    incumbent and one run does not separate 0.002, so most seeds will be rejected by the rule
+    even when their mechanism acts; a rejection is not a dead mechanism. After the seeds the
+    main work is to combine what acted. Keep, from the first refill on, one table of every
+    decided run: what it changed, whether its activation held, its x4 and x1 deltas, the labels
+    it moved and the diagnostics it changed. Propose combinations of mechanisms that act on
+    different labels or different parts of the recipe (for example two views on a type with a
+    spread per view, so that one stays on the joint and the other reaches the edges, routed by
+    the label bias; knee anchors under two views; the learned centre under a learned spread),
+    give each combination its own mechanism_id, state its complete recipe, name the decided
+    experiments it draws on with their directories so that the developer reuses their code, and
+    say what the combination should show that its parts did not. A combination needs a stated
+    reason its parts add up; when two mechanisms compete for the same quantity, say which one
+    owns it. Also open: the
+    optimizer of the view values (rate, schedule, warm-up, when they stop moving), the jitter
+    that explores around them, their starting point and ranges, anchors per axis, a learned
+    value per label group or per study instead of per series type, the label bias and other
+    routing, how the budget is learned (the estimator, the spread of slices along the stack),
+    regularisers on the learned values, and estimators other than the gradient through the
+    resampling. Not candidates (contract.md, Excluded): a recipe whose views are set by hand
+    and frozen (data.learn_views empty), and hand sweeps of a width, shift or budget; a frozen
+    run of learned values is a diagnostic the user runs outside the campaign. prior-work.md
+    records every run of the build and the flaws already fixed; propose a mechanism again only
+    with a named reason it should differ. Start every refill from the per-epoch curves and the
+    view columns of every decided run and the reference: where each view ended and when it
+    stopped moving, the gradients, the clipped share, the attention per label, the budgets, and
+    the x1 curve beside the x4 score. Both learned runs so far score 0.002 under the hand recipe
+    at x1 and tie it at x4, the one submitted lost 0.003 on the public set, in line with x1, and
+    its final views frozen from the start score like the plain centre crop, so the learned run's
+    score comes from how it trains more than from where its views end; name the behaviour each
+    proposal targets and say what it should do to the x1 score. One run does not separate
+    differences under about 0.002 macro, and the learned view values differ between runs of the
+    same recipe, so argue from the diagnostics and the per-label pattern as well.
+    Configuration-only ideas are allowed, but every refill carries at least one idea that needs
+    a source change. Estimate each idea's time against the reference (26 inputs of 224 px in
+    1,096 s) and keep it inside the range at ten epochs. Standing rules, not open: no trained
+    model in the loader, no fewer epochs, no ensembling or test-time augmentation, no weight
+    averaging, no reflection-probability changes, no class-balance exponent change, no label
+    changes, no gold weighting, no multi-seed or confirmation runs.

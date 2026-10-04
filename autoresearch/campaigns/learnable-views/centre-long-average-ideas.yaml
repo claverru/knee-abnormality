@@ -1,0 +1,63 @@
+ideas:
+- id: knee-frame-3d-position-centre-long-average
+  mechanism_id: knee-centre-optimizer
+  parent_idea_id: knee-frame-3d-position
+  title: The knee-frame-3d-position recipe with the centre weights stepped on a gradient averaged over
+    about a hundred steps (beta1 0.99 for the centre logits alone)
+  opportunity: 'Follow-up to the audit of knee-frame-3d-position (2026-10-02, requested by the user,
+    who suspected the centre). Measured in that run and in learned-centre-fit: the six centre weights
+    wander instead of converging. Their largest change per epoch follows the learning rate (0.155,
+    0.182, 0.074, 0.156, 0.092, 0.081, 0.073, 0.049, 0.027, 0.006 over the ten epochs), a weight
+    moves by up to 0.16 within one epoch and back in the next (sagittal T1/PD 1.085 to 0.930 during
+    epoch 4), and the two runs agree on one weight only (axial fluid falls in both, to 0.81 and to
+    0.50-0.60) and disagree in sign on the others. An epoch of 437 steps at the rate in force could
+    move a logit by about 2.6 if its gradient were consistent; the weights move by about 0.15, so
+    the steps are mostly noise. The centre itself stays within 0.3-0.5 mm of the computed one on
+    average (p95 0.8-1.1 mm; up to 0.75 and 1.9 mm in learned-centre-fit), so the audit found no
+    sign that the centre moved too much or caused the loss of the epoch-3 lead, which runs without
+    a learned centre show too. What it found is a learned quantity that does not settle: the window
+    path gives about 98% of its gradient norm (0.016-0.026, against 0.0004-0.0006 from the position
+    path and 0.0003-0.0004 from the slice path), and that gradient changes sign from batch to batch.
+    AdamW divides each step by the gradient''s own size, so a noisy gradient still moves a value
+    by about 0.23 of the rate at beta1 0.9. Averaging over about a hundred steps cuts the noise-driven
+    step to about 0.07 of the rate and leaves a consistent gradient, like the one on axial fluid,
+    its full step.'
+  mechanism: 'The complete recipe of knee-frame-3d-position (every view anchored on the knee centre
+    on both axes with learned offsets; the centre fit with a learned weight per series type; one
+    3D position per token from the learned centre in place of position_1d and position_2d) with one
+    change: the centre logits form their own optimizer group with beta1 0.99 in place of 0.9. Their
+    rate (optimizer.view_lr), beta2, schedule, absence of weight decay and exclusion from gradient
+    clipping are unchanged, and so is every other group, the view spacings and offsets included.
+    Nothing else changes: the loader still receives the weights once per epoch.'
+  precedents:
+  - 'knee-frame-3d-position (this campaign): x4 0.932077 against 0.932489, -0.0004, 80% [-0.0019,
+    +0.0010], rejected; its centre diagnostics are quoted above. Frozen source: outputs/autoresearch/learnable-views/experiments/knee-frame-3d-position-20261002T204955Z-1592c25c/source.'
+  - 'learned-centre-fit (this campaign): the same wander with the 1D and 2D embeddings; largest weight
+    change during epoch 4 0.163 (axial fluid 0.695 to 0.533).'
+  - view-optimizer-long-average (forced seed of this campaign, queued) makes the same change to the
+    whole view group of the incumbent, which has no centre weights; this idea applies it to the centre
+    logits alone, so the two do not overlap.
+  novelty: First run that changes how the centre weights are stepped; separates a centre that wanders
+    from a centre that is learned.
+  coverage: Every study with an accepted centre fit; six parameters.
+  exploitation: 'Activation: the beta1 of the centre group read back from the optimizer and logged
+    (0.99), with a non-zero centre-logit gradient at epoch 0; and, logged per epoch, the largest absolute
+    change of a centre weight during the epoch, to be read against the values of knee-frame-3d-position
+    quoted in the opportunity. Log what knee-frame-3d-position logs for the centre (the weights, the
+    distance between the learned and the computed centre, the gradient norms of the window, slice
+    and position paths). Read against knee-frame-3d-position, its exact control, and against the
+    reference, at x4 and x1: whether the weights settle, whether they end where the other run''s
+    do, and whether axial fluid still falls.'
+  budget: The time of knee-frame-3d-position; one more optimizer group of six parameters. Inside 822-1,370
+    s.
+  implementation: 'training/lightning.py, build_optimizer: the centre logits in their own group with
+    betas (0.99, optimizer.beta2); one setting, optimizer.center_beta1 (0.99 here; a recipe without
+    learned centre weights has no such group). Take the whole implementation of knee-frame-3d-position
+    from its frozen source named in the precedents and apply it to the incumbent as it was built and
+    reviewed, without redesigning it; then add the group.'
+  open_choices: 0.99, an average over about a hundred steps, a quarter of an epoch; it follows from
+    the noise argument, not from a measured signal-to-noise ratio of the centre gradient.
+  dependencies: []
+  priority_rationale: User direction, 2026-10-02 (an idea from the audit of knee-frame-3d-position),
+    forced; read with knee-frame-3d-position.
+exhausted_directions: None. User-ordered addition to the forced seeds.

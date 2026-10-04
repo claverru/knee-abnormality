@@ -169,9 +169,6 @@ measured outcomes are in the [validation results](../validation/results/INDEX.md
 
 ## Active lines
 
-- [View optimisation](view-optimisation.md): spacing, shift and label routing of each series
-  type's views as learned parameters, with configuration experiments as the fallback; nothing is
-  built yet.
 - [Label rebuild](../public-labels/label-rebuild.md): adopted; its control scored ×4 0.928288 and
   0.944 public (S78).
 - [RadImageNet backbones](radimagenet-backbone.md): the ResNet-18 recipe ties the ReXNet control
@@ -185,6 +182,14 @@ measured outcomes are in the [validation results](../validation/results/INDEX.md
 
 ## Recently closed
 
+- **2026-10-03:** the `learnable-views` autoresearch campaign (view width, shift, label bias and
+  slice budget learned by gradient), stopped by the user after 47 scored runs and no adoption by
+  rule: learned widths drift to about 110 mm and never find the hand 84/93 mm table, which is
+  worth about 0.002; the label bias is the learned recipe's own gain (+0.0017) and is adopted on
+  main with the hand views (S101 0.951); learned budget, shifts, a second view per type and a
+  size menu tie or lose on the hand views; a label bias per slice depth is the nearest miss
+  (+0.0003, 80% [−0.0001, +0.0006]). The learnable build stays on the `view-optimisation` branch
+  ([result](../validation/results/2026-10-03-learnable-views-campaign.md)).
 - **2026-10-02:** the `smart-crops` autoresearch campaign (finer views and crops on the joint),
   stopped by the user after 29 scored runs: coronal and sagittal T1/PD at 84 mm and fluid at
   93.33 mm adopted (+0.0022, 0.950 public as S93); every added view or crop tied; learned

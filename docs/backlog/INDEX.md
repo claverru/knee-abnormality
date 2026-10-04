@@ -7,6 +7,7 @@
 | Comparing AdamP with AdamW on ReXNet | [AdamP optimizer](small-changes.md#adamp-for-rexnet) |
 | Adapting acquisition features before attention selects evidence | [Plane/contrast-specific feature adapters](small-changes.md#planecontrast-specific-feature-adapters) |
 | Planning larger investigations | [Big bets](big-bets.md) |
+| Choosing view-table runs after the learnable-views campaign: a label bias per slice depth, wider coronal and sagittal sizes, the width batch and regression, a budget batch, views added on top of a type's slices, label routing, the smart-crops leftovers | [View table and label routing](big-bets.md#view-table-and-label-routing) |
 | Reading every slice at 120 mm and again at 140 mm through two streams (paired views; the first attempt's gate kept the second stream off) | [Two views per slice](big-bets.md#two-views-per-slice) |
 | Planning an autoresearch campaign on training-only auxiliary losses and heads (report state, OA attributes, per-view classifiers, pretext tasks) | [Auxiliary-loss campaign](big-bets.md#auxiliary-loss-campaign) |
 | Checking whether PF OA is ranked from correlated findings (effusion, tibiofemoral OA) instead of the patella, and the PF-targeted axial input bet | [Patellofemoral OA evidence](big-bets.md#patellofemoral-oa-evidence) |

@@ -1,0 +1,66 @@
+ideas:
+- id: knee-frame-3d-position-centre-noise
+  mechanism_id: knee-centre-noise
+  parent_idea_id: knee-frame-3d-position
+  title: The knee-frame-3d-position recipe with a random displacement of the knee centre in training,
+    as the origin of the 3D positions and of the medial and anterior axes
+  opportunity: 'User direction, 2026-10-02: every other learned quantity of the recipe is explored
+    with noise in training (the window shift and scale are jittered around the learned offsets and
+    spacings, the slice shares are shifted and rounded at random around the learned budget); the
+    learned centre has none where it matters most. As the anchor of the windows it already inherits
+    the shift jitter, since a knee-anchored window sits at centre plus offset plus jitter. As the
+    origin of the 3D positions and of the medial and anterior axes it is exact in every step: the
+    jitter moves the window and the positions report that move truthfully, so the model always sees
+    positions measured from the fitted centre to the fraction of a millimetre. The fitted centre
+    is itself an estimate: the knee centre lies 3.2 to 4.1 mm from the image centre at the median
+    and 9.5 to 12.5 mm at the 95th percentile (CPU check before the campaign), studies without an
+    accepted fit fall back to coarser rules, and reweighting the series types moves it by 0.3 to
+    0.75 mm on average. A model trained on exact origins has never seen an origin that is off. The
+    audit of knee-frame-3d-position also found that run fitting the training set faster than the
+    reference (training loss 0.002 to 0.004 lower from the first epoch on) with no validation gain.'
+  mechanism: 'The complete recipe of knee-frame-3d-position (every view anchored on the knee centre
+    on both axes with learned offsets; the centre fit with a learned weight per series type; one
+    3D position per token from the learned centre in place of position_1d and position_2d) with one
+    change, in training only: for every study (every knee of a bilateral study) and every step, one
+    displacement d is drawn, uniform in plus or minus 4 mm on each of the three patient axes, and
+    the 3D positions and the medial and anterior axes (the meniscus mask, the OA detector regions
+    and the half-knee loss) are measured from the model''s centre plus d. Window placement and slice
+    selection keep the undisplaced centre, so no window moves and nothing more is clipped; the windows
+    keep their own shift jitter. d is a constant of the step: it takes no gradient and the gradient
+    of the centre weights passes through unchanged. A token on the unknown-side or unknown-position
+    branch keeps its branch. Validation and prediction draw nothing: d is zero. The draw comes from
+    a forked generator so that the training stream of every other random quantity is unchanged.'
+  precedents:
+  - 'knee-frame-3d-position (this campaign): x4 0.932077 against 0.932489, -0.0004, 80% [-0.0019,
+    +0.0010], rejected; exact origins. Frozen source: outputs/autoresearch/learnable-views/experiments/knee-frame-3d-position-20261002T204955Z-1592c25c/source.'
+  - 'The build''s own jitter: data.affine_augmentation shift_mm 8 and scale_range plus or minus 10%
+    on the window placement, and data.slice_budget_shift 0.5 on the slice shares; the earlier learned
+    runs owe their score to how they train more than to where their views end (prior-work.md).'
+  - 'docs/ongoing/view-optimisation.md, knee anchors on both axes, CPU check: the distance between
+    the knee centre and the image centre quoted in the opportunity.'
+  novelty: First noise on the centre as an origin; separates it from window jitter, which moves the
+    image and reports the move in the positions.
+  coverage: Every study with an accepted centre fit, every training step; tokens on the full and the
+    unknown-side branches.
+  exploitation: 'Activation: the mean norm of d over the studies of the epoch, logged in training,
+    between 3 and 5 mm (the mean norm of a uniform draw in plus or minus 4 mm on three axes is about
+    3.8 mm), and exactly zero in validation; the share of tokens whose midline band differs from
+    the undisplaced one, logged in training. Log what knee-frame-3d-position logs for the centre
+    and the positions, and the OA detector''s correction, which stayed near zero in that run. Read
+    against knee-frame-3d-position, its exact control, and against the reference, at x4 and x1, on
+    the gap between training loss and validation, and on the labels that use the axes (the menisci,
+    the OA labels).'
+  budget: One draw per study and step; the time of knee-frame-3d-position, inside 822-1,370 s.
+  implementation: 'modeling/model.py: the displacement added to the centre where the positions and
+    the medial and anterior axes are computed, in training only; one setting, model.center_noise_mm
+    (4.0 here, 0 gives knee-frame-3d-position exactly); training/lightning.py: the logging. Take the
+    whole implementation of knee-frame-3d-position from its frozen source named in the precedents
+    and apply it to the incumbent as it was built and reviewed, without redesigning it; then add
+    the displacement.'
+  open_choices: 4 mm, the median distance between the knee centre and the image centre (3.2 to 4.1
+    mm), so that the noise is as large as the correction the centre typically makes; half the window
+    jitter and a quarter of the token pitch. It follows from that extent, not from a measured error
+    of the centre fit.
+  dependencies: []
+  priority_rationale: User direction, 2026-10-02, forced; read with knee-frame-3d-position.
+exhausted_directions: None. User-ordered addition to the forced seeds.

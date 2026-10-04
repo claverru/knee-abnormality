@@ -1,0 +1,59 @@
+ideas:
+- id: hand-views-frozen-with-label-bias
+  mechanism_id: hand-views-label-bias
+  parent_idea_id: null
+  title: 'The hand views of S93, frozen, with the per-view label bias: the two ingredients that each
+    help, together (user seed)'
+  opportunity: 'User seed, 2026-10-03, and a user exception to the contract''s exclusion of frozen-view
+    recipes, for this idea only; the researcher still proposes no frozen recipe. After 34 decided
+    runs without an adoption, the comparison of the hand recipe with the 28 learned runs shows two
+    gains that have never been in one run. The hand view table is worth about +0.002 when nothing
+    else differs (hand views frozen 0.932627 against the learned final views frozen 0.930609; x1 0.9290
+    against 0.9262), and learning never reproduces it: the learned widths end near 110 to 120 mm in
+    every run and widen again when started on the hand views. The learned recipe''s own gain is the
+    label bias: without it the recipe scores 0.930803, the level of the frozen centre crop. The hand
+    recipe has no label bias; the learned recipe has views no better than the centre crop.'
+  mechanism: 'The complete recipe. The view table of configs/hand-views.yaml replaces the incumbent''s,
+    one view per series type: axial T1/PD and axial fluid 0.5357142857142857 mm, 6 slices each, both
+    axes anchored on the image with offset 0; coronal T1/PD 0.375 mm and coronal fluid 0.4166666666666667
+    mm, 5 slices each, horizontal anchor knee with offset 0, vertical anchor image with offset 10
+    mm; sagittal T1/PD 0.375 mm and sagittal fluid 0.4166666666666667 mm, 5 slices each, horizontal
+    anchor knee with offset 7 mm, vertical anchor image with offset 10 mm. data.learn_views is empty:
+    the spacings, offsets and slices stay at these values for the whole training. data.slice_budget_shift
+    0.0. data.affine_augmentation.shift_mm 4.0 and scale_range [0.95, 1.05], the hand recipe''s jitter.
+    model.view_label_bias stays true and is learned as in the incumbent. Everything else as in the
+    incumbent. This is outputs/training/view-frozen-control with the label bias switched on and nothing
+    else changed.'
+  precedents:
+  - 'view-frozen-control (hand views frozen on this build, no label bias): x4 0.932627, x1 0.9290,
+    1,419 s before the loader fixes; the exact control of this idea. The same recipe on main, fluid-detail-93-replacement:
+    x4 0.932880, x1 0.9293, 0.950 public as S93.'
+  - 'frozen-learned-views-run4 (the reference''s final views frozen, same recipe): x4 0.930609, x1
+    0.9262, 1,008 s.'
+  - 'label-bias-off (this campaign): -0.001686 against the reference, 80% [-0.003002, -0.000400],
+    x1 0.9249.'
+  - 'start-from-hand-recipe (this campaign) is not this test: its views are learned and widen from
+    84 and 93 mm to 105 and 111 mm on the coronal series, and it trains with the 8 mm jitter; -0.000761,
+    x1 0.9265.'
+  - 'Per label at x4, the hand recipe against the 28 learned runs: ahead on fracture, synovitis, contusion,
+    effusion and the lateral meniscus, behind on Baker''s cyst and PF OA, where 24 of 28 learned runs
+    beat it; the label bias of the learned runs is largest on Baker''s cyst (axial fluid +0.10) (docs/ongoing/view-optimisation.md,
+    What separates S93 from the learned recipe).'
+  novelty: First run with the hand view table and the label bias together.
+  coverage: Every window of every study is placed by the hand view table; every token carries the
+    label bias of its view.
+  exploitation: 'Activation: the six logged widths at 120, 120, 84, 93.3, 84 and 93.3 mm and the shifts
+    at their configured values at every epoch, no gradient on the view values or the slice budget,
+    and the largest absolute label bias above 0.03 by the last epoch. Read against view-frozen-control
+    first (the bias alone), then against the reference and the hand recipe on main, on macro at x4
+    and x1, and per label on Baker''s cyst and PF OA (where the hand views trail) and on fracture,
+    synovitis, contusion and effusion (where they lead).'
+  budget: A frozen recipe on this build trains in about 1,000 to 1,100 s; inside 822-1,370 s.
+  implementation: 'Configuration only, in configs/training.yaml: the views of data.series_types as
+    stated, data.learn_views [], data.slice_budget_shift 0.0, and the two values under data.affine_augmentation.
+    No source change. Replaces the incumbent''s view table and switches its view learning off; the
+    label bias and everything outside the view table are kept.'
+  open_choices: None. The values are the recipe in force on main plus the incumbent's label bias.
+  dependencies: []
+  priority_rationale: User seed, forced to the front of the queue, 2026-10-03.
+exhausted_directions: None. A user exception to the frozen-recipe exclusion for this idea only.

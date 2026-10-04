@@ -1,0 +1,74 @@
+ideas:
+- id: knee-frame-3d-position-first-order-oa-detector
+  mechanism_id: oa-detector-start
+  parent_idea_id: knee-frame-3d-position
+  title: The knee-frame-3d-position recipe with the OA detector started first-order (zero-initialised
+    readout, positive gain) so that it engages beside the 3D positions
+  opportunity: 'User direction, 2026-10-03: find out why the OA detector stays dead whenever the 1D
+    and 2D embeddings are replaced by the 3D position, and make it work with the 3D position instead
+    of removing it. Audit (CPU, 64 validation and 48 training studies, the twins learned-centre-fit
+    and knee-frame-3d-position, identical but for the encoding): inputs, region masks, token counts
+    and the detector''s initial weights are the same in both, and at step 0 its scale gets the same
+    strong, consistent push in both, about 95% of it a bias effect (most labels are negative while
+    the pooled evidence is positive on average). The difference is the tokens: with the 3D code the
+    medial and lateral side is linearly readable at initialisation (probe accuracy 0.999, against
+    0.585 with 1D and 2D), so the main head''s attention becomes compartment-selective by itself (Medial
+    OA attention on the medial and lateral regions 0.61/0.10, against 0.43/0.23), the region-pooled
+    evidence stops correlating with what the head gets wrong (+0.03/+0.10/-0.11), and the detector,
+    held at a zero scale whose own gradient is second-order through a random readout, never catches
+    up (correction 0.007/0.001/0.001 at the end, against 0.29/0.27/0.05 in the twin). Where it does
+    engage, it is inverted: the scale ends negative and the pooled evidence ranks OA at AUC 0.19, so
+    it fires on normal tissue, a sign it took from the bias push. A detector whose readout learns
+    first-order from step 0 and whose gain cannot change sign reads the strongest abnormality in
+    each 3D compartment and can race the head instead of losing to it.'
+  mechanism: 'The complete recipe of knee-frame-3d-position (every view anchored on the knee centre
+    on both axes with learned offsets; the centre fit with a learned weight per series type; one
+    3D position per token from the learned centre in place of position_1d and position_2d) with one
+    change to the OA detector: its readout weight (oa_detector, Linear of the token width to 1, no
+    bias) starts at zero instead of the xavier draw, the draw itself still made inside the existing
+    forked-RNG block so that the random stream of every other parameter is unchanged; and oa_detector_scale
+    (three values starting at zero) is replaced by oa_detector_log_gain (three values starting at
+    zero), with correction = pooled_evidence * exp(log_gain), so the gain is positive and starts
+    at one. The evidence, the regions (already the medial, lateral and anterior knee-frame axes from
+    the learned centre) and the logsumexp pooling stay as they are. At step 0 the readout is zero,
+    so the evidence, the pooled evidence and the correction are exactly zero and no gradient reaches
+    the tokens: every other quantity equals knee-frame-3d-position''s; the readout itself gets a first-order
+    gradient, like the head''s. Optimizer groups as today: the readout at the head''s rate with its
+    weight decay, the gain without decay.'
+  precedents:
+  - 'knee-frame-3d-position (this campaign): x4 0.932077 against 0.932489, -0.0004, rejected; detector
+    dead. Frozen source: outputs/autoresearch/learnable-views/experiments/knee-frame-3d-position-20261002T204955Z-1592c25c/source,
+    modeling/model.py lines 193-196 (construction) and about 446-476 (regions, evidence, pooling,
+    correction), training/lightning.py about 620-640 and 805-830 (logging).'
+  - 'computed-centre-3d-position (this campaign): 3D position on the plain incumbent, detector dead
+    again, OA AUCs unchanged; knee-frame-3d-position-with-1d-2d: detector alive beside the 3D code,
+    OA AUCs not better.'
+  - 'Audit numbers quoted in the opportunity: scratchpad audit of 2026-10-03; the live detector of
+    the 1D and 2D twin and the head''s 3D attention look like substitutes (final x4 OA AUC 0.9406/0.9101/0.8867
+    with a live detector, 0.9427/0.9118/0.8896 with a dead one, one run each).'
+  novelty: First detector start that learns first-order and keeps a fixed sign; first run with a live
+    detector over 3D knee-frame regions and 3D-coded tokens.
+  coverage: The three OA labels; every study with tokens in the medial, lateral or patellofemoral region.
+  exploitation: 'Activation: a new per-epoch metric oa_detector_correction_std_{medial,lateral,pf},
+    the spread of the correction across the studies of each batch averaged over the epoch, at least
+    0.05 for medial and lateral at the third epoch (logged epoch 2), and oa_detector_absolute_correction_medial
+    at least 0.09 at that epoch (the twin with 1D and 2D reaches 0.09-0.17 by then; the dead run
+    sits at 0.008/0.001); a constant offset alone cannot pass the spread condition. Log the gains
+    and the readout norm per epoch in place of the scale. Read against knee-frame-3d-position, its
+    exact control, and against the reference, on the three OA labels at x4 and x1 and on macro.'
+  budget: No new layer; under 1% of compute. The time of knee-frame-3d-position, inside 822-1,370 s.
+  implementation: 'modeling/model.py: the zero-initialised readout inside the existing forked-RNG
+    block, oa_detector_log_gain in place of oa_detector_scale, correction = pooled_evidence * exp(log_gain);
+    training/lightning.py: the gain, readout-norm and spread logging in place of the scale''s. Take
+    the whole implementation of knee-frame-3d-position from its frozen source named in the precedents
+    and apply it to the incumbent as it was built and reviewed, without redesigning it; then change
+    the detector. No option keeps the old scale.'
+  open_choices: None. Expected effect on the OA AUCs is about zero (the audit found the live detector
+    and the head's 3D attention to be substitutes and no extra signal in 3D-specific readouts, on
+    64 studies); the run tests whether the two can coexist and whether a correctly signed detector
+    differs from the inverted one.
+  dependencies: []
+  priority_rationale: User direction, 2026-10-03, forced; read with knee-frame-3d-position.
+exhausted_directions: 'Readouts specific to the 3D position (pooling across planes by voxel, a readout
+  conditioned on q, a medial-minus-lateral contrast) showed no extra signal over the current pooling
+  in the audit; 64 studies, underpowered.'
