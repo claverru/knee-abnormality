@@ -1,0 +1,147 @@
+ideas:
+- id: fluid-type-upper-quantile
+  mechanism_id: bright-end-clipping
+  parent_idea_id: loader-upper-quantile-098
+  title: Bright-end quantile 0.98 for the fluid-sensitive series only, 0.995 for the others
+  opportunity: >-
+    Evidence-backed. The two groups want different clipping: the fluid-sensitive series are
+    closest to the pretraining statistics at 0.98 (stem gap 0.031 against 0.162 at 0.995), the
+    other series at 0.995 (0.044 against 0.052 at 0.98). A single loader value has to
+    compromise; a value per series type does not.
+  mechanism: >-
+    data.fluid_upper_quantile 0.98 and data.upper_quantile 0.995 in configs/training.yaml. The
+    loader uses fluid_upper_quantile for the three fluid-sensitive series types and
+    upper_quantile for the other three, in training and prediction.
+  precedents:
+  - 'prior-work.md, Intensity mapping: fluid and non-fluid columns of the loader quantile table.'
+  novelty: Per-series-type intensity scaling has not been tried.
+  coverage: All studies; the three fluid-sensitive series types change, the others are at 0.995.
+  exploitation: >-
+    input_fluid_std about 0.26 and input_other_std about 0.28.
+    The reference run predates these scalars; on the unchanged recipe they are about 0.20
+    (fluid) and 0.28 (other), and every run of this campaign logs them. Then x4 against the incumbent and against both loader-quantile seeds; per-label deltas.
+  budget: Same cost as the incumbent.
+  implementation: >-
+    Configuration only, two values: add "fluid_upper_quantile: 0.98" under data, next to
+    upper_quantile, and set data.upper_quantile to 0.995 whatever the incumbent holds (0.995,
+    0.99 or 0.98), so the run is never identical to the incumbent. Keep model.slice_upper_quantile
+    as the incumbent has it. No Python change.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The measured optimum of each group at once.
+- id: fluid-brightness
+  mechanism_id: fluid-intensity-gain
+  parent_idea_id: null
+  title: Brighten the fluid-sensitive series
+  opportunity: >-
+    Evidence-backed. Multiplying the fluid-sensitive slices by 1.5 brings them the closest to
+    the pretraining statistics of anything measured for that group (stem gap 0.014 against
+    0.180, stem variance 0.84 against 0.41). The same gain on the other series overshoots
+    (stem gap 0.194), so it is applied to the fluid-sensitive series only. Unlike bright-end
+    clipping it also raises the mean, which the fat-suppressed images lack.
+  mechanism: >-
+    model.fluid_brightness: every slice of a fluid-sensitive series is multiplied by this value
+    and clamped to 1, right after scaling to [0, 1] and before augmentation, in training and
+    prediction. Value 1.5 when the incumbent's fluid series are still at loader quantile 0.995
+    with model.slice_upper_quantile null; value 1.2 when an earlier seed already raised their
+    contrast (data.upper_quantile below 0.995, data.fluid_upper_quantile set, or
+    model.slice_upper_quantile set).
+  precedents:
+  - 'prior-work.md, Intensity mapping: brightness x1.5, fluid 0.014 / 0.84, non-fluid 0.194 / 1.28.'
+  novelty: A per-type gain has not been tried.
+  coverage: The three fluid-sensitive series types of every study.
+  exploitation: >-
+    input_fluid_mean and input_fluid_std must rise by close to the gain (a little less, from
+    the clamp at 1) while input_other_mean and input_other_std stay where the earlier runs of this campaign
+    have them (about 0.28 for the std on the unchanged recipe); x4 and
+    per-label deltas.
+  budget: Same cost as the incumbent.
+  implementation: >-
+    Configuration only: set model.fluid_brightness in configs/training.yaml to 1.5 or 1.2 by
+    the rule in the mechanism, and state in the developer report which case applied. No Python
+    change.
+  open_choices: None; the value is fixed by the rule above.
+  dependencies: []
+  priority_rationale: The closest measured match for the fluid group; a different tool from clipping.
+- id: no-bilateral-smoothing
+  mechanism_id: off-distribution-augmentation
+  parent_idea_id: null
+  title: Train without the bilateral smoothing augmentation
+  opportunity: >-
+    Evidence-backed on the measurement, a guess on the score. Bilateral smoothing was adopted
+    on ReXNet-200 with ImageNet weights. On this backbone it is the augmentation that moves the
+    input furthest from the pretraining statistics in the deep layers (late-layer gap 0.077
+    against 0.044 without it, overall 0.052 against 0.037): smoothed slices are something the
+    backbone never saw.
+  mechanism: data.smoothing_augmentation.probability 0.0 (incumbent 0.2). Nothing else changes.
+  precedents:
+  - 'prior-work.md, Our augmentations: bilateral smoothing row.'
+  - 'revisits campaign, ResNet-18 before the normalization fix: removing smoothing did not pass.'
+  novelty: First removal on the corrected input and on this backbone.
+  coverage: 20% of training slices lose the smoothing; validation unchanged.
+  exploitation: >-
+    smoothing_affected_acquisitions must be zero; training loss, x1 per epoch and the gap between
+    training and validation loss against the incumbent (a wider gap means it was regularizing);
+    per-label deltas.
+  budget: Slightly faster than the incumbent; inside the range.
+  implementation: >-
+    Configuration only: set data.smoothing_augmentation.probability to 0.0 in
+    configs/training.yaml and keep spatial_sigma and range_sigma_range as they are. No Python
+    change.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Free; the largest measured late-layer shift among our augmentations.
+- id: no-contrast-mixing
+  mechanism_id: off-distribution-augmentation
+  parent_idea_id: null
+  title: Train without contrast mixing
+  opportunity: >-
+    Evidence-backed on the measurement, a guess on the score. Contrast mixing blends a slice
+    with another series' slice, which lowers its contrast (stem variance 0.58 against 0.66) and
+    raises the stem gap to 0.083 against 0.060: it pushes the input in the direction the
+    contrast seeds try to correct, and a blend of two MRI contrasts is an image the pretraining
+    never contained.
+  mechanism: >-
+    data.contrast_mixing_augmentation.probability 0.0 (incumbent 0.3). Nothing else changes.
+  precedents:
+  - 'prior-work.md, Our augmentations: contrast mixing row.'
+  - 'augmentation campaign: contrast mixing adopted on ReXNet-200 with ImageNet weights.'
+  novelty: First removal on these weights.
+  coverage: 30% of training studies lose the mixing; validation unchanged.
+  exploitation: >-
+    contrast_mixing_studies and contrast_mixing_acquisitions must be zero; input_fluid_std and input_other_std
+    against the incumbent; training and validation loss, x1 per epoch; per-label deltas.
+  budget: Same cost as the incumbent.
+  implementation: >-
+    Configuration only: set data.contrast_mixing_augmentation.probability to 0.0 in
+    configs/training.yaml and keep target_weight_range as it is. No Python change.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Free; acts on the same contrast gap from the augmentation side.
+- id: no-gin
+  mechanism_id: off-distribution-augmentation
+  parent_idea_id: null
+  title: Train without the GIN augmentation
+  opportunity: >-
+    Evidence-backed on the measurement, a guess on the score. GIN passes the slice through a
+    random convolutional network. Under it the frozen pretrained network stops reading the
+    slices as knee MRI (knee-class mass 0.773 against 0.959), the largest loss of any
+    augmentation we use: for 30% of the slices the backbone's knee features are pushed off.
+    GIN was adopted for robustness across sites, so the per-site reading matters here.
+  mechanism: data.gin_augmentation.probability 0.0 (incumbent 0.3). Nothing else changes.
+  precedents:
+  - 'prior-work.md, Our augmentations: GIN row.'
+  - 'revisits campaign, ResNet-18 before the normalization fix: GIN replaced by a much weaker augmentation, -0.0015 on the sites-out split.'
+  novelty: First removal on the corrected input and on this backbone, on the standard fold.
+  coverage: 30% of training slices lose GIN; validation unchanged.
+  exploitation: >-
+    gin_affected_acquisitions must be zero; training and validation loss and x1 per epoch;
+    per-label deltas; x4 against the incumbent.
+  budget: Slightly faster than the incumbent; inside the range.
+  implementation: >-
+    Configuration only: set data.gin_augmentation.probability to 0.0 in configs/training.yaml
+    and keep blend_max as it is. No Python change.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Free; the augmentation that most disturbs what the backbone recognises.
+exhausted_directions: None.

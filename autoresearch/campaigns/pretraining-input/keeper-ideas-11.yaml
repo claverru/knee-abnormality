@@ -1,0 +1,121 @@
+ideas:
+- id: feature-sparsity-penalty
+  mechanism_id: heated-in-one-model
+  parent_idea_id: heated-weights
+  title: L1 penalty on the final feature map, the heated checkpoint's signature trained into the standard weights
+  opportunity: >-
+    Asked by the user on 2026-10-05: the strengths of the heated and of the standard weights in
+    one model, obtained during training, with one checkpoint at prediction. Evidence for the
+    motive: an equal-weight blend of the incumbent and a heated-weights run scores +0.001208
+    over the incumbent on fold 0 although the heated run alone is 0.0022 below it (MCL +0.0040,
+    ACL +0.0031, Lateral Meniscus +0.0023), so the two make different errors; four runs of the
+    heated weights give ligaments, lateral meniscus and contusion up and the OA labels down.
+    The one measured difference between the checkpoints before any training is sparsity: 88%
+    of the heated checkpoint's final features are zero on our slices against 48% for the
+    standard one, at equal linear-probe quality (prior-work.md). A guess: the sparse, strongly
+    firing local detectors are what serves the focal labels. If so the property can be trained
+    into the standard weights directly, without the second checkpoint.
+  mechanism: >-
+    A new option optimizer.feature_sparsity_weight (0.0 off, the incumbent's behaviour). In
+    training the mean of the backbone's final feature map (N x 512 x 7 x 7, after the last
+    ReLU, so the mean is its L1 norm per element) is multiplied by the weight and added to the
+    loss. The run uses 0.05. Prediction is unchanged.
+  precedents:
+  - 'prior-work.md, Mask-trained (heated) weights: 48% against 88% zero final features.'
+  - 'run-notes.md, Equal-weight blends with the incumbent.'
+  novelty: No run has put a pressure on the activations themselves.
+  coverage: All training slices.
+  exploitation: >-
+    feature_zero_share per epoch (about 0.48 at the start on the standard weights; the target
+    is a clear rise toward the heated checkpoint's 0.88) and feature_sparsity_penalty. If the
+    zero share does not move, the weight was too small and the next value is ten times
+    larger; if it passes 0.9 early with x1 behind, ten times smaller. Then x4 against the
+    incumbent; per-label deltas against the heated pattern (MCL, ACL, Lateral Meniscus,
+    Contusion up) and on the two OA labels the heated weights lose.
+  budget: Same cost as the incumbent.
+  implementation: >-
+    Source change, three exact edits, then one configuration value. (1) config.py, the
+    optimizer settings class that holds anchor_alpha_early and anchor_alpha_late: add the field
+    feature_sparsity_weight of type Annotated[float, Field(ge=0, allow_inf_nan=False)] with
+    default 0.0, directly below anchor_alpha_late. (2) modeling/model.py:
+    KneeAbnormalityModel.__init__, below "self.input_statistics = None", add "self.feature_l1 =
+    None" and "self.feature_zero_share = None". In encode_batch, directly after the line "maps
+    = self._encode_images(valid_images, acquisition_index, token_type)", add: if self.training:
+    self.feature_l1 = maps.float().mean(); self.feature_zero_share = (maps ==
+    0).float().mean().detach(). Do not detach feature_l1; it carries the gradient. (3)
+    training/lightning.py, training_step, directly before the block "if
+    self.anchor_parameters:": if self.config.optimizer.feature_sparsity_weight > 0: penalty =
+    self.config.optimizer.feature_sparsity_weight * self.model.feature_l1; loss = loss +
+    penalty; self._log_epoch_metric("feature_sparsity_penalty", penalty, studies). And,
+    unconditionally in the same place, self._log_epoch_metric("feature_zero_share",
+    self.model.feature_zero_share, studies). The variable studies is the study count already
+    defined at the top of training_step. Nothing else in Python. (4) configs/training.yaml:
+    under optimizer, next to anchor_alpha_late, add "feature_sparsity_weight: 0.05".
+    Activation signature: feature_sparsity_penalty > 0 at epoch 0 (logged only when the weight
+    is positive).
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Asked by the user; no second network and no extra compute.
+- id: anchor-toward-heated
+  mechanism_id: heated-in-one-model
+  parent_idea_id: heated-weights
+  title: Standard weights with the L2-SP anchor pointing at the heated checkpoint instead of the starting weights
+  opportunity: >-
+    Asked by the user on 2026-10-05, the same aim as feature-sparsity-penalty: both
+    checkpoints' strengths in one model during training. The recipe already holds the backbone
+    near a reference set of weights (L2-SP, 0.01 on the stem and layer1, 0.001 on the later
+    layers). Today that reference is the starting point, so the pull only limits drift.
+    Pointing it at the heated checkpoint makes the same term a guide: training starts from the
+    standard weights, which are better on the OA labels, and is drawn toward the solution that
+    is better on ligaments, menisci and contusion (blend +0.001208 over the incumbent). A
+    guess; the two checkpoints come from the same pretraining, the heated one continued under
+    the authors' mask.
+  mechanism: >-
+    A new option optimizer.anchor_target_weights with values initial (default, the incumbent's
+    behaviour) and radimagenet_policy. With radimagenet_policy, each anchored backbone
+    parameter's reference is the heated checkpoint's parameter of the same name, multiplied by
+    the ratio of the two parameters' norms (standard over heated), so that the reference has
+    the standard layer's scale (the heated weights are 3.4 times larger overall, which
+    BatchNorm absorbs). The anchor strengths are a tenth of the incumbent's, 0.001 and 0.0001,
+    because the reference now starts far away instead of at distance zero.
+  precedents:
+  - 'run-notes.md, runs 3 and 21 and the blend table: what the heated checkpoint adds.'
+  novelty: The anchor has only ever pointed at the starting weights.
+  coverage: All anchored backbone layers, every step.
+  exploitation: >-
+    anchor_target_distance (the distance between the starting weights and the reference;
+    positive only with this option) and anchor_penalty per epoch (it starts high and should
+    fall as the backbone moves toward the reference; on the incumbent it starts at zero and
+    rises). If the penalty dominates the loss (above 0.3 in epoch 1) the strengths were too
+    large. Then x4 against the incumbent; per-label deltas against the heated pattern and on
+    the OA labels.
+  budget: Same cost as the incumbent.
+  implementation: >-
+    Source change, three exact edits, then three configuration values. (1) config.py, the
+    optimizer settings class, directly below anchor_alpha_late: add the field
+    anchor_target_weights of type Literal["initial", "radimagenet_policy"] with default
+    "initial". (2) training/lightning.py, in the module's __init__, in the loop "for index,
+    (name, parameter) in enumerate(backbone.named_parameters()):" that registers the anchor
+    buffers: before the loop add: targets = radimagenet_state_dict(config.model.backbone,
+    "radimagenet_policy") if settings.anchor_target_weights == "radimagenet_policy" else None;
+    distance = 0.0 (import radimagenet_state_dict from knee_abnormality.modeling.radimagenet).
+    Inside the loop, in the branch "if alpha > 0:", replace the buffer value
+    "parameter.detach().float().clone()" by a variable reference computed just above it:
+    reference = parameter.detach().float().clone(); if targets is not None: heated =
+    targets[name].float().to(reference.device); reference = heated * (reference.norm() /
+    heated.norm().clamp_min(1e-12)); distance += float((parameter.detach().float() -
+    reference).square().sum()). After the loop: self.anchor_target_distance =
+    math.sqrt(distance). The names of backbone.named_parameters() are the keys of the
+    checkpoint state (the model loads it strictly). (3) training/lightning.py,
+    on_train_epoch_end: if self.config.optimizer.anchor_target_weights != "initial", call
+    self._log_epoch_metric("anchor_target_distance", self.anchor_target_distance, 1). Nothing
+    else in Python; the penalty line that uses the buffers stays as it is. (4)
+    configs/training.yaml, under optimizer: add "anchor_target_weights: radimagenet_policy" and
+    set anchor_alpha_early to 0.001 and anchor_alpha_late to 0.0001. model.pretrained_weights
+    stays radimagenet and optimizer.backbone_lr stays as the incumbent has it. Activation
+    signature: anchor_target_distance > 0 at epoch 0 (logged only with this option; zero only
+    if the reference equalled the starting weights).
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Asked by the user; reuses the recipe's own anchor term, no extra compute.
+exhausted_directions: None.

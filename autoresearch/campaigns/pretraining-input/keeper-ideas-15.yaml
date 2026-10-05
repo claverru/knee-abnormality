@@ -1,0 +1,47 @@
+ideas:
+- id: feature-sparsity-penalty-05
+  mechanism_id: heated-in-one-model
+  parent_idea_id: feature-sparsity-penalty
+  title: L1 penalty on the final feature map at weight 0.5, ten times the first run's
+  opportunity: 'Evidence-backed for the setting, a guess for the outcome. feature-sparsity-penalty
+    at weight 0.05 did not make the features sparser in its first three epochs: the penalty was 0.021,
+    0.019, 0.019 beside a training loss near 0.70 and the share of zero final features went 0.459,
+    0.435, 0.436, while the heated checkpoint the penalty imitates sits at 0.88. The mean activation
+    fell by a tenth; the zeros did not rise. The seed fixed the rule beforehand: if the zero share
+    does not move, the next weight is ten times larger. The aim is unchanged, asked by the user on
+    2026-10-05: the heated checkpoint''s strengths (MCL, ACL, Lateral Meniscus, Contusion) trained
+    into the standard weights with one checkpoint at prediction.'
+  mechanism: A new option optimizer.feature_sparsity_weight (0.0 off, the incumbent's behaviour).
+    In training the mean of the backbone's final feature map (N x 512 x 7 x 7, after the last ReLU,
+    so the mean is its L1 norm per element) is multiplied by the weight and added to the loss. The
+    run uses 0.5. Prediction is unchanged.
+  precedents:
+  - run-notes.md, feature-sparsity-penalty at weight 0.05, zero share 0.459 to 0.436 in three epochs.
+  - prior-work.md, Mask-trained (heated) weights, 48% against 88% zero final features.
+  novelty: The penalty has only been run at a weight too small to change the zero share.
+  coverage: All training slices.
+  exploitation: feature_zero_share per epoch against the first run's 0.459, 0.435, 0.436 (a rise above
+    0.6 is the target) and feature_sparsity_penalty (about 0.2 at the start). Then x4 against the
+    incumbent and against the first run; per-label deltas against the heated pattern (MCL, ACL, Lateral
+    Meniscus, Contusion up) and on the two OA labels.
+  budget: Same cost as the incumbent.
+  implementation: 'Source change, three exact edits, then one configuration value. (1) config.py,
+    the optimizer settings class that holds anchor_alpha_early and anchor_alpha_late: add the field
+    feature_sparsity_weight of type Annotated[float, Field(ge=0, allow_inf_nan=False)] with default
+    0.0, directly below anchor_alpha_late. (2) modeling/model.py: KneeAbnormalityModel.__init__, below
+    "self.input_statistics = None", add "self.feature_l1 = None" and "self.feature_zero_share = None".
+    In encode_batch, directly after the line "maps = self._encode_images(valid_images, acquisition_index,
+    token_type)", add: if self.training: self.feature_l1 = maps.float().mean(); self.feature_zero_share
+    = (maps == 0).float().mean().detach(). Do not detach feature_l1; it carries the gradient. (3)
+    training/lightning.py, training_step, directly before the block "if self.anchor_parameters:":
+    if self.config.optimizer.feature_sparsity_weight > 0: penalty = self.config.optimizer.feature_sparsity_weight
+    * self.model.feature_l1; loss = loss + penalty; self._log_epoch_metric("feature_sparsity_penalty",
+    penalty, studies). And, unconditionally in the same place, self._log_epoch_metric("feature_zero_share",
+    self.model.feature_zero_share, studies). The variable studies is the study count already defined
+    at the top of training_step. Nothing else in Python. (4) configs/training.yaml: under optimizer,
+    next to anchor_alpha_late, add "feature_sparsity_weight: 0.5". Activation signature: feature_sparsity_penalty
+    > 0 at epoch 0 (logged only when the weight is positive).'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The value the first run's own rule names.
+exhausted_directions: None.

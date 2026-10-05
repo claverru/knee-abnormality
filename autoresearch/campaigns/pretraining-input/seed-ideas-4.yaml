@@ -1,0 +1,214 @@
+ideas:
+- id: split-knee-bag-loss
+  mechanism_id: union-bag
+  parent_idea_id: union-bag-loss
+  title: Extra loss on chimera knees, the medial half of one study joined to the lateral half of another
+  opportunity: >-
+    A guess, on a mechanism the model already has. Medial and lateral findings co-occur in the
+    same knee (OA above all), so the model can score a side from the other side's evidence. A
+    bag made of the medial half of study A and the lateral half of study B has exactly known
+    side labels, medial from A and lateral from B, and breaks that co-occurrence: half of the
+    pairs carry a finding on one side only, which real knees rarely give. Every token already
+    has its medial-lateral coordinate (the half-knee loss uses it), so the halves are cut in
+    the knee's own frame in every plane.
+  mechanism: >-
+    trainer.split_knee_bag_loss_weight 0.5. In training, the studies of each batch are paired at
+    random (four pairs at batch 8). In each pair, one study keeps only its tokens more than 10
+    mm medial of the midline and the other only its tokens more than 10 mm lateral (the
+    existing COMPARTMENT_MIDLINE_BAND_MM); the kept, already-encoded tokens are pooled as one
+    bag by the model's own pooling. Only the five side labels count: Medial Meniscus,
+    Medial OA and MCL (a medial structure) take the medial donor's label, Lateral Meniscus and
+    Lateral OA the lateral donor's, each when observed in its donor; the other seven labels are
+    left out of this loss (trainer.split_knee_other_labels none, the default). Its
+    class-balanced BCE, times the weight, is added to the loss. A pair in which a donor has no token on its
+    side (a study of unknown knee side) is left whole and not counted. No extra backbone pass;
+    validation and prediction unchanged.
+  precedents:
+  - 'The half-knee loss of the recipe: per-half meniscus scores from the same medial-lateral coordinate.'
+  - 'union-bag-loss: the same pairing with whole studies and OR labels.'
+  novelty: Recombining halves of different knees has not been tried.
+  coverage: Every training study, as one half of one of four bags per batch; five labels.
+  exploitation: >-
+    split_knee_bag_loss, split_knee_bags (expect about 1,600 per epoch: about 1,750 pairs less
+    those with a study of unknown knee side) and split_knee_kept_token_share (about 0.4); the per-label deltas of the five side labels and
+    the medial-lateral crossed-error counts of the validation metrics against the incumbent;
+    x4 and x1.
+  budget: One extra pooling pass per step; same cost as the incumbent within a few percent.
+  implementation: >-
+    Configuration only: set trainer.split_knee_bag_loss_weight to 0.5 in configs/training.yaml
+    and leave trainer.split_knee_other_labels absent (default none).
+    The option is built (KneeModule._chimera_bag_loss in training/lightning.py). Keep every
+    other bag-loss key as the incumbent has it. No Python change.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: A label-exact mix of two studies aimed at the side labels.
+- id: split-knee-bag-average
+  mechanism_id: union-bag
+  parent_idea_id: split-knee-bag-loss
+  title: Chimera knees with the non-side labels averaged over the two donors
+  opportunity: >-
+    A guess, on a mechanism the model already has. Medial and lateral findings co-occur in the
+    same knee (OA above all), so the model can score a side from the other side's evidence. A
+    bag made of the medial half of study A and the lateral half of study B has exactly known
+    side labels, medial from A and lateral from B, and breaks that co-occurrence: half of the
+    pairs carry a finding on one side only, which real knees rarely give. Every token already
+    has its medial-lateral coordinate (the half-knee loss uses it), so the halves are cut in
+    the knee's own frame in every plane.
+  mechanism: >-
+    trainer.split_knee_bag_loss_weight 0.5. In training, the studies of each batch are paired at
+    random (four pairs at batch 8). In each pair, one study keeps only its tokens more than 10
+    mm medial of the midline and the other only its tokens more than 10 mm lateral (the
+    existing COMPARTMENT_MIDLINE_BAND_MM); the kept, already-encoded tokens are pooled as one
+    bag by the model's own pooling. Medial Meniscus, Medial OA and MCL take the medial
+    donor's label, Lateral Meniscus and Lateral OA the lateral donor's, each when observed in
+    its donor; the other seven labels take the average of the two donors' labels, when observed
+    in both, since the bag holds half of each knee (trainer.split_knee_other_labels average).
+    Its class-balanced BCE, times the weight, is added to the loss. A pair in which a donor has no token on its
+    side (a study of unknown knee side) is left whole and not counted. No extra backbone pass;
+    validation and prediction unchanged.
+  precedents:
+  - 'The half-knee loss of the recipe: per-half meniscus scores from the same medial-lateral coordinate.'
+  - 'union-bag-loss: the same pairing with whole studies and OR labels.'
+  novelty: Recombining halves of different knees has not been tried.
+  coverage: Every training study, as one half of one of four bags per batch; all twelve labels.
+  exploitation: >-
+    split_knee_bag_loss, split_knee_bags (expect about 1,600 per epoch: about 1,750 pairs less
+    those with a study of unknown knee side) and split_knee_kept_token_share (about 0.4); the per-label deltas of the five side labels and
+    the medial-lateral crossed-error counts of the validation metrics against the incumbent;
+    x4 and x1.
+  budget: One extra pooling pass per step; same cost as the incumbent within a few percent.
+  implementation: >-
+    Configuration only: set trainer.split_knee_bag_loss_weight to 0.5 and
+    trainer.split_knee_other_labels to average in configs/training.yaml (both keys, whatever
+    the incumbent holds). Report it against the incumbent and against split-knee-bag-loss.
+    The option is built (KneeModule._chimera_bag_loss in training/lightning.py). Keep every
+    other bag-loss key as the incumbent has it. No Python change.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The same chimera training all twelve labels; the pair of runs settles the choice.
+- id: split-knee-bag-or
+  mechanism_id: union-bag
+  parent_idea_id: split-knee-bag-loss
+  title: Chimera knees with the non-side labels as the OR of the two donors
+  opportunity: >-
+    A guess, on a mechanism the model already has. Medial and lateral findings co-occur in the
+    same knee (OA above all), so the model can score a side from the other side's evidence. A
+    bag made of the medial half of study A and the lateral half of study B has exactly known
+    side labels, medial from A and lateral from B, and breaks that co-occurrence: half of the
+    pairs carry a finding on one side only, which real knees rarely give. Every token already
+    has its medial-lateral coordinate (the half-knee loss uses it), so the halves are cut in
+    the knee's own frame in every plane.
+  mechanism: >-
+    trainer.split_knee_bag_loss_weight 0.5. In training, the studies of each batch are paired at
+    random (four pairs at batch 8). In each pair, one study keeps only its tokens more than 10
+    mm medial of the midline and the other only its tokens more than 10 mm lateral (the
+    existing COMPARTMENT_MIDLINE_BAND_MM); the kept, already-encoded tokens are pooled as one
+    bag by the model's own pooling. Medial Meniscus, Medial OA and MCL take the medial
+    donor's label, Lateral Meniscus and Lateral OA the lateral donor's, each when observed in
+    its donor; the other seven labels take the OR of the two donors' labels, 1 - (1 - a)(1 - b),
+    counted when both donors have the label observed or an observed one is positive, as in
+    union-bag-loss (trainer.split_knee_other_labels or). Its class-balanced
+    BCE, times the weight, is added to the loss. A pair in which a donor has no token on its
+    side (a study of unknown knee side) is left whole and not counted. No extra backbone pass;
+    validation and prediction unchanged.
+  precedents:
+  - 'The half-knee loss of the recipe: per-half meniscus scores from the same medial-lateral coordinate.'
+  - 'union-bag-loss: the same pairing with whole studies and OR labels.'
+  novelty: Recombining halves of different knees has not been tried.
+  coverage: Every training study, as one half of one of four bags per batch; all twelve labels.
+  exploitation: >-
+    split_knee_bag_loss, split_knee_bags (expect about 1,600 per epoch: about 1,750 pairs less
+    those with a study of unknown knee side) and split_knee_kept_token_share (about 0.4); the per-label deltas of the five side labels and
+    the medial-lateral crossed-error counts of the validation metrics against the incumbent;
+    x4 and x1.
+  budget: One extra pooling pass per step; same cost as the incumbent within a few percent.
+  implementation: >-
+    Configuration only: set trainer.split_knee_bag_loss_weight to 0.5 and
+    trainer.split_knee_other_labels to "or" (quoted, so YAML keeps it a string) in
+    configs/training.yaml, both keys whatever the incumbent holds. Report it against the
+    incumbent, split-knee-bag-loss and split-knee-bag-average.
+    The option is built (KneeModule._chimera_bag_loss in training/lightning.py). Keep every
+    other bag-loss key as the incumbent has it. No Python change.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The third labelling of the same chimera; the three runs settle the choice.
+- id: front-back-bag-loss
+  mechanism_id: union-bag
+  parent_idea_id: split-knee-bag-loss
+  title: Chimera knees cut front to back, the anterior half of one study joined to the posterior half of another
+  opportunity: >-
+    A guess, the split knee on the other axis. Every token also carries its anterior-posterior
+    coordinate in the knee's frame. PF OA lives in the anterior compartment and a Baker's cyst
+    in the posterior one, so a bag made of the anterior half of study A and the posterior half
+    of study B has exactly known labels for those two, and teaches the pooling to read each
+    from its own region instead of from findings that travel with it.
+  mechanism: >-
+    trainer.front_back_bag_loss_weight 0.5 and trainer.front_back_other_labels or. In training,
+    the studies of each batch are paired at random (four pairs at batch 8). In each pair, one
+    study keeps only its tokens more than 10 mm anterior of the knee centre and the other only
+    its tokens more than 10 mm posterior; the kept, already-encoded tokens are pooled as one
+    bag by the model's own pooling. PF OA takes the anterior donor's label and Baker's the
+    posterior donor's, each when observed in its donor; the other ten labels take the OR of the
+    two donors' labels, 1 - (1 - a)(1 - b), counted when both donors have the label observed or
+    an observed one is positive. Its class-balanced BCE, times the weight, is added to the
+    loss. A pair in which a donor has no token on its side is left whole and not counted. No
+    extra backbone pass; validation and prediction unchanged.
+  precedents:
+  - 'split-knee-bag-loss: the same construction on the medial-lateral coordinate.'
+  - 'The OA region detector of the recipe already pools tokens with anterior coordinate above zero.'
+  novelty: Recombining anterior and posterior halves of different knees has not been tried.
+  coverage: Every training study, as one half of one of four bags per batch; all twelve labels.
+  exploitation: >-
+    front_back_bag_loss, front_back_bags (expect about 1,600 per epoch) and
+    front_back_kept_token_share (about 0.4); the per-label deltas of PF OA and Baker's first,
+    then x4 and x1 against the incumbent and against the three split-knee runs.
+  budget: One extra pooling pass per step; same cost as the incumbent within a few percent.
+  implementation: >-
+    Configuration only: set trainer.front_back_bag_loss_weight to 0.5 and
+    trainer.front_back_other_labels to "or" (quoted, so YAML keeps it a string) in
+    configs/training.yaml. The option is built
+    (KneeModule._chimera_bag_loss in training/lightning.py). Keep every other bag-loss key as
+    the incumbent has it. No Python change.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Two more labels with exact chimera labels, on a built mechanism.
+- id: transplant-bag-loss
+  mechanism_id: union-bag
+  parent_idea_id: union-bag-loss
+  title: Finding transplant, the most attended tokens of one study dropped into the whole of another
+  opportunity: >-
+    A guess aimed at the dense-bag goal. At inference with more slices, a finding is a few
+    tokens among thousands. Moving only the tokens the pooling attends to most in study A into
+    the full bag of study B builds exactly that case in training: the host is whole, the
+    donor's evidence is a small minority, and the bag's labels are the OR of the two. It is
+    union-bag-loss with a sparse donor, so the pooling must find a needle rather than half a
+    bag.
+  mechanism: >-
+    trainer.transplant_bag_loss_weight 0.5. In training, the studies of each batch are paired
+    at random as donor and host (four pairs at batch 8). For the donor, the attention scores of
+    its already-encoded tokens are computed without gradient; for each of the twelve labels the
+    top 2% of its tokens are selected and the union is kept (about a fifth of the donor's
+    tokens), the rest are dropped. The kept donor tokens and all host tokens are pooled as one
+    bag by the model's own pooling. The target is the OR of the two studies' labels, 1 - (1 -
+    a)(1 - b), counted when both have the label observed or an observed one is positive. Its
+    class-balanced BCE, times the weight, is added to the loss. No extra backbone pass;
+    validation and prediction unchanged.
+  precedents:
+  - 'union-bag-loss: whole studies joined with OR labels.'
+  - 'dense-bag pooling goal: robustness of the pooling across study sizes and inference multipliers.'
+  novelty: Attention-selected token transplants have not been tried.
+  coverage: Every training study, as donor or host of one of four bags per batch; all labels.
+  exploitation: >-
+    transplant_bag_loss, transplant_bags (expect about 1,750 per epoch) and
+    transplant_donor_token_share (about 0.2); the x4 minus x1 difference against the
+    incumbent's and against union-bag-loss (the bag-size robustness reading); per-label deltas.
+  budget: One extra attention and pooling pass per step; same cost as the incumbent within a few percent.
+  implementation: >-
+    Configuration only: set trainer.transplant_bag_loss_weight to 0.5 in configs/training.yaml.
+    The option is built (KneeModule._transplant_bag_loss in training/lightning.py; the 2% per
+    label is the constant TRANSPLANT_TOKEN_FRACTION). Keep every other bag-loss key as the
+    incumbent has it. No Python change.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The mix that most directly trains finding sparse evidence in a large bag.
+exhausted_directions: None.

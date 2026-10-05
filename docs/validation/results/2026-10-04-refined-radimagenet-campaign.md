@@ -90,6 +90,6 @@ scored.
 
 - **Heated ResNet-50 weights.** Two ResNet-50 runs on the mask-trained checkpoint were started
   and stopped by the user before completion; no result.
-- **The follow-up campaign** on the input preparation (`pretraining-input`, on a ResNet-10t
-  reference with this normalization) ran on 2026-10-04 and 2026-10-05 in the same worktree;
-  its record is not on main yet ([ongoing](../../ongoing/next.md)).
+- **The follow-up campaign** on the input preparation, on a ResNet-10t reference with this
+  normalization, is the [pretraining-input campaign](2026-10-05-pretraining-input-campaign.md);
+  nothing from it was adopted.

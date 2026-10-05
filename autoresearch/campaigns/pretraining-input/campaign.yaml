@@ -1,0 +1,140 @@
+id: pretraining-input
+recipe: configs/training.yaml
+reference_run: outputs/training/20261004-203750-rn10t-radimagenet-normalization
+reference_equivalences:
+  data.autoaugment_intensity.probability: 0.0
+  data.study_cutmix_augmentation.probability: 0.0
+  model.fluid_brightness: 1.0
+  model.input_mask_expectation: false
+  trainer.input_mask.grid: 64
+  trainer.input_mask.kernel: 13
+  trainer.input_mask.kind: none
+  trainer.input_mask.low: 0.0
+  trainer.input_mask.sigma: 6.0
+  trainer.union_bag_loss_weight: 0.0
+  trainer.split_knee_bag_loss_weight: 0.0
+  trainer.split_knee_other_labels: none
+  trainer.front_back_bag_loss_weight: 0.0
+  trainer.front_back_other_labels: none
+  trainer.transplant_bag_loss_weight: 0.0
+reference_config_exceptions:
+  - paths.label_manifest
+  - paths.report_attribute_manifest
+reference_identity_exceptions:
+  - preprocessing_identity.sources_sha256
+additional_evidence_runs:
+  - outputs/training/20261004-094416-rn10t-view-label-bias
+backlog:
+  refill_below: 3
+  refill_to: 5
+  seed_order: forced
+  rotate_after: 1000000
+budget:
+  mode: range
+  min_fraction: 0.75
+  max_fraction: 1.35
+policy:
+  editable_files:
+    - configs/training.yaml
+    - src/knee_abnormality/config.py
+    - src/knee_abnormality/training/lightning.py
+  editable_directories:
+    - src/knee_abnormality/modeling
+  config_keys:
+    - data.upper_quantile
+    - data.fluid_upper_quantile
+    - trainer.union_bag_loss_weight
+    - trainer.split_knee_bag_loss_weight
+    - trainer.split_knee_other_labels
+    - trainer.front_back_bag_loss_weight
+    - trainer.front_back_other_labels
+    - trainer.transplant_bag_loss_weight
+  config_prefixes:
+    - model
+    - optimizer
+    - data.intensity_augmentation
+    - data.affine_augmentation
+    - data.noise_augmentation
+    - data.smoothing_augmentation
+    - data.resolution_augmentation
+    - data.gin_augmentation
+    - data.contrast_mixing_augmentation
+    - data.autoaugment_intensity
+    - data.study_cutmix_augmentation
+    - trainer.input_mask
+  list_item_fields: {}
+  input_identity_keys:
+    - preprocessing_identity
+  require_source_change: false
+  configuration_only_ideas: true
+  developer_instructions: >-
+    The incumbent is the Refined-RadImageNet ResNet-10t recipe in configs/training.yaml
+    (resnet10t.c3_in1k, standard weights, mean 0.3162 and std 0.3213, repeated middle slice,
+    84/93 mm views, backbone LR 6e-5, L2-SP 0.01 and 0.001, ten epochs, batch 8). Every idea
+    applies exactly its own change to the current incumbent and keeps everything else. MOST
+    IDEAS ARE CONFIGURATION-ONLY: the mechanisms are already built in this source and switched
+    by the keys below. When an idea says configuration only, change configs/training.yaml to
+    the stated values and nothing else; do not edit Python, do not add logging, do not rename
+    anything; every option already logs its own scalars. Declare as activation signature the row of the idea's option in contract.md, Activation signatures (metric, comparison and threshold as written there, epoch 0); do not derive a threshold from prior-work measurements. Built options and their meaning
+    (contract.md, Built options, has the full table): data.upper_quantile (bright-end quantile
+    of the loader's per-series intensity scaling, incumbent 0.995); data.fluid_upper_quantile
+    (null off; overrides data.upper_quantile for the three fluid-sensitive series types); model.slice_upper_quantile (null off; each slice is divided by its own quantile
+    and clamped to 1, in training and prediction); model.fluid_brightness (1.0 off; multiplies
+    the fluid-sensitive series by this value and clamps to 1, in training and prediction);
+    data.autoaugment_intensity.probability (0 off; training only; the intensity operations of
+    torchvision's AutoAugment ImageNet policy per slice); data.study_cutmix_augmentation.probability
+    (0 off; training only; pastes a random box from another slice of the same study and series
+    type); trainer.union_bag_loss_weight (0 off; adds the loss of union bags of two studies with
+    OR labels); trainer.split_knee_bag_loss_weight (0 off; adds the loss of bags made of the
+    medial half of one study and the lateral half of another; the five side labels from their donor; trainer.split_knee_other_labels none leaves the
+    other seven out, average sets them to the mean of the two donors, or to their OR);
+    trainer.front_back_bag_loss_weight with trainer.front_back_other_labels (the same
+    chimera cut front to back: PF OA from the anterior donor, Baker's from the posterior one);
+    trainer.transplant_bag_loss_weight (0 off; the most attended tokens of one study pooled with
+    the whole of another, OR labels); trainer.input_mask (kind none or random, grid, kernel, sigma, low, epochs) with
+    model.input_mask_expectation, which must be true exactly when kind is not none;
+    model.pretrained_weights radimagenet_policy and radimagenet_policy_ft (the mask-trained
+    ResNet-10t checkpoints, cached and hash-pinned). Augmentations are switched off by setting
+    their probability to 0 and keeping their other fields. Only learned-mask-policy and the researcher ideas
+    whose implementation lists source edits change source; for those follow the idea text literally: training-only modules live on
+    the Lightning module and never inside self.model (prediction loads model.* keys strictly from
+    the config), new parameters are created under torch.random.fork_rng, new scalars are logged
+    per epoch with self._log_epoch_metric, validation and prediction stay deterministic. Do not
+    touch the loader, the views, the sampling, the labels, the loss weights, the epochs or the
+    batch size unless the idea names one. Training time must stay within 0.75 to 1.35 times the
+    reference's; never reduce epochs, slices or studies to fit. No weight averaging. Use the
+    existing Python environment for static checks only; no model execution on GPU or CPU, no
+    tests. Return prepared or blocked.
+  researcher_instructions: >-
+    Research starts after the forced seeds and never stops: never return an empty refill. Two
+    kinds of idea are allowed and nothing else. (A) Ideas that bring our input preparation or
+    our training augmentation closer to what the Refined-RadImageNet backbone was pretrained on,
+    or that use the authors' mask procedure (contract.md, Objective, and prior-work.md, which
+    holds the label-free gap measurements): intensity mapping per slice, per series or per
+    series type; the pretraining augmentations (AutoAugment operations and their strengths,
+    rotation, crop scale); removing or weakening our augmentations that move the input away
+    from the pretraining statistics; mask regularization; and values of a mechanism of this
+    campaign one knob at a time, with the direction taken from the gap measurements and the
+    run curves. A generic recipe change with no link to the pretraining data or recipe is out
+    of scope. (B) Combinations of good prospects from this campaign's own runs: two mechanisms
+    that each showed promise here (accepted, or rejected with a positive macro delta, or a
+    clear per-label lift, or curves a named change could turn into a gain), two per run; state
+    each run, its delta with the 80% interval, its per-label pattern and why the two should add
+    up. Prefer configuration-only ideas on the built options (contract.md, Built options): they
+    cost no development. A source change is allowed when the idea needs it; then write the
+    implementation as exact edits (file, function, the lines to add, the config key and its
+    default that reproduces the incumbent, the scalars to log), because vague implementation
+    text is what makes a candidate bounce between developer and reviewer. Start every refill
+    from run_curves and the per-label deltas of every decided run, name the behaviour each
+    proposal targets, and check prior-work.md before proposing. A family verdict of extend or
+    retry has priority over a new family; when a family closes, open another inside the scope.
+    Mark every proposal as evidence-backed or a guess. One value per knob; no two-sided sweeps
+    of the same knob and no repeat of a measured value. Per-label rules are allowed when every
+    choice is fixed before the run. Stay inside the training-time range. Excluded: anything
+    outside (A) and (B); pretraining on RadImageNet images or any external data; weight
+    averaging; image sizes above 224, the views and field of view, more slices per study,
+    ensembling and test-time augmentation; fewer epochs; reflection-probability changes; the
+    class-balance exponent; label changes and gold-study weighting; multi-seed or confirmation
+    runs; trained models in the loader; choosing anything on fold-0 validation labels; MixUp
+    (measured: it moves the input away from the pretraining statistics, and earlier runs were
+    flat); ideas already measured at the same value (prior-work.md).

@@ -1,0 +1,86 @@
+ideas:
+- id: learned-mask-policy
+  mechanism_id: input-mask
+  parent_idea_id: input-mask-centred-one
+  title: Mask policy with a learning signal that can move it
+  opportunity: >-
+    A guess with a diagnosed cause. In the previous campaign the policy never learned: its Beta
+    parameters stayed at 1.000 and its gradient norm at 0.0001, so both policy runs were the
+    random mask. Three things starved it: the loss weighted the reward by a logsumexp over
+    4,096 cells, which is dominated by one cell; the reward had no baseline, so every mask in a
+    batch was pushed the same way; and one reward per study was spread over 4,096 cells per
+    slice. This seed fixes those three and nothing else, so the authors' procedure gets a run
+    in which the mask actually depends on the image.
+  mechanism: >-
+    A small policy network (ResNet-10t from the standard Refined-RadImageNet weights, then two
+    heads) reads each normalized slice and outputs the Beta parameters of an 8 x 8 grid of
+    cells. A mask is sampled, shifted to the range [0.5, 1.5] (mean near 1 at the start),
+    resized to 224 and blurred, and multiplies the normalized input in training. The policy is
+    trained by REINFORCE on the study's class-balanced BCE: its loss is the mean over slices of
+    the per-slice mean log-density of the sampled cells times the study's advantage, where the
+    advantage is the detached study loss minus the batch mean, divided by the batch standard
+    deviation. Prediction multiplies the input by the constant 1.0.
+  precedents:
+  - 'prior-work.md, The mask procedure in our training: policy uniform, gradient norm 0.0001.'
+  - 'Frozen source of the earlier implementation: outputs/autoresearch/refined-radimagenet/experiments/policy-mask-rn10t-20261004T114633Z-b68939c7/source/src/knee_abnormality (modeling/input_mask.py and the input_mask parts of training/lightning.py and config.py).'
+  novelty: First policy run with a baseline, a per-cell mean and a coarse grid.
+  coverage: Every training slice, all epochs.
+  exploitation: >-
+    First whether the policy moved: input_mask_alpha_mean and input_mask_beta_mean away from
+    1.0, input_mask_alpha_slice_std above 0.01 (the mask depends on the image) and
+    input_mask_policy_grad_norm well above the earlier 0.0001. Then input_mask_mean and
+    input_mask_std, and x4, x1 per epoch and per-label deltas against the incumbent and against
+    input-mask-centred-one, which is the same mask without a policy.
+  budget: >-
+    One extra ResNet-10t pass with gradient per step: estimated 1.5 to 1.8 times the incumbent
+    (the earlier policy run on a ResNet-18 took 1.5 times); inside the range.
+  implementation: >-
+    Source change in three files; do not touch modeling/model.py or the loader.
+    (1) config.py, InputMaskConfig: extend kind to Literal["none", "random", "policy"] and add
+    policy_backbone_lr: PositiveFiniteFloat = 0.0006.
+    (2) modeling/pretraining_augmentation.py: add class PolicyInputMask(nn.Module), whose
+    forward keeps gradients (unlike RandomInputMask.forward, which is under no_grad), by porting
+    PolicyInputMask from the frozen source named in the precedents (constructor arguments
+    settings, image_size, seed; feature_extractor timm resnet10t.c3_in1k with num_classes 0
+    loaded strictly from radimagenet_state_dict("resnet10t.c3_in1k"); alpha and beta heads
+    Linear 512-512, BatchNorm1d, ReLU, Linear 512-512, BatchNorm1d, ReLU, Linear 512-cells;
+    seeded sampling under torch.random.fork_rng with the generator state kept on the module;
+    the separable Gaussian smoothing), with exactly these differences: cells = settings.grid
+    squared with grid 8; no base_alpha or base_beta buffers and no 0.9/0.1 mixing: the Beta
+    parameters are exp of the head outputs clamped to [-4, 4], and the last Linear of each head
+    is initialized with zero weight and zero bias so the policy starts uniform; self.log_likelihood
+    = distribution.log_prob(cells).mean(-1), not logsumexp; the mask is settings.low plus the
+    smoothed sampled cells; forward returns the detached mask and stores self.mask,
+    self.new_alpha and self.new_beta (the clamped log-parameters, detached); no expectation
+    method.
+    (3) training/lightning.py: in KneeModule.__init__, when config.trainer.input_mask.kind is
+    "policy", set self.input_mask = PolicyInputMask(config.trainer.input_mask,
+    config.data.image_size, config.seed) and fill self.model.input_mask_expectation with
+    config.trainer.input_mask.low + 0.5, as the existing random branch does; training_step
+    already passes self.input_mask to encode_batch and logs input_mask_mean, input_mask_std and
+    input_mask_slices. After logits are computed in training_step, when the kind is "policy",
+    add the policy loss to the loss: with autocast disabled, per-study reward = class-balanced
+    BCE of logits.detach() against batch["target"] over the observed labels (weights
+    self.class_balance_weights[0] for targets >= 0.5 and [1] otherwise, summed over labels and
+    divided by the observed count clamped to 1), advantage = (reward - reward.mean()) /
+    (reward.std() + 1e-6), or zeros when the batch has fewer than two studies, policy_loss = (self.input_mask.log_likelihood *
+    advantage[encoded["study"]]).mean(). Log per epoch with self._log_epoch_metric:
+    input_mask_policy_loss, input_mask_alpha_mean and input_mask_beta_mean (means of
+    new_alpha.exp() and new_beta.exp()), input_mask_alpha_slice_std (new_alpha.exp().mean(1)
+    .std()), and in on_before_optimizer_step input_mask_policy_grad_norm (total norm of the
+    policy parameters' gradients). Pass self.input_mask in the heads tuple of build_optimizer
+    when the kind is "policy"; in build_optimizer give the parameters of
+    head.feature_extractor the rate settings policy_backbone_lr and the policy heads the head
+    rate, as the frozen source does. Override configure_gradient_clipping as the frozen source
+    does, so the model's parameters and the policy's parameters are each clipped at the
+    configured norm separately. Save and restore the policy's generator state in
+    on_save_checkpoint and on_load_checkpoint as the frozen source does. The policy's
+    parameters are stored in the checkpoint under input_mask.*, outside model.*, so prediction
+    is unaffected.
+    (4) configs/training.yaml: under trainer, input_mask with kind: policy, grid: 8, kernel:
+    13, sigma: 6.0, low: 0.5, epochs: null, policy_backbone_lr: 0.0006; model.input_mask_expectation
+    true.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The authors' procedure with a policy that can learn; last because it is the only source change.
+exhausted_directions: None.

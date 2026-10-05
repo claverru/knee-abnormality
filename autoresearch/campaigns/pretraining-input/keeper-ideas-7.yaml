@@ -1,0 +1,45 @@
+ideas:
+- id: autoaugment-mild-operations
+  mechanism_id: pretraining-augmentation
+  parent_idea_id: autoaugment-intensity-025
+  title: AutoAugment at probability 0.25 with only its brightness, contrast, sharpness and autocontrast steps
+  opportunity: >-
+    A guess with a measured motive. Two runs of the policy lost about the same at very
+    different doses: autoaugment-intensity (every slice, -0.002907, 80% [-0.004085, -0.001671])
+    and autoaugment-intensity-025 (18% of the slices, -0.003720, 80% [-0.005028, -0.002470]),
+    each one run. A loss that does not scale with the share of slices points at what the
+    operations do rather than how often. Four of them (Invert, Solarize, Posterize, Equalize)
+    turn a slice into something no validation slice resembles: inverted or folded intensities,
+    eight grey levels, a flat histogram; prior-work.md measured equalize and posterize as the
+    largest single-operation gaps (0.082 and 0.062 against 0.034 for brightness and 0.037 for
+    sharpness). The other four are mild photometric changes of the kind our own augmentation
+    already makes.
+  mechanism: >-
+    The skipped-operation set of the AutoAugment step gains Invert, Solarize, Posterize and
+    Equalize, so a sub-policy applies only its Brightness, Contrast, Sharpness and AutoContrast
+    steps; sub-policies with none of those change nothing. Probability 0.25, our intensity
+    augmentation kept, training only.
+  precedents:
+  - 'run-notes.md, runs 5 and 17: the full operation set at probability 1.0 and 0.25.'
+  - 'prior-work.md, the pretraining augmentations: per-operation stem gaps.'
+  novelty: The policy has only been run with all its intensity operations.
+  coverage: Below 18% of the training slices each epoch (the sub-policies that hold one of the four kept steps and fire).
+  exploitation: >-
+    autoaugment_intensity_slices above 0 and below run 17's 16,931 per epoch; input_fluid_mean
+    and input_fluid_std at the incumbent's values within 0.01. Then x4 and x1 per epoch against
+    the incumbent (run 17 fell behind from epoch 5) and against run 17; per-label deltas on MCL,
+    Baker's and Lateral Meniscus, the largest losses of run 17.
+  budget: About 1.01 times the reference.
+  implementation: >-
+    Source change, one exact edit, then one configuration value. (1)
+    modeling/pretraining_augmentation.py: in the frozenset AUTOAUGMENT_SKIPPED_OPERATIONS, add
+    the four names "Invert", "Solarize", "Posterize" and "Equalize" to the six already there.
+    Nothing else in Python; the function autoaugment_intensity already skips every name in
+    that set and already reports the slices it changed. (2) configs/training.yaml: set
+    data.autoaugment_intensity.probability to 0.25 and leave data.intensity_augmentation as the
+    incumbent has it. Activation signature: the data.autoaugment_intensity.probability row of
+    contract.md, autoaugment_intensity_slices > 0 at epoch 0.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: One-line change; separates the harsh operations from the policy as a whole.
+exhausted_directions: None.

@@ -1,0 +1,38 @@
+ideas:
+- id: no-bilateral-smoothing-on-no-mixing
+  mechanism_id: off-distribution-augmentation
+  parent_idea_id: no-bilateral-smoothing
+  title: Bilateral smoothing off on the incumbent that already trains without contrast mixing
+  opportunity: >-
+    Evidence-backed, two runs of this campaign, each one run. no-bilateral-smoothing scored
+    +0.000902 over the per-slice quantile incumbent (80% [-0.000073, +0.001923], short of the
+    rule by 0.00007; Baker's +0.0057, Fracture +0.0054, MCL +0.0039, all three fluid labels
+    up). no-contrast-mixing scored +0.001952 on the same incumbent (80% [+0.000994, +0.002938],
+    accepted; Fracture +0.0066, Lateral OA +0.0046, Baker's +0.0044). Both remove an
+    augmentation that moves the training input away from the pretraining statistics and from
+    the validation input; smoothing was measured on a recipe that still mixed contrasts.
+    Whether the two add is a guess: they share a label pattern (Fracture, Baker's, MCL up; ACL
+    -0.003 in both), which can mean overlap.
+  mechanism: >-
+    data.smoothing_augmentation.probability 0.0 on the current incumbent, which holds
+    data.contrast_mixing_augmentation.probability 0.0 and model.slice_upper_quantile 0.98.
+    Training only; validation and prediction never smoothed.
+  precedents:
+  - 'run-notes.md, runs 10 and 12: each switch-off alone on the per-slice quantile incumbent.'
+  novelty: The two switch-offs have only been run one at a time.
+  coverage: All training slices; about 20% of them were smoothed on the incumbent.
+  exploitation: >-
+    smoothing_off_slices and contrast_mixing_off_slices both about 93,569 per epoch. Then x4
+    against the incumbent and against run 10; per-label deltas on Baker's, Fracture, MCL (up in
+    both single runs) and ACL (down in both).
+  budget: About 0.95 of the reference (run 10 trained in 1,100 s).
+  implementation: >-
+    Configuration only: set data.smoothing_augmentation.probability to 0.0 in
+    configs/training.yaml and keep spatial_sigma and range_sigma_range as they are; keep every
+    other value of the incumbent, including data.contrast_mixing_augmentation.probability 0.0.
+    No Python change. Activation signature: the switched-off augmentation row of contract.md,
+    smoothing_off_slices > 0 at epoch 0.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Free; the largest rejected positive of the campaign on top of its largest acceptance.
+exhausted_directions: None.

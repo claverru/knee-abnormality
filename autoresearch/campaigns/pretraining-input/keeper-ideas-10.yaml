@@ -1,0 +1,43 @@
+ideas:
+- id: heated-weights-on-incumbent
+  mechanism_id: mask-trained-weights
+  parent_idea_id: heated-weights
+  title: The authors' mask-trained (heated) ResNet-10t checkpoint on the current incumbent
+  opportunity: >-
+    Ordered by the user on 2026-10-05. heated-weights scored +0.001039 over the historical
+    control (80% [-0.000650, +0.002647], one run), the largest delta of the first seeds, with
+    MCL +0.0096, ACL +0.0075, Lateral Meniscus +0.0053 and Contusion +0.0036 up and the OA
+    labels down; the same size and pattern as the two runs of the previous campaign (+0.0012,
+    +0.0011). It was measured before the per-slice quantile stretch and the removal of
+    contrast mixing became the incumbent. heated-weights-mask-release ran these weights on the
+    current incumbent together with a three-epoch mask (-0.002152) and its x1 curve was level
+    with the incumbent from epoch 4, the best of the runs on this incumbent; the weights alone
+    have no run on it.
+  mechanism: >-
+    model.pretrained_weights radimagenet_policy, optimizer.backbone_lr 0.0002,
+    optimizer.anchor_alpha_early 0.00088, optimizer.anchor_alpha_late 0.000088, on the current
+    incumbent (model.slice_upper_quantile 0.98, contrast mixing off). The rate and the anchor
+    strengths follow the checkpoint's weight scale (convolution RMS 0.0531 against 0.0158), as
+    in heated-weights. No input mask.
+  precedents:
+  - 'run-notes.md, run 3: heated-weights on the historical control.'
+  - 'run-notes.md, run 21: the same weights with a three-epoch mask on the current incumbent.'
+  novelty: First run of the heated weights alone on the stretched input without contrast mixing.
+  coverage: All studies and labels.
+  exploitation: >-
+    pretrained_conv_rms 0.05305. x4 and x1 per epoch against the incumbent (run 3 was behind
+    in epoch 1 and ahead from epoch 5), against run 21 (the mask's share) and against run 3;
+    per-label deltas against the known pattern (MCL, ACL, Lateral Meniscus, Contusion up; the
+    OA labels down).
+  budget: Same cost as the incumbent.
+  implementation: >-
+    Configuration only, four values in configs/training.yaml: model.pretrained_weights
+    radimagenet_policy, optimizer.backbone_lr 0.0002, optimizer.anchor_alpha_early 0.00088,
+    optimizer.anchor_alpha_late 0.000088. Keep every other value of the incumbent; no
+    trainer.input_mask block and model.input_mask_expectation false. No Python change.
+    Activation signature: the model.pretrained_weights row of contract.md, pretrained_conv_rms
+    > 0.04 at epoch 0.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Ordered by the user to run as soon as possible.
+exhausted_directions: None.

@@ -1,0 +1,64 @@
+ideas:
+- id: slice-quantile-soft-knee
+  mechanism_id: bright-end-clipping
+  parent_idea_id: slice-upper-quantile-098
+  title: Per-slice quantile stretch with a smooth roll-off above 0.8 instead of the hard clip at 1
+  opportunity: >-
+    Evidence-backed for the diagnosis, a guess for the outcome. slice-upper-quantile-098
+    (+0.000716, 80% [+0.000009, +0.001413], accepted) raised MCL +0.0056, Lateral OA +0.0041,
+    Lateral Meniscus +0.0037 and ACL +0.0021 and lowered Baker's -0.0020 and Effusion -0.0012.
+    slice-quantile-other-types (-0.000952, 80% [-0.001677, -0.000240]) took the rescaling off
+    the fluid-sensitive series and reversed exactly that split: Baker's +0.0020, Effusion
+    +0.0020, Synovitis +0.0013 against MCL -0.0070, Lateral OA -0.0056, Lateral Meniscus
+    -0.0033, ACL -0.0033. Each is one run. Both effects come from the same operation on the
+    fluid-sensitive slices: dividing by the 98th percentile stretches ligament, meniscus and
+    cartilage (the gain), and clamping at 1 flattens the brightest 2%, which is the fluid (the
+    loss; input_fluid_saturated_share 0.020 against 0.005). A stretch that keeps the same gain
+    below the knee and compresses the top instead of flattening it should keep the first and
+    give back the second.
+  mechanism: >-
+    A new option model.slice_quantile_soft_knee (null off, the incumbent's behaviour). With a
+    value k in (0, 1), after each slice is divided by its own quantile and before the clamp,
+    every value v above k is replaced by k + (1 - k) * tanh((v - k) / (1 - k)). Values up to k
+    are unchanged, so the stretch of the darker tissue is exactly the incumbent's; the
+    quantile itself (v = 1) lands at 0.95 for k = 0.8 and brighter pixels approach 1 without
+    reaching it, so fluid keeps its gradation. All series types, training and prediction
+    alike. The run sets k = 0.8 with model.slice_upper_quantile 0.98.
+  precedents:
+  - 'run-notes.md, runs 4 and 8: the accepted per-slice stretch and its removal from the fluid-sensitive series.'
+  novelty: Every clipping run so far saturated the top of the range; none compressed it.
+  coverage: All studies and slices; pixels above 0.8 of each slice's 98th percentile change against the incumbent.
+  exploitation: >-
+    slice_soft_knee_pixels above 0; input_fluid_saturated_share and input_other_saturated_share
+    near 0 (against 0.020 and 0.021 on the incumbent); input_fluid_std and input_other_std
+    slightly below the incumbent's 0.263 and 0.313. Then x4 against the incumbent; per-label
+    deltas split into the fluid labels (Effusion, Synovitis, Baker's; expected up) and MCL,
+    Lateral OA, Lateral Meniscus, ACL (expected held).
+  budget: Same cost as the incumbent; one tanh per slice on the GPU.
+  implementation: >-
+    Source change, three exact edits, then one configuration value. (1) config.py, ModelConfig,
+    directly below slice_upper_quantile: add the field slice_quantile_soft_knee of type
+    Annotated[float, Field(gt=0, lt=1)] | None with default None. (2) modeling/model.py: in
+    KneeAbnormalityModel.__init__, below "self.slice_upper_quantile =
+    model.slice_upper_quantile", add "self.slice_quantile_soft_knee =
+    model.slice_quantile_soft_knee", and below "self.slice_quantile_rescaled = None" add
+    "self.slice_soft_knee_pixels = None". In encode_batch, inside "if self.slice_upper_quantile
+    is not None:", replace the single line "valid_images = (valid_images / top[:, None, None,
+    None]).clamp_(0, 1)" by: valid_images = valid_images / top[:, None, None, None]; then, if
+    self.slice_quantile_soft_knee is not None: knee = self.slice_quantile_soft_knee; above =
+    valid_images > knee; valid_images = torch.where(above, knee + (1 - knee) *
+    torch.tanh((valid_images - knee) / (1 - knee)), valid_images);
+    self.slice_soft_knee_pixels = above.sum().detach(); then valid_images =
+    valid_images.clamp_(0, 1). Leave the existing slice_quantile_rescaled line as it is; the
+    block runs in training and prediction. (3) training/lightning.py, training_step, directly
+    after the existing block that logs slice_quantile_rescaled_slices: if
+    self.config.model.slice_quantile_soft_knee is not None, call
+    self._log_epoch_metric("slice_soft_knee_pixels", self.model.slice_soft_knee_pixels.float(),
+    1, "sum"). Nothing else in Python. (4) configs/training.yaml: under model, next to
+    slice_upper_quantile, add "slice_quantile_soft_knee: 0.8"; keep slice_upper_quantile 0.98.
+    Activation signature: slice_soft_knee_pixels > 0 at epoch 0 (epoch count of training pixels
+    the roll-off changed; logged only when the option is set).
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Small and exact; aims at keeping both halves of the label split that two runs isolate.
+exhausted_directions: None.

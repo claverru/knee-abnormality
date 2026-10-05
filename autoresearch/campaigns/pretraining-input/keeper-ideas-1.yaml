@@ -1,0 +1,41 @@
+ideas:
+- id: other-type-upper-quantile
+  mechanism_id: bright-end-clipping
+  parent_idea_id: loader-upper-quantile-098
+  title: Bright-end quantile 0.98 for the non-fluid series only, 0.995 for the fluid-sensitive ones
+  opportunity: >-
+    Evidence-backed by two runs of this campaign, each one run and weak evidence.
+    loader-upper-quantile-099 (+0.000439, 80% [-0.000048, +0.000911]) and
+    loader-upper-quantile-098 (+0.000420, 80% [-0.000230, +0.001087]) show the same split: the
+    labels read on bone and ligament rise (0.98: MCL +0.0040, Lateral OA +0.0035, ACL +0.0018,
+    PF OA +0.0011, Fracture +0.0009) and the three fluid labels fall, more at the stronger
+    clipping (Baker's -0.0013 then -0.0035, Effusion -0.0004 then -0.0008, Synovitis -0.0020 then
+    -0.0017). Clipping the brightest 2% of a fluid-sensitive series saturates the fluid itself
+    (input_fluid_saturated_share 0.020). Keeping the fluid-sensitive series at 0.995 and clipping
+    only the others should keep the gains and drop the losses. It is the mirror of
+    fluid-type-upper-quantile, so the two runs together say which group carries each effect.
+  mechanism: >-
+    data.upper_quantile 0.98 and data.fluid_upper_quantile 0.995 in configs/training.yaml. The
+    loader uses fluid_upper_quantile for the three fluid-sensitive series types and
+    upper_quantile for the other three, in training and prediction.
+  precedents:
+  - 'run-notes.md, runs 1 and 2: per-label deltas of the two loader-quantile seeds.'
+  novelty: The loader quantile has only been moved for every series at once.
+  coverage: All studies; the three non-fluid series types change, the fluid-sensitive ones stay at 0.995.
+  exploitation: >-
+    loader_other_bright_tail 0.02 and loader_fluid_bright_tail 0.005; input_other_saturated_share
+    about 0.020 and input_fluid_saturated_share about 0.005; input_other_std about 0.305 as in
+    loader-upper-quantile-098. Then x4 against the incumbent, against both loader-quantile seeds
+    and against fluid-type-upper-quantile; per-label deltas split into the fluid labels
+    (Effusion, Synovitis, Baker's) and the others.
+  budget: Same cost as the incumbent.
+  implementation: >-
+    Configuration only, two values: set data.upper_quantile to 0.98 and add
+    "fluid_upper_quantile: 0.995" under data, next to upper_quantile, whatever the incumbent
+    holds. Keep model.slice_upper_quantile as the incumbent has it. No Python change.
+    Activation signature: the data.upper_quantile row of contract.md, loader_other_bright_tail
+    > 0.0125 at epoch 0 (0.005 at the unchanged recipe, 0.02 here).
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Free; separates the group that gains from clipping from the group that loses.
+exhausted_directions: None.

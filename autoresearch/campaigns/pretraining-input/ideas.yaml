@@ -1,0 +1,1973 @@
+revision: 592
+ideas:
+- id: loader-upper-quantile-099
+  mechanism_id: bright-end-clipping
+  parent_idea_id: null
+  title: Loader bright-end quantile 0.99 instead of 0.995
+  opportunity: Evidence-backed. The loader scales each series to [0, 1] between its
+    0.005 and 0.995 quantiles. In the fluid-sensitive series a few very bright pixels
+    set the top, so the rest of the image keeps about two thirds of the other series'
+    contrast and under half the pretraining variance at the backbone's stem (stem
+    variance 0.43, stem gap 0.162). At 0.99 the fluid series' stem gap falls to 0.085
+    and their contrast rises from 0.203 to 0.229, while the non-fluid series stay
+    where they are (prior-work.md, Intensity mapping). A batch mixes all six series
+    types under shared BatchNorm statistics, so this difference between types is not
+    absorbed by normalization.
+  mechanism: data.upper_quantile 0.99 in configs/training.yaml. The loader already
+    uses this value for every series in training and prediction. Nothing else changes.
+  precedents:
+  - 'prior-work.md, Intensity mapping: upper quantile 0.999 / 0.995 / 0.99 / 0.98
+    gives fluid stem gap 0.334 / 0.162 / 0.085 / 0.031.'
+  - 'refined-radimagenet campaign: the checkpoint normalization, the only adoption
+    there, was also an input-statistics fix (+0.0006 on the ResNet-18).'
+  novelty: The intensity quantiles have never been varied on these backbones.
+  coverage: All studies and labels; the effect is concentrated in the three fluid-sensitive
+    series types.
+  exploitation: 'Read input_fluid_std and input_other_std first: expect about 0.23
+    and 0.29. The reference run predates these scalars; on the unchanged recipe they
+    are about 0.20 (fluid) and 0.28 (other), and every run of this campaign logs them.
+    Then x4, x1 per epoch and the per-label deltas, with effusion, synovitis, Baker''s,
+    contusion and the menisci (read on fluid series) the labels to watch.'
+  budget: Same cost as the incumbent.
+  implementation: 'Configuration only: set data.upper_quantile to 0.99 in configs/training.yaml.
+    Do not edit any Python file and do not add logging: input_fluid_mean, input_fluid_std,
+    input_other_mean and input_other_std are already logged every epoch. If accepted,
+    later seeds inherit it.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Free, measured, and the mildest step of the contrast fix.
+  status: completed
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality-refined-radimagenet/autoresearch/campaigns/pretraining-input/seed-ideas.yaml
+  experiments:
+  - loader-upper-quantile-099-20261004T214842Z-6978c236
+  decision: reject
+- id: loader-upper-quantile-098
+  mechanism_id: bright-end-clipping
+  parent_idea_id: loader-upper-quantile-099
+  title: Loader bright-end quantile 0.98
+  opportunity: 'Evidence-backed. The gap keeps closing with harder clipping: at 0.98
+    the fluid series'' stem gap is 0.031 (0.162 at the incumbent''s 0.995, 0.085 at
+    0.99), their stem variance 0.69 and their contrast 0.257. The non-fluid series
+    move slightly away (stem gap 0.052 against 0.044, variance 0.92), so this run
+    also tells whether one value can serve both groups or the setting must be per
+    series type.'
+  mechanism: data.upper_quantile 0.98 in configs/training.yaml, whatever value the
+    incumbent holds (0.995 or 0.99). Nothing else changes.
+  precedents:
+  - prior-work.md, Intensity mapping.
+  - 'loader-upper-quantile-099: the milder step.'
+  novelty: The second point of the dose response.
+  coverage: All studies and labels.
+  exploitation: input_fluid_std about 0.26 and input_other_std about 0.30. The reference
+    run predates these scalars; on the unchanged recipe they are about 0.20 (fluid)
+    and 0.28 (other), and every run of this campaign logs them. Then x4 against the
+    incumbent and against loader-upper-quantile-099; per-label deltas split by the
+    labels read on fluid series and on non-fluid series.
+  budget: Same cost as the incumbent.
+  implementation: 'Configuration only: set data.upper_quantile to 0.98 in configs/training.yaml.
+    Runs whatever the verdict of loader-upper-quantile-099. No Python change.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Free and measured; the value with the smallest overall stem
+    gap (0.020).
+  status: completed
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality-refined-radimagenet/autoresearch/campaigns/pretraining-input/seed-ideas.yaml
+  experiments:
+  - loader-upper-quantile-098-20261004T215130Z-4fce85a8
+  decision: reject
+- id: heated-weights
+  mechanism_id: mask-trained-weights
+  parent_idea_id: null
+  title: Start from the authors' mask-trained (heated) ResNet-10t checkpoint
+  opportunity: In the previous campaign the heated and the fine-tuned mask-trained
+    checkpoints scored +0.0012 and +0.0011 over the standard weights on this backbone,
+    the largest effects of that campaign, with ligaments and menisci up and the OA
+    labels down. Those runs used the ImageNet normalization, under which these checkpoints
+    start far outside their input range, and their reference was mismatched too. This
+    is the clean redo on the corrected input. The two checkpoints trained identically
+    there, so one run is enough. Whether the gain holds is a guess.
+  mechanism: 'model.pretrained_weights radimagenet_policy, optimizer.backbone_lr 0.0002,
+    optimizer.anchor_alpha_early 0.00088, optimizer.anchor_alpha_late 0.000088. Everything
+    else as the incumbent. The rate and the anchor strengths follow the checkpoint''s
+    weight scale (convolution RMS 0.0531 against 0.0158 for the standard weights,
+    a factor 3.37): the rate is 6e-5 times that factor and each anchor strength is
+    the incumbent''s divided by the factor squared, which keeps the same relative
+    step and the same relative pull.'
+  precedents:
+  - 'refined-radimagenet run notes, runs 2 and 3: x4 0.928777 and 0.928671 against
+    0.927543, same settings, ImageNet normalization.'
+  - 'prior-work.md, Mask-trained weights: equal linear-probe quality at the start,
+    88% of final features zero against 48%, a first-epoch dip of 0.006 followed by
+    a lead from epoch 5.'
+  novelty: First run of the mask-trained weights under the checkpoint normalization.
+  coverage: All studies and labels.
+  exploitation: x4 and x1 per epoch against the incumbent (expect behind in epoch
+    1 and level or ahead from epoch 5), per-stage drift, anchor_penalty, per-label
+    deltas against the earlier pattern (MCL, ACL, lateral meniscus, contusion up;
+    OA labels down).
+  budget: Same cost as the incumbent.
+  implementation: 'Configuration only: the four values above in configs/training.yaml.
+    The model already loads this weights option for resnet10t.c3_in1k (hash-checked,
+    strict). No Python change. If accepted, later seeds run on these weights and keep
+    these four values.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The cleanest open lead of the previous campaign, and the reference
+    for the mask-release seed.
+  status: completed
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality-refined-radimagenet/autoresearch/campaigns/pretraining-input/seed-ideas.yaml
+  experiments:
+  - heated-weights-20261004T221145Z-817b28af
+  decision: reject
+- id: slice-upper-quantile-098
+  mechanism_id: bright-end-clipping
+  parent_idea_id: null
+  title: Rescale every slice by its own 0.98 quantile
+  opportunity: Evidence-backed. RadImageNet images were each exported with their own
+    window, while our loader uses one scale per series, so slices far from the brightest
+    ones stay dim. Rescaling each prepared slice by its own 0.98 quantile gives the
+    smallest stem gap of any deterministic mapping measured (0.015 against 0.044;
+    fluid series 0.026, non-fluid variance 1.05) and needs no loader change.
+  mechanism: model.slice_upper_quantile 0.98. In the model, right after the slices
+    are scaled to [0, 1] and before any augmentation, each slice is divided by the
+    value at its own 0.98 quantile and clamped to 1, in training and in prediction.
+    The loader's quantiles stay as the incumbent has them.
+  precedents:
+  - 'prior-work.md, Intensity mapping: per-slice quantile 0.99 / 0.98 / 0.95 gives
+    stem gap 0.018 / 0.015 / 0.037.'
+  novelty: Per-slice intensity scaling has not been tried.
+  coverage: All studies and labels, every slice.
+  exploitation: input_fluid_std and input_other_std both between about 0.26 and 0.31,
+    close to each other. The reference run predates these scalars; on the unchanged
+    recipe they are about 0.20 (fluid) and 0.28 (other), and every run of this campaign
+    logs them. Then x4 against the incumbent and against the loader-quantile seeds;
+    per-label deltas.
+  budget: One sort per slice on the GPU; same cost as the incumbent within a few percent.
+  implementation: 'Configuration only: set model.slice_upper_quantile to 0.98 in configs/training.yaml.
+    The option is built (KneeAbnormalityModel.encode_batch) and applies in training
+    and prediction. No Python change. It is applied on top of whatever loader quantile
+    the incumbent holds.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The best measured deterministic mapping; no loader change.
+  status: completed
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality-refined-radimagenet/autoresearch/campaigns/pretraining-input/seed-ideas.yaml
+  experiments:
+  - slice-upper-quantile-098-20261004T223353Z-9b2352e9
+  decision: provisional_accept
+- id: autoaugment-intensity
+  mechanism_id: pretraining-augmentation
+  parent_idea_id: null
+  title: Use the pretraining's AutoAugment intensity operations in place of our gamma
+    and contrast augmentation
+  opportunity: 'Evidence-backed. The backbone was trained with torchvision''s AutoAugment
+    ImageNet policy on every image, and its stored BatchNorm statistics were collected
+    on those images. Passing our slices through that policy brings them to the stored
+    statistics (stem gap 0.044 to 0.015-0.017, fluid series 0.180 to 0.017-0.019),
+    while our own gamma and contrast augmentation leaves the gap where it is. So the
+    backbone already knows these appearance changes: they regularize without asking
+    it to learn a new invariance.'
+  mechanism: data.autoaugment_intensity.probability 1.0 and data.intensity_augmentation.probability
+    0.0. In training only, each slice gets one randomly chosen sub-policy of the ImageNet
+    policy with its own operation probabilities and magnitudes (posterize, solarize,
+    autocontrast, equalize, contrast, brightness, sharpness, invert); the policy's
+    rotate, shear and colour steps are skipped, because our affine augmentation handles
+    geometry together with the token positions and the images are grey. It runs after
+    our affine, noise, smoothing, resolution and GIN steps and before normalization.
+    Validation and prediction are unchanged.
+  precedents:
+  - prior-work.md, The pretraining augmentation on our slices, and the single-operation
+    readings.
+  - 'prior-work.md, The pretraining recipe: AutoAugment ImageNet on, MixUp off.'
+  novelty: AutoAugment has never been run in our fine-tuning.
+  coverage: All training slices; about three quarters receive at least one operation.
+  exploitation: 'autoaugment_intensity_slices per epoch (the slices that received
+    at least one operation: expect about three quarters of the roughly 90,000 training
+    slices of an epoch, zero means it did not run); training loss and x1 per epoch
+    against the incumbent; per-label deltas; training seconds.'
+  budget: 'The operations run slice by slice on the GPU: estimated 1.3 to 1.6 times
+    the incumbent, unmeasured; inside the range.'
+  implementation: 'Configuration only: set data.autoaugment_intensity.probability
+    to 1.0 and data.intensity_augmentation.probability to 0.0 in configs/training.yaml,
+    keeping the other fields of intensity_augmentation as they are. The option is
+    built (modeling/pretraining_augmentation.py, called in encode_batch). No Python
+    change.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The largest measured closing of the gap on the augmentation
+    side.
+  status: completed
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality-refined-radimagenet/autoresearch/campaigns/pretraining-input/seed-ideas.yaml
+  experiments:
+  - autoaugment-intensity-20261004T225355Z-2a879d99
+  - autoaugment-intensity-20261004T231503Z-4d75246d
+  decision: reject
+- id: fluid-type-upper-quantile
+  mechanism_id: bright-end-clipping
+  parent_idea_id: loader-upper-quantile-098
+  title: Bright-end quantile 0.98 for the fluid-sensitive series only, 0.995 for the
+    others
+  opportunity: 'Evidence-backed. The two groups want different clipping: the fluid-sensitive
+    series are closest to the pretraining statistics at 0.98 (stem gap 0.031 against
+    0.162 at 0.995), the other series at 0.995 (0.044 against 0.052 at 0.98). A single
+    loader value has to compromise; a value per series type does not.'
+  mechanism: data.fluid_upper_quantile 0.98 and data.upper_quantile 0.995 in configs/training.yaml.
+    The loader uses fluid_upper_quantile for the three fluid-sensitive series types
+    and upper_quantile for the other three, in training and prediction.
+  precedents:
+  - 'prior-work.md, Intensity mapping: fluid and non-fluid columns of the loader quantile
+    table.'
+  novelty: Per-series-type intensity scaling has not been tried.
+  coverage: All studies; the three fluid-sensitive series types change, the others
+    are at 0.995.
+  exploitation: input_fluid_std about 0.26 and input_other_std about 0.28. The reference
+    run predates these scalars; on the unchanged recipe they are about 0.20 (fluid)
+    and 0.28 (other), and every run of this campaign logs them. Then x4 against the
+    incumbent and against both loader-quantile seeds; per-label deltas.
+  budget: Same cost as the incumbent.
+  implementation: 'Configuration only, two values: add "fluid_upper_quantile: 0.98"
+    under data, next to upper_quantile, and set data.upper_quantile to 0.995 whatever
+    the incumbent holds (0.995, 0.99 or 0.98), so the run is never identical to the
+    incumbent. Keep model.slice_upper_quantile as the incumbent has it. No Python
+    change.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The measured optimum of each group at once.
+  status: completed
+  created_revision: 1
+  seeded: /home/claudio/src/knee-abnormality-refined-radimagenet/autoresearch/campaigns/pretraining-input/seed-ideas-2.yaml
+  experiments:
+  - fluid-type-upper-quantile-20261004T231751Z-c19e605a
+  decision: reject
+- id: fluid-brightness
+  mechanism_id: fluid-intensity-gain
+  parent_idea_id: null
+  title: Brighten the fluid-sensitive series
+  opportunity: Evidence-backed. Multiplying the fluid-sensitive slices by 1.5 brings
+    them the closest to the pretraining statistics of anything measured for that group
+    (stem gap 0.014 against 0.180, stem variance 0.84 against 0.41). The same gain
+    on the other series overshoots (stem gap 0.194), so it is applied to the fluid-sensitive
+    series only. Unlike bright-end clipping it also raises the mean, which the fat-suppressed
+    images lack.
+  mechanism: 'model.fluid_brightness: every slice of a fluid-sensitive series is multiplied
+    by this value and clamped to 1, right after scaling to [0, 1] and before augmentation,
+    in training and prediction. Value 1.5 when the incumbent''s fluid series are still
+    at loader quantile 0.995 with model.slice_upper_quantile null; value 1.2 when
+    an earlier seed already raised their contrast (data.upper_quantile below 0.995,
+    data.fluid_upper_quantile set, or model.slice_upper_quantile set).'
+  precedents:
+  - 'prior-work.md, Intensity mapping: brightness x1.5, fluid 0.014 / 0.84, non-fluid
+    0.194 / 1.28.'
+  novelty: A per-type gain has not been tried.
+  coverage: The three fluid-sensitive series types of every study.
+  exploitation: input_fluid_mean and input_fluid_std must rise by close to the gain
+    (a little less, from the clamp at 1) while input_other_mean and input_other_std
+    stay where the earlier runs of this campaign have them (about 0.28 for the std
+    on the unchanged recipe); x4 and per-label deltas.
+  budget: Same cost as the incumbent.
+  implementation: 'Configuration only: set model.fluid_brightness in configs/training.yaml
+    to 1.5 or 1.2 by the rule in the mechanism, and state in the developer report
+    which case applied. No Python change.'
+  open_choices: None; the value is fixed by the rule above.
+  dependencies: []
+  priority_rationale: The closest measured match for the fluid group; a different
+    tool from clipping.
+  status: completed
+  created_revision: 1
+  seeded: /home/claudio/src/knee-abnormality-refined-radimagenet/autoresearch/campaigns/pretraining-input/seed-ideas-2.yaml
+  experiments:
+  - fluid-brightness-20261005T002208Z-1fe8f3a5
+  decision: reject
+- id: no-bilateral-smoothing
+  mechanism_id: off-distribution-augmentation
+  parent_idea_id: null
+  title: Train without the bilateral smoothing augmentation
+  opportunity: 'Evidence-backed on the measurement, a guess on the score. Bilateral
+    smoothing was adopted on ReXNet-200 with ImageNet weights. On this backbone it
+    is the augmentation that moves the input furthest from the pretraining statistics
+    in the deep layers (late-layer gap 0.077 against 0.044 without it, overall 0.052
+    against 0.037): smoothed slices are something the backbone never saw.'
+  mechanism: data.smoothing_augmentation.probability 0.0 (incumbent 0.2). Nothing
+    else changes.
+  precedents:
+  - 'prior-work.md, Our augmentations: bilateral smoothing row.'
+  - 'revisits campaign, ResNet-18 before the normalization fix: removing smoothing
+    did not pass.'
+  novelty: First removal on the corrected input and on this backbone.
+  coverage: 20% of training slices lose the smoothing; validation unchanged.
+  exploitation: smoothing_affected_acquisitions must be zero; training loss, x1 per
+    epoch and the gap between training and validation loss against the incumbent (a
+    wider gap means it was regularizing); per-label deltas.
+  budget: Slightly faster than the incumbent; inside the range.
+  implementation: 'Configuration only: set data.smoothing_augmentation.probability
+    to 0.0 in configs/training.yaml and keep spatial_sigma and range_sigma_range as
+    they are. No Python change.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Free; the largest measured late-layer shift among our augmentations.
+  status: completed
+  created_revision: 1
+  seeded: /home/claudio/src/knee-abnormality-refined-radimagenet/autoresearch/campaigns/pretraining-input/seed-ideas-2.yaml
+  experiments:
+  - no-bilateral-smoothing-20261005T004250Z-91a209ce
+  decision: reject
+- id: no-contrast-mixing
+  mechanism_id: off-distribution-augmentation
+  parent_idea_id: null
+  title: Train without contrast mixing
+  opportunity: 'Evidence-backed on the measurement, a guess on the score. Contrast
+    mixing blends a slice with another series'' slice, which lowers its contrast (stem
+    variance 0.58 against 0.66) and raises the stem gap to 0.083 against 0.060: it
+    pushes the input in the direction the contrast seeds try to correct, and a blend
+    of two MRI contrasts is an image the pretraining never contained.'
+  mechanism: data.contrast_mixing_augmentation.probability 0.0 (incumbent 0.3). Nothing
+    else changes.
+  precedents:
+  - 'prior-work.md, Our augmentations: contrast mixing row.'
+  - 'augmentation campaign: contrast mixing adopted on ReXNet-200 with ImageNet weights.'
+  novelty: First removal on these weights.
+  coverage: 30% of training studies lose the mixing; validation unchanged.
+  exploitation: contrast_mixing_studies and contrast_mixing_acquisitions must be zero;
+    input_fluid_std and input_other_std against the incumbent; training and validation
+    loss, x1 per epoch; per-label deltas.
+  budget: Same cost as the incumbent.
+  implementation: 'Configuration only: set data.contrast_mixing_augmentation.probability
+    to 0.0 in configs/training.yaml and keep target_weight_range as it is. No Python
+    change.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Free; acts on the same contrast gap from the augmentation side.
+  status: completed
+  created_revision: 1
+  seeded: /home/claudio/src/knee-abnormality-refined-radimagenet/autoresearch/campaigns/pretraining-input/seed-ideas-2.yaml
+  experiments:
+  - no-contrast-mixing-20261005T012244Z-811efd8a
+  decision: provisional_accept
+- id: no-gin
+  mechanism_id: off-distribution-augmentation
+  parent_idea_id: null
+  title: Train without the GIN augmentation
+  opportunity: 'Evidence-backed on the measurement, a guess on the score. GIN passes
+    the slice through a random convolutional network. Under it the frozen pretrained
+    network stops reading the slices as knee MRI (knee-class mass 0.773 against 0.959),
+    the largest loss of any augmentation we use: for 30% of the slices the backbone''s
+    knee features are pushed off. GIN was adopted for robustness across sites, so
+    the per-site reading matters here.'
+  mechanism: data.gin_augmentation.probability 0.0 (incumbent 0.3). Nothing else changes.
+  precedents:
+  - 'prior-work.md, Our augmentations: GIN row.'
+  - 'revisits campaign, ResNet-18 before the normalization fix: GIN replaced by a
+    much weaker augmentation, -0.0015 on the sites-out split.'
+  novelty: First removal on the corrected input and on this backbone, on the standard
+    fold.
+  coverage: 30% of training slices lose GIN; validation unchanged.
+  exploitation: gin_affected_acquisitions must be zero; training and validation loss
+    and x1 per epoch; per-label deltas; x4 against the incumbent.
+  budget: Slightly faster than the incumbent; inside the range.
+  implementation: 'Configuration only: set data.gin_augmentation.probability to 0.0
+    in configs/training.yaml and keep blend_max as it is. No Python change.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Free; the augmentation that most disturbs what the backbone
+    recognises.
+  status: completed
+  created_revision: 1
+  seeded: /home/claudio/src/knee-abnormality-refined-radimagenet/autoresearch/campaigns/pretraining-input/seed-ideas-2.yaml
+  experiments:
+  - no-gin-20261005T014307Z-fd897de7
+  - no-gin-20261005T020921Z-64aa9ce9
+  decision: reject
+- id: rotation-30
+  mechanism_id: pretraining-augmentation
+  parent_idea_id: null
+  title: Rotation range 30 degrees instead of 10
+  opportunity: Evidence-backed on the measurement, a guess on the score. The pretraining
+    policy rotates images by up to 30 degrees, and RadImageNet knees are not orientation-normalized.
+    Rotating our slices lowers the overall gap to the pretraining statistics (0.033
+    to 0.024 at 15 degrees and 0.019 at 30) and nearly closes the non-fluid stem gap
+    (0.021 to 0.004), so a wider rotation is an augmentation the backbone already
+    handles.
+  mechanism: data.affine_augmentation.rotation_degrees 30.0 (incumbent 10.0). Probability,
+    translation and scale range unchanged. The affine augmentation already rotates
+    the token positions with the image.
+  precedents:
+  - 'prior-work.md, The pretraining augmentation on our slices: rotation row.'
+  novelty: The rotation range has not been varied on these weights.
+  coverage: 70% of training slices (the affine probability); validation unchanged.
+  exploitation: Training and validation loss and x1 per epoch against the incumbent;
+    per-label deltas, with the side-specific labels (medial and lateral meniscus and
+    OA) the ones to watch.
+  budget: Same cost as the incumbent.
+  implementation: 'Configuration only: set data.affine_augmentation.rotation_degrees
+    to 30.0 in configs/training.yaml. No Python change.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Free and measured.
+  status: completed
+  created_revision: 2
+  seeded: /home/claudio/src/knee-abnormality-refined-radimagenet/autoresearch/campaigns/pretraining-input/seed-ideas-3.yaml
+  experiments:
+  - rotation-30-20261005T025145Z-c672e0c4
+  decision: reject
+- id: study-cutmix
+  mechanism_id: study-cutmix
+  parent_idea_id: null
+  title: CutMix between slices of the same study and series type
+  opportunity: A guess, with a neutral gap measurement. The pretraining configuration
+    sets CutMix (alpha 1.0). Pasting a box from another slice of the same study and
+    series type keeps the study's labels exactly right, because both slices belong
+    to the same knee, and CutMix moves the input no further from the pretraining statistics
+    (stem gap 0.035 against 0.044). It forces the pooling to use evidence from partial
+    slices.
+  mechanism: data.study_cutmix_augmentation.probability 0.5. In training only, each
+    slice with that probability has a random box (side fraction sqrt(1 - u), u uniform,
+    random centre) replaced by the same box of another slice of the same study and
+    series type; slices with no partner are left alone. Labels and token positions
+    are unchanged. It runs after our other augmentations and before normalization.
+  precedents:
+  - prior-work.md, The pretraining recipe (CutMix alpha 1.0 set) and the CutMix rows
+    of the augmentation table.
+  novelty: CutMix has never been run in our fine-tuning.
+  coverage: About half of the training slices.
+  exploitation: study_cutmix_slices per epoch (expect about half of the roughly 90,000
+    training slices) and study_cutmix_area (the mean replaced share over all slices,
+    about 0.15); training and validation loss and x1 per epoch; per-label deltas.
+  budget: Same cost as the incumbent within a few percent.
+  implementation: 'Configuration only: set data.study_cutmix_augmentation.probability
+    to 0.5 in configs/training.yaml. The option is built (modeling/pretraining_augmentation.py,
+    study_cutmix, called in encode_batch). No Python change.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The label-safe form of the pretraining's CutMix.
+  status: completed
+  created_revision: 2
+  seeded: /home/claudio/src/knee-abnormality-refined-radimagenet/autoresearch/campaigns/pretraining-input/seed-ideas-3.yaml
+  experiments:
+  - study-cutmix-20261005T033142Z-4d7e04f5
+  decision: reject
+- id: union-bag-loss
+  mechanism_id: union-bag
+  parent_idea_id: null
+  title: Extra loss on bags that join two studies, labelled with the OR of their labels
+  opportunity: 'A guess. Mixing two studies with labels in proportion to their share
+    is wrong for our labels: a tear visible on three slices does not become half a
+    tear. The correct label of the slices of two knees pooled together is the OR.
+    Training the attention pooling on such bags asks it to find a finding among twice
+    as many slices, half of them from a knee without it, which is what larger inference
+    bags and big studies demand.'
+  mechanism: trainer.union_bag_loss_weight 0.5. In training, the studies of each batch
+    are paired at random (four pairs at batch 8); the already-encoded tokens of each
+    pair are pooled as one bag by the model's own pooling; the target is 1 - (1 -
+    a)(1 - b) for the two studies' soft labels; a label counts when both studies have
+    it observed or an observed one is positive; the class-balanced BCE of these bags,
+    times the weight, is added to the loss. No extra backbone pass. Validation and
+    prediction are unchanged.
+  precedents:
+  - 'dense-bag pooling goal: robustness of the pooling across study sizes and inference
+    multipliers.'
+  - 'augmentation campaign: pooled-output MixUp +0.0007 and image MixUp +0.0006 on
+    ReXNet-200, not separated.'
+  novelty: Union bags have not been tried.
+  coverage: Every training study, as one of four bags per batch.
+  exploitation: 'union_bag_loss, union_bags (expect about 1,750 per epoch: 3,495 studies
+    in batches of 8, four bags each) and union_bag_positive_rate; the x4 minus x1
+    difference against the incumbent''s (the bag-size robustness reading); per-label
+    deltas.'
+  budget: One extra pooling pass per step; same cost as the incumbent within a few
+    percent.
+  implementation: 'Configuration only: set trainer.union_bag_loss_weight to 0.5 in
+    configs/training.yaml. The option is built (KneeModule._union_bag_loss in training/lightning.py).
+    No Python change.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The correct-label form of mixing studies; cheap.
+  status: completed
+  created_revision: 2
+  seeded: /home/claudio/src/knee-abnormality-refined-radimagenet/autoresearch/campaigns/pretraining-input/seed-ideas-3.yaml
+  experiments:
+  - union-bag-loss-20261005T035255Z-eac9bf78
+  decision: reject
+- id: input-mask-centred-one
+  mechanism_id: input-mask
+  parent_idea_id: null
+  title: Random smooth input mask with mean 1 instead of 0.5
+  opportunity: A guess. The previous campaign's masks all averaged 0.5 and cost about
+    0.0024, with or without a policy. A mask of mean 0.5 halves the input the standard
+    weights expect, and prediction then had to be scaled to match. A mask that varies
+    around 1 keeps the same spatially smooth brightness perturbation, which is the
+    regularizer the authors describe, without the shift in scale, and needs no correction
+    at prediction.
+  mechanism: 'trainer.input_mask kind random, grid 64, kernel 13, sigma 6.0, low 0.5,
+    epochs null, and model.input_mask_expectation true. In training the normalized
+    input is multiplied by a smooth random field per slice: cells uniform in [0.5,
+    1.5] on a 64 x 64 lattice, resized to 224 by nearest neighbour and blurred (kernel
+    13, sigma 6); the field has mean 1 and standard deviation about 0.08. At prediction
+    the input is multiplied by the stored constant low + 0.5 = 1.0, so it is unchanged.'
+  precedents:
+  - 'prior-work.md, The mask procedure in our training: three runs at mean 0.5, -0.0023
+    to -0.0026.'
+  novelty: A mask centred at 1 has not been run.
+  coverage: Every training slice, all epochs.
+  exploitation: input_mask_mean (expect 1.00), input_mask_std (about 0.08), input_mask_slices
+    and input_mask_expectation_mean (1.00); training and validation loss and x1 per
+    epoch against the incumbent and against the earlier mean-0.5 runs; per-label deltas.
+  budget: Same cost as the incumbent within a few percent.
+  implementation: 'Configuration only, in configs/training.yaml: add under trainer
+    the block "input_mask:" with kind: random, grid: 64, kernel: 13, sigma: 6.0, low:
+    0.5, epochs: null (the recipe has no input_mask block yet; all six keys go in
+    it); and set model.input_mask_expectation to true (the config refuses one without
+    the other). The option is built (RandomInputMask). No Python change.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Separates the mask's regularization from its scale shift.
+  status: completed
+  created_revision: 2
+  seeded: /home/claudio/src/knee-abnormality-refined-radimagenet/autoresearch/campaigns/pretraining-input/seed-ideas-3.yaml
+  experiments:
+  - input-mask-centred-one-20261005T041305Z-78a77d88
+  decision: reject
+- id: heated-weights-mask-release
+  mechanism_id: mask-trained-weights
+  parent_idea_id: heated-weights
+  title: Heated weights with the mask kept for the first three epochs, then removed
+  opportunity: A guess with a measured motive. The heated checkpoint was trained on
+    inputs under a mask of mean 0.5; frozen, it reads our slices as knee MRI with
+    mass 0.987 under that strength and 0.223 at full strength, and its runs dip in
+    epoch 1. Keeping the condition it was trained under for the first epochs, then
+    removing it, lets the head and the anchor settle before the input changes, instead
+    of changing weights and input condition at once.
+  mechanism: The heated-weights settings (model.pretrained_weights radimagenet_policy,
+    optimizer.backbone_lr 0.0002, optimizer.anchor_alpha_early 0.00088, optimizer.anchor_alpha_late
+    0.000088) plus trainer.input_mask kind random, grid 64, kernel 13, sigma 6.0,
+    low 0.0, epochs 3, and model.input_mask_expectation true. Epochs 1 to 3 train
+    under the random smooth mask of mean 0.5 and validate with the input multiplied
+    by 0.5; from epoch 4 the mask is off in training and the stored constant becomes
+    1, so validation and prediction use the plain input.
+  precedents:
+  - 'prior-work.md, Mask-trained weights: input strength reading and the first-epoch
+    dip.'
+  - 'refined-radimagenet campaign: mask for six epochs then four without, -0.0017
+    on the ResNet-18 with standard weights.'
+  novelty: The mask has not been combined with the weights that were trained under
+    it.
+  coverage: All studies; epochs 1 to 3 masked.
+  exploitation: input_mask_slices non-zero in epochs 1 to 3 and absent after; input_mask_expectation_mean
+    0.5 then 1.0; x1 per epoch against the heated-weights run (the comparison that
+    isolates the mask) and against the incumbent; the epoch-1 dip and the change at
+    epoch 4.
+  budget: Same cost as the incumbent.
+  implementation: 'Configuration only, in configs/training.yaml: set the four heated-weights
+    values above (already there if heated-weights was accepted); under trainer, add
+    the block "input_mask:" with kind: random, grid: 64, kernel: 13, sigma: 6.0, low:
+    0.0, epochs: 3, replacing the block if input-mask-centred-one was accepted and
+    left one there; set model.input_mask_expectation to true. No Python change. Report
+    the result against the incumbent and against the heated-weights run.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The one untested pairing of the authors' weights with the authors'
+    mask.
+  status: completed
+  created_revision: 2
+  seeded: /home/claudio/src/knee-abnormality-refined-radimagenet/autoresearch/campaigns/pretraining-input/seed-ideas-3.yaml
+  experiments:
+  - heated-weights-mask-release-20261005T043322Z-661c0df7
+  decision: reject
+- id: split-knee-bag-loss
+  mechanism_id: union-bag
+  parent_idea_id: union-bag-loss
+  title: Extra loss on chimera knees, the medial half of one study joined to the lateral
+    half of another
+  opportunity: 'A guess, on a mechanism the model already has. Medial and lateral
+    findings co-occur in the same knee (OA above all), so the model can score a side
+    from the other side''s evidence. A bag made of the medial half of study A and
+    the lateral half of study B has exactly known side labels, medial from A and lateral
+    from B, and breaks that co-occurrence: half of the pairs carry a finding on one
+    side only, which real knees rarely give. Every token already has its medial-lateral
+    coordinate (the half-knee loss uses it), so the halves are cut in the knee''s
+    own frame in every plane.'
+  mechanism: 'trainer.split_knee_bag_loss_weight 0.5. In training, the studies of
+    each batch are paired at random (four pairs at batch 8). In each pair, one study
+    keeps only its tokens more than 10 mm medial of the midline and the other only
+    its tokens more than 10 mm lateral (the existing COMPARTMENT_MIDLINE_BAND_MM);
+    the kept, already-encoded tokens are pooled as one bag by the model''s own pooling.
+    Only the five side labels count: Medial Meniscus, Medial OA and MCL (a medial
+    structure) take the medial donor''s label, Lateral Meniscus and Lateral OA the
+    lateral donor''s, each when observed in its donor; the other seven labels are
+    left out of this loss (trainer.split_knee_other_labels none, the default). Its
+    class-balanced BCE, times the weight, is added to the loss. A pair in which a
+    donor has no token on its side (a study of unknown knee side) is left whole and
+    not counted. No extra backbone pass; validation and prediction unchanged.'
+  precedents:
+  - 'The half-knee loss of the recipe: per-half meniscus scores from the same medial-lateral
+    coordinate.'
+  - 'union-bag-loss: the same pairing with whole studies and OR labels.'
+  novelty: Recombining halves of different knees has not been tried.
+  coverage: Every training study, as one half of one of four bags per batch; five
+    labels.
+  exploitation: 'split_knee_bag_loss, split_knee_bags (expect about 1,600 per epoch:
+    about 1,750 pairs less those with a study of unknown knee side) and split_knee_kept_token_share
+    (about 0.4); the per-label deltas of the five side labels and the medial-lateral
+    crossed-error counts of the validation metrics against the incumbent; x4 and x1.'
+  budget: One extra pooling pass per step; same cost as the incumbent within a few
+    percent.
+  implementation: 'Configuration only: set trainer.split_knee_bag_loss_weight to 0.5
+    in configs/training.yaml and leave trainer.split_knee_other_labels absent (default
+    none). The option is built (KneeModule._chimera_bag_loss in training/lightning.py).
+    Keep every other bag-loss key as the incumbent has it. No Python change.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: A label-exact mix of two studies aimed at the side labels.
+  status: completed
+  created_revision: 3
+  seeded: /home/claudio/src/knee-abnormality-refined-radimagenet/autoresearch/campaigns/pretraining-input/seed-ideas-4.yaml
+  experiments:
+  - split-knee-bag-loss-20261005T045320Z-0a6425d0
+  decision: reject
+- id: split-knee-bag-average
+  mechanism_id: union-bag
+  parent_idea_id: split-knee-bag-loss
+  title: Chimera knees with the non-side labels averaged over the two donors
+  opportunity: 'A guess, on a mechanism the model already has. Medial and lateral
+    findings co-occur in the same knee (OA above all), so the model can score a side
+    from the other side''s evidence. A bag made of the medial half of study A and
+    the lateral half of study B has exactly known side labels, medial from A and lateral
+    from B, and breaks that co-occurrence: half of the pairs carry a finding on one
+    side only, which real knees rarely give. Every token already has its medial-lateral
+    coordinate (the half-knee loss uses it), so the halves are cut in the knee''s
+    own frame in every plane.'
+  mechanism: trainer.split_knee_bag_loss_weight 0.5. In training, the studies of each
+    batch are paired at random (four pairs at batch 8). In each pair, one study keeps
+    only its tokens more than 10 mm medial of the midline and the other only its tokens
+    more than 10 mm lateral (the existing COMPARTMENT_MIDLINE_BAND_MM); the kept,
+    already-encoded tokens are pooled as one bag by the model's own pooling. Medial
+    Meniscus, Medial OA and MCL take the medial donor's label, Lateral Meniscus and
+    Lateral OA the lateral donor's, each when observed in its donor; the other seven
+    labels take the average of the two donors' labels, when observed in both, since
+    the bag holds half of each knee (trainer.split_knee_other_labels average). Its
+    class-balanced BCE, times the weight, is added to the loss. A pair in which a
+    donor has no token on its side (a study of unknown knee side) is left whole and
+    not counted. No extra backbone pass; validation and prediction unchanged.
+  precedents:
+  - 'The half-knee loss of the recipe: per-half meniscus scores from the same medial-lateral
+    coordinate.'
+  - 'union-bag-loss: the same pairing with whole studies and OR labels.'
+  novelty: Recombining halves of different knees has not been tried.
+  coverage: Every training study, as one half of one of four bags per batch; all twelve
+    labels.
+  exploitation: 'split_knee_bag_loss, split_knee_bags (expect about 1,600 per epoch:
+    about 1,750 pairs less those with a study of unknown knee side) and split_knee_kept_token_share
+    (about 0.4); the per-label deltas of the five side labels and the medial-lateral
+    crossed-error counts of the validation metrics against the incumbent; x4 and x1.'
+  budget: One extra pooling pass per step; same cost as the incumbent within a few
+    percent.
+  implementation: 'Configuration only: set trainer.split_knee_bag_loss_weight to 0.5
+    and trainer.split_knee_other_labels to average in configs/training.yaml (both
+    keys, whatever the incumbent holds). Report it against the incumbent and against
+    split-knee-bag-loss. The option is built (KneeModule._chimera_bag_loss in training/lightning.py).
+    Keep every other bag-loss key as the incumbent has it. No Python change.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The same chimera training all twelve labels; the pair of runs
+    settles the choice.
+  status: completed
+  created_revision: 3
+  seeded: /home/claudio/src/knee-abnormality-refined-radimagenet/autoresearch/campaigns/pretraining-input/seed-ideas-4.yaml
+  experiments:
+  - split-knee-bag-average-20261005T051318Z-ce4411f0
+  - split-knee-bag-average-20261005T051613Z-a09ba656
+  decision: reject
+- id: split-knee-bag-or
+  mechanism_id: union-bag
+  parent_idea_id: split-knee-bag-loss
+  title: Chimera knees with the non-side labels as the OR of the two donors
+  opportunity: 'A guess, on a mechanism the model already has. Medial and lateral
+    findings co-occur in the same knee (OA above all), so the model can score a side
+    from the other side''s evidence. A bag made of the medial half of study A and
+    the lateral half of study B has exactly known side labels, medial from A and lateral
+    from B, and breaks that co-occurrence: half of the pairs carry a finding on one
+    side only, which real knees rarely give. Every token already has its medial-lateral
+    coordinate (the half-knee loss uses it), so the halves are cut in the knee''s
+    own frame in every plane.'
+  mechanism: trainer.split_knee_bag_loss_weight 0.5. In training, the studies of each
+    batch are paired at random (four pairs at batch 8). In each pair, one study keeps
+    only its tokens more than 10 mm medial of the midline and the other only its tokens
+    more than 10 mm lateral (the existing COMPARTMENT_MIDLINE_BAND_MM); the kept,
+    already-encoded tokens are pooled as one bag by the model's own pooling. Medial
+    Meniscus, Medial OA and MCL take the medial donor's label, Lateral Meniscus and
+    Lateral OA the lateral donor's, each when observed in its donor; the other seven
+    labels take the OR of the two donors' labels, 1 - (1 - a)(1 - b), counted when
+    both donors have the label observed or an observed one is positive, as in union-bag-loss
+    (trainer.split_knee_other_labels or). Its class-balanced BCE, times the weight,
+    is added to the loss. A pair in which a donor has no token on its side (a study
+    of unknown knee side) is left whole and not counted. No extra backbone pass; validation
+    and prediction unchanged.
+  precedents:
+  - 'The half-knee loss of the recipe: per-half meniscus scores from the same medial-lateral
+    coordinate.'
+  - 'union-bag-loss: the same pairing with whole studies and OR labels.'
+  novelty: Recombining halves of different knees has not been tried.
+  coverage: Every training study, as one half of one of four bags per batch; all twelve
+    labels.
+  exploitation: 'split_knee_bag_loss, split_knee_bags (expect about 1,600 per epoch:
+    about 1,750 pairs less those with a study of unknown knee side) and split_knee_kept_token_share
+    (about 0.4); the per-label deltas of the five side labels and the medial-lateral
+    crossed-error counts of the validation metrics against the incumbent; x4 and x1.'
+  budget: One extra pooling pass per step; same cost as the incumbent within a few
+    percent.
+  implementation: 'Configuration only: set trainer.split_knee_bag_loss_weight to 0.5
+    and trainer.split_knee_other_labels to "or" (quoted, so YAML keeps it a string)
+    in configs/training.yaml, both keys whatever the incumbent holds. Report it against
+    the incumbent, split-knee-bag-loss and split-knee-bag-average. The option is built
+    (KneeModule._chimera_bag_loss in training/lightning.py). Keep every other bag-loss
+    key as the incumbent has it. No Python change.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The third labelling of the same chimera; the three runs settle
+    the choice.
+  status: completed
+  created_revision: 3
+  seeded: /home/claudio/src/knee-abnormality-refined-radimagenet/autoresearch/campaigns/pretraining-input/seed-ideas-4.yaml
+  experiments:
+  - split-knee-bag-or-20261005T053350Z-a54c3624
+  - split-knee-bag-or-20261005T053612Z-ccada898
+  decision: reject
+- id: front-back-bag-loss
+  mechanism_id: union-bag
+  parent_idea_id: split-knee-bag-loss
+  title: Chimera knees cut front to back, the anterior half of one study joined to
+    the posterior half of another
+  opportunity: A guess, the split knee on the other axis. Every token also carries
+    its anterior-posterior coordinate in the knee's frame. PF OA lives in the anterior
+    compartment and a Baker's cyst in the posterior one, so a bag made of the anterior
+    half of study A and the posterior half of study B has exactly known labels for
+    those two, and teaches the pooling to read each from its own region instead of
+    from findings that travel with it.
+  mechanism: trainer.front_back_bag_loss_weight 0.5 and trainer.front_back_other_labels
+    or. In training, the studies of each batch are paired at random (four pairs at
+    batch 8). In each pair, one study keeps only its tokens more than 10 mm anterior
+    of the knee centre and the other only its tokens more than 10 mm posterior; the
+    kept, already-encoded tokens are pooled as one bag by the model's own pooling.
+    PF OA takes the anterior donor's label and Baker's the posterior donor's, each
+    when observed in its donor; the other ten labels take the OR of the two donors'
+    labels, 1 - (1 - a)(1 - b), counted when both donors have the label observed or
+    an observed one is positive. Its class-balanced BCE, times the weight, is added
+    to the loss. A pair in which a donor has no token on its side is left whole and
+    not counted. No extra backbone pass; validation and prediction unchanged.
+  precedents:
+  - 'split-knee-bag-loss: the same construction on the medial-lateral coordinate.'
+  - The OA region detector of the recipe already pools tokens with anterior coordinate
+    above zero.
+  novelty: Recombining anterior and posterior halves of different knees has not been
+    tried.
+  coverage: Every training study, as one half of one of four bags per batch; all twelve
+    labels.
+  exploitation: front_back_bag_loss, front_back_bags (expect about 1,600 per epoch)
+    and front_back_kept_token_share (about 0.4); the per-label deltas of PF OA and
+    Baker's first, then x4 and x1 against the incumbent and against the three split-knee
+    runs.
+  budget: One extra pooling pass per step; same cost as the incumbent within a few
+    percent.
+  implementation: 'Configuration only: set trainer.front_back_bag_loss_weight to 0.5
+    and trainer.front_back_other_labels to "or" (quoted, so YAML keeps it a string)
+    in configs/training.yaml. The option is built (KneeModule._chimera_bag_loss in
+    training/lightning.py). Keep every other bag-loss key as the incumbent has it.
+    No Python change.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Two more labels with exact chimera labels, on a built mechanism.
+  status: completed
+  created_revision: 3
+  seeded: /home/claudio/src/knee-abnormality-refined-radimagenet/autoresearch/campaigns/pretraining-input/seed-ideas-4.yaml
+  experiments:
+  - front-back-bag-loss-20261005T055435Z-ee9367bc
+  - front-back-bag-loss-20261005T055612Z-6ae1ac22
+  decision: reject
+- id: transplant-bag-loss
+  mechanism_id: union-bag
+  parent_idea_id: union-bag-loss
+  title: Finding transplant, the most attended tokens of one study dropped into the
+    whole of another
+  opportunity: 'A guess aimed at the dense-bag goal. At inference with more slices,
+    a finding is a few tokens among thousands. Moving only the tokens the pooling
+    attends to most in study A into the full bag of study B builds exactly that case
+    in training: the host is whole, the donor''s evidence is a small minority, and
+    the bag''s labels are the OR of the two. It is union-bag-loss with a sparse donor,
+    so the pooling must find a needle rather than half a bag.'
+  mechanism: trainer.transplant_bag_loss_weight 0.5. In training, the studies of each
+    batch are paired at random as donor and host (four pairs at batch 8). For the
+    donor, the attention scores of its already-encoded tokens are computed without
+    gradient; for each of the twelve labels the top 2% of its tokens are selected
+    and the union is kept (about a fifth of the donor's tokens), the rest are dropped.
+    The kept donor tokens and all host tokens are pooled as one bag by the model's
+    own pooling. The target is the OR of the two studies' labels, 1 - (1 - a)(1 -
+    b), counted when both have the label observed or an observed one is positive.
+    Its class-balanced BCE, times the weight, is added to the loss. No extra backbone
+    pass; validation and prediction unchanged.
+  precedents:
+  - 'union-bag-loss: whole studies joined with OR labels.'
+  - 'dense-bag pooling goal: robustness of the pooling across study sizes and inference
+    multipliers.'
+  novelty: Attention-selected token transplants have not been tried.
+  coverage: Every training study, as donor or host of one of four bags per batch;
+    all labels.
+  exploitation: transplant_bag_loss, transplant_bags (expect about 1,750 per epoch)
+    and transplant_donor_token_share (about 0.2); the x4 minus x1 difference against
+    the incumbent's and against union-bag-loss (the bag-size robustness reading);
+    per-label deltas.
+  budget: One extra attention and pooling pass per step; same cost as the incumbent
+    within a few percent.
+  implementation: 'Configuration only: set trainer.transplant_bag_loss_weight to 0.5
+    in configs/training.yaml. The option is built (KneeModule._transplant_bag_loss
+    in training/lightning.py; the 2% per label is the constant TRANSPLANT_TOKEN_FRACTION).
+    Keep every other bag-loss key as the incumbent has it. No Python change.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The mix that most directly trains finding sparse evidence in
+    a large bag.
+  status: completed
+  created_revision: 3
+  seeded: /home/claudio/src/knee-abnormality-refined-radimagenet/autoresearch/campaigns/pretraining-input/seed-ideas-4.yaml
+  experiments:
+  - transplant-bag-loss-20261005T061449Z-e8e6c933
+  decision: reject
+- id: learned-mask-policy
+  mechanism_id: input-mask
+  parent_idea_id: input-mask-centred-one
+  title: Mask policy with a learning signal that can move it
+  opportunity: 'A guess with a diagnosed cause. In the previous campaign the policy
+    never learned: its Beta parameters stayed at 1.000 and its gradient norm at 0.0001,
+    so both policy runs were the random mask. Three things starved it: the loss weighted
+    the reward by a logsumexp over 4,096 cells, which is dominated by one cell; the
+    reward had no baseline, so every mask in a batch was pushed the same way; and
+    one reward per study was spread over 4,096 cells per slice. This seed fixes those
+    three and nothing else, so the authors'' procedure gets a run in which the mask
+    actually depends on the image.'
+  mechanism: 'A small policy network (ResNet-10t from the standard Refined-RadImageNet
+    weights, then two heads) reads each normalized slice and outputs the Beta parameters
+    of an 8 x 8 grid of cells. A mask is sampled, shifted to the range [0.5, 1.5]
+    (mean near 1 at the start), resized to 224 and blurred, and multiplies the normalized
+    input in training. The policy is trained by REINFORCE on the study''s class-balanced
+    BCE: its loss is the mean over slices of the per-slice mean log-density of the
+    sampled cells times the study''s advantage, where the advantage is the detached
+    study loss minus the batch mean, divided by the batch standard deviation. Prediction
+    multiplies the input by the constant 1.0.'
+  precedents:
+  - 'prior-work.md, The mask procedure in our training: policy uniform, gradient norm
+    0.0001.'
+  - 'Frozen source of the earlier implementation: outputs/autoresearch/refined-radimagenet/experiments/policy-mask-rn10t-20261004T114633Z-b68939c7/source/src/knee_abnormality
+    (modeling/input_mask.py and the input_mask parts of training/lightning.py and
+    config.py).'
+  novelty: First policy run with a baseline, a per-cell mean and a coarse grid.
+  coverage: Every training slice, all epochs.
+  exploitation: 'First whether the policy moved: input_mask_alpha_mean and input_mask_beta_mean
+    away from 1.0, input_mask_alpha_slice_std above 0.01 (the mask depends on the
+    image) and input_mask_policy_grad_norm well above the earlier 0.0001. Then input_mask_mean
+    and input_mask_std, and x4, x1 per epoch and per-label deltas against the incumbent
+    and against input-mask-centred-one, which is the same mask without a policy.'
+  budget: 'One extra ResNet-10t pass with gradient per step: estimated 1.5 to 1.8
+    times the incumbent (the earlier policy run on a ResNet-18 took 1.5 times); inside
+    the range.'
+  implementation: 'Source change in three files; do not touch modeling/model.py or
+    the loader. (1) config.py, InputMaskConfig: extend kind to Literal["none", "random",
+    "policy"] and add policy_backbone_lr: PositiveFiniteFloat = 0.0006. (2) modeling/pretraining_augmentation.py:
+    add class PolicyInputMask(nn.Module), whose forward keeps gradients (unlike RandomInputMask.forward,
+    which is under no_grad), by porting PolicyInputMask from the frozen source named
+    in the precedents (constructor arguments settings, image_size, seed; feature_extractor
+    timm resnet10t.c3_in1k with num_classes 0 loaded strictly from radimagenet_state_dict("resnet10t.c3_in1k");
+    alpha and beta heads Linear 512-512, BatchNorm1d, ReLU, Linear 512-512, BatchNorm1d,
+    ReLU, Linear 512-cells; seeded sampling under torch.random.fork_rng with the generator
+    state kept on the module; the separable Gaussian smoothing), with exactly these
+    differences: cells = settings.grid squared with grid 8; no base_alpha or base_beta
+    buffers and no 0.9/0.1 mixing: the Beta parameters are exp of the head outputs
+    clamped to [-4, 4], and the last Linear of each head is initialized with zero
+    weight and zero bias so the policy starts uniform; self.log_likelihood = distribution.log_prob(cells).mean(-1),
+    not logsumexp; the mask is settings.low plus the smoothed sampled cells; forward
+    returns the detached mask and stores self.mask, self.new_alpha and self.new_beta
+    (the clamped log-parameters, detached); no expectation method. (3) training/lightning.py:
+    in KneeModule.__init__, when config.trainer.input_mask.kind is "policy", set self.input_mask
+    = PolicyInputMask(config.trainer.input_mask, config.data.image_size, config.seed)
+    and fill self.model.input_mask_expectation with config.trainer.input_mask.low
+    + 0.5, as the existing random branch does; training_step already passes self.input_mask
+    to encode_batch and logs input_mask_mean, input_mask_std and input_mask_slices.
+    After logits are computed in training_step, when the kind is "policy", add the
+    policy loss to the loss: with autocast disabled, per-study reward = class-balanced
+    BCE of logits.detach() against batch["target"] over the observed labels (weights
+    self.class_balance_weights[0] for targets >= 0.5 and [1] otherwise, summed over
+    labels and divided by the observed count clamped to 1), advantage = (reward -
+    reward.mean()) / (reward.std() + 1e-6), or zeros when the batch has fewer than
+    two studies, policy_loss = (self.input_mask.log_likelihood * advantage[encoded["study"]]).mean().
+    Log per epoch with self._log_epoch_metric: input_mask_policy_loss, input_mask_alpha_mean
+    and input_mask_beta_mean (means of new_alpha.exp() and new_beta.exp()), input_mask_alpha_slice_std
+    (new_alpha.exp().mean(1) .std()), and in on_before_optimizer_step input_mask_policy_grad_norm
+    (total norm of the policy parameters'' gradients). Pass self.input_mask in the
+    heads tuple of build_optimizer when the kind is "policy"; in build_optimizer give
+    the parameters of head.feature_extractor the rate settings policy_backbone_lr
+    and the policy heads the head rate, as the frozen source does. Override configure_gradient_clipping
+    as the frozen source does, so the model''s parameters and the policy''s parameters
+    are each clipped at the configured norm separately. Save and restore the policy''s
+    generator state in on_save_checkpoint and on_load_checkpoint as the frozen source
+    does. The policy''s parameters are stored in the checkpoint under input_mask.*,
+    outside model.*, so prediction is unaffected. (4) configs/training.yaml: under
+    trainer, input_mask with kind: policy, grid: 8, kernel: 13, sigma: 6.0, low: 0.5,
+    epochs: null, policy_backbone_lr: 0.0006; model.input_mask_expectation true.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The authors' procedure with a policy that can learn; last because
+    it is the only source change.
+  status: completed
+  created_revision: 4
+  seeded: /home/claudio/src/knee-abnormality-refined-radimagenet/autoresearch/campaigns/pretraining-input/seed-ideas-5.yaml
+  experiments:
+  - learned-mask-policy-20261005T063516Z-6b81db7e
+  decision: invalid
+- id: other-type-upper-quantile
+  mechanism_id: bright-end-clipping
+  parent_idea_id: loader-upper-quantile-098
+  title: Bright-end quantile 0.98 for the non-fluid series only, 0.995 for the fluid-sensitive
+    ones
+  opportunity: 'Evidence-backed by two runs of this campaign, each one run and weak
+    evidence. loader-upper-quantile-099 (+0.000439, 80% [-0.000048, +0.000911]) and
+    loader-upper-quantile-098 (+0.000420, 80% [-0.000230, +0.001087]) show the same
+    split: the labels read on bone and ligament rise (0.98: MCL +0.0040, Lateral OA
+    +0.0035, ACL +0.0018, PF OA +0.0011, Fracture +0.0009) and the three fluid labels
+    fall, more at the stronger clipping (Baker''s -0.0013 then -0.0035, Effusion -0.0004
+    then -0.0008, Synovitis -0.0020 then -0.0017). Clipping the brightest 2% of a
+    fluid-sensitive series saturates the fluid itself (input_fluid_saturated_share
+    0.020). Keeping the fluid-sensitive series at 0.995 and clipping only the others
+    should keep the gains and drop the losses. It is the mirror of fluid-type-upper-quantile,
+    so the two runs together say which group carries each effect.'
+  mechanism: data.upper_quantile 0.98 and data.fluid_upper_quantile 0.995 in configs/training.yaml.
+    The loader uses fluid_upper_quantile for the three fluid-sensitive series types
+    and upper_quantile for the other three, in training and prediction.
+  precedents:
+  - 'run-notes.md, runs 1 and 2: per-label deltas of the two loader-quantile seeds.'
+  novelty: The loader quantile has only been moved for every series at once.
+  coverage: All studies; the three non-fluid series types change, the fluid-sensitive
+    ones stay at 0.995.
+  exploitation: loader_other_bright_tail 0.02 and loader_fluid_bright_tail 0.005;
+    input_other_saturated_share about 0.020 and input_fluid_saturated_share about
+    0.005; input_other_std about 0.305 as in loader-upper-quantile-098. Then x4 against
+    the incumbent, against both loader-quantile seeds and against fluid-type-upper-quantile;
+    per-label deltas split into the fluid labels (Effusion, Synovitis, Baker's) and
+    the others.
+  budget: Same cost as the incumbent.
+  implementation: 'Configuration only, two values: set data.upper_quantile to 0.98
+    and add "fluid_upper_quantile: 0.995" under data, next to upper_quantile, whatever
+    the incumbent holds. Keep model.slice_upper_quantile as the incumbent has it.
+    No Python change. Activation signature: the data.upper_quantile row of contract.md,
+    loader_other_bright_tail > 0.0125 at epoch 0 (0.005 at the unchanged recipe, 0.02
+    here).'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Free; separates the group that gains from clipping from the
+    group that loses.
+  status: completed
+  created_revision: 50
+  seeded: /home/claudio/src/knee-abnormality-refined-radimagenet/autoresearch/campaigns/pretraining-input/keeper-ideas-1.yaml
+  experiments:
+  - other-type-upper-quantile-20261004T234137Z-a7431a40
+  decision: reject
+- id: slice-quantile-other-types
+  mechanism_id: bright-end-clipping
+  parent_idea_id: slice-upper-quantile-098
+  title: Per-slice quantile 0.98 on the non-fluid series only; fluid-sensitive slices
+    left as loaded
+  opportunity: 'Evidence-backed by three runs of this campaign, each one run and weak
+    evidence. Every version of bright-end clipping gave the same label split: loader
+    0.99 (+0.000439), loader 0.98 (+0.000420) and per-slice 0.98 (+0.000716, 80% [+0.000009,
+    +0.001413], accepted). The labels read on bone, ligament and meniscus rise (per-slice
+    run: MCL +0.0056, Lateral OA +0.0041, Lateral Meniscus +0.0037, ACL +0.0021) and
+    the fluid labels fall in all three (Baker''s -0.0013, -0.0035, -0.0020; Effusion
+    -0.0004, -0.0008, -0.0012; Synovitis -0.0020, -0.0017, -0.0006). Fluid is the
+    brightest tissue of a fluid-sensitive slice, so a 2% clip saturates it (input_fluid_saturated_share
+    0.020). Rescaling only the non-fluid series should keep the gains and return the
+    fluid labels to the reference.'
+  mechanism: A new option model.slice_upper_quantile_types with values all (default,
+    the incumbent's behaviour), other and fluid. With other, a slice of a fluid-sensitive
+    series type is not divided by its quantile (its divisor is 1); the slices of the
+    other three series types are rescaled as now. Training and prediction alike. The
+    run sets it to other and keeps model.slice_upper_quantile 0.98.
+  precedents:
+  - 'run-notes.md, runs 1, 2 and 4: per-label deltas of the three clipping runs.'
+  novelty: The per-slice rescaling has only been applied to every series type at once.
+  coverage: All studies; the slices of the three non-fluid series types change against
+    the reference, the fluid-sensitive ones are as in the reference.
+  exploitation: slice_quantile_skipped_slices above 0 and slice_quantile_rescaled_slices
+    below the incumbent's 91,400 per epoch; input_fluid_saturated_share back near
+    0.005 and input_fluid_std near 0.20, input_other_saturated_share about 0.021 and
+    input_other_std about 0.313 as in the incumbent. Then x4 against the incumbent
+    and against the historical control; per-label deltas split into the fluid labels
+    (Effusion, Synovitis, Baker's) and the others.
+  budget: Same cost as the incumbent.
+  implementation: 'Source change, three exact edits, then two configuration values.
+    (1) config.py, ModelConfig, directly below slice_upper_quantile: add the field
+    slice_upper_quantile_types of type Literal["all", "other", "fluid"] with default
+    "all". (2) modeling/model.py: in KneeAbnormalityModel.__init__, below "self.slice_upper_quantile
+    = model.slice_upper_quantile", add "self.slice_upper_quantile_types = model.slice_upper_quantile_types",
+    and below "self.slice_quantile_rescaled = None" add "self.slice_quantile_skipped
+    = None". In encode_batch, inside "if self.slice_upper_quantile is not None:",
+    directly after the line that computes top with kthvalue and clamp_min, add: if
+    self.slice_upper_quantile_types != "all": selected = self.fluid_type[token_type]
+    == (self.slice_upper_quantile_types == "fluid"); top = torch.where(selected, top,
+    torch.ones_like(top)); self.slice_quantile_skipped = (~selected).sum().detach().
+    Leave the division, the clamp and the existing slice_quantile_rescaled line as
+    they are; this block runs in training and prediction. (3) training/lightning.py,
+    training_step, directly after the existing block that logs slice_quantile_rescaled_slices:
+    if self.config.model.slice_upper_quantile_types != "all", call self._log_epoch_metric("slice_quantile_skipped_slices",
+    self.model.slice_quantile_skipped.float(), 1, "sum"). Nothing else in Python.
+    (4) configs/training.yaml: under model, next to slice_upper_quantile, add "slice_upper_quantile_types:
+    other"; keep slice_upper_quantile 0.98. Activation signature: slice_quantile_skipped_slices
+    > 0 at epoch 0 (epoch count of training slices of fluid-sensitive series left
+    unscaled; logged only when the option is not all).'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Small and exact; the direct test of the label split that three
+    runs agree on.
+  status: completed
+  created_revision: 86
+  seeded: /home/claudio/src/knee-abnormality-refined-radimagenet/autoresearch/campaigns/pretraining-input/keeper-ideas-2.yaml
+  experiments:
+  - slice-quantile-other-types-20261005T000148Z-7ace6ea2
+  decision: reject
+- id: autoaugment-intensity-025
+  mechanism_id: pretraining-augmentation
+  parent_idea_id: autoaugment-intensity
+  title: AutoAugment intensity operations on a quarter of the slices, our intensity
+    augmentation kept
+  opportunity: 'Evidence-backed for the diagnosis, a guess for the outcome. autoaugment-intensity
+    (-0.002907, 80% [-0.004085, -0.001671], one run) applied the policy to every slice
+    and switched our gamma and contrast augmentation off, two changes at their extremes.
+    Its x1 curve was behind the incumbent from the first epoch (-0.0068) and still
+    closing at the tenth (-0.0030), and its input statistics moved far from the incumbent''s
+    (input_fluid_mean 0.410 against 0.341, input_fluid_std 0.295 against 0.263): with
+    the policy on every slice the model rarely trains on an input like the validation
+    one. The pretraining applied the policy to every image but for 90 epochs; in ten
+    epochs a minority of policy slices keeps most batches on the scored distribution
+    while still showing the backbone its pretraining operations.'
+  mechanism: data.autoaugment_intensity.probability 0.25 and data.intensity_augmentation
+    exactly as the incumbent has it (probability and ranges unchanged). Per slice,
+    with probability 0.25, one sub-policy of torchvision's AutoAugment ImageNet policy
+    with its rotate, shear and colour steps skipped, in training only.
+  precedents:
+  - 'run-notes.md, run 5: autoaugment-intensity at probability 1.0 without our intensity
+    augmentation.'
+  novelty: The policy has only been run on every slice and in place of our intensity
+    augmentation.
+  coverage: About 18% of the training slices each epoch (0.25 times the 72% of sub-policies
+    with an intensity step that fires).
+  exploitation: autoaugment_intensity_slices about 17,000 per epoch; input_fluid_mean
+    and input_fluid_std between the incumbent's (0.341, 0.263) and run 5's (0.410,
+    0.295), close to the incumbent's. Then x4 and x1 per epoch against the incumbent
+    (the first-epoch deficit of run 5 should mostly go) and against run 5; per-label
+    deltas.
+  budget: About 1.04 times the reference (the policy loop on a quarter of the slices;
+    run 5 took 1.15).
+  implementation: 'Configuration only: set data.autoaugment_intensity.probability
+    to 0.25 in configs/training.yaml and leave data.intensity_augmentation as the
+    incumbent has it. No Python change. Activation signature: the data.autoaugment_intensity.probability
+    row of contract.md, autoaugment_intensity_slices > 0 at epoch 0.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Free; the mild point of a mechanism measured only at its extreme.
+  status: completed
+  created_revision: 110
+  seeded: /home/claudio/src/knee-abnormality-refined-radimagenet/autoresearch/campaigns/pretraining-input/keeper-ideas-3.yaml
+  experiments:
+  - autoaugment-intensity-025-20261005T031147Z-e70f6c11
+  decision: reject
+- id: slice-quantile-soft-knee
+  mechanism_id: bright-end-clipping
+  parent_idea_id: slice-upper-quantile-098
+  title: Per-slice quantile stretch with a smooth roll-off above 0.8 instead of the
+    hard clip at 1
+  opportunity: 'Evidence-backed for the diagnosis, a guess for the outcome. slice-upper-quantile-098
+    (+0.000716, 80% [+0.000009, +0.001413], accepted) raised MCL +0.0056, Lateral
+    OA +0.0041, Lateral Meniscus +0.0037 and ACL +0.0021 and lowered Baker''s -0.0020
+    and Effusion -0.0012. slice-quantile-other-types (-0.000952, 80% [-0.001677, -0.000240])
+    took the rescaling off the fluid-sensitive series and reversed exactly that split:
+    Baker''s +0.0020, Effusion +0.0020, Synovitis +0.0013 against MCL -0.0070, Lateral
+    OA -0.0056, Lateral Meniscus -0.0033, ACL -0.0033. Each is one run. Both effects
+    come from the same operation on the fluid-sensitive slices: dividing by the 98th
+    percentile stretches ligament, meniscus and cartilage (the gain), and clamping
+    at 1 flattens the brightest 2%, which is the fluid (the loss; input_fluid_saturated_share
+    0.020 against 0.005). A stretch that keeps the same gain below the knee and compresses
+    the top instead of flattening it should keep the first and give back the second.'
+  mechanism: A new option model.slice_quantile_soft_knee (null off, the incumbent's
+    behaviour). With a value k in (0, 1), after each slice is divided by its own quantile
+    and before the clamp, every value v above k is replaced by k + (1 - k) * tanh((v
+    - k) / (1 - k)). Values up to k are unchanged, so the stretch of the darker tissue
+    is exactly the incumbent's; the quantile itself (v = 1) lands at 0.95 for k =
+    0.8 and brighter pixels approach 1 without reaching it, so fluid keeps its gradation.
+    All series types, training and prediction alike. The run sets k = 0.8 with model.slice_upper_quantile
+    0.98.
+  precedents:
+  - 'run-notes.md, runs 4 and 8: the accepted per-slice stretch and its removal from
+    the fluid-sensitive series.'
+  novelty: Every clipping run so far saturated the top of the range; none compressed
+    it.
+  coverage: All studies and slices; pixels above 0.8 of each slice's 98th percentile
+    change against the incumbent.
+  exploitation: slice_soft_knee_pixels above 0; input_fluid_saturated_share and input_other_saturated_share
+    near 0 (against 0.020 and 0.021 on the incumbent); input_fluid_std and input_other_std
+    slightly below the incumbent's 0.263 and 0.313. Then x4 against the incumbent;
+    per-label deltas split into the fluid labels (Effusion, Synovitis, Baker's; expected
+    up) and MCL, Lateral OA, Lateral Meniscus, ACL (expected held).
+  budget: Same cost as the incumbent; one tanh per slice on the GPU.
+  implementation: 'Source change, three exact edits, then one configuration value.
+    (1) config.py, ModelConfig, directly below slice_upper_quantile: add the field
+    slice_quantile_soft_knee of type Annotated[float, Field(gt=0, lt=1)] | None with
+    default None. (2) modeling/model.py: in KneeAbnormalityModel.__init__, below "self.slice_upper_quantile
+    = model.slice_upper_quantile", add "self.slice_quantile_soft_knee = model.slice_quantile_soft_knee",
+    and below "self.slice_quantile_rescaled = None" add "self.slice_soft_knee_pixels
+    = None". In encode_batch, inside "if self.slice_upper_quantile is not None:",
+    replace the single line "valid_images = (valid_images / top[:, None, None, None]).clamp_(0,
+    1)" by: valid_images = valid_images / top[:, None, None, None]; then, if self.slice_quantile_soft_knee
+    is not None: knee = self.slice_quantile_soft_knee; above = valid_images > knee;
+    valid_images = torch.where(above, knee + (1 - knee) * torch.tanh((valid_images
+    - knee) / (1 - knee)), valid_images); self.slice_soft_knee_pixels = above.sum().detach();
+    then valid_images = valid_images.clamp_(0, 1). Leave the existing slice_quantile_rescaled
+    line as it is; the block runs in training and prediction. (3) training/lightning.py,
+    training_step, directly after the existing block that logs slice_quantile_rescaled_slices:
+    if self.config.model.slice_quantile_soft_knee is not None, call self._log_epoch_metric("slice_soft_knee_pixels",
+    self.model.slice_soft_knee_pixels.float(), 1, "sum"). Nothing else in Python.
+    (4) configs/training.yaml: under model, next to slice_upper_quantile, add "slice_quantile_soft_knee:
+    0.8"; keep slice_upper_quantile 0.98. Activation signature: slice_soft_knee_pixels
+    > 0 at epoch 0 (epoch count of training pixels the roll-off changed; logged only
+    when the option is set).'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Small and exact; aims at keeping both halves of the label split
+    that two runs isolate.
+  status: completed
+  created_revision: 160
+  seeded: /home/claudio/src/knee-abnormality-refined-radimagenet/autoresearch/campaigns/pretraining-input/keeper-ideas-4.yaml
+  experiments:
+  - slice-quantile-soft-knee-20261005T010301Z-bad3f2c1
+  decision: reject
+- id: series-quantile-stretch
+  mechanism_id: bright-end-clipping
+  parent_idea_id: slice-upper-quantile-098
+  title: One stretch factor per series (the mean of its slices' 98th percentiles)
+    instead of one per slice
+  opportunity: 'A guess that separates two readings of this campaign''s runs, each
+    one run. The per-slice stretch (slice-upper-quantile-098, +0.000716, accepted)
+    raises MCL, Lateral OA, Lateral Meniscus and ACL and lowers Baker''s and Effusion;
+    taking it off the fluid-sensitive series (slice-quantile-other-types, -0.000952)
+    reverses both. slice-quantile-soft-knee (+0.000025, 80% [-0.000266, +0.000314])
+    removed the saturation (0.004% of fluid pixels against 2.05%) at the same contrast
+    and the fluid labels did not come back (Baker''s +0.0003, Effusion +0.0008, Synovitis
+    -0.0008). So the flat top is not what costs them. What a per-slice divisor also
+    does is make every slice equally bright: a slice full of fluid has a high 98th
+    percentile and is stretched little, a slice without fluid has a low one and is
+    stretched a lot, so how much bright fluid a slice holds relative to the rest of
+    its series is normalized away. Effusion and Baker''s are read from exactly that.
+    One factor per series keeps the stretch of the dark tissue on average and keeps
+    the slices of a series in their true proportion.'
+  mechanism: A new option model.slice_upper_quantile_scope with values slice (default,
+    the incumbent's behaviour) and series. With series, each slice's own quantile
+    is still computed, then replaced by the mean of the quantiles of the slices of
+    the same series in the batch (same acquisition index); every slice of a series
+    is divided by that one value and clamped to 1. Training and prediction alike.
+    The run sets it to series with model.slice_upper_quantile 0.98.
+  precedents:
+  - 'run-notes.md, runs 4, 8 and 11: the per-slice stretch, its removal from the fluid-sensitive
+    series, and the roll-off.'
+  novelty: The stretch has only been computed per slice (model) or as a clip per series
+    (loader); never as a per-series gain.
+  coverage: All studies and slices; a slice changes against the incumbent by the ratio
+    of its own quantile to its series mean.
+  exploitation: slice_quantile_series_groups above 0; input_fluid_std and input_other_std
+    close to the incumbent's 0.263 and 0.313; input_fluid_saturated_share above the
+    incumbent's 0.020 on the fluid series (slices brighter than their series mean
+    now clip more). Then x4 against the incumbent; per-label deltas split into the
+    fluid labels (Effusion, Synovitis, Baker's; expected up if the relative brightness
+    is what they need) and MCL, Lateral OA, Lateral Meniscus, ACL (expected held).
+  budget: Same cost as the incumbent.
+  implementation: 'Source change, three exact edits, then one configuration value.
+    (1) config.py, ModelConfig, directly below slice_upper_quantile: add the field
+    slice_upper_quantile_scope of type Literal["slice", "series"] with default "slice".
+    (2) modeling/model.py: in KneeAbnormalityModel.__init__, below "self.slice_upper_quantile
+    = model.slice_upper_quantile", add "self.slice_upper_quantile_scope = model.slice_upper_quantile_scope",
+    and below "self.slice_quantile_rescaled = None" add "self.slice_quantile_series_groups
+    = None". In encode_batch, inside "if self.slice_upper_quantile is not None:",
+    directly after the line that computes top with kthvalue and clamp_min and before
+    the division, add: if self.slice_upper_quantile_scope == "series": groups = int(acquisition_index.max())
+    + 1; total = top.new_zeros(groups).index_add_(0, acquisition_index, top); count
+    = top.new_zeros(groups).index_add_(0, acquisition_index, torch.ones_like(top));
+    top = (total / count.clamp_min(1))[acquisition_index]; self.slice_quantile_series_groups
+    = (count > 0).sum().detach(). acquisition_index is the variable already defined
+    just above that block (slice_mask.nonzero(as_tuple=True)[0]), one entry per slice.
+    Leave the division, the clamp and the existing slice_quantile_rescaled line as
+    they are; the block runs in training and prediction. (3) training/lightning.py,
+    training_step, directly after the existing block that logs slice_quantile_rescaled_slices:
+    if self.config.model.slice_upper_quantile_scope == "series", call self._log_epoch_metric("slice_quantile_series_groups",
+    self.model.slice_quantile_series_groups.float(), 1, "sum"). Nothing else in Python.
+    (4) configs/training.yaml: under model, next to slice_upper_quantile, add "slice_upper_quantile_scope:
+    series"; keep slice_upper_quantile 0.98. Activation signature: slice_quantile_series_groups
+    > 0 at epoch 0 (epoch count of series whose slices were given one shared factor;
+    logged only when the scope is series).'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Small and exact; tells apart the two open readings of the fluid-label
+    loss.
+  status: completed
+  created_revision: 207
+  seeded: /home/claudio/src/knee-abnormality-refined-radimagenet/autoresearch/campaigns/pretraining-input/keeper-ideas-5.yaml
+  experiments:
+  - series-quantile-stretch-20261005T023230Z-dddceb71
+  decision: reject
+- id: no-bilateral-smoothing-on-no-mixing
+  mechanism_id: off-distribution-augmentation
+  parent_idea_id: no-bilateral-smoothing
+  title: Bilateral smoothing off on the incumbent that already trains without contrast
+    mixing
+  opportunity: 'Evidence-backed, two runs of this campaign, each one run. no-bilateral-smoothing
+    scored +0.000902 over the per-slice quantile incumbent (80% [-0.000073, +0.001923],
+    short of the rule by 0.00007; Baker''s +0.0057, Fracture +0.0054, MCL +0.0039,
+    all three fluid labels up). no-contrast-mixing scored +0.001952 on the same incumbent
+    (80% [+0.000994, +0.002938], accepted; Fracture +0.0066, Lateral OA +0.0046, Baker''s
+    +0.0044). Both remove an augmentation that moves the training input away from
+    the pretraining statistics and from the validation input; smoothing was measured
+    on a recipe that still mixed contrasts. Whether the two add is a guess: they share
+    a label pattern (Fracture, Baker''s, MCL up; ACL -0.003 in both), which can mean
+    overlap.'
+  mechanism: data.smoothing_augmentation.probability 0.0 on the current incumbent,
+    which holds data.contrast_mixing_augmentation.probability 0.0 and model.slice_upper_quantile
+    0.98. Training only; validation and prediction never smoothed.
+  precedents:
+  - 'run-notes.md, runs 10 and 12: each switch-off alone on the per-slice quantile
+    incumbent.'
+  novelty: The two switch-offs have only been run one at a time.
+  coverage: All training slices; about 20% of them were smoothed on the incumbent.
+  exploitation: smoothing_off_slices and contrast_mixing_off_slices both about 93,569
+    per epoch. Then x4 against the incumbent and against run 10; per-label deltas
+    on Baker's, Fracture, MCL (up in both single runs) and ACL (down in both).
+  budget: About 0.95 of the reference (run 10 trained in 1,100 s).
+  implementation: 'Configuration only: set data.smoothing_augmentation.probability
+    to 0.0 in configs/training.yaml and keep spatial_sigma and range_sigma_range as
+    they are; keep every other value of the incumbent, including data.contrast_mixing_augmentation.probability
+    0.0. No Python change. Activation signature: the switched-off augmentation row
+    of contract.md, smoothing_off_slices > 0 at epoch 0.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Free; the largest rejected positive of the campaign on top of
+    its largest acceptance.
+  status: completed
+  created_revision: 217
+  seeded: /home/claudio/src/knee-abnormality-refined-radimagenet/autoresearch/campaigns/pretraining-input/keeper-ideas-6.yaml
+  experiments:
+  - no-bilateral-smoothing-on-no-mixing-20261005T021255Z-e09913ba
+  decision: reject
+- id: autoaugment-mild-operations
+  mechanism_id: pretraining-augmentation
+  parent_idea_id: autoaugment-intensity-025
+  title: AutoAugment at probability 0.25 with only its brightness, contrast, sharpness
+    and autocontrast steps
+  opportunity: 'A guess with a measured motive. Two runs of the policy lost about
+    the same at very different doses: autoaugment-intensity (every slice, -0.002907,
+    80% [-0.004085, -0.001671]) and autoaugment-intensity-025 (18% of the slices,
+    -0.003720, 80% [-0.005028, -0.002470]), each one run. A loss that does not scale
+    with the share of slices points at what the operations do rather than how often.
+    Four of them (Invert, Solarize, Posterize, Equalize) turn a slice into something
+    no validation slice resembles: inverted or folded intensities, eight grey levels,
+    a flat histogram; prior-work.md measured equalize and posterize as the largest
+    single-operation gaps (0.082 and 0.062 against 0.034 for brightness and 0.037
+    for sharpness). The other four are mild photometric changes of the kind our own
+    augmentation already makes.'
+  mechanism: The skipped-operation set of the AutoAugment step gains Invert, Solarize,
+    Posterize and Equalize, so a sub-policy applies only its Brightness, Contrast,
+    Sharpness and AutoContrast steps; sub-policies with none of those change nothing.
+    Probability 0.25, our intensity augmentation kept, training only.
+  precedents:
+  - 'run-notes.md, runs 5 and 17: the full operation set at probability 1.0 and 0.25.'
+  - 'prior-work.md, the pretraining augmentations: per-operation stem gaps.'
+  novelty: The policy has only been run with all its intensity operations.
+  coverage: Below 18% of the training slices each epoch (the sub-policies that hold
+    one of the four kept steps and fire).
+  exploitation: autoaugment_intensity_slices above 0 and below run 17's 16,931 per
+    epoch; input_fluid_mean and input_fluid_std at the incumbent's values within 0.01.
+    Then x4 and x1 per epoch against the incumbent (run 17 fell behind from epoch
+    5) and against run 17; per-label deltas on MCL, Baker's and Lateral Meniscus,
+    the largest losses of run 17.
+  budget: About 1.01 times the reference.
+  implementation: 'Source change, one exact edit, then one configuration value. (1)
+    modeling/pretraining_augmentation.py: in the frozenset AUTOAUGMENT_SKIPPED_OPERATIONS,
+    add the four names "Invert", "Solarize", "Posterize" and "Equalize" to the six
+    already there. Nothing else in Python; the function autoaugment_intensity already
+    skips every name in that set and already reports the slices it changed. (2) configs/training.yaml:
+    set data.autoaugment_intensity.probability to 0.25 and leave data.intensity_augmentation
+    as the incumbent has it. Activation signature: the data.autoaugment_intensity.probability
+    row of contract.md, autoaugment_intensity_slices > 0 at epoch 0.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: One-line change; separates the harsh operations from the policy
+    as a whole.
+  status: queued
+  created_revision: 303
+  seeded: /home/claudio/src/knee-abnormality-refined-radimagenet/autoresearch/campaigns/pretraining-input/keeper-ideas-7.yaml
+- id: union-bag-loss-01
+  mechanism_id: union-bag
+  parent_idea_id: union-bag-loss
+  title: Union bags of two studies at loss weight 0.1
+  opportunity: 'Evidence-backed for the diagnosis, a guess for the outcome. Both bag
+    losses were run at weight 0.5 only: union-bag-loss (-0.003706, 80% [-0.005447,
+    -0.001899]) and split-knee-bag-loss (-0.004919, 80% [-0.006380, -0.003556]), each
+    one run. Their x1 curves share a shape no augmentation run has: a constant deficit
+    from the second epoch on (about -0.009 and -0.005) instead of a slower curve that
+    closes. In the split-knee run the labels the bag loss trains and the labels it
+    leaves out lost alike. That is the picture of a second objective that takes attention
+    and head capacity from the study loss at any epoch, in proportion to its weight,
+    and not of a wrong target. At a fifth of the weight the bag loss is a regularizer
+    beside the study loss instead of a competitor.'
+  mechanism: trainer.union_bag_loss_weight 0.1 on the incumbent. Studies of a batch
+    are paired at random; each pair's tokens are pooled as one bag with OR labels;
+    class-balanced BCE times 0.1 is added to the loss. Training only.
+  precedents:
+  - 'run-notes.md, runs 19 and 22: the union and split-knee bag losses at weight 0.5.'
+  novelty: No bag loss has been run below weight 0.5.
+  coverage: Every training study, as one half of one of four bags per batch; all twelve
+    labels.
+  exploitation: union_bags about 1,747 per epoch, union_bag_loss near 0.7. Then the
+    x1 curve against the incumbent (run 19 sat 0.009 below from epoch 2; a deficit
+    of about a fifth of that would confirm the proportional reading) and x4; per-label
+    deltas on MCL, Lateral Meniscus and Contusion, the largest losses of run 19.
+  budget: Same cost as the incumbent within a few percent (run 19 took 1,134 s).
+  implementation: 'Configuration only: set trainer.union_bag_loss_weight to 0.1 in
+    configs/training.yaml. The option is built (KneeModule._union_bag_loss in training/lightning.py).
+    No Python change. Activation signature: the bag-loss row of contract.md, union_bags
+    > 0 at epoch 0.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Free; the mild point of a mechanism measured twice at one strong
+    weight.
+  status: queued
+  created_revision: 390
+  seeded: /home/claudio/src/knee-abnormality-refined-radimagenet/autoresearch/campaigns/pretraining-input/keeper-ideas-8.yaml
+- id: incumbent-rerun
+  mechanism_id: reference-control
+  parent_idea_id: no-contrast-mixing
+  title: Second run of the incumbent recipe, ordered by the user as a control
+  opportunity: 'Ordered by the user on 2026-10-05; a control, not a mechanism. All
+    eleven candidates measured against the no-contrast-mixing incumbent are negative,
+    and two small labels lose in almost every one whatever the mechanism: MCL (48
+    positives; -0.0099, -0.0073, -0.0148, -0.0043, -0.0113, -0.0104, -0.0175, -0.0105,
+    -0.0131, -0.0163) and Fracture (59 positives; -0.0083, -0.0047, -0.0047, -0.0069,
+    -0.0043, -0.0058, -0.0087, -0.0051). The incumbent itself gained +0.0020 and +0.0066
+    on them. That reads as the incumbent''s single run sitting high on those two labels,
+    which would shift every later delta by about -0.001 on the macro. A second run
+    of the same recipe at the same seed measures how far two runs of one recipe land
+    apart (training is not deterministic), which is the yardstick every delta of this
+    campaign needs.'
+  mechanism: None. The recipe of the incumbent, unchanged in behaviour. To give the
+    candidate a configuration difference, data.fluid_upper_quantile is written as
+    0.995, the value the loader already uses for the fluid-sensitive series through
+    data.upper_quantile 0.995, so every pixel the loader produces is the same.
+  precedents:
+  - run-notes.md, run 20, The reference, across runs 13 to 20.
+  novelty: No recipe of this campaign has been run twice.
+  coverage: All studies and labels.
+  exploitation: 'x4, x1 per epoch and the twelve per-label deltas against the incumbent:
+    their size is the run-to-run spread of one recipe. MCL and Fracture first. loader_fluid_bright_tail
+    and loader_other_bright_tail 0.005, contrast_mixing_off_slices about 93,569 and
+    slice_quantile_rescaled_slices about 91,400 per epoch, as on the incumbent. The
+    decision rule will most likely reject it; the result is read as a measurement,
+    not as an idea.'
+  budget: Same cost as the incumbent.
+  implementation: 'Configuration only: add "fluid_upper_quantile: 0.995" under data,
+    next to upper_quantile, in configs/training.yaml, and change nothing else. No
+    Python change. This is a control run with no mechanism to prove, so the activation
+    signature can only show that the incumbent recipe trained: contrast_mixing_off_slices
+    > 0 at epoch 0 (logged only while contrast mixing is off, as on the incumbent).
+    State in the report that the signature does not separate the candidate from the
+    incumbent because the two are meant to be the same.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Ordered by the user; the yardstick for every delta against this
+    incumbent.
+  status: completed
+  created_revision: 448
+  seeded: /home/claudio/src/knee-abnormality-refined-radimagenet/autoresearch/campaigns/pretraining-input/keeper-ideas-9.yaml
+  experiments:
+  - incumbent-rerun-20261005T065543Z-f0ce2e48
+  decision: reject
+- id: slice-window-channels
+  mechanism_id: bright-end-clipping
+  parent_idea_id: slice-upper-quantile-098
+  title: Stretched and unstretched slice side by side in the three input channels
+  opportunity: 'Evidence-backed for the motive, a guess for the outcome. Two runs
+    isolate a trade on the fluid-sensitive series: with the per-slice 0.98 stretch
+    MCL, Lateral OA, Lateral Meniscus and ACL gain (+0.0056, +0.0041, +0.0037, +0.0021
+    in slice-upper-quantile-098) and Baker''s and Effusion lose; with the stretch
+    taken off those series (slice-quantile-other-types) the fluid labels return (+0.0020,
+    +0.0020, Synovitis +0.0013) and the four lose what they gained. Three shapes of
+    one stretch (clip, roll-off, per series) landed within 0.0006 of each other, so
+    one image cannot serve both groups. The recipe feeds the same middle slice three
+    times, once per input channel, so two of the three channels carry nothing new.
+    They can carry the two scales at no cost in slices or compute, the way CT models
+    are given several intensity windows.'
+  mechanism: 'A new option model.slice_window_channels (false off, the incumbent''s
+    behaviour). When true, the stretch is no longer applied before augmentation; at
+    the point where the single channel is repeated three times, the channels become:
+    the slice divided by its own 0.98 quantile and clamped to 1, the slice as loaded,
+    and the stretched slice again. Two channels stretched keep the input close to
+    the incumbent''s; the middle channel gives the fluid its full range. Training
+    and prediction alike.'
+  precedents:
+  - 'run-notes.md, runs 4, 8, 11 and 15: the stretch, its removal from the fluid series,
+    and two reshaped versions.'
+  novelty: Every run so far gave the backbone one intensity scale per slice.
+  coverage: All studies and slices; one of three channels changes against the incumbent.
+  exploitation: slice_window_channel_gap above 0 (mean absolute difference between
+    the stretched and the unstretched channel, about 0.05 to 0.1). Then x4 against
+    the incumbent; per-label deltas split into Effusion, Synovitis, Baker's (expected
+    up) and MCL, Lateral OA, Lateral Meniscus, ACL (expected held).
+  budget: Same cost as the incumbent.
+  implementation: 'Source change, four exact edits, then one configuration value.
+    (1) config.py, ModelConfig, directly below slice_upper_quantile: add the field
+    slice_window_channels of type bool with default False. (2) modeling/model.py,
+    KneeAbnormalityModel.__init__: below "self.slice_upper_quantile = model.slice_upper_quantile"
+    add "self.slice_window_channels = model.slice_window_channels", and below "self.slice_quantile_rescaled
+    = None" add "self.slice_window_gap = None". (3) modeling/model.py, encode_batch:
+    change the condition "if self.slice_upper_quantile is not None:" of the block
+    that computes pixels, rank and top to "if self.slice_upper_quantile is not None
+    and not self.slice_window_channels:". Further down, replace the two lines "if
+    self.repeated_middle_slice:" / "valid_images = valid_images.expand(-1, SLICES_PER_INPUT,
+    -1, -1)" by: if self.repeated_middle_slice: if self.slice_window_channels: pixels
+    = valid_images.flatten(1); rank = max(1, round(self.slice_upper_quantile * pixels.shape[1]));
+    top = pixels.kthvalue(rank, dim=1).values.clamp_min(1e-3); stretched = (valid_images
+    / top[:, None, None, None]).clamp(0, 1); self.slice_window_gap = (stretched -
+    valid_images).abs().mean().detach(); self.slice_quantile_rescaled = (top < 1).sum().detach();
+    valid_images = torch.cat([stretched, valid_images, stretched], 1); else: valid_images
+    = valid_images.expand(-1, SLICES_PER_INPUT, -1, -1). The normalization line that
+    follows stays as it is. The block runs in training and prediction. (4) training/lightning.py,
+    training_step, directly after the existing block that logs slice_quantile_rescaled_slices:
+    if self.config.model.slice_window_channels, call self._log_epoch_metric("slice_window_channel_gap",
+    self.model.slice_window_gap.float(), studies). Nothing else in Python. (5) configs/training.yaml:
+    under model, next to slice_upper_quantile, add "slice_window_channels: true";
+    keep slice_upper_quantile 0.98. Activation signature: slice_window_channel_gap
+    > 0 at epoch 0 (logged only when the option is on; zero only if the two channels
+    were identical).'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Free in compute; the direct way to give each label group its
+    own scale.
+  status: completed
+  created_revision: 448
+  seeded: /home/claudio/src/knee-abnormality-refined-radimagenet/autoresearch/campaigns/pretraining-input/keeper-ideas-9.yaml
+  experiments:
+  - slice-window-channels-20261005T083424Z-68f235ff
+  decision: reject
+- id: slice-quantile-keep-axial-fluid
+  mechanism_id: bright-end-clipping
+  parent_idea_id: slice-upper-quantile-098
+  title: Per-slice stretch everywhere except the axial fluid-sensitive series
+  opportunity: 'A guess from anatomy on an evidence-backed trade. The stretch of the
+    fluid-sensitive series helps MCL, Lateral OA, the menisci and ACL and costs Baker''s
+    and Effusion (runs 4 and 8). Those two groups are not read on the same planes:
+    the collateral ligaments, the menisci and the tibiofemoral cartilage are read
+    on coronal and sagittal slices, the cruciates on sagittal ones; a Baker''s cyst
+    and a joint effusion are read best on the axial fluid-sensitive series (popliteal
+    fossa, suprapatellar recess). Leaving only that series unstretched gives the fluid
+    labels one plane at the loader''s scale while every plane the other group depends
+    on keeps the stretch. slice-quantile-other-types removed the stretch from all
+    three fluid planes; this removes it from one.'
+  mechanism: A new option model.slice_upper_quantile_keep_axial_fluid (false off,
+    the incumbent's behaviour). When true, a slice whose series type is fluid-sensitive
+    and axial is not divided by its quantile (its divisor is 1); every other slice
+    is rescaled as now. Training and prediction alike.
+  precedents:
+  - 'run-notes.md, runs 4 and 8: the stretch on all series, and off all three fluid-sensitive
+    planes.'
+  novelty: The stretch has only been switched by fluid sensitivity, never by plane.
+  coverage: All studies; the axial fluid-sensitive slices change against the incumbent,
+    about a sixth of the slices.
+  exploitation: slice_quantile_kept_slices above 0 and slice_quantile_rescaled_slices
+    below the incumbent's 91,400 per epoch by about that count; input_fluid_saturated_share
+    between 0.005 and 0.020. Then x4 against the incumbent; per-label deltas on Baker's
+    and Effusion (expected up) and on MCL, Lateral OA, Lateral Meniscus, ACL (expected
+    held, unlike run 8).
+  budget: Same cost as the incumbent.
+  implementation: 'Source change, three exact edits, then one configuration value.
+    (1) config.py, ModelConfig, directly below slice_upper_quantile: add the field
+    slice_upper_quantile_keep_axial_fluid of type bool with default False. (2) modeling/model.py:
+    in KneeAbnormalityModel.__init__, below "self.slice_upper_quantile = model.slice_upper_quantile",
+    add "self.slice_upper_quantile_keep_axial_fluid = model.slice_upper_quantile_keep_axial_fluid",
+    and below "self.slice_quantile_rescaled = None" add "self.slice_quantile_kept
+    = None". In encode_batch, inside "if self.slice_upper_quantile is not None:",
+    directly after the line that computes top with kthvalue and clamp_min and before
+    the division, add: if self.slice_upper_quantile_keep_axial_fluid: kept = self.fluid_type[token_type]
+    & (self.spatial_tokens.plane_lookup[token_type] == 0); top = torch.where(kept,
+    torch.ones_like(top), top); self.slice_quantile_kept = kept.sum().detach(). Plane
+    index 0 is Axial (plane order Axial, Coronal, Sagittal in modeling/spatial_tokens.py);
+    token_type is the variable defined just above that block. Leave the division,
+    the clamp and the existing slice_quantile_rescaled line as they are; the block
+    runs in training and prediction. (3) training/lightning.py, training_step, directly
+    after the existing block that logs slice_quantile_rescaled_slices: if self.config.model.slice_upper_quantile_keep_axial_fluid,
+    call self._log_epoch_metric("slice_quantile_kept_slices", self.model.slice_quantile_kept.float(),
+    1, "sum"). Nothing else in Python. (4) configs/training.yaml: under model, next
+    to slice_upper_quantile, add "slice_upper_quantile_keep_axial_fluid: true"; keep
+    slice_upper_quantile 0.98. Activation signature: slice_quantile_kept_slices >
+    0 at epoch 0 (epoch count of axial fluid-sensitive training slices left unscaled;
+    logged only when the option is on).'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Small and exact; splits the fluid-sensitive series by the plane
+    each label group is read on.
+  status: completed
+  created_revision: 448
+  seeded: /home/claudio/src/knee-abnormality-refined-radimagenet/autoresearch/campaigns/pretraining-input/keeper-ideas-9.yaml
+  experiments:
+  - slice-quantile-keep-axial-fluid-20261005T071345Z-9f3c887a
+  decision: reject
+- id: heated-weights-on-incumbent
+  mechanism_id: mask-trained-weights
+  parent_idea_id: heated-weights
+  title: The authors' mask-trained (heated) ResNet-10t checkpoint on the current incumbent
+  opportunity: Ordered by the user on 2026-10-05. heated-weights scored +0.001039
+    over the historical control (80% [-0.000650, +0.002647], one run), the largest
+    delta of the first seeds, with MCL +0.0096, ACL +0.0075, Lateral Meniscus +0.0053
+    and Contusion +0.0036 up and the OA labels down; the same size and pattern as
+    the two runs of the previous campaign (+0.0012, +0.0011). It was measured before
+    the per-slice quantile stretch and the removal of contrast mixing became the incumbent.
+    heated-weights-mask-release ran these weights on the current incumbent together
+    with a three-epoch mask (-0.002152) and its x1 curve was level with the incumbent
+    from epoch 4, the best of the runs on this incumbent; the weights alone have no
+    run on it.
+  mechanism: model.pretrained_weights radimagenet_policy, optimizer.backbone_lr 0.0002,
+    optimizer.anchor_alpha_early 0.00088, optimizer.anchor_alpha_late 0.000088, on
+    the current incumbent (model.slice_upper_quantile 0.98, contrast mixing off).
+    The rate and the anchor strengths follow the checkpoint's weight scale (convolution
+    RMS 0.0531 against 0.0158), as in heated-weights. No input mask.
+  precedents:
+  - 'run-notes.md, run 3: heated-weights on the historical control.'
+  - 'run-notes.md, run 21: the same weights with a three-epoch mask on the current
+    incumbent.'
+  novelty: First run of the heated weights alone on the stretched input without contrast
+    mixing.
+  coverage: All studies and labels.
+  exploitation: pretrained_conv_rms 0.05305. x4 and x1 per epoch against the incumbent
+    (run 3 was behind in epoch 1 and ahead from epoch 5), against run 21 (the mask's
+    share) and against run 3; per-label deltas against the known pattern (MCL, ACL,
+    Lateral Meniscus, Contusion up; the OA labels down).
+  budget: Same cost as the incumbent.
+  implementation: 'Configuration only, four values in configs/training.yaml: model.pretrained_weights
+    radimagenet_policy, optimizer.backbone_lr 0.0002, optimizer.anchor_alpha_early
+    0.00088, optimizer.anchor_alpha_late 0.000088. Keep every other value of the incumbent;
+    no trainer.input_mask block and model.input_mask_expectation false. No Python
+    change. Activation signature: the model.pretrained_weights row of contract.md,
+    pretrained_conv_rms > 0.04 at epoch 0.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Ordered by the user to run as soon as possible.
+  status: completed
+  created_revision: 484
+  seeded: /home/claudio/src/knee-abnormality-refined-radimagenet/autoresearch/campaigns/pretraining-input/keeper-ideas-10.yaml
+  experiments:
+  - heated-weights-on-incumbent-20261005T073414Z-c2371b78
+  decision: reject
+- id: feature-sparsity-penalty
+  mechanism_id: heated-in-one-model
+  parent_idea_id: heated-weights
+  title: L1 penalty on the final feature map, the heated checkpoint's signature trained
+    into the standard weights
+  opportunity: 'Asked by the user on 2026-10-05: the strengths of the heated and of
+    the standard weights in one model, obtained during training, with one checkpoint
+    at prediction. Evidence for the motive: an equal-weight blend of the incumbent
+    and a heated-weights run scores +0.001208 over the incumbent on fold 0 although
+    the heated run alone is 0.0022 below it (MCL +0.0040, ACL +0.0031, Lateral Meniscus
+    +0.0023), so the two make different errors; four runs of the heated weights give
+    ligaments, lateral meniscus and contusion up and the OA labels down. The one measured
+    difference between the checkpoints before any training is sparsity: 88% of the
+    heated checkpoint''s final features are zero on our slices against 48% for the
+    standard one, at equal linear-probe quality (prior-work.md). A guess: the sparse,
+    strongly firing local detectors are what serves the focal labels. If so the property
+    can be trained into the standard weights directly, without the second checkpoint.'
+  mechanism: A new option optimizer.feature_sparsity_weight (0.0 off, the incumbent's
+    behaviour). In training the mean of the backbone's final feature map (N x 512
+    x 7 x 7, after the last ReLU, so the mean is its L1 norm per element) is multiplied
+    by the weight and added to the loss. The run uses 0.05. Prediction is unchanged.
+  precedents:
+  - 'prior-work.md, Mask-trained (heated) weights: 48% against 88% zero final features.'
+  - run-notes.md, Equal-weight blends with the incumbent.
+  novelty: No run has put a pressure on the activations themselves.
+  coverage: All training slices.
+  exploitation: feature_zero_share per epoch (about 0.48 at the start on the standard
+    weights; the target is a clear rise toward the heated checkpoint's 0.88) and feature_sparsity_penalty.
+    If the zero share does not move, the weight was too small and the next value is
+    ten times larger; if it passes 0.9 early with x1 behind, ten times smaller. Then
+    x4 against the incumbent; per-label deltas against the heated pattern (MCL, ACL,
+    Lateral Meniscus, Contusion up) and on the two OA labels the heated weights lose.
+  budget: Same cost as the incumbent.
+  implementation: 'Source change, three exact edits, then one configuration value.
+    (1) config.py, the optimizer settings class that holds anchor_alpha_early and
+    anchor_alpha_late: add the field feature_sparsity_weight of type Annotated[float,
+    Field(ge=0, allow_inf_nan=False)] with default 0.0, directly below anchor_alpha_late.
+    (2) modeling/model.py: KneeAbnormalityModel.__init__, below "self.input_statistics
+    = None", add "self.feature_l1 = None" and "self.feature_zero_share = None". In
+    encode_batch, directly after the line "maps = self._encode_images(valid_images,
+    acquisition_index, token_type)", add: if self.training: self.feature_l1 = maps.float().mean();
+    self.feature_zero_share = (maps == 0).float().mean().detach(). Do not detach feature_l1;
+    it carries the gradient. (3) training/lightning.py, training_step, directly before
+    the block "if self.anchor_parameters:": if self.config.optimizer.feature_sparsity_weight
+    > 0: penalty = self.config.optimizer.feature_sparsity_weight * self.model.feature_l1;
+    loss = loss + penalty; self._log_epoch_metric("feature_sparsity_penalty", penalty,
+    studies). And, unconditionally in the same place, self._log_epoch_metric("feature_zero_share",
+    self.model.feature_zero_share, studies). The variable studies is the study count
+    already defined at the top of training_step. Nothing else in Python. (4) configs/training.yaml:
+    under optimizer, next to anchor_alpha_late, add "feature_sparsity_weight: 0.05".
+    Activation signature: feature_sparsity_penalty > 0 at epoch 0 (logged only when
+    the weight is positive).'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Asked by the user; no second network and no extra compute.
+  status: launched
+  created_revision: 501
+  seeded: /home/claudio/src/knee-abnormality-refined-radimagenet/autoresearch/campaigns/pretraining-input/keeper-ideas-11.yaml
+  experiments:
+  - feature-sparsity-penalty-20261005T085611Z-0ab381d6
+- id: anchor-toward-heated
+  mechanism_id: heated-in-one-model
+  parent_idea_id: heated-weights
+  title: Standard weights with the L2-SP anchor pointing at the heated checkpoint
+    instead of the starting weights
+  opportunity: 'Asked by the user on 2026-10-05, the same aim as feature-sparsity-penalty:
+    both checkpoints'' strengths in one model during training. The recipe already
+    holds the backbone near a reference set of weights (L2-SP, 0.01 on the stem and
+    layer1, 0.001 on the later layers). Today that reference is the starting point,
+    so the pull only limits drift. Pointing it at the heated checkpoint makes the
+    same term a guide: training starts from the standard weights, which are better
+    on the OA labels, and is drawn toward the solution that is better on ligaments,
+    menisci and contusion (blend +0.001208 over the incumbent). A guess; the two checkpoints
+    come from the same pretraining, the heated one continued under the authors'' mask.'
+  mechanism: A new option optimizer.anchor_target_weights with values initial (default,
+    the incumbent's behaviour) and radimagenet_policy. With radimagenet_policy, each
+    anchored backbone parameter's reference is the heated checkpoint's parameter of
+    the same name, multiplied by the ratio of the two parameters' norms (standard
+    over heated), so that the reference has the standard layer's scale (the heated
+    weights are 3.4 times larger overall, which BatchNorm absorbs). The anchor strengths
+    are a tenth of the incumbent's, 0.001 and 0.0001, because the reference now starts
+    far away instead of at distance zero.
+  precedents:
+  - 'run-notes.md, runs 3 and 21 and the blend table: what the heated checkpoint adds.'
+  novelty: The anchor has only ever pointed at the starting weights.
+  coverage: All anchored backbone layers, every step.
+  exploitation: anchor_target_distance (the distance between the starting weights
+    and the reference; positive only with this option) and anchor_penalty per epoch
+    (it starts high and should fall as the backbone moves toward the reference; on
+    the incumbent it starts at zero and rises). If the penalty dominates the loss
+    (above 0.3 in epoch 1) the strengths were too large. Then x4 against the incumbent;
+    per-label deltas against the heated pattern and on the OA labels.
+  budget: Same cost as the incumbent.
+  implementation: 'Source change, three exact edits, then three configuration values.
+    (1) config.py, the optimizer settings class, directly below anchor_alpha_late:
+    add the field anchor_target_weights of type Literal["initial", "radimagenet_policy"]
+    with default "initial". (2) training/lightning.py, in the module''s __init__,
+    in the loop "for index, (name, parameter) in enumerate(backbone.named_parameters()):"
+    that registers the anchor buffers: before the loop add: targets = radimagenet_state_dict(config.model.backbone,
+    "radimagenet_policy") if settings.anchor_target_weights == "radimagenet_policy"
+    else None; distance = 0.0 (import radimagenet_state_dict from knee_abnormality.modeling.radimagenet).
+    Inside the loop, in the branch "if alpha > 0:", replace the buffer value "parameter.detach().float().clone()"
+    by a variable reference computed just above it: reference = parameter.detach().float().clone();
+    if targets is not None: heated = targets[name].float().to(reference.device); reference
+    = heated * (reference.norm() / heated.norm().clamp_min(1e-12)); distance += float((parameter.detach().float()
+    - reference).square().sum()). After the loop: self.anchor_target_distance = math.sqrt(distance).
+    The names of backbone.named_parameters() are the keys of the checkpoint state
+    (the model loads it strictly). (3) training/lightning.py, on_train_epoch_end:
+    if self.config.optimizer.anchor_target_weights != "initial", call self._log_epoch_metric("anchor_target_distance",
+    self.anchor_target_distance, 1). Nothing else in Python; the penalty line that
+    uses the buffers stays as it is. (4) configs/training.yaml, under optimizer: add
+    "anchor_target_weights: radimagenet_policy" and set anchor_alpha_early to 0.001
+    and anchor_alpha_late to 0.0001. model.pretrained_weights stays radimagenet and
+    optimizer.backbone_lr stays as the incumbent has it. Activation signature: anchor_target_distance
+    > 0 at epoch 0 (logged only with this option; zero only if the reference equalled
+    the starting weights).'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Asked by the user; reuses the recipe's own anchor term, no extra
+    compute.
+  status: queued
+  created_revision: 501
+  seeded: /home/claudio/src/knee-abnormality-refined-radimagenet/autoresearch/campaigns/pretraining-input/keeper-ideas-11.yaml
+- id: slice-quantile-keep-sagittal-fluid
+  mechanism_id: bright-end-clipping
+  parent_idea_id: slice-upper-quantile-098
+  title: Per-slice stretch everywhere except the sagittal fluid-sensitive series
+  opportunity: Evidence-backed by the per-view validation scores of two runs, each
+    one run. Removing the stretch from all three fluid-sensitive planes (slice-quantile-other-types
+    against slice-upper-quantile-098, single-view AUC, mean of the last three epochs)
+    moved the labels plane by plane. On the sagittal fluid view Baker's +0.080 and
+    Medial OA +0.011 against MCL -0.020 and Synovitis -0.009; on the coronal fluid
+    view Baker's +0.016 against MCL -0.023; on the axial fluid view nothing above
+    0.010 (ACL -0.009, Lateral OA +0.010, Fracture +0.008). A same-seed rerun moves
+    single-view rows by up to about 0.006. So the fluid labels' loss under the stretch
+    sits on the sagittal fluid series, and MCL's gain sits on the coronal and sagittal
+    ones; MCL is read far better on the coronal fluid view (0.854 alone) than on the
+    sagittal one (0.733), so giving up the stretch on the sagittal series costs MCL
+    its weaker view and returns Baker's its largest single-view gain. slice-quantile-keep-axial-fluid
+    chose the axial plane from anatomy; these numbers point at the sagittal one.
+  mechanism: A new option model.slice_upper_quantile_keep_sagittal_fluid (false off,
+    the incumbent's behaviour). When true, a slice whose series type is fluid-sensitive
+    and sagittal is not divided by its quantile (its divisor is 1); every other slice
+    is rescaled as now. Training and prediction alike.
+  precedents:
+  - run-notes.md, runs 4 and 8 and the per-view table of 2026-10-05, the stretch on
+    all series and off all three fluid-sensitive planes.
+  novelty: The stretch has been switched by fluid sensitivity and for the axial plane,
+    never for the sagittal one.
+  coverage: All studies; the sagittal fluid-sensitive slices change against the incumbent.
+  exploitation: slice_quantile_kept_slices above 0 and slice_quantile_rescaled_slices
+    below the incumbent's 91,400 per epoch by that count. Then x4 against the incumbent;
+    per-label deltas on Baker's and Medial OA (expected up) and on MCL (expected held
+    by the coronal view); the single-view scores val_auc_view_sagittal_fluid_93mm_*
+    against the incumbent's.
+  budget: Same cost as the incumbent.
+  implementation: 'Source change, three exact edits, then one configuration value.
+    (1) config.py, ModelConfig, directly below slice_upper_quantile: add the field
+    slice_upper_quantile_keep_sagittal_fluid of type bool with default False. (2)
+    modeling/model.py: in KneeAbnormalityModel.__init__, below "self.slice_upper_quantile
+    = model.slice_upper_quantile", add "self.slice_upper_quantile_keep_sagittal_fluid
+    = model.slice_upper_quantile_keep_sagittal_fluid", and below "self.slice_quantile_rescaled
+    = None" add "self.slice_quantile_kept = None". In encode_batch, inside "if self.slice_upper_quantile
+    is not None:", directly after the line that computes top with kthvalue and clamp_min
+    and before the division, add: if self.slice_upper_quantile_keep_sagittal_fluid:
+    kept = self.fluid_type[token_type] & (self.spatial_tokens.plane_lookup[token_type]
+    == 2); top = torch.where(kept, torch.ones_like(top), top); self.slice_quantile_kept
+    = kept.sum().detach(). Plane index 2 is Sagittal (plane order Axial, Coronal,
+    Sagittal in modeling/spatial_tokens.py); token_type is the variable defined just
+    above that block. Leave the division, the clamp and the existing slice_quantile_rescaled
+    line as they are; the block runs in training and prediction. (3) training/lightning.py,
+    training_step, directly after the existing block that logs slice_quantile_rescaled_slices:
+    if self.config.model.slice_upper_quantile_keep_sagittal_fluid, call self._log_epoch_metric("slice_quantile_kept_slices",
+    self.model.slice_quantile_kept.float(), 1, "sum"). Nothing else in Python. (4)
+    configs/training.yaml: under model, next to slice_upper_quantile, add "slice_upper_quantile_keep_sagittal_fluid:
+    true"; keep slice_upper_quantile 0.98. Activation signature: slice_quantile_kept_slices
+    > 0 at epoch 0 (epoch count of sagittal fluid-sensitive training slices left unscaled;
+    logged only when the option is on).'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Small and exact; the plane the per-view scores single out.
+  status: completed
+  created_revision: 504
+  seeded: /home/claudio/src/knee-abnormality-refined-radimagenet/autoresearch/campaigns/pretraining-input/keeper-ideas-12.yaml
+  experiments:
+  - slice-quantile-keep-sagittal-fluid-20261005T075411Z-a9179b06
+  decision: reject
+- id: heated-teacher-distillation
+  mechanism_id: heated-in-one-model
+  parent_idea_id: heated-weights-on-incumbent
+  title: Standard-weights student with a frozen, trained heated model as a teacher
+    during training
+  opportunity: 'Asked by the user on 2026-10-05: the strengths of the heated and of
+    the standard weights in one model, obtained during training, with one checkpoint
+    at prediction. Evidence for the motive, one fold and one run each: an equal-weight
+    blend of the incumbent and a heated-weights run scores +0.001208 over the incumbent
+    although the heated run alone is 0.0022 below it (MCL +0.0040, ACL +0.0031, Synovitis
+    +0.0029, Lateral Meniscus +0.0023; ten of twelve labels at or above the incumbent);
+    a standard-weights second member adds 0.0005 and a same-seed rerun nothing. The
+    two checkpoints make different errors. Distillation is the standard way to put
+    a second model''s view into one network: the student keeps its own weights and
+    loss and is also pulled toward the teacher''s predictions. Whether it recovers
+    a useful part of the blend''s gain is a guess.'
+  mechanism: Two new options, optimizer.teacher_checkpoint (null off) and optimizer.teacher_loss_weight
+    (0.0 off). The teacher is the trained model of heated-weights-on-incumbent, loaded
+    once, frozen, in evaluation mode, kept outside the module's parameters so that
+    it is neither optimized nor saved. In each training step it scores the same batch
+    without augmentation and without gradient; the student's study logits get an extra
+    binary cross-entropy against the teacher's probabilities on all twelve labels,
+    times the weight (0.5). Validation and prediction use the student alone. The teacher
+    was trained on the same training fold and never saw the validation fold.
+  precedents:
+  - run-notes.md, Equal-weight blends with the incumbent.
+  - 'refined-radimagenet run notes, run 11: a frozen pretrained slice teacher, +0.000333,
+    not separated.'
+  novelty: No run has used a model trained on this task as a teacher.
+  coverage: All training studies and all twelve labels, every step.
+  exploitation: teacher_distillation_loss per epoch (falling as the student approaches
+    the teacher) and teacher_student_gap, the mean absolute difference of the two
+    probabilities. Then x4 and x1 per epoch against the incumbent and against the
+    teacher's own run; per-label deltas on MCL, ACL, Lateral Meniscus and Contusion
+    (the heated side) and on Medial OA and Lateral OA (the side the student should
+    keep).
+  budget: One forward pass of a second ResNet-10t per step without a backward pass;
+    about 1.25 to 1.3 times the incumbent's 1,106 s, inside the 1,568 s limit.
+  implementation: 'Source change, exact edits, then two configuration values. (1)
+    config.py, the optimizer settings class that holds anchor_alpha_early and anchor_alpha_late,
+    directly below anchor_alpha_late: add teacher_checkpoint of type Path | None with
+    default None and teacher_loss_weight of type Annotated[float, Field(ge=0, allow_inf_nan=False)]
+    with default 0.0. (2) training/lightning.py, the module''s __init__, after self.model
+    is built: add self._teacher = [] (a plain list, so the teacher is not a registered
+    submodule, is not optimized and does not enter the checkpoint). If config.optimizer.teacher_checkpoint
+    is not None and config.optimizer.teacher_loss_weight > 0: state = torch.load(config.optimizer.teacher_checkpoint,
+    map_location="cpu", weights_only=False)["state_dict"]; teacher = KneeAbnormalityModel(config.model,
+    config.data, targets, load_pretrained=False); teacher.load_state_dict({key.removeprefix("model."):
+    value for key, value in state.items() if key.startswith("model.")}, strict=True);
+    teacher.requires_grad_(False); teacher.eval(); self._teacher.append(teacher).
+    (3) training/lightning.py, on_fit_start (add the method if it does not exist,
+    calling super().on_fit_start() first): for teacher in self._teacher: teacher.to(self.device);
+    teacher.eval(). (4) training/lightning.py, training_step, directly before the
+    block "if self.anchor_parameters:": if self._teacher: with torch.no_grad(): teacher_probability
+    = torch.sigmoid(self._teacher[0](batch).to(torch.float32)); distillation = torch.nn.functional.binary_cross_entropy_with_logits(logits,
+    teacher_probability); loss = loss + self.config.optimizer.teacher_loss_weight
+    * distillation; self._log_epoch_metric("teacher_distillation_loss", distillation,
+    studies); self._log_epoch_metric("teacher_student_gap", (torch.sigmoid(logits.detach())
+    - teacher_probability).abs().mean(), studies). Here logits is the student''s study
+    logits already computed in training_step by self.model.pool_encoded(encoded).to(torch.float32),
+    and studies the study count defined at the top of the step. The teacher is called
+    through its forward (encode_batch then pool_encoded) in evaluation mode, so it
+    applies no augmentation and draws no random numbers; it must stay in evaluation
+    mode for the whole run, so do not put it where Lightning''s train() would reach
+    it. Nothing else in Python; validation and prediction are untouched. (5) configs/training.yaml,
+    under optimizer: add "teacher_checkpoint: /home/claudio/src/knee-abnormality/outputs/autoresearch/pretraining-input/experiments/heated-weights-on-incumbent-20261005T073414Z-c2371b78/training/fold_0/best-epoch=09-val_macro_auc=0.92215.ckpt"
+    and "teacher_loss_weight: 0.5". model.pretrained_weights stays radimagenet and
+    every other value stays the incumbent''s. Activation signature: teacher_distillation_loss
+    > 0 at epoch 0 (logged only when a teacher is loaded).'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Asked by the user; the single-model route the blend measurement
+    supports most directly.
+  status: completed
+  created_revision: 525
+  seeded: /home/claudio/src/knee-abnormality-refined-radimagenet/autoresearch/campaigns/pretraining-input/keeper-ideas-13.yaml
+  experiments:
+  - heated-teacher-distillation-20261005T081428Z-ec8a2b04
+  decision: reject
+- id: blend-teacher-distillation
+  mechanism_id: heated-in-one-model
+  parent_idea_id: heated-teacher-distillation
+  title: Standard-weights student distilled from the blend of the incumbent and the
+    heated model
+  opportunity: 'Evidence-backed by two measurements of this campaign, each one run
+    on one fold. The equal-weight blend of the incumbent and the heated model scores
+    +0.001087 over the incumbent (ACL +0.0042, Lateral Meniscus +0.0040, PF OA +0.0031,
+    Synovitis +0.0029; only Lateral OA -0.0041 clearly down). heated-teacher-distillation,
+    with the heated model alone as the teacher, scored +0.000105 (80% [-0.000486,
+    +0.000680]): the student took the heated side''s gains (MCL +0.0039, ACL +0.0034,
+    Lateral Meniscus +0.0011) and kept Lateral OA (-0.0001 against the teacher''s
+    -0.0124), but lost PF OA -0.0029, Contusion -0.0014 and Medial OA -0.0011, labels
+    on which the heated model is the worse of the two. A teacher that is the blend
+    carries the gains without those losses, because on every label it is at least
+    close to the better of its two members. Whether the student reaches the blend
+    is a guess.'
+  mechanism: 'A new option optimizer.teacher_checkpoints (empty list off) with optimizer.teacher_loss_weight
+    (0.0 off). Two frozen teachers in evaluation mode, kept outside the module''s
+    parameters: the incumbent''s own trained model and the trained heated model. In
+    each training step both score the same batch without augmentation and without
+    gradient; the target is the mean of their probabilities; the student''s study
+    logits get an extra binary cross-entropy against it on all twelve labels, times
+    the weight (0.5). Validation and prediction use the student alone. Neither teacher
+    saw the validation fold.'
+  precedents:
+  - run-notes.md, run 32, heated-teacher-distillation with one teacher.
+  - run-notes.md, run 30 and the blend table, the blend of the two teachers at +0.001087.
+  novelty: The teacher has been one model; never the blend that was measured.
+  coverage: All training studies and all twelve labels, every step.
+  exploitation: teacher_distillation_loss per epoch and teacher_student_gap (0.141
+    falling to 0.050 with one teacher). Then x4 and x1 per epoch against the incumbent
+    and against run 32; per-label deltas on MCL, ACL and Lateral Meniscus (expected
+    held from run 32) and on PF OA, Contusion and Medial OA (expected back to the
+    incumbent's level).
+  budget: Two forward passes of a ResNet-10t per step without a backward pass; run
+    32 with one took 1,219 s, so about 1,330 s, inside the 1,568 s limit.
+  implementation: 'Source change, exact edits, then two configuration values. (1)
+    config.py, the optimizer settings class that holds anchor_alpha_early and anchor_alpha_late,
+    directly below anchor_alpha_late: add teacher_checkpoints of type tuple[Path,
+    ...] with default () and teacher_loss_weight of type Annotated[float, Field(ge=0,
+    allow_inf_nan=False)] with default 0.0. (2) training/lightning.py, the module''s
+    __init__, after self.model is built: add self._teacher = [] (a plain list, so
+    the teacher is not a registered submodule, is not optimized and does not enter
+    the checkpoint). If config.optimizer.teacher_loss_weight > 0, then for each path
+    in config.optimizer.teacher_checkpoints: state = torch.load(path, map_location="cpu",
+    weights_only=False)["state_dict"]; teacher = KneeAbnormalityModel(config.model,
+    config.data, targets, load_pretrained=False); teacher.load_state_dict({key.removeprefix("model."):
+    value for key, value in state.items() if key.startswith("model.")}, strict=True);
+    teacher.requires_grad_(False); teacher.eval(); self._teacher.append(teacher).
+    (3) training/lightning.py, on_fit_start (add the method if it does not exist,
+    calling super().on_fit_start() first): for teacher in self._teacher: teacher.to(self.device);
+    teacher.eval(). (4) training/lightning.py, training_step, directly before the
+    block "if self.anchor_parameters:": if self._teacher: with torch.no_grad(): teacher_probability
+    = torch.stack([torch.sigmoid(teacher(batch).to(torch.float32)) for teacher in
+    self._teacher]).mean(0); distillation = torch.nn.functional.binary_cross_entropy_with_logits(logits,
+    teacher_probability); loss = loss + self.config.optimizer.teacher_loss_weight
+    * distillation; self._log_epoch_metric("teacher_distillation_loss", distillation,
+    studies); self._log_epoch_metric("teacher_student_gap", (torch.sigmoid(logits.detach())
+    - teacher_probability).abs().mean(), studies). Here logits is the student''s study
+    logits already computed in training_step by self.model.pool_encoded(encoded).to(torch.float32),
+    and studies the study count defined at the top of the step. Each teacher is called
+    through its forward (encode_batch then pool_encoded) in evaluation mode, so it
+    applies no augmentation and draws no random numbers; it must stay in evaluation
+    mode for the whole run, so do not put it where Lightning''s train() would reach
+    it. Nothing else in Python; validation and prediction are untouched. (5) configs/training.yaml,
+    under optimizer: add "teacher_checkpoints:" as a list of two paths, first /home/claudio/src/knee-abnormality/outputs/autoresearch/pretraining-input/experiments/no-contrast-mixing-20261005T012244Z-811efd8a/training/fold_0/best-epoch=08-val_macro_auc=0.92400.ckpt
+    and second /home/claudio/src/knee-abnormality/outputs/autoresearch/pretraining-input/experiments/heated-weights-on-incumbent-20261005T073414Z-c2371b78/training/fold_0/best-epoch=09-val_macro_auc=0.92215.ckpt,
+    and "teacher_loss_weight: 0.5". model.pretrained_weights stays radimagenet and
+    every other value stays the incumbent''s. Activation signature: teacher_distillation_loss
+    > 0 at epoch 0 (logged only when a teacher is loaded).'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The teacher is the blend that measured +0.0011; one change from
+    run 32.
+  status: prepared
+  created_revision: 567
+  seeded: /home/claudio/src/knee-abnormality-refined-radimagenet/autoresearch/campaigns/pretraining-input/keeper-ideas-14.yaml
+  experiments:
+  - blend-teacher-distillation-20261005T091612Z-db09815f
+- id: feature-sparsity-penalty-05
+  mechanism_id: heated-in-one-model
+  parent_idea_id: feature-sparsity-penalty
+  title: L1 penalty on the final feature map at weight 0.5, ten times the first run's
+  opportunity: 'Evidence-backed for the setting, a guess for the outcome. feature-sparsity-penalty
+    at weight 0.05 did not make the features sparser in its first three epochs: the
+    penalty was 0.021, 0.019, 0.019 beside a training loss near 0.70 and the share
+    of zero final features went 0.459, 0.435, 0.436, while the heated checkpoint the
+    penalty imitates sits at 0.88. The mean activation fell by a tenth; the zeros
+    did not rise. The seed fixed the rule beforehand: if the zero share does not move,
+    the next weight is ten times larger. The aim is unchanged, asked by the user on
+    2026-10-05: the heated checkpoint''s strengths (MCL, ACL, Lateral Meniscus, Contusion)
+    trained into the standard weights with one checkpoint at prediction.'
+  mechanism: A new option optimizer.feature_sparsity_weight (0.0 off, the incumbent's
+    behaviour). In training the mean of the backbone's final feature map (N x 512
+    x 7 x 7, after the last ReLU, so the mean is its L1 norm per element) is multiplied
+    by the weight and added to the loss. The run uses 0.5. Prediction is unchanged.
+  precedents:
+  - run-notes.md, feature-sparsity-penalty at weight 0.05, zero share 0.459 to 0.436
+    in three epochs.
+  - prior-work.md, Mask-trained (heated) weights, 48% against 88% zero final features.
+  novelty: The penalty has only been run at a weight too small to change the zero
+    share.
+  coverage: All training slices.
+  exploitation: feature_zero_share per epoch against the first run's 0.459, 0.435,
+    0.436 (a rise above 0.6 is the target) and feature_sparsity_penalty (about 0.2
+    at the start). Then x4 against the incumbent and against the first run; per-label
+    deltas against the heated pattern (MCL, ACL, Lateral Meniscus, Contusion up) and
+    on the two OA labels.
+  budget: Same cost as the incumbent.
+  implementation: 'Source change, three exact edits, then one configuration value.
+    (1) config.py, the optimizer settings class that holds anchor_alpha_early and
+    anchor_alpha_late: add the field feature_sparsity_weight of type Annotated[float,
+    Field(ge=0, allow_inf_nan=False)] with default 0.0, directly below anchor_alpha_late.
+    (2) modeling/model.py: KneeAbnormalityModel.__init__, below "self.input_statistics
+    = None", add "self.feature_l1 = None" and "self.feature_zero_share = None". In
+    encode_batch, directly after the line "maps = self._encode_images(valid_images,
+    acquisition_index, token_type)", add: if self.training: self.feature_l1 = maps.float().mean();
+    self.feature_zero_share = (maps == 0).float().mean().detach(). Do not detach feature_l1;
+    it carries the gradient. (3) training/lightning.py, training_step, directly before
+    the block "if self.anchor_parameters:": if self.config.optimizer.feature_sparsity_weight
+    > 0: penalty = self.config.optimizer.feature_sparsity_weight * self.model.feature_l1;
+    loss = loss + penalty; self._log_epoch_metric("feature_sparsity_penalty", penalty,
+    studies). And, unconditionally in the same place, self._log_epoch_metric("feature_zero_share",
+    self.model.feature_zero_share, studies). The variable studies is the study count
+    already defined at the top of training_step. Nothing else in Python. (4) configs/training.yaml:
+    under optimizer, next to anchor_alpha_late, add "feature_sparsity_weight: 0.5".
+    Activation signature: feature_sparsity_penalty > 0 at epoch 0 (logged only when
+    the weight is positive).'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The value the first run's own rule names.
+  status: queued
+  created_revision: 586
+  seeded: /home/claudio/src/knee-abnormality-refined-radimagenet/autoresearch/campaigns/pretraining-input/keeper-ideas-15.yaml

@@ -19,12 +19,12 @@ Pending from the [Refined-RadImageNet campaign](../validation/results/2026-10-04
 - **Decide on the mask-trained (heated) ResNet-50 weights.** Two ResNet-50 runs were started
   and stopped by the user before completion; no result
   ([run notes](../../autoresearch/campaigns/refined-radimagenet/run-notes.md)).
-- **Record the pretraining-input campaign.** It ran on a ResNet-10t with this normalization on
-  2026-10-04 and 2026-10-05 in the `refined-radimagenet` worktree and was stopped by the user;
-  its record and build are uncommitted there. Its two acceptances on the ResNet-10t (per-slice
-  bright-end quantile 0.98, contrast mixing off) are not adopted: together on the ResNet-18
-  they scored ×4 0.931789 against 0.933058 (−0.0013, 95% [−0.0033, +0.0007], one run,
-  `outputs/training/20261005-094913-rn18-slice-quantile-no-mixing`).
+- **Nothing pending from the
+  [pretraining-input campaign](../validation/results/2026-10-05-pretraining-input-campaign.md)**
+  (closed 2026-10-05): its two ResNet-10t acceptances did not carry over to the ResNet-18 and
+  are not adopted. Its build is uncommitted in the `refined-radimagenet` worktree. The heated
+  model as a second member or teacher is in the
+  [endgame backlog](../backlog/endgame.md#ensembling).
 
 Awaiting a public check:
 

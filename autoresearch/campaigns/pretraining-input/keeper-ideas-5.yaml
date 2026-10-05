@@ -1,0 +1,67 @@
+ideas:
+- id: series-quantile-stretch
+  mechanism_id: bright-end-clipping
+  parent_idea_id: slice-upper-quantile-098
+  title: One stretch factor per series (the mean of its slices' 98th percentiles) instead of one per slice
+  opportunity: >-
+    A guess that separates two readings of this campaign's runs, each one run. The per-slice
+    stretch (slice-upper-quantile-098, +0.000716, accepted) raises MCL, Lateral OA, Lateral
+    Meniscus and ACL and lowers Baker's and Effusion; taking it off the fluid-sensitive series
+    (slice-quantile-other-types, -0.000952) reverses both. slice-quantile-soft-knee (+0.000025,
+    80% [-0.000266, +0.000314]) removed the saturation (0.004% of fluid pixels against 2.05%)
+    at the same contrast and the fluid labels did not come back (Baker's +0.0003, Effusion
+    +0.0008, Synovitis -0.0008). So the flat top is not what costs them. What a per-slice
+    divisor also does is make every slice equally bright: a slice full of fluid has a high
+    98th percentile and is stretched little, a slice without fluid has a low one and is
+    stretched a lot, so how much bright fluid a slice holds relative to the rest of its series
+    is normalized away. Effusion and Baker's are read from exactly that. One factor per series
+    keeps the stretch of the dark tissue on average and keeps the slices of a series in their
+    true proportion.
+  mechanism: >-
+    A new option model.slice_upper_quantile_scope with values slice (default, the incumbent's
+    behaviour) and series. With series, each slice's own quantile is still computed, then
+    replaced by the mean of the quantiles of the slices of the same series in the batch (same
+    acquisition index); every slice of a series is divided by that one value and clamped to 1.
+    Training and prediction alike. The run sets it to series with model.slice_upper_quantile
+    0.98.
+  precedents:
+  - 'run-notes.md, runs 4, 8 and 11: the per-slice stretch, its removal from the fluid-sensitive series, and the roll-off.'
+  novelty: The stretch has only been computed per slice (model) or as a clip per series (loader); never as a per-series gain.
+  coverage: All studies and slices; a slice changes against the incumbent by the ratio of its own quantile to its series mean.
+  exploitation: >-
+    slice_quantile_series_groups above 0; input_fluid_std and input_other_std close to the
+    incumbent's 0.263 and 0.313; input_fluid_saturated_share above the incumbent's 0.020 on the
+    fluid series (slices brighter than their series mean now clip more). Then x4 against the
+    incumbent; per-label deltas split into the fluid labels (Effusion, Synovitis, Baker's;
+    expected up if the relative brightness is what they need) and MCL, Lateral OA, Lateral
+    Meniscus, ACL (expected held).
+  budget: Same cost as the incumbent.
+  implementation: >-
+    Source change, three exact edits, then one configuration value. (1) config.py, ModelConfig,
+    directly below slice_upper_quantile: add the field slice_upper_quantile_scope of type
+    Literal["slice", "series"] with default "slice". (2) modeling/model.py: in
+    KneeAbnormalityModel.__init__, below "self.slice_upper_quantile =
+    model.slice_upper_quantile", add "self.slice_upper_quantile_scope =
+    model.slice_upper_quantile_scope", and below "self.slice_quantile_rescaled = None" add
+    "self.slice_quantile_series_groups = None". In encode_batch, inside "if
+    self.slice_upper_quantile is not None:", directly after the line that computes top with
+    kthvalue and clamp_min and before the division, add: if self.slice_upper_quantile_scope ==
+    "series": groups = int(acquisition_index.max()) + 1; total = top.new_zeros(groups).index_add_(0,
+    acquisition_index, top); count = top.new_zeros(groups).index_add_(0, acquisition_index,
+    torch.ones_like(top)); top = (total / count.clamp_min(1))[acquisition_index];
+    self.slice_quantile_series_groups = (count > 0).sum().detach(). acquisition_index is the
+    variable already defined just above that block (slice_mask.nonzero(as_tuple=True)[0]), one
+    entry per slice. Leave the division, the clamp and the existing slice_quantile_rescaled
+    line as they are; the block runs in training and prediction. (3) training/lightning.py,
+    training_step, directly after the existing block that logs slice_quantile_rescaled_slices:
+    if self.config.model.slice_upper_quantile_scope == "series", call
+    self._log_epoch_metric("slice_quantile_series_groups",
+    self.model.slice_quantile_series_groups.float(), 1, "sum"). Nothing else in Python. (4)
+    configs/training.yaml: under model, next to slice_upper_quantile, add
+    "slice_upper_quantile_scope: series"; keep slice_upper_quantile 0.98. Activation signature:
+    slice_quantile_series_groups > 0 at epoch 0 (epoch count of series whose slices were given
+    one shared factor; logged only when the scope is series).
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Small and exact; tells apart the two open readings of the fluid-label loss.
+exhausted_directions: None.

@@ -1,0 +1,7 @@
+revision: 592
+queue:
+- blend-teacher-distillation
+- anchor-toward-heated
+- autoaugment-mild-operations
+- union-bag-loss-01
+- feature-sparsity-penalty-05
