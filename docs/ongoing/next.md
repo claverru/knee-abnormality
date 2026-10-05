@@ -22,7 +22,8 @@ Pending from the [Refined-RadImageNet campaign](../validation/results/2026-10-04
 - **Nothing pending from the
   [pretraining-input campaign](../validation/results/2026-10-05-pretraining-input-campaign.md)**
   (closed 2026-10-05): its two ResNet-10t acceptances did not carry over to the ResNet-18 and
-  are not adopted. Its build is uncommitted in the `refined-radimagenet` worktree. The heated
+  are not adopted. Its build is not on main; the worktree was removed on 2026-10-05 and a full copy is frozen in
+  `outputs/autoresearch/pretraining-input/baseline/source/`. The heated
   model as a second member or teacher is in the
   [endgame backlog](../backlog/endgame.md#ensembling).
 

@@ -25,8 +25,8 @@ one run at one seed. Training-time range 0.75 to 1.35 of the reference's 1,162 s
   the keeper's repairs): [run notes](../../../autoresearch/campaigns/pretraining-input/run-notes.md).
 - **Code:** the build (the options of the campaign's
   [contract](../../../autoresearch/campaigns/pretraining-input/contract.md#built-options) and one
-  logged scalar per option) is uncommitted in the `refined-radimagenet` worktree and is not on
-  main; a full copy is frozen in `outputs/autoresearch/pretraining-input/baseline/source/`, and
+  logged scalar per option) is not on main; its worktree was removed on 2026-10-05 after
+  the campaign closed, and a full copy is frozen in `outputs/autoresearch/pretraining-input/baseline/source/`, and
   each run's source, with the developer's change where it had one, under
   `experiments/<run>/source/`.
 - **Artifacts:** `outputs/autoresearch/pretraining-input/` (state, and per run the frozen source,
