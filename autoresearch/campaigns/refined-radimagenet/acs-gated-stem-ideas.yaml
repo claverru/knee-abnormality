@@ -1,0 +1,66 @@
+ideas:
+- id: acs-gated-stem
+  mechanism_id: acs-conv
+  parent_idea_id: acs-gated-stem-block1
+  title: Gated ACS convolution in the stem only, computed at the middle depth, on the
+    incumbent's own weights (keeper seed replacing acs-gated-stem-block1, which did not fit the
+    time bound)
+  opportunity: >-
+    Repair on cost. acs-gated-stem-block1 started exactly as the incumbent (x1 0.885681 against
+    0.885713 after epoch 1, so the gated form is function-preserving as designed) but took 250
+    s per epoch, which projects to about 2,500 s against the 2,362 s bound; the keeper
+    cancelled it after one epoch. The cost is the stem evaluated at three depths with 3D
+    convolutions at 224 px, needed only so that the first block can look across depth. This
+    seed keeps the gated ACS reorientation in the stem alone, where only the middle-depth
+    output is needed: one ordinary 2D stem convolution plus two small 3D convolutions that
+    produce a single depth. The adjacent slices enter through 42 stem channels whose kernels
+    can blend from in-plane to depth-plane. Gain is a guess.
+  mechanism: >-
+    model.slice_channels depth and model.depth_stem acs_gated_stem, pretrained weights as the
+    incumbent. Input N x 3 channels x 3 depth x 224 x 224 as in acs-gated-stem-block1. Stem
+    output = inplane + gate[channel] * (depth_plane - inplane) for channels 22-63 and inplane
+    for channels 0-21, where inplane = conv2d(middle slice, w) with the incumbent's 64 x 3 x 7
+    x 7 stem weight w (stride 2, padding 3), and depth_plane is, for channels 22-42,
+    conv3d(volume, w[22:43].unsqueeze(3)) with kernel 7 x 1 x 7, stride (1, 2, 2), padding (2,
+    0, 3), and for channels 43-63, conv3d(volume, w[43:].unsqueeze(4)) with kernel 7 x 7 x 1,
+    stride (1, 2, 2), padding (2, 3, 0); the depth padding of 2 on a depth of 3 gives exactly
+    one output depth, centred on the middle slice. gate is 64 values initialized to zero,
+    clamped to [0, 1] in the forward pass. After the stem the tensor is N x 64 x 112 x 112 and
+    bn1, act1, maxpool, layer1 to layer4 are the incumbent's 2D layers. With the gate at zero
+    the network is the incumbent. The stem weight stays the incumbent's own tensor under its
+    own name.
+  precedents:
+  - 'run-notes.md: acs-gated-stem-block1 matched the incumbent after epoch 1 and cost 250 s per epoch; acs-stem-layer1 ungated starts from a broken network (knee mass 0.256 against 0.990).'
+  - 'run-notes.md, run 16: crossd-gated-depth-stem, gates stayed near 0.03 on the Cross-D base.'
+  - 'ACS convolutions, Yang et al. 2021.'
+  novelty: Adjacent slices through reoriented stem kernels of the incumbent, at the incumbent's cost.
+  coverage: All studies and labels.
+  exploitation: >-
+    Log per epoch acs_gate_mean and acs_gate_max over channels 22-63 after the clamp, and
+    acs_blend_ratio, the mean absolute value of the gated difference over that of inplane on
+    the last batch. Per-label deltas, x1 per epoch against the incumbent (equal at step 0),
+    training seconds.
+  budget: >-
+    One 2D stem convolution plus two 3D convolutions of 21 output channels at one depth: about
+    1.05 times the backbone's multiply-accumulates; estimated 1.05 to 1.2 times the incumbent,
+    unmeasured.
+  implementation: >-
+    Port from the frozen source of acs-gated-stem-block1
+    (outputs/autoresearch/refined-radimagenet/experiments/acs-gated-stem-block1-20261004T170533Z-7802eb51/source):
+    keep its depth input branch in encode_batch, its config fields, its optimizer handling of
+    the gates (head_lr, no weight decay, not anchored), its logging and
+    modeling/depth_stem.py. Change only the backbone path: add the depth_stem value
+    acs_gated_stem with a single gate of 64 zeros; in depth_stem.py add a function that
+    computes the stem as stated above (in gated_acs the middle_only branch uses depth padding 0,
+    which is right for 3 x 3 kernels only: for the 7 x 7 stem the depth padding must be
+    (kernel - 3) // 2 = 2 so the two depth-plane convolutions return one depth; write the stem
+    case explicitly and assert the output depth is 1), squeezes the depth and returns N x 64 x
+    112 x 112; then self.backbone.bn1, act1, maxpool and the unchanged layer1.. run in 2D.
+    forward_features and _backbone_to_stride_8 both use this stem. Do not evaluate the stem at
+    three depths and do not touch layer1. backbone_mapping stays the plain resnet18's (assert
+    it). The dummy forward that probes the feature shape uses the 5D input. Keep channels_last
+    false.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Keeps the ACS seed alive inside the time bound.
+exhausted_directions: None.

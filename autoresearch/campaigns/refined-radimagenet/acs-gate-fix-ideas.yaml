@@ -1,0 +1,47 @@
+ideas:
+- id: acs-gated-stem-signed-gate
+  mechanism_id: acs-conv
+  parent_idea_id: acs-gated-stem
+  title: Gated ACS stem with a signed, unclamped gate (keeper seed; the clamped gate of
+    acs-gated-stem died at zero and the mechanism never ran)
+  opportunity: >-
+    Repair of an inert mechanism. In acs-gated-stem the gate was clamped to [0, 1] in the
+    forward pass and started at zero. Its logged values: acs_gate_max 0.0001 in epochs 1-2 and
+    0.0000 after, acs_gate_mean 0.0000 and acs_blend_ratio 0.0 in every epoch. A gate whose
+    first updates take it below zero is clamped to zero and receives no gradient from then on,
+    so every channel died within the warmup; the run was the incumbent without any ACS term
+    (x4 +0.000027, 80% [-0.000328, +0.000374]) and says nothing about adjacent slices. The
+    clamp came from the keeper's seed text. The gated Cross-D stem, whose gate was unclamped,
+    did move (mean 0.026, largest 0.10).
+  mechanism: >-
+    Exactly acs-gated-stem with one change: the gate is used as it is, without clamp:
+    stem output for channels 22-63 = inplane + gate[channel] * (depth_plane - inplane), gate a
+    parameter of 64 values initialized to zero, free to take either sign. Everything else as
+    acs-gated-stem: model.slice_channels depth, model.depth_stem acs_gated_stem, the
+    incumbent's weights, the stem computed at the middle depth only (2D in-plane convolution
+    on the middle slice, the two 21-channel depth-plane 3D convolutions with depth padding 2),
+    the gate at head_lr without weight decay and not anchored.
+  precedents:
+  - 'acs-gated-stem-20261004T172410Z-54c7c519: gate statistics zero from epoch 3; x4 +0.000027.'
+  - 'crossd-gated-depth-stem-20261004T161947Z-4bb697d6: an unclamped gate from zero reached mean 0.026.'
+  - 'run-notes.md: ACS without gates starts from a broken network (knee mass 0.256 against 0.990).'
+  novelty: The first run in which the gated ACS term can actually open.
+  coverage: All studies and labels.
+  exploitation: >-
+    Log per epoch acs_gate_mean_abs, acs_gate_max_abs and acs_gate_positive_share over
+    channels 22-63, and acs_blend_ratio as before. The run is valid evidence only if
+    acs_gate_mean_abs is above 0.001 from epoch 2 on; report it as inert otherwise. Per-label
+    deltas, x1 per epoch against the incumbent, training seconds.
+  budget: As acs-gated-stem, 1,379 s measured (1.17 times the reference).
+  implementation: >-
+    Port the frozen source of acs-gated-stem
+    (outputs/autoresearch/refined-radimagenet/experiments/acs-gated-stem-20261004T172410Z-54c7c519/source)
+    and remove the clamp on the gate in the stem function of modeling/depth_stem.py (and in
+    gated_acs if the stem path calls it), so the raw parameter multiplies the difference. Rename
+    the logged gate scalars to the absolute-value forms above and add the positive share. No
+    other change: same config values, same optimizer handling of the gate, same input branch.
+    Confirm by a static read that nothing else bounds or detaches the gate.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The previous run of this seed did not exercise its mechanism.
+exhausted_directions: None.

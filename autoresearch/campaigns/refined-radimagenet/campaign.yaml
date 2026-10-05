@@ -1,0 +1,113 @@
+id: refined-radimagenet
+recipe: configs/training.yaml
+reference_run: outputs/training/20261003-100844-rn18-view-label-bias
+reference_equivalences: {}
+reference_config_exceptions:
+  - paths.label_manifest
+  - paths.report_attribute_manifest
+additional_evidence_runs:
+  - outputs/training/20261004-094416-rn10t-view-label-bias
+backlog:
+  refill_below: 3
+  refill_to: 5
+  seed_order: forced
+  rotate_after: 1000000
+budget:
+  mode: range
+  min_fraction: 0.75
+  max_fraction: 2.0
+policy:
+  editable_files:
+    - configs/training.yaml
+    - src/knee_abnormality/config.py
+    - src/knee_abnormality/training/lightning.py
+  editable_directories:
+    - src/knee_abnormality/modeling
+  config_keys:
+    - data.mean
+    - data.std
+  config_prefixes:
+    - model
+    - optimizer
+    - trainer.input_mask
+    - trainer.slice_teacher
+  list_item_fields: {}
+  input_identity_keys:
+    - preprocessing_identity
+  require_source_change: false
+  configuration_only_ideas: true
+  developer_instructions: >-
+    The incumbent is the Refined-RadImageNet ResNet-18 recipe in configs/training.yaml (repeated
+    middle slice, 84/93 mm views, view label bias, plane-contrast readouts, L2-SP anchoring,
+    backbone LR 5e-5, ten epochs, batch 8). Every idea applies exactly its own change to the
+    current incumbent and keeps everything else. Read contract.md, section Build facts, before
+    writing code: it states where each mechanism goes and what is already built. In short. (1)
+    Inference builds KneeAbnormalityModel from the config and loads the checkpoint's model.* keys
+    strictly (inference/checkpoint.py), so a module used only in training (mask policy, frozen
+    teacher) lives on the Lightning module beside report_attribute_heads, never inside
+    self.model, and its options go under trainer.input_mask or trainer.slice_teacher; a
+    mechanism that changes what the model computes at prediction goes inside the model under a
+    model option whose default reproduces the incumbent. (2) Already built in this worktree and
+    to be used, not rewritten: modeling/radimagenet.py (PRETRAINED_WEIGHTS[weights][backbone] for
+    model.pretrained_weights radimagenet, radimagenet_policy, radimagenet_policy_ft and
+    radimagenet_crossd; radimagenet_state_dict(backbone, weights) with weights defaulting to
+    radimagenet; radimagenet_classifier(backbone, weights) returning the 165-class fc weight
+    and bias;
+    RADIMAGENET_KNEE_CLASSES name to class index; RADIMAGENET_MEAN and RADIMAGENET_STD) and
+    modeling/crossd.py (CrossDConv and replace_convolutions, checked against the authors' layer).
+    modeling/model.py is unchanged from main and loads only the standard radimagenet weights:
+    an idea that uses another weights value makes the two-line change its text states. All
+    weight files are in the torch hub cache with pinned hashes; never download. (3) The model
+    receives slices in [0, 1] and normalizes them with data.mean and data.std in
+    encode_batch, after augmentation and right before _encode_images; an input mask or an
+    alternative input for a second network is applied at that point. (4) Backbone features are
+    N x C x 7 x 7 per slice (C 512 for ResNet-18 and ResNet-10t); each of the 49 positions is one
+    token after self.projection (256 wide); a per-token quantity computed from the raw features
+    is aligned with the tokens by maps.flatten(2).transpose(1, 2). (5) The disease loss, its
+    class-balance weights, the half-knee and report-attribute terms, L2-SP, DSU, the views, the
+    sampling, the studies per epoch, ten epochs, batch 8 and the evaluation stay untouched unless
+    the idea names one. (6) New parameters and buffers initialize under torch.random.fork_rng, as
+    the existing heads do, so the incumbent's random stream is unchanged. (7) Log every new
+    mechanism's own scalars per epoch with self._log_epoch_metric for the activation signature;
+    each idea lists them. (8) Validation and prediction are deterministic: no sampling, no
+    policy network, no teacher. (9) Training time must stay within 886-2,362 s (the reference
+    takes 1,181 s, about 118 s per epoch); do not reduce epochs, slices or studies to fit. No
+    weight averaging (SWA or EMA). Return prepared or blocked. Use the existing Python
+    environment for static checks and tiny CPU checks only (no forward and backward passes of the
+    full model on CPU while a training runs). No tests.
+  researcher_instructions: >-
+    Research starts after the forced seeds and never stops: never return an empty refill. Two
+    kinds of idea are allowed and nothing else. (A) Ideas inside the Refined-RadImageNet scope
+    (contract.md, Objective): the checkpoints' input statistics, the pretrained 165-class head
+    and its 18 knee MRI classes, a frozen pretrained network as teacher, the authors'
+    policy-gradient mask and mask-trained weights, and Cross-D or ACS uses of pretrained
+    kernels over adjacent slices. An idea belongs to the scope only if it uses something the
+    pretraining produced (its weights, its classifier, its statistics, its training recipe or
+    the authors' published methods); a generic change to the recipe that would apply equally to
+    an ImageNet backbone is out of scope, however promising. Within the scope, examples:
+    feature-level or relational distillation from the frozen pretrained network, anchoring in
+    function space next to L2-SP, other uses of the knee-class logits, intensity mappings
+    scored without labels by the frozen head's knee-class mass, the pretraining recipe's own
+    augmentations (AutoAugment-style policies), values and schedules of an accepted or
+    promising mechanism one knob at a time, and the same mechanism at another place in the
+    network. (B) Combinations of good prospects from this campaign's own past experiments: two
+    mechanisms that each showed promise here, applied together. A prospect is a run of this
+    campaign that was accepted, or was rejected with a positive macro delta, or lifted
+    specific labels clearly while flat overall, or whose curves show an advantage that a named
+    change could turn into a gain. State for each combined mechanism the run, its delta with
+    the 80% interval and its per-label pattern, and say why the two should add up (different
+    labels, or different parts of the model). Combine two mechanisms per run, not more, and
+    only mechanisms that ran in this campaign. Start every refill from run_curves and the
+    per-label deltas of every decided run, name the behaviour each proposal targets, and check
+    prior-work.md before proposing. A family verdict of extend or retry has priority over a
+    new family; when a family closes, open another inside the scope. Mark every proposal as
+    evidence-backed or a guess. One value per knob; no two-sided sweeps of the same knob and no
+    repeat of a measured value. Configuration-only ideas are allowed; each refill carries at
+    least one idea with a source change. Per-label rules are allowed when every choice is fixed
+    before the run. Stay inside the training-time range. Excluded: anything outside (A) and
+    (B); pretraining on RadImageNet images or any external data; weight averaging; image sizes
+    above 224, more slices per study, ensembling and test-time augmentation (endgame); fewer
+    epochs; reflection-probability changes; the class-balance exponent; label changes and
+    gold-study weighting; multi-seed or confirmation runs; trained models in the loader;
+    choosing anything on fold-0 validation labels; ideas already measured on ResNet-18 at the
+    same value (prior-work.md).

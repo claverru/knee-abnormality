@@ -5,10 +5,13 @@
 Every input is an adjacent triplet (`SLICES_PER_INPUT = 3` in `config.py`; there is no
 input-mode or channel-count field): each three-channel
 CNN input contains three consecutive slices from the physically sorted series.
-Channels retain their slice order and use the selected ReXNet and historical
-RA2 checkpoints' ImageNet normalization: mean `[0.485, 0.456, 0.406]` and standard deviation
-`[0.229, 0.224, 0.225]` (`data.mean` and `data.std` take exactly three values), after dividing
-uint8 pixels by 255. The training config prepares 224 px
+Channels retain their slice order and are normalized, after dividing uint8 pixels by 255,
+with the statistics the Refined-RadImageNet checkpoints were trained with: mean 0.3162 and
+standard deviation 0.3213 on every channel (`data.mean` and `data.std` take exactly three
+values; since 2026-10-05,
+[result](../validation/results/2026-10-04-refined-radimagenet-campaign.md)). The ImageNet
+values `[0.485, 0.456, 0.406]` and `[0.229, 0.224, 0.225]` were used before, for the ReXNet
+and historical RA2 checkpoints. The training config prepares 224 px
 triplets at 0.536 mm, covering **120 × 120 mm** (since 2026-10-01,
 [result](../validation/results/2026-10-01-mixed-field-campaign.md); the ReXNet recipe keeps
 0.625 mm and 140 mm), after the

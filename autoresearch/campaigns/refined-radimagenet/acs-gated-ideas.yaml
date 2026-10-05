@@ -1,0 +1,79 @@
+ideas:
+- id: acs-gated-stem-block1
+  mechanism_id: acs-conv
+  parent_idea_id: acs-stem-layer1
+  title: Gated ACS convolutions in the stem and the first block of layer1, on the incumbent's
+    own weights, starting as the incumbent (keeper seed replacing acs-stem-layer1)
+  opportunity: >-
+    Repair of a faulty seed. acs-stem-layer1 switches two thirds of the channels of five
+    pretrained convolutions from in-plane to depth-plane kernels at step 0. Checked without
+    labels on 48 held-out slices with the frozen pretrained network and its 165-class head: the
+    incumbent's weights put 0.990 of their probability on knee classes; with the ACS stem and
+    layer1 as that seed specifies them, 0.256, and the top class agrees on 0% of slices. It
+    would train from a broken network, as crossd-3d-stem did. The idea stands: adjacent slices
+    through the incumbent's own kernels reoriented across depth. Here every depth-plane channel
+    starts as its in-plane self and is blended toward its depth-plane version by a gate that
+    starts at zero, so step 0 is the incumbent. Gain is a guess.
+  mechanism: >-
+    model.slice_channels depth and model.depth_stem acs_gated, pretrained weights as the
+    incumbent (radimagenet). Input: the three adjacent slices as depth, each repeated on three
+    channels (N x 3 x 3 x 224 x 224). In three convolutions, backbone.conv1,
+    layer1.0.conv1 and layer1.0.conv2 (64 output channels each, weight w of shape 64 x in x k
+    x k, padding p, in-plane stride s), the output is inplane + gate[channel] * (acs -
+    inplane), where inplane applies w to every depth slice separately (w.unsqueeze(2), kernel 1
+    x k x k, padding (0, p, p)), and acs is the ACS form: channels 0-21 as inplane, channels
+    22-42 with w[22:43] as k x 1 x k kernels (padding (p, 0, p)), channels 43-63 with w[43:] as
+    k x k x 1 kernels (padding (p, p, 0)); all with stride (1, s, s). gate is one parameter of
+    64 values per convolution, initialized to zero and clamped to [0, 1] in the forward pass;
+    the first 22 entries have no effect. BatchNorm, activation and the stem's max pooling act
+    per depth slice. conv1 and layer1.0.conv1 are computed at all three depths;
+    layer1.0.conv2, its BatchNorm, the shortcut and act2 only at the middle depth (index 1),
+    whose output is the N x 64 x 56 x 56 input of layer1.1; from there the network is the
+    incumbent's 2D layers. With all gates at zero the middle-depth path is the incumbent's
+    computation. The convolution parameters are the incumbent's own tensors under their own
+    names; only the three gates are new.
+  precedents:
+  - 'run-notes.md: the ACS stem and layer1 without gates start from a broken network (knee mass 0.256 against 0.990, top-class agreement 0.00, 48 slices, three identical slices as depth).'
+  - 'ACS convolutions, Yang et al. 2021: the three-plane channel split.'
+  - 'run-notes.md, run 14: crossd-3d-stem trained from a scrambled start reached x1 0.744 at epoch 4.'
+  - 'radimagenet-rn18 campaign: adjacent slices through the first 2D convolution lost (-0.0039, -0.00005).'
+  novelty: First ACS use here, function-preserving at the start.
+  coverage: All studies and labels.
+  exploitation: >-
+    Log per epoch acs_gate_mean and acs_gate_max for each of the three convolutions (over
+    channels 22-63, after the clamp) and acs_blend_ratio, the mean absolute value of gate *
+    (acs - inplane) over that of inplane at the stem on the last batch. Per-label deltas, x1 per
+    epoch against the incumbent (expected equal at step 0), training seconds.
+  budget: >-
+    The stem and layer1.0.conv1 run at three depths with both forms, layer1.0.conv2 at one:
+    about 1.56 times the backbone's multiply-accumulates; estimated 1.3 to 1.5 times the
+    incumbent, unmeasured.
+  implementation: >-
+    Replaces acs-stem-layer1; start from its workspace or frozen source if one exists and
+    keep its depth input branch (slice_channels depth, three slices kept through augmentation
+    as the adjacent path does, token geometry and validity from the middle slice as
+    repeated_middle does, x5 = images[:, None].expand(-1, 3, -1, -1, -1) normalized per
+    channel), otherwise write that branch. (1) config.py: slice_channels gains depth;
+    ModelConfig.depth_stem gains acs_gated (Literal none, acs_gated, plus any value already
+    present in the incumbent source), default none; a validator requires depth_stem not none
+    exactly when slice_channels is depth. (2) model.py: three parameters of 64 zeros under
+    torch.random.fork_rng, registered on the model (not under backbone), e.g.
+    self.acs_gates = nn.ParameterList of three; a helper gated_acs(x5, conv, gate) computing
+    inplane = F.conv3d(x5, w.unsqueeze(2), stride=(1, s, s), padding=(0, p, p)) and the two
+    depth-plane groups with F.conv3d on w[22:43].unsqueeze(3) and w[43:].unsqueeze(4), then
+    inplane with channels 22-63 replaced by inplane + gate.clamp(0, 1)[22:] * (depth_plane -
+    inplane[:, 22:]); a helper that folds depth into the batch to apply 2D BatchNorm,
+    activation and max pooling. Functional forward, without replacing modules: x5 -> gated_acs
+    with backbone.conv1 -> bn1, act1, maxpool per depth slice -> block = backbone.layer1[0]:
+    z = gated_acs(y, block.conv1) -> bn1, act1 per depth slice -> gated_acs(z, block.conv2)
+    evaluated then cut at depth index 1 (or computed only there) -> block.bn2 -> add y[:, :,
+    1] -> block.act2 -> backbone.layer1[1] and layer2.. as now. forward_features and
+    _backbone_to_stride_8 both use this path. (3) The dummy forward that probes the feature
+    shape uses the new input. backbone_mapping stays the plain resnet18's (assert it). (4)
+    lightning.py build_optimizer: the gates train at head_lr without weight decay and are not
+    anchored. Log the scalars. Prediction rebuilds the same path from the config. Keep
+    channels_last false.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Repairs a seed that would start from a broken network; adjacent slices on the incumbent's own weights.
+exhausted_directions: None.

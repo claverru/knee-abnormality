@@ -1,0 +1,240 @@
+ideas:
+- id: policy-mask-pretrained-policy
+  mechanism_id: policy-gradient-mask
+  parent_idea_id: policy-mask-rn10t
+  title: Policy-gradient mask whose policy ResNet-10t starts from the Refined-RadImageNet
+    ResNet-10t instead of from scratch
+  opportunity: >-
+    A guess. The authors train the policy network from scratch over 1.2M images and 90 epochs;
+    ours has ten epochs on 3,495 studies. Starting its feature extractor from the cached
+    Refined-RadImageNet ResNet-10t gives it knee-aware features from the first step, so the
+    image-conditional part of the mask can become useful sooner.
+  mechanism: >-
+    As policy-mask-rn10t (mask on for all ten epochs) with trainer.input_mask.policy_pretrained
+    true and trainer.input_mask.policy_backbone_lr 0.00006: the policy's feature extractor is
+    timm resnet10t.c3_in1k (num_classes 0) loaded strictly from
+    radimagenet_state_dict("resnet10t.c3_in1k") and trained at 6e-5, the rate
+    the weight-scale rule gives that checkpoint; the two heads stay randomly initialized at
+    head_lr. Everything else as policy-mask-rn10t.
+  precedents:
+  - 'policy-mask-rn10t: the mechanism and its code.'
+  - 'outputs/training/20261004-094416-rn10t-view-label-bias: that checkpoint fine-tuned at 6e-5 reaches x4 0.927543.'
+  novelty: A pretrained policy network; the authors use none.
+  coverage: All studies and labels.
+  exploitation: >-
+    The scalars of policy-mask-rn10t; in addition input_mask_conditional_std, the standard
+    deviation across slices of the per-slice mean of exp(new_alpha) / (exp(new_alpha) +
+    exp(new_beta)), which shows whether the mask depends on the image, compared with the
+    from-scratch policy.
+  budget: As policy-mask-rn10t, about 1,800-1,900 s, unmeasured.
+  implementation: >-
+    Uses the mask code of policy-mask-rn10t (in the incumbent if accepted, else ported from its
+    frozen source). Adds the policy_pretrained branch: build the extractor as
+    timm.create_model("resnet10t.c3_in1k", pretrained=False, num_classes=0) and
+    load_state_dict(radimagenet_state_dict("resnet10t.c3_in1k"), strict=True);
+    the from-scratch branch keeps timm resnet10t with pretrained False. Add the logged
+    conditional standard deviation to both branches. If policy-mask-two-stage was accepted,
+    keep its epochs value; otherwise epochs null.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: User seed.
+- id: random-smooth-mask
+  mechanism_id: random-input-mask
+  parent_idea_id: policy-mask-rn10t
+  title: The same blurred multiplicative mask drawn at random, with no policy network
+  opportunity: >-
+    Evidence-backed as a question: the paper reports that the learned dataset-level Beta
+    parameters converge to an almost uniform distribution, and the mask is 90% that dataset
+    part. This run uses the same mask shape with uniform cells and no policy, at no extra
+    training time. It tells whether the regularization comes from the mask itself or from the
+    policy, and if it works it is the cheap version.
+  mechanism: >-
+    trainer.input_mask.kind random (grid 64, kernel 13, sigma 6.0, epochs null) and
+    model.input_mask_expectation true. Per training step and slice: m uniform in [0, 1] of
+    shape N x 1 x 64 x 64 (Beta(1, 1)), resized to 224 by nearest neighbour, Gaussian blur
+    kernel 13 sigma 6, multiplied into the normalized slices before the backbone. No policy
+    network, no policy loss, no extra optimizer group. Validation and prediction multiply by
+    input_mask_expectation, which is the constant 0.5 (the mean of the mask), set once at the
+    start of training.
+  precedents:
+  - 'prior-work.md, The authors mask method: dataset-level parameters converge to an almost uniform distribution.'
+  - 'policy-mask-rn10t: the mask construction and the expectation buffer.'
+  novelty: The policy-free control of the mask family.
+  coverage: All studies and labels.
+  exploitation: >-
+    input_mask_mean and input_mask_std per epoch (expected about 0.5 and a small spread after
+    the blur), x1 per epoch and training loss against the incumbent and against
+    policy-mask-rn10t.
+  budget: Same cost as the incumbent, about 1,181 s.
+  implementation: >-
+    Uses the mask code of policy-mask-rn10t (in the incumbent if accepted, else ported from its
+    frozen source) and adds kind random: the mask callable draws torch.rand instead of calling
+    a policy; no policy module is built, so nothing is added to the optimizer and no clipping
+    override is needed for this kind. If the incumbent already trains under the policy mask,
+    this seed replaces the policy mask by the random one (kind random) and is judged against
+    that incumbent; if policy-mask-two-stage was accepted, keep its epochs value.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Free control that separates the mask from the policy.
+- id: knee-logit-token-features
+  mechanism_id: pretrained-knee-classifier
+  parent_idea_id: null
+  title: Feed each token's 18 pretrained knee-class logits to our head as an extra input
+  opportunity: >-
+    The pretrained 165-class head is discarded although 18 of its classes are knee MRI findings
+    (ACL, MCL, meniscal, chondral, fluid, bone inflammation, fracture and others; 179,555
+    training images). Under the checkpoint's normalization its knee logits alone, averaged per
+    study with no training, reach AUC 0.69 on average against our labels and 0.83-0.85 for
+    contusion and fracture (prior-work.md). The idea keeps those directions in feature space
+    available to our head instead of asking the random projection to rediscover them. Gain is a
+    guess.
+  mechanism: >-
+    model.knee_logit_features true. The 18 knee rows of the pretrained classifier (weight 18 x
+    512, bias 18; rows at RADIMAGENET_KNEE_CLASSES indices, in index order) are stored in the
+    model as persistent buffers and never trained. For every token, z = W_knee f + b_knee,
+    with f the raw 512-channel backbone feature of that token (the live, fine-tuned backbone),
+    giving N x 49 x 18. A new Linear(18, 256), weight and bias initialized to zero, maps z to
+    the token width, and its output is added to features right after self.projection, before
+    the position and type embeddings and mil_norm. At step 0 the model equals the incumbent;
+    the new layer receives gradient immediately because z is not zero. Requires data.mean
+    [0.3162, 0.3162, 0.3162] and data.std [0.3213, 0.3213, 0.3213].
+  precedents:
+  - 'prior-work.md, Pretrained head on our slices: knee mass 0.978 and zero-shot AUCs under the checkpoint normalization.'
+  - 'contract.md, Build facts: radimagenet_classifier and RADIMAGENET_KNEE_CLASSES are built.'
+  novelty: The pretrained classifier has never been used here.
+  coverage: All studies and labels; all 18 knee classes for every target.
+  exploitation: >-
+    Log per epoch knee_logit_projection_norm (Frobenius norm of the new layer's weight),
+    knee_logit_mean and knee_logit_std (over tokens and classes), and knee_logit_top_class_share
+    (share of tokens whose largest knee logit is each of the three most frequent classes).
+    Per-label deltas, with contusion, fracture, ACL and the menisci expected to move most.
+  budget: One 18 x 512 matrix product per token; same cost as the incumbent.
+  implementation: >-
+    Adds to the incumbent. (1) config.py: ModelConfig.knee_logit_features bool default false.
+    (2) model.py __init__: when true, register_buffer knee_classifier_weight (18 x C) and
+    knee_classifier_bias (18), persistent, filled with zeros, then, only when pretrained
+    weights are being loaded (the same condition as the backbone's radimagenet load), copy the
+    rows of radimagenet_classifier(model.backbone, model.pretrained_weights) at the sorted
+    RADIMAGENET_KNEE_CLASSES indices; create self.knee_logit_projection = nn.Linear(18, 256)
+    under torch.random.fork_rng and zero its weight and bias. At prediction the buffers come
+    from the checkpoint, so no pretrained file is read. (3) encode_batch: tokens =
+    maps.flatten(2).transpose(1, 2); features = self.projection(tokens) +
+    self.knee_logit_projection(F.linear(tokens.float(), weight, bias).to(tokens.dtype)).
+    The new layer is not under backbone., so it trains at head_lr with the model's weight
+    decay. If the incumbent's data.mean is not the RadImageNet value, set data.mean and
+    data.std to it in this candidate as well (contract.md, Seeds).
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Simplest use of the pretrained head; all classes, no mapping.
+- id: knee-classifier-readout
+  mechanism_id: pretrained-knee-classifier
+  parent_idea_id: null
+  title: A second, direct readout on the raw backbone features, initialized from the pretrained
+    knee-class rows mapped to our targets
+  opportunity: >-
+    Our label head starts from random weights on a random 256-wide projection, while the
+    checkpoint already holds a trained direction for most of our targets: ACL, MCL, meniscal,
+    chondral, fluid, bone inflammation and fracture classes, with zero-shot AUC 0.64-0.85 for
+    nine of the twelve targets (prior-work.md). This seed starts a parallel readout from those
+    directions. Gain is a guess.
+  mechanism: >-
+    model.knee_classifier_readout true. A trainable Linear(512, 12), self.knee_readout, whose
+    row for target t is the pretrained classifier row (weight and bias) of the class mapped to
+    t in contract.md, Build facts (ACL acl_pathology 83; MCL mcl_pathology 90; both menisci
+    meniscal_abnormality 91; the three OA targets chondral_abnormality 85; Effusion, Synovitis
+    and Baker's soft_tissue_fluid_collection 99; Contusion bone_inflammation 84; Fracture
+    fracture 87). Per token, knee_evidence = knee_readout(f) on the raw 512-channel feature f,
+    N x 49 x 12. In _attention_pool the study logit of target t becomes the incumbent's logit
+    plus knee_readout_scale[t] times the sum over tokens of attention[t] x knee_evidence[:, t],
+    with the same attention weights the incumbent's evidence uses. knee_readout_scale is a
+    parameter of 12 values initialized to zero: the model equals the incumbent at step 0 and
+    the scale receives gradient at once. Requires the RadImageNet data.mean and data.std.
+  precedents:
+  - 'prior-work.md, Pretrained head on our slices: zero-shot AUC of the mapped class per target.'
+  - 'contract.md, Build facts: the mapping table, fixed from class names.'
+  novelty: A readout initialized from pretrained class directions; the incumbent's head is random.
+  coverage: All twelve targets; seven pretrained classes.
+  exploitation: >-
+    Log per epoch knee_readout_scale per target, knee_readout_drift (relative L2 distance of
+    the readout weight from its initial rows) and the mean absolute contribution of the new
+    term to each target's logit. Per-label deltas.
+  budget: One 12 x 512 product per token; same cost as the incumbent.
+  implementation: >-
+    Adds to the incumbent. (1) config.py: ModelConfig.knee_classifier_readout bool default
+    false. (2) model.py __init__: build self.knee_readout = nn.Linear(C, target_count) under
+    torch.random.fork_rng; when pretrained weights are being loaded, overwrite its weight and
+    bias from radimagenet_classifier(model.backbone, model.pretrained_weights) with the mapped rows in the order of targets (look
+    targets up by name; raise if a target has no mapping); self.knee_readout_scale =
+    nn.Parameter(zeros(target_count)). (3) encode_batch returns knee_evidence =
+    self.knee_readout(tokens) (N x 49 x 12, float32) in the encoded dict; pool_encoded passes
+    it flattened over tokens to _attention_pool, which adds the term inside the existing
+    float32 block, after logits is formed and before the OA detector correction, in both the
+    plane_readout branch and the plain one. Every caller of _attention_pool (pool_encoded for
+    the study logits and for the per-view diagnostic) passes it; the half-knee term uses
+    half_knee_tokens only and stays unchanged. (4) lightning.py build_optimizer: give
+    knee_readout_scale no weight decay, like view_label_bias; knee_readout trains at head_lr.
+    Set the RadImageNet data.mean and data.std if the incumbent does not have them.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Uses the trained class directions as a start for our readout.
+- id: pretrained-slice-teacher
+  mechanism_id: pretrained-slice-teacher
+  parent_idea_id: null
+  title: A frozen copy of the pretrained network with its knee head teaches the backbone per
+    slice through an auxiliary loss
+  opportunity: >-
+    Our labels are per study: no slice is told what it shows. The frozen pretrained network
+    gives a slice-level opinion over 18 knee findings for every slice, with a knee class on top
+    for 98.5% of our slices under its own normalization (prior-work.md). Asking the fine-tuned
+    backbone to keep predicting it is slice-level supervision and a function-space anchor next
+    to L2-SP's weight-space one. On the ResNet-50 the same option makes the ResNet-50 teach
+    itself. Gain is a guess.
+  mechanism: >-
+    trainer.slice_teacher (enabled true, weight 0.1). Teacher, on the Lightning module, frozen,
+    in eval mode, no gradient: a second backbone of model.backbone loaded from the same
+    pretrained weights, and the 18 knee rows of the pretrained classifier. Per training step it
+    receives the same augmented slices as the student, taken in [0, 1] before normalization and
+    normalized with RADIMAGENET_MEAN and RADIMAGENET_STD whatever data.mean holds, and outputs
+    p_T = softmax over the 18 knee logits of its globally averaged feature. Student: a
+    training-only Linear(512, 18) on the student's globally averaged raw backbone feature
+    (mean of maps over the 7 x 7 positions), initialized from the same 18 pretrained rows,
+    giving q_S = softmax of its logits. Loss term: weight times the mean over slices of
+    KL(p_T || q_S), added to the incumbent's loss. Validation and prediction are unchanged and
+    use neither the teacher nor the student head.
+  precedents:
+  - 'prior-work.md, Pretrained head on our slices.'
+  - 'trainer.report_attribute_loss_weight 0.1: the existing auxiliary term of the same size.'
+  - 'L2-SP anchoring is adopted (site-generalization campaign): keeping close to the pretrained solution helps here.'
+  novelty: No slice-level target and no frozen teacher have been used with these backbones.
+  coverage: Every slice of every training study.
+  exploitation: >-
+    Log per epoch slice_teacher_loss, slice_teacher_agreement (share of slices where student
+    and teacher agree on the top knee class), slice_teacher_entropy (mean entropy of p_T) and
+    slice_teacher_knee_mass (mean probability the teacher puts on the 18 knee classes among all
+    165, which must stay near 0.98). Per-label deltas and per-stage drift.
+  budget: >-
+    One extra ResNet-18 forward without gradient per slice: estimated 1.2 to 1.3 times the
+    incumbent, about 1,450-1,550 s, unmeasured.
+  implementation: >-
+    Adds to the incumbent; the model's prediction path is untouched. (1) config.py:
+    SliceTeacherConfig (enabled bool default false, weight float default 0.1) under
+    TrainerConfig. (2) model.py encode_batch: add to the encoded dict input_unit, the slices in
+    [0, 1] after augmentation and the three-channel expansion, i.e. the tensor before
+    .sub(self.mean) (keep a reference; sub is not in place), and slice_features =
+    maps.float().mean((-2, -1)) (N x 512). (3) lightning.py: when enabled, build the teacher
+    with timm.create_model(config.model.backbone, pretrained=False, in_chans=3, num_classes=0)
+    loaded strictly from radimagenet_state_dict(config.model.backbone,
+    config.model.pretrained_weights), keep it in eval mode (override train so it never switches),
+    requires_grad False, excluded from the optimizer and from the L2-SP anchors; store the knee
+    rows as buffers; build the student head nn.Linear(C, 18) initialized from the same rows and
+    pass it through heads to build_optimizer. In training_step, under torch.no_grad, teacher
+    logits = F.linear(teacher(normalized input_unit).mean((-2, -1)), knee_weight, knee_bias);
+    loss += weight * F.kl_div(log_softmax(student_logits), softmax(teacher_logits),
+    reduction="batchmean"), computed in float32. Also compute the full 165-class teacher
+    softmax once per epoch's first batch for slice_teacher_knee_mass (store the full classifier
+    as a buffer for that). Keep the teacher out of on_save_checkpoint size concerns: it may be
+    saved; inference ignores non-model keys.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Slice-level supervision from the pretrained network; carries to the ResNet-50 unchanged.
+exhausted_directions: None.
