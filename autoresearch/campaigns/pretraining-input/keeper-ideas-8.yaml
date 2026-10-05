@@ -1,0 +1,37 @@
+ideas:
+- id: union-bag-loss-01
+  mechanism_id: union-bag
+  parent_idea_id: union-bag-loss
+  title: Union bags of two studies at loss weight 0.1
+  opportunity: >-
+    Evidence-backed for the diagnosis, a guess for the outcome. Both bag losses were run at
+    weight 0.5 only: union-bag-loss (-0.003706, 80% [-0.005447, -0.001899]) and
+    split-knee-bag-loss (-0.004919, 80% [-0.006380, -0.003556]), each one run. Their x1 curves
+    share a shape no augmentation run has: a constant deficit from the second epoch on (about
+    -0.009 and -0.005) instead of a slower curve that closes. In the split-knee run the labels
+    the bag loss trains and the labels it leaves out lost alike. That is the picture of a
+    second objective that takes attention and head capacity from the study loss at any epoch,
+    in proportion to its weight, and not of a wrong target. At a fifth of the weight the bag
+    loss is a regularizer beside the study loss instead of a competitor.
+  mechanism: >-
+    trainer.union_bag_loss_weight 0.1 on the incumbent. Studies of a batch are paired at
+    random; each pair's tokens are pooled as one bag with OR labels; class-balanced BCE times
+    0.1 is added to the loss. Training only.
+  precedents:
+  - 'run-notes.md, runs 19 and 22: the union and split-knee bag losses at weight 0.5.'
+  novelty: No bag loss has been run below weight 0.5.
+  coverage: Every training study, as one half of one of four bags per batch; all twelve labels.
+  exploitation: >-
+    union_bags about 1,747 per epoch, union_bag_loss near 0.7. Then the x1 curve against the
+    incumbent (run 19 sat 0.009 below from epoch 2; a deficit of about a fifth of that would
+    confirm the proportional reading) and x4; per-label deltas on MCL, Lateral Meniscus and
+    Contusion, the largest losses of run 19.
+  budget: Same cost as the incumbent within a few percent (run 19 took 1,134 s).
+  implementation: >-
+    Configuration only: set trainer.union_bag_loss_weight to 0.1 in configs/training.yaml. The
+    option is built (KneeModule._union_bag_loss in training/lightning.py). No Python change.
+    Activation signature: the bag-loss row of contract.md, union_bags > 0 at epoch 0.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Free; the mild point of a mechanism measured twice at one strong weight.
+exhausted_directions: None.

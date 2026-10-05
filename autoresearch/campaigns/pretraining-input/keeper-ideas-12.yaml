@@ -1,0 +1,54 @@
+ideas:
+- id: slice-quantile-keep-sagittal-fluid
+  mechanism_id: bright-end-clipping
+  parent_idea_id: slice-upper-quantile-098
+  title: Per-slice stretch everywhere except the sagittal fluid-sensitive series
+  opportunity: Evidence-backed by the per-view validation scores of two runs, each one run. Removing
+    the stretch from all three fluid-sensitive planes (slice-quantile-other-types against slice-upper-quantile-098,
+    single-view AUC, mean of the last three epochs) moved the labels plane by plane. On the sagittal
+    fluid view Baker's +0.080 and Medial OA +0.011 against MCL -0.020 and Synovitis -0.009; on the
+    coronal fluid view Baker's +0.016 against MCL -0.023; on the axial fluid view nothing above 0.010
+    (ACL -0.009, Lateral OA +0.010, Fracture +0.008). A same-seed rerun moves single-view rows by
+    up to about 0.006. So the fluid labels' loss under the stretch sits on the sagittal fluid series,
+    and MCL's gain sits on the coronal and sagittal ones; MCL is read far better on the coronal fluid
+    view (0.854 alone) than on the sagittal one (0.733), so giving up the stretch on the sagittal
+    series costs MCL its weaker view and returns Baker's its largest single-view gain. slice-quantile-keep-axial-fluid
+    chose the axial plane from anatomy; these numbers point at the sagittal one.
+  mechanism: A new option model.slice_upper_quantile_keep_sagittal_fluid (false off, the incumbent's
+    behaviour). When true, a slice whose series type is fluid-sensitive and sagittal is not divided
+    by its quantile (its divisor is 1); every other slice is rescaled as now. Training and prediction
+    alike.
+  precedents:
+  - run-notes.md, runs 4 and 8 and the per-view table of 2026-10-05, the stretch on all series and
+    off all three fluid-sensitive planes.
+  novelty: The stretch has been switched by fluid sensitivity and for the axial plane, never for the
+    sagittal one.
+  coverage: All studies; the sagittal fluid-sensitive slices change against the incumbent.
+  exploitation: slice_quantile_kept_slices above 0 and slice_quantile_rescaled_slices below the incumbent's
+    91,400 per epoch by that count. Then x4 against the incumbent; per-label deltas on Baker's and
+    Medial OA (expected up) and on MCL (expected held by the coronal view); the single-view scores
+    val_auc_view_sagittal_fluid_93mm_* against the incumbent's.
+  budget: Same cost as the incumbent.
+  implementation: 'Source change, three exact edits, then one configuration value. (1) config.py,
+    ModelConfig, directly below slice_upper_quantile: add the field slice_upper_quantile_keep_sagittal_fluid
+    of type bool with default False. (2) modeling/model.py: in KneeAbnormalityModel.__init__, below
+    "self.slice_upper_quantile = model.slice_upper_quantile", add "self.slice_upper_quantile_keep_sagittal_fluid
+    = model.slice_upper_quantile_keep_sagittal_fluid", and below "self.slice_quantile_rescaled = None"
+    add "self.slice_quantile_kept = None". In encode_batch, inside "if self.slice_upper_quantile is
+    not None:", directly after the line that computes top with kthvalue and clamp_min and before the
+    division, add: if self.slice_upper_quantile_keep_sagittal_fluid: kept = self.fluid_type[token_type]
+    & (self.spatial_tokens.plane_lookup[token_type] == 2); top = torch.where(kept, torch.ones_like(top),
+    top); self.slice_quantile_kept = kept.sum().detach(). Plane index 2 is Sagittal (plane order Axial,
+    Coronal, Sagittal in modeling/spatial_tokens.py); token_type is the variable defined just above
+    that block. Leave the division, the clamp and the existing slice_quantile_rescaled line as they
+    are; the block runs in training and prediction. (3) training/lightning.py, training_step, directly
+    after the existing block that logs slice_quantile_rescaled_slices: if self.config.model.slice_upper_quantile_keep_sagittal_fluid,
+    call self._log_epoch_metric("slice_quantile_kept_slices", self.model.slice_quantile_kept.float(),
+    1, "sum"). Nothing else in Python. (4) configs/training.yaml: under model, next to slice_upper_quantile,
+    add "slice_upper_quantile_keep_sagittal_fluid: true"; keep slice_upper_quantile 0.98. Activation
+    signature: slice_quantile_kept_slices > 0 at epoch 0 (epoch count of sagittal fluid-sensitive
+    training slices left unscaled; logged only when the option is on).'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Small and exact; the plane the per-view scores single out.
+exhausted_directions: None.

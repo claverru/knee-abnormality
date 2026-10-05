@@ -1,0 +1,78 @@
+ideas:
+- id: heated-teacher-distillation
+  mechanism_id: heated-in-one-model
+  parent_idea_id: heated-weights-on-incumbent
+  title: Standard-weights student with a frozen, trained heated model as a teacher during training
+  opportunity: >-
+    Asked by the user on 2026-10-05: the strengths of the heated and of the standard weights in
+    one model, obtained during training, with one checkpoint at prediction. Evidence for the
+    motive, one fold and one run each: an equal-weight blend of the incumbent and a
+    heated-weights run scores +0.001208 over the incumbent although the heated run alone is
+    0.0022 below it (MCL +0.0040, ACL +0.0031, Synovitis +0.0029, Lateral Meniscus +0.0023; ten
+    of twelve labels at or above the incumbent); a standard-weights second member adds 0.0005
+    and a same-seed rerun nothing. The two checkpoints make different errors. Distillation is
+    the standard way to put a second model's view into one network: the student keeps its own
+    weights and loss and is also pulled toward the teacher's predictions. Whether it recovers
+    a useful part of the blend's gain is a guess.
+  mechanism: >-
+    Two new options, optimizer.teacher_checkpoint (null off) and optimizer.teacher_loss_weight
+    (0.0 off). The teacher is the trained model of heated-weights-on-incumbent, loaded once,
+    frozen, in evaluation mode, kept outside the module's parameters so that it is neither
+    optimized nor saved. In each training step it scores the same batch without augmentation
+    and without gradient; the student's study logits get an extra binary cross-entropy against
+    the teacher's probabilities on all twelve labels, times the weight (0.5). Validation and
+    prediction use the student alone. The teacher was trained on the same training fold and
+    never saw the validation fold.
+  precedents:
+  - 'run-notes.md, Equal-weight blends with the incumbent.'
+  - 'refined-radimagenet run notes, run 11: a frozen pretrained slice teacher, +0.000333, not separated.'
+  novelty: No run has used a model trained on this task as a teacher.
+  coverage: All training studies and all twelve labels, every step.
+  exploitation: >-
+    teacher_distillation_loss per epoch (falling as the student approaches the teacher) and
+    teacher_student_gap, the mean absolute difference of the two probabilities. Then x4 and x1
+    per epoch against the incumbent and against the teacher's own run; per-label deltas on MCL,
+    ACL, Lateral Meniscus and Contusion (the heated side) and on Medial OA and Lateral OA (the
+    side the student should keep).
+  budget: >-
+    One forward pass of a second ResNet-10t per step without a backward pass; about 1.25 to 1.3
+    times the incumbent's 1,106 s, inside the 1,568 s limit.
+  implementation: >-
+    Source change, exact edits, then two configuration values. (1) config.py, the optimizer
+    settings class that holds anchor_alpha_early and anchor_alpha_late, directly below
+    anchor_alpha_late: add teacher_checkpoint of type Path | None with default None and
+    teacher_loss_weight of type Annotated[float, Field(ge=0, allow_inf_nan=False)] with default
+    0.0. (2) training/lightning.py, the module's __init__, after self.model is built: add
+    self._teacher = [] (a plain list, so the teacher is not a registered submodule, is not
+    optimized and does not enter the checkpoint). If config.optimizer.teacher_checkpoint is not
+    None and config.optimizer.teacher_loss_weight > 0: state =
+    torch.load(config.optimizer.teacher_checkpoint, map_location="cpu",
+    weights_only=False)["state_dict"]; teacher = KneeAbnormalityModel(config.model, config.data,
+    targets, load_pretrained=False); teacher.load_state_dict({key.removeprefix("model."): value
+    for key, value in state.items() if key.startswith("model.")}, strict=True);
+    teacher.requires_grad_(False); teacher.eval(); self._teacher.append(teacher). (3)
+    training/lightning.py, on_fit_start (add the method if it does not exist, calling
+    super().on_fit_start() first): for teacher in self._teacher: teacher.to(self.device);
+    teacher.eval(). (4) training/lightning.py, training_step, directly before the block "if
+    self.anchor_parameters:": if self._teacher: with torch.no_grad(): teacher_probability =
+    torch.sigmoid(self._teacher[0](batch).to(torch.float32)); distillation =
+    torch.nn.functional.binary_cross_entropy_with_logits(logits, teacher_probability); loss =
+    loss + self.config.optimizer.teacher_loss_weight * distillation;
+    self._log_epoch_metric("teacher_distillation_loss", distillation, studies);
+    self._log_epoch_metric("teacher_student_gap", (torch.sigmoid(logits.detach()) -
+    teacher_probability).abs().mean(), studies). Here logits is the student's study logits
+    already computed in training_step by self.model.pool_encoded(encoded).to(torch.float32),
+    and studies the study count defined at the top of the step. The teacher is called through
+    its forward (encode_batch then pool_encoded) in evaluation mode, so it applies no
+    augmentation and draws no random numbers; it must stay in evaluation mode for the whole
+    run, so do not put it where Lightning's train() would reach it. Nothing else in Python;
+    validation and prediction are untouched. (5) configs/training.yaml, under optimizer: add
+    "teacher_checkpoint:
+    /home/claudio/src/knee-abnormality/outputs/autoresearch/pretraining-input/experiments/heated-weights-on-incumbent-20261005T073414Z-c2371b78/training/fold_0/best-epoch=09-val_macro_auc=0.92215.ckpt"
+    and "teacher_loss_weight: 0.5". model.pretrained_weights stays radimagenet and every other
+    value stays the incumbent's. Activation signature: teacher_distillation_loss > 0 at epoch 0
+    (logged only when a teacher is loaded).
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Asked by the user; the single-model route the blend measurement supports most directly.
+exhausted_directions: None.

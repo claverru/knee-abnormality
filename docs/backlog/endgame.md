@@ -21,6 +21,19 @@ superseded loss; seed ensembles and diverse runs are still untried. Train the re
 the [validation strategy](../validation/validation-strategy.md), then combine models under the
 [ensemble interpretation](../validation/ensemble-interpretation.md) rules.
 
+**A mask-trained (heated) member beside the standard one** (filed 2026-10-05, evidence-backed on
+one fold). On the ResNet-10t an equal-weight blend of a standard-weights run and a heated-weights
+run scored +0.0011 to +0.0012 over the standard run on fold 0, with two different heated runs
+that were 0.0017 and 0.0022 below it alone; a second standard-weights run added 0.0000 to 0.0005
+([result](../validation/results/2026-10-05-pretraining-input-campaign.md#findings)). The two
+checkpoints make different errors (heated: ligaments, lateral meniscus and contusion up, OA
+labels down). To use it: train the heated ResNet-50 (`model.pretrained_weights:
+radimagenet_policy`, backbone rate and L2-SP strengths rescaled for the checkpoint's 3.4 times
+larger weights; the weight entry and loader are in the uncommitted `refined-radimagenet` build)
+as a second family, either as ensemble members or as a second teacher in the
+[out-of-fold table](#out-of-fold-self-distillation). No ResNet-50 run of these weights has
+finished.
+
 - *Bundling mechanism (implemented 2026-09-19):* `export.py` and `predict.py` now support a
   multi-checkpoint bundle that averages members' per-label probabilities on one shared decode
   pass, so building the eventual fold/seed ensemble is a matter of exporting with the trained

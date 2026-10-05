@@ -1,0 +1,59 @@
+ideas:
+- id: slice-quantile-other-types
+  mechanism_id: bright-end-clipping
+  parent_idea_id: slice-upper-quantile-098
+  title: Per-slice quantile 0.98 on the non-fluid series only; fluid-sensitive slices left as loaded
+  opportunity: >-
+    Evidence-backed by three runs of this campaign, each one run and weak evidence. Every
+    version of bright-end clipping gave the same label split: loader 0.99 (+0.000439), loader
+    0.98 (+0.000420) and per-slice 0.98 (+0.000716, 80% [+0.000009, +0.001413], accepted). The
+    labels read on bone, ligament and meniscus rise (per-slice run: MCL +0.0056, Lateral OA
+    +0.0041, Lateral Meniscus +0.0037, ACL +0.0021) and the fluid labels fall in all three
+    (Baker's -0.0013, -0.0035, -0.0020; Effusion -0.0004, -0.0008, -0.0012; Synovitis -0.0020,
+    -0.0017, -0.0006). Fluid is the brightest tissue of a fluid-sensitive slice, so a 2% clip
+    saturates it (input_fluid_saturated_share 0.020). Rescaling only the non-fluid series should
+    keep the gains and return the fluid labels to the reference.
+  mechanism: >-
+    A new option model.slice_upper_quantile_types with values all (default, the incumbent's
+    behaviour), other and fluid. With other, a slice of a fluid-sensitive series type is not
+    divided by its quantile (its divisor is 1); the slices of the other three series types are
+    rescaled as now. Training and prediction alike. The run sets it to other and keeps
+    model.slice_upper_quantile 0.98.
+  precedents:
+  - 'run-notes.md, runs 1, 2 and 4: per-label deltas of the three clipping runs.'
+  novelty: The per-slice rescaling has only been applied to every series type at once.
+  coverage: All studies; the slices of the three non-fluid series types change against the reference, the fluid-sensitive ones are as in the reference.
+  exploitation: >-
+    slice_quantile_skipped_slices above 0 and slice_quantile_rescaled_slices below the
+    incumbent's 91,400 per epoch; input_fluid_saturated_share back near 0.005 and
+    input_fluid_std near 0.20, input_other_saturated_share about 0.021 and input_other_std about
+    0.313 as in the incumbent. Then x4 against the incumbent and against the historical
+    control; per-label deltas split into the fluid labels (Effusion, Synovitis, Baker's) and the
+    others.
+  budget: Same cost as the incumbent.
+  implementation: >-
+    Source change, three exact edits, then two configuration values. (1) config.py, ModelConfig,
+    directly below slice_upper_quantile: add the field slice_upper_quantile_types of type
+    Literal["all", "other", "fluid"] with default "all". (2) modeling/model.py:
+    in KneeAbnormalityModel.__init__, below "self.slice_upper_quantile =
+    model.slice_upper_quantile", add "self.slice_upper_quantile_types =
+    model.slice_upper_quantile_types", and below "self.slice_quantile_rescaled = None" add
+    "self.slice_quantile_skipped = None". In encode_batch, inside "if self.slice_upper_quantile
+    is not None:", directly after the line that computes top with kthvalue and clamp_min, add:
+    if self.slice_upper_quantile_types != "all": selected = self.fluid_type[token_type] ==
+    (self.slice_upper_quantile_types == "fluid"); top = torch.where(selected, top,
+    torch.ones_like(top)); self.slice_quantile_skipped = (~selected).sum().detach(). Leave the
+    division, the clamp and the existing slice_quantile_rescaled line as they are; this block
+    runs in training and prediction. (3) training/lightning.py, training_step, directly after
+    the existing block that logs slice_quantile_rescaled_slices: if
+    self.config.model.slice_upper_quantile_types != "all", call
+    self._log_epoch_metric("slice_quantile_skipped_slices",
+    self.model.slice_quantile_skipped.float(), 1, "sum"). Nothing else in Python. (4)
+    configs/training.yaml: under model, next to slice_upper_quantile, add
+    "slice_upper_quantile_types: other"; keep slice_upper_quantile 0.98. Activation signature:
+    slice_quantile_skipped_slices > 0 at epoch 0 (epoch count of training slices of
+    fluid-sensitive series left unscaled; logged only when the option is not all).
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Small and exact; the direct test of the label split that three runs agree on.
+exhausted_directions: None.

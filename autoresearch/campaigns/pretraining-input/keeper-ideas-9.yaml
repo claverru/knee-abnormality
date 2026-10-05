@@ -1,0 +1,160 @@
+ideas:
+- id: incumbent-rerun
+  mechanism_id: reference-control
+  parent_idea_id: no-contrast-mixing
+  title: Second run of the incumbent recipe, ordered by the user as a control
+  opportunity: >-
+    Ordered by the user on 2026-10-05; a control, not a mechanism. All eleven candidates measured
+    against the no-contrast-mixing incumbent are negative, and two small labels lose in almost
+    every one whatever the mechanism: MCL (48 positives; -0.0099, -0.0073, -0.0148, -0.0043,
+    -0.0113, -0.0104, -0.0175, -0.0105, -0.0131, -0.0163) and Fracture (59 positives; -0.0083,
+    -0.0047, -0.0047, -0.0069, -0.0043, -0.0058, -0.0087, -0.0051). The incumbent itself gained
+    +0.0020 and +0.0066 on them. That reads as the incumbent's single run sitting high on those
+    two labels, which would shift every later delta by about -0.001 on the macro. A second
+    run of the same recipe at the same seed measures how far two runs of one recipe land apart
+    (training is not deterministic), which is the yardstick every delta of this campaign
+    needs.
+  mechanism: >-
+    None. The recipe of the incumbent, unchanged in behaviour. To give the candidate a
+    configuration difference, data.fluid_upper_quantile is written as 0.995, the value the
+    loader already uses for the fluid-sensitive series through data.upper_quantile 0.995, so
+    every pixel the loader produces is the same.
+  precedents:
+  - 'run-notes.md, run 20, The reference, across runs 13 to 20.'
+  novelty: No recipe of this campaign has been run twice.
+  coverage: All studies and labels.
+  exploitation: >-
+    x4, x1 per epoch and the twelve per-label deltas against the incumbent: their size is the
+    run-to-run spread of one recipe. MCL and Fracture first. loader_fluid_bright_tail and
+    loader_other_bright_tail 0.005, contrast_mixing_off_slices about 93,569 and
+    slice_quantile_rescaled_slices about 91,400 per epoch, as on the incumbent. The decision
+    rule will most likely reject it; the result is read as a measurement, not as an idea.
+  budget: Same cost as the incumbent.
+  implementation: >-
+    Configuration only: add "fluid_upper_quantile: 0.995" under data, next to upper_quantile, in
+    configs/training.yaml, and change nothing else. No Python change. This is a control run
+    with no mechanism to prove, so the activation signature can only show that the incumbent
+    recipe trained: contrast_mixing_off_slices > 0 at epoch 0 (logged only while contrast
+    mixing is off, as on the incumbent). State in the report that the signature does not
+    separate the candidate from the incumbent because the two are meant to be the same.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Ordered by the user; the yardstick for every delta against this incumbent.
+- id: slice-window-channels
+  mechanism_id: bright-end-clipping
+  parent_idea_id: slice-upper-quantile-098
+  title: Stretched and unstretched slice side by side in the three input channels
+  opportunity: >-
+    Evidence-backed for the motive, a guess for the outcome. Two runs isolate a trade on the
+    fluid-sensitive series: with the per-slice 0.98 stretch MCL, Lateral OA, Lateral Meniscus
+    and ACL gain (+0.0056, +0.0041, +0.0037, +0.0021 in slice-upper-quantile-098) and Baker's
+    and Effusion lose; with the stretch taken off those series (slice-quantile-other-types)
+    the fluid labels return (+0.0020, +0.0020, Synovitis +0.0013) and the four lose what they
+    gained. Three shapes of one stretch (clip, roll-off, per series) landed within 0.0006 of
+    each other, so one image cannot serve both groups. The recipe feeds the same middle slice
+    three times, once per input channel, so two of the three channels carry nothing new. They
+    can carry the two scales at no cost in slices or compute, the way CT models are given
+    several intensity windows.
+  mechanism: >-
+    A new option model.slice_window_channels (false off, the incumbent's behaviour). When true,
+    the stretch is no longer applied before augmentation; at the point where the single
+    channel is repeated three times, the channels become: the slice divided by its own 0.98
+    quantile and clamped to 1, the slice as loaded, and the stretched slice again. Two
+    channels stretched keep the input close to the incumbent's; the middle channel gives the
+    fluid its full range. Training and prediction alike.
+  precedents:
+  - 'run-notes.md, runs 4, 8, 11 and 15: the stretch, its removal from the fluid series, and two reshaped versions.'
+  novelty: Every run so far gave the backbone one intensity scale per slice.
+  coverage: All studies and slices; one of three channels changes against the incumbent.
+  exploitation: >-
+    slice_window_channel_gap above 0 (mean absolute difference between the stretched and the
+    unstretched channel, about 0.05 to 0.1). Then x4 against the incumbent; per-label deltas
+    split into Effusion, Synovitis, Baker's (expected up) and MCL, Lateral OA, Lateral
+    Meniscus, ACL (expected held).
+  budget: Same cost as the incumbent.
+  implementation: >-
+    Source change, four exact edits, then one configuration value. (1) config.py, ModelConfig,
+    directly below slice_upper_quantile: add the field slice_window_channels of type bool with
+    default False. (2) modeling/model.py, KneeAbnormalityModel.__init__: below
+    "self.slice_upper_quantile = model.slice_upper_quantile" add "self.slice_window_channels =
+    model.slice_window_channels", and below "self.slice_quantile_rescaled = None" add
+    "self.slice_window_gap = None". (3) modeling/model.py, encode_batch: change the condition
+    "if self.slice_upper_quantile is not None:" of the block that computes pixels, rank and
+    top to "if self.slice_upper_quantile is not None and not self.slice_window_channels:".
+    Further down, replace the two lines "if self.repeated_middle_slice:" / "valid_images =
+    valid_images.expand(-1, SLICES_PER_INPUT, -1, -1)" by: if self.repeated_middle_slice: if
+    self.slice_window_channels: pixels = valid_images.flatten(1); rank = max(1,
+    round(self.slice_upper_quantile * pixels.shape[1])); top = pixels.kthvalue(rank,
+    dim=1).values.clamp_min(1e-3); stretched = (valid_images / top[:, None, None,
+    None]).clamp(0, 1); self.slice_window_gap = (stretched -
+    valid_images).abs().mean().detach(); self.slice_quantile_rescaled = (top <
+    1).sum().detach(); valid_images = torch.cat([stretched, valid_images, stretched], 1); else:
+    valid_images = valid_images.expand(-1, SLICES_PER_INPUT, -1, -1). The normalization line
+    that follows stays as it is. The block runs in training and prediction. (4)
+    training/lightning.py, training_step, directly after the existing block that logs
+    slice_quantile_rescaled_slices: if self.config.model.slice_window_channels, call
+    self._log_epoch_metric("slice_window_channel_gap", self.model.slice_window_gap.float(),
+    studies). Nothing else in Python. (5) configs/training.yaml: under model, next to
+    slice_upper_quantile, add "slice_window_channels: true"; keep slice_upper_quantile 0.98.
+    Activation signature: slice_window_channel_gap > 0 at epoch 0 (logged only when the option
+    is on; zero only if the two channels were identical).
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Free in compute; the direct way to give each label group its own scale.
+- id: slice-quantile-keep-axial-fluid
+  mechanism_id: bright-end-clipping
+  parent_idea_id: slice-upper-quantile-098
+  title: Per-slice stretch everywhere except the axial fluid-sensitive series
+  opportunity: >-
+    A guess from anatomy on an evidence-backed trade. The stretch of the fluid-sensitive series
+    helps MCL, Lateral OA, the menisci and ACL and costs Baker's and Effusion (runs 4 and 8).
+    Those two groups are not read on the same planes: the collateral ligaments, the menisci
+    and the tibiofemoral cartilage are read on coronal and sagittal slices, the cruciates on
+    sagittal ones; a Baker's cyst and a joint effusion are read best on the axial
+    fluid-sensitive series (popliteal fossa, suprapatellar recess). Leaving only that series
+    unstretched gives the fluid labels one plane at the loader's scale while every plane the
+    other group depends on keeps the stretch. slice-quantile-other-types removed the stretch
+    from all three fluid planes; this removes it from one.
+  mechanism: >-
+    A new option model.slice_upper_quantile_keep_axial_fluid (false off, the incumbent's
+    behaviour). When true, a slice whose series type is fluid-sensitive and axial is not
+    divided by its quantile (its divisor is 1); every other slice is rescaled as now. Training
+    and prediction alike.
+  precedents:
+  - 'run-notes.md, runs 4 and 8: the stretch on all series, and off all three fluid-sensitive planes.'
+  novelty: The stretch has only been switched by fluid sensitivity, never by plane.
+  coverage: All studies; the axial fluid-sensitive slices change against the incumbent, about a sixth of the slices.
+  exploitation: >-
+    slice_quantile_kept_slices above 0 and slice_quantile_rescaled_slices below the incumbent's
+    91,400 per epoch by about that count; input_fluid_saturated_share between 0.005 and 0.020.
+    Then x4 against the incumbent; per-label deltas on Baker's and Effusion (expected up) and
+    on MCL, Lateral OA, Lateral Meniscus, ACL (expected held, unlike run 8).
+  budget: Same cost as the incumbent.
+  implementation: >-
+    Source change, three exact edits, then one configuration value. (1) config.py, ModelConfig,
+    directly below slice_upper_quantile: add the field slice_upper_quantile_keep_axial_fluid of
+    type bool with default False. (2) modeling/model.py: in KneeAbnormalityModel.__init__, below
+    "self.slice_upper_quantile = model.slice_upper_quantile", add
+    "self.slice_upper_quantile_keep_axial_fluid = model.slice_upper_quantile_keep_axial_fluid",
+    and below "self.slice_quantile_rescaled = None" add "self.slice_quantile_kept = None". In
+    encode_batch, inside "if self.slice_upper_quantile is not None:", directly after the line
+    that computes top with kthvalue and clamp_min and before the division, add: if
+    self.slice_upper_quantile_keep_axial_fluid: kept = self.fluid_type[token_type] &
+    (self.spatial_tokens.plane_lookup[token_type] == 0); top = torch.where(kept,
+    torch.ones_like(top), top); self.slice_quantile_kept = kept.sum().detach(). Plane index 0
+    is Axial (plane order Axial, Coronal, Sagittal in modeling/spatial_tokens.py); token_type
+    is the variable defined just above that block. Leave the division, the clamp and the
+    existing slice_quantile_rescaled line as they are; the block runs in training and
+    prediction. (3) training/lightning.py, training_step, directly after the existing block
+    that logs slice_quantile_rescaled_slices: if
+    self.config.model.slice_upper_quantile_keep_axial_fluid, call
+    self._log_epoch_metric("slice_quantile_kept_slices", self.model.slice_quantile_kept.float(),
+    1, "sum"). Nothing else in Python. (4) configs/training.yaml: under model, next to
+    slice_upper_quantile, add "slice_upper_quantile_keep_axial_fluid: true"; keep
+    slice_upper_quantile 0.98. Activation signature: slice_quantile_kept_slices > 0 at epoch 0
+    (epoch count of axial fluid-sensitive training slices left unscaled; logged only when the
+    option is on).
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Small and exact; splits the fluid-sensitive series by the plane each label group is read on.
+exhausted_directions: None.

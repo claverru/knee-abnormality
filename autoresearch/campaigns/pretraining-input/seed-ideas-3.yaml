@@ -1,0 +1,168 @@
+ideas:
+- id: rotation-30
+  mechanism_id: pretraining-augmentation
+  parent_idea_id: null
+  title: Rotation range 30 degrees instead of 10
+  opportunity: >-
+    Evidence-backed on the measurement, a guess on the score. The pretraining policy rotates
+    images by up to 30 degrees, and RadImageNet knees are not orientation-normalized. Rotating
+    our slices lowers the overall gap to the pretraining statistics (0.033 to 0.024 at 15
+    degrees and 0.019 at 30) and nearly closes the non-fluid stem gap (0.021 to 0.004), so a
+    wider rotation is an augmentation the backbone already handles.
+  mechanism: >-
+    data.affine_augmentation.rotation_degrees 30.0 (incumbent 10.0). Probability, translation
+    and scale range unchanged. The affine augmentation already rotates the token positions
+    with the image.
+  precedents:
+  - 'prior-work.md, The pretraining augmentation on our slices: rotation row.'
+  novelty: The rotation range has not been varied on these weights.
+  coverage: 70% of training slices (the affine probability); validation unchanged.
+  exploitation: >-
+    Training and validation loss and x1 per epoch against the incumbent; per-label deltas, with
+    the side-specific labels (medial and lateral meniscus and OA) the ones to watch.
+  budget: Same cost as the incumbent.
+  implementation: >-
+    Configuration only: set data.affine_augmentation.rotation_degrees to 30.0 in
+    configs/training.yaml. No Python change.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Free and measured.
+- id: study-cutmix
+  mechanism_id: study-cutmix
+  parent_idea_id: null
+  title: CutMix between slices of the same study and series type
+  opportunity: >-
+    A guess, with a neutral gap measurement. The pretraining configuration sets CutMix (alpha
+    1.0). Pasting a box from another slice of the same study and series type keeps the study's
+    labels exactly right, because both slices belong to the same knee, and CutMix moves the
+    input no further from the pretraining statistics (stem gap 0.035 against 0.044). It forces
+    the pooling to use evidence from partial slices.
+  mechanism: >-
+    data.study_cutmix_augmentation.probability 0.5. In training only, each slice with that
+    probability has a random box (side fraction sqrt(1 - u), u uniform, random centre) replaced
+    by the same box of another slice of the same study and series type; slices with no partner
+    are left alone. Labels and token positions are unchanged. It runs after our other
+    augmentations and before normalization.
+  precedents:
+  - 'prior-work.md, The pretraining recipe (CutMix alpha 1.0 set) and the CutMix rows of the augmentation table.'
+  novelty: CutMix has never been run in our fine-tuning.
+  coverage: About half of the training slices.
+  exploitation: >-
+    study_cutmix_slices per epoch (expect about half of the roughly 90,000 training slices)
+    and study_cutmix_area (the mean replaced share over all slices, about 0.15); training and validation loss and x1 per epoch; per-label deltas.
+  budget: Same cost as the incumbent within a few percent.
+  implementation: >-
+    Configuration only: set data.study_cutmix_augmentation.probability to 0.5 in
+    configs/training.yaml. The option is built (modeling/pretraining_augmentation.py,
+    study_cutmix, called in encode_batch). No Python change.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The label-safe form of the pretraining's CutMix.
+- id: union-bag-loss
+  mechanism_id: union-bag
+  parent_idea_id: null
+  title: Extra loss on bags that join two studies, labelled with the OR of their labels
+  opportunity: >-
+    A guess. Mixing two studies with labels in proportion to their share is wrong for our
+    labels: a tear visible on three slices does not become half a tear. The correct label of
+    the slices of two knees pooled together is the OR. Training the attention pooling on such
+    bags asks it to find a finding among twice as many slices, half of them from a knee without
+    it, which is what larger inference bags and big studies demand.
+  mechanism: >-
+    trainer.union_bag_loss_weight 0.5. In training, the studies of each batch are paired at
+    random (four pairs at batch 8); the already-encoded tokens of each pair are pooled as one
+    bag by the model's own pooling; the target is 1 - (1 - a)(1 - b) for the two studies'
+    soft labels; a label counts when both studies have it observed or an observed one is
+    positive; the class-balanced BCE of these bags, times the weight, is added to the loss. No
+    extra backbone pass. Validation and prediction are unchanged.
+  precedents:
+  - 'dense-bag pooling goal: robustness of the pooling across study sizes and inference multipliers.'
+  - 'augmentation campaign: pooled-output MixUp +0.0007 and image MixUp +0.0006 on ReXNet-200, not separated.'
+  novelty: Union bags have not been tried.
+  coverage: Every training study, as one of four bags per batch.
+  exploitation: >-
+    union_bag_loss, union_bags (expect about 1,750 per epoch: 3,495 studies in batches of 8,
+    four bags each) and union_bag_positive_rate; the
+    x4 minus x1 difference against the incumbent's (the bag-size robustness reading);
+    per-label deltas.
+  budget: One extra pooling pass per step; same cost as the incumbent within a few percent.
+  implementation: >-
+    Configuration only: set trainer.union_bag_loss_weight to 0.5 in configs/training.yaml. The
+    option is built (KneeModule._union_bag_loss in training/lightning.py). No Python change.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The correct-label form of mixing studies; cheap.
+- id: input-mask-centred-one
+  mechanism_id: input-mask
+  parent_idea_id: null
+  title: Random smooth input mask with mean 1 instead of 0.5
+  opportunity: >-
+    A guess. The previous campaign's masks all averaged 0.5 and cost about 0.0024, with or
+    without a policy. A mask of mean 0.5 halves the input the standard weights expect, and
+    prediction then had to be scaled to match. A mask that varies around 1 keeps the same
+    spatially smooth brightness perturbation, which is the regularizer the authors describe,
+    without the shift in scale, and needs no correction at prediction.
+  mechanism: >-
+    trainer.input_mask kind random, grid 64, kernel 13, sigma 6.0, low 0.5, epochs null, and
+    model.input_mask_expectation true. In training the normalized input is multiplied by a
+    smooth random field per slice: cells uniform in [0.5, 1.5] on a 64 x 64 lattice, resized to
+    224 by nearest neighbour and blurred (kernel 13, sigma 6); the field has mean 1 and
+    standard deviation about 0.08. At prediction the input is multiplied by the stored
+    constant low + 0.5 = 1.0, so it is unchanged.
+  precedents:
+  - 'prior-work.md, The mask procedure in our training: three runs at mean 0.5, -0.0023 to -0.0026.'
+  novelty: A mask centred at 1 has not been run.
+  coverage: Every training slice, all epochs.
+  exploitation: >-
+    input_mask_mean (expect 1.00), input_mask_std (about 0.08), input_mask_slices and
+    input_mask_expectation_mean (1.00); training and validation loss and x1 per epoch against
+    the incumbent and against the earlier mean-0.5 runs; per-label deltas.
+  budget: Same cost as the incumbent within a few percent.
+  implementation: >-
+    Configuration only, in configs/training.yaml: add under trainer the block "input_mask:"
+    with kind: random, grid: 64, kernel: 13, sigma: 6.0, low: 0.5, epochs: null (the recipe has
+    no input_mask block yet; all six keys go in it); and set
+    model.input_mask_expectation to true (the config refuses one without the other). The option
+    is built (RandomInputMask). No Python change.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Separates the mask's regularization from its scale shift.
+- id: heated-weights-mask-release
+  mechanism_id: mask-trained-weights
+  parent_idea_id: heated-weights
+  title: Heated weights with the mask kept for the first three epochs, then removed
+  opportunity: >-
+    A guess with a measured motive. The heated checkpoint was trained on inputs under a mask of
+    mean 0.5; frozen, it reads our slices as knee MRI with mass 0.987 under that strength and
+    0.223 at full strength, and its runs dip in epoch 1. Keeping the condition it was trained
+    under for the first epochs, then removing it, lets the head and the anchor settle before
+    the input changes, instead of changing weights and input condition at once.
+  mechanism: >-
+    The heated-weights settings (model.pretrained_weights radimagenet_policy,
+    optimizer.backbone_lr 0.0002, optimizer.anchor_alpha_early 0.00088,
+    optimizer.anchor_alpha_late 0.000088) plus trainer.input_mask kind random, grid 64, kernel
+    13, sigma 6.0, low 0.0, epochs 3, and model.input_mask_expectation true. Epochs 1 to 3
+    train under the random smooth mask of mean 0.5 and validate with the input multiplied by
+    0.5; from epoch 4 the mask is off in training and the stored constant becomes 1, so
+    validation and prediction use the plain input.
+  precedents:
+  - 'prior-work.md, Mask-trained weights: input strength reading and the first-epoch dip.'
+  - 'refined-radimagenet campaign: mask for six epochs then four without, -0.0017 on the ResNet-18 with standard weights.'
+  novelty: The mask has not been combined with the weights that were trained under it.
+  coverage: All studies; epochs 1 to 3 masked.
+  exploitation: >-
+    input_mask_slices non-zero in epochs 1 to 3 and absent after; input_mask_expectation_mean
+    0.5 then 1.0; x1 per epoch against the heated-weights run (the comparison that isolates the
+    mask) and against the incumbent; the epoch-1 dip and the change at epoch 4.
+  budget: Same cost as the incumbent.
+  implementation: >-
+    Configuration only, in configs/training.yaml: set the four heated-weights values above
+    (already there if heated-weights was accepted); under trainer, add the block "input_mask:"
+    with kind: random, grid: 64, kernel: 13, sigma: 6.0, low: 0.0, epochs: 3, replacing the
+    block if input-mask-centred-one was accepted and left one there; set
+    model.input_mask_expectation to true. No Python change. Report the result against the
+    incumbent and against the heated-weights run.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The one untested pairing of the authors' weights with the authors' mask.
+exhausted_directions: None.

@@ -1,0 +1,39 @@
+ideas:
+- id: autoaugment-intensity-025
+  mechanism_id: pretraining-augmentation
+  parent_idea_id: autoaugment-intensity
+  title: AutoAugment intensity operations on a quarter of the slices, our intensity augmentation kept
+  opportunity: >-
+    Evidence-backed for the diagnosis, a guess for the outcome. autoaugment-intensity (-0.002907,
+    80% [-0.004085, -0.001671], one run) applied the policy to every slice and switched our
+    gamma and contrast augmentation off, two changes at their extremes. Its x1 curve was behind
+    the incumbent from the first epoch (-0.0068) and still closing at the tenth (-0.0030), and
+    its input statistics moved far from the incumbent's (input_fluid_mean 0.410 against 0.341,
+    input_fluid_std 0.295 against 0.263): with the policy on every slice the model rarely
+    trains on an input like the validation one. The pretraining applied the policy to every
+    image but for 90 epochs; in ten epochs a minority of policy slices keeps most batches on
+    the scored distribution while still showing the backbone its pretraining operations.
+  mechanism: >-
+    data.autoaugment_intensity.probability 0.25 and data.intensity_augmentation exactly as the
+    incumbent has it (probability and ranges unchanged). Per slice, with probability 0.25, one
+    sub-policy of torchvision's AutoAugment ImageNet policy with its rotate, shear and colour
+    steps skipped, in training only.
+  precedents:
+  - 'run-notes.md, run 5: autoaugment-intensity at probability 1.0 without our intensity augmentation.'
+  novelty: The policy has only been run on every slice and in place of our intensity augmentation.
+  coverage: About 18% of the training slices each epoch (0.25 times the 72% of sub-policies with an intensity step that fires).
+  exploitation: >-
+    autoaugment_intensity_slices about 17,000 per epoch; input_fluid_mean and input_fluid_std
+    between the incumbent's (0.341, 0.263) and run 5's (0.410, 0.295), close to the incumbent's.
+    Then x4 and x1 per epoch against the incumbent (the first-epoch deficit of run 5 should
+    mostly go) and against run 5; per-label deltas.
+  budget: About 1.04 times the reference (the policy loop on a quarter of the slices; run 5 took 1.15).
+  implementation: >-
+    Configuration only: set data.autoaugment_intensity.probability to 0.25 in
+    configs/training.yaml and leave data.intensity_augmentation as the incumbent has it. No
+    Python change. Activation signature: the data.autoaugment_intensity.probability row of
+    contract.md, autoaugment_intensity_slices > 0 at epoch 0.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Free; the mild point of a mechanism measured only at its extreme.
+exhausted_directions: None.
