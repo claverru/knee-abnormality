@@ -300,6 +300,38 @@ Kept: the campaign reference `hand-views-frozen-with-label-bias` (S100), the fiv
 label bias at ten times the rate, protected-strata depth transport). Predictions, metrics,
 configs, source snapshots and the campaign state are untouched.
 
+**2026-10-04, 22:14 CEST:** `scripts.tools.free_disk`, run after the `refined-radimagenet`
+campaign stopped: **19.22 GiB freed**
+([manifest](../../outputs/archive/maintenance/disk-cleanup-20261004T201421Z/manifest.json)). The
+user asked for the campaign's checkpoints; the script applies its rules to every worktree, so it
+also removed what the rules covered elsewhere.
+
+- *From the campaign (6.43 GiB):* 19 `last.ckpt` (3.51 GiB) and 16 selected checkpoints of
+  recorded runs (2.92 GiB). Kept: the incumbent `radimagenet-input-statistics` (named in
+  `docs/ongoing/`), the two manual slice-teacher runs (results not in the campaign state) and the
+  two cancelled runs without a selection record (`crossd-3d-stem`, `acs-gated-stem-block1`).
+- *Outside the campaign, by rule (12.79 GiB):* 29 `last.ckpt` of finished runs in
+  `outputs/training` (7.39 GiB); 21 selected checkpoints of recorded runs no longer named in any
+  `docs/ongoing/` (3.46 GiB): **the ten `learnable-views` checkpoints retained by hand earlier the
+  same day** (reference S100, the S99 members, four runs above the reference), the ReXNet-200
+  folds 1–4 and `rn18-l2sp-no-confusion` folds 1–4 teachers, `attributes-v4-w005` and `-w02`
+  candidates and `budget-learnable-recipe`; 41 export folders of unsubmitted models (1.82 GiB);
+  three unused Hugging Face models (0.11 GiB); ten finished-session scratchpads (0.05 GiB).
+  Submitted bundles in the ledger and their source checkpoints are untouched.
+- *Failed:* one `.ruff_cache` inside a Codex debate (permission denied, 4 KB).
+- *Kept for a decision:* six `model.ckpt` outside a fold folder (slice-budget scratch copy and
+  the `ens5-learnable-views-f0` dataset), four `mixed-field` two-stream checkpoints and the two
+  stopped ResNet-50 heated runs (no selection record), the ten `oof-blend-v2` children, the
+  ResNet-10t reference, five `learnable-views`-era runs in `outputs/training` and the
+  `oof-blend-v2` export members (results not recorded in `docs/`).
+- *uv cache:* `uv cache prune` was skipped: another uv process held the cache lock.
+
+**2026-10-05, about 12:10 CEST:** removed by hand on the user's request, outside the script:
+the 72 checkpoint files of the `pretraining-input` campaign (36 runs, 5.7 GiB) and six of the
+seven left in `refined-radimagenet` (the two manual slice-teacher runs and the two cancelled
+runs). Kept: the `radimagenet-input-statistics` incumbent, the reference of the ResNet-18
+comparisons.
+
 ## Current scope and next execution
 
 The config, fold-aware labels, on-the-fly image preparation, study dataset,

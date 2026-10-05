@@ -1,0 +1,45 @@
+ideas:
+- id: backbone-eval-pretrained-statistics
+  mechanism_id: pretrained-batchnorm-statistics
+  parent_idea_id: radimagenet-input-statistics
+  title: Keep the backbone in eval mode during training, so its BatchNorm layers use the
+    pretrained running statistics instead of batch statistics (user seed)
+  opportunity: >-
+    User seed, 2026-10-04. With the checkpoint's own input normalization now in the incumbent
+    (radimagenet-input-statistics, +0.000581), the pretrained BatchNorm running statistics
+    describe our slices: under that normalization the frozen network in eval mode reads 98.5% of
+    them as knee MRI, against 7.8% under the ImageNet values (prior-work.md). The earlier
+    frozen-BatchNorm run (-0.0086, site-generalization campaign) was made under the ImageNet
+    values, where those statistics were wrong for our input, and it also froze the BatchNorm
+    weights. Eval mode keeps the pretrained normalization as a fixed part of the function and
+    removes the dependence of each slice's features on the other slices of the batch. Gain is a
+    guess.
+  mechanism: >-
+    model.backbone_eval true in configs/training.yaml. The existing option calls
+    self.backbone.eval() whenever the model is put in training mode: every backbone BatchNorm
+    normalizes with its stored running mean and variance and does not update them; all backbone
+    weights, including the BatchNorm scale and shift, keep training at the backbone rate with
+    L2-SP as now. Everything else exactly as the incumbent, including data.mean 0.3162 and
+    data.std 0.3213, DSU at the stride-8 point and ten epochs.
+  precedents:
+  - 'radimagenet-input-statistics-20261004T103433Z-ff2f3786: the checkpoint normalization, accepted, +0.000581, 80% [+0.000182, +0.001016].'
+  - 'prior-work.md, Pretrained head on our slices: the eval-mode network is in domain only under the checkpoint normalization.'
+  - 'site-generalization campaign, frozen backbone BatchNorm: -0.0086 on the sites-out split, under ImageNet normalization and with the BatchNorm weights frozen too.'
+  novelty: First eval-mode backbone run under the checkpoint's own input statistics.
+  coverage: All studies and labels.
+  exploitation: >-
+    Per-epoch x1 and training loss against the incumbent from epoch 0; per-stage drift and
+    gradient norms (existing columns); a static check that the backbone's BatchNorm running_mean
+    and running_var are unchanged between the first and the last checkpoint, logged once as
+    backbone_running_statistics_changed (0 or 1). Per-label deltas.
+  budget: Same cost as the incumbent or slightly less, about 1,181 s.
+  implementation: >-
+    Configuration-only change to configs/training.yaml: model.backbone_eval true. No source
+    change: the option exists (KneeAbnormalityModel.train). Confirm by a static read that DSU
+    (_encode_images) still follows the model's training flag, not the backbone's, so it stays
+    active. Do not set checkpoint_backbone. If accepted, later seeds train with the backbone in
+    eval mode; the frozen teacher and the policy network are separate modules and unaffected.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: User seed; follows directly from the accepted normalization.
+exhausted_directions: None.

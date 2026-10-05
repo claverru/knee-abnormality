@@ -1,0 +1,220 @@
+ideas:
+- id: radimagenet-input-statistics
+  mechanism_id: input-statistics
+  parent_idea_id: null
+  title: Normalize inputs with the checkpoint's own mean 0.3162 and std 0.3213 instead of the
+    ImageNet values
+  opportunity: >-
+    Evidence-backed. The Refined-RadImageNet checkpoints were trained with mean 0.3162 and std
+    0.3213 on all three channels (the authors' presets.py); our recipe feeds them ImageNet mean
+    and std. On 8,615 prepared validation slices the frozen pretrained ResNet-18 with its
+    165-class head puts 0.088 of its probability on the 18 knee classes under our normalization
+    (top class US thyroid, 0.387) and 0.978 under its own, with a knee class on top for 98.5% of
+    the slices (prior-work.md, Pretrained head on our slices). Fine-tuning currently starts from
+    features computed out of the checkpoint's input domain.
+  mechanism: >-
+    data.mean [0.3162, 0.3162, 0.3162] and data.std [0.3213, 0.3213, 0.3213] in
+    configs/training.yaml. Nothing else changes: the model already normalizes with these two
+    config values in encode_batch.
+  precedents:
+  - 'prior-work.md, Pretrained head on our slices: knee-class mass 0.088 against 0.978, label-free.'
+  - 'docs/research/radimagenet-weights.md: the earlier BatchNorm check matched no candidate mean and left normalization resting on the script default.'
+  - 'docs/ongoing/radimagenet-backbone.md: the original RadImageNet ResNet-50 needed [-1, 1] inputs, found the same way.'
+  novelty: First run of a Refined-RadImageNet backbone with the normalization it was trained with.
+  coverage: All studies and labels.
+  exploitation: >-
+    Per-epoch x1 against the incumbent from epoch 0 (a start inside the pretraining domain should
+    show in the first epochs), per-stage drift of the backbone (expected lower in the stem and
+    layer1), anchor_penalty, per-label deltas.
+  budget: Same cost as the incumbent, about 1,181 s.
+  implementation: >-
+    Configuration-only change to configs/training.yaml (data.mean, data.std). Replaces the
+    ImageNet constants; no source change. Check with a static read that no other place hardcodes
+    the ImageNet constants for the backbone input. If accepted, later seeds inherit it, except
+    the two ResNet-10t seeds, which keep their reference's normalization.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Label-free evidence, no cost, and the head seeds need it; first.
+- id: rn10t-policy-weights
+  mechanism_id: policy-gradient-weights
+  parent_idea_id: null
+  title: ResNet-10t started from the authors' mask-trained ("heated") checkpoint instead of
+    their standard one (measurement against the ResNet-10t reference)
+  opportunity: >-
+    The authors report that classifiers pretrained under their policy-gradient mask transfer
+    better (RadImageNet macro F1 0.484 against 0.452 for ResNet-10t; gains on MedMNIST and
+    few-shot tasks). The heated checkpoint is their intended start for fine-tuning; our
+    training plays that role. Whether it helps on our task is a guess. The mask-trained files
+    exist only for ResNet-10t and ResNet-50, so this runs on the ResNet-10t against its own
+    reference, rn10t-view-label-bias (x4 0.927543, x1 0.921848, 1,141 s).
+  mechanism: >-
+    model.backbone resnet10t.c3_in1k, model.pretrained_weights radimagenet_policy,
+    optimizer.backbone_lr 0.0002, optimizer.anchor_alpha_early 0.00088,
+    optimizer.anchor_alpha_late 0.000088, and data.mean [0.485, 0.456, 0.406] with data.std
+    [0.229, 0.224, 0.225] (the reference's values, whatever the incumbent holds). Every other
+    setting exactly as the incumbent. The rate and the anchor strengths follow the checkpoint's
+    weight scale: its convolution RMS is 0.05305 against 0.01576 for the standard ResNet-10t,
+    so the rate is 6e-5 x 3.37 and each anchor strength is the reference's (0.01, 0.001)
+    divided by 3.37 squared, which keeps the same relative step and the same relative pull.
+  precedents:
+  - 'outputs/training/20261004-094416-rn10t-view-label-bias: the reference, standard ResNet-10t weights at backbone LR 6e-5.'
+  - 'prior-work.md, Checkpoints: file, hash and weight scale; The authors mask method.'
+  - 'docs/modeling/backbone-swaps.md#checkpoint-weight-scale: the rate rule.'
+  novelty: First use of a mask-trained RadImageNet checkpoint in this project.
+  coverage: All studies and labels.
+  exploitation: >-
+    x4 and x1 against rn10t-view-label-bias (the comparison of interest) and against the
+    incumbent; per-epoch x1 and training loss against the reference; per-stage drift.
+  budget: About 1,141 s, as the ResNet-10t reference.
+  implementation: >-
+    The seven values above in configs/training.yaml, plus one small source change in modeling/model.py, which loads only the standard weights today: (a) the guard `model.pretrained_weights == "radimagenet" and model.backbone not in RADIMAGENET_WEIGHTS` becomes `model.pretrained_weights != "timm" and model.backbone not in PRETRAINED_WEIGHTS[model.pretrained_weights]` (import PRETRAINED_WEIGHTS from modeling/radimagenet.py); (b) the load condition `pretrained and model.pretrained_weights == "radimagenet"` becomes `pretrained and model.pretrained_weights != "timm"` and the call becomes radimagenet_state_dict(model.backbone, model.pretrained_weights), still strict. Nothing else in the model changes. The weights entry and the file exist (modeling/radimagenet.py, hash-checked;
+    the state dict loads strictly into resnet10t.c3_in1k, verified). This is a measurement: it is
+    not expected to beat the ResNet-18 incumbent; if it passes the adoption rule the keeper
+    restores the ResNet-18 incumbent.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: User seed; the cheapest test of whether mask pretraining transfers to our task.
+- id: rn10t-policy-ft-weights
+  mechanism_id: policy-gradient-weights
+  parent_idea_id: rn10t-policy-weights
+  title: ResNet-10t started from the authors' mask-trained checkpoint after their own
+    fine-tuning without the mask (measurement against the ResNet-10t reference)
+  opportunity: >-
+    As rn10t-policy-weights, with the second published file: the heated classifier after ten
+    more RadImageNet epochs without the mask, the authors' final model. It behaves well on clean
+    input from the start, where the heated one needs our fine-tuning to recover. Which of the
+    two transfers better is unknown.
+  mechanism: >-
+    model.backbone resnet10t.c3_in1k, model.pretrained_weights radimagenet_policy_ft,
+    optimizer.backbone_lr 0.0002, optimizer.anchor_alpha_early 0.00093,
+    optimizer.anchor_alpha_late 0.000093, data.mean [0.485, 0.456, 0.406] and data.std [0.229,
+    0.224, 0.225]. Every other setting exactly as the incumbent. Convolution RMS 0.05181
+    against 0.01576: rate 6e-5 x 3.29, anchor strengths (0.01, 0.001) divided by 3.29 squared.
+  precedents:
+  - 'outputs/training/20261004-094416-rn10t-view-label-bias: the reference.'
+  - 'prior-work.md, Checkpoints.'
+  novelty: First use of the fine-tuned mask-trained checkpoint.
+  coverage: All studies and labels.
+  exploitation: As rn10t-policy-weights, plus the delta against rn10t-policy-weights.
+  budget: About 1,141 s.
+  implementation: >-
+    The seven values above in configs/training.yaml, plus the same two-line change to
+    modeling/model.py as rn10t-policy-weights (in the incumbent if that seed was accepted, else
+    repeat it here): one small source change in modeling/model.py, which loads only the standard weights today: (a) the guard `model.pretrained_weights == "radimagenet" and model.backbone not in RADIMAGENET_WEIGHTS` becomes `model.pretrained_weights != "timm" and model.backbone not in PRETRAINED_WEIGHTS[model.pretrained_weights]` (import PRETRAINED_WEIGHTS from modeling/radimagenet.py); (b) the load condition `pretrained and model.pretrained_weights == "radimagenet"` becomes `pretrained and model.pretrained_weights != "timm"` and the call becomes radimagenet_state_dict(model.backbone, model.pretrained_weights), still strict. Nothing else in the model changes. Runs whatever the verdict of rn10t-policy-weights. Measurement, as
+    rn10t-policy-weights.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: User seed; completes the pair.
+- id: policy-mask-rn10t
+  mechanism_id: policy-gradient-mask
+  parent_idea_id: null
+  title: Train the ResNet-18 under a learned policy-gradient input mask, with a ResNet-10t
+    policy network trained from scratch, mask on for all ten epochs
+  opportunity: >-
+    The authors' method applied to our own fine-tuning (user idea, 2026-10-04): a small policy
+    network learns per-slice multiplicative masks that regularize the classifier. Their policy
+    network was never published, and it was rewarded on RadImageNet's loss, so we train our own
+    on our loss, as their code does from scratch. Gain on our task is a guess. Inference never
+    runs the policy.
+  mechanism: >-
+    New trainer.input_mask (kind policy, grid 64, kernel 13, sigma 6.0, epochs null,
+    policy_backbone_lr 0.0006, policy_pretrained false) and model.input_mask_expectation true.
+    Policy on the Lightning module: timm resnet10t (pretrained False, num_classes 0, 512 pooled
+    features) and two heads alpha and beta, each Linear(512,512), BatchNorm1d, ReLU,
+    Linear(512,512), BatchNorm1d, ReLU, Linear(512,4096); buffers base_alpha and base_beta of
+    shape 1 x 4096 started from torch.rand. Per training step, on the normalized slices x (N x 3
+    x 224 x 224, detached) that the backbone is about to see: f = policy(x); a = alpha(f), b =
+    beta(f) in float32; new_alpha = 0.9 base_alpha + 0.1 a, new_beta likewise, both clamped to
+    [-4, 4]; then base_alpha = 0.99 base_alpha + 0.01 mean_over_slices(a.detach()), base_beta
+    likewise. dist = Beta(exp(new_alpha), exp(new_beta)); m = dist.sample() clamped to [1e-4,
+    1 - 1e-4] (no gradient through the sample); mask = gaussian_blur(interpolate(m.view(N, 1,
+    64, 64), size 224, nearest), kernel 13, sigma 6); the backbone encodes x * mask. Losses:
+    the incumbent's full loss computed from the masked input, unchanged and unscaled, plus
+    policy_loss = mean over slices of logsumexp_cells(dist.log_prob(m)) times the detached
+    disease loss of the slice's study (class-balanced BCE averaged over that study's observed
+    targets). The policy loss moves only the policy; the model's loss moves only the model.
+    Validation and prediction: no policy, no sampling; the model multiplies its normalized input
+    by the persistent buffer input_mask_expectation (1 x 1 x 224 x 224), which the Lightning
+    module sets at the end of every training epoch to the blurred, resized mean of the dataset
+    mask, exp(base_alpha) / (exp(base_alpha) + exp(base_beta)).
+  precedents:
+  - 'prior-work.md, The authors mask method: every constant above is theirs (grid 64, kernel 13, sigma 6, momenta 0.9 and 0.99, base from torch.rand, policy ResNet-10t without pretrained weights, evaluation with the dataset-level mask).'
+  - 'https://github.com/convergedmachine/Policy-Gradient-Driven-Noise-Mask/blob/main/_policy_gradient/train_one_epoch.py'
+  - 'Two deliberate differences from their code: their single product loss also rescales the classifier loss by the log-probability term, ours leaves the model loss unscaled; their evaluation samples a mask, ours uses its mean so prediction stays deterministic.'
+  novelty: No learned input regularizer has been tried here; DSU and GIN are fixed-rule.
+  coverage: All studies and labels; every slice is masked in training.
+  exploitation: >-
+    Log per epoch: input_mask_mean and input_mask_std (over pixels and slices),
+    input_mask_alpha_mean and input_mask_beta_mean (exp of new_alpha and new_beta),
+    input_mask_base_alpha_mean, input_mask_base_beta_mean, input_mask_policy_loss,
+    input_mask_clamp_fraction, input_mask_expectation_mean, and the policy gradient norm before
+    clipping. Compare per-epoch x1 and training loss with the incumbent.
+  budget: >-
+    One extra ResNet-10t forward and backward per slice: estimated 1.5 to 1.6 times the
+    incumbent, about 1,800-1,900 s, unmeasured; the range allows 2,362 s.
+  implementation: >-
+    Adds to the incumbent; nothing is removed. (1) config.py: InputMaskConfig under
+    TrainerConfig (kind none, policy or random; grid; kernel; sigma; epochs int or null;
+    policy_backbone_lr; policy_pretrained) with kind none as default, and
+    ModelConfig.input_mask_expectation bool default false; a validator requires
+    input_mask_expectation true exactly when kind is not none. (2) model.py: when the option is
+    true, register_buffer("input_mask_expectation", ones(1, 1, image_size, image_size),
+    persistent=True); encode_batch takes an optional input_mask callable; right after
+    valid_images.sub(self.mean).div_(self.std) it multiplies by input_mask(valid_images) in
+    training when a callable is given, and by the buffer when not training. (3) lightning.py:
+    build the policy module under torch.random.fork_rng beside report_attribute_heads, outside
+    self.model; pass it to build_optimizer through heads, with parameters under its feature
+    extractor at policy_backbone_lr and its two heads at head_lr; training_step passes the mask
+    callable to self.model.encode_batch and adds policy_loss; compute the Beta, log_prob and
+    logsumexp in float32 with autocast disabled; override configure_gradient_clipping so the
+    policy's parameters are clipped separately at gradient_clip_val and the model with the
+    existing heads together as now; on_train_epoch_end writes the expectation buffer. With
+    epochs null the mask is on in every epoch. The half-knee and report-attribute terms use the
+    same encoded batch and need no change. kind random and an integer epochs are used by later
+    seeds: implement the fields, and raise for kind random until random-smooth-mask adds it. If
+    accepted, later seeds train under the mask.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: User seed; the parent of the three mask variants.
+- id: policy-mask-two-stage
+  mechanism_id: policy-gradient-mask
+  parent_idea_id: policy-mask-rn10t
+  title: Policy-gradient mask for the first six epochs, then four epochs without it, as the
+    authors' heated then fine-tuned scheme
+  opportunity: >-
+    The authors' final models are heated under the mask and then fine-tuned without it; their
+    heated model does poorly on clean input until that second stage (prior-work.md). This is the
+    version of the mask closest to their method, inside our ten epochs: the last four epochs
+    see clean slices and prediction needs no mask at all.
+  mechanism: >-
+    As policy-mask-rn10t with trainer.input_mask.epochs 6: epochs 0-5 train under the sampled
+    mask exactly as in that seed; from the start of epoch 6 the policy is not run, no policy
+    loss is added, the model sees unmasked normalized slices, and input_mask_expectation is set
+    to ones, so validation of epochs 6-9 and prediction use clean input. The learning-rate
+    schedule is the incumbent's single warmup and cosine over ten epochs, unchanged.
+  precedents:
+  - 'prior-work.md, The authors mask method: heated model poor on unmasked input until fine-tuned.'
+  - 'policy-mask-rn10t: the mechanism and its code.'
+  novelty: The staged variant of the previous seed.
+  coverage: All studies and labels.
+  exploitation: >-
+    The scalars of policy-mask-rn10t for epochs 0-5; x1 per epoch, with the step at epoch 6
+    when the mask goes off (validation moves from the expected mask to clean input);
+    BatchNorm running statistics of bn1 before and after epoch 6 (mean of running_mean and
+    running_var), since the input scale changes there.
+  budget: >-
+    Six epochs with the policy and four without: estimated 1.3 to 1.4 times the incumbent,
+    about 1,550-1,650 s, unmeasured.
+  implementation: >-
+    Changes only trainer.input_mask.epochs from null to 6 on the mask code. If
+    policy-mask-rn10t was accepted the code is in the incumbent; if not, port it from that
+    run's frozen source (outputs/autoresearch/refined-radimagenet/experiments/policy-mask-rn10t-*/source/)
+    with kind policy and apply this change. In on_train_epoch_start, when current_epoch equals
+    epochs, fill input_mask_expectation with ones and stop passing the mask callable; do not
+    write the expectation at the end of later epochs. The policy stays in the optimizer with no
+    gradient, which AdamW skips. If policy-mask-rn10t was accepted, this seed is judged against
+    it as the incumbent.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: User seed; the authors' own two-stage scheme.
+exhausted_directions: None.

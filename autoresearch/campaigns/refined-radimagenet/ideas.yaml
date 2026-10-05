@@ -1,0 +1,1578 @@
+revision: 372
+ideas:
+- id: radimagenet-input-statistics
+  mechanism_id: input-statistics
+  parent_idea_id: null
+  title: Normalize inputs with the checkpoint's own mean 0.3162 and std 0.3213 instead
+    of the ImageNet values
+  opportunity: Evidence-backed. The Refined-RadImageNet checkpoints were trained with
+    mean 0.3162 and std 0.3213 on all three channels (the authors' presets.py); our
+    recipe feeds them ImageNet mean and std. On 8,615 prepared validation slices the
+    frozen pretrained ResNet-18 with its 165-class head puts 0.088 of its probability
+    on the 18 knee classes under our normalization (top class US thyroid, 0.387) and
+    0.978 under its own, with a knee class on top for 98.5% of the slices (prior-work.md,
+    Pretrained head on our slices). Fine-tuning currently starts from features computed
+    out of the checkpoint's input domain.
+  mechanism: 'data.mean [0.3162, 0.3162, 0.3162] and data.std [0.3213, 0.3213, 0.3213]
+    in configs/training.yaml. Nothing else changes: the model already normalizes with
+    these two config values in encode_batch.'
+  precedents:
+  - 'prior-work.md, Pretrained head on our slices: knee-class mass 0.088 against 0.978,
+    label-free.'
+  - 'docs/research/radimagenet-weights.md: the earlier BatchNorm check matched no
+    candidate mean and left normalization resting on the script default.'
+  - 'docs/ongoing/radimagenet-backbone.md: the original RadImageNet ResNet-50 needed
+    [-1, 1] inputs, found the same way.'
+  novelty: First run of a Refined-RadImageNet backbone with the normalization it was
+    trained with.
+  coverage: All studies and labels.
+  exploitation: Per-epoch x1 against the incumbent from epoch 0 (a start inside the
+    pretraining domain should show in the first epochs), per-stage drift of the backbone
+    (expected lower in the stem and layer1), anchor_penalty, per-label deltas.
+  budget: Same cost as the incumbent, about 1,181 s.
+  implementation: Configuration-only change to configs/training.yaml (data.mean, data.std).
+    Replaces the ImageNet constants; no source change. Check with a static read that
+    no other place hardcodes the ImageNet constants for the backbone input. If accepted,
+    later seeds inherit it, except the two ResNet-10t seeds, which keep their reference's
+    normalization.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Label-free evidence, no cost, and the head seeds need it; first.
+  status: completed
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality-refined-radimagenet/autoresearch/campaigns/refined-radimagenet/seed-ideas.yaml
+  experiments:
+  - radimagenet-input-statistics-20261004T103433Z-ff2f3786
+  decision: provisional_accept
+- id: rn10t-policy-weights
+  mechanism_id: policy-gradient-weights
+  parent_idea_id: null
+  title: ResNet-10t started from the authors' mask-trained ("heated") checkpoint instead
+    of their standard one (measurement against the ResNet-10t reference)
+  opportunity: The authors report that classifiers pretrained under their policy-gradient
+    mask transfer better (RadImageNet macro F1 0.484 against 0.452 for ResNet-10t;
+    gains on MedMNIST and few-shot tasks). The heated checkpoint is their intended
+    start for fine-tuning; our training plays that role. Whether it helps on our task
+    is a guess. The mask-trained files exist only for ResNet-10t and ResNet-50, so
+    this runs on the ResNet-10t against its own reference, rn10t-view-label-bias (x4
+    0.927543, x1 0.921848, 1,141 s).
+  mechanism: 'model.backbone resnet10t.c3_in1k, model.pretrained_weights radimagenet_policy,
+    optimizer.backbone_lr 0.0002, optimizer.anchor_alpha_early 0.00088, optimizer.anchor_alpha_late
+    0.000088, and data.mean [0.485, 0.456, 0.406] with data.std [0.229, 0.224, 0.225]
+    (the reference''s values, whatever the incumbent holds). Every other setting exactly
+    as the incumbent. The rate and the anchor strengths follow the checkpoint''s weight
+    scale: its convolution RMS is 0.05305 against 0.01576 for the standard ResNet-10t,
+    so the rate is 6e-5 x 3.37 and each anchor strength is the reference''s (0.01,
+    0.001) divided by 3.37 squared, which keeps the same relative step and the same
+    relative pull.'
+  precedents:
+  - 'outputs/training/20261004-094416-rn10t-view-label-bias: the reference, standard
+    ResNet-10t weights at backbone LR 6e-5.'
+  - 'prior-work.md, Checkpoints: file, hash and weight scale; The authors mask method.'
+  - 'docs/modeling/backbone-swaps.md#checkpoint-weight-scale: the rate rule.'
+  novelty: First use of a mask-trained RadImageNet checkpoint in this project.
+  coverage: All studies and labels.
+  exploitation: x4 and x1 against rn10t-view-label-bias (the comparison of interest)
+    and against the incumbent; per-epoch x1 and training loss against the reference;
+    per-stage drift.
+  budget: About 1,141 s, as the ResNet-10t reference.
+  implementation: 'The seven values above in configs/training.yaml, plus one small
+    source change in modeling/model.py, which loads only the standard weights today:
+    (a) the guard `model.pretrained_weights == "radimagenet" and model.backbone not
+    in RADIMAGENET_WEIGHTS` becomes `model.pretrained_weights != "timm" and model.backbone
+    not in PRETRAINED_WEIGHTS[model.pretrained_weights]` (import PRETRAINED_WEIGHTS
+    from modeling/radimagenet.py); (b) the load condition `pretrained and model.pretrained_weights
+    == "radimagenet"` becomes `pretrained and model.pretrained_weights != "timm"`
+    and the call becomes radimagenet_state_dict(model.backbone, model.pretrained_weights),
+    still strict. Nothing else in the model changes. The weights entry and the file
+    exist (modeling/radimagenet.py, hash-checked; the state dict loads strictly into
+    resnet10t.c3_in1k, verified). This is a measurement: it is not expected to beat
+    the ResNet-18 incumbent; if it passes the adoption rule the keeper restores the
+    ResNet-18 incumbent.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: User seed; the cheapest test of whether mask pretraining transfers
+    to our task.
+  status: completed
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality-refined-radimagenet/autoresearch/campaigns/refined-radimagenet/seed-ideas.yaml
+  experiments:
+  - rn10t-policy-weights-20261004T103911Z-2a3673fb
+  - rn10t-policy-weights-20261004T110216Z-700bbacd
+  decision: reject
+- id: rn10t-policy-ft-weights
+  mechanism_id: policy-gradient-weights
+  parent_idea_id: rn10t-policy-weights
+  title: ResNet-10t started from the authors' mask-trained checkpoint after their
+    own fine-tuning without the mask (measurement against the ResNet-10t reference)
+  opportunity: 'As rn10t-policy-weights, with the second published file: the heated
+    classifier after ten more RadImageNet epochs without the mask, the authors'' final
+    model. It behaves well on clean input from the start, where the heated one needs
+    our fine-tuning to recover. Which of the two transfers better is unknown.'
+  mechanism: 'model.backbone resnet10t.c3_in1k, model.pretrained_weights radimagenet_policy_ft,
+    optimizer.backbone_lr 0.0002, optimizer.anchor_alpha_early 0.00093, optimizer.anchor_alpha_late
+    0.000093, data.mean [0.485, 0.456, 0.406] and data.std [0.229, 0.224, 0.225].
+    Every other setting exactly as the incumbent. Convolution RMS 0.05181 against
+    0.01576: rate 6e-5 x 3.29, anchor strengths (0.01, 0.001) divided by 3.29 squared.'
+  precedents:
+  - 'outputs/training/20261004-094416-rn10t-view-label-bias: the reference.'
+  - prior-work.md, Checkpoints.
+  novelty: First use of the fine-tuned mask-trained checkpoint.
+  coverage: All studies and labels.
+  exploitation: As rn10t-policy-weights, plus the delta against rn10t-policy-weights.
+  budget: About 1,141 s.
+  implementation: 'The seven values above in configs/training.yaml, plus the same
+    two-line change to modeling/model.py as rn10t-policy-weights (in the incumbent
+    if that seed was accepted, else repeat it here): one small source change in modeling/model.py,
+    which loads only the standard weights today: (a) the guard `model.pretrained_weights
+    == "radimagenet" and model.backbone not in RADIMAGENET_WEIGHTS` becomes `model.pretrained_weights
+    != "timm" and model.backbone not in PRETRAINED_WEIGHTS[model.pretrained_weights]`
+    (import PRETRAINED_WEIGHTS from modeling/radimagenet.py); (b) the load condition
+    `pretrained and model.pretrained_weights == "radimagenet"` becomes `pretrained
+    and model.pretrained_weights != "timm"` and the call becomes radimagenet_state_dict(model.backbone,
+    model.pretrained_weights), still strict. Nothing else in the model changes. Runs
+    whatever the verdict of rn10t-policy-weights. Measurement, as rn10t-policy-weights.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: User seed; completes the pair.
+  status: completed
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality-refined-radimagenet/autoresearch/campaigns/refined-radimagenet/seed-ideas.yaml
+  experiments:
+  - rn10t-policy-ft-weights-20261004T110619Z-53b34de3
+  decision: reject
+- id: policy-mask-rn10t
+  mechanism_id: policy-gradient-mask
+  parent_idea_id: null
+  title: Train the ResNet-18 under a learned policy-gradient input mask, with a ResNet-10t
+    policy network trained from scratch, mask on for all ten epochs
+  opportunity: 'The authors'' method applied to our own fine-tuning (user idea, 2026-10-04):
+    a small policy network learns per-slice multiplicative masks that regularize the
+    classifier. Their policy network was never published, and it was rewarded on RadImageNet''s
+    loss, so we train our own on our loss, as their code does from scratch. Gain on
+    our task is a guess. Inference never runs the policy.'
+  mechanism: 'New trainer.input_mask (kind policy, grid 64, kernel 13, sigma 6.0,
+    epochs null, policy_backbone_lr 0.0006, policy_pretrained false) and model.input_mask_expectation
+    true. Policy on the Lightning module: timm resnet10t (pretrained False, num_classes
+    0, 512 pooled features) and two heads alpha and beta, each Linear(512,512), BatchNorm1d,
+    ReLU, Linear(512,512), BatchNorm1d, ReLU, Linear(512,4096); buffers base_alpha
+    and base_beta of shape 1 x 4096 started from torch.rand. Per training step, on
+    the normalized slices x (N x 3 x 224 x 224, detached) that the backbone is about
+    to see: f = policy(x); a = alpha(f), b = beta(f) in float32; new_alpha = 0.9 base_alpha
+    + 0.1 a, new_beta likewise, both clamped to [-4, 4]; then base_alpha = 0.99 base_alpha
+    + 0.01 mean_over_slices(a.detach()), base_beta likewise. dist = Beta(exp(new_alpha),
+    exp(new_beta)); m = dist.sample() clamped to [1e-4, 1 - 1e-4] (no gradient through
+    the sample); mask = gaussian_blur(interpolate(m.view(N, 1, 64, 64), size 224,
+    nearest), kernel 13, sigma 6); the backbone encodes x * mask. Losses: the incumbent''s
+    full loss computed from the masked input, unchanged and unscaled, plus policy_loss
+    = mean over slices of logsumexp_cells(dist.log_prob(m)) times the detached disease
+    loss of the slice''s study (class-balanced BCE averaged over that study''s observed
+    targets). The policy loss moves only the policy; the model''s loss moves only
+    the model. Validation and prediction: no policy, no sampling; the model multiplies
+    its normalized input by the persistent buffer input_mask_expectation (1 x 1 x
+    224 x 224), which the Lightning module sets at the end of every training epoch
+    to the blurred, resized mean of the dataset mask, exp(base_alpha) / (exp(base_alpha)
+    + exp(base_beta)).'
+  precedents:
+  - 'prior-work.md, The authors mask method: every constant above is theirs (grid
+    64, kernel 13, sigma 6, momenta 0.9 and 0.99, base from torch.rand, policy ResNet-10t
+    without pretrained weights, evaluation with the dataset-level mask).'
+  - https://github.com/convergedmachine/Policy-Gradient-Driven-Noise-Mask/blob/main/_policy_gradient/train_one_epoch.py
+  - 'Two deliberate differences from their code: their single product loss also rescales
+    the classifier loss by the log-probability term, ours leaves the model loss unscaled;
+    their evaluation samples a mask, ours uses its mean so prediction stays deterministic.'
+  novelty: No learned input regularizer has been tried here; DSU and GIN are fixed-rule.
+  coverage: All studies and labels; every slice is masked in training.
+  exploitation: 'Log per epoch: input_mask_mean and input_mask_std (over pixels and
+    slices), input_mask_alpha_mean and input_mask_beta_mean (exp of new_alpha and
+    new_beta), input_mask_base_alpha_mean, input_mask_base_beta_mean, input_mask_policy_loss,
+    input_mask_clamp_fraction, input_mask_expectation_mean, and the policy gradient
+    norm before clipping. Compare per-epoch x1 and training loss with the incumbent.'
+  budget: 'One extra ResNet-10t forward and backward per slice: estimated 1.5 to 1.6
+    times the incumbent, about 1,800-1,900 s, unmeasured; the range allows 2,362 s.'
+  implementation: 'Adds to the incumbent; nothing is removed. (1) config.py: InputMaskConfig
+    under TrainerConfig (kind none, policy or random; grid; kernel; sigma; epochs
+    int or null; policy_backbone_lr; policy_pretrained) with kind none as default,
+    and ModelConfig.input_mask_expectation bool default false; a validator requires
+    input_mask_expectation true exactly when kind is not none. (2) model.py: when
+    the option is true, register_buffer("input_mask_expectation", ones(1, 1, image_size,
+    image_size), persistent=True); encode_batch takes an optional input_mask callable;
+    right after valid_images.sub(self.mean).div_(self.std) it multiplies by input_mask(valid_images)
+    in training when a callable is given, and by the buffer when not training. (3)
+    lightning.py: build the policy module under torch.random.fork_rng beside report_attribute_heads,
+    outside self.model; pass it to build_optimizer through heads, with parameters
+    under its feature extractor at policy_backbone_lr and its two heads at head_lr;
+    training_step passes the mask callable to self.model.encode_batch and adds policy_loss;
+    compute the Beta, log_prob and logsumexp in float32 with autocast disabled; override
+    configure_gradient_clipping so the policy''s parameters are clipped separately
+    at gradient_clip_val and the model with the existing heads together as now; on_train_epoch_end
+    writes the expectation buffer. With epochs null the mask is on in every epoch.
+    The half-knee and report-attribute terms use the same encoded batch and need no
+    change. kind random and an integer epochs are used by later seeds: implement the
+    fields, and raise for kind random until random-smooth-mask adds it. If accepted,
+    later seeds train under the mask.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: User seed; the parent of the three mask variants.
+  status: completed
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality-refined-radimagenet/autoresearch/campaigns/refined-radimagenet/seed-ideas.yaml
+  experiments:
+  - policy-mask-rn10t-20261004T114633Z-b68939c7
+  decision: reject
+- id: policy-mask-two-stage
+  mechanism_id: policy-gradient-mask
+  parent_idea_id: policy-mask-rn10t
+  title: Policy-gradient mask for the first six epochs, then four epochs without it,
+    as the authors' heated then fine-tuned scheme
+  opportunity: 'The authors'' final models are heated under the mask and then fine-tuned
+    without it; their heated model does poorly on clean input until that second stage
+    (prior-work.md). This is the version of the mask closest to their method, inside
+    our ten epochs: the last four epochs see clean slices and prediction needs no
+    mask at all.'
+  mechanism: 'As policy-mask-rn10t with trainer.input_mask.epochs 6: epochs 0-5 train
+    under the sampled mask exactly as in that seed; from the start of epoch 6 the
+    policy is not run, no policy loss is added, the model sees unmasked normalized
+    slices, and input_mask_expectation is set to ones, so validation of epochs 6-9
+    and prediction use clean input. The learning-rate schedule is the incumbent''s
+    single warmup and cosine over ten epochs, unchanged.'
+  precedents:
+  - 'prior-work.md, The authors mask method: heated model poor on unmasked input until
+    fine-tuned.'
+  - 'policy-mask-rn10t: the mechanism and its code.'
+  novelty: The staged variant of the previous seed.
+  coverage: All studies and labels.
+  exploitation: The scalars of policy-mask-rn10t for epochs 0-5; x1 per epoch, with
+    the step at epoch 6 when the mask goes off (validation moves from the expected
+    mask to clean input); BatchNorm running statistics of bn1 before and after epoch
+    6 (mean of running_mean and running_var), since the input scale changes there.
+  budget: 'Six epochs with the policy and four without: estimated 1.3 to 1.4 times
+    the incumbent, about 1,550-1,650 s, unmeasured.'
+  implementation: Changes only trainer.input_mask.epochs from null to 6 on the mask
+    code. If policy-mask-rn10t was accepted the code is in the incumbent; if not,
+    port it from that run's frozen source (outputs/autoresearch/refined-radimagenet/experiments/policy-mask-rn10t-*/source/)
+    with kind policy and apply this change. In on_train_epoch_start, when current_epoch
+    equals epochs, fill input_mask_expectation with ones and stop passing the mask
+    callable; do not write the expectation at the end of later epochs. The policy
+    stays in the optimizer with no gradient, which AdamW skips. If policy-mask-rn10t
+    was accepted, this seed is judged against it as the incumbent.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: User seed; the authors' own two-stage scheme.
+  status: completed
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality-refined-radimagenet/autoresearch/campaigns/refined-radimagenet/seed-ideas.yaml
+  experiments:
+  - policy-mask-two-stage-20261004T120731Z-e6d8019f
+  decision: reject
+- id: policy-mask-pretrained-policy
+  mechanism_id: policy-gradient-mask
+  parent_idea_id: policy-mask-rn10t
+  title: Policy-gradient mask whose policy ResNet-10t starts from the Refined-RadImageNet
+    ResNet-10t instead of from scratch
+  opportunity: A guess. The authors train the policy network from scratch over 1.2M
+    images and 90 epochs; ours has ten epochs on 3,495 studies. Starting its feature
+    extractor from the cached Refined-RadImageNet ResNet-10t gives it knee-aware features
+    from the first step, so the image-conditional part of the mask can become useful
+    sooner.
+  mechanism: 'As policy-mask-rn10t (mask on for all ten epochs) with trainer.input_mask.policy_pretrained
+    true and trainer.input_mask.policy_backbone_lr 0.00006: the policy''s feature
+    extractor is timm resnet10t.c3_in1k (num_classes 0) loaded strictly from radimagenet_state_dict("resnet10t.c3_in1k")
+    and trained at 6e-5, the rate the weight-scale rule gives that checkpoint; the
+    two heads stay randomly initialized at head_lr. Everything else as policy-mask-rn10t.'
+  precedents:
+  - 'policy-mask-rn10t: the mechanism and its code.'
+  - 'outputs/training/20261004-094416-rn10t-view-label-bias: that checkpoint fine-tuned
+    at 6e-5 reaches x4 0.927543.'
+  novelty: A pretrained policy network; the authors use none.
+  coverage: All studies and labels.
+  exploitation: The scalars of policy-mask-rn10t; in addition input_mask_conditional_std,
+    the standard deviation across slices of the per-slice mean of exp(new_alpha) /
+    (exp(new_alpha) + exp(new_beta)), which shows whether the mask depends on the
+    image, compared with the from-scratch policy.
+  budget: As policy-mask-rn10t, about 1,800-1,900 s, unmeasured.
+  implementation: 'Uses the mask code of policy-mask-rn10t (in the incumbent if accepted,
+    else ported from its frozen source). Adds the policy_pretrained branch: build
+    the extractor as timm.create_model("resnet10t.c3_in1k", pretrained=False, num_classes=0)
+    and load_state_dict(radimagenet_state_dict("resnet10t.c3_in1k"), strict=True);
+    the from-scratch branch keeps timm resnet10t with pretrained False. Add the logged
+    conditional standard deviation to both branches. If policy-mask-two-stage was
+    accepted, keep its epochs value; otherwise epochs null.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: User seed.
+  status: completed
+  created_revision: 1
+  seeded: /home/claudio/src/knee-abnormality-refined-radimagenet/autoresearch/campaigns/refined-radimagenet/seed-ideas-2.yaml
+  experiments:
+  - policy-mask-pretrained-policy-20261004T123425Z-876070db
+  decision: reject
+- id: random-smooth-mask
+  mechanism_id: random-input-mask
+  parent_idea_id: policy-mask-rn10t
+  title: The same blurred multiplicative mask drawn at random, with no policy network
+  opportunity: 'Evidence-backed as a question: the paper reports that the learned
+    dataset-level Beta parameters converge to an almost uniform distribution, and
+    the mask is 90% that dataset part. This run uses the same mask shape with uniform
+    cells and no policy, at no extra training time. It tells whether the regularization
+    comes from the mask itself or from the policy, and if it works it is the cheap
+    version.'
+  mechanism: 'trainer.input_mask.kind random (grid 64, kernel 13, sigma 6.0, epochs
+    null) and model.input_mask_expectation true. Per training step and slice: m uniform
+    in [0, 1] of shape N x 1 x 64 x 64 (Beta(1, 1)), resized to 224 by nearest neighbour,
+    Gaussian blur kernel 13 sigma 6, multiplied into the normalized slices before
+    the backbone. No policy network, no policy loss, no extra optimizer group. Validation
+    and prediction multiply by input_mask_expectation, which is the constant 0.5 (the
+    mean of the mask), set once at the start of training.'
+  precedents:
+  - 'prior-work.md, The authors mask method: dataset-level parameters converge to
+    an almost uniform distribution.'
+  - 'policy-mask-rn10t: the mask construction and the expectation buffer.'
+  novelty: The policy-free control of the mask family.
+  coverage: All studies and labels.
+  exploitation: input_mask_mean and input_mask_std per epoch (expected about 0.5 and
+    a small spread after the blur), x1 per epoch and training loss against the incumbent
+    and against policy-mask-rn10t.
+  budget: Same cost as the incumbent, about 1,181 s.
+  implementation: 'Uses the mask code of policy-mask-rn10t (in the incumbent if accepted,
+    else ported from its frozen source) and adds kind random: the mask callable draws
+    torch.rand instead of calling a policy; no policy module is built, so nothing
+    is added to the optimizer and no clipping override is needed for this kind. If
+    the incumbent already trains under the policy mask, this seed replaces the policy
+    mask by the random one (kind random) and is judged against that incumbent; if
+    policy-mask-two-stage was accepted, keep its epochs value.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Free control that separates the mask from the policy.
+  status: completed
+  created_revision: 1
+  seeded: /home/claudio/src/knee-abnormality-refined-radimagenet/autoresearch/campaigns/refined-radimagenet/seed-ideas-2.yaml
+  experiments:
+  - random-smooth-mask-20261004T125851Z-36cbce69
+  decision: reject
+- id: knee-logit-token-features
+  mechanism_id: pretrained-knee-classifier
+  parent_idea_id: null
+  title: Feed each token's 18 pretrained knee-class logits to our head as an extra
+    input
+  opportunity: The pretrained 165-class head is discarded although 18 of its classes
+    are knee MRI findings (ACL, MCL, meniscal, chondral, fluid, bone inflammation,
+    fracture and others; 179,555 training images). Under the checkpoint's normalization
+    its knee logits alone, averaged per study with no training, reach AUC 0.69 on
+    average against our labels and 0.83-0.85 for contusion and fracture (prior-work.md).
+    The idea keeps those directions in feature space available to our head instead
+    of asking the random projection to rediscover them. Gain is a guess.
+  mechanism: model.knee_logit_features true. The 18 knee rows of the pretrained classifier
+    (weight 18 x 512, bias 18; rows at RADIMAGENET_KNEE_CLASSES indices, in index
+    order) are stored in the model as persistent buffers and never trained. For every
+    token, z = W_knee f + b_knee, with f the raw 512-channel backbone feature of that
+    token (the live, fine-tuned backbone), giving N x 49 x 18. A new Linear(18, 256),
+    weight and bias initialized to zero, maps z to the token width, and its output
+    is added to features right after self.projection, before the position and type
+    embeddings and mil_norm. At step 0 the model equals the incumbent; the new layer
+    receives gradient immediately because z is not zero. Requires data.mean [0.3162,
+    0.3162, 0.3162] and data.std [0.3213, 0.3213, 0.3213].
+  precedents:
+  - 'prior-work.md, Pretrained head on our slices: knee mass 0.978 and zero-shot AUCs
+    under the checkpoint normalization.'
+  - 'contract.md, Build facts: radimagenet_classifier and RADIMAGENET_KNEE_CLASSES
+    are built.'
+  novelty: The pretrained classifier has never been used here.
+  coverage: All studies and labels; all 18 knee classes for every target.
+  exploitation: Log per epoch knee_logit_projection_norm (Frobenius norm of the new
+    layer's weight), knee_logit_mean and knee_logit_std (over tokens and classes),
+    and knee_logit_top_class_share (share of tokens whose largest knee logit is each
+    of the three most frequent classes). Per-label deltas, with contusion, fracture,
+    ACL and the menisci expected to move most.
+  budget: One 18 x 512 matrix product per token; same cost as the incumbent.
+  implementation: 'Adds to the incumbent. (1) config.py: ModelConfig.knee_logit_features
+    bool default false. (2) model.py __init__: when true, register_buffer knee_classifier_weight
+    (18 x C) and knee_classifier_bias (18), persistent, filled with zeros, then, only
+    when pretrained weights are being loaded (the same condition as the backbone''s
+    radimagenet load), copy the rows of radimagenet_classifier(model.backbone, model.pretrained_weights)
+    at the sorted RADIMAGENET_KNEE_CLASSES indices; create self.knee_logit_projection
+    = nn.Linear(18, 256) under torch.random.fork_rng and zero its weight and bias.
+    At prediction the buffers come from the checkpoint, so no pretrained file is read.
+    (3) encode_batch: tokens = maps.flatten(2).transpose(1, 2); features = self.projection(tokens)
+    + self.knee_logit_projection(F.linear(tokens.float(), weight, bias).to(tokens.dtype)).
+    The new layer is not under backbone., so it trains at head_lr with the model''s
+    weight decay. If the incumbent''s data.mean is not the RadImageNet value, set
+    data.mean and data.std to it in this candidate as well (contract.md, Seeds).'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Simplest use of the pretrained head; all classes, no mapping.
+  status: completed
+  created_revision: 1
+  seeded: /home/claudio/src/knee-abnormality-refined-radimagenet/autoresearch/campaigns/refined-radimagenet/seed-ideas-2.yaml
+  experiments:
+  - knee-logit-token-features-20261004T132549Z-b0f2608e
+  decision: reject
+- id: knee-classifier-readout
+  mechanism_id: pretrained-knee-classifier
+  parent_idea_id: null
+  title: A second, direct readout on the raw backbone features, initialized from the
+    pretrained knee-class rows mapped to our targets
+  opportunity: 'Our label head starts from random weights on a random 256-wide projection,
+    while the checkpoint already holds a trained direction for most of our targets:
+    ACL, MCL, meniscal, chondral, fluid, bone inflammation and fracture classes, with
+    zero-shot AUC 0.64-0.85 for nine of the twelve targets (prior-work.md). This seed
+    starts a parallel readout from those directions. Gain is a guess.'
+  mechanism: 'model.knee_classifier_readout true. A trainable Linear(512, 12), self.knee_readout,
+    whose row for target t is the pretrained classifier row (weight and bias) of the
+    class mapped to t in contract.md, Build facts (ACL acl_pathology 83; MCL mcl_pathology
+    90; both menisci meniscal_abnormality 91; the three OA targets chondral_abnormality
+    85; Effusion, Synovitis and Baker''s soft_tissue_fluid_collection 99; Contusion
+    bone_inflammation 84; Fracture fracture 87). Per token, knee_evidence = knee_readout(f)
+    on the raw 512-channel feature f, N x 49 x 12. In _attention_pool the study logit
+    of target t becomes the incumbent''s logit plus knee_readout_scale[t] times the
+    sum over tokens of attention[t] x knee_evidence[:, t], with the same attention
+    weights the incumbent''s evidence uses. knee_readout_scale is a parameter of 12
+    values initialized to zero: the model equals the incumbent at step 0 and the scale
+    receives gradient at once. Requires the RadImageNet data.mean and data.std.'
+  precedents:
+  - 'prior-work.md, Pretrained head on our slices: zero-shot AUC of the mapped class
+    per target.'
+  - 'contract.md, Build facts: the mapping table, fixed from class names.'
+  novelty: A readout initialized from pretrained class directions; the incumbent's
+    head is random.
+  coverage: All twelve targets; seven pretrained classes.
+  exploitation: Log per epoch knee_readout_scale per target, knee_readout_drift (relative
+    L2 distance of the readout weight from its initial rows) and the mean absolute
+    contribution of the new term to each target's logit. Per-label deltas.
+  budget: One 12 x 512 product per token; same cost as the incumbent.
+  implementation: 'Adds to the incumbent. (1) config.py: ModelConfig.knee_classifier_readout
+    bool default false. (2) model.py __init__: build self.knee_readout = nn.Linear(C,
+    target_count) under torch.random.fork_rng; when pretrained weights are being loaded,
+    overwrite its weight and bias from radimagenet_classifier(model.backbone, model.pretrained_weights)
+    with the mapped rows in the order of targets (look targets up by name; raise if
+    a target has no mapping); self.knee_readout_scale = nn.Parameter(zeros(target_count)).
+    (3) encode_batch returns knee_evidence = self.knee_readout(tokens) (N x 49 x 12,
+    float32) in the encoded dict; pool_encoded passes it flattened over tokens to
+    _attention_pool, which adds the term inside the existing float32 block, after
+    logits is formed and before the OA detector correction, in both the plane_readout
+    branch and the plain one. Every caller of _attention_pool (pool_encoded for the
+    study logits and for the per-view diagnostic) passes it; the half-knee term uses
+    half_knee_tokens only and stays unchanged. (4) lightning.py build_optimizer: give
+    knee_readout_scale no weight decay, like view_label_bias; knee_readout trains
+    at head_lr. Set the RadImageNet data.mean and data.std if the incumbent does not
+    have them.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Uses the trained class directions as a start for our readout.
+  status: completed
+  created_revision: 1
+  seeded: /home/claudio/src/knee-abnormality-refined-radimagenet/autoresearch/campaigns/refined-radimagenet/seed-ideas-2.yaml
+  experiments:
+  - knee-classifier-readout-20261004T134652Z-0fda241c
+  decision: reject
+- id: pretrained-slice-teacher
+  mechanism_id: pretrained-slice-teacher
+  parent_idea_id: null
+  title: A frozen copy of the pretrained network with its knee head teaches the backbone
+    per slice through an auxiliary loss
+  opportunity: 'Our labels are per study: no slice is told what it shows. The frozen
+    pretrained network gives a slice-level opinion over 18 knee findings for every
+    slice, with a knee class on top for 98.5% of our slices under its own normalization
+    (prior-work.md). Asking the fine-tuned backbone to keep predicting it is slice-level
+    supervision and a function-space anchor next to L2-SP''s weight-space one. On
+    the ResNet-50 the same option makes the ResNet-50 teach itself. Gain is a guess.'
+  mechanism: 'trainer.slice_teacher (enabled true, weight 0.1). Teacher, on the Lightning
+    module, frozen, in eval mode, no gradient: a second backbone of model.backbone
+    loaded from the same pretrained weights, and the 18 knee rows of the pretrained
+    classifier. Per training step it receives the same augmented slices as the student,
+    taken in [0, 1] before normalization and normalized with RADIMAGENET_MEAN and
+    RADIMAGENET_STD whatever data.mean holds, and outputs p_T = softmax over the 18
+    knee logits of its globally averaged feature. Student: a training-only Linear(512,
+    18) on the student''s globally averaged raw backbone feature (mean of maps over
+    the 7 x 7 positions), initialized from the same 18 pretrained rows, giving q_S
+    = softmax of its logits. Loss term: weight times the mean over slices of KL(p_T
+    || q_S), added to the incumbent''s loss. Validation and prediction are unchanged
+    and use neither the teacher nor the student head.'
+  precedents:
+  - prior-work.md, Pretrained head on our slices.
+  - 'trainer.report_attribute_loss_weight 0.1: the existing auxiliary term of the
+    same size.'
+  - 'L2-SP anchoring is adopted (site-generalization campaign): keeping close to the
+    pretrained solution helps here.'
+  novelty: No slice-level target and no frozen teacher have been used with these backbones.
+  coverage: Every slice of every training study.
+  exploitation: Log per epoch slice_teacher_loss, slice_teacher_agreement (share of
+    slices where student and teacher agree on the top knee class), slice_teacher_entropy
+    (mean entropy of p_T) and slice_teacher_knee_mass (mean probability the teacher
+    puts on the 18 knee classes among all 165, which must stay near 0.98). Per-label
+    deltas and per-stage drift.
+  budget: 'One extra ResNet-18 forward without gradient per slice: estimated 1.2 to
+    1.3 times the incumbent, about 1,450-1,550 s, unmeasured.'
+  implementation: 'Adds to the incumbent; the model''s prediction path is untouched.
+    (1) config.py: SliceTeacherConfig (enabled bool default false, weight float default
+    0.1) under TrainerConfig. (2) model.py encode_batch: add to the encoded dict input_unit,
+    the slices in [0, 1] after augmentation and the three-channel expansion, i.e.
+    the tensor before .sub(self.mean) (keep a reference; sub is not in place), and
+    slice_features = maps.float().mean((-2, -1)) (N x 512). (3) lightning.py: when
+    enabled, build the teacher with timm.create_model(config.model.backbone, pretrained=False,
+    in_chans=3, num_classes=0) loaded strictly from radimagenet_state_dict(config.model.backbone,
+    config.model.pretrained_weights), keep it in eval mode (override train so it never
+    switches), requires_grad False, excluded from the optimizer and from the L2-SP
+    anchors; store the knee rows as buffers; build the student head nn.Linear(C, 18)
+    initialized from the same rows and pass it through heads to build_optimizer. In
+    training_step, under torch.no_grad, teacher logits = F.linear(teacher(normalized
+    input_unit).mean((-2, -1)), knee_weight, knee_bias); loss += weight * F.kl_div(log_softmax(student_logits),
+    softmax(teacher_logits), reduction="batchmean"), computed in float32. Also compute
+    the full 165-class teacher softmax once per epoch''s first batch for slice_teacher_knee_mass
+    (store the full classifier as a buffer for that). Keep the teacher out of on_save_checkpoint
+    size concerns: it may be saved; inference ignores non-model keys.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Slice-level supervision from the pretrained network; carries
+    to the ResNet-50 unchanged.
+  status: completed
+  created_revision: 1
+  seeded: /home/claudio/src/knee-abnormality-refined-radimagenet/autoresearch/campaigns/refined-radimagenet/seed-ideas-2.yaml
+  experiments:
+  - pretrained-slice-teacher-20261004T140749Z-4cc3f307
+  decision: reject
+- id: knee-logit-attention-prior
+  mechanism_id: pretrained-knee-classifier
+  parent_idea_id: null
+  title: Bias each target's token attention with the pretrained logit of its mapped
+    knee class
+  opportunity: The attention scorer has to learn from study labels alone which tokens
+    matter for each target. The pretrained classifier already scores every token for
+    the matching finding (zero-shot study AUC 0.64-0.85 for nine of twelve targets,
+    prior-work.md). Using that score as a learnable prior on where to look leaves
+    the evidence path untouched. Gain is a guess.
+  mechanism: model.knee_logit_attention_prior true. The seven mapped pretrained classifier
+    rows (contract.md, Build facts) are stored as persistent buffers, never trained.
+    Per token, z_t = w_class(t) . f + b_class(t) on the raw 512-channel backbone feature
+    f, detached, one value per target (N x 49 x 12). In _attention_pool, scores[t,
+    token] gains knee_attention_gain[t] * z_t[token], added next to view_label_bias,
+    before the membership mask and the softmax. knee_attention_gain is a parameter
+    of 12 values initialized to zero, so the model equals the incumbent at step 0.
+    Requires the RadImageNet data.mean and data.std.
+  precedents:
+  - prior-work.md, Pretrained head on our slices.
+  - 'model.view_label_bias (adopted 2026-10-03): an additive attention bias per view
+    and target, the same place in the code.'
+  novelty: An attention prior from pretrained class evidence.
+  coverage: All twelve targets through seven pretrained classes.
+  exploitation: Log per epoch knee_attention_gain per target, and knee_attention_shift,
+    the mean over studies and targets of the total-variation distance between the
+    attention with and without the prior term. Per-label deltas.
+  budget: One 12 x 512 product per token; same cost as the incumbent.
+  implementation: 'Adds to the incumbent. (1) config.py: ModelConfig.knee_logit_attention_prior
+    bool default false. (2) model.py __init__: persistent buffers knee_prior_weight
+    (12 x C) and knee_prior_bias (12), zeros, filled from radimagenet_classifier(model.backbone,
+    model.pretrained_weights) with the mapped rows in target order only when pretrained
+    weights are being loaded; self.knee_attention_gain = nn.Parameter(zeros(target_count)).
+    (3) encode_batch returns knee_prior = F.linear(tokens.float(), weight, bias).detach()
+    (N x 49 x 12); pool_encoded passes it flattened over tokens to _attention_pool,
+    which adds gain[:, None] * knee_prior.transpose(0, 1) to scores in float32 right
+    after the view_label_bias term. (4) lightning.py build_optimizer: no weight decay
+    for knee_attention_gain. The campaign scores at attention temperature 1, where
+    apply_attention_temperature (inference/checkpoint.py, outside the editable scope)
+    changes nothing; state in the report that an adoption needs the gain divided by
+    the temperature there, like view_label_bias. Set the RadImageNet data.mean and
+    data.std if the incumbent does not have them. If knee-classifier-readout or knee-logit-token-features
+    is in the incumbent, share its buffers instead of duplicating them.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Third use of the pretrained head, on the attention instead of
+    the evidence.
+  status: completed
+  created_revision: 2
+  seeded: /home/claudio/src/knee-abnormality-refined-radimagenet/autoresearch/campaigns/refined-radimagenet/seed-ideas-3.yaml
+  experiments:
+  - knee-logit-attention-prior-20261004T142904Z-704694f5
+  decision: reject
+- id: crossd-resnet18-drop-in
+  mechanism_id: crossd-conv
+  parent_idea_id: null
+  title: Cross-D-Conv ResNet-18 pretrained on RadImageNet as the backbone, slice by
+    slice
+  opportunity: The same authors published a ResNet-18 whose convolutions are 3D kernels
+    with a per-image shift, pretrained on Refined-RadImageNet; they report RadImageNet
+    macro F1 0.547 against 0.525 for the regular ResNet-18. It is a different pretrained
+    representation of the same data in our control's architecture family, and the
+    parent of the 3D use in the next seed. Gain on our task is a guess.
+  mechanism: 'model.pretrained_weights radimagenet_crossd with model.backbone resnet18.a1_in1k:
+    every nn.Conv2d of the backbone is replaced by CrossDConv (replace_convolutions)
+    and the checkpoint is loaded strictly. Input as the incumbent (repeated middle
+    slice). The layer predicts a shift per slice and uses the middle depth slice of
+    the shifted 3D kernel as that slice''s 2D kernel. optimizer.backbone_lr 0.0002,
+    optimizer.anchor_alpha_early 0.000043, optimizer.anchor_alpha_late 0.0000043.
+    The checkpoint''s convolution RMS is 0.190 against 0.01244 (15.3 times), uniform
+    across depth: the anchor strengths are the incumbent''s divided by 15.3 squared
+    (same relative pull); the rate is not the rule''s 7.6e-4 but the one that matched
+    early-layer movement for the equally uniform original RadImageNet ResNet-50 (3e-4
+    at RMS 0.314), scaled to this RMS.'
+  precedents:
+  - prior-work.md, Cross-D-Conv and Checkpoints.
+  - 'docs/ongoing/radimagenet-backbone.md, First run: a uniform-scale checkpoint at
+    the median-matched rate overwrote its early layers.'
+  - 'contract.md, Build facts: modeling/crossd.py is built and checked against the
+    authors layer; the weights entry exists.'
+  novelty: First Cross-D backbone here.
+  coverage: All studies and labels.
+  exploitation: Log per epoch crossd_shift_mean and crossd_shift_std (the three predicted
+    shifts, over slices and layers), per-stage drift, training seconds and peak GPU
+    memory. x1 per epoch against the incumbent.
+  budget: Unmeasured. Per-slice kernels are built for 20 convolutions and recomputed
+    in the backward pass (gradient checkpointing in chunks of 16 slices); the estimate
+    is 1.5 to 2.5 times the incumbent. If the first epochs project past 2,362 s the
+    supervisor stops the run as invalid; report the measured seconds per epoch and
+    peak memory in that case.
+  implementation: 'Replaces the backbone''s convolutions; everything after the backbone
+    is unchanged. (1) model.py: when model.pretrained_weights is radimagenet_crossd,
+    call replace_convolutions(self.backbone) right after timm.create_model (also when
+    load_pretrained is False, so prediction builds the same module), then, when pretrained
+    weights are being loaded, self.backbone.load_state_dict(radimagenet_state_dict(
+    model.backbone, model.pretrained_weights), strict=True); widen the existing guard
+    and load condition from pretrained_weights == "radimagenet" to != "timm" with
+    PRETRAINED_WEIGHTS[model.pretrained_weights] as the table (the model loads only
+    the standard weights today). (2) spatial_tokens.py: backbone_mapping must return
+    for this backbone exactly what it returns for a plain resnet18.a1_in1k (same kernel
+    sizes, strides and paddings in the plane): compute the mapping from the plain
+    timm model before the replacement, or teach _resnet_mapping to read kernel_size,
+    stride and padding from CrossDConv; assert equality with the plain model''s mapping
+    in __init__. (3) The DSU split path (_backbone_to_stride_8, _backbone_from_stride_8)
+    calls the same submodules and needs no change; confirm by a static read. (4) Keep
+    model.channels_last false. CrossDConv handles mixed precision itself. Do not change
+    crossd.py except CROSSD_CHUNK if memory requires it; state the value used. The
+    rotation networks'' parameters are backbone parameters (backbone rate, anchored).'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: User seed; the per-slice use of the Cross-D checkpoint.
+  status: blocked
+  created_revision: 2
+  seeded: /home/claudio/src/knee-abnormality-refined-radimagenet/autoresearch/campaigns/refined-radimagenet/seed-ideas-3.yaml
+  experiments:
+  - crossd-resnet18-drop-in-20261004T145156Z-13700c8f
+  - crossd-resnet18-drop-in-20261004T155255Z-d18b3d8d
+  blocked_reason: Block and park the seed at its own implementation review. Its one
+    bounded repair is exhausted, the developer returned blocked, and the preparation
+    gate failed. Direct comparison confirms all five critical workspace files are
+    identical to the failed candidate. No runtime repair was implemented. Reducing
+    epochs or input would violate the controlling contract. Preserve the remaining
+    queue order; no proposals or priority changes are warranted.
+- id: crossd-3d-stem
+  mechanism_id: crossd-conv
+  parent_idea_id: crossd-resnet18-drop-in
+  title: Cross-D kernels as true 3D convolutions over the three adjacent slices, the
+    authors' 2D-to-3D conversion applied to our triplets
+  opportunity: The point of Cross-D-Conv is that 2D-pretrained 3D kernels can be used
+    as real 3D convolutions. Our loader already decodes three adjacent slices per
+    input and the recipe throws two away (repeated middle slice). Feeding neighbours
+    as input channels lost before (-0.0039 and -0.00005, prior-work.md); here they
+    enter through pretrained depth kernels instead. Gain is a guess.
+  mechanism: 'model.depth_stem crossd, model.slice_channels depth, model.pretrained_weights
+    radimagenet_crossd, optimizer.backbone_lr 0.0002, anchor_alpha_early 0.000043,
+    anchor_alpha_late 0.0000043 (as crossd-resnet18-drop-in). Input per token: the
+    three adjacent slices as depth, each repeated over the three input channels: N
+    x 3 (channels) x 3 (depth) x 224 x 224. The network is the authors'' 3D conversion
+    (every convolution a plain Conv3d with weights_3d, the same stride on all three
+    axes, 3D max pooling, no rotation networks) evaluated on a depth of 3: conv1 is
+    a Conv3d(3, 64, 7, stride 2, padding 3) with the 64 x 3 x 7 x 7 x 7 kernel, giving
+    depth 2; bn1 and the activation act per depth slice; 3D max pooling (kernel 3,
+    stride 2, padding 1) gives depth 1; from there every 3 x 3 x 3 convolution with
+    padding 1 on a depth of 1 equals the 2D convolution with the middle depth slice
+    of its kernel, so layer1 to layer4 are ordinary 2D layers whose weights are weights_3d[:,
+    :, 1] (weights_3d[:, :, 0] for the 1 x 1 x 1 downsample kernels). Output N x 512
+    x 7 x 7 as now.'
+  precedents:
+  - 'prior-work.md, Cross-D-Conv: the authors conversion (convert2threed) and the
+    checkpoint layout.'
+  - 'radimagenet-rn18 campaign: mean-initialized adjacent slices -0.0039, gated adjacent
+    residuals -0.00005.'
+  novelty: First use of adjacent slices through pretrained 3D kernels.
+  coverage: All studies and labels; every token now sees its two neighbours.
+  exploitation: Log per epoch depth_stem_side_energy, the share of the stem kernel's
+    squared weight that lies outside its middle depth slice (it starts near 6/7),
+    per-stage drift, training seconds. Per-label deltas; x1 per epoch against the
+    incumbent and against crossd-resnet18-drop-in.
+  budget: 'The 3D stem costs about 14 times the 2D stem (1.65 against 0.12 GMACs per
+    input), the rest is the plain ResNet-18: estimated 1.5 to 1.9 times the incumbent,
+    unmeasured.'
+  implementation: 'Replaces the backbone input path; independent of the verdict of
+    crossd-resnet18-drop-in (it does not use CrossDConv). (1) config.py: ModelConfig.depth_stem
+    Literal none, crossd, acs, default none; slice_channels gains the value depth;
+    validators: depth_stem not none requires slice_channels depth and the reverse;
+    crossd requires pretrained_weights radimagenet_crossd. Raise for acs until acs-stem-layer1
+    adds it. (2) model.py: build the plain timm resnet18.a1_in1k, replace self.backbone.conv1
+    by nn.Conv3d(3, 64, 7, stride=2, padding=3, bias=False); when loading pretrained,
+    remap radimagenet_state_dict("resnet18.a1_in1k", "radimagenet_crossd"): drop every
+    key containing ".rotation_params."; rename "<prefix>.weights_3d" to "<prefix>.weight";
+    keep conv1''s 5D tensor whole and take value[:, :, value.shape[2] // 2] for all
+    others; load strictly. Add a method that runs the stem: x5 (N x 3 x 3 x H x W)
+    -> conv1 -> fold depth into the batch for bn1 and act1 and unfold -> F.max_pool3d(kernel
+    3, stride 2, padding 1) -> squeeze the depth of 1 -> N x 64 x 56 x 56; forward_features
+    and _backbone_to_stride_8 both use it, then layer1.. as now. (3) encode_batch
+    with slice_channels depth: keep the three slices through augmentation exactly
+    as the existing adjacent path does (all three transformed together), take token
+    geometry and validity from the middle slice exactly as repeated_middle does (valid_rects[:,
+    1:2], channels[:, 1:2]), then x5 = images[:, None].expand(-1, 3, -1, -1, -1) and
+    normalize with mean and std per channel. (4) backbone_mapping must equal the plain
+    resnet18''s (the in-plane geometry is unchanged); assert it. (5) The dummy forward
+    in __init__ that probes the feature shape must use the new input shape. Keep channels_last
+    false.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: User seed; the real 3D use of the Cross-D kernels.
+  status: completed
+  created_revision: 2
+  seeded: /home/claudio/src/knee-abnormality-refined-radimagenet/autoresearch/campaigns/refined-radimagenet/seed-ideas-3.yaml
+  experiments:
+  - crossd-3d-stem-20261004T151316Z-f5d98e17
+  decision: invalid
+- id: acs-stem-layer1
+  mechanism_id: acs-conv
+  parent_idea_id: null
+  title: ACS convolutions built from the plain Refined-RadImageNet ResNet-18 weights
+    in the stem and layer1, over the three adjacent slices
+  opportunity: 'ACS convolutions are the standard way to run 2D-pretrained kernels
+    in 3D and the baseline Cross-D-Conv is compared against in its own tables: each
+    layer''s output channels are split in three groups whose 2D kernels are applied
+    in the three orthogonal planes of the volume. It needs no new checkpoint, keeps
+    the incumbent''s weights, and is the partner of crossd-3d-stem: adjacent slices
+    through the incumbent''s own kernels. Gain is a guess.'
+  mechanism: 'model.depth_stem acs, model.slice_channels depth, pretrained weights
+    as the incumbent (radimagenet). Input N x 3 x 3 x 224 x 224 as in crossd-3d-stem.
+    In conv1 and the four 3 x 3 convolutions of layer1 (all 64 output channels), the
+    2D weight w (64 x in x k x k) is used as three 3D kernels with depth stride 1:
+    output channels 0-21 in the image plane, w[:22] as 1 x k x k with padding (0,
+    p, p); channels 22-42 in the depth-width plane, w[22:43] as k x 1 x k with padding
+    (p, 0, p); channels 43-63 in the depth-height plane, w[43:] as k x k x 1 with
+    padding (p, p, 0); in-plane strides as the layer''s (conv1 (1, 2, 2)), outputs
+    concatenated in channel order. BatchNorm, activation and the stem''s max pooling
+    act per depth slice. After layer1 the middle depth slice (index 1) is taken, N
+    x 64 x 56 x 56, and layer2 to layer4 run as the incumbent''s 2D layers. The parameters
+    are the incumbent''s own 2D tensors under their own names, so the pretrained load,
+    L2-SP anchors, rates and the checkpoint layout are unchanged.'
+  precedents:
+  - 'ACS convolutions, Yang et al. 2021 (Reinventing 2D Convolutions for 3D Images):
+    the channel split in three plane groups.'
+  - 'prior-work.md, Cross-D-Conv: ACS is the comparison in the Cross-D tables.'
+  - 'radimagenet-rn18 campaign: adjacent slices through the first 2D convolution lost
+    (-0.0039, -0.00005).'
+  novelty: First ACS use here; adjacent slices enter in the stem and layer1 only.
+  coverage: All studies and labels.
+  exploitation: Log per epoch acs_side_response, the ratio of the mean absolute activation
+    after layer1 at the two outer depth slices to the middle one, per-stage drift,
+    training seconds. Per-label deltas; x1 per epoch against the incumbent and crossd-3d-stem.
+  budget: 'The stem and layer1 run at three depth positions: about 1.64 times the
+    backbone''s multiply-accumulates; estimated 1.4 to 1.7 times the incumbent, unmeasured.'
+  implementation: 'Uses the depth input path of crossd-3d-stem (slice_channels depth,
+    the depth_stem option, the encode_batch branch, the mapping assertion; in the
+    incumbent if that seed was accepted, else ported from its frozen source) and adds
+    depth_stem acs. Do not replace modules: write a functional forward for the stem
+    and layer1 that reads the existing modules'' parameters: a helper acs_conv3d(x5,
+    conv) calling F.conv3d three times with the views conv.weight[:22].unsqueeze(2),
+    conv.weight[22:43].unsqueeze(3) and conv.weight[43:].unsqueeze(4), stride (1,
+    s, s) and the paddings above, then torch.cat on channels; fold depth into the
+    batch to apply bn1, act1, maxpool and each BasicBlock''s BatchNorms and activations;
+    each BasicBlock of layer1 is conv1, bn1, act1, conv2, bn2, add the identity shortcut,
+    act2 (layer1 has no downsample). Then x = x5[:, :, 1] and layer2.. as now. forward_features
+    and _backbone_to_stride_8 both use the new path. The split 22/21/21 is fixed for
+    all five convolutions. Keep channels_last false.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Partner of crossd-3d-stem on the incumbent's own weights.
+  status: completed
+  created_revision: 2
+  seeded: /home/claudio/src/knee-abnormality-refined-radimagenet/autoresearch/campaigns/refined-radimagenet/seed-ideas-3.yaml
+  experiments:
+  - acs-stem-layer1-20261004T164044Z-72dc4b6c
+  decision: invalid
+- id: backbone-eval-pretrained-statistics
+  mechanism_id: pretrained-batchnorm-statistics
+  parent_idea_id: radimagenet-input-statistics
+  title: Keep the backbone in eval mode during training, so its BatchNorm layers use
+    the pretrained running statistics instead of batch statistics (user seed)
+  opportunity: 'User seed, 2026-10-04. With the checkpoint''s own input normalization
+    now in the incumbent (radimagenet-input-statistics, +0.000581), the pretrained
+    BatchNorm running statistics describe our slices: under that normalization the
+    frozen network in eval mode reads 98.5% of them as knee MRI, against 7.8% under
+    the ImageNet values (prior-work.md). The earlier frozen-BatchNorm run (-0.0086,
+    site-generalization campaign) was made under the ImageNet values, where those
+    statistics were wrong for our input, and it also froze the BatchNorm weights.
+    Eval mode keeps the pretrained normalization as a fixed part of the function and
+    removes the dependence of each slice''s features on the other slices of the batch.
+    Gain is a guess.'
+  mechanism: 'model.backbone_eval true in configs/training.yaml. The existing option
+    calls self.backbone.eval() whenever the model is put in training mode: every backbone
+    BatchNorm normalizes with its stored running mean and variance and does not update
+    them; all backbone weights, including the BatchNorm scale and shift, keep training
+    at the backbone rate with L2-SP as now. Everything else exactly as the incumbent,
+    including data.mean 0.3162 and data.std 0.3213, DSU at the stride-8 point and
+    ten epochs.'
+  precedents:
+  - 'radimagenet-input-statistics-20261004T103433Z-ff2f3786: the checkpoint normalization,
+    accepted, +0.000581, 80% [+0.000182, +0.001016].'
+  - 'prior-work.md, Pretrained head on our slices: the eval-mode network is in domain
+    only under the checkpoint normalization.'
+  - 'site-generalization campaign, frozen backbone BatchNorm: -0.0086 on the sites-out
+    split, under ImageNet normalization and with the BatchNorm weights frozen too.'
+  novelty: First eval-mode backbone run under the checkpoint's own input statistics.
+  coverage: All studies and labels.
+  exploitation: Per-epoch x1 and training loss against the incumbent from epoch 0;
+    per-stage drift and gradient norms (existing columns); a static check that the
+    backbone's BatchNorm running_mean and running_var are unchanged between the first
+    and the last checkpoint, logged once as backbone_running_statistics_changed (0
+    or 1). Per-label deltas.
+  budget: Same cost as the incumbent or slightly less, about 1,181 s.
+  implementation: 'Configuration-only change to configs/training.yaml: model.backbone_eval
+    true. No source change: the option exists (KneeAbnormalityModel.train). Confirm
+    by a static read that DSU (_encode_images) still follows the model''s training
+    flag, not the backbone''s, so it stays active. Do not set checkpoint_backbone.
+    If accepted, later seeds train with the backbone in eval mode; the frozen teacher
+    and the policy network are separate modules and unaffected.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: User seed; follows directly from the accepted normalization.
+  status: completed
+  created_revision: 39
+  seeded: /home/claudio/src/knee-abnormality-refined-radimagenet/autoresearch/campaigns/refined-radimagenet/backbone-eval-ideas.yaml
+  experiments:
+  - backbone-eval-pretrained-statistics-20261004T112644Z-24ec85b7
+  decision: reject
+- id: crossd-static-kernels
+  mechanism_id: crossd-conv
+  parent_idea_id: crossd-resnet18-drop-in
+  title: Cross-D RadImageNet kernels as a plain ResNet-18, each layer's 3D kernel
+    shifted once by its mean predicted shift (keeper seed replacing the per-slice
+    drop-in)
+  opportunity: 'Evidence-backed repair. crossd-resnet18-drop-in was stopped on time:
+    building a kernel per slice in 20 convolutions took 5.5 s per step, ten times
+    the bound, and gave no evidence about the checkpoint. The per-slice shifts barely
+    vary: measured on 240 training slices (no labels), each layer''s shift has a standard
+    deviation of 0.001-0.10 per axis around its mean (0.31 only in layer4.1.conv2).
+    One kernel per layer, shifted by that mean, turns the network into a plain ResNet-18
+    at the incumbent''s cost and keeps most of the pretrained function: on 96 held-out
+    slices the frozen static network puts 0.85 of its probability on the 18 knee classes
+    (0.95 for the authors'' dynamic network) and agrees with it on the top class for
+    57% of slices. Taking the kernels without the shift destroys the function (knee
+    mass 0.000), which is what crossd-3d-stem did. Whether the checkpoint transfers
+    better than the incumbent''s is a guess.'
+  mechanism: 'model.pretrained_weights radimagenet_crossd with model.backbone resnet18.a1_in1k,
+    the plain timm ResNet-18 (no CrossDConv modules, no rotation networks), loaded
+    strictly from crossd_static_state_dict(model.backbone, depth_stem=False) in modeling/crossd.py:
+    for each convolution, the checkpoint''s K x K x K kernel shifted in the Fourier
+    domain by the layer''s mean shift (CROSSD_MEAN_SHIFTS) and cut at its middle depth
+    slice; BatchNorm tensors as in the checkpoint. Input as the incumbent (repeated
+    middle slice, data.mean 0.3162, data.std 0.3213). optimizer.backbone_lr 0.0002,
+    optimizer.anchor_alpha_early 0.000033, optimizer.anchor_alpha_late 0.0000033:
+    the static kernels'' convolution RMS is 0.2166 against 0.01244 (17.4 times), uniform
+    across depth; the anchor strengths are the incumbent''s divided by 17.4 squared,
+    and the rate is the early-layer-matched one of the original RadImageNet ResNet-50
+    (3e-4 at RMS 0.314) scaled to this RMS.'
+  precedents:
+  - 'run-notes.md, run 13: the per-slice layer measured at 5.5 s per step, invalid
+    on time.'
+  - 'modeling/crossd.py: CROSSD_MEAN_SHIFTS (240 training slices, label-free) and
+    crossd_static_state_dict, built and checked on CPU: strict load into timm resnet18.a1_in1k;
+    knee mass 0.848 against 0.949 dynamic on 96 held-out slices.'
+  - prior-work.md, Cross-D-Conv and Checkpoints.
+  novelty: First scored run of the Cross-D checkpoint; a static form of its kernels.
+  coverage: All studies and labels.
+  exploitation: Log once per epoch crossd_static_conv_rms (overall RMS of the backbone's
+    convolution weights). Per-stage drift, anchor_penalty, x1 per epoch and training
+    loss against the incumbent, per-label deltas, training seconds (expected at the
+    incumbent's).
+  budget: A plain ResNet-18; about 1,181 s.
+  implementation: 'Replaces the starting weights of the backbone; everything else
+    is the incumbent. (1) configs/training.yaml: the four values above. (2) modeling/model.py,
+    which loads only the standard weights today: the guard `model.pretrained_weights
+    == "radimagenet" and model.backbone not in RADIMAGENET_WEIGHTS` becomes `model.pretrained_weights
+    != "timm" and model.backbone not in PRETRAINED_WEIGHTS[model.pretrained_weights]`;
+    the load condition `pretrained and model.pretrained_weights == "radimagenet"`
+    becomes `pretrained and model.pretrained_weights != "timm"`, and inside it the
+    state dict is crossd_static_state_dict(model.backbone, depth_stem=False) when
+    pretrained_weights is radimagenet_crossd, else radimagenet_state_dict(model.backbone,
+    model.pretrained_weights); load strictly. Import PRETRAINED_WEIGHTS and crossd_static_state_dict.
+    Do not call replace_convolutions and do not create CrossDConv modules: the model
+    is a plain ResNet-18 at training and at prediction, so spatial_tokens.py, the
+    DSU split path and the checkpoint layout need no change. (3) lightning.py: the
+    one logged scalar. Do not edit crossd.py. If the workspace of crossd-resnet18-drop-in
+    is used as a starting point, remove its replace_convolutions call, its mapping
+    changes and its shift diagnostics.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Repairs a seed that was blocked by its cost, not by a result.
+  status: completed
+  created_revision: 228
+  seeded: /home/claudio/src/knee-abnormality-refined-radimagenet/autoresearch/campaigns/refined-radimagenet/crossd-static-ideas.yaml
+  experiments:
+  - crossd-static-kernels-20261004T160948Z-a40e0b62
+  - crossd-static-kernels-20261004T161234Z-c0aeebae
+  decision: reject
+- id: crossd-gated-depth-stem
+  mechanism_id: crossd-conv
+  parent_idea_id: crossd-static-kernels
+  title: Cross-D static kernels with the stem's two neighbouring depth slices applied
+    to the adjacent slices through a gate that starts at zero (keeper seed replacing
+    crossd-3d-stem)
+  opportunity: 'Repair of a faulty seed. crossd-3d-stem took the checkpoint''s kernels
+    without their shift, which scrambles them (frozen network: knee mass 0.000), and
+    ran its 3D stem ungated; it scored x1 0.61, 0.71, 0.71 in its first epochs and
+    is no evidence about the idea. The idea stands: the loader decodes three adjacent
+    slices and the Cross-D stem kernel has trained depth slices on both sides of the
+    one used in 2D. Applied ungated, the side slices break the pretrained function
+    even with correct kernels (three identical slices: knee mass 0.016). So the side
+    slices enter through a per-channel gate that starts at zero: at step 0 the network
+    is exactly crossd-static-kernels, and it opens the gate only as far as the neighbours
+    help. Gain is a guess.'
+  mechanism: 'As crossd-static-kernels, plus model.slice_channels depth and model.depth_stem
+    gated. The stem becomes: out = conv_mid(middle slice repeated on three channels)
+    + gate[channel] * conv_side(previous slice x 3 channels, next slice x 3 channels),
+    then bn1 and the rest unchanged. conv_mid is the static 7 x 7 stem kernel of crossd-static-kernels
+    (64 x 3 x 7 x 7); conv_side is a Conv2d(6, 64, 7, stride 2, padding 3, no bias)
+    holding the two depth slices next to the middle one of the same shifted 3D stem
+    kernel; gate is 64 values initialized to zero. crossd_static_state_dict(model.backbone,
+    depth_stem=True) returns conv1.weight as 64 x 9 x 7 x 7 with input channels ordered
+    previous x 3, middle x 3, next x 3: channels 3:6 are conv_mid (identical to the
+    depth_stem=False stem, checked) and channels 0:3 with 6:9 are conv_side. Rates
+    and anchors as crossd-static-kernels; the gate trains at head_lr without weight
+    decay and is not anchored.'
+  precedents:
+  - 'run-notes.md, runs 13 and 14: the per-slice layer over time, and crossd-3d-stem
+    started from unshifted kernels.'
+  - 'modeling/crossd.py: crossd_static_state_dict(depth_stem=True), checked on CPU:
+    with the neighbours zeroed the 9-channel stem equals the 2D stem.'
+  - 'radimagenet-rn18 campaign: gated adjacent residuals -0.00005 with untrained neighbour
+    kernels; here the neighbour kernels are pretrained depth slices.'
+  novelty: Adjacent slices through pretrained depth kernels, function-preserving at
+    the start.
+  coverage: All studies and labels; every token sees its two neighbours through the
+    gate.
+  exploitation: Log per epoch depth_stem_gate_mean_abs and depth_stem_gate_max (over
+    the 64 channels) and depth_stem_side_ratio, the mean absolute value of the gated
+    side term over that of the middle term on the last batch. Per-label deltas; x1
+    per epoch against crossd-static-kernels and the incumbent.
+  budget: One extra 6-channel stem convolution; estimated 1.05 to 1.15 times the incumbent.
+  implementation: 'Builds on crossd-static-kernels (in the incumbent if accepted,
+    else ported from its frozen source). (1) config.py: slice_channels gains depth;
+    ModelConfig.depth_stem Literal none, gated, default none; a validator requires
+    depth_stem gated exactly when slice_channels is depth, and pretrained_weights
+    radimagenet_crossd for gated. (2) model.py: a small module GatedDepthStem(mid,
+    side, gate) with forward(x9) = mid(x9[:, 3:6]) + gate[None, :, None, None] * side(torch.cat((x9[:,
+    0:3], x9[:, 6:9]), 1)); after timm.create_model, set self.backbone.conv1 = GatedDepthStem(self.backbone.conv1,
+    nn.Conv2d(6, 64, 7, stride=2, padding=3, bias=False), nn.Parameter(torch.zeros(64)))
+    under torch.random.fork_rng; when loading pretrained, take state = crossd_static_state_dict(model.backbone,
+    depth_stem=True), pop conv1.weight (64 x 9 x 7 x 7) and add conv1.mid.weight =
+    weight[:, 3:6] and conv1.side.weight = torch.cat((weight[:, 0:3], weight[:, 6:9]),
+    1); the gate is not in the pretrained state: load with strict=False and assert
+    that the only missing key is conv1.gate and there are no unexpected keys. (3)
+    encode_batch with slice_channels depth: keep the three slices through augmentation
+    exactly as the existing adjacent path does, take token geometry and validity from
+    the middle slice exactly as repeated_middle does (valid_rects[:, 1:2], channels[:,
+    1:2]), then x9 = images.repeat_interleave(3, dim=1) (previous x 3, middle x 3,
+    next x 3) and normalize with self.mean.repeat(1, 3, 1, 1) and self.std.repeat(1,
+    3, 1, 1). The frozen source of crossd-3d-stem has a depth input branch to port
+    from; keep its augmentation and geometry handling and drop its 3D convolution,
+    its 5D input and its kernel remapping. (4) The dummy forward in __init__ that
+    probes the feature shape uses 9 input channels. backbone_mapping is the plain
+    resnet18''s: spatial_tokens.py must find the stem''s kernel, stride and padding
+    on conv1.mid (assert the mapping equals the plain model''s). The DSU split path
+    calls self.backbone.conv1 and works unchanged. (5) lightning.py build_optimizer:
+    the parameter backbone.conv1.gate uses head_lr and no weight decay; conv1.mid.weight
+    and conv1.side.weight are backbone parameters under the early anchor (their names
+    start with conv1.). Log the three scalars. Prediction rebuilds the same module
+    from the config with load_pretrained False.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Repairs a seed that started from scrambled kernels; the adjacent-slice
+    use of Cross-D.
+  status: completed
+  created_revision: 228
+  seeded: /home/claudio/src/knee-abnormality-refined-radimagenet/autoresearch/campaigns/refined-radimagenet/crossd-static-ideas.yaml
+  experiments:
+  - crossd-gated-depth-stem-20261004T161947Z-4bb697d6
+  decision: reject
+- id: acs-gated-stem-block1
+  mechanism_id: acs-conv
+  parent_idea_id: acs-stem-layer1
+  title: Gated ACS convolutions in the stem and the first block of layer1, on the
+    incumbent's own weights, starting as the incumbent (keeper seed replacing acs-stem-layer1)
+  opportunity: 'Repair of a faulty seed. acs-stem-layer1 switches two thirds of the
+    channels of five pretrained convolutions from in-plane to depth-plane kernels
+    at step 0. Checked without labels on 48 held-out slices with the frozen pretrained
+    network and its 165-class head: the incumbent''s weights put 0.990 of their probability
+    on knee classes; with the ACS stem and layer1 as that seed specifies them, 0.256,
+    and the top class agrees on 0% of slices. It would train from a broken network,
+    as crossd-3d-stem did. The idea stands: adjacent slices through the incumbent''s
+    own kernels reoriented across depth. Here every depth-plane channel starts as
+    its in-plane self and is blended toward its depth-plane version by a gate that
+    starts at zero, so step 0 is the incumbent. Gain is a guess.'
+  mechanism: 'model.slice_channels depth and model.depth_stem acs_gated, pretrained
+    weights as the incumbent (radimagenet). Input: the three adjacent slices as depth,
+    each repeated on three channels (N x 3 x 3 x 224 x 224). In three convolutions,
+    backbone.conv1, layer1.0.conv1 and layer1.0.conv2 (64 output channels each, weight
+    w of shape 64 x in x k x k, padding p, in-plane stride s), the output is inplane
+    + gate[channel] * (acs - inplane), where inplane applies w to every depth slice
+    separately (w.unsqueeze(2), kernel 1 x k x k, padding (0, p, p)), and acs is the
+    ACS form: channels 0-21 as inplane, channels 22-42 with w[22:43] as k x 1 x k
+    kernels (padding (p, 0, p)), channels 43-63 with w[43:] as k x k x 1 kernels (padding
+    (p, p, 0)); all with stride (1, s, s). gate is one parameter of 64 values per
+    convolution, initialized to zero and clamped to [0, 1] in the forward pass; the
+    first 22 entries have no effect. BatchNorm, activation and the stem''s max pooling
+    act per depth slice. conv1 and layer1.0.conv1 are computed at all three depths;
+    layer1.0.conv2, its BatchNorm, the shortcut and act2 only at the middle depth
+    (index 1), whose output is the N x 64 x 56 x 56 input of layer1.1; from there
+    the network is the incumbent''s 2D layers. With all gates at zero the middle-depth
+    path is the incumbent''s computation. The convolution parameters are the incumbent''s
+    own tensors under their own names; only the three gates are new.'
+  precedents:
+  - 'run-notes.md: the ACS stem and layer1 without gates start from a broken network
+    (knee mass 0.256 against 0.990, top-class agreement 0.00, 48 slices, three identical
+    slices as depth).'
+  - 'ACS convolutions, Yang et al. 2021: the three-plane channel split.'
+  - 'run-notes.md, run 14: crossd-3d-stem trained from a scrambled start reached x1
+    0.744 at epoch 4.'
+  - 'radimagenet-rn18 campaign: adjacent slices through the first 2D convolution lost
+    (-0.0039, -0.00005).'
+  novelty: First ACS use here, function-preserving at the start.
+  coverage: All studies and labels.
+  exploitation: Log per epoch acs_gate_mean and acs_gate_max for each of the three
+    convolutions (over channels 22-63, after the clamp) and acs_blend_ratio, the mean
+    absolute value of gate * (acs - inplane) over that of inplane at the stem on the
+    last batch. Per-label deltas, x1 per epoch against the incumbent (expected equal
+    at step 0), training seconds.
+  budget: 'The stem and layer1.0.conv1 run at three depths with both forms, layer1.0.conv2
+    at one: about 1.56 times the backbone''s multiply-accumulates; estimated 1.3 to
+    1.5 times the incumbent, unmeasured.'
+  implementation: 'Replaces acs-stem-layer1; start from its workspace or frozen source
+    if one exists and keep its depth input branch (slice_channels depth, three slices
+    kept through augmentation as the adjacent path does, token geometry and validity
+    from the middle slice as repeated_middle does, x5 = images[:, None].expand(-1,
+    3, -1, -1, -1) normalized per channel), otherwise write that branch. (1) config.py:
+    slice_channels gains depth; ModelConfig.depth_stem gains acs_gated (Literal none,
+    acs_gated, plus any value already present in the incumbent source), default none;
+    a validator requires depth_stem not none exactly when slice_channels is depth.
+    (2) model.py: three parameters of 64 zeros under torch.random.fork_rng, registered
+    on the model (not under backbone), e.g. self.acs_gates = nn.ParameterList of three;
+    a helper gated_acs(x5, conv, gate) computing inplane = F.conv3d(x5, w.unsqueeze(2),
+    stride=(1, s, s), padding=(0, p, p)) and the two depth-plane groups with F.conv3d
+    on w[22:43].unsqueeze(3) and w[43:].unsqueeze(4), then inplane with channels 22-63
+    replaced by inplane + gate.clamp(0, 1)[22:] * (depth_plane - inplane[:, 22:]);
+    a helper that folds depth into the batch to apply 2D BatchNorm, activation and
+    max pooling. Functional forward, without replacing modules: x5 -> gated_acs with
+    backbone.conv1 -> bn1, act1, maxpool per depth slice -> block = backbone.layer1[0]:
+    z = gated_acs(y, block.conv1) -> bn1, act1 per depth slice -> gated_acs(z, block.conv2)
+    evaluated then cut at depth index 1 (or computed only there) -> block.bn2 -> add
+    y[:, :, 1] -> block.act2 -> backbone.layer1[1] and layer2.. as now. forward_features
+    and _backbone_to_stride_8 both use this path. (3) The dummy forward that probes
+    the feature shape uses the new input. backbone_mapping stays the plain resnet18''s
+    (assert it). (4) lightning.py build_optimizer: the gates train at head_lr without
+    weight decay and are not anchored. Log the scalars. Prediction rebuilds the same
+    path from the config. Keep channels_last false.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Repairs a seed that would start from a broken network; adjacent
+    slices on the incumbent's own weights.
+  status: completed
+  created_revision: 273
+  seeded: /home/claudio/src/knee-abnormality-refined-radimagenet/autoresearch/campaigns/refined-radimagenet/acs-gated-ideas.yaml
+  experiments:
+  - acs-gated-stem-block1-20261004T170533Z-7802eb51
+  decision: invalid
+- id: acs-gated-stem
+  mechanism_id: acs-conv
+  parent_idea_id: acs-gated-stem-block1
+  title: Gated ACS convolution in the stem only, computed at the middle depth, on
+    the incumbent's own weights (keeper seed replacing acs-gated-stem-block1, which
+    did not fit the time bound)
+  opportunity: 'Repair on cost. acs-gated-stem-block1 started exactly as the incumbent
+    (x1 0.885681 against 0.885713 after epoch 1, so the gated form is function-preserving
+    as designed) but took 250 s per epoch, which projects to about 2,500 s against
+    the 2,362 s bound; the keeper cancelled it after one epoch. The cost is the stem
+    evaluated at three depths with 3D convolutions at 224 px, needed only so that
+    the first block can look across depth. This seed keeps the gated ACS reorientation
+    in the stem alone, where only the middle-depth output is needed: one ordinary
+    2D stem convolution plus two small 3D convolutions that produce a single depth.
+    The adjacent slices enter through 42 stem channels whose kernels can blend from
+    in-plane to depth-plane. Gain is a guess.'
+  mechanism: model.slice_channels depth and model.depth_stem acs_gated_stem, pretrained
+    weights as the incumbent. Input N x 3 channels x 3 depth x 224 x 224 as in acs-gated-stem-block1.
+    Stem output = inplane + gate[channel] * (depth_plane - inplane) for channels 22-63
+    and inplane for channels 0-21, where inplane = conv2d(middle slice, w) with the
+    incumbent's 64 x 3 x 7 x 7 stem weight w (stride 2, padding 3), and depth_plane
+    is, for channels 22-42, conv3d(volume, w[22:43].unsqueeze(3)) with kernel 7 x
+    1 x 7, stride (1, 2, 2), padding (2, 0, 3), and for channels 43-63, conv3d(volume,
+    w[43:].unsqueeze(4)) with kernel 7 x 7 x 1, stride (1, 2, 2), padding (2, 3, 0);
+    the depth padding of 2 on a depth of 3 gives exactly one output depth, centred
+    on the middle slice. gate is 64 values initialized to zero, clamped to [0, 1]
+    in the forward pass. After the stem the tensor is N x 64 x 112 x 112 and bn1,
+    act1, maxpool, layer1 to layer4 are the incumbent's 2D layers. With the gate at
+    zero the network is the incumbent. The stem weight stays the incumbent's own tensor
+    under its own name.
+  precedents:
+  - 'run-notes.md: acs-gated-stem-block1 matched the incumbent after epoch 1 and cost
+    250 s per epoch; acs-stem-layer1 ungated starts from a broken network (knee mass
+    0.256 against 0.990).'
+  - 'run-notes.md, run 16: crossd-gated-depth-stem, gates stayed near 0.03 on the
+    Cross-D base.'
+  - ACS convolutions, Yang et al. 2021.
+  novelty: Adjacent slices through reoriented stem kernels of the incumbent, at the
+    incumbent's cost.
+  coverage: All studies and labels.
+  exploitation: Log per epoch acs_gate_mean and acs_gate_max over channels 22-63 after
+    the clamp, and acs_blend_ratio, the mean absolute value of the gated difference
+    over that of inplane on the last batch. Per-label deltas, x1 per epoch against
+    the incumbent (equal at step 0), training seconds.
+  budget: 'One 2D stem convolution plus two 3D convolutions of 21 output channels
+    at one depth: about 1.05 times the backbone''s multiply-accumulates; estimated
+    1.05 to 1.2 times the incumbent, unmeasured.'
+  implementation: 'Port from the frozen source of acs-gated-stem-block1 (outputs/autoresearch/refined-radimagenet/experiments/acs-gated-stem-block1-20261004T170533Z-7802eb51/source):
+    keep its depth input branch in encode_batch, its config fields, its optimizer
+    handling of the gates (head_lr, no weight decay, not anchored), its logging and
+    modeling/depth_stem.py. Change only the backbone path: add the depth_stem value
+    acs_gated_stem with a single gate of 64 zeros; in depth_stem.py add a function
+    that computes the stem as stated above (in gated_acs the middle_only branch uses
+    depth padding 0, which is right for 3 x 3 kernels only: for the 7 x 7 stem the
+    depth padding must be (kernel - 3) // 2 = 2 so the two depth-plane convolutions
+    return one depth; write the stem case explicitly and assert the output depth is
+    1), squeezes the depth and returns N x 64 x 112 x 112; then self.backbone.bn1,
+    act1, maxpool and the unchanged layer1.. run in 2D. forward_features and _backbone_to_stride_8
+    both use this stem. Do not evaluate the stem at three depths and do not touch
+    layer1. backbone_mapping stays the plain resnet18''s (assert it). The dummy forward
+    that probes the feature shape uses the 5D input. Keep channels_last false.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Keeps the ACS seed alive inside the time bound.
+  status: completed
+  created_revision: 304
+  seeded: /home/claudio/src/knee-abnormality-refined-radimagenet/autoresearch/campaigns/refined-radimagenet/acs-gated-stem-ideas.yaml
+  experiments:
+  - acs-gated-stem-20261004T172410Z-54c7c519
+  decision: reject
+- id: knee-normal-contrast-attention
+  mechanism_id: pretrained-knee-classifier
+  parent_idea_id: knee-logit-attention-prior
+  title: Use bounded pathology-versus-normal classifier evidence as the attention
+    prior
+  opportunity: Evidence-backed retry; the replacement signal is unmeasured. The raw-logit
+    attention prior nearly passed adoption and activated throughout training. Its
+    frozen classifier reads features that continue changing during fine-tuning. Comparing
+    each mapped pathology with the pretrained normal class could remove shared responses
+    and make the prior more specific to pathology.
+  mechanism: "Replace the raw mapped logit with tanh((pathology_logit\u2212normal_logit)/2),\
+    \ using the checkpoint's normal class 93 and the existing name-based target mapping.\
+    \ Apply the same formula to all twelve targets. Keep detached backbone features,\
+    \ frozen classifier rows and zero-initialized signed per-target attention gains.\
+    \ Retain learned attention, view-label bias, anatomical restrictions and evidence\
+    \ readouts. Log prior dispersion, saturation fraction, all gains, attention-distribution\
+    \ shift and epoch counts of batches with an actual nonzero shift."
+  precedents:
+  - "[Attention-prior comparison](/home/claudio/src/knee-abnormality/outputs/autoresearch/refined-radimagenet/experiments/knee-logit-attention-prior-20261004T142904Z-704694f5/comparison/comparison.json):\
+    \ macro delta +0.000297, 80% interval [\u22120.000114, +0.000679]."
+  - '[Attention-prior metrics](/home/claudio/src/knee-abnormality/outputs/autoresearch/refined-radimagenet/experiments/knee-logit-attention-prior-20261004T142904Z-704694f5/training/fold_0/logs/version_0/metrics.csv):
+    attention shift 0.02436 in epoch 0, peaking at 0.04968; the pathway activated.'
+  - modeling/radimagenet.py fixes normal=93. The contract fixes pathology mappings
+    from class names; neither mapping nor target coverage changes.
+  novelty: Changes the pretrained evidence supplied to attention through a competing
+    normal-class reference and a bounded nonlinear readout. It does not repeat the
+    rejected linear token-feature projection or change only prior strength.
+  coverage: Tests classifier calibration and token routing across all targets without
+    choosing labels from validation performance.
+  exploitation: Builds directly on the closest classifier-family near miss while keeping
+    its inexpensive inference path.
+  budget: "Ten epochs, batch size 8, 26 slices and 4370 optimizer steps at seed 1533697213.\
+    \ The parent took 1175.4 s. One additional classifier row and elementwise operations\
+    \ should remain near that cost, within 885.867\u20132362.312 s. No second backbone\
+    \ pass."
+  implementation: Port the historical attention-prior plumbing into the current incumbent,
+    then replace its raw-logit calculation rather than retaining parallel prior variants.
+    Change modeling/model.py, config.py, training/lightning.py and configs/training.yaml
+    only. Persist classifier-difference weights and biases in model buffers; construct
+    correctly shaped buffers without pretrained-file access when load_pretrained=False.
+    Retain accepted normalization and every unrelated incumbent improvement. If another
+    attention-prior variant is accepted during development, replace that component
+    explicitly and record its removed idea ID; do not stack priors.
+  open_choices: Fix the divisor at 2 before training. Normal subtraction can suppress
+    useful pathology responses or saturate the signal; these are hypotheses to inspect
+    through the logged scalars, without label-specific retuning.
+  dependencies:
+  - radimagenet-input-statistics
+  priority_rationale: 'Priority 1: closest adoption near miss, clear activation, small
+    implementation and runtime cost, and a structural change to the evidence rather
+    than a value sweep.'
+  source_change: true
+  targeted_curve: "knee-logit-attention-prior, epochs 6\u20139: \xD71 macro stays\
+    \ near the incumbent's 0.9280\u20130.9299 despite sustained attention shifts.\
+    \ Seek a higher late macro curve while avoiding its OA and Baker's tradeoffs;\
+    \ evaluate all labels under the fixed macro rule."
+  status: completed
+  created_revision: 321
+  ranking_rationale: "Admit all five: proposal_admission reports satisfied dependencies,\
+    \ and each introduces a material difference from the family ledger and prior-work\
+    \ precedents. Targeted searches of docs/validation/results/ and docs/history/\
+    \ found no matching measurement of these proposed operators, schedule or combination.\
+    \ Lead with bounded pathology-versus-normal attention: its parent is the closest\
+    \ attention-family near miss, demonstrably changes attention, and needs no additional\
+    \ backbone pass. Next, early teacher release directly targets the verified reversal\
+    \ from an epochs 0\u20135 lead to an epochs 6\u20139 lag. Place contrast calibration\
+    \ third: it extends accepted normalization, but that small single-seed win is\
+    \ weak against documented recipe seed noise, so it does not warrant precedence\
+    \ over these retries. Move the teacher-plus-attention combination ahead of moment-restored\
+    \ masking: both components have positive campaign deltas and different observed\
+    \ label tradeoffs, whereas random masking lost on eleven of twelve labels. Keep\
+    \ the structural mask retry last; restoring moments materially changes its operator,\
+    \ but attenuation remains an unproven explanation of failure."
+  experiments:
+  - knee-normal-contrast-attention-20261004T175206Z-5bdf1182
+  decision: reject
+- id: slice-teacher-early-release
+  mechanism_id: pretrained-slice-teacher
+  parent_idea_id: pretrained-slice-teacher
+  title: Use the frozen slice teacher for six epochs, then release the student
+  opportunity: "Evidence-backed retry; improvement from the schedule is a hypothesis.\
+    \ The teacher leads the incumbent's \xD71 macro curve during epochs 0\u20135 but\
+    \ trails during epochs 6\u20139. Its positive final \xD74 delta missed adoption.\
+    \ Early distillation may provide useful initialization guidance while continued\
+    \ alignment limits task-specific adaptation."
+  mechanism: "Keep the measured frozen Refined-RadImageNet teacher, 18-class knee\
+    \ distribution, trainable student slice head and KL weight 0.1 for epochs 0\u2013\
+    5. Set the contribution to zero and skip teacher computation in epochs 6\u2013\
+    9, without restarting the optimizer or changing the learning-rate schedule. Log\
+    \ effective KL weight, active batches, distilled slices, KL, agreement, entropy,\
+    \ knee mass and separate task versus distillation loss contributions. Log zero\
+    \ activity after release."
+  precedents:
+  - "[Teacher comparison](/home/claudio/src/knee-abnormality/outputs/autoresearch/refined-radimagenet/experiments/pretrained-slice-teacher-20261004T140749Z-4cc3f307/comparison/comparison.json):\
+    \ macro delta +0.000333, 80% interval [\u22120.000588, +0.001210]."
+  - "[Teacher metrics](/home/claudio/src/knee-abnormality/outputs/autoresearch/refined-radimagenet/experiments/pretrained-slice-teacher-20261004T140749Z-4cc3f307/training/fold_0/logs/version_0/metrics.csv):\
+    \ \xD71 macro 0.8908 versus incumbent 0.8857 at epoch 0; 0.9291 versus 0.9299\
+    \ at epoch 9. KL falls from 0.1451 to 0.1098."
+  - The historical source distills an 18-class distribution at temperature 1. Its
+    higher total training loss includes the added KL term and does not establish worse
+    task-loss fitting.
+  novelty: Changes when the pretrained function constrains learning. It retains the
+    measured teacher objective and strength instead of introducing another teacher
+    or lowering a constant weight.
+  coverage: Tests whether early guidance and late task adaptation can coexist across
+    the complete target set.
+  exploitation: "Uses the teacher's observed early advantage and positive \xD74 near\
+    \ miss."
+  budget: "Keep ten epochs, batch size 8, 26 slices, 4370 steps and seed 1533697213.\
+    \ The full-duration teacher took 1291.9 s. Skipping its last four epochs should\
+    \ reduce overhead; approximately 1200\u20131300 s is plausible, not measured.\
+    \ The required range remains 885.867\u20132362.312 s."
+  implementation: Port the historical teacher into training/lightning.py with the
+    necessary training feature exposure in modeling/model.py. Add the six-epoch cutoff
+    under trainer.slice_teacher and retain separate clipping of the student auxiliary
+    head, with the model and existing heads clipped together at 1.0. Keep all existing
+    losses and L2-SP. Inference contains no teacher. Rebase on a newly accepted incumbent
+    and retain unrelated improvements. If it already contains a teacher, replace only
+    that teacher's schedule and record any superseded accepted idea. If a depth stem
+    wins, the frozen teacher still reads the corresponding augmented middle slice.
+  open_choices: Fix active epochs at six and KL weight at 0.1. Late divergence suggests,
+    but does not prove, excessive continued alignment. The early benefit may disappear
+    after release.
+  dependencies: []
+  priority_rationale: 'Priority 2: observed temporal advantage, positive macro delta,
+    inexpensive schedule change and lower expected cost than the measured teacher.'
+  source_change: true
+  targeted_curve: "pretrained-slice-teacher: retain its epochs 0\u20135 \xD71 lead,\
+    \ then lift epochs 6\u20139 from 0.9266\u20130.9291 toward or above the incumbent's\
+    \ 0.9280\u20130.9299 after distillation stops."
+  status: prepared
+  created_revision: 321
+  ranking_rationale: "Admit all five: proposal_admission reports satisfied dependencies,\
+    \ and each introduces a material difference from the family ledger and prior-work\
+    \ precedents. Targeted searches of docs/validation/results/ and docs/history/\
+    \ found no matching measurement of these proposed operators, schedule or combination.\
+    \ Lead with bounded pathology-versus-normal attention: its parent is the closest\
+    \ attention-family near miss, demonstrably changes attention, and needs no additional\
+    \ backbone pass. Next, early teacher release directly targets the verified reversal\
+    \ from an epochs 0\u20135 lead to an epochs 6\u20139 lag. Place contrast calibration\
+    \ third: it extends accepted normalization, but that small single-seed win is\
+    \ weak against documented recipe seed noise, so it does not warrant precedence\
+    \ over these retries. Move the teacher-plus-attention combination ahead of moment-restored\
+    \ masking: both components have positive campaign deltas and different observed\
+    \ label tradeoffs, whereas random masking lost on eleven of twelve labels. Keep\
+    \ the structural mask retry last; restoring moments materially changes its operator,\
+    \ but attenuation remains an unproven explanation of failure."
+  experiments:
+  - slice-teacher-early-release-20261004T181824Z-fc8876d1
+- id: radimagenet-bounded-contrast-calibration
+  mechanism_id: input-statistics
+  parent_idea_id: radimagenet-input-statistics
+  title: Calibrate acquisition contrast toward the pretrained standard deviation with
+    bounded gains
+  opportunity: Guess grounded in the accepted normalization result and label-free
+    input measurements. Prepared slices have reported standard deviation 0.252, whereas
+    the pretraining normalization uses 0.3213. Correct normalization helped, but residual
+    acquisition contrast differences may still change how pretrained filters respond.
+    The pretraining statistic is dataset-wide, so matching individual acquisitions
+    is not known to be beneficial.
+  mechanism: "After augmentation and before the existing normalization, compute each\
+    \ acquisition's mean and standard deviation over its rendered nonzero middle-slice\
+    \ pixels. Use g=clamp(0.3213/max(s,1e\u22126),1/1.25,1.25), then x'=clamp(mean+g(x\u2212\
+    mean),0,1), preserving zero pixels and leaving constant acquisitions unchanged.\
+    \ Share the gain across the acquisition's slices and channels. Apply the same\
+    \ deterministic mapping at inference. Log affected acquisitions, gain distribution,\
+    \ cap frequency, clipping fraction, pixel change and before/after dispersion.\
+    \ On the first training batch of each epoch, measure paired original/mapped knee\
+    \ mass with a frozen pretrained diagnostic network; this never controls the mapping."
+  precedents:
+  - '[Normalization comparison](/home/claudio/src/knee-abnormality/outputs/autoresearch/refined-radimagenet/experiments/radimagenet-input-statistics-20261004T103433Z-ff2f3786/comparison/comparison.json):
+    accepted macro delta +0.000581, 80% interval [+0.000182, +0.001016].'
+  - '[Prior work](/home/claudio/src/knee-abnormality-refined-radimagenet/autoresearch/campaigns/refined-radimagenet/prior-work.md#pretrained-head-on-our-slices):
+    prepared mean/std 0.335/0.252; the checkpoint''s normalization yields knee-class
+    mass 0.978.'
+  - The external continuous-normalization work changes quantized storage and preserves
+    the intensity mapping. This proposal retains storage and preparation, and adds
+    a bounded model-side contrast mapping.
+  novelty: Uses the checkpoint's published input statistic to define a deterministic
+    acquisition-level mapping. It neither repeats a mean/std setting nor changes generic
+    augmentation probability.
+  coverage: Explores intensity mapping, a remaining input-statistics direction, uniformly
+    across acquisitions and targets.
+  exploitation: Retains the adopted normalization and uses one restrained contrast
+    cap to investigate its remaining distribution mismatch.
+  budget: "Keep ten epochs, batch size 8, 26 slices, 4370 steps and seed 1533697213.\
+    \ Vectorized acquisition reductions add modest work. Diagnostic frozen-network\
+    \ passes run only on the first batch of each epoch. Expected training near 1265\u2013\
+    1400 s, unmeasured; required range 885.867\u20132362.312 s. Inference adds reductions\
+    \ and elementwise mapping."
+  implementation: Add the mapping in modeling/model.py, configuration in config.py
+    and configs/training.yaml, and epoch diagnostics in training/lightning.py. Retain
+    uint8 preparation, geometry, sampling, augmentation, DSU, native mean/std and
+    normalization probes. The diagnostic network is training-only; prediction reconstructs
+    the mapping from saved configuration without weight-file access. Retain newly
+    accepted unrelated improvements. If an incumbent adds another intensity mapping,
+    replace that mapping explicitly instead of applying both. If native normalization
+    is superseded, reconcile the declared prerequisite before development.
+  open_choices: Fix the gain cap at 1.25 and the target standard deviation at 0.3213.
+    Per-acquisition matching may remove useful contrast cues, and clipping may shift
+    means. Increased knee mass would be a diagnostic, not evidence of improved macro
+    AUC.
+  dependencies:
+  - radimagenet-input-statistics
+  priority_rationale: 'Priority 3: the accepted input-statistics family earns a follow-up.
+    This is inexpensive and within scope, but its benefit is less directly supported
+    than the two head-based retries.'
+  source_change: true
+  targeted_curve: "radimagenet-input-statistics, epochs 7\u20139: \xD71 macro rises\
+    \ only from 0.9289 to 0.9299 while training loss falls from 0.5791 to 0.5714.\
+    \ Seek a higher late validation curve through pretrained-statistic contrast calibration."
+  status: queued
+  created_revision: 321
+  ranking_rationale: "Admit all five: proposal_admission reports satisfied dependencies,\
+    \ and each introduces a material difference from the family ledger and prior-work\
+    \ precedents. Targeted searches of docs/validation/results/ and docs/history/\
+    \ found no matching measurement of these proposed operators, schedule or combination.\
+    \ Lead with bounded pathology-versus-normal attention: its parent is the closest\
+    \ attention-family near miss, demonstrably changes attention, and needs no additional\
+    \ backbone pass. Next, early teacher release directly targets the verified reversal\
+    \ from an epochs 0\u20135 lead to an epochs 6\u20139 lag. Place contrast calibration\
+    \ third: it extends accepted normalization, but that small single-seed win is\
+    \ weak against documented recipe seed noise, so it does not warrant precedence\
+    \ over these retries. Move the teacher-plus-attention combination ahead of moment-restored\
+    \ masking: both components have positive campaign deltas and different observed\
+    \ label tradeoffs, whereas random masking lost on eleven of twelve labels. Keep\
+    \ the structural mask retry last; restoring moments materially changes its operator,\
+    \ but attenuation remains an unproven explanation of failure."
+- id: random-mask-moment-restoration
+  mechanism_id: random-input-mask
+  parent_idea_id: random-smooth-mask
+  title: Restore acquisition input moments after applying the authors' random smooth
+    mask
+  opportunity: Diagnosis-backed retry; performance benefit is a guess. The random
+    mask operated at mean 0.5 and spatial standard deviation 0.0789, altering the
+    scale supplied to a standard pretrained backbone. Its deterministic inference
+    input was also halved. Restore input moments while retaining spatial perturbations
+    to separate mask regularization from this scale change.
+  mechanism: "Keep uniform 64\xD764 cells, nearest-neighbour resizing and Gaussian\
+    \ smoothing with kernel 13 and sigma 6. For normalized inputs z and masked inputs\
+    \ y=z\xB7mask, compute shared acquisition moments across slices and pixels, then\
+    \ use y'=mean(z)+(y\u2212mean(y))\xB7std(z)/max(std(y),1e\u22126). Constant acquisitions\
+    \ remain unchanged. Use clean inputs at validation and inference: restoring moments\
+    \ under the old constant expectation mask would likewise recover z. Log actual\
+    \ changed slices, original/masked/restored moments, restoration errors, mask dispersion\
+    \ and pixel changes. This affine restoration changes the operator, rather than\
+    \ merely weakening the mask."
+  precedents:
+  - "[Random-mask comparison](/home/claudio/src/knee-abnormality/outputs/autoresearch/refined-radimagenet/experiments/random-smooth-mask-20261004T125851Z-36cbce69/comparison/comparison.json):\
+    \ macro delta \u22120.002325, 80% interval [\u22120.003573, \u22120.001116]."
+  - '[Random-mask metrics](/home/claudio/src/knee-abnormality/outputs/autoresearch/refined-radimagenet/experiments/random-smooth-mask-20261004T125851Z-36cbce69/training/fold_0/logs/version_0/metrics.csv):
+    mean approximately 0.5 and std approximately 0.0789 in every epoch; 93,569 masked
+    slices per epoch.'
+  - 'policy-mask-two-stage metrics provide supporting scale diagnostics: bn1 running
+    variance changes from 0.2090 to 0.8096 when the expectation switches from 0.5
+    to 1.0. This does not prove that attenuation caused the random-mask rejection.'
+  novelty: Preserves each acquisition's first two normalized-input moments while retaining
+    the authors' spatial mask construction. It removes mean-mask inference and adds
+    no policy network.
+  coverage: Tests a structural repair of the random-mask line without reopening the
+    closed policy-gradient-mask family.
+  exploitation: Uses the measured mask distribution and successful activation to address
+    a specific input-statistics disturbance.
+  budget: "Ten epochs, batch size 8, 26 slices, 4370 steps and seed 1533697213. The\
+    \ random-mask parent took 1179.5 s. Additional acquisition reductions should keep\
+    \ training around 1200\u20131350 s, unmeasured, within 885.867\u20132362.312 s.\
+    \ Inference has no mask overhead."
+  implementation: Port only the random-mask sampler and isolated checkpointed RNG
+    into modeling and training/lightning.py. Add moment restoration after native normalization.
+    Do not port policy networks, policy optimizers or the persistent 0.5 inference
+    expectation. Retain normalization probes before masking, all existing losses,
+    clipping and unrelated incumbent behavior. Put settings under trainer.input_mask.
+    On a new incumbent, restore moments relative to its actual input tensor and retain
+    other winners; replace an existing mask operator explicitly rather than stacking
+    masks.
+  open_choices: Fix the original grid, kernel and sigma. Matching image moments does
+    not match convolutional feature distributions or eliminate nonlinear train/inference
+    differences. Spatial perturbations may remain harmful even after restoration.
+  dependencies: []
+  priority_rationale: 'Priority 4: a concrete structural diagnosis supports one retry,
+    but the negative parent and several negative mask runs make this less promising
+    than the head-based directions.'
+  source_change: true
+  targeted_curve: "random-smooth-mask, epochs 4\u20139: \xD71 macro remains below\
+    \ the incumbent and ends at 0.9269 versus 0.9299; loss ends at 0.5778 versus 0.5714.\
+    \ Seek smaller gaps while restored input moments stay equal to the pre-mask moments."
+  status: queued
+  created_revision: 321
+  ranking_rationale: "Admit all five: proposal_admission reports satisfied dependencies,\
+    \ and each introduces a material difference from the family ledger and prior-work\
+    \ precedents. Targeted searches of docs/validation/results/ and docs/history/\
+    \ found no matching measurement of these proposed operators, schedule or combination.\
+    \ Lead with bounded pathology-versus-normal attention: its parent is the closest\
+    \ attention-family near miss, demonstrably changes attention, and needs no additional\
+    \ backbone pass. Next, early teacher release directly targets the verified reversal\
+    \ from an epochs 0\u20135 lead to an epochs 6\u20139 lag. Place contrast calibration\
+    \ third: it extends accepted normalization, but that small single-seed win is\
+    \ weak against documented recipe seed noise, so it does not warrant precedence\
+    \ over these retries. Move the teacher-plus-attention combination ahead of moment-restored\
+    \ masking: both components have positive campaign deltas and different observed\
+    \ label tradeoffs, whereas random masking lost on eleven of twelve labels. Keep\
+    \ the structural mask retry last; restoring moments materially changes its operator,\
+    \ but attenuation remains an unproven explanation of failure."
+- id: slice-teacher-with-knee-attention
+  mechanism_id: teacher-attention-combination
+  parent_idea_id: null
+  title: Combine the measured slice teacher with the measured knee-logit attention
+    prior
+  opportunity: Evidence-backed combination; additivity is unmeasured. Both mechanisms
+    had positive macro deltas but missed adoption. The teacher's strongest lifts were
+    Lateral OA and PF OA, whereas the attention prior lifted ACL, MCL and Synovitis.
+    Distillation constrains representation learning; the prior routes token evidence.
+    Those different roles and label patterns justify one two-mechanism combination.
+  mechanism: Combine the original full-duration 18-class slice teacher at KL weight
+    0.1 with the original detached raw-logit attention prior and zero-initialized
+    signed gains. Preserve each measured mechanism's settings; do not add early release,
+    normal subtraction or contrast calibration to this candidate. Log the original
+    teacher and attention scalars plus epoch counts of batches where both finite distillation
+    and an actual attention shift occur. Use the same augmented middle slices for
+    the frozen teacher and the trainable representation.
+  precedents:
+  - "[Teacher comparison](/home/claudio/src/knee-abnormality/outputs/autoresearch/refined-radimagenet/experiments/pretrained-slice-teacher-20261004T140749Z-4cc3f307/comparison/comparison.json):\
+    \ delta +0.000333, 80% interval [\u22120.000588, +0.001210]. Per-label deltas:\
+    \ Lateral OA +0.006687, PF OA +0.002270, Fracture +0.002106; ACL \u22120.001962\
+    \ and MCL \u22120.002025."
+  - "[Attention-prior comparison](/home/claudio/src/knee-abnormality/outputs/autoresearch/refined-radimagenet/experiments/knee-logit-attention-prior-20261004T142904Z-704694f5/comparison/comparison.json):\
+    \ delta +0.000297, 80% interval [\u22120.000114, +0.000679]. Per-label deltas:\
+    \ ACL +0.000835, MCL +0.001133, Synovitis +0.000964, Fracture +0.001749; PF OA\
+    \ \u22120.001005."
+  - Both runs activated and met the time range. The teacher is training-only; the
+    prior reads frozen classifier rows from the student's token maps.
+  novelty: Tests exactly two measured campaign prospects together. The classifier
+    prior has not previously been evaluated with the slice-distillation objective.
+  coverage: Covers an allowed combination across representation learning and evidence
+    routing. Every target remains in the objective and evaluation.
+  exploitation: Combines complementary observed label patterns without selecting labels
+    or claiming that individual positive point estimates establish a combined win.
+  budget: "Keep ten epochs, batch size 8, 26 slices, 4370 steps and seed 1533697213.\
+    \ The teacher took 1291.9 s and the prior 1175.4 s. The prior adds no backbone\
+    \ pass, so approximately 1300\u20131450 s is plausible, unmeasured, within 885.867\u2013\
+    2362.312 s. Inference retains only the prior's small readout overhead."
+  implementation: Integrate both frozen historical sources through modeling/model.py,
+    config.py, training/lightning.py and configs/training.yaml. Keep native normalization,
+    model-owned persistent prior buffers, the training-only teacher and separate clipping
+    of its student head. Prediction loads model state strictly without teacher construction
+    or pretrained-file access. Retain unrelated new incumbent improvements. If the
+    incumbent already includes either component, deduplicate it; replace a conflicting
+    variant explicitly with the historical component and record any removed accepted
+    idea. Do not silently turn this into a three-mechanism combination.
+  open_choices: Use the two historical settings unchanged. Their gains may be correlated
+    through the same pretrained features; teacher alignment may also reinforce the
+    prior's weaker OA behavior. No class-specific gates or settings will be selected
+    from validation labels.
+  dependencies:
+  - radimagenet-input-statistics
+  priority_rationale: 'Priority 5: credible complementary near misses and moderate
+    cost, but first give the open families their individual follow-ups so their structural
+    changes remain interpretable.'
+  source_change: true
+  targeted_curve: "pretrained-slice-teacher epochs 6\u20139: lift its \xD71 macro\
+    \ lag and preserve its Lateral OA advantage. knee-logit-attention-prior epochs\
+    \ 4\u20139 supplies complementary routing; seek a higher late macro curve from\
+    \ their joint action."
+  status: queued
+  created_revision: 321
+  ranking_rationale: "Admit all five: proposal_admission reports satisfied dependencies,\
+    \ and each introduces a material difference from the family ledger and prior-work\
+    \ precedents. Targeted searches of docs/validation/results/ and docs/history/\
+    \ found no matching measurement of these proposed operators, schedule or combination.\
+    \ Lead with bounded pathology-versus-normal attention: its parent is the closest\
+    \ attention-family near miss, demonstrably changes attention, and needs no additional\
+    \ backbone pass. Next, early teacher release directly targets the verified reversal\
+    \ from an epochs 0\u20135 lead to an epochs 6\u20139 lag. Place contrast calibration\
+    \ third: it extends accepted normalization, but that small single-seed win is\
+    \ weak against documented recipe seed noise, so it does not warrant precedence\
+    \ over these retries. Move the teacher-plus-attention combination ahead of moment-restored\
+    \ masking: both components have positive campaign deltas and different observed\
+    \ label tradeoffs, whereas random masking lost on eleven of twelve labels. Keep\
+    \ the structural mask retry last; restoring moments materially changes its operator,\
+    \ but attenuation remains an unproven explanation of failure."
+- id: acs-gated-stem-signed-gate
+  mechanism_id: acs-conv
+  parent_idea_id: acs-gated-stem
+  title: Gated ACS stem with a signed, unclamped gate (keeper seed; the clamped gate
+    of acs-gated-stem died at zero and the mechanism never ran)
+  opportunity: 'Repair of an inert mechanism. In acs-gated-stem the gate was clamped
+    to [0, 1] in the forward pass and started at zero. Its logged values: acs_gate_max
+    0.0001 in epochs 1-2 and 0.0000 after, acs_gate_mean 0.0000 and acs_blend_ratio
+    0.0 in every epoch. A gate whose first updates take it below zero is clamped to
+    zero and receives no gradient from then on, so every channel died within the warmup;
+    the run was the incumbent without any ACS term (x4 +0.000027, 80% [-0.000328,
+    +0.000374]) and says nothing about adjacent slices. The clamp came from the keeper''s
+    seed text. The gated Cross-D stem, whose gate was unclamped, did move (mean 0.026,
+    largest 0.10).'
+  mechanism: 'Exactly acs-gated-stem with one change: the gate is used as it is, without
+    clamp: stem output for channels 22-63 = inplane + gate[channel] * (depth_plane
+    - inplane), gate a parameter of 64 values initialized to zero, free to take either
+    sign. Everything else as acs-gated-stem: model.slice_channels depth, model.depth_stem
+    acs_gated_stem, the incumbent''s weights, the stem computed at the middle depth
+    only (2D in-plane convolution on the middle slice, the two 21-channel depth-plane
+    3D convolutions with depth padding 2), the gate at head_lr without weight decay
+    and not anchored.'
+  precedents:
+  - 'acs-gated-stem-20261004T172410Z-54c7c519: gate statistics zero from epoch 3;
+    x4 +0.000027.'
+  - 'crossd-gated-depth-stem-20261004T161947Z-4bb697d6: an unclamped gate from zero
+    reached mean 0.026.'
+  - 'run-notes.md: ACS without gates starts from a broken network (knee mass 0.256
+    against 0.990).'
+  novelty: The first run in which the gated ACS term can actually open.
+  coverage: All studies and labels.
+  exploitation: Log per epoch acs_gate_mean_abs, acs_gate_max_abs and acs_gate_positive_share
+    over channels 22-63, and acs_blend_ratio as before. The run is valid evidence
+    only if acs_gate_mean_abs is above 0.001 from epoch 2 on; report it as inert otherwise.
+    Per-label deltas, x1 per epoch against the incumbent, training seconds.
+  budget: As acs-gated-stem, 1,379 s measured (1.17 times the reference).
+  implementation: 'Port the frozen source of acs-gated-stem (outputs/autoresearch/refined-radimagenet/experiments/acs-gated-stem-20261004T172410Z-54c7c519/source)
+    and remove the clamp on the gate in the stem function of modeling/depth_stem.py
+    (and in gated_acs if the stem path calls it), so the raw parameter multiplies
+    the difference. Rename the logged gate scalars to the absolute-value forms above
+    and add the positive share. No other change: same config values, same optimizer
+    handling of the gate, same input branch. Confirm by a static read that nothing
+    else bounds or detaches the gate.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The previous run of this seed did not exercise its mechanism.
+  status: launched
+  created_revision: 334
+  seeded: /home/claudio/src/knee-abnormality-refined-radimagenet/autoresearch/campaigns/refined-radimagenet/acs-gate-fix-ideas.yaml
+  experiments:
+  - acs-gated-stem-signed-gate-20261004T175732Z-f9f95892
+  - acs-gated-stem-signed-gate-20261004T180215Z-190fb6a3

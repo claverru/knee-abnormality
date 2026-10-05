@@ -1,0 +1,132 @@
+ideas:
+- id: crossd-static-kernels
+  mechanism_id: crossd-conv
+  parent_idea_id: crossd-resnet18-drop-in
+  title: Cross-D RadImageNet kernels as a plain ResNet-18, each layer's 3D kernel shifted once
+    by its mean predicted shift (keeper seed replacing the per-slice drop-in)
+  opportunity: >-
+    Evidence-backed repair. crossd-resnet18-drop-in was stopped on time: building a kernel per
+    slice in 20 convolutions took 5.5 s per step, ten times the bound, and gave no evidence
+    about the checkpoint. The per-slice shifts barely vary: measured on 240 training slices
+    (no labels), each layer's shift has a standard deviation of 0.001-0.10 per axis around its
+    mean (0.31 only in layer4.1.conv2). One kernel per layer, shifted by that mean, turns the
+    network into a plain ResNet-18 at the incumbent's cost and keeps most of the pretrained
+    function: on 96 held-out slices the frozen static network puts 0.85 of its probability on
+    the 18 knee classes (0.95 for the authors' dynamic network) and agrees with it on the top
+    class for 57% of slices. Taking the kernels without the shift destroys the function (knee
+    mass 0.000), which is what crossd-3d-stem did. Whether the checkpoint transfers better
+    than the incumbent's is a guess.
+  mechanism: >-
+    model.pretrained_weights radimagenet_crossd with model.backbone resnet18.a1_in1k, the plain
+    timm ResNet-18 (no CrossDConv modules, no rotation networks), loaded strictly from
+    crossd_static_state_dict(model.backbone, depth_stem=False) in modeling/crossd.py: for each
+    convolution, the checkpoint's K x K x K kernel shifted in the Fourier domain by the layer's
+    mean shift (CROSSD_MEAN_SHIFTS) and cut at its middle depth slice; BatchNorm tensors as in
+    the checkpoint. Input as the incumbent (repeated middle slice, data.mean 0.3162, data.std
+    0.3213). optimizer.backbone_lr 0.0002, optimizer.anchor_alpha_early 0.000033,
+    optimizer.anchor_alpha_late 0.0000033: the static kernels' convolution RMS is 0.2166
+    against 0.01244 (17.4 times), uniform across depth; the anchor strengths are the
+    incumbent's divided by 17.4 squared, and the rate is the early-layer-matched one of the
+    original RadImageNet ResNet-50 (3e-4 at RMS 0.314) scaled to this RMS.
+  precedents:
+  - 'run-notes.md, run 13: the per-slice layer measured at 5.5 s per step, invalid on time.'
+  - 'modeling/crossd.py: CROSSD_MEAN_SHIFTS (240 training slices, label-free) and crossd_static_state_dict, built and checked on CPU: strict load into timm resnet18.a1_in1k; knee mass 0.848 against 0.949 dynamic on 96 held-out slices.'
+  - 'prior-work.md, Cross-D-Conv and Checkpoints.'
+  novelty: First scored run of the Cross-D checkpoint; a static form of its kernels.
+  coverage: All studies and labels.
+  exploitation: >-
+    Log once per epoch crossd_static_conv_rms (overall RMS of the backbone's convolution
+    weights). Per-stage drift, anchor_penalty, x1 per epoch and training loss against the
+    incumbent, per-label deltas, training seconds (expected at the incumbent's).
+  budget: A plain ResNet-18; about 1,181 s.
+  implementation: >-
+    Replaces the starting weights of the backbone; everything else is the incumbent. (1)
+    configs/training.yaml: the four values above. (2) modeling/model.py, which loads only the
+    standard weights today: the guard `model.pretrained_weights == "radimagenet" and
+    model.backbone not in RADIMAGENET_WEIGHTS` becomes `model.pretrained_weights != "timm" and
+    model.backbone not in PRETRAINED_WEIGHTS[model.pretrained_weights]`; the load condition
+    `pretrained and model.pretrained_weights == "radimagenet"` becomes `pretrained and
+    model.pretrained_weights != "timm"`, and inside it the state dict is
+    crossd_static_state_dict(model.backbone, depth_stem=False) when pretrained_weights is
+    radimagenet_crossd, else radimagenet_state_dict(model.backbone, model.pretrained_weights);
+    load strictly. Import PRETRAINED_WEIGHTS and crossd_static_state_dict. Do not call
+    replace_convolutions and do not create CrossDConv modules: the model is a plain ResNet-18
+    at training and at prediction, so spatial_tokens.py, the DSU split path and the checkpoint
+    layout need no change. (3) lightning.py: the one logged scalar. Do not edit crossd.py. If
+    the workspace of crossd-resnet18-drop-in is used as a starting point, remove its
+    replace_convolutions call, its mapping changes and its shift diagnostics.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Repairs a seed that was blocked by its cost, not by a result.
+- id: crossd-gated-depth-stem
+  mechanism_id: crossd-conv
+  parent_idea_id: crossd-static-kernels
+  title: Cross-D static kernels with the stem's two neighbouring depth slices applied to the
+    adjacent slices through a gate that starts at zero (keeper seed replacing crossd-3d-stem)
+  opportunity: >-
+    Repair of a faulty seed. crossd-3d-stem took the checkpoint's kernels without their shift,
+    which scrambles them (frozen network: knee mass 0.000), and ran its 3D stem ungated; it
+    scored x1 0.61, 0.71, 0.71 in its first epochs and is no evidence about the idea. The idea
+    stands: the loader decodes three adjacent slices and the Cross-D stem kernel has trained
+    depth slices on both sides of the one used in 2D. Applied ungated, the side slices break
+    the pretrained function even with correct kernels (three identical slices: knee mass
+    0.016). So the side slices enter through a per-channel gate that starts at zero: at step 0
+    the network is exactly crossd-static-kernels, and it opens the gate only as far as the
+    neighbours help. Gain is a guess.
+  mechanism: >-
+    As crossd-static-kernels, plus model.slice_channels depth and model.depth_stem gated. The
+    stem becomes: out = conv_mid(middle slice repeated on three channels) + gate[channel] *
+    conv_side(previous slice x 3 channels, next slice x 3 channels), then bn1 and the rest
+    unchanged. conv_mid is the static 7 x 7 stem kernel of crossd-static-kernels (64 x 3 x 7 x
+    7); conv_side is a Conv2d(6, 64, 7, stride 2, padding 3, no bias) holding the two depth
+    slices next to the middle one of the same shifted 3D stem kernel; gate is 64 values
+    initialized to zero. crossd_static_state_dict(model.backbone, depth_stem=True) returns
+    conv1.weight as 64 x 9 x 7 x 7 with input channels ordered previous x 3, middle x 3, next
+    x 3: channels 3:6 are conv_mid (identical to the depth_stem=False stem, checked) and
+    channels 0:3 with 6:9 are conv_side. Rates and anchors as crossd-static-kernels; the gate
+    trains at head_lr without weight decay and is not anchored.
+  precedents:
+  - 'run-notes.md, runs 13 and 14: the per-slice layer over time, and crossd-3d-stem started from unshifted kernels.'
+  - 'modeling/crossd.py: crossd_static_state_dict(depth_stem=True), checked on CPU: with the neighbours zeroed the 9-channel stem equals the 2D stem.'
+  - 'radimagenet-rn18 campaign: gated adjacent residuals -0.00005 with untrained neighbour kernels; here the neighbour kernels are pretrained depth slices.'
+  novelty: Adjacent slices through pretrained depth kernels, function-preserving at the start.
+  coverage: All studies and labels; every token sees its two neighbours through the gate.
+  exploitation: >-
+    Log per epoch depth_stem_gate_mean_abs and depth_stem_gate_max (over the 64 channels) and
+    depth_stem_side_ratio, the mean absolute value of the gated side term over that of the
+    middle term on the last batch. Per-label deltas; x1 per epoch against crossd-static-kernels
+    and the incumbent.
+  budget: One extra 6-channel stem convolution; estimated 1.05 to 1.15 times the incumbent.
+  implementation: >-
+    Builds on crossd-static-kernels (in the incumbent if accepted, else ported from its frozen
+    source). (1) config.py: slice_channels gains depth; ModelConfig.depth_stem Literal none,
+    gated, default none; a validator requires depth_stem gated exactly when slice_channels is
+    depth, and pretrained_weights radimagenet_crossd for gated. (2) model.py: a small module
+    GatedDepthStem(mid, side, gate) with forward(x9) = mid(x9[:, 3:6]) + gate[None, :, None,
+    None] * side(torch.cat((x9[:, 0:3], x9[:, 6:9]), 1)); after timm.create_model, set
+    self.backbone.conv1 = GatedDepthStem(self.backbone.conv1, nn.Conv2d(6, 64, 7, stride=2,
+    padding=3, bias=False), nn.Parameter(torch.zeros(64))) under torch.random.fork_rng; when
+    loading pretrained, take state = crossd_static_state_dict(model.backbone,
+    depth_stem=True), pop conv1.weight (64 x 9 x 7 x 7) and add conv1.mid.weight =
+    weight[:, 3:6] and conv1.side.weight = torch.cat((weight[:, 0:3], weight[:, 6:9]), 1); the
+    gate is not in the pretrained state: load with strict=False and assert that the only
+    missing key is conv1.gate and there are no unexpected keys. (3) encode_batch with
+    slice_channels depth: keep the three slices through augmentation exactly as the existing
+    adjacent path does, take token geometry and validity from the middle slice exactly as
+    repeated_middle does (valid_rects[:, 1:2], channels[:, 1:2]), then x9 =
+    images.repeat_interleave(3, dim=1) (previous x 3, middle x 3, next x 3) and normalize with
+    self.mean.repeat(1, 3, 1, 1) and self.std.repeat(1, 3, 1, 1). The frozen source of
+    crossd-3d-stem has a depth input branch to port from; keep its augmentation and geometry
+    handling and drop its 3D convolution, its 5D input and its kernel remapping. (4) The dummy
+    forward in __init__ that probes the feature shape uses 9 input channels. backbone_mapping
+    is the plain resnet18's: spatial_tokens.py must find the stem's kernel, stride and padding
+    on conv1.mid (assert the mapping equals the plain model's). The DSU split path calls
+    self.backbone.conv1 and works unchanged. (5) lightning.py build_optimizer: the parameter
+    backbone.conv1.gate uses head_lr and no weight decay; conv1.mid.weight and
+    conv1.side.weight are backbone parameters under the early anchor (their names start with
+    conv1.). Log the three scalars. Prediction rebuilds the same module from the config with
+    load_pretrained False.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Repairs a seed that started from scrambled kernels; the adjacent-slice use of Cross-D.
+exhausted_directions: None.

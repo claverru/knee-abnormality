@@ -8,6 +8,24 @@ finished runs and decisions live in the [validation results](../validation/resul
 live under [autoresearch](../../autoresearch/campaigns/INDEX.md). New candidates pair with the
 current control at its fold and seed.
 
+Pending from the [Refined-RadImageNet campaign](../validation/results/2026-10-04-refined-radimagenet-campaign.md)
+(closed 2026-10-04; the checkpoint normalization is on main since 2026-10-05):
+
+- **Control: the campaign incumbent** (user decision 2026-10-05; it is the adopted recipe,
+  `configs/training.yaml` with `data.mean` 0.3162 and `data.std` 0.3213, so no retraining):
+  `outputs/autoresearch/refined-radimagenet/experiments/radimagenet-input-statistics-20261004T103433Z-ff2f3786/training`,
+  ×4 0.933058, ×1 0.929948. New candidates pair with it. Its checkpoint is the only one of the
+  campaign still kept.
+- **Decide on the mask-trained (heated) ResNet-50 weights.** Two ResNet-50 runs were started
+  and stopped by the user before completion; no result
+  ([run notes](../../autoresearch/campaigns/refined-radimagenet/run-notes.md)).
+- **Record the pretraining-input campaign.** It ran on a ResNet-10t with this normalization on
+  2026-10-04 and 2026-10-05 in the `refined-radimagenet` worktree and was stopped by the user;
+  its record and build are uncommitted there. Its two acceptances on the ResNet-10t (per-slice
+  bright-end quantile 0.98, contrast mixing off) are not adopted: together on the ResNet-18
+  they scored ×4 0.931789 against 0.933058 (−0.0013, 95% [−0.0033, +0.0007], one run,
+  `outputs/training/20261005-094913-rn18-slice-quantile-no-mixing`).
+
 Awaiting a public check:
 
 - **[Out-of-fold self-distillation](../backlog/endgame.md#out-of-fold-self-distillation) at

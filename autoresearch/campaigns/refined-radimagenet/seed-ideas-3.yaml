@@ -1,0 +1,223 @@
+ideas:
+- id: knee-logit-attention-prior
+  mechanism_id: pretrained-knee-classifier
+  parent_idea_id: null
+  title: Bias each target's token attention with the pretrained logit of its mapped knee class
+  opportunity: >-
+    The attention scorer has to learn from study labels alone which tokens matter for each
+    target. The pretrained classifier already scores every token for the matching finding
+    (zero-shot study AUC 0.64-0.85 for nine of twelve targets, prior-work.md). Using that score
+    as a learnable prior on where to look leaves the evidence path untouched. Gain is a guess.
+  mechanism: >-
+    model.knee_logit_attention_prior true. The seven mapped pretrained classifier rows
+    (contract.md, Build facts) are stored as persistent buffers, never trained. Per token, z_t
+    = w_class(t) . f + b_class(t) on the raw 512-channel backbone feature f, detached, one
+    value per target (N x 49 x 12). In _attention_pool, scores[t, token] gains
+    knee_attention_gain[t] * z_t[token], added next to view_label_bias, before the membership
+    mask and the softmax. knee_attention_gain is a parameter of 12 values initialized to zero,
+    so the model equals the incumbent at step 0. Requires the RadImageNet data.mean and
+    data.std.
+  precedents:
+  - 'prior-work.md, Pretrained head on our slices.'
+  - 'model.view_label_bias (adopted 2026-10-03): an additive attention bias per view and target, the same place in the code.'
+  novelty: An attention prior from pretrained class evidence.
+  coverage: All twelve targets through seven pretrained classes.
+  exploitation: >-
+    Log per epoch knee_attention_gain per target, and knee_attention_shift, the mean over
+    studies and targets of the total-variation distance between the attention with and without
+    the prior term. Per-label deltas.
+  budget: One 12 x 512 product per token; same cost as the incumbent.
+  implementation: >-
+    Adds to the incumbent. (1) config.py: ModelConfig.knee_logit_attention_prior bool default
+    false. (2) model.py __init__: persistent buffers knee_prior_weight (12 x C) and
+    knee_prior_bias (12), zeros, filled from radimagenet_classifier(model.backbone, model.pretrained_weights) with the mapped rows
+    in target order only when pretrained weights are being loaded;
+    self.knee_attention_gain = nn.Parameter(zeros(target_count)). (3) encode_batch returns
+    knee_prior = F.linear(tokens.float(), weight, bias).detach() (N x 49 x 12); pool_encoded
+    passes it flattened over tokens to _attention_pool, which adds gain[:, None] *
+    knee_prior.transpose(0, 1) to scores in float32 right after the view_label_bias term. (4)
+    lightning.py build_optimizer: no weight decay for knee_attention_gain. The campaign scores
+    at attention temperature 1, where apply_attention_temperature (inference/checkpoint.py,
+    outside the editable scope) changes nothing; state in the report that an adoption needs
+    the gain divided by the temperature there, like view_label_bias. Set the RadImageNet
+    data.mean and data.std if the incumbent does not have them. If knee-classifier-readout or
+    knee-logit-token-features is in the incumbent, share its buffers instead of duplicating
+    them.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Third use of the pretrained head, on the attention instead of the evidence.
+- id: crossd-resnet18-drop-in
+  mechanism_id: crossd-conv
+  parent_idea_id: null
+  title: Cross-D-Conv ResNet-18 pretrained on RadImageNet as the backbone, slice by slice
+  opportunity: >-
+    The same authors published a ResNet-18 whose convolutions are 3D kernels with a per-image
+    shift, pretrained on Refined-RadImageNet; they report RadImageNet macro F1 0.547 against
+    0.525 for the regular ResNet-18. It is a different pretrained representation of the same
+    data in our control's architecture family, and the parent of the 3D use in the next seed.
+    Gain on our task is a guess.
+  mechanism: >-
+    model.pretrained_weights radimagenet_crossd with model.backbone resnet18.a1_in1k: every
+    nn.Conv2d of the backbone is replaced by CrossDConv (replace_convolutions) and the
+    checkpoint is loaded strictly. Input as the incumbent (repeated middle slice). The layer
+    predicts a shift per slice and uses the middle depth slice of the shifted 3D kernel as that
+    slice's 2D kernel. optimizer.backbone_lr 0.0002, optimizer.anchor_alpha_early 0.000043,
+    optimizer.anchor_alpha_late 0.0000043. The checkpoint's convolution RMS is 0.190 against
+    0.01244 (15.3 times), uniform across depth: the anchor strengths are the incumbent's
+    divided by 15.3 squared (same relative pull); the rate is not the rule's 7.6e-4 but the one
+    that matched early-layer movement for the equally uniform original RadImageNet ResNet-50
+    (3e-4 at RMS 0.314), scaled to this RMS.
+  precedents:
+  - 'prior-work.md, Cross-D-Conv and Checkpoints.'
+  - 'docs/ongoing/radimagenet-backbone.md, First run: a uniform-scale checkpoint at the median-matched rate overwrote its early layers.'
+  - 'contract.md, Build facts: modeling/crossd.py is built and checked against the authors layer; the weights entry exists.'
+  novelty: First Cross-D backbone here.
+  coverage: All studies and labels.
+  exploitation: >-
+    Log per epoch crossd_shift_mean and crossd_shift_std (the three predicted shifts, over
+    slices and layers), per-stage drift, training seconds and peak GPU memory. x1 per epoch
+    against the incumbent.
+  budget: >-
+    Unmeasured. Per-slice kernels are built for 20 convolutions and recomputed in the backward
+    pass (gradient checkpointing in chunks of 16 slices); the estimate is 1.5 to 2.5 times the
+    incumbent. If the first epochs project past 2,362 s the supervisor stops the run as
+    invalid; report the measured seconds per epoch and peak memory in that case.
+  implementation: >-
+    Replaces the backbone's convolutions; everything after the backbone is unchanged. (1)
+    model.py: when model.pretrained_weights is radimagenet_crossd, call
+    replace_convolutions(self.backbone) right after timm.create_model (also when
+    load_pretrained is False, so prediction builds the same module), then, when pretrained
+    weights are being loaded, self.backbone.load_state_dict(radimagenet_state_dict(
+    model.backbone, model.pretrained_weights), strict=True); widen the existing guard and load
+    condition from pretrained_weights == "radimagenet" to != "timm" with
+    PRETRAINED_WEIGHTS[model.pretrained_weights] as the table (the model loads only the
+    standard weights today). (2) spatial_tokens.py: backbone_mapping must return for this backbone exactly what it
+    returns for a plain resnet18.a1_in1k (same kernel sizes, strides and paddings in the
+    plane): compute the mapping from the plain timm model before the replacement, or teach
+    _resnet_mapping to read kernel_size, stride and padding from CrossDConv; assert equality
+    with the plain model's mapping in __init__. (3) The DSU split path
+    (_backbone_to_stride_8, _backbone_from_stride_8) calls the same submodules and needs no
+    change; confirm by a static read. (4) Keep model.channels_last false. CrossDConv handles
+    mixed precision itself. Do not change crossd.py except CROSSD_CHUNK if memory requires it;
+    state the value used. The rotation networks' parameters are backbone parameters (backbone
+    rate, anchored).
+  open_choices: None.
+  dependencies: []
+  priority_rationale: User seed; the per-slice use of the Cross-D checkpoint.
+- id: crossd-3d-stem
+  mechanism_id: crossd-conv
+  parent_idea_id: crossd-resnet18-drop-in
+  title: Cross-D kernels as true 3D convolutions over the three adjacent slices, the authors'
+    2D-to-3D conversion applied to our triplets
+  opportunity: >-
+    The point of Cross-D-Conv is that 2D-pretrained 3D kernels can be used as real 3D
+    convolutions. Our loader already decodes three adjacent slices per input and the recipe
+    throws two away (repeated middle slice). Feeding neighbours as input channels lost before
+    (-0.0039 and -0.00005, prior-work.md); here they enter through pretrained depth kernels
+    instead. Gain is a guess.
+  mechanism: >-
+    model.depth_stem crossd, model.slice_channels depth, model.pretrained_weights
+    radimagenet_crossd, optimizer.backbone_lr 0.0002, anchor_alpha_early 0.000043,
+    anchor_alpha_late 0.0000043 (as crossd-resnet18-drop-in). Input per token: the three
+    adjacent slices as depth, each repeated over the three input channels: N x 3 (channels) x 3
+    (depth) x 224 x 224. The network is the authors' 3D conversion (every convolution a plain
+    Conv3d with weights_3d, the same stride on all three axes, 3D max pooling, no rotation
+    networks) evaluated on a depth of 3: conv1 is a Conv3d(3, 64, 7, stride 2, padding 3) with
+    the 64 x 3 x 7 x 7 x 7 kernel, giving depth 2; bn1 and the activation act per depth slice;
+    3D max pooling (kernel 3, stride 2, padding 1) gives depth 1; from there every 3 x 3 x 3
+    convolution with padding 1 on a depth of 1 equals the 2D convolution with the middle depth
+    slice of its kernel, so layer1 to layer4 are ordinary 2D layers whose weights are
+    weights_3d[:, :, 1] (weights_3d[:, :, 0] for the 1 x 1 x 1 downsample kernels). Output N x
+    512 x 7 x 7 as now.
+  precedents:
+  - 'prior-work.md, Cross-D-Conv: the authors conversion (convert2threed) and the checkpoint layout.'
+  - 'radimagenet-rn18 campaign: mean-initialized adjacent slices -0.0039, gated adjacent residuals -0.00005.'
+  novelty: First use of adjacent slices through pretrained 3D kernels.
+  coverage: All studies and labels; every token now sees its two neighbours.
+  exploitation: >-
+    Log per epoch depth_stem_side_energy, the share of the stem kernel's squared weight that
+    lies outside its middle depth slice (it starts near 6/7), per-stage drift, training
+    seconds. Per-label deltas; x1 per epoch against the incumbent and against
+    crossd-resnet18-drop-in.
+  budget: >-
+    The 3D stem costs about 14 times the 2D stem (1.65 against 0.12 GMACs per input), the rest
+    is the plain ResNet-18: estimated 1.5 to 1.9 times the incumbent, unmeasured.
+  implementation: >-
+    Replaces the backbone input path; independent of the verdict of crossd-resnet18-drop-in
+    (it does not use CrossDConv). (1) config.py: ModelConfig.depth_stem Literal none, crossd,
+    acs, default none; slice_channels gains the value depth; validators: depth_stem not none
+    requires slice_channels depth and the reverse; crossd requires pretrained_weights
+    radimagenet_crossd. Raise for acs until acs-stem-layer1 adds it. (2) model.py: build the
+    plain timm resnet18.a1_in1k, replace self.backbone.conv1 by nn.Conv3d(3, 64, 7, stride=2,
+    padding=3, bias=False); when loading pretrained, remap
+    radimagenet_state_dict("resnet18.a1_in1k", "radimagenet_crossd"): drop every key containing
+    ".rotation_params."; rename "<prefix>.weights_3d" to "<prefix>.weight"; keep conv1's
+    5D tensor whole and take value[:, :, value.shape[2] // 2] for all others; load strictly.
+    Add a method that runs the stem: x5 (N x 3 x 3 x H x W) -> conv1 -> fold depth into the
+    batch for bn1 and act1 and unfold -> F.max_pool3d(kernel 3, stride 2, padding 1) ->
+    squeeze the depth of 1 -> N x 64 x 56 x 56; forward_features and _backbone_to_stride_8
+    both use it, then layer1.. as now. (3) encode_batch with slice_channels depth: keep the
+    three slices through augmentation exactly as the existing adjacent path does (all three
+    transformed together), take token geometry and validity from the middle slice exactly as
+    repeated_middle does (valid_rects[:, 1:2], channels[:, 1:2]), then x5 = images[:,
+    None].expand(-1, 3, -1, -1, -1) and normalize with mean and std per channel. (4)
+    backbone_mapping must equal the plain resnet18's (the in-plane geometry is unchanged);
+    assert it. (5) The dummy forward in __init__ that probes the feature shape must use the
+    new input shape. Keep channels_last false.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: User seed; the real 3D use of the Cross-D kernels.
+- id: acs-stem-layer1
+  mechanism_id: acs-conv
+  parent_idea_id: null
+  title: ACS convolutions built from the plain Refined-RadImageNet ResNet-18 weights in the
+    stem and layer1, over the three adjacent slices
+  opportunity: >-
+    ACS convolutions are the standard way to run 2D-pretrained kernels in 3D and the baseline
+    Cross-D-Conv is compared against in its own tables: each layer's output channels are split
+    in three groups whose 2D kernels are applied in the three orthogonal planes of the volume.
+    It needs no new checkpoint, keeps the incumbent's weights, and is the partner of
+    crossd-3d-stem: adjacent slices through the incumbent's own kernels. Gain is a guess.
+  mechanism: >-
+    model.depth_stem acs, model.slice_channels depth, pretrained weights as the incumbent
+    (radimagenet). Input N x 3 x 3 x 224 x 224 as in crossd-3d-stem. In conv1 and the four
+    3 x 3 convolutions of layer1 (all 64 output channels), the 2D weight w (64 x in x k x k)
+    is used as three 3D kernels with depth stride 1: output channels 0-21 in the image plane,
+    w[:22] as 1 x k x k with padding (0, p, p); channels 22-42 in the depth-width plane,
+    w[22:43] as k x 1 x k with padding (p, 0, p); channels 43-63 in the depth-height plane,
+    w[43:] as k x k x 1 with padding (p, p, 0); in-plane strides as the layer's (conv1 (1, 2,
+    2)), outputs concatenated in channel order. BatchNorm, activation and the stem's max
+    pooling act per depth slice. After layer1 the middle depth slice (index 1) is taken, N x 64
+    x 56 x 56, and layer2 to layer4 run as the incumbent's 2D layers. The parameters are the
+    incumbent's own 2D tensors under their own names, so the pretrained load, L2-SP anchors,
+    rates and the checkpoint layout are unchanged.
+  precedents:
+  - 'ACS convolutions, Yang et al. 2021 (Reinventing 2D Convolutions for 3D Images): the channel split in three plane groups.'
+  - 'prior-work.md, Cross-D-Conv: ACS is the comparison in the Cross-D tables.'
+  - 'radimagenet-rn18 campaign: adjacent slices through the first 2D convolution lost (-0.0039, -0.00005).'
+  novelty: First ACS use here; adjacent slices enter in the stem and layer1 only.
+  coverage: All studies and labels.
+  exploitation: >-
+    Log per epoch acs_side_response, the ratio of the mean absolute activation after layer1 at
+    the two outer depth slices to the middle one, per-stage drift, training seconds. Per-label
+    deltas; x1 per epoch against the incumbent and crossd-3d-stem.
+  budget: >-
+    The stem and layer1 run at three depth positions: about 1.64 times the backbone's
+    multiply-accumulates; estimated 1.4 to 1.7 times the incumbent, unmeasured.
+  implementation: >-
+    Uses the depth input path of crossd-3d-stem (slice_channels depth, the depth_stem option,
+    the encode_batch branch, the mapping assertion; in the incumbent if that seed was accepted,
+    else ported from its frozen source) and adds depth_stem acs. Do not replace modules: write
+    a functional forward for the stem and layer1 that reads the existing modules' parameters:
+    a helper acs_conv3d(x5, conv) calling F.conv3d three times with the views
+    conv.weight[:22].unsqueeze(2), conv.weight[22:43].unsqueeze(3) and
+    conv.weight[43:].unsqueeze(4), stride (1, s, s) and the paddings above, then torch.cat on
+    channels; fold depth into the batch to apply bn1, act1, maxpool and each BasicBlock's
+    BatchNorms and activations; each BasicBlock of layer1 is conv1, bn1, act1, conv2, bn2, add
+    the identity shortcut, act2 (layer1 has no downsample). Then x = x5[:, :, 1] and
+    layer2.. as now. forward_features and _backbone_to_stride_8 both use the new path. The
+    split 22/21/21 is fixed for all five convolutions. Keep channels_last false.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Partner of crossd-3d-stem on the incumbent's own weights.
+exhausted_directions: None.
