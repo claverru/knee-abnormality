@@ -24,7 +24,7 @@ convolutions. Fourteen forced seeds, then an endless researcher.
 
 ## Setup
 
-- **Branch and worktree:** `refined-radimagenet` in `../knee-abnormality-refined-radimagenet`,
+- **Branch and worktree (removed 2026-10-05, the build was never committed):** `refined-radimagenet` in `../knee-abnormality-refined-radimagenet`,
   off `5edd795`. The build is uncommitted (the runtime works from uncommitted source):
   the `radimagenet_policy`, `radimagenet_policy_ft` and `radimagenet_crossd` weight entries,
   the classifier loader and knee-class table in `modeling/radimagenet.py`, `modeling/crossd.py`,

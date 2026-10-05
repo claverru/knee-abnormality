@@ -38,8 +38,8 @@ researcher never ran.
 
 ## Setup
 
-- **Branch and worktree:** `refined-radimagenet` in `../knee-abnormality-refined-radimagenet`.
-  The build was never committed; a full copy is frozen in
+- **Branch and worktree:** `refined-radimagenet` in `../knee-abnormality-refined-radimagenet`,
+  removed on 2026-10-05. The build was never committed; a full copy is frozen in
   `outputs/autoresearch/pretraining-input/baseline/source/`.
 - **Build:** the options of the [contract's table](contract.md#built-options) in `config.py`,
   `data/dataset.py`, `modeling/model.py`, `modeling/pretraining_augmentation.py` and

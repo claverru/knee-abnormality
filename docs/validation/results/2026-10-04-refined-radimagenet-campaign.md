@@ -24,8 +24,8 @@ three slice-teacher durations lie within 0.0005 of each other).
 - **Per-run details** (per-label deltas, curves, mechanism readings, keeper repairs):
   [run notes](../../../autoresearch/campaigns/refined-radimagenet/run-notes.md).
 - **Code:** the campaign's build (weight table for the mask-trained and Cross-D checkpoints, the
-  classifier loader, `modeling/crossd.py`) is in the `refined-radimagenet` worktree and is not on
-  main; each run's frozen source is under `outputs/autoresearch/refined-radimagenet/experiments/<run>/source/`.
+  classifier loader, `modeling/crossd.py`) is not on main (its worktree was removed on 2026-10-05; the later copy with the
+  pretraining-input options is frozen in `outputs/autoresearch/pretraining-input/baseline/source/`); each run's frozen source is under `outputs/autoresearch/refined-radimagenet/experiments/<run>/source/`.
 - **Artifacts:** `outputs/autoresearch/refined-radimagenet/` (state, and per run the frozen
   source, `changes.diff`, config, logs, predictions and comparison). Checkpoints were removed on
   2026-10-04 and 2026-10-05 except the incumbent's

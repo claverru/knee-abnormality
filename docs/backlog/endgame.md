@@ -29,7 +29,8 @@ that were 0.0017 and 0.0022 below it alone; a second standard-weights run added 
 checkpoints make different errors (heated: ligaments, lateral meniscus and contusion up, OA
 labels down). To use it: train the heated ResNet-50 (`model.pretrained_weights:
 radimagenet_policy`, backbone rate and L2-SP strengths rescaled for the checkpoint's 3.4 times
-larger weights; the weight entry and loader are in the uncommitted `refined-radimagenet` build)
+larger weights; the weight entry and loader are in the frozen build,
+`outputs/autoresearch/pretraining-input/baseline/source/`)
 as a second family, either as ensemble members or as a second teacher in the
 [out-of-fold table](#out-of-fold-self-distillation). No ResNet-50 run of these weights has
 finished.
