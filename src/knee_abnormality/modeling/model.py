@@ -198,13 +198,6 @@ class KneeAbnormalityModel(nn.Module):
                 )
         with torch.random.fork_rng(devices=[]):
             self.half_knee_detector = nn.Linear(PROJECTION_WIDTH, 1)
-        self.oa_indices = tuple(
-            targets.index(name) for name in (*COMPARTMENT_PAIRS["oa"], "PF OA")
-        )
-        with torch.random.fork_rng(devices=[]):
-            self.oa_detector = nn.Linear(PROJECTION_WIDTH, 1, bias=False)
-            nn.init.xavier_uniform_(self.oa_detector.weight)
-        self.oa_detector_scale = nn.Parameter(torch.zeros(3))
         with torch.random.fork_rng(devices=[]):
             self.detail_view_embedding = nn.Parameter(torch.zeros(PROJECTION_WIDTH))
         self.register_buffer(
@@ -360,8 +353,6 @@ class KneeAbnormalityModel(nn.Module):
         token_valid: torch.Tensor,
         batch_size: int,
         medial_axis: torch.Tensor,
-        anterior_axis: torch.Tensor,
-        trusted_geometry: torch.Tensor,
         token_view: torch.Tensor,
         diagnostic: bool = False,
     ) -> torch.Tensor:
@@ -413,33 +404,6 @@ class KneeAbnormalityModel(nn.Module):
                 logits = (pooled * self.head.weight.float()[None]).sum(
                     -1
                 ) + self.head.bias.float()
-            regions = (
-                torch.stack(
-                    (
-                        medial_axis.float() > COMPARTMENT_MIDLINE_BAND_MM,
-                        medial_axis.float() < -COMPARTMENT_MIDLINE_BAND_MM,
-                        anterior_axis.float() > 0,
-                    )
-                )
-                & trusted_geometry[None]
-            )
-            region_membership = membership[:, None] & regions[None]
-            counts = region_membership.sum(-1)
-            empty = counts == 0
-            safe_membership = region_membership.clone()
-            safe_membership[..., 0] |= empty
-            evidence = self.oa_detector(tokens.float()).squeeze(-1)
-            scores = evidence[None, None].masked_fill(~safe_membership, -torch.inf)
-            pooled_evidence = torch.logsumexp(scores, -1) - counts.clamp_min(1).log()
-            pooled_evidence = torch.where(empty, 0.0, pooled_evidence)
-            correction = pooled_evidence * self.oa_detector_scale.float()[None]
-            logits[:, list(self.oa_indices)] += correction
-            if self.training:
-                self.oa_detector_activity = (
-                    counts.detach(),
-                    (token_valid & ~trusted_geometry).sum().detach(),
-                    correction.detach().abs().mean(0),
-                )
         if not torch.isfinite(logits).all():
             raise RuntimeError("Study attention pooling produced non-finite logits")
         return logits
@@ -527,6 +491,7 @@ class KneeAbnormalityModel(nn.Module):
         )
         view_index = batch["view_index"][keep_series][acquisition_index]
         detail_view = self.detail_view[view_index]
+        mirror = reflected & ~sagittal
         with torch.autocast(device_type=features.device.type, enabled=False):
             view_to_wide = batch["view_to_wide"].flatten(0, 1)[flat_indices].float()
             prepared_homogeneous = torch.cat(
@@ -535,6 +500,11 @@ class KneeAbnormalityModel(nn.Module):
             wide_xy = torch.einsum("nij,nkj->nki", view_to_wide, prepared_homogeneous)[
                 ..., :2
             ]
+            wide_xy[..., 0] = torch.where(
+                mirror[:, None],
+                (valid_images.shape[-1] - 1) - wide_xy[..., 0],
+                wide_xy[..., 0],
+            )
             wide_xy = 2 * wide_xy / (valid_images.shape[-1] - 1) - 1
             spatial_xy = torch.where(detail_view[:, None, None], wide_xy, xy[None])
             middle_map = patient_maps[:, 1]
@@ -542,22 +512,12 @@ class KneeAbnormalityModel(nn.Module):
                 (prepared_xy.float(), torch.ones_like(prepared_xy[..., :1])), -1
             )
             patient_x = torch.einsum("nj,nkj->nk", middle_map[:, 0], homogeneous)
-            patient_y = torch.einsum("nj,nkj->nk", middle_map[:, 1], homogeneous)
             side = batch["knee_side_sign"][keep_series][acquisition_index].float()
             center = batch["knee_center_x_mm"][keep_series][acquisition_index].float()
             medial_axis = torch.where(
                 geometry_valid[:, None] & (side[:, None] != 0),
                 side[:, None] * (patient_x - center[:, None]),
                 0.0,
-            )
-            center_y = batch["knee_center_y_mm"][keep_series][acquisition_index].float()
-            anterior_axis = torch.where(
-                geometry_valid[:, None] & (side[:, None] != 0),
-                center_y[:, None] - patient_y,
-                0.0,
-            )
-            trusted_geometry = (
-                geometry_valid[:, None] & (side[:, None] != 0) & visual_valid
             )
         return {
             "features": features,
@@ -572,8 +532,6 @@ class KneeAbnormalityModel(nn.Module):
             "image_type": token_type,
             "visual_valid": visual_valid,
             "medial_axis": medial_axis,
-            "anterior_axis": anterior_axis,
-            "trusted_geometry": trusted_geometry,
             "batch_size": len(presence),
         }
 
@@ -607,8 +565,6 @@ class KneeAbnormalityModel(nn.Module):
             ).flatten(),
             encoded["batch_size"],
             encoded["medial_axis"].flatten(),
-            encoded["anterior_axis"].flatten(),
-            encoded["trusted_geometry"].flatten(),
             encoded["view_index"][:, None].expand_as(encoded["visual_valid"]).flatten(),
             diagnostic=view is not None,
         )

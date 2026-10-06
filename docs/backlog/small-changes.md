@@ -8,6 +8,20 @@ training seed) and remove the entry from this file. Runs follow the
 [controlled-comparison rules](../validation/validation-strategy.md#controlled-comparisons). Each
 entry says whether its motivation is measured or a hypothesis.
 
+## Removals of active mechanisms
+
+Queued by the [fixes-and-removals campaign](../validation/results/2026-10-05-fixes-and-removals-campaign.md#open) and never run (guesses: each was adopted
+on an earlier backbone or in a bundle and never removed alone on the current recipe). Each is a
+bypass at one point, specified in the campaign's
+[seeds 3](../../autoresearch/campaigns/fixes-and-removals/seed-ideas-3.yaml); one run each, and
+an adopted removal deletes the code.
+
+- **Half-knee loss off:** the term is not added in the training step.
+- **Meniscus own-side mask off.**
+- **Plane-contrast readouts off.**
+- **Detail-view embedding off.**
+- **Report-attribute heads off** (−0.0006, 80% [−0.0011, −0.0001], on the 2026-10-01 recipe).
+
 ## Per-slot budget split between its own series
 
 **Hypothesis; untested, no design yet.** Whether splitting a slot's own budget more evenly between

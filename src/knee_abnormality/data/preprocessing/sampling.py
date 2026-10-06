@@ -20,7 +20,7 @@ from knee_abnormality.data.preprocessing.geometry import (
 from knee_abnormality.data.preprocessing.series import IndexedSeries, SliceRecord
 
 SAMPLING_IDENTITY = {
-    "robust_reference_physical": "within_acquired_range_else_local",
+    "reference_physical": "within_acquired_range_else_local_all_fit_methods",
     "gap_floor_mm": 0.01,
     "gap_median_multiplier": 1.5,
     "gap_margin_mm": 0.05,
@@ -215,9 +215,8 @@ def build_pool(
         agrees = reliable and int(np.argmax(np.abs(normal))) == axis
         if reliable and not agrees:
             diagnostics["plane_disagreements"] += 1
-        inside = reference.method == "fit" or (
-            reference.point is not None
-            and within_acquired_range(geometry, reference.point)
+        inside = reference.point is not None and within_acquired_range(
+            geometry, reference.point
         )
         use_physical = agrees and inside and reference.point is not None
         local_ok = usable_local_order(indexed)
@@ -231,6 +230,8 @@ def build_pool(
         diagnostics["sources"][uid] = (
             "physical"
             if use_physical
+            else "centre_outside_slab"
+            if agrees and reference.point is not None and not inside
             else geometry.reason or reference.reason or "plane_disagreement"
         )
         if not runs:

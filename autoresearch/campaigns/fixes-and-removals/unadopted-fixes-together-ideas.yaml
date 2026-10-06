@@ -1,0 +1,44 @@
+ideas:
+- id: unadopted-fixes-together
+  mechanism_id: fixes-together
+  parent_idea_id: null
+  title: The three fixes not adopted one by one, applied together (slab rule, aligned contrast
+    mixing, positive feature-statistics std)
+  opportunity: >-
+    User seed, 2026-10-05. Each of the three is a defect shown in the code, and each alone moved
+    the macro by less than a change that does nothing moves it on this fold (about 0.0005):
+    centre-outside-slab-rule -0.000537 (80% [-0.001584, +0.000536]), which touches 20 series;
+    contrast-mixing-aligned-donor-requeue -0.000844 (80% [-0.001465, -0.000209]);
+    feature-statistics-positive-std -0.000174 (80% [-0.000623, +0.000251]), which changes 0.4%
+    of the draws. The slab rule also acts at inference, where
+    its reach in the test set is unknown, so the fold cannot judge it alone. Together they
+    change more of the data than any one of them, a second chance to adopt them as one step.
+  mechanism: >-
+    The incumbent with the three changes of the three runs, ported from their frozen sources
+    and nothing else. (1) data/preprocessing/sampling.py as in
+    outputs/autoresearch/fixes-and-removals/experiments/centre-outside-slab-rule-20261005T130421Z-c810fa93/source:
+    the slab test applies for every fit method and the diagnostic is centre_outside_slab. (2)
+    modeling/augmentation.py and modeling/model.py as in
+    outputs/autoresearch/fixes-and-removals/experiments/contrast-mixing-aligned-donor-requeue-20261005T130844Z-22da8214/source:
+    the donor is resampled onto the target grid before blending. (3) modeling/augmentation.py
+    as in
+    outputs/autoresearch/fixes-and-removals/experiments/feature-statistics-positive-std-20261005T133003Z-3fe7afa5/source:
+    the resampled standard deviation is clamped at zero. Keep each run's own logged scalars.
+  precedents:
+  - 'run-notes.md, 2, 4 and 5: the three single runs with their per-label deltas and logs.'
+  - 'run-notes.md, 2: the independent check that the alignment is correct.'
+  novelty: First run with the three fixes at once.
+  coverage: Sampling of 20 training series and any test series outside its slab; every mixed slice in training; 0.4% of feature-statistics draws.
+  exploitation: >-
+    Log the three runs' scalars (sources per sampling outcome, aligned signal fraction and
+    in-plane shift, clamped fraction). Read x4 and x1 against the incumbent and against the sum
+    of the three single deltas, and the per-label deltas.
+  budget: As the aligned-mixing run, inside the range.
+  implementation: >-
+    Port the three diffs onto the incumbent at its turn; they touch different functions and do
+    not interact in code. No option selects the old behaviour. Do not add the edge fade of
+    contrast-mixing-aligned-feathered: that stays its own seed.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user's second chance for the fixes the single runs could not separate from noise.
+exhausted_directions: ''

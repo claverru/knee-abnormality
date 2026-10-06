@@ -8,10 +8,20 @@ finished runs and decisions live in the [validation results](../validation/resul
 live under [autoresearch](../../autoresearch/campaigns/INDEX.md). New candidates pair with the
 current control at its fold and seed.
 
+Pending from the [fixes-and-removals campaign](../validation/results/2026-10-05-fixes-and-removals-campaign.md)
+(closed 2026-10-05, on main since 2026-10-06):
+
+- **Train the control** on main's source: `configs/training.yaml`, fold 1, seed 819238850 (user
+  launch). Old checkpoints do not load, so every new candidate waits for it. The
+  `configs/refined-resnet50.yaml` run on the same fold and seed is the submission model's.
+- **Check the OA detector's removal before a submission relies on it:** one run with the
+  detector restored on the recipe in force, read on the three OA labels, and on the ResNet-50
+  ([open items](../validation/results/2026-10-05-fixes-and-removals-campaign.md#open)).
+
 Pending from the [Refined-RadImageNet campaign](../validation/results/2026-10-04-refined-radimagenet-campaign.md)
 (closed 2026-10-04; the checkpoint normalization is on main since 2026-10-05):
 
-- **Control: the campaign incumbent** (user decision 2026-10-05; it is the adopted recipe,
+- **Control until 2026-10-06: the campaign incumbent** (user decision 2026-10-05; it was the adopted recipe,
   `configs/training.yaml` with `data.mean` 0.3162 and `data.std` 0.3213, so no retraining):
   `outputs/autoresearch/refined-radimagenet/experiments/radimagenet-input-statistics-20261004T103433Z-ff2f3786/training`,
   ×4 0.933058, ×1 0.929948. New candidates pair with it. Its checkpoint is the only one of the
