@@ -1,0 +1,85 @@
+id: fixes-and-removals
+recipe: configs/training.yaml
+reference_run: outputs/training/20261005-113728-rn18-fold1
+reference_equivalences: {}
+reference_config_exceptions:
+  - paths.label_manifest
+  - paths.report_attribute_manifest
+additional_evidence_runs: []
+backlog:
+  refill_below: 3
+  refill_to: 5
+  seed_order: forced
+  rotate_after: 6
+budget:
+  mode: range
+  min_fraction: 0.5
+  max_fraction: 1.2
+policy:
+  editable_files:
+    - configs/training.yaml
+    - src/knee_abnormality/config.py
+    - src/knee_abnormality/inference/reflection.py
+    - src/knee_abnormality/training/lightning.py
+    - src/knee_abnormality/data/dataset.py
+  editable_directories:
+    - src/knee_abnormality/modeling
+    - src/knee_abnormality/data/preprocessing
+  config_keys:
+    - trainer.half_knee_loss_weight
+    - trainer.report_attribute_loss_weight
+    - optimizer.anchor_alpha_early
+    - optimizer.anchor_alpha_late
+  config_prefixes:
+    - model
+    - data.contrast_mixing_augmentation
+    - data.intensity_augmentation
+    - data.affine_augmentation
+    - data.noise_augmentation
+    - data.smoothing_augmentation
+    - data.resolution_augmentation
+    - data.gin_augmentation
+  list_item_fields: {}
+  input_identity_keys:
+    - preprocessing_identity
+  require_source_change: false
+  configuration_only_ideas: true
+  developer_instructions: >-
+    The incumbent is the Refined-RadImageNet ResNet-18 recipe in configs/training.yaml (repeated
+    middle slice, 84/93 mm detail views, view label bias, plane-contrast readouts, L2-SP
+    anchoring, checkpoint normalization, ten epochs, batch 8). This campaign does two things and
+    adds no new modelling mechanism. A fix repairs a defect: it replaces the defective behaviour,
+    with no flag, option or config field to select the old behaviour and no fallback that keeps
+    it. A removal switches off one mechanism that is active in the recipe today, to test whether
+    the recipe still needs it: use the mechanism's existing off value (a probability or weight of
+    0, or its boolean) and change nothing else; when the mechanism has no off value, bypass it in
+    code at the single point the seed names. Do not delete the mechanism's code in the run: the
+    user deletes it when an adopted removal is merged. Every idea applies exactly its own change
+    to the current incumbent and keeps everything else byte-identical. Read contract.md before
+    writing code; each seed states the exact change. New parameters or buffers initialize under
+    torch.random.fork_rng so the incumbent's random stream is unchanged. Validation and
+    prediction stay deterministic. Training time must stay within 0.5 to 1.2 times the
+    reference's training time (the sealed limits); do not reduce epochs, slices or studies to fit, and
+    never decode more slices per study than the incumbent does. No weight averaging. Return
+    prepared or blocked. Use the existing Python environment for static checks and tiny CPU
+    checks only (no forward and backward passes of the full model on CPU while a training
+    runs). No tests.
+  researcher_instructions: >-
+    Research starts after the forced seeds. Two kinds of idea are allowed and nothing else. (A)
+    Fixes: a place where the code does something other than what the recipe intends, shown by
+    reading the code and stating the file, the lines, the inputs that trigger it and what the
+    correct behaviour is. Priority goes to train/validation/inference mismatches, wrong masks,
+    indices or broadcasts, coordinates that disagree between two paths, and silent data loss.
+    (B) Removals: one mechanism active in the recipe today, switched off, where the reason it
+    was adopted may no longer hold because the recipe has changed since (backbone, weights,
+    views, normalization, labels). State when and on which recipe it was adopted, with its delta,
+    what has changed since, and whether its removal was measured later (prior-work.md lists the
+    measured ones; do not repeat a removal measured on the current ResNet-18 recipe). One defect
+    or one removal per idea; a removal that passes may be followed by the next removal on the new
+    incumbent. Mark every proposal as evidence-backed or a guess. Excluded: new modelling
+    mechanisms, hyperparameter changes other than switching a mechanism off, anything whose only
+    argument is that it might score better; weight averaging; larger images, more slices,
+    ensembling and test-time augmentation changes other than a defect; fewer epochs;
+    reflection-probability changes; the class-balance exponent; label changes and gold-study
+    weighting; removing the series-cleaning rules; trained models in the loader; multi-seed or
+    confirmation runs; choosing anything on the campaign fold's validation labels.

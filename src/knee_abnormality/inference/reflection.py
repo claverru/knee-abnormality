@@ -20,6 +20,7 @@ def reflect_batch(
     rects = batch["valid_rects"][:, :, kept]
     positions = batch["slice_positions"].clone()
     patient_maps = batch["patient_maps"][:, :, kept]
+    view_to_wide = batch["view_to_wide"]
     if mirror.any() or not middle_only:
         images = images.clone()
         rects = rects.clone()
@@ -33,6 +34,9 @@ def reflect_batch(
         reversal[0, 0] = -1
         reversal[0, 2] = images.shape[-1] - 1
         patient_maps[mirror] = patient_maps[mirror] @ reversal
+        view_to_wide = view_to_wide.clone()
+        view_reversal = reversal.to(view_to_wide.dtype)
+        view_to_wide[mirror] = view_reversal @ view_to_wide[mirror] @ view_reversal
     if reverse.any():
         positions[reverse] = -positions[reverse]
         if not middle_only:
@@ -45,4 +49,5 @@ def reflect_batch(
         "valid_rects": rects.expand(-1, -1, slices, -1),
         "slice_positions": positions,
         "patient_maps": patient_maps.expand(-1, -1, slices, -1, -1),
+        "view_to_wide": view_to_wide,
     }

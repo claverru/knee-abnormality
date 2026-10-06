@@ -199,8 +199,7 @@ class KneeStudyDataset(Dataset):
             )
             center = fitted if fitted is not None else side.center_x_mm
             valid = bool(
-                sign
-                and center is not None
+                center is not None
                 and own_reference is not None
                 and own_reference.point is not None
                 and own_reference.method in {"fit", "robust"}

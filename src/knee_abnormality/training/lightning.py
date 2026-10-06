@@ -502,25 +502,6 @@ class KneeModule(L.LightningModule):
             on_epoch=True,
             batch_size=1,
         )
-        for region, scale in zip(
-            ("medial", "lateral", "pf"),
-            self.model.oa_detector_scale.detach().float(),
-            strict=True,
-        ):
-            self.log(
-                f"oa_detector_scale_{region}",
-                scale,
-                on_step=False,
-                on_epoch=True,
-                batch_size=1,
-            )
-        self.log(
-            "oa_detector_weight_norm",
-            self.model.oa_detector.weight.detach().float().norm(),
-            on_step=False,
-            on_epoch=True,
-            batch_size=1,
-        )
         parameters = dict(self.model.backbone.named_parameters())
         anchor_buffers = {
             name: buffer_name for name, _, buffer_name, _ in self.anchor_parameters
@@ -724,52 +705,6 @@ class KneeModule(L.LightningModule):
         self._log_augmentation_activity(len(batch["study_uid"]))
         logits = self.model.pool_encoded(encoded).to(torch.float32)
         self._log_views(batch, encoded, "")
-        counts, masked, absolute_corrections = self.model.oa_detector_activity
-        for region, region_counts, absolute_correction in zip(
-            ("medial", "lateral", "pf"),
-            counts.unbind(1),
-            absolute_corrections,
-            strict=True,
-        ):
-            self.log(
-                f"oa_detector_absolute_correction_{region}",
-                absolute_correction,
-                on_step=False,
-                on_epoch=True,
-                batch_size=len(batch["study_uid"]),
-            )
-            self.log(
-                f"oa_detector_tokens_{region}",
-                region_counts.sum().float(),
-                on_step=False,
-                on_epoch=True,
-                reduce_fx="sum",
-                batch_size=1,
-            )
-            self.log(
-                f"oa_detector_studies_{region}",
-                (region_counts > 0).sum().float(),
-                on_step=False,
-                on_epoch=True,
-                reduce_fx="sum",
-                batch_size=1,
-            )
-            self.log(
-                f"oa_detector_empty_studies_{region}",
-                (region_counts == 0).sum().float(),
-                on_step=False,
-                on_epoch=True,
-                reduce_fx="sum",
-                batch_size=1,
-            )
-        self.log(
-            "oa_detector_masked_tokens",
-            masked.float(),
-            on_step=False,
-            on_epoch=True,
-            reduce_fx="sum",
-            batch_size=1,
-        )
         loss = masked_binary_cross_entropy_with_logits(
             logits,
             batch["target"],

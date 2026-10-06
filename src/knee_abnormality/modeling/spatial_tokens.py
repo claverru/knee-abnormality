@@ -76,7 +76,6 @@ SPATIAL_TOKEN_IDENTITY = {
     "augmentation": "kornia_normalized_affine_align_corners_false_v1",
     "aggregation": "layernorm_target_attention_256_128_12",
     "meniscus_half_knee": "own_side_attention_excludes_opposite_tokens_beyond_10mm_training_shared_float32_smooth_max",
-    "oa_shared_detector_regions": "trusted_middle_slice_patient_LPS_medial_axis_beyond_10mm_and_anterior_center_y_minus_patient_y",
 }
 
 

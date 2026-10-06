@@ -1,4 +1,4 @@
-# Project state (2026-10-03)
+# Project state (2026-10-06)
 
 What is in force now: the recipe, the control candidates pair with, the best public submissions and
 the rules every comparison depends on. Pending work is in [next](next.md), active lines have their
@@ -12,8 +12,9 @@ measured outcomes are in the [validation results](../validation/results/INDEX.md
 - **Labels and split, since 2026-09-28 (user decision):** training and evaluation use
   [`rebuild_state_v2`](../public-labels/label-rebuild.md#a2-common-state-scale-and-the-zhen-lineage-fix-2026-09-28)
   (A2 of the label rebuild) and the label-stratified split
-  [`all_5fold_scanner_v2`](../validation/project-validation-protocol.md#all_5fold_scanner_v2), fold 0,
-  seed 1533697213 (`configs/training.yaml`); the 2026-09-30 adoption kept both (user decision). The evidence is one fold-4 pair: A, the pre-fix
+  [`all_5fold_scanner_v2`](../validation/project-validation-protocol.md#all_5fold_scanner_v2), fold 1,
+  seed 819238850 since 2026-10-06 (`configs/training.yaml` and `configs/refined-resnet50.yaml`,
+  user decision; fold 0 and seed 1533697213 before). The evidence is one fold-4 pair: A, the pre-fix
   version of A2, scored 0.947 public (S76) against 0.946 for S73, one rounding step; A2's fold-0
   control scored 0.944 (S78), not comparable with those fold-4 runs. The autoresearch gate requires both the label source and the split.
 - **Model:** the [current model](../modeling/current-model.md), since 2026-09-29 on a
@@ -24,7 +25,9 @@ measured outcomes are in the [validation results](../validation/results/INDEX.md
   stays at 120 mm), `backbone_lr` 5e-5, no
   series dropout, 26 triplets, spatial tokens with knee geometry, plane-contrast readouts and no
   anatomical attention bias (since 2026-10-01), a learned attention bias per view and label
-  (since 2026-10-03), the three-compartment OA detector, training-only
+  (since 2026-10-03), no OA detector (removed 2026-10-06, to be
+  [checked again](../validation/results/2026-10-05-fixes-and-removals-campaign.md#open) before a
+  submission relies on it), training-only
   report-attribute heads, L2-SP weight anchoring (since 2026-09-30, which also removed the scanner
   confusion head), the half-stack augmentation and class-balanced BCE at exponent 0.5.
   `configs/refined-resnet50.yaml` is the same recipe on the Refined-RadImageNet ResNet-50, the
@@ -44,6 +47,15 @@ measured outcomes are in the [validation results](../validation/results/INDEX.md
 
 ## Current control
 
+- **No run from main's source exists for the recipe in force** (2026-10-06): the control is to
+  be trained on fold 1 with seed 819238850 ([next](next.md)). The nearest run is the
+  fixes-and-removals incumbent, `slab-rule-and-positive-std-requeue`
+  (`outputs/autoresearch/fixes-and-removals/experiments/slab-rule-and-positive-std-requeue-20261005T155303Z-59280bbc/training`):
+  ×4 0.924049 (×1 0.916134, fold 1, seed 1110484336), the same behaviour with the OA detector's
+  parameters kept unused, so its checkpoint loads only from its archived `source/`. Its
+  reference `rn18-fold1` (`outputs/training/20261005-113728-rn18-fold1`), the previous recipe on
+  that fold and seed, scored ×4 0.923102; 0.950 public for two models between them (S108, S111)
+  ([result](../validation/results/2026-10-05-fixes-and-removals-campaign.md)).
 - **`rn18-view-label-bias`** (`outputs/training/20261003-100844-rn18-view-label-bias`), the
   `configs/training.yaml` recipe in force apart from name and paths, trained on 2026-10-03
   from the adoption commit's source: ×4 0.932477 (×1 0.929026, epoch 9 of 10, fold 0, seed
@@ -171,7 +183,7 @@ measured outcomes are in the [validation results](../validation/results/INDEX.md
   [evaluation and adoption rule](../../autoresearch/protocol.md#shared-evaluation-and-adoption) and
   takes its fold from the sealed recipe. Campaigns no longer retrain controls after a provisional
   acceptance; the user retrains the fresh-seed control when an adoption is merged. No campaign is
-  active ([status](../../autoresearch/status.md)).
+  active on main ([status](../../autoresearch/status.md)).
 - **Deferred to the final phase:** further folds, ensembles, TTA, bigger images and weight
   averaging ([endgame](../backlog/endgame.md)); hidden-test failure modes are in
   [risks](../backlog/risks.md).
@@ -191,6 +203,12 @@ measured outcomes are in the [validation results](../validation/results/INDEX.md
 
 ## Recently closed
 
+- **2026-10-05:** the `fixes-and-removals` autoresearch campaign (audit fixes and removals of
+  active mechanisms, fold 1), stopped by the user after 13 decided runs: the detail-view
+  position fix under reflection, the centre without a side (+0.0014), the slab rule with the
+  std clamp and the OA detector's removal adopted, the last three by user decision at ties;
+  aligned contrast mixing lost twice; the 3D position tied in three variants; seven removals
+  never ran ([result](../validation/results/2026-10-05-fixes-and-removals-campaign.md)).
 - **2026-10-03:** the `learnable-views` autoresearch campaign (view width, shift, label bias and
   slice budget learned by gradient), stopped by the user after 47 scored runs and no adoption by
   rule: learned widths drift to about 110 mm and never find the hand 84/93 mm table, which is

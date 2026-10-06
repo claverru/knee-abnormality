@@ -1,0 +1,102 @@
+ideas:
+- id: position-3d-study-dropout
+  mechanism_id: knee-frame-position
+  parent_idea_id: computed-centre-3d-position
+  title: The 3D position with the position of 15% of training studies replaced by the
+    unknown-position vector
+  opportunity: >-
+    User seed, 2026-10-05. computed-centre-3d-position led the incumbent by +0.0077, +0.0026 and
+    +0.0028 at x1 in its first three epochs and ended -0.0002 (x4 -0.000778, 80% [-0.002063,
+    +0.000489]), while its training loss stayed below the incumbent's at every epoch (0.565
+    against 0.567 at the end). Lower training loss without a validation gain is overfitting: the
+    position is a shortcut the model keeps using on the training studies. Dropping it for part
+    of the studies regularizes that shortcut. It also trains the unknown-position vector, which
+    no training token used in that run (0%), so a test study without a fitted centre gets an
+    untrained input today. Evidence-backed diagnosis, guess for the remedy.
+  mechanism: >-
+    The code of computed-centre-3d-position (frozen source:
+    outputs/autoresearch/fixes-and-removals/experiments/computed-centre-3d-position-20261005T135141Z-336ae83f/source)
+    ported onto the incumbent, with one change in KneeAbnormalityModel.encode_batch: in
+    training, one uniform draw per study; for a study whose draw is below 0.15, valid_position
+    is set false for all its tokens, so they take the learned unknown-position vector. Nothing
+    is dropped in validation or prediction. medial_axis, anterior_axis and trusted_geometry are
+    untouched, so the meniscus mask, the OA regions and the half-knee loss keep working for
+    those studies.
+  precedents:
+  - 'run-notes.md, 6: the parent, its curve, training loss, per-label deltas and branch shares.'
+  - 'docs/research/efficientnet-training.md: the September spatial tokens declared a 3D-position dropout of 0.10.'
+  novelty: First 3D position on this recipe with the position dropped per study.
+  coverage: Every token; 15% of studies per training batch without position.
+  exploitation: >-
+    Log the three branch shares (unknown position expected near 0.15) and the training loss.
+    Read the x1 curve against the parent's and the incumbent's from epoch 4 on, where the
+    parent fell behind, and the per-label deltas against the parent's (lateral labels up,
+    ligament labels down).
+  budget: As the parent.
+  implementation: >-
+    Port the parent's files and add the draw; the rate is a constant, no option. It adds a
+    mechanism, so it is decided by the shared rule.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Aims at the measured overfitting directly and closes the untrained-vector gap.
+- id: position-3d-attention-only
+  mechanism_id: knee-frame-position
+  parent_idea_id: computed-centre-3d-position
+  title: The 3D position given to the attention and the detectors, not to the evidence the
+    readout pools
+  opportunity: >-
+    User seed, 2026-10-05, a guess for the remedy. In the parent the position is added to the
+    token, and the same token feeds the attention scorer (where to look) and the readout (what
+    was seen). Position can therefore act as evidence for a label by itself, which is the
+    shortcut the parent's lower training loss points to. Giving it to the attention only lets
+    it guide the search, where the early lead comes from, without becoming evidence.
+  mechanism: >-
+    The parent's code ported onto the incumbent, with one change in
+    KneeAbnormalityModel._pooling_tokens: it returns two tensors instead of the same one twice.
+    tokens = mil_norm(features + position_3d + plane + contrast + detail-view embedding), used
+    by the attention scorer, the half-knee detector and the OA detector as today; values =
+    mil_norm(features + plane + contrast + detail-view embedding), without the position, used
+    by the readout. The same mil_norm module is applied to both sums.
+  precedents:
+  - 'run-notes.md, 6: the parent.'
+  novelty: First run with position in the attention path only.
+  coverage: Every token of every study.
+  exploitation: >-
+    Training loss against the parent's and the incumbent's; x1 curve from epoch 4 on; per-label
+    deltas, with the ligament labels the parent lost as the first check.
+  budget: One extra LayerNorm pass over the tokens; as the parent.
+  implementation: >-
+    Port the parent's files and split the two tensors; no option. half_knee_tokens keeps using
+    the first tensor. It adds a mechanism, so it is decided by the shared rule.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Removes the shortcut by construction instead of regularizing it.
+- id: position-3d-coarse
+  mechanism_id: knee-frame-position
+  parent_idea_id: computed-centre-3d-position
+  title: The 3D position with wavelengths from 32 to 512 mm, without the 8 and 16 mm ones
+  opportunity: >-
+    User seed, 2026-10-05, a guess for the remedy. The parent encodes each coordinate at seven
+    wavelengths from 8 to 512 mm. The two shortest resolve a few millimetres, finer than the
+    centre is known (fit RMS 2.8 mm median, 8.8 mm at the 99th percentile) and fine enough to
+    tell individual training studies apart. Without them the position places a token in a
+    region of the knee and cannot pinpoint it, which leaves less to memorize.
+  mechanism: >-
+    The parent's code ported onto the incumbent, with one change in SpatialTokens: the
+    wavelengths are five, log-spaced from 32 to 512 mm (30 features), and the first layer of
+    the position network is linear 30 to 64. The unknown-side vector has 10 entries.
+  precedents:
+  - 'run-notes.md, 6: the parent.'
+  - 'docs/validation/results/2026-10-05-code-audit-measurements.md, F05: the centre-fit residuals.'
+  novelty: First 3D position without sub-centimetre wavelengths.
+  coverage: Every token of every study.
+  exploitation: Training loss against the parent's; x1 curve from epoch 4 on; per-label deltas against the parent's.
+  budget: As the parent.
+  implementation: >-
+    Port the parent's files and change the wavelengths and the layer width; no option. Record
+    the wavelengths in SPATIAL_TOKEN_IDENTITY. It adds a mechanism, so it is decided by the
+    shared rule.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The cheapest way to make the position less memorizable.
+exhausted_directions: ''

@@ -7,11 +7,11 @@ in the [campaigns](campaigns/INDEX.md) and the
 ## Current state (2026-09-28)
 
 - **No campaign is running.** Every campaign under `outputs/autoresearch/` is stopped, and the
-  watchdog is stopped. The last one, [learnable-views](campaigns/learnable-views/INDEX.md),
-  was stopped by the user on 2026-10-03 and its line closed; it ran from the `view-optimisation`
-  branch's worktree, whose build is not on main.
+  watchdog is stopped. The last one recorded on main,
+  [fixes-and-removals](campaigns/fixes-and-removals/INDEX.md), was stopped by the user on
+  2026-10-05 and its four changes are on main.
 - **Main recipe:** `configs/training.yaml` trains on the rebuilt labels `rebuild_state_v2` with
-  seed 1533697213 on fold 0 of `all_5fold_scanner_v2`
+  seed 819238850 on fold 1 of `all_5fold_scanner_v2`
   ([current model](../docs/modeling/current-model.md)); the evaluation gate in
   [`campaign/rules.py`](../src/knee_abnormality/autoresearch/campaign/rules.py) requires both, so
   campaigns sealed on `all_5fold_scanner_v1` or `combined_v1` cannot resume.

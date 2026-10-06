@@ -1,0 +1,12 @@
+revision: 340
+queue:
+- intensity-augmentation-off
+- noise-augmentation-off
+- half-knee-loss-off
+- meniscus-mask-off
+- plane-readouts-off
+- detail-view-embedding-off
+- report-attribute-heads-off
+- position-3d-study-dropout
+- position-3d-attention-only
+- position-3d-coarse

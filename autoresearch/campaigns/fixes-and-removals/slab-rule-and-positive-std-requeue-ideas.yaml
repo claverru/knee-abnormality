@@ -1,0 +1,36 @@
+ideas:
+- id: slab-rule-and-positive-std-requeue
+  mechanism_id: fixes-together
+  parent_idea_id: null
+  title: The slab rule and the positive feature-statistics std together, adopted by user decision
+  opportunity: 'User seed, 2026-10-05, adopted whatever its delta (contract.md, Forced adoption). Both
+    are defects shown in the code and both are too small for a run on this fold to judge: the slab rule
+    changes sampling for 20 training series and 2 validation studies (centre-outside-slab-rule -0.000537,
+    80% [-0.001584, +0.000536]), and the clamp changes 0.4% of the feature-statistics draws (feature-statistics-positive-std
+    -0.000174, 80% [-0.000623, +0.000251]). The slab rule also acts at inference, where its reach in the
+    test set is unknown. unadopted-fixes-together, which added the aligned contrast mixing to these two,
+    scored -0.000817, the delta of the aligned mixing alone; the mixing is left out here.'
+  mechanism: 'The incumbent with two changes ported from the frozen sources of their runs and nothing
+    else. (1) data/preprocessing/sampling.py as in outputs/autoresearch/fixes-and-removals/experiments/centre-outside-slab-rule-20261005T130421Z-c810fa93/source:
+    the slab test applies for every fit method and the diagnostic is centre_outside_slab. (2) modeling/augmentation.py
+    as in outputs/autoresearch/fixes-and-removals/experiments/feature-statistics-positive-std-20261005T133003Z-3fe7afa5/source:
+    the resampled standard deviation is clamped at zero. Contrast mixing stays the incumbent''s pixel-index
+    blend.'
+  precedents:
+  - 'run-notes.md, 4, 5 and 7: the two single runs and the three-fix run.'
+  novelty: The two small fixes without the aligned mixing.
+  coverage: Sampling of 20 training series and any test series outside its slab; 0.4% of feature-statistics
+    draws.
+  exploitation: Log the sources per sampling outcome and the clamped fraction. The delta is expected inside
+    rerun noise; report it with the per-label deltas against the slab-rule run's, which shares its changed
+    sampling.
+  budget: Same cost as the incumbent.
+  implementation: Port the two diffs; they touch different functions. No option selects the old behaviour.
+    Later seeds build on this run once the keeper adopts it. Keeper requeue of slab-rule-and-positive-std,
+    whose first run was cancelled when the campaign stopped to adopt oa-detector-off by user decision;
+    this run builds on the incumbent without the OA detector.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Puts the two correct-by-reading fixes into the incumbent the remaining seeds and
+    the ResNet-50 build on.
+exhausted_directions: ''

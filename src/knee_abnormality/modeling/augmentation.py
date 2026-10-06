@@ -957,7 +957,7 @@ def apply_feature_statistics_augmentation(
                 group_count, channel_count, device=values.device, generator=generator
             )
             * spread_std
-        )
+        ).clamp_min_(0)
 
         per_triplet_apply = eligible[group][:, None, None, None]
         per_triplet_mean = acquisition_mean[group][:, :, None, None]
