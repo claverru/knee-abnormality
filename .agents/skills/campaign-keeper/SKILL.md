@@ -40,4 +40,9 @@ switches.
   every job has been blocked for over 30 minutes, stop the campaign, set `provider` in
   `state.json` to the other provider (Codex ↔ Claude) and resume. Switch back once the primary
   works again.
+- **Adoption by the contract:** when a campaign's contract sets its own adoption (a forced
+  seed, a lineage, flags from a run report), compute what it asks for after each run and adopt
+  by hand with `python -m scripts.tools.autoresearch adopt CAMPAIGN --experiment ID`, citing
+  the contract. Arm `bash .agents/skills/campaign-keeper/stop_before_end.sh CAMPAIGN ROOT` so
+  the next training cannot launch before the adoption.
 - **Never** end the campaign (only the user does), and never submit or upload anything.
