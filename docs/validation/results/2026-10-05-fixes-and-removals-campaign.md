@@ -111,8 +111,10 @@ Main takes the behaviour of `slab-rule-and-positive-std-requeue` (user decision,
   `score_tta_detail_coordinates.py` read the removed token fields and run only on sources from
   before this change.
 
-Checkpoints trained before this change do not load on main, and no run from main's source
-exists yet: the control is to be trained ([next](../../ongoing/next.md)).
+Checkpoints trained before this change do not load on main. The control is the campaign
+incumbent itself, without retraining (user decision, 2026-10-06); it exports from its archived
+`source/` ([state](../../ongoing/state.md#current-control)). On 2026-10-06 the campaign's other
+checkpoints were removed, except those of S108 and S111.
 
 ## Open
 

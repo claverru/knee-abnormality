@@ -230,6 +230,14 @@ holds the deletion rules, and
 [`free_disk`](../../scripts/tools/free_disk.py), which applies them and writes the manifest under
 `outputs/archive/maintenance/disk-cleanup-<UTC>/`. Record each run below.
 
+**2026-10-06:** a cleanup limited to `outputs/autoresearch/fixes-and-removals/` (user
+instruction: nothing outside the campaign), done by hand under the checkpoint rules, without
+`free_disk` and without a manifest: **25 `.ckpt` files (4.25 GiB)** removed, 14 `last.ckpt` and
+the selected checkpoints of 11 runs; the folder went from 5.5 to 1.3 GiB. Retained: the selected
+checkpoint of the incumbent `slab-rule-and-positive-std-requeue` (the control) and those of
+`centre-without-side` (S108) and `oa-detector-off` (S111), with every run's predictions,
+metrics, configs and sources.
+
 **2026-10-02:** the first run of the skill removed **180 entries (25.789 GiB)**
 ([manifest](../../outputs/archive/maintenance/disk-cleanup-20261002T171047Z/manifest.json)); free
 space rose by 24.74 GiB while a training run was writing, and a separate `uv cache prune` removed

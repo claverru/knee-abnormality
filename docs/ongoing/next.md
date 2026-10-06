@@ -11,9 +11,10 @@ current control at its fold and seed.
 Pending from the [fixes-and-removals campaign](../validation/results/2026-10-05-fixes-and-removals-campaign.md)
 (closed 2026-10-05, on main since 2026-10-06):
 
-- **Train the control** on main's source: `configs/training.yaml`, fold 1, seed 819238850 (user
-  launch). Old checkpoints do not load, so every new candidate waits for it. The
-  `configs/refined-resnet50.yaml` run on the same fold and seed is the submission model's.
+- **Control: the campaign incumbent** `slab-rule-and-positive-std-requeue` (user decision
+  2026-10-06, no retraining): ×4 0.924049, fold 1, seed 1110484336
+  ([state](state.md#current-control)). Its checkpoint and those of S108 and S111 are the only
+  ones of the campaign still kept.
 - **Check the OA detector's removal before a submission relies on it:** one run with the
   detector restored on the recipe in force, read on the three OA labels, and on the ResNet-50
   ([open items](../validation/results/2026-10-05-fixes-and-removals-campaign.md#open)).
