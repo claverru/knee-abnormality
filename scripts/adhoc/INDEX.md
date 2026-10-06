@@ -13,6 +13,7 @@ findings doc holds the question, method, command and result.
 | [audit_repeated_series.py](audit_repeated_series.py) | Which series repeat pixel-for-pixel within or across studies? | [Repeated series](../../docs/metadata/repeated-series.md) |
 | [simulate_online_series_dedup.py](simulate_online_series_dedup.py) | How accurate and costly is a per-study online duplicate-series filter? | [Online detection](../../docs/metadata/repeated-series.md#online-detection-per-study) |
 | [score_series_cleaning_rules.py](score_series_cleaning_rules.py) | What do candidate series-cleaning rules change in fold-0 predictions? | [Series-cleaning rules](../../docs/validation/results/2026-09-22-series-cleaning-rules.md) |
+| [census_series_deletions.py](census_series_deletions.py) | Do the superseded and exact-copy rules delete series that are not the same anatomy or not full copies? | [Deletion-identity census](../../docs/metadata/series-filtering-census.md#deletion-identity-census-2026-10-05) |
 
 ## Metadata and reports
 
@@ -23,11 +24,13 @@ findings doc holds the question, method, command and result.
 | [infer_training_sites.py](infer_training_sites.py) | Which report languages and sites does training contain, and are the officially listed Italian and Mongolian sites absent? (needs `--with langdetect`) | [Sites and test composition](../../docs/metadata/sites-and-test-composition.md) |
 | [audit_knee_laterality.py](audit_knee_laterality.py) | What explicit and textual knee-side evidence do the DICOMs carry? | [Knee-side metadata audit](../../docs/metadata/2026-09-14-knee-side-metadata-audit.md) |
 | [audit_knee_side_geometry.py](audit_knee_side_geometry.py) | Can physical geometry alone resolve the knee side? | [Knee-side coordinates](../../docs/metadata/knee-side-coordinate-investigation.md) |
+| [census_knee_side_and_centre.py](census_knee_side_and_centre.py) | How is each study's knee side and centre resolved, and do coordinate sides agree with reports? | [Side and centre census](../../docs/validation/results/2026-10-05-code-audit-measurements.md#f04-and-f05-knee-side-and-centre-census) |
 
 ## Sampling and preprocessing
 
 | Script | Question | Findings |
 |---|---|---|
+| [measure_bag_normalization_drift.py](measure_bag_normalization_drift.py) | How much do a series' intensity window and shared pixels change with the bag (×1, ×4, ×6, two training epochs)? | [Bag-dependent normalization](../../docs/validation/results/2026-10-05-code-audit-measurements.md#f06-bag-dependent-normalization) |
 | [analyze_physical_sampling.py](analyze_physical_sampling.py) | How does production physical sampling and its fallback behave on the geometry cohort? | [Physical sampling](../../docs/data-preparation/physical-sampling/implementation-verification.md) |
 | [audit_sampling_protocols.py](audit_sampling_protocols.py) | What sequence metadata separates repeated plane-contrast groups? | [Sampling cohort and rules](../../docs/data-preparation/physical-sampling/sampling-analysis-cohort-and-rules.md) |
 | [analyze_study_center_extents.py](analyze_study_center_extents.py) | How much of each plane lies on either side of the fitted study centre? | [Accurate sampling centres](../../docs/data-preparation/accurate-sampling-centers.md#cohort-wide-center-fit-and-plane-extents) |
@@ -70,6 +73,7 @@ findings doc holds the question, method, command and result.
 
 | Script | Question | Findings |
 |---|---|---|
+| [score_tta_detail_coordinates.py](score_tta_detail_coordinates.py) | What does mirroring the detail-to-wide map under reflection TTA change, and does it match the training reflection? | [Reflection TTA detail coordinates](../../docs/validation/results/2026-10-05-code-audit-measurements.md#f01-reflection-tta-detail-coordinates) |
 | [compare_local_and_public_scores.py](compare_local_and_public_scores.py) | Which local metric tracks the public score across comparable submissions? | [Local and public metrics](../../docs/validation/results/2026-09-18-local-public-metric-comparison.md) |
 | [rescore_campaign_comparisons.py](rescore_campaign_comparisons.py) | Which autoresearch verdicts change when past comparisons are re-scored against another frozen label set? | [2026-09-28 campaign re-scoring](../../docs/validation/results/2026-09-28-campaign-rescoring.md) |
 | [correlate_submission_metrics.py](correlate_submission_metrics.py) | Which local metric and label set track the public score across S23–S77, and do fixed labels judge label changes? | [2026-09-28 update](../../docs/validation/results/2026-09-18-local-public-metric-comparison.md#2026-09-28-update) |

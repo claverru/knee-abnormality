@@ -151,8 +151,10 @@ It is written this way because `modeling/model.py` is one of the files hashed in
 every checkpoint's `preprocessing_identity` (`identity.PREPROCESSING_SOURCES`), and
 that hash is byte-exact rather than semantic: adding even a no-op `force_reflection`
 argument there invalidates every existing checkpoint and makes `export.py` refuse it.
-`inference/` is not hashed, so `model.py` stays byte-identical and every checkpoint
-remains valid.
+`model.py` stays byte-identical, so every checkpoint that predates the transform remains
+valid. `inference/reflection.py` itself has since joined the hashed sources, so editing the
+transform now invalidates existing checkpoints
+([detail-view coordinates](../validation/results/2026-10-05-code-audit-measurements.md#f01-reflection-tta-detail-coordinates)).
 
 Verified equal to forcing reflection inside the model: on two fold-0 studies the two
 routes agree to **exactly 0.0**, while both differ from the unreflected pass by 0.087.
