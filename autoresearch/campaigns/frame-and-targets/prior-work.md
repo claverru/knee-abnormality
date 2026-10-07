@@ -244,8 +244,15 @@ spot-shift-locator-keeps-spatial-maps-k" onwards). Outputs under
 Extracted on 2026-10-07 in the worktree `knee-abnormality-jevk5-attributes-v4` (specification and
 check results: its `attributes_v5.md`). The 34 kept questions are the v4 answers run 24 already
 trains on; two questions are new. Their option probabilities, one column per option
-named `attribute_<question>__<option>` beside `StudyInstanceUID`, are in the prepared file the
-seeds name.
+named `attribute_<question>__<option>` beside `StudyInstanceUID`, are in
+`data/labels/prepared/jevk5-report-attributes-v5.0-new/targets.parquet` (4,407 studies; columns `weight_marrow_edema_bone`, `weight_extensor_tendon` hold each question's weight). It was cut from target set 5.0
+(`data/labels/prepared/jevk5-report-attributes-v5.0/targets.parquet`, built in that worktree from the
+merged answers with recipe 5.0, which gates the bone on `marrow_edema` and the tendon on
+`extra_extensor_tendons`); its 217 columns shared with the v4.0 targets are identical to them.
+Commonest option per study in the full run: bone none 2,595, femur 250, tibia 394, femur and tibia
+551, patella 86, patella and other 191, not stated 340 (706 studies with more than half their mass
+on the femur, 863 on the tibia); tendon none 3,648, quadriceps 304, patellar 231, both 178, not
+stated 46.
 
 | Question | Options | On the 212 audited reports |
 |---|---|---|
