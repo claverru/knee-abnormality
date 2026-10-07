@@ -19,14 +19,15 @@ measured outcomes are in the [validation results](../validation/results/INDEX.md
   control scored 0.944 (S78), not comparable with those fold-4 runs. The autoresearch gate requires both the label source and the split.
 - **Side-routed shared heads, since 2026-10-07 (`configs/training.yaml`, fold 1, seed 1110484336):** on top of
   the model below, one shared classifier for the two meniscus targets and one for the three OA
-  targets, routed by a frame inferred per knee from the heads' own attention spots (centre, side
-  axis and the two height cuts from the meniscus and kneecap spots; forward tilt, core and ring
-  radius learned), eight sectors, a core, two rings and three heights with hard cuts and a soft
-  gradient, routed v4.0 report targets and a knee-level term on every routed channel. It is the
-  incumbent of the routing-and-shifts campaign: ×4 0.925389, ×1 0.917411, 0.952 public (S120);
-  its parent, run 24, 0.953 (S118); the ResNet-50 on run 24's recipe 0.957 (S119, equal to the
-  best). The recipe without routing on the same fold and seed: ×4 0.924049, 0.950 public.
-  `configs/refined-resnet50.yaml` keeps seed 819238850. Design, runs and measurements:
+  targets, routed by a frame inferred per knee (centre and side axis from the heads' own meniscus
+  attention spots; forward tilt, two height cuts, core and ring radius regressed), eight sectors,
+  a core, two rings and three heights with hard cuts and a soft gradient, routed v4.0 report
+  targets and a knee-level term on every routed channel. It is run 24 of the line: ×4 0.925067,
+  ×1 0.917070, 0.953 public (S118); the ResNet-50 on the same recipe 0.957 (S119, equal to the
+  best). The recipe without routing on the same fold and seed: ×4 0.924049, 0.950 public. The
+  routing-and-shifts campaign's one adoption on it (height cuts from the spots, 0.952 as S120) is
+  level locally and not in force (user decision, 2026-10-07); it is the first seed of the next
+  campaign. `configs/refined-resnet50.yaml` keeps seed 819238850. Design, runs and measurements:
   [side-routed shared heads](side-routed-heads.md); next campaign, prepared and not started:
   [frame and targets](../../autoresearch/campaigns/frame-and-targets/INDEX.md).
 - **Model:** the [current model](../modeling/current-model.md), since 2026-09-29 on a

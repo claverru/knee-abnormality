@@ -646,39 +646,22 @@ class KneeAbnormalityModel(nn.Module):
         ).unbind(1)
         forward = front - centre
         upward = up - centre
-        shared = len(self.channels) - len(SHARED_CHANNELS)
+        meniscus = (
+            len(self.channels)
+            - len(SHARED_CHANNELS)
+            + SHARED_CHANNELS.index("meniscus")
+        )
         with torch.no_grad():
-            shared_looks = self.attention(tokens.float()).float().flatten(0, 1)
-
-            def spot(
-                looks: torch.Tensor, region: torch.Tensor
-            ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-                chosen = member & region[None]
-                found = chosen.any(-1)
-                open_ = chosen.clone()
-                open_[:, 0] |= ~found
-                weight = looks[None].masked_fill(~open_, -torch.inf).softmax(-1).square()
-                weight = weight / weight.sum(-1, keepdim=True)
-                centre = weight @ points
-                spread = (
-                    (weight @ points.square() - centre.square())
-                    .sum(-1)
-                    .clamp_min(1e-6)
-                    .sqrt()
-                )
-                return centre, spread, found
-
-            meniscus_looks = shared_looks[:, shared + SHARED_CHANNELS.index("meniscus")]
-            medial_spot, medial_spread, medial_found = spot(
-                meniscus_looks, points[:, 0] > 0
-            )
-            lateral_spot, lateral_spread, lateral_found = spot(
-                meniscus_looks, points[:, 0] <= 0
-            )
-            kneecap_spot, kneecap_spread, kneecap_found = spot(
-                shared_looks[:, shared + SHARED_CHANNELS.index("oa")],
-                (points[:, 1] > 0) & (points[:, 2] > 0),
-            )
+            looks = self.attention(tokens.float())[..., meniscus].float().flatten()
+        spots = []
+        for side in (points[:, 0] > 0, points[:, 0] <= 0):
+            chosen = member & side[None]
+            found = chosen.any(-1)
+            open_ = chosen.clone()
+            open_[:, 0] |= ~found
+            weight = looks[None].masked_fill(~open_, -torch.inf).softmax(-1).square()
+            spots.append(((weight / weight.sum(-1, keepdim=True)) @ points, found))
+        (medial_spot, medial_found), (lateral_spot, lateral_found) = spots
         both = (medial_found & lateral_found)[:, None]
         unit = torch.eye(count, device=tokens.device)
         side_axis = nn.functional.normalize(
@@ -719,36 +702,7 @@ class KneeAbnormalityModel(nn.Module):
         sizes = (
             self.frame_size_start + self.frame_size.float() + output[:, 2 * count :]
         ) * study_pitch[:, None]
-        with torch.no_grad():
-            medial_place, lateral_place, kneecap_place = (
-                torch.einsum("bc,bac->ba", place - shift, rotation)
-                for place in (medial_spot, lateral_spot, kneecap_spot)
-            )
-            meniscus_height = (medial_place[:, 2] + lateral_place[:, 2]) / 2
-            meniscus_spread = (medial_spread + lateral_spread) / 2
-            top = torch.maximum(
-                meniscus_height
-                + (kneecap_place[:, 2] - meniscus_height)
-                * meniscus_spread
-                / (meniscus_spread + kneecap_spread),
-                meniscus_height,
-            )
-            found = both[:, 0] & kneecap_found
-            start = self.frame_size_start[:2] * study_pitch[:, None]
-            heights = torch.where(
-                found[:, None],
-                torch.stack((top, 2 * meniscus_height - top), -1),
-                start,
-            )
-            height_cuts_applied = found & (heights != start).any(-1)
-        sizes = torch.cat((heights, sizes[:, 2:]), -1)
-        return (
-            shift,
-            rotation,
-            torch.stack((medial_spot, lateral_spot), 1),
-            sizes,
-            height_cuts_applied,
-        )
+        return shift, rotation, torch.stack((medial_spot, lateral_spot), 1), sizes
 
     def frame(self, encoded: dict, medial_sign: torch.Tensor | float) -> torch.Tensor:
         return (
@@ -1181,13 +1135,7 @@ class KneeAbnormalityModel(nn.Module):
             fitted_position = torch.stack(
                 (sign * knee_x, anterior_axis, superior_axis), -1
             )
-            (
-                study_shift,
-                study_rotation,
-                landmarks,
-                study_sizes,
-                height_cuts_applied,
-            ) = self.study_frames(
+            study_shift, study_rotation, landmarks, study_sizes = self.study_frames(
                 tokens,
                 fitted_position,
                 visual_valid & valid_position[:, None],
@@ -1217,7 +1165,6 @@ class KneeAbnormalityModel(nn.Module):
             "study_frame_rotation": study_rotation,
             "study_landmarks": landmarks,
             "study_frame_sizes": study_sizes,
-            "height_cuts_from_spots_applied": height_cuts_applied,
             "position": position,
             "fitted_position": fitted_position,
             "left_probability": left_probability,

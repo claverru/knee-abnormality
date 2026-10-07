@@ -1,6 +1,6 @@
 id: frame-and-targets
 recipe: configs/training.yaml
-reference_run: outputs/autoresearch/routing-and-shifts/experiments/height-cuts-from-the-spots-requeue-20261006T232351Z-d2445402/training
+reference_run: outputs/training/20261006-163650-side-routed-spot-frame-ring-sectors
 reference_equivalences: {}
 additional_evidence_runs: []
 backlog:
@@ -49,8 +49,8 @@ policy:
     The incumbent is described in prior-work.md (The incumbent) and drawn in
     docs/ongoing/side-routed-heads.md: one shared classifier for the two meniscus targets and
     one for the three OA targets; a frame inferred per knee in KneeAbnormalityModel.study_frames
-    (centre and side axis from the two meniscus spots, forward tilt learned, the two height cuts
-    from the meniscus and kneecap spots, core and ring radius regressed); regions in _regions
+    (centre and side axis from the two meniscus spots; forward tilt, the two height cuts, the
+    core and the ring radius regressed per knee); regions in _regions
     made of eight sectors, a core, two rings and three heights, cut hard with a soft gradient;
     routed report-attribute heads in training/report_attributes.py; a knee-level term on every
     routed channel. Read contract.md before writing code. Each seed is one design step and says
@@ -72,8 +72,9 @@ policy:
     the experiments of the routing-and-shifts campaign with source/ and changes.diff, the two
     manual runs with source_snapshot.zip (unzip into a temporary directory outside the
     candidate), and the rotation build under
-    outputs/analysis/routing-and-shifts-frames-20261007/builds/. That code was written on run
-    24 or on the incumbent as stated there: port the mechanism, do not copy files whole.
+    outputs/analysis/routing-and-shifts-frames-20261007/builds/. Each was written on run 24
+    (this campaign's base) or on the height-cuts model as stated there: port the mechanism, do
+    not copy files whole.
     Topic 2 facts: prepare_images in data/preprocessing/device.py resamples each slice's view
     window to 224 px, normalises each series between two quantiles of its windows' valid pixels
     and rounds to uint8; the canvas port of the routing-and-shifts campaign hands the model
@@ -109,8 +110,8 @@ policy:
     per-target AUC deltas from the two runs' fold_1/validation_predictions.csv with each
     target's sibling standard deviation (prior-work.md, Yardstick), and the geometry from the
     logs (frame angles, cuts, radii, what the run set). A delta under one sibling standard
-    deviation is not a result, and the incumbent sits 0.0003 to 0.0010 above its own reruns
-    (prior-work.md, The incumbent): say for each run whether it is level with a rerun. Only then
+    deviation is not a result, and near-identical runs spread over 0.0007 at x4 and 0.0010 at
+    x1 (prior-work.md, The incumbent): say for each run whether it is level with a rerun. Only then
     propose. Each idea fills the five parts of contract.md (How a seed is written) and is one
     training run; an idea that only measures is not allowed, so put the measurement in what the
     run logs. Start every implementation text with the sentence "Follow the environment

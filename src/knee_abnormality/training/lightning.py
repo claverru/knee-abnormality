@@ -851,11 +851,6 @@ class KneeModule(L.LightningModule):
                 study_angles[:, number].abs().mean(),
                 studies,
             )
-        self._log_epoch_metric(
-            f"{prefix}height_cuts_from_spots_applied_share",
-            encoded["height_cuts_from_spots_applied"].float().mean(),
-            studies,
-        )
         study_sizes = encoded["study_frame_sizes"].detach().float()
         for number, name in enumerate(FRAME_SIZES):
             self._log_epoch_metric(
