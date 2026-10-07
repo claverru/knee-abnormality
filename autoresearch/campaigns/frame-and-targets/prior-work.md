@@ -9,30 +9,35 @@ the design are [side routing](../side-routing/INDEX.md) and
 
 ## The incumbent
 
-`height-cuts-from-the-spots-requeue` of the routing-and-shifts campaign
-(`outputs/autoresearch/routing-and-shifts/experiments/height-cuts-from-the-spots-requeue-20261006T232351Z-d2445402`,
-with `source/` and `training/`): fold 1 of `all_5fold_scanner_v2`, seed 1110484336, ResNet-18,
-ten epochs. ×4 0.925389, ×1 0.917411, 0.952 public (S120). Its parent, run 24
-(`outputs/training/20261006-163650-side-routed-spot-frame-ring-sectors`): ×4 0.925067, ×1
-0.917070, 0.953 public (S118). The old recipe without routing, same fold and seed: ×4 0.924049,
-×1 0.916134, 0.950 public. The ResNet-50 on run 24's recipe: ×4 0.933209, ×1 0.922934, 0.957
-public (S119).
+Run 24 of the line, `outputs/training/20261006-163650-side-routed-spot-frame-ring-sectors`: fold
+1 of `all_5fold_scanner_v2`, seed 1110484336, ResNet-18, ten epochs. ×4 0.925067, ×1 0.917070,
+0.953 public (S118). The ResNet-50 on the same recipe: ×4 0.933209, ×1 0.922934, 0.957 public
+(S119, equal to the best submission). The old recipe without routing, same fold and seed: ×4
+0.924049, ×1 0.916134, 0.950 public.
 
-**The incumbent is at the top of its own reruns.** Eight runs of the previous campaign that
-differed from it only by a change that turned out inert landed 0.0003 to 0.0010 below it at ×4
-and 0.0009 to 0.0019 below at ×1. A run level with it at both multipliers is therefore a gain of
-about 0.0005 to 0.0010 over a typical rerun.
+The routing-and-shifts campaign adopted one change on it, `height-cuts-from-the-spots-requeue`
+(`outputs/autoresearch/routing-and-shifts/experiments/height-cuts-from-the-spots-requeue-20261006T232351Z-d2445402`,
+with `source/`, `changes.diff` and `training/`): the two height cuts placed per knee from the
+meniscus and kneecap spots without gradient. ×4 0.925389, ×1 0.917411, 0.952 public (S120): level
+with run 24 locally and one step lower on the public board. It is not part of this campaign's
+base (user decision, 2026-10-07: the base is the model with a submission on both backbones); it
+returns as the first seed. Most measurements of 2026-10-07 below were taken on its weights and
+say so.
+
+**How far near-identical runs spread.** Eight runs of the previous campaign that differed from
+the height-cuts model only by a change that turned out inert scored 0.9244 to 0.9251 at ×4 and
+0.9155 to 0.9165 at ×1. Run 24 (0.925067, 0.917070) is at the upper end of that range, so a run
+level with it at both multipliers is a small gain over a typical rerun.
 
 Its design: the frame of each knee is centred on the midpoint of two meniscus attention spots
 (squared-attention centroids of the shared meniscus channel over the two fitted halves, no
 gradient) plus one shared learned shift; its side axis is the line between them (roll and turn);
-the forward tilt (nod) is a landmark tilt plus a per-knee regression, learned from the labels;
-the two height cuts are placed per knee without gradient (upper cut between the menisci's height
-and the kneecap spot's, weighted by the spots' spreads; lower cut its mirror about the menisci);
-the core and ring radius are regressed per knee; eight 45° sectors centred on the axes, a core,
-an inner and an outer ring, three heights; hard cuts with a soft gradient; routed v4.0 report
-targets; a knee-level term on every routed channel. Geometry at its last epoch, validation
-means: upper cut +10.8 mm, lower cut −12.9 mm, core 16.3 mm, ring 29.8 mm, nod 6.0°.
+the forward tilt (nod) is a landmark tilt plus a per-knee regression; four sizes (upper cut,
+lower cut, core radius, ring radius) are regressed per knee; all of these learn from the labels.
+Eight 45° sectors centred on the axes, a core, an inner and an outer ring, three heights; hard
+cuts with a soft gradient; routed v4.0 report targets; a knee-level term on every routed channel.
+Geometry at its last epoch, validation means: upper cut +13.7 mm, lower cut −1.8 mm, nod 13.6°
+(the height-cuts model: +10.8 mm, −12.9 mm, core 16.3 mm, ring 29.8 mm, nod 6.0°).
 
 | Target | Region in the incumbent |
 |---|---|
@@ -153,8 +158,8 @@ Public scores of the line: 0.952 (S112, run 2), 0.953 (S113, run 4), 0.952 (S114
 
 ## The routing-and-shifts campaign (2026-10-06 and 07, 21 decided runs)
 
-One adoption, the incumbent above (+0.0003 at both multipliers). Deltas against the incumbent at
-×4 and ×1; details per run in its [run notes](../routing-and-shifts/run-notes.md).
+One adoption, the height cuts from the spots (+0.0003 over run 24 at both multipliers). Deltas
+against that model at ×4 and ×1; details per run in its [run notes](../routing-and-shifts/run-notes.md).
 
 | Run | ×4 | ×1 | What it showed |
 |---|---:|---:|---|
@@ -187,7 +192,7 @@ spot-shift-locator-keeps-spatial-maps-k" onwards). Outputs under
 - **Random crop offsets in training** (3 mm disc, sunflower pattern at prediction;
   `outputs/training/20261007-081431-side-routed-crop-offsets-3mm`): ×4 −0.0004, ×1 −0.0026.
   Training with the offsets costs 0.0012 to 0.0020; closed.
-- **An offset pattern at prediction on the incumbent's weights:** fourteen variants (by
+- **An offset pattern at prediction on the height-cuts model's weights:** fourteen variants (by
   direction, radius 1.5 to 6 mm, constant shifts, two positions) average 0.0000 with a spread of
   0.00025; closed. What changes a score is the picture the backbone sees, not the frame or the
   token positions (frame and position swaps: +0.0038 for Lateral Meniscus with the anchor's
@@ -195,7 +200,7 @@ spot-shift-locator-keeps-spatial-maps-k" onwards). Outputs under
   as a share of the gap between positives and negatives: 0.022 to 0.029 for the two menisci, the
   two OA sides and MCL, 0.007 to 0.014 for the rest; unrelated to the number of positives.
   Moving every coronal crop 3 mm medially costs Lateral OA 0.0043.
-- **Crops cut by the knee's frame, incumbent's weights, no training** (first look for the frame,
+- **Crops cut by the knee's frame, the height-cuts model's weights, no training** (first look for the frame,
   then the 84 and 93 mm views re-cut):
 
   | Variant | ×4 | ×1 |
@@ -214,13 +219,13 @@ spot-shift-locator-keeps-spatial-maps-k" onwards). Outputs under
   two reference models: run 24 +0.0007, the ResNet-50 +0.0002.
 - **The frame's angles across knees** (run 24's frames): nod median 14°, 1st to 99th percentile
   3° to 21°; roll −14° to 11°; turn −14° to 15°; single knees reach −25° of roll and −39° of
-  turn. The incumbent's nod has a median of 6°. A 300 px canvas holds a 224 px crop turned by
+  turn. The height-cuts model's nod has a median of 6°. A 300 px canvas holds a 224 px crop turned by
   7.5° and moved by 9 mm, or turned by 15° and moved by 5 mm.
 - **The spread of the frame's centre around the hand-set crop position:** 2.3 mm side to side,
   4.8 mm front to back, 7.4 mm up and down (standard deviations, spot noise of 4 to 6 mm
   included).
 - **A femur segment with its own lean**
-  (`outputs/training/20261007-101112-side-routed-femur-lean`): the band above the upper cut laid
+  (`outputs/training/20261007-101112-side-routed-femur-lean`, on the height-cuts model): the band above the upper cut laid
   out around an axis hinged at the cut, lean = a start from the kneecap spot plus a per-knee
   regression learned from the labels. ×4 −0.0002, ×1 −0.0009; Effusion +0.0021. The lean went to
   −25° for every knee within two epochs and the nod rose from 6° to 15°: the two angles traded
@@ -237,8 +242,8 @@ spot-shift-locator-keeps-spatial-maps-k" onwards). Outputs under
 ## The v5 report answers
 
 Extracted on 2026-10-07 in the worktree `knee-abnormality-jevk5-attributes-v4` (specification and
-check results: its `attributes_v5.md`). The 34 kept questions are the v4 answers the incumbent
-already trains on; two questions are new. Their option probabilities, one column per option
+check results: its `attributes_v5.md`). The 34 kept questions are the v4 answers run 24 already
+trains on; two questions are new. Their option probabilities, one column per option
 named `attribute_<question>__<option>` beside `StudyInstanceUID`, are in the prepared file the
 seeds name.
 
@@ -262,15 +267,15 @@ seed moves that head into the model.
 
 - Every campaign experiment has `source/` and `changes.diff` under
   `outputs/autoresearch/routing-and-shifts/experiments/<experiment>/`. The canvas loader (uint8
-  canvases with a margin, normalised in the loader with the incumbent's bounds) and the in-model
+  canvases with a margin, normalised in the loader with the prepared images' bounds) and the in-model
   cutter are in `spot-shift-locator-keeps-spatial-maps-k-20261007T043843Z-632ceac9`.
 - Manual runs keep their full source in `source_snapshot.zip`:
   `outputs/training/20261007-081431-side-routed-crop-offsets-3mm` (the canvas loader on the
-  incumbent with a cutter that takes an offset per slice, no locator) and
+  height-cuts model with a cutter that takes an offset per slice, no locator) and
   `outputs/training/20261007-101112-side-routed-femur-lean` (the upper band around its own axis
   in `frame()`, the kneecap spot's place returned by `study_frames`).
-- `outputs/analysis/routing-and-shifts-frames-20261007/builds/rotation-on-run-24/`: the crop
-  rotation inside the model on run 24's code (`modeling/model.py`: `ViewWindows.frame_angles`,
+- `outputs/analysis/routing-and-shifts-frames-20261007/builds/rotation-on-run-24/`: the canvas
+  loader and the crop rotation inside the model on run 24's code, this campaign's base (`modeling/model.py`: `ViewWindows.frame_angles`,
   the rotated cut in `ViewWindows.forward`, the first look in `KneeAbnormalityModel.forward`).
   `builds/scripts/frame_crops.py` has the centring as well and the controls.
 

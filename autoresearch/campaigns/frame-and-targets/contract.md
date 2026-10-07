@@ -3,7 +3,7 @@
 ## Objective
 
 Improve the side-routed model on three topics at once, continuing the
-[routing-and-shifts campaign](../routing-and-shifts/INDEX.md) from its incumbent:
+[routing-and-shifts campaign](../routing-and-shifts/INDEX.md) from the model it started on:
 
 1. **The knee frame:** the angles and regions of the frame each knee is given, measured from the
    heads' own attention spots where they are learned from the labels today.
@@ -13,13 +13,14 @@ Improve the side-routed model on three topics at once, continuing the
    extensor tendon involved) as targets read in regions, and which report questions are worth
    their head.
 
-The base and starting incumbent is `height-cuts-from-the-spots-requeue` of the previous campaign
-(`outputs/autoresearch/routing-and-shifts/experiments/height-cuts-from-the-spots-requeue-20261006T232351Z-d2445402/training`:
-fold 1 of `all_5fold_scanner_v2`, seed 1110484336, ResNet-18, ten epochs, ×4 0.925389, ×1
-0.917411, 0.952 public as S120). It is run 24 of
-[the line](../../../docs/ongoing/side-routed-heads.md) with the two height cuts placed per knee
-from the meniscus and kneecap spots. The campaign follows the three topics locally and makes no
-Kaggle submission.
+The base and starting incumbent is run 24 of [the line](../../../docs/ongoing/side-routed-heads.md),
+`side-routed-spot-frame-ring-sectors`
+(`outputs/training/20261006-163650-side-routed-spot-frame-ring-sectors`: fold 1 of
+`all_5fold_scanner_v2`, seed 1110484336, ResNet-18, ten epochs, ×4 0.925067, ×1 0.917070, 0.953
+public as S118; the ResNet-50 on its recipe scored 0.957 as S119). The previous campaign's one
+adoption on it, the height cuts placed from the spots, is level with it locally and scored 0.952
+(S120); it is not in the base and returns as the first seed. The campaign follows the three
+topics locally and makes no Kaggle submission.
 
 ## Scope
 
