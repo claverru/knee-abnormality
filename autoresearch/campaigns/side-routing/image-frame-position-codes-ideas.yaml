@@ -1,0 +1,65 @@
+ideas:
+- id: image-frame-position-codes-for-own-channels
+  mechanism_id: own-channel-token-position
+  parent_idea_id: null
+  title: Give the own-channel classifiers' tokens the old recipe's slice-position and in-image
+    position codes in place of the knee-frame sinusoid
+  opportunity: >-
+    Evidence-backed for where the deficit comes from, a guess that the same codes cure it
+    here. Three own-channel targets of the incumbent sit below the 12 same-fold runs of the old
+    recipe: Baker's (below all 12), Fracture and ACL (below 11); against the sibling mean
+    Fracture is -0.0072 and Baker's -0.0036. Exactly one of those sibling runs shows the same
+    profile: position-embeddings-off, the old recipe with its two token position codes switched
+    off, is the lowest sibling on Baker's (-0.0028) and scores +0.0002 on Fracture where the
+    other eleven score +0.0043 to +0.0117. So in the old recipe these two codes are what holds
+    Fracture and Baker's up. This line removed them in its first run. Its replacements have not
+    restored them: the fixed knee-frame sinusoid of the fifth run (Fracture +0.0000, Baker's
+    -0.0035) and the learned knee-frame code of learned-position-code-for-own-channels
+    (Fracture -0.0037 against the incumbent, 2026-10-06). The two old codes differ from the
+    knee-frame ones in kind: they are read from each series alone (which slice of the stack,
+    where in the image) and need neither the fitted centre nor the knee side.
+  mechanism: >-
+    On the tokens the own-channel classifiers read, and only there, replace the fixed knee-frame
+    sinusoid by the old recipe's two codes, taken from its frozen source
+    (outputs/autoresearch/fixes-and-removals/experiments/slab-rule-and-positive-std-requeue-20261005T155303Z-59280bbc/source/src/knee_abnormality/modeling/model.py
+    and modeling/spatial_tokens.py). (1) Slice position: sinusoidal_positions(positions, 256)
+    of batch["slice_positions"] for the acquisition's middle slice, added to every token of
+    that slice, with positions negated for mirrored sagittal acquisitions as
+    reflection_positions did (the batch key and inference/reflection.py still carry it). (2)
+    In-image position: Linear(2, 64), GELU, Linear(64, 256) with PyTorch's default
+    initialisation, on the token's image coordinates normalised to [-1, 1]: for a wide view the
+    final augmented image grid, as the old recipe; for a detail view the token's
+    inverse-augmented position in its own prepared crop (prepared_xy), since the old
+    detail-to-wide map no longer exists and the detail-view embedding already marks those
+    tokens. Both are added before the normalisation, to the own-channel version of the tokens
+    only. The shared classifiers' tokens stay position-free. position_code, code_frequencies
+    and the padding go. The knee frame, the routing, the position prior on the attention and
+    the side head are unchanged.
+  precedents:
+  - 'outputs/autoresearch/fixes-and-removals/experiments/position-embeddings-off-20261005T165932Z-7aa8b0ae against its 11 siblings: Fracture +0.0002 against +0.0043 to +0.0117, Baker''s -0.0028, the lowest.'
+  - 'autoresearch/campaigns/side-routing/run-notes.md, learned-position-code-for-own-channels: a learned knee-frame code lowered Fracture by 0.0037 and MCL by 0.0047.'
+  - 'docs/ongoing/side-routed-heads.md, Fourth run and Fifth run: own-channel targets without a token code and with the fixed knee-frame sinusoid.'
+  novelty: The old recipe's two codes have not been run in this design; every run of the line used no code or a knee-frame one.
+  coverage: >-
+    Every token, with or without a fitted centre, for the seven own-channel targets and the
+    unrouted report questions, training and inference. Tokens of series without a fitted centre
+    get a position for the first time since the fifth build.
+  exploitation: >-
+    Read the run report against the incumbent: Fracture and Baker's first (expected towards the
+    sibling mean, +0.007 and +0.004 over the incumbent), ACL, then the other own-channel
+    targets and the own-targets flag; the routed sum must not move, since the shared
+    classifiers do not read the codes. Shown wrong by: Fracture and Baker's not above the
+    incumbent, which would mean the old codes are not what this design is missing either.
+  budget: Same cost as the incumbent.
+  implementation: >-
+    modeling/model.py: sinusoidal_positions and the slice positions through encode_batch
+    (mirrored-sagittal negation included), the in-image network created under
+    torch.random.fork_rng, and study_tokens adding both codes to the own-channel version only;
+    remove position_code and code_frequencies. modeling/spatial_tokens.py: the token entry of
+    SPATIAL_TOKEN_IDENTITY. No config field and no option; no data-loading change is needed.
+    scripts.tools.check_side_routing runs on the CPU when no GPU is visible; all nine guardrails
+    must pass (its position-free test covers the shared tokens) and its JSON goes in the report.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Keeper seed on the largest local deficit left in the design, after the learned knee-frame code failed; the one sibling run without these codes reproduces that deficit.
+exhausted_directions: ''

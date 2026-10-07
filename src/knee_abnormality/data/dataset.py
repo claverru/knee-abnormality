@@ -40,12 +40,12 @@ from knee_abnormality.data.preprocessing.series import IndexedSeries, index_seri
 from knee_abnormality.data.preprocessing.spatial import (
     fallback_window_center,
     view_position,
-    view_transforms,
 )
 from knee_abnormality.data.sources import SeriesCandidate, StudySeries
 from knee_abnormality.data.splits import STUDY
 
 UNKNOWN_GEOMETRY = (0.0, (0.0, 0.0, 0.0), False)
+CERTAIN_SIDE_REASON = "explicit_coordinates_agree"
 
 
 class KneeStudyDataset(Dataset):
@@ -83,6 +83,7 @@ class KneeStudyDataset(Dataset):
         self._view_specs: dict[tuple[str, str, int], tuple] = {}
         self._study_references: dict[str, StudyReference] = {}
         self._study_sides: dict[str, KneeSide] = {}
+        self._split_studies: set[str] = set()
         self._series_geometry: dict[
             str, dict[str, tuple[float, tuple[float, float, float], bool]]
         ] = {}
@@ -168,6 +169,8 @@ class KneeStudyDataset(Dataset):
         self._study_references[study.uid] = reference
         side = resolve_knee_side(tuple(item for item in sides if item[0] not in strays))
         self._study_sides[study.uid] = side
+        if bilateral:
+            self._split_studies.add(study.uid)
         knee_references = (
             {
                 group: estimate_reference(
@@ -199,8 +202,7 @@ class KneeStudyDataset(Dataset):
             )
             center = fitted if fitted is not None else side.center_x_mm
             valid = bool(
-                sign
-                and center is not None
+                center is not None
                 and own_reference is not None
                 and own_reference.point is not None
                 and own_reference.method in {"fit", "robust"}
@@ -296,14 +298,8 @@ class KneeStudyDataset(Dataset):
                 knee_side_sign=sign,
                 knee_center_x_mm=center,
                 knee_center_y_mm=center_y,
+                knee_center_z_mm=center_z,
                 view_index=view_index,
-                view_to_wide=(
-                    view_transforms(
-                        value, self.data.reference_spacing_mm, self.data.image_size
-                    )
-                    if detail
-                    else torch.eye(3)[None].expand(value.triplet_count, -1, -1)
-                ),
                 window_center_mm=window_center,
                 window_rule_distance_mm=rule_distance,
             )
@@ -457,6 +453,7 @@ class KneeStudyDataset(Dataset):
             "series": tuple(prepared),
             "study_reference": self._study_references.get(study.uid),
             "knee_side": self._study_sides[study.uid],
+            "knee_side_split": study.uid in self._split_studies,
             "target": target,
             "target_observed": observed,
             "failures": tuple(failures),
@@ -492,12 +489,12 @@ def collate_studies(items: list[dict]) -> dict:
     patient_maps = torch.zeros((len(entries), max_slices, SLICES_PER_INPUT, 3, 3))
     geometry_valid = torch.zeros((len(entries), max_slices), dtype=torch.bool)
     view_index = torch.zeros(len(entries), dtype=torch.long)
-    view_to_wide = torch.eye(3).expand(len(entries), max_slices, 3, 3).clone()
     window_center = torch.zeros((len(entries), 2))
     window_rule_distance = torch.zeros(len(entries))
     knee_side_sign = torch.zeros(len(entries), dtype=torch.float32)
     knee_center_x_mm = torch.zeros(len(entries), dtype=torch.float32)
     knee_center_y_mm = torch.zeros(len(entries), dtype=torch.float32)
+    knee_center_z_mm = torch.zeros(len(entries), dtype=torch.float32)
     reflection_eligible = torch.ones(batch_size, dtype=torch.bool)
     for index, item in enumerate(items):
         supplied = [
@@ -535,7 +532,6 @@ def collate_studies(items: list[dict]) -> dict:
         )
         count = series.triplet_count
         view_index[series_index] = series.view_index
-        view_to_wide[series_index, :count] = series.view_to_wide
         window_center[series_index] = torch.tensor(series.window_center_mm)
         window_rule_distance[series_index] = series.window_rule_distance_mm
         first = series_index * max_slices * SLICES_PER_INPUT
@@ -550,6 +546,7 @@ def collate_studies(items: list[dict]) -> dict:
         knee_side_sign[series_index] = series.knee_side_sign
         knee_center_x_mm[series_index] = series.knee_center_x_mm
         knee_center_y_mm[series_index] = series.knee_center_y_mm
+        knee_center_z_mm[series_index] = series.knee_center_z_mm
         slice_mask[series_index, :count] = True
         study_indices[series_index] = study_index
         type_indices[series_index] = type_index
@@ -567,12 +564,22 @@ def collate_studies(items: list[dict]) -> dict:
         "patient_maps": patient_maps,
         "geometry_valid": geometry_valid,
         "view_index": view_index,
-        "view_to_wide": view_to_wide,
         "window_center_mm": window_center,
         "window_rule_distance_mm": window_rule_distance,
         "knee_side_sign": knee_side_sign,
         "knee_center_x_mm": knee_center_x_mm,
         "knee_center_y_mm": knee_center_y_mm,
+        "knee_center_z_mm": knee_center_z_mm,
+        "knee_side_certain": torch.tensor(
+            [item["knee_side"].reason == CERTAIN_SIDE_REASON for item in items]
+        ),
+        "knee_side_coordinates": torch.tensor(
+            [item["knee_side"].source == "coordinates" for item in items]
+        ),
+        "knee_side_left": torch.tensor(
+            [item["knee_side"].value == LEFT for item in items]
+        ),
+        "knee_side_split": torch.tensor([item["knee_side_split"] for item in items]),
         "knee_side_reasons": [item["knee_side"].reason for item in items],
         "reflection_eligible": reflection_eligible,
         "reflection_reasons": [item["reflection_reasons"] for item in items],

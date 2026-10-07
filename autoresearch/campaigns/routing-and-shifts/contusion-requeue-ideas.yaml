@@ -1,0 +1,57 @@
+ideas:
+- id: contusion-reads-the-edema-head-requeue
+  mechanism_id: report-region-targets
+  parent_idea_id: null
+  title: Add to Contusion's logit what the shared marrow-edema head sees in the three compartments
+  opportunity: 'A guess. Contusion is the one target that goes down when the others go up: -0.0020
+    between the top six and the bottom six runs, and its spread across the routed runs is 1.4 sibling
+    SDs (0.9453 to 0.9531). It is not routed, because a contusion can be anywhere. The training already
+    holds a head that says where marrow edema is: the located family marrow_edema_place, one shared
+    head read over the medial, lateral and kneecap regions, whose targets explain 25% on unseen knees.
+    A contusion is marrow edema with a traumatic cause, so that head''s evidence is Contusion''s evidence
+    with a place attached.'
+  mechanism: 'Today the family marrow_edema_place lives in ReportAttributeHeads (training/report_attributes.py),
+    owned by the training module, and is absent at inference: one attention column and one classifier
+    row shared by its three Region entries (routes oa_medial, oa_lateral, kneecap), pooled over each
+    route on the shared tokens. Move that family''s reader into KneeAbnormalityModel as a module edema_place
+    with the same shape (an attention network of Linear(PROJECTION_WIDTH, MIL_ATTENTION_WIDTH), Tanh,
+    Linear(..., 1) and a classifier Linear(PROJECTION_WIDTH, 1)) and a method that returns the three
+    region logits of a batch, pooled exactly as ReportAttributeHeads._pool pools a located family.
+    ReportAttributeHeads takes those three logits from the model for this family and no longer holds
+    a column and row for it; the report loss on the three edema targets is otherwise unchanged. In
+    the model''s pooling, the Contusion target''s logit gains contusion_edema_scale * logsumexp of
+    the three edema logits, with contusion_edema_scale a learned scalar starting at zero. Contusion
+    keeps its own unrouted channel. The edema reader is trained by the report loss as today and by
+    Contusion''s target loss through the new term; it reads the shared tokens without detaching, as
+    the report heads do.'
+  precedents:
+  - 'docs/ongoing/side-routed-heads.md: edema by compartment 25% explained on validation knees.'
+  - 'docs/ongoing/side-routed-heads.md, The runs sorted: Contusion -0.0020 top six against bottom
+    six.'
+  novelty: First use of a located report head at inference.
+  coverage: Contusion on every study; the edema reader on every study at inference.
+  exploitation: 'Read Contusion against the incumbent (sibling SD 0.0013), both multipliers, the learned
+    scale, and val_report_attribute_bce of the three edema targets against the incumbent''s. Shown
+    wrong by: a scale that stays within 0.02 of zero, or the edema targets fitting worse than in the
+    incumbent.'
+  budget: Same cost; three pooled logits more at inference.
+  implementation: 'Guardrail evidence, read this first: the developer''s environment has no GPU and
+    must not use one. Run `rtk proxy uv run --locked python -m scripts.tools.check_side_routing --config
+    configs/training.yaml` from the candidate as it is: the script selects the CPU by itself when
+    no GPU is visible (DEVICE in its source), takes a few minutes there, and that CPU run is the required
+    check; its JSON is the required evidence. Never return blocked for lack of a GPU. Keep the prepared
+    source, the diff and the JSON in the assigned experiment directory, not under /tmp. modeling/model.py:
+    the module edema_place and contusion_edema_scale, both created under torch.random.fork_rng; the
+    three logits computed where the routing weights are available (pool_encoded or _attention_pool)
+    and added to the Contusion column only. training/report_attributes.py: REGION_FAMILIES keeps marrow_edema_place
+    for the targets and the loss, but its logits come from the model. Since the weights are under
+    the model''s state dict, inference/checkpoint.py loads them with no change; confirm that a saved
+    checkpoint reloads strictly. Log contusion_edema_scale per epoch. Update SPATIAL_TOKEN_IDENTITY
+    and run the guardrail check: with the scale at zero the logits equal the incumbent''s, so every
+    guardrail must pass unchanged.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: 'Keeper''s requeue of 2026-10-07: the first candidate was parked because the
+    developer did not run the guardrail check, reading it as needing a GPU. The one target moving
+    against the rest, with a located head already trained for its finding.'
+exhausted_directions: ''

@@ -1,0 +1,191 @@
+ideas:
+- id: routed-report-attribute-heads
+  mechanism_id: report-attribute-routing
+  parent_idea_id: null
+  title: Share and route the per-compartment report-attribute heads with the same cuts as the
+    targets, and drop the two questions whose answer is the compartment
+  opportunity: >-
+    Evidence-backed that the conflict exists in the code; a guess that removing it gains.
+    training/report_attributes.py builds 35 heads, each with its own attention over all of a
+    study's tokens and its own classifier, and their loss (weight 0.1) trains the backbone. 16
+    of the 35 questions are about one compartment and none is routed: medial_meniscus_status
+    and lateral_meniscus_status are two separate heads over the whole knee, so they can differ
+    only if the tokens themselves say which side they are on. That asks the backbone to encode
+    the compartment, which the shared target classifiers are built to do without. Cartilage and
+    meniscus questions carry about 43% of the attribute signal
+    (docs/modeling/report-attribute-heads.md, Question weighting). The heads are worth keeping:
+    +0.00105 x4 at adoption and -0.0006 when removed on the ResNet-18 recipe. The same sharing
+    gave the five routed targets +0.0090 to +0.0131 against separate classifiers in the fourth
+    and fifth runs (docs/ongoing/side-routed-heads.md).
+  mechanism: >-
+    Five question families get one shared head each (one attention score column and one
+    classifier block of options), routed by the model's routing weights exactly as the targets
+    are. The option lists inside each family are identical in
+    configs/labels/jevk5-report-attribute-targets-v3.1.json (checked 2026-10-05: 6, 8, 8, 6 and
+    5 options). Family, member questions, route of each member (names from ROUTES in
+    modeling/model.py): (1) meniscus status: medial_meniscus_status -> medial,
+    lateral_meniscus_status -> lateral; (2) meniscus tear location:
+    medial_meniscus_tear_location -> medial, lateral_meniscus_tear_location -> lateral; (3)
+    meniscus tear type: medial_meniscus_tear_type -> medial, lateral_meniscus_tear_type ->
+    lateral; (4) cartilage depth: medial_cartilage_depth -> medial_back,
+    lateral_cartilage_depth -> lateral_back, pf_cartilage_depth -> front; (5) cartilage extent:
+    medial_cartilage_extent -> medial_back, lateral_cartilage_extent -> lateral_back,
+    pf_cartilage_extent -> front. For a routed question q with route r, its attention is the
+    softmax over the study's valid tokens of (the family's score + log of the routing weight of
+    r), with the same floor (ROUTING_MINIMUM_WEIGHT) and the same fallback as
+    KneeAbnormalityModel._attention_pool: when the study's routing weights for r sum to less
+    than one token, q pools unrouted. Its logits are that pooled token times the family's
+    classifier block, so the members of a family differ only by their routing. The routed
+    families read the shared classifiers' tokens, study_tokens(encoded, shared=True), which
+    carry no position; every other question reads study_tokens(encoded) as today. The routing
+    weights are the model's routing_weights(...) for the batch, not detached, so the attribute
+    loss also acts on the frame and the widths. Two questions are dropped from the heads and
+    from the loss, by id, because their answer is the compartment itself: contusion_location
+    and extra_meniscal_cyst. The remaining 21 questions (medial_meniscus_extrusion and
+    pf_cartilage_surface among them) keep their own unrouted head. That leaves 33 questions on
+    26 heads. The targets table, the reliability weights, report_attribute_loss, the loss
+    weight and the logged report_attribute_kl_<question> per remaining question are unchanged.
+  precedents:
+  - 'docs/ongoing/side-routed-heads.md, Fourth run and Fifth run: the five routed targets sum to +0.0131 and +0.0090 against the reference; localisation +0.002 to +0.013 in the fourth run.'
+  - 'docs/modeling/report-attribute-heads.md: adoption at +0.00105 x4 and 0.940 against 0.938 public; removal on the ResNet-18 recipe -0.0006 (80% [-0.0011, -0.0001]).'
+  novelty: First change to the structure of the report-attribute heads since their adoption on 2026-09-25; they have never been routed or shared.
+  coverage: >-
+    Training only. Every training study with attribute targets; 12 routed questions in 5
+    families, 2 questions dropped, 21 unchanged. Inference does not use the heads.
+  exploitation: >-
+    Read the run report against the incumbent: the routed targets' sum and the five
+    localisation deltas (the questions now pull on the same cuts as the targets), the frame
+    angles and the two cut widths, and the own-channel targets (the backbone is no longer asked
+    for the compartment). Per-question report_attribute_kl for the 12 routed questions against
+    the incumbent's values shows whether the shared heads fit as well as the separate ones.
+    Shown wrong by: the routed sum or a localisation delta flagged in the report, or the routed
+    questions' divergences clearly above the incumbent's.
+  budget: Same cost as the incumbent; nine attention columns and classifier blocks fewer.
+  implementation: >-
+    training/report_attributes.py: ReportAttributeHeads takes the question families and routes
+    as module constants (question id to family name and to route name), builds one attention
+    output and one classifier block per head, and maps each kept question to its head, its
+    route index in ROUTES (len(ROUTES) for unrouted) and whether it reads the shared tokens;
+    forward takes both token versions and the routing weights and returns logits in the kept
+    questions' order; option_counts, question_ids, the targets table and the weights are
+    restricted to the kept questions. training/lightning.py, _report_attribute_step: pass
+    study_tokens(encoded), study_tokens(encoded, shared=True) and
+    model.routing_weights(encoded["knee_x"], encoded["anterior_axis"],
+    encoded["superior_axis"], encoded["left_probability"][:, None],
+    encoded["routable"][:, None]).flatten(1). New parameters initialize under
+    torch.random.fork_rng. No config field and no option; the manifest file is not edited. The
+    guardrail check must still pass; it does not exercise the attribute heads, so also confirm
+    on one batch that flipping left_probability swaps the logits of medial_meniscus_status and
+    lateral_meniscus_status.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The one remaining part of the model that asks the backbone for the compartment; the user ordered it first.
+- id: front-and-up-region-for-pf-oa
+  mechanism_id: octant-routing
+  parent_idea_id: null
+  title: Route PF OA from the front-and-up region and give Medial and Lateral OA the rest of
+    their side, with a height cut held by the same competition
+  opportunity: >-
+    Evidence-backed for the geometry (drawings), a guess for the gain. In the fifth run the
+    front cut passes through the fitted centre and only the learned rotation can tilt it. The
+    nod ended at 5 degrees, so the cut stayed close to vertical, and Medial OA and Lateral OA,
+    which gave up the whole front of their side, fell from +0.0030 and +0.0022 (fourth run,
+    front tokens counted for their side) to +0.0013 and +0.0003, while PF OA stayed above all
+    12 sibling runs (+0.0071). The drawings of 2026-10-05
+    (outputs/analysis/octant-sketches-20261005, docs/ongoing/side-routed-heads.md, Octant
+    sketches) show why a vertical cut costs them: the fitted centre sits at the notch, about
+    15 mm above the joint line, so the front-and-low region holds the front of the tibial
+    plateau, its cartilage and the anterior meniscal horns, which belong to the tibiofemoral
+    compartments, and the front-and-up region alone holds the kneecap and the trochlea. The
+    position prior of the third run found the same split unaided: PF OA 45 mm in front and
+    21 mm up, the two OA sides 18 mm behind and 16 mm down.
+  mechanism: >-
+    A third cut, at the frame's height coordinate, used for routing because PF OA and the two
+    tibiofemoral OA targets compete across it. With (m, f, h) = frame(...) as today:
+    r_medial = sigmoid(m / width_medial), r_front = sigmoid(f / width_front) and the new
+    r_up = sigmoid(h / width_up), each computed as r_medial and r_front are today (for the left
+    and the right hypothesis, mixed by left_probability). width_up is a new learned width with
+    the same parametrisation and start as the others (5 mm, 1 to 40 mm). Routing weights:
+    Medial Meniscus r_medial; Lateral Meniscus 1 - r_medial; PF OA r_front * r_up; Medial OA
+    r_medial * (1 - r_front * r_up); Lateral OA (1 - r_medial) * (1 - r_front * r_up). The
+    three OA weights sum to one at every token, as the two meniscus weights do. ROUTES becomes
+    ("medial", "lateral", "front_up", "medial_rest", "lateral_rest") and TARGET_ROUTES,
+    PRIOR_VARIANTS and the report-attribute routes that name "front", "medial_back" or
+    "lateral_back" follow (front -> front_up, medial_back -> medial_rest, lateral_back ->
+    lateral_rest). The frame, its learned rotation, the position prior, the token position code
+    and the side head are unchanged; the origin stays the fitted centre with no offset.
+  precedents:
+  - 'docs/ongoing/side-routed-heads.md, Fifth run: nod -5.1 degrees, Medial OA +0.0013 and Lateral OA +0.0003 against +0.0030 and +0.0022 in the fourth run, PF OA +0.0071.'
+  - 'docs/ongoing/side-routed-heads.md, Octant sketches and Third run: the centre about 15 mm above the joint line; prior peaks for PF OA and the OA sides.'
+  novelty: First use of the height coordinate for routing; the fifth build routes on the midline and the front cut only.
+  coverage: >-
+    Every study with a fitted centre, training and inference. Tokens in front of and below the
+    centre move from PF OA to Medial or Lateral OA; everything else keeps its target.
+  exploitation: >-
+    Read the run report against the incumbent: Medial OA and Lateral OA (expected back towards
+    the fourth run's level), PF OA (must not fall), their three localisation deltas, the logged
+    routing_width_up_mm and the frame's nod (frame_rotation_nod_deg). Shown wrong by: PF OA
+    flagged on localisation, or Medial and Lateral OA not above the incumbent's.
+  budget: Same cost as the incumbent.
+  implementation: >-
+    modeling/model.py: ROUTES, TARGET_ROUTES, PRIOR_VARIANTS, ROUTING_WIDTHS (add "up"; the side
+    head's width is read by name, not by position) and routing_weights as above;
+    SPATIAL_TOKEN_IDENTITY compartment_routing in modeling/spatial_tokens.py. training/lightning.py
+    logs every routing width and the mean routing weight per route already; keep both working
+    for the new names. If the report-attribute heads are routed in the incumbent, rename their
+    routes in training/report_attributes.py. No config field and no option. The guardrail check
+    must pass; its partition test covers the new weights.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The one geometric loss the fifth run showed (the two tibiofemoral OA targets), with drawings and a learned prior pointing at the same region.
+- id: learned-position-code-for-own-channels
+  mechanism_id: own-channel-token-position
+  parent_idea_id: null
+  title: Give the own-channel classifiers' tokens a learned position code in the knee frame in
+    place of the fixed sinusoid
+  opportunity: >-
+    Evidence-backed for Fracture, a guess for the others. The fifth run put a fixed sinusoid of
+    the knee-frame position on the tokens the seven own-channel classifiers read, and their
+    summed deficit against the old recipe shrank from -0.0143 to -0.0039. Three targets stay
+    below the 12 same-fold sibling runs of the old recipe: Baker's (below all 12, -0.0035),
+    Fracture (below 11, +0.0000 against a sibling mean of +0.0072) and ACL (below 11, -0.0041).
+    Three of those sibling runs carried a learned code of a side-normalised 3D position on
+    every token, the code this seed proposes, and scored on Fracture +0.0102
+    (computed-centre-3d-position), +0.0116 (position-3d-without-oa-detector) and +0.0105
+    (position-3d-beside-1d-2d), the three highest but one; the sibling without any token
+    position scored +0.0002. So for Fracture a learned code is worth about 0.010 over none and
+    the fixed sinusoid recovered none of it. On Baker's the same three runs scored -0.0020,
+    -0.0022 and -0.0005 against -0.0028 without position.
+  mechanism: >-
+    In KneeAbnormalityModel.position_code (modeling/model.py), replace the fixed 42-wavelength
+    sinusoid by the learned code of those campaign runs: sin and cos of the three knee-frame
+    coordinates at 7 wavelengths from 8 to 512 mm (the existing position_frequencies), flattened
+    to 42 features, then Linear(42, 64), GELU, Linear(64, 256), with PyTorch's default
+    initialisation so the code works from the first step (the second run's zero-started code
+    stayed at a tenth of the token's norm and was not used). The position stays detached and
+    stays the frame's (m, f, h). A token without a fitted centre takes one learned vector
+    (a parameter of 256 zeros) instead of zero. The code is added, as today, only to the tokens
+    of the own-channel classifiers and the unrouted report-attribute heads; the shared
+    classifiers' tokens stay position-free. code_frequencies and the padding go.
+  precedents:
+  - 'outputs/autoresearch/fixes-and-removals/experiments: computed-centre-3d-position, position-3d-without-oa-detector, position-3d-beside-1d-2d and position-embeddings-off, per-target x4 deltas against slab-rule-and-positive-std-requeue.'
+  - 'docs/ongoing/side-routed-heads.md, Second run (zero-started code unused), Fourth run and Fifth run (own-channel targets with and without the fixed sinusoid).'
+  novelty: The campaign's learned 3D code has not been run in the knee frame or restricted to the own-channel classifiers.
+  coverage: >-
+    Every token of a series with a fitted centre, for the seven own-channel targets and the
+    unrouted report questions, training and inference.
+  exploitation: >-
+    Read the run report against the incumbent: Fracture, Baker's and ACL first (the own-targets
+    flag), then the other four own-channel targets, and the routed sum, which must not move
+    (the shared classifiers do not read the code). Shown wrong by: Fracture not above the
+    incumbent, or an own-channel target newly below every sibling.
+  budget: Same cost as the incumbent.
+  implementation: >-
+    modeling/model.py: the position module (created under torch.random.fork_rng), the learned
+    no-centre vector, position_code; drop the code_frequencies buffer.
+    modeling/spatial_tokens.py: the token entry of SPATIAL_TOKEN_IDENTITY. No config field and
+    no option. The guardrail check must pass; its position-free test covers the shared tokens.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The largest remaining own-channel deficit, with three campaign runs showing what a learned code is worth on it.
+exhausted_directions: ''

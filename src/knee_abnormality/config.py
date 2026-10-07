@@ -277,7 +277,6 @@ class ModelConfig(ConfigModel):
     channels_last: bool = False
     checkpoint_backbone: bool = False
     backbone_eval: bool = False
-    anatomical_bias: bool = True
     dropout: Annotated[float, Field(ge=0, lt=1)]
     series_dropout: Annotated[float, Field(ge=0, lt=1)]
     plane_readout: bool = False
@@ -335,7 +334,6 @@ class TrainerConfig(ConfigModel):
     min_delta: Annotated[float, Field(ge=0)]
     deterministic: bool
     class_balance_exponent: Annotated[float, Field(ge=0, le=1)]
-    half_knee_loss_weight: PositiveFiniteFloat = 0.075
     report_attribute_loss_weight: PositiveFiniteFloat
     scanner_confusion_weight: Annotated[float, Field(ge=0, allow_inf_nan=False)]
 

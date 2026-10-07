@@ -1,0 +1,642 @@
+{
+  "version": 1,
+  "prepared_at": "2026-09-29T15:53:34.521239+00:00",
+  "method": "JevK5 option probabilities averaged over both option orders, one column per question and option. Questions in excluded are dropped. Each merge sums its source options into one option in both orders. Each question's weight is one minus the total-variation distance between its forward and reverse distributions after merging. Each gate conditions a child question on its parent: with p the parent's probability mass on parent_options, the child becomes (1 - p) on empty_option plus p times the child's own distribution with its empty_option mass moved to fallback_option, and its weight becomes (1 - p) times the parent's weight plus p times its own.",
+  "source_run": {
+    "model": "alibiserikbay/JevK5",
+    "model_revision": "05b7ad9408a979c0e56af8c5592d216547e14c53",
+    "questions": "configs/labels/jevk5-report-attributes-v4.json",
+    "questions_sha256": "67721ddc6878979c9afdfa085725cd670cca7bac75a8a3fab6c7a6e25342f507",
+    "reports": "data/raw/train.csv",
+    "reports_sha256": "8ca2203c0e9d61c080c7a314c7cdb51c1b03a1d9eb4770819f7f34af53ef4e33",
+    "sample": null,
+    "studies_list": null,
+    "studies_list_sha256": null,
+    "seed": 20260924,
+    "shard_size": 200,
+    "studies": 4407,
+    "question_count": 37,
+    "orders": [
+      "forward",
+      "reverse"
+    ]
+  },
+  "attributes": {
+    "path": "outputs/labels/jevk5-attributes-v4/attributes.parquet",
+    "bytes": 11039086,
+    "sha256": "188e006a3c7109ffad3cced823ad6e9b64e98ed8deb1ed709cffc979cfbfc554"
+  },
+  "question_set": {
+    "path": "configs/labels/jevk5-report-attributes-v4.json",
+    "bytes": 37682,
+    "sha256": "67721ddc6878979c9afdfa085725cd670cca7bac75a8a3fab6c7a6e25342f507"
+  },
+  "targets": {
+    "path": "data/labels/prepared/jevk5-report-attributes-v4.0/targets.parquet",
+    "bytes": 3781611,
+    "sha256": "65dd9c901065c86028da96a51144964024feb4737d4cb45e04516d3990a3a6e5"
+  },
+  "excluded": [],
+  "merges": [
+    {
+      "question": "overall_osteoarthritis",
+      "option": "no_osteoarthritis",
+      "sources": [
+        "not_mentioned",
+        "none"
+      ]
+    },
+    {
+      "question": "medial_cartilage_depth",
+      "option": "no_damage",
+      "sources": [
+        "not_mentioned",
+        "normal",
+        "only_elsewhere"
+      ]
+    },
+    {
+      "question": "lateral_cartilage_depth",
+      "option": "no_damage",
+      "sources": [
+        "not_mentioned",
+        "normal",
+        "only_elsewhere"
+      ]
+    },
+    {
+      "question": "pf_cartilage_depth",
+      "option": "no_damage",
+      "sources": [
+        "not_mentioned",
+        "normal"
+      ]
+    },
+    {
+      "question": "medial_cartilage_depth",
+      "option": "full_thickness",
+      "sources": [
+        "full_thickness",
+        "bone_on_bone"
+      ]
+    },
+    {
+      "question": "lateral_cartilage_depth",
+      "option": "full_thickness",
+      "sources": [
+        "full_thickness",
+        "bone_on_bone"
+      ]
+    },
+    {
+      "question": "pf_cartilage_depth",
+      "option": "full_thickness",
+      "sources": [
+        "full_thickness",
+        "bone_on_bone"
+      ]
+    },
+    {
+      "question": "medial_cartilage_extent",
+      "option": "no_loss",
+      "sources": [
+        "no_loss",
+        "only_elsewhere"
+      ]
+    },
+    {
+      "question": "lateral_cartilage_extent",
+      "option": "no_loss",
+      "sources": [
+        "no_loss",
+        "only_elsewhere"
+      ]
+    }
+  ],
+  "gates": [
+    {
+      "child": "medial_meniscus_tear_location",
+      "parent": "medial_meniscus_status",
+      "parent_options": [
+        "possible_tear",
+        "tear",
+        "displaced_or_truncated"
+      ],
+      "empty_option": "no_tear",
+      "fallback_option": "not_stated"
+    },
+    {
+      "child": "medial_meniscus_tear_type",
+      "parent": "medial_meniscus_status",
+      "parent_options": [
+        "possible_tear",
+        "tear",
+        "displaced_or_truncated"
+      ],
+      "empty_option": "no_tear",
+      "fallback_option": "not_stated"
+    },
+    {
+      "child": "lateral_meniscus_tear_location",
+      "parent": "lateral_meniscus_status",
+      "parent_options": [
+        "possible_tear",
+        "tear",
+        "displaced_or_truncated"
+      ],
+      "empty_option": "no_tear",
+      "fallback_option": "not_stated"
+    },
+    {
+      "child": "lateral_meniscus_tear_type",
+      "parent": "lateral_meniscus_status",
+      "parent_options": [
+        "possible_tear",
+        "tear",
+        "displaced_or_truncated"
+      ],
+      "empty_option": "no_tear",
+      "fallback_option": "not_stated"
+    },
+    {
+      "child": "mcl_timing",
+      "parent": "mcl_status",
+      "parent_options": [
+        "sprain_or_thickening",
+        "possible_tear",
+        "partial_unspecified",
+        "partial_high_grade",
+        "complete_tear"
+      ],
+      "empty_option": "no_injury",
+      "fallback_option": "not_stated"
+    },
+    {
+      "child": "marrow_edema_location",
+      "parent": "marrow_edema",
+      "parent_options": [
+        "contusion",
+        "possible_contusion",
+        "degenerative",
+        "insufficiency_or_necrosis",
+        "unexplained"
+      ],
+      "empty_option": "none",
+      "fallback_option": "not_stated"
+    },
+    {
+      "child": "baker_ruptured",
+      "parent": "baker_size",
+      "parent_options": [
+        "small",
+        "moderate",
+        "large",
+        "unspecified"
+      ],
+      "empty_option": "no_cyst",
+      "fallback_option": "intact"
+    },
+    {
+      "child": "medial_cartilage_extent",
+      "parent": "medial_cartilage_depth",
+      "parent_options": [
+        "unspecified_loss",
+        "partial_low",
+        "partial_high",
+        "full_thickness"
+      ],
+      "empty_option": "no_loss",
+      "fallback_option": "not_stated"
+    },
+    {
+      "child": "lateral_cartilage_extent",
+      "parent": "lateral_cartilage_depth",
+      "parent_options": [
+        "unspecified_loss",
+        "partial_low",
+        "partial_high",
+        "full_thickness"
+      ],
+      "empty_option": "no_loss",
+      "fallback_option": "not_stated"
+    },
+    {
+      "child": "pf_cartilage_extent",
+      "parent": "pf_cartilage_depth",
+      "parent_options": [
+        "unspecified_loss",
+        "partial_low",
+        "partial_high",
+        "full_thickness"
+      ],
+      "empty_option": "no_loss",
+      "fallback_option": "not_stated"
+    },
+    {
+      "child": "pf_cartilage_surface",
+      "parent": "pf_cartilage_depth",
+      "parent_options": [
+        "softening",
+        "unspecified_loss",
+        "partial_low",
+        "partial_high",
+        "full_thickness"
+      ],
+      "empty_option": "no_damage",
+      "fallback_option": "not_stated"
+    },
+    {
+      "child": "patellar_facet",
+      "parent": "pf_cartilage_depth",
+      "parent_options": [
+        "softening",
+        "unspecified_loss",
+        "partial_low",
+        "partial_high",
+        "full_thickness"
+      ],
+      "empty_option": "no_patellar_damage",
+      "fallback_option": "not_stated"
+    }
+  ],
+  "questions": [
+    {
+      "id": "study_context",
+      "options": [
+        "acute_injury",
+        "pain_or_degenerative",
+        "postoperative",
+        "not_stated"
+      ]
+    },
+    {
+      "id": "acl_status",
+      "options": [
+        "not_mentioned",
+        "intact",
+        "degeneration_or_sprain",
+        "possible_tear",
+        "tear_unspecified",
+        "partial_unspecified",
+        "partial_low_grade",
+        "partial_high_grade",
+        "complete_tear",
+        "graft"
+      ]
+    },
+    {
+      "id": "mcl_status",
+      "options": [
+        "not_mentioned",
+        "intact",
+        "sprain_or_thickening",
+        "possible_tear",
+        "partial_unspecified",
+        "partial_high_grade",
+        "complete_tear"
+      ]
+    },
+    {
+      "id": "mcl_timing",
+      "options": [
+        "no_injury",
+        "acute",
+        "chronic",
+        "not_stated"
+      ]
+    },
+    {
+      "id": "medial_meniscus_status",
+      "options": [
+        "not_mentioned",
+        "normal",
+        "degeneration",
+        "possible_tear",
+        "tear",
+        "displaced_or_truncated"
+      ]
+    },
+    {
+      "id": "medial_meniscus_tear_location",
+      "options": [
+        "no_tear",
+        "anterior",
+        "body",
+        "posterior",
+        "posterior_body",
+        "anterior_body",
+        "multiple",
+        "not_stated"
+      ]
+    },
+    {
+      "id": "medial_meniscus_tear_type",
+      "options": [
+        "no_tear",
+        "horizontal",
+        "longitudinal",
+        "radial",
+        "complex",
+        "displaced",
+        "root",
+        "not_stated"
+      ]
+    },
+    {
+      "id": "medial_meniscus_extrusion",
+      "options": [
+        "yes",
+        "no"
+      ]
+    },
+    {
+      "id": "lateral_meniscus_status",
+      "options": [
+        "not_mentioned",
+        "normal",
+        "degeneration",
+        "possible_tear",
+        "tear",
+        "displaced_or_truncated"
+      ]
+    },
+    {
+      "id": "lateral_meniscus_tear_location",
+      "options": [
+        "no_tear",
+        "anterior",
+        "body",
+        "posterior",
+        "posterior_body",
+        "anterior_body",
+        "multiple",
+        "not_stated"
+      ]
+    },
+    {
+      "id": "lateral_meniscus_tear_type",
+      "options": [
+        "no_tear",
+        "horizontal",
+        "longitudinal",
+        "radial",
+        "complex",
+        "displaced",
+        "root",
+        "not_stated"
+      ]
+    },
+    {
+      "id": "medial_cartilage_depth",
+      "options": [
+        "no_damage",
+        "softening",
+        "unspecified_loss",
+        "partial_low",
+        "partial_high",
+        "full_thickness"
+      ]
+    },
+    {
+      "id": "medial_cartilage_extent",
+      "options": [
+        "no_loss",
+        "focal",
+        "large",
+        "diffuse",
+        "not_stated"
+      ]
+    },
+    {
+      "id": "lateral_cartilage_depth",
+      "options": [
+        "no_damage",
+        "softening",
+        "unspecified_loss",
+        "partial_low",
+        "partial_high",
+        "full_thickness"
+      ]
+    },
+    {
+      "id": "lateral_cartilage_extent",
+      "options": [
+        "no_loss",
+        "focal",
+        "large",
+        "diffuse",
+        "not_stated"
+      ]
+    },
+    {
+      "id": "pf_cartilage_depth",
+      "options": [
+        "no_damage",
+        "softening",
+        "unspecified_loss",
+        "partial_low",
+        "partial_high",
+        "full_thickness"
+      ]
+    },
+    {
+      "id": "pf_cartilage_extent",
+      "options": [
+        "no_loss",
+        "focal",
+        "large",
+        "diffuse",
+        "not_stated"
+      ]
+    },
+    {
+      "id": "pf_cartilage_surface",
+      "options": [
+        "no_damage",
+        "patella",
+        "trochlea",
+        "both",
+        "not_stated"
+      ]
+    },
+    {
+      "id": "patellar_facet",
+      "options": [
+        "no_patellar_damage",
+        "medial_facet",
+        "lateral_facet",
+        "both_or_ridge",
+        "not_stated"
+      ]
+    },
+    {
+      "id": "osteophytes",
+      "options": [
+        "none",
+        "small",
+        "moderate_large",
+        "unspecified"
+      ]
+    },
+    {
+      "id": "overall_osteoarthritis",
+      "options": [
+        "no_osteoarthritis",
+        "cartilage_only",
+        "mild",
+        "moderate",
+        "severe",
+        "unspecified"
+      ]
+    },
+    {
+      "id": "marrow_edema",
+      "options": [
+        "none",
+        "soft_tissue_only",
+        "contusion",
+        "possible_contusion",
+        "degenerative",
+        "insufficiency_or_necrosis",
+        "unexplained"
+      ]
+    },
+    {
+      "id": "marrow_edema_location",
+      "options": [
+        "none",
+        "lateral",
+        "medial",
+        "medial_lateral",
+        "patellofemoral",
+        "patellofemoral_femorotibial",
+        "not_stated"
+      ]
+    },
+    {
+      "id": "fracture_status",
+      "options": [
+        "none",
+        "acute",
+        "possible",
+        "stress_or_insufficiency",
+        "old"
+      ]
+    },
+    {
+      "id": "effusion_size",
+      "options": [
+        "not_mentioned",
+        "none",
+        "small",
+        "moderate",
+        "large",
+        "unspecified"
+      ]
+    },
+    {
+      "id": "synovitis_status",
+      "options": [
+        "absent",
+        "present",
+        "possible"
+      ]
+    },
+    {
+      "id": "baker_size",
+      "options": [
+        "absent",
+        "other_cyst_only",
+        "small",
+        "moderate",
+        "large",
+        "unspecified"
+      ]
+    },
+    {
+      "id": "baker_ruptured",
+      "options": [
+        "no_cyst",
+        "intact",
+        "ruptured"
+      ]
+    },
+    {
+      "id": "extra_pcl",
+      "options": [
+        "none",
+        "present",
+        "possible"
+      ]
+    },
+    {
+      "id": "extra_lateral_ligaments",
+      "options": [
+        "none",
+        "present",
+        "possible"
+      ]
+    },
+    {
+      "id": "extra_extensor_tendons",
+      "options": [
+        "none",
+        "tendinosis",
+        "tear"
+      ]
+    },
+    {
+      "id": "extra_bursitis",
+      "options": [
+        "none",
+        "suprapatellar_only",
+        "soft_tissue_edema_only",
+        "present"
+      ]
+    },
+    {
+      "id": "extra_meniscal_cyst",
+      "options": [
+        "none",
+        "other_cyst_only",
+        "medial",
+        "lateral"
+      ]
+    },
+    {
+      "id": "extra_other_cysts",
+      "options": [
+        "none",
+        "baker_or_meniscal_only",
+        "ganglion",
+        "intraosseous",
+        "other"
+      ]
+    },
+    {
+      "id": "extra_patellar_instability",
+      "options": [
+        "none",
+        "dislocation",
+        "maltracking"
+      ]
+    },
+    {
+      "id": "extra_osteochondral",
+      "options": [
+        "none",
+        "chondral_only",
+        "bone_only",
+        "present",
+        "possible"
+      ]
+    },
+    {
+      "id": "extra_loose_bodies",
+      "options": [
+        "none",
+        "present"
+      ]
+    }
+  ]
+}

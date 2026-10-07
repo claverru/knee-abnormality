@@ -1,0 +1,293 @@
+ideas:
+- id: shift-per-study-one-point-unit-output
+  mechanism_id: learned-crop-shift
+  parent_idea_id: null
+  title: Predict one point per study from a low-resolution look at its canvases and place every view's
+    crop from it, trained by the target loss through the crop
+  opportunity: 'A guess. Knees do not sit at the same place in their images: the joint line varies
+    by about 5 mm between studies and the loader''s fitted centre is a least-squares compromise across
+    series (prior-work.md, Topic 2). A shift shared by all knees cannot follow that; a shift predicted
+    per knee can, and one point in space for the whole study keeps the planes in agreement by construction.
+    The routed model gives the shift a consequence: the regions are cut around a per-knee centre,
+    so a crop centred on the knee puts the same anatomy in the same tokens. Keeper''s seed of 2026-10-07
+    after a defect the first per-study run exposed. shift-per-study-one-point-light-port-c (20261007T005816Z-9a106989)
+    trained within budget and its point barely moved: at the last epoch the mean over validation knees
+    is -0.62, +0.59 and +0.20 mm (anterior, left-right, superior) and the spread across knees 0.07,
+    0.09 and 0.06 mm, so every knee received the same sub-millimetre offset (x4 0.924344 and x1 0.915927
+    against 0.925389 and 0.917411). The locator''s last layer gives millimetres directly and learns
+    at the head rate of 0.0006, as the per-series parameter did when it stayed within 0.07 mm of zero.'
+  mechanism: 'One change against shift-per-study-one-point-light-port-c, whose code is reused (changes.diff
+    and source/ of the latest candidate of shift-per-study-one-point-light-port-c under outputs/autoresearch/routing-and-shifts/experiments/
+    for the port and the locator): the locator''s last layer is dimensionless. Wherever shift-per-study-one-point-light-port-c
+    bounds a millimetre output x as limit * tanh(x / limit), this seed uses limit * tanh(x) with the
+    same limit, and the last layer still starts at zero. A step of the optimiser then moves a shift
+    about fifteen times further. Everything else is as follows. Port: steps (1) to (4) of shift-per-series-type-light-port-c
+    exactly (uint8 canvases normalised in the loader with the incumbent''s quantile bounds, the cut
+    in the model, no normalisation after the cut); never the first port''s float canvases. The locator''s
+    input is the uint8 canvas divided by 255, with no further scaling. Steps (1) to (4) of shift-per-series-type-light-port-c,
+    unchanged: the canvas with its margin, the cut in the model, the augmentation on the cut crop.
+    In place of the per-type parameter of step (5), a locator runs on the canvases before the cut.
+    Input: each series'' canvases, average-pooled to 64 px and averaged over the series'' slices.
+    Network: three 3x3 convolutions with stride 2 (16, 32, 64 channels, ReLU), a global average, plus
+    a learned embedding of the series type; the vectors of a study''s present series are averaged
+    and a linear layer with zero weight and bias gives delta in R^3 in millimetres, bounded as 15
+    * tanh(delta / 15). Axes of delta: the fitted frame''s axes before the knee side is applied (patient
+    left-right after the header rotation, anterior, superior), so the locator needs no knee side.
+    Each image''s two-axis shift is delta mapped to its row and column directions with the linear
+    part of its patient map, then bounded to that view''s margin; views with no margin are not shifted.
+    The cut and the locator run before the reflection, on the canvases as loaded. The locator is trained
+    by the target loss through the sampling grid at the head learning rate. The routing frame is unchanged:
+    it still centres on the meniscus spots.'
+  precedents:
+  - 'autoresearch/campaigns/learnable-views: nothing per study was tried; shifts per series type looked
+    random.'
+  - 'docs/ongoing/side-routed-heads.md: the frame per knee is read from the heads without any marking.'
+  novelty: First per-study crop placement predicted by the model.
+  coverage: Every study in training and at inference; the locator sees every series.
+  exploitation: 'Read both multipliers, the per-target deltas, and the logged delta per axis: its
+    mean and its standard deviation across validation knees per epoch. Shown wrong by: a spread across
+    knees under 2 mm on every axis (the locator learned one constant, which the per-series seed covers),
+    or a prediction time above 1.3 times the incumbent''s.'
+  budget: 'The locator reads 64 px images: under 1% of the backbone''s cost. The canvas cost is that
+    of shift-per-series-type-light-port-c.'
+  implementation: 'Environment, read this first. (1) You have no GPU and must not use one. Run `rtk
+    proxy uv run --locked python -m scripts.tools.check_side_routing --config configs/training.yaml`
+    from your candidate workspace as it is: the script selects the CPU by itself when no GPU is visible,
+    takes a few minutes there, and that CPU run is the required check. Never return blocked for lack
+    of a GPU. (2) Make every change inside the candidate workspace you were assigned and nowhere else.
+    Do not stage the candidate under /tmp, and do not write source/ or changes.diff in the experiment
+    directory: it is read-only to you by design, and the supervisor freezes the source and the diff
+    from your workspace after you return. (3) When the change is complete and the check passes, return
+    status prepared with the integration and activation declarations and the guardrail JSON in the
+    report. An unwritable experiment directory is never a reason to return blocked. Reuse the port
+    from the latest shift-per-series-type-light-port-c candidate under outputs/autoresearch/routing-and-shifts/experiments/
+    (changes.diff and source/), and the locator from an earlier per-study candidate when one exists;
+    do not reuse any candidate named learned-shift-*. The same check (c) applies: one collated batch
+    at most 2.0 times the incumbent''s bytes, or the candidate is returned blocked. Start from the
+    port of shift-per-series-type-light-port-c: if an earlier candidate of this campaign built it,
+    copy that code from its changes.diff under outputs/autoresearch/routing-and-shifts/experiments/,
+    otherwise build it as that seed describes (same reuse sources). Add the locator module in modeling,
+    created under torch.random.fork_rng, and pass a shift per image to the cutter; there is no view_shift
+    parameter in this seed. inference/engine.py runs the locator. Log shift_delta_<axis>_mean_mm and
+    shift_delta_<axis>_sd_mm for training and validation per epoch through _log_epoch_metric. Required
+    checks, reported with their numbers: checks (a) and (b) of shift-per-series-type-light-port-c
+    (true at initialisation, since the last layer is zero); and on one batch with a random nonzero
+    last layer, a mirrored pass and a plain pass give crops that are mirror images of each other.
+    Then the guardrail check.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: 'Keeper''s seed: the per-study shift could not move at the optimiser''s step
+    size. Keeper''s requeue on the light port. The user''s main line for topic 2.'
+- id: shift-per-study-per-view-unit-output
+  mechanism_id: learned-crop-shift
+  parent_idea_id: null
+  title: Predict two free offsets for every view of every study, trained by the target loss through
+    the crop
+  opportunity: 'A guess, the counterpart of shift-per-study-one-point-unit-output. One point per study
+    assumes the series of a study agree in space. 99% of same-plane series pairs move under 2.7 mm,
+    but the views differ in what they should centre on: the sagittal views are already offset forward
+    by hand and the coronal ones are not. Free offsets per view let each view find its own centre
+    for each knee. Keeper''s seed of 2026-10-07 after a defect the first per-study run exposed. shift-per-study-one-point-light-port-c
+    (20261007T005816Z-9a106989) trained within budget and its point barely moved: at the last epoch
+    the mean over validation knees is -0.62, +0.59 and +0.20 mm (anterior, left-right, superior) and
+    the spread across knees 0.07, 0.09 and 0.06 mm, so every knee received the same sub-millimetre
+    offset (x4 0.924344 and x1 0.915927 against 0.925389 and 0.917411). The locator''s last layer
+    gives millimetres directly and learns at the head rate of 0.0006, as the per-series parameter
+    did when it stayed within 0.07 mm of zero.'
+  mechanism: 'One change against shift-per-study-per-view-light-port-c, whose code is reused (changes.diff
+    and source/ of the latest candidate of shift-per-study-one-point-light-port-c under outputs/autoresearch/routing-and-shifts/experiments/
+    for the port and the locator): the locator''s last layer is dimensionless. Wherever shift-per-study-per-view-light-port-c
+    bounds a millimetre output x as limit * tanh(x / limit), this seed uses limit * tanh(x) with the
+    same limit, and the last layer still starts at zero. A step of the optimiser then moves a shift
+    about fifteen times further. Everything else is as follows. Port: steps (1) to (4) of shift-per-series-type-light-port-c
+    exactly (uint8 canvases normalised in the loader with the incumbent''s quantile bounds, the cut
+    in the model, no normalisation after the cut); never the first port''s float canvases. The locator''s
+    input is the uint8 canvas divided by 255, with no further scaling. Everything of shift-per-study-one-point-unit-output
+    up to the locator''s per-series vectors. The output differs: for each series, its vector concatenated
+    with the study''s mean vector goes through one linear layer per series type, zero weight and bias
+    at the start, that gives two offsets in millimetres along the image''s rows and columns for each
+    view of that series, bounded as limit * tanh(x / limit) with limit that view''s margin in millimetres.
+    There is no common point and no projection through the patient maps. Trained by the target loss
+    through the sampling grid at the head learning rate.'
+  precedents:
+  - 'docs/ongoing/side-routed-heads.md, inter-series motion: 99% of same-plane pairs move under 2.7
+    mm.'
+  novelty: Per-study, per-view placement; the pair with the one-point seed says whether tying the
+    planes together matters.
+  coverage: Every coronal and sagittal view of every study.
+  exploitation: 'Compare with shift-per-study-one-point-unit-output at both multipliers and by the
+    spread of the offsets across knees per view. Shown wrong by: views of one study whose implied
+    points in space disagree by more than the 2.7 mm the series move, which would mean the freedom
+    is fitting noise.'
+  budget: As shift-per-study-one-point-unit-output.
+  implementation: 'Environment, read this first. (1) You have no GPU and must not use one. Run `rtk
+    proxy uv run --locked python -m scripts.tools.check_side_routing --config configs/training.yaml`
+    from your candidate workspace as it is: the script selects the CPU by itself when no GPU is visible,
+    takes a few minutes there, and that CPU run is the required check. Never return blocked for lack
+    of a GPU. (2) Make every change inside the candidate workspace you were assigned and nowhere else.
+    Do not stage the candidate under /tmp, and do not write source/ or changes.diff in the experiment
+    directory: it is read-only to you by design, and the supervisor freezes the source and the diff
+    from your workspace after you return. (3) When the change is complete and the check passes, return
+    status prepared with the integration and activation declarations and the guardrail JSON in the
+    report. An unwritable experiment directory is never a reason to return blocked. Reuse the port
+    from the latest shift-per-series-type-light-port-c candidate under outputs/autoresearch/routing-and-shifts/experiments/
+    (changes.diff and source/), and the locator from an earlier per-study candidate when one exists;
+    do not reuse any candidate named learned-shift-*. The same check (c) applies: one collated batch
+    at most 2.0 times the incumbent''s bytes, or the candidate is returned blocked. As shift-per-study-one-point-unit-output
+    (reuse the earlier candidate''s port and locator when one exists), with the output layers per
+    series type. Log shift_<type>_<view>_<axis>_mean_mm and _sd_mm per epoch for training and validation,
+    and shift_view_disagreement_mm: per study, map every view''s offset to patient millimetres with
+    its patient map and take the mean distance between the views'' displacement vectors projected
+    on the axes two views share; report its mean across validation knees. Same two required checks,
+    then the guardrail check.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: 'Keeper''s seed: the per-study shift could not move at the optimiser''s step
+    size. Keeper''s requeue on the light port. The user asked for both parametrisations as seeds.'
+- id: shift-per-study-from-the-spots-unit-output
+  mechanism_id: learned-crop-shift
+  parent_idea_id: null
+  title: Train the per-study point to predict where the heads' meniscus spots are, and place the crops
+    from it
+  opportunity: 'A guess with a strong signal. The target loss reaches a shift only through the sampling
+    grid, and the augmentation teaches the model to ignore shifts of the size being learned (prior-work.md,
+    Topic 2). The routed heads already say where the knee is: the midpoint of the two meniscus attention
+    spots, read without gradient, is the centre of the incumbent''s frame, and frames built on it
+    gave the line its best run. That point is a per-study target nobody marked. A locator trained
+    to predict it from the low-resolution canvases centres every knee''s crops on the same anatomy.
+    Keeper''s seed of 2026-10-07 after a defect the first per-study run exposed. shift-per-study-one-point-light-port-c
+    (20261007T005816Z-9a106989) trained within budget and its point barely moved: at the last epoch
+    the mean over validation knees is -0.62, +0.59 and +0.20 mm (anterior, left-right, superior) and
+    the spread across knees 0.07, 0.09 and 0.06 mm, so every knee received the same sub-millimetre
+    offset (x4 0.924344 and x1 0.915927 against 0.925389 and 0.917411). The locator''s last layer
+    gives millimetres directly and learns at the head rate of 0.0006, as the per-series parameter
+    did when it stayed within 0.07 mm of zero.'
+  mechanism: 'One change against shift-per-study-from-the-spots-light-port-c, whose code is reused
+    (changes.diff and source/ of the latest candidate of shift-per-study-one-point-light-port-c under
+    outputs/autoresearch/routing-and-shifts/experiments/ for the port and the locator): the locator''s
+    last layer is dimensionless. Wherever shift-per-study-from-the-spots-light-port-c bounds a millimetre
+    output x as limit * tanh(x / limit), this seed uses limit * tanh(x) with the same limit, and the
+    last layer still starts at zero. A step of the optimiser then moves a shift about fifteen times
+    further. Everything else is as follows. Port: steps (1) to (4) of shift-per-series-type-light-port-c
+    exactly (uint8 canvases normalised in the loader with the incumbent''s quantile bounds, the cut
+    in the model, no normalisation after the cut); never the first port''s float canvases. The locator''s
+    input is the uint8 canvas divided by 255, with no further scaling. The canvas, cut and locator
+    of shift-per-study-one-point-unit-output, with two differences. First, the crop is cut at the
+    locator''s delta detached, so the target loss does not train the locator. Second, the locator
+    has its own loss. After the main pass, study_frames gives each knee''s two meniscus spots in the
+    fitted frame (the entry study_landmarks of the encoded batch, millimetres, no gradient); take
+    their midpoint m and undo the knee side on its medial component so it is in delta''s axes. Because
+    the crop has already been moved by delta, the spots'' position in the fitted frame does not depend
+    on the shift: m is a property of the knee. Keep a running mean of m over training knees whose
+    two spots were found (a persistent buffer of three values, momentum 0.99, started at the first
+    batch''s mean, updated only in training). The locator''s target is m minus that mean: the offset
+    that would bring this knee''s menisci to where the average knee''s are. shift_locator_loss = smooth
+    L1 (beta 1) between delta and the target, both divided by the study''s mean token pitch as study_frames
+    computes it, averaged over the knees whose two spots were found; it is added to the training loss
+    with weight 0.1, the weight of the side loss. It is the one loss term this seed adds, and the
+    guardrail check allows that name.'
+  precedents:
+  - 'Runs 23 and 24: the frame centred on the meniscus spots; run 24 is the incumbent.'
+  - 'autoresearch/campaigns/learnable-views/build-notes.md: the open question on the augmentation
+    hiding the signal.'
+  novelty: First shift trained on a target the model produces itself.
+  coverage: Every study with both meniscus spots found, in training; every study at inference.
+  exploitation: 'Read shift_locator_loss on training and validation, the spread of delta across validation
+    knees per axis, the spread across validation knees of m minus delta per axis (it should shrink
+    over the epochs), both multipliers, and the front targets. Shown wrong by: a validation shift_locator_loss
+    that does not fall below its first-epoch value.'
+  budget: As shift-per-study-one-point-unit-output.
+  implementation: 'Environment, read this first. (1) You have no GPU and must not use one. Run `rtk
+    proxy uv run --locked python -m scripts.tools.check_side_routing --config configs/training.yaml`
+    from your candidate workspace as it is: the script selects the CPU by itself when no GPU is visible,
+    takes a few minutes there, and that CPU run is the required check. Never return blocked for lack
+    of a GPU. (2) Make every change inside the candidate workspace you were assigned and nowhere else.
+    Do not stage the candidate under /tmp, and do not write source/ or changes.diff in the experiment
+    directory: it is read-only to you by design, and the supervisor freezes the source and the diff
+    from your workspace after you return. (3) When the change is complete and the check passes, return
+    status prepared with the integration and activation declarations and the guardrail JSON in the
+    report. An unwritable experiment directory is never a reason to return blocked. Reuse the port
+    from the latest shift-per-series-type-light-port-c candidate under outputs/autoresearch/routing-and-shifts/experiments/
+    (changes.diff and source/), and the locator from an earlier per-study candidate when one exists;
+    do not reuse any candidate named learned-shift-*. The same check (c) applies: one collated batch
+    at most 2.0 times the incumbent''s bytes, or the candidate is returned blocked. Start from shift-per-study-one-point-unit-output
+    (reuse the earlier candidate''s port and locator when one exists). Detach delta where the cutter
+    receives it. In training/lightning.py add _shift_locator_step, called in training_step and validation_step
+    like _side_step, logging shift_locator_loss and val_shift_locator_loss per epoch through _log_epoch_metric;
+    validation computes the loss against the stored running mean and does not update it. Log shift_residual_<axis>_sd_mm
+    (the standard deviation across knees of m minus delta) for training and validation per epoch.
+    Same two required checks as shift-per-study-one-point-unit-output, then the guardrail check, whose
+    loss-term check must list shift_locator_loss among the logged terms.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: 'Keeper''s seed: the per-study shift could not move at the optimiser''s step
+    size. Keeper''s requeue on the light port. The user allowed the added loss term as a separate
+    seed.'
+- id: crops-and-frame-share-one-centre-unit-output
+  mechanism_id: learned-crop-shift
+  parent_idea_id: null
+  title: Use the per-study point both to place the crops and as the centre of the routing frame
+  opportunity: 'A guess. With shift-per-study-one-point-unit-output the model holds two centres per
+    knee: the locator''s point for the crops and the meniscus-spot midpoint for the regions. They
+    describe the same thing. One point for both is fewer moving parts, lets the region cuts train
+    the point through the soft gradient as well as the crop does, and puts the same anatomy at the
+    same token and in the same region. The pair of runs says whether sharing helps. Keeper''s seed
+    of 2026-10-07 after a defect the first per-study run exposed. shift-per-study-one-point-light-port-c
+    (20261007T005816Z-9a106989) trained within budget and its point barely moved: at the last epoch
+    the mean over validation knees is -0.62, +0.59 and +0.20 mm (anterior, left-right, superior) and
+    the spread across knees 0.07, 0.09 and 0.06 mm, so every knee received the same sub-millimetre
+    offset (x4 0.924344 and x1 0.915927 against 0.925389 and 0.917411). The locator''s last layer
+    gives millimetres directly and learns at the head rate of 0.0006, as the per-series parameter
+    did when it stayed within 0.07 mm of zero.'
+  mechanism: 'One change against crops-and-frame-share-one-centre-light-port-c, whose code is reused
+    (changes.diff and source/ of the latest candidate of shift-per-study-one-point-light-port-c under
+    outputs/autoresearch/routing-and-shifts/experiments/ for the port and the locator): the locator''s
+    last layer is dimensionless. Wherever crops-and-frame-share-one-centre-light-port-c bounds a millimetre
+    output x as limit * tanh(x / limit), this seed uses limit * tanh(x) with the same limit, and the
+    last layer still starts at zero. A step of the optimiser then moves a shift about fifteen times
+    further. Everything else is as follows. Port: steps (1) to (4) of shift-per-series-type-light-port-c
+    exactly (uint8 canvases normalised in the loader with the incumbent''s quantile bounds, the cut
+    in the model, no normalisation after the cut); never the first port''s float canvases. The locator''s
+    input is the uint8 canvas divided by 255, with no further scaling. Everything of shift-per-study-one-point-unit-output,
+    and one change in study_frames (modeling/model.py). Today the frame''s centre is the midpoint
+    of the two meniscus spots plus the shared frame_shift times the study''s pitch, in the fitted
+    frame. It becomes the locator''s delta (with gradient), with the knee side applied to its medial
+    component so it is in the fitted frame''s axes, plus the shared frame_shift times the pitch; the
+    meniscus midpoint is no longer used for the centre. The side axis still comes from the line between
+    the two meniscus spots, and the nod and the four sizes from the regression, as in the incumbent.
+    The locator therefore receives gradient from the target loss through the sampling grid and through
+    the soft gradient of every cut. The fitted frame''s origin does not move with the crop, so delta
+    means the same displacement in both uses.'
+  precedents:
+  - 'Runs 8 and 11: a frame centre regressed per knee from the tokens scored 0.9243 and 0.9241 at
+    x4; run 24 replaced it by the spot midpoint.'
+  novelty: First design in which the crops and the regions move together.
+  coverage: Every study.
+  exploitation: 'Compare with shift-per-study-one-point-unit-output at both multipliers; read per
+    epoch the distance per knee between the locator''s point and the meniscus-spot midpoint. Shown
+    wrong by: that distance growing over the run, which means the regions pull the point off the menisci.'
+  budget: As shift-per-study-one-point-unit-output.
+  implementation: 'Environment, read this first. (1) You have no GPU and must not use one. Run `rtk
+    proxy uv run --locked python -m scripts.tools.check_side_routing --config configs/training.yaml`
+    from your candidate workspace as it is: the script selects the CPU by itself when no GPU is visible,
+    takes a few minutes there, and that CPU run is the required check. Never return blocked for lack
+    of a GPU. (2) Make every change inside the candidate workspace you were assigned and nowhere else.
+    Do not stage the candidate under /tmp, and do not write source/ or changes.diff in the experiment
+    directory: it is read-only to you by design, and the supervisor freezes the source and the diff
+    from your workspace after you return. (3) When the change is complete and the check passes, return
+    status prepared with the integration and activation declarations and the guardrail JSON in the
+    report. An unwritable experiment directory is never a reason to return blocked. Reuse the port
+    from the latest shift-per-series-type-light-port-c candidate under outputs/autoresearch/routing-and-shifts/experiments/
+    (changes.diff and source/), and the locator from an earlier per-study candidate when one exists;
+    do not reuse any candidate named learned-shift-*. The same check (c) applies: one collated batch
+    at most 2.0 times the incumbent''s bytes, or the candidate is returned blocked. Start from shift-per-study-one-point-unit-output
+    (reuse the earlier candidate''s code when one exists); encode_batch passes delta per study to
+    study_frames. Log shift_to_spot_distance_mm, mean and standard deviation across knees, for training
+    and validation per epoch. Same two required checks, then the guardrail check: its mirror and side-flip
+    checks must hold with the shared centre.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: 'Keeper''s seed: the per-study shift could not move at the optimiser''s step
+    size. Keeper''s requeue on the light port. The user asked to try the shared centre beside the
+    separate one.'
+exhausted_directions: ''

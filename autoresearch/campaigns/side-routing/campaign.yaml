@@ -1,0 +1,93 @@
+id: side-routing
+recipe: configs/training.yaml
+reference_run: outputs/training/20261005-205251-side-routed-run5
+reference_equivalences: {}
+additional_evidence_runs: []
+backlog:
+  refill_below: 2
+  refill_to: 3
+  seed_order: forced
+  rotate_after: 1000000
+budget:
+  mode: range
+  min_fraction: 0.75
+  max_fraction: 1.25
+policy:
+  editable_files:
+    - src/knee_abnormality/modeling/model.py
+    - src/knee_abnormality/modeling/spatial_tokens.py
+    - src/knee_abnormality/modeling/plane_readout.py
+    - src/knee_abnormality/training/lightning.py
+    - src/knee_abnormality/training/report_attributes.py
+    - src/knee_abnormality/inference/checkpoint.py
+    - src/knee_abnormality/inference/reflection.py
+  editable_directories: []
+  config_keys: []
+  config_prefixes: []
+  list_item_fields: {}
+  input_identity_keys:
+    - preprocessing_identity
+  require_source_change: true
+  configuration_only_ideas: false
+  developer_instructions: >-
+    The incumbent is the side-routed design in docs/ongoing/side-routed-heads.md (Design, then
+    Fifth build): one shared classifier for the two meniscus targets and one for the three OA
+    targets; tokens placed in a knee frame (fitted centre, header rotation, one learned rotation
+    of three angles); routing weights from that frame; a linear position prior on the attention;
+    position-free tokens for the shared classifiers and a fixed sinusoidal position code on the
+    own-channel classifiers' tokens; a detached per-token side head. Read contract.md before
+    writing code. Each seed is a full design step and states exactly what changes and what it
+    removes; apply it to the incumbent and leave everything outside it byte-identical. Replace
+    what a seed supersedes: no flag, option or config field selects the old behaviour, and the
+    recipe's configuration does not change. Before returning prepared, run
+    `rtk proxy uv run --locked python -m scripts.tools.check_side_routing --config
+    configs/training.yaml` from the candidate and include its JSON in the report: it builds the
+    model without pretrained weights and checks nine guardrails on four studies on the GPU
+    (about a minute, about 2 GB; it may run beside a training). A candidate that fails any
+    guardrail is repaired or returned blocked, never returned prepared, and the guardrail script
+    is not edited. Keep the interface the check uses: KneeAbnormalityModel.encode_batch returning
+    knee_x, anterior_axis, superior_axis, position, routable, left_probability, visual_valid,
+    study and image_plane; frame(knee_x, anterior_axis, superior_axis, medial_sign);
+    routing_weights(knee_x, anterior_axis, superior_axis, left_probability, routable) returning
+    one row per entry of ROUTES; position_priors(position, routable); study_tokens(encoded,
+    shared); pool_encoded(encoded); frame_rotation(); target_channel, target_route,
+    target_bias and position_prior; TARGET_ROUTES and SHARED_CHANNELS; KneeModule._side_step and
+    training_step. New parameters or buffers initialize under torch.random.fork_rng so the
+    incumbent's random stream is unchanged, and every learned geometric value starts at zero.
+    Whatever reads the knee side or a position from tokens reads them detached. Update the
+    matching entries of SPATIAL_TOKEN_IDENTITY when the described behaviour changes. Validation
+    and prediction stay deterministic. Training time must stay within 0.75 to 1.25 times the
+    reference's; do not reduce epochs, slices or studies, and never decode more slices per
+    study than the incumbent. No weight averaging. No tests. Besides the guardrail check, use
+    the existing Python environment for static checks and tiny checks only.
+  researcher_instructions: >-
+    The campaign has no end: it runs until the user stops it. Never return an empty report and
+    never declare the directions exhausted. When the listed questions are answered, take the
+    weakest number in the latest run reports (a target below the sibling runs, a localisation
+    delta, a learned value that did not move, a part the model does not use) and work on that:
+    measure it, then design from the measurement. Research starts after the forced seeds. Your first product after every completed run is its
+    analysis, written from
+    `python -m scripts.tools.report_side_routing --run RUN --base BASE --lineage LINEAGE
+    --siblings SIBLINGS --output FILE` (prior-work.md gives the lineage and the sibling list) and the run's logs: the per-target
+    deltas with the sibling range, the routed targets' sum, the localisation deltas, the side
+    head, the learned frame angles and widths, and the flags. Only then propose. Each idea is
+    the best full design step from everything known, not one isolated tweak, and fills the five
+    parts of contract.md (How a seed is written): evidence with its run, mechanism, what it
+    replaces, what in the run report would show it wrong, and an evidence-backed or guess label
+    per change. Scope: the knee frame, the routing, the position prior and the position the
+    own-channel classifiers read, which targets or report questions share a classifier, and how
+    the side is read. Everything else is fixed. An idea that moves a cut or a region must cite
+    a census or a drawing on studies; if none exists, the idea is the measurement, done with a
+    loader-only script and returned as a finding before any design that depends on it. Open
+    questions to measure before proposing a mechanism: why ACL, Baker's and Fracture stay below
+    the sibling runs; why isolated Medial OA is weak; whether the frame's nod stays near 5
+    degrees because the targets want a near-vertical front cut or because one shared angle
+    learns slowly; how much further compartment localisation can go; whether contusion or
+    cartilage findings can share a classifier. Out of bounds: hyperparameter sweeps; loss
+    weights; auxiliary losses; hand-set distances, angles or regions; learned geometry per
+    study or per series without a measured spread above half a token; anything that sends a
+    reader's gradient into the backbone; offsets of the frame's origin; fewer epochs; weight
+    averaging; reflection-probability changes; the class-balance exponent; gold-study
+    weighting; trained models in the loader; multi-seed or confirmation runs; other backbones;
+    choosing anything on the campaign fold's validation labels; and everything in the contract's
+    closed list.

@@ -1,0 +1,117 @@
+id: routing-and-shifts
+recipe: configs/training.yaml
+reference_run: outputs/training/20261006-163650-side-routed-spot-frame-ring-sectors
+reference_equivalences: {}
+additional_evidence_runs: []
+backlog:
+  refill_below: 2
+  refill_to: 3
+  seed_order: forced
+  rotate_after: 1000000
+budget:
+  mode: range
+  min_fraction: 0.75
+  max_fraction: 1.3
+policy:
+  editable_files:
+    - configs/training.yaml
+    - src/knee_abnormality/config.py
+    - src/knee_abnormality/data/dataset.py
+    - src/knee_abnormality/training/lightning.py
+    - src/knee_abnormality/training/report_attributes.py
+    - src/knee_abnormality/inference/checkpoint.py
+    - src/knee_abnormality/inference/engine.py
+    - src/knee_abnormality/inference/reflection.py
+  editable_directories:
+    - src/knee_abnormality/modeling
+    - src/knee_abnormality/data/preprocessing
+  config_keys:
+    - data.view_shift_limit_mm
+  config_prefixes: []
+  list_item_fields: {}
+  input_identity_keys:
+    - preprocessing_identity
+  require_source_change: true
+  configuration_only_ideas: false
+  developer_instructions: >-
+    The incumbent is run 24 of docs/ongoing/side-routed-heads.md (read "Runs at a glance", the
+    run 24 design and "What the thirty runs show"): one shared classifier for the two meniscus
+    targets and one for the three OA targets; a frame inferred per knee, centred on the two
+    meniscus attention spots; regions made of eight sectors, a core, two rings and three
+    heights, cut hard with a soft gradient; routed report-attribute heads; a knee-level term on
+    every routed channel. Read contract.md before writing code. Each seed is one design step and
+    says exactly what changes and what it removes; apply it to the incumbent and leave
+    everything outside it byte-identical. Replace what a seed supersedes: no flag, option or
+    config field selects the old behaviour. The only config key a seed may add is
+    data.view_shift_limit_mm (topic 2). Before returning prepared, run
+    `rtk proxy uv run --locked python -m scripts.tools.check_side_routing --config
+    configs/training.yaml` from the candidate and include its JSON in the report: it builds the
+    model without pretrained weights and checks nine guardrails on four studies on the GPU
+    (about a minute, about 2 GB; it may run beside a training). A candidate that fails any
+    guardrail is repaired or returned blocked, never returned prepared, and the guardrail script
+    is not edited; it is the authority on the interface it calls (encode_batch, frame,
+    routing_weights, position_priors, study_tokens, pool_encoded, frame_rotation,
+    KneeModule._side_step and training_step), so keep those callable as it calls them. New
+    parameters or buffers initialize under torch.random.fork_rng so the incumbent's random
+    stream is unchanged. Whatever reads the knee side, a position or a shift target from tokens
+    reads them detached unless the seed says otherwise. Update the matching entries of
+    SPATIAL_TOKEN_IDENTITY when the described behaviour changes. Validation and prediction stay
+    deterministic. Reusing earlier code is allowed and expected; three sources, all readable
+    from the candidate. (a) Runs of this line, for the routing seeds: each run directory under
+    outputs/training/ has its full source in source_snapshot.zip (unzip it into a temporary
+    directory outside the candidate); the seeds name the run to read. (b) Earlier candidates of
+    this campaign: outputs/autoresearch/routing-and-shifts/experiments/<experiment>/ holds
+    source/ and changes.diff; a topic 2 seed that follows another reuses its port, cutter and
+    locator instead of rebuilding them. (c) The learned-view work of 2026-10-02 and 03, for
+    topic 2: the branch view-optimisation (commit b290da6; read files with `git show
+    view-optimisation:PATH`, never check it out), whose src/knee_abnormality/modeling/views.py
+    has the in-model cutter (sample_windows, normalise_windows, ViewWindows with a clamped
+    two-axis shift per view), and the experiments under
+    outputs/autoresearch/learnable-views/experiments/, each with source/ and changes.diff:
+    hand-sizes-learned-shifts-20261003T183532Z-8d11d7a5 (sizes pinned, shifts learned, the
+    closest to this campaign's per-series seed), knee-anchored-learned-offsets-20261002T194645Z-d4e331e1
+    and hand-views-routed-shift-learning-20261003T212020Z-0863da22 (built and reviewed, never
+    run). That code was written on an older recipe: take the grid construction, the shift
+    parameter, the normalisation after the cut and the logging, and adapt them to this
+    worktree; do not take its single global canvas at its own spacing, its bicubic reads, its
+    learned width, label bias or slice budget, and do not copy files whole. Topic 2 facts
+    about the incumbent: prepare_images in data/preprocessing/device.py resamples each slice's
+    view window to 224 px with an index-based plan, normalises each series between two
+    quantiles of its windows' valid pixels and rounds to uint8; the view window's position
+    comes from view_position in data/preprocessing/spatial.py; the affine augmentation and the
+    reflection run in the model afterwards. The first topic 2 seed
+    (learned-shift-per-series-type) states the port in five numbered steps; every other topic
+    2 seed keeps steps 1 to 4 exactly. Required of every topic 2 candidate, with the numbers
+    in its report: with every shift at zero, the crops entering the augmentation equal the
+    incumbent's prepared images on one batch, in training and in evaluation mode, largest
+    absolute difference at most 1 grey level of 255; the per-study seeds also show that a
+    mirrored pass and a plain pass give mirror-image crops. Never decode more slices per study
+    than the incumbent, and do not change widths, image size or slice counts. Each topic 2 run
+    logs once per epoch, for training and validation, the mean and the standard deviation
+    across knees of every learned shift in millimetres, and reports its prediction time.
+    Training time must stay within 0.75 to 1.3 times the reference's; do not reduce epochs,
+    slices or studies. Per-epoch diagnostics go through the module's epoch accumulators
+    (_log_epoch_metric), never per step. No weight averaging. No tests. Besides the guardrail
+    check, use the existing Python environment for static checks and tiny checks only, and run
+    nothing heavy on the CPU beside a training.
+  researcher_instructions: >-
+    The campaign has no end: it runs until the user stops it. Never return an empty report and
+    never declare the directions exhausted. Research starts after the forced seeds and
+    alternates between the two topics of contract.md unless one of them has an open lead.
+    Your first product after every completed run is its analysis: both multipliers against the
+    incumbent (score and prediction_macro_auc in fold_1/selected_checkpoint.json), the
+    per-target AUC deltas from the two runs' fold_1/validation_predictions.csv with each
+    target's sibling standard deviation (prior-work.md, Yardstick), and the learned geometry
+    from the logs (frame angles, sizes, shifts). A delta under one sibling standard deviation is
+    not a result. Only then propose. Each idea fills the five parts of contract.md (How a seed
+    is written) and is one training run; an idea that only measures is not allowed, so put the
+    measurement in what the run logs. What decides the ranking of the routed runs so far is
+    PF OA and Synovitis (prior-work.md, What separates the runs): start there. Open questions:
+    why PF OA fell from 0.9067 (run 23) to 0.9033 (run 24) when the width of its region is not
+    the cause (run 31); why ACL stays at 0.9406 with a spread equal to its noise against 0.9458
+    for the old recipe; which per-knee shift signal is consistent across knees. Read
+    autoresearch/campaigns/learnable-views/build-notes.md before proposing on topic 2: learned
+    shifts per series type ended within 2.5 mm of their start there and differed by 3 to 7 mm
+    between runs. Out of bounds: everything in the contract's out-of-bounds and closed lists;
+    narrowing a region without a measurement that allows it; a cut with targets on one side
+    only.

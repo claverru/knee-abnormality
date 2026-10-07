@@ -1,0 +1,127 @@
+id: frame-and-targets
+recipe: configs/training.yaml
+reference_run: outputs/autoresearch/routing-and-shifts/experiments/height-cuts-from-the-spots-requeue-20261006T232351Z-d2445402/training
+reference_equivalences: {}
+additional_evidence_runs: []
+backlog:
+  refill_below: 3
+  refill_to: 5
+  seed_order: forced
+  rotate_after: 1000000
+budget:
+  mode: range
+  min_fraction: 0.75
+  max_fraction: 1.3
+policy:
+  editable_files:
+    - configs/training.yaml
+    - src/knee_abnormality/config.py
+    - src/knee_abnormality/data/dataset.py
+    - src/knee_abnormality/training/lightning.py
+    - src/knee_abnormality/training/report_attributes.py
+    - src/knee_abnormality/inference/checkpoint.py
+    - src/knee_abnormality/inference/engine.py
+    - src/knee_abnormality/inference/reflection.py
+  editable_directories:
+    - src/knee_abnormality/modeling
+    - src/knee_abnormality/data/preprocessing
+  config_keys:
+    - data.view_shift_limit_mm
+  config_prefixes:
+    - data.affine_augmentation
+  list_item_fields: {}
+  input_identity_keys:
+    - preprocessing_identity
+  require_source_change: true
+  configuration_only_ideas: false
+  developer_instructions: >-
+    Environment, read this first. (1) You have no GPU and must not use one. Run
+    `rtk proxy uv run --locked python -m scripts.tools.check_side_routing --config
+    configs/training.yaml` from your candidate workspace as it is: the script selects the CPU by
+    itself when no GPU is visible, takes a few minutes there, and that CPU run is the required
+    check. Never return blocked for lack of a GPU. (2) Make every change inside the candidate
+    workspace you were assigned and nowhere else. Do not stage the candidate under /tmp, and do
+    not write source/ or changes.diff in the experiment directory: it is read-only to you by
+    design, and the supervisor freezes the source and the diff from your workspace after you
+    return. (3) When the change is complete and the check passes, return status prepared with
+    the integration and activation declarations and the guardrail JSON in the report. An
+    unwritable experiment directory is never a reason to return blocked.
+    The incumbent is described in prior-work.md (The incumbent) and drawn in
+    docs/ongoing/side-routed-heads.md: one shared classifier for the two meniscus targets and
+    one for the three OA targets; a frame inferred per knee in KneeAbnormalityModel.study_frames
+    (centre and side axis from the two meniscus spots, forward tilt learned, the two height cuts
+    from the meniscus and kneecap spots, core and ring radius regressed); regions in _regions
+    made of eight sectors, a core, two rings and three heights, cut hard with a soft gradient;
+    routed report-attribute heads in training/report_attributes.py; a knee-level term on every
+    routed channel. Read contract.md before writing code. Each seed is one design step and says
+    exactly what changes and what it removes; apply it to the incumbent and leave everything
+    outside it byte-identical. Replace what a seed supersedes: no flag, option or config field
+    selects the old behaviour. The only config changes a seed may make are
+    data.view_shift_limit_mm (the canvas margin, topic 2) and the fields of
+    data.affine_augmentation in the seeds that say so. A candidate that fails any guardrail is
+    repaired or returned blocked, never returned prepared, and the guardrail script is not
+    edited; it is the authority on the interface it calls (encode_batch, frame, routing_weights,
+    position_priors, study_tokens, pool_encoded, frame_rotation, KneeModule._side_step and
+    training_step), so keep those callable as it calls them, with any new argument optional.
+    New parameters or buffers initialize under torch.random.fork_rng so the incumbent's random
+    stream is unchanged, and any random draw a seed adds comes from its own generator. Whatever
+    reads the knee side, a position or a spot from tokens reads them detached unless the seed
+    says otherwise. Update the matching entries of SPATIAL_TOKEN_IDENTITY when the described
+    behaviour changes. Validation and prediction stay deterministic. Reusing earlier code is
+    expected; prior-work.md (Reusable code) lists the sources, all readable from the candidate:
+    the experiments of the routing-and-shifts campaign with source/ and changes.diff, the two
+    manual runs with source_snapshot.zip (unzip into a temporary directory outside the
+    candidate), and the rotation build under
+    outputs/analysis/routing-and-shifts-frames-20261007/builds/. That code was written on run
+    24 or on the incumbent as stated there: port the mechanism, do not copy files whole.
+    Topic 2 facts: prepare_images in data/preprocessing/device.py resamples each slice's view
+    window to 224 px, normalises each series between two quantiles of its windows' valid pixels
+    and rounds to uint8; the canvas port of the routing-and-shifts campaign hands the model
+    uint8 canvases with a margin, normalised in the loader with the incumbent's bounds, and the
+    model cuts the 224 px crop; the affine augmentation and the reflection run in the model
+    after the cut. A topic 2 candidate composes the frame's turn and shift with the cut into
+    one resampling of the canvas, updates patient_maps and valid_rects with the same transform
+    so token positions stay physical, leaves the 120 mm views untouched, and reports: with the
+    angle and shift at zero, the largest absolute difference between its crops and the
+    incumbent's prepared images on one batch in training and in evaluation mode (at most 1 grey
+    level of 255); the residual angle of the frame's axis in the re-cut crop; and that a
+    mirrored pass and a plain pass give mirror-image crops. The first look of a topic 2 seed
+    is one no-gradient pass of the same model in evaluation mode on the crops at the hand-set
+    position; at validation and prediction it reads, for each series row, at most as many
+    slices as that view's configured count, evenly spaced among the row's valid slices; it
+    never runs twice.
+    A training-time memory of each knee's frame is a plain dictionary on the module keyed by
+    study_uid, written from the training pass itself, never saved in the checkpoint and never
+    read outside training. Never decode more slices per study than the incumbent, and do not
+    change widths, image size or slice counts. Every run logs once per epoch, for training and
+    validation, the mean and the standard deviation across knees of every angle, cut or shift
+    it sets, through the module's epoch accumulators (_log_epoch_metric), never per step, and a
+    topic 2 run reports its prediction time. Training time must stay within 0.75 to 1.3 times
+    the reference's; do not reduce epochs, slices or studies. No weight averaging. No tests.
+    Besides the guardrail check, use the existing Python environment for static checks and tiny
+    checks only, and run nothing heavy on the CPU beside a training.
+  researcher_instructions: >-
+    The campaign has no end: it runs until the user stops it. Never return an empty report and
+    never declare the directions exhausted. Research starts after the forced seeds and moves
+    between the three topics of contract.md, staying on one while it has an open lead. Your
+    first product after every completed run is its analysis: both multipliers against the
+    incumbent (score and prediction_macro_auc in fold_1/selected_checkpoint.json), the
+    per-target AUC deltas from the two runs' fold_1/validation_predictions.csv with each
+    target's sibling standard deviation (prior-work.md, Yardstick), and the geometry from the
+    logs (frame angles, cuts, radii, what the run set). A delta under one sibling standard
+    deviation is not a result, and the incumbent sits 0.0003 to 0.0010 above its own reruns
+    (prior-work.md, The incumbent): say for each run whether it is level with a rerun. Only then
+    propose. Each idea fills the five parts of contract.md (How a seed is written) and is one
+    training run; an idea that only measures is not allowed, so put the measurement in what the
+    run logs. Start every implementation text with the sentence "Follow the environment
+    paragraph of the developer instructions." Open leads: the forward tilt is the one angle of
+    the frame still learned from the labels, it differs between runs (6 to 15 degrees) and
+    trades against any other free angle; half the frame's angle works better than the full one
+    for turning the crops, which points at the tilt's noise; centring the crops on the frame
+    gains four targets and costs Fracture and PF OA, which read far from the joint centre; the
+    upper band holds the condyles and the kneecap and nothing marks the femur's direction; the
+    report heads are training-only, so a spot read from a report head needs that head in the
+    model; ACL stays at 0.939 against 0.946 for the old recipe; PF OA and Synovitis decide the
+    ranking of the routed runs. Out of bounds: everything in the contract's out-of-bounds and
+    closed lists; narrowing a region without a measurement that allows it; a cut or an angle
+    that only one side pulls on.

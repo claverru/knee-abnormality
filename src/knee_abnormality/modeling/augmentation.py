@@ -37,7 +37,8 @@ REFLECTION_IDENTITY = {
     "axes": {"Axial": [0, 1, 2], "Coronal": [0, 2, 1], "Sagittal": [1, 2, 0]},
     "pixels": "exact_columns_axial_coronal_channels_sagittal_before_affine_and_normalization",
     "membership": "triplet_container_order_and_middle_slice_unchanged",
-    "embeddings": "plane_contrast_and_final_image_2d_anchor_unchanged",
+    "embeddings": "plane_and_contrast_unchanged",
+    "knee_side": "side_head_target_and_routing_left_probability_flipped_for_mirrored_studies",
     "positions": "negate_sagittal_preserve_axial_coronal",
     "source_channels": "sagittal_2_minus_k_middle_unchanged_source_metadata_immutable",
     "validity": "F_times_U_original_rectangles_all_associated_channels",
@@ -134,6 +135,13 @@ class AugmentationActivity:
     total_acquisitions: int
     changed_elements: torch.Tensor
     mean_absolute_change: torch.Tensor
+
+
+@dataclass(frozen=True)
+class FeatureStatisticsActivity(AugmentationActivity):
+    clamped_channels: torch.Tensor
+    applied_clamped_channels: torch.Tensor
+    total_channels: int
 
 
 @dataclass(frozen=True)
@@ -870,7 +878,7 @@ def apply_feature_statistics_augmentation(
     acquisition_type: torch.Tensor,
     settings: FeatureStatisticsAugmentationConfig,
     generator: torch.Generator | None = None,
-) -> tuple[torch.Tensor, AugmentationActivity]:
+) -> tuple[torch.Tensor, FeatureStatisticsActivity]:
     dtype = features.dtype
     with torch.autocast(device_type=features.device.type, enabled=False):
         values = features.float()
@@ -958,6 +966,8 @@ def apply_feature_statistics_augmentation(
             )
             * spread_std
         )
+        clamped_channels = resampled_std.detach() < 0
+        resampled_std.clamp_min_(0)
 
         per_triplet_apply = eligible[group][:, None, None, None]
         per_triplet_mean = acquisition_mean[group][:, :, None, None]
@@ -972,9 +982,12 @@ def apply_feature_statistics_augmentation(
 
         changed_elements = per_triplet_apply.expand_as(values).sum()
         mean_change = (result - values).abs().sum() / changed_elements.clamp_min(1)
-    return result.to(dtype), AugmentationActivity(
+    return result.to(dtype), FeatureStatisticsActivity(
         eligible.sum().detach(),
         group_count,
         changed_elements.detach(),
         mean_change.detach(),
+        clamped_channels.sum(),
+        (clamped_channels & eligible[:, None]).sum(),
+        resampled_std.numel(),
     )

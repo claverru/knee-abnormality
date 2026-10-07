@@ -1,0 +1,83 @@
+ideas:
+- id: routed-report-attribute-heads-requeue
+  mechanism_id: report-attribute-routing
+  parent_idea_id: null
+  title: Share and route the per-compartment report-attribute heads with the same cuts as the targets,
+    and drop the two questions whose answer is the compartment
+  opportunity: 'Evidence-backed that the conflict exists in the code; a guess that removing it gains.
+    training/report_attributes.py builds 35 heads, each with its own attention over all of a study''s
+    tokens and its own classifier, and their loss (weight 0.1) trains the backbone. 16 of the 35 questions
+    are about one compartment and none is routed: medial_meniscus_status and lateral_meniscus_status
+    are two separate heads over the whole knee, so they can differ only if the tokens themselves say
+    which side they are on. That asks the backbone to encode the compartment, which the shared target
+    classifiers are built to do without. Cartilage and meniscus questions carry about 43% of the attribute
+    signal (docs/modeling/report-attribute-heads.md, Question weighting). The heads are worth keeping:
+    +0.00105 x4 at adoption and -0.0006 when removed on the ResNet-18 recipe. The same sharing gave
+    the five routed targets +0.0090 to +0.0131 against separate classifiers in the fourth and fifth
+    runs (docs/ongoing/side-routed-heads.md).'
+  mechanism: 'Five question families get one shared head each (one attention score column and one classifier
+    block of options), routed by the model''s routing weights exactly as the targets are. The option
+    lists inside each family are identical in configs/labels/jevk5-report-attribute-targets-v3.1.json
+    (checked 2026-10-05: 6, 8, 8, 6 and 5 options). Family, member questions, route of each member (names
+    from ROUTES in modeling/model.py): (1) meniscus status: medial_meniscus_status -> medial, lateral_meniscus_status
+    -> lateral; (2) meniscus tear location: medial_meniscus_tear_location -> medial, lateral_meniscus_tear_location
+    -> lateral; (3) meniscus tear type: medial_meniscus_tear_type -> medial, lateral_meniscus_tear_type
+    -> lateral; (4) cartilage depth: medial_cartilage_depth -> medial_back, lateral_cartilage_depth
+    -> lateral_back, pf_cartilage_depth -> front; (5) cartilage extent: medial_cartilage_extent -> medial_back,
+    lateral_cartilage_extent -> lateral_back, pf_cartilage_extent -> front. For a routed question q
+    with route r, its attention is the softmax over the study''s valid tokens of (the family''s score
+    + log of the routing weight of r), with the same floor (ROUTING_MINIMUM_WEIGHT) and the same fallback
+    as KneeAbnormalityModel._attention_pool: when the study''s routing weights for r sum to less than
+    one token, q pools unrouted. Its logits are that pooled token times the family''s classifier block,
+    so the members of a family differ only by their routing. The routed families read the shared classifiers''
+    tokens, study_tokens(encoded, shared=True), which carry no position; every other question reads
+    study_tokens(encoded) as today. The routing weights are the model''s routing_weights(...) for the
+    batch, not detached, so the attribute loss also acts on the frame and the widths. Two questions
+    are dropped from the heads and from the loss, by id, because their answer is the compartment itself:
+    contusion_location and extra_meniscal_cyst. The remaining 21 questions (medial_meniscus_extrusion
+    and pf_cartilage_surface among them) keep their own unrouted head. That leaves 33 questions on 26
+    heads. The targets table, the reliability weights, report_attribute_loss, the loss weight and the
+    logged report_attribute_kl_<question> per remaining question are unchanged. Route names follow the
+    incumbent''s ROUTES at the time of the run: if the OA sides are routed as medial_rest and lateral_rest
+    and PF OA as front_up, the cartilage questions use those three routes in place of medial_back, lateral_back
+    and front.'
+  precedents:
+  - 'docs/ongoing/side-routed-heads.md, Fourth run and Fifth run: the five routed targets sum to +0.0131
+    and +0.0090 against the reference; localisation +0.002 to +0.013 in the fourth run.'
+  - 'docs/modeling/report-attribute-heads.md: adoption at +0.00105 x4 and 0.940 against 0.938 public;
+    removal on the ResNet-18 recipe -0.0006 (80% [-0.0011, -0.0001]).'
+  novelty: First change to the structure of the report-attribute heads since their adoption on 2026-09-25;
+    they have never been routed or shared.
+  coverage: Training only. Every training study with attribute targets; 12 routed questions in 5 families,
+    2 questions dropped, 21 unchanged. Inference does not use the heads.
+  exploitation: 'Read the run report against the incumbent: the routed targets'' sum and the five localisation
+    deltas (the questions now pull on the same cuts as the targets), the frame angles and the two cut
+    widths, and the own-channel targets (the backbone is no longer asked for the compartment). Per-question
+    report_attribute_kl for the 12 routed questions against the incumbent''s values shows whether the
+    shared heads fit as well as the separate ones. Shown wrong by: the routed sum or a localisation
+    delta flagged in the report, or the routed questions'' divergences clearly above the incumbent''s.
+    Activation: log, per epoch, the number of observed, positively weighted routed question pools whose
+    attention differs from the same head''s unrouted attention by a total variation above 1e-5; the
+    run is void if that count is zero in the first epoch.'
+  budget: Same cost as the incumbent; nine attention columns and classifier blocks fewer.
+  implementation: 'training/report_attributes.py: ReportAttributeHeads takes the question families and
+    routes as module constants (question id to family name and to route name), builds one attention
+    output and one classifier block per head, and maps each kept question to its head, its route index
+    in ROUTES (len(ROUTES) for unrouted) and whether it reads the shared tokens; forward takes both
+    token versions and the routing weights and returns logits in the kept questions'' order; option_counts,
+    question_ids, the targets table and the weights are restricted to the kept questions. training/lightning.py,
+    _report_attribute_step: pass study_tokens(encoded), study_tokens(encoded, shared=True) and model.routing_weights(encoded["knee_x"],
+    encoded["anterior_axis"], encoded["superior_axis"], encoded["left_probability"][:, None], encoded["routable"][:,
+    None]).flatten(1). New parameters initialize under torch.random.fork_rng. No config field and no
+    option; the manifest file is not edited. The guardrail check must still pass; it does not exercise
+    the attribute heads, so also confirm on one batch that flipping left_probability swaps the logits
+    of medial_meniscus_status and lateral_meniscus_status. Keeper note, 2026-10-05: the first candidate
+    of this idea (routed-report-attribute-heads) implemented the mechanism and was blocked only because
+    the guardrail check needed a GPU the developer''s environment does not have. scripts.tools.check_side_routing
+    now runs on the CPU when no GPU is visible (about ten seconds, about 7 GB); run it as the developer
+    instructions say and report its JSON.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Requeue of the first forced seed after a harness failure (no GPU in the developer's
+    environment for the mandatory guardrail check), not a result.
+exhausted_directions: ''

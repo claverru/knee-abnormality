@@ -115,12 +115,17 @@ MODEL_BATCH_KEYS = frozenset(
         "patient_maps",
         "geometry_valid",
         "view_index",
-        "view_to_wide",
         "window_center_mm",
         "window_rule_distance_mm",
         "knee_side_sign",
         "knee_center_x_mm",
         "knee_center_y_mm",
+        "knee_center_z_mm",
+        "knee_side_certain",
+        "knee_side_coordinates",
+        "knee_side_left",
+        "knee_side_split",
+        "mirrored_study",
     }
 )
 

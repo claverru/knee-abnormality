@@ -43,9 +43,9 @@ def researcher_streak(state, seeded):
     for exp in decided_runs(state):
         if exp["decision"] == "provisional_accept":
             streak = 0
-        elif (
-            exp["decision"] != "invalid" or failed_run_check(exp)
-        ) and researcher_run(state, exp, seeded):
+        elif (exp["decision"] != "invalid" or failed_run_check(exp)) and researcher_run(
+            state, exp, seeded
+        ):
             streak += 1
     return streak
 

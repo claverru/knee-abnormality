@@ -60,13 +60,13 @@ BACKBONE_MAPPINGS = {
 }
 
 SPATIAL_TOKEN_IDENTITY = {
-    "algorithm": "all_valid_spatial_tokens_four_embeddings_v6",
+    "algorithm": "all_valid_spatial_tokens_rotatable_knee_frame_attention_prior_side_routed_shared_channels_knee_level_term_v14_hard_octants_soft_gradient_own_routes_study_frames_and_landmarks_eighteen_regions_overlap_routed_reports_fixed_frame_own_position_hard_cuts_soft_gradient_knee_level_term_on_every_routed_channel_side_labels_keep_their_half_of_the_core_region_table_from_all_token_attention_synovitis_unrouted_per_study_centre_nod_and_sizes_roll_and_turn_shared_kneecap_region_front_above_the_lower_cut_frame_on_meniscus_spots_eight_sections_three_tear_places_per_side_ring_sector_division_height_cuts_from_meniscus_and_kneecap_spots",
     "projection": "shared_linear_C_to_256",
-    "position_1d": "sinusoidal_middle_slice_acquisition_midpoint_mm",
-    "position_2d": "wide_augmented_anchor_detail_inverse_augmented_anchor_in_wide_frame_linear2_64_gelu_linear64_256",
+    "token": "projection_plus_plane_contrast_and_detail_view_embeddings_layernorm_two_versions_own_channels_plus_fixed_sinusoid_of_detached_knee_frame_position_42_wavelengths_8_to_512_per_axis_zero_without_fitted_center_shared_channels_position_free",
+    "initialization_rng": "side_head_position_prior_up_width_and_knee_level_scale_parameters_forked_removed_position_draw_count_and_target_sized_scorer_and_readout_draws_preserve_training_stream",
     "view_policy": "configured_views_per_series_type_frame_spacing_wide_else_detail_image_or_knee_anchor_offset_inside_frame_v3",
     "view_embedding": "zero_initialized_additive_detail_only",
-    "view_label_bias": "optional_zero_initialized_additive_attention_score_per_view_and_target",
+    "view_label_bias": "optional_zero_initialized_additive_attention_score_per_view_and_channel",
     "geometry_dtype": "float32_outside_autocast",
     "plane_order": ["Axial", "Coronal", "Sagittal"],
     "contrast_order": [[0, 0], [1, 1]],
@@ -74,9 +74,13 @@ SPATIAL_TOKEN_IDENTITY = {
     "visual_validity": "all_channel_inverse_augmented_anchors_inside_prepared_rectangles",
     "preparation": "rounded_resampling_half_pixel_series_offset_crop_v2",
     "augmentation": "kornia_normalized_affine_align_corners_false_v1",
-    "aggregation": "layernorm_target_attention_256_128_12",
-    "meniscus_half_knee": "own_side_attention_excludes_opposite_tokens_beyond_10mm_training_shared_float32_smooth_max",
-    "oa_shared_detector_regions": "trusted_middle_slice_patient_LPS_medial_axis_beyond_10mm_and_anterior_center_y_minus_patient_y",
+    "aggregation": "layernorm_channel_attention_256_128_9_seven_own_channels_shared_meniscus_and_oa_twelve_target_biases_plus_zero_started_channel_scale_times_position_free_shared_evidence_pooled_by_unrouted_attention_with_same_scores_and_view_bias_no_position_prior",
+    "compartment_routing": "log_routing_weight_over_routing_temperature_added_to_attention_scores_weights_are_hard_steps_with_the_gradient_of_a_sigmoid_of_signed_distance_over_the_projected_token_box_extent_eight_45_degree_sectors_centred_on_the_frame_axes_a_core_cylinder_an_outer_ring_and_three_heights_around_the_study_frame_per_target_region_table_from_the_attention_of_run_11_medial_and_lateral_mirrored_floor_1e-6_unrouted_below_one_token_contusion_and_fracture_unrouted",
+    "routing_geometry": "middle_slice_patient_LPS_minus_fitted_center_xyz_rotated_about_z_to_study_mean_folded_axial_coronal_row_direction_identity_without_one_then_medial_positive_frame_rotated_by_learned_rotation_vector_90deg_tanh_zero_initialized_series_without_fitted_center_half",
+    "learned_centre": "fitted_center_with_three_learned_frame_rotations_nod_roll_turn_about_it_zero_initialized_common_to_all_studies_no_offsets_no_per_study_part_plus_per_study_frame_head_on_detached_tokens_with_position_code_attention_pooled_256_128_to_three_shifts_in_token_pitches_and_three_rotation_logits_zero_initialized_shared_shift_bias_composed_with_a_frame_from_three_landmarks_centre_front_up_zero_initialized_attention_maps_256_128_3_landmark_minus_uniform_mean_shift_axes_from_per_axis_token_spread_plus_landmark_differences_gram_schmidt_plus_per_study_band_top_band_bottom_core_radius_in_token_pitches_from_0_minus_2_and_1_centre_at_the_midpoint_of_the_two_meniscus_spots_side_axis_along_them_spots_are_squared_attention_centroids_of_the_shared_meniscus_channel_over_the_fitted_medial_and_lateral_halves_no_gradient_nod_and_two_radii_regressed_core_radius_ring_radius_from_1.1_and_2.2_pitches_height_cuts_no_gradient_between_mean_meniscus_height_and_front_up_shared_oa_kneecap_height_weighted_by_squared_attention_spot_spreads_upper_at_least_meniscus_height_lower_mirrored_about_meniscus_height_missing_any_spot_uses_start_heights_1.3_and_minus_0.9_pitches",
+    "position": "attention_score_prior_per_target_linear42_10_zero_initialized_on_sincos_7_wavelengths_8_to_512_of_rotated_frame_medial_front_up_mm_from_the_fitted_center_own_channels_signed_medial_meniscus_and_oa_sides_one_map_each_on_depth_into_own_compartment_pf_on_absolute_medial_zero_without_fitted_center",
+    "knee_side": "explicit_coordinates_agree_metadata_else_sigmoid_detached_source_frame_side_head_logit_plus_4.33_coordinate_side_prior_for_coordinate_source_studies_mixture_bilateral_split_series_own_sign",
+    "side_head": "detached_normalized_visually_valid_axial_coronal_fitted_center_tokens_linear_256_128_tanh_linear_128_1_per_token_mean_weighted_by_tanh_displayed_knee_x_over_learned_width_left_logit_flipped_for_mirrored_studies",
 }
 
 
@@ -285,17 +289,11 @@ def feature_geometry(
     valid_rects: torch.Tensor,
     inverse_affine: torch.Tensor,
     grid_shape: tuple[int, int],
-    input_shape: tuple[int, int],
     mapping: tuple[float, float, float, float],
     source_channels: torch.Tensor,
-) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+) -> tuple[torch.Tensor, torch.Tensor]:
     with torch.autocast(device_type=valid_rects.device.type, enabled=False):
         height, width = grid_shape
-        input_height, input_width = input_shape
-        if min(input_height, input_width) <= 1:
-            raise ValueError(
-                "Spatial coordinates require input dimensions greater than one"
-            )
         origin_y, origin_x, stride_y, stride_x = mapping
         y, x = torch.meshgrid(
             torch.arange(height, device=valid_rects.device, dtype=torch.float32)
@@ -308,13 +306,6 @@ def feature_geometry(
         )
         anchors = torch.stack(
             (x.flatten(), y.flatten(), torch.ones_like(x.flatten())), -1
-        )
-        xy = torch.stack(
-            (
-                2 * anchors[:, 0] / (input_width - 1) - 1,
-                2 * anchors[:, 1] / (input_height - 1) - 1,
-            ),
-            -1,
         )
         prepared = torch.einsum("nij,kj->nki", inverse_affine.float(), anchors)
         valid_rects = valid_rects.gather(
@@ -329,15 +320,14 @@ def feature_geometry(
             & (py >= top[..., None])
             & (py <= (top + rows - 1)[..., None])
         ).all(1)
-    return xy, visual_valid, prepared[..., :2]
+    return visual_valid, prepared[..., :2]
 
 
 class SpatialTokens(nn.Module):
     def __init__(self, width, series_types):
         super().__init__()
-        self.position_2d = nn.Sequential(
-            nn.Linear(2, 64), nn.GELU(), nn.Linear(64, width)
-        )
+        removed_position_draws = 3 * 64 + 65 * width
+        torch.empty(removed_position_draws).uniform_()
         self.plane = nn.Embedding(3, width)
         self.contrast = nn.Embedding(2, width)
         planes = SPATIAL_TOKEN_IDENTITY["plane_order"]
@@ -358,11 +348,8 @@ class SpatialTokens(nn.Module):
         nn.init.normal_(self.plane.weight, std=0.02)
         nn.init.normal_(self.contrast.weight, std=0.02)
 
-    def forward(self, xy, types, dtype):
-        with torch.autocast(device_type=xy.device.type, enabled=False):
-            position_2d = self.position_2d(xy.float())
+    def forward(self, types, dtype):
         return {
-            "position_2d": position_2d.to(dtype),
             "plane": self.plane(self.plane_lookup[types]).to(dtype),
             "contrast": self.contrast(self.contrast_lookup[types]).to(dtype),
         }

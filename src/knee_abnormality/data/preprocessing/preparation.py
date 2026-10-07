@@ -74,8 +74,8 @@ class PreparedSeries:
     knee_side_sign: float = 0.0
     knee_center_x_mm: float = 0.0
     knee_center_y_mm: float = 0.0
+    knee_center_z_mm: float = 0.0
     view_index: int = 0
-    view_to_wide: torch.Tensor | None = None
     window_center_mm: tuple[float, float] = (0.0, 0.0)
     window_rule_distance_mm: float = 0.0
 

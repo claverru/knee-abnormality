@@ -3,7 +3,6 @@ from dataclasses import dataclass
 from functools import lru_cache
 
 import numpy as np
-import torch
 from scipy.sparse import csr_matrix
 
 from knee_abnormality.data.preprocessing.dicom import DecodedFrame
@@ -366,16 +365,6 @@ def view_position(records, plane, view, side, knee, trusted, frame_spacing, size
     )
 
 
-def frame_wide_transform(frame, wide_spacing, size):
-    rows, columns, row_spacing, column_spacing = frame.native_layout
-    return _output_to_native(
-        rows,
-        columns,
-        *resample_targets(rows, columns, row_spacing, column_spacing, wide_spacing),
-        size,
-    )
-
-
 def fallback_window_center(value, view, size):
     if not value.triplet_count:
         return (0.0, 0.0), 0.0
@@ -389,26 +378,3 @@ def fallback_window_center(value, view, size):
         ]
     )
     return tuple(map(float, center)), float(np.linalg.norm(center - image_rule(view)))
-
-
-def view_transforms(value, wide_spacing, size):
-    return (
-        torch.tensor(
-            np.stack(
-                [
-                    np.linalg.inv(
-                        frame_wide_transform(
-                            value.frames[int(value.gather[index * 3 + 1])],
-                            wide_spacing,
-                            size,
-                        )
-                    )
-                    @ value.frames[int(value.gather[index * 3 + 1])].output_to_native
-                    for index in range(value.triplet_count)
-                ]
-            ),
-            dtype=torch.float32,
-        )
-        if value.triplet_count
-        else torch.empty((0, 3, 3))
-    )

@@ -1,0 +1,71 @@
+ideas:
+- id: calibrated-shared-report-outputs-requeue
+  mechanism_id: report-attribute-routing
+  parent_idea_id: null
+  title: Keep report evidence shared and learn separate question intercepts
+  opportunity: 'The priors retry changed supervised attention throughout training, yet all twelve shared
+    questions finished with higher training KL than the reference. A training-only census of the 3,533
+    non-fold-1 studies identifies a concrete mismatch: weighted medial/lateral meniscus ''tear'' frequencies
+    are 0.2538/0.1085; cartilage ''no_damage'' frequencies are 0.5857 medial, 0.7088 lateral and 0.5108
+    PF. The current shared report classifier ties its option biases. Constant-only predictors lose 0.038469
+    nats for meniscus status and 0.031117 for tear location when their intercepts are tied. These measurements
+    establish different answer distributions; they do not establish a lower bound on the feature-dependent
+    head''s loss.'
+  mechanism: 'In src/knee_abnormality/training/report_attributes.py, implement the five historical shared
+    families with their routed, position-free token pools and zero-started spatial priors. Add a zero-initialized
+    question-by-option parameter block U for each shared family. Use delta = U - mean_options(U) - mean_questions(U)
+    + mean_all(U), and output z[q,o] = shared_classifier[F,o](pool[q]) + delta[q,o]. The centering separates
+    common family calibration from question differences. These intercepts sit after visual evidence
+    pooling, analogous to the disease path''s existing target_bias; they never enter tokens, attention
+    or routing. Retain detached report geometry, all 35 questions and the original loss normalization.
+    Keep neutral invalid-geometry partitions: 1/2 per meniscus route and 1/3 per OA route. Evidence-backed
+    change: restore calibration freedom for measured unequal answer distributions. Hypothesis: this
+    reduces conflicting report gradients while preserving shared anatomical evidence.'
+  precedents:
+  - 'outputs/autoresearch/side-routing/experiments/spatial-priors-for-routed-report-heads-20261005T234457Z-e780321a/side_routing_report.json
+    and training/fold_1/logs/version_0/metrics.csv: routing/localisation diagnostics and twelve shared-question
+    KL curves.'
+  - '/home/claudio/src/knee-abnormality/data/labels/prepared/jevk5-report-attributes-v3.1/targets.parquet,
+    joined to data/folds/all_5fold_scanner_v2/studies.csv with fold != 1: the training-only weighted
+    option census and constant-predictor KL calculations reported above.'
+  - 'src/knee_abnormality/modeling/model.py: _attention_pool adds separate target_bias after shared
+    disease evidence. scripts/tools/check_side_routing.py subtracts those intercepts when checking shared
+    visual-evidence symmetry.'
+  - 'routed-report-attribute-heads-requeue: sharing without priors also left all twelve shared questions
+    with worse final training KL. Question removal and differentiable report routing are superseded
+    by the complete priors design.'
+  - Auxiliary-signals precedent attribute-gate-family-shared-pooling was rejected. This proposal preserves
+    the existing targets, gates and weights and addresses calibration of spatially routed shared heads.
+  novelty: Previous attempts changed sharing, routing and spatial priors while keeping one classifier
+    bias vector per family. This adds question-specific output calibration without exposing compartment
+    identity to the shared visual classifier or changing report targets and losses.
+  coverage: Apply the same construction to meniscus status, tear location, tear type, cartilage depth
+    and cartilage extent. The other 23 questions retain their independent heads and original initialization
+    draws. Geometry continues to determine which tokens supply each compartment's shared visual evidence.
+  exploitation: 'Run one complete candidate against the live incumbent. Log full-epoch supervised intercept
+    contribution and the existing prior-induced attention changes, plus every question''s KL. Shown
+    wrong by: active calibration leaves the shared-question KL deficit broadly unchanged and the routing
+    report still shows the same localisation weakness. These are explanatory diagnostics; adoption remains
+    solely the fixed 80% macro-bootstrap rule.'
+  budget: Keep ten epochs, inputs, optimizer, schedule and losses unchanged; use the supervisor's incumbent
+    seed, currently 1110484336. The historical priors candidate trained in 1,249.1 seconds. The small
+    intercept blocks should add negligible compute; expected training remains around 1,250–1,300 seconds
+    within the supplied 979.0–1,631.7-second range. No confirmation run.
+  implementation: 'Replace the baseline''s twelve independent report blocks with the five declared routed
+    shared families, priors and centered question intercepts; retain the other 23 heads. Update training/report_attributes.py
+    and training/lightning.py; use modeling/model.py for current detached routes/coordinates and replace
+    its invalid OA fallback with the neutral simplex. Update modeling/spatial_tokens.py identity. Nothing
+    changes in configs/training.yaml or protected label/evaluation code. Preserve all unrelated accepted
+    incumbent behavior. If a newer incumbent already has routed report heads, replace only their calibration
+    with this declared design and retain its current geometry rather than copying historical cuts. The
+    developer must report the unchanged pre-run guardrail JSON. Keeper note, 2026-10-06: requeue of
+    the researcher''s calibrated-shared-report-outputs. Its first candidate was built on the previous
+    incumbent and its training was cancelled seconds after launch, when separate-oa-frame-with-knee-level-term
+    was adopted; build this one on the current incumbent, using its route names.'
+  open_choices: 'The causal importance of tied biases remains a hypothesis: shared visual features can
+    already encode different compartment appearances. The bundled neutral fallback repair can affect
+    mixed-geometry pooling, so log full-epoch geometry coverage and mixed-bag counts. No question selection,
+    target modification, loss reweighting or data-derived bias initialization is proposed.'
+  dependencies: []
+  priority_rationale: Requeue after a cancelled launch on a superseded incumbent, not a result.
+exhausted_directions: ''

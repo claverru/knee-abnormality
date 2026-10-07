@@ -1,0 +1,59 @@
+ideas:
+- id: knee-level-term-on-incumbent-routing
+  mechanism_id: knee-level-disease-term
+  parent_idea_id: null
+  title: Add to every routed target the shared classifier's knee-level evidence, on the incumbent's
+    routing
+  opportunity: 'Evidence-backed observation, mechanism a guess. Exclusive regions make a routed target
+    better at telling its compartment from the others and worse at the plain AUC, because OA in one
+    compartment predicts OA in another (166 of the 363 OA studies of the fold have more than one compartment)
+    and an exclusive region cannot see the other compartments'' evidence. Three runs show it. Fourth
+    run, front tokens counted for the OA sides as well as for PF OA (weights not summing to one): Medial
+    OA +0.0030, Lateral OA +0.0022 against the old recipe, 0.953 public. Fifth run, sides on the back
+    only: +0.0013 and +0.0003, 0.952 public. front-and-up-region-for-pf-oa (this campaign, 2026-10-06),
+    PF OA on front-and-up and the sides on the rest: PF OA localisation +0.0153 against the incumbent
+    (tolerance 0.0057), the largest localisation gain of the line, with PF OA +0.0013; but Medial OA
+    -0.0009 and Lateral OA -0.0027, routed sum -0.0049, macro -0.0002, not adopted. Giving the sides
+    the front-and-low region back did not help them, so what they lost after the fourth run is the PF
+    region''s evidence, not their own front. The design should keep exclusive regions for localisation
+    and return the knee-level evidence explicitly instead of through overlapping regions. knee-level-term-with-front-and-up-routing
+    changes the PF OA region and adds the knee-level term in one design. This seed is the same term
+    on the incumbent''s regions (PF OA in front, the OA sides behind), so the two runs together show
+    what the term is worth with each region, and the campaign has a design ready that returns the other
+    compartments'' evidence without moving any cut.'
+  mechanism: 'Part (B) of knee-level-term-with-front-and-up-routing only, on the incumbent''s routing,
+    which does not change. In KneeAbnormalityModel._attention_pool, for each shared channel c compute
+    an unrouted attention over the study''s valid tokens, softmax(score_c + view bias) with the same
+    scorer output and view label bias the routed targets use, with no routing term and no position prior,
+    and pool the channel''s evidence with it: g_c = sum over tokens of that attention times evidence_c
+    (the same evidence, from the shared classifiers'' position-free tokens). Every target k of channel
+    c then has logit_k = its routed logit + scale_c * g_c, where scale is a new learned parameter with
+    one scalar per shared channel (meniscus, oa), started at zero under torch.random.fork_rng. The seven
+    own-channel targets are unchanged. Nothing else changes.'
+  precedents:
+  - 'docs/ongoing/side-routed-heads.md, Fourth run and Fifth run: Medial OA and Lateral OA with and
+    without the front of their side; S113 0.953 and S114 0.952.'
+  - 'autoresearch/campaigns/side-routing/run-notes.md, front-and-up-region-for-pf-oa: per-target and
+    localisation deltas of 2026-10-06.'
+  novelty: The knee-level term without any change of region.
+  coverage: Every study, training and inference, for the five routed targets. Studies with more than
+    one affected compartment (46% of OA studies, 15% of meniscus studies) are where the knee-level term
+    adds evidence a compartment's own region does not hold.
+  exploitation: 'Read the run report against the incumbent: Medial OA and Lateral OA (expected above
+    the incumbent''s, towards the fourth run''s +0.0017 and +0.0019 over it), the five localisation
+    deltas (expected unchanged: the term is the same for the targets of a channel), the routed sum against
+    the lineage''s best, and the two logged scales. Shown wrong by: the OA scale near zero, or the OA
+    sides not above the incumbent''s with a scale that moved.'
+  budget: Same cost as the incumbent; one extra softmax and pooling per shared channel.
+  implementation: 'modeling/model.py: the new parameter knee_level_scale and the knee-level term in
+    _attention_pool; SPATIAL_TOKEN_IDENTITY aggregation in modeling/spatial_tokens.py. training/lightning.py:
+    log knee_level_scale_<channel> per epoch. The temperature needs no change: the unrouted attention
+    uses the scorer and the view bias, which apply_attention_temperature already scales. No config field
+    and no option. scripts.tools.check_side_routing runs on the CPU when no GPU is visible; all nine
+    guardrails must pass and its JSON goes in the report.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: 'Keeper seed: the knee-level term on its own regions, beside the combined design,
+    from the first run''s finding that exclusive regions cost the OA sides the other compartments''
+    evidence.'
+exhausted_directions: ''

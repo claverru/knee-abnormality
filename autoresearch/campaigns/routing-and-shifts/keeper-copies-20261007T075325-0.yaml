@@ -1,0 +1,127 @@
+ideas:
+- id: compact-support-cut-gradients-k
+  mechanism_id: cut-surrogate-support
+  parent_idea_id: null
+  title: Confine each hard cut's surrogate gradient to its current measured token extent
+  opportunity: Incumbent PF OA stays within 0.8851–0.8859 in epochs 6–9 while training loss falls
+    from 0.5335 to 0.5225. Synovitis finishes below its epoch-4 peak. Source inspection shows that
+    each hard cut uses a sigmoid surrogate whose derivative remains nonzero arbitrarily far from the
+    boundary. Distant tokens can therefore influence geometry despite unchanged hard membership. Their
+    actual contribution and its utility are unmeasured.
+  mechanism: 'Replace modeling/model.py::_regions::inside''s sigmoid surrogate. For signed distance
+    d and the cut''s existing detached extent e, define s=clamp(1/2+d/(2e),0,1), f=(3s²−2s³)/6, and
+    return H(d.detach())+(f−f.detach()). Forward membership remains unchanged. The derivative vanishes
+    outside |d|<e and matches the incumbent''s 1/(8e) derivative at d=0. Retain every distance equation
+    and extent calculation. Log actual supervised boundary-gradient participation, frame gradient
+    norms, and upstream-gradient-weighted incumbent derivative mass inside and outside this support.
+    Use hooks and scalar reductions without another backward pass. Label: unlimited sigmoid support
+    is source-backed; harmful distant influence and improved optimization are hypotheses.'
+  precedents:
+  - Incumbent modeling/model.py::_regions defines the hard-forward sigmoid surrogate using detached
+    token extents.
+  - '[Prior work, measured cut forces](/home/claudio/src/knee-abnormality-side-routed-heads/autoresearch/campaigns/routing-and-shifts/prior-work.md#measured-with-drawings):
+    supported cuts have readers on both sides; unsupported cuts drift.'
+  - The activated vertical-spread extension failed macro adoption. This proposal investigates optimization
+    while retaining existing forward regions.
+  novelty: Changes gradient support without changing forward routing, geometry parameters, losses
+    or token resolution. Boundary normalization is derived analytically rather than selected through
+    a strength sweep.
+  coverage: Topic 1. Applies uniformly to the current height, radial, sector and side primitives.
+    Retains mirrored assignments, compartment-blind shared classifiers, token-centre ownership and
+    existing readers.
+  exploitation: 'Shown wrong by: distant derivative contribution is negligible, effective supervised
+    geometry gradients disappear, or the activated candidate fails the fixed macro adoption rule.
+    These logs diagnose the mechanism; they add no numerical adoption threshold or label-specific
+    objective.'
+  budget: One ten-epoch run at seed 1110484336 and 4,420 steps. Polynomial arithmetic replaces sigmoid
+    evaluation. Diagnostics require hooks and reductions, with no additional backbone or backward
+    pass. Expected training cost is near the incumbent's 1,202.8 s, within 920.4–1,595.3 s; compliance
+    requires measurement. The developer reports the unchanged routing guardrails.
+  implementation: 'Environment, read this first. (1) You have no GPU and must not use one. Run `rtk
+    proxy uv run --locked python -m scripts.tools.check_side_routing --config configs/training.yaml`
+    from your candidate workspace as it is: the script selects the CPU by itself when no GPU is visible,
+    takes a few minutes there, and that CPU run is the required check. Never return blocked for lack
+    of a GPU. (2) Make every change inside the candidate workspace you were assigned and nowhere else.
+    Do not stage the candidate under /tmp, and do not write source/ or changes.diff in the experiment
+    directory: it is read-only to you by design, and the supervisor freezes the source and the diff
+    from your workspace after you return. (3) When the change is complete and the check passes, return
+    status prepared with the integration and activation declarations and the guardrail JSON in the
+    report. An unwritable experiment directory is never a reason to return blocked. Replace the primitive
+    in modeling/model.py, update modeling/spatial_tokens.py''s algorithm identity and add diagnostics
+    in training/lightning.py. Remove the live sigmoid-gradient branch; its derivative may remain only
+    for detached diagnostics. Retain accepted spot-derived heights, all current route expressions,
+    frame readers, priors, classifiers and losses. Apply the replacement to the development-time incumbent''s
+    current cuts, preserving unrelated accepted changes and any accepted radial deletion. Add no configuration
+    option.'
+  open_choices: The cubic, current extent and boundary-derivative normalization are fixed. Distant-gradient
+    contribution remains missing evidence. Hooks must accumulate only actual supervised backward signals
+    and release step-local graphs.
+  dependencies: []
+  priority_rationale: 'Keeper''s copy with the developer-environment paragraph. Priority 1: a distinct,
+    inexpensive mechanism with identical forward regions. Causal evidence is limited, but the source
+    exposes an untested property of geometry optimization.'
+- id: report-answers-own-attention-k
+  mechanism_id: report-answer-attention
+  parent_idea_id: null
+  title: Untie categorical report answers' attention while retaining classifiers and region assignments
+  opportunity: ReportAttributeHeads pools one feature vector for every answer of a categorical question.
+    The frozen manifest yields 33 categorical questions, 27 shared heads and 129 classifier answer
+    rows. PF cartilage surface's five answers and Synovitis status's three answers each share one
+    attention column. Their training KL continues decreasing while the corresponding main AUC curves
+    plateau. Answers may require different evidence locations; useful specialization is unmeasured.
+  mechanism: 'In training/report_attributes.py, assign one attention output to each categorical classifier
+    row. Retain the shared hidden layer. For head h and answer o, compute α_h,o=softmax(score_h,o+the
+    current routing term) over current membership, then L_h,o=Σ_n α_h,o,n(W_h,o·x_n)+b_h,o. Use the
+    same routed shared tokens or unrouted positioned tokens as today. Corresponding compartment questions
+    retain shared answer scorers and classifier parameters. Initialize each answer scorer by copying
+    its question''s ordinary seeded scorer row, preserving initial logits and unrelated RNG consumption.
+    Keep the three binary region-family readers unchanged. Log attention divergence on observed questions,
+    scorer-row dispersion and train/validation question KL. Label: current tying is source-backed;
+    useful answer-specific evidence is a hypothesis.'
+  precedents:
+  - Incumbent training/report_attributes.py::_pool and forward pool once per categorical question
+    before applying its classifier rows.
+  - The frozen v4 manifest supplies 129 categorical answer rows across 27 shared heads. No target
+    construction, options or observation weights need changing.
+  - 'Incumbent epochs 4–9: PF-surface training KL falls 0.4850→0.4512 and Synovitis-status KL 0.1602→0.1462,
+    while late main AUC gains remain limited.'
+  - Closed report-region-targets attempts connected main targets to report classifiers or residual
+    outputs. This proposal changes attention among existing categorical answers without those cross-task
+    connections.
+  novelty: Unties answer-level attention within existing report heads. Retains classifier sharing,
+    question schemas, regions and losses. Adds no cross-task detector, residual output or auxiliary
+    objective.
+  coverage: Topic 1's attention-sharing scope. Applies uniformly to all categorical report questions.
+    Existing generous supports and mirrored shared parameter assignments remain fixed.
+  exploitation: 'Shown wrong by: answer attention remains identical on observed questions, or active
+    specialization fails the fixed macro adoption rule. Report fitting and specialization are diagnostics
+    across all questions, without selecting answers or compartments from validation performance.'
+  budget: One ten-epoch run at seed 1110484336 and 4,420 steps. Attention outputs increase from 30
+    to 132, including three unchanged binary families. Compute token evidence and reduce weighted
+    scalar evidence rather than materializing a feature vector per answer. No backbone pass or slice
+    is added. Runtime and memory require measurement within the fixed range. Main prediction does
+    not use these auxiliary heads.
+  implementation: 'Environment, read this first. (1) You have no GPU and must not use one. Run `rtk
+    proxy uv run --locked python -m scripts.tools.check_side_routing --config configs/training.yaml`
+    from your candidate workspace as it is: the script selects the CPU by itself when no GPU is visible,
+    takes a few minutes there, and that CPU run is the required check. Never return blocked for lack
+    of a GPU. (2) Make every change inside the candidate workspace you were assigned and nowhere else.
+    Do not stage the candidate under /tmp, and do not write source/ or changes.diff in the experiment
+    directory: it is read-only to you by design, and the supervisor freezes the source and the diff
+    from your workspace after you return. (3) When the change is complete and the check passes, return
+    status prepared with the integration and activation declarations and the guardrail JSON in the
+    report. An unwritable experiment directory is never a reason to return blocked. Replace categorical
+    attention indexing and pooling in training/report_attributes.py; add diagnostics in training/lightning.py.
+    Remove question-level categorical pooling without retaining a flag. Preserve classifier shapes,
+    family tying, mappings, routing masks, binary readers, target construction, observation weights
+    and loss normalization and coefficient. Retain accepted spot heights and unrelated incumbent changes.
+    If a new incumbent changes report routing, expand its current categorical sharing map and use
+    its current routes.'
+  open_choices: Uniform answer-level untying and initialization from existing question rows are fixed.
+    Specialization remains missing evidence. Preserve shared answer rows across compartment questions
+    and unrelated initialization randomness.
+  dependencies: []
+  priority_rationale: 'Keeper''s copy with the developer-environment paragraph. Priority 3: an independent
+    representation change with bounded scope. Potential is uncertain and training overhead exceeds
+    the two geometry proposals, but existing answer classifiers make it concrete.'
+exhausted_directions: ''

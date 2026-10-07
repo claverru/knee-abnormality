@@ -1,0 +1,57 @@
+ideas:
+- id: separate-oa-frame-with-knee-level-term
+  mechanism_id: knee-level-disease-term
+  parent_idea_id: null
+  title: Add the knee-level term to the design with a separate OA frame
+  opportunity: 'Evidence-backed on each part; that they add up is a guess. separate-oa-frame-for-octant-routing
+    (2026-10-06) has the highest x4 macro of the campaign, 0.924876 (+0.000400), PF OA localisation
+    +0.0137 and an own-channel sum of +0.0067. Its two frames turned apart about the vertical axis,
+    +6.2 degrees for the meniscus frame and -6.1 degrees for the OA frame, where the single shared frame
+    had stayed within 1.6 degrees in every run: the two diseases ask for different orientations of the
+    midline. It was kept out by Medial Meniscus localisation, 0.0045 under the fourth run''s mark (tolerance
+    0.0025), and by Medial OA localisation, 0.0031 under the best (tolerance 0.0030). The knee-level
+    term has raised Medial Meniscus localisation in each of its four runs (+0.0018, +0.0041, +0.0048,
+    +0.0036 against the incumbent) and cleared that mark in three of them, with strengths learned negative
+    every time (meniscus -0.14, OA -0.02 to -0.04).'
+  mechanism: 'Two parts. (A) The design of separate-oa-frame-for-octant-routing unchanged, whose source
+    is under outputs/autoresearch/side-routing/experiments/separate-oa-frame-for-octant-routing-*/source:
+    Use two global zero-started rotations R_g=exp([90° tanh(theta_g)]×), with the existing bound and
+    fitted-centre origin. Retain the incumbent frame for meniscus routes, meniscus/own-channel priors
+    and own position. Add an OA frame for OA routes and OA/PF position priors. In that frame, derive
+    m, f and u with the existing side-probability mixing and sigmoid widths; assign OA weights (f*u,
+    m*(1-f*u), (1-m)*(1-f*u)). Meniscus weights remain (m_meniscus,1-m_meniscus). Keep current medial/front/side
+    widths and the previous zero-deviation up-width parameterization. Log both frame trajectories and
+    the actual assignment difference from applying the OA partition in the meniscus frame. Shown wrong
+    by: no assignment difference, or active separation that retains the routed tradeoff without valid
+    macro improvement. (B) The knee-level term of knee-level-term-on-incumbent-routing, whose source
+    is under outputs/autoresearch/side-routing/experiments/knee-level-term-on-incumbent-routing-*/source,
+    on top of that routing: Part (B) of knee-level-term-with-front-and-up-routing only, on the incumbent''s
+    routing, which does not change. In KneeAbnormalityModel._attention_pool, for each shared channel
+    c compute an unrouted attention over the study''s valid tokens, softmax(score_c + view bias) with
+    the same scorer output and view label bias the routed targets use, with no routing term and no position
+    prior, and pool the channel''s evidence with it: g_c = sum over tokens of that attention times evidence_c
+    (the same evidence, from the shared classifiers'' position-free tokens). Every target k of channel
+    c then has logit_k = its routed logit + scale_c * g_c, where scale is a new learned parameter with
+    one scalar per shared channel (meniscus, oa), started at zero under torch.random.fork_rng. The seven
+    own-channel targets are unchanged. Nothing else changes.'
+  precedents:
+  - autoresearch/campaigns/side-routing/run-notes.md, decisions 5 and 11 and the knee-level term's four
+    runs (4, 5, 9, 10).
+  novelty: The separate OA frame has been run once, without the knee-level term.
+  coverage: Every study with a fitted centre, training and inference, for the five routed targets.
+  exploitation: 'Read the run report against the incumbent: Medial Meniscus and Medial OA localisation
+    against the lineage''s best (the two flags of the separate-frame run), PF OA localisation (expected
+    to stay near +0.013), the macro, the two frames'' angles (expected to turn apart again) and the
+    two knee-level strengths (expected negative). Shown wrong by: frames that stay together, or Medial
+    Meniscus localisation not above the separate-frame run''s.'
+  budget: Same cost as the incumbent.
+  implementation: Start from the separate-frame experiment's changes (modeling/model.py, modeling/spatial_tokens.py,
+    training/lightning.py as in its source) and add the knee_level_scale parameter and the knee-level
+    term in _attention_pool, logging knee_level_scale_<channel> per epoch. No config field and no option.
+    scripts.tools.check_side_routing runs on the CPU when no GPU is visible; all nine guardrails must
+    pass and its JSON goes in the report.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: 'Keeper seed: the highest macro of the campaign with the one mechanism that has
+    cleared its main flag every time.'
+exhausted_directions: ''
