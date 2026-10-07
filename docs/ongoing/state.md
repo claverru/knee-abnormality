@@ -13,7 +13,8 @@ measured outcomes are in the [validation results](../validation/results/INDEX.md
   [`rebuild_state_v2`](../public-labels/label-rebuild.md#a2-common-state-scale-and-the-zhen-lineage-fix-2026-09-28)
   (A2 of the label rebuild) and the label-stratified split
   [`all_5fold_scanner_v2`](../validation/project-validation-protocol.md#all_5fold_scanner_v2), fold 1,
-  seed 819238850 for new trainings since 2026-10-06 (`configs/training.yaml` and `configs/refined-resnet50.yaml`,
+  seed 1110484336 since 2026-10-07 in both `configs/training.yaml` and `configs/refined-resnet50.yaml` (the seed of
+  the submitted side-routed runs S118 and S119, user decision; seed 819238850 from 2026-10-06 until then,
   user decision; fold 0 and seed 1533697213 before). The evidence is one fold-4 pair: A, the pre-fix
   version of A2, scored 0.947 public (S76) against 0.946 for S73, one rounding step; A2's fold-0
   control scored 0.944 (S78), not comparable with those fold-4 runs. The autoresearch gate requires both the label source and the split.
@@ -27,7 +28,7 @@ measured outcomes are in the [validation results](../validation/results/INDEX.md
   best). The recipe without routing on the same fold and seed: ×4 0.924049, 0.950 public. The
   routing-and-shifts campaign's one adoption on it (height cuts from the spots, 0.952 as S120) is
   level locally and not in force (user decision, 2026-10-07); it is the first seed of the next
-  campaign. `configs/refined-resnet50.yaml` keeps seed 819238850. Design, runs and measurements:
+  campaign. `configs/refined-resnet50.yaml` carries the same fold and seed as its submitted run. Design, runs and measurements:
   [side-routed shared heads](side-routed-heads.md); next campaign, prepared and not started:
   [frame and targets](../../autoresearch/campaigns/frame-and-targets/INDEX.md).
 - **Model:** the [current model](../modeling/current-model.md), since 2026-09-29 on a
@@ -66,7 +67,9 @@ measured outcomes are in the [validation results](../validation/results/INDEX.md
   retraining): ×4 0.924049 (×1 0.916134, epoch 9 of 10, fold 1, seed 1110484336). Candidates
   pair with it at its fold and seed. It has the recipe's behaviour with the OA detector's two
   parameters kept unused, so its checkpoint loads from its archived `source/`, not from main.
-  `configs/training.yaml` carries a new seed, 819238850, for the next training. Its reference
+  Since 2026-10-07 candidates on the side-routed recipe pair with run 24 instead
+  (`outputs/training/20261006-163650-side-routed-spot-frame-ring-sectors`, same fold and seed: ×4
+  0.925067, ×1 0.917070). The earlier control's reference
   `rn18-fold1` (`outputs/training/20261005-113728-rn18-fold1`), the previous recipe on that fold
   and seed, scored ×4 0.923102; 0.950 public for two models between them (S108, S111)
   ([result](../validation/results/2026-10-05-fixes-and-removals-campaign.md)).

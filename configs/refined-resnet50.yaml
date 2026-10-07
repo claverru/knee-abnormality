@@ -1,5 +1,5 @@
 name: refined-radimagenet-resnet50
-seed: 819238850
+seed: 1110484336
 
 paths:
   data_root: ../data
