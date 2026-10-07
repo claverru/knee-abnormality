@@ -1,5 +1,5 @@
 name: refined-radimagenet-resnet50
-seed: 1533697213
+seed: 819238850
 
 paths:
   data_root: ../data
@@ -12,7 +12,7 @@ labels:
 
 validation:
   split: all_5fold_scanner_v2
-  folds: [0]
+  folds: [1]
   prediction_image_multiplier: 4
 
 data:

@@ -1,0 +1,42 @@
+ideas:
+- id: contrast-mixing-aligned-donor-requeue
+  mechanism_id: contrast-mixing-alignment
+  parent_idea_id: null
+  title: Contrast mixing resamples the donor slice onto the target slice's grid through the two patient
+    maps before blending
+  opportunity: 'Evidence-backed defect. apply_contrast_mixing (modeling/augmentation.py) picks the donor
+    slice nearest along the plane normal and blends it with the target pixel by pixel. Since 2026-10-02
+    the T1/PD crop of coronal and sagittal series is 84 mm and the fluid crop 93.33 mm at the same 224
+    px, so equal pixel indices are different places: 80 px from the centre is 30.0 mm in one and 33.3
+    mm in the other, and the two crops are also placed per series. The donor''s structures are blended
+    at shifted positions. On ResNet-18, mixing off costs about 0.0005 to 0.0025 (prior-work.md), so the
+    mechanism is worth keeping and aligning.'
+  mechanism: 'In apply_contrast_mixing, for each target row t and its matched donor row d, with M_t and
+    M_d the middle-slice patient maps (3x3, pixel (x, y, 1) to patient mm): D = M_d[:, :2], o = M_d[:,
+    2]; the donor pixel for target pixel q is pinv(D) @ (M_t @ q - o), the target point projected onto
+    the donor plane. Build the 2x3 affine in normalized coordinates and resample the donor with F.grid_sample
+    (bilinear, zeros padding, align_corners=True), then blend as today (donor zero keeps the target, target
+    zero stays zero). The images are already mirrored for reflected non-sagittal acquisitions while the
+    maps are the source maps: conjugate the affine by the column reversal for those rows. Selection of
+    the donor slice, the probability and the weight range are unchanged.'
+  precedents:
+  - 'docs/data-preparation/plane-fluid-spacing-review.md: equal-sized contrast mixing uses unregistered
+    prepared grids.'
+  - 'prior-work.md, Removals already measured: contrast mixing off on ResNet-18 and ResNet-10t.'
+  novelty: First contrast mixing with the two contrasts registered in the plane.
+  coverage: Training only; studies where mixing fires (probability 0.3 per plane with both contrasts).
+  exploitation: Log contrast_mixing_pixel_change as today plus the share of target pixels that receive
+    donor signal after resampling and the mean in-plane shift in mm between the two grids. Read x4, x1
+    and per-label deltas, and the curve against the incumbent.
+  budget: One grid_sample per mixed slice; estimate under 3% more training time.
+  implementation: Replaces the pixel-index blend in modeling/augmentation.py; no option. Axial pairs share
+    the 120 mm field but are resampled the same way, since their series are placed independently. Use
+    float32 outside autocast for the maps. Rows without valid geometry are already excluded by geometry_valid.
+    Keeper requeue of contrast-mixing-aligned-donor, whose first run was cancelled when the campaign stopped
+    to adopt seed 1; the frozen source of that run (outputs/autoresearch/fixes-and-removals/experiments/contrast-mixing-aligned-donor-20261005T121205Z-38e90d49/source)
+    holds a reviewed implementation to port onto the new incumbent.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Active in every training run of the current recipe; the mismatch has existed since
+    the views were adopted.
+exhausted_directions: ''

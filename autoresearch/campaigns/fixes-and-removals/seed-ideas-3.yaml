@@ -1,0 +1,113 @@
+ideas:
+- id: half-knee-loss-off
+  mechanism_id: removal-half-knee-loss
+  parent_idea_id: null
+  title: Removal, the training-only half-knee MIL loss
+  opportunity: >-
+    Guess. The loss was adopted on 2026-09-24 on the ReXNet recipe together with the meniscus
+    own-side mask (+0.0031 for the pair, 80% [+0.0015, +0.0048]); it has never been removed
+    alone. Since then the backbone, the weights, the views and the readouts changed.
+  mechanism: >-
+    The half-knee term is not added to the loss in the training step
+    (trainer.half_knee_loss_weight cannot be 0 in the config schema, so the addition is
+    bypassed in training/lightning.py); half_knee_mil_loss is not computed. Nothing else
+    changes; the own-side mask stays.
+  precedents:
+  - 'docs/validation/results/2026-09-24-knee-geometry-campaign.md #3: the adoption.'
+  - 'plane-specialization #21, half-knee MIL per plane: -0.0006.'
+  novelty: First removal of the loss by itself.
+  coverage: Training only; the two meniscus labels of studies with a known side.
+  exploitation: Per-label deltas on Medial and Lateral Meniscus; training time (the term has a cost).
+  budget: Same cost as the incumbent or slightly less.
+  implementation: A bypass at that one point in src/knee_abnormality/training/lightning.py; the code is not deleted in the run.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Adopted in a bundle on another backbone.
+- id: meniscus-mask-off
+  mechanism_id: removal-meniscus-mask
+  parent_idea_id: null
+  title: Removal, the meniscus own-side attention mask
+  opportunity: >-
+    Evidence-backed doubt. In the knee-geometry campaign the mask alone scored -0.0018 (80%
+    [-0.0034, -0.0002]); it entered the recipe only bundled with the half-knee loss, and has
+    never been shown to help by itself. A wrong or unknown side also makes it the mechanism
+    with the most to lose in test.
+  mechanism: >-
+    meniscus_mask_signs stays all zero at construction in KneeAbnormalityModel.__init__, so
+    own_side is true for every token and the two meniscus labels attend to the whole knee.
+    Nothing else changes; the half-knee loss stays.
+  precedents:
+  - 'docs/validation/results/2026-09-24-knee-geometry-campaign.md #4: the mask on the fitted midline alone, -0.0018.'
+  - 'docs/validation/results/2026-09-23-side-mask-and-token-attention.md: the trained side mask.'
+  novelty: First removal of the mask from the adopted bundle.
+  coverage: The two meniscus labels of studies with a known side.
+  exploitation: Per-label deltas on Medial and Lateral Meniscus; attention share on the other side for the two labels.
+  budget: Same cost as the incumbent.
+  implementation: A bypass at that one point in src/knee_abnormality/modeling/model.py; the code is not deleted in the run.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The only removal with earlier evidence that the mechanism alone hurts.
+- id: plane-readouts-off
+  mechanism_id: removal-plane-readouts
+  parent_idea_id: null
+  title: Removal, the plane-contrast readouts
+  opportunity: >-
+    Guess. The readouts were adopted on 2026-10-01 at +0.0009 (80% [+0.0001, +0.0017]) on the
+    ResNet-18. Two days later the view label bias gave each view its own bias per label, a
+    similar per-type job in the attention; the readouts may now be redundant.
+  mechanism: model.plane_readout false. Nothing else changes.
+  precedents:
+  - 'docs/validation/results/2026-10-01-revisits-campaign.md: plane-contrast readouts +0.0009, dense per-plane readouts -0.0052.'
+  novelty: First test of the readouts with the view label bias in place.
+  coverage: Every label of every study.
+  exploitation: Per-label deltas against those of the adoption run; the view_label_bias values against the incumbent's.
+  budget: Same cost as the incumbent.
+  implementation: Configuration only, configs/training.yaml.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The one recent adoption with a later mechanism overlapping it.
+- id: detail-view-embedding-off
+  mechanism_id: removal-detail-view-embedding
+  parent_idea_id: null
+  title: Removal, the detail-view embedding
+  opportunity: >-
+    Guess. A learned vector is added to every token of an 84 or 93 mm view. The view label bias
+    and the plane and contrast embeddings already tell the model which view a token is from,
+    and the embedding has never been tested alone.
+  mechanism: >-
+    In KneeAbnormalityModel._pooling_tokens the detail_view_embedding term is not added. The
+    parameter stays in the model, unused. Nothing else changes.
+  precedents:
+  - 'docs/validation/results/2026-10-02-smart-crops-campaign.md: the views were adopted with the embedding in place.'
+  novelty: First removal of the embedding.
+  coverage: Coronal and sagittal tokens of every study.
+  exploitation: Per-label deltas; the norm of the incumbent's embedding as context for how much it carried.
+  budget: Same cost as the incumbent.
+  implementation: A bypass at that one term in src/knee_abnormality/modeling/model.py; the code is not deleted in the run.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Small; a tie is the likely outcome.
+- id: report-attribute-heads-off
+  mechanism_id: removal-report-attribute-heads
+  parent_idea_id: null
+  title: Removal, the training-only report-attribute heads
+  opportunity: >-
+    User seed. The removal was measured on 2026-10-01 on the ResNet-18 at -0.0006 (80% [-0.0011,
+    -0.0001]), 10% faster, before the 84/93 mm views, the view label bias and the checkpoint
+    normalization. The user keeps it in the campaign to see whether it still holds.
+  mechanism: >-
+    The report-attribute term is not added to the loss in the training step and
+    _report_attribute_step is not run (trainer.report_attribute_loss_weight cannot be 0 in the
+    config schema, so the addition is bypassed in training/lightning.py). Nothing else changes.
+  precedents:
+  - 'docs/validation/results/2026-10-01-revisits-campaign.md: report-attribute heads removed, -0.0006, 10% faster.'
+  - 'docs/validation/results/2026-09-25-report-attribute-heads.md: the adoption, +0.00105 and 0.940 against 0.938 public.'
+  novelty: First removal on the current views.
+  coverage: Training only.
+  exploitation: Per-label deltas against those of the 2026-10-01 removal; training time.
+  budget: About 10% less than the incumbent, inside the range.
+  implementation: A bypass at that one point in src/knee_abnormality/training/lightning.py; the code is not deleted in the run.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Last, because it has the clearest earlier result.
+exhausted_directions: ''

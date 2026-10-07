@@ -37,8 +37,6 @@ defined by [`configs/training.yaml`](../../configs/training.yaml). Since
   types that show it (`model.view_label_bias: true`, since 2026-10-03).
 - **Half-knee loss (training only):** a shared meniscus tear detector is supervised on each
   half of the knee, so token features learn the medial-lateral split.
-- **Three-compartment OA detector:** one detector, shared by Medial, Lateral and PF OA, is read
-  over each compartment's region and added to that label's output through a learned scale.
 - **Report-attribute heads (training only):** 35 auxiliary heads predict the JevK5 report
   attributes (grades, hedging, silence, tear and contusion location, extra findings) from the
   shared tokens, weighted 0.1 ([design](report-attribute-heads.md)).
@@ -67,6 +65,7 @@ comparable.
 
 | Adopted | Change | Evidence | Control after adoption |
 |---|---|---|---|
+| 2026-10-06 | Four changes from the fixes-and-removals campaign, on ResNet-18 and the ResNet-50 config: detail-view positions mirrored under reflection in training and TTA; the knee centre used when the side is unknown; the slab rule for every centre-fit method with the feature-statistics std clamped at zero; the three-compartment OA detector removed. Both configs move to fold 1 with seed 819238850 | Fold 1, seed 1110484336, one run each against the incumbent at its turn: +0.0003 (80% [−0.0002, +0.0008], forced as a bug fix), +0.0014 (80% [+0.0003, +0.0026], by the rule), −0.0003 (80% [−0.0015, +0.0009], user decision) and −0.0005 for the detector (80% [−0.0010, +0.0001], user decision; its three OA labels do not fall, and 0.950 public with it, S108, and without it, S111); together ×4 0.924049 against 0.923102. The detector's removal is to be checked again before a submission ([result](../validation/results/2026-10-05-fixes-and-removals-campaign.md)) | No retrain: the campaign incumbent `slab-rule-and-positive-std-requeue`, fold 1, seed 1110484336: ×4 0.924049 |
 | 2026-10-05 | Checkpoint input normalization: `data.mean` 0.3162 and `data.std` 0.3213 (the statistics the Refined-RadImageNet checkpoints were trained with) in place of the ImageNet values, in `configs/training.yaml` and `configs/refined-resnet50.yaml` (user decision 2026-10-04; the ResNet-50 config takes it without a run of its own) | In the [Refined-RadImageNet campaign](../validation/results/2026-10-04-refined-radimagenet-campaign.md), one run on ResNet-18: ×4 0.933058 against 0.932477, +0.000581 (80% [+0.000182, +0.001016]), ×1 0.929948 against 0.929026; ten of twelve labels up | The campaign incumbent itself, `radimagenet-input-statistics-20261004T103433Z-ff2f3786` under `outputs/autoresearch/refined-radimagenet/experiments/` (the adopted recipe, ×4 0.933058, ×1 0.929948; user decision 2026-10-05, no retraining) |
 | 2026-10-04 | ReXNet-200 retired: `configs/rexnet-200.yaml` removed, models stay on the Refined-RadImageNet weights (user decision). Code paths kept (hashed sources) | Five ResNet-50 children alone score 0.957 public (S106) against 0.955 with five ReXNet children added (S103), although the ReXNets add +0.0026 pooled out of fold; labels with the ResNet-50 teacher alone agree better with the 58 gold studies than with the ReXNet teacher added (0.9394 against 0.9358, 80% [−0.0070, −0.0002] for the difference); ConvNeXt-Tiny reached 0.927 with no blend gain. Architecture, pretraining and anchoring differ together in each comparison ([result](../validation/results/2026-10-04-two-family-oof-distillation.md#resnet-50-children-alone-s106)) | unchanged: `rn18-view-label-bias` for ResNet-18, `refined-rn50-views-label-bias` for ResNet-50 |
 | 2026-10-03 | The ResNet-18 recipe carried to the two other configs. `configs/refined-resnet50.yaml` gains the 84/93 mm views and the view label bias (backbone only differs from `configs/training.yaml`). `configs/rexnet-200.yaml` becomes the same recipe with ReXNet's backbone settings (ImageNet `timm` weights, adjacent slices, `backbone_lr` 2e-4, no L2-SP): 120 mm field, the views, label bias and plane-contrast readouts added; anatomical bias, scanner confusion head and series dropout removed | Fold 0, seed 1533697213, one run each. ResNet-50: ×4 0.937129 against 0.934423 for `refined-rn50-incumbent-recipe` (+0.0027, 80% [+0.0010, +0.0045]; ACL +0.007, MCL +0.008, lateral meniscus +0.006), 0.954 public alone (S102) against 0.948 (S88). ReXNet: ×4 0.932523 against 0.928288 for `rebuild-state-v2-control` (+0.0042, 80% [+0.0018, +0.0066]; MCL +0.021, contusion +0.011, synovitis +0.010, lateral meniscus −0.006), not submitted alone; its changes were made together and are not separated. Equal blend of the two at ×4, τ 1, no TTA: 0.939492, +0.0024 over the ResNet-50 alone (80% [+0.0010, +0.0037]); with the old ReXNet +0.0007; adding the ResNet-18 control to the pair −0.0007 | `refined-rn50-views-label-bias` (`outputs/training/20261003-110045-refined-rn50-views-label-bias`, ×1 0.931222, 1,995 s) and `rexnet-200-views-label-bias` (`outputs/training/20261003-114512-rexnet-200-views-label-bias`, ×1 0.928556, 2,349 s), both trained from main at `a5b8758` with command-line overrides equal to these configs |
@@ -228,11 +227,6 @@ Tokens receive four additive embeddings:
   the normalized tokens beyond ±10 mm; a float32 smooth-max per half is trained with soft BCE and
   the class-balance weights against the matching meniscus label, for studies with resolved side,
   valid geometry and both halves present. Weight 0.075. Prediction never uses the detector.
-- **OA detector:** one linear detector shared by the three
-  OA labels. Medial OA pools it with a smooth-max over the medial half and Lateral OA over the
-  lateral half (both beyond ±10 mm); PF OA pools it over tokens in front of the knee centre. Each
-  pooled score is added to the label's logit through its own zero-initialized scale. Tokens
-  without trusted geometry belong to no region. Used at inference.
 - **Report-attribute heads:** `ReportAttributeHeads` in the Lightning module, outside
   `KneeAbnormalityModel`, gives each report-attribute question its own attention query over the
   normalized tokens and a softmax over its options. The reliability-weighted soft cross-entropy
@@ -261,8 +255,8 @@ Side and centre are carried per series:
   then falls back to the sagittal fluid slab centre, then any sagittal series. The sagittal
   fallbacks only steer sampling: as a midline they sit a median 13–23 mm from the fitted
   centre, so those studies get no anatomical geometry (never triggered in training data;
-  `outputs/analysis/sagittal-fallback-midline-20260924/`). A robust centre outside a series'
-  acquired range samples that series locally. Token geometry no longer
+  `outputs/analysis/sagittal-fallback-midline-20260924/`). A centre outside a series'
+  acquired range samples that series locally, whatever the fit method (since 2026-10-06). Token geometry no longer
   requires physical sampling.
 - **Bilateral studies:** at least two series beyond +40 mm and two beyond −40 mm in X mark two
   knees; each knee gets its own fitted centre and its side from the sign of X (+X is patient

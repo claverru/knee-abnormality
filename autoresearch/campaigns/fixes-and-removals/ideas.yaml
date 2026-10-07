@@ -1,0 +1,972 @@
+revision: 340
+ideas:
+- id: reflected-detail-view-positions
+  mechanism_id: reflection-detail-positions
+  parent_idea_id: null
+  title: Give a mirrored detail view the mirrored window position, in the training
+    reflection and in reflection TTA alike
+  opportunity: 'Evidence-backed defect. Under the training reflection, encode_batch
+    folds the column flip into inverse_affine, so prepared_xy is the un-mirrored source
+    location. Wide views take their 2D position from the final image grid, but detail
+    views (the two coronal types) take it from view_to_wide @ prepared_xy: mirrored
+    pixels with x-reversed positions, against REFLECTION_IDENTITY ("final_image_2d_anchor_unchanged")
+    and the reflection doc. Reflection TTA (inference/reflection.py) leaves view_to_wide
+    untouched, so its mirrored pass pairs pixels and positions in a way training never
+    showed. Measured on 2026-10-05: making TTA copy the training convention matches
+    training to 0.0004 in the position embedding and moves the S106 children by +0.000024,
+    so today the two paths disagree and neither follows the rule (prior-work.md, F01).'
+  mechanism: 'One convention in both paths: a mirrored detail view sits at the mirrored
+    window of the wide frame, F_wide @ V @ F, where V is view_to_wide and F reverses
+    columns around W-1. (1) modeling/model.py, encode_batch: after wide_xy = view_to_wide
+    @ prepared_xy in pixel units, for tokens with reflected & ~sagittal replace x
+    by (W-1) - x, before the normalization to [-1, 1]. (2) inference/reflection.py,
+    reflect_batch: when mirror.any(), view_to_wide = batch["view_to_wide"].clone();
+    view_to_wide[mirror] = reversal @ view_to_wide[mirror] @ reversal (reversal cast
+    to its dtype), returned under "view_to_wide". Wide views are unchanged in both
+    paths (V is the identity, and they use the grid). Nothing else changes.'
+  precedents:
+  - 'docs/validation/results/2026-10-05-code-audit-measurements.md, F01: parity of
+    the two TTA variants against the training reflection and their pooled out-of-fold
+    scores.'
+  - 'docs/data-preparation/reflection-geometry-and-previews.md: 2D anchors stay in
+    the augmented image frame.'
+  novelty: First correction of detail-view positions under reflection since the detail
+    views arrived on 2026-10-02.
+  coverage: 'Training: coronal detail tokens of reflected studies, about half of the
+    eligible studies per epoch. Inference: the mirrored pass of reflection TTA. Plain
+    validation is untouched.'
+  exploitation: Per-epoch x1 and final x4 against the incumbent, per-label deltas
+    (meniscus and OA labels read coronal position most), view_label_bias and attention
+    share of the two coronal views. Check on one reflected batch that the position
+    embedding of a mirrored coronal detail view equals that of the same view passed
+    through reflect_batch in eval mode.
+  budget: Same cost as the incumbent.
+  implementation: Replaces the defective behaviour in src/knee_abnormality/modeling/model.py
+    and src/knee_abnormality/inference/reflection.py; no option and no config field.
+    Both files are hashed preprocessing sources, so the run's preprocessing identity
+    differs from the incumbent's, which the campaign permits. Update the "embeddings"
+    entry of REFLECTION_IDENTITY only if its wording no longer holds. The user adopts
+    this seed by decision whatever the delta (contract.md, Forced adoption); later
+    seeds build on it.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: A confirmed defect in training and in the submission path; the
+    user ordered it first and adopted.
+  status: completed
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality-fixes-and-removals/autoresearch/campaigns/fixes-and-removals/seed-ideas.yaml
+  experiments:
+  - reflected-detail-view-positions-20261005T120707Z-5fa8e10e
+  decision: provisional_accept
+- id: contrast-mixing-aligned-donor
+  mechanism_id: contrast-mixing-alignment
+  parent_idea_id: null
+  title: Contrast mixing resamples the donor slice onto the target slice's grid through
+    the two patient maps before blending
+  opportunity: 'Evidence-backed defect. apply_contrast_mixing (modeling/augmentation.py)
+    picks the donor slice nearest along the plane normal and blends it with the target
+    pixel by pixel. Since 2026-10-02 the T1/PD crop of coronal and sagittal series
+    is 84 mm and the fluid crop 93.33 mm at the same 224 px, so equal pixel indices
+    are different places: 80 px from the centre is 30.0 mm in one and 33.3 mm in the
+    other, and the two crops are also placed per series. The donor''s structures are
+    blended at shifted positions. On ResNet-18, mixing off costs about 0.0005 to 0.0025
+    (prior-work.md), so the mechanism is worth keeping and aligning.'
+  mechanism: 'In apply_contrast_mixing, for each target row t and its matched donor
+    row d, with M_t and M_d the middle-slice patient maps (3x3, pixel (x, y, 1) to
+    patient mm): D = M_d[:, :2], o = M_d[:, 2]; the donor pixel for target pixel q
+    is pinv(D) @ (M_t @ q - o), the target point projected onto the donor plane. Build
+    the 2x3 affine in normalized coordinates and resample the donor with F.grid_sample
+    (bilinear, zeros padding, align_corners=True), then blend as today (donor zero
+    keeps the target, target zero stays zero). The images are already mirrored for
+    reflected non-sagittal acquisitions while the maps are the source maps: conjugate
+    the affine by the column reversal for those rows. Selection of the donor slice,
+    the probability and the weight range are unchanged.'
+  precedents:
+  - 'docs/data-preparation/plane-fluid-spacing-review.md: equal-sized contrast mixing
+    uses unregistered prepared grids.'
+  - 'prior-work.md, Removals already measured: contrast mixing off on ResNet-18 and
+    ResNet-10t.'
+  novelty: First contrast mixing with the two contrasts registered in the plane.
+  coverage: Training only; studies where mixing fires (probability 0.3 per plane with
+    both contrasts).
+  exploitation: Log contrast_mixing_pixel_change as today plus the share of target
+    pixels that receive donor signal after resampling and the mean in-plane shift
+    in mm between the two grids. Read x4, x1 and per-label deltas, and the curve against
+    the incumbent.
+  budget: One grid_sample per mixed slice; estimate under 3% more training time.
+  implementation: Replaces the pixel-index blend in modeling/augmentation.py; no option.
+    Axial pairs share the 120 mm field but are resampled the same way, since their
+    series are placed independently. Use float32 outside autocast for the maps. Rows
+    without valid geometry are already excluded by geometry_valid.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Active in every training run of the current recipe; the mismatch
+    has existed since the views were adopted.
+  status: completed
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality-fixes-and-removals/autoresearch/campaigns/fixes-and-removals/seed-ideas.yaml
+  experiments:
+  - contrast-mixing-aligned-donor-20261005T121205Z-38e90d49
+  decision: invalid
+- id: centre-without-side
+  mechanism_id: centre-validity
+  parent_idea_id: null
+  title: Keep knee-anchored crops and contrast mixing for studies whose centre is
+    fitted but whose side is unknown
+  opportunity: 'Evidence-backed defect. In KneeStudyDataset._index_study_geometry
+    (data/dataset.py) a series'' geometry is valid only if the side sign is non-zero,
+    so a study with an unknown side loses everything that flag gates: coronal and
+    sagittal detail crops fall back to the image centre (sagittal also loses its 7
+    mm anterior offset) and contrast mixing never fires, because it filters on geometry_valid.
+    None of these needs the side: the view table has no side-dependent offset. About
+    162 training studies have a fitted centre and no side (4,400 with a centre, 4,238
+    with trusted geometry), and a test site whose side abstains gets the same treatment.'
+  mechanism: 'In _index_study_geometry, valid no longer requires the sign: valid =
+    centre is not None and the reference has a point with method fit or robust. The
+    stored sign stays 0 for an unknown side. Everything that needs the side is already
+    gated on side != 0 in KneeAbnormalityModel.encode_batch (medial_axis, anterior_axis,
+    trusted_geometry), so the meniscus mask, the OA regions and the half-knee loss
+    stay off for these studies. Check that view_position with side 0 places the coronal
+    window at the centre (its offset is 0) and the sagittal window with its fixed
+    direction.'
+  precedents:
+  - 'docs/validation/results/2026-10-05-code-audit-measurements.md, F04 and F05: 170
+    studies with unknown side, 4,400 with a fitted centre.'
+  novelty: First separation of "centre known" from "side known".
+  coverage: About 3.7% of training studies and the same share of validation; any test
+    study with an unknown side.
+  exploitation: Log per epoch the studies with a centre and no side, and how many
+    of their detail views are knee-anchored (expected all). Report the macro delta
+    and the delta on the validation studies with unknown side apart.
+  budget: Same cost as the incumbent.
+  implementation: Replaces the validity rule in src/knee_abnormality/data/dataset.py;
+    no option. A hashed preprocessing source. Bilateral studies keep their per-knee
+    rule.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: A subgroup on a different crop distribution for no reason; also
+    what makes an abstaining side cheap in test.
+  status: completed
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality-fixes-and-removals/autoresearch/campaigns/fixes-and-removals/seed-ideas.yaml
+  experiments:
+  - centre-without-side-20261005T123308Z-e8462b49
+  - centre-without-side-20261005T123838Z-c7646746
+  decision: provisional_accept
+- id: centre-outside-slab-rule
+  mechanism_id: slab-guard
+  parent_idea_id: null
+  title: Apply the slab guard whatever the fit method, and name its outcome correctly
+  opportunity: 'Evidence-backed defect. build_pool (data/preprocessing/sampling.py)
+    samples a series around the fitted centre only if the centre lies inside the series''
+    slab, but skips that test when the centre comes from the ordinary fit (inside
+    = reference.method == "fit" or ...). In training the centre misses the slab of
+    69 series (0.29%): 20 in ordinary-fit studies are sampled around a centre up to
+    45 mm outside them, 43 in robust-fit studies are dropped because a sibling covers
+    the centre, and 6 are sampled locally. A guard-rejected series is also recorded
+    as "plane_disagreement", which it is not.'
+  mechanism: inside = reference.point is not None and within_acquired_range(geometry,
+    reference.point), for every method. The diagnostic for a reliable, plane-agreeing
+    series outside the slab becomes "centre_outside_slab". Nothing else in the pool
+    changes.
+  precedents:
+  - 'outputs/analysis/centre-slab-guard-20261005/summary.json: the counts, the miss
+    distances and the three outcomes.'
+  novelty: First run with one rule for a centre outside a slab.
+  coverage: 20 series in 20 training studies change sampling; the diagnostic label
+    changes for 49.
+  exploitation: Log the sources per outcome. The change touches under 0.1% of series,
+    so the macro delta is expected inside rerun noise; report it against seed 1's
+    delta as the yardstick.
+  budget: Same cost as the incumbent.
+  implementation: Replaces the rule in src/knee_abnormality/data/preprocessing/sampling.py;
+    update SAMPLING_IDENTITY if its wording names the exemption. No option.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Small, but the same situation is handled three ways today.
+  status: completed
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality-fixes-and-removals/autoresearch/campaigns/fixes-and-removals/seed-ideas.yaml
+  experiments:
+  - centre-outside-slab-rule-20261005T124230Z-3d9c4e6a
+  - centre-outside-slab-rule-20261005T130421Z-c810fa93
+  decision: reject
+- id: feature-statistics-positive-std
+  mechanism_id: feature-statistics-std
+  parent_idea_id: null
+  title: Feature-statistics augmentation keeps the resampled standard deviation positive
+  opportunity: Evidence-backed defect. apply_feature_statistics_augmentation (modeling/augmentation.py)
+    draws resampled_std = acquisition_std + randn * spread_std with no lower bound.
+    When the spread across acquisitions of a type is comparable to a channel's own
+    standard deviation the draw can be negative, which inverts the channel instead
+    of rescaling it. How often this happens is not measured.
+  mechanism: resampled_std.clamp_min_(0) before it is applied. Nothing else changes;
+    the probability stays 0.5.
+  precedents:
+  - 'docs/validation/results/2026-10-01-revisits-campaign.md: no DSU on ResNet-18,
+    -0.0013 (80% [-0.0027, -0.0001]), so the mechanism stays.'
+  novelty: First run with the scale restricted to non-negative values.
+  coverage: Training only, half of the acquisitions.
+  exploitation: Log per epoch the share of (acquisition, channel) draws that the clamp
+    changed; if it is zero the run is a rerun of the incumbent and is reported as
+    such.
+  budget: Same cost as the incumbent.
+  implementation: Replaces one line in src/knee_abnormality/modeling/augmentation.py;
+    no option.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: One line; the log tells whether the defect ever fires.
+  status: completed
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality-fixes-and-removals/autoresearch/campaigns/fixes-and-removals/seed-ideas.yaml
+  experiments:
+  - feature-statistics-positive-std-20261005T133003Z-3fe7afa5
+  decision: reject
+- id: computed-centre-3d-position
+  mechanism_id: knee-frame-position
+  parent_idea_id: null
+  title: One side-normalized 3D position per token from the computed knee centre,
+    in place of the 1D and 2D position embeddings
+  opportunity: 'User seed, 2026-10-05. Earlier runs of this encoding were ties (-0.0001
+    with the computed centre, -0.0004 with a learned one, on the learnable-views recipe
+    of 2026-10-02). The geometry it reads has defects found since: studies with an
+    unknown side lost their centre as well (seed centre-without-side) and a centre
+    outside a slab was handled three ways (seed centre-outside-slab-rule). It also
+    does not use the 2D frame that the reflection defect of seed 1 corrupted, since
+    it is built from the medial and anterior axes. A guess that the corrected geometry
+    changes the result.'
+  mechanism: 'position_1d and position_2d are removed and every token takes one 3D
+    position q in mm from the loader''s computed centre: q_x is medial_axis, q_y anterior_axis
+    with its sign, q_z the token''s patient z minus the centre''s, from the third
+    row of the same patient map. Encoder as in the earlier run: sine and cosine of
+    each coordinate at seven wavelengths from 8 to 512 mm (42 features), linear 42
+    to 64, GELU, linear 64 to 256, added to the token. Branches: trusted geometry
+    and known side take the full encoding; a fitted centre with unknown side encodes
+    y and z and a learned vector replaces the x features; no centre takes a learned
+    unknown-position vector. Under reflection q is unchanged. The detail-view embedding
+    stays.'
+  precedents:
+  - 'learnable-views #8 computed-centre-3d-position: x4 -0.0001 (80% [-0.0015, +0.0013]);
+    frozen source in outputs/autoresearch/learnable-views/experiments/computed-centre-3d-position-20261002T215833Z-cb1b0f75/source
+    (modeling/spatial_tokens.py, modeling/model.py).'
+  - 'learnable-views #4 and #6: learned centre in place of 1D and 2D -0.0004; beside
+    them +0.0005.'
+  - 'near-misses #6 on the ReXNet recipe: +0.0008 hard, -0.0006 soft, PF OA +0.0061.'
+  - 'learnable-views, repeating pattern with the 3D position: medial OA and Baker''s
+    cyst up, synovitis and lateral meniscus down, the OA detector silent in 5 of 5.'
+  novelty: First 3D position on the hand 84/93 mm views with the corrected centre
+    validity.
+  coverage: Every token; the full branch for studies with a fitted centre and a known
+    side.
+  exploitation: Log the share of tokens on each of the three branches per epoch and
+    oa_detector activity. Read per-label deltas against the earlier pattern, and the
+    delta on unknown-side studies.
+  budget: A small MLP in place of two embeddings; about the incumbent's cost.
+  implementation: modeling/spatial_tokens.py and modeling/model.py; record the change
+    in SPATIAL_TOKEN_IDENTITY. Port the encoder and its branches from the frozen source
+    named in the precedents and adapt them to this build; do not redesign them. Removes
+    position_1d and position_2d, no option keeps them. Applies to the incumbent at
+    its turn, whatever the earlier seeds decided.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Placed after the two geometry fixes so it reads corrected geometry.
+  status: completed
+  created_revision: 1
+  seeded: /home/claudio/src/knee-abnormality-fixes-and-removals/autoresearch/campaigns/fixes-and-removals/seed-ideas-2.yaml
+  experiments:
+  - computed-centre-3d-position-20261005T135141Z-336ae83f
+  decision: reject
+- id: oa-detector-off
+  mechanism_id: removal-oa-detector
+  parent_idea_id: null
+  title: Removal, the three-compartment OA detector
+  opportunity: Guess. The detector was adopted on 2026-09-25 on the ReXNet recipe
+    on a local near-miss (+0.0013, later re-scored +0.0022) and 0.944 against 0.940
+    public. Since then the backbone, the weights, the views, the readouts and the
+    label bias changed, and in the learnable-views campaign it stayed silent in 5
+    of 5 runs with a 3D position. Its removal has never been run.
+  mechanism: In KneeAbnormalityModel._attention_pool the correction is not added to
+    the OA logits (logits[:, oa_indices] += correction is skipped); the detector's
+    parameters stay in the model, unused. Nothing else changes.
+  precedents:
+  - 'docs/validation/results/2026-09-25-near-misses-campaign.md #8: the adoption,
+    PF OA +0.0102.'
+  - 'docs/validation/results/2026-10-03-learnable-views-campaign.md: silent with the
+    3D position.'
+  novelty: First removal of the detector.
+  coverage: The three OA labels of every study.
+  exploitation: Per-label deltas on Medial OA, Lateral OA and PF OA; the incumbent's
+    oa_detector_scale as context.
+  budget: Same cost as the incumbent.
+  implementation: A bypass at that one line in src/knee_abnormality/modeling/model.py;
+    the code is not deleted in the run. Applies to the incumbent at its turn, so after
+    the 3D position seed whatever that seed decided.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Placed after the 3D position because the two interacted before.
+  status: completed
+  created_revision: 1
+  seeded: /home/claudio/src/knee-abnormality-fixes-and-removals/autoresearch/campaigns/fixes-and-removals/seed-ideas-2.yaml
+  experiments:
+  - oa-detector-off-20261005T145725Z-349c87ea
+  decision: provisional_accept
+- id: intensity-augmentation-off
+  mechanism_id: removal-intensity-augmentation
+  parent_idea_id: null
+  title: Removal, the gamma and contrast intensity augmentation
+  opportunity: Guess. Gamma 0.85 to 1.15 and contrast 0.9 to 1.1 at probability 0.5
+    date from the first recipes. Since then GIN, bilateral smoothing, contrast mixing
+    and DSU were added, the checkpoint normalization was adopted, and the bag-dependent
+    window already moves a series' contrast by more than 10% in one series out of
+    ten. Its removal has never been run.
+  mechanism: data.intensity_augmentation.probability 0. Nothing else changes.
+  precedents:
+  - 'pretraining-input #5 on the ResNet-10t: AutoAugment intensity operations in its
+    place, -0.0029; a replacement, not a removal.'
+  novelty: First removal of the intensity augmentation.
+  coverage: Training only.
+  exploitation: Per-epoch x1 curve against the incumbent (an augmentation removal
+    shows as faster early and lower late if it was needed); per-label deltas.
+  budget: Same cost as the incumbent or slightly less.
+  implementation: Configuration only, configs/training.yaml.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Oldest augmentation in the stack, never re-tested.
+  status: prepared
+  created_revision: 1
+  seeded: /home/claudio/src/knee-abnormality-fixes-and-removals/autoresearch/campaigns/fixes-and-removals/seed-ideas-2.yaml
+  experiments:
+  - intensity-augmentation-off-20261005T170400Z-88f59847
+- id: noise-augmentation-off
+  mechanism_id: removal-noise-augmentation
+  parent_idea_id: null
+  title: Removal, the noise augmentation
+  opportunity: Guess. Noise at probability 0.15 with standard deviation 0.005 to 0.02
+    predates the half-stack augmentation and has never been re-tested; at that probability
+    and strength a tie is the likely outcome.
+  mechanism: data.noise_augmentation.probability 0. Nothing else changes.
+  precedents:
+  - 'docs/validation/results/2026-09-26-augmentation-campaign.md: the stack was built
+    around it without testing it.'
+  novelty: First removal of the noise augmentation.
+  coverage: Training only, 15% of acquisitions.
+  exploitation: Per-epoch x1 curve and per-label deltas against the incumbent and
+    against seed 1's rerun delta.
+  budget: Same cost as the incumbent.
+  implementation: Configuration only, configs/training.yaml.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Cheap; closes the augmentation list.
+  status: queued
+  created_revision: 1
+  seeded: /home/claudio/src/knee-abnormality-fixes-and-removals/autoresearch/campaigns/fixes-and-removals/seed-ideas-2.yaml
+- id: half-knee-loss-off
+  mechanism_id: removal-half-knee-loss
+  parent_idea_id: null
+  title: Removal, the training-only half-knee MIL loss
+  opportunity: Guess. The loss was adopted on 2026-09-24 on the ReXNet recipe together
+    with the meniscus own-side mask (+0.0031 for the pair, 80% [+0.0015, +0.0048]);
+    it has never been removed alone. Since then the backbone, the weights, the views
+    and the readouts changed.
+  mechanism: The half-knee term is not added to the loss in the training step (trainer.half_knee_loss_weight
+    cannot be 0 in the config schema, so the addition is bypassed in training/lightning.py);
+    half_knee_mil_loss is not computed. Nothing else changes; the own-side mask stays.
+  precedents:
+  - 'docs/validation/results/2026-09-24-knee-geometry-campaign.md #3: the adoption.'
+  - 'plane-specialization #21, half-knee MIL per plane: -0.0006.'
+  novelty: First removal of the loss by itself.
+  coverage: Training only; the two meniscus labels of studies with a known side.
+  exploitation: Per-label deltas on Medial and Lateral Meniscus; training time (the
+    term has a cost).
+  budget: Same cost as the incumbent or slightly less.
+  implementation: A bypass at that one point in src/knee_abnormality/training/lightning.py;
+    the code is not deleted in the run.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Adopted in a bundle on another backbone.
+  status: queued
+  created_revision: 2
+  seeded: /home/claudio/src/knee-abnormality-fixes-and-removals/autoresearch/campaigns/fixes-and-removals/seed-ideas-3.yaml
+- id: meniscus-mask-off
+  mechanism_id: removal-meniscus-mask
+  parent_idea_id: null
+  title: Removal, the meniscus own-side attention mask
+  opportunity: Evidence-backed doubt. In the knee-geometry campaign the mask alone
+    scored -0.0018 (80% [-0.0034, -0.0002]); it entered the recipe only bundled with
+    the half-knee loss, and has never been shown to help by itself. A wrong or unknown
+    side also makes it the mechanism with the most to lose in test.
+  mechanism: meniscus_mask_signs stays all zero at construction in KneeAbnormalityModel.__init__,
+    so own_side is true for every token and the two meniscus labels attend to the
+    whole knee. Nothing else changes; the half-knee loss stays.
+  precedents:
+  - 'docs/validation/results/2026-09-24-knee-geometry-campaign.md #4: the mask on
+    the fitted midline alone, -0.0018.'
+  - 'docs/validation/results/2026-09-23-side-mask-and-token-attention.md: the trained
+    side mask.'
+  novelty: First removal of the mask from the adopted bundle.
+  coverage: The two meniscus labels of studies with a known side.
+  exploitation: Per-label deltas on Medial and Lateral Meniscus; attention share on
+    the other side for the two labels.
+  budget: Same cost as the incumbent.
+  implementation: A bypass at that one point in src/knee_abnormality/modeling/model.py;
+    the code is not deleted in the run.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The only removal with earlier evidence that the mechanism alone
+    hurts.
+  status: queued
+  created_revision: 2
+  seeded: /home/claudio/src/knee-abnormality-fixes-and-removals/autoresearch/campaigns/fixes-and-removals/seed-ideas-3.yaml
+- id: plane-readouts-off
+  mechanism_id: removal-plane-readouts
+  parent_idea_id: null
+  title: Removal, the plane-contrast readouts
+  opportunity: Guess. The readouts were adopted on 2026-10-01 at +0.0009 (80% [+0.0001,
+    +0.0017]) on the ResNet-18. Two days later the view label bias gave each view
+    its own bias per label, a similar per-type job in the attention; the readouts
+    may now be redundant.
+  mechanism: model.plane_readout false. Nothing else changes.
+  precedents:
+  - 'docs/validation/results/2026-10-01-revisits-campaign.md: plane-contrast readouts
+    +0.0009, dense per-plane readouts -0.0052.'
+  novelty: First test of the readouts with the view label bias in place.
+  coverage: Every label of every study.
+  exploitation: Per-label deltas against those of the adoption run; the view_label_bias
+    values against the incumbent's.
+  budget: Same cost as the incumbent.
+  implementation: Configuration only, configs/training.yaml.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The one recent adoption with a later mechanism overlapping it.
+  status: queued
+  created_revision: 2
+  seeded: /home/claudio/src/knee-abnormality-fixes-and-removals/autoresearch/campaigns/fixes-and-removals/seed-ideas-3.yaml
+- id: detail-view-embedding-off
+  mechanism_id: removal-detail-view-embedding
+  parent_idea_id: null
+  title: Removal, the detail-view embedding
+  opportunity: Guess. A learned vector is added to every token of an 84 or 93 mm view.
+    The view label bias and the plane and contrast embeddings already tell the model
+    which view a token is from, and the embedding has never been tested alone.
+  mechanism: In KneeAbnormalityModel._pooling_tokens the detail_view_embedding term
+    is not added. The parameter stays in the model, unused. Nothing else changes.
+  precedents:
+  - 'docs/validation/results/2026-10-02-smart-crops-campaign.md: the views were adopted
+    with the embedding in place.'
+  novelty: First removal of the embedding.
+  coverage: Coronal and sagittal tokens of every study.
+  exploitation: Per-label deltas; the norm of the incumbent's embedding as context
+    for how much it carried.
+  budget: Same cost as the incumbent.
+  implementation: A bypass at that one term in src/knee_abnormality/modeling/model.py;
+    the code is not deleted in the run.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Small; a tie is the likely outcome.
+  status: queued
+  created_revision: 2
+  seeded: /home/claudio/src/knee-abnormality-fixes-and-removals/autoresearch/campaigns/fixes-and-removals/seed-ideas-3.yaml
+- id: report-attribute-heads-off
+  mechanism_id: removal-report-attribute-heads
+  parent_idea_id: null
+  title: Removal, the training-only report-attribute heads
+  opportunity: User seed. The removal was measured on 2026-10-01 on the ResNet-18
+    at -0.0006 (80% [-0.0011, -0.0001]), 10% faster, before the 84/93 mm views, the
+    view label bias and the checkpoint normalization. The user keeps it in the campaign
+    to see whether it still holds.
+  mechanism: The report-attribute term is not added to the loss in the training step
+    and _report_attribute_step is not run (trainer.report_attribute_loss_weight cannot
+    be 0 in the config schema, so the addition is bypassed in training/lightning.py).
+    Nothing else changes.
+  precedents:
+  - 'docs/validation/results/2026-10-01-revisits-campaign.md: report-attribute heads
+    removed, -0.0006, 10% faster.'
+  - 'docs/validation/results/2026-09-25-report-attribute-heads.md: the adoption, +0.00105
+    and 0.940 against 0.938 public.'
+  novelty: First removal on the current views.
+  coverage: Training only.
+  exploitation: Per-label deltas against those of the 2026-10-01 removal; training
+    time.
+  budget: About 10% less than the incumbent, inside the range.
+  implementation: A bypass at that one point in src/knee_abnormality/training/lightning.py;
+    the code is not deleted in the run.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Last, because it has the clearest earlier result.
+  status: queued
+  created_revision: 2
+  seeded: /home/claudio/src/knee-abnormality-fixes-and-removals/autoresearch/campaigns/fixes-and-removals/seed-ideas-3.yaml
+- id: contrast-mixing-aligned-donor-requeue
+  mechanism_id: contrast-mixing-alignment
+  parent_idea_id: null
+  title: Contrast mixing resamples the donor slice onto the target slice's grid through
+    the two patient maps before blending
+  opportunity: 'Evidence-backed defect. apply_contrast_mixing (modeling/augmentation.py)
+    picks the donor slice nearest along the plane normal and blends it with the target
+    pixel by pixel. Since 2026-10-02 the T1/PD crop of coronal and sagittal series
+    is 84 mm and the fluid crop 93.33 mm at the same 224 px, so equal pixel indices
+    are different places: 80 px from the centre is 30.0 mm in one and 33.3 mm in the
+    other, and the two crops are also placed per series. The donor''s structures are
+    blended at shifted positions. On ResNet-18, mixing off costs about 0.0005 to 0.0025
+    (prior-work.md), so the mechanism is worth keeping and aligning.'
+  mechanism: 'In apply_contrast_mixing, for each target row t and its matched donor
+    row d, with M_t and M_d the middle-slice patient maps (3x3, pixel (x, y, 1) to
+    patient mm): D = M_d[:, :2], o = M_d[:, 2]; the donor pixel for target pixel q
+    is pinv(D) @ (M_t @ q - o), the target point projected onto the donor plane. Build
+    the 2x3 affine in normalized coordinates and resample the donor with F.grid_sample
+    (bilinear, zeros padding, align_corners=True), then blend as today (donor zero
+    keeps the target, target zero stays zero). The images are already mirrored for
+    reflected non-sagittal acquisitions while the maps are the source maps: conjugate
+    the affine by the column reversal for those rows. Selection of the donor slice,
+    the probability and the weight range are unchanged.'
+  precedents:
+  - 'docs/data-preparation/plane-fluid-spacing-review.md: equal-sized contrast mixing
+    uses unregistered prepared grids.'
+  - 'prior-work.md, Removals already measured: contrast mixing off on ResNet-18 and
+    ResNet-10t.'
+  novelty: First contrast mixing with the two contrasts registered in the plane.
+  coverage: Training only; studies where mixing fires (probability 0.3 per plane with
+    both contrasts).
+  exploitation: Log contrast_mixing_pixel_change as today plus the share of target
+    pixels that receive donor signal after resampling and the mean in-plane shift
+    in mm between the two grids. Read x4, x1 and per-label deltas, and the curve against
+    the incumbent.
+  budget: One grid_sample per mixed slice; estimate under 3% more training time.
+  implementation: Replaces the pixel-index blend in modeling/augmentation.py; no option.
+    Axial pairs share the 120 mm field but are resampled the same way, since their
+    series are placed independently. Use float32 outside autocast for the maps. Rows
+    without valid geometry are already excluded by geometry_valid. Keeper requeue
+    of contrast-mixing-aligned-donor, whose first run was cancelled when the campaign
+    stopped to adopt seed 1; the frozen source of that run (outputs/autoresearch/fixes-and-removals/experiments/contrast-mixing-aligned-donor-20261005T121205Z-38e90d49/source)
+    holds a reviewed implementation to port onto the new incumbent.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Active in every training run of the current recipe; the mismatch
+    has existed since the views were adopted.
+  status: completed
+  created_revision: 40
+  seeded: /home/claudio/src/knee-abnormality-fixes-and-removals/autoresearch/campaigns/fixes-and-removals/contrast-mixing-requeue-ideas.yaml
+  experiments:
+  - contrast-mixing-aligned-donor-requeue-20261005T130844Z-22da8214
+  decision: reject
+- id: contrast-mixing-aligned-feathered
+  mechanism_id: contrast-mixing-alignment
+  parent_idea_id: contrast-mixing-aligned-donor-requeue
+  title: Aligned contrast mixing with the blend faded out toward the edge of the donor's
+    coverage
+  opportunity: 'Keeper seed, 2026-10-05, a guess. The aligned donor of contrast-mixing-aligned-donor-requeue
+    scored -0.000844 (80% [-0.001465, -0.000209]) against the pixel-index blend with
+    identical random draws. An independent check found the alignment correct (landmark
+    error 0.01 px on synthetic grids; on 300 real pairs the aligned donor is closer
+    to the target in every plane). It also found the one new artifact the alignment
+    introduces: when the 93 mm fluid series is the target and the 84 mm series the
+    donor, the outer 20% of the frame gets no donor signal and stays pure target,
+    so the blended image carries a rectangular contrast step at the edge of the donor''s
+    coverage. The pixel-index blend covered the whole frame. This seed removes that
+    step and keeps the alignment.'
+  mechanism: 'The parent''s code (frozen source: outputs/autoresearch/fixes-and-removals/experiments/contrast-mixing-aligned-donor-requeue-20261005T130844Z-22da8214/source,
+    modeling/augmentation.py and modeling/model.py) with one change. In aligned_contrast_donors,
+    resample an all-ones image with the same grid to get the coverage c in [0, 1],
+    smooth it with a 31 x 31 average pool (stride 1, padding 15, zeros counted), and
+    set w = clamp(2 * c_smooth - 1, 0, 1): zero at the coverage boundary, one about
+    15 px inside it. The blend becomes mixed = target + w * (1 - lam) * (donor - target)
+    where donor and target are both non-zero, target elsewhere. With full coverage
+    w is one everywhere and the result equals the parent''s.'
+  precedents:
+  - 'run-notes.md, 2: the parent''s result, per-label deltas and logs (shift 3.9 mm,
+    88% of target pixels with donor signal).'
+  - 'run-notes.md, 2: the independent check of the alignment and the uncovered frame.'
+  novelty: First aligned blend without a coverage step.
+  coverage: Training only; changes the image only where coverage is partial, mainly
+    fluid targets in coronal and sagittal.
+  exploitation: Log the parent's two scalars plus the mean of w over target pixels.
+    Read x4 and x1 against the incumbent and against the parent's -0.000844, and the
+    per-label deltas against the parent's.
+  budget: One extra grid_sample and one average pool per mixed slice; inside the range.
+  implementation: Port the parent's two files onto the incumbent and add the weight;
+    replaces the pixel-index blend, no option. Keep the order and count of random
+    draws unchanged.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The one artifact the alignment added; decides whether an aligned
+    blend can match the old one.
+  status: completed
+  created_revision: 121
+  seeded: /home/claudio/src/knee-abnormality-fixes-and-removals/autoresearch/campaigns/fixes-and-removals/contrast-mixing-feathered-ideas.yaml
+  experiments:
+  - contrast-mixing-aligned-feathered-20261005T143540Z-d32fefd3
+  decision: reject
+- id: unadopted-fixes-together
+  mechanism_id: fixes-together
+  parent_idea_id: null
+  title: The three fixes not adopted one by one, applied together (slab rule, aligned
+    contrast mixing, positive feature-statistics std)
+  opportunity: 'User seed, 2026-10-05. Each of the three is a defect shown in the
+    code, and each alone moved the macro by less than a change that does nothing moves
+    it on this fold (about 0.0005): centre-outside-slab-rule -0.000537 (80% [-0.001584,
+    +0.000536]), which touches 20 series; contrast-mixing-aligned-donor-requeue -0.000844
+    (80% [-0.001465, -0.000209]); feature-statistics-positive-std -0.000174 (80% [-0.000623,
+    +0.000251]), which changes 0.4% of the draws. The slab rule also acts at inference,
+    where its reach in the test set is unknown, so the fold cannot judge it alone.
+    Together they change more of the data than any one of them, a second chance to
+    adopt them as one step.'
+  mechanism: 'The incumbent with the three changes of the three runs, ported from
+    their frozen sources and nothing else. (1) data/preprocessing/sampling.py as in
+    outputs/autoresearch/fixes-and-removals/experiments/centre-outside-slab-rule-20261005T130421Z-c810fa93/source:
+    the slab test applies for every fit method and the diagnostic is centre_outside_slab.
+    (2) modeling/augmentation.py and modeling/model.py as in outputs/autoresearch/fixes-and-removals/experiments/contrast-mixing-aligned-donor-requeue-20261005T130844Z-22da8214/source:
+    the donor is resampled onto the target grid before blending. (3) modeling/augmentation.py
+    as in outputs/autoresearch/fixes-and-removals/experiments/feature-statistics-positive-std-20261005T133003Z-3fe7afa5/source:
+    the resampled standard deviation is clamped at zero. Keep each run''s own logged
+    scalars.'
+  precedents:
+  - 'run-notes.md, 2, 4 and 5: the three single runs with their per-label deltas and
+    logs.'
+  - 'run-notes.md, 2: the independent check that the alignment is correct.'
+  novelty: First run with the three fixes at once.
+  coverage: Sampling of 20 training series and any test series outside its slab; every
+    mixed slice in training; 0.4% of feature-statistics draws.
+  exploitation: Log the three runs' scalars (sources per sampling outcome, aligned
+    signal fraction and in-plane shift, clamped fraction). Read x4 and x1 against
+    the incumbent and against the sum of the three single deltas, and the per-label
+    deltas.
+  budget: As the aligned-mixing run, inside the range.
+  implementation: 'Port the three diffs onto the incumbent at its turn; they touch
+    different functions and do not interact in code. No option selects the old behaviour.
+    Do not add the edge fade of contrast-mixing-aligned-feathered: that stays its
+    own seed.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user's second chance for the fixes the single runs could
+    not separate from noise.
+  status: completed
+  created_revision: 133
+  seeded: /home/claudio/src/knee-abnormality-fixes-and-removals/autoresearch/campaigns/fixes-and-removals/unadopted-fixes-together-ideas.yaml
+  experiments:
+  - unadopted-fixes-together-20261005T141339Z-57b9d4d0
+  decision: reject
+- id: position-3d-without-oa-detector
+  mechanism_id: knee-frame-position
+  parent_idea_id: computed-centre-3d-position
+  title: The 3D position in place of 1D and 2D with the three-compartment OA detector
+    removed
+  opportunity: 'Keeper seed, 2026-10-05: the missing cell of a two-by-two. computed-centre-3d-position
+    scored -0.000778 (80% [-0.002063, +0.000489]) with the detector in place, and
+    its logs show the detector almost silent beside the 3D position: mean absolute
+    correction 0.031 medial, 0.013 lateral and 0.014 patellofemoral at the last epoch,
+    against 0.277, 0.291 and 0.043 in the incumbent, as in 5 of 5 runs of the learnable-views
+    campaign. The 3D position gives every token its compartment, which is the information
+    the detector''s regions supply. With both present, the detector''s parameters
+    and gradient path stay in the model while carrying nothing. oa-detector-off tests
+    the detector''s removal with the 1D and 2D positions; this seed tests it with
+    the 3D position. A guess.'
+  mechanism: 'The code of computed-centre-3d-position (frozen source: outputs/autoresearch/fixes-and-removals/experiments/computed-centre-3d-position-20261005T135141Z-336ae83f/source,
+    modeling/spatial_tokens.py, modeling/model.py, data/dataset.py, data/preprocessing/preparation.py,
+    inference/reflection.py) ported onto the incumbent, plus the bypass of oa-detector-off:
+    in KneeAbnormalityModel._attention_pool the correction is not added to the OA
+    logits. Nothing else changes.'
+  precedents:
+  - 'run-notes.md, 6: computed-centre-3d-position, its per-label deltas and the detector''s
+    corrections.'
+  - 'docs/validation/results/2026-10-03-learnable-views-campaign.md: the detector
+    silent beside the 3D position in 5 of 5 runs; the 3D position with a first-order
+    detector +0.0010.'
+  novelty: First 3D position without the detector.
+  coverage: Every token; the three OA labels lose the detector's correction.
+  exploitation: 'Read against the incumbent, against computed-centre-3d-position and
+    against oa-detector-off: x4, x1, and Medial OA, Lateral OA and PF OA. Log the
+    three position branch shares as the parent does.'
+  budget: As the parent, about the incumbent's cost.
+  implementation: Port the parent's files and add the one-line bypass; no option.
+    It adds a mechanism, so it is decided by the shared rule.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Completes the comparison of position encoding and detector that
+    the two neighbouring seeds leave open.
+  status: completed
+  created_revision: 155
+  seeded: /home/claudio/src/knee-abnormality-fixes-and-removals/autoresearch/campaigns/fixes-and-removals/position-3d-without-oa-detector-ideas.yaml
+  experiments:
+  - position-3d-without-oa-detector-20261005T154038Z-9651703f
+  - position-3d-without-oa-detector-20261005T154744Z-d1efd475
+  decision: reject
+- id: position-3d-study-dropout
+  mechanism_id: knee-frame-position
+  parent_idea_id: computed-centre-3d-position
+  title: The 3D position with the position of 15% of training studies replaced by
+    the unknown-position vector
+  opportunity: 'User seed, 2026-10-05. computed-centre-3d-position led the incumbent
+    by +0.0077, +0.0026 and +0.0028 at x1 in its first three epochs and ended -0.0002
+    (x4 -0.000778, 80% [-0.002063, +0.000489]), while its training loss stayed below
+    the incumbent''s at every epoch (0.565 against 0.567 at the end). Lower training
+    loss without a validation gain is overfitting: the position is a shortcut the
+    model keeps using on the training studies. Dropping it for part of the studies
+    regularizes that shortcut. It also trains the unknown-position vector, which no
+    training token used in that run (0%), so a test study without a fitted centre
+    gets an untrained input today. Evidence-backed diagnosis, guess for the remedy.'
+  mechanism: 'The code of computed-centre-3d-position (frozen source: outputs/autoresearch/fixes-and-removals/experiments/computed-centre-3d-position-20261005T135141Z-336ae83f/source)
+    ported onto the incumbent, with one change in KneeAbnormalityModel.encode_batch:
+    in training, one uniform draw per study; for a study whose draw is below 0.15,
+    valid_position is set false for all its tokens, so they take the learned unknown-position
+    vector. Nothing is dropped in validation or prediction. medial_axis, anterior_axis
+    and trusted_geometry are untouched, so the meniscus mask, the OA regions and the
+    half-knee loss keep working for those studies.'
+  precedents:
+  - 'run-notes.md, 6: the parent, its curve, training loss, per-label deltas and branch
+    shares.'
+  - 'docs/research/efficientnet-training.md: the September spatial tokens declared
+    a 3D-position dropout of 0.10.'
+  novelty: First 3D position on this recipe with the position dropped per study.
+  coverage: Every token; 15% of studies per training batch without position.
+  exploitation: Log the three branch shares (unknown position expected near 0.15)
+    and the training loss. Read the x1 curve against the parent's and the incumbent's
+    from epoch 4 on, where the parent fell behind, and the per-label deltas against
+    the parent's (lateral labels up, ligament labels down).
+  budget: As the parent.
+  implementation: Port the parent's files and add the draw; the rate is a constant,
+    no option. It adds a mechanism, so it is decided by the shared rule.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Aims at the measured overfitting directly and closes the untrained-vector
+    gap.
+  status: queued
+  created_revision: 168
+  seeded: /home/claudio/src/knee-abnormality-fixes-and-removals/autoresearch/campaigns/fixes-and-removals/position-3d-retakes-ideas.yaml
+- id: position-3d-attention-only
+  mechanism_id: knee-frame-position
+  parent_idea_id: computed-centre-3d-position
+  title: The 3D position given to the attention and the detectors, not to the evidence
+    the readout pools
+  opportunity: User seed, 2026-10-05, a guess for the remedy. In the parent the position
+    is added to the token, and the same token feeds the attention scorer (where to
+    look) and the readout (what was seen). Position can therefore act as evidence
+    for a label by itself, which is the shortcut the parent's lower training loss
+    points to. Giving it to the attention only lets it guide the search, where the
+    early lead comes from, without becoming evidence.
+  mechanism: 'The parent''s code ported onto the incumbent, with one change in KneeAbnormalityModel._pooling_tokens:
+    it returns two tensors instead of the same one twice. tokens = mil_norm(features
+    + position_3d + plane + contrast + detail-view embedding), used by the attention
+    scorer, the half-knee detector and the OA detector as today; values = mil_norm(features
+    + plane + contrast + detail-view embedding), without the position, used by the
+    readout. The same mil_norm module is applied to both sums.'
+  precedents:
+  - 'run-notes.md, 6: the parent.'
+  novelty: First run with position in the attention path only.
+  coverage: Every token of every study.
+  exploitation: Training loss against the parent's and the incumbent's; x1 curve from
+    epoch 4 on; per-label deltas, with the ligament labels the parent lost as the
+    first check.
+  budget: One extra LayerNorm pass over the tokens; as the parent.
+  implementation: Port the parent's files and split the two tensors; no option. half_knee_tokens
+    keeps using the first tensor. It adds a mechanism, so it is decided by the shared
+    rule.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Removes the shortcut by construction instead of regularizing
+    it.
+  status: queued
+  created_revision: 168
+  seeded: /home/claudio/src/knee-abnormality-fixes-and-removals/autoresearch/campaigns/fixes-and-removals/position-3d-retakes-ideas.yaml
+- id: position-3d-coarse
+  mechanism_id: knee-frame-position
+  parent_idea_id: computed-centre-3d-position
+  title: The 3D position with wavelengths from 32 to 512 mm, without the 8 and 16
+    mm ones
+  opportunity: User seed, 2026-10-05, a guess for the remedy. The parent encodes each
+    coordinate at seven wavelengths from 8 to 512 mm. The two shortest resolve a few
+    millimetres, finer than the centre is known (fit RMS 2.8 mm median, 8.8 mm at
+    the 99th percentile) and fine enough to tell individual training studies apart.
+    Without them the position places a token in a region of the knee and cannot pinpoint
+    it, which leaves less to memorize.
+  mechanism: 'The parent''s code ported onto the incumbent, with one change in SpatialTokens:
+    the wavelengths are five, log-spaced from 32 to 512 mm (30 features), and the
+    first layer of the position network is linear 30 to 64. The unknown-side vector
+    has 10 entries.'
+  precedents:
+  - 'run-notes.md, 6: the parent.'
+  - 'docs/validation/results/2026-10-05-code-audit-measurements.md, F05: the centre-fit
+    residuals.'
+  novelty: First 3D position without sub-centimetre wavelengths.
+  coverage: Every token of every study.
+  exploitation: Training loss against the parent's; x1 curve from epoch 4 on; per-label
+    deltas against the parent's.
+  budget: As the parent.
+  implementation: Port the parent's files and change the wavelengths and the layer
+    width; no option. Record the wavelengths in SPATIAL_TOKEN_IDENTITY. It adds a
+    mechanism, so it is decided by the shared rule.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The cheapest way to make the position less memorizable.
+  status: queued
+  created_revision: 168
+  seeded: /home/claudio/src/knee-abnormality-fixes-and-removals/autoresearch/campaigns/fixes-and-removals/position-3d-retakes-ideas.yaml
+- id: slab-rule-and-positive-std
+  mechanism_id: fixes-together
+  parent_idea_id: null
+  title: The slab rule and the positive feature-statistics std together, adopted by
+    user decision
+  opportunity: 'User seed, 2026-10-05, adopted whatever its delta (contract.md, Forced
+    adoption). Both are defects shown in the code and both are too small for a run
+    on this fold to judge: the slab rule changes sampling for 20 training series and
+    2 validation studies (centre-outside-slab-rule -0.000537, 80% [-0.001584, +0.000536]),
+    and the clamp changes 0.4% of the feature-statistics draws (feature-statistics-positive-std
+    -0.000174, 80% [-0.000623, +0.000251]). The slab rule also acts at inference,
+    where its reach in the test set is unknown. unadopted-fixes-together, which added
+    the aligned contrast mixing to these two, scored -0.000817, the delta of the aligned
+    mixing alone; the mixing is left out here.'
+  mechanism: 'The incumbent with two changes ported from the frozen sources of their
+    runs and nothing else. (1) data/preprocessing/sampling.py as in outputs/autoresearch/fixes-and-removals/experiments/centre-outside-slab-rule-20261005T130421Z-c810fa93/source:
+    the slab test applies for every fit method and the diagnostic is centre_outside_slab.
+    (2) modeling/augmentation.py as in outputs/autoresearch/fixes-and-removals/experiments/feature-statistics-positive-std-20261005T133003Z-3fe7afa5/source:
+    the resampled standard deviation is clamped at zero. Contrast mixing stays the
+    incumbent''s pixel-index blend.'
+  precedents:
+  - 'run-notes.md, 4, 5 and 7: the two single runs and the three-fix run.'
+  novelty: The two small fixes without the aligned mixing.
+  coverage: Sampling of 20 training series and any test series outside its slab; 0.4%
+    of feature-statistics draws.
+  exploitation: Log the sources per sampling outcome and the clamped fraction. The
+    delta is expected inside rerun noise; report it with the per-label deltas against
+    the slab-rule run's, which shares its changed sampling.
+  budget: Same cost as the incumbent.
+  implementation: Port the two diffs; they touch different functions. No option selects
+    the old behaviour. Later seeds build on this run once the keeper adopts it.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Puts the two correct-by-reading fixes into the incumbent the
+    remaining seeds and the ResNet-50 build on.
+  status: completed
+  created_revision: 184
+  seeded: /home/claudio/src/knee-abnormality-fixes-and-removals/autoresearch/campaigns/fixes-and-removals/slab-rule-and-positive-std-ideas.yaml
+  experiments:
+  - slab-rule-and-positive-std-20261005T151904Z-38b6fa6f
+  decision: invalid
+- id: position-3d-beside-1d-2d
+  mechanism_id: knee-frame-position
+  parent_idea_id: computed-centre-3d-position
+  title: The 3D position added beside the 1D and 2D position embeddings instead of
+    replacing them
+  opportunity: 'Keeper seed from the 2026-10-05 audit of every 3D run, evidence-backed
+    but weak (one earlier run). Every replace run confounds two changes: adding the
+    knee-frame position and removing the 1D slice code and the 2D frame position.
+    The audit found that the early lead of the replace runs goes with the removal:
+    seven of seven learnable-views replace runs start with a training loss 0.0056
+    to 0.0069 below the reference, while the one run that kept 1D and 2D starts level
+    (+0.0006) and is the second best of the family at the end (+0.0005 at x4, ahead
+    at x1 from epoch 6 on). The 1D sinusoid is a fixed code three to four times stronger
+    than the 3D term (norm 11.3 against 2.5 to 4.0), and it is the only dedicated
+    depth signal. This run adds the 3D position and removes nothing.'
+  mechanism: 'The incumbent with position_1d and position_2d kept exactly as they
+    are, plus the 3D term of computed-centre-3d-position (frozen source: outputs/autoresearch/fixes-and-removals/experiments/computed-centre-3d-position-20261005T135141Z-336ae83f/source,
+    modeling/spatial_tokens.py and modeling/model.py): the same coordinates, encoder
+    and three branches, added to the token beside the two existing embeddings. The
+    position_2d network keeps its initialisation draws; the new parameters initialise
+    under torch.random.fork_rng.'
+  precedents:
+  - 'learnable-views #6 knee-frame-3d-position-with-1d-2d: x4 +0.0005 (80% [-0.0007,
+    +0.0017]).'
+  - 'run-notes.md, 6 and the audit of the 3D runs: the replace runs average zero against
+    their references.'
+  novelty: First 3D position beside 1D and 2D on the hand views with the computed
+    centre.
+  coverage: Every token of every study.
+  exploitation: Read Lateral OA and the three OA labels, validation soft BCE and soft
+    macro AUC as well as the hard macro; the x1 curve against the incumbent and against
+    the replace run; the OA detector's corrections; the epoch-0 training loss (expected
+    level with the incumbent's).
+  budget: As the incumbent plus a small MLP.
+  implementation: modeling/spatial_tokens.py and modeling/model.py; record the change
+    in SPATIAL_TOKEN_IDENTITY. No option. It adds a mechanism, so it is decided by
+    the shared rule.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The best-supported variant of the family and the one that separates
+    adding from removing.
+  status: completed
+  created_revision: 192
+  seeded: /home/claudio/src/knee-abnormality-fixes-and-removals/autoresearch/campaigns/fixes-and-removals/position-audit-ideas.yaml
+  experiments:
+  - position-3d-beside-1d-2d-20261005T161450Z-2a175892
+  decision: reject
+- id: position-embeddings-off
+  mechanism_id: removal-position-embeddings
+  parent_idea_id: null
+  title: Removal, the 1D slice-position and 2D image-position embeddings, with nothing
+    in their place
+  opportunity: Keeper seed from the 2026-10-05 audit, a diagnostic that is also a
+    removal. No run exists without any position. The audit found the position networks
+    barely train (the incumbent's 2D network stays at its initial norms; the 3D network's
+    first layer grows 10%), and that replacing 1D and 2D by the 3D position ends as
+    a tie in nine runs. If the recipe scores the same with no position, the early
+    lead of the 3D runs is explained by the removal alone, and the two embeddings
+    can go. The plane, contrast and detail-view embeddings and the view label bias
+    stay, so the model still knows which view a token is from.
+  mechanism: 'In KneeAbnormalityModel._pooling_tokens the position_1d and position_2d
+    terms are not added. Their parameters stay in the model, unused. Nothing else
+    changes: medial_axis, anterior_axis, the meniscus mask, the OA regions and the
+    half-knee loss are untouched.'
+  precedents:
+  - 'run-notes.md, 6: computed-centre-3d-position, a tie with 1D and 2D replaced.'
+  - 'docs/validation/results/2026-10-03-learnable-views-campaign.md: seven replace
+    runs averaging zero.'
+  novelty: First run of the recipe without position embeddings.
+  coverage: Every token of every study.
+  exploitation: The epoch-0 and epoch-1 training loss and x1 against the incumbent
+    (does the early lead of the 3D runs appear without any position?), the final x4
+    and x1, and the per-label deltas against the 3D replace run's.
+  budget: Same cost as the incumbent.
+  implementation: A bypass of those two terms in src/knee_abnormality/modeling/model.py;
+    the code is not deleted in the run. Decided as a removal.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Explains the 3D pattern in one run and may simplify the recipe.
+  status: launched
+  created_revision: 192
+  seeded: /home/claudio/src/knee-abnormality-fixes-and-removals/autoresearch/campaigns/fixes-and-removals/position-audit-ideas.yaml
+  experiments:
+  - position-embeddings-off-20261005T163810Z-a97fd82f
+  - position-embeddings-off-20261005T165932Z-7aa8b0ae
+- id: slab-rule-and-positive-std-requeue
+  mechanism_id: fixes-together
+  parent_idea_id: null
+  title: The slab rule and the positive feature-statistics std together, adopted by
+    user decision
+  opportunity: 'User seed, 2026-10-05, adopted whatever its delta (contract.md, Forced
+    adoption). Both are defects shown in the code and both are too small for a run
+    on this fold to judge: the slab rule changes sampling for 20 training series and
+    2 validation studies (centre-outside-slab-rule -0.000537, 80% [-0.001584, +0.000536]),
+    and the clamp changes 0.4% of the feature-statistics draws (feature-statistics-positive-std
+    -0.000174, 80% [-0.000623, +0.000251]). The slab rule also acts at inference,
+    where its reach in the test set is unknown. unadopted-fixes-together, which added
+    the aligned contrast mixing to these two, scored -0.000817, the delta of the aligned
+    mixing alone; the mixing is left out here.'
+  mechanism: 'The incumbent with two changes ported from the frozen sources of their
+    runs and nothing else. (1) data/preprocessing/sampling.py as in outputs/autoresearch/fixes-and-removals/experiments/centre-outside-slab-rule-20261005T130421Z-c810fa93/source:
+    the slab test applies for every fit method and the diagnostic is centre_outside_slab.
+    (2) modeling/augmentation.py as in outputs/autoresearch/fixes-and-removals/experiments/feature-statistics-positive-std-20261005T133003Z-3fe7afa5/source:
+    the resampled standard deviation is clamped at zero. Contrast mixing stays the
+    incumbent''s pixel-index blend.'
+  precedents:
+  - 'run-notes.md, 4, 5 and 7: the two single runs and the three-fix run.'
+  novelty: The two small fixes without the aligned mixing.
+  coverage: Sampling of 20 training series and any test series outside its slab; 0.4%
+    of feature-statistics draws.
+  exploitation: Log the sources per sampling outcome and the clamped fraction. The
+    delta is expected inside rerun noise; report it with the per-label deltas against
+    the slab-rule run's, which shares its changed sampling.
+  budget: Same cost as the incumbent.
+  implementation: Port the two diffs; they touch different functions. No option selects
+    the old behaviour. Later seeds build on this run once the keeper adopts it. Keeper
+    requeue of slab-rule-and-positive-std, whose first run was cancelled when the
+    campaign stopped to adopt oa-detector-off by user decision; this run builds on
+    the incumbent without the OA detector.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Puts the two correct-by-reading fixes into the incumbent the
+    remaining seeds and the ResNet-50 build on.
+  status: completed
+  created_revision: 230
+  seeded: /home/claudio/src/knee-abnormality-fixes-and-removals/autoresearch/campaigns/fixes-and-removals/slab-rule-and-positive-std-requeue-ideas.yaml
+  experiments:
+  - slab-rule-and-positive-std-requeue-20261005T155303Z-59280bbc
+  decision: provisional_accept

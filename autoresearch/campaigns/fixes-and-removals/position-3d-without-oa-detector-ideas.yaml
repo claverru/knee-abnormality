@@ -1,0 +1,39 @@
+ideas:
+- id: position-3d-without-oa-detector
+  mechanism_id: knee-frame-position
+  parent_idea_id: computed-centre-3d-position
+  title: The 3D position in place of 1D and 2D with the three-compartment OA detector removed
+  opportunity: >-
+    Keeper seed, 2026-10-05: the missing cell of a two-by-two. computed-centre-3d-position scored
+    -0.000778 (80% [-0.002063, +0.000489]) with the detector in place, and its logs show the
+    detector almost silent beside the 3D position: mean absolute correction 0.031 medial, 0.013
+    lateral and 0.014 patellofemoral at the last epoch, against 0.277, 0.291 and 0.043 in the
+    incumbent, as in 5 of 5 runs of the learnable-views campaign. The 3D position gives every
+    token its compartment, which is the information the detector's regions supply. With both
+    present, the detector's parameters and gradient path stay in the model while carrying
+    nothing. oa-detector-off tests the detector's removal with the 1D and 2D positions; this
+    seed tests it with the 3D position. A guess.
+  mechanism: >-
+    The code of computed-centre-3d-position (frozen source:
+    outputs/autoresearch/fixes-and-removals/experiments/computed-centre-3d-position-20261005T135141Z-336ae83f/source,
+    modeling/spatial_tokens.py, modeling/model.py, data/dataset.py,
+    data/preprocessing/preparation.py, inference/reflection.py) ported onto the incumbent, plus
+    the bypass of oa-detector-off: in KneeAbnormalityModel._attention_pool the correction is
+    not added to the OA logits. Nothing else changes.
+  precedents:
+  - 'run-notes.md, 6: computed-centre-3d-position, its per-label deltas and the detector''s corrections.'
+  - 'docs/validation/results/2026-10-03-learnable-views-campaign.md: the detector silent beside the 3D position in 5 of 5 runs; the 3D position with a first-order detector +0.0010.'
+  novelty: First 3D position without the detector.
+  coverage: Every token; the three OA labels lose the detector's correction.
+  exploitation: >-
+    Read against the incumbent, against computed-centre-3d-position and against
+    oa-detector-off: x4, x1, and Medial OA, Lateral OA and PF OA. Log the three position branch
+    shares as the parent does.
+  budget: As the parent, about the incumbent's cost.
+  implementation: >-
+    Port the parent's files and add the one-line bypass; no option. It adds a mechanism, so it
+    is decided by the shared rule.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Completes the comparison of position encoding and detector that the two neighbouring seeds leave open.
+exhausted_directions: ''
