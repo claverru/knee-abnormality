@@ -46,6 +46,14 @@ patient points. Remaining (hypotheses), from the
   missing; abstentions must take no offset. The 96.14% coverage is the historical audit,
   not a fresh coverage measurement.
 
+- **3D position from the computed knee centre** (measured, three ties on fold 1): replacing the
+  1D and 2D embeddings −0.0008 and −0.0002, adding beside them +0.0003, no position at all
+  −0.0005; Lateral OA is the one robust gain (+0.0073). Three retakes were queued and never run
+  (position dropped for 15% of studies, position in the attention path only, wavelengths from
+  32 mm); the audit expects little of them
+  ([result](../validation/results/2026-10-05-fixes-and-removals-campaign.md#what-the-runs-established),
+  [seeds](../../autoresearch/campaigns/fixes-and-removals/position-3d-retakes-ideas.yaml)).
+
 The [knee-geometry campaign](../../autoresearch/campaigns/knee-geometry/INDEX.md), stopped
 2026-09-24, left the curve-density sampler and the fallback-safe OA readout untried, and
 `meniscus-core-band-contrast-readout` trained but was never compared.
@@ -256,9 +264,8 @@ reproduces it.
 - **Gate 3, geometry, label-free:** measure how much of the patellofemoral joint the current axial
   and sagittal inputs cover and the in-plane resolution over its cartilage.
 - **Bet (guess, low confidence), only if gates 1 and 3 agree:** a PF-targeted axial input, one run
-  against the control at its fold and seed. Evidence against: the
-  [OA detector](../modeling/current-model.md#architecture) already reads PF OA over tokens in
-  front of the knee centre, and
+  against the control at its fold and seed. Evidence against: the OA detector, which read PF OA
+  over tokens in front of the knee centre, was [removed at a tie](../validation/results/2026-10-05-fixes-and-removals-campaign.md), and
   [per-label crops](../validation/results/2026-09-16-per-label-crops-result.md) moved PF OA by
   +0.0018 against crop224 while trailing `00-baseline` by 0.0028.
 - **Tried once without the gates (2026-10-03):** an 84 mm axial-fluid view 21 mm anterior of the

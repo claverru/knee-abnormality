@@ -1,0 +1,110 @@
+ideas:
+- id: computed-centre-3d-position
+  mechanism_id: knee-frame-position
+  parent_idea_id: null
+  title: One side-normalized 3D position per token from the computed knee centre, in place of the
+    1D and 2D position embeddings
+  opportunity: >-
+    User seed, 2026-10-05. Earlier runs of this encoding were ties (-0.0001 with the computed
+    centre, -0.0004 with a learned one, on the learnable-views recipe of 2026-10-02). The
+    geometry it reads has defects found since: studies with an unknown side lost their centre
+    as well (seed centre-without-side) and a centre outside a slab was handled three ways (seed
+    centre-outside-slab-rule). It also does not use the 2D frame that the reflection defect of
+    seed 1 corrupted, since it is built from the medial and anterior axes. A guess that the
+    corrected geometry changes the result.
+  mechanism: >-
+    position_1d and position_2d are removed and every token takes one 3D position q in mm from
+    the loader's computed centre: q_x is medial_axis, q_y anterior_axis with its sign, q_z the
+    token's patient z minus the centre's, from the third row of the same patient map. Encoder as
+    in the earlier run: sine and cosine of each coordinate at seven wavelengths from 8 to 512 mm
+    (42 features), linear 42 to 64, GELU, linear 64 to 256, added to the token. Branches: trusted
+    geometry and known side take the full encoding; a fitted centre with unknown side encodes y
+    and z and a learned vector replaces the x features; no centre takes a learned
+    unknown-position vector. Under reflection q is unchanged. The detail-view embedding stays.
+  precedents:
+  - 'learnable-views #8 computed-centre-3d-position: x4 -0.0001 (80% [-0.0015, +0.0013]); frozen source in outputs/autoresearch/learnable-views/experiments/computed-centre-3d-position-20261002T215833Z-cb1b0f75/source (modeling/spatial_tokens.py, modeling/model.py).'
+  - 'learnable-views #4 and #6: learned centre in place of 1D and 2D -0.0004; beside them +0.0005.'
+  - 'near-misses #6 on the ReXNet recipe: +0.0008 hard, -0.0006 soft, PF OA +0.0061.'
+  - 'learnable-views, repeating pattern with the 3D position: medial OA and Baker''s cyst up, synovitis and lateral meniscus down, the OA detector silent in 5 of 5.'
+  novelty: First 3D position on the hand 84/93 mm views with the corrected centre validity.
+  coverage: Every token; the full branch for studies with a fitted centre and a known side.
+  exploitation: >-
+    Log the share of tokens on each of the three branches per epoch and oa_detector activity.
+    Read per-label deltas against the earlier pattern, and the delta on unknown-side studies.
+  budget: A small MLP in place of two embeddings; about the incumbent's cost.
+  implementation: >-
+    modeling/spatial_tokens.py and modeling/model.py; record the change in
+    SPATIAL_TOKEN_IDENTITY. Port the encoder and its branches from the frozen source named in
+    the precedents and adapt them to this build; do not redesign them. Removes position_1d and
+    position_2d, no option keeps them. Applies to the incumbent at its turn, whatever the
+    earlier seeds decided.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Placed after the two geometry fixes so it reads corrected geometry.
+- id: oa-detector-off
+  mechanism_id: removal-oa-detector
+  parent_idea_id: null
+  title: Removal, the three-compartment OA detector
+  opportunity: >-
+    Guess. The detector was adopted on 2026-09-25 on the ReXNet recipe on a local near-miss
+    (+0.0013, later re-scored +0.0022) and 0.944 against 0.940 public. Since then the backbone,
+    the weights, the views, the readouts and the label bias changed, and in the learnable-views
+    campaign it stayed silent in 5 of 5 runs with a 3D position. Its removal has never been run.
+  mechanism: >-
+    In KneeAbnormalityModel._attention_pool the correction is not added to the OA logits
+    (logits[:, oa_indices] += correction is skipped); the detector's parameters stay in the
+    model, unused. Nothing else changes.
+  precedents:
+  - 'docs/validation/results/2026-09-25-near-misses-campaign.md #8: the adoption, PF OA +0.0102.'
+  - 'docs/validation/results/2026-10-03-learnable-views-campaign.md: silent with the 3D position.'
+  novelty: First removal of the detector.
+  coverage: The three OA labels of every study.
+  exploitation: Per-label deltas on Medial OA, Lateral OA and PF OA; the incumbent's oa_detector_scale as context.
+  budget: Same cost as the incumbent.
+  implementation: >-
+    A bypass at that one line in src/knee_abnormality/modeling/model.py; the code is not deleted
+    in the run. Applies to the incumbent at its turn, so after the 3D position seed whatever
+    that seed decided.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Placed after the 3D position because the two interacted before.
+- id: intensity-augmentation-off
+  mechanism_id: removal-intensity-augmentation
+  parent_idea_id: null
+  title: Removal, the gamma and contrast intensity augmentation
+  opportunity: >-
+    Guess. Gamma 0.85 to 1.15 and contrast 0.9 to 1.1 at probability 0.5 date from the first
+    recipes. Since then GIN, bilateral smoothing, contrast mixing and DSU were added, the
+    checkpoint normalization was adopted, and the bag-dependent window already moves a series'
+    contrast by more than 10% in one series out of ten. Its removal has never been run.
+  mechanism: data.intensity_augmentation.probability 0. Nothing else changes.
+  precedents:
+  - 'pretraining-input #5 on the ResNet-10t: AutoAugment intensity operations in its place, -0.0029; a replacement, not a removal.'
+  novelty: First removal of the intensity augmentation.
+  coverage: Training only.
+  exploitation: Per-epoch x1 curve against the incumbent (an augmentation removal shows as faster early and lower late if it was needed); per-label deltas.
+  budget: Same cost as the incumbent or slightly less.
+  implementation: Configuration only, configs/training.yaml.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Oldest augmentation in the stack, never re-tested.
+- id: noise-augmentation-off
+  mechanism_id: removal-noise-augmentation
+  parent_idea_id: null
+  title: Removal, the noise augmentation
+  opportunity: >-
+    Guess. Noise at probability 0.15 with standard deviation 0.005 to 0.02 predates the
+    half-stack augmentation and has never been re-tested; at that probability and strength a
+    tie is the likely outcome.
+  mechanism: data.noise_augmentation.probability 0. Nothing else changes.
+  precedents:
+  - 'docs/validation/results/2026-09-26-augmentation-campaign.md: the stack was built around it without testing it.'
+  novelty: First removal of the noise augmentation.
+  coverage: Training only, 15% of acquisitions.
+  exploitation: Per-epoch x1 curve and per-label deltas against the incumbent and against seed 1's rerun delta.
+  budget: Same cost as the incumbent.
+  implementation: Configuration only, configs/training.yaml.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Cheap; closes the augmentation list.
+exhausted_directions: ''

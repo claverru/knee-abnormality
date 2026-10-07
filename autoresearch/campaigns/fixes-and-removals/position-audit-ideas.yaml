@@ -1,0 +1,69 @@
+ideas:
+- id: position-3d-beside-1d-2d
+  mechanism_id: knee-frame-position
+  parent_idea_id: computed-centre-3d-position
+  title: The 3D position added beside the 1D and 2D position embeddings instead of replacing them
+  opportunity: >-
+    Keeper seed from the 2026-10-05 audit of every 3D run, evidence-backed but weak (one earlier
+    run). Every replace run confounds two changes: adding the knee-frame position and removing
+    the 1D slice code and the 2D frame position. The audit found that the early lead of the
+    replace runs goes with the removal: seven of seven learnable-views replace runs start with a
+    training loss 0.0056 to 0.0069 below the reference, while the one run that kept 1D and 2D
+    starts level (+0.0006) and is the second best of the family at the end (+0.0005 at x4,
+    ahead at x1 from epoch 6 on). The 1D sinusoid is a fixed code three to four times stronger
+    than the 3D term (norm 11.3 against 2.5 to 4.0), and it is the only dedicated depth signal.
+    This run adds the 3D position and removes nothing.
+  mechanism: >-
+    The incumbent with position_1d and position_2d kept exactly as they are, plus the 3D term of
+    computed-centre-3d-position (frozen source:
+    outputs/autoresearch/fixes-and-removals/experiments/computed-centre-3d-position-20261005T135141Z-336ae83f/source,
+    modeling/spatial_tokens.py and modeling/model.py): the same coordinates, encoder and three
+    branches, added to the token beside the two existing embeddings. The position_2d network
+    keeps its initialisation draws; the new parameters initialise under torch.random.fork_rng.
+  precedents:
+  - 'learnable-views #6 knee-frame-3d-position-with-1d-2d: x4 +0.0005 (80% [-0.0007, +0.0017]).'
+  - 'run-notes.md, 6 and the audit of the 3D runs: the replace runs average zero against their references.'
+  novelty: First 3D position beside 1D and 2D on the hand views with the computed centre.
+  coverage: Every token of every study.
+  exploitation: >-
+    Read Lateral OA and the three OA labels, validation soft BCE and soft macro AUC as well as
+    the hard macro; the x1 curve against the incumbent and against the replace run; the OA
+    detector's corrections; the epoch-0 training loss (expected level with the incumbent's).
+  budget: As the incumbent plus a small MLP.
+  implementation: >-
+    modeling/spatial_tokens.py and modeling/model.py; record the change in
+    SPATIAL_TOKEN_IDENTITY. No option. It adds a mechanism, so it is decided by the shared rule.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The best-supported variant of the family and the one that separates adding from removing.
+- id: position-embeddings-off
+  mechanism_id: removal-position-embeddings
+  parent_idea_id: null
+  title: Removal, the 1D slice-position and 2D image-position embeddings, with nothing in their place
+  opportunity: >-
+    Keeper seed from the 2026-10-05 audit, a diagnostic that is also a removal. No run exists
+    without any position. The audit found the position networks barely train (the incumbent's
+    2D network stays at its initial norms; the 3D network's first layer grows 10%), and that
+    replacing 1D and 2D by the 3D position ends as a tie in nine runs. If the recipe scores the
+    same with no position, the early lead of the 3D runs is explained by the removal alone, and
+    the two embeddings can go. The plane, contrast and detail-view embeddings and the view label
+    bias stay, so the model still knows which view a token is from.
+  mechanism: >-
+    In KneeAbnormalityModel._pooling_tokens the position_1d and position_2d terms are not added.
+    Their parameters stay in the model, unused. Nothing else changes: medial_axis,
+    anterior_axis, the meniscus mask, the OA regions and the half-knee loss are untouched.
+  precedents:
+  - 'run-notes.md, 6: computed-centre-3d-position, a tie with 1D and 2D replaced.'
+  - 'docs/validation/results/2026-10-03-learnable-views-campaign.md: seven replace runs averaging zero.'
+  novelty: First run of the recipe without position embeddings.
+  coverage: Every token of every study.
+  exploitation: >-
+    The epoch-0 and epoch-1 training loss and x1 against the incumbent (does the early lead of
+    the 3D runs appear without any position?), the final x4 and x1, and the per-label deltas
+    against the 3D replace run's.
+  budget: Same cost as the incumbent.
+  implementation: A bypass of those two terms in src/knee_abnormality/modeling/model.py; the code is not deleted in the run. Decided as a removal.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Explains the 3D pattern in one run and may simplify the recipe.
+exhausted_directions: ''

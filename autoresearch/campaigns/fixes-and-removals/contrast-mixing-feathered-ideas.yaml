@@ -1,0 +1,42 @@
+ideas:
+- id: contrast-mixing-aligned-feathered
+  mechanism_id: contrast-mixing-alignment
+  parent_idea_id: contrast-mixing-aligned-donor-requeue
+  title: Aligned contrast mixing with the blend faded out toward the edge of the donor's coverage
+  opportunity: >-
+    Keeper seed, 2026-10-05, a guess. The aligned donor of contrast-mixing-aligned-donor-requeue
+    scored -0.000844 (80% [-0.001465, -0.000209]) against the pixel-index blend with identical
+    random draws. An independent check found the alignment correct (landmark error 0.01 px on
+    synthetic grids; on 300 real pairs the aligned donor is closer to the target in every
+    plane). It also found the one new artifact the alignment introduces: when the 93 mm fluid
+    series is the target and the 84 mm series the donor, the outer 20% of the frame gets no
+    donor signal and stays pure target, so the blended image carries a rectangular contrast
+    step at the edge of the donor's coverage. The pixel-index blend covered the whole frame.
+    This seed removes that step and keeps the alignment.
+  mechanism: >-
+    The parent's code (frozen source:
+    outputs/autoresearch/fixes-and-removals/experiments/contrast-mixing-aligned-donor-requeue-20261005T130844Z-22da8214/source,
+    modeling/augmentation.py and modeling/model.py) with one change. In
+    aligned_contrast_donors, resample an all-ones image with the same grid to get the coverage
+    c in [0, 1], smooth it with a 31 x 31 average pool (stride 1, padding 15, zeros counted),
+    and set w = clamp(2 * c_smooth - 1, 0, 1): zero at the coverage boundary, one about 15 px
+    inside it. The blend becomes mixed = target + w * (1 - lam) * (donor - target) where donor
+    and target are both non-zero, target elsewhere. With full coverage w is one everywhere and
+    the result equals the parent's.
+  precedents:
+  - 'run-notes.md, 2: the parent''s result, per-label deltas and logs (shift 3.9 mm, 88% of target pixels with donor signal).'
+  - 'run-notes.md, 2: the independent check of the alignment and the uncovered frame.'
+  novelty: First aligned blend without a coverage step.
+  coverage: Training only; changes the image only where coverage is partial, mainly fluid targets in coronal and sagittal.
+  exploitation: >-
+    Log the parent's two scalars plus the mean of w over target pixels. Read x4 and x1 against
+    the incumbent and against the parent's -0.000844, and the per-label deltas against the
+    parent's.
+  budget: One extra grid_sample and one average pool per mixed slice; inside the range.
+  implementation: >-
+    Port the parent's two files onto the incumbent and add the weight; replaces the pixel-index
+    blend, no option. Keep the order and count of random draws unchanged.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The one artifact the alignment added; decides whether an aligned blend can match the old one.
+exhausted_directions: ''

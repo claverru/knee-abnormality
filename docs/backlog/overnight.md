@@ -24,6 +24,12 @@ One entry, which waits for the control to be retrained on the recipe in force
   ([result](../validation/results/2026-10-01-mixed-field-campaign.md#what-the-runs-established),
   [geometry](../research/input-resolution.md#what-a-narrow-field-cuts)).
 
+Two removals queued by the [fixes-and-removals campaign](../validation/results/2026-10-05-fixes-and-removals-campaign.md#open) and never run
+(guesses; both date from the first recipes and were never re-tested):
+
+- **Intensity augmentation off** (`data.intensity_augmentation.probability: 0`).
+- **Noise augmentation off** (`data.noise_augmentation.probability: 0`).
+
 The revisits
 campaign also ran 18 hyperparameter values on ResNet-18 without a gain
 ([result](../validation/results/2026-10-01-revisits-campaign.md#other-runs)), so do not repeat them.

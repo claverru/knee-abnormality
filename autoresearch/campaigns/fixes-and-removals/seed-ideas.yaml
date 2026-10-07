@@ -1,0 +1,183 @@
+ideas:
+- id: reflected-detail-view-positions
+  mechanism_id: reflection-detail-positions
+  parent_idea_id: null
+  title: Give a mirrored detail view the mirrored window position, in the training reflection
+    and in reflection TTA alike
+  opportunity: >-
+    Evidence-backed defect. Under the training reflection, encode_batch folds the column flip
+    into inverse_affine, so prepared_xy is the un-mirrored source location. Wide views take their
+    2D position from the final image grid, but detail views (the two coronal types) take it from
+    view_to_wide @ prepared_xy: mirrored pixels with x-reversed positions, against
+    REFLECTION_IDENTITY ("final_image_2d_anchor_unchanged") and the reflection doc. Reflection
+    TTA (inference/reflection.py) leaves view_to_wide untouched, so its mirrored pass pairs
+    pixels and positions in a way training never showed. Measured on 2026-10-05: making TTA copy
+    the training convention matches training to 0.0004 in the position embedding and moves the
+    S106 children by +0.000024, so today the two paths disagree and neither follows the rule
+    (prior-work.md, F01).
+  mechanism: >-
+    One convention in both paths: a mirrored detail view sits at the mirrored window of the wide
+    frame, F_wide @ V @ F, where V is view_to_wide and F reverses columns around W-1. (1)
+    modeling/model.py, encode_batch: after wide_xy = view_to_wide @ prepared_xy in pixel units,
+    for tokens with reflected & ~sagittal replace x by (W-1) - x, before the normalization to
+    [-1, 1]. (2) inference/reflection.py, reflect_batch: when mirror.any(), view_to_wide =
+    batch["view_to_wide"].clone(); view_to_wide[mirror] = reversal @ view_to_wide[mirror] @
+    reversal (reversal cast to its dtype), returned under "view_to_wide". Wide views are
+    unchanged in both paths (V is the identity, and they use the grid). Nothing else changes.
+  precedents:
+  - 'docs/validation/results/2026-10-05-code-audit-measurements.md, F01: parity of the two TTA variants against the training reflection and their pooled out-of-fold scores.'
+  - 'docs/data-preparation/reflection-geometry-and-previews.md: 2D anchors stay in the augmented image frame.'
+  novelty: First correction of detail-view positions under reflection since the detail views arrived on 2026-10-02.
+  coverage: >-
+    Training: coronal detail tokens of reflected studies, about half of the eligible studies per
+    epoch. Inference: the mirrored pass of reflection TTA. Plain validation is untouched.
+  exploitation: >-
+    Per-epoch x1 and final x4 against the incumbent, per-label deltas (meniscus and OA labels
+    read coronal position most), view_label_bias and attention share of the two coronal views.
+    Check on one reflected batch that the position embedding of a mirrored coronal detail view
+    equals that of the same view passed through reflect_batch in eval mode.
+  budget: Same cost as the incumbent.
+  implementation: >-
+    Replaces the defective behaviour in src/knee_abnormality/modeling/model.py and
+    src/knee_abnormality/inference/reflection.py; no option and no config field. Both files are
+    hashed preprocessing sources, so the run's preprocessing identity differs from the
+    incumbent's, which the campaign permits. Update the "embeddings" entry of
+    REFLECTION_IDENTITY only if its wording no longer holds. The user adopts this seed by
+    decision whatever the delta (contract.md, Forced adoption); later seeds build on it.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: A confirmed defect in training and in the submission path; the user ordered it first and adopted.
+- id: contrast-mixing-aligned-donor
+  mechanism_id: contrast-mixing-alignment
+  parent_idea_id: null
+  title: Contrast mixing resamples the donor slice onto the target slice's grid through the two
+    patient maps before blending
+  opportunity: >-
+    Evidence-backed defect. apply_contrast_mixing (modeling/augmentation.py) picks the donor
+    slice nearest along the plane normal and blends it with the target pixel by pixel. Since
+    2026-10-02 the T1/PD crop of coronal and sagittal series is 84 mm and the fluid crop 93.33 mm
+    at the same 224 px, so equal pixel indices are different places: 80 px from the centre is
+    30.0 mm in one and 33.3 mm in the other, and the two crops are also placed per series. The
+    donor's structures are blended at shifted positions. On ResNet-18, mixing off costs about
+    0.0005 to 0.0025 (prior-work.md), so the mechanism is worth keeping and aligning.
+  mechanism: >-
+    In apply_contrast_mixing, for each target row t and its matched donor row d, with M_t and M_d
+    the middle-slice patient maps (3x3, pixel (x, y, 1) to patient mm): D = M_d[:, :2], o =
+    M_d[:, 2]; the donor pixel for target pixel q is pinv(D) @ (M_t @ q - o), the target point
+    projected onto the donor plane. Build the 2x3 affine in normalized coordinates and resample
+    the donor with F.grid_sample (bilinear, zeros padding, align_corners=True), then blend as
+    today (donor zero keeps the target, target zero stays zero). The images are already mirrored
+    for reflected non-sagittal acquisitions while the maps are the source maps: conjugate the
+    affine by the column reversal for those rows. Selection of the donor slice, the probability
+    and the weight range are unchanged.
+  precedents:
+  - 'docs/data-preparation/plane-fluid-spacing-review.md: equal-sized contrast mixing uses unregistered prepared grids.'
+  - 'prior-work.md, Removals already measured: contrast mixing off on ResNet-18 and ResNet-10t.'
+  novelty: First contrast mixing with the two contrasts registered in the plane.
+  coverage: Training only; studies where mixing fires (probability 0.3 per plane with both contrasts).
+  exploitation: >-
+    Log contrast_mixing_pixel_change as today plus the share of target pixels that receive donor
+    signal after resampling and the mean in-plane shift in mm between the two grids. Read x4,
+    x1 and per-label deltas, and the curve against the incumbent.
+  budget: One grid_sample per mixed slice; estimate under 3% more training time.
+  implementation: >-
+    Replaces the pixel-index blend in modeling/augmentation.py; no option. Axial pairs share the
+    120 mm field but are resampled the same way, since their series are placed independently.
+    Use float32 outside autocast for the maps. Rows without valid geometry are already excluded
+    by geometry_valid.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Active in every training run of the current recipe; the mismatch has existed since the views were adopted.
+- id: centre-without-side
+  mechanism_id: centre-validity
+  parent_idea_id: null
+  title: Keep knee-anchored crops and contrast mixing for studies whose centre is fitted but
+    whose side is unknown
+  opportunity: >-
+    Evidence-backed defect. In KneeStudyDataset._index_study_geometry (data/dataset.py) a
+    series' geometry is valid only if the side sign is non-zero, so a study with an unknown
+    side loses everything that flag gates: coronal and sagittal detail crops fall back to the
+    image centre (sagittal also loses its 7 mm anterior offset) and contrast mixing never fires,
+    because it filters on geometry_valid. None of these needs the side: the view table has no
+    side-dependent offset. About 162 training studies have a fitted centre and no side (4,400
+    with a centre, 4,238 with trusted geometry), and a test site whose side abstains gets the
+    same treatment.
+  mechanism: >-
+    In _index_study_geometry, valid no longer requires the sign: valid = centre is not None and
+    the reference has a point with method fit or robust. The stored sign stays 0 for an unknown
+    side. Everything that needs the side is already gated on side != 0 in
+    KneeAbnormalityModel.encode_batch (medial_axis, anterior_axis, trusted_geometry), so the
+    meniscus mask, the OA regions and the half-knee loss stay off for these studies. Check that
+    view_position with side 0 places the coronal window at the centre (its offset is 0) and the
+    sagittal window with its fixed direction.
+  precedents:
+  - 'docs/validation/results/2026-10-05-code-audit-measurements.md, F04 and F05: 170 studies with unknown side, 4,400 with a fitted centre.'
+  novelty: First separation of "centre known" from "side known".
+  coverage: About 3.7% of training studies and the same share of validation; any test study with an unknown side.
+  exploitation: >-
+    Log per epoch the studies with a centre and no side, and how many of their detail views are
+    knee-anchored (expected all). Report the macro delta and the delta on the validation studies
+    with unknown side apart.
+  budget: Same cost as the incumbent.
+  implementation: >-
+    Replaces the validity rule in src/knee_abnormality/data/dataset.py; no option. A hashed
+    preprocessing source. Bilateral studies keep their per-knee rule.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: A subgroup on a different crop distribution for no reason; also what makes an abstaining side cheap in test.
+- id: centre-outside-slab-rule
+  mechanism_id: slab-guard
+  parent_idea_id: null
+  title: Apply the slab guard whatever the fit method, and name its outcome correctly
+  opportunity: >-
+    Evidence-backed defect. build_pool (data/preprocessing/sampling.py) samples a series around
+    the fitted centre only if the centre lies inside the series' slab, but skips that test when
+    the centre comes from the ordinary fit (inside = reference.method == "fit" or ...). In
+    training the centre misses the slab of 69 series (0.29%): 20 in ordinary-fit studies are
+    sampled around a centre up to 45 mm outside them, 43 in robust-fit studies are dropped
+    because a sibling covers the centre, and 6 are sampled locally. A guard-rejected series is
+    also recorded as "plane_disagreement", which it is not.
+  mechanism: >-
+    inside = reference.point is not None and within_acquired_range(geometry, reference.point),
+    for every method. The diagnostic for a reliable, plane-agreeing series outside the slab
+    becomes "centre_outside_slab". Nothing else in the pool changes.
+  precedents:
+  - 'outputs/analysis/centre-slab-guard-20261005/summary.json: the counts, the miss distances and the three outcomes.'
+  novelty: First run with one rule for a centre outside a slab.
+  coverage: 20 series in 20 training studies change sampling; the diagnostic label changes for 49.
+  exploitation: >-
+    Log the sources per outcome. The change touches under 0.1% of series, so the macro delta is
+    expected inside rerun noise; report it against seed 1's delta as the yardstick.
+  budget: Same cost as the incumbent.
+  implementation: >-
+    Replaces the rule in src/knee_abnormality/data/preprocessing/sampling.py; update
+    SAMPLING_IDENTITY if its wording names the exemption. No option.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Small, but the same situation is handled three ways today.
+- id: feature-statistics-positive-std
+  mechanism_id: feature-statistics-std
+  parent_idea_id: null
+  title: Feature-statistics augmentation keeps the resampled standard deviation positive
+  opportunity: >-
+    Evidence-backed defect. apply_feature_statistics_augmentation (modeling/augmentation.py)
+    draws resampled_std = acquisition_std + randn * spread_std with no lower bound. When the
+    spread across acquisitions of a type is comparable to a channel's own standard deviation
+    the draw can be negative, which inverts the channel instead of rescaling it. How often this
+    happens is not measured.
+  mechanism: >-
+    resampled_std.clamp_min_(0) before it is applied. Nothing else changes; the probability
+    stays 0.5.
+  precedents:
+  - 'docs/validation/results/2026-10-01-revisits-campaign.md: no DSU on ResNet-18, -0.0013 (80% [-0.0027, -0.0001]), so the mechanism stays.'
+  novelty: First run with the scale restricted to non-negative values.
+  coverage: Training only, half of the acquisitions.
+  exploitation: >-
+    Log per epoch the share of (acquisition, channel) draws that the clamp changed; if it is
+    zero the run is a rerun of the incumbent and is reported as such.
+  budget: Same cost as the incumbent.
+  implementation: Replaces one line in src/knee_abnormality/modeling/augmentation.py; no option.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: One line; the log tells whether the defect ever fires.
+exhausted_directions: ''
