@@ -14,7 +14,9 @@ from knee_abnormality.provenance import sha256_file
 from scripts.tools.prepare_combined_labels import fingerprint
 
 TEACHER_SPLIT = Path("data/folds/all_5fold_scanner_v2")
-REXNET_FOLDS_1_4 = Path("outputs/training/20261003-224423-rexnet-200-views-label-bias-folds-1-4")
+REXNET_FOLDS_1_4 = Path(
+    "outputs/training/20261003-224423-rexnet-200-views-label-bias-folds-1-4"
+)
 LABEL_TABLE = "oof_blend_v2"
 BASE_TABLE = "rebuild_state_v2"
 TEACHER_WEIGHT = 0.25

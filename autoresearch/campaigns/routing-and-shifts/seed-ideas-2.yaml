@@ -1,0 +1,260 @@
+ideas:
+- id: held-cuts-with-wider-regions
+  mechanism_id: held-division
+  parent_idea_id: null
+  title: The mirrored division whose every cut has targets on both sides, at the 15% reading
+    threshold - two heights, a 24 mm core and four sectors, with wider regions than run 30
+  opportunity: >-
+    Evidence-backed in its two halves, a guess that they add up. Run 30 built the finest
+    mirrored division in which targets hold every cut from both sides and its cuts stayed
+    where they started with no balancing (27.0, 12.9 and 20.2 mm from starts of 27, 9 and 21),
+    where the incumbent's lower cut wanders from -9 to +1 mm and slid 10 mm in run 26. It lost
+    0.0015 because its regions were cut at 20% of each target's free attention: MCL -0.0078,
+    Synovitis -0.0050, Effusion -0.0031, PF OA -0.0022, the four tightest. The same search at
+    15% gives a division that is still held on every cut and reads more: no target loses more
+    than 14% of its attention, against 20%
+    (outputs/analysis/side-routing-cut-forces-20261006/symmetric-division-0.15.json).
+  mechanism: >-
+    All in modeling/model.py. FRAME_SIZES = ("cut_height", "core_radius"), regressed per knee
+    as today, with FRAME_SIZE_START_PITCHES = (0.95, 1.9), about 12 and 24 mm; the lower cut
+    and the ring radius are removed. SECTORS = (front_medial, front_lateral, back_lateral,
+    back_medial), starting at 30, 90, 150 and 270 degrees from the medial axis through the
+    front: beyond[k] = inside(front * cos(a_k) - medial * sin(a_k), across) and sector k =
+    beyond[k] * (1 - beyond[k + 1]) cyclically, as today with these four angles. upper =
+    inside(height - cut_height, half[..., 2]) and lower = 1 - upper; core, ringed and
+    medial_side as today; medial_core = core * medial_side, lateral_core = core *
+    lateral_side. Route table, in the order of ROUTES: meniscus_medial (medial_core + ringed *
+    back_medial) * lower; meniscus_lateral (lateral_core + ringed * back_lateral) * lower;
+    oa_medial medial_core + ringed * (front_medial + back_medial); oa_lateral lateral_core +
+    ringed * (front_lateral + back_lateral); kneecap (PF OA) ringed * (front_medial +
+    front_lateral); core (ACL) core; collateral_medial (MCL) and baker medial_core + ringed *
+    back_medial; front_core (Synovitis) core + ringed * (front_medial + front_lateral); a new
+    route pouch (Effusion; add it to ROUTES and point OWN_ROUTES["Effusion"] at it) ringed *
+    (front_medial + front_lateral) * upper. Report routes: tear_medial_anterior ringed *
+    front_medial * lower, tear_medial_body ringed * (front_medial + back_medial) * lower,
+    tear_medial_posterior ringed * back_medial * lower, the three lateral ones mirrored;
+    facet_medial ringed * front_medial * upper, facet_lateral ringed * front_lateral * upper.
+    Cuts stay hard with the soft gradient.
+  precedents:
+  - 'Run 30 (outputs/training/20261006-200553-side-routed-mirrored-held-division): cuts held, 0.923564 and 0.914537, losses on the tightest targets.'
+  - 'Run 26: the lower cut, with targets on one side only, slid from -2 to +10 mm.'
+  novelty: The held division has only been run with its tightest regions.
+  coverage: All ten routed targets and the located report targets.
+  exploitation: >-
+    Read both multipliers, then MCL, Synovitis, Effusion and PF OA against run 30 and against
+    the incumbent, and the two sizes per epoch (study_frame_cut_height_mm,
+    study_frame_core_radius_mm). Shown wrong by: a size that moves more than 4 mm after epoch
+    3, or the four targets not recovering over run 30.
+  budget: Same cost as the incumbent.
+  implementation: >-
+    Run 30's code is the closest starting point and may be reused: unzip
+    outputs/training/20261006-200553-side-routed-mirrored-held-division/source_snapshot.zip and
+    read its modeling/model.py (same four sectors, the pouch route, three sizes); this seed
+    drops its lower cut and widens its table as written above. The size regression
+    (frame_output) and frame_size have two outputs; training/lightning.py logs the sizes by
+    name from FRAME_SIZES, so no logging change is needed. Update SPATIAL_TOKEN_IDENTITY and
+    run the guardrail check.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Joins the day's two clearest lessons, held cuts and generous regions.
+- id: shared-ligament-reader
+  mechanism_id: report-region-targets
+  parent_idea_id: null
+  title: One shared head for four ligament report answers, read in the core for ACL and PCL
+    and at the rim for MCL and the lateral ligaments
+  opportunity: >-
+    Evidence-backed counts, a guess for the effect. ACL sits at 0.9406 over the routed runs
+    with a spread equal to its noise, against 0.9458 for the old recipe, and nothing varied so
+    far touches it. The ring radius has ACL alone on one side and the core radius has no
+    report target on either. The v4 answers already hold what a both-sided reader needs:
+    ACL tears 716 and PCL findings 259 in the core, MCL injuries 874 and lateral-ligament
+    findings 321 at the rim (prior-work.md, Measured). One head reading the core for two of
+    them and the rim for the other two is the meniscus head's arrangement turned from
+    medial-lateral to inside-outside: it gives ACL's region more supervision and gives the two
+    radii an opposing reader.
+  mechanism: >-
+    A new located family "ligament_injury" in REGIONS (training/report_attributes.py), four
+    Region entries read by one shared head exactly as the existing located families are (one
+    attention column and one classifier row for the family, pooled over each entry's route,
+    one yes/no target per entry): question acl_status on the route core; extra_pcl on core;
+    mcl_status on collateral_medial; extra_lateral_ligaments on a new route collateral_lateral,
+    the mirror of collateral_medial: ringed * (sector["anterolateral"] + sector["lateral"]), all
+    heights, added to ROUTES and to _regions. For each entry, located = the question's options
+    that state an injury or abnormality and unplaced = its not-stated or not-mentioned
+    options, read from configs/labels/jevk5-report-attribute-targets-v4.0.json; a knee whose
+    report says the ligament is normal is then a full-weight negative, as for the other
+    families. One change to the constructor is required: today every question named in
+    REGIONS is removed from the option-level heads (the set `placed`). acl_status and
+    extra_pcl are routed option-level questions (QUESTION_ROUTES) and mcl_status and
+    extra_lateral_ligaments are ordinary ones; all four must keep their option-level heads, so
+    only the four questions placed today (medial_meniscus_tear_location,
+    lateral_meniscus_tear_location, marrow_edema_location and patellar_facet) stay excluded. No target's region changes.
+  precedents:
+  - 'attributes_v5.md (worktree knee-abnormality-jevk5-attributes-v4), Core against rings: the four counts from the v4 answers.'
+  - 'docs/ongoing/side-routed-heads.md: located targets hold on unseen knees (tear place 33%, edema by compartment 25% explained).'
+  novelty: First located target across the core-ring boundary; first extra supervision on ACL's region.
+  coverage: Training only; every study with v4 answers for the four questions.
+  exploitation: >-
+    Read ACL and MCL against the incumbent (sibling SDs 0.0014 and 0.0029), both multipliers,
+    val_report_attribute_bce_<region> for the four new targets, and the core and ring radii
+    per epoch. Shown wrong by: the four targets explaining under 10% on the validation knees,
+    or ACL inside one SD of the incumbent.
+  budget: Same cost as the incumbent; one more attention column and classifier row.
+  implementation: >-
+    modeling/model.py: the route collateral_lateral in ROUTES (append it, so existing route
+    indices do not move) and its row at the same position in the stack returned by _regions.
+    training/report_attributes.py: the four Region entries and the narrowed `placed` rule;
+    report in the candidate's notes the exact located and unplaced options chosen for each of
+    the four questions and the number of training studies with positive mass on each target.
+    training/lightning.py already logs every region's validation fit by REGION_IDS. Update
+    SPATIAL_TOKEN_IDENTITY and run the guardrail check.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The only idea for ACL that has not been tried, built from answers already extracted.
+- id: learned-shift-per-study-from-the-spots
+  mechanism_id: learned-crop-shift
+  parent_idea_id: null
+  title: Train the per-study point to predict where the heads' meniscus spots are, and place
+    the crops from it
+  opportunity: >-
+    A guess with a strong signal. The target loss reaches a shift only through the sampling
+    grid, and the augmentation teaches the model to ignore shifts of the size being learned
+    (prior-work.md, Topic 2). The routed heads already say where the knee is: the midpoint of
+    the two meniscus attention spots, read without gradient, is the centre of the incumbent's
+    frame, and frames built on it gave the line its best run. That point is a per-study
+    target nobody marked. A locator trained to predict it from the low-resolution canvases
+    centres every knee's crops on the same anatomy.
+  mechanism: >-
+    The canvas, cut and locator of learned-shift-per-study-one-point, with two differences.
+    First, the crop is cut at the locator's delta detached, so the target loss does not train
+    the locator. Second, the locator has its own loss. After the main pass, study_frames
+    gives each knee's two meniscus spots in the fitted frame (the entry study_landmarks of
+    the encoded batch, millimetres, no gradient); take their midpoint m and undo the knee
+    side on its medial component so it is in delta's axes. Because the crop has already been
+    moved by delta, the spots' position in the fitted frame does not depend on the shift: m is
+    a property of the knee. Keep a running mean of m over training knees whose two spots were
+    found (a persistent buffer of three values, momentum 0.99, started at the first batch's
+    mean, updated only in training). The locator's target is m minus that mean: the offset
+    that would bring this knee's menisci to where the average knee's are.
+    shift_locator_loss = smooth L1 (beta 1) between delta and the target, both divided by the
+    study's mean token pitch as study_frames computes it, averaged over the knees whose two
+    spots were found; it is added to the training loss with weight 0.1, the weight of the side
+    loss. It is the one loss term this seed adds, and the guardrail check allows that name.
+  precedents:
+  - 'Runs 23 and 24: the frame centred on the meniscus spots; run 24 is the incumbent.'
+  - 'autoresearch/campaigns/learnable-views/build-notes.md: the open question on the augmentation hiding the signal.'
+  novelty: First shift trained on a target the model produces itself.
+  coverage: Every study with both meniscus spots found, in training; every study at inference.
+  exploitation: >-
+    Read shift_locator_loss on training and validation, the spread of delta across validation
+    knees per axis, the spread across validation knees of m minus delta per axis (it should
+    shrink over the epochs), both multipliers, and the front targets. Shown wrong by: a
+    validation shift_locator_loss that does not fall below its first-epoch value.
+  budget: As learned-shift-per-study-one-point.
+  implementation: >-
+    Start from learned-shift-per-study-one-point (reuse the earlier candidate's port and
+    locator when one exists). Detach delta where the cutter receives it. In
+    training/lightning.py add _shift_locator_step, called in training_step and
+    validation_step like _side_step, logging shift_locator_loss and
+    val_shift_locator_loss per epoch through _log_epoch_metric; validation computes the loss
+    against the stored running mean and does not update it. Log
+    shift_residual_<axis>_sd_mm (the standard deviation across knees of m minus delta) for
+    training and validation per epoch. Same two required checks as
+    learned-shift-per-study-one-point, then the guardrail check, whose loss-term check must
+    list shift_locator_loss among the logged terms.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user allowed the added loss term as a separate seed.
+- id: height-cuts-from-the-spots
+  mechanism_id: spot-placed-cuts
+  parent_idea_id: null
+  title: Place the two height cuts per knee midway between the meniscus and kneecap spots and
+    keep the core and ring radii learned
+  opportunity: >-
+    Evidence-backed for the heights, a guess that the rest carries over. Run 28 placed all
+    four sizes per knee between attention spots with no gradient. Its joint band lay on the
+    joint line in every drawing, the nod settled at 5 to 6 degrees where the incumbent swings
+    between 8 and 18, and Contusion (+0.0020), Effusion (+0.0012), MCL (+0.0010) and Synovitis
+    (+0.0008) gained. It ended 0.0007 below the incumbent at x4 through ACL (-0.0019), whose
+    region depends on the ring radius: placed between the menisci (20 mm from the axis) and
+    the kneecap spot (22 mm), it landed on the meniscus spots at 21 mm in place of 26. The
+    incumbent's two height cuts are the two cuts with targets on one side only.
+  mechanism: >-
+    In study_frames (modeling/model.py), run 28's placement for the upper and lower cut only.
+    Spots, all squared-attention centroids without gradient with their spread (the weighted
+    standard deviation of the spot's tokens, summed over the three axes): the two meniscus
+    spots as today, and a kneecap spot from the shared OA channel over the tokens with fitted
+    front > 0 and fitted height > 0. Express the spots in the knee's frame (subtract the
+    frame's shift, apply its rotation). With h_m and s_m the mean height and mean spread of
+    the two meniscus spots and h_k, s_k the kneecap spot's: band_top = max(h_m + (h_k - h_m) *
+    s_m / (s_m + s_k), h_m) and band_bottom = 2 * h_m - band_top, computed under
+    torch.no_grad. Where a meniscus spot or the kneecap spot is not found, the two cuts keep
+    their start values (the first two entries of frame_size_start times the study's pitch).
+    core_radius and ring_radius stay exactly as in the incumbent: frame_size_start +
+    frame_size + the regression's outputs for those two entries, times the pitch. FRAME_SIZES
+    keeps its four names and order, so the region table and the logging are unchanged; only
+    the first two values no longer come from frame_size and frame_output.
+  precedents:
+  - 'Run 28 (outputs/training/20261006-184303-side-routed-midway-cuts): 0.924384 and 0.916204; upper cut +10.9 mm, lower -12.3 mm, steady over the epochs.'
+  - 'Run 26: the lower cut slid 10 mm when ACL stopped depending on it.'
+  novelty: Run 28 without the one cut that cost it.
+  coverage: Every knee with its meniscus and kneecap spots found.
+  exploitation: >-
+    Read both multipliers, ACL (should equal the incumbent's within its SD of 0.0014), the
+    four targets that gained in run 28, and the two radii per epoch against the incumbent's.
+    Shown wrong by: ACL more than one SD below the incumbent, or the gains of run 28 not
+    repeating.
+  budget: Same cost as the incumbent.
+  implementation: >-
+    Run 28's code may be reused: unzip
+    outputs/training/20261006-184303-side-routed-midway-cuts/source_snapshot.zip and read
+    study_frames in its modeling/model.py (the spot helper with spreads, the kneecap spot, the
+    midway formula). Unlike run 28, do not add the notch spot, do not pass own tokens to
+    study_frames, keep frame_size and the four regression outputs, and place only the two
+    height cuts. Update SPATIAL_TOKEN_IDENTITY and run the guardrail check.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Finishes what run 28 left half answered.
+- id: crops-and-frame-share-one-centre
+  mechanism_id: learned-crop-shift
+  parent_idea_id: null
+  title: Use the per-study point both to place the crops and as the centre of the routing
+    frame
+  opportunity: >-
+    A guess. With learned-shift-per-study-one-point the model holds two centres per knee: the
+    locator's point for the crops and the meniscus-spot midpoint for the regions. They
+    describe the same thing. One point for both is fewer moving parts, lets the region cuts
+    train the point through the soft gradient as well as the crop does, and puts the same
+    anatomy at the same token and in the same region. The pair of runs says whether sharing
+    helps.
+  mechanism: >-
+    Everything of learned-shift-per-study-one-point, and one change in study_frames
+    (modeling/model.py). Today the frame's centre is the midpoint of the two meniscus spots
+    plus the shared frame_shift times the study's pitch, in the fitted frame. It becomes the
+    locator's delta (with gradient), with the knee side applied to its medial component so it
+    is in the fitted frame's axes, plus the shared frame_shift times the pitch; the meniscus
+    midpoint is no longer used for the centre. The side axis still comes from the line between
+    the two meniscus spots, and the nod and the four sizes from the regression, as in the
+    incumbent. The locator therefore receives gradient from the target loss through the
+    sampling grid and through the soft gradient of every cut. The fitted frame's origin does
+    not move with the crop, so delta means the same displacement in both uses.
+  precedents:
+  - 'Runs 8 and 11: a frame centre regressed per knee from the tokens scored 0.9243 and 0.9241 at x4; run 24 replaced it by the spot midpoint.'
+  novelty: First design in which the crops and the regions move together.
+  coverage: Every study.
+  exploitation: >-
+    Compare with learned-shift-per-study-one-point at both multipliers; read per epoch the
+    distance per knee between the locator's point and the meniscus-spot midpoint. Shown wrong
+    by: that distance growing over the run, which means the regions pull the point off the
+    menisci.
+  budget: As learned-shift-per-study-one-point.
+  implementation: >-
+    Start from learned-shift-per-study-one-point (reuse the earlier candidate's code when one
+    exists); encode_batch passes delta per study to study_frames. Log
+    shift_to_spot_distance_mm, mean and standard deviation across knees, for training and
+    validation per epoch. Same two required checks, then the guardrail check: its mirror and
+    side-flip checks must hold with the shared centre.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user asked to try the shared centre beside the separate one.
+exhausted_directions: ''

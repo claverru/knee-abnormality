@@ -84,9 +84,11 @@ def apply_attention_temperature(
     with torch.no_grad():
         scorer.weight.div_(temperature)
         scorer.bias.div_(temperature)
-        model.compartment_signs.div_(temperature)
         if model.view_label_bias is not None:
             model.view_label_bias.div_(temperature)
+        model.position_prior.weight.div_(temperature)
+        model.position_prior.bias.div_(temperature)
+        model.routing_temperature.mul_(temperature)
     return temperature
 
 

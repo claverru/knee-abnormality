@@ -45,4 +45,5 @@ def reflect_batch(
         "valid_rects": rects.expand(-1, -1, slices, -1),
         "slice_positions": positions,
         "patient_maps": patient_maps.expand(-1, -1, slices, -1, -1),
+        "mirrored_study": batch["reflection_eligible"],
     }

@@ -1,0 +1,163 @@
+ideas:
+- id: smaller-rotation-augmentation-on-turned-crops
+  mechanism_id: frame-aligned-crops
+  parent_idea_id: null
+  title: Crops turned by half the frame's angle, with the random rotation of the affine augmentation halved
+  opportunity: >-
+    A guess. The affine augmentation turns 70% of series by up to 10 degrees, a range chosen
+    when knees arrived at the scanner's orientation. The frame's in-plane angle has a median of
+    3.6 degrees on coronal views and 5.9 on sagittal (90th percentiles 8.7 and 11.5); once the
+    crops are turned by half of it, about half of that spread is gone, and the augmentation
+    spends its range on orientations the model no longer meets. The validation crops are never
+    augmented, so a narrower range brings training closer to what is predicted on.
+  mechanism: >-
+    Everything of the seed crops-turned-to-the-frame, built here in full, and
+    data.affine_augmentation.rotation_degrees: 5.0 in configs/training.yaml in place of 10.0.
+    The probability, the translation and the scale range stay.
+  precedents:
+  - "learnable-views run 17 (jitter 4 mm and 5% in place of 8 mm and 10%, on unaligned views of the old recipe): -0.0008 [-0.0022, +0.0006]."
+  novelty: First change of the affine range on crops aligned to the knee.
+  coverage: Training only; every series the augmentation touches.
+  exploitation: >-
+    Read both multipliers against the incumbent and against crops-turned-to-the-frame, and the
+    gap between the training loss and the validation loss at the last epoch against that run's.
+    Shown wrong by: both multipliers below crops-turned-to-the-frame by more than a rerun
+    (0.0010).
+  budget: As crops-turned-to-the-frame.
+  implementation: >-
+    Follow the environment paragraph of the developer instructions. Build on the candidate of
+    crops-turned-to-the-frame if it exists under this campaign's experiments (its source/ and
+    changes.diff), otherwise from the sources that seed names. The only further change is the
+    one config value. Report the three topic 2 checks of the contract.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user's third element of the aligned default (small augmentation around the aligned crop), measured apart from the turn.
+- id: edema-bone-targets-by-side
+  mechanism_id: report-region-targets
+  parent_idea_id: null
+  title: Four located targets for marrow edema, femur and tibia on each side, read by one shared head on both sides of the joint line
+  opportunity: >-
+    Evidence-backed counts, a guess for the effect. No report target today is read on both
+    sides of the tibia-against-joint cut or tells the femoral side of a compartment from the
+    tibial side. The v5 answer marrow_edema_bone does: with the compartment answer the incumbent
+    already uses, the reports give about 393 medial-femur, 349 medial-tibia, 354 lateral-femur
+    and 310 lateral-tibia knees, each above the 200 a located target needs, and 2,512 reports
+    without edema as full-weight negatives. On 212 audited reports the femur is right in 48 of
+    60 answers and the tibia in 58 of 72, femur and tibia are swapped once in 37 single-bone
+    reports, and the typical error is answering both bones (prior-work.md, The v5 report
+    answers). It also gives Contusion's finding a place per study.
+  mechanism: >-
+    training/report_attributes.py reads, beside the v4.0 targets, the two v5 questions from
+    `<paths.data_root>/labels/prepared/jevk5-report-attributes-v5.0-new/targets.parquet`
+    (columns `StudyInstanceUID` and `attribute_<question>__<option>`, one row per study of the
+    4,407). A new located family "marrow_edema_bone" with four Region entries, read by one
+    shared head exactly as the existing located families are: femur_medial, femur_lateral,
+    tibia_medial, tibia_lateral. The target of a region is the product of two masses: the bone
+    (femur: options femur and femur_tibia; tibia: options tibia and femur_tibia) times the
+    compartment (the options of marrow_edema_location that include that compartment, as the
+    existing edema-by-compartment regions define them). Its weight is the reliability weight
+    times one minus the mass of the bone options not_stated and patella_and_other. Four new
+    routes appended to ROUTES and _regions (modeling/model.py): bone_femur_medial = the medial
+    compartment's sectors and its half of the core in the joint and upper bands;
+    bone_tibia_medial = the same sectors and half core in the tibia and joint bands; the two
+    lateral ones their mirror images. No existing target or region changes, and
+    marrow_edema_bone gets no option-level head.
+  precedents:
+  - "docs/ongoing/side-routed-heads.md: located targets hold on unseen knees (tear place 33% explained, edema by compartment 25%)."
+  - "routing-and-shifts, contusion-reads-the-edema-head-2: Contusion pooled with the edema head's attention, -0.0007 and -0.0011, its scale stayed at 0."
+  novelty: First report target on both sides of the lower and upper cuts; first use of a v5 answer.
+  coverage: Training only; the 4,407 studies with reports.
+  exploitation: >-
+    Read both multipliers against the incumbent, Contusion, Fracture and the four compartment
+    targets, val_report_attribute_bce_<region> for the four new targets with the share each
+    explains, and the two height cuts per epoch. Shown wrong by: the four targets explaining
+    under 10% on the validation knees.
+  budget: Same cost as the incumbent; one more attention column and classifier row.
+  implementation: >-
+    Follow the environment paragraph of the developer instructions. The Region tuple takes one
+    question today; extend it, or the code that turns a Region into a target, so that a region
+    may multiply the located mass of a second question, without changing the values of the
+    existing regions (report the largest absolute difference of their targets on one batch
+    against the incumbent: it must be zero). Load the extra file once, aligned by
+    StudyInstanceUID, failing loudly if a training study with a report is missing from it.
+    Report in the candidate's notes the options chosen for each region and the number of
+    training studies with a target above 0.5 in each of the four. Update
+    SPATIAL_TOKEN_IDENTITY["compartment_routing"].
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The reason the v5 extraction was run; the only source of a femoral and a tibial target on each side.
+- id: extensor-tendon-targets-above-and-below-the-kneecap
+  mechanism_id: report-region-targets
+  parent_idea_id: null
+  title: Two located targets for the extensor tendons, quadriceps above the upper cut and patellar below it, read by one shared head at the front
+  opportunity: >-
+    Evidence-backed counts, a guess for the effect. The upper cut at the front has PF OA,
+    Effusion and Synovitis reading across it and nothing reading it from both sides with
+    different answers. The v5 answer extensor_tendon does: quadriceps only in about 237 reports,
+    patellar only in 183, both in 164, and the two tendons named as normal in about 1,756 and
+    1,398. On 212 audited reports it is right in 205 with a located precision of 0.943. PF OA
+    and Synovitis decide the ranking of the routed runs and both read this part of the knee.
+    Open: the upper pole of the kneecap may lie near the edge of the 84 and 93 mm views.
+  mechanism: >-
+    training/report_attributes.py reads the v5 file named in edema-bone-targets-by-side. A new
+    located family "extensor_tendon" with two Region entries read by one shared head:
+    quadriceps (options quadriceps and both) on a new route tendon_upper = the three front
+    sectors outside the core in the upper band; patellar (options patellar and both) on a new
+    route tendon_lower = the same sectors in the joint and tibia bands. Unplaced: not_stated.
+    The existing option-level head of extra_extensor_tendons stays. No existing target or
+    region changes.
+  precedents:
+  - "attributes_v5.md (worktree knee-abnormality-jevk5-attributes-v4): the counts and the check on the audited reports."
+  - "Run 31 (PF OA and Effusion on the front half): the front regions are where Effusion gains."
+  novelty: First report target that sets the front above the kneecap against the front below it.
+  coverage: Training only; the 4,407 studies with reports.
+  exploitation: >-
+    Read both multipliers against the incumbent, PF OA, Effusion and Synovitis,
+    val_report_attribute_bce_<region> for the two new targets with the share each explains, and
+    the upper cut per epoch. Shown wrong by: the two targets explaining under 10% on the
+    validation knees.
+  budget: Same cost as the incumbent; one more attention column and classifier row.
+  implementation: >-
+    Follow the environment paragraph of the developer instructions. Two routes appended to
+    ROUTES and _regions (modeling/model.py) and two Region entries; load the extra file as the
+    edema-bone seed describes, building on that candidate's loader if it exists under this
+    campaign's experiments. Report the number of training studies with a target above 0.5 in
+    each of the two. Update SPATIAL_TOKEN_IDENTITY["compartment_routing"].
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The second v5 answer; a reader on both sides of the cut that PF OA and Synovitis depend on.
+- id: five-unplaced-report-questions-without-heads
+  mechanism_id: report-question-set
+  parent_idea_id: null
+  title: Train without the heads of the five report questions that locate nothing the routed model can use
+  opportunity: >-
+    A guess, kept open on purpose. Five v4 questions have varied answers but no place in the
+    knee: extra_osteochondral, extra_other_cysts, extra_bursitis, pf_cartilage_surface and
+    baker_ruptured. Every earlier removal of report information cost (low-agreement questions
+    dropped: 0.943 public against 0.947; hedged options -0.0015; grade merges -0.0014;
+    completeness options -0.0005), each on a single run with whole-knee heads, before routing.
+    The v5 specification leaves these five to one run with and without them.
+  mechanism: >-
+    training/report_attributes.py: the five questions get no head and no loss term; their
+    columns are ignored. Nothing else changes.
+  precedents:
+  - "attributes_v5.md, Dropped or decided by a test: the four recorded removals and their costs."
+  novelty: First removal of report questions on the routed model.
+  coverage: Training only.
+  exploitation: >-
+    Read both multipliers against the incumbent and every target against its sibling SD. Shown
+    wrong by: a macro more than a rerun (0.0010) below the incumbent at x4, which keeps the five
+    questions in every later question set.
+  budget: Same cost as the incumbent, five heads fewer.
+  implementation: >-
+    Follow the environment paragraph of the developer instructions. Exclude the five question
+    ids where ReportAttributeHeads builds its option-level heads, so the remaining heads keep
+    their order and their initial weights (report on one batch that the remaining questions'
+    initial logits equal the incumbent's; create nothing new, and keep the incumbent's random
+    stream by drawing the removed heads' initial weights under torch.random.fork_rng or by
+    constructing and discarding them as the incumbent would). Update
+    SPATIAL_TOKEN_IDENTITY["algorithm"].
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Decides which questions later extractions need, now that a question costs ten minutes to extract.
+exhausted_directions: ""

@@ -1,0 +1,227 @@
+ideas:
+- id: shared-ligament-reader-2
+  mechanism_id: report-region-targets
+  parent_idea_id: null
+  title: One shared head for four ligament report answers, read in the core for ACL and PCL and at
+    the rim for MCL and the lateral ligaments
+  opportunity: 'Evidence-backed counts, a guess for the effect. ACL sits at 0.9406 over the routed
+    runs with a spread equal to its noise, against 0.9458 for the old recipe, and nothing varied so
+    far touches it. The ring radius has ACL alone on one side and the core radius has no report target
+    on either. The v4 answers already hold what a both-sided reader needs: ACL tears 716 and PCL findings
+    259 in the core, MCL injuries 874 and lateral-ligament findings 321 at the rim (prior-work.md,
+    Measured). One head reading the core for two of them and the rim for the other two is the meniscus
+    head''s arrangement turned from medial-lateral to inside-outside: it gives ACL''s region more
+    supervision and gives the two radii an opposing reader.'
+  mechanism: 'A new located family "ligament_injury" in REGIONS (training/report_attributes.py), four
+    Region entries read by one shared head exactly as the existing located families are (one attention
+    column and one classifier row for the family, pooled over each entry''s route, one yes/no target
+    per entry): question acl_status on the route core; extra_pcl on core; mcl_status on collateral_medial;
+    extra_lateral_ligaments on a new route collateral_lateral, the mirror of collateral_medial: ringed
+    * (sector["anterolateral"] + sector["lateral"]), all heights, added to ROUTES and to _regions.
+    For each entry, located = the question''s options that state an injury or abnormality and unplaced
+    = its not-stated or not-mentioned options, read from configs/labels/jevk5-report-attribute-targets-v4.0.json;
+    a knee whose report says the ligament is normal is then a full-weight negative, as for the other
+    families. One change to the constructor is required: today every question named in REGIONS is
+    removed from the option-level heads (the set `placed`). acl_status and extra_pcl are routed option-level
+    questions (QUESTION_ROUTES) and mcl_status and extra_lateral_ligaments are ordinary ones; all
+    four must keep their option-level heads, so only the four questions placed today (medial_meniscus_tear_location,
+    lateral_meniscus_tear_location, marrow_edema_location and patellar_facet) stay excluded. No target''s
+    region changes.'
+  precedents:
+  - 'attributes_v5.md (worktree knee-abnormality-jevk5-attributes-v4), Core against rings: the four
+    counts from the v4 answers.'
+  - 'docs/ongoing/side-routed-heads.md: located targets hold on unseen knees (tear place 33%, edema
+    by compartment 25% explained).'
+  novelty: First located target across the core-ring boundary; first extra supervision on ACL's region.
+  coverage: Training only; every study with v4 answers for the four questions.
+  exploitation: 'Read ACL and MCL against the incumbent (sibling SDs 0.0014 and 0.0029), both multipliers,
+    val_report_attribute_bce_<region> for the four new targets, and the core and ring radii per epoch.
+    Shown wrong by: the four targets explaining under 10% on the validation knees, or ACL inside one
+    SD of the incumbent.'
+  budget: Same cost as the incumbent; one more attention column and classifier row.
+  implementation: 'Environment, read this first. (1) You have no GPU and must not use one. Run `rtk
+    proxy uv run --locked python -m scripts.tools.check_side_routing --config configs/training.yaml`
+    from your candidate workspace as it is: the script selects the CPU by itself when no GPU is visible,
+    takes a few minutes there, and that CPU run is the required check. Never return blocked for lack
+    of a GPU. (2) Make every change inside the candidate workspace you were assigned and nowhere else.
+    Do not stage the candidate under /tmp, and do not write source/ or changes.diff in the experiment
+    directory: it is read-only to you by design, and the supervisor freezes the source and the diff
+    from your workspace after you return. (3) When the change is complete and the check passes, return
+    status prepared with the integration and activation declarations and the guardrail JSON in the
+    report. An unwritable experiment directory is never a reason to return blocked. modeling/model.py:
+    the route collateral_lateral in ROUTES (append it, so existing route indices do not move) and
+    its row at the same position in the stack returned by _regions. training/report_attributes.py:
+    the four Region entries and the narrowed `placed` rule; report in the candidate''s notes the exact
+    located and unplaced options chosen for each of the four questions and the number of training
+    studies with positive mass on each target. training/lightning.py already logs every region''s
+    validation fit by REGION_IDS. Update SPATIAL_TOKEN_IDENTITY and run the guardrail check.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: 'Keeper''s requeue of 2026-10-07: the first candidate was parked because the
+    developer did not run the guardrail check, reading it as needing a GPU. The only idea for ACL
+    that has not been tried, built from answers already extracted.'
+- id: height-cuts-from-the-spots-2
+  mechanism_id: spot-placed-cuts
+  parent_idea_id: null
+  title: Place the two height cuts per knee midway between the meniscus and kneecap spots and keep
+    the core and ring radii learned
+  opportunity: 'Evidence-backed for the heights, a guess that the rest carries over. Run 28 placed
+    all four sizes per knee between attention spots with no gradient. Its joint band lay on the joint
+    line in every drawing, the nod settled at 5 to 6 degrees where the incumbent swings between 8
+    and 18, and Contusion (+0.0020), Effusion (+0.0012), MCL (+0.0010) and Synovitis (+0.0008) gained.
+    It ended 0.0007 below the incumbent at x4 through ACL (-0.0019), whose region depends on the ring
+    radius: placed between the menisci (20 mm from the axis) and the kneecap spot (22 mm), it landed
+    on the meniscus spots at 21 mm in place of 26. The incumbent''s two height cuts are the two cuts
+    with targets on one side only.'
+  mechanism: 'In study_frames (modeling/model.py), run 28''s placement for the upper and lower cut
+    only. Spots, all squared-attention centroids without gradient with their spread (the weighted
+    standard deviation of the spot''s tokens, summed over the three axes): the two meniscus spots
+    as today, and a kneecap spot from the shared OA channel over the tokens with fitted front > 0
+    and fitted height > 0. Express the spots in the knee''s frame (subtract the frame''s shift, apply
+    its rotation). With h_m and s_m the mean height and mean spread of the two meniscus spots and
+    h_k, s_k the kneecap spot''s: band_top = max(h_m + (h_k - h_m) * s_m / (s_m + s_k), h_m) and band_bottom
+    = 2 * h_m - band_top, computed under torch.no_grad. Where a meniscus spot or the kneecap spot
+    is not found, the two cuts keep their start values (the first two entries of frame_size_start
+    times the study''s pitch). core_radius and ring_radius stay exactly as in the incumbent: frame_size_start
+    + frame_size + the regression''s outputs for those two entries, times the pitch. FRAME_SIZES keeps
+    its four names and order, so the region table and the logging are unchanged; only the first two
+    values no longer come from frame_size and frame_output.'
+  precedents:
+  - 'Run 28 (outputs/training/20261006-184303-side-routed-midway-cuts): 0.924384 and 0.916204; upper
+    cut +10.9 mm, lower -12.3 mm, steady over the epochs.'
+  - 'Run 26: the lower cut slid 10 mm when ACL stopped depending on it.'
+  novelty: Run 28 without the one cut that cost it.
+  coverage: Every knee with its meniscus and kneecap spots found.
+  exploitation: 'Read both multipliers, ACL (should equal the incumbent''s within its SD of 0.0014),
+    the four targets that gained in run 28, and the two radii per epoch against the incumbent''s.
+    Shown wrong by: ACL more than one SD below the incumbent, or the gains of run 28 not repeating.'
+  budget: Same cost as the incumbent.
+  implementation: 'Environment, read this first. (1) You have no GPU and must not use one. Run `rtk
+    proxy uv run --locked python -m scripts.tools.check_side_routing --config configs/training.yaml`
+    from your candidate workspace as it is: the script selects the CPU by itself when no GPU is visible,
+    takes a few minutes there, and that CPU run is the required check. Never return blocked for lack
+    of a GPU. (2) Make every change inside the candidate workspace you were assigned and nowhere else.
+    Do not stage the candidate under /tmp, and do not write source/ or changes.diff in the experiment
+    directory: it is read-only to you by design, and the supervisor freezes the source and the diff
+    from your workspace after you return. (3) When the change is complete and the check passes, return
+    status prepared with the integration and activation declarations and the guardrail JSON in the
+    report. An unwritable experiment directory is never a reason to return blocked. Run 28''s code
+    may be reused: unzip outputs/training/20261006-184303-side-routed-midway-cuts/source_snapshot.zip
+    and read study_frames in its modeling/model.py (the spot helper with spreads, the kneecap spot,
+    the midway formula). Unlike run 28, do not add the notch spot, do not pass own tokens to study_frames,
+    keep frame_size and the four regression outputs, and place only the two height cuts. Update SPATIAL_TOKEN_IDENTITY
+    and run the guardrail check.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: 'Keeper''s requeue of 2026-10-07: the first candidate was parked because the
+    developer did not run the guardrail check, reading it as needing a GPU. Finishes what run 28 left
+    half answered.'
+- id: synovitis-shares-effusion-attention-2
+  mechanism_id: shared-attention
+  parent_idea_id: null
+  title: Let Synovitis pool with Effusion's attention scores and keep its own readout and region
+  opportunity: 'A guess. Synovitis and PF OA decide the order of the routed runs, and Synovitis is
+    the unstable one: 0.878 to 0.893 across the line with 114 positives on the fold, 2.3 sibling SDs
+    between the top and bottom runs. Effusion looks at the same place (both read the front of the
+    knee above the joint; spots at 26 mm forward and 32 mm up against 13 and 19) with 244 positives
+    and stays within 0.917 to 0.922 in every run. Synovial thickening and joint fluid are read on
+    the same tokens; what differs is what is read from them. Sharing where to look and keeping what
+    to read gives Synovitis an attention learned from twice the cases.'
+  mechanism: 'In KneeAbnormalityModel._attention_pool (modeling/model.py), scores holds one row of
+    attention scores per channel. Immediately after scores is built from self.attention and before
+    the view label bias is added, the Synovitis channel''s row is replaced by the Effusion channel''s
+    row (scores = scores[attention_source], with attention_source the identity except Synovitis ->
+    Effusion). Everything downstream uses the replaced row: the target attention and the knee-level
+    attention. Synovitis keeps its own column of the view label bias, its own position prior, its
+    own route (front_core) and its own readout; the Synovitis output of self.attention is no longer
+    used. The Effusion row is not detached, so Synovitis''s loss also trains it.'
+  precedents:
+  - 'docs/ongoing/side-routed-heads.md, The runs sorted: Synovitis and PF OA carry about half of the
+    macro variance between runs.'
+  - Sharing a classifier across the meniscus pair and the OA triple gave the routed targets +0.0090
+    to +0.0131 summed against separate classifiers (runs 4 and 5).
+  novelty: First sharing of an attention column between two targets that keep separate readouts.
+  coverage: Synovitis on every study.
+  exploitation: 'Read Synovitis and Effusion against the incumbent (sibling SDs 0.0022 and 0.0015)
+    and both multipliers. Shown wrong by: Effusion more than one SD below the incumbent, which would
+    mean Synovitis''s loss pulled the shared attention away from the fluid.'
+  budget: Same cost as the incumbent.
+  implementation: 'Environment, read this first. (1) You have no GPU and must not use one. Run `rtk
+    proxy uv run --locked python -m scripts.tools.check_side_routing --config configs/training.yaml`
+    from your candidate workspace as it is: the script selects the CPU by itself when no GPU is visible,
+    takes a few minutes there, and that CPU run is the required check. Never return blocked for lack
+    of a GPU. (2) Make every change inside the candidate workspace you were assigned and nowhere else.
+    Do not stage the candidate under /tmp, and do not write source/ or changes.diff in the experiment
+    directory: it is read-only to you by design, and the supervisor freezes the source and the diff
+    from your workspace after you return. (3) When the change is complete and the check passes, return
+    status prepared with the integration and activation declarations and the guardrail JSON in the
+    report. An unwritable experiment directory is never a reason to return blocked. modeling/model.py:
+    a non-persistent buffer attention_source built in __init__ from self.channels (the name channel_source
+    is already used there for something else), and the one indexing line in _attention_pool. study_frames
+    calls self.attention on its own for the spots and is not touched. Update SPATIAL_TOKEN_IDENTITY
+    and run the guardrail check.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: 'Keeper''s requeue of 2026-10-07: the first candidate was parked because the
+    developer did not run the guardrail check, reading it as needing a GPU. Aimed at one of the two
+    targets that decide the ranking.'
+- id: contusion-reads-the-edema-head-2
+  mechanism_id: report-region-targets
+  parent_idea_id: null
+  title: Add to Contusion's logit what the shared marrow-edema head sees in the three compartments
+  opportunity: 'A guess. Contusion is the one target that goes down when the others go up: -0.0020
+    between the top six and the bottom six runs, and its spread across the routed runs is 1.4 sibling
+    SDs (0.9453 to 0.9531). It is not routed, because a contusion can be anywhere. The training already
+    holds a head that says where marrow edema is: the located family marrow_edema_place, one shared
+    head read over the medial, lateral and kneecap regions, whose targets explain 25% on unseen knees.
+    A contusion is marrow edema with a traumatic cause, so that head''s evidence is Contusion''s evidence
+    with a place attached.'
+  mechanism: 'Today the family marrow_edema_place lives in ReportAttributeHeads (training/report_attributes.py),
+    owned by the training module, and is absent at inference: one attention column and one classifier
+    row shared by its three Region entries (routes oa_medial, oa_lateral, kneecap), pooled over each
+    route on the shared tokens. Move that family''s reader into KneeAbnormalityModel as a module edema_place
+    with the same shape (an attention network of Linear(PROJECTION_WIDTH, MIL_ATTENTION_WIDTH), Tanh,
+    Linear(..., 1) and a classifier Linear(PROJECTION_WIDTH, 1)) and a method that returns the three
+    region logits of a batch, pooled exactly as ReportAttributeHeads._pool pools a located family.
+    ReportAttributeHeads takes those three logits from the model for this family and no longer holds
+    a column and row for it; the report loss on the three edema targets is otherwise unchanged. In
+    the model''s pooling, the Contusion target''s logit gains contusion_edema_scale * logsumexp of
+    the three edema logits, with contusion_edema_scale a learned scalar starting at zero. Contusion
+    keeps its own unrouted channel. The edema reader is trained by the report loss as today and by
+    Contusion''s target loss through the new term; it reads the shared tokens without detaching, as
+    the report heads do.'
+  precedents:
+  - 'docs/ongoing/side-routed-heads.md: edema by compartment 25% explained on validation knees.'
+  - 'docs/ongoing/side-routed-heads.md, The runs sorted: Contusion -0.0020 top six against bottom
+    six.'
+  novelty: First use of a located report head at inference.
+  coverage: Contusion on every study; the edema reader on every study at inference.
+  exploitation: 'Read Contusion against the incumbent (sibling SD 0.0013), both multipliers, the learned
+    scale, and val_report_attribute_bce of the three edema targets against the incumbent''s. Shown
+    wrong by: a scale that stays within 0.02 of zero, or the edema targets fitting worse than in the
+    incumbent.'
+  budget: Same cost; three pooled logits more at inference.
+  implementation: 'Environment, read this first. (1) You have no GPU and must not use one. Run `rtk
+    proxy uv run --locked python -m scripts.tools.check_side_routing --config configs/training.yaml`
+    from your candidate workspace as it is: the script selects the CPU by itself when no GPU is visible,
+    takes a few minutes there, and that CPU run is the required check. Never return blocked for lack
+    of a GPU. (2) Make every change inside the candidate workspace you were assigned and nowhere else.
+    Do not stage the candidate under /tmp, and do not write source/ or changes.diff in the experiment
+    directory: it is read-only to you by design, and the supervisor freezes the source and the diff
+    from your workspace after you return. (3) When the change is complete and the check passes, return
+    status prepared with the integration and activation declarations and the guardrail JSON in the
+    report. An unwritable experiment directory is never a reason to return blocked. modeling/model.py:
+    the module edema_place and contusion_edema_scale, both created under torch.random.fork_rng; the
+    three logits computed where the routing weights are available (pool_encoded or _attention_pool)
+    and added to the Contusion column only. training/report_attributes.py: REGION_FAMILIES keeps marrow_edema_place
+    for the targets and the loss, but its logits come from the model. Since the weights are under
+    the model''s state dict, inference/checkpoint.py loads them with no change; confirm that a saved
+    checkpoint reloads strictly. Log contusion_edema_scale per epoch. Update SPATIAL_TOKEN_IDENTITY
+    and run the guardrail check: with the scale at zero the logits equal the incumbent''s, so every
+    guardrail must pass unchanged.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: 'Keeper''s requeue of 2026-10-07: the first candidate was parked because the
+    developer did not run the guardrail check, reading it as needing a GPU. The one target moving
+    against the rest, with a located head already trained for its finding.'
+exhausted_directions: ''

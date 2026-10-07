@@ -1,0 +1,63 @@
+ideas:
+- id: remove-unheld-acl-ring-cut-requeue
+  mechanism_id: supported-radial-division
+  parent_idea_id: null
+  title: Remove the outer-radius cut read only by ACL while retaining the supported core cut
+  opportunity: 'Prior cut-force analysis identifies the ring radius as read by ACL alone, whereas
+    the core boundary has readers on both sides. The current incumbent retains this unsupported cut:
+    final validation core/ring radii are 16.3451/29.7905 mm. ACL peaks at ×1 0.9280 in epoch 4 and
+    finishes at 0.9250; PF OA also flattens late. Deleting the unsupported radial restriction tests
+    whether its frame-learning demands or excluded peripheral ACL evidence are costly. Effects on
+    PF OA/Synovitis would be indirect and are explicitly speculative.'
+  mechanism: 'In modeling/model.py:_regions, replace ACL''s (core + inner*(anterior + posterior +
+    lateral_trio))*(1-tibia) with (core + ringed*(anterior + posterior + lateral_trio))*(1-tibia),
+    where ringed=1-core. This admits all radii in the same angular and height region. Delete the inner/outer
+    ring boundary, ring_radius parameter/output and unused calculation. Retain the learned core boundary,
+    which has readers on both sides, and the accepted measured height cuts. All other route formulas
+    remain identical because they already use both rings through ringed. Log actual added routable
+    ACL support, its supervised pooling application, ACL attention-radius summaries, retained frame
+    geometry and all-label curves. Label: the unsupported reader pattern and generous expansion are
+    evidence-backed; predictive benefit is a guess.'
+  precedents:
+  - 'Prior-work.md, Measured with drawings: ring radius has ACL alone on its reading side; midline
+    and core radius have readers on both sides. The campaign principle requires a reader on both sides
+    of a learned cut.'
+  - 'Incumbent epochs 4–9: ACL falls from 0.9280 to 0.9250 while training loss falls from 0.5519 to
+    0.5225. Final validation ring radius is 29.7905 mm.'
+  - Run 28 reduced the ring radius to about 21 mm and ACL fell by 0.0019. That combined run does not
+    isolate the radius, but gives no support for retaining a tighter radial exclusion.
+  - 'Runs 23/24/31: PF OA''s decline after run 23 was not recovered by widening its own region. This
+    proposal tests an indirect frame-supervision mechanism and does not claim the PF width explains
+    that decline.'
+  - held-cuts-with-wider-regions changed heights, sectors, radius and routes together and was rejected.
+    This proposal deletes one unsupported cut while preserving every other division.
+  novelty: 'Removes a structurally unsupported boundary instead of moving it, adding anchors or changing
+    the whole region table. It differs from the closed ACL height extension: ACL''s lower height restriction
+    remains exactly as in the incumbent.'
+  coverage: ACL gains support radially; no target or report question loses tokens. Shared meniscus/OA
+    classifiers, mirrored routes, token-centre membership and hard-step gradients remain intact. No
+    new hand-set geometry is introduced.
+  exploitation: 'Tests the campaign''s measured reader-balance principle with a focused deletion.
+    Shown wrong by: no newly admitted valid ACL tokens reach supervised pooling, or an activated candidate
+    fails macro adoption. Improved ACL alone would not justify acceptance.'
+  budget: One ten-epoch run at seed 1110484336 and 4,420 steps. Removing a boundary and one frame
+    output should keep compute close to or slightly below the incumbent's 1,202.8 s training, comfortably
+    inside the recorded range; this is an estimate. No preprocessing or prediction-pass additions.
+    Developer runs the unchanged guardrails.
+  implementation: Replace the ACL radial formula and remove ring-radius state/output in modeling/model.py;
+    update affected frame-size consumers and logging in training/lightning.py and the spatial identity.
+    Preserve initialization of unrelated frame/landmark readers when removing the output row. Retain
+    spot-derived heights, core radius, eight sectors, classifiers, reports, priors, knee-level terms
+    and fixed configuration. If another incumbent is accepted, apply the deletion only where the same
+    unsupported ring remains and retain unrelated winners; do not restore a removed ring or discard
+    a new accepted routing mechanism silently.
+  open_choices: The route formula and deletion are fixed. Current logs do not quantify ACL pooling
+    mass beyond the ring, so measure it in the candidate against the counterfactual old radial mask.
+    Do not replace the removed radius with a manually selected distance or broaden ACL in height.
+  dependencies: []
+  priority_rationale: 'Keeper''s requeue of 2026-10-07: parked without training because the developer
+    returned blocked without running the guardrail check and tried to write the frozen source itself;
+    the contract now states where and how the check runs. Priority 3: a cheap, distinct structural
+    hypothesis grounded in measured cut forces. It directly addresses an unresolved ACL weakness,
+    but its potential to improve the PF OA/Synovitis-driven macro ranking is less certain.'
+exhausted_directions: ''

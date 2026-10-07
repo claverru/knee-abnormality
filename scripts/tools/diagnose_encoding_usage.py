@@ -66,17 +66,32 @@ class DiagnoseCLI(CLISettings, Runtime, Bootstrap):
 
 
 PLANES = tuple(SPATIAL_TOKEN_IDENTITY["plane_order"])
-EMBEDDINGS = ("position_1d", "position_2d", "plane", "contrast")
+IMAGE_KEYS = (
+    "features",
+    "plane",
+    "contrast",
+    "view_index",
+    "detail_view",
+    "study",
+    "image_type",
+    "visual_valid",
+    "knee_x",
+    "anterior_axis",
+    "superior_axis",
+    "token_pitch",
+    "position",
+    "frame_shift",
+    "frame_rotation",
+    "frame_sizes",
+    "token_box",
+    "fitted_position",
+    "left_probability",
+    "routable",
+)
 FULL_VARIANTS = {
     "intact": frozenset(),
-    "without_1d": frozenset(("position_1d",)),
-    "without_2d": frozenset(("position_2d",)),
     "without_plane": frozenset(("plane",)),
     "without_contrast": frozenset(("contrast",)),
-    "without_anatomical_bias": frozenset(("medial_axis",)),
-    "without_position_information": frozenset(
-        ("position_1d", "position_2d", "medial_axis")
-    ),
 }
 PLANE_VARIANTS = {f"{plane.lower()}_only": index for index, plane in enumerate(PLANES)}
 VARIANTS = (*FULL_VARIANTS, *PLANE_VARIANTS)
@@ -184,49 +199,30 @@ def paired_bootstrap(
     return {name: interval(measurements) for name, measurements in values.items()}
 
 
-def variant_tokens(
-    model, encoded: dict, omitted: frozenset[str]
-) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor | None]:
-    variant = {
+def variant_encoded(encoded: dict, omitted: frozenset[str]) -> dict:
+    return {
         **encoded,
-        **{
-            name: torch.zeros_like(encoded[name])
-            for name in omitted
-            if encoded[name] is not None
-        },
+        **{name: torch.zeros_like(encoded[name]) for name in omitted},
     }
-    tokens, values = model._pooling_tokens(variant)
-    shape = encoded["visual_valid"].shape
-    return (
-        tokens.unflatten(0, shape),
-        values.unflatten(0, shape),
-        variant["medial_axis"],
-    )
 
 
 def pooled_logits(
-    model,
-    encoded: dict,
-    tokens: tuple[torch.Tensor, torch.Tensor, torch.Tensor | None],
-    images: torch.Tensor,
+    model, encoded: dict, images: torch.Tensor
 ) -> tuple[torch.Tensor | None, torch.Tensor]:
-    attention_tokens, value_tokens, medial_axis = tokens
-    valid = encoded["visual_valid"][images]
     study = encoded["study"][images]
     studies = torch.arange(encoded["batch_size"], device=study.device)
-    present = (studies[:, None] == study[valid.any(-1)][None]).any(-1)
+    visible = encoded["visual_valid"][images].any(-1)
+    present = (studies[:, None] == study[visible][None]).any(-1)
     if not present.any():
         return None, present
-    remap = present.cumsum(0) - 1
-    logits = model._attention_pool(
-        attention_tokens[images].flatten(0, 1),
-        value_tokens[images].flatten(0, 1),
-        remap[study][:, None].expand_as(valid).flatten(),
-        valid.flatten(),
-        int(present.sum()),
-        medial_axis[images].flatten() if medial_axis is not None else None,
-    )
-    return logits, present
+    kept = images & present[encoded["study"]]
+    subset = {
+        **encoded,
+        **{name: encoded[name][kept] for name in IMAGE_KEYS},
+        "batch_size": int(present.sum()),
+    }
+    subset["study"] = (present.cumsum(0) - 1)[subset["study"]]
+    return model.pool_encoded(subset), present
 
 
 def plane_records(batch: dict, encoded: dict) -> list[dict]:
@@ -367,17 +363,16 @@ def diagnose(args: DiagnoseCLI) -> None:
                     raise ValueError("Encoded batch size differs from study membership")
                 every_image = torch.ones_like(encoded["study"], dtype=torch.bool)
                 for name, omitted in FULL_VARIANTS.items():
-                    tokens = variant_tokens(model, encoded, omitted)
-                    if name == "intact":
-                        intact_tokens = tokens
-                    logits, present = pooled_logits(model, encoded, tokens, every_image)
+                    logits, present = pooled_logits(
+                        model, variant_encoded(encoded, omitted), every_image
+                    )
                     if not present.all():
                         raise ValueError("A study has no visually valid spatial tokens")
                     collected[name].append(torch.sigmoid(logits.float()).cpu())
                     membership[name].extend(present.tolist())
                 for name, plane in PLANE_VARIANTS.items():
                     logits, present = pooled_logits(
-                        model, encoded, intact_tokens, encoded["image_plane"] == plane
+                        model, encoded, encoded["image_plane"] == plane
                     )
                     if logits is not None:
                         collected[name].append(torch.sigmoid(logits.float()).cpu())
@@ -548,7 +543,7 @@ def diagnose(args: DiagnoseCLI) -> None:
             "max_abs": float(np.abs(predictions["intact"] - saved_values).max()),
         },
         "preparation_conditions": preparation_conditions,
-        "interpretation": "These are removal-based reliance measurements for one held-out checkpoint. Embeddings and planes overlap and interact, effects do not add to unique percentages, and removals can create inputs absent from training. All position information removal drops the 1D and 2D embeddings. Plane-only variants pool one plane's intact tokens for studies having that plane; series dropout gives such inputs only partial training support, and their metrics describe a study subset. Saved prediction disagreement must be investigated before interpreting small ablation effects.",
+        "interpretation": "These are removal-based reliance measurements for one held-out checkpoint. Embeddings and planes overlap and interact, effects do not add to unique percentages, and removals can create inputs absent from training. Plane-only variants pool one plane's intact tokens for studies having that plane; series dropout gives such inputs only partial training support, and their metrics describe a study subset. Saved prediction disagreement must be investigated before interpreting small ablation effects.",
         "per_target": per_target.to_dicts(),
     }
     result["artifact_sha256"] = {

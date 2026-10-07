@@ -1,0 +1,60 @@
+ideas:
+- id: knee-level-term-with-image-frame-position-codes
+  mechanism_id: knee-level-disease-term
+  parent_idea_id: null
+  title: Combine the knee-level term of the routed targets with the image-frame position codes of the
+    own-channel classifiers
+  opportunity: 'Evidence-backed on each part, a guess that they add up. (1) knee-level-term-on-incumbent-routing
+    (2026-10-06): x4 0.924834, +0.000358 over the incumbent and the highest of the line; Medial and
+    Lateral Meniscus localisation +0.0041 and +0.0059, above the fourth run''s mark; the two learned
+    strengths settled at -0.138 (meniscus) and -0.021 (OA), so each compartment''s evidence is contrasted
+    with the knee-level evidence; its one flag was ACL, 0.0012 below the incumbent''s and 0.0002 under
+    the lowest sibling run. (2) image-frame-position-codes-for-own-channels (2026-10-06): x4 0.924035,
+    -0.000441 against the incumbent; ACL +0.0013, Baker''s +0.0026 and Synovitis +0.0024, Fracture -0.0016;
+    the routed sum fell 0.0095 although the routed targets'' tokens and routing were untouched, a movement
+    of the size seen between sibling runs. Its ACL gain is what the knee-level run lacked to clear the
+    own-targets flag. The two changes touch different parts of the model: the first only the logits
+    of the five routed targets, the second only the tokens the seven own-channel classifiers read.'
+  mechanism: 'Both mechanisms exactly as in their own runs, whose sources are under outputs/autoresearch/side-routing/experiments/knee-level-term-on-incumbent-routing-*/source
+    and outputs/autoresearch/side-routing/experiments/image-frame-position-codes-for-own-channels-*/source.
+    (A) Part (B) of knee-level-term-with-front-and-up-routing only, on the incumbent''s routing, which
+    does not change. In KneeAbnormalityModel._attention_pool, for each shared channel c compute an unrouted
+    attention over the study''s valid tokens, softmax(score_c + view bias) with the same scorer output
+    and view label bias the routed targets use, with no routing term and no position prior, and pool
+    the channel''s evidence with it: g_c = sum over tokens of that attention times evidence_c (the same
+    evidence, from the shared classifiers'' position-free tokens). Every target k of channel c then
+    has logit_k = its routed logit + scale_c * g_c, where scale is a new learned parameter with one
+    scalar per shared channel (meniscus, oa), started at zero under torch.random.fork_rng. The seven
+    own-channel targets are unchanged. Nothing else changes. (B) On the tokens the own-channel classifiers
+    read, and only there, replace the fixed knee-frame sinusoid by the old recipe''s two codes, taken
+    from its frozen source (outputs/autoresearch/fixes-and-removals/experiments/slab-rule-and-positive-std-requeue-20261005T155303Z-59280bbc/source/src/knee_abnormality/modeling/model.py
+    and modeling/spatial_tokens.py). (1) Slice position: sinusoidal_positions(positions, 256) of batch["slice_positions"]
+    for the acquisition''s middle slice, added to every token of that slice, with positions negated
+    for mirrored sagittal acquisitions as reflection_positions did (the batch key and inference/reflection.py
+    still carry it). (2) In-image position: Linear(2, 64), GELU, Linear(64, 256) with PyTorch''s default
+    initialisation, on the token''s image coordinates normalised to [-1, 1]: for a wide view the final
+    augmented image grid, as the old recipe; for a detail view the token''s inverse-augmented position
+    in its own prepared crop (prepared_xy), since the old detail-to-wide map no longer exists and the
+    detail-view embedding already marks those tokens. Both are added before the normalisation, to the
+    own-channel version of the tokens only. The shared classifiers'' tokens stay position-free. position_code,
+    code_frequencies and the padding go. The knee frame, the routing, the position prior on the attention
+    and the side head are unchanged.'
+  precedents:
+  - 'autoresearch/campaigns/side-routing/run-notes.md, decisions 5 and 6: the two runs this design combines.'
+  novelty: The two changes have only been run apart.
+  coverage: 'Every study, training and inference: the five routed targets through the knee-level term,
+    the seven own-channel targets through the token codes.'
+  exploitation: 'Read the run report against the incumbent: the macro (expected above both parts), ACL
+    and the own-targets flag, Fracture and Baker''s, the meniscus localisation values against the lineage''s
+    best, the routed sum, and the two knee-level strengths (expected negative again). Shown wrong by:
+    a macro below the better of the two parts, or the own-targets flag on ACL.'
+  budget: Same cost as the incumbent.
+  implementation: 'modeling/model.py, modeling/spatial_tokens.py and training/lightning.py: apply both
+    changes as their own experiments did (see the two sources named in the mechanism); they edit different
+    functions (_attention_pool and the knee_level_scale parameter; encode_batch, study_tokens and the
+    token codes). No config field and no option. scripts.tools.check_side_routing runs on the CPU when
+    no GPU is visible; all nine guardrails must pass and its JSON goes in the report.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: 'Keeper seed: the two parts that each moved their own targets, as one design.'
+exhausted_directions: ''

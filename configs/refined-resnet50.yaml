@@ -5,7 +5,7 @@ paths:
   data_root: ../data
   output_root: ../outputs/training
   label_manifest: labels/rebuild-state-v2-label-sources.json
-  report_attribute_manifest: labels/jevk5-report-attribute-targets-v3.1.json
+  report_attribute_manifest: labels/jevk5-report-attribute-targets-v4.0.json
 
 labels:
   source: rebuild_state_v2
@@ -110,7 +110,6 @@ model:
   channels_last: false
   checkpoint_backbone: false
   backbone_eval: false
-  anatomical_bias: false
   dropout: 0.0
   series_dropout: 0.0
   plane_readout: true
@@ -144,6 +143,5 @@ trainer:
   min_delta: 0.0001
   deterministic: false
   class_balance_exponent: 0.5
-  half_knee_loss_weight: 0.075
   report_attribute_loss_weight: 0.1
   scanner_confusion_weight: 0.0

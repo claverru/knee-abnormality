@@ -1,0 +1,57 @@
+ideas:
+- id: knee-level-term-with-routed-report-heads-and-priors
+  mechanism_id: knee-level-disease-term
+  parent_idea_id: null
+  title: Combine the knee-level term of the routed targets with the shared, routed report heads and
+    their position priors
+  opportunity: 'Evidence-backed on each part, a guess that they add up. The two runs of the campaign
+    above the incumbent on the x4 macro are knee-level-term-on-incumbent-routing (0.924834, +0.000358)
+    and spatial-priors-for-routed-report-heads (0.924807, +0.000331). Each was kept out of the lineage
+    by one flag the other does not raise. The knee-level run lifted Medial and Lateral Meniscus localisation
+    by +0.0041 and +0.0059, above the fourth run''s mark, and was flagged only on ACL (-0.0012, 0.0002
+    under the lowest sibling run). The report-heads run raised no own-channel flag (ACL -0.0004, Fracture
+    +0.0023, Baker''s no longer below every sibling) and was flagged only on Medial Meniscus localisation
+    (0.0036 under the mark, tolerance 0.0025), the one number the knee-level term moves. The two changes
+    touch different parts: the logits of the five routed targets, and the training-only report heads.'
+  mechanism: 'Both mechanisms exactly as in their own runs, whose sources are under outputs/autoresearch/side-routing/experiments/knee-level-term-on-incumbent-routing-*/source
+    and outputs/autoresearch/side-routing/experiments/spatial-priors-for-routed-report-heads-*/source.
+    (A) Part (B) of knee-level-term-with-front-and-up-routing only, on the incumbent''s routing, which
+    does not change. In KneeAbnormalityModel._attention_pool, for each shared channel c compute an unrouted
+    attention over the study''s valid tokens, softmax(score_c + view bias) with the same scorer output
+    and view label bias the routed targets use, with no routing term and no position prior, and pool
+    the channel''s evidence with it: g_c = sum over tokens of that attention times evidence_c (the same
+    evidence, from the shared classifiers'' position-free tokens). Every target k of channel c then
+    has logit_k = its routed logit + scale_c * g_c, where scale is a new learned parameter with one
+    scalar per shared channel (meniscus, oa), started at zero under torch.random.fork_rng. The seven
+    own-channel targets are unchanged. Nothing else changes. (B) Retain five shared question families:
+    meniscus status, tear location and tear type; cartilage depth and extent. For question q in family
+    g, pool position-free tokens with attention proportional to exp(a_g(h)+b_g(F(p_q))) r_q. Add one
+    zero-initialized Fourier prior b_g per family, using the corresponding disease target''s anatomical
+    coordinate convention: medial, reversed medial for lateral, and absolute medial for PF cartilage.
+    Detach both coordinates and routing weights before report pooling. Report classifiers and content
+    attention remain shared; geometry assigns their outputs. Keep all 35 original questions, target
+    distributions, reliability weights and the original loss normalization. Log supervised attention
+    change caused specifically by the new prior. Shown wrong by: active priors with persistent shared-question
+    KL gaps and no valid macro improvement.'
+  precedents:
+  - 'autoresearch/campaigns/side-routing/run-notes.md, decisions 5 and 7: the two runs this design combines.'
+  novelty: The two changes have only been run apart.
+  coverage: 'Every study: the five routed targets at training and inference through the knee-level term;
+    the report heads at training only.'
+  exploitation: 'Read the run report against the incumbent: the macro (expected at or above both parts),
+    Medial Meniscus localisation against the lineage''s best (expected above it, as in the knee-level
+    run), ACL and the own-targets flag, the routed sum, the two knee-level strengths (expected negative
+    again) and the report questions'' divergences. Shown wrong by: Medial Meniscus localisation flagged
+    with negative knee-level strengths, or a macro below the incumbent.'
+  budget: Same cost as the incumbent.
+  implementation: 'Apply both changes as their own experiments did (see the two sources named in the
+    mechanism): modeling/model.py for the knee_level_scale parameter and the knee-level term in _attention_pool;
+    training/report_attributes.py and training/lightning.py for the shared, routed report heads with
+    their priors; modeling/spatial_tokens.py for the identity entries; training/lightning.py also logs
+    knee_level_scale_<channel>. No config field and no option. scripts.tools.check_side_routing runs
+    on the CPU when no GPU is visible; all nine guardrails must pass and its JSON goes in the report.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: 'Keeper seed: the two runs above the incumbent, each blocked by a flag the other
+    clears, as one design.'
+exhausted_directions: ''

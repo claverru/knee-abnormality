@@ -275,11 +275,10 @@ def anchor_record(series, size, center, eligible, sagittal, inverse=None):
     if inverse is None:
         inverse = torch.eye(3)[None].expand(count, -1, -1)
     inverse = reflection_inverse(inverse, reflected, planes, size)
-    _, visual, _ = feature_geometry(
+    visual, _ = feature_geometry(
         series.valid_rects,
         inverse,
         (3, 3),
-        (size, size),
         (0, 0, (size - 1) / 2, (size - 1) / 2),
         association,
     )

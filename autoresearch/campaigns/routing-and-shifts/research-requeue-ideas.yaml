@@ -1,0 +1,62 @@
+ideas:
+- id: height-cuts-use-vertical-spot-spread-requeue
+  mechanism_id: spot-placed-cuts
+  parent_idea_id: height-cuts-from-the-spots-requeue
+  title: Widen the spot-derived height band when measured vertical spread requires it
+  opportunity: 'The incumbent reaches ×1 0.917411 and ×4 0.925389. During epochs 6–9, PF OA stays
+    near 0.8851–0.8859 while training loss falls from 0.5335 to 0.5225; Synovitis finishes below its
+    epoch-4 peak. Source inspection identifies a geometric mismatch: height placement uses sqrt(trace(Cov)),
+    so variation along the side and front axes influences a vertical boundary. Projecting the same
+    spot distributions onto the fitted up axis may locate generous height cuts more appropriately.
+    This mismatch is measured in source; its predictive importance is a hypothesis.'
+  mechanism: 'In modeling/model.py:study_frames, retain each detached spot''s squared-attention weights
+    and compute its covariance C. With fitted up-axis u, use sigma_z=sqrt(u^T C u), retaining the
+    existing numerical variance floor. Let m be the mean fitted height of the two meniscus spots and
+    p the kneecap height; sigma_m is the mean of the two meniscus vertical spreads. Compute h_z=max((p-m)*sigma_m/(sigma_m+sigma_p),0).
+    Let h_3d be the incumbent''s measured half-band width. Set h=max(h_3d,h_z), top=m+h and bottom=m-h.
+    The measured envelope preserves every incumbent target/report region''s support; it introduces
+    no hand-set distance or additional anchor. Retain missing-spot fallback and detached placement.
+    Log vertical versus total spreads, expansion in millimetres, cut means/spreads and the fraction
+    of supervised knees whose effective routed tokens change. Label: covariance projection is evidence-backed;
+    improved validation ranking is a guess.'
+  precedents:
+  - 'height-cuts-from-the-spots-requeue: ×1 +0.000341 and ×4 +0.000322 against run 24; central 80%
+    interval [-0.000341,+0.000961]. It is the supplied incumbent, although the interval does not establish
+    an eligible new adoption.'
+  - Incumbent study_frames computes each spot spread by summing variance over all three axes before
+    placing height cuts. Final validation top/bottom are +10.7775/-12.8938 mm, with signed nod +6.0024°.
+  - 'Prior work, runs 18/19/30: narrow regions lost evidence. The proposed envelope permits expansion
+    only; it retains the current generous table.'
+  - Run 28 placed cuts between measured attention spots but also changed radii. This proposal changes
+    only the height-spread calculation.
+  novelty: Uses directional uncertainty for a directional boundary. It differs from static wider tables,
+    extra frame anchors and regressing heights through target gradients. The incumbent's measured
+    band remains an active lower bound on generosity, rather than a compatibility branch.
+  coverage: Both meniscus halves use the same mirrored construction. All targets and report questions
+    retain their current routes; expanding the joint band cannot exclude previously admitted tokens.
+    No validation labels determine geometry.
+  exploitation: 'Builds directly on the supplied spot-cut incumbent. Shown wrong by: projected spreads
+    never enlarge the band, effective supervised routing remains unchanged, or the activated candidate
+    fails the fixed macro adoption rule. PF OA and Synovitis curves are explanatory diagnostics, not
+    separate objectives.'
+  budget: One ten-epoch run at seed 1110484336, with 4,420 optimizer steps. Additional detached covariance
+    reductions are small relative to the incumbent's 1,202.8 s training time; estimated training remains
+    around 1,210–1,260 s, not measured. Keep the 920.4–1,595.3 s training range and 1,819 s total
+    limit. Developer runs the unchanged side-routing guardrails before launch.
+  implementation: Replace the scalar-spread height-placement calculation in src/knee_abnormality/modeling/model.py;
+    add epoch diagnostics in training/lightning.py and update modeling/spatial_tokens.py identity.
+    Retain the accepted spot centres, orientation, fallback, learned core/ring radii, classifiers,
+    priors, report supervision and fixed recipe. Remove superseded scalar-only placement code without
+    adding an option. Preserve unrelated improvements if a new incumbent is accepted during development;
+    explicitly reconcile any replacement of its height-placement mechanism.
+  open_choices: The covariance and envelope formulas are fixed. Current artifacts do not contain projected
+    spot covariances or effective routing changes, so the candidate must log them during its training
+    run. Do not choose a multiplier, floor or expansion limit from validation labels.
+  dependencies: []
+  priority_rationale: 'Keeper''s requeue of 2026-10-07: parked without training because the developer
+    returned blocked without running the guardrail check and tried to write the frozen source itself;
+    the contract now states where and how the check runs. Priority 1: required follow-up to the supplied
+    accepted family, inexpensive, and directly addresses PF OA/Synovitis plateauing through an identified
+    geometric mismatch. The previous gain has a zero-spanning interval, so expected benefit remains
+    uncertain.'
+exhausted_directions: ''

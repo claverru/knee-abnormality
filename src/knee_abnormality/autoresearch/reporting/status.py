@@ -164,7 +164,9 @@ def status_summary(supervisor):
             f"Inbox: {pending} request(s) waiting for the supervisor's next safe point."
         )
     if rejected:
-        warnings.append(f"Inbox: {rejected} rejected request(s) in {inbox / 'rejected'}.")
+        warnings.append(
+            f"Inbox: {rejected} rejected request(s) in {inbox / 'rejected'}."
+        )
     if phase := supervisor.rotation_phase():
         warnings.append(f"Topic rotation: {ROTATION[phase]}.")
     if (supervisor.output / "stop.json").exists() and current["status"] != "stopped":

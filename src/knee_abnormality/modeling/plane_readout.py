@@ -9,7 +9,6 @@ class PlaneContrastReadout(nn.Module):
             raise ValueError("Plane/contrast readout requires six series types")
         initial = shared.weight.detach().clone()
         self.weight = nn.Parameter(initial[None].repeat(type_count, 1, 1))
-        self.bias = shared.bias
         self.register_buffer("initial_weight", initial)
 
     def forward(self, values: torch.Tensor, image_type: torch.Tensor) -> torch.Tensor:

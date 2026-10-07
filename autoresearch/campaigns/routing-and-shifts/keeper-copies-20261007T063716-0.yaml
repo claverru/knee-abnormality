@@ -1,0 +1,155 @@
+ideas:
+- id: spot-shift-locator-keeps-spatial-maps-k
+  mechanism_id: learned-crop-shift
+  parent_idea_id: shift-per-study-from-the-spots-unit-output
+  title: Predict the spot-supervised crop point from spatial heatmaps instead of globally averaged
+    features
+  opportunity: The spot-supervised locator achieved ×1 0.915219 and ×4 0.924941, both below the incumbent.
+    Its validation locator loss declined from 0.0668 to 0.0567, but final left–right shift SD was
+    only 0.1947 mm against residual SD 2.1199 mm. Source inspection shows that the CNN globally averages
+    its spatial map before coordinate regression. This removes explicit positional information and
+    could explain weak knee-specific localization. Larger free outputs instead produced nearly common
+    shifts or margin saturation; another output-strength change is unsupported.
+  mechanism: 'Replace StudyShiftLocator''s spatial averaging and Linear(64,3) with a zero-initialized
+    1×1 heatmap scorer on the existing low-resolution convolutional maps. For acquisition a, form
+    masked spatial probabilities alpha_a=softmax(score_a) and identical-mask uniform probabilities
+    alpha_0. Compute two physical offsets b_a=sum((alpha_a-alpha_0)*q_a), where q_a contains row/column
+    coordinates in millimetres. Zero scorer weights give exactly zero offsets. Using trusted patient-map
+    row/column unit vectors, stack the equations A*d=b across acquisitions and obtain the minimum-norm
+    study point d=(A^T A)^+ A^T b; map it to the existing anatomical axes and bound it with 15*tanh(d/15).
+    Unobserved directions remain zero. Retain the parent''s detached cutter and its single shift_locator_loss:
+    pitch-normalized smooth-L1 against detached meniscus-midpoint residuals centred by the training-only
+    EMA, with the same coefficient. Log heatmap entropy, geometric disagreement, locator gradients/loss,
+    residual spreads, and every applied view shift''s validation mean and SD in mm. Label: positional
+    information loss is source-backed; the causal diagnosis and heatmap benefit are hypotheses.'
+  precedents:
+  - 'shift-per-study-from-the-spots-unit-output: training 1,441.4 s; ×4 delta -0.000448, central 80%
+    interval [-0.002036,+0.001021]. Final validation shift SDs anterior/left–right/superior: 1.7346/0.1947/3.7982
+    mm; residual SDs: 4.6054/2.1199/6.3682 mm.'
+  - The parent's StudyShiftLocator applies convolutions(...).mean((-1,-2)), then averages acquisition
+    vectors before coordinate regression. Its shift_locator_loss already supplies detached coordinate
+    supervision without changing backbone gradients.
+  - 'Per-view unit-output run: sagittal-fluid column shift reaches 14.4305±0.0726 mm; view disagreement
+    reaches 11.6031 mm. Its ×4 macro delta is -0.002052, so increased movement alone did not help.'
+  - 'Learnable-views build-notes, campaign review: historical type shifts stayed within ±2.5 mm on
+    average and varied by 3–7 mm between runs. They do not establish a consistent population offset.'
+  - '[Nibali et al., Numerical Coordinate Regression with Convolutional Neural Networks](https://arxiv.org/abs/1801.07372):
+    differentiable spatial expectations retain coordinate information and work with low-resolution
+    heatmaps. Transfer to knee crop placement remains unmeasured.'
+  novelty: Changes the localization representation and its geometric combination, rather than reseeding,
+    increasing displacement strength or retrying the same global regression. Acquisition heatmaps
+    yield one geometrically consistent study point, without a second full-resolution backbone pass
+    or identity lookup.
+  coverage: Uses the existing slices and canvases across present acquisitions. Trusted geometry supplies
+    projection equations; invalid acquisitions do not invent a physical direction. The zero-start
+    crop, fixed view widths/pixels, reflection and random affine placement must remain equivalent
+    to the incumbent.
+  exploitation: 'Retries the diagnosed locator bottleneck while retaining its existing supervision.
+    Shown wrong by: heatmaps activate but residual variation remains unexplained, predictions again
+    collapse to common offsets or saturate, or the valid macro interval fails adoption. Coordinate
+    fit and label gains cannot override the macro verdict.'
+  budget: 'One ten-epoch run at seed 1110484336. Reuse the light uint8 canvas transport and existing
+    64×64 locator input; no full-resolution second pass. The parent''s 1,441.4 s training leaves about
+    154 s below the upper bound; a heatmap output and 3×3 solve should be modest additions, but runtime
+    is unmeasured. Prediction overhead is material: the parent took about 46.1 s versus roughly 31.8
+    s for the incumbent. This proposal does not establish that cutter overhead is resolved.'
+  implementation: 'Environment, read this first. (1) You have no GPU and must not use one. Run `rtk
+    proxy uv run --locked python -m scripts.tools.check_side_routing --config configs/training.yaml`
+    from your candidate workspace as it is: the script selects the CPU by itself when no GPU is visible,
+    takes a few minutes there, and that CPU run is the required check. Never return blocked for lack
+    of a GPU. (2) Make every change inside the candidate workspace you were assigned and nowhere else.
+    Do not stage the candidate under /tmp, and do not write source/ or changes.diff in the experiment
+    directory: it is read-only to you by design, and the supervisor freezes the source and the diff
+    from your workspace after you return. (3) When the change is complete and the check passes, return
+    status prepared with the integration and activation declarations and the guardrail JSON in the
+    report. An unwritable experiment directory is never a reason to return blocked. Adds movable-crop
+    infrastructure to the current incumbent, borrowing the reviewed light cutter as a historical implementation.
+    Change modeling/model.py, training/lightning.py, required data/preprocessing and dataset transport,
+    config.py, inference/engine.py and reflection.py; set only data.view_shift_limit_mm=15. Replace
+    the borrowed global-average locator with the heatmap locator and remove its unused regression
+    path. Retain accepted height cuts and all unrelated incumbent behavior. If the running shared
+    crop/frame-centre idea becomes incumbent, preserve that sharing and supply the new predicted point
+    to both consumers; do not depend on its undecided result. Developer reports unchanged guardrails
+    and exact zero-shift crop difference.'
+  open_choices: Keep the parent's loss, EMA update and bounding scale fixed. Use acquisition-level
+    equations with equal acquisition weighting and a minimum-norm solve, without a learned confidence
+    gate. Teacher drift and low-resolution visibility remain uncertainties to log, not reasons to
+    add another loss or confirmation run.
+  dependencies: []
+  priority_rationale: 'Keeper''s copy with the developer-environment paragraph. Priority 2: a concrete
+    source-level retry for weak spatial localization, alternating back to learned shifts. It has stronger
+    diagnostic grounding than another displacement adjustment, but costs more and retains unresolved
+    prediction overhead.'
+- id: remove-unheld-acl-ring-cut-requeue-k
+  mechanism_id: supported-radial-division
+  parent_idea_id: null
+  title: Remove the outer-radius cut read only by ACL while retaining the supported core cut
+  opportunity: 'Prior cut-force analysis identifies the ring radius as read by ACL alone, whereas
+    the core boundary has readers on both sides. The current incumbent retains this unsupported cut:
+    final validation core/ring radii are 16.3451/29.7905 mm. ACL peaks at ×1 0.9280 in epoch 4 and
+    finishes at 0.9250; PF OA also flattens late. Deleting the unsupported radial restriction tests
+    whether its frame-learning demands or excluded peripheral ACL evidence are costly. Effects on
+    PF OA/Synovitis would be indirect and are explicitly speculative.'
+  mechanism: 'In modeling/model.py:_regions, replace ACL''s (core + inner*(anterior + posterior +
+    lateral_trio))*(1-tibia) with (core + ringed*(anterior + posterior + lateral_trio))*(1-tibia),
+    where ringed=1-core. This admits all radii in the same angular and height region. Delete the inner/outer
+    ring boundary, ring_radius parameter/output and unused calculation. Retain the learned core boundary,
+    which has readers on both sides, and the accepted measured height cuts. All other route formulas
+    remain identical because they already use both rings through ringed. Log actual added routable
+    ACL support, its supervised pooling application, ACL attention-radius summaries, retained frame
+    geometry and all-label curves. Label: the unsupported reader pattern and generous expansion are
+    evidence-backed; predictive benefit is a guess.'
+  precedents:
+  - 'Prior-work.md, Measured with drawings: ring radius has ACL alone on its reading side; midline
+    and core radius have readers on both sides. The campaign principle requires a reader on both sides
+    of a learned cut.'
+  - 'Incumbent epochs 4–9: ACL falls from 0.9280 to 0.9250 while training loss falls from 0.5519 to
+    0.5225. Final validation ring radius is 29.7905 mm.'
+  - Run 28 reduced the ring radius to about 21 mm and ACL fell by 0.0019. That combined run does not
+    isolate the radius, but gives no support for retaining a tighter radial exclusion.
+  - 'Runs 23/24/31: PF OA''s decline after run 23 was not recovered by widening its own region. This
+    proposal tests an indirect frame-supervision mechanism and does not claim the PF width explains
+    that decline.'
+  - held-cuts-with-wider-regions changed heights, sectors, radius and routes together and was rejected.
+    This proposal deletes one unsupported cut while preserving every other division.
+  novelty: 'Removes a structurally unsupported boundary instead of moving it, adding anchors or changing
+    the whole region table. It differs from the closed ACL height extension: ACL''s lower height restriction
+    remains exactly as in the incumbent.'
+  coverage: ACL gains support radially; no target or report question loses tokens. Shared meniscus/OA
+    classifiers, mirrored routes, token-centre membership and hard-step gradients remain intact. No
+    new hand-set geometry is introduced.
+  exploitation: 'Tests the campaign''s measured reader-balance principle with a focused deletion.
+    Shown wrong by: no newly admitted valid ACL tokens reach supervised pooling, or an activated candidate
+    fails macro adoption. Improved ACL alone would not justify acceptance.'
+  budget: One ten-epoch run at seed 1110484336 and 4,420 steps. Removing a boundary and one frame
+    output should keep compute close to or slightly below the incumbent's 1,202.8 s training, comfortably
+    inside the recorded range; this is an estimate. No preprocessing or prediction-pass additions.
+    Developer runs the unchanged guardrails.
+  implementation: 'Environment, read this first. (1) You have no GPU and must not use one. Run `rtk
+    proxy uv run --locked python -m scripts.tools.check_side_routing --config configs/training.yaml`
+    from your candidate workspace as it is: the script selects the CPU by itself when no GPU is visible,
+    takes a few minutes there, and that CPU run is the required check. Never return blocked for lack
+    of a GPU. (2) Make every change inside the candidate workspace you were assigned and nowhere else.
+    Do not stage the candidate under /tmp, and do not write source/ or changes.diff in the experiment
+    directory: it is read-only to you by design, and the supervisor freezes the source and the diff
+    from your workspace after you return. (3) When the change is complete and the check passes, return
+    status prepared with the integration and activation declarations and the guardrail JSON in the
+    report. An unwritable experiment directory is never a reason to return blocked. Replace the ACL
+    radial formula and remove ring-radius state/output in modeling/model.py; update affected frame-size
+    consumers and logging in training/lightning.py and the spatial identity. Preserve initialization
+    of unrelated frame/landmark readers when removing the output row. Retain spot-derived heights,
+    core radius, eight sectors, classifiers, reports, priors, knee-level terms and fixed configuration.
+    If another incumbent is accepted, apply the deletion only where the same unsupported ring remains
+    and retain unrelated winners; do not restore a removed ring or discard a new accepted routing
+    mechanism silently.'
+  open_choices: The route formula and deletion are fixed. Current logs do not quantify ACL pooling
+    mass beyond the ring, so measure it in the candidate against the counterfactual old radial mask.
+    Do not replace the removed radius with a manually selected distance or broaden ACL in height.
+  dependencies: []
+  priority_rationale: 'Keeper''s copy with the developer-environment paragraph. Keeper''s requeue
+    of 2026-10-07: parked without training because the developer returned blocked without running
+    the guardrail check and tried to write the frozen source itself; the contract now states where
+    and how the check runs. Priority 3: a cheap, distinct structural hypothesis grounded in measured
+    cut forces. It directly addresses an unresolved ACL weakness, but its potential to improve the
+    PF OA/Synovitis-driven macro ranking is less certain.'
+exhausted_directions: ''

@@ -1,0 +1,209 @@
+import math
+import sys
+from pathlib import Path
+
+import matplotlib
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+import numpy as np
+import torch
+
+from knee_abnormality.config import DataConfig, load_config
+from knee_abnormality.data.dataset import KneeStudyDataset, collate_studies
+from knee_abnormality.data.preprocessing.device import with_images
+from knee_abnormality.data.sources import build_series_index, prediction_studies
+from knee_abnormality.data.splits import STUDY
+from knee_abnormality.inference.engine import move_batch
+
+OUT = Path("outputs/analysis/octant-sketches-20261006")
+OUT.mkdir(parents=True, exist_ok=True)
+ROWS = [int(v) for v in sys.argv[1].split(",")]
+RUN = Path(
+    "outputs/autoresearch/side-routing/experiments/separate-oa-frame-with-knee-level-term-20261006T020231Z-52418f08/training/fold_1"
+)
+WIDTHS = {"medial": 4.72, "front": 5.55, "up": 5.14}
+COLOURS = {
+    "Medial Meniscus": (0.82, 0.29, 0.36),
+    "Lateral Meniscus": (0.23, 0.49, 0.65),
+    "Medial OA": (0.88, 0.48, 0.37),
+    "Lateral OA": (0.36, 0.56, 0.73),
+    "PF OA": (0.95, 0.76, 0.31),
+}
+SLICES = (
+    ("Sagittal", 0, 20.0, "sagittal, 20 mm medial"),
+    ("Sagittal", 0, -20.0, "sagittal, 20 mm lateral"),
+    ("Coronal", 1, -10.0, "coronal, 10 mm behind the centre"),
+    ("Coronal", 1, 25.0, "coronal, 25 mm in front"),
+    ("Axial", 2, 20.0, "axial, 20 mm above the centre"),
+    ("Axial", 2, -15.0, "axial, 15 mm below"),
+)
+
+
+def rotation(logit: torch.Tensor) -> np.ndarray:
+    angles = (math.pi / 2) * torch.tanh(logit.float())
+    zero = angles.new_zeros(())
+    return torch.linalg.matrix_exp(
+        torch.stack(
+            (
+                torch.stack((zero, -angles[2], angles[1])),
+                torch.stack((angles[2], zero, -angles[0])),
+                torch.stack((-angles[1], angles[0], zero)),
+            )
+        )
+    ).numpy()
+
+
+def sigmoid(values):
+    return 1 / (1 + np.exp(-values))
+
+
+checkpoint = torch.load(next(RUN.glob("best-*.ckpt")), map_location="cpu", weights_only=False)
+state = checkpoint["state_dict"]
+meniscus_frame = rotation(state["model.frame_rotation_logit"])
+oa_frame = rotation(state["model.oa_frame_rotation_logit"])
+for name, logit in (
+    ("meniscus frame", state["model.frame_rotation_logit"]),
+    ("OA frame", state["model.oa_frame_rotation_logit"]),
+):
+    print(name, "nod, roll, turn deg", np.degrees((math.pi / 2) * np.tanh(logit.numpy())).round(2))
+
+
+def wide_data(data: DataConfig) -> DataConfig:
+    values = data.model_dump(mode="json")
+    for kind in values["series_types"]:
+        for view in kind["views"]:
+            view["field_mm"] = values["reference_field_mm"]
+            view["horizontal"] = {"anchor": "image", "offset_mm": 0.0}
+            view["vertical"] = {"anchor": "image", "offset_mm": 0.0}
+    return DataConfig.model_validate(values)
+
+
+config = load_config(Path("configs/training.yaml"))
+targets, studies, split = prediction_studies(config, "validation", 1)
+studies = studies.sort(STUDY).head(60)
+index = build_series_index(
+    config.paths.data_root, config.data, split, studies[STUDY].to_list()
+)
+data = wide_data(config.data)
+dataset = KneeStudyDataset(studies, index, data, targets, None, 1)
+planes = [kind.plane for kind in data.series_types]
+fluid = [kind.fluid_sensitive for kind in data.series_types]
+device = torch.device("cpu")
+for row in ROWS:
+    batch = with_images(move_batch(collate_studies([dataset[row]]), device))
+    mask = batch["slice_mask"]
+    series_of = mask.nonzero()[:, 0]
+    images = batch["images"].flatten(0, 1)[mask.flatten()][:, 1].float().numpy()
+    maps = batch["patient_maps"].flatten(0, 1)[mask.flatten()][:, 1].float().numpy()
+    kinds = batch["series_type_index"][series_of].numpy()
+    centre = np.stack(
+        [
+            batch[key][series_of].numpy()
+            for key in ("knee_center_x_mm", "knee_center_y_mm", "knee_center_z_mm")
+        ],
+        -1,
+    )
+    left = bool(batch["knee_side_left"][0])
+    sign = -1.0 if left else 1.0
+    directions = []
+    for item, kind in enumerate(kinds):
+        if planes[kind] != "Sagittal" and np.isfinite(maps[item]).all():
+            vector = maps[item][:2, 0]
+            vector = -vector if vector[0] < 0 else vector
+            directions.append(vector / np.linalg.norm(vector))
+    axis = np.mean(directions, 0) if directions else np.array([1.0, 0.0])
+    axis = axis / np.linalg.norm(axis)
+    size = images.shape[-1]
+    ys, xs = np.mgrid[0:size, 0:size].astype(np.float32)
+    grid = np.stack((xs, ys, np.ones_like(xs)), -1)
+    middle = np.array([size / 2, size / 2, 1.0], dtype=np.float32)
+
+    def knee(points):
+        offset = points - centre[item]
+        u = offset[..., 0] * axis[0] + offset[..., 1] * axis[1]
+        a = offset[..., 0] * axis[1] - offset[..., 1] * axis[0]
+        return np.stack((sign * u, a, offset[..., 2]), -1)
+
+    figure, axes = plt.subplots(2, len(SLICES), figsize=(3.5 * len(SLICES), 8.4))
+    for column, (plane, component, wanted, title) in enumerate(SLICES):
+        members = [
+            i
+            for i, kind in enumerate(kinds)
+            if planes[kind] == plane and not fluid[kind] and np.isfinite(maps[i]).all()
+        ] or [
+            i
+            for i, kind in enumerate(kinds)
+            if planes[kind] == plane and np.isfinite(maps[i]).all()
+        ]
+        if not members:
+            for line in range(2):
+                axes[line][column].axis("off")
+            continue
+        distances = []
+        for item in members:
+            distances.append(abs(knee(maps[item] @ middle)[component] - wanted))
+        item = members[int(np.argmin(distances))]
+        raw = knee(np.einsum("ij,hwj->hwi", maps[item], grid))
+        actual = float(knee(maps[item] @ middle)[component])
+        image = images[item] / 255.0
+        for line, (frame, name) in enumerate(
+            ((meniscus_frame, "Meniscus"), (oa_frame, "OA"))
+        ):
+            coordinates = raw @ frame.T
+            medial = sigmoid(coordinates[..., 0] / WIDTHS["medial"])
+            front = sigmoid(coordinates[..., 1] / WIDTHS["front"])
+            up = sigmoid(coordinates[..., 2] / WIDTHS["up"])
+            if name == "Meniscus":
+                weights = {"Medial Meniscus": medial, "Lateral Meniscus": 1 - medial}
+                cuts = ((coordinates[..., 0], "white"),)
+            else:
+                patellar = front * up
+                weights = {
+                    "PF OA": patellar,
+                    "Medial OA": medial * (1 - patellar),
+                    "Lateral OA": (1 - medial) * (1 - patellar),
+                }
+                cuts = (
+                    (coordinates[..., 0], "white"),
+                    (coordinates[..., 1], "yellow"),
+                    (coordinates[..., 2], "cyan"),
+                )
+            colour = sum(
+                weight[..., None] * np.array(COLOURS[label])
+                for label, weight in weights.items()
+            )
+            blended = 0.58 * image[..., None] + 0.42 * colour
+            panel = axes[line][column]
+            panel.imshow(np.clip(blended, 0, 1))
+            for values, shade in cuts:
+                if values.min() < 0 < values.max():
+                    panel.contour(values, [0.0], colors=shade, linewidths=1.3)
+            panel.set_title(
+                f"{name}: {title}\n(slice at {actual:+.0f} mm)", fontsize=8.5
+            )
+            panel.set_xticks([])
+            panel.set_yticks([])
+    handles = [
+        plt.Rectangle((0, 0), 1, 1, facecolor=colour, edgecolor="#333333")
+        for colour in COLOURS.values()
+    ]
+    figure.legend(
+        handles,
+        list(COLOURS),
+        loc="lower center",
+        ncol=5,
+        fontsize=10,
+        frameon=False,
+    )
+    figure.suptitle(
+        f"Study row {row} ({'left' if left else 'right'} knee): the adopted model's learned regions on real slices. "
+        "Top: meniscus frame. Bottom: OA frame. "
+        "Lines: white midline, yellow front cut, cyan height cut.",
+        fontsize=10.5,
+    )
+    figure.tight_layout(rect=(0, 0.045, 1, 0.94))
+    figure.subplots_adjust(hspace=0.28)
+    figure.savefig(OUT / f"tilted-octants-{row:03d}.png", dpi=85)
+    plt.close(figure)
+    print("saved", OUT / f"tilted-octants-{row:03d}.png")

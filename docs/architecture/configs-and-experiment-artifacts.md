@@ -332,6 +332,20 @@ seven left in `refined-radimagenet` (the two manual slice-teacher runs and the t
 runs). Kept: the `radimagenet-input-statistics` incumbent, the reference of the ResNet-18
 comparisons.
 
+**2026-10-06, 23:21 CEST:** removed by hand on the user's request, outside the script: the 48
+checkpoint files of the stopped `side-routing` campaign (24 runs, 8.16 GiB) and 58 of the manual
+side-routed runs of 2026-10-05 and 06 in `outputs/training` (29 runs, 10.25 GiB), the stopped
+ResNet-50 attempt among them. Kept: the reference `20261006-163650-side-routed-spot-frame-ring-sectors`
+and `20261006-210555-rn50-side-routed-reference`, which was training. The seven bundles
+submitted from this line (S112 to S118) keep their weights in `outputs/submission/exports/`.
+Manifest: `outputs/archive/maintenance/disk-cleanup-20261006T212117Z/manifest.json`.
+
+On 2026-10-07 13:28 CEST the user had the checkpoints of the routing-and-shifts campaign removed: 42
+files in 21 runs, 7.16 GiB. The two checkpoints of its incumbent
+(`height-cuts-from-the-spots-requeue-20261006T232351Z-d2445402`) are kept, as the reference of the
+frame-and-targets campaign. Predictions, logs, frozen source and diffs of every run remain.
+Manifest: `outputs/archive/maintenance/disk-cleanup-20261007T112812Z/manifest.json`.
+
 ## Current scope and next execution
 
 The config, fold-aware labels, on-the-fly image preparation, study dataset,
