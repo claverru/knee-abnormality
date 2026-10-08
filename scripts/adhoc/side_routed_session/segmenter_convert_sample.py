@@ -7,7 +7,7 @@ from pathlib import Path
 import numpy as np
 import SimpleITK as sitk
 
-ROOT = Path("/home/claudio/src/knee-abnormality-side-routed-heads")
+ROOT = Path(__file__).resolve().parents[3]
 OUT = Path("/home/claudio/.cache/knee-segmenters") / sys.argv[1]
 TRAINING, VALIDATION = int(sys.argv[2]), int(sys.argv[3])
 SAMPLE_ROWS = (532, 200, 370, 374, 45, 5)

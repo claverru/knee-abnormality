@@ -9,7 +9,7 @@ sys.path.insert(0, "/home/claudio/.cache/knee-segmenters")
 from bone_geometry import knee
 
 SOURCE = Path("/home/claudio/.cache/knee-segmenters") / sys.argv[1]
-OUT = Path("/home/claudio/src/knee-abnormality-side-routed-heads/data/labels/prepared") / sys.argv[2]
+OUT = Path(__file__).resolve().parents[3] / "data/labels/prepared" / sys.argv[2]
 SPACING = 2.5
 CLASSES = {7: 1, 8: 2, 9: 3, 10: 4}
 FLIP = np.array([-1.0, -1.0, 1.0])

@@ -8,7 +8,7 @@ import numpy as np
 from scipy import ndimage
 
 SOURCE = Path("/home/claudio/.cache/knee-segmenters") / sys.argv[1]
-TARGETS = Path("/home/claudio/src/knee-abnormality-side-routed-heads/data/labels/prepared") / sys.argv[2]
+TARGETS = Path(__file__).resolve().parents[3] / "data/labels/prepared" / sys.argv[2]
 JOINT_ABOVE_PLATEAU_MM = 6.4
 
 
