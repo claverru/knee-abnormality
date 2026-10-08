@@ -217,13 +217,15 @@ class KneeStudyDataset(Dataset):
         self._cleaned_studies[study.uid] = study
         return study
 
-    def _decode_series(self, records, spacing_mm, image_size, offset_y, offset_x):
+    def _decode_series(
+        self, records, spacing_mm, image_size, offset_y, offset_x, margin
+    ):
         return decode_series(
-            records, spacing_mm, image_size, self.io_threads, offset_y, offset_x
+            records, spacing_mm, image_size, self.io_threads, offset_y, offset_x, margin
         )
 
     def _prepare_candidate(
-        self, selected, cache, spacing, offset_y, offset_x
+        self, selected, cache, spacing, offset_y, offset_x, margin
     ) -> PreparedSeries:
         return prepare_series(
             selected,
@@ -231,7 +233,9 @@ class KneeStudyDataset(Dataset):
             self.data.image_size,
             self.data.lower_quantile,
             self.data.upper_quantile,
-            decoder=partial(self._decode_series, offset_y=offset_y, offset_x=offset_x),
+            decoder=partial(
+                self._decode_series, offset_y=offset_y, offset_x=offset_x, margin=margin
+            ),
             cache=cache,
         )
 
@@ -276,6 +280,12 @@ class KneeStudyDataset(Dataset):
                 view.field_mm / self.data.image_size,
                 offset_y,
                 offset_x,
+                round(
+                    self.data.view_shift_limit_mm
+                    / (view.field_mm / self.data.image_size)
+                )
+                if detail
+                else 0,
             )
             if detail and window_center is None:
                 window_center, rule_distance = fallback_window_center(
@@ -471,6 +481,22 @@ class KneeStudyDataset(Dataset):
         }
 
 
+class Metadata:
+    __slots__ = ("values",)
+
+    def __init__(self, values) -> None:
+        self.values = list(values)
+
+    def __iter__(self):
+        return iter(self.values)
+
+    def __getitem__(self, index):
+        return self.values[index]
+
+    def __len__(self) -> int:
+        return len(self.values)
+
+
 def collate_studies(items: list[dict]) -> dict:
     batch_size = len(items)
     type_count = len(items[0]["series"])
@@ -528,6 +554,7 @@ def collate_studies(items: list[dict]) -> dict:
                 start,
                 len(series.frames),
                 (lower.tolist(), upper.tolist(), fraction.tolist()),
+                series.canvas_margin,
             )
         )
         count = series.triplet_count
@@ -554,6 +581,8 @@ def collate_studies(items: list[dict]) -> dict:
         "study_uid": [item["study_uid"] for item in items],
         "is_gold": torch.tensor([item["is_gold"] for item in items], dtype=torch.bool),
         "image_size": image_size,
+        "canvas_size": image_size
+        + 2 * max(series.canvas_margin for _, _, series in entries),
         "frames": frames,
         "frame_buffers": buffers,
         "series_frames": series_frames,
@@ -583,8 +612,8 @@ def collate_studies(items: list[dict]) -> dict:
         "knee_side_reasons": [item["knee_side"].reason for item in items],
         "reflection_eligible": reflection_eligible,
         "reflection_reasons": [item["reflection_reasons"] for item in items],
-        "selected_paths": [series.selected_paths for _, _, series in entries],
-        "sampling": [item["sampling"] for item in items],
+        "selected_paths": Metadata(series.selected_paths for _, _, series in entries),
+        "sampling": Metadata(item["sampling"] for item in items),
         "slice_mask": slice_mask,
         "series_presence": presence,
         "series_study_index": study_indices,
@@ -599,6 +628,12 @@ def collate_prepared(items: list[dict]) -> dict:
     return prepare_images(collate_studies(items))
 
 
+def collate_prepared_middle(items: list[dict]) -> dict:
+    batch = collate_prepared(items)
+    batch["images"] = batch["images"][:, :, 1:2].contiguous()
+    return batch
+
+
 def build_data_loader(
     dataset: Dataset,
     settings: TrainerConfig,
@@ -610,6 +645,7 @@ def build_data_loader(
     persistent_workers: bool | None = None,
     generator: torch.Generator | None = None,
     prepare_on_loader: bool = True,
+    middle_only: bool = False,
 ) -> DataLoader:
     workers = settings.num_workers if num_workers is None else num_workers
     persistent = (
@@ -622,7 +658,11 @@ def build_data_loader(
         "batch_size": batch_size,
         "shuffle": shuffle,
         "num_workers": workers,
-        "collate_fn": collate_prepared if prepare_on_loader else collate_studies,
+        "collate_fn": (
+            (collate_prepared_middle if middle_only else collate_prepared)
+            if prepare_on_loader
+            else collate_studies
+        ),
         "pin_memory": pin_memory,
         "persistent_workers": persistent and workers > 0,
         "generator": generator,

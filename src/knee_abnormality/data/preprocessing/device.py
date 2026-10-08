@@ -16,6 +16,7 @@ RAW_KEYS = (
     "series_frames",
     "image_positions",
     "image_sources",
+    "canvas_size",
 )
 
 _PLANS: dict[tuple, tuple[torch.Tensor, ...]] = {}
@@ -74,8 +75,20 @@ def _native_blocks(
     return (blocks.to(torch.int32) & 0xFFFF).to(torch.float32)
 
 
-def _region_values(canvas: torch.Tensor, frames: list, start: int, count: int):
-    rects = {frames[index][10] for index in range(start, start + count)}
+def central_rectangle(rect: tuple, margin: int, size: int) -> tuple:
+    top, left, rows, columns = rect
+    first_y, first_x = max(top, margin), max(left, margin)
+    last_y, last_x = min(top + rows, margin + size), min(left + columns, margin + size)
+    return first_y, first_x, max(0, last_y - first_y), max(0, last_x - first_x)
+
+
+def _region_values(
+    canvas: torch.Tensor, frames: list, start: int, count: int, margin: int, size: int
+):
+    rects = {
+        central_rectangle(frames[index][10], margin, size)
+        for index in range(start, start + count)
+    }
     if len(rects) == 1:
         top, left, rows, columns = next(iter(rects))
         return canvas[
@@ -85,7 +98,9 @@ def _region_values(canvas: torch.Tensor, frames: list, start: int, count: int):
         [
             canvas[index, top : top + rows, left : left + columns].reshape(-1)
             for index in range(start, start + count)
-            for top, left, rows, columns in (frames[index][10],)
+            for top, left, rows, columns in (
+                central_rectangle(frames[index][10], margin, size),
+            )
         ]
     )
 
@@ -108,10 +123,10 @@ def _region(frame: tuple, buffers: list[torch.Tensor]) -> np.ndarray:
 def _prepare_on_cpu(batch: dict) -> dict:
     buffers = batch["frame_buffers"]
     frames = batch["frames"]
-    size = batch["image_size"]
+    size = batch["canvas_size"]
     normalized = np.zeros((len(frames), size, size), dtype=np.uint8)
     constant = torch.zeros(len(batch["series_frames"]), dtype=torch.bool)
-    for row, (start, count, (lower, upper, fraction)) in enumerate(
+    for row, (start, count, (lower, upper, fraction), margin) in enumerate(
         batch["series_frames"]
     ):
         rects = np.asarray([frame[10] for frame in frames[start : start + count]])
@@ -124,7 +139,10 @@ def _prepare_on_cpu(batch: dict) -> dict:
             np.concatenate(
                 [
                     canvas[index, top : top + rows, left : left + columns].reshape(-1)
-                    for index, (top, left, rows, columns) in enumerate(rects)
+                    for index, (top, left, rows, columns) in enumerate(
+                        central_rectangle(rect, margin, batch["image_size"])
+                        for rect in rects
+                    )
                 ]
             ),
             np.asarray(lower),
@@ -155,7 +173,7 @@ def prepare_images(batch: dict) -> dict:
     buffers = batch["frame_buffers"]
     device = batch["slice_mask"].device
     frames = batch["frames"]
-    size = batch["image_size"]
+    size = batch["canvas_size"]
     canvas = torch.zeros((len(frames), size, size), dtype=torch.float32, device=device)
     rescale = torch.tensor(
         [(frame[8], frame[9]) for frame in frames], dtype=torch.float32
@@ -188,7 +206,8 @@ def prepare_images(batch: dict) -> dict:
         canvas[indices, top : top + rows, left : left + columns] = region
     series = batch["series_frames"]
     values = [
-        _region_values(canvas, frames, start, count) for start, count, _ in series
+        _region_values(canvas, frames, start, count, margin, batch["image_size"])
+        for start, count, _, margin in series
     ]
     padded = torch.full(
         (len(values), max(1, *(len(value) for value in values))),
@@ -200,10 +219,10 @@ def prepare_images(batch: dict) -> dict:
         padded[row, : len(value)] = value
     ordered = padded.sort(dim=1).values
     ranks = torch.tensor(
-        [(*lower, *upper) for _, _, (lower, upper, _) in series], dtype=torch.int64
+        [(*lower, *upper) for _, _, (lower, upper, _), _ in series], dtype=torch.int64
     ).to(device, non_blocking=True)
     fraction = torch.tensor(
-        [tuple(fraction) for _, _, (_, _, fraction) in series], dtype=torch.float32
+        [tuple(fraction) for _, _, (_, _, fraction), _ in series], dtype=torch.float32
     ).to(device, non_blocking=True)
     statistics = ordered.gather(1, ranks)
     lower_values = statistics[:, :2]
@@ -212,7 +231,7 @@ def prepare_images(batch: dict) -> dict:
     constant = ~torch.isfinite(low) | ~torch.isfinite(high) | (high <= low)
     gain = torch.reciprocal(high - low) * 255.0
     owner = torch.tensor(
-        [row for row, (_, count, _) in enumerate(series) for _ in range(count)]
+        [row for row, (_, count, _, _) in enumerate(series) for _ in range(count)]
     ).to(device, non_blocking=True)
     frame_low = low[owner][:, None, None]
     normalized = torch.minimum(

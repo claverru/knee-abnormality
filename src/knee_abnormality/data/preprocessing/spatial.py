@@ -21,19 +21,20 @@ def _crop_geometry(
     image_size: int,
     offset_y: int = 0,
     offset_x: int = 0,
+    margin: int = 0,
 ) -> tuple[int, int, int, int, int, int]:
-    source_top = min(
-        max(0, (target_height - image_size) // 2 + offset_y),
-        max(0, target_height - image_size),
+    origins = (
+        min(max(0, (extent - image_size) // 2 + offset), max(0, extent - image_size))
+        - max(0, (image_size - extent) // 2)
+        - margin
+        for extent, offset in ((target_height, offset_y), (target_width, offset_x))
     )
-    source_left = min(
-        max(0, (target_width - image_size) // 2 + offset_x),
-        max(0, target_width - image_size),
-    )
-    output_top = max(0, (image_size - target_height) // 2)
-    output_left = max(0, (image_size - target_width) // 2)
-    rows = min(target_height, image_size)
-    columns = min(target_width, image_size)
+    origin_y, origin_x = origins
+    size = image_size + 2 * margin
+    source_top, source_left = max(0, origin_y), max(0, origin_x)
+    output_top, output_left = max(0, -origin_y), max(0, -origin_x)
+    rows = min(target_height - source_top, size - output_top)
+    columns = min(target_width - source_left, size - output_left)
     return source_top, source_left, output_top, output_left, rows, columns
 
 
@@ -107,9 +108,10 @@ def _output_to_native(
     image_size: int,
     offset_y: int = 0,
     offset_x: int = 0,
+    margin: int = 0,
 ) -> np.ndarray:
     source_top, source_left, output_top, output_left, _, _ = _crop_geometry(
-        target_height, target_width, image_size, offset_y, offset_x
+        target_height, target_width, image_size, offset_y, offset_x, margin
     )
     scale_x = source_columns / target_width
     scale_y = source_rows / target_height
@@ -147,9 +149,10 @@ def resample_plan(
     image_size: int,
     offset_y: int = 0,
     offset_x: int = 0,
+    margin: int = 0,
 ) -> ResamplePlan | None:
     source_top, source_left, output_top, output_left, rows, columns = _crop_geometry(
-        target_height, target_width, image_size, offset_y, offset_x
+        target_height, target_width, image_size, offset_y, offset_x, margin
     )
     vertical = _axis_filter(source_rows, target_height, source_top, rows)
     horizontal = _axis_filter(source_columns, target_width, source_left, columns)
@@ -164,6 +167,7 @@ def resample_plan(
             image_size,
             offset_y,
             offset_x,
+            margin,
         ),
         *_taps(vertical),
         *_taps(horizontal),
@@ -176,6 +180,7 @@ def resample_plan(
             image_size,
             offset_y,
             offset_x,
+            margin,
         ),
     )
 
@@ -191,6 +196,7 @@ def resample_crop(
     image_size: int,
     offset_y: int = 0,
     offset_x: int = 0,
+    margin: int = 0,
 ) -> ResampledSlice:
     pixels = frame.pixels
     slope, intercept = frame.slope, frame.intercept
@@ -198,10 +204,16 @@ def resample_crop(
         *pixels.shape, frame.row_spacing, frame.column_spacing, spacing_mm
     )
     plan = resample_plan(
-        *pixels.shape, target_height, target_width, image_size, offset_y, offset_x
+        *pixels.shape,
+        target_height,
+        target_width,
+        image_size,
+        offset_y,
+        offset_x,
+        margin,
     )
     source_top, source_left, output_top, output_left, rows, columns = _crop_geometry(
-        target_height, target_width, image_size, offset_y, offset_x
+        target_height, target_width, image_size, offset_y, offset_x, margin
     )
     if plan is None:
         middle = _axis_filter(pixels.shape[0], target_height, source_top, rows).dot(
@@ -222,7 +234,8 @@ def resample_crop(
     if slope != 1.0 or intercept != 0.0:
         region *= np.float32(slope)
         region += np.float32(intercept)
-    image = np.zeros((image_size, image_size), dtype=np.float32)
+    size = image_size + 2 * margin
+    image = np.zeros((size, size), dtype=np.float32)
     image[
         output_top : output_top + rows,
         output_left : output_left + columns,
@@ -238,6 +251,7 @@ def resample_crop(
             image_size,
             offset_y,
             offset_x,
+            margin,
         ),
     )
 
@@ -370,7 +384,9 @@ def fallback_window_center(value, view, size):
         return (0.0, 0.0), 0.0
     frame = value.frames[int(value.gather[1])]
     rows, columns, row_spacing, column_spacing = frame.native_layout
-    native = frame.output_to_native @ np.array([(size - 1) / 2, (size - 1) / 2, 1])
+    native = frame.output_to_native @ np.array(
+        [(size - 1) / 2 + frame.margin, (size - 1) / 2 + frame.margin, 1]
+    )
     center = np.array(
         [
             (native[0] - (columns - 1) / 2) * column_spacing,

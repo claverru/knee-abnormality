@@ -1,4 +1,4 @@
-# Project state (2026-10-07)
+# Project state (2026-10-08)
 
 What is in force now: the recipe, the control candidates pair with, the best public submissions and
 the rules every comparison depends on. Pending work is in [next](next.md), active lines have their
@@ -27,10 +27,24 @@ measured outcomes are in the [validation results](../validation/results/INDEX.md
   ×1 0.917070, 0.953 public (S118); the ResNet-50 on the same recipe 0.957 (S119, equal to the
   best). The recipe without routing on the same fold and seed: ×4 0.924049, 0.950 public. The
   routing-and-shifts campaign's one adoption on it (height cuts from the spots, 0.952 as S120) is
-  level locally and not in force (user decision, 2026-10-07); it is the first seed of the next
-  campaign. `configs/refined-resnet50.yaml` carries the same fold and seed as its submitted run. Design, runs and measurements:
-  [side-routed shared heads](side-routed-heads.md); next campaign, prepared and not started:
-  [frame and targets](../../autoresearch/campaigns/frame-and-targets/INDEX.md).
+  level locally and not in force (user decision, 2026-10-07). `configs/refined-resnet50.yaml` carries the same fold and seed as its submitted run. Design, runs and measurements:
+  [side-routed shared heads](side-routed-heads.md). The
+  [frame-and-targets campaign](../../autoresearch/campaigns/frame-and-targets/INDEX.md) on it
+  adopted nothing.
+- **Anatomy map and posed crops, since 2026-10-08 (user decision, `configs/training.yaml`):** on
+  top of the side-routed model, an anatomy map taught per token from an offline segmenter's masks
+  (training only, `trainer.anatomy_loss_weight` 0.1), a joint plane and a joint centre read from
+  the map, sections by anatomy, and sagittal and coronal crops turned and shifted to the knee's
+  own pose after a first look without gradient, cut with bicubic interpolation; `model.channels_last`
+  is on. It is the second adopted seed of the
+  [anatomy-masks campaign](../../autoresearch/campaigns/anatomy-masks/INDEX.md): ×4 0.927083,
+  ×1 0.917666, 0.954 public (S125), against ×4 0.925885 and 0.953 (S122) for the campaign's
+  reference and 0.953 (S118) for run 24. In a study with two knees each series takes its own
+  knee's side in the pose. Design: the campaign's
+  [prior work](../../autoresearch/campaigns/anatomy-masks/prior-work.md#the-incumbent); results per
+  run: its [run notes](../../autoresearch/campaigns/anatomy-masks/run-notes.md); training time:
+  [runtime](../modeling/training-runtime-and-memory.md#posed-crop-recipe-where-a-step-goes-and-what-was-removed-2026-10-08).
+  The ResNet-50 config has not been trained on it.
 - **Model:** the [current model](../modeling/current-model.md), since 2026-09-29 on a
   RadImageNet ResNet-18 (`configs/training.yaml`): repeated middle slice at 224 px and 0.536 mm, a
   120 mm field (since 2026-10-01, with augmentation on that slice only), coronal and sagittal
@@ -61,6 +75,13 @@ measured outcomes are in the [validation results](../validation/results/INDEX.md
 
 ## Current control
 
+- **`rn18-anatomy-map-centre-control`** (`outputs/training/rn18-anatomy-map-centre-control`), the
+  control since 2026-10-08: the recipe in force trained from the current sources, fold 1, seed
+  1110484336: ×4 0.926762, ×1 0.917074 (epoch 9 of 10), training 1,391 s. Candidates pair with it
+  at its fold and seed; it is the reference of the
+  [anatomy-recipe campaign](../../autoresearch/campaigns/anatomy-recipe/INDEX.md). The same recipe
+  before the training speed-ups and the two-knee pose fix scored ×4 0.927083 and ×1 0.917666 in
+  1,687 s (S125); with the same weights the two sources give the same predictions.
 - **`slab-rule-and-positive-std-requeue`**
   (`outputs/autoresearch/fixes-and-removals/experiments/slab-rule-and-positive-std-requeue-20261005T155303Z-59280bbc/training`),
   the fixes-and-removals incumbent and the control since 2026-10-06 (user decision, no
@@ -134,6 +155,11 @@ measured outcomes are in the [validation results](../validation/results/INDEX.md
   [two-family out-of-fold distillation](../validation/results/2026-10-04-two-family-oof-distillation.md):
   five Refined ResNet-50 and five ReXNet-200 of folds 0 to 4 trained on `oof_blend_v2`, one bundle
   at ×6 with reflection TTA, τ 0.7 and 1.0, equal weights; pooled out of fold 0.938887.
+- **0.954:** S125, the ResNet-18 of the recipe in force (anatomy map, posed crops, the map's
+  joint centre), alone, fold 1 at ×4, τ 0.9, no TTA (×4 0.927083): the best single ResNet-18,
+  against 0.953 for S118 (run 24), S122 (the anatomy-masks reference) and S123 (S122's weights
+  with the bicubic cut and the map's centre at prediction only). S124, a rerun in effect, was
+  still being scored by Kaggle when the campaign closed.
 - **0.954:** S102, the Refined-RadImageNet ResNet-50 with the 84/93 mm views and the view label
   bias, alone, fold 0 at ×4, τ 0.9, no TTA (×4 0.937129): the best single model, level with S97.
 - **0.954:** S97: 28 networks in 13 bundles with mirror TTA on all, weighted
@@ -207,6 +233,8 @@ measured outcomes are in the [validation results](../validation/results/INDEX.md
 
 ## Active lines
 
+- [Anatomy recipe](../../autoresearch/campaigns/anatomy-recipe/INDEX.md): the campaign on the
+  recipe in force, validated with seven forced seeds and not started.
 - [Label rebuild](../public-labels/label-rebuild.md): adopted; its control scored ×4 0.928288 and
   0.944 public (S78).
 - [RadImageNet backbones](radimagenet-backbone.md): the ResNet-18 recipe ties the ReXNet control
@@ -220,6 +248,16 @@ measured outcomes are in the [validation results](../validation/results/INDEX.md
 
 ## Recently closed
 
+- **2026-10-08:** the `anatomy-masks` autoresearch campaign (the anatomy map, sections read from
+  it, posed crops, measurements from the masks as targets), stopped by the user after 18 trained
+  runs: the bicubic cut and the joint centre from the map adopted and in force; a later adoption
+  by rule (equal view exposure) withdrawn as a rerun in effect; a tenth of the map's gradient,
+  the map's loss without Dice, a first look on fewer slices or on the whole canvas, both series
+  of a plane a ninth wider, a fixed forward move for the kneecap and the joint gap as a target not
+  adopted ([run notes](../../autoresearch/campaigns/anatomy-masks/run-notes.md)).
+- **2026-10-07:** the `frame-and-targets` autoresearch campaign (the frame from attention spots,
+  crops moved to it, located v5 report targets), stopped by the user after six decided runs and
+  no adoption ([run notes](../../autoresearch/campaigns/frame-and-targets/run-notes.md)).
 - **2026-10-05:** the `fixes-and-removals` autoresearch campaign (audit fixes and removals of
   active mechanisms, fold 1), stopped by the user after 13 decided runs: the detail-view
   position fix under reflection, the centre without a side (+0.0014), the slab rule with the

@@ -21,6 +21,7 @@ trainer:
 ```
 
 The manifest path resolves relative to the config file, like `paths.label_manifest`.
+A weight of 0 switches the loss and its validation fit off; the heads stay in the model untrained.
 
 ## Targets
 

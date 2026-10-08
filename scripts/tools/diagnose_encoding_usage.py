@@ -264,7 +264,7 @@ def tensor_hash(value: torch.Tensor) -> str:
 def batch_identity(batch: dict) -> dict:
     return {
         "study_uid": batch["study_uid"],
-        "selected_paths": batch["selected_paths"],
+        "selected_paths": list(batch["selected_paths"]),
         "failures": batch["failures"],
         "tensor_sha256": {
             name: tensor_hash(value)

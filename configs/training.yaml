@@ -6,6 +6,7 @@ paths:
   output_root: ../outputs/training
   label_manifest: labels/rebuild-state-v2-label-sources.json
   report_attribute_manifest: labels/jevk5-report-attribute-targets-v4.0.json
+  anatomy_targets: ../data/labels/prepared/anatomy-mrannotator-sample550-joints
 
 labels:
   source: rebuild_state_v2
@@ -95,6 +96,7 @@ data:
           slices: 5
           horizontal: {anchor: knee, offset_mm: 7.0}
           vertical: {anchor: image, offset_mm: 10.0}
+  view_shift_limit_mm: 17.0
   reference_field_mm: 120.0
   image_size: 224
   lower_quantile: 0.005
@@ -107,13 +109,14 @@ model:
   pretrained: true
   pretrained_weights: radimagenet
   slice_channels: repeated_middle
-  channels_last: false
+  channels_last: true
   checkpoint_backbone: false
   backbone_eval: false
   dropout: 0.0
   series_dropout: 0.0
   plane_readout: true
   view_label_bias: true
+  anatomical_frame: true
   feature_statistics_augmentation:
     probability: 0.5
 
@@ -144,4 +147,5 @@ trainer:
   deterministic: false
   class_balance_exponent: 0.5
   report_attribute_loss_weight: 0.1
+  anatomy_loss_weight: 0.1
   scanner_confusion_weight: 0.0

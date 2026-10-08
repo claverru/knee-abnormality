@@ -44,6 +44,7 @@ class PreparedFrame:
     rect: tuple[int, int, int, int]
     output_to_native: np.ndarray
     native_layout: tuple[int, int, float, float]
+    margin: int
 
 
 def shared_empty(count: int, dtype: torch.dtype) -> torch.Tensor:
@@ -78,6 +79,7 @@ class PreparedSeries:
     view_index: int = 0
     window_center_mm: tuple[float, float] = (0.0, 0.0)
     window_rule_distance_mm: float = 0.0
+    canvas_margin: int = 0
 
     @property
     def triplet_count(self) -> int:
@@ -112,6 +114,7 @@ def _native_plan(
     image_size: int,
     offset_y: int = 0,
     offset_x: int = 0,
+    margin: int = 0,
 ) -> ResamplePlan | None:
     if not _native_rescale(slope, intercept):
         return None
@@ -122,6 +125,7 @@ def _native_plan(
         image_size,
         offset_y,
         offset_x,
+        margin,
     )
 
 
@@ -131,6 +135,7 @@ def _descriptor_plan(
     image_size: int,
     offset_y: int = 0,
     offset_x: int = 0,
+    margin: int = 0,
 ) -> ResamplePlan | None:
     if descriptor is None:
         return None
@@ -145,6 +150,7 @@ def _descriptor_plan(
         image_size,
         offset_y,
         offset_x,
+        margin,
     )
 
 
@@ -169,6 +175,7 @@ def _stored_frame(
         plan.rect,
         plan.output_to_native,
         native_layout,
+        plan.key[-1],
     )
 
 
@@ -178,6 +185,7 @@ def decode_slice(
     image_size: int,
     offset_y: int = 0,
     offset_x: int = 0,
+    margin: int = 0,
 ) -> DecodedSlice:
     path = record.path
     try:
@@ -195,6 +203,7 @@ def decode_slice(
                 image_size,
                 offset_y,
                 offset_x,
+                margin,
             )
             if frame.pixels.dtype in NATIVE_DTYPES
             else None
@@ -207,7 +216,7 @@ def decode_slice(
                 frame.intercept,
                 (*frame.pixels.shape, frame.row_spacing, frame.column_spacing),
             )
-        value = resample_crop(frame, spacing_mm, image_size, offset_y, offset_x)
+        value = resample_crop(frame, spacing_mm, image_size, offset_y, offset_x, margin)
     except PREPARATION_ERRORS as error:
         return f"{path}: {type(error).__name__}: {error}"
     top, left, rows, columns = value.rect
@@ -226,6 +235,7 @@ def decode_slice(
         value.rect,
         value.output_to_native,
         (*frame.pixels.shape, frame.row_spacing, frame.column_spacing),
+        margin,
     )
 
 
@@ -247,9 +257,12 @@ def decode_series(
     threads: int = 1,
     offset_y: int = 0,
     offset_x: int = 0,
+    margin: int = 0,
 ) -> tuple[DecodedSlice, ...]:
     plans = [
-        _descriptor_plan(record.descriptor, spacing_mm, image_size, offset_y, offset_x)
+        _descriptor_plan(
+            record.descriptor, spacing_mm, image_size, offset_y, offset_x, margin
+        )
         for record in records
     ]
     sizes = [
@@ -283,7 +296,7 @@ def decode_series(
             record.descriptor.rows * record.descriptor.columns
         ):
             decoded.append(
-                decode_slice(record, spacing_mm, image_size, offset_y, offset_x)
+                decode_slice(record, spacing_mm, image_size, offset_y, offset_x, margin)
             )
             continue
         decoded.append(
@@ -304,6 +317,7 @@ def decode_series(
                     record.descriptor.row_spacing,
                     record.descriptor.column_spacing,
                 ),
+                margin,
             )
         )
     return tuple(decoded)
@@ -385,7 +399,11 @@ def prepare_series(
     gather = np.asarray([lookup[r.path] for r in successful_records], dtype=np.int64)
     frames = tuple(cache[r.path] for r in retained)
     rects = np.asarray([frame.rect for frame in frames], dtype=np.int32)
-    pixel_count = int((rects[:, 2].astype(np.int64) * rects[:, 3]).sum())
+    margin = frames[0].margin
+    first = np.maximum(rects[:, :2], margin)
+    last = np.minimum(rects[:, :2] + rects[:, 2:], margin + image_size)
+    extent = np.maximum(last - first, 0).astype(np.int64)
+    pixel_count = int((extent[:, 0] * extent[:, 1]).sum())
     rects = rects[gather]
     transforms = [cache[r.path].output_to_native for r in successful_records]
     selected_paths = tuple(tuple(str(r.path) for r in group) for group in groups)
@@ -438,4 +456,5 @@ def prepare_series(
         failed_paths=failed_paths,
         unique_slice_count=len(retained),
         intensity_pixel_count=pixel_count,
+        canvas_margin=frames[0].margin,
     )

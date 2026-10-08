@@ -109,3 +109,47 @@ In the `two-crops` run, validation took about 70 s of a roughly 340 s epoch and 
 - **Setting at the time:** `trainer.validation_num_workers` (28 in the crop configs) sized
   the validation loader separately, using the cores the idle training workers left free. The
   field was removed on 2026-09-16, so validation uses `num_workers`.
+
+## Posed-crop recipe: where a step goes and what was removed (2026-10-08)
+
+Measured on the anatomy-masks recipe (ResNet-18, posed sagittal and coronal crops, first look),
+RTX 3090, with `scripts/tools/bench_training_steps.py` (110 training and 40
+validation steps under the real `Trainer`; outputs in `outputs/analysis/anatomy-masks-speed/`).
+
+| | Before | After |
+|---|---:|---:|
+| Training step | 304 ms | 245 ms |
+| Wait on the loader per step | 10 ms | 3 ms |
+| Training steps per second | 3.18 | 4.04 |
+| Validation step | 231 ms | 168 to 182 ms |
+| Epoch, from a two-epoch run | 167 to 170 s | 138 to 141 s |
+| Ten epochs | 1,687 s | about 1,390 s (projected from two) |
+
+The two-epoch run is `outputs/training/rn18-anatomy-map-centre-fast` (stopped by hand after
+epoch 2; validation macro 0.895404 and 0.900571 against 0.893990 and 0.900518 for the same
+recipe before the changes).
+
+- **The step is not loader-bound.** The GPU executes about 180 ms of kernels per step; the rest
+  is the main thread issuing about 5,500 small operations and waiting at about 265 points that
+  force a GPU synchronisation (boolean indexing, `nonzero`, `.item()`, `unique`, Python branches
+  on tensor values), most of them in the augmentation and geometry code. Removing those would
+  let CPU and GPU work overlap; it was not attempted.
+- **What gave the gain, in order:** only the middle channel of each canvas is sent to the GPU
+  when `slice_channels` is `repeated_middle` (33 MB instead of 99 MB per batch; 270 to 246 ms);
+  `model.channels_last: true` (304 to 291 ms; on ResNet-18 the changing image count per step
+  caused none of the cuDNN setup delays recorded above for ReXNet-100); the batch's nested
+  sampling metadata is carried in an opaque container, so the pin thread and the device transfer
+  no longer walk about 5,500 Python objects per batch; tokens, routing weights and position
+  priors are computed once per encoded batch instead of two to seven times; the epoch metric
+  accumulator stacks at the end of the epoch instead of multiplying and adding per call;
+  gradient diagnostics every tenth step; bicubic resampling only for turned, valid crops.
+- **Parity:** seed 2's weights give the same ×4 validation predictions on the old and the new
+  code: mean absolute difference 0.000004, macro 0.927078 on both, where two runs of the old
+  code differ from the saved predictions by 0.00046 on average (BF16 and the rounded crop
+  shift). The first eight training losses follow the same trajectory.
+- **Tried and reverted:** skipping the per-study frame head when the anatomical frame is on. Its
+  global rotation reaches the across axis the anatomical frame keeps, so the predictions moved
+  (mean difference 0.0010, macro −0.0001).
+- **Not allowed:** fused AdamW, which Lightning refuses together with gradient clipping.
+- **Left on the table:** the first look is about 65 ms of the step and the image augmentation
+  about 35 ms; both are part of the design.
