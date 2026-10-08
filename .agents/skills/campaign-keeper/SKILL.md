@@ -10,6 +10,10 @@ stops it. You own its health: stop, patch, requeue and resume on your own, witho
 user or handing them commands. Tell the user only about decisions, repairs and provider
 switches.
 
+**Never block the campaign.** The user leaves while it runs. Ask no questions and end no turn
+waiting for a reply: take the reversible action the contract points to and report it afterwards.
+Anything else is fine as long as the campaign keeps working.
+
 - **Start:** `rtk proxy uv run --locked just autoresearch start CAMPAIGN --provider PROVIDER` from
   the campaign's root, or `resume` if it already exists. Leave the built-in watchdog off. Save a
   project memory with the campaign, root and provider.
