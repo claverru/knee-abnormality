@@ -44,7 +44,11 @@ measured outcomes are in the [validation results](../validation/results/INDEX.md
   [prior work](../../autoresearch/campaigns/anatomy-masks/prior-work.md#the-incumbent); results per
   run: its [run notes](../../autoresearch/campaigns/anatomy-masks/run-notes.md); training time:
   [runtime](../modeling/training-runtime-and-memory.md#posed-crop-recipe-where-a-step-goes-and-what-was-removed-2026-10-08).
-  The ResNet-50 config has not been trained on it.
+  The ResNet-50 on it (`configs/refined-resnet50.yaml`, which carries the same anatomy settings
+  since 2026-10-08; `outputs/training/rn50-anatomy-map-centre`, same fold and seed): ×4 0.933265,
+  ×1 0.924650 and **0.959 public (S126), the best submission**, against ×4 0.933209, ×1 0.922934
+  and 0.957 (S119) for the ResNet-50 of run 24; training 2,251 s against 2,075 s, ×4 prediction
+  67.7 s against 46.0 s.
 - **Model:** the [current model](../modeling/current-model.md), since 2026-09-29 on a
   RadImageNet ResNet-18 (`configs/training.yaml`): repeated middle slice at 224 px and 0.536 mm, a
   120 mm field (since 2026-10-01, with augmentation on that slice only), coronal and sagittal
@@ -148,6 +152,12 @@ measured outcomes are in the [validation results](../validation/results/INDEX.md
 
 ## Best public submissions
 
+- **0.959:** S126, the Refined-RadImageNet ResNet-50 of the recipe in force (anatomy map, posed
+  crops, the map's joint centre), alone, fold 1 at ×4, τ 0.9, no TTA (×4 0.933265): the best
+  submission and the best single model, +0.002 over the same backbone without the anatomy map
+  (S119, 0.957). It was submitted by hand from the notebook's first completed version through
+  the Kaggle API after the submit job lost it in Kaggle's queue; the output was not downloaded
+  and validated first.
 - **0.957:** S106, the five Refined ResNet-50 children of the
   [two-family out-of-fold distillation](../validation/results/2026-10-04-two-family-oof-distillation.md#resnet-50-children-alone-s106)
   alone, one bundle at ×6 with reflection TTA and τ 0.8; pooled out of fold 0.936272.
@@ -158,8 +168,8 @@ measured outcomes are in the [validation results](../validation/results/INDEX.md
 - **0.954:** S125, the ResNet-18 of the recipe in force (anatomy map, posed crops, the map's
   joint centre), alone, fold 1 at ×4, τ 0.9, no TTA (×4 0.927083): the best single ResNet-18,
   against 0.953 for S118 (run 24), S122 (the anatomy-masks reference) and S123 (S122's weights
-  with the bicubic cut and the map's centre at prediction only). S124, a rerun in effect, was
-  still being scored by Kaggle when the campaign closed.
+  with the bicubic cut and the map's centre at prediction only). S124, a rerun of S125 in
+  effect, also scored 0.954.
 - **0.954:** S102, the Refined-RadImageNet ResNet-50 with the 84/93 mm views and the view label
   bias, alone, fold 0 at ×4, τ 0.9, no TTA (×4 0.937129): the best single model, level with S97.
 - **0.954:** S97: 28 networks in 13 bundles with mirror TTA on all, weighted

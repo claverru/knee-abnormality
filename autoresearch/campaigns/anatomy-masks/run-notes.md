@@ -758,13 +758,16 @@ Both at ×4, τ 0.9, batch 4, exported from each run's frozen source.
 | S122 | campaign reference, posed crops | 0.925885 | 0.917130 | 0.953 |
 | S123 | reference weights, bicubic cut and map centre at prediction only | — | — | 0.953 |
 | S125 | seed 2: bicubic cut and map centre, trained | 0.927083 | 0.917666 | 0.954 |
-| S124 | equal view exposure | 0.927262 | 0.917892 | pending at 09:10 |
+| S124 | equal view exposure | 0.927262 | 0.917892 | 0.954 |
+| S119 | ResNet-50 of run 24, no anatomy map | 0.933209 | 0.922934 | 0.957 |
+| S126 | ResNet-50 on the adopted recipe (`rn50-anatomy-map-centre`) | 0.933265 | 0.924650 | 0.959 |
 
 - S125 is +0.001 public over the reference and over the same two changes applied only at
   prediction (S123), with +0.0012 at ×4 on fold 1. One submission at three decimals; the two
   forced seeds are the campaign's only step that shows on both.
-- S124 was submitted at 08:40 CEST and was still being scored by Kaggle half an hour later; S125,
-  submitted at 09:01, scored in five minutes.
+- S124 took over two hours to be scored by Kaggle and came back at 0.954, the same as S125.
+- S126 is the best submission so far: +0.002 public over the same backbone without the anatomy
+  map, with ×4 on fold 1 level (+0.00006) and ×1 +0.0017. One submission at three decimals.
 
 ## 18. `patellar-regions-sum-disjoint-anatomy-shares` (researcher): trained and compared, not decided
 
