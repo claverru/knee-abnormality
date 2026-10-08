@@ -9,7 +9,7 @@ import numpy as np
 from scipy import ndimage
 
 SOURCE = Path("/home/claudio/.cache/knee-segmenters") / sys.argv[1]
-BASE = Path("/home/claudio/src/knee-abnormality-side-routed-heads/data/labels/prepared")
+BASE = Path(__file__).resolve().parents[3] / "data/labels/prepared"
 PREVIOUS = BASE / sys.argv[2]
 OUT = BASE / sys.argv[3]
 WORKERS = 4
