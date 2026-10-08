@@ -1,0 +1,108 @@
+ideas:
+- id: double-cylinder-with-one-shared-bend
+  mechanism_id: upper-band-on-its-own-axis
+  parent_idea_id: null
+  title: A double cylinder with one bend shared by all knees, learned from the labels and the reports, the frame's tilt held at zero
+  opportunity: >-
+    The control for the per-knee lean. The user's double cylinder has two parts that have never
+    been separated: the shape (a femur section on its own axis) and the per-knee angle. The one
+    run with a learned lean ended with the same angle for every knee, -25 degrees, level with
+    the incumbent (x4 -0.0002, x1 -0.0009) and with Effusion up by 0.0021, but its second free
+    angle, the frame's tilt, moved 9 degrees against it, so that result says nothing clean about
+    the shape. With the tilt held at zero and the cuts placed from the spots, a single shared
+    bend has nothing to trade with: if the shape helps, this run shows it, and the per-knee
+    seed (double-cylinder-with-a-learned-femur-lean) is then judged against it rather than
+    against a cylinder.
+  mechanism: >-
+    Everything of the seed double-cylinder-with-a-learned-femur-lean except how the lean is
+    obtained: built on the candidate of femur-section-on-spot-placed-cuts-2 (the bone head in
+    the model, the two height cuts placed from the spots, frame() with the band above the upper
+    cut around a leaned axis); the frame's forward tilt zero for every knee (no landmark tilt,
+    no regressed nod, the shared rotation's nod component held at zero); above the upper cut
+    the two femur edema targets read only the core half and the inner-ring sectors of their
+    side. The lean is one learned scalar for all knees: lean = L * tanh(p / L) with L = 35
+    degrees and p a parameter that starts at zero. No head, no spot and no per-knee quantity
+    enters it.
+  precedents:
+  - "outputs/training/20261007-101112-side-routed-femur-lean: lean learned with a free tilt: -25 degrees for every knee, x4 -0.0002, x1 -0.0009, Effusion +0.0021."
+  - "frame-and-targets run notes: the tilt the incumbent learns (+13.6 degrees) is about 22 degrees from the tibial plateau, so part of it may be serving the femur band."
+  novelty: First double cylinder with a single free angle.
+  coverage: Every knee.
+  exploitation: >-
+    Read both multipliers against the incumbent, PF OA, Effusion, Synovitis and ACL, the four
+    compartment targets and the bone targets' explained shares, and per epoch the shared bend in
+    degrees, the two cuts and the two radii. Shown wrong by: a bend that stays within 3 degrees
+    of zero (the labels and reports see no use for a second axis), or both multipliers more than
+    a rerun (0.0010) below the incumbent.
+  budget: Same cost as the incumbent plus the bone head.
+  implementation: >-
+    Follow the environment paragraph of the developer instructions. Build on the candidate of
+    double-cylinder-with-a-learned-femur-lean if it exists under this campaign's experiments
+    (replace its per-knee lean head by the scalar parameter), otherwise on
+    outputs/autoresearch/frame-and-targets/experiments/femur-section-on-spot-placed-cuts-2-20261007T125017Z-e395eccf
+    with the three changes that seed describes. The withdrawn mirrored-spot requirement of the
+    first bone-head seed is not a gate. Create the parameter without consuming the random
+    stream. Report on one batch with untrained weights that the lean and the frame's forward
+    tilt are zero and that the loss has a nonzero gradient on the parameter once it is nudged
+    off zero. Log val_ and training study_femur_lean_deg (the shared value) per epoch. Update
+    SPATIAL_TOKEN_IDENTITY["algorithm"] and ["compartment_routing"].
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Separates the shape of the double cylinder from the per-knee angle; one line different from the seed before it.
+- id: tendon-targets-with-the-head-in-the-model
+  mechanism_id: report-region-targets
+  parent_idea_id: null
+  title: Two located targets for the extensor tendons, read by one shared head that lives in the model, so a spot above and a spot below the kneecap exist for every knee
+  opportunity: >-
+    A guess, aimed at the landmark the double cylinder lacks. The femur's direction could not be
+    measured from the bone head: its spots sit in the condyle 15 mm from the joint, and the
+    condyle is round, so the femur turns about it (bends of 51 +- 28, 18 +- 25 and 7 +- 24
+    degrees from three constructions, none agreeing with the knees judged bent or straight).
+    The extensor tendons are linear structures that run along the bones: the quadriceps tendon
+    along the front of the femur above the kneecap, the patellar tendon from the kneecap down
+    to the tibial tuberosity. The v5 answer extensor_tendon places abnormalities in one, the
+    other or both (commonest option in 304, 231 and 178 reports; none in 3,648), right in 205
+    of 212 audited reports. A head trained on it has to look at each tendon, and the bone head
+    showed that such a head attends to its structure in knees without the finding too. This
+    run does not change the frame: it reports where the two spots fall.
+  mechanism: >-
+    training/report_attributes.py reads the v5 file
+    `<paths.data_root>/labels/prepared/jevk5-report-attributes-v5.0-new/targets.parquet`. A new
+    located family "extensor_tendon" with two Region entries read by one shared head: quadriceps
+    (options quadriceps and both) on a new route tendon_upper = the three front sectors outside
+    the core in the upper band; patellar (options patellar and both) on a new route tendon_lower
+    = the same sectors in the joint and tibia bands; unplaced not_stated; the existing
+    option-level head of extra_extensor_tendons stays. The family's attention column and
+    classifier row are parameters of KneeAbnormalityModel, called by the training module for
+    the report loss with the same detachment and gradient path as the other located families.
+    With that column's scores the model computes, without gradient and with the existing spot
+    function, two spots per knee: the squared-attention centroid over the valid tokens with
+    fitted front > 0 above the meniscus midpoint's height, and the same below it.
+    encode_batch returns them. Nothing reads them: the frame is unchanged.
+  precedents:
+  - "frame-and-targets, edema-bone-targets-with-the-head-in-the-model-2: the same construction for the bone targets; 27 to 31% explained; spots in the right bone in every knee with or without edema."
+  - "attributes_v5.md (worktree knee-abnormality-jevk5-attributes-v4): the counts and the check on the audited reports."
+  novelty: First landmark candidates along the bones rather than in them.
+  coverage: Training only for the targets; the spots for every knee.
+  exploitation: >-
+    Read both multipliers against the incumbent, PF OA, Effusion and Synovitis,
+    val_report_attribute_bce_<region> for the two targets with the share each explains, and per
+    epoch on the validation knees, for each spot, the share of knees where it is found and the
+    mean and spread of its place in the knee's frame (medial, front, height, in millimetres),
+    separately for knees whose report has a tendon finding and knees without. Shown wrong by:
+    the two targets explaining under 10%, or the upper spot lying within 20 mm of the joint
+    line on average (too short a lever to give the femur's direction).
+  budget: Same cost as the incumbent; one more attention column and classifier row.
+  implementation: >-
+    Follow the environment paragraph of the developer instructions. Reuse the pattern and the
+    file loader of the bone-head candidate,
+    outputs/autoresearch/frame-and-targets/experiments/edema-bone-targets-with-the-head-in-the-model-2-20261007T124438Z-ade9be4a
+    (source/ and changes.diff): its model-owned report trunk, its spots and its validation
+    diagnostics, for this family instead of the bone family (this seed does not include the
+    bone targets). No mirrored-spot requirement applies. Create the layers under
+    torch.random.fork_rng. Report the number of training studies with a target above 0.5 in
+    each of the two. Update SPATIAL_TOKEN_IDENTITY["algorithm"] and ["compartment_routing"].
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Looks for the femur landmark the double cylinder needs in structures that run along the bones; its spots are read before any frame depends on them.
+exhausted_directions: ""

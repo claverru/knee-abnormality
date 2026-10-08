@@ -1,0 +1,155 @@
+ideas:
+- id: femur-section-turned-to-a-running-template-2
+  mechanism_id: sections-aligned-to-templates
+  parent_idea_id: null
+  title: A femur section turned about the femur spots by the angle at which the knee's own femur-band
+    tokens best match a running template, with no label gradient and no landmark pair
+  opportunity: 'Evidence-backed gate, a guess for the score. Every attempt to give the femur section
+    its own direction used one or two attention spots or the label gradient, and all failed: spots
+    carry 4 to 6 mm of noise, so two of them 15 to 21 mm apart give 15 to 19 degrees of noise (three
+    constructions, bends with spreads of 24 to 28 degrees, uncorrelated with each other: 0.07, 0.02,
+    -0.24); a lean learned from the labels went to one value for every knee and traded against the
+    frame''s tilt. A research review of the runs (keeper''s notes, 2026-10-07) pointed at using all
+    the femur-band tokens at once. Checked without training on the bone-head run''s weights (outputs/analysis/frame-and-targets/template-bend/):
+    for each of the 874 validation knees, the rotation about the femur-spot hinge that best matches
+    the knee''s sagittal tokens to the average token at each place, estimated separately from the
+    T1/PD series and from the fluid series of the same knee, agrees between the two with a correlation
+    of 0.76 (796 knees), with a spread of 12 degrees across knees; drawn on fifteen knees (template-bend.png),
+    the direction follows the visible femur where the two estimates agree. It is the first estimate
+    of the femur''s direction that passes a check. Open: the three knees at the lower limit of the
+    search (-30 degrees) have their femur spots misplaced, and the estimate from axial series does
+    not agree with the sagittal ones (0.17), as expected for slices that each sit at one height.'
+  mechanism: 'Built on the candidate of femur-section-on-spot-placed-cuts-2 (the bone head in the
+    model with its four spots, the two height cuts placed from the spots). Four changes. (1) The frame''s
+    forward tilt is zero for every knee: no landmark tilt, no regressed nod, the shared rotation''s
+    nod component held at zero; roll and turn as today. (2) Hinge and turn: H is the midpoint of the
+    knee''s two femur spots in the frame''s (front, height) plane. For a token above the upper cut,
+    frame() replaces its front coordinate by the front coordinate of the token turned about H by the
+    knee''s angle a: front'' = H_front + (front - H_front) * cos(a) - (height - H_height) * sin(a).
+    Band membership keeps using the unturned height, so the bands still partition the tokens. This
+    replaces the candidate''s shear and its lean from the femur spot. (3) The angle a, per knee, without
+    gradient: a persistent template buffer holds, for each of two groups of sagittal series (T1/PD
+    and fluid-sensitive) and each 8 mm cell of a grid over front in [-48, 48] and height in [-4, 44]
+    mm relative to H, the running mean of the L2-normalised detached token features (the tokens study_frames
+    receives) of the tokens that fall in that cell after being turned back by their knee''s current
+    angle. For a knee, each candidate angle from -30 to +45 degrees in steps of 5 turns the knee''s
+    sagittal tokens within 40 mm of the midline about H, and its score is the mean cosine similarity
+    between each token and its group''s template cell, over cells holding at least 30 tokens'' worth
+    of updates; a is the best candidate refined by a parabola through its two neighbours, minus a
+    running mean of a over training knees (a persistent buffer) so the population mean stays at zero;
+    a = 0 for a knee with fewer than 40 such tokens or without both femur spots, and for every knee
+    until the template has cells with support. The buffers are updated in training only, with momentum
+    0.99 per step, and read as they are at validation and prediction. (4) Above the upper cut the
+    femur edema targets read the core half and the inner-ring sectors of their side, around the turned
+    axis; in the joint band they read as today.'
+  precedents:
+  - 'outputs/analysis/frame-and-targets/template-bend/: template_bend.py (the check as run: three
+    rounds over the validation knees), template-bend.csv, template-bend.png.'
+  - 'frame-and-targets run notes, runs 3 and 4: the bone head''s spots and the failure of angles read
+    from them.'
+  - 'outputs/training/20261007-101112-side-routed-femur-lean and femur-section-on-spot-placed-cuts-2:
+    the two earlier femur sections and how they failed.'
+  novelty: First frame angle obtained by registering a band of tokens to a template; first that uses
+    neither a landmark pair nor the label gradient.
+  coverage: Every knee with sagittal series and both femur spots; the others keep a straight femur
+    section.
+  exploitation: 'Read both multipliers against the incumbent, PF OA, Effusion, Synovitis and ACL (they
+    read above the lower cut), the four compartment targets and the bone targets'' explained shares,
+    and per epoch on the validation knees the mean and the spread across knees of the angle, the share
+    of knees with a measured angle, the share at either limit of the search, and the correlation across
+    knees between the angle estimated from the T1/PD tokens alone and from the fluid tokens alone.
+    Shown wrong by: that correlation under 0.5 at the last epoch (the template does not hold while
+    the backbone trains), a spread under 3 degrees, or more than 10% of knees at a limit of the search.'
+  budget: Same cost as the incumbent plus the bone head and sixteen table lookups per knee, without
+    gradient.
+  implementation: 'Follow the environment paragraph of the developer instructions. Start from outputs/autoresearch/frame-and-targets/experiments/femur-section-on-spot-placed-cuts-2-20261007T125017Z-e395eccf
+    (source/ and changes.diff): keep its bone head and spot-placed cuts; replace its shear and its
+    lean. The withdrawn mirrored-spot requirement of the first bone-head seed is not a gate. The check
+    script outputs/analysis/frame-and-targets/template-bend/template_bend.py shows the binning, the
+    scoring and the sign of the turn on cached tokens; port its arithmetic into study_frames as torch
+    code on the batch''s tokens, with running buffers in place of its three passes. Create the buffers
+    under torch.random.fork_rng, register them as persistent, and update them only when self.training.
+    Remove what only the landmark tilt and the regressed nod used, keeping the other columns'' behaviour;
+    keep frame_rotation callable and zero at the start for the guardrail script, with its nod component
+    multiplied by zero where it is applied. Report on one batch with untrained weights: a = 0 for
+    every knee while the template is empty; after filling the template from that batch and turning
+    one knee''s sagittal tokens about H by a known 15 degrees, the estimate for that knee is 15 degrees
+    to within 3; a token at H keeps its front coordinate for any a. Log val_ and training study_femur_turn_deg
+    (mean and standard deviation across knees), the measured share, the share at a limit and the T1/PD
+    against fluid correlation. Replaces: the landmark tilt, the regressed nod, the shear and the lean
+    from the femur spot. Update SPATIAL_TOKEN_IDENTITY["algorithm"], ["compartment_routing"] and ["initialization_rng"].
+    Keeper''s correction, 2026-10-07, after the first candidate trained four epochs and was aborted:
+    its angles saturated (34 to 56% of knees at a limit of the search, spread 28 to 31 degrees, against
+    2% and 12 degrees in the offline check). Two causes, both in how an angle is scored. (i) Every
+    sagittal token took part, so at large angles tokens from below the joint turned into the grid
+    and added to the score; only tokens whose unturned place relative to H has height in (-10, 55)
+    mm and |front| < 60 mm take part, as in the check script. (ii) The score was the summed similarity
+    divided by a count that did not depend on the angle, so an angle that brought more tokens into
+    supported cells won; the score is the mean similarity over the tokens that land in supported cells
+    at that angle, and an angle with fewer than 40 such tokens is not a candidate; a knee is measured
+    when at least one angle is. The keeper has already made both changes in the first candidate''s
+    workspace, outputs/autoresearch/frame-and-targets/experiments/femur-section-turned-to-a-running-template-20261007T142458Z-9b8ab2cc/workspace
+    (modeling/femur_templates.py): start from that workspace, review the change, rerun the guardrail
+    check and the made-up-turn check, and return prepared.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Keeper's requeue with the scoring corrected; the first candidate's angles saturated.
+- id: tibia-and-femur-sections-turned-to-running-templates-2
+  mechanism_id: sections-aligned-to-templates
+  parent_idea_id: null
+  title: Two tilts per knee, the tibia section and the femur section each turned to its own running
+    template about its own bone's spots
+  opportunity: 'The user''s direction in full: one tilt for the tibia and one for the femur. The same
+    template matching that gives the femur band''s direction was checked on the tibia band, hinged
+    at the tibia spots, on the same weights (outputs/analysis/frame-and-targets/template-bend/template-bend-tibia.csv):
+    the estimates from the T1/PD series and from the fluid series of one knee correlate at 0.59 (797
+    knees), with a spread of 10 degrees; weaker than the femur''s 0.76, at the edge of the 0.6 the
+    check asked for. The tibia and femur angles of a knee correlate at 0.25, so they are mostly separate
+    quantities, as two tilts should be. A guess: that turning the tibia and joint bands by a noisier
+    angle helps more than it costs; the frame''s tilt is zero otherwise, which is wrong for knees
+    whose whole limb is tilted in the coil.'
+  mechanism: 'Everything of the seed femur-section-turned-to-a-running-template-2, built here in full.
+    In addition the frame''s forward tilt per knee, zero in that seed, becomes the angle b at which
+    the knee''s sagittal tokens of the tibia band best match a second running template: the same construction
+    with the hinge at the midpoint of the knee''s two tibia spots, the grid over front in [-48, 48]
+    and height in [-44, 4] mm relative to that hinge, its own two template buffers and its own running
+    mean. The frame''s rotation is self.frame_rotation() @ R(b) @ basis with R the rotation about
+    the side axis, so the tibia band and the joint band are laid out in a frame turned by b, and the
+    femur section is turned by a about the femur spots on top of it, with a estimated from tokens
+    expressed in the frame already turned by b. Neither angle receives a gradient.'
+  precedents:
+  - 'outputs/analysis/frame-and-targets/template-bend/: template_bend_tibia.py and template-bend-tibia.csv.'
+  - 'frame-and-targets, forward-tilt-from-the-meniscus-front-and-back-spots and frame-read-from-the-spots:
+    a tibia tilt read from attention spots moved with training (9, 15, 21 degrees).'
+  novelty: First frame with a separate, measured tilt for each bone.
+  coverage: Every knee with sagittal series and the four bone spots; each angle falls back to zero
+    on its own.
+  exploitation: 'Read both multipliers against the incumbent and against femur-section-turned-to-a-running-template-2,
+    the same targets, and per epoch on the validation knees the mean and spread of each angle and
+    of their difference, the shares measured and at a limit, and each angle''s T1/PD against fluid
+    correlation. Shown wrong by: the tibia angle''s correlation under 0.4 at the last epoch, or the
+    four compartment targets each more than one sibling SD below the femur-only seed.'
+  budget: As the femur-only seed plus one more set of lookups.
+  implementation: 'Follow the environment paragraph of the developer instructions. Build on the candidate
+    of femur-section-turned-to-a-running-template-2 if it exists under this campaign''s experiments
+    (its source/ and changes.diff), otherwise as that seed describes. The tibia check script is outputs/analysis/frame-and-targets/template-bend/template_bend_tibia.py
+    (it flips the height axis to reuse the femur code; implement the tibia grid directly, without
+    the flip, and report the sign with the same made-up-turn check as the femur''s: a known turn of
+    the tibia band''s tokens about the tibia hinge is recovered to within 3 degrees). Update SPATIAL_TOKEN_IDENTITY["algorithm"]
+    and ["initialization_rng"]. Keeper''s correction, 2026-10-07, after the first candidate trained
+    four epochs and was aborted: its angles saturated (34 to 56% of knees at a limit of the search,
+    spread 28 to 31 degrees, against 2% and 12 degrees in the offline check). Two causes, both in
+    how an angle is scored. (i) Every sagittal token took part, so at large angles tokens from below
+    the joint turned into the grid and added to the score; only tokens whose unturned place relative
+    to H has height in (-10, 55) mm and |front| < 60 mm take part, as in the check script. (ii) The
+    score was the summed similarity divided by a count that did not depend on the angle, so an angle
+    that brought more tokens into supported cells won; the score is the mean similarity over the tokens
+    that land in supported cells at that angle, and an angle with fewer than 40 such tokens is not
+    a candidate; a knee is measured when at least one angle is. The keeper has already made both changes
+    in the first candidate''s workspace, outputs/autoresearch/frame-and-targets/experiments/femur-section-turned-to-a-running-template-20261007T142458Z-9b8ab2cc/workspace
+    (modeling/femur_templates.py): start from that workspace, review the change, rerun the guardrail
+    check and the made-up-turn check, and return prepared.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Keeper's requeue with the scoring corrected; the first candidate's angles saturated.
+exhausted_directions: ''

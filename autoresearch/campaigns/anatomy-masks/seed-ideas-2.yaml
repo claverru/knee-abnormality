@@ -1,0 +1,69 @@
+ideas:
+- id: fluid-sagittal-crops-moved-forward-for-the-kneecap
+  mechanism_id: crop-target-position
+  parent_idea_id: null
+  title: Place the joint further back in the 93 mm fluid sagittal crops so that the whole kneecap is inside
+  opportunity: 'Evidence-backed. On the masks of 550 knees the kneecap''s front lies 55.9 mm in front
+    of the plateau centre (sd 5.2, 95th percentile 64.1) and its back at 40.0 mm (measurements.json).
+    The sagittal crops place the joint centre 7.4 mm behind the crop''s centre, so the 84 mm crop reaches
+    49 mm forward and the 93 mm crop 54 mm: the kneecap is whole in 11% and 38% of them (prior-work.md,
+    Measured on the masks). PF OA, Effusion and Synovitis read the kneecap and the pouch above it, and
+    the fluid series is where they show. Moving the joint 8.6 mm further back in the 93 mm crop reaches
+    62.7 mm forward, the kneecap''s front for about 90% of knees, and still leaves 30.7 mm behind the
+    joint centre; the plateau is about 50 mm deep, so the back of the joint stays inside. The 84 mm crop
+    cannot hold both ends.'
+  mechanism: 'In ViewWindows (modeling/model.py) make the sagittal target depend on the view: keep SAGITTAL_JOINT_TARGET_MM
+    = (7.4, 2.3) for the 84 mm views and use (16.0, 2.3) for the 93 mm fluid sagittal view, chosen by
+    view index from the view''s field_mm; `geometry` returns the pivot accordingly. Everything else as
+    the incumbent.'
+  precedents:
+  - The kneecap route led by kneecap and kneecap-joint tokens recovered most of PF OA's loss (rn18-anatomy-front-sample550).
+  - Crops centred on the old frame cost PF OA and Fracture, which read far from the joint centre (frame-and-targets).
+  novelty: First crop placed for a structure other than the joint.
+  coverage: Every fluid sagittal series, 4,150 of 4,407 studies have one.
+  exploitation: 'Read PF OA, Effusion, Synovitis, ACL and the two menisci at both multipliers against
+    the incumbent, and per epoch the mean share of kneecap and kneecap-joint tokens per fluid sagittal
+    image against the incumbent''s. Shown wrong by: PF OA and Effusion both below the incumbent, or the
+    menisci each more than one sibling SD below it.'
+  budget: Same cost as the incumbent.
+  implementation: Follow the environment paragraph of the developer instructions. modeling/model.py only.
+    Replaces the single sagittal target by one per view width. The shift limit is unchanged; report the
+    share of fluid sagittal series at the limit. Update SPATIAL_TOKEN_IDENTITY['view_policy'].
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The measured reason the front labels see half a kneecap, on the series where their
+    findings show.
+- id: joint-gap-per-side-as-a-target
+  mechanism_id: mask-measurements-as-targets
+  parent_idea_id: null
+  title: Teach the model the gap between femur and tibia on the medial and on the lateral side
+  opportunity: 'A guess, with a new source of information. Everything the masks have given so far is position;
+    the gap between the bones on each side is a number about disease: it narrows with compartment osteoarthritis.
+    measurements.json holds it per knee and per side of the patient (prior-work.md, The targets). Medial
+    OA is the one target that gained beyond its interval from the anatomy work (+0.0062 at x1).'
+  mechanism: 'Load measurements.json beside knees.json in AnatomyTargets (training/anatomy.py): gap_patient_left_mm
+    and gap_patient_right_mm per knee. In the training module add one linear head with two outputs on
+    the route-pooled tokens of the OA channel: for each knee pool the shared tokens with the oa_medial
+    and the oa_lateral routing weights (the same weights the labels use, detached) into two vectors and
+    predict one gap from each. The target for the medial vector is the gap on the knee''s medial side:
+    patient right for a left knee, patient left for a right knee, from batch["knee_side_left"]; knees
+    whose side is not certain or that lack a gap skip the loss. Loss: smooth L1 on (prediction - target)
+    / 2 mm, added inside the anatomy loss, so with its weight of 0.1.'
+  precedents:
+  - Routed report targets are read the same way, through the routing weights (report_attributes.py).
+  novelty: First target from the masks that measures the joint instead of locating it.
+  coverage: The 400 training knees with masks whose side is certain.
+  exploitation: 'Read Medial OA and Lateral OA at both multipliers against the incumbent, and per epoch
+    on the validation knees the mean absolute error of each gap against the error of always predicting
+    the training mean. Shown wrong by: a gap error not below that baseline, or both OA targets below the
+    incumbent by more than one sibling SD.'
+  budget: Same cost as the incumbent; one small head.
+  implementation: 'Follow the environment paragraph of the developer instructions. training/anatomy.py
+    and training/lightning.py. Adds; nothing can go, since no gap target exists. The head is created under
+    torch.random.fork_rng and added to the optimiser with the other training heads. Log val_anatomy_gap_error_mm
+    and val_anatomy_gap_baseline_mm. Add anatomy_gap_loss to nothing the guardrail counts: fold it into
+    anatomy_loss before logging.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The only seed that adds information about disease from the masks.
+exhausted_directions: ''

@@ -241,3 +241,29 @@ per-label total loss mass rises with rarity (1.01 to 1.20 across our labels) and
 scale with it. That is a third difference, deliberately not adopted here: our normalisation is
 what keeps the comparison to the control a change of emphasis rather than of effective learning
 rate.
+
+## Anatomy-map recipe (from the anatomy-masks campaign, 2026-10-08)
+
+Each is one change on the adopted recipe (the map's joint centre, sped up, with the two-knee pose
+fix). Seven others are the forced seeds of the
+[anatomy-recipe campaign](../../autoresearch/campaigns/anatomy-recipe/INDEX.md). Evidence and figures are in the
+campaign's [run notes](../../autoresearch/campaigns/anatomy-masks/run-notes.md).
+
+- **Region membership over the token's footprint** (source-backed, effect a guess): membership
+  is decided at the token's centre though a token is 12 to 13 mm wide; the researcher's
+  `regions-integrate-the-token-footprint`, queued and never run.
+- **Across axis from the joint mask's shape** (measured on masks, effect a guess): the
+  researcher's `joint-map-covariance-sets-the-across-axis`, queued and never run.
+- **Lighter Dice in the map's loss** and **a third of the map's gradient to the backbone**
+  (guesses): the steps between the two settings each tested in one run.
+- **Joint gap as a class or relative to the other side** (guess): in millimetres the head
+  recovered a fifth of a target that varies by under a millimetre.
+- **One plane and centre per knee in two-knee studies** (source-backed): they are fitted over
+  both knees pooled; about eight training studies, unknown in the hidden test set.
+- **Which structure each label depends on** (read-only diagnostic, from the working notes of
+  2026-10-07): where each head's attention falls by anatomy class is already measured
+  (`outputs/analysis/frame-and-targets/anatomy-sections-audit/`); what is not is the ablation: at
+  validation, drop the tokens of one predicted class at a time and see which targets fall.
+- **Cleaning rules checked against the masks** (guess, from the same notes): series in which no
+  knee is found point at wrong body parts or bad scans; rule-based checks designed against the
+  masks, with no trained model in the loader.

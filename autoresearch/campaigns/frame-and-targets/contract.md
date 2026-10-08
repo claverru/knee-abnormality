@@ -19,7 +19,7 @@ The base and starting incumbent is run 24 of [the line](../../../docs/ongoing/si
 `all_5fold_scanner_v2`, seed 1110484336, ResNet-18, ten epochs, ×4 0.925067, ×1 0.917070, 0.953
 public as S118; the ResNet-50 on its recipe scored 0.957 as S119). The previous campaign's one
 adoption on it, the height cuts placed from the spots, is level with it locally and scored 0.952
-(S120); it is not in the base and returns as the first seed. The campaign follows the three
+(S120); it is not in the base and returns inside the seed that reads the whole frame from the spots. The campaign follows the three
 topics locally and makes no Kaggle submission.
 
 ## Scope

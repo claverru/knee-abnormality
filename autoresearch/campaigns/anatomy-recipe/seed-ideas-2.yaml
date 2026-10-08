@@ -1,0 +1,124 @@
+ideas:
+- id: femur-front-in-the-kneecap-routes
+  mechanism_id: kneecap-route-sections
+  parent_idea_id: null
+  title: Read the femur's front, behind the kneecap, in full in the kneecap routes
+  opportunity: 'Measured premise, effect a guess. With the kneecap route led by the kneecap, PF OA, Effusion
+    and Synovitis still spend 44 to 46% of their attention on femur tokens and 9 to 21% on kneecap-joint
+    tokens (anatomy-masks run notes, run 15, last epoch on validation). The trochlea, the cartilage PF
+    OA is read from, and the pouch above it, where effusion and synovitis show, are femur and tissue in
+    front of the femur at the kneecap''s height; the route weights them at a quarter (FRONT_FLOOR) unless
+    they are kneecap tokens. On the masks the kneecap spans 21.3 mm (sd 5.7) to 54.6 mm (sd 6.7) above
+    the joint plane. Checked on the validation fold with the control''s weights: the front tokens in that
+    height window number 235 per study, 18% of a study''s tokens, and 57% of them are soft tissue; taking
+    all of them in full would bring back the wide front block that lost PF OA before the kneecap led the
+    route (prior-work.md). Restricted to femur tokens (share above half) they are 60 per study, 4.6% of
+    the tokens, and the kneecap route reads them at a mean weight of 0.31.'
+  mechanism: 'In KneeAbnormalityModel._regions (modeling/model.py) add one membership for the kneecap
+    route and the front-core route: tokens in front_plane whose height above the joint plane lies between
+    21.3 - 5.7 and 54.6 + 6.7 mm, weighted by the detached femur share alone (not the free share). Where
+    the routes now use behind_kneecap + (1 - behind_kneecap) * FRONT_FLOOR * front_plane * heights, take
+    the larger of that floor term and this membership, so the femur''s front counts in full instead of
+    at a quarter while the soft tissue of the front block stays at the floor. The height is the token''s
+    existing height coordinate in the frame. Nothing else in the routes changes.'
+  precedents:
+  - 'patellar-routing-uses-unsaturated-shares (anatomy-masks run 15): x4 +0.0003, its own targets unmoved.'
+  - 'rn18-anatomy-front-sample550: the kneecap route led by kneecap tokens recovered most of PF OA''s
+    loss.'
+  novelty: First section for the trochlea and the pouch.
+  coverage: Every study; the tokens in front of the femur at kneecap height.
+  exploitation: 'Read PF OA, Effusion and Synovitis at both multipliers against the control. On validation
+    only, log the share of the three targets'' attention on this membership (three metrics). Shown wrong
+    by: PF OA not above the control at either multiplier, or the macro below it at both.'
+  budget: 'Same cost as the control: within 1.02 of its training time. One masked product on tensors that
+    _regions already holds.'
+  implementation: Follow the environment paragraph of the developer instructions. modeling/model.py only.
+    Adds one membership inside the two existing unions and removes nothing; the quarter floor stays for
+    front tokens outside the height window. Report on one batch the mean number of tokens per study in
+    the membership and that routes other than kneecap and front-core are bit-identical. Update SPATIAL_TOKEN_IDENTITY
+    where it describes the kneecap route.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The three targets that pay for the map spend half their attention where the route
+    gives a quarter weight.
+- id: kneecap-inside-the-fluid-sagittal-crop-per-knee
+  mechanism_id: crop-target-position
+  parent_idea_id: null
+  title: Move the fluid sagittal crop forward only as far as each knee's kneecap needs
+  opportunity: 'Measured premise, effect a guess. The kneecap''s front lies 55.9 mm in front of the plateau
+    centre (sd 5.3) and the 93 mm fluid sagittal crop reaches 51.6 mm with the incumbent''s joint target;
+    a fixed move of 8.6 mm for every knee put 38% of the fluid sagittal series at the shift limit and
+    scored x4 -0.0005 (anatomy-masks run 7). Checked on the validation fold with the control''s weights
+    (prior-work.md, Premise checks): the first look predicts kneecap tokens in every knee; the share-weighted
+    mean front coordinate of the kneecap share tracks the mask''s kneecap front with correlation 0.67
+    on 150 knees (the largest front coordinate among kneecap tokens: 0.56) and lies 11.9 mm behind it
+    on average, leaving a residual of 3.9 mm against 5.3 mm for a constant. The move a knee needs is 7.4
+    mm on average (p90 14.3) and positive for 93% of knees, on top of pose shifts with a spread of 4 mm,
+    so inside today''s 12.75 mm limit it would be clipped as the fixed move was.'
+  mechanism: In KneeAbnormalityModel.first_look_pose (modeling/model.py), after the frame is fitted, take
+    per study the mean front coordinate, in the frame, of the first look's tokens weighted by their detached
+    kneecap share (valid, routable tokens of every view), add 11.9 mm, and subtract the fluid sagittal
+    crop's forward reach (half the field plus the sagittal target's forward offset). Where the result
+    is positive, shift the fluid sagittal view's crop forward by it in the same call of frame_pose, before
+    the clamp. Set data.view_shift_limit_mm to 22.5 and give the fluid sagittal view the limit 0.75 *
+    margin (16.9 mm) while every other view keeps today's 12.75 mm, as min(0.75 * margin, 0.75 * round(17
+    mm / pixel pitch)) in canvas pixels. One weighted mean over tensors the first look already holds;
+    no extra pass. T1/PD sagittal, coronal and axial crops do not change.
+  precedents:
+  - 'fluid-sagittal-crops-moved-forward-for-the-kneecap (anatomy-masks run 7): fixed 8.6 mm, 38% at the
+    limit, x4 -0.0005.'
+  novelty: First crop move set by the knee's own kneecap.
+  coverage: The fluid sagittal series of knees whose kneecap reaches the crop's front edge.
+  exploitation: 'Read PF OA, Effusion and Synovitis at both multipliers against the control. On validation
+    only, log the mean forward move in mm, the share of fluid sagittal series moved and the share at the
+    shift limit (three metrics). Shown wrong by: more than 20% of fluid sagittal series at the shift limit,
+    or PF OA and Effusion both below the control at x4.'
+  budget: Canvases about a fifth larger in area for the sagittal and coronal series; training within 1.08
+    of the control, from the canvases only.
+  implementation: Follow the environment paragraph of the developer instructions. modeling/model.py and
+    configs/training.yaml (data.view_shift_limit_mm only). Replaces nothing; the fixed sagittal target
+    stays as the starting point. Report on one batch the mean and largest move in mm and that every other
+    view's pose is bit-identical to the control's. Update SPATIAL_TOKEN_IDENTITY['preparation'].
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The kneecap is whole in a minority of fluid sagittal crops, and the fixed move was
+    clipped.
+- id: joint-centre-offset-from-the-training-knees
+  mechanism_id: joint-centre-offset
+  parent_idea_id: null
+  title: Remove the joint centre's measured offset and restore the crop targets measured with the true
+    centre
+  opportunity: 'Measured. The map''s joint centre sits in front of and to one side of the plateau centre
+    by the same amount in every run: on the training knees with targets its signed error averages +1.23
+    mm across and +2.07 mm front to back over the control''s last three epochs (anatomy_centre_error_*_mm_mean
+    in its metrics.csv; +0.94 and +1.74 mm on validation), with a spread of 2.4 and 1.9 mm. The incumbent
+    absorbed it by re-measuring the crop targets on eight validation knees (sagittal 4.89, 2.73 mm; coronal
+    -2.08, 2.03 mm) instead of the targets measured with the true centre on the masks (sagittal 7.4, 2.3
+    mm; coronal -1.1, 1.3 mm), so the crops are framed as before but the sections and regions, which are
+    centred on the same point, stay 1 to 2 mm off. Confirmed independently on 150 validation knees with
+    targets, first look: +1.18 mm across and +2.13 mm front (frame comparison, anatomy-masks run notes).
+    The two sets of targets differ by 2.5 mm forward in sagittal and 1.0 mm across in coronal, which is
+    this offset to within half a millimetre.'
+  mechanism: In KneeAbnormalityModel.anatomical_frames (modeling/model.py) subtract (1.23, 2.07) mm from
+    the across and front coordinates of the bone-weighted centroid before it is projected onto the plane.
+    Set CORONAL_JOINT_TARGET_MM back to (-1.1, 1.3) and SAGITTAL_JOINT_TARGET_MM back to (7.4, 2.3). Two
+    constants and one subtraction; nothing else changes.
+  precedents:
+  - 'joint-centre-from-the-map-instead-of-the-spots (the incumbent''s centre): x4 level, 0.954 public.'
+  - 'joint-centre-with-equal-view-exposure: moved the centre 0.06 mm and scored like a rerun.'
+  novelty: First centre without its fixed bias, and crop targets from 550 knees instead of eight.
+  coverage: 'Every knee: the regions and sections move by 1 to 2 mm, the crops by the difference between
+    the two sets of targets and the offset, under 1 mm on average.'
+  exploitation: 'Read both multipliers against the control with both menisci and the three OA targets,
+    whose regions are centred on this point. The existing validation metrics anatomy_centre_error_across_mm_mean
+    and anatomy_centre_error_front_mm_mean must fall below 0.5 mm in absolute value. Shown wrong by: either
+    mean above 0.5 mm, or the macro below the control at both multipliers.'
+  budget: 'Same cost as the control: within 1.02 of its training time.'
+  implementation: Follow the environment paragraph of the developer instructions. modeling/model.py only.
+    Replaces the two re-measured targets and adds the offset; adds no metric. Report on one batch the
+    mean crop shift in mm against the control's for sagittal and coronal series (expect under 1 mm). Update
+    the view_policy entry of SPATIAL_TOKEN_IDENTITY, which names the targets.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: A measured bias with a two-constant repair; last of the agreed seeds.
+exhausted_directions: ''

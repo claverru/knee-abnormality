@@ -1,0 +1,81 @@
+ideas:
+- id: edema-bone-targets-with-the-head-in-the-model-2
+  mechanism_id: report-region-targets
+  parent_idea_id: null
+  title: Four located targets for marrow edema, femur and tibia on each side, read by one shared head
+    that lives in the model, so a femur spot and a tibia spot exist for every knee
+  opportunity: 'Evidence-backed counts, a guess for the effect. No report target today is read on
+    both sides of the tibia-against-joint cut or tells the femoral side of a compartment from the
+    tibial side. The v5 answer marrow_edema_bone does: with the compartment answer the incumbent already
+    uses, the reports give about 393 medial-femur, 349 medial-tibia, 354 lateral-femur and 310 lateral-tibia
+    knees, each above the 200 a located target needs, and 2,512 reports without edema as full-weight
+    negatives. On 212 audited reports the femur is right in 48 of 60 answers and the tibia in 58 of
+    72, femur and tibia are swapped once in 37 single-bone reports, and the typical error is answering
+    both bones (prior-work.md, The v5 report answers). It also gives Contusion''s finding a place
+    per study. Nothing in the frame marks the femur today: the crops show about 3 cm of it, and the
+    kneecap spot marks the kneecap. A head trained to find edema in the femur and in the tibia has
+    to look at each bone''s marrow, in knees with and without edema, so its attention above and below
+    the joint is a candidate landmark for each bone. The report heads live in the training module
+    and vanish at prediction; this one is put in the model so that its spots can be read for any knee.'
+  mechanism: 'training/report_attributes.py reads, beside the v4.0 targets, the two v5 questions from
+    `<paths.data_root>/labels/prepared/jevk5-report-attributes-v5.0-new/targets.parquet` (columns
+    `StudyInstanceUID` and `attribute_<question>__<option>`, one row per study of the 4,407). A new
+    located family "marrow_edema_bone" with four Region entries, read by one shared head exactly as
+    the existing located families are: femur_medial, femur_lateral, tibia_medial, tibia_lateral. The
+    target of a region is the product of two masses: the bone (femur: options femur and femur_tibia;
+    tibia: options tibia and femur_tibia) times the compartment (the options of marrow_edema_location
+    that include that compartment, as the existing edema-by-compartment regions define them). Its
+    weight is the reliability weight times one minus the mass of the bone options not_stated and patella_and_other.
+    Four new routes appended to ROUTES and _regions (modeling/model.py): bone_femur_medial = the medial
+    compartment''s sectors and its half of the core in the joint and upper bands; bone_tibia_medial
+    = the same sectors and half core in the tibia and joint bands; the two lateral ones their mirror
+    images. No existing target or region changes, and marrow_edema_bone gets no option-level head.
+    The family''s attention column and classifier row are parameters of KneeAbnormalityModel instead
+    of the training module: the training module calls them for the report loss exactly where a located
+    family''s own column and row would be, with the same detachment and the same gradient path as
+    the other located families. With that column''s scores the model computes, without gradient and
+    with the existing `spot` function, four spots per knee: femur medial, femur lateral, tibia medial,
+    tibia lateral, each the squared-attention centroid over the tokens of that fitted side (fitted
+    medial > 0 or <= 0) above or below the meniscus midpoint''s height. encode_batch returns them.
+    Nothing reads them in this seed: the frame is unchanged.'
+  precedents:
+  - 'docs/ongoing/side-routed-heads.md: located targets hold on unseen knees (tear place 33% explained,
+    edema by compartment 25%).'
+  - 'routing-and-shifts, contusion-reads-the-edema-head-2: Contusion pooled with the edema head''s
+    attention, -0.0007 and -0.0011, its scale stayed at 0.'
+  novelty: First report head kept in the model; first landmark candidates for the femur and the tibia.
+  coverage: Training only; the 4,407 studies with reports.
+  exploitation: 'Read both multipliers against the incumbent, Contusion, Fracture and the four compartment
+    targets, val_report_attribute_bce_<region> for the four new targets with the share each explains,
+    and per epoch on the validation knees, for each of the four spots, the share of knees where it
+    is found and the mean and spread of its place in the knee''s frame (medial, front, height, in
+    millimetres), separately for knees whose report has edema and knees whose report has none. Shown
+    wrong by: the four targets explaining under 10% on the validation knees; or, for the spots, a
+    place in knees without edema that differs from the place in knees with edema by more than its
+    own spread.'
+  budget: Same cost as the incumbent; one more attention column and classifier row.
+  implementation: 'Follow the environment paragraph of the developer instructions. The Region tuple
+    takes one question today; extend it, or the code that turns a Region into a target, so that a
+    region may multiply the located mass of a second question, without changing the values of the
+    existing regions (report the largest absolute difference of their targets on one batch against
+    the incumbent: it must be zero). Load the extra file once, aligned by StudyInstanceUID, failing
+    loudly if a training study with a report is missing from it. Report in the candidate''s notes
+    the options chosen for each region and the number of training studies with a target above 0.5
+    in each of the four. Update SPATIAL_TOKEN_IDENTITY["compartment_routing"]. Create the head''s
+    layers under torch.random.fork_rng. Keeper''s requeue, 2026-10-07: the first candidate was parked
+    because this text demanded that a mirrored pass give mirror-image spots. That was the keeper''s
+    mistake and is withdrawn: a mirrored image passes through the backbone as a different picture,
+    so attention scores and the token lattice differ and the spots cannot coincide exactly (5.2 mm
+    apart on the one study the developer checked, with untrained weights). It is not a gate. Report
+    the distance between the mirrored pass''s spots, reflected back, and the plain pass''s spots on
+    one batch as a number, and log nothing more about it. The complete implementation exists in the
+    parked candidate''s workspace, outputs/autoresearch/frame-and-targets/experiments/edema-bone-targets-with-the-head-in-the-model-20261007T123302Z-8f577e2e/workspace
+    (the four targets, the appended routes, the model-owned report trunk with the new attention column
+    and classifier row, the detached spots, the validation diagnostics and the supervision-weight
+    log): reuse it as it is, rerun the guardrail check and return prepared. Update SPATIAL_TOKEN_IDENTITY["algorithm"]
+    as well.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Keeper's requeue of a seed parked by a requirement the keeper wrote wrongly;
+    the femur and tibia spots are what the campaign's direction rests on.
+exhausted_directions: ''

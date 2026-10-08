@@ -326,6 +326,24 @@ regenerate them at the cost of one ×4 prediction per fold.
 5. **Routing labels to their best planes** when building the teacher label; the view label bias
    already learns a version of this.
 
+## Anatomy masks: what is left untried
+
+From the working notes of 2026-10-07 on exploiting a pretrained segmenter offline, after the
+[anatomy-masks campaign](../../autoresearch/campaigns/anatomy-masks/INDEX.md) used the bone
+masks for the map, the plane, the centre, the sections, each token's position in the bone frame
+and the posed crops. All are guesses about the score; the segmenter never runs at prediction.
+
+- **Soft-tissue masks.** Menisci, cartilage and cruciates from `aagatti/nnunet_knee`, PYCAD Knee
+  or the SKM-TEA models, in place of bone-only MRAnnotator: the recipe already routes each head
+  through sections read from the bone map (femur, joint, tibia, kneecap); these masks would let
+  the meniscus, OA and ACL targets read the structures themselves, and give cartilage volume per
+  compartment as a target. Licence and training data of each model to be checked first (the bone
+  model passed the host's test).
+- **Masks for every training knee.** About 400 of 3,500 training knees carry targets; the map
+  already reaches 0.90 overlap on femur and tibia with them, so what the rest would add is
+  unknown.
+- **Segmentation before the labels.** A stage that teaches the backbone to segment knees, or a
+  full decoder beside the labels dropped at prediction, instead of the per-token map head.
 ## Parked until a specific need
 
 ### Fused study volume and 3D model

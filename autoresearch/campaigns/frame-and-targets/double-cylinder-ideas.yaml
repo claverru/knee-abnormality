@@ -1,0 +1,80 @@
+ideas:
+- id: double-cylinder-with-a-learned-femur-lean
+  mechanism_id: upper-band-on-its-own-axis
+  parent_idea_id: null
+  title: A double cylinder whose femur section leans by an angle learned per knee from the labels and the reports, with one free angle and readers on both sides of the femur's axis
+  opportunity: >-
+    The user's direction, given a fair setup. One run let the labels set the femur section's
+    lean (outputs/training/20261007-101112-side-routed-femur-lean): every knee went to -25
+    degrees within two epochs and the frame's tilt rose by 9 degrees. That run had four
+    identifiable flaws, and this seed removes each. (a) Two free angles, the frame's learned
+    forward tilt and the lean, traded against each other; the same trade appeared when the lean
+    came from a spot (femur-section-on-spot-placed-cuts-2: lean +60, tilt -38). (b) Only the
+    front targets read the femur band (PF OA, Effusion, Synovitis), so every gradient on the
+    lean pushed one way and nothing rewarded putting the axis on the bone. (c) The lean was
+    regressed from one pooled summary of the whole knee and came out the same for every knee.
+    (d) No report target touched the femur. Since then the bone head exists: four edema targets
+    by bone and side, explaining 27 to 31% on unseen knees, whose attention sits in the femoral
+    condyle in every knee, with or without edema (edema-bone-targets-with-the-head-in-the-model-2).
+    Measuring the femur's direction from that head's spots failed three ways (levers of 15 to 56
+    mm, bends with a spread of 24 to 28 degrees), so the direction has to be learned; what the
+    head supplies is a reader inside the bone to pull against the readers in front of it.
+  mechanism: >-
+    Built on the candidate of femur-section-on-spot-placed-cuts-2, which already has the bone
+    head in the model, the two height cuts placed from the spots without gradient, and frame()
+    with the band above the upper cut laid out around a leaned axis (front becomes front - max(
+    height - upper cut, 0) * tan(lean), hinged at the cut). Three changes to it. (1) One free
+    angle: the frame's forward tilt is zero for every knee. The landmark tilt and the per-knee
+    regressed nod are removed and the nod component of the shared learned rotation is held at
+    zero; roll and turn stay as they are (from the meniscus spots, plus the shared rotation's
+    roll and turn). With the cuts placed from the spots, the only geometry the labels and
+    reports can move is the lean, the two radii and the shared shift. (2) The lean is learned
+    per knee: lean = L * tanh(z / L) with L = 35 degrees, z from a new head that reads only the
+    knee's valid tokens above the meniscus midpoint's height: the existing frame hidden
+    (frame_head of the detached tokens plus the position code of their fitted positions), pooled
+    by a new attention layer over those tokens and mapped by a new linear layer whose weight
+    starts at zero, so the lean starts at zero for every knee. No spot enters the lean. (3)
+    Readers on both sides of the femur's axis: above the upper cut the two femur edema targets
+    read only the bone column of their side, the core half and the inner-ring sectors of that
+    side; in the joint band they read as today. The tibia edema targets and every label's
+    region are unchanged, so above the cut the front labels read both rings in front while the
+    femur targets read the core and inner ring: moving the axis off the marrow costs the report
+    loss, moving it off the kneecap costs the labels.
+  precedents:
+  - "outputs/training/20261007-101112-side-routed-femur-lean: lean learned with two free angles and front readers only: x4 -0.0002, x1 -0.0009, Effusion +0.0021; lean -25 degrees for every knee."
+  - "frame-and-targets, femur-section-on-spot-placed-cuts-2: lean from the femur spot: x4 -0.0032, x1 -0.0044; lean +60 degrees, learned tilt -38."
+  - "frame-and-targets, edema-bone-targets-with-the-head-in-the-model-2: the bone head alone: x4 -0.0006, x1 -0.0000; femur spots 15.0 mm above and 13.2 mm in front of the meniscus midpoint (SD 3.7 and 7.1), tibia spots 11.2 mm below."
+  - "Run 30 (cuts with readers on both sides stay where they start) and run 26 (a cut with readers on one side slides)."
+  novelty: First lean with a single free angle and a report-supervised reader inside the bone; first frame without a learned forward tilt.
+  coverage: Every knee; the lean starts at zero and needs no spot.
+  exploitation: >-
+    Read both multipliers against the incumbent, PF OA, Effusion, Synovitis and ACL (they read
+    above the lower cut), the four compartment targets and the four bone targets' explained
+    shares against the bone-head run's, and per epoch on the validation knees the mean and the
+    spread across knees of the lean in degrees, the two cuts and the two radii. Shown wrong by:
+    a lean whose spread across knees stays under 3 degrees at the last epoch (one shared
+    setting again); or the femur targets' explained share falling under 10%.
+  budget: Same cost as the incumbent plus the bone head and one small head.
+  implementation: >-
+    Follow the environment paragraph of the developer instructions. Start from
+    outputs/autoresearch/frame-and-targets/experiments/femur-section-on-spot-placed-cuts-2-20261007T125017Z-e395eccf
+    (source/ and changes.diff): keep its bone head, its spot-placed cuts, its leaned frame() and
+    the "frame_lean" plumbing and logs; remove its lean from the femur spots. The withdrawn
+    mirrored-spot requirement of the first bone-head seed is not a gate here either. Create the
+    two new layers under torch.random.fork_rng; the tokens the new head reads are detached.
+    Remove what only the landmark tilt and the regressed nod used (the landmark_attention layer,
+    the nod columns of frame_output), keeping every other column's behaviour. The guardrail
+    script calls frame_rotation and checks that the shared rotation starts at zero: keep it
+    callable and zero at the start, with its nod component multiplied by zero where it is
+    applied. Report on one batch, with untrained weights: the lean is exactly zero for every
+    knee; the frame's forward tilt is zero; the femur targets' weight above the upper cut is
+    zero on outer-ring tokens and equals the bone-head candidate's on core and inner-ring
+    tokens; and the loss has a nonzero gradient on the new head's output layer after one
+    backward pass with the lean nudged off zero. Log val_ and training study_femur_lean_deg,
+    its standard deviation across knees and the lean's gradient norm per epoch. Replaces: the
+    landmark tilt, the regressed nod and the lean read from the femur spots. Update
+    SPATIAL_TOKEN_IDENTITY["algorithm"] and ["compartment_routing"].
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user's double cylinder, asked for on 2026-10-07 after three measurements of the femur's direction failed; set up so the gradient has an opposing reader and no second angle to trade with.
+exhausted_directions: ""

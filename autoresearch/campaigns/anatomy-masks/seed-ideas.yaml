@@ -1,0 +1,168 @@
+ideas:
+- id: turned-crops-cut-with-bicubic-interpolation
+  mechanism_id: crop-resampling
+  parent_idea_id: null
+  title: Cut the turned crops with bicubic interpolation instead of bilinear, so that turning no longer
+    blurs them
+  opportunity: 'Evidence-backed. The incumbent cuts a turned crop from the canvas with bilinear interpolation:
+    on 900 slices its fine detail (mean absolute Laplacian) is 0.81 of the loader''s crop, the same under
+    1 degree as at 6 to 12 degrees, and the training jitter turns every crop. The same cut with bicubic
+    interpolation keeps 0.98; a crop that is only shifted keeps 1.00 (posed_crop_sharpness.py). Since
+    the crops were posed, the targets that read fine detail fell at x1: Lateral Meniscus -0.0148 (interval
+    excludes zero), Contusion -0.0058, Fracture -0.0057, each level or up in the run before, and nine
+    of twelve targets moved attention from the posed sagittal views to the untouched axial ones (target-analysis.txt).
+    The blur is a defect of the cut, not a property of turning.'
+  mechanism: In ViewWindows.forward (modeling/model.py) call F.grid_sample with mode='bicubic' instead
+    of 'bilinear' (padding_mode and align_corners unchanged) and clamp the result to the canvas range
+    0 to 255 before it is used, since bicubic can overshoot. The exact copy for a zero angle, the pose,
+    the shift, the limits and the jitter stay as they are.
+  precedents:
+  - An offset pattern at prediction changed scores through the resampling of the picture, not through
+    positions (routing-and-shifts run notes).
+  - 'Crops turned by half the old frame''s angle, bilinear: x4 +0.0015, x1 -0.0006 (frame-and-targets,
+    crops-turned-to-the-frame).'
+  novelty: First turned crops at the loader's sharpness.
+  coverage: 'Every sagittal and coronal slice with a non-zero turn: all of them in training, nearly all
+    at prediction.'
+  exploitation: 'Read Lateral Meniscus, Contusion, Fracture and ACL at both multipliers against the incumbent,
+    and each target''s share of attention per view. Shown wrong by: Lateral Meniscus not above the incumbent
+    by one sibling SD (0.0024) at x1.'
+  budget: Same cost as the incumbent within a few percent; bicubic reads sixteen canvas pixels per output
+    pixel instead of four.
+  implementation: Follow the environment paragraph of the developer instructions. modeling/model.py only.
+    Replaces the bilinear cut. Report on one batch the ratio of the mean absolute Laplacian of the turned
+    crops to that of the central crops (expect about 0.98, against 0.81 for the incumbent) and that the
+    values stay within 0 to 255. Update SPATIAL_TOKEN_IDENTITY['preparation'].
+  open_choices: None.
+  dependencies: []
+  priority_rationale: A measured defect that removes a fifth of the fine detail from every posed crop,
+    with a one-line repair.
+- id: joint-centre-from-the-map-instead-of-the-spots
+  mechanism_id: joint-centre-source
+  parent_idea_id: null
+  title: Take the knee's centre across and front to back from the anatomy map instead of the meniscus
+    attention spots
+  opportunity: 'Evidence-backed. The frame''s centre across the knee and front to back is still the midpoint
+    of two meniscus attention spots, a leftover of the design before the map; its height already comes
+    from the joint plane. Against the real plateau centre on 150 validation knees (centre-sources.txt),
+    the spots leave 3.0 mm across and 3.1 mm front to back between knees; the centroid of the predicted
+    femur and tibia tokens near the joint plane leaves 2.2 and 1.7 mm (the joint class alone 2.3 and 1.7;
+    the loader''s own centre 4.5 and 4.7). The crops'' shift across follows this centre: it matched the
+    real one at only 0.76 to 0.81 and removed a third of its spread, while the shift up and down, read
+    from the plane, matched at 0.97 (pose-accuracy.txt). Lateral Meniscus is the incumbent''s largest
+    loss and the knee nearly fills the crop from side to side.'
+  mechanism: In KneeAbnormalityModel.anatomical_frames (modeling/model.py), after the plane is fitted,
+    compute per knee the centroid of the token positions weighted by (femur share + tibia share) * exp(-0.5
+    * (h / 10 mm)^2), h the token's height above the fitted plane, over the valid tokens, on detached
+    shares. Replace the two in-plane components of the frame's shift by this centroid's components in
+    the plane (keep the height from the plane as now). Knees with no bone token keep the spots' midpoint.
+    The side axis and the turn about the vertical stay from the spots. In ViewWindows set both joint targets
+    to the mean position this centre takes in the crops, measured by the developer on the validation knees
+    of one batch run of the incumbent and reported, so the average framing does not move.
+  precedents:
+  - The plane read from the map replaced a height read elsewhere and went from 6 mm to 1.7 mm (prior-work.md).
+  - 'Centring the crops on the old frame: -0.0004, with PF OA and Fracture paying (frame-and-targets).'
+  novelty: First frame whose centre, height and tilt all come from the map.
+  coverage: Every knee with femur or tibia tokens in view.
+  exploitation: 'Read Lateral Meniscus, Medial Meniscus, the two compartment OA targets, MCL and ACL at
+    both multipliers against the incumbent, and per epoch on the validation knees the spread of the centre''s
+    error across and front to back against the plateau centre (log it with the plane error). Shown wrong
+    by: a centre error not below 2.6 mm across or 2.4 mm front to back at the last epoch, or Lateral Meniscus
+    not above the incumbent by one sibling SD (0.0024) at x1.'
+  budget: Same cost as the incumbent; one weighted mean per knee.
+  implementation: Follow the environment paragraph of the developer instructions. modeling/model.py, plus
+    the log in training/lightning.py. Replaces the spots' midpoint as the centre. The regions (core, ring,
+    sectors) and the crop pose both read the new centre, since both read the frame's shift. Log val_anatomy_centre_error_across_mm
+    and val_anatomy_centre_error_front_mm as standard deviations across knees, from the plateau centres
+    in knees.json converted as token_heights converts them. Update SPATIAL_TOKEN_IDENTITY['algorithm'].
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The one part of the pose still decided by an attention spot; the map locates it
+    a quarter to a half better in a check without training.
+- id: a-tenth-of-the-map-gradient-to-the-backbone
+  mechanism_id: map-gradient-share
+  parent_idea_id: null
+  title: Let a tenth of the anatomy map's gradient reach the backbone instead of all of it
+  opportunity: 'Evidence-backed problem, a guess for the dose. Synovitis fell in every run that trains
+    the map, including the first, where the regions were run 24''s: x4 -0.0045, -0.0028, -0.0052, -0.0068
+    (prior-work.md, The cost to Synovitis), and in the last its attention by anatomy was equal to run
+    24''s, so the regions are not the cause. With no gradient at all the map is too weak after one epoch
+    (femur 0.52, tibia 0.44, joint 0.40, plane error 4.6 mm against 0.85, 0.84, 0.68 and 1.8 mm). Nothing
+    between the two extremes has been tried.'
+  mechanism: 'In KneeAbnormalityModel.encode_batch (modeling/model.py) the map head reads `tokens.float()`.
+    Feed it `tokens.detach() + MAP_GRADIENT_SHARE * (tokens - tokens.detach())` with MAP_GRADIENT_SHARE
+    = 0.1, a module constant: the forward value is unchanged and the gradient into the tokens is scaled
+    by 0.1. The head, the loss, its weight, the plane, the sections and the crops stay as they are.'
+  precedents:
+  - 'Full gradient: rn18-anatomy-front-sample550, x4 -0.00008, x1 +0.00002, Synovitis -0.0068 and -0.0110.'
+  - 'No gradient, two-layer head with Dice: stopped after one epoch, plane error 4.6 mm.'
+  novelty: First dose between full and none.
+  coverage: Every knee with targets; the frame and the crops of every knee depend on the map's quality.
+  exploitation: 'Read Synovitis, Effusion and PF OA at both multipliers against the incumbent and run
+    24, and per epoch the plane error and the overlap of femur, tibia, joint and kneecap joint. Shown
+    wrong by: Synovitis not above the incumbent by one sibling SD (0.0022) at either multiplier, or a
+    plane error above 2.5 mm at the last epoch.'
+  budget: Same cost as the incumbent.
+  implementation: 'Follow the environment paragraph of the developer instructions. modeling/model.py only:
+    one constant and one expression. Replaces the undamped read of the tokens by the map head. Confirm
+    on one batch that the gradient of the anatomy loss on the projection weights is 0.1 times the incumbent''s
+    (ratio within 1e-4) and that the logits are bit-identical in evaluation mode. Update SPATIAL_TOKEN_IDENTITY["algorithm"].'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Synovitis is the one target with a loss beyond its interval in every map run; it
+    holds the macro about 0.0005 to 0.0009 down.
+- id: the-map-loss-without-its-dice-term
+  mechanism_id: map-loss-terms
+  parent_idea_id: null
+  title: Train the map with cross-entropy alone, removing the Dice term the incumbent added
+  opportunity: Evidence on both sides, the balance is a guess. Dice lifted the thin classes from the first
+    epoch (kneecap 0.46 to 0.65, kneecap joint 0.51 to 0.62, joint 0.68 to 0.73) and the pose and the
+    kneecap route read exactly those classes. It also pushes the backbone harder towards anatomy, which
+    is what Synovitis pays for (principle 7). The incumbent added Dice and the posed crops in one run,
+    so the two were never separated.
+  mechanism: In anatomy_loss (training/anatomy.py) remove the soft Dice term (the `present`, `overlap`
+    lines and the added `(1 - overlap[present]).mean()`), leaving the cross-entropy against the target
+    shares. Everything else as the incumbent.
+  precedents:
+  - 'Cross-entropy alone, no posed crops: rn18-anatomy-front-sample550, x4 -0.00008, x1 +0.00002 against
+    run 24.'
+  novelty: Separates the two changes the incumbent made together.
+  coverage: Every knee with targets.
+  exploitation: 'Read both multipliers against the incumbent, Synovitis, PF OA and Effusion, and the per-epoch
+    overlap of kneecap, joint and kneecap joint with the plane error and the spread of the crop turns.
+    Shown wrong by: the macro below the incumbent at both multipliers with Synovitis not one sibling SD
+    above it.'
+  budget: Same cost as the incumbent.
+  implementation: Follow the environment paragraph of the developer instructions. training/anatomy.py
+    only. Replaces the Dice term; the logged overlap metrics stay.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The incumbent's two changes need to be told apart before anything is built on them.
+- id: the-first-look-on-a-third-of-the-slices
+  mechanism_id: first-look-cost
+  parent_idea_id: null
+  title: Read the pose from every third slice of the first look instead of all of them
+  opportunity: Evidence-backed. The posed crops make training about 25% slower and add about a quarter
+    of the model's work at x4 prediction (prior-work.md, Measured on the masks), and the contract refuses
+    a run above 1.3 times the incumbent's prediction time. The pose is one plane and one centre per knee,
+    fitted over all of its tokens; the fit used a few hundred tokens when it was checked offline and held
+    at 1.7 mm.
+  mechanism: 'In ViewWindows (modeling/model.py) first_look_batch selects `budget` slices evenly among
+    each series row''s valid slices, with budget = min(count, first_look_slices[view]). Use budget = min(count,
+    ceil(first_look_slices[view] / 3)) and keep the even spacing; at least one slice per row. Nothing
+    else changes: the same fit, the same crops.'
+  precedents:
+  - 'crops-turned-to-the-frame (frame-and-targets): a first look on the configured slice counts.'
+  novelty: First reduction of the first look.
+  coverage: Every knee.
+  exploitation: 'Report training seconds and prediction seconds against the incumbent, and per epoch the
+    plane error and the spread of turns and shifts. Shown wrong by: a plane error more than 0.3 mm above
+    the incumbent''s at the last epoch, or the macro below the incumbent at both multipliers.'
+  budget: Cheaper than the incumbent; expect training near 0.9 of its time.
+  implementation: Follow the environment paragraph of the developer instructions. modeling/model.py only.
+    Replaces the full-count first look. Log first_look_slices_per_knee (mean) once per epoch.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The cost of the first look is what the adoption rule and the Kaggle time limit both
+    watch.
+exhausted_directions: ''

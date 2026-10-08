@@ -1,0 +1,48 @@
+ideas:
+- id: the-first-look-on-the-whole-canvas-at-224-px
+  mechanism_id: first-look-field
+  parent_idea_id: null
+  title: Give the first look the whole canvas resized to 224 px instead of its central crop
+  opportunity: 'User-ordered on 2026-10-08. Geometry evidence-backed, the gain a guess. The first look
+    reads the central 224 px of each sagittal and coronal canvas, the same 84 or 93 mm the unposed crop
+    shows, and the pose it returns then moves the crop by up to three quarters of the 17 mm margin: the
+    true pose asks for shifts with sd 7.5 and 6.8 mm up and down and 4.5 and 4.2 mm across, and 2% and
+    4% of series sit at the limit (prior-work.md, Measured on the masks). The look that decides the move
+    never sees the margin it moves into: the central crop shows the femur to 42 to 49 mm above the joint
+    and the tibia to 39 to 44 mm below, and the kneecap whole in 11% and 38% of the sagittal crops. The
+    whole canvas is 314 px for the 84 mm views and 306 px for the 93 mm ones, 118 and 127 mm across;
+    resized to 224 px it has 0.526 and 0.568 mm per pixel, beside the 0.536 mm per pixel of the 120 mm
+    axial views the backbone already reads, and costs the same as the central crop.'
+  mechanism: 'In ViewWindows (modeling/model.py) add the first look''s own cut: for a view with margin
+    m > 0 take the canvas region of side 224 + 2m from the canvas origin and resize it to image_size with
+    F.interpolate(mode="bilinear", antialias=True, align_corners=False); views with margin 0 (axial) keep
+    the exact copy they have now. Set crop_affine for those slices to the scale s = (224 + 2m) / 224 on
+    both axes with translation (s - 1) / 2, in the convention of the existing affine (crop pixel to canvas
+    pixel), so that feature_geometry gives every token its true patient position and canvas_valid_rects
+    still masks what lies outside the picture. KneeAbnormalityModel.first_look_pose encodes this cut instead
+    of the central crop; the map, the plane, the centre and frame_pose read it as they are. The posed
+    crops, their widths, the jitter and the limits do not change, and the map is still trained only on
+    the posed crops.'
+  precedents:
+  - 'The incumbent''s first look on the central crops: plane error 1.73 mm, map overlap femur 0.905, tibia
+    0.899 (prior-work.md, The incumbent).'
+  - 'Axial views at 120 mm, 0.536 mm per pixel, read by the same backbone and map head.'
+  novelty: First first look that sees the margin the crops move into.
+  coverage: Every sagittal and coronal series of every knee, in training and at prediction.
+  exploitation: 'Read both multipliers against the incumbent with Lateral Meniscus, ACL, PF OA, Effusion
+    and Synovitis, and per epoch on the validation knees the plane error, the mean and spread of every
+    turn and shift, the share of series at the shift limit and the first look''s share of kneecap and
+    kneecap-joint tokens per sagittal slice. Shown wrong by: a plane error more than 0.3 mm above the
+    incumbent''s at the last epoch, or the macro below the incumbent at both multipliers.'
+  budget: Same cost as the incumbent; the first look still reads the same slices at 224 px.
+  implementation: Follow the environment paragraph of the developer instructions. modeling/model.py only.
+    Replaces the first look on the central crops, including the sentence of the developer instructions
+    that names them; it stays one no-gradient pass in evaluation mode on no more slices than a x1 pass.
+    Report on one batch the largest distance in mm between the patient positions of the same canvas points
+    seen through the resized look and through the central crop (expect under half a token pitch), and
+    that axial slices are bit-identical to the incumbent's first look. Log first_look_mm_per_pixel (mean
+    per plane) once per epoch. Update SPATIAL_TOKEN_IDENTITY['preparation'].
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Ordered by the user; the pose is limited by a look narrower than the move it sets.
+exhausted_directions: ''
