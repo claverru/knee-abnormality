@@ -78,12 +78,14 @@ class PathsConfig(ConfigModel):
     output_root: Path
     label_manifest: Path
     report_attribute_manifest: Path
+    anatomy_targets: Path | None = None
 
     @field_validator(
         "data_root",
         "output_root",
         "label_manifest",
         "report_attribute_manifest",
+        "anatomy_targets",
         mode="before",
     )
     @classmethod
@@ -202,6 +204,7 @@ class DataConfig(ConfigModel):
     )
     reference_field_mm: Annotated[float, Field(gt=0)]
     image_size: Annotated[StrictInt, Field(gt=0)]
+    view_shift_limit_mm: PositiveFiniteFloat = 6.0
     lower_quantile: Annotated[float, Field(ge=0, le=1)]
     upper_quantile: Annotated[float, Field(ge=0, le=1)]
     mean: tuple[FiniteFloat, FiniteFloat, FiniteFloat]
@@ -281,6 +284,7 @@ class ModelConfig(ConfigModel):
     series_dropout: Annotated[float, Field(ge=0, lt=1)]
     plane_readout: bool = False
     view_label_bias: bool = False
+    anatomical_frame: bool = False
     feature_statistics_augmentation: FeatureStatisticsAugmentationConfig = Field(
         default_factory=FeatureStatisticsAugmentationConfig
     )
@@ -334,7 +338,8 @@ class TrainerConfig(ConfigModel):
     min_delta: Annotated[float, Field(ge=0)]
     deterministic: bool
     class_balance_exponent: Annotated[float, Field(ge=0, le=1)]
-    report_attribute_loss_weight: PositiveFiniteFloat
+    report_attribute_loss_weight: Annotated[float, Field(ge=0, allow_inf_nan=False)]
+    anatomy_loss_weight: Annotated[float, Field(ge=0, allow_inf_nan=False)] = 0.0
     scanner_confusion_weight: Annotated[float, Field(ge=0, allow_inf_nan=False)]
 
 

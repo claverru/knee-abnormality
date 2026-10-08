@@ -19,6 +19,7 @@ from knee_abnormality.training.lightning import (
 )
 
 ALLOWED_LOSSES = {
+    "anatomy_loss",
     "train_loss",
     "side_head_loss",
     "report_attribute_loss",

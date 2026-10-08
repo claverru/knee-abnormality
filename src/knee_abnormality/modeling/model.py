@@ -2,9 +2,11 @@ import math
 
 import timm
 import torch
+import torch.nn.functional as F
 from torch import nn
 
 from knee_abnormality.config import SLICES_PER_INPUT, DataConfig, ModelConfig
+from knee_abnormality.inference.reflection import reflect_crops
 from knee_abnormality.modeling.augmentation import (
     ImageAugmentation,
     affine_matrices,
@@ -31,6 +33,367 @@ from knee_abnormality.modeling.spatial_tokens import (
     backbone_mapping_identity,
     feature_geometry,
 )
+
+
+def sample_windows(
+    canvas: torch.Tensor, origin: torch.Tensor, size: int
+) -> torch.Tensor:
+    height, width = canvas.shape[-2:]
+    integral = origin.long()
+    lines = torch.arange(size, device=canvas.device)
+    rows = integral[:, 0, None] + lines
+    columns = integral[:, 1, None] + lines
+    indices = (
+        rows.clamp(0, height - 1)[:, :, None] * width
+        + columns.clamp(0, width - 1)[:, None, :]
+    )
+    exact = (
+        canvas.flatten(2)
+        .gather(2, indices.flatten(1)[:, None].expand(-1, canvas.shape[1], -1))
+        .view(len(canvas), canvas.shape[1], size, size)
+    )
+    inside = ((rows >= 0) & (rows < height))[:, :, None] & (
+        (columns >= 0) & (columns < width)
+    )[:, None, :]
+    return exact * inside[:, None]
+
+
+def crop_rectangles(
+    rects: torch.Tensor, origin: torch.Tensor, size: int
+) -> torch.Tensor:
+    first = rects[..., :2] - origin
+    last = first + rects[..., 2:]
+    first = first.clamp(0, size)
+    last = last.clamp(0, size)
+    return torch.cat((first, (last - first).clamp_min(0)), -1)
+
+
+MAX_VIEW_ROTATION = math.radians(12.0)
+MAX_VIEW_SHIFT_FRACTION = 0.75
+VIEW_ROTATION_JITTER_DEGREES = 3.0
+VIEW_SHIFT_JITTER_MM = 3.0
+CORONAL_JOINT_TARGET_MM = (-2.075445, 2.031255)
+SAGITTAL_JOINT_TARGET_MM = (4.894627, 2.727388)
+
+
+def rotated_rectangles(
+    rects: torch.Tensor, affine: torch.Tensor, size: int
+) -> torch.Tensor:
+    top, left, rows, columns = rects.float().unbind(-1)
+    right, bottom = left + columns - 1, top + rows - 1
+    x = torch.stack((left, right, right, left), -1)
+    y = torch.stack((top, top, bottom, bottom), -1)
+    corners = torch.stack((x, y, torch.ones_like(x)), -1)
+    inverse = torch.linalg.inv(affine.float())
+    placed = torch.einsum("ntij,ntckj->ntcki", inverse, corners)[..., :2]
+    first = placed.amin(-2).clamp(0, size - 1)
+    last = placed.amax(-2).clamp(0, size - 1)
+    extent = (last - first + 1).clamp_min(0)
+    extent = torch.where(((rows > 0) & (columns > 0))[..., None], extent, 0.0)
+    return torch.cat((first.flip(-1), extent.flip(-1)), -1)
+
+
+class ViewWindows(nn.Module):
+    def __init__(self, data: DataConfig) -> None:
+        super().__init__()
+        self.image_size = data.image_size
+        views = [view for _, view in data.views]
+        self.first_look_width = max(view.slices for view in views)
+        with torch.random.fork_rng(devices=[]):
+            self.register_buffer(
+                "margin",
+                torch.tensor(
+                    [
+                        round(
+                            data.view_shift_limit_mm / (view.field_mm / data.image_size)
+                        )
+                        if view.field_mm != data.reference_field_mm
+                        else 0
+                        for view in views
+                    ],
+                    dtype=torch.float32,
+                ),
+                persistent=False,
+            )
+            self.register_buffer(
+                "sagittal",
+                torch.tensor([kind.plane == "Sagittal" for kind in data.series_types]),
+                persistent=False,
+            )
+            self.register_buffer(
+                "coronal",
+                torch.tensor([kind.plane == "Coronal" for kind in data.series_types]),
+                persistent=False,
+            )
+            self.register_buffer(
+                "coronal_target",
+                torch.tensor(CORONAL_JOINT_TARGET_MM),
+                persistent=False,
+            )
+            self.register_buffer(
+                "sagittal_target",
+                torch.tensor(SAGITTAL_JOINT_TARGET_MM),
+                persistent=False,
+            )
+            self.register_buffer(
+                "first_look_slices",
+                torch.tensor([view.slices for view in views]),
+                persistent=False,
+            )
+
+    def first_look_batch(self, batch: dict) -> dict:
+        mask = batch["slice_mask"]
+        count = mask.sum(-1)
+        budget = torch.minimum(count, self.first_look_slices[batch["view_index"]])
+        width = self.first_look_width
+        steps = torch.arange(width, device=mask.device)[None]
+        ranks = (
+            (
+                steps
+                * (count - 1).clamp_min(0)[:, None]
+                / (budget - 1).clamp_min(1)[:, None]
+            )
+            .round()
+            .long()
+        )
+        positions = torch.arange(mask.shape[1], device=mask.device).expand_as(mask)
+        ordered = torch.where(mask, positions, mask.shape[1]).sort(-1).values
+        indices = ordered.gather(1, ranks.clamp_max(mask.shape[1] - 1)).clamp_max(
+            mask.shape[1] - 1
+        )
+        prepared = {
+            key: value for key, value in batch.items() if key != "mirrored_study"
+        }
+        prepared["images"] = (
+            batch["images"][:, :, 1:2]
+            if batch["images"].shape[2] > 1
+            else batch["images"]
+        )
+        for key in (
+            "images",
+            "slice_mask",
+            "slice_positions",
+            "valid_rects",
+            "patient_maps",
+            "geometry_valid",
+        ):
+            value = prepared[key]
+            selection = indices.reshape(*indices.shape, *([1] * (value.ndim - 2)))
+            prepared[key] = value.gather(
+                1, selection.expand(*indices.shape, *value.shape[2:])
+            )
+        prepared["slice_mask"] = steps < budget[:, None]
+        return prepared
+
+    def geometry(self, batch: dict) -> tuple[torch.Tensor, ...]:
+        maps = batch["patient_maps"].float()[:, :, 1]
+        linear = torch.where(torch.isfinite(maps[..., :2]), maps[..., :2], 0.0)
+        length = linear.norm(dim=-2)
+        usable = (length > 1e-4).all(-1) & batch["geometry_valid"] & batch["slice_mask"]
+        usable = usable & torch.isfinite(maps).all((-1, -2))
+        series = batch["series_type_index"]
+        coronal = self.coronal[series][:, None]
+        sagittal = self.sagittal[series][:, None]
+        movable = (self.margin[batch["view_index"]] > 0)[:, None]
+        usable = usable & movable & (coronal | sagittal)
+        half = (self.image_size - 1) / 2
+        offset = torch.where(
+            coronal[..., None], self.coronal_target, self.sagittal_target
+        ) / length.clamp_min(1e-4)
+        return maps, linear, length, usable, half + offset
+
+    def frame_pose(self, batch: dict, encoded: dict) -> torch.Tensor:
+        with torch.autocast(device_type=batch["images"].device.type, enabled=False):
+            study = batch["series_study_index"]
+            studies = encoded["batch_size"]
+            side = torch.zeros(studies, device=study.device).index_add(
+                0, encoded["study"], 1 - 2 * encoded["left_probability"].float()
+            )
+            side = torch.where(side < 0, -1.0, 1.0)[study]
+            sign = batch["knee_side_sign"]
+            own = (
+                batch["knee_side_split"][study]
+                & ~batch["knee_side_certain"][study]
+                & (sign != 0)
+            )
+            side = torch.where(own, torch.where(sign < 0, -1.0, 1.0), side)
+            cosine, sine = encoded["study_axis"].float()[study].unbind(-1)
+            up = encoded["study_frame_rotation"].float()[study][:, 2]
+            centre = encoded["study_frame_shift"].float()[study]
+
+            def patient(vector: torch.Tensor) -> torch.Tensor:
+                return torch.stack(
+                    (
+                        side * vector[:, 0] * cosine + vector[:, 1] * sine,
+                        side * vector[:, 0] * sine - vector[:, 1] * cosine,
+                        vector[:, 2],
+                    ),
+                    -1,
+                )
+
+            knee = torch.stack(
+                [
+                    batch[key].float()
+                    for key in (
+                        "knee_center_x_mm",
+                        "knee_center_y_mm",
+                        "knee_center_z_mm",
+                    )
+                ],
+                -1,
+            )
+            maps, linear, length, usable, pivot = self.geometry(batch)
+            across, down = torch.einsum(
+                "ntpa,np->nta",
+                linear / length.clamp_min(1e-6)[..., None, :],
+                patient(up),
+            ).unbind(-1)
+            angle = torch.atan(-across / torch.where(down.abs() < 1e-6, 1e-6, down))
+            angle = angle.clamp(-MAX_VIEW_ROTATION, MAX_VIEW_ROTATION)
+            point = (knee + patient(centre))[:, None] - maps[..., 2]
+            point = torch.where(torch.isfinite(point), point, 0.0)
+            gram = torch.einsum("ntpa,ntpb->ntab", linear, linear)
+            gram = gram + 1e-6 * torch.eye(2, device=gram.device)
+            pixel = torch.linalg.solve(
+                gram, torch.einsum("ntpa,ntp->nta", linear, point)
+            )
+            margin = self.margin[batch["view_index"]][:, None, None]
+            limit = MAX_VIEW_SHIFT_FRACTION * margin
+            shift = (pixel - margin - pivot).clamp(-limit, limit).round()
+            usable = usable & torch.isfinite(angle) & torch.isfinite(shift).all(-1)
+            pose = torch.cat((angle[..., None], shift), -1)
+            return torch.where(usable[..., None], pose, 0.0)
+
+    def jitter(self, batch: dict, pose: torch.Tensor) -> torch.Tensor:
+        with torch.autocast(device_type=pose.device.type, enabled=False):
+            _, _, length, usable, _ = self.geometry(batch)
+            series = len(pose)
+            turn = math.radians(VIEW_ROTATION_JITTER_DEGREES) * (
+                2 * torch.rand((series, 1), device=pose.device) - 1
+            )
+            move = (
+                VIEW_SHIFT_JITTER_MM
+                * (2 * torch.rand((series, 1, 2), device=pose.device) - 1)
+                / length.clamp_min(1e-4)
+            ).round()
+            margin = self.margin[batch["view_index"]][:, None, None]
+            moved = torch.cat(
+                (
+                    (pose[..., :1] + turn[..., None]).clamp(
+                        -MAX_VIEW_ROTATION, MAX_VIEW_ROTATION
+                    ),
+                    (pose[..., 1:] + move).clamp(
+                        -MAX_VIEW_SHIFT_FRACTION * margin,
+                        MAX_VIEW_SHIFT_FRACTION * margin,
+                    ),
+                ),
+                -1,
+            )
+            return torch.where(usable[..., None], moved, 0.0)
+
+    def forward(
+        self,
+        batch: dict,
+        middle_only: bool = False,
+        pose: torch.Tensor | None = None,
+    ) -> dict:
+        with torch.autocast(device_type=batch["images"].device.type, enabled=False):
+            canvas = batch["images"]
+            maps = batch["patient_maps"].float()
+            margin = self.margin[batch["view_index"]][:, None]
+            origin = margin[..., None].expand(-1, canvas.shape[1], 2)
+            if middle_only and canvas.shape[2] > 1:
+                canvas = canvas[:, :, 1:2]
+            affine = torch.eye(3, device=canvas.device).repeat(
+                len(canvas), canvas.shape[1], 1, 1
+            )
+            if pose is None:
+                crops = sample_windows(
+                    canvas.flatten(0, 1).float(),
+                    origin.flatten(0, 1),
+                    self.image_size,
+                ).view(*canvas.shape[:3], self.image_size, self.image_size)
+                affine[..., :2, 2] = origin
+                angle = None
+            else:
+                angle = pose[..., 0]
+                shift = pose[..., 1:]
+                pivot = self.geometry(batch)[4]
+                cosine, sine = angle.cos(), angle.sin()
+                affine[..., 0, 0], affine[..., 0, 1] = cosine, -sine
+                affine[..., 1, 0], affine[..., 1, 1] = sine, cosine
+                affine[..., 0, 2] = (
+                    margin
+                    + pivot[..., 0]
+                    + shift[..., 0]
+                    - (cosine * pivot[..., 0] - sine * pivot[..., 1])
+                )
+                affine[..., 1, 2] = (
+                    margin
+                    + pivot[..., 1]
+                    + shift[..., 1]
+                    - (sine * pivot[..., 0] + cosine * pivot[..., 1])
+                )
+                flat_canvas = canvas.flatten(0, 1)
+                crops = sample_windows(
+                    flat_canvas,
+                    (origin + shift.flip(-1)).flatten(0, 1),
+                    self.image_size,
+                ).float()
+                turned = ((angle != 0) & batch["slice_mask"]).flatten()
+                if turned.any():
+                    lines = torch.arange(
+                        self.image_size, device=canvas.device, dtype=torch.float32
+                    )
+                    rows, columns = torch.meshgrid(lines, lines, indexing="ij")
+                    points = torch.stack((columns, rows, torch.ones_like(rows)), -1)
+                    placed = torch.einsum(
+                        "nij,hwj->nhwi", affine.flatten(0, 1)[turned][:, :2, :], points
+                    )
+                    height, width = canvas.shape[-2:]
+                    grid = torch.stack(
+                        (
+                            (2 * placed[..., 0] + 1) / width - 1,
+                            (2 * placed[..., 1] + 1) / height - 1,
+                        ),
+                        -1,
+                    )
+                    crops[turned] = F.grid_sample(
+                        flat_canvas[turned].float(),
+                        grid,
+                        mode="bicubic",
+                        padding_mode="zeros",
+                        align_corners=False,
+                    ).clamp(0, 255)
+                crops = crops.view(*canvas.shape[:3], self.image_size, self.image_size)
+            prepared = {
+                **batch,
+                "images": crops.expand(-1, -1, 3, -1, -1),
+                "valid_rects": (
+                    crop_rectangles(
+                        batch["valid_rects"], origin[:, :, None], self.image_size
+                    )
+                    if angle is None
+                    else rotated_rectangles(
+                        batch["valid_rects"], affine, self.image_size
+                    )
+                ),
+                "patient_maps": maps @ affine[:, :, None],
+                "crop_affine": affine,
+                "canvas_valid_rects": batch["valid_rects"],
+                "applied_view_angle": torch.zeros_like(batch["slice_positions"])
+                if angle is None
+                else angle,
+                "applied_view_shift": torch.zeros_like(affine[..., :2, 2])
+                if pose is None
+                else pose[..., 1:],
+            }
+            return (
+                reflect_crops(prepared, self.sagittal)
+                if "mirrored_study" in batch
+                else prepared
+            )
+
 
 PROJECTION_WIDTH = 256
 MIL_ATTENTION_WIDTH = 128
@@ -98,6 +461,44 @@ PRIOR_VARIANTS = {
 }
 FRAME_ROTATIONS = ("nod", "roll", "turn")
 FRAME_ROTATION_RANGE_RAD = math.pi / 2
+PLANE_SCALE_MM = 50.0
+PLANE_RIDGE = 0.5
+PLANE_START_SLOPE = 0.05
+PLANE_REFITS = 3
+PLANE_REFIT_WIDTH_MM = 12.0
+ANATOMY_CENTRE_WIDTH_MM = 10.0
+ANATOMY_CLASS_COUNT = 7
+FEMUR_CLASS, TIBIA_CLASS, KNEECAP_CLASS, JOINT_CLASS, KNEECAP_JOINT_CLASS = (
+    1,
+    2,
+    3,
+    5,
+    6,
+)
+SECTION_LOGIT = 2.0
+SECTION_RATE = 5.0
+KNEECAP_FULL_SHARE = 0.3
+FRONT_FLOOR = 0.25
+ROUTE_SECTIONS = {
+    "meniscus_medial": (0, 1, 1),
+    "meniscus_lateral": (0, 1, 1),
+    "oa_medial": (0, 1, 1),
+    "oa_lateral": (0, 1, 1),
+    "kneecap": (1, 0, 0),
+    "core": (1, 1, 0),
+    "collateral_medial": (1, 1, 1),
+    "baker": (1, 1, 1),
+    "front_core": (1, 0, 0),
+    "tear_medial_anterior": (0, 1, 0),
+    "tear_medial_body": (0, 1, 0),
+    "tear_medial_posterior": (0, 1, 0),
+    "tear_lateral_anterior": (0, 1, 0),
+    "tear_lateral_body": (0, 1, 0),
+    "tear_lateral_posterior": (0, 1, 0),
+    "facet_medial": (1, 0, 0),
+    "facet_lateral": (1, 0, 0),
+}
+ANATOMICAL_BAND_PITCHES = (0.5, -0.5)
 SIDE_COORDINATE_LOG_ODDS = 4.33
 
 
@@ -132,6 +533,7 @@ class KneeAbnormalityModel(nn.Module):
             "std", torch.tensor(data.std).reshape(1, -1, 1, 1), persistent=False
         )
         self.channels_last = model.channels_last
+        self._pooling_cache = None
         self.repeated_middle_slice = model.slice_channels == "repeated_middle"
         self.checkpoint_backbone = model.checkpoint_backbone
         self.backbone_eval = model.backbone_eval
@@ -329,6 +731,22 @@ class KneeAbnormalityModel(nn.Module):
             torch.tensor(FRAME_SIZE_START_PITCHES),
             persistent=False,
         )
+        self.anatomical_frame = model.anatomical_frame
+        if self.anatomical_frame:
+            with torch.random.fork_rng(devices=[]):
+                self.anatomy_head = nn.Linear(PROJECTION_WIDTH, ANATOMY_CLASS_COUNT)
+                self.route_section_shift = nn.Parameter(torch.zeros((len(ROUTES), 3)))
+            self.register_buffer(
+                "route_section_start",
+                SECTION_LOGIT
+                * (2 * torch.tensor([ROUTE_SECTIONS[route] for route in ROUTES]) - 1.0),
+                persistent=False,
+            )
+            self.register_buffer(
+                "anatomical_band_start",
+                torch.tensor(ANATOMICAL_BAND_PITCHES),
+                persistent=False,
+            )
         with torch.random.fork_rng(devices=[]):
             self.frame_head = nn.Sequential(
                 nn.Linear(PROJECTION_WIDTH, MIL_ATTENTION_WIDTH), nn.Tanh()
@@ -385,6 +803,8 @@ class KneeAbnormalityModel(nn.Module):
             if model.view_label_bias
             else None
         )
+        with torch.random.fork_rng(devices=[]):
+            self.view_windows = ViewWindows(data)
         self.train(self.training)
 
     def train(self, mode: bool = True) -> "KneeAbnormalityModel":
@@ -704,6 +1124,103 @@ class KneeAbnormalityModel(nn.Module):
         ) * study_pitch[:, None]
         return shift, rotation, torch.stack((medial_spot, lateral_spot), 1), sizes
 
+    def anatomical_frames(
+        self,
+        scores: torch.Tensor,
+        position: torch.Tensor,
+        valid: torch.Tensor,
+        token_study: torch.Tensor,
+        pitch: torch.Tensor,
+        batch_size: int,
+        shift: torch.Tensor,
+        rotation: torch.Tensor,
+        sizes: torch.Tensor,
+        diagnostics: dict | None = None,
+    ) -> tuple[torch.Tensor, ...]:
+        device = position.device
+        shares = scores.detach().float().softmax(-1)
+        femur, tibia = shares[..., 1], shares[..., 2]
+        study = token_study[:, None].expand_as(valid).flatten()
+        points = (
+            torch.cat(
+                (position / PLANE_SCALE_MM, torch.ones_like(position[..., :1])), -1
+            )
+            .flatten(0, 1)
+            .double()
+        )
+        bone = (valid & (femur + tibia > 0.5)).flatten().double()
+        target = (femur - tibia).flatten().double()
+        eye = PLANE_RIDGE * torch.eye(4, dtype=torch.float64, device=device)
+        prior = torch.zeros((batch_size, 4), dtype=torch.float64, device=device)
+        prior[:, 2] = PLANE_SCALE_MM * PLANE_START_SLOPE
+        prior[:, 3] = -PLANE_START_SLOPE * shift[:, 2].detach().double()
+        weight = bone
+        for _ in range(PLANE_REFITS + 1):
+            moments = torch.zeros(
+                (batch_size, 4, 4), dtype=torch.float64, device=device
+            ).index_add(
+                0, study, points[:, :, None] * points[:, None] * weight[:, None, None]
+            )
+            response = torch.zeros(
+                (batch_size, 4), dtype=torch.float64, device=device
+            ).index_add(0, study, points * (target * weight)[:, None])
+            solution = torch.linalg.solve(moments + eye, response + PLANE_RIDGE * prior)
+            slope = solution[:, :3] / PLANE_SCALE_MM
+            length = slope.norm(dim=-1, keepdim=True).clamp_min(1e-9)
+            distance = (
+                (points[:, :3] * PLANE_SCALE_MM * slope[study]).sum(-1)
+                + solution[study, 3]
+            ) / length[study, 0]
+            weight = bone * torch.exp(-0.5 * (distance / PLANE_REFIT_WIDTH_MM) ** 2)
+        normal = (slope / length).float()
+        normal = torch.where(normal[:, 2:] < 0, -normal, normal)
+        level = (
+            torch.where(slope[:, 2:] < 0, -solution[:, 3:], solution[:, 3:]).float()
+            / length.float()
+        )
+        side = nn.functional.normalize(
+            rotation[:, 0] - (rotation[:, 0] * normal).sum(-1, keepdim=True) * normal,
+            dim=-1,
+        )
+        rotation = torch.stack((side, torch.linalg.cross(normal, side), normal), 1)
+        shift = shift - normal * ((shift * normal).sum(-1, keepdim=True) + level)
+        height = (position.detach().float() * normal[token_study, None]).sum(
+            -1
+        ) + level[token_study]
+        centre_weight = (
+            valid.float()
+            * (femur + tibia)
+            * torch.exp(-0.5 * (height / ANATOMY_CENTRE_WIDTH_MM).square())
+        ).flatten()
+        mass = torch.zeros(batch_size, device=device).index_add(0, study, centre_weight)
+        centroid = (
+            torch.zeros((batch_size, 3), device=device).index_add(
+                0,
+                study,
+                position.detach().float().flatten(0, 1) * centre_weight[:, None],
+            )
+            / mass.clamp_min(torch.finfo(torch.float32).tiny)[:, None]
+        )
+        centroid = centroid - normal * (
+            (centroid * normal).sum(-1, keepdim=True) + level
+        )
+        centred = torch.where((mass > 0)[:, None], centroid, shift)
+        if diagnostics is not None:
+            diagnostics["anatomy_centre_delta_mm"] = (centred - shift).detach()
+            diagnostics["anatomy_centre_applied"] = mass > 0
+        shift = centred
+        slices = valid.any(-1).float()
+        study_pitch = torch.zeros(batch_size, device=device).index_add(
+            0, token_study, pitch * slices
+        ) / torch.zeros(batch_size, device=device).index_add(
+            0, token_study, slices
+        ).clamp_min(1)
+        band = (self.anatomical_band_start + self.frame_size.float()[:2]) * study_pitch[
+            :, None
+        ]
+        radii = self.frame_size_start[2:] * study_pitch[:, None]
+        return shift, rotation, torch.cat((band, radii), -1)
+
     def frame(self, encoded: dict, medial_sign: torch.Tensor | float) -> torch.Tensor:
         return (
             torch.stack(
@@ -790,6 +1307,62 @@ class KneeAbnormalityModel(nn.Module):
             1 - upper
         )
         kneecap = ringed * front_trio * (1 - tibia)
+        shares = encoded.get("anatomy_shares")
+        if shares is not None:
+            femur_share, tibia_share, joint_share = (
+                shares[..., FEMUR_CLASS],
+                shares[..., TIBIA_CLASS],
+                shares[..., JOINT_CLASS],
+            )
+            free = (1 - femur_share - tibia_share - joint_share).clamp_min(0)
+            sections = torch.stack(
+                (
+                    femur_share + free * upper,
+                    joint_share + free * joint,
+                    tibia_share + free * tibia,
+                )
+            )
+            heights = torch.einsum("rs,snt->rnt", self.route_sections(), sections)
+            front_plane = ringed * front_trio
+            behind_kneecap = (
+                shares[..., KNEECAP_CLASS] + shares[..., KNEECAP_JOINT_CLASS]
+            )
+            behind_kneecap = (behind_kneecap / KNEECAP_FULL_SHARE).clamp(max=1)
+            kneecap = behind_kneecap + (1 - behind_kneecap) * FRONT_FLOOR * (
+                front_plane * heights[4]
+            )
+            front_core = (front_plane + core) * heights[8]
+            front_core = front_core + (1 - front_core) * behind_kneecap
+            medial_plane = ringed * medial_trio + core * medial_side
+            lateral_plane = ringed * lateral_trio + core * lateral_side
+            return torch.stack(
+                (
+                    medial_plane * heights[0],
+                    lateral_plane * heights[1],
+                    medial_plane * heights[2],
+                    lateral_plane * heights[3],
+                    kneecap,
+                    (
+                        core
+                        + inner
+                        * (sector["anterior"] + sector["posterior"] + lateral_trio)
+                    )
+                    * heights[5],
+                    ringed * (sector["anteromedial"] + sector["medial"]) * heights[6],
+                    ringed
+                    * (sector["posterior"] + sector["posteromedial"] + sector["medial"])
+                    * heights[7],
+                    front_core,
+                    ringed * sector["anteromedial"] * heights[9],
+                    ringed * sector["medial"] * heights[10],
+                    ringed * sector["posteromedial"] * heights[11],
+                    ringed * sector["anterolateral"] * heights[12],
+                    ringed * sector["lateral"] * heights[13],
+                    ringed * sector["posterolateral"] * heights[14],
+                    kneecap * medial_side,
+                    kneecap * lateral_side,
+                )
+            )
         return torch.stack(
             (
                 medial_compartment,
@@ -817,7 +1390,33 @@ class KneeAbnormalityModel(nn.Module):
             )
         )
 
+    def route_sections(self) -> torch.Tensor:
+        return torch.sigmoid(
+            self.route_section_start + SECTION_RATE * self.route_section_shift.float()
+        )
+
+    @staticmethod
+    def _memo(encoded: dict, name: str, compute):
+        inputs = tuple(
+            value for key, value in encoded.items() if not key.startswith("memo_")
+        )
+        entry = encoded.get(name)
+        if (
+            entry is not None
+            and len(entry[0]) == len(inputs)
+            and all(old is new for old, new in zip(entry[0], inputs, strict=True))
+        ):
+            return entry[1]
+        value = compute()
+        encoded[name] = (inputs, value)
+        return value
+
     def routing_weights(self, encoded: dict) -> torch.Tensor:
+        return self._memo(
+            encoded, "memo_routing_weights", lambda: self._routing_weights(encoded)
+        )
+
+    def _routing_weights(self, encoded: dict) -> torch.Tensor:
         knee_x = encoded["knee_x"]
         with torch.autocast(device_type=knee_x.device.type, enabled=False):
             left = encoded["left_probability"][:, None].float()
@@ -839,11 +1438,31 @@ class KneeAbnormalityModel(nn.Module):
         token_view: torch.Tensor,
         diagnostic: bool = False,
     ) -> torch.Tensor:
-        scores = torch.where(
-            self.shared_channel[:, None],
-            self.attention(shared_tokens).transpose(0, 1),
-            self.attention(tokens).transpose(0, 1),
-        )
+        cached = self._pooling_cache
+        if (
+            diagnostic
+            and cached is not None
+            and cached[0] is tokens
+            and cached[1] is shared_tokens
+        ):
+            scores, evidence = cached[2], cached[3]
+        else:
+            scores = torch.where(
+                self.shared_channel[:, None],
+                self.attention(shared_tokens).transpose(0, 1),
+                self.attention(tokens).transpose(0, 1),
+            )
+            evidence = None
+            if self.plane_readout:
+                with torch.autocast(device_type=tokens.device.type, enabled=False):
+                    evidence = torch.where(
+                        self.shared_channel,
+                        self.head(shared_tokens, image_type),
+                        self.head(tokens, image_type),
+                    )
+            self._pooling_cache = (
+                None if self.training else (tokens, shared_tokens, scores, evidence)
+            )
         if self.view_label_bias is not None:
             scores = scores.float() + self.view_label_bias.float()[
                 token_view
@@ -887,11 +1506,6 @@ class KneeAbnormalityModel(nn.Module):
                     (routing * token_valid).sum(-1) / token_valid.sum().clamp_min(1)
                 ).detach()
             if self.plane_readout:
-                evidence = torch.where(
-                    self.shared_channel,
-                    self.head(shared_tokens, image_type),
-                    self.head(tokens, image_type),
-                )
                 logits = torch.einsum(
                     "btn,nt->bt", attention, evidence[:, self.target_channel]
                 )
@@ -938,7 +1552,24 @@ class KneeAbnormalityModel(nn.Module):
             raise RuntimeError("Study attention pooling produced non-finite logits")
         return logits
 
-    def encode_batch(self, batch: dict) -> dict:
+    def encode_batch(self, batch: dict, view_pose: torch.Tensor | None = None) -> dict:
+        if view_pose is None:
+            view_pose = self.first_look_pose(batch)
+            if self.training:
+                view_pose = self.view_windows.jitter(batch, view_pose)
+        return self._encode_crops(batch, view_pose)
+
+    def first_look_pose(self, batch: dict) -> torch.Tensor:
+        training = self.training
+        self.eval()
+        with torch.no_grad():
+            first = self._encode_crops(self.view_windows.first_look_batch(batch))
+            pose = self.view_windows.frame_pose(batch, first)
+        self.train(training)
+        return pose
+
+    def _encode_crops(self, batch: dict, view_pose: torch.Tensor | None = None) -> dict:
+        batch = self.view_windows(batch, self.repeated_middle_slice, view_pose)
         presence = batch["series_presence"]
         reflected_study = torch.zeros_like(batch["reflection_eligible"])
         if self.training:
@@ -1015,6 +1646,8 @@ class KneeAbnormalityModel(nn.Module):
             maps.shape[-2:],
             self.feature_mapping,
             channels,
+            batch["canvas_valid_rects"].flatten(0, 1)[flat_indices],
+            batch["crop_affine"].flatten(0, 1)[flat_indices],
         )
         view_index = batch["view_index"][keep_series][acquisition_index]
         detail_view = self.detail_view[view_index]
@@ -1051,7 +1684,10 @@ class KneeAbnormalityModel(nn.Module):
             offset = torch.where(
                 valid_position[:, None, None], patient_position - center[:, None], 0.0
             ).detach()
-            row = middle[:, :2, 0]
+            source_middle = middle @ torch.linalg.inv(
+                batch["crop_affine"].flatten(0, 1)[flat_indices].float()
+            )
+            row = source_middle[:, :2, 0]
             row = torch.where(row[:, :1] < 0, -row, row)
             length = row.norm(dim=-1)
             aligned = valid_position & ~sagittal & (length > 1e-6)
@@ -1143,6 +1779,24 @@ class KneeAbnormalityModel(nn.Module):
                 token_pitch,
                 batch_size,
             )
+            anatomy_scores = None
+            anatomy_shares = None
+            anatomy_diagnostics = {}
+            if self.anatomical_frame:
+                anatomy_scores = self.anatomy_head(tokens.float())
+                anatomy_shares = anatomy_scores.detach().float().softmax(-1)
+                study_shift, study_rotation, study_sizes = self.anatomical_frames(
+                    anatomy_scores,
+                    fitted_position.detach(),
+                    visual_valid & valid_position[:, None],
+                    token_study,
+                    token_pitch,
+                    batch_size,
+                    study_shift,
+                    study_rotation,
+                    study_sizes,
+                    anatomy_diagnostics if view_pose is not None else None,
+                )
             geometry = {
                 "knee_x": knee_x,
                 "anterior_axis": anterior_axis,
@@ -1150,6 +1804,7 @@ class KneeAbnormalityModel(nn.Module):
                 "frame_shift": study_shift[token_study],
                 "frame_rotation": study_rotation[token_study],
                 "frame_sizes": study_sizes[token_study],
+                "anatomy_shares": anatomy_shares,
                 "token_box": token_box,
             }
             position = self.frame(geometry, sign)
@@ -1159,6 +1814,8 @@ class KneeAbnormalityModel(nn.Module):
             "study": token_study,
             "image_plane": token_plane,
             "image_type": token_type,
+            "crop_angle": batch["applied_view_angle"].flatten()[flat_indices],
+            "crop_shift": batch["applied_view_shift"].flatten(0, 1)[flat_indices],
             "visual_valid": visual_valid,
             **geometry,
             "study_frame_shift": study_shift,
@@ -1167,6 +1824,10 @@ class KneeAbnormalityModel(nn.Module):
             "study_frame_sizes": study_sizes,
             "position": position,
             "fitted_position": fitted_position,
+            "anatomy_scores": anatomy_scores,
+            **anatomy_diagnostics,
+            "patient_position": patient_position.detach(),
+            "token_steps": steps.detach(),
             "left_probability": left_probability,
             "routable": valid_position,
             "token_pitch": token_pitch,
@@ -1188,6 +1849,13 @@ class KneeAbnormalityModel(nn.Module):
         )
 
     def study_tokens(self, encoded: dict, shared: bool = False) -> torch.Tensor:
+        return self._memo(
+            encoded,
+            f"memo_study_tokens_{int(shared)}",
+            lambda: self._study_tokens(encoded, shared),
+        )
+
+    def _study_tokens(self, encoded: dict, shared: bool) -> torch.Tensor:
         tokens = self._base_tokens(encoded)
         if not shared:
             tokens = tokens + self.position_code(
@@ -1208,14 +1876,22 @@ class KneeAbnormalityModel(nn.Module):
             ).flatten(),
             encoded["batch_size"],
             self.routing_weights(encoded).flatten(1),
-            torch.where(
-                self.shared_channel[self.target_channel][:, None, None],
-                self.position_priors(encoded["position"], encoded["routable"]),
-                self.position_priors(encoded["fitted_position"], encoded["routable"]),
-            ).flatten(1),
+            self._memo(
+                encoded,
+                "memo_position_prior",
+                lambda: torch.where(
+                    self.shared_channel[self.target_channel][:, None, None],
+                    self.position_priors(encoded["position"], encoded["routable"]),
+                    self.position_priors(
+                        encoded["fitted_position"], encoded["routable"]
+                    ),
+                ).flatten(1),
+            ),
             encoded["view_index"][:, None].expand_as(encoded["visual_valid"]).flatten(),
             diagnostic=view is not None,
         )
 
-    def forward(self, batch: dict) -> torch.Tensor:
-        return self.pool_encoded(self.encode_batch(batch))
+    def forward(
+        self, batch: dict, view_pose: torch.Tensor | None = None
+    ) -> torch.Tensor:
+        return self.pool_encoded(self.encode_batch(batch, view_pose))

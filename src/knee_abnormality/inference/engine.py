@@ -126,6 +126,10 @@ MODEL_BATCH_KEYS = frozenset(
         "knee_side_left",
         "knee_side_split",
         "mirrored_study",
+        "crop_affine",
+        "canvas_valid_rects",
+        "applied_view_angle",
+        "applied_view_shift",
     }
 )
 
@@ -229,16 +233,22 @@ def predict_loader(
                 dtype=autocast_dtype,
                 enabled=autocast_dtype is not None,
             ):
-                probabilities = torch.stack(
-                    [torch.sigmoid(model(batch).to(torch.float32)) for model in models]
-                ).mean(dim=0)
+                plain_probabilities = []
+                mirror_probabilities = []
+                for model in models:
+                    angle = model.first_look_pose(batch)
+                    plain_probabilities.append(
+                        torch.sigmoid(model(batch, angle).to(torch.float32))
+                    )
+                    if mirrored is not None:
+                        mirror_probabilities.append(
+                            torch.sigmoid(model(mirrored, angle).to(torch.float32))
+                        )
+                probabilities = torch.stack(plain_probabilities).mean(dim=0)
                 if mirrored is not None:
-                    reflected_probabilities = torch.stack(
-                        [
-                            torch.sigmoid(model(mirrored).to(torch.float32))
-                            for model in models
-                        ]
-                    ).mean(dim=0)
+                    reflected_probabilities = torch.stack(mirror_probabilities).mean(
+                        dim=0
+                    )
                     eligible = batch["reflection_eligible"][:, None]
                     probabilities = torch.where(
                         eligible,
