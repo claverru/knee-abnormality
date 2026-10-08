@@ -8,6 +8,14 @@ finished runs and decisions live in the [validation results](../validation/resul
 live under [autoresearch](../../autoresearch/campaigns/INDEX.md). New candidates pair with the
 current control at its fold and seed.
 
+Pending on the recipe in force (anatomy map and posed crops, [state](state.md#recipe-in-force)):
+
+- **Start the [anatomy-recipe campaign](../../autoresearch/campaigns/anatomy-recipe/INDEX.md):**
+  validated, seven forced seeds, reference `rn18-anatomy-map-centre-control`; about three and a
+  quarter hours for the seeds.
+- **Train the ResNet-50 config on the recipe:** not done; S119 (0.957) is the ResNet-50 of run 24.
+- **Submission ledger:** S122 to S125 are not in it yet; S124's score was pending.
+
 Pending from the [fixes-and-removals campaign](../validation/results/2026-10-05-fixes-and-removals-campaign.md)
 (closed 2026-10-05, on main since 2026-10-06):
 

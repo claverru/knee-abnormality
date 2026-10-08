@@ -21,7 +21,7 @@ with `source/`, `changes.diff` and `training/`): the two height cuts placed per 
 meniscus and kneecap spots without gradient. ×4 0.925389, ×1 0.917411, 0.952 public (S120): level
 with run 24 locally and one step lower on the public board. It is not part of this campaign's
 base (user decision, 2026-10-07: the base is the model with a submission on both backbones); it
-returns as the first seed. Most measurements of 2026-10-07 below were taken on its weights and
+returns inside the forced seed that reads the whole frame from the spots. Most measurements of 2026-10-07 below were taken on its weights and
 say so.
 
 **How far near-identical runs spread.** Eight runs of the previous campaign that differed from

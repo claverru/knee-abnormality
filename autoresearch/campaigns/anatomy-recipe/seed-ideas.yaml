@@ -1,0 +1,148 @@
+ideas:
+- id: report-attribute-loss-off
+  mechanism_id: report-attribute-weight
+  parent_idea_id: null
+  title: Train without the report-attribute loss
+  opportunity: 'User-ordered on 2026-10-08. A guess. The loss was last measured before the 84/93 mm views
+    and before the anatomy map: removing it cost -0.0006 at x4 (80% -0.0011 to -0.0001) and halving it
+    -0.0004 (revisits campaign, docs/modeling/report-attribute-heads.md). The map now draws on the same
+    token features, and three anatomy-masks runs saw Synovitis fall when an auxiliary reading was added
+    (run notes, runs 7 and 8).'
+  mechanism: 'Set trainer.report_attribute_loss_weight: 0 in configs/training.yaml. At zero the training
+    step does not compute the term and validation does not compute its fit; the heads stay in the model
+    untrained. No source change.'
+  precedents:
+  - 'Removing the heads on ResNet-18, 2026-10-01: -0.0006 at x4.'
+  - 'Adding them, 2026-09-25: +0.00105 at x4, 0.940 public against 0.938.'
+  novelty: First measurement of the loss beside the anatomy map.
+  coverage: Every training study with report answers.
+  exploitation: 'Rule: the loss is removed only if this run is at least the control at both x1 and x4,
+    the campaign''s adoption rule; otherwise 0.1 stays. Read per target Synovitis, Effusion, PF OA and
+    both menisci, and the map''s overlap per class and plane error against the control''s, to see whether
+    the two auxiliary losses compete. Shown wrong by: the run below the control at both multipliers.'
+  budget: 'Slightly cheaper than the control: the report step is about 6 ms of a 245 ms training step.'
+  implementation: 'Follow the environment paragraph of the developer instructions. configs/training.yaml
+    only (trainer.report_attribute_loss_weight: 0). Changes no source. Report that no report_attribute
+    metric is logged and that the anatomy and side losses are unchanged on one batch.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Ordered first by the user; settles whether the loss still earns its place.
+- id: jitter-shared-by-the-two-contrasts-of-a-plane
+  mechanism_id: crop-jitter
+  parent_idea_id: null
+  title: Draw the crop jitter once per study and plane, so both contrasts of a plane move together
+  opportunity: Measured premise, effect a guess. Contrast mixing blends the two contrasts of a plane pixel
+    for pixel. On 40 training batches the blended pixels are 0.2 mm apart at the crop centre with posed
+    crops and 3.1 mm (p90 5.5) once the training jitter is added, because the jitter is drawn per series
+    (run notes, Contrast mixing under posed crops). The 6.6 mm at the corners comes from the 84 against
+    93.3 mm fields and is not touched here; the donor aligned over the whole crop lost twice (fixes-and-removals).
+  mechanism: 'In ViewWindows.jitter (modeling/model.py) draw the turn and the two shifts once per (study,
+    plane) instead of once per series row, and give every series row of that study and plane the same
+    draw: the turn in degrees and the shift in millimetres, converted to each row''s own pixels as now.
+    The number of random values drawn changes; draw them in one call of size (studies x planes) for the
+    turn and one for the shifts. Ranges, clipping and the pose do not change.'
+  precedents:
+  - 'Posed crops with per-series jitter: the incumbent.'
+  - 'Contrast mixing off on the 2026-10-05 recipe: about -0.0005 on top of the quantile change.'
+  novelty: First jitter that keeps the mixed pair registered at the joint.
+  coverage: Every sagittal and coronal study with both contrasts of a plane, in training.
+  exploitation: 'Read both multipliers against the control with both menisci, ACL and Effusion; report
+    once, on one training batch, the in-plane distance in mm between the two contrasts'' crop centres
+    for mixed pairs (expect about 0.2 mm against 3.1). Shown wrong by: that distance above 1 mm, or the
+    macro below the control at both multipliers.'
+  budget: 'Same cost as the control: within 1.02 of its training time.'
+  implementation: Follow the environment paragraph of the developer instructions. modeling/model.py only.
+    Replaces the per-series draw. Report on one batch that two series of one study and plane receive the
+    same turn and the same shift in mm, and that series of different planes do not. Update SPATIAL_TOKEN_IDENTITY['preparation'].
+  open_choices: None.
+  dependencies: []
+  priority_rationale: A measured misalignment the posed crops introduced.
+- id: coronal-fluid-crops-at-108-mm
+  mechanism_id: crop-field
+  parent_idea_id: null
+  title: Cut the posed fluid coronal crops at 108 mm instead of 93.3 mm, leaving T1/PD at 84 mm
+  opportunity: 'User-ordered on 2026-10-08, which lifts the bar on crop widths for this seed. Measured
+    premise, effect a guess. The field comes from the bone extents of the 550 mask knees with the incumbent''s
+    joint target: 108 mm is the field at which the bone edge plus 5 mm is inside on the tighter side for
+    95% of knees, against 45% at 93.3 mm and 87% at 103.7 mm; the fibular head is inside for 93% against
+    57%. The 5 mm for the collateral ligaments is an assumption. Past 108 mm almost nothing is left to
+    gain (99% at 112 mm). Checked on the validation fold with the control''s weights: the 108 mm posed
+    crop lies inside the acquired image for 99.75% of its area, 1.9% of slices under 95% (5.6% at 120
+    mm); examples in outputs/analysis/anatomy-masks-field/fluid-fields/coronal-fluid.png. The run that
+    widened both coronal series to 93.3 and 103.7 mm was level at x4 (+0.00015) with MCL +0.0015, Contusion
+    +0.0013 and the menisci unharmed (anatomy-masks run 11). The pixel goes from 0.417 to 0.482 mm, finer
+    than the axial views'' 0.536 mm.'
+  mechanism: One zoom factor s = 108 / 93.333 for the fluid coronal view only. In ViewWindows (modeling/model.py)
+    its posed cut samples the canvas on a grid whose pixel pitch is s canvas pixels, in the same bicubic
+    resampling as the turn; crop_affine carries the scale; the joint target keeps its offset in mm, so
+    geometry divides it by s in crop pixels; that view is always resampled. Set data.view_shift_limit_mm
+    to 24.5 and replace MAX_VIEW_SHIFT_FRACTION * margin in frame_pose and jitter by a per-view limit
+    in canvas pixels, min(margin - (s - 1) * image_size / 2 - 0.25 * round(17 mm / pixel pitch), 0.75
+    * round(17 mm / pixel pitch)), so every view keeps today's 12.75 mm of shift and today's 4.25 mm of
+    slack to the canvas edge. All other views, the first look, slice counts and image size do not change.
+  precedents:
+  - 'coronal-crops-a-ninth-wider (anatomy-masks run 11): both coronal series wider, x4 +0.00015, x1 -0.00037.'
+  novelty: First wider field on one contrast of a plane.
+  coverage: Every fluid coronal series.
+  exploitation: 'Read both multipliers against the control with MCL, Contusion, Fracture, Medial OA, Lateral
+    OA and both menisci, and on validation only the share of fluid coronal series at the shift limit.
+    Shown wrong by: MCL and Contusion both below the control at x4, or the macro below at both multipliers.'
+  budget: Canvases 354 and 342 px against 314 and 306, about 27% larger in area; training within 1.08
+    of the control, from the canvases only (an estimate from the 20% larger canvases of anatomy-masks
+    runs 10 and 11, which cost 5 to 7%).
+  implementation: Follow the environment paragraph of the developer instructions. modeling/model.py and
+    configs/training.yaml (data.view_shift_limit_mm only). Replaces the fluid coronal crop at its own
+    field; no flag selects the old one. The run of anatomy-masks that did this for both coronal series
+    is in outputs/autoresearch/anatomy-masks/experiments/coronal-crops-a-ninth-wider-*/changes.diff, including
+    the validity-rectangle repair its review asked for; apply it to one view. Report the field in mm of
+    a fluid coronal crop from its corner tokens (expect 108.0) and that every other view's crops are bit-identical
+    to the control's at the same pose. Update SPATIAL_TOKEN_IDENTITY['preparation'].
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The half of the coronal field run that carried its gains, at half its cost.
+- id: sagittal-fluid-crops-at-112-mm
+  mechanism_id: crop-field
+  parent_idea_id: null
+  title: Cut the posed fluid sagittal crops at 112 mm, 0.5 mm per pixel, leaving T1/PD at 84 mm
+  opportunity: 'User-ordered on 2026-10-08, which lifts the bar on crop widths for this seed. Measured
+    premise, effect a guess. On the 550 mask knees with the incumbent''s joint target the kneecap''s front
+    is inside the fluid sagittal crop for 20% of knees at 93.3 mm, 59% at 103.7 mm, 83% at 112 mm and
+    97% at 120 mm (whole kneecap 8%, 36%, 65%, 87%): coverage rises all the way to 120 mm, so the extents
+    alone set no value. 112 mm is taken because it is 0.5 mm per pixel, the most common acquired resolution,
+    so half the series are still fully resolved; 120 mm is the field smart-crops replaced with 93 mm for
+    +0.0005 to +0.0007. Checked on the validation fold with the control''s weights: the 112 mm posed crop
+    lies inside the acquired image for 99.73% of its area, 1.6% of slices under 95% (4.7% at 120 mm);
+    examples in outputs/analysis/anatomy-masks-field/fluid-fields/sagittal-fluid.png. The run that widened
+    both sagittal series gained on Baker''s (+0.0024, interval above zero) and PF OA (+0.0017) and lost
+    on Lateral Meniscus (-0.0029) and ACL (-0.0012), which the T1/PD series carries (anatomy-masks run
+    10).'
+  mechanism: One zoom factor s = 112 / 93.333 for the fluid sagittal view only. In ViewWindows (modeling/model.py)
+    its posed cut samples the canvas on a grid whose pixel pitch is s canvas pixels, in the same bicubic
+    resampling as the turn; crop_affine carries the scale; the joint target keeps its offset in mm, so
+    geometry divides it by s in crop pixels; that view is always resampled. Set data.view_shift_limit_mm
+    to 26.5 and replace MAX_VIEW_SHIFT_FRACTION * margin in frame_pose and jitter by a per-view limit
+    in canvas pixels, min(margin - (s - 1) * image_size / 2 - 0.25 * round(17 mm / pixel pitch), 0.75
+    * round(17 mm / pixel pitch)), so every view keeps today's 12.75 mm of shift and today's 4.25 mm of
+    slack to the canvas edge. All other views, the first look, slice counts and image size do not change.
+  precedents:
+  - 'sagittal-crops-a-ninth-wider (anatomy-masks run 10): both sagittal series wider, x4 -0.0006, x1 -0.0005.'
+  novelty: First wider sagittal field that leaves the T1/PD series at its detail.
+  coverage: Every fluid sagittal series.
+  exploitation: 'Read both multipliers against the control with Baker''s, PF OA, Effusion, Synovitis,
+    Lateral Meniscus and ACL, and on validation only the share of kneecap and kneecap-joint tokens per
+    fluid sagittal image and the share of those series at the shift limit. Shown wrong by: Baker''s and
+    PF OA both below the control at x4, or Lateral Meniscus and ACL both below it by more than one sibling
+    SD.'
+  budget: Canvases 366 and 352 px against 314 and 306, about 35% larger in area; training within 1.1 of
+    the control, from the canvases only (an estimate from the 20% larger canvases of anatomy-masks runs
+    10 and 11, which cost 5 to 7%).
+  implementation: Follow the environment paragraph of the developer instructions. modeling/model.py and
+    configs/training.yaml (data.view_shift_limit_mm only). Replaces the fluid sagittal crop at its own
+    field. Start from outputs/autoresearch/anatomy-masks/experiments/sagittal-crops-a-ninth-wider-*/changes.diff
+    (the second, repaired candidate) and apply it to one view. Report the field in mm of a fluid sagittal
+    crop (expect 112.0) and that every other view's crops are bit-identical to the control's at the same
+    pose. Update SPATIAL_TOKEN_IDENTITY['preparation'].
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Keeps the gain of the sagittal field run and drops what paid for it.
+exhausted_directions: ''

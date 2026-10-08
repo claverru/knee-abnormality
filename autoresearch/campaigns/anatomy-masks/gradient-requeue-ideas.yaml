@@ -1,0 +1,34 @@
+ideas:
+- id: a-tenth-of-the-map-gradient-to-the-backbone-2
+  mechanism_id: map-gradient-share
+  parent_idea_id: null
+  title: Let a tenth of the anatomy map's gradient reach the backbone instead of all of it
+  opportunity: 'Evidence-backed problem, a guess for the dose. Synovitis fell in every run that trains
+    the map, including the first, where the regions were run 24''s: x4 -0.0045, -0.0028, -0.0052, -0.0068
+    (prior-work.md, The cost to Synovitis), and in the last its attention by anatomy was equal to run
+    24''s, so the regions are not the cause. With no gradient at all the map is too weak after one epoch
+    (femur 0.52, tibia 0.44, joint 0.40, plane error 4.6 mm against 0.85, 0.84, 0.68 and 1.8 mm). Nothing
+    between the two extremes has been tried.'
+  mechanism: 'In KneeAbnormalityModel.encode_batch (modeling/model.py) the map head reads `tokens.float()`.
+    Feed it `tokens.detach() + MAP_GRADIENT_SHARE * (tokens - tokens.detach())` with MAP_GRADIENT_SHARE
+    = 0.1, a module constant: the forward value is unchanged and the gradient into the tokens is scaled
+    by 0.1. The head, the loss, its weight, the plane, the sections and the crops stay as they are.'
+  precedents:
+  - 'Full gradient: rn18-anatomy-front-sample550, x4 -0.00008, x1 +0.00002, Synovitis -0.0068 and -0.0110.'
+  - 'No gradient, two-layer head with Dice: stopped after one epoch, plane error 4.6 mm.'
+  novelty: First dose between full and none.
+  coverage: Every knee with targets; the frame and the crops of every knee depend on the map's quality.
+  exploitation: 'Read Synovitis, Effusion and PF OA at both multipliers against the incumbent and run
+    24, and per epoch the plane error and the overlap of femur, tibia, joint and kneecap joint. Shown
+    wrong by: Synovitis not above the incumbent by one sibling SD (0.0022) at either multiplier, or a
+    plane error above 2.5 mm at the last epoch.'
+  budget: Same cost as the incumbent.
+  implementation: 'Follow the environment paragraph of the developer instructions. modeling/model.py only:
+    one constant and one expression. Replaces the undamped read of the tokens by the map head. Confirm
+    on one batch that the gradient of the anatomy loss on the projection weights is 0.1 times the incumbent''s
+    (ratio within 1e-4) and that the logits are bit-identical in evaluation mode. Update SPATIAL_TOKEN_IDENTITY["algorithm"].'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Synovitis is the one target with a loss beyond its interval in every map run; it
+    holds the macro about 0.0005 to 0.0009 down.
+exhausted_directions: ''

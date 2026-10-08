@@ -1,0 +1,1546 @@
+revision: 341
+ideas:
+- id: turned-crops-cut-with-bicubic-interpolation
+  mechanism_id: crop-resampling
+  parent_idea_id: null
+  title: Cut the turned crops with bicubic interpolation instead of bilinear, so that
+    turning no longer blurs them
+  opportunity: 'Evidence-backed. The incumbent cuts a turned crop from the canvas
+    with bilinear interpolation: on 900 slices its fine detail (mean absolute Laplacian)
+    is 0.81 of the loader''s crop, the same under 1 degree as at 6 to 12 degrees,
+    and the training jitter turns every crop. The same cut with bicubic interpolation
+    keeps 0.98; a crop that is only shifted keeps 1.00 (posed_crop_sharpness.py).
+    Since the crops were posed, the targets that read fine detail fell at x1: Lateral
+    Meniscus -0.0148 (interval excludes zero), Contusion -0.0058, Fracture -0.0057,
+    each level or up in the run before, and nine of twelve targets moved attention
+    from the posed sagittal views to the untouched axial ones (target-analysis.txt).
+    The blur is a defect of the cut, not a property of turning.'
+  mechanism: In ViewWindows.forward (modeling/model.py) call F.grid_sample with mode='bicubic'
+    instead of 'bilinear' (padding_mode and align_corners unchanged) and clamp the
+    result to the canvas range 0 to 255 before it is used, since bicubic can overshoot.
+    The exact copy for a zero angle, the pose, the shift, the limits and the jitter
+    stay as they are.
+  precedents:
+  - An offset pattern at prediction changed scores through the resampling of the picture,
+    not through positions (routing-and-shifts run notes).
+  - 'Crops turned by half the old frame''s angle, bilinear: x4 +0.0015, x1 -0.0006
+    (frame-and-targets, crops-turned-to-the-frame).'
+  novelty: First turned crops at the loader's sharpness.
+  coverage: 'Every sagittal and coronal slice with a non-zero turn: all of them in
+    training, nearly all at prediction.'
+  exploitation: 'Read Lateral Meniscus, Contusion, Fracture and ACL at both multipliers
+    against the incumbent, and each target''s share of attention per view. Shown wrong
+    by: Lateral Meniscus not above the incumbent by one sibling SD (0.0024) at x1.'
+  budget: Same cost as the incumbent within a few percent; bicubic reads sixteen canvas
+    pixels per output pixel instead of four.
+  implementation: Follow the environment paragraph of the developer instructions.
+    modeling/model.py only. Replaces the bilinear cut. Report on one batch the ratio
+    of the mean absolute Laplacian of the turned crops to that of the central crops
+    (expect about 0.98, against 0.81 for the incumbent) and that the values stay within
+    0 to 255. Update SPATIAL_TOKEN_IDENTITY['preparation'].
+  open_choices: None.
+  dependencies: []
+  priority_rationale: A measured defect that removes a fifth of the fine detail from
+    every posed crop, with a one-line repair.
+  status: completed
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality-side-routed-heads/autoresearch/campaigns/anatomy-masks/seed-ideas.yaml
+  experiments:
+  - turned-crops-cut-with-bicubic-interpolation-20261007T220525Z-8ad05dfb
+  decision: provisional_accept
+- id: joint-centre-from-the-map-instead-of-the-spots
+  mechanism_id: joint-centre-source
+  parent_idea_id: null
+  title: Take the knee's centre across and front to back from the anatomy map instead
+    of the meniscus attention spots
+  opportunity: 'Evidence-backed. The frame''s centre across the knee and front to
+    back is still the midpoint of two meniscus attention spots, a leftover of the
+    design before the map; its height already comes from the joint plane. Against
+    the real plateau centre on 150 validation knees (centre-sources.txt), the spots
+    leave 3.0 mm across and 3.1 mm front to back between knees; the centroid of the
+    predicted femur and tibia tokens near the joint plane leaves 2.2 and 1.7 mm (the
+    joint class alone 2.3 and 1.7; the loader''s own centre 4.5 and 4.7). The crops''
+    shift across follows this centre: it matched the real one at only 0.76 to 0.81
+    and removed a third of its spread, while the shift up and down, read from the
+    plane, matched at 0.97 (pose-accuracy.txt). Lateral Meniscus is the incumbent''s
+    largest loss and the knee nearly fills the crop from side to side.'
+  mechanism: In KneeAbnormalityModel.anatomical_frames (modeling/model.py), after
+    the plane is fitted, compute per knee the centroid of the token positions weighted
+    by (femur share + tibia share) * exp(-0.5 * (h / 10 mm)^2), h the token's height
+    above the fitted plane, over the valid tokens, on detached shares. Replace the
+    two in-plane components of the frame's shift by this centroid's components in
+    the plane (keep the height from the plane as now). Knees with no bone token keep
+    the spots' midpoint. The side axis and the turn about the vertical stay from the
+    spots. In ViewWindows set both joint targets to the mean position this centre
+    takes in the crops, measured by the developer on the validation knees of one batch
+    run of the incumbent and reported, so the average framing does not move.
+  precedents:
+  - The plane read from the map replaced a height read elsewhere and went from 6 mm
+    to 1.7 mm (prior-work.md).
+  - 'Centring the crops on the old frame: -0.0004, with PF OA and Fracture paying
+    (frame-and-targets).'
+  novelty: First frame whose centre, height and tilt all come from the map.
+  coverage: Every knee with femur or tibia tokens in view.
+  exploitation: 'Read Lateral Meniscus, Medial Meniscus, the two compartment OA targets,
+    MCL and ACL at both multipliers against the incumbent, and per epoch on the validation
+    knees the spread of the centre''s error across and front to back against the plateau
+    centre (log it with the plane error). Shown wrong by: a centre error not below
+    2.6 mm across or 2.4 mm front to back at the last epoch, or Lateral Meniscus not
+    above the incumbent by one sibling SD (0.0024) at x1.'
+  budget: Same cost as the incumbent; one weighted mean per knee.
+  implementation: Follow the environment paragraph of the developer instructions.
+    modeling/model.py, plus the log in training/lightning.py. Replaces the spots'
+    midpoint as the centre. The regions (core, ring, sectors) and the crop pose both
+    read the new centre, since both read the frame's shift. Log val_anatomy_centre_error_across_mm
+    and val_anatomy_centre_error_front_mm as standard deviations across knees, from
+    the plateau centres in knees.json converted as token_heights converts them. Update
+    SPATIAL_TOKEN_IDENTITY['algorithm'].
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The one part of the pose still decided by an attention spot;
+    the map locates it a quarter to a half better in a check without training.
+  status: completed
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality-side-routed-heads/autoresearch/campaigns/anatomy-masks/seed-ideas.yaml
+  experiments:
+  - joint-centre-from-the-map-instead-of-the-spots-20261007T220944Z-03920379
+  - joint-centre-from-the-map-instead-of-the-spots-20261007T224024Z-0fea1d4e
+  decision: provisional_accept
+- id: a-tenth-of-the-map-gradient-to-the-backbone
+  mechanism_id: map-gradient-share
+  parent_idea_id: null
+  title: Let a tenth of the anatomy map's gradient reach the backbone instead of all
+    of it
+  opportunity: 'Evidence-backed problem, a guess for the dose. Synovitis fell in every
+    run that trains the map, including the first, where the regions were run 24''s:
+    x4 -0.0045, -0.0028, -0.0052, -0.0068 (prior-work.md, The cost to Synovitis),
+    and in the last its attention by anatomy was equal to run 24''s, so the regions
+    are not the cause. With no gradient at all the map is too weak after one epoch
+    (femur 0.52, tibia 0.44, joint 0.40, plane error 4.6 mm against 0.85, 0.84, 0.68
+    and 1.8 mm). Nothing between the two extremes has been tried.'
+  mechanism: 'In KneeAbnormalityModel.encode_batch (modeling/model.py) the map head
+    reads `tokens.float()`. Feed it `tokens.detach() + MAP_GRADIENT_SHARE * (tokens
+    - tokens.detach())` with MAP_GRADIENT_SHARE = 0.1, a module constant: the forward
+    value is unchanged and the gradient into the tokens is scaled by 0.1. The head,
+    the loss, its weight, the plane, the sections and the crops stay as they are.'
+  precedents:
+  - 'Full gradient: rn18-anatomy-front-sample550, x4 -0.00008, x1 +0.00002, Synovitis
+    -0.0068 and -0.0110.'
+  - 'No gradient, two-layer head with Dice: stopped after one epoch, plane error 4.6
+    mm.'
+  novelty: First dose between full and none.
+  coverage: Every knee with targets; the frame and the crops of every knee depend
+    on the map's quality.
+  exploitation: 'Read Synovitis, Effusion and PF OA at both multipliers against the
+    incumbent and run 24, and per epoch the plane error and the overlap of femur,
+    tibia, joint and kneecap joint. Shown wrong by: Synovitis not above the incumbent
+    by one sibling SD (0.0022) at either multiplier, or a plane error above 2.5 mm
+    at the last epoch.'
+  budget: Same cost as the incumbent.
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    modeling/model.py only: one constant and one expression. Replaces the undamped
+    read of the tokens by the map head. Confirm on one batch that the gradient of
+    the anatomy loss on the projection weights is 0.1 times the incumbent''s (ratio
+    within 1e-4) and that the logits are bit-identical in evaluation mode. Update
+    SPATIAL_TOKEN_IDENTITY["algorithm"].'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Synovitis is the one target with a loss beyond its interval
+    in every map run; it holds the macro about 0.0005 to 0.0009 down.
+  status: completed
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality-side-routed-heads/autoresearch/campaigns/anatomy-masks/seed-ideas.yaml
+  experiments:
+  - a-tenth-of-the-map-gradient-to-the-backbone-20261007T224522Z-48e7838e
+  - a-tenth-of-the-map-gradient-to-the-backbone-20261007T224927Z-01abb085
+  decision: invalid
+- id: the-map-loss-without-its-dice-term
+  mechanism_id: map-loss-terms
+  parent_idea_id: null
+  title: Train the map with cross-entropy alone, removing the Dice term the incumbent
+    added
+  opportunity: Evidence on both sides, the balance is a guess. Dice lifted the thin
+    classes from the first epoch (kneecap 0.46 to 0.65, kneecap joint 0.51 to 0.62,
+    joint 0.68 to 0.73) and the pose and the kneecap route read exactly those classes.
+    It also pushes the backbone harder towards anatomy, which is what Synovitis pays
+    for (principle 7). The incumbent added Dice and the posed crops in one run, so
+    the two were never separated.
+  mechanism: In anatomy_loss (training/anatomy.py) remove the soft Dice term (the
+    `present`, `overlap` lines and the added `(1 - overlap[present]).mean()`), leaving
+    the cross-entropy against the target shares. Everything else as the incumbent.
+  precedents:
+  - 'Cross-entropy alone, no posed crops: rn18-anatomy-front-sample550, x4 -0.00008,
+    x1 +0.00002 against run 24.'
+  novelty: Separates the two changes the incumbent made together.
+  coverage: Every knee with targets.
+  exploitation: 'Read both multipliers against the incumbent, Synovitis, PF OA and
+    Effusion, and the per-epoch overlap of kneecap, joint and kneecap joint with the
+    plane error and the spread of the crop turns. Shown wrong by: the macro below
+    the incumbent at both multipliers with Synovitis not one sibling SD above it.'
+  budget: Same cost as the incumbent.
+  implementation: Follow the environment paragraph of the developer instructions.
+    training/anatomy.py only. Replaces the Dice term; the logged overlap metrics stay.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The incumbent's two changes need to be told apart before anything
+    is built on them.
+  status: completed
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality-side-routed-heads/autoresearch/campaigns/anatomy-masks/seed-ideas.yaml
+  experiments:
+  - the-map-loss-without-its-dice-term-20261007T232611Z-51c8e790
+  decision: reject
+- id: the-first-look-on-a-third-of-the-slices
+  mechanism_id: first-look-cost
+  parent_idea_id: null
+  title: Read the pose from every third slice of the first look instead of all of
+    them
+  opportunity: Evidence-backed. The posed crops make training about 25% slower and
+    add about a quarter of the model's work at x4 prediction (prior-work.md, Measured
+    on the masks), and the contract refuses a run above 1.3 times the incumbent's
+    prediction time. The pose is one plane and one centre per knee, fitted over all
+    of its tokens; the fit used a few hundred tokens when it was checked offline and
+    held at 1.7 mm.
+  mechanism: 'In ViewWindows (modeling/model.py) first_look_batch selects `budget`
+    slices evenly among each series row''s valid slices, with budget = min(count,
+    first_look_slices[view]). Use budget = min(count, ceil(first_look_slices[view]
+    / 3)) and keep the even spacing; at least one slice per row. Nothing else changes:
+    the same fit, the same crops.'
+  precedents:
+  - 'crops-turned-to-the-frame (frame-and-targets): a first look on the configured
+    slice counts.'
+  novelty: First reduction of the first look.
+  coverage: Every knee.
+  exploitation: 'Report training seconds and prediction seconds against the incumbent,
+    and per epoch the plane error and the spread of turns and shifts. Shown wrong
+    by: a plane error more than 0.3 mm above the incumbent''s at the last epoch, or
+    the macro below the incumbent at both multipliers.'
+  budget: Cheaper than the incumbent; expect training near 0.9 of its time.
+  implementation: Follow the environment paragraph of the developer instructions.
+    modeling/model.py only. Replaces the full-count first look. Log first_look_slices_per_knee
+    (mean) once per epoch.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The cost of the first look is what the adoption rule and the
+    Kaggle time limit both watch.
+  status: completed
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality-side-routed-heads/autoresearch/campaigns/anatomy-masks/seed-ideas.yaml
+  experiments:
+  - the-first-look-on-a-third-of-the-slices-20261007T235855Z-b161e01e
+  decision: reject
+- id: fluid-sagittal-crops-moved-forward-for-the-kneecap
+  mechanism_id: crop-target-position
+  parent_idea_id: null
+  title: Place the joint further back in the 93 mm fluid sagittal crops so that the
+    whole kneecap is inside
+  opportunity: 'Evidence-backed. On the masks of 550 knees the kneecap''s front lies
+    55.9 mm in front of the plateau centre (sd 5.2, 95th percentile 64.1) and its
+    back at 40.0 mm (measurements.json). The sagittal crops place the joint centre
+    7.4 mm behind the crop''s centre, so the 84 mm crop reaches 49 mm forward and
+    the 93 mm crop 54 mm: the kneecap is whole in 11% and 38% of them (prior-work.md,
+    Measured on the masks). PF OA, Effusion and Synovitis read the kneecap and the
+    pouch above it, and the fluid series is where they show. Moving the joint 8.6
+    mm further back in the 93 mm crop reaches 62.7 mm forward, the kneecap''s front
+    for about 90% of knees, and still leaves 30.7 mm behind the joint centre; the
+    plateau is about 50 mm deep, so the back of the joint stays inside. The 84 mm
+    crop cannot hold both ends.'
+  mechanism: 'In ViewWindows (modeling/model.py) make the sagittal target depend on
+    the view: keep SAGITTAL_JOINT_TARGET_MM = (7.4, 2.3) for the 84 mm views and use
+    (16.0, 2.3) for the 93 mm fluid sagittal view, chosen by view index from the view''s
+    field_mm; `geometry` returns the pivot accordingly. Everything else as the incumbent.'
+  precedents:
+  - The kneecap route led by kneecap and kneecap-joint tokens recovered most of PF
+    OA's loss (rn18-anatomy-front-sample550).
+  - Crops centred on the old frame cost PF OA and Fracture, which read far from the
+    joint centre (frame-and-targets).
+  novelty: First crop placed for a structure other than the joint.
+  coverage: Every fluid sagittal series, 4,150 of 4,407 studies have one.
+  exploitation: 'Read PF OA, Effusion, Synovitis, ACL and the two menisci at both
+    multipliers against the incumbent, and per epoch the mean share of kneecap and
+    kneecap-joint tokens per fluid sagittal image against the incumbent''s. Shown
+    wrong by: PF OA and Effusion both below the incumbent, or the menisci each more
+    than one sibling SD below it.'
+  budget: Same cost as the incumbent.
+  implementation: Follow the environment paragraph of the developer instructions.
+    modeling/model.py only. Replaces the single sagittal target by one per view width.
+    The shift limit is unchanged; report the share of fluid sagittal series at the
+    limit. Update SPATIAL_TOKEN_IDENTITY['view_policy'].
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The measured reason the front labels see half a kneecap, on
+    the series where their findings show.
+  status: completed
+  created_revision: 1
+  seeded: /home/claudio/src/knee-abnormality-side-routed-heads/autoresearch/campaigns/anatomy-masks/seed-ideas-2.yaml
+  experiments:
+  - fluid-sagittal-crops-moved-forward-for-the-kneecap-20261008T002848Z-ac858b1a
+  - fluid-sagittal-crops-moved-forward-for-the-kneecap-20261008T004013Z-584885d9
+  decision: reject
+- id: joint-gap-per-side-as-a-target
+  mechanism_id: mask-measurements-as-targets
+  parent_idea_id: null
+  title: Teach the model the gap between femur and tibia on the medial and on the
+    lateral side
+  opportunity: 'A guess, with a new source of information. Everything the masks have
+    given so far is position; the gap between the bones on each side is a number about
+    disease: it narrows with compartment osteoarthritis. measurements.json holds it
+    per knee and per side of the patient (prior-work.md, The targets). Medial OA is
+    the one target that gained beyond its interval from the anatomy work (+0.0062
+    at x1).'
+  mechanism: 'Load measurements.json beside knees.json in AnatomyTargets (training/anatomy.py):
+    gap_patient_left_mm and gap_patient_right_mm per knee. In the training module
+    add one linear head with two outputs on the route-pooled tokens of the OA channel:
+    for each knee pool the shared tokens with the oa_medial and the oa_lateral routing
+    weights (the same weights the labels use, detached) into two vectors and predict
+    one gap from each. The target for the medial vector is the gap on the knee''s
+    medial side: patient right for a left knee, patient left for a right knee, from
+    batch["knee_side_left"]; knees whose side is not certain or that lack a gap skip
+    the loss. Loss: smooth L1 on (prediction - target) / 2 mm, added inside the anatomy
+    loss, so with its weight of 0.1.'
+  precedents:
+  - Routed report targets are read the same way, through the routing weights (report_attributes.py).
+  novelty: First target from the masks that measures the joint instead of locating
+    it.
+  coverage: The 400 training knees with masks whose side is certain.
+  exploitation: 'Read Medial OA and Lateral OA at both multipliers against the incumbent,
+    and per epoch on the validation knees the mean absolute error of each gap against
+    the error of always predicting the training mean. Shown wrong by: a gap error
+    not below that baseline, or both OA targets below the incumbent by more than one
+    sibling SD.'
+  budget: Same cost as the incumbent; one small head.
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    training/anatomy.py and training/lightning.py. Adds; nothing can go, since no
+    gap target exists. The head is created under torch.random.fork_rng and added to
+    the optimiser with the other training heads. Log val_anatomy_gap_error_mm and
+    val_anatomy_gap_baseline_mm. Add anatomy_gap_loss to nothing the guardrail counts:
+    fold it into anatomy_loss before logging.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The only seed that adds information about disease from the masks.
+  status: completed
+  created_revision: 1
+  seeded: /home/claudio/src/knee-abnormality-side-routed-heads/autoresearch/campaigns/anatomy-masks/seed-ideas-2.yaml
+  experiments:
+  - joint-gap-per-side-as-a-target-20261008T005743Z-1c529ff0
+  decision: reject
+- id: the-first-look-on-the-whole-canvas-at-224-px
+  mechanism_id: first-look-field
+  parent_idea_id: null
+  title: Give the first look the whole canvas resized to 224 px instead of its central
+    crop
+  opportunity: 'User-ordered on 2026-10-08. Geometry evidence-backed, the gain a guess.
+    The first look reads the central 224 px of each sagittal and coronal canvas, the
+    same 84 or 93 mm the unposed crop shows, and the pose it returns then moves the
+    crop by up to three quarters of the 17 mm margin: the true pose asks for shifts
+    with sd 7.5 and 6.8 mm up and down and 4.5 and 4.2 mm across, and 2% and 4% of
+    series sit at the limit (prior-work.md, Measured on the masks). The look that
+    decides the move never sees the margin it moves into: the central crop shows the
+    femur to 42 to 49 mm above the joint and the tibia to 39 to 44 mm below, and the
+    kneecap whole in 11% and 38% of the sagittal crops. The whole canvas is 314 px
+    for the 84 mm views and 306 px for the 93 mm ones, 118 and 127 mm across; resized
+    to 224 px it has 0.526 and 0.568 mm per pixel, beside the 0.536 mm per pixel of
+    the 120 mm axial views the backbone already reads, and costs the same as the central
+    crop.'
+  mechanism: 'In ViewWindows (modeling/model.py) add the first look''s own cut: for
+    a view with margin m > 0 take the canvas region of side 224 + 2m from the canvas
+    origin and resize it to image_size with F.interpolate(mode="bilinear", antialias=True,
+    align_corners=False); views with margin 0 (axial) keep the exact copy they have
+    now. Set crop_affine for those slices to the scale s = (224 + 2m) / 224 on both
+    axes with translation (s - 1) / 2, in the convention of the existing affine (crop
+    pixel to canvas pixel), so that feature_geometry gives every token its true patient
+    position and canvas_valid_rects still masks what lies outside the picture. KneeAbnormalityModel.first_look_pose
+    encodes this cut instead of the central crop; the map, the plane, the centre and
+    frame_pose read it as they are. The posed crops, their widths, the jitter and
+    the limits do not change, and the map is still trained only on the posed crops.'
+  precedents:
+  - 'The incumbent''s first look on the central crops: plane error 1.73 mm, map overlap
+    femur 0.905, tibia 0.899 (prior-work.md, The incumbent).'
+  - Axial views at 120 mm, 0.536 mm per pixel, read by the same backbone and map head.
+  novelty: First first look that sees the margin the crops move into.
+  coverage: Every sagittal and coronal series of every knee, in training and at prediction.
+  exploitation: 'Read both multipliers against the incumbent with Lateral Meniscus,
+    ACL, PF OA, Effusion and Synovitis, and per epoch on the validation knees the
+    plane error, the mean and spread of every turn and shift, the share of series
+    at the shift limit and the first look''s share of kneecap and kneecap-joint tokens
+    per sagittal slice. Shown wrong by: a plane error more than 0.3 mm above the incumbent''s
+    at the last epoch, or the macro below the incumbent at both multipliers.'
+  budget: Same cost as the incumbent; the first look still reads the same slices at
+    224 px.
+  implementation: Follow the environment paragraph of the developer instructions.
+    modeling/model.py only. Replaces the first look on the central crops, including
+    the sentence of the developer instructions that names them; it stays one no-gradient
+    pass in evaluation mode on no more slices than a x1 pass. Report on one batch
+    the largest distance in mm between the patient positions of the same canvas points
+    seen through the resized look and through the central crop (expect under half
+    a token pitch), and that axial slices are bit-identical to the incumbent's first
+    look. Log first_look_mm_per_pixel (mean per plane) once per epoch. Update SPATIAL_TOKEN_IDENTITY['preparation'].
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Ordered by the user; the pose is limited by a look narrower
+    than the move it sets.
+  status: completed
+  created_revision: 19
+  seeded: /home/claudio/src/knee-abnormality-side-routed-heads/autoresearch/campaigns/anatomy-masks/first-look-ideas.yaml
+  experiments:
+  - the-first-look-on-the-whole-canvas-at-224-px-20261008T012757Z-83e42e7c
+  decision: reject
+- id: a-tenth-of-the-map-gradient-to-the-backbone-2
+  mechanism_id: map-gradient-share
+  parent_idea_id: null
+  title: Let a tenth of the anatomy map's gradient reach the backbone instead of all
+    of it
+  opportunity: 'Evidence-backed problem, a guess for the dose. Synovitis fell in every
+    run that trains the map, including the first, where the regions were run 24''s:
+    x4 -0.0045, -0.0028, -0.0052, -0.0068 (prior-work.md, The cost to Synovitis),
+    and in the last its attention by anatomy was equal to run 24''s, so the regions
+    are not the cause. With no gradient at all the map is too weak after one epoch
+    (femur 0.52, tibia 0.44, joint 0.40, plane error 4.6 mm against 0.85, 0.84, 0.68
+    and 1.8 mm). Nothing between the two extremes has been tried.'
+  mechanism: 'In KneeAbnormalityModel.encode_batch (modeling/model.py) the map head
+    reads `tokens.float()`. Feed it `tokens.detach() + MAP_GRADIENT_SHARE * (tokens
+    - tokens.detach())` with MAP_GRADIENT_SHARE = 0.1, a module constant: the forward
+    value is unchanged and the gradient into the tokens is scaled by 0.1. The head,
+    the loss, its weight, the plane, the sections and the crops stay as they are.'
+  precedents:
+  - 'Full gradient: rn18-anatomy-front-sample550, x4 -0.00008, x1 +0.00002, Synovitis
+    -0.0068 and -0.0110.'
+  - 'No gradient, two-layer head with Dice: stopped after one epoch, plane error 4.6
+    mm.'
+  novelty: First dose between full and none.
+  coverage: Every knee with targets; the frame and the crops of every knee depend
+    on the map's quality.
+  exploitation: 'Read Synovitis, Effusion and PF OA at both multipliers against the
+    incumbent and run 24, and per epoch the plane error and the overlap of femur,
+    tibia, joint and kneecap joint. Shown wrong by: Synovitis not above the incumbent
+    by one sibling SD (0.0022) at either multiplier, or a plane error above 2.5 mm
+    at the last epoch.'
+  budget: Same cost as the incumbent.
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    modeling/model.py only: one constant and one expression. Replaces the undamped
+    read of the tokens by the map head. Confirm on one batch that the gradient of
+    the anatomy loss on the projection weights is 0.1 times the incumbent''s (ratio
+    within 1e-4) and that the logits are bit-identical in evaluation mode. Update
+    SPATIAL_TOKEN_IDENTITY["algorithm"].'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Synovitis is the one target with a loss beyond its interval
+    in every map run; it holds the macro about 0.0005 to 0.0009 down.
+  status: completed
+  created_revision: 69
+  seeded: /home/claudio/src/knee-abnormality-side-routed-heads/autoresearch/campaigns/anatomy-masks/gradient-requeue-ideas.yaml
+  experiments:
+  - a-tenth-of-the-map-gradient-to-the-backbone-2-20261007T232915Z-cc13e276
+  decision: reject
+- id: sagittal-crops-a-ninth-wider
+  mechanism_id: crop-field
+  parent_idea_id: null
+  title: Cut the posed sagittal crops a ninth wider, 93.3 mm for T1/PD and 103.7 mm
+    for the fluid series, at the same 224 px
+  opportunity: 'User-ordered on 2026-10-08, which lifts the contract''s bar on crop
+    widths for this seed. Extents evidence-backed (bone extents on the 550 mask volumes,
+    scripts/adhoc/side_routed_session/field_extents.py and field_cover.py, output
+    in outputs/analysis/anatomy-masks-field/); the gain a guess. With the joint centre
+    7.4 mm behind and 2.3 mm below the crop centre, the 93.3 mm fluid crop reaches
+    54.1 mm forward and 49.0 mm up, where the kneecap''s front lies at 55.9 mm (median;
+    75th percentile 59.1, 95th 64.3) and its top at 54.6 mm (90th 63.0). At 103.7
+    mm the front edge reaches the kneecap''s 75th percentile: its front is inside
+    for 77% of knees instead of 36%, its top for 48% instead of 22%, the whole kneecap
+    for 44% instead of 13%, and the tissue behind the condyles grows from 16.7 to
+    22.0 mm (Baker''s). The T1/PD crop at 93.3 mm has the kneecap''s front inside
+    for 36% instead of 11%. The pixel goes from 0.375 and 0.417 mm to 0.417 and 0.463
+    mm, still finer than the axial views'' 0.536 mm. The two series types keep their
+    difference: T1/PD carries ACL and the menisci, and at 120 mm it cost -0.0012 with
+    Lateral Meniscus -0.0061 (smart-crops). Clinical protocols image the knee at 140
+    to 160 mm.'
+  mechanism: 'One zoom factor s = 10/9 for the sagittal views and 1 for all others.
+    In ViewWindows (modeling/model.py) the posed cut of a sagittal view samples the
+    canvas on a grid whose pixel pitch is s canvas pixels, so the crop shows s times
+    the view''s field_mm at image_size, in the same single bicubic resampling as the
+    turn; crop_affine carries the scale, so feature_geometry gives every token its
+    true patient position. The joint centre keeps its target in mm from the crop centre
+    (SAGITTAL_JOINT_TARGET_MM), so `geometry` divides that offset by s in crop pixels.
+    A sagittal crop is always resampled: its exact-copy path for a zero angle is removed.
+    So that the wider crop keeps today''s room to move, set data.view_shift_limit_mm
+    to 22.5 (canvases of 344 and 332 px) and replace MAX_VIEW_SHIFT_FRACTION * margin
+    in frame_pose and jitter by a per-view limit in canvas pixels, min(0.75 * margin
+    - (s - 1) * image_size / 2, 0.75 * round(17 mm / pixel pitch)): 12.2 and 11.7
+    mm for the two sagittal views and today''s 12.75 mm for the coronal ones, whose
+    crops, pose and limits do not change. The first look still reads the central 224
+    px of each canvas at the view''s own field. Axial views, slice counts and image
+    size do not change.'
+  precedents:
+  - 'sagittal-fluid-100 (smart-crops): the fluid sagittal view at 100 mm instead of
+    93 mm, cut by the loader without pose, -0.0002 with PF OA -0.0024 and Baker''s
+    -0.0020; one run.'
+  - 'mixed-field: a single 160 mm field -0.0034 and a single 120 mm field +0.0011
+    against the 140 mm reference; the 84/93 mm views replaced 120 mm in smart-crops.'
+  - 'fluid-sagittal-crops-moved-forward-for-the-kneecap (this campaign): 38% of series
+    at the shift limit when 8.6 mm were added inside the 17 mm margin; x4 -0.0005.'
+  novelty: First wider field cut by the pose instead of by the loader, and the first
+    with the margin grown to keep the shift room.
+  coverage: Every sagittal series of every knee, in training and at prediction.
+  exploitation: 'Read both multipliers against the incumbent with PF OA, Effusion,
+    Synovitis and Baker''s (the kneecap and the back of the joint enter) and ACL and
+    both menisci (the pixel grows by a ninth), and per epoch on the validation knees
+    the plane error, the mean and spread of every turn and shift, the share of sagittal
+    series at the shift limit, and the share of kneecap and kneecap-joint tokens per
+    sagittal image. Shown wrong by: PF OA, Effusion and Baker''s all below the incumbent
+    at x4, or Lateral Meniscus and ACL both below it by more than one sibling SD.'
+  budget: Canvases about a fifth larger in area for the sagittal and coronal series;
+    expect training near 1.05 to 1.1 of the incumbent's time, inside the 1.2 ceiling,
+    and prediction inside 1.3.
+  implementation: Follow the environment paragraph of the developer instructions.
+    modeling/model.py and configs/training.yaml (data.view_shift_limit_mm only). Replaces
+    the sagittal crops at the views' own field and the single shift fraction; no flag
+    selects the old field. The developer instructions' sentence against changing widths
+    is lifted for this seed by the user's order; slice counts and image size stay.
+    Report on one batch the field in mm of a sagittal crop measured from the patient
+    positions of its corner tokens (expect 93.3 and 103.7), that the coronal and axial
+    crops are bit-identical to the incumbent's at the same pose, and the largest shift
+    applied in mm. Log crop_field_mm per plane and sagittal_shift_limit_series_fraction
+    once per epoch. Update SPATIAL_TOKEN_IDENTITY['preparation'].
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Ordered by the user; the field comes from the measured extents,
+    not from a sweep.
+  status: completed
+  created_revision: 159
+  seeded: /home/claudio/src/knee-abnormality-side-routed-heads/autoresearch/campaigns/anatomy-masks/field-ideas.yaml
+  experiments:
+  - sagittal-crops-a-ninth-wider-20261008T015757Z-3e68b766
+  - sagittal-crops-a-ninth-wider-20261008T020917Z-bfde0dd7
+  decision: reject
+- id: coronal-crops-a-ninth-wider
+  mechanism_id: crop-field
+  parent_idea_id: null
+  title: Cut the posed coronal crops a ninth wider, 93.3 mm for T1/PD and 103.7 mm
+    for the fluid series, at the same 224 px
+  opportunity: 'User-ordered on 2026-10-08, which lifts the contract''s bar on crop
+    widths for this seed. Extents evidence-backed (bone extents on the 550 mask volumes,
+    scripts/adhoc/side_routed_session/field_extents.py and field_cover.py, output
+    in outputs/analysis/anatomy-masks-field/); the gain a guess. With the joint centre
+    1.1 mm from the crop centre across, the crops reach 40.9 mm (84 mm T1/PD) and
+    45.6 mm (93.3 mm fluid) to each side, where the widest bone edge lies at 40.2
+    mm (median; 95th percentile 46.9) and the fibular head at 43.5 mm (95th 52.6);
+    the collateral ligaments and the soft tissue where MCL injury and marrow oedema
+    are read lie outside the bone. At 103.7 mm the fluid crop reaches 50.9 mm: the
+    bone edge is inside on both sides for 99% of knees instead of 90%, the bone plus
+    5 mm for 92% instead of 55%, the fibular head for 91% instead of 63%. The T1/PD
+    crop at 93.3 mm has the bone edge inside for 90% instead of 58% and the bone plus
+    5 mm for 55% instead of 13%. The MCL runs from about 30 mm above the joint line
+    to 61 mm below it (literature); the lower edge reaches about 51 mm, so its far
+    end stays cut. The pixel goes from 0.375 and 0.417 mm to 0.417 and 0.463 mm, still
+    finer than the axial views'' 0.536 mm. Clinical protocols image the knee at 140
+    to 160 mm.'
+  mechanism: 'One zoom factor s = 10/9 for the coronal views and 1 for all others.
+    In ViewWindows (modeling/model.py) the posed cut of a coronal view samples the
+    canvas on a grid whose pixel pitch is s canvas pixels, so the crop shows s times
+    the view''s field_mm at image_size, in the same single bicubic resampling as the
+    turn; crop_affine carries the scale, so feature_geometry gives every token its
+    true patient position. The joint centre keeps its target in mm from the crop centre
+    (CORONAL_JOINT_TARGET_MM), so `geometry` divides that offset by s in crop pixels.
+    A coronal crop is always resampled: its exact-copy path for a zero angle is removed.
+    So that the wider crop keeps today''s room to move, set data.view_shift_limit_mm
+    to 22.5 (canvases of 344 and 332 px) and replace MAX_VIEW_SHIFT_FRACTION * margin
+    in frame_pose and jitter by a per-view limit in canvas pixels, min(0.75 * margin
+    - (s - 1) * image_size / 2, 0.75 * round(17 mm / pixel pitch)): 12.2 and 11.7
+    mm for the two coronal views and today''s 12.75 mm for the sagittal ones, whose
+    crops, pose and limits do not change. The first look still reads the central 224
+    px of each canvas at the view''s own field. Axial views, slice counts and image
+    size do not change.'
+  precedents:
+  - 'Coronal fluid at 93 mm instead of 120 mm (smart-crops): +0.0003 and +0.0004,
+    ACL +0.0018 and +0.0031; axial plus coronal fluid at 120 mm read MCL at 0.910
+    against 0.855 for coronal fluid at 93 mm alone. Coronal T1/PD width was never
+    changed alone.'
+  - 'mixed-field: a single 160 mm field -0.0034 and a single 120 mm field +0.0011
+    against the 140 mm reference; the 84/93 mm views replaced 120 mm in smart-crops.'
+  - 'fluid-sagittal-crops-moved-forward-for-the-kneecap (this campaign): 38% of series
+    at the shift limit when 8.6 mm were added inside the 17 mm margin; x4 -0.0005.'
+  novelty: First wider field cut by the pose instead of by the loader, and the first
+    with the margin grown to keep the shift room.
+  coverage: Every coronal series of every knee, in training and at prediction.
+  exploitation: 'Read both multipliers against the incumbent with MCL, Contusion,
+    Fracture, Medial OA and Lateral OA (the sides of the joint enter) and both menisci
+    and ACL (the pixel grows by a ninth), and per epoch on the validation knees the
+    plane error, the mean and spread of every turn and shift, the share of coronal
+    series at the shift limit, and the share of kneecap and kneecap-joint tokens per
+    coronal image. Shown wrong by: MCL not above the incumbent at x4, or Medial Meniscus
+    and Lateral Meniscus both below it by more than one sibling SD.'
+  budget: Canvases about a fifth larger in area for the sagittal and coronal series;
+    expect training near 1.05 to 1.1 of the incumbent's time, inside the 1.2 ceiling,
+    and prediction inside 1.3.
+  implementation: Follow the environment paragraph of the developer instructions.
+    modeling/model.py and configs/training.yaml (data.view_shift_limit_mm only). Replaces
+    the coronal crops at the views' own field and the single shift fraction; no flag
+    selects the old field. The developer instructions' sentence against changing widths
+    is lifted for this seed by the user's order; slice counts and image size stay.
+    Report on one batch the field in mm of a coronal crop measured from the patient
+    positions of its corner tokens (expect 93.3 and 103.7), that the sagittal and
+    axial crops are bit-identical to the incumbent's at the same pose, and the largest
+    shift applied in mm. Log crop_field_mm per plane and coronal_shift_limit_series_fraction
+    once per epoch. Update SPATIAL_TOKEN_IDENTITY['preparation'].
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Ordered by the user; the field comes from the measured extents,
+    not from a sweep.
+  status: completed
+  created_revision: 159
+  seeded: /home/claudio/src/knee-abnormality-side-routed-heads/autoresearch/campaigns/anatomy-masks/field-ideas.yaml
+  experiments:
+  - coronal-crops-a-ninth-wider-20261008T022815Z-8f245d21
+  decision: reject
+- id: soft-bone-shares-fit-the-joint-plane
+  mechanism_id: soft-bone-plane-fitting
+  parent_idea_id: null
+  title: Fit the joint plane with continuous bone shares instead of discarding tokens
+    below half bone
+  opportunity: 'Measured: incumbent validation plane error is 1.7051 mm at epoch 0
+    and 1.7561 mm at epoch 9, despite joint overlap improving from 0.7290 to 0.7576.
+    The source discards tokens whenever femur+tibia share is at most 0.5. Partial
+    bone tokens therefore influence the centre and sections but cannot influence the
+    plane. Evidence-backed implementation inconsistency; improved geometry and macro
+    AUC are hypotheses.'
+  mechanism: In anatomical_frames, replace hard bone selection and the raw femur-minus-tibia
+    response by weighted conditional bone regression. Let b=femur+tibia, y=(femur-tibia)/b
+    where b>0, and w=valid*b*G(distance). Fit the existing affine plane to y with
+    w. Accumulate the response directly as valid*(femur-tibia)*G, avoiding division.
+    Retain the existing scale, ridge, prior, three Gaussian refits and 12 mm refit
+    width. Everything remains detached. This removes the 0.5 selection discontinuity
+    without adding a class threshold or fitted distance.
+  precedents:
+  - "Incumbent modeling/model.py:1120\u20131156 contains the hard selection and existing\
+    \ plane fit; training/lightning.py logs its validation error."
+  - The CE-only run improved final plane error to 1.5925 mm while weakening several
+    map classes. This shows that overlap and plane accuracy need separate assessment;
+    it does not establish that this replacement will help.
+  - '[Prior work: anatomy plane and mask measurements](/home/claudio/src/knee-abnormality-side-routed-heads/autoresearch/campaigns/anatomy-masks/prior-work.md:87).'
+  novelty: Changes how predicted shares become geometry. It neither predicts token
+    heights nor estimates a bone axis from token positions, both closed directions.
+  coverage: Every routable knee with predicted bone mass, in the existing first look
+    and final pass. No extra images, segmenter, target lookup or backbone teaching
+    is introduced at prediction.
+  exploitation: Log the bone mass actually admitted below the former cutoff, plane
+    error, first-look plane error, centre error and crop transforms. Shown wrong diagnostically
+    by admitted mass failing to affect the fit, or increased plane/crop instability.
+    Expect no additional supervision cost to Synovitis, Effusion or PF OA, but geometry
+    can affect all twelve labels. Only the fixed macro bootstrap rule decides adoption.
+  budget: "One ten-epoch run at seed 1110484336, preserving 4420 optimizer steps and\
+    \ all sampling. Reuses the existing small plane solves; expected training cost\
+    \ is near the incumbent's 1687 s, with no additional CNN pass. Actual training\
+    \ must remain within 931.58\u20132235.80 s; report prediction time against 53.09\
+    \ s."
+  implementation: Follow the environment paragraph of the developer instructions.
+    Replace the fitter's hard-selection/response calculation in modeling/model.py;
+    update modeling/spatial_tokens.py and add epoch diagnostics in training/lightning.py.
+    Retain the accepted map-derived centre, bicubic/clamped sampling, exact central
+    copying, map objective, routing and crop targets. Do not retain an inference option
+    for the old fitter. A newly accepted incumbent supplies all unrelated behavior;
+    apply this replacement to its current fitter and preserve its centre and crop
+    improvements. Run the required CPU routing and crop guardrails with the supplied
+    environment.
+  open_choices: Use the algebraic response accumulation above and floating-point zero-mass
+    safeguards only. The amount and spatial distribution of formerly discarded bone
+    mass are unknown and must be logged, not converted into a hand-selected cutoff.
+  dependencies: []
+  priority_rationale: 'Priority 1: a concrete source inconsistency with a cheap structural
+    replacement, broad geometric coverage and no stronger anatomy loss. Predictive
+    benefit remains uncertain.'
+  source_change: true
+  targeted_curve: "Incumbent epochs 0\u20139: reduce the roughly 1.7\u20132.0 mm plane-error\
+    \ plateau while preserving rising map overlap; improve the epochs 7\u20139 \xD7\
+    1 macro plateau around 0.9175\u20130.9177."
+  status: completed
+  created_revision: 208
+  ranking_rationale: 'Admit four proposals with satisfied dependencies and material
+    differences from measured predecessors. Rank continuous translations first: it
+    extends the statistically supported bicubic line with a cheap, localized replacement.
+    Soft bone-plane fitting follows because source inspection confirms the hard cutoff
+    and its replacement needs no additional encoding or supervision. Conflict-dependent
+    gradient transfer ranks third: it addresses the useful teaching lost under rejected
+    uniform damping, but conflict prevalence and implementation cost are unknown.
+    Exposure-normalized centring ranks fourth because its accepted parent showed no
+    statistically supported predictive gain and exposure-driven bias remains hypothetical.
+    Leave sparse interior-depth selection proposed: it materially changes endpoint
+    selection, but the preceding sparse run lost 0.001528 macro AUC with an entirely
+    negative 80% interval, saved only about 48 s training, and showed no prediction
+    speedup. Its expected yield is weaker than the admitted mechanisms. Searches of
+    results/history and the prior-work precedent table found no measured equivalent
+    of the four admitted replacements.'
+  experiments:
+  - soft-bone-shares-fit-the-joint-plane-20261008T033130Z-816591b0
+  decision: reject
+- id: map-gradient-projected-away-from-task-conflict
+  mechanism_id: map-gradient-share
+  parent_idea_id: a-tenth-of-the-map-gradient-to-the-backbone-2
+  title: Remove only conflicting anatomy gradients instead of damping every anatomy
+    update
+  opportunity: "Measured: uniform 0.1 damping left final kneecap/joint overlap at\
+    \ 0.6193/0.6944 versus incumbent 0.7336/0.7576; plane error rose to 1.9487 mm.\
+    \ Lateral Meniscus \xD71 AUC fell from 0.8826 at epoch 3 to 0.8737 at epoch 9\
+    \ while loss decreased. Synovitis did not recover. The diagnosis is indiscriminate\
+    \ removal of useful map teaching; conflict between objectives is an unmeasured\
+    \ hypothesis."
+  mechanism: "Keep full anatomy-head learning and the incumbent CE+Dice objective.\
+    \ Isolate the anatomy path into the shared projected image features. Obtain a\
+    \ detached gradient gT of the unchanged combined non-anatomy training objective\
+    \ at those features, restricted to covered anatomy tokens. For each covered knee,\
+    \ replace incoming anatomy gradient gA by gA-min(<gA,gT>,0)*gT/||gT||\xB2; use\
+    \ gA when gT is zero. Leave task gradients and all forward predictions unchanged.\
+    \ Nonconflicting anatomy updates pass in full; conflicting components are removed.\
+    \ This is an asymmetric, feature-space adaptation of gradient projection, not\
+    \ another constant dose."
+  precedents:
+  - 'a-tenth-of-the-map-gradient-to-the-backbone-2: qualifying damping activation
+    occurred, but thin-class learning and late Lateral Meniscus AUC weakened; see
+    its family verdict.'
+  - '[Gradient Surgery for Multi-Task Learning](https://arxiv.org/abs/2001.06782)
+    projects conflicting task gradients. This proposal modifies only the auxiliary
+    anatomy gradient at shared features; the paper does not establish benefit for
+    this model.'
+  - '[Historical cost to Synovitis](/home/claudio/src/knee-abnormality-side-routed-heads/autoresearch/campaigns/anatomy-masks/prior-work.md:126).'
+  novelty: A conflict-dependent structural retry. It preserves useful anatomy gradients
+    that the rejected uniform attenuation removed, without changing loss weights,
+    selecting labels or introducing a warm-up schedule.
+  coverage: Only covered anatomy tokens during training. All twelve labels contribute
+    through the existing combined task objective. Uncovered tokens receive no newly
+    projected anatomy gradient. Evaluation and prediction retain the ordinary forward
+    computation.
+  exploitation: Log actual projected backward batches, conflict fraction, removed-gradient
+    norm and retained-gradient share, alongside all existing anatomy and crop diagnostics.
+    Shown wrong by absent qualifying conflicts, persistent thin-class degradation,
+    or failure to improve late macro AUC. Synovitis recovery is a hypothesis; Effusion
+    and PF OA should retain useful map teaching. Feature-space orthogonality does
+    not guarantee orthogonality of backbone parameter gradients.
+  budget: One ten-epoch run at the incumbent seed and sampling. The extra reverse
+    calculation stops at shared features rather than traversing the backbone; no extra
+    image encoding is needed. Its runtime is unknown. Preserve the 2235.80 s training
+    ceiling and 2580 s overall ceiling, and report prediction time. No shortened run
+    or confirmation run.
+  implementation: Follow the environment paragraph of the developer instructions.
+    Add an isolated anatomy feature branch in modeling/model.py and compute the detached
+    task-gradient reference plus anatomy-only backward projection in training/lightning.py.
+    Restrict projection to the actual supervision mask. Retain full anatomy-head gradients,
+    all non-anatomy gradients, CE+Dice, accepted centre and bicubic crops. The incumbent
+    has no damping branch to remove; replace its unconditional auxiliary gradient
+    transfer. Update spatial-token identity. On a new incumbent, preserve unrelated
+    winners and replace only its anatomy-gradient transfer. Use the required CPU guardrail;
+    add no optimizer or inference option.
+  open_choices: Apply projection per covered knee at shared image features, with the
+    complete unchanged non-anatomy objective as reference. Handle mixed-precision
+    scaling consistently. Conflict prevalence, overhead and effects on shared normalization
+    parameters remain unknown.
+  dependencies: []
+  priority_rationale: 'Priority 2: the largest potentially useful structural retry,
+    motivated by observed loss of map learning. More implementation and runtime uncertainty
+    than the geometry proposals.'
+  source_change: true
+  targeted_curve: "Damping run epochs 3\u20139: arrest Lateral Meniscus \xD71 decline\
+    \ 0.8826\u21920.8737 and restore thin-class overlap toward incumbent levels; improve\
+    \ late macro AUC without repeating Synovitis's loss."
+  status: completed
+  created_revision: 208
+  ranking_rationale: 'Admit three dependency-satisfied proposals, filling the five-idea
+    queue while preserving the reserved head. Raw patellar shares rank first among
+    unreserved work: the source replacement is narrow, inexpensive and supported by
+    independently reproduced mask accounting. It precedes equal-view centre aggregation
+    because the accepted centre change''s interval included zero and supplies no demonstrated
+    predictive win. Admit interior-depth sampling as one structural retry: inspected
+    historical code selects endpoints, whereas the proposed midpoint rule changes
+    selection at the same sparse budget; its small measured savings limit priority.
+    Admit footprint integration last: it aligns geometric membership with existing
+    anatomy-target quadrature, but has broad routing effects and uncertain overhead.
+    The earlier meniscus-fractional-footprint-mask-20260924T055746Z-bc4f72e4 lost
+    macro AUC; its inspected diff computes polygon-clipped own-half membership around
+    a fixed midline band, without anatomy-first sections. Sixteen-point integration
+    of the current detached anatomical frame and complete region formulas is a material
+    difference, not an identical retry. Leave anatomy-head-reads-neighbour-contrasts
+    proposed: its information change is distinct from the closed detached-head experiment,
+    but backbone context may make it redundant and stronger effective teaching risks
+    the historical Synovitis cost. It does not displace the better-supported queued
+    work.'
+  experiments:
+  - map-gradient-projected-away-from-task-conflict-20261008T040129Z-ed914f13
+  decision: reject
+- id: joint-centre-with-equal-view-exposure
+  mechanism_id: joint-centre-source
+  parent_idea_id: joint-centre-from-the-map-instead-of-the-spots
+  title: Normalize each view's exposure before reading the joint centre
+  opportunity: 'Measured: the accepted map centre retains final signed errors of +0.9250
+    mm across and +1.7355 mm front, with spreads 1.9379/1.5565 mm. Its source sums
+    every token''s bone-weighted position equally, so a view''s influence grows with
+    its valid token and slice count. The sparse-first-look run changed crop shifts
+    substantially despite similar final map accuracy. Sampling-dependent centre bias
+    is a hypothesis, not an established cause of that rejection.'
+  mechanism: Retain the detached 10 mm Gaussian bone-share centroid and plane projection.
+    For each knee and view index, count valid tokens Nv. Replace each token weight
+    v*(femur+tibia)*G(height) by that weight divided by Nv, then compute the existing
+    global centroid and project it onto the current plane. This equalizes view exposure
+    before bone-confidence weighting, rather than giving a weak view a normalized
+    unit bone vote. Preserve the existing zero-total-mass fallback. Remove only count-proportional
+    weighting.
+  precedents:
+  - 'joint-centre-from-the-map-instead-of-the-spots: accepted map source, remaining
+    signed centre errors and a very small prediction delta; see its family verdict.'
+  - "modeling/model.py:1172\u20131189 implements the current unnormalized accumulation;\
+    \ view_index is already available in _encode_crops."
+  - 'Sparse first look: final plane error 1.7361 mm, but coronal across-shift spread
+    20.6603 px versus incumbent 9.3233 px. This motivates checking exposure sensitivity
+    without establishing its cause.'
+  novelty: Changes aggregation of the accepted map centre, retaining its anatomical
+    source and Gaussian locality. It does not return to attention spots or introduce
+    learned geometry from labels.
+  coverage: All available routable views in both existing passes. Uses only current
+    images, predicted shares, geometry and view membership. Missing views and zero
+    mass use algebraic safeguards; no class threshold is introduced.
+  exploitation: Log per-view exposure and resulting weight fractions, displacement
+    from the count-weighted centre, first-look centre error, signed bias/spread and
+    realized crop displacement after clipping/rounding. Shown wrong by no effective
+    displacement, unchanged bias, or domination by weak views. No stronger map teaching
+    is expected; Synovitis, Effusion and PF OA still need reporting because crop geometry
+    changes.
+  budget: One ten-epoch run at seed 1110484336 with unchanged final and first-look
+    slice counts. Adds grouped scalar reductions, not encoding or learned parameters.
+    Expected cost is near 1687 s training and 53.09 s prediction; actual accounting
+    must satisfy the assignment limits.
+  implementation: Follow the environment paragraph of the developer instructions.
+    Pass view membership to anatomical_frames in modeling/model.py and replace only
+    its centroid weights. Update modeling/spatial_tokens.py and epoch logging in training/lightning.py.
+    Retain map-derived centre sourcing, plane fitting, Gaussian width, spot orientation,
+    fallback, calibrated crop targets and bicubic sampling. Do not recalibrate targets
+    to validation labels or retain an old weighting option. On a new incumbent, use
+    its current plane and within-view anatomy statistic while applying exposure normalization;
+    preserve unrelated accepted behavior. Report the required routing and crop guardrails.
+  open_choices: Normalize by valid-token exposure per knee/view, not by bone mass.
+    Whether residual bias correlates with view exposure is unknown and must be logged.
+    Keep current target calibration to isolate this aggregation change.
+  dependencies:
+  - joint-centre-from-the-map-instead-of-the-spots
+  priority_rationale: 'Priority 3: cheap follow-up to the accepted centre source,
+    with a plausible sampling weakness. Its parent''s interval straddled zero, so
+    predictive potential should be weighted cautiously.'
+  source_change: true
+  targeted_curve: "Incumbent epochs 1\u20139: reduce persistent front-centre bias\
+    \ near +1.7 mm and exposure-driven crop variation; improve the late \xD71 macro\
+    \ plateau while retaining map overlap."
+  status: completed
+  created_revision: 208
+  ranking_rationale: 'Admit three dependency-satisfied proposals, filling the five-idea
+    queue while preserving the reserved head. Raw patellar shares rank first among
+    unreserved work: the source replacement is narrow, inexpensive and supported by
+    independently reproduced mask accounting. It precedes equal-view centre aggregation
+    because the accepted centre change''s interval included zero and supplies no demonstrated
+    predictive win. Admit interior-depth sampling as one structural retry: inspected
+    historical code selects endpoints, whereas the proposed midpoint rule changes
+    selection at the same sparse budget; its small measured savings limit priority.
+    Admit footprint integration last: it aligns geometric membership with existing
+    anatomy-target quadrature, but has broad routing effects and uncertain overhead.
+    The earlier meniscus-fractional-footprint-mask-20260924T055746Z-bc4f72e4 lost
+    macro AUC; its inspected diff computes polygon-clipped own-half membership around
+    a fixed midline band, without anatomy-first sections. Sixteen-point integration
+    of the current detached anatomical frame and complete region formulas is a material
+    difference, not an identical retry. Leave anatomy-head-reads-neighbour-contrasts
+    proposed: its information change is distinct from the closed detached-head experiment,
+    but backbone context may make it redundant and stronger effective teaching risks
+    the historical Synovitis cost. It does not displace the better-supported queued
+    work.'
+  experiments:
+  - joint-centre-with-equal-view-exposure-20261008T050113Z-9937e29a
+  decision: provisional_accept
+- id: sparse-first-look-at-interior-depth-quantiles
+  mechanism_id: first-look-cost
+  parent_idea_id: the-first-look-on-a-third-of-the-slices
+  title: Use interior depth strata for the sparse first look instead of the two endpoints
+  opportunity: "Measured and source-backed: the rejected sparse run's two-slice rows\
+    \ select ranks 0 and N\u22121; a one-slice row selects rank 0. Final plane error\
+    \ stayed near the incumbent, but absolute crop shift rose to 16.2743 px from 11.7513,\
+    \ and coronal turn spread to 5.3771\xB0 from 3.3805\xB0. Endpoint sampling can\
+    \ underrepresent central knee anatomy. This is a diagnosed selection weakness;\
+    \ the causal link to AUC remains a hypothesis."
+  mechanism: "Reuse the rejected sparse run's exact budget B=min(N,ceil(configured_slices/3))\
+    \ and reduced padding width. Replace endpoint ranks with floor((j+0.5)*N/B), j=0\u2026\
+    B\u22121, over ordered valid slices. These are the midpoints of equal depth strata;\
+    \ B=1 selects the middle and B=2 selects interior quarter/three-quarter positions.\
+    \ Keep the final pass unchanged. The mathematical midpoint rule introduces no\
+    \ validation-tuned distance or angle."
+  precedents:
+  - 'the-first-look-on-a-third-of-the-slices source, ViewWindows.first_look_batch:
+    endpoint ranks under a two-slice budget; its activation and larger applied-transform
+    spreads are measured.'
+  - Incumbent full-budget first look remains the control. The rejected budget saved
+    about 48 s training and did not reduce measured prediction time.
+  - '[Prior work: pose accuracy and first-look cost](/home/claudio/src/knee-abnormality-side-routed-heads/autoresearch/campaigns/anatomy-masks/prior-work.md:139).'
+  novelty: A structural sampling retry at the same sparse dose, rather than increasing
+    the slice fraction. It addresses which slices estimate geometry.
+  coverage: Every first-look acquisition, including short rows. One no-gradient evaluation-mode
+    first look remains; no additional decoding, second look or prediction crop ensemble
+    is introduced.
+  exploitation: Log executed slice counts, interior-selection changes, normalized
+    selected depths, first-look plane/centre errors and actual crop-transform spreads.
+    Shown wrong by persistent transform inflation despite changed selection, or continued
+    late macro weakness. Report all labels, especially Synovitis, Effusion and PF
+    OA; final-pass map accuracy alone cannot validate first-look geometry.
+  budget: One ten-epoch run at the incumbent seed, 4420 steps and unchanged final
+    input accounting. Uses the prior sparse budget, so expected cost is near its 1639
+    s; savings are uncertain and no prediction speedup is presumed. Preserve the assignment's
+    training-time range and overall ceiling.
+  implementation: Follow the environment paragraph of the developer instructions.
+    In modeling/model.py replace the incumbent full-budget first-look policy with
+    the historical sparse budget and the new interior rank rule. Retain final-pass
+    sampling, central first-look crops, accepted anatomy centre, bicubic cuts and
+    crop limits/jitter. Add detached first-look diagnostics and epoch logging in training/lightning.py;
+    update spatial-token identity. The historical endpoint implementation is a precedent,
+    not an active dependency. On a new incumbent preserve its geometry and crop winners,
+    replacing only first-look depth selection. Run the required CPU routing check,
+    zero-pose crop equivalence in both modes and known-plane residual-angle check.
+  open_choices: Use equal valid-depth strata and the historical sparse budget exactly.
+    First-look ground-truth error was not logged by the rejected run; the new run
+    must expose it without another encoding pass.
+  dependencies: []
+  priority_rationale: 'Priority 4: a clear sampling defect with cheap repair and observable
+    geometry diagnostics. The prior macro interval was negative and compute savings
+    small, so this is one structural retry with limited expected yield.'
+  source_change: true
+  targeted_curve: "Sparse run epochs 0\u20139: reduce inflated applied shifts and\
+    \ turn spread toward incumbent levels; recover late \xD71/\xD74 macro performance\
+    \ while retaining the same reduced first-look budget."
+  status: completed
+  created_revision: 208
+  ranking_rationale: 'Admit all three new proposals: proposal_admission reports satisfied
+    dependencies, and each specifies a material mechanism beyond its measured precedents.
+    Keep the reserved head first. Place categorical patellar routing next because
+    source inspection confirms patellar shares enter the residual height mixture before
+    their explicit union; this is a concrete composition replacement, not another
+    promotion strength. Balanced continuous fitting follows: it adds class normalization
+    to the rejected continuous fitter rather than repeating it, although actual token
+    imbalance remains unknown. Keep footprint integration ahead of the new covariance
+    direction, whose full-mask evidence is less direct. Joint transverse covariance
+    differs from the closed long-bone direction fits and preserves the plane normal.
+    Searches of docs/validation/results and docs/history found no matching measured
+    categorical construction, class-balanced plane solve or joint transverse covariance
+    run. Leave neighbour-context proposed; the resulting five-item queue already contains
+    stronger or more directly supported opportunities.'
+  experiments:
+  - sparse-first-look-at-interior-depth-quantiles-20261008T053126Z-14172132
+  decision: reject
+- id: posed-crops-keep-their-subpixel-shifts
+  mechanism_id: crop-resampling
+  parent_idea_id: turned-crops-cut-with-bicubic-interpolation
+  title: Keep continuous crop translations through the accepted bicubic sampler
+  opportunity: 'Source-backed: frame_pose rounds the geometric shift, and jitter rounds
+    its sampled translation before bicubic sampling. The fixed 84/93.333 mm fields
+    at 224 px make half-pixel snapping errors up to 0.1875/0.2083 mm per axis. Bicubic
+    already preserves fine detail, but still receives snapped translations. Removing
+    this quantization is a small geometric hypothesis, not evidence of another 0.001
+    gain.'
+  mechanism: "Remove translation rounding from frame_pose and jitter while retaining\
+    \ identical random draws, millimetre jitter range and clipping limits. Carry floating\
+    \ translations into the existing bicubic affine. Use exact copying only when angle\
+    \ is zero and translation is integral; zero angle with fractional translation\
+    \ uses bicubic. Retain exact central zero-pose copying and clamping to 0\u2013\
+    255. Replace integer translation quantization only."
+  precedents:
+  - Accepted bicubic interpolation has a positive 80% interval against its historical
+    parent; see the crop-resampling verdict.
+  - Incumbent ViewWindows.frame_pose and jitter contain the two rounding operations;
+    configs/training.yaml fixes the field sizes and 224 px image size.
+  - '[Measured interpolation detail retention](/home/claudio/src/knee-abnormality-side-routed-heads/autoresearch/campaigns/anatomy-masks/prior-work.md:139):
+    approximately 0.98 for bicubic versus 0.81 for bilinear.'
+  novelty: Uses the accepted interpolator for continuous geometry. It does not change
+    its kernel, loss, crop width, jitter strength or inference averaging.
+  coverage: Every movable sagittal/coronal series with a fractional pose or training
+    jitter. Axial views remain untouched; evaluation remains deterministic.
+  exploitation: Log realized translation differences from the rounded counterfactual
+    under identical draws and clipping, fractional-translation frequency, all crop-transform
+    means/spreads and known-plane residual angle. Shown wrong by no realized displacement
+    or degraded geometry/detail diagnostics. Expect little change to Synovitis, Effusion
+    or PF OA because supervision is unchanged; score all twelve labels under the fixed
+    rule.
+  budget: One ten-epoch run at seed 1110484336 with identical sampling and first-look
+    count. Turned crops already use bicubic, so expected overhead is negligible; only
+    zero-angle fractional translations need its branch. Measure actual training and
+    prediction time rather than assuming a gain.
+  implementation: "Follow the environment paragraph of the developer instructions.\
+    \ Change translation rounding and the exact-copy condition in modeling/model.py;\
+    \ update modeling/spatial_tokens.py and add mechanism-specific epoch logging in\
+    \ training/lightning.py. Retain bicubic interpolation, 0\u2013255 clamping, exact\
+    \ copying for central zero pose, map-derived centre, pose limits, jitter distribution\
+    \ and all unrelated behavior. Remove snapped translations as an inference/training\
+    \ choice. A newly accepted incumbent supplies its latest pose and targets; preserve\
+    \ them and remove only translation snapping. Report CPU routing, zero-pose equivalence\
+    \ within one grey level in both modes and the known-plane residual-angle guardrail."
+  open_choices: Use exact integrality for the copying branch, without a new geometric
+    tolerance. The snapping-error bounds are derived from fixed pixel spacing; actual
+    realized displacement and predictive usefulness remain unknown.
+  dependencies:
+  - turned-crops-cut-with-bicubic-interpolation
+  priority_rationale: 'Priority 5: the successful interpolation family earns a low-cost
+    follow-up. Expected benefit is modest because the removed positional error is
+    much smaller than current centre error.'
+  source_change: true
+  targeted_curve: "Bicubic and incumbent epochs 7\u20139: test whether continuous\
+    \ translations lift the late macro plateau while preserving the fine-detail improvement,\
+    \ map overlap and stable crop geometry."
+  status: completed
+  created_revision: 208
+  ranking_rationale: 'Admit four proposals with satisfied dependencies and material
+    differences from measured predecessors. Rank continuous translations first: it
+    extends the statistically supported bicubic line with a cheap, localized replacement.
+    Soft bone-plane fitting follows because source inspection confirms the hard cutoff
+    and its replacement needs no additional encoding or supervision. Conflict-dependent
+    gradient transfer ranks third: it addresses the useful teaching lost under rejected
+    uniform damping, but conflict prevalence and implementation cost are unknown.
+    Exposure-normalized centring ranks fourth because its accepted parent showed no
+    statistically supported predictive gain and exposure-driven bias remains hypothetical.
+    Leave sparse interior-depth selection proposed: it materially changes endpoint
+    selection, but the preceding sparse run lost 0.001528 macro AUC with an entirely
+    negative 80% interval, saved only about 48 s training, and showed no prediction
+    speedup. Its expected yield is weaker than the admitted mechanisms. Searches of
+    results/history and the prior-work precedent table found no measured equivalent
+    of the four admitted replacements.'
+  experiments:
+  - posed-crops-keep-their-subpixel-shifts-20261008T032202Z-2e909f40
+  decision: reject
+- id: patellar-routing-uses-unsaturated-shares
+  mechanism_id: patellar-share-routing
+  parent_idea_id: null
+  title: Use patellar shares directly instead of promoting 30% occupancy to full routing
+    membership
+  opportunity: 'Source-backed: modeling/model.py:1312 uses min((kneecap+kneecap_joint)/0.3,1).
+    A new read-only analysis of the historical crops.npz audit found 188,276 covered,
+    valid, routable tokens across 150 knees. Raw patellar share averaged 0.03386;
+    amplified membership averaged 0.05224. Among tokens promoted to full membership,
+    15.26% had true patellar share below 0.30. This measures amplification and imperfect
+    localization in the historical model, not the live incumbent. Hypothesis: amplification
+    admits excess non-patellar tissue into PF OA, Effusion and Synovitis routes. The
+    incumbent''s late macro plateau leaves room to improve routing without strengthening
+    anatomy teaching.'
+  mechanism: 'Let p be the detached sum of kneecap and kneecap-joint shares. Replace
+    min(p/0.3,1) with p in both existing unions: kneecap_route=p+(1-p)*FRONT_FLOOR*front_plane*section_preference;
+    front_core_route=g+(1-g)*p, where g is the existing front/core membership. Retain
+    facet mirroring, section preferences, geometric background, shared classifiers
+    and every other route. Remove KNEECAP_FULL_SHARE and its saturation calculation.
+    This is one replacement of the map-to-routing probability transformation, with
+    no new distance, threshold or loss.'
+  precedents:
+  - '[Historical token audit](/home/claudio/src/knee-abnormality-side-routed-heads/outputs/analysis/frame-and-targets/anatomy-sections-audit/crops.npz):
+    the new occupancy analysis above uses predicted and true shares without validation
+    labels. These historical percentages require remeasurement on the candidate.'
+  - '[Current routing implementation](/home/claudio/src/knee-abnormality/outputs/autoresearch/anatomy-masks/experiments/joint-centre-from-the-map-instead-of-the-spots-20261007T224024Z-0fea1d4e/source/src/knee_abnormality/modeling/model.py:1292):
+    anatomy sections already use shares directly; patellar membership applies a separate
+    amplification.'
+  - '[Prior anatomical routing findings](/home/claudio/src/knee-abnormality-side-routed-heads/autoresearch/campaigns/anatomy-masks/prior-work.md):
+    map-led front regions recovered earlier losses, while moving the sagittal fluid
+    crop forward subsequently lost posterior context. This proposal changes routing
+    within the retained crops.'
+  novelty: Changes confidence interpretation rather than crop placement, anatomy-loss
+    strength or plane fitting. It preserves the successful map-led front design while
+    removing an unsupported promotion of partial occupancy to certainty.
+  coverage: The kneecap, front-core and derived facet routes in the ordinary final
+    pass. This directly reaches PF OA, Effusion, Synovitis and relevant report outputs;
+    shared-head training can affect other labels. Crops, first-look geometry and inference
+    inputs remain unchanged.
+  exploitation: Log patellar_share_routing_delta as the actual mean absolute route
+    change from the amplified counterfactual, plus raw share, historical-saturation
+    fraction and attention-weighted true class shares on covered validation knees.
+    Retain all map-overlap, plane-error and crop diagnostics. Shown wrong by negligible
+    route changes or persistent excess non-patellar attention without macro benefit.
+    Synovitis, Effusion and PF OA could lose useful surrounding context; their neutrality
+    is not assumed. Only the fixed macro interval determines adoption.
+  budget: One ten-epoch run at the supervisor's incumbent seed, currently 1110484336,
+    with unchanged 4420 steps and sampling. Replaces scalar arithmetic and adds diagnostic
+    reductions; no extra encoding. Expected cost is near incumbent training/prediction
+    times of 1686.98/53.09 s. Actual runtime must satisfy every assignment limit.
+  implementation: Follow the environment paragraph of the developer instructions.
+    Replace the patellar amplification in modeling/model.py, remove KNEECAP_FULL_SHARE,
+    update modeling/spatial_tokens.py identity and add epoch diagnostics in training/lightning.py.
+    Retain accepted bicubic cuts, map-derived centre, current plane fitter, anatomy
+    objective, section preferences and routing table. Keep an old-form calculation
+    only as a detached diagnostic, not an operational option. On a newly accepted
+    incumbent, preserve its unrelated winners and apply raw-share interpretation to
+    its current patellar unions, including any accepted footprint integration. The
+    developer reports the required routing guardrail.
+  open_choices: Use the raw sum of the two mutually exclusive patellar classes exactly.
+    Whether amplification is harmful in the live incumbent is unknown; the candidate
+    logs its actual distribution. Do not select a replacement saturation point or
+    tune routing against validation labels.
+  dependencies: []
+  priority_rationale: 'Priority 1: a small, observable source replacement supported
+    by a mask-based measurement. It addresses three map-sensitive labels without changing
+    their losses or adding compute-heavy teaching. Predictive benefit remains uncertain.'
+  source_change: true
+  targeted_curve: "Incumbent epochs 7\u20139: lift \xD71 macro from its 0.9175\u2013\
+    0.9177 plateau while preserving map overlap. Examine PF OA's 0.8880\u21920.8869\
+    \ movement and the Effusion/Synovitis curves as diagnostics of changed front routing."
+  status: completed
+  created_revision: 249
+  ranking_rationale: 'Admit three dependency-satisfied proposals, filling the five-idea
+    queue while preserving the reserved head. Raw patellar shares rank first among
+    unreserved work: the source replacement is narrow, inexpensive and supported by
+    independently reproduced mask accounting. It precedes equal-view centre aggregation
+    because the accepted centre change''s interval included zero and supplies no demonstrated
+    predictive win. Admit interior-depth sampling as one structural retry: inspected
+    historical code selects endpoints, whereas the proposed midpoint rule changes
+    selection at the same sparse budget; its small measured savings limit priority.
+    Admit footprint integration last: it aligns geometric membership with existing
+    anatomy-target quadrature, but has broad routing effects and uncertain overhead.
+    The earlier meniscus-fractional-footprint-mask-20260924T055746Z-bc4f72e4 lost
+    macro AUC; its inspected diff computes polygon-clipped own-half membership around
+    a fixed midline band, without anatomy-first sections. Sixteen-point integration
+    of the current detached anatomical frame and complete region formulas is a material
+    difference, not an identical retry. Leave anatomy-head-reads-neighbour-contrasts
+    proposed: its information change is distinct from the closed detached-head experiment,
+    but backbone context may make it redundant and stronger effective teaching risks
+    the historical Synovitis cost. It does not displace the better-supported queued
+    work.'
+  experiments:
+  - patellar-routing-uses-unsaturated-shares-20261008T043119Z-c48cc9c2
+  decision: reject
+- id: regions-integrate-the-token-footprint
+  mechanism_id: region-footprint-membership
+  parent_idea_id: null
+  title: Assign geometric region membership over the token footprint instead of only
+    its centre
+  opportunity: 'Source-backed: modeling/model.py:1249 gives geometric predicates hard
+    forward membership at each token centre, although token extents enter only the
+    surrogate gradient. AnatomyTargets.token_shares instead samples sixteen positions
+    across the same physical token footprint. Thus anatomical section shares describe
+    area fractions while sector, core and height membership describe a point. The
+    fixed 84/93.33 mm views and stride-32 grid imply approximately 12/13.33 mm in-plane
+    token spacing, comparable to the joint band and core. Hypothesis: centre-based
+    membership discards substantial boundary evidence and makes routing sensitive
+    to small geometric errors. The incumbent and both new runs retain late macro plateaus
+    despite similar map accuracy.'
+  mechanism: 'Reuse the existing Cartesian SUBSAMPLES grid (-0.375,-0.125,0.125,0.375)^2.
+    For each token, construct the sixteen physical in-plane positions from its existing
+    token steps, transform them through the existing side/frame coordinates, and average
+    the complete region membership computed at those positions: R_token=mean_q R(q).
+    Evaluate the existing anatomy-first section formula at each position using the
+    token''s unchanged class shares; only its undecided remainder follows sampled
+    height. Preserve all sector boundaries, radii, cuts, section preferences and target
+    mappings. Replace centre-only geometric membership with footprint fractions, without
+    changing token resolution or sampling additional images.'
+  precedents:
+  - '[Current region predicates](/home/claudio/src/knee-abnormality/outputs/autoresearch/anatomy-masks/experiments/joint-centre-from-the-map-instead-of-the-spots-20261007T224024Z-0fea1d4e/source/src/knee_abnormality/modeling/model.py:1228):
+    hard centre membership with extent-dependent surrogate gradients.'
+  - '[Existing target footprint](/home/claudio/src/knee-abnormality/outputs/autoresearch/anatomy-masks/experiments/joint-centre-from-the-map-instead-of-the-spots-20261007T224024Z-0fea1d4e/source/src/knee_abnormality/training/anatomy.py:89):
+    sixteen-point quadrature already defines token anatomy shares.'
+  - The rejected continuous-crop translation run changed validation translations by
+    0.1504 mm on average while leaving map accuracy similar. That does not diagnose
+    its rejection or establish a routing benefit; this proposal changes region membership
+    and retains incumbent crop quantization.
+  - Earlier compact-support cut-gradient work is a precedent for changing boundary
+    derivatives. This proposal changes forward memberships rather than merely their
+    surrogate gradients.
+  novelty: Makes geometric membership use the existing token-area representation.
+    It retains measured region dimensions and anatomy-first section assignment, without
+    learned radii, wider crops, finer tokens or a new smoothing scale.
+  coverage: All seventeen geometric routes on valid, routable tokens. Mirrored routes
+    use the same symmetric quadrature and mirrored coordinates. Non-routable handling,
+    classifier blindness to compartment and anatomy supervision stay intact.
+  exploitation: Log routing_footprint_membership_delta against centre-only membership,
+    the fraction of tokens crossing each existing boundary, and route/section attention
+    mass. Retain overlap per class, plane error and every applied turn/shift mean
+    and spread. Shown wrong by negligible forward changes, dilution of anatomical
+    attention or failure to improve late macro AUC. Synovitis, Effusion and PF OA
+    may gain context or lose specificity; unchanged anatomy loss does not guarantee
+    neutrality. Report all twelve labels under the fixed macro rule.
+  budget: "One ten-epoch run at the current incumbent seed and unchanged sampling.\
+    \ No extra CNN or first look; geometric predicates execute sixteen times. Stream\
+    \ their accumulation rather than retaining sixteen complete route tensors. Overhead\
+    \ is unmeasured and could be material; actual training must remain within 931.58\u2013\
+    2235.80 s and satisfy overall and prediction limits."
+  implementation: Follow the environment paragraph of the developer instructions.
+    Replace centre-only region evaluation in modeling/model.py with streamed footprint
+    integration. Share the existing quadrature definition through a modeling utility
+    and update training/anatomy.py imports without changing target construction. Update
+    spatial-token identity and training/lightning.py diagnostics. Retain accepted
+    centre/bicubic behavior, widths, plane fitting, classes, losses and target-route
+    mappings. Sampled plane, centre and angular geometry remains detached from label
+    loss; retain permitted section-preference learning. Remove the operational centre-only
+    branch. On a new incumbent, integrate its current region formulas and preserve
+    unrelated accepted changes. The developer reports the routing guardrail.
+  open_choices: Use the existing sixteen-point target grid and existing token geometry
+    exactly; introduce no distance sweep. A token footprint is a spatial cell, not
+    the backbone's full receptive field. Boundary coverage and computational overhead
+    remain unknown and must be logged.
+  dependencies: []
+  priority_rationale: 'Priority 2: a distinct forward-routing replacement with broad
+    coverage and a concrete mismatch in the source. More implementation and runtime
+    uncertainty than raw-share routing, but potentially larger effects around the
+    joint and compartment boundaries.'
+  source_change: true
+  targeted_curve: "Incumbent and new runs, epochs 7\u20139: improve the flat \xD7\
+    1 macro near 0.917 despite continuing loss reduction. Target stable anatomical\
+    \ section attention and less boundary-sensitive routing while retaining the roughly\
+    \ 1.7\u20131.8 mm plane-error plateau."
+  status: retired
+  created_revision: 249
+  ranking_rationale: 'Admit all three new proposals: proposal_admission reports satisfied
+    dependencies, and each specifies a material mechanism beyond its measured precedents.
+    Keep the reserved head first. Place categorical patellar routing next because
+    source inspection confirms patellar shares enter the residual height mixture before
+    their explicit union; this is a concrete composition replacement, not another
+    promotion strength. Balanced continuous fitting follows: it adds class normalization
+    to the rejected continuous fitter rather than repeating it, although actual token
+    imbalance remains unknown. Keep footprint integration ahead of the new covariance
+    direction, whose full-mask evidence is less direct. Joint transverse covariance
+    differs from the closed long-bone direction fits and preserves the plane normal.
+    Searches of docs/validation/results and docs/history found no matching measured
+    categorical construction, class-balanced plane solve or joint transverse covariance
+    run. Leave neighbour-context proposed; the resulting five-item queue already contains
+    stronger or more directly supported opportunities.'
+  retired_reason: 'User decision 2026-10-08: only the eight seeds agreed on the adopted
+    recipe stay queued'
+- id: anatomy-head-reads-neighbour-contrasts
+  mechanism_id: map-local-context
+  parent_idea_id: null
+  title: Let the anatomy head read adjacent token contrasts while retaining its own-token
+    classifier
+  opportunity: "Measured: incumbent validation femur/tibia overlap finishes at 0.9036/0.8968,\
+    \ but kneecap-joint and fibula reach only 0.6693/0.6957. From epochs 1\u20139,\
+    \ those latter classes improve only 0.6430\u21920.6693 and 0.6602\u21920.6957,\
+    \ while plane error remains around 1.7\u20132.0 mm. Source-backed: the deployed\
+    \ anatomy head is one linear layer on each token independently. Hypothesis: adjacent\
+    \ spatial contrasts can help distinguish thin joint and small-bone cells without\
+    \ increasing loss strength. The backbone already contains spatial context, so\
+    \ head-level context may prove redundant."
+  mechanism: On each existing slice grid, let n_i be the mean of the immediate valid
+    horizontal/vertical neighbours of token t_i. Replace the independent head with
+    logits_i=W_self*t_i+b+W_neighbour*(n_i-t_i). Use zero correction when no neighbour
+    exists. Neighbours stay within the same encoded slice and view; no finer grid
+    or additional image pass is introduced. Initialize W_self/b exactly as the incumbent
+    head at the recorded training seed and W_neighbour to zero, inside the existing
+    RNG isolation. Keep the seven classes, CE+Dice objective and whole anatomy-loss
+    weight unchanged. The neighbour branch learns from anatomy targets; all geometry
+    consumes detached output shares.
+  precedents:
+  - '[Deployed linear head](/home/claudio/src/knee-abnormality/outputs/autoresearch/anatomy-masks/experiments/joint-centre-from-the-map-instead-of-the-spots-20261007T224024Z-0fea1d4e/source/src/knee_abnormality/modeling/model.py:719),
+    applied to normalized tokens at line 1732.'
+  - '[Incumbent curves](/home/claudio/src/knee-abnormality/outputs/autoresearch/anatomy-masks/jobs/researcher-20261008T040130Z-53b0b505/curves.json):
+    persistent small-class overlap gap and late macro plateau.'
+  - The historical detached two-layer map head learned poorly and is closed. This
+    proposal retains backbone teaching and adds spatial neighbour information; it
+    does not repeat gradient detachment.
+  - The rejected CE-only and uniformly damped runs weakened small-class overlap. Their
+    loss or gradient changes are not reinstated here.
+  novelty: Changes the information available to the deployed map head, rather than
+    its loss terms or gradient dose. A shared neighbour-contrast operator is symmetric
+    under grid reflection and introduces no hand-set physical radius.
+  coverage: Both existing encoding passes and every available view, with unchanged
+    slice grids. Anatomy supervision remains restricted to covered training tokens;
+    validation target access is diagnostic only. Prediction uses its own encoded images
+    and never loads prepared masks.
+  exploitation: 'Log anatomy_neighbour_logit_rms from the executed correction, neighbour
+    degree and correction/self-logit ratio, alongside class overlap, share error,
+    first-look geometry error and crop statistics. Shown wrong by a dormant branch,
+    unchanged small-class plateaus or better anatomy without macro benefit. A more
+    capable head may increase effective backbone teaching even at unchanged loss weight:
+    Synovitis could worsen, and Effusion/PF OA effects are uncertain. Report all labels
+    without per-label objectives.'
+  budget: One ten-epoch run at the supervisor's incumbent seed, with unchanged 4420
+    steps, grids and first-look count. Adds neighbour reductions and a 256-to-seven
+    linear correction, without another backbone pass. Expected overhead is small but
+    unmeasured; enforce the supplied training range, runtime ceiling and prediction
+    accounting.
+  implementation: Follow the environment paragraph of the developer instructions.
+    Replace the deployed nn.Linear anatomy head with the contextual head in modeling/model.py
+    or a focused modeling module; pass the actual grid shape and visual-valid mask
+    at _encode_crops. Retain the own-token classifier, existing normalization, classes,
+    losses, accepted map centre, bicubic crops and current gradient-transfer policy.
+    Remove the operational independent-head implementation and add no head-type flag
+    or checkpoint compatibility fallback. Update spatial-token identity and training/lightning.py
+    diagnostics. On a newly accepted incumbent, preserve its geometry and gradient-transfer
+    winners while replacing only map-head readout. The developer reports the required
+    routing guardrail.
+  open_choices: Use immediate cardinal grid adjacency, uniform valid-neighbour averaging
+    and a zero-initialized correction. Do not add a kernel-radius or width sweep.
+    Spatial context may already be sufficient in backbone features; the candidate
+    must establish activation and usefulness.
+  dependencies: []
+  priority_rationale: 'Priority 3: a cheap, distinct map-head mechanism aimed at measured
+    weak classes. Its predictive rationale is more speculative than the routing replacements,
+    and stronger effective teaching could repeat the historical Synovitis cost.'
+  source_change: true
+  targeted_curve: "Incumbent epochs 1\u20139: lift kneecap-joint overlap from its\
+    \ 0.6430\u21920.6693 plateau and fibula from 0.6602\u21920.6957, improve first-look\
+    \ geometry, and raise late \xD71 macro while monitoring the Synovitis/Effusion/PF\
+    \ OA curves."
+  status: proposed
+  created_revision: 249
+- id: patellar-regions-sum-disjoint-anatomy-shares
+  mechanism_id: patellar-share-routing
+  parent_idea_id: patellar-routing-uses-unsaturated-shares
+  title: Build patellar regions by summing mutually exclusive anatomy shares
+  opportunity: "Measured: raw patellar routing produced \u0394macro +0.000332, but\
+    \ its 80% interval crossed zero. Its late \xD71 curve remained below the incumbent.\
+    \ Source-backed: the current patellar union multiplies a geometric section mixture\
+    \ containing patellar mass by another patellar complement. Hypothesis: treating\
+    \ these mutually exclusive classes as a categorical mixture can retain useful\
+    \ nonpatellar context without promoting or counting patellar mass twice. The completed\
+    \ attention-composition diagnostics are available, contrary to the stale pre-run\
+    \ concern; they do not establish that femoral attention is harmful."
+  mechanism: "Replace the patellar union with one categorical construction. Let p=p_kneecap+p_kneecap_joint,\
+    \ f=p_femur, t=p_tibia, j=p_joint, and u=p_other+p_fibula. For each affected route\
+    \ r, define H_r=a_rF*f+a_rJ*j+a_rT*t+u*(a_rF*upper+a_rJ*joint_height+a_rT*tibia_height),\
+    \ using its existing section preferences. Set kneecap membership to p+FRONT_FLOOR*front_plane*H_kneecap,\
+    \ and front-core membership to p+(front_plane+core)*H_front_core. Keep the mirrored\
+    \ facets as kneecap membership times their existing side memberships. Since H_r\u2264\
+    1\u2212p, these are bounded categorical sums. Remove saturation and the noisy-union\
+    \ multiplication; do not change other routes, add the joint row to front preferences,\
+    \ or introduce a new coefficient."
+  precedents:
+  - '[Raw-share result and comparison](/home/claudio/src/knee-abnormality/outputs/autoresearch/anatomy-masks/experiments/patellar-routing-uses-unsaturated-shares-20261008T043119Z-c48cc9c2/comparison/comparison.json):
+    positive macro near miss, not an adoption.'
+  - '[Current patellar construction](/home/claudio/src/knee-abnormality/outputs/autoresearch/anatomy-masks/experiments/joint-centre-from-the-map-instead-of-the-spots-20261007T224024Z-0fea1d4e/source/src/knee_abnormality/modeling/model.py:1297):
+    patellar shares also enter the residual height mixture before their explicit union.'
+  - '[Prepared categorical classes](/home/claudio/src/knee-abnormality/data/labels/prepared/anatomy-mrannotator-sample550-joints/classes.json):
+    seven mutually exclusive classes support the partition without a new anatomical
+    threshold.'
+  novelty: A structural probability-composition replacement, rather than another patellar
+    promotion strength. It preserves geometric context through the nonpatellar class
+    mixture and keeps both facets symmetric.
+  coverage: Kneecap, front-core and both facet memberships in existing views. Other
+    routes retain their current section assignment. Inference uses detached predicted
+    shares from the knee's own images; prepared targets remain supervision and diagnostics
+    only.
+  exploitation: Log executed membership and actual pooling-attention differences against
+    the incumbent formula, affected-route total mass, routing-fallback frequency,
+    and attention composition with its covered fraction. Retain class overlaps, plane
+    error and crop distributions. Shown wrong by unchanged attention, loss of useful
+    context, or failure to improve macro AUC. Anatomy teaching is unchanged; Synovitis,
+    Effusion and PF OA may still change through routing, so report all twelve labels
+    under the fixed macro rule.
+  budget: "One ten-epoch run at the supervisor's current incumbent seed, with unchanged\
+    \ 4,420 steps and sampling. Adds small categorical reductions and detached diagnostics,\
+    \ with no extra backbone pass or first look. Overhead is unmeasured; training\
+    \ must remain within 931.58\u20132235.80 seconds and satisfy the supplied overall\
+    \ runtime limits."
+  implementation: Follow the environment paragraph of the developer instructions.
+    Replace the operational patellar formulas in src/knee_abnormality/modeling/model.py;
+    update modeling/spatial_tokens.py identity and training/lightning.py diagnostics.
+    Retain existing FRONT_FLOOR, section preferences, geometric predicates, route
+    mappings, classifiers, anatomy objective, accepted map centre and bicubic cuts.
+    Remove KNEECAP_FULL_SHARE and the operational complement-product union; an old
+    formula may exist only as a detached diagnostic counterfactual. On a newly accepted
+    incumbent, apply this categorical construction to its current geometric memberships
+    and retain unrelated winners. The developer reports the unchanged routing guardrail.
+  open_choices: "Use the stated categorical partition and existing constants exactly.\
+    \ Do not tune a promotion factor or select routes on label AUC. Within-token class\u2013\
+    position dependence remains an approximation; the queued footprint integration\
+    \ is independent and is not a prerequisite."
+  dependencies: []
+  priority_rationale: 'Priority 1: the strongest positive near miss has a concrete
+    source-level composition issue and a cheap structural follow-up. Predictive benefit
+    remains uncertain, particularly for fluid labels.'
+  source_change: true
+  targeted_curve: "Raw-share run, epochs 7\u20139: macro 0.9171\u21920.9174 remained\
+    \ below incumbent 0.9175\u21920.9176. Improve late macro through categorical routing\
+    \ while tracking Effusion, Synovitis, PF OA and actual attention changes."
+  status: launched
+  created_revision: 298
+  ranking_rationale: 'Admit all three new proposals: proposal_admission reports satisfied
+    dependencies, and each specifies a material mechanism beyond its measured precedents.
+    Keep the reserved head first. Place categorical patellar routing next because
+    source inspection confirms patellar shares enter the residual height mixture before
+    their explicit union; this is a concrete composition replacement, not another
+    promotion strength. Balanced continuous fitting follows: it adds class normalization
+    to the rejected continuous fitter rather than repeating it, although actual token
+    imbalance remains unknown. Keep footprint integration ahead of the new covariance
+    direction, whose full-mask evidence is less direct. Joint transverse covariance
+    differs from the closed long-bone direction fits and preserves the plane normal.
+    Searches of docs/validation/results and docs/history found no matching measured
+    categorical construction, class-balanced plane solve or joint transverse covariance
+    run. Leave neighbour-context proposed; the resulting five-item queue already contains
+    stronger or more directly supported opportunities.'
+  experiments:
+  - patellar-regions-sum-disjoint-anatomy-shares-20261008T060446Z-698d18c8
+  - patellar-regions-sum-disjoint-anatomy-shares-20261008T063334Z-6fa05ba8
+- id: joint-plane-balances-soft-femur-and-tibia-mass
+  mechanism_id: soft-bone-plane-fitting
+  parent_idea_id: soft-bone-shares-fit-the-joint-plane
+  title: Balance femur and tibia mass within each continuous joint-plane solve
+  opportunity: "Measured: continuous fitting improved final plane error from 1.7561\
+    \ to 1.5959 mm, but \xD71 macro peaked at epoch 7 and fell; its positive \xD7\
+    4 delta missed adoption. A read-only calculation on 400 prepared training knees\
+    \ found femur contributes 60.40%\xB12.76% of full femur+tibia volume, and 53.64%\xB1\
+    3.05% under the existing 12 mm Gaussian around the recorded target plane. Hypothesis:\
+    \ unequal class exposure moves the regression interface. These mask-volume measurements\
+    \ do not establish the imbalance in sampled predicted tokens; the candidate must\
+    \ log that quantity."
+  mechanism: "Replace the incumbent fitter with a class-balanced continuous conditional\
+    \ affine fit. At each of the existing four solves, use detached shares f,t and\
+    \ current locality G. Compute M_f=\u03A3valid*G*f, M_t=\u03A3valid*G*t, S=M_f+M_t,\
+    \ then f'=f*S/(2*M_f), t'=t*S/(2*M_t). Accumulate moments with valid*G*(f'+t')\
+    \ and response with valid*G*(f'\u2212t'). This gives both bones equal integrated\
+    \ mass while retaining total mass S and therefore the existing ridge scale. Recompute\
+    \ normalization at every refit. Keep the existing Gaussian width, prior, ridge,\
+    \ plane projection and centre calculation. The factor two is the number of paired\
+    \ bone classes, not a tuned strength. Truly absent class mass uses the existing\
+    \ plane prior, with no old-fitter fallback."
+  precedents:
+  - "[Continuous-fit comparison](/home/claudio/src/knee-abnormality/outputs/autoresearch/anatomy-masks/experiments/soft-bone-shares-fit-the-joint-plane-20261008T033130Z-816591b0/comparison/comparison.json):\
+    \ \u0394macro +0.000136, 80% [\u22120.000683,+0.000945], reject."
+  - '[Continuous conditional moments](/home/claudio/src/knee-abnormality/outputs/autoresearch/anatomy-masks/experiments/soft-bone-shares-fit-the-joint-plane-20261008T033130Z-816591b0/source/src/knee_abnormality/modeling/model.py:1133):
+    the rejected implementation supplies the algebraic precedent, not an active dependency.'
+  - '[Prepared volumes and planes](/home/claudio/src/knee-abnormality/data/labels/prepared/anatomy-mrannotator-sample550-joints/knees.json),
+    [bone-volume metadata](/home/claudio/src/knee-abnormality/data/labels/prepared/anatomy-mrannotator-sample550-joints/classes.json):
+    measurements used only studies outside fold 1.'
+  - '[Inherited locality constants](/home/claudio/src/knee-abnormality/outputs/autoresearch/anatomy-masks/experiments/joint-centre-from-the-map-instead-of-the-spots-20261007T224024Z-0fea1d4e/source/src/knee_abnormality/modeling/model.py:447)
+    and [6.4 mm diagnostic plane offset](/home/claudio/src/knee-abnormality/outputs/autoresearch/anatomy-masks/experiments/joint-centre-from-the-map-instead-of-the-spots-20261007T224024Z-0fea1d4e/source/src/knee_abnormality/training/lightning.py:68)
+    define the Gaussian mask calculation.'
+  novelty: Normalizes the two anatomical classes within each fit instead of changing
+    a cutoff, locality width or loss strength. This is distinct from the running centre-exposure
+    normalization, which balances views in the centroid.
+  coverage: Both existing encoding passes and all valid geometry tokens. Plane geometry
+    remains detached from label loss. Mask planes are used only to assess accuracy,
+    never to place validation or prediction crops.
+  exploitation: Log pre-normalization femur mass fraction and spread, each class's
+    applied mass, prior-only knees, and executed plane displacement against the unbalanced
+    continuous fit. Log first-look and final plane error separately, normal-angle
+    error, realized crop changes, overlaps and pose distributions. Shown wrong by
+    negligible imbalance or geometry change, worse plane accuracy, or anatomical improvement
+    without macro benefit. Backbone teaching is unchanged; Synovitis, Effusion and
+    PF OA remain uncertain through changed geometry.
+  budget: "One ten-epoch run at the current incumbent's recorded seed, unchanged inputs\
+    \ and steps. Adds per-knee class-mass reductions to the existing four small solves;\
+    \ no new image pass. Expected cost is small but unmeasured. Enforce 931.58\u2013\
+    2235.80 seconds training and the supplied overall runtime ceilings."
+  implementation: Follow the environment paragraph of the developer instructions.
+    Replace the hard-cutoff plane fitter in src/knee_abnormality/modeling/model.py
+    with the complete balanced continuous formulation; update modeling/spatial_tokens.py
+    identity and training/lightning.py diagnostics. Remove operational binary bone
+    selection and unbalanced regression, retaining no fitter selector. Retain anatomy
+    supervision, accepted map-derived centre and its zero-mass fallback, bicubic cuts,
+    section rules, crop targets and single first look. On a newly accepted incumbent,
+    preserve its centre aggregation, routing and other unrelated winners while replacing
+    only plane fitting. The developer reports the required routing guardrail.
+  open_choices: Normalize each class within the actual Gaussian support at every solve,
+    preserving total mass. Add no class-strength or width sweep. Equal class contribution
+    could itself bias the desired anatomical interface; full-volume mask imbalance
+    is evidence for investigation, not proof of the fix.
+  dependencies: []
+  priority_rationale: 'Priority 2: preserves the useful anatomical direction of a
+    positive near miss and addresses a measured exposure asymmetry. Its causal diagnosis
+    is weaker than the source-level patellar issue because actual fitted class imbalance
+    remains unknown.'
+  source_change: true
+  targeted_curve: "Continuous-fit run, epochs 7\u20139: \xD71 macro 0.9166\u21920.9163\
+    \ and Lateral Meniscus 0.8787\u21920.8761 despite falling loss. Seek stable late\
+    \ macro while retaining improved plane accuracy; log class imbalance rather than\
+    \ optimizing a label."
+  status: developing
+  created_revision: 298
+  ranking_rationale: 'Admit all three new proposals: proposal_admission reports satisfied
+    dependencies, and each specifies a material mechanism beyond its measured precedents.
+    Keep the reserved head first. Place categorical patellar routing next because
+    source inspection confirms patellar shares enter the residual height mixture before
+    their explicit union; this is a concrete composition replacement, not another
+    promotion strength. Balanced continuous fitting follows: it adds class normalization
+    to the rejected continuous fitter rather than repeating it, although actual token
+    imbalance remains unknown. Keep footprint integration ahead of the new covariance
+    direction, whose full-mask evidence is less direct. Joint transverse covariance
+    differs from the closed long-bone direction fits and preserves the plane normal.
+    Searches of docs/validation/results and docs/history found no matching measured
+    categorical construction, class-balanced plane solve or joint transverse covariance
+    run. Leave neighbour-context proposed; the resulting five-item queue already contains
+    stronger or more directly supported opportunities.'
+  experiments:
+  - joint-plane-balances-soft-femur-and-tibia-mass-20261008T063723Z-1c6d496b
+- id: joint-map-covariance-sets-the-across-axis
+  mechanism_id: joint-map-across-axis
+  parent_idea_id: null
+  title: Read the frame's across axis from the joint map's transverse covariance
+  opportunity: "Source-backed: the incumbent replaces centre and plane with map geometry\
+    \ but still projects the direction between meniscus-attention spots onto that\
+    \ plane to obtain its across axis. Its mean validation frame turn rises from 4.996\xB0\
+    \ to 5.329\xB0 in epochs 7\u20139 while macro flattens. Read-only measurement\
+    \ of joint masks on 400 training knees found a clear transverse axis: median in-plane\
+    \ eigenvalue ratio 2.116, fifth percentile 1.777; its angle to projected patient\
+    \ left\u2013right is 0.640\xB0\xB19.024\xB0, with every measured axis within 45\xB0\
+    . Hypothesis: this anatomical shape can supply a steadier compartment axis. Full\
+    \ masks do not establish accuracy from sampled predicted shares."
+  mechanism: "Keep the current map plane and centre. Compute a detached joint-share-weighted\
+    \ centroid and covariance of valid token positions. Project covariance into the\
+    \ plane's tangent space and take its largest-eigenvalue direction as the across\
+    \ axis. Orient its sign toward the projected positive across coordinate in the\
+    \ existing fitted-position system; construct front as normal\xD7across. For exactly\
+    \ zero mass or a numerically degenerate eigenspace, use the projected coordinate\
+    \ axis, without an anatomy-confidence threshold or spot-direction fallback. Replace\
+    \ only the operational across-axis source. This uses joint shape, not a line through\
+    \ femur or tibia tokens, and introduces no distance, angular limit or learned\
+    \ geometry parameter."
+  precedents:
+  - '[Meniscus-spot direction](/home/claudio/src/knee-abnormality/outputs/autoresearch/anatomy-masks/experiments/joint-centre-from-the-map-instead-of-the-spots-20261007T224024Z-0fea1d4e/source/src/knee_abnormality/modeling/model.py:1050)
+    and its projection in anatomical_frames provide the remaining appearance-attention
+    axis source.'
+  - '[Incumbent curves](/home/claudio/src/knee-abnormality/outputs/autoresearch/anatomy-masks/jobs/researcher-20261008T053127Z-9ab0f0f0/curves.json):
+    late macro plateau and frame-turn drift.'
+  - '[Prepared planes](/home/claudio/src/knee-abnormality/data/labels/prepared/anatomy-mrannotator-sample550-joints/knees.json)
+    and [class definitions](/home/claudio/src/knee-abnormality/data/labels/prepared/anatomy-mrannotator-sample550-joints/classes.json):
+    training-only covariance measurement used joint voxels projected onto each recorded
+    plateau plane.'
+  - Closed long-bone direction fitting estimated femur or tibia axes from lines through
+    their tokens. This proposal reads the transverse footprint of the joint class
+    and retains the existing joint-plane normal.
+  novelty: Removes the remaining meniscus-attention direction from anatomical routing
+    using a measured joint-shape property. It neither changes plane regression nor
+    repeats centre aggregation, footprint membership or map-head context proposals.
+  coverage: Frame orientation for existing geometric regions and mirrored compartment
+    routes. Crop posing directly reads the retained normal and centre, so this mechanism
+    targets routing orientation rather than a new crop policy. Prediction requires
+    only its own map shares.
+  exploitation: Log executed across-axis angular displacement, joint mass, eigenvalue
+    ratio, coordinate-fallback frequency, per-view covariance weight fractions, and
+    angular error against joint-mask covariance on covered diagnostic knees. Retain
+    overlaps, plane error and applied crop distributions. Shown wrong by unstable
+    predicted axes, coverage-driven rotations, failure of mirror routing, or no macro
+    benefit. No stronger anatomy teaching is introduced; Synovitis, Effusion and PF
+    OA may nevertheless change through routing and shared feature learning.
+  budget: "One ten-epoch run at the supervisor's incumbent seed, with unchanged sampling.\
+    \ Adds weighted 3\xD73 moments and a tangent-space eigensolve per knee to each\
+    \ existing encoding pass. No extra first look, backbone or finer tokens. Runtime\
+    \ and numerical overhead are unmeasured; enforce the supplied training range and\
+    \ overall limits."
+  implementation: Follow the environment paragraph of the developer instructions.
+    Replace the projected meniscus-pair across direction inside anatomical_frames
+    in src/knee_abnormality/modeling/model.py. Update modeling/spatial_tokens.py identity
+    and training/lightning.py diagnostic logging; a focused training/anatomy.py helper
+    may compute target covariance for diagnostics only. Retain spot computation wherever
+    required by the accepted zero-mass centre fallback, but remove its operational
+    role in the across axis. Retain the current plane fitter, centre, accepted bicubic
+    crops, section preferences, classifiers and losses. On a newly accepted incumbent,
+    retain its plane and centre winners and replace only across-axis construction.
+    The developer reports the unchanged side-routing guardrail.
+  open_choices: Use the joint class alone, its continuous shares, centred covariance
+    and the stated sign convention. No eigenvalue-ratio cutoff or damping strength
+    is proposed. Unequal view exposure and early diffuse joint predictions can distort
+    covariance; log them without adding a second aggregation mechanism.
+  dependencies: []
+  priority_rationale: 'Priority 3: a distinct, inexpensive routing mechanism supported
+    by training-mask geometry. Predicted-token coverage and the meaning of the anatomical
+    principal axis remain substantial uncertainties.'
+  source_change: true
+  targeted_curve: "Incumbent epochs 7\u20139: macro 0.9175\u21920.9177\u21920.9176\
+    \ while mean frame turn drifts 4.996\xB0\u21925.329\xB0. Seek better anatomical\
+    \ axis agreement and higher late macro without sacrificing the current plane,\
+    \ centre or fluid-label curves."
+  status: retired
+  created_revision: 298
+  ranking_rationale: 'Admit all three new proposals: proposal_admission reports satisfied
+    dependencies, and each specifies a material mechanism beyond its measured precedents.
+    Keep the reserved head first. Place categorical patellar routing next because
+    source inspection confirms patellar shares enter the residual height mixture before
+    their explicit union; this is a concrete composition replacement, not another
+    promotion strength. Balanced continuous fitting follows: it adds class normalization
+    to the rejected continuous fitter rather than repeating it, although actual token
+    imbalance remains unknown. Keep footprint integration ahead of the new covariance
+    direction, whose full-mask evidence is less direct. Joint transverse covariance
+    differs from the closed long-bone direction fits and preserves the plane normal.
+    Searches of docs/validation/results and docs/history found no matching measured
+    categorical construction, class-balanced plane solve or joint transverse covariance
+    run. Leave neighbour-context proposed; the resulting five-item queue already contains
+    stronger or more directly supported opportunities.'
+  retired_reason: 'User decision 2026-10-08: only the eight seeds agreed on the adopted
+    recipe stay queued'

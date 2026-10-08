@@ -1,0 +1,111 @@
+id: anatomy-recipe
+recipe: configs/training.yaml
+reference_run: outputs/training/rn18-anatomy-map-centre-control
+reference_equivalences: {}
+additional_evidence_runs: []
+backlog:
+  refill_below: 3
+  refill_to: 5
+  seed_order: forced
+  rotate_after: 1000000
+budget:
+  mode: range
+  min_fraction: 0.5
+  max_fraction: 1.1
+policy:
+  editable_files:
+  - configs/training.yaml
+  - src/knee_abnormality/config.py
+  - src/knee_abnormality/data/dataset.py
+  - src/knee_abnormality/training/lightning.py
+  - src/knee_abnormality/training/anatomy.py
+  - src/knee_abnormality/training/report_attributes.py
+  - src/knee_abnormality/inference/checkpoint.py
+  - src/knee_abnormality/inference/engine.py
+  - src/knee_abnormality/inference/reflection.py
+  editable_directories:
+  - src/knee_abnormality/modeling
+  - src/knee_abnormality/data/preprocessing
+  config_keys:
+  - data.view_shift_limit_mm
+  - trainer.anatomy_loss_weight
+  - trainer.report_attribute_loss_weight
+  config_prefixes: []
+  list_item_fields: {}
+  input_identity_keys:
+  - preprocessing_identity
+  require_source_change: false
+  configuration_only_ideas: true
+  developer_instructions: 'Environment, read this first. (1) You have no GPU and must not use one. Run
+    `rtk proxy uv run --locked python -m scripts.tools.check_side_routing --config configs/training.yaml`
+    from your candidate workspace as it is: the script selects the CPU by itself when no GPU is visible,
+    takes a few minutes there, and that CPU run is the required check. Never return blocked for lack of
+    a GPU. (2) Make every change inside the candidate workspace you were assigned and nowhere else. Do
+    not stage the candidate under /tmp, and do not write source/ or changes.diff in the experiment directory:
+    it is read-only to you by design, and the supervisor freezes the source and the diff from your workspace
+    after you return. (3) When the change is complete and the check passes, return status prepared with
+    the integration and activation declarations and the guardrail JSON in the report. An unwritable experiment
+    directory is never a reason to return blocked. The incumbent is the adopted anatomy-map recipe, described
+    in prior-work.md of this campaign and, for the design, in ../anatomy-masks/prior-work.md (The incumbent)
+    as changed by its first two adopted seeds (bicubic cut, joint centre from the map): a seven-class
+    anatomy map predicted per token by KneeAbnormalityModel.anatomy_head and trained in training/anatomy.py
+    (anatomy_loss) on targets looked up by AnatomyTargets; a joint plane fitted to the map in KneeAbnormalityModel.anatomical_frames;
+    sections and route preferences in _regions and route_sections; posed crops cut by ViewWindows (first_look_batch,
+    frame_pose, jitter, forward) from the pose of first_look_pose. Read contract.md before writing code.
+    Each seed is one design step and says exactly what changes and what it removes; apply it to the incumbent
+    and leave everything outside it byte-identical. Replace what a seed supersedes: no flag, option or
+    config field selects the old behaviour. The only config changes a seed may make are data.view_shift_limit_mm,
+    trainer.anatomy_loss_weight and trainer.report_attribute_loss_weight, in the seeds that say so; a
+    seed that says it changes only a config value changes no source. Keep the speed changes of 2026-10-08
+    as they are: the loaders send only the middle channel of each canvas (the model must accept one or
+    three channels), tokens, routing weights and position priors are memoised per encoded batch through
+    KneeAbnormalityModel._memo (never read a memo from a dict whose inputs you changed without going through
+    _memo), epoch metrics go through _log_epoch_metric, and model.channels_last stays true. Never run
+    a segmenter and never read the prepared targets outside the training module: nothing from them may
+    be needed at validation or prediction. A candidate that fails any guardrail is repaired or returned
+    blocked, never returned prepared, and the guardrail script is not edited; keep the interface it calls
+    (encode_batch, frame, routing_weights, position_priors, study_tokens, pool_encoded, frame_rotation,
+    KneeModule._side_step and training_step) callable as it calls them, with any new argument optional.
+    New parameters or buffers initialize under torch.random.fork_rng so the incumbent''s random stream
+    is unchanged. The plane, the sections'' shares and the pose are read from detached values: the label
+    loss must not reach the map head through them. Update the matching entries of SPATIAL_TOKEN_IDENTITY
+    when the described behaviour changes. Validation and prediction stay deterministic. The first look
+    is one no-gradient pass of the same model in evaluation mode on the central crops of the canvases;
+    it never runs twice and never reads more slices than a x1 pass. Never decode more slices per study
+    than the incumbent, and do not change widths, image size or slice counts. Cost discipline, fixed by
+    the user on 2026-10-08: a seed adds no training time its mechanism does not need. Add no diagnostic
+    to the training step: what a seed asks to be known is reported once on one batch in your report, or
+    logged on validation only, through _log_epoch_metric, and at most five new validation metrics per
+    seed. In code that runs every training step write no .item(), .cpu(), bool() or int() of a tensor,
+    no nonzero, unique or boolean-mask indexing, no Python loop over studies, series or views, no torch.tensor
+    built from Python values, and no second evaluation of the pose, the frame, the routing weights or
+    the tokens: these force the GPU to synchronise and are what made earlier candidates 4 to 7% slower.
+    Add no forward pass. Keep the existing diagnostics as they are; do not extend them. Report the mean
+    training step time of the control and of your candidate from scripts/tools/bench_training_steps.py
+    only if a GPU is visible; otherwise state which lines run per training step. A seed that says ''same
+    cost'' must train within 1.02 of the control''s time; the coronal field seed and the kneecap seed
+    within 1.08 and the sagittal field seed within 1.1, from their larger canvases only. Training time
+    must stay within 0.5 to 1.1 times the reference''s; do not reduce epochs, slices or studies. No weight
+    averaging. No tests. Besides the guardrail check, use the existing Python environment for static checks
+    and tiny checks only, and run nothing heavy on the CPU beside a training: the training with canvases
+    already uses most of the machine''s memory.'
+  researcher_instructions: 'The campaign has no end: it runs until the user stops it. Never return an
+    empty report and never declare the directions exhausted. Research starts after the forced seeds and
+    moves between the four topics of contract.md, staying on one while it has an open lead. Your first
+    product after every completed run is its analysis: both multipliers against the incumbent and against
+    the anatomy-masks reference (score and prediction_macro_auc in fold_1/selected_checkpoint.json), the
+    per-target AUC deltas from the two runs'' fold_1/validation_predictions.csv with each target''s sibling
+    standard deviation (prior-work.md, Yardstick), the map''s overlap per class, the plane error and the
+    crop statistics from the logs, and the training and prediction seconds. A delta under one sibling
+    standard deviation is not a result, and a macro difference inside +-0.0015 is inside the bootstrap
+    interval of two runs: say for each run whether it is level with a rerun. Always report Synovitis,
+    Effusion and PF OA: they pay for the map (prior-work.md, The cost to Synovitis). Only then propose.
+    Each idea fills the five parts of contract.md (How a seed is written) and is one training run with
+    one mechanism; an idea that only measures is not allowed, so put the measurement in what the run logs.
+    Start every implementation text with the sentence "Follow the environment paragraph of the developer
+    instructions." Open leads are listed at the end of prior-work.md. Out of bounds: everything in the
+    contract''s out-of-bounds and closed lists; anything that needs a segmenter or the prepared targets
+    at validation or prediction; a number set by hand without a cited measurement; letting the label loss
+    move a plane, a centre or an angle. Cost discipline: every idea states its expected training time
+    against the control and adds no training-step diagnostics; an idea whose run trains more than 1.02
+    times the control without having said so is reported as a defect of the candidate, not as a result.'

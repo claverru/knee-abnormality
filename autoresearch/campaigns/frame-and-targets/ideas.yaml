@@ -1,2 +1,1985 @@
-revision: 0
-ideas: []
+revision: 211
+ideas:
+- id: forward-tilt-from-the-meniscus-front-and-back-spots
+  mechanism_id: frame-angles-from-spots
+  parent_idea_id: null
+  title: Measure the frame's forward tilt per knee from the front and back spots of
+    each meniscus instead of learning it from the labels
+  opportunity: 'Evidence-backed problem, a guess for the fix. The forward tilt (nod)
+    is the one angle of the frame still learned from the labels. It ends anywhere
+    between 6 and 15 degrees across runs of the same design (run 24 13.6, the height-cuts
+    model 6.0, the femur-lean run 15.3), it reaches 21 degrees on a knee whose bones
+    stand upright (validation row 370 of the femur-lean run, drawn in outputs/analysis/routing-and-shifts-frames-20261007/femur-lean/),
+    and it trades against any other free angle (prior-work.md, Measured on 2026-10-07).
+    Turning the crops by half the frame''s angle scored better than the full angle
+    at both multipliers, which points at the tilt''s noise. In the incumbent the centre
+    and the side axis are already read from spots without gradient and hold still,
+    and the previous campaign did the same for the two height cuts, which then held
+    at +10.8 and -12.9 mm; the incumbent still regresses its cuts, and this seed leaves
+    them as they are. The two menisci lie on the tibial plateau: the line between
+    them gives roll and turn today, and the front and back of each meniscus give the
+    plateau''s slope from front to back, which is the missing angle.'
+  mechanism: 'In KneeAbnormalityModel.study_frames (modeling/model.py), with the existing
+    `spot` function and the shared meniscus channel''s looks, compute four more spots
+    without gradient: medial and front (points[:, 0] > 0 and points[:, 1] > 0), medial
+    and back (points[:, 0] > 0 and points[:, 1] <= 0), lateral and front, lateral
+    and back. Express each in the basis already built from the side axis (rows of
+    `basis`: side, front, up): f = offset from the meniscus midpoint along the basis
+    front axis, h = along the basis up axis. For each side whose two spots are found
+    and whose front and back spots are at least one token pitch (study_pitch) apart
+    in f, slope = (h_front - h_back) / (f_front - f_back). tilt = atan of the mean
+    slope over the sides that qualify, zero when none does. The frame''s rotation
+    becomes self.frame_rotation() @ R(tilt) @ basis, with R the rotation about the
+    side axis that the existing code builds from `tilt`; the shared learned rotation
+    stays as it is.'
+  precedents:
+  - 'routing-and-shifts, height-cuts-from-the-spots-requeue: the two height cuts read
+    from spots without gradient, +0.0003 at both multipliers; the cuts hold at +10.8
+    and -12.9 mm.'
+  - 'Run 25 (more anchors on the frame, the nod following a notch and a kneecap landmark):
+    stable nod, -0.0006; closed as a learned-landmark design, not as a spot measurement.'
+  novelty: First frame with no angle learned per knee from the labels; first use of
+    a front-against-back split of the meniscus attention.
+  coverage: Every knee with both spots of at least one meniscus; the others keep a
+    tilt of zero.
+  exploitation: 'Read both multipliers against the incumbent, PF OA, Synovitis, Effusion
+    and ACL (they read above the lower cut, which the tilt moves most), and per epoch
+    on the validation knees the mean and the spread of the tilt, the share of knees
+    with a measured tilt and the two height cuts. Shown wrong by: a tilt whose spread
+    across knees exceeds 10 degrees (spot noise, not anatomy), or the four targets
+    above each more than one sibling SD below the incumbent.'
+  budget: Same cost as the incumbent; four more spot centroids per knee.
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    modeling/model.py only, plus the log in training/lightning.py. Replaces: the landmark
+    tilt (the `tilt` computed from the learned landmarks'' forward and upward vectors)
+    and the per-knee regressed nod (output[:, count : 2 * count] * nod_only). Remove
+    what only they used: the landmark_attention layer, the LANDMARKS it sizes if nothing
+    else reads them, and the nod columns of frame_output (keep its other columns at
+    the same indices or shrink it, as long as the shift and size columns behave as
+    before and every new or resized layer is created under torch.random.fork_rng).
+    study_frames keeps returning the two meniscus spots as study_landmarks. Check
+    the sign on made-up points before the guardrail run and report it: place a medial
+    pair and a lateral pair of spots on a plane through the midpoint tilted by a known
+    angle about the side axis; in the resulting frame all four must have the same
+    height to within 0.1 mm. Log val_ and training study_frame_tilt_deg (mean), its
+    standard deviation across knees and study_frame_tilt_measured_share, with the
+    existing frame logs unchanged. Update SPATIAL_TOKEN_IDENTITY["algorithm"].'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The tilt is the root of three of today's findings (half angle,
+    the trade with the femur lean, 21 degrees on a straight knee) and every other
+    frame or crop seed inherits it.
+  status: completed
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality-side-routed-heads/autoresearch/campaigns/frame-and-targets/seed-ideas.yaml
+  experiments:
+  - forward-tilt-from-the-meniscus-front-and-back-spots-20261007T115021Z-ca13c36b
+  decision: reject
+- id: frame-read-from-the-spots
+  mechanism_id: frame-angles-from-spots
+  parent_idea_id: null
+  title: 'A frame with nothing placed by the labels but the two radii: the forward
+    tilt from the meniscus front and back spots and the two height cuts from the meniscus
+    and kneecap spots'
+  opportunity: 'Evidence-backed parts, a guess for the whole. The frame''s centre
+    and side axis are read from the meniscus spots and hold still. Its forward tilt
+    and its two height cuts are regressed from the labels: the tilt ends between 6
+    and 15 degrees across runs and reaches 21 degrees on a knee whose bones stand
+    upright; the lower cut ends at -1.8 mm, through the joint line, and a learned
+    cut slides when one side pulls on it (run 26). The previous campaign placed the
+    two cuts from the spots and they held at +10.8 and -12.9 mm, level with run 24
+    (+0.0003 at both multipliers, 0.952 against 0.953 public). The cuts are measured
+    along the frame''s up axis, so they are only as good as the tilt: on the samples
+    drawn from that model the cuts slope across the joint where the tilt is off. This
+    seed measures both, so the tibia and joint bands sit on the plateau the menisci
+    mark.'
+  mechanism: 'Two changes in KneeAbnormalityModel.study_frames, both without gradient.
+    (1) The forward tilt exactly as the seed forward-tilt-from-the-meniscus-front-and-back-spots
+    defines it, built here in full: four spots of the shared meniscus channel (medial
+    and lateral, each split at fitted front 0), the slope of height against front
+    between the front and back spot of each side in the basis built from the side
+    axis, tilt = atan of the mean slope over the sides whose two spots are found and
+    at least one token pitch apart, zero otherwise; rotation = self.frame_rotation()
+    @ R(tilt) @ basis; the landmark tilt and the per-knee regressed nod are removed.
+    (2) The two height cuts exactly as the previous campaign''s adopted experiment
+    places them (outputs/autoresearch/routing-and-shifts/experiments/height-cuts-from-the-spots-requeue-20261006T232351Z-d2445402/changes.diff):
+    a kneecap spot, the squared-attention centroid of the shared OA channel over the
+    tokens with fitted front > 0 and height > 0; in the knee''s frame h_m, s_m the
+    mean height and spread of the two meniscus spots and h_k, s_k the kneecap spot''s;
+    upper cut = max(h_m + (h_k - h_m) * s_m / (s_m + s_k), h_m); lower cut = 2 * h_m
+    - upper cut; the regressed start values when a spot is missing. The core and ring
+    radius stay regressed.'
+  precedents:
+  - 'routing-and-shifts, height-cuts-from-the-spots-requeue: +0.0003 at both multipliers
+    against run 24; S120 0.952 against S118 0.953.'
+  - 'outputs/analysis/routing-and-shifts-frames-20261007/height-cuts-from-the-spots/regions-005.png
+    and regions-045.png: cuts at the right height that slope with the frame''s tilt
+    and roll.'
+  novelty: First frame whose centre, three angles and two cuts are all read from spots.
+  coverage: Every knee with the meniscus and kneecap spots; a missing spot falls back
+    per quantity as each part states.
+  exploitation: 'Read both multipliers against the incumbent and against forward-tilt-from-the-meniscus-front-and-back-spots,
+    the four targets above the lower cut (PF OA, Effusion, Synovitis, ACL) and the
+    four compartment targets, and per epoch on the validation knees the mean and spread
+    of the tilt, of each cut and of the two radii. Shown wrong by: cuts that do not
+    hold near +11 and -13 mm, or a tilt whose spread across knees exceeds 10 degrees.'
+  budget: Same cost as the incumbent.
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    Build on the candidate of forward-tilt-from-the-meniscus-front-and-back-spots
+    if it exists under this campaign''s experiments (its source/ and changes.diff),
+    then apply the changes.diff named in the mechanism for the cuts; both were written
+    on run 24''s code. Run that seed''s sign check on made-up points and report it,
+    and keep the logs of both parts. Replaces: the landmark tilt, the regressed nod
+    and the two regressed height cuts. Update SPATIAL_TOKEN_IDENTITY["algorithm"].'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The frame the user asked to have right first; the tilt alone
+    is measured by the seed before it.
+  status: completed
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality-side-routed-heads/autoresearch/campaigns/frame-and-targets/seed-ideas.yaml
+  experiments:
+  - frame-read-from-the-spots-20261007T115815Z-4ff54a4b
+  decision: reject
+- id: edema-bone-targets-with-the-head-in-the-model
+  mechanism_id: report-region-targets
+  parent_idea_id: null
+  title: Four located targets for marrow edema, femur and tibia on each side, read
+    by one shared head that lives in the model, so a femur spot and a tibia spot exist
+    for every knee
+  opportunity: 'Evidence-backed counts, a guess for the effect. No report target today
+    is read on both sides of the tibia-against-joint cut or tells the femoral side
+    of a compartment from the tibial side. The v5 answer marrow_edema_bone does: with
+    the compartment answer the incumbent already uses, the reports give about 393
+    medial-femur, 349 medial-tibia, 354 lateral-femur and 310 lateral-tibia knees,
+    each above the 200 a located target needs, and 2,512 reports without edema as
+    full-weight negatives. On 212 audited reports the femur is right in 48 of 60 answers
+    and the tibia in 58 of 72, femur and tibia are swapped once in 37 single-bone
+    reports, and the typical error is answering both bones (prior-work.md, The v5
+    report answers). It also gives Contusion''s finding a place per study. Nothing
+    in the frame marks the femur today: the crops show about 3 cm of it, and the kneecap
+    spot marks the kneecap. A head trained to find edema in the femur and in the tibia
+    has to look at each bone''s marrow, in knees with and without edema, so its attention
+    above and below the joint is a candidate landmark for each bone. The report heads
+    live in the training module and vanish at prediction; this one is put in the model
+    so that its spots can be read for any knee.'
+  mechanism: 'training/report_attributes.py reads, beside the v4.0 targets, the two
+    v5 questions from `<paths.data_root>/labels/prepared/jevk5-report-attributes-v5.0-new/targets.parquet`
+    (columns `StudyInstanceUID` and `attribute_<question>__<option>`, one row per
+    study of the 4,407). A new located family "marrow_edema_bone" with four Region
+    entries, read by one shared head exactly as the existing located families are:
+    femur_medial, femur_lateral, tibia_medial, tibia_lateral. The target of a region
+    is the product of two masses: the bone (femur: options femur and femur_tibia;
+    tibia: options tibia and femur_tibia) times the compartment (the options of marrow_edema_location
+    that include that compartment, as the existing edema-by-compartment regions define
+    them). Its weight is the reliability weight times one minus the mass of the bone
+    options not_stated and patella_and_other. Four new routes appended to ROUTES and
+    _regions (modeling/model.py): bone_femur_medial = the medial compartment''s sectors
+    and its half of the core in the joint and upper bands; bone_tibia_medial = the
+    same sectors and half core in the tibia and joint bands; the two lateral ones
+    their mirror images. No existing target or region changes, and marrow_edema_bone
+    gets no option-level head. The family''s attention column and classifier row are
+    parameters of KneeAbnormalityModel instead of the training module: the training
+    module calls them for the report loss exactly where a located family''s own column
+    and row would be, with the same detachment and the same gradient path as the other
+    located families. With that column''s scores the model computes, without gradient
+    and with the existing `spot` function, four spots per knee: femur medial, femur
+    lateral, tibia medial, tibia lateral, each the squared-attention centroid over
+    the tokens of that fitted side (fitted medial > 0 or <= 0) above or below the
+    meniscus midpoint''s height. encode_batch returns them. Nothing reads them in
+    this seed: the frame is unchanged.'
+  precedents:
+  - 'docs/ongoing/side-routed-heads.md: located targets hold on unseen knees (tear
+    place 33% explained, edema by compartment 25%).'
+  - 'routing-and-shifts, contusion-reads-the-edema-head-2: Contusion pooled with the
+    edema head''s attention, -0.0007 and -0.0011, its scale stayed at 0.'
+  novelty: First report head kept in the model; first landmark candidates for the
+    femur and the tibia.
+  coverage: Training only; the 4,407 studies with reports.
+  exploitation: 'Read both multipliers against the incumbent, Contusion, Fracture
+    and the four compartment targets, val_report_attribute_bce_<region> for the four
+    new targets with the share each explains, and per epoch on the validation knees,
+    for each of the four spots, the share of knees where it is found and the mean
+    and spread of its place in the knee''s frame (medial, front, height, in millimetres),
+    separately for knees whose report has edema and knees whose report has none. Shown
+    wrong by: the four targets explaining under 10% on the validation knees; or, for
+    the spots, a place in knees without edema that differs from the place in knees
+    with edema by more than its own spread.'
+  budget: Same cost as the incumbent; one more attention column and classifier row.
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    The Region tuple takes one question today; extend it, or the code that turns a
+    Region into a target, so that a region may multiply the located mass of a second
+    question, without changing the values of the existing regions (report the largest
+    absolute difference of their targets on one batch against the incumbent: it must
+    be zero). Load the extra file once, aligned by StudyInstanceUID, failing loudly
+    if a training study with a report is missing from it. Report in the candidate''s
+    notes the options chosen for each region and the number of training studies with
+    a target above 0.5 in each of the four. Update SPATIAL_TOKEN_IDENTITY["compartment_routing"].
+    Create the head''s layers under torch.random.fork_rng. The mirrored pass must
+    give mirror-image spots; report it on one batch. Update SPATIAL_TOKEN_IDENTITY["algorithm"]
+    as well.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The report supervision the femur section needs; measured alone
+    first so the spots are read before anything depends on them.
+  status: blocked
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality-side-routed-heads/autoresearch/campaigns/frame-and-targets/seed-ideas.yaml
+  experiments:
+  - edema-bone-targets-with-the-head-in-the-model-20261007T122019Z-2ecdd892
+  - edema-bone-targets-with-the-head-in-the-model-20261007T123302Z-8f577e2e
+  blocked_reason: Block and park the seed because its one bounded repair is exhausted
+    and the required full-pass mirrored-spot gate still fails. Direct parent-relative
+    diff and critical-source inspection confirm that the squared-attention centroid
+    mechanism remains implemented without a correction satisfying that gate. The passing
+    standard routing guardrail cannot override it. Supply the complete remaining queue
+    explicitly to resolve the rejected ranking, preserving every remaining user seed's
+    order.
+- id: femur-section-leaning-to-the-femur-spots
+  mechanism_id: upper-band-on-its-own-axis
+  parent_idea_id: null
+  title: A femur section hinged at the upper cut whose axis passes through the knee's
+    own femur spots, read from the report-supervised bone head
+  opportunity: 'A guess, on a measured failure. A knee in the coil is bent: on eighteen
+    sagittal slices the tibia stands close to vertical and the femur leans by 0 to
+    30 degrees, so a single axis is a compromise between two bones. The femur-lean
+    run gave the band above the upper cut its own axis and let the labels set the
+    lean: every knee went to -25 degrees within two epochs and the lean traded against
+    the nod, because only the targets of that band pull on it. The lean needs a landmark
+    on the femur. The bone head''s femur spots are one, supervised by the reports
+    (706 reports place edema in the femur, 863 in the tibia, 2,595 report none), independent
+    of the twelve labels'' gradient.'
+  mechanism: 'Everything of the seed edema-bone-targets-with-the-head-in-the-model,
+    built here in full. In addition, in frame() (modeling/model.py), after the position
+    (medial, front, height) is computed as today: lift = max(height - upper cut, 0)
+    and front becomes front - lift * t. In study_frames, without gradient: F = the
+    midpoint of the knee''s two femur spots expressed in the knee''s frame; t = F_front
+    / max(F_height - upper cut, 0.5 * study_pitch); t = 0 when a femur spot is missing
+    or F lies below the upper cut. So above the cut the sectors, the core and the
+    rings are laid out around the line from the centre of the cut to the femur spots,
+    and the section stays attached at the cut (lift is zero there). The tibia and
+    joint bands, the regions and the table are unchanged, and the bone targets'' own
+    regions use the leaned band like every other target.'
+  precedents:
+  - 'outputs/training/20261007-101112-side-routed-femur-lean: the same hinged band
+    with a lean learned from the labels: x4 -0.0002, x1 -0.0009, Effusion +0.0021,
+    the lean at -25 degrees for every knee and the nod up by 9 degrees.'
+  - 'outputs/analysis/routing-and-shifts-frames-20261007/knee-bend/sagittal-gallery.png:
+    the bend by eye; two rule-based measurements of it failed.'
+  novelty: First angle of the frame set by a report-supervised landmark; first femur
+    section that can differ between knees.
+  coverage: Every knee with the two femur spots above its upper cut; the others keep
+    a straight upper band.
+  exploitation: 'Read both multipliers against the incumbent and against edema-bone-targets-with-the-head-in-the-model,
+    PF OA, Effusion, Synovitis and ACL, and per epoch on the validation knees the
+    mean and the spread of atan(t) in degrees, the share of knees with a lean, the
+    frame''s forward tilt, and the femur spots'' place. Shown wrong by: a lean with
+    a spread across knees under 3 degrees (it would be one shared setting again),
+    a forward tilt that moves by more than 5 degrees against the incumbent''s (the
+    two trading), or PF OA and Effusion both more than one sibling SD below the incumbent.'
+  budget: Same cost as the incumbent plus one attention column and classifier row.
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    Build on the candidate of edema-bone-targets-with-the-head-in-the-model if it
+    exists under this campaign''s experiments (its source/ and changes.diff). Port
+    the leaned frame() and its plumbing from the femur-lean run''s source_snapshot.zip
+    (prior-work.md, Reusable code): "frame_lean" in the geometry dictionary and the
+    lean in the encode_batch output and the logs. Do not port its learned parts or
+    its kneecap start: no femur_output layer, no femur_offset parameter, no gain,
+    no tanh bound. frame() must keep working when called by scripts.tools.check_side_routing
+    with the dictionary encode_batch returns. Replaces nothing in the frame: the band
+    above the cut has no axis of its own today. Update SPATIAL_TOKEN_IDENTITY["algorithm"].'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The tiltable femur section the user asked for, with its angle
+    supervised by the reports instead of the labels.
+  status: retired
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality-side-routed-heads/autoresearch/campaigns/frame-and-targets/seed-ideas.yaml
+  retired_reason: 'Keeper, 2026-10-07: replaced by its version built on the height
+    cuts placed from the spots (the user allowed seeds on the previous campaign''s
+    incumbent); the femur section hinges at the upper cut, which must not be free
+    to trade against the new angles'
+- id: kneecap-region-on-the-kneecap-spot
+  mechanism_id: upper-band-on-its-own-axis
+  parent_idea_id: null
+  title: Lay the band above the upper cut out around an axis that passes at the usual
+    distance behind each knee's own kneecap spot, with nothing learned
+  opportunity: 'A guess, on a measured mechanism. Above the upper cut the crops hold
+    the femoral condyles and the kneecap, and the targets that read there (PF OA,
+    Effusion, Synovitis) are about the kneecap and the pouch. The femur-lean run laid
+    that band out around an axis hinged at the cut and let the labels set its lean:
+    the lean went to -25 degrees for every knee within two epochs and traded against
+    the nod, yet Effusion gained 0.0021 (sibling SD 0.0015) with the band displaced.
+    Measured on the height-cuts model of the previous campaign, whose upper cut sits
+    at +10.8 mm (the incumbent regresses its own, +13.7 mm on average): the kneecap
+    spot is found in every validation knee, 21.8 mm in front of the axis on average
+    (1.57 token pitches, SD 0.40) and 12.5 mm above that upper cut (0.90 pitches,
+    SD 0.21): the kneecap''s place differs between knees by about 5.6 mm, a third
+    of a sector''s width at that radius. Principle 9: the spot marks the kneecap,
+    so use it to place the kneecap''s region, not to infer the femur.'
+  mechanism: 'In frame() (modeling/model.py), after the position (medial, front, height)
+    is computed as today: lift = max(height - upper cut, 0) and front becomes front
+    - lift * t, with t per knee. In study_frames, without gradient: t = (k_front -
+    m * study_pitch) / max(k_height - upper cut, 0.5 * study_pitch), where (k_front,
+    k_height) is the kneecap spot''s place in the knee''s frame (the squared-attention
+    centroid of the shared OA channel over the tokens with fitted front > 0 and height
+    > 0, as the previous campaign''s experiment computes it, outputs/autoresearch/routing-and-shifts/experiments/height-cuts-from-the-spots-requeue-20261006T232351Z-d2445402/changes.diff;
+    the incumbent does not have it), the upper cut is the knee''s own upper cut however
+    the incumbent obtains it, and m is the running mean over training knees of k_front
+    / study_pitch, a persistent buffer updated in training with momentum 0.99 from
+    the knees whose kneecap spot is found, initialised from the first training batch,
+    and read as it is at validation and prediction. t = 0 for a knee without the three
+    spots. So at the kneecap''s height the band''s axis sits the usual distance behind
+    that knee''s kneecap, and the band stays attached at the cut (lift is zero there).
+    The regions, the table and the two lower bands are unchanged.'
+  precedents:
+  - 'outputs/training/20261007-101112-side-routed-femur-lean: the same displaced band
+    with a lean learned from the labels: x4 -0.0002, x1 -0.0009, Effusion +0.0021,
+    the lean at -25 degrees for every knee.'
+  - 'Run 31 (PF OA and Effusion on the front half): -0.0005 at both multipliers, Effusion
+    +0.0026, PF OA +0.0004.'
+  novelty: First region placed on the kneecap spot; first band of the frame with its
+    own axis that is measured per knee.
+  coverage: Every knee with the two meniscus spots and the kneecap spot (all 874 validation
+    knees on the height-cuts model).
+  exploitation: 'Read both multipliers against the incumbent, PF OA, Effusion and
+    Synovitis, and per epoch on the validation knees the mean and spread of atan(t)
+    in degrees, the running mean m and the nod. Shown wrong by: Effusion and PF OA
+    both inside one sibling SD of the incumbent, or the nod moving by more than 5
+    degrees against the incumbent''s (the two trading again).'
+  budget: Same cost as the incumbent.
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    Port from the femur-lean run''s source_snapshot.zip (prior-work.md, Reusable code):
+    the changed frame(), the lean and kneecap_place returned by study_frames, their
+    unpacking in encode_batch ("frame_lean" in the geometry dictionary, "study_femur_lean"
+    and "study_kneecap_place" in the output) and the logs in training/lightning.py.
+    Do not port its learned parts: no femur_output layer, no femur_offset parameter,
+    no FEMUR_START_GAIN, no tanh bound. frame() must keep working when called by scripts.tools.check_side_routing
+    with the dictionary encode_batch returns. Create the buffer under torch.random.fork_rng.
+    Replaces nothing: the band above the cut has no placement of its own today. Update
+    SPATIAL_TOKEN_IDENTITY["algorithm"] and ["initialization_rng"]. That run was built
+    on the height-cuts model and the incumbent regresses its height cuts: port the
+    kneecap spot only and leave the cuts as the incumbent has them.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The measured version of the run trained by hand on 2026-10-07;
+    the only change so far that moved Effusion above its noise.
+  status: retired
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality-side-routed-heads/autoresearch/campaigns/frame-and-targets/seed-ideas.yaml
+  retired_reason: 'Keeper, 2026-10-07, on the user''s instruction: the campaign chases
+    two tilts per knee (tibia and femur) from the report-supervised bone spots, then
+    crops turned and moved by that frame; this seed is outside that direction'
+- id: extensor-tendon-targets-above-and-below-the-kneecap
+  mechanism_id: report-region-targets
+  parent_idea_id: null
+  title: Two located targets for the extensor tendons, quadriceps above the upper
+    cut and patellar below it, read by one shared head at the front
+  opportunity: 'Evidence-backed counts, a guess for the effect. The upper cut at the
+    front has PF OA, Effusion and Synovitis reading across it and nothing reading
+    it from both sides with different answers. The v5 answer extensor_tendon does:
+    quadriceps only in about 237 reports, patellar only in 183, both in 164, and the
+    two tendons named as normal in about 1,756 and 1,398. On 212 audited reports it
+    is right in 205 with a located precision of 0.943. PF OA and Synovitis decide
+    the ranking of the routed runs and both read this part of the knee. Open: the
+    upper pole of the kneecap may lie near the edge of the 84 and 93 mm views.'
+  mechanism: 'training/report_attributes.py reads the v5 file named in edema-bone-targets-with-the-head-in-the-model.
+    A new located family "extensor_tendon" with two Region entries read by one shared
+    head: quadriceps (options quadriceps and both) on a new route tendon_upper = the
+    three front sectors outside the core in the upper band; patellar (options patellar
+    and both) on a new route tendon_lower = the same sectors in the joint and tibia
+    bands. Unplaced: not_stated. The existing option-level head of extra_extensor_tendons
+    stays. No existing target or region changes.'
+  precedents:
+  - 'attributes_v5.md (worktree knee-abnormality-jevk5-attributes-v4): the counts
+    and the check on the audited reports.'
+  - 'Run 31 (PF OA and Effusion on the front half): the front regions are where Effusion
+    gains.'
+  novelty: First report target that sets the front above the kneecap against the front
+    below it.
+  coverage: Training only; the 4,407 studies with reports.
+  exploitation: 'Read both multipliers against the incumbent, PF OA, Effusion and
+    Synovitis, val_report_attribute_bce_<region> for the two new targets with the
+    share each explains, and the upper cut per epoch. Shown wrong by: the two targets
+    explaining under 10% on the validation knees.'
+  budget: Same cost as the incumbent; one more attention column and classifier row.
+  implementation: Follow the environment paragraph of the developer instructions.
+    Two routes appended to ROUTES and _regions (modeling/model.py) and two Region
+    entries; load the extra file as the edema-bone seed describes, building on that
+    candidate's loader if it exists under this campaign's experiments. Report the
+    number of training studies with a target above 0.5 in each of the two. Update
+    SPATIAL_TOKEN_IDENTITY["compartment_routing"].
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The second v5 answer; a reader on both sides of the cut that
+    PF OA and Synovitis depend on.
+  status: retired
+  created_revision: 1
+  seeded: /home/claudio/src/knee-abnormality-side-routed-heads/autoresearch/campaigns/frame-and-targets/seed-ideas-2.yaml
+  retired_reason: 'Keeper, 2026-10-07, on the user''s instruction: the campaign chases
+    two tilts per knee (tibia and femur) from the report-supervised bone spots, then
+    crops turned and moved by that frame; this seed is outside that direction'
+- id: acl-on-its-unrouted-head
+  mechanism_id: routing-table
+  parent_idea_id: null
+  title: Give ACL its own channel over the whole knee again, as Contusion and Fracture
+    have, while every other target stays routed
+  opportunity: 'Evidence-backed gap, a guess for the cause. ACL sits at 0.9387 in
+    run 24 and at 0.9406 across the routed runs with a spread equal to its noise (sibling
+    SD 0.0014), against 0.9458 for the old recipe without routing on the same fold
+    and seed: the largest per-target gap of the line. Its region (the core and the
+    inner ring of five sectors, joint and upper bands) was widened in height (run
+    26, +0.0010, inside noise) and its ring cut was removed (-0.0007 macro), and a
+    shared ligament reader gave it +0.0021. Nothing has tested whether the routing
+    itself costs it: an ACL tear is read from secondary signs far from the notch (the
+    bone bruises of the lateral compartment, the anterior shift of the tibia, the
+    effusion), which a region around the axis leaves out.'
+  mechanism: Remove "ACL" from OWN_ROUTES (modeling/model.py) so that ACL's own channel
+    is pooled without a routing weight and without a position prior tied to a route,
+    exactly as Contusion and Fracture are. The route "core" stays in ROUTES for the
+    report questions that use it (QUESTION_ROUTES in training/report_attributes.py).
+    Nothing else changes.
+  precedents:
+  - 'Old recipe, same fold and seed: ACL 0.9458.'
+  - 'routing-and-shifts, shared-ligament-reader-2: ACL +0.0021, macro -0.0007 and
+    +0.0003.'
+  - 'Run 26 (ACL at all heights): ACL +0.0010; the lower cut then slid and Synovitis
+    lost 0.0072.'
+  novelty: First run of the routed design with ACL unrouted.
+  coverage: Every knee.
+  exploitation: 'Read ACL against the incumbent at both multipliers, the macro, and
+    the core and ring radius per epoch (ACL was the only target reading inside the
+    ring cut alone). Shown wrong by: ACL inside one sibling SD of the incumbent.'
+  budget: Same cost as the incumbent.
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    modeling/model.py: OWN_ROUTES without "ACL", and whatever indexes the routes of
+    own channels must treat ACL as it treats Contusion and Fracture. Check and report
+    on one batch that ACL''s routing weight is 1 for every routable token and that
+    the other targets'' weights equal the incumbent''s. Replaces: ACL''s region. Update
+    SPATIAL_TOKEN_IDENTITY["compartment_routing"].'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The largest known per-target gap, one line to test, and never
+    run.
+  status: retired
+  created_revision: 1
+  seeded: /home/claudio/src/knee-abnormality-side-routed-heads/autoresearch/campaigns/frame-and-targets/seed-ideas-2.yaml
+  retired_reason: 'Keeper, 2026-10-07, on the user''s instruction: the campaign chases
+    two tilts per knee (tibia and femur) from the report-supervised bone spots, then
+    crops turned and moved by that frame; this seed is outside that direction'
+- id: five-unplaced-report-questions-without-heads
+  mechanism_id: report-question-set
+  parent_idea_id: null
+  title: Train without the heads of the five report questions that locate nothing
+    the routed model can use
+  opportunity: 'A guess, kept open on purpose. Five v4 questions have varied answers
+    but no place in the knee: extra_osteochondral, extra_other_cysts, extra_bursitis,
+    pf_cartilage_surface and baker_ruptured. Every earlier removal of report information
+    cost (low-agreement questions dropped: 0.943 public against 0.947; hedged options
+    -0.0015; grade merges -0.0014; completeness options -0.0005), each on a single
+    run with whole-knee heads, before routing. The v5 specification leaves these five
+    to one run with and without them.'
+  mechanism: 'training/report_attributes.py: the five questions get no head and no
+    loss term; their columns are ignored. Nothing else changes.'
+  precedents:
+  - 'attributes_v5.md, Dropped or decided by a test: the four recorded removals and
+    their costs.'
+  novelty: First removal of report questions on the routed model.
+  coverage: Training only.
+  exploitation: 'Read both multipliers against the incumbent and every target against
+    its sibling SD. Shown wrong by: a macro more than a rerun (0.0010) below the incumbent
+    at x4, which keeps the five questions in every later question set.'
+  budget: Same cost as the incumbent, five heads fewer.
+  implementation: Follow the environment paragraph of the developer instructions.
+    Exclude the five question ids where ReportAttributeHeads builds its option-level
+    heads, so the remaining heads keep their order and their initial weights (report
+    on one batch that the remaining questions' initial logits equal the incumbent's;
+    create nothing new, and keep the incumbent's random stream by drawing the removed
+    heads' initial weights under torch.random.fork_rng or by constructing and discarding
+    them as the incumbent would). Update SPATIAL_TOKEN_IDENTITY["algorithm"].
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Decides which questions later extractions need, now that a question
+    costs ten minutes to extract.
+  status: retired
+  created_revision: 1
+  seeded: /home/claudio/src/knee-abnormality-side-routed-heads/autoresearch/campaigns/frame-and-targets/seed-ideas-2.yaml
+  retired_reason: 'Keeper, 2026-10-07, on the user''s instruction: the campaign chases
+    two tilts per knee (tibia and femur) from the report-supervised bone spots, then
+    crops turned and moved by that frame; this seed is outside that direction'
+- id: crops-turned-to-the-frame
+  mechanism_id: frame-aligned-crops
+  parent_idea_id: null
+  title: Cut each 84 and 93 mm view turned by half the knee's own frame angle, in
+    training and at prediction
+  opportunity: Evidence-backed at prediction, a guess for training. On the height-cuts
+    model's weights, with no training, re-cutting the crops turned to the frame scored
+    +0.0011 at x4 and -0.0002 at x1; turned the wrong way -0.0007 and -0.0009; turned
+    by half the angle +0.0010 and +0.0007, the only variant above the anchor at both
+    multipliers (prior-work.md, Measured on 2026-10-07). The sign of the turn matters
+    with identical resampling, so it is the alignment. It repeats on run 24's weights
+    (+0.0007 at x4 with half the angle). Those weights were trained on knees at the
+    scanner's orientation with 10 degrees of rotation augmentation; a model trained
+    on upright knees does not have to spend capacity on the tilt.
+  mechanism: '(1) The canvas port of the routing-and-shifts campaign with data.view_shift_limit_mm:
+    6.0 (a margin of 16 and 14 px, enough for 7.5 degrees). (2) In the model, the
+    frame''s in-plane angle per slice: on coronal views the angle between the frame''s
+    side axis, projected into the slice, and the image columns; on sagittal views
+    the angle between the frame''s up axis and the image rows; clamped to 15 degrees;
+    zero on views without a margin and where the geometry is not valid. (3) The crop
+    is cut turned by 0.5 times that angle about its own centre, in the same single
+    resampling of the canvas as the cut, and patient_maps receive the same transform.
+    (4) At validation and prediction the frame comes from one first look: a no-gradient
+    pass in evaluation mode on the unturned crops, reading for each series row at
+    most as many slices as its view''s configured count, evenly spaced among the row''s
+    valid slices. (5) In training the frame comes from the model''s own last training
+    pass over that knee, kept in a dictionary on the module keyed by study_uid (the
+    frame''s rotation, the study axis and the left probability, detached); a knee
+    not yet seen is cut unturned. The affine augmentation is unchanged and applies
+    after the cut.'
+  precedents:
+  - 'outputs/analysis/routing-and-shifts-frames-20261007/frame-crops/: the prediction-only
+    check and its controls on the height-cuts model, on run 24 (this campaign''s base,
+    +0.0007 at x4 with half the angle) and on the ResNet-50.'
+  - 'routing-and-shifts, shift-per-study-from-the-spots: crops moved toward the meniscus
+    midpoint by a trained locator: -0.0004 and -0.0022; a shift, not a turn.'
+  novelty: First training on crops aligned to the knee's own frame; first use of a
+    first look.
+  coverage: Coronal and sagittal 84 and 93 mm views of every knee; the 120 mm axial
+    views are untouched.
+  exploitation: 'Read both multipliers against the incumbent, Fracture, Lateral OA,
+    Lateral Meniscus, MCL and ACL (the targets that moved in the prediction-only check),
+    and per epoch on the validation knees the mean and spread of the applied angle
+    per plane, the share of knees turned in training, and the frame''s own angles
+    (after training on turned crops the roll and nod should shrink only if the frame
+    followed the picture, which it must not: positions are physical). Report the prediction
+    time against the incumbent''s. Shown wrong by: both multipliers below the incumbent
+    by more than a rerun (0.0010), or a prediction time above 1.3 times.'
+  budget: Training as the incumbent plus the larger canvases (the 15 mm canvases of
+    the previous campaign trained in 1,455 s against a limit of 1,595 s; these are
+    smaller). Prediction adds one first look at the multiplier-1 slice count.
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    The base of this campaign is run 24, and outputs/analysis/routing-and-shifts-frames-20261007/builds/rotation-on-run-24/
+    is this change at prediction, written on run 24''s code: the canvas loader (config.py,
+    data/dataset.py, data/preprocessing/, inference/engine.py, inference/reflection.py)
+    and, in modeling/model.py, sample_windows, crop_rectangles, ViewWindows with frame_angles
+    and the rotated cut, and the two-pass forward. Port it; drop the locator_series_index
+    and locator_series_first keys it carries from an older candidate, and replace
+    its config field view_frame_rotation_fraction by a module constant. That build
+    takes the first look on the whole batch and has no training path: add the slice
+    subset for the first look (subset every per-slice tensor of the batch consistently)
+    and the training dictionary. The mirrored pass (a batch carrying "mirrored_study")
+    takes its angle from a first look without that key and reflects after the cut,
+    as the build does. If the incumbent has changed since run 24, apply the port on
+    the incumbent. Report the three topic 2 checks of the contract. Replaces: the
+    cut at the scanner''s orientation. Update SPATIAL_TOKEN_IDENTITY["view_policy"]
+    and ["preparation"].'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The largest effect measured on 2026-10-07, confirmed by a wrong-way
+    control and on a second set of weights, and never trained.
+  status: completed
+  created_revision: 2
+  seeded: /home/claudio/src/knee-abnormality-side-routed-heads/autoresearch/campaigns/frame-and-targets/seed-ideas-3.yaml
+  ranking_rationale: Block and park this seed at its own implementation review. It
+    imports the full bone-target mechanism whose required mirrored-spot gate failed
+    after its bounded repair. Inspected bone-spot computation depends on upstream
+    coordinates, quadrant membership and attention scores; the proposed downstream
+    cuts and hinge do not resolve that failure. No candidate implementation was produced.
+    Correct the previously rejected queue report by explicitly listing every remaining
+    live entry once, preserving the user-ordered seed order.
+  experiments:
+  - crops-turned-to-the-frame-20261007T131425Z-d88162fd
+  decision: provisional_accept
+- id: crops-turned-and-centred-on-the-frame
+  mechanism_id: frame-aligned-crops
+  parent_idea_id: null
+  title: Cut each 84 and 93 mm view turned by half the frame's angle and moved by
+    half the frame centre's deviation, in training and at prediction
+  opportunity: 'A guess, with the measurements that shape it. Centring the crops on
+    the frame''s centre at prediction only, on the height-cuts model''s weights, scored
+    -0.0004 at x4: it gained Medial Meniscus, ACL, Effusion and Contusion by about
+    0.002 each and cost Fracture 0.0088 and PF OA 0.0037. It moved crops by 5 to 7
+    mm at the median, most of it the spots'' own noise (4 to 6 mm), on weights that
+    had never seen a centred knee. Half the angle beat the full angle for the same
+    reason. Training on the moved crops lets the targets that read far from the joint
+    centre adapt. The spread of the frame''s centre around the hand-set position is
+    2.3 mm side to side, 4.8 mm front to back and 7.4 mm up and down.'
+  mechanism: 'Everything of the seed crops-turned-to-the-frame, built here in full,
+    with data.view_shift_limit_mm: 14.0 (a 300 px canvas at 84 mm). In addition the
+    crop''s centre moves by 0.5 times the deviation of the knee''s frame centre (study_frame_shift)
+    from its running mean over training knees (a persistent buffer, momentum 0.99,
+    initialised from the first training batch, read as it is at validation and prediction),
+    projected into each slice''s plane and converted to pixels with that slice''s
+    patient map. The move is clamped so that the turned crop stays inside the canvas,
+    and composed with the turn and the cut into one resampling; patient_maps and valid_rects
+    receive the same transform. The frame for the move comes from the same first look
+    or training dictionary as the angle.'
+  precedents:
+  - 'outputs/analysis/routing-and-shifts-frames-20261007/frame-crops/frame-crops-x4.npz:
+    centred -0.0004, centred and turned -0.0007, prediction only, full deviation and
+    full angle.'
+  - 'routing-and-shifts, crops-and-frame-share-one-centre-unit-output: a learned centre
+    shared by crops and frame, -0.0037 and -0.0062; learned from the labels, not read
+    from the spots.'
+  novelty: First training on crops both turned and centred by the knee's own frame.
+  coverage: Coronal and sagittal 84 and 93 mm views of every knee.
+  exploitation: 'Read both multipliers against the incumbent and against crops-turned-to-the-frame,
+    Fracture and PF OA (the two that paid for centring at prediction), Medial Meniscus,
+    ACL, Effusion and Contusion (the four that gained), and per epoch on the validation
+    knees the mean and spread of the applied move per plane and direction in millimetres,
+    the share of slices clamped and the applied angle. Report the prediction time.
+    Shown wrong by: Fracture and PF OA each more than one sibling SD below the incumbent
+    while the four others stay inside theirs.'
+  budget: As crops-turned-to-the-frame with 300 px canvases, the size the previous
+    campaign's shift runs trained with inside the limit.
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    Build on the candidate of crops-turned-to-the-frame if it exists under this campaign''s
+    experiments (its source/ and changes.diff), otherwise from the same sources. The
+    centring arithmetic is in outputs/analysis/routing-and-shifts-frames-20261007/builds/scripts/frame_crops.py
+    (function `moves`: the deviation in the knee''s anatomical axes turned into the
+    patient''s axes with the study axis and the side sign, then projected on the slice''s
+    two in-plane directions); it used the fold''s mean, which a candidate replaces
+    by the training running mean. The two halves are module constants with no config
+    field. Create the buffer under torch.random.fork_rng. Report the three topic 2
+    checks of the contract. Update SPATIAL_TOKEN_IDENTITY["view_policy"], ["preparation"]
+    and ["initialization_rng"].'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user's design for the default crop (turn and move, aligned
+    to the frame); runs after the turn alone so the two are measured apart.
+  status: retired
+  created_revision: 2
+  seeded: /home/claudio/src/knee-abnormality-side-routed-heads/autoresearch/campaigns/frame-and-targets/seed-ideas-3.yaml
+  ranking_rationale: Block and park this seed at its own implementation review. It
+    imports the full bone-target mechanism whose required mirrored-spot gate failed
+    after its bounded repair. Inspected bone-spot computation depends on upstream
+    coordinates, quadrant membership and attention scores; the proposed downstream
+    cuts and hinge do not resolve that failure. No candidate implementation was produced.
+    Correct the previously rejected queue report by explicitly listing every remaining
+    live entry once, preserving the user-ordered seed order.
+  experiments:
+  - crops-turned-and-centred-on-the-frame-20261007T133717Z-77f50bac
+  - crops-turned-and-centred-on-the-frame-20261007T140432Z-b13de681
+  retired_reason: 'Keeper, 2026-10-07, on the user''s instruction: no further crop
+    seeds until the double cylinder is right. Taken out while the campaign was stopped,
+    before its candidate was reviewed.'
+- id: smaller-rotation-augmentation-on-turned-crops
+  mechanism_id: frame-aligned-crops
+  parent_idea_id: null
+  title: Crops turned by half the frame's angle, with the random rotation of the affine
+    augmentation halved
+  opportunity: A guess. The affine augmentation turns 70% of series by up to 10 degrees,
+    a range chosen when knees arrived at the scanner's orientation. The frame's in-plane
+    angle has a median of 3.6 degrees on coronal views and 5.9 on sagittal (90th percentiles
+    8.7 and 11.5); once the crops are turned by half of it, about half of that spread
+    is gone, and the augmentation spends its range on orientations the model no longer
+    meets. The validation crops are never augmented, so a narrower range brings training
+    closer to what is predicted on.
+  mechanism: 'Everything of the seed crops-turned-to-the-frame, built here in full,
+    and data.affine_augmentation.rotation_degrees: 5.0 in configs/training.yaml in
+    place of 10.0. The probability, the translation and the scale range stay.'
+  precedents:
+  - 'learnable-views run 17 (jitter 4 mm and 5% in place of 8 mm and 10%, on unaligned
+    views of the old recipe): -0.0008 [-0.0022, +0.0006].'
+  novelty: First change of the affine range on crops aligned to the knee.
+  coverage: Training only; every series the augmentation touches.
+  exploitation: 'Read both multipliers against the incumbent and against crops-turned-to-the-frame,
+    and the gap between the training loss and the validation loss at the last epoch
+    against that run''s. Shown wrong by: both multipliers below crops-turned-to-the-frame
+    by more than a rerun (0.0010).'
+  budget: As crops-turned-to-the-frame.
+  implementation: Follow the environment paragraph of the developer instructions.
+    Build on the candidate of crops-turned-to-the-frame if it exists under this campaign's
+    experiments (its source/ and changes.diff), otherwise from the sources that seed
+    names. The only further change is the one config value. Report the three topic
+    2 checks of the contract.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user's third element of the aligned default (small augmentation
+    around the aligned crop), measured apart from the turn.
+  status: retired
+  created_revision: 2
+  seeded: /home/claudio/src/knee-abnormality-side-routed-heads/autoresearch/campaigns/frame-and-targets/seed-ideas-3.yaml
+  ranking_rationale: Block and park this seed at its own implementation review. It
+    imports the full bone-target mechanism whose required mirrored-spot gate failed
+    after its bounded repair. Inspected bone-spot computation depends on upstream
+    coordinates, quadrant membership and attention scores; the proposed downstream
+    cuts and hinge do not resolve that failure. No candidate implementation was produced.
+    Correct the previously rejected queue report by explicitly listing every remaining
+    live entry once, preserving the user-ordered seed order.
+  retired_reason: 'Keeper, 2026-10-07, on the user''s instruction: no further crop
+    seeds until the double cylinder is right'
+- id: tibia-and-femur-sections-on-their-own-axes
+  mechanism_id: upper-band-on-its-own-axis
+  parent_idea_id: null
+  title: Two tilts per knee, one for the tibia and one for the femur, each read from
+    that bone's report-supervised spots
+  opportunity: 'The direction of the campaign, stated by the user on 2026-10-07. A
+    knee in the coil is bent: on eighteen sagittal slices the tibia stands close to
+    vertical and the femur leans by 0 to 30 degrees. The frame has one forward tilt,
+    learned from the labels, which has to stand for both bones: it ends between 6
+    and 15 degrees across runs of one design, and when the band above the upper cut
+    was given its own lean learned from the labels the two angles traded against each
+    other (the lean at -25 degrees for every knee, the tilt up by 9 degrees). So the
+    tilt may be wrong because there are two. The v5 extraction was run to get a landmark
+    on each bone: marrow edema placed in the femur (706 reports), in the tibia (863),
+    or absent (2,595). A head trained on those targets has to look at each bone''s
+    marrow, and its attention above and below the joint gives a femur spot and a tibia
+    spot per side. A guess: that those spots mark the bones in knees without edema
+    too; the seed edema-bone-targets-with-the-head-in-the-model reports that before
+    this one runs.'
+  mechanism: 'Everything of the seed edema-bone-targets-with-the-head-in-the-model,
+    built here in full: the four located edema targets, their shared head inside the
+    model, and the four spots per knee (femur and tibia, medial and lateral), without
+    gradient. Then, in KneeAbnormalityModel.study_frames, without gradient, with M
+    the midpoint of the two meniscus spots, T the midpoint of the two tibia spots
+    and F the midpoint of the two femur spots, all expressed in the basis built from
+    the side axis (side, front, up). (1) Tibia tilt: the frame''s forward tilt becomes
+    the angle about the side axis that puts T straight below M, tilt = atan2 of the
+    front and up components of M - T, so that in the knee''s frame T has no front
+    offset; zero when a tibia spot is missing or T is less than one token pitch below
+    M. The frame''s rotation is self.frame_rotation() @ R(tilt) @ basis; the landmark
+    tilt and the per-knee regressed nod are removed. The tibia band and the joint
+    band are laid out in this frame as today. (2) Femur tilt: in frame(), above the
+    upper cut, lift = max(height - upper cut, 0) and front becomes front - lift *
+    t, with t = F_front / max(F_height - upper cut, 0.5 * study_pitch) for F expressed
+    in the knee''s frame; t = 0 when a femur spot is missing or F lies below the upper
+    cut. So below the upper cut the sectors, core and rings sit around the tibia''s
+    line, above it around the line from the centre of the cut to the femur spots,
+    and the two sections stay attached at the cut. The regions, the table, the height
+    cuts and the two radii are unchanged, and every target reads the sections as laid
+    out.'
+  precedents:
+  - 'outputs/training/20261007-101112-side-routed-femur-lean: one hinged band with
+    a lean learned from the labels: x4 -0.0002, x1 -0.0009, Effusion +0.0021; the
+    lean at -25 degrees for every knee and the tilt up by 9 degrees.'
+  - 'outputs/analysis/routing-and-shifts-frames-20261007/knee-bend/sagittal-gallery.png:
+    the tibia near vertical and the femur leaning by 0 to 30 degrees, by eye; two
+    rule-based measurements of the bend failed.'
+  - 'Crops turned by the frame''s angle at prediction: +0.0007 at x4 on run 24''s
+    weights with half the angle; half as good as or better than the full angle, as
+    an angle standing for two bones would give.'
+  novelty: First frame with a separate, measured axis for each bone; first frame angle
+    set by report-supervised landmarks.
+  coverage: Every knee with the two meniscus spots; the tibia tilt needs the two tibia
+    spots and the femur tilt the two femur spots, and each falls back to zero on its
+    own.
+  exploitation: 'Read both multipliers against the incumbent and against edema-bone-targets-with-the-head-in-the-model
+    and femur-section-leaning-to-the-femur-spots, PF OA, Effusion, Synovitis and ACL
+    (they read above the lower cut) and the four compartment targets, and per epoch
+    on the validation knees: the mean and the spread across knees of the tibia tilt,
+    of the femur tilt atan(t) and of their difference (the knee''s bend) in degrees,
+    the share of knees with each, and the place of the four spots in the knee''s frame.
+    Shown wrong by: a tibia tilt whose spread across knees exceeds 10 degrees while
+    the tibia stands near vertical by eye; a bend whose spread is under 3 degrees
+    (the two tilts would be one setting again); or the four targets above the lower
+    cut each more than one sibling SD below the incumbent.'
+  budget: Same cost as the incumbent plus one attention column and classifier row.
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    Build on the candidate of femur-section-leaning-to-the-femur-spots if it exists
+    under this campaign''s experiments (its source/ and changes.diff): it already
+    has the bone head in the model, the four spots and the leaned frame(). Otherwise
+    build on the candidate of edema-bone-targets-with-the-head-in-the-model and port
+    the leaned frame() from the femur-lean run''s source_snapshot.zip (prior-work.md,
+    Reusable code) without its learned parts (no femur_output layer, no femur_offset
+    parameter, no gain, no tanh bound). Remove what only the landmark tilt and the
+    regressed nod used (the landmark_attention layer, the nod columns of frame_output),
+    keeping every other column''s behaviour and creating any new or resized layer
+    under torch.random.fork_rng. study_frames keeps returning the two meniscus spots
+    as study_landmarks. Check the signs on made-up points before the guardrail run
+    and report both: with a tibia midpoint placed below and in front of M by a known
+    angle, T must have a front coordinate within 0.1 mm of zero in the resulting frame;
+    with a femur midpoint placed above the cut and behind the axis, a token at F must
+    have a front coordinate within 0.1 mm of zero after frame(). frame() must keep
+    working when called by scripts.tools.check_side_routing with the dictionary encode_batch
+    returns. Log val_ and training study_frame_tibia_tilt_deg, study_frame_femur_tilt_deg
+    and study_frame_bend_deg (mean and standard deviation across knees) and the two
+    shares. Replaces: the landmark tilt and the regressed nod. Update SPATIAL_TOKEN_IDENTITY["algorithm"].'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The campaign's direction as the user set it; the crops are turned
+    and moved by this frame afterwards.
+  status: retired
+  created_revision: 17
+  seeded: /home/claudio/src/knee-abnormality-side-routed-heads/autoresearch/campaigns/frame-and-targets/direction-ideas.yaml
+  retired_reason: 'Keeper, 2026-10-07: replaced by its version built on the height
+    cuts placed from the spots (the user allowed seeds on the previous campaign''s
+    incumbent); the femur section hinges at the upper cut, which must not be free
+    to trade against the new angles'
+- id: femur-section-on-spot-placed-cuts
+  mechanism_id: upper-band-on-its-own-axis
+  parent_idea_id: null
+  title: A femur section hinged at an upper cut placed from the spots, its axis through
+    the knee's own report-supervised femur spots
+  opportunity: 'A guess, on a measured failure. A knee in the coil is bent: on eighteen
+    sagittal slices the tibia stands close to vertical and the femur leans by 0 to
+    30 degrees, so a single axis is a compromise between two bones. The femur-lean
+    run gave the band above the upper cut its own axis and let the labels set the
+    lean: every knee went to -25 degrees within two epochs and the lean traded against
+    the nod, because only the targets of that band pull on it. The lean needs a landmark
+    on the femur. The bone head''s femur spots are one, supervised by the reports
+    (706 reports place edema in the femur, 863 in the tibia, 2,595 report none), independent
+    of the twelve labels'' gradient. The hinge of the femur section is the upper cut,
+    and in run 24 the two cuts are regressed from the labels (+13.7 and -1.8 mm at
+    the end, the lower one through the joint line): a learned cut can slide to trade
+    against a new angle, as the learned tilt did against the learned lean. Placed
+    from the spots the cuts held at +10.8 and -12.9 mm, level with run 24 (+0.0003
+    at both multipliers), so this seed is built on that change (user decision, 2026-10-07:
+    seeds may build on the previous campaign''s incumbent).'
+  mechanism: 'Everything of the seed edema-bone-targets-with-the-head-in-the-model,
+    built here in full. In addition, in frame() (modeling/model.py), after the position
+    (medial, front, height) is computed as today: lift = max(height - upper cut, 0)
+    and front becomes front - lift * t. In study_frames, without gradient: F = the
+    midpoint of the knee''s two femur spots expressed in the knee''s frame; t = F_front
+    / max(F_height - upper cut, 0.5 * study_pitch); t = 0 when a femur spot is missing
+    or F lies below the upper cut. So above the cut the sectors, the core and the
+    rings are laid out around the line from the centre of the cut to the femur spots,
+    and the section stays attached at the cut (lift is zero there). The tibia and
+    joint bands, the regions and the table are unchanged, and the bone targets'' own
+    regions use the leaned band like every other target. The two height cuts are placed
+    per knee from the spots, as the previous campaign''s adopted experiment places
+    them (outputs/autoresearch/routing-and-shifts/experiments/height-cuts-from-the-spots-requeue-20261006T232351Z-d2445402/changes.diff),
+    built here in full and without gradient: a kneecap spot, the squared-attention
+    centroid of the shared OA channel over the tokens with fitted front > 0 and height
+    > 0; in the knee''s frame h_m, s_m the mean height and spread of the two meniscus
+    spots and h_k, s_k the kneecap spot''s; upper cut = max(h_m + (h_k - h_m) * s_m
+    / (s_m + s_k), h_m); lower cut = 2 * h_m - upper cut; the regressed start values
+    when a spot is missing. The femur section hinges at that upper cut.'
+  precedents:
+  - 'outputs/training/20261007-101112-side-routed-femur-lean: the same hinged band
+    with a lean learned from the labels: x4 -0.0002, x1 -0.0009, Effusion +0.0021,
+    the lean at -25 degrees for every knee and the nod up by 9 degrees.'
+  - 'outputs/analysis/routing-and-shifts-frames-20261007/knee-bend/sagittal-gallery.png:
+    the bend by eye; two rule-based measurements of it failed.'
+  novelty: First angle of the frame set by a report-supervised landmark; first femur
+    section that can differ between knees.
+  coverage: Every knee with the two femur spots above its upper cut; the others keep
+    a straight upper band.
+  exploitation: 'Read both multipliers against the incumbent and against edema-bone-targets-with-the-head-in-the-model,
+    PF OA, Effusion, Synovitis and ACL, and per epoch on the validation knees the
+    mean and the spread of atan(t) in degrees, the share of knees with a lean, the
+    frame''s forward tilt, and the femur spots'' place. Shown wrong by: a lean with
+    a spread across knees under 3 degrees (it would be one shared setting again),
+    a forward tilt that moves by more than 5 degrees against the incumbent''s (the
+    two trading), or PF OA and Effusion both more than one sibling SD below the incumbent.
+    Also log the two cuts per epoch (mean and spread): they must hold near +11 and
+    -13 mm.'
+  budget: Same cost as the incumbent plus one attention column and classifier row.
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    Build on the candidate of edema-bone-targets-with-the-head-in-the-model if it
+    exists under this campaign''s experiments (its source/ and changes.diff). Port
+    the leaned frame() and its plumbing from the femur-lean run''s source_snapshot.zip
+    (prior-work.md, Reusable code): "frame_lean" in the geometry dictionary and the
+    lean in the encode_batch output and the logs. Do not port its learned parts or
+    its kneecap start: no femur_output layer, no femur_offset parameter, no gain,
+    no tanh bound. frame() must keep working when called by scripts.tools.check_side_routing
+    with the dictionary encode_batch returns. Replaces nothing in the frame: the band
+    above the cut has no axis of its own today. Update SPATIAL_TOKEN_IDENTITY["algorithm"].
+    Apply the height-cut changes.diff named in the mechanism first (it was written
+    on run 24''s code: modeling/model.py, modeling/spatial_tokens.py, training/lightning.py)
+    and keep its logs; "Replaces" then also covers the two regressed height cuts.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The tiltable femur section the user asked for, with its angle
+    supervised by the reports instead of the labels. Keeper's version on the spot-placed
+    cuts; it replaces the queued version on run 24's learned cuts.
+  status: blocked
+  created_revision: 28
+  seeded: /home/claudio/src/knee-abnormality-side-routed-heads/autoresearch/campaigns/frame-and-targets/direction-ideas-2.yaml
+  ranking_rationale: Block and park the seed because its one bounded repair is exhausted
+    and the required full-pass mirrored-spot gate still fails. Direct parent-relative
+    diff and critical-source inspection confirm that the squared-attention centroid
+    mechanism remains implemented without a correction satisfying that gate. The passing
+    standard routing guardrail cannot override it. Supply the complete remaining queue
+    explicitly to resolve the rejected ranking, preserving every remaining user seed's
+    order.
+  experiments:
+  - femur-section-on-spot-placed-cuts-20261007T124035Z-6eacb4e0
+  blocked_reason: Block and park this seed at its own implementation review. It imports
+    the full bone-target mechanism whose required mirrored-spot gate failed after
+    its bounded repair. Inspected bone-spot computation depends on upstream coordinates,
+    quadrant membership and attention scores; the proposed downstream cuts and hinge
+    do not resolve that failure. No candidate implementation was produced. Correct
+    the previously rejected queue report by explicitly listing every remaining live
+    entry once, preserving the user-ordered seed order.
+- id: tibia-and-femur-tilts-on-spot-placed-cuts
+  mechanism_id: upper-band-on-its-own-axis
+  parent_idea_id: null
+  title: Two tilts per knee, one for the tibia and one for the femur, each read from
+    that bone's report-supervised spots, with the height cuts placed from the spots
+  opportunity: 'The direction of the campaign, stated by the user on 2026-10-07. A
+    knee in the coil is bent: on eighteen sagittal slices the tibia stands close to
+    vertical and the femur leans by 0 to 30 degrees. The frame has one forward tilt,
+    learned from the labels, which has to stand for both bones: it ends between 6
+    and 15 degrees across runs of one design, and when the band above the upper cut
+    was given its own lean learned from the labels the two angles traded against each
+    other (the lean at -25 degrees for every knee, the tilt up by 9 degrees). So the
+    tilt may be wrong because there are two. The v5 extraction was run to get a landmark
+    on each bone: marrow edema placed in the femur (706 reports), in the tibia (863),
+    or absent (2,595). A head trained on those targets has to look at each bone''s
+    marrow, and its attention above and below the joint gives a femur spot and a tibia
+    spot per side. A guess: that those spots mark the bones in knees without edema
+    too; the seed edema-bone-targets-with-the-head-in-the-model reports that before
+    this one runs. The hinge of the femur section is the upper cut, and in run 24
+    the two cuts are regressed from the labels (+13.7 and -1.8 mm at the end, the
+    lower one through the joint line): a learned cut can slide to trade against a
+    new angle, as the learned tilt did against the learned lean. Placed from the spots
+    the cuts held at +10.8 and -12.9 mm, level with run 24 (+0.0003 at both multipliers),
+    so this seed is built on that change (user decision, 2026-10-07: seeds may build
+    on the previous campaign''s incumbent).'
+  mechanism: 'Everything of the seed edema-bone-targets-with-the-head-in-the-model,
+    built here in full: the four located edema targets, their shared head inside the
+    model, and the four spots per knee (femur and tibia, medial and lateral), without
+    gradient. Then, in KneeAbnormalityModel.study_frames, without gradient, with M
+    the midpoint of the two meniscus spots, T the midpoint of the two tibia spots
+    and F the midpoint of the two femur spots, all expressed in the basis built from
+    the side axis (side, front, up). (1) Tibia tilt: the frame''s forward tilt becomes
+    the angle about the side axis that puts T straight below M, tilt = atan2 of the
+    front and up components of M - T, so that in the knee''s frame T has no front
+    offset; zero when a tibia spot is missing or T is less than one token pitch below
+    M. The frame''s rotation is self.frame_rotation() @ R(tilt) @ basis; the landmark
+    tilt and the per-knee regressed nod are removed. The tibia band and the joint
+    band are laid out in this frame as today. (2) Femur tilt: in frame(), above the
+    upper cut, lift = max(height - upper cut, 0) and front becomes front - lift *
+    t, with t = F_front / max(F_height - upper cut, 0.5 * study_pitch) for F expressed
+    in the knee''s frame; t = 0 when a femur spot is missing or F lies below the upper
+    cut. So below the upper cut the sectors, core and rings sit around the tibia''s
+    line, above it around the line from the centre of the cut to the femur spots,
+    and the two sections stay attached at the cut. The regions, the table, the height
+    cuts and the two radii are unchanged, and every target reads the sections as laid
+    out. The two height cuts are placed per knee from the spots, as the previous campaign''s
+    adopted experiment places them (outputs/autoresearch/routing-and-shifts/experiments/height-cuts-from-the-spots-requeue-20261006T232351Z-d2445402/changes.diff),
+    built here in full and without gradient: a kneecap spot, the squared-attention
+    centroid of the shared OA channel over the tokens with fitted front > 0 and height
+    > 0; in the knee''s frame h_m, s_m the mean height and spread of the two meniscus
+    spots and h_k, s_k the kneecap spot''s; upper cut = max(h_m + (h_k - h_m) * s_m
+    / (s_m + s_k), h_m); lower cut = 2 * h_m - upper cut; the regressed start values
+    when a spot is missing. The femur section hinges at that upper cut.'
+  precedents:
+  - 'outputs/training/20261007-101112-side-routed-femur-lean: one hinged band with
+    a lean learned from the labels: x4 -0.0002, x1 -0.0009, Effusion +0.0021; the
+    lean at -25 degrees for every knee and the tilt up by 9 degrees.'
+  - 'outputs/analysis/routing-and-shifts-frames-20261007/knee-bend/sagittal-gallery.png:
+    the tibia near vertical and the femur leaning by 0 to 30 degrees, by eye; two
+    rule-based measurements of the bend failed.'
+  - 'Crops turned by the frame''s angle at prediction: +0.0007 at x4 on run 24''s
+    weights with half the angle; half as good as or better than the full angle, as
+    an angle standing for two bones would give.'
+  novelty: First frame with a separate, measured axis for each bone; first frame angle
+    set by report-supervised landmarks.
+  coverage: Every knee with the two meniscus spots; the tibia tilt needs the two tibia
+    spots and the femur tilt the two femur spots, and each falls back to zero on its
+    own.
+  exploitation: 'Read both multipliers against the incumbent and against edema-bone-targets-with-the-head-in-the-model
+    and femur-section-on-spot-placed-cuts, PF OA, Effusion, Synovitis and ACL (they
+    read above the lower cut) and the four compartment targets, and per epoch on the
+    validation knees: the mean and the spread across knees of the tibia tilt, of the
+    femur tilt atan(t) and of their difference (the knee''s bend) in degrees, the
+    share of knees with each, and the place of the four spots in the knee''s frame.
+    Shown wrong by: a tibia tilt whose spread across knees exceeds 10 degrees while
+    the tibia stands near vertical by eye; a bend whose spread is under 3 degrees
+    (the two tilts would be one setting again); or the four targets above the lower
+    cut each more than one sibling SD below the incumbent. Also log the two cuts per
+    epoch (mean and spread): they must hold near +11 and -13 mm.'
+  budget: Same cost as the incumbent plus one attention column and classifier row.
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    Build on the candidate of femur-section-on-spot-placed-cuts if it exists under
+    this campaign''s experiments (its source/ and changes.diff): it already has the
+    bone head in the model, the four spots and the leaned frame(). Otherwise build
+    on the candidate of edema-bone-targets-with-the-head-in-the-model and port the
+    leaned frame() from the femur-lean run''s source_snapshot.zip (prior-work.md,
+    Reusable code) without its learned parts (no femur_output layer, no femur_offset
+    parameter, no gain, no tanh bound). Remove what only the landmark tilt and the
+    regressed nod used (the landmark_attention layer, the nod columns of frame_output),
+    keeping every other column''s behaviour and creating any new or resized layer
+    under torch.random.fork_rng. study_frames keeps returning the two meniscus spots
+    as study_landmarks. Check the signs on made-up points before the guardrail run
+    and report both: with a tibia midpoint placed below and in front of M by a known
+    angle, T must have a front coordinate within 0.1 mm of zero in the resulting frame;
+    with a femur midpoint placed above the cut and behind the axis, a token at F must
+    have a front coordinate within 0.1 mm of zero after frame(). frame() must keep
+    working when called by scripts.tools.check_side_routing with the dictionary encode_batch
+    returns. Log val_ and training study_frame_tibia_tilt_deg, study_frame_femur_tilt_deg
+    and study_frame_bend_deg (mean and standard deviation across knees) and the two
+    shares. Replaces: the landmark tilt and the regressed nod. Update SPATIAL_TOKEN_IDENTITY["algorithm"].
+    Apply the height-cut changes.diff named in the mechanism first (it was written
+    on run 24''s code: modeling/model.py, modeling/spatial_tokens.py, training/lightning.py)
+    and keep its logs; "Replaces" then also covers the two regressed height cuts.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The campaign's direction as the user set it; the crops are turned
+    and moved by this frame afterwards. Keeper's version on the spot-placed cuts;
+    it replaces the queued version on run 24's learned cuts.
+  status: retired
+  created_revision: 28
+  seeded: /home/claudio/src/knee-abnormality-side-routed-heads/autoresearch/campaigns/frame-and-targets/direction-ideas-2.yaml
+  ranking_rationale: Block and park this seed at its own implementation review. It
+    imports the full bone-target mechanism whose required mirrored-spot gate failed
+    after its bounded repair. Inspected bone-spot computation depends on upstream
+    coordinates, quadrant membership and attention scores; the proposed downstream
+    cuts and hinge do not resolve that failure. No candidate implementation was produced.
+    Correct the previously rejected queue report by explicitly listing every remaining
+    live entry once, preserving the user-ordered seed order.
+  retired_reason: 'Keeper, 2026-10-07: replaced by its -2 copy, which states that
+    the withdrawn mirrored-spot requirement of the bone-head seed is not a gate'
+- id: edema-bone-targets-with-the-head-in-the-model-2
+  mechanism_id: report-region-targets
+  parent_idea_id: null
+  title: Four located targets for marrow edema, femur and tibia on each side, read
+    by one shared head that lives in the model, so a femur spot and a tibia spot exist
+    for every knee
+  opportunity: 'Evidence-backed counts, a guess for the effect. No report target today
+    is read on both sides of the tibia-against-joint cut or tells the femoral side
+    of a compartment from the tibial side. The v5 answer marrow_edema_bone does: with
+    the compartment answer the incumbent already uses, the reports give about 393
+    medial-femur, 349 medial-tibia, 354 lateral-femur and 310 lateral-tibia knees,
+    each above the 200 a located target needs, and 2,512 reports without edema as
+    full-weight negatives. On 212 audited reports the femur is right in 48 of 60 answers
+    and the tibia in 58 of 72, femur and tibia are swapped once in 37 single-bone
+    reports, and the typical error is answering both bones (prior-work.md, The v5
+    report answers). It also gives Contusion''s finding a place per study. Nothing
+    in the frame marks the femur today: the crops show about 3 cm of it, and the kneecap
+    spot marks the kneecap. A head trained to find edema in the femur and in the tibia
+    has to look at each bone''s marrow, in knees with and without edema, so its attention
+    above and below the joint is a candidate landmark for each bone. The report heads
+    live in the training module and vanish at prediction; this one is put in the model
+    so that its spots can be read for any knee.'
+  mechanism: 'training/report_attributes.py reads, beside the v4.0 targets, the two
+    v5 questions from `<paths.data_root>/labels/prepared/jevk5-report-attributes-v5.0-new/targets.parquet`
+    (columns `StudyInstanceUID` and `attribute_<question>__<option>`, one row per
+    study of the 4,407). A new located family "marrow_edema_bone" with four Region
+    entries, read by one shared head exactly as the existing located families are:
+    femur_medial, femur_lateral, tibia_medial, tibia_lateral. The target of a region
+    is the product of two masses: the bone (femur: options femur and femur_tibia;
+    tibia: options tibia and femur_tibia) times the compartment (the options of marrow_edema_location
+    that include that compartment, as the existing edema-by-compartment regions define
+    them). Its weight is the reliability weight times one minus the mass of the bone
+    options not_stated and patella_and_other. Four new routes appended to ROUTES and
+    _regions (modeling/model.py): bone_femur_medial = the medial compartment''s sectors
+    and its half of the core in the joint and upper bands; bone_tibia_medial = the
+    same sectors and half core in the tibia and joint bands; the two lateral ones
+    their mirror images. No existing target or region changes, and marrow_edema_bone
+    gets no option-level head. The family''s attention column and classifier row are
+    parameters of KneeAbnormalityModel instead of the training module: the training
+    module calls them for the report loss exactly where a located family''s own column
+    and row would be, with the same detachment and the same gradient path as the other
+    located families. With that column''s scores the model computes, without gradient
+    and with the existing `spot` function, four spots per knee: femur medial, femur
+    lateral, tibia medial, tibia lateral, each the squared-attention centroid over
+    the tokens of that fitted side (fitted medial > 0 or <= 0) above or below the
+    meniscus midpoint''s height. encode_batch returns them. Nothing reads them in
+    this seed: the frame is unchanged.'
+  precedents:
+  - 'docs/ongoing/side-routed-heads.md: located targets hold on unseen knees (tear
+    place 33% explained, edema by compartment 25%).'
+  - 'routing-and-shifts, contusion-reads-the-edema-head-2: Contusion pooled with the
+    edema head''s attention, -0.0007 and -0.0011, its scale stayed at 0.'
+  novelty: First report head kept in the model; first landmark candidates for the
+    femur and the tibia.
+  coverage: Training only; the 4,407 studies with reports.
+  exploitation: 'Read both multipliers against the incumbent, Contusion, Fracture
+    and the four compartment targets, val_report_attribute_bce_<region> for the four
+    new targets with the share each explains, and per epoch on the validation knees,
+    for each of the four spots, the share of knees where it is found and the mean
+    and spread of its place in the knee''s frame (medial, front, height, in millimetres),
+    separately for knees whose report has edema and knees whose report has none. Shown
+    wrong by: the four targets explaining under 10% on the validation knees; or, for
+    the spots, a place in knees without edema that differs from the place in knees
+    with edema by more than its own spread.'
+  budget: Same cost as the incumbent; one more attention column and classifier row.
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    The Region tuple takes one question today; extend it, or the code that turns a
+    Region into a target, so that a region may multiply the located mass of a second
+    question, without changing the values of the existing regions (report the largest
+    absolute difference of their targets on one batch against the incumbent: it must
+    be zero). Load the extra file once, aligned by StudyInstanceUID, failing loudly
+    if a training study with a report is missing from it. Report in the candidate''s
+    notes the options chosen for each region and the number of training studies with
+    a target above 0.5 in each of the four. Update SPATIAL_TOKEN_IDENTITY["compartment_routing"].
+    Create the head''s layers under torch.random.fork_rng. Keeper''s requeue, 2026-10-07:
+    the first candidate was parked because this text demanded that a mirrored pass
+    give mirror-image spots. That was the keeper''s mistake and is withdrawn: a mirrored
+    image passes through the backbone as a different picture, so attention scores
+    and the token lattice differ and the spots cannot coincide exactly (5.2 mm apart
+    on the one study the developer checked, with untrained weights). It is not a gate.
+    Report the distance between the mirrored pass''s spots, reflected back, and the
+    plain pass''s spots on one batch as a number, and log nothing more about it. The
+    complete implementation exists in the parked candidate''s workspace, outputs/autoresearch/frame-and-targets/experiments/edema-bone-targets-with-the-head-in-the-model-20261007T123302Z-8f577e2e/workspace
+    (the four targets, the appended routes, the model-owned report trunk with the
+    new attention column and classifier row, the detached spots, the validation diagnostics
+    and the supervision-weight log): reuse it as it is, rerun the guardrail check
+    and return prepared. Update SPATIAL_TOKEN_IDENTITY["algorithm"] as well.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Keeper's requeue of a seed parked by a requirement the keeper
+    wrote wrongly; the femur and tibia spots are what the campaign's direction rests
+    on.
+  status: completed
+  created_revision: 66
+  seeded: /home/claudio/src/knee-abnormality-side-routed-heads/autoresearch/campaigns/frame-and-targets/bone-head-requeue-ideas.yaml
+  ranking_rationale: Block and park this seed at its own implementation review. It
+    imports the full bone-target mechanism whose required mirrored-spot gate failed
+    after its bounded repair. Inspected bone-spot computation depends on upstream
+    coordinates, quadrant membership and attention scores; the proposed downstream
+    cuts and hinge do not resolve that failure. No candidate implementation was produced.
+    Correct the previously rejected queue report by explicitly listing every remaining
+    live entry once, preserving the user-ordered seed order.
+  experiments:
+  - edema-bone-targets-with-the-head-in-the-model-2-20261007T124438Z-ade9be4a
+  decision: reject
+- id: femur-section-on-spot-placed-cuts-2
+  mechanism_id: upper-band-on-its-own-axis
+  parent_idea_id: null
+  title: A femur section hinged at an upper cut placed from the spots, its axis through
+    the knee's own report-supervised femur spots
+  opportunity: 'A guess, on a measured failure. A knee in the coil is bent: on eighteen
+    sagittal slices the tibia stands close to vertical and the femur leans by 0 to
+    30 degrees, so a single axis is a compromise between two bones. The femur-lean
+    run gave the band above the upper cut its own axis and let the labels set the
+    lean: every knee went to -25 degrees within two epochs and the lean traded against
+    the nod, because only the targets of that band pull on it. The lean needs a landmark
+    on the femur. The bone head''s femur spots are one, supervised by the reports
+    (706 reports place edema in the femur, 863 in the tibia, 2,595 report none), independent
+    of the twelve labels'' gradient. The hinge of the femur section is the upper cut,
+    and in run 24 the two cuts are regressed from the labels (+13.7 and -1.8 mm at
+    the end, the lower one through the joint line): a learned cut can slide to trade
+    against a new angle, as the learned tilt did against the learned lean. Placed
+    from the spots the cuts held at +10.8 and -12.9 mm, level with run 24 (+0.0003
+    at both multipliers), so this seed is built on that change (user decision, 2026-10-07:
+    seeds may build on the previous campaign''s incumbent).'
+  mechanism: 'Everything of the seed edema-bone-targets-with-the-head-in-the-model,
+    built here in full. In addition, in frame() (modeling/model.py), after the position
+    (medial, front, height) is computed as today: lift = max(height - upper cut, 0)
+    and front becomes front - lift * t. In study_frames, without gradient: F = the
+    midpoint of the knee''s two femur spots expressed in the knee''s frame; t = F_front
+    / max(F_height - upper cut, 0.5 * study_pitch); t = 0 when a femur spot is missing
+    or F lies below the upper cut. So above the cut the sectors, the core and the
+    rings are laid out around the line from the centre of the cut to the femur spots,
+    and the section stays attached at the cut (lift is zero there). The tibia and
+    joint bands, the regions and the table are unchanged, and the bone targets'' own
+    regions use the leaned band like every other target. The two height cuts are placed
+    per knee from the spots, as the previous campaign''s adopted experiment places
+    them (outputs/autoresearch/routing-and-shifts/experiments/height-cuts-from-the-spots-requeue-20261006T232351Z-d2445402/changes.diff),
+    built here in full and without gradient: a kneecap spot, the squared-attention
+    centroid of the shared OA channel over the tokens with fitted front > 0 and height
+    > 0; in the knee''s frame h_m, s_m the mean height and spread of the two meniscus
+    spots and h_k, s_k the kneecap spot''s; upper cut = max(h_m + (h_k - h_m) * s_m
+    / (s_m + s_k), h_m); lower cut = 2 * h_m - upper cut; the regressed start values
+    when a spot is missing. The femur section hinges at that upper cut.'
+  precedents:
+  - 'outputs/training/20261007-101112-side-routed-femur-lean: the same hinged band
+    with a lean learned from the labels: x4 -0.0002, x1 -0.0009, Effusion +0.0021,
+    the lean at -25 degrees for every knee and the nod up by 9 degrees.'
+  - 'outputs/analysis/routing-and-shifts-frames-20261007/knee-bend/sagittal-gallery.png:
+    the bend by eye; two rule-based measurements of it failed.'
+  novelty: First angle of the frame set by a report-supervised landmark; first femur
+    section that can differ between knees.
+  coverage: Every knee with the two femur spots above its upper cut; the others keep
+    a straight upper band.
+  exploitation: 'Read both multipliers against the incumbent and against edema-bone-targets-with-the-head-in-the-model,
+    PF OA, Effusion, Synovitis and ACL, and per epoch on the validation knees the
+    mean and the spread of atan(t) in degrees, the share of knees with a lean, the
+    frame''s forward tilt, and the femur spots'' place. Shown wrong by: a lean with
+    a spread across knees under 3 degrees (it would be one shared setting again),
+    a forward tilt that moves by more than 5 degrees against the incumbent''s (the
+    two trading), or PF OA and Effusion both more than one sibling SD below the incumbent.
+    Also log the two cuts per epoch (mean and spread): they must hold near +11 and
+    -13 mm.'
+  budget: Same cost as the incumbent plus one attention column and classifier row.
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    Build on the candidate of edema-bone-targets-with-the-head-in-the-model if it
+    exists under this campaign''s experiments (its source/ and changes.diff). Port
+    the leaned frame() and its plumbing from the femur-lean run''s source_snapshot.zip
+    (prior-work.md, Reusable code): "frame_lean" in the geometry dictionary and the
+    lean in the encode_batch output and the logs. Do not port its learned parts or
+    its kneecap start: no femur_output layer, no femur_offset parameter, no gain,
+    no tanh bound. frame() must keep working when called by scripts.tools.check_side_routing
+    with the dictionary encode_batch returns. Replaces nothing in the frame: the band
+    above the cut has no axis of its own today. Update SPATIAL_TOKEN_IDENTITY["algorithm"].
+    Apply the height-cut changes.diff named in the mechanism first (it was written
+    on run 24''s code: modeling/model.py, modeling/spatial_tokens.py, training/lightning.py)
+    and keep its logs; "Replaces" then also covers the two regressed height cuts.
+    Keeper''s note, 2026-10-07: the seed edema-bone-targets-with-the-head-in-the-model
+    was parked because its text demanded that a mirrored pass give mirror-image spots.
+    That requirement was the keeper''s mistake and is withdrawn everywhere: a mirrored
+    image passes through the backbone as a different picture, so the spots of the
+    two passes cannot coincide exactly. It is not a gate for this seed either; the
+    mirror guardrail of scripts.tools.check_side_routing is the only mirror requirement.
+    Build the bone head from the candidate of edema-bone-targets-with-the-head-in-the-model-2
+    under this campaign''s experiments if it exists, otherwise from the parked workspace
+    outputs/autoresearch/frame-and-targets/experiments/edema-bone-targets-with-the-head-in-the-model-20261007T123302Z-8f577e2e/workspace.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: 'Keeper''s requeue: the first version was parked, or would be,
+    for a requirement the keeper wrote wrongly in the seed it builds on.'
+  status: completed
+  created_revision: 72
+  seeded: /home/claudio/src/knee-abnormality-side-routed-heads/autoresearch/campaigns/frame-and-targets/direction-requeue-ideas.yaml
+  experiments:
+  - femur-section-on-spot-placed-cuts-2-20261007T125017Z-e395eccf
+  decision: reject
+- id: tibia-and-femur-tilts-on-spot-placed-cuts-2
+  mechanism_id: upper-band-on-its-own-axis
+  parent_idea_id: null
+  title: Two tilts per knee, one for the tibia and one for the femur, each read from
+    that bone's report-supervised spots, with the height cuts placed from the spots
+  opportunity: 'The direction of the campaign, stated by the user on 2026-10-07. A
+    knee in the coil is bent: on eighteen sagittal slices the tibia stands close to
+    vertical and the femur leans by 0 to 30 degrees. The frame has one forward tilt,
+    learned from the labels, which has to stand for both bones: it ends between 6
+    and 15 degrees across runs of one design, and when the band above the upper cut
+    was given its own lean learned from the labels the two angles traded against each
+    other (the lean at -25 degrees for every knee, the tilt up by 9 degrees). So the
+    tilt may be wrong because there are two. The v5 extraction was run to get a landmark
+    on each bone: marrow edema placed in the femur (706 reports), in the tibia (863),
+    or absent (2,595). A head trained on those targets has to look at each bone''s
+    marrow, and its attention above and below the joint gives a femur spot and a tibia
+    spot per side. A guess: that those spots mark the bones in knees without edema
+    too; the seed edema-bone-targets-with-the-head-in-the-model reports that before
+    this one runs. The hinge of the femur section is the upper cut, and in run 24
+    the two cuts are regressed from the labels (+13.7 and -1.8 mm at the end, the
+    lower one through the joint line): a learned cut can slide to trade against a
+    new angle, as the learned tilt did against the learned lean. Placed from the spots
+    the cuts held at +10.8 and -12.9 mm, level with run 24 (+0.0003 at both multipliers),
+    so this seed is built on that change (user decision, 2026-10-07: seeds may build
+    on the previous campaign''s incumbent).'
+  mechanism: 'Everything of the seed edema-bone-targets-with-the-head-in-the-model,
+    built here in full: the four located edema targets, their shared head inside the
+    model, and the four spots per knee (femur and tibia, medial and lateral), without
+    gradient. Then, in KneeAbnormalityModel.study_frames, without gradient, with M
+    the midpoint of the two meniscus spots, T the midpoint of the two tibia spots
+    and F the midpoint of the two femur spots, all expressed in the basis built from
+    the side axis (side, front, up). (1) Tibia tilt: the frame''s forward tilt becomes
+    the angle about the side axis that puts T straight below M, tilt = atan2 of the
+    front and up components of M - T, so that in the knee''s frame T has no front
+    offset; zero when a tibia spot is missing or T is less than one token pitch below
+    M. The frame''s rotation is self.frame_rotation() @ R(tilt) @ basis; the landmark
+    tilt and the per-knee regressed nod are removed. The tibia band and the joint
+    band are laid out in this frame as today. (2) Femur tilt: in frame(), above the
+    upper cut, lift = max(height - upper cut, 0) and front becomes front - lift *
+    t, with t = F_front / max(F_height - upper cut, 0.5 * study_pitch) for F expressed
+    in the knee''s frame; t = 0 when a femur spot is missing or F lies below the upper
+    cut. So below the upper cut the sectors, core and rings sit around the tibia''s
+    line, above it around the line from the centre of the cut to the femur spots,
+    and the two sections stay attached at the cut. The regions, the table, the height
+    cuts and the two radii are unchanged, and every target reads the sections as laid
+    out. The two height cuts are placed per knee from the spots, as the previous campaign''s
+    adopted experiment places them (outputs/autoresearch/routing-and-shifts/experiments/height-cuts-from-the-spots-requeue-20261006T232351Z-d2445402/changes.diff),
+    built here in full and without gradient: a kneecap spot, the squared-attention
+    centroid of the shared OA channel over the tokens with fitted front > 0 and height
+    > 0; in the knee''s frame h_m, s_m the mean height and spread of the two meniscus
+    spots and h_k, s_k the kneecap spot''s; upper cut = max(h_m + (h_k - h_m) * s_m
+    / (s_m + s_k), h_m); lower cut = 2 * h_m - upper cut; the regressed start values
+    when a spot is missing. The femur section hinges at that upper cut.'
+  precedents:
+  - 'outputs/training/20261007-101112-side-routed-femur-lean: one hinged band with
+    a lean learned from the labels: x4 -0.0002, x1 -0.0009, Effusion +0.0021; the
+    lean at -25 degrees for every knee and the tilt up by 9 degrees.'
+  - 'outputs/analysis/routing-and-shifts-frames-20261007/knee-bend/sagittal-gallery.png:
+    the tibia near vertical and the femur leaning by 0 to 30 degrees, by eye; two
+    rule-based measurements of the bend failed.'
+  - 'Crops turned by the frame''s angle at prediction: +0.0007 at x4 on run 24''s
+    weights with half the angle; half as good as or better than the full angle, as
+    an angle standing for two bones would give.'
+  novelty: First frame with a separate, measured axis for each bone; first frame angle
+    set by report-supervised landmarks.
+  coverage: Every knee with the two meniscus spots; the tibia tilt needs the two tibia
+    spots and the femur tilt the two femur spots, and each falls back to zero on its
+    own.
+  exploitation: 'Read both multipliers against the incumbent and against edema-bone-targets-with-the-head-in-the-model
+    and femur-section-on-spot-placed-cuts-2, PF OA, Effusion, Synovitis and ACL (they
+    read above the lower cut) and the four compartment targets, and per epoch on the
+    validation knees: the mean and the spread across knees of the tibia tilt, of the
+    femur tilt atan(t) and of their difference (the knee''s bend) in degrees, the
+    share of knees with each, and the place of the four spots in the knee''s frame.
+    Shown wrong by: a tibia tilt whose spread across knees exceeds 10 degrees while
+    the tibia stands near vertical by eye; a bend whose spread is under 3 degrees
+    (the two tilts would be one setting again); or the four targets above the lower
+    cut each more than one sibling SD below the incumbent. Also log the two cuts per
+    epoch (mean and spread): they must hold near +11 and -13 mm.'
+  budget: Same cost as the incumbent plus one attention column and classifier row.
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    Build on the candidate of femur-section-on-spot-placed-cuts-2 if it exists under
+    this campaign''s experiments (its source/ and changes.diff): it already has the
+    bone head in the model, the four spots and the leaned frame(). Otherwise build
+    on the candidate of edema-bone-targets-with-the-head-in-the-model and port the
+    leaned frame() from the femur-lean run''s source_snapshot.zip (prior-work.md,
+    Reusable code) without its learned parts (no femur_output layer, no femur_offset
+    parameter, no gain, no tanh bound). Remove what only the landmark tilt and the
+    regressed nod used (the landmark_attention layer, the nod columns of frame_output),
+    keeping every other column''s behaviour and creating any new or resized layer
+    under torch.random.fork_rng. study_frames keeps returning the two meniscus spots
+    as study_landmarks. Check the signs on made-up points before the guardrail run
+    and report both: with a tibia midpoint placed below and in front of M by a known
+    angle, T must have a front coordinate within 0.1 mm of zero in the resulting frame;
+    with a femur midpoint placed above the cut and behind the axis, a token at F must
+    have a front coordinate within 0.1 mm of zero after frame(). frame() must keep
+    working when called by scripts.tools.check_side_routing with the dictionary encode_batch
+    returns. Log val_ and training study_frame_tibia_tilt_deg, study_frame_femur_tilt_deg
+    and study_frame_bend_deg (mean and standard deviation across knees) and the two
+    shares. Replaces: the landmark tilt and the regressed nod. Update SPATIAL_TOKEN_IDENTITY["algorithm"].
+    Apply the height-cut changes.diff named in the mechanism first (it was written
+    on run 24''s code: modeling/model.py, modeling/spatial_tokens.py, training/lightning.py)
+    and keep its logs; "Replaces" then also covers the two regressed height cuts.
+    Keeper''s note, 2026-10-07: the seed edema-bone-targets-with-the-head-in-the-model
+    was parked because its text demanded that a mirrored pass give mirror-image spots.
+    That requirement was the keeper''s mistake and is withdrawn everywhere: a mirrored
+    image passes through the backbone as a different picture, so the spots of the
+    two passes cannot coincide exactly. It is not a gate for this seed either; the
+    mirror guardrail of scripts.tools.check_side_routing is the only mirror requirement.
+    Build the bone head from the candidate of edema-bone-targets-with-the-head-in-the-model-2
+    under this campaign''s experiments if it exists, otherwise from the parked workspace
+    outputs/autoresearch/frame-and-targets/experiments/edema-bone-targets-with-the-head-in-the-model-20261007T123302Z-8f577e2e/workspace.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: 'Keeper''s requeue: the first version was parked, or would be,
+    for a requirement the keeper wrote wrongly in the seed it builds on.'
+  status: retired
+  created_revision: 72
+  seeded: /home/claudio/src/knee-abnormality-side-routed-heads/autoresearch/campaigns/frame-and-targets/direction-requeue-ideas.yaml
+  retired_reason: 'Keeper, 2026-10-07, after drawing the bone head''s spots on six
+    knees and measuring all 874: the femur and tibia spots sit in the right bones
+    but 15 and 11 mm from the joint line, so a line from one of them through the menisci
+    is set by where on the condyle or plateau the attention sits, not by the bone''s
+    direction (femur line +38 degrees on average with a spread of 13, tibia line spread
+    19, bend 51 with a spread of 28 against 0 to 30 by eye; no agreement with the
+    knees judged bent or straight). This seed would train on those angles; it is replaced
+    by a seed built on what the spots do mark'
+- id: crops-turned-to-the-current-frame
+  mechanism_id: frame-aligned-crops
+  parent_idea_id: null
+  title: Cut each 84 and 93 mm view turned by half the knee's frame angle, with the
+    frame of the same training step instead of the one remembered from the last epoch
+  opportunity: A defect the first crop run exposed. crops-turned-to-the-frame turns
+    each training crop by the frame the model computed the last time it saw that knee,
+    to save a second look per step, while validation and prediction turn by the current
+    frame from a first look. The frame's learned forward tilt swings in the first
+    epochs (validation mean -2 degrees after epoch 2, +12 after epoch 3), so at epoch
+    3 the model trained on crops turned -1.9 degrees on average and was validated
+    on crops turned -5.0 degrees, and its validation macro fell 0.0046 behind the
+    incumbent, below its own epoch 2, before recovering to -0.0012 at epoch 4. A remembered
+    frame is one epoch old; whenever the frame moves, training and prediction see
+    different crops. Taking the frame in the same step removes the mismatch at every
+    epoch.
+  mechanism: 'Everything of the seed crops-turned-to-the-frame except its training
+    path. In training, the frame for the cut comes from a first look inside the same
+    step: one pass of the same model without gradient, with the model''s modules in
+    evaluation mode for that pass and restored afterwards, on the batch''s unturned
+    crops, reading every second valid slice of each series row (the first, third,
+    fifth valid slice, at least one); the frame''s rotation, study axis and left probability
+    read from that pass give the angle exactly as at validation. The dictionary of
+    remembered frames is removed. Validation and prediction are unchanged: a first
+    look reading at most each view''s configured slice count.'
+  precedents:
+  - 'outputs/autoresearch/frame-and-targets/experiments/crops-turned-to-the-frame-20261007T131425Z-d88162fd:
+    the remembered-frame version; its per-epoch angles in training and validation
+    (crop_turn_*_deg, val_crop_turn_*_deg).'
+  - 'outputs/analysis/routing-and-shifts-frames-20261007/frame-crops/: the prediction-only
+    check and its controls.'
+  novelty: First training in which the crop follows the frame of the same step.
+  coverage: Coronal and sagittal 84 and 93 mm views of every knee; the 120 mm axial
+    views are untouched.
+  exploitation: 'Read both multipliers against the incumbent and against crops-turned-to-the-frame,
+    and per epoch the mean applied angle per plane in training and in validation:
+    the two must agree within a degree at every epoch, where the remembered-frame
+    run differed by 3 degrees at epoch 3. Report training time and prediction time.
+    Shown wrong by: both multipliers below crops-turned-to-the-frame by more than
+    a rerun (0.0010), or a training time above the limit.'
+  budget: As crops-turned-to-the-frame plus half a forward pass without gradient per
+    training step, about 15% of training time; the limit is 1.3 times the reference.
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    Build on the candidate of crops-turned-to-the-frame (outputs/autoresearch/frame-and-targets/experiments/crops-turned-to-the-frame-20261007T131425Z-d88162fd:
+    source/ and changes.diff). Replace the training dictionary by the same-step first
+    look; subset every per-slice tensor of the batch consistently for it, as the validation
+    first look does. The first look must leave no trace on the step: no gradient,
+    no update of BatchNorm statistics or of any running buffer, no random draw from
+    the training stream (report that the model''s buffers and the global random state
+    are identical before and after it on one batch). Log the applied angles as that
+    candidate does. Report the three topic 2 checks of the contract. Replaces: the
+    remembered frame. Update SPATIAL_TOKEN_IDENTITY["view_policy"].'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: 'Keeper''s seed for a defect the first crop run exposed, raised
+    by the user: the crop should follow the current frame in training as it does at
+    prediction.'
+  status: retired
+  created_revision: 125
+  seeded: /home/claudio/src/knee-abnormality-side-routed-heads/autoresearch/campaigns/frame-and-targets/current-frame-ideas.yaml
+  retired_reason: 'Keeper: withdrawn on the user''s instruction; the user did not
+    want this seed added'
+- id: double-cylinder-with-a-learned-femur-lean
+  mechanism_id: upper-band-on-its-own-axis
+  parent_idea_id: null
+  title: A double cylinder whose femur section leans by an angle learned per knee
+    from the labels and the reports, with one free angle and readers on both sides
+    of the femur's axis
+  opportunity: 'The user''s direction, given a fair setup. One run let the labels
+    set the femur section''s lean (outputs/training/20261007-101112-side-routed-femur-lean):
+    every knee went to -25 degrees within two epochs and the frame''s tilt rose by
+    9 degrees. That run had four identifiable flaws, and this seed removes each. (a)
+    Two free angles, the frame''s learned forward tilt and the lean, traded against
+    each other; the same trade appeared when the lean came from a spot (femur-section-on-spot-placed-cuts-2:
+    lean +60, tilt -38). (b) Only the front targets read the femur band (PF OA, Effusion,
+    Synovitis), so every gradient on the lean pushed one way and nothing rewarded
+    putting the axis on the bone. (c) The lean was regressed from one pooled summary
+    of the whole knee and came out the same for every knee. (d) No report target touched
+    the femur. Since then the bone head exists: four edema targets by bone and side,
+    explaining 27 to 31% on unseen knees, whose attention sits in the femoral condyle
+    in every knee, with or without edema (edema-bone-targets-with-the-head-in-the-model-2).
+    Measuring the femur''s direction from that head''s spots failed three ways (levers
+    of 15 to 56 mm, bends with a spread of 24 to 28 degrees), so the direction has
+    to be learned; what the head supplies is a reader inside the bone to pull against
+    the readers in front of it.'
+  mechanism: 'Built on the candidate of femur-section-on-spot-placed-cuts-2, which
+    already has the bone head in the model, the two height cuts placed from the spots
+    without gradient, and frame() with the band above the upper cut laid out around
+    a leaned axis (front becomes front - max( height - upper cut, 0) * tan(lean),
+    hinged at the cut). Three changes to it. (1) One free angle: the frame''s forward
+    tilt is zero for every knee. The landmark tilt and the per-knee regressed nod
+    are removed and the nod component of the shared learned rotation is held at zero;
+    roll and turn stay as they are (from the meniscus spots, plus the shared rotation''s
+    roll and turn). With the cuts placed from the spots, the only geometry the labels
+    and reports can move is the lean, the two radii and the shared shift. (2) The
+    lean is learned per knee: lean = L * tanh(z / L) with L = 35 degrees, z from a
+    new head that reads only the knee''s valid tokens above the meniscus midpoint''s
+    height: the existing frame hidden (frame_head of the detached tokens plus the
+    position code of their fitted positions), pooled by a new attention layer over
+    those tokens and mapped by a new linear layer whose weight starts at zero, so
+    the lean starts at zero for every knee. No spot enters the lean. (3) Readers on
+    both sides of the femur''s axis: above the upper cut the two femur edema targets
+    read only the bone column of their side, the core half and the inner-ring sectors
+    of that side; in the joint band they read as today. The tibia edema targets and
+    every label''s region are unchanged, so above the cut the front labels read both
+    rings in front while the femur targets read the core and inner ring: moving the
+    axis off the marrow costs the report loss, moving it off the kneecap costs the
+    labels.'
+  precedents:
+  - 'outputs/training/20261007-101112-side-routed-femur-lean: lean learned with two
+    free angles and front readers only: x4 -0.0002, x1 -0.0009, Effusion +0.0021;
+    lean -25 degrees for every knee.'
+  - 'frame-and-targets, femur-section-on-spot-placed-cuts-2: lean from the femur spot:
+    x4 -0.0032, x1 -0.0044; lean +60 degrees, learned tilt -38.'
+  - 'frame-and-targets, edema-bone-targets-with-the-head-in-the-model-2: the bone
+    head alone: x4 -0.0006, x1 -0.0000; femur spots 15.0 mm above and 13.2 mm in front
+    of the meniscus midpoint (SD 3.7 and 7.1), tibia spots 11.2 mm below.'
+  - Run 30 (cuts with readers on both sides stay where they start) and run 26 (a cut
+    with readers on one side slides).
+  novelty: First lean with a single free angle and a report-supervised reader inside
+    the bone; first frame without a learned forward tilt.
+  coverage: Every knee; the lean starts at zero and needs no spot.
+  exploitation: 'Read both multipliers against the incumbent, PF OA, Effusion, Synovitis
+    and ACL (they read above the lower cut), the four compartment targets and the
+    four bone targets'' explained shares against the bone-head run''s, and per epoch
+    on the validation knees the mean and the spread across knees of the lean in degrees,
+    the two cuts and the two radii. Shown wrong by: a lean whose spread across knees
+    stays under 3 degrees at the last epoch (one shared setting again); or the femur
+    targets'' explained share falling under 10%.'
+  budget: Same cost as the incumbent plus the bone head and one small head.
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    Start from outputs/autoresearch/frame-and-targets/experiments/femur-section-on-spot-placed-cuts-2-20261007T125017Z-e395eccf
+    (source/ and changes.diff): keep its bone head, its spot-placed cuts, its leaned
+    frame() and the "frame_lean" plumbing and logs; remove its lean from the femur
+    spots. The withdrawn mirrored-spot requirement of the first bone-head seed is
+    not a gate here either. Create the two new layers under torch.random.fork_rng;
+    the tokens the new head reads are detached. Remove what only the landmark tilt
+    and the regressed nod used (the landmark_attention layer, the nod columns of frame_output),
+    keeping every other column''s behaviour. The guardrail script calls frame_rotation
+    and checks that the shared rotation starts at zero: keep it callable and zero
+    at the start, with its nod component multiplied by zero where it is applied. Report
+    on one batch, with untrained weights: the lean is exactly zero for every knee;
+    the frame''s forward tilt is zero; the femur targets'' weight above the upper
+    cut is zero on outer-ring tokens and equals the bone-head candidate''s on core
+    and inner-ring tokens; and the loss has a nonzero gradient on the new head''s
+    output layer after one backward pass with the lean nudged off zero. Log val_ and
+    training study_femur_lean_deg, its standard deviation across knees and the lean''s
+    gradient norm per epoch. Replaces: the landmark tilt, the regressed nod and the
+    lean read from the femur spots. Update SPATIAL_TOKEN_IDENTITY["algorithm"] and
+    ["compartment_routing"].'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user's double cylinder, asked for on 2026-10-07 after three
+    measurements of the femur's direction failed; set up so the gradient has an opposing
+    reader and no second angle to trade with.
+  status: launched
+  created_revision: 128
+  seeded: /home/claudio/src/knee-abnormality-side-routed-heads/autoresearch/campaigns/frame-and-targets/double-cylinder-ideas.yaml
+  experiments:
+  - double-cylinder-with-a-learned-femur-lean-20261007T140806Z-895dceb9
+  - double-cylinder-with-a-learned-femur-lean-20261007T142120Z-a725530b
+  - double-cylinder-with-a-learned-femur-lean-20261007T143804Z-36edf4bd
+- id: double-cylinder-with-one-shared-bend
+  mechanism_id: upper-band-on-its-own-axis
+  parent_idea_id: null
+  title: A double cylinder with one bend shared by all knees, learned from the labels
+    and the reports, the frame's tilt held at zero
+  opportunity: 'The control for the per-knee lean. The user''s double cylinder has
+    two parts that have never been separated: the shape (a femur section on its own
+    axis) and the per-knee angle. The one run with a learned lean ended with the same
+    angle for every knee, -25 degrees, level with the incumbent (x4 -0.0002, x1 -0.0009)
+    and with Effusion up by 0.0021, but its second free angle, the frame''s tilt,
+    moved 9 degrees against it, so that result says nothing clean about the shape.
+    With the tilt held at zero and the cuts placed from the spots, a single shared
+    bend has nothing to trade with: if the shape helps, this run shows it, and the
+    per-knee seed (double-cylinder-with-a-learned-femur-lean) is then judged against
+    it rather than against a cylinder.'
+  mechanism: 'Everything of the seed double-cylinder-with-a-learned-femur-lean except
+    how the lean is obtained: built on the candidate of femur-section-on-spot-placed-cuts-2
+    (the bone head in the model, the two height cuts placed from the spots, frame()
+    with the band above the upper cut around a leaned axis); the frame''s forward
+    tilt zero for every knee (no landmark tilt, no regressed nod, the shared rotation''s
+    nod component held at zero); above the upper cut the two femur edema targets read
+    only the core half and the inner-ring sectors of their side. The lean is one learned
+    scalar for all knees: lean = L * tanh(p / L) with L = 35 degrees and p a parameter
+    that starts at zero. No head, no spot and no per-knee quantity enters it.'
+  precedents:
+  - 'outputs/training/20261007-101112-side-routed-femur-lean: lean learned with a
+    free tilt: -25 degrees for every knee, x4 -0.0002, x1 -0.0009, Effusion +0.0021.'
+  - 'frame-and-targets run notes: the tilt the incumbent learns (+13.6 degrees) is
+    about 22 degrees from the tibial plateau, so part of it may be serving the femur
+    band.'
+  novelty: First double cylinder with a single free angle.
+  coverage: Every knee.
+  exploitation: 'Read both multipliers against the incumbent, PF OA, Effusion, Synovitis
+    and ACL, the four compartment targets and the bone targets'' explained shares,
+    and per epoch the shared bend in degrees, the two cuts and the two radii. Shown
+    wrong by: a bend that stays within 3 degrees of zero (the labels and reports see
+    no use for a second axis), or both multipliers more than a rerun (0.0010) below
+    the incumbent.'
+  budget: Same cost as the incumbent plus the bone head.
+  implementation: Follow the environment paragraph of the developer instructions.
+    Build on the candidate of double-cylinder-with-a-learned-femur-lean if it exists
+    under this campaign's experiments (replace its per-knee lean head by the scalar
+    parameter), otherwise on outputs/autoresearch/frame-and-targets/experiments/femur-section-on-spot-placed-cuts-2-20261007T125017Z-e395eccf
+    with the three changes that seed describes. The withdrawn mirrored-spot requirement
+    of the first bone-head seed is not a gate. Create the parameter without consuming
+    the random stream. Report on one batch with untrained weights that the lean and
+    the frame's forward tilt are zero and that the loss has a nonzero gradient on
+    the parameter once it is nudged off zero. Log val_ and training study_femur_lean_deg
+    (the shared value) per epoch. Update SPATIAL_TOKEN_IDENTITY["algorithm"] and ["compartment_routing"].
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Separates the shape of the double cylinder from the per-knee
+    angle; one line different from the seed before it.
+  status: prepared
+  created_revision: 138
+  seeded: /home/claudio/src/knee-abnormality-side-routed-heads/autoresearch/campaigns/frame-and-targets/double-cylinder-ideas-2.yaml
+  experiments:
+  - double-cylinder-with-one-shared-bend-20261007T144854Z-0c62abc0
+- id: tendon-targets-with-the-head-in-the-model
+  mechanism_id: report-region-targets
+  parent_idea_id: null
+  title: Two located targets for the extensor tendons, read by one shared head that
+    lives in the model, so a spot above and a spot below the kneecap exist for every
+    knee
+  opportunity: 'A guess, aimed at the landmark the double cylinder lacks. The femur''s
+    direction could not be measured from the bone head: its spots sit in the condyle
+    15 mm from the joint, and the condyle is round, so the femur turns about it (bends
+    of 51 +- 28, 18 +- 25 and 7 +- 24 degrees from three constructions, none agreeing
+    with the knees judged bent or straight). The extensor tendons are linear structures
+    that run along the bones: the quadriceps tendon along the front of the femur above
+    the kneecap, the patellar tendon from the kneecap down to the tibial tuberosity.
+    The v5 answer extensor_tendon places abnormalities in one, the other or both (commonest
+    option in 304, 231 and 178 reports; none in 3,648), right in 205 of 212 audited
+    reports. A head trained on it has to look at each tendon, and the bone head showed
+    that such a head attends to its structure in knees without the finding too. This
+    run does not change the frame: it reports where the two spots fall.'
+  mechanism: 'training/report_attributes.py reads the v5 file `<paths.data_root>/labels/prepared/jevk5-report-attributes-v5.0-new/targets.parquet`.
+    A new located family "extensor_tendon" with two Region entries read by one shared
+    head: quadriceps (options quadriceps and both) on a new route tendon_upper = the
+    three front sectors outside the core in the upper band; patellar (options patellar
+    and both) on a new route tendon_lower = the same sectors in the joint and tibia
+    bands; unplaced not_stated; the existing option-level head of extra_extensor_tendons
+    stays. The family''s attention column and classifier row are parameters of KneeAbnormalityModel,
+    called by the training module for the report loss with the same detachment and
+    gradient path as the other located families. With that column''s scores the model
+    computes, without gradient and with the existing spot function, two spots per
+    knee: the squared-attention centroid over the valid tokens with fitted front >
+    0 above the meniscus midpoint''s height, and the same below it. encode_batch returns
+    them. Nothing reads them: the frame is unchanged.'
+  precedents:
+  - 'frame-and-targets, edema-bone-targets-with-the-head-in-the-model-2: the same
+    construction for the bone targets; 27 to 31% explained; spots in the right bone
+    in every knee with or without edema.'
+  - 'attributes_v5.md (worktree knee-abnormality-jevk5-attributes-v4): the counts
+    and the check on the audited reports.'
+  novelty: First landmark candidates along the bones rather than in them.
+  coverage: Training only for the targets; the spots for every knee.
+  exploitation: 'Read both multipliers against the incumbent, PF OA, Effusion and
+    Synovitis, val_report_attribute_bce_<region> for the two targets with the share
+    each explains, and per epoch on the validation knees, for each spot, the share
+    of knees where it is found and the mean and spread of its place in the knee''s
+    frame (medial, front, height, in millimetres), separately for knees whose report
+    has a tendon finding and knees without. Shown wrong by: the two targets explaining
+    under 10%, or the upper spot lying within 20 mm of the joint line on average (too
+    short a lever to give the femur''s direction).'
+  budget: Same cost as the incumbent; one more attention column and classifier row.
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    Reuse the pattern and the file loader of the bone-head candidate, outputs/autoresearch/frame-and-targets/experiments/edema-bone-targets-with-the-head-in-the-model-2-20261007T124438Z-ade9be4a
+    (source/ and changes.diff): its model-owned report trunk, its spots and its validation
+    diagnostics, for this family instead of the bone family (this seed does not include
+    the bone targets). No mirrored-spot requirement applies. Create the layers under
+    torch.random.fork_rng. Report the number of training studies with a target above
+    0.5 in each of the two. Update SPATIAL_TOKEN_IDENTITY["algorithm"] and ["compartment_routing"].'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Looks for the femur landmark the double cylinder needs in structures
+    that run along the bones; its spots are read before any frame depends on them.
+  status: retired
+  created_revision: 138
+  seeded: /home/claudio/src/knee-abnormality-side-routed-heads/autoresearch/campaigns/frame-and-targets/double-cylinder-ideas-2.yaml
+  retired_reason: 'Keeper, 2026-10-07: the research review measured 4 to 6 mm of noise
+    per attention spot, so any pair of spots needs a lever of about 70 mm for a usable
+    angle; the tendon spots cannot supply the femur''s direction either. Replaced
+    by the template seeds'
+- id: femur-section-turned-to-a-running-template
+  mechanism_id: sections-aligned-to-templates
+  parent_idea_id: null
+  title: A femur section turned about the femur spots by the angle at which the knee's
+    own femur-band tokens best match a running template, with no label gradient and
+    no landmark pair
+  opportunity: 'Evidence-backed gate, a guess for the score. Every attempt to give
+    the femur section its own direction used one or two attention spots or the label
+    gradient, and all failed: spots carry 4 to 6 mm of noise, so two of them 15 to
+    21 mm apart give 15 to 19 degrees of noise (three constructions, bends with spreads
+    of 24 to 28 degrees, uncorrelated with each other: 0.07, 0.02, -0.24); a lean
+    learned from the labels went to one value for every knee and traded against the
+    frame''s tilt. A research review of the runs (keeper''s notes, 2026-10-07) pointed
+    at using all the femur-band tokens at once. Checked without training on the bone-head
+    run''s weights (outputs/analysis/frame-and-targets/template-bend/): for each of
+    the 874 validation knees, the rotation about the femur-spot hinge that best matches
+    the knee''s sagittal tokens to the average token at each place, estimated separately
+    from the T1/PD series and from the fluid series of the same knee, agrees between
+    the two with a correlation of 0.76 (796 knees), with a spread of 12 degrees across
+    knees; drawn on fifteen knees (template-bend.png), the direction follows the visible
+    femur where the two estimates agree. It is the first estimate of the femur''s
+    direction that passes a check. Open: the three knees at the lower limit of the
+    search (-30 degrees) have their femur spots misplaced, and the estimate from axial
+    series does not agree with the sagittal ones (0.17), as expected for slices that
+    each sit at one height.'
+  mechanism: 'Built on the candidate of femur-section-on-spot-placed-cuts-2 (the bone
+    head in the model with its four spots, the two height cuts placed from the spots).
+    Four changes. (1) The frame''s forward tilt is zero for every knee: no landmark
+    tilt, no regressed nod, the shared rotation''s nod component held at zero; roll
+    and turn as today. (2) Hinge and turn: H is the midpoint of the knee''s two femur
+    spots in the frame''s (front, height) plane. For a token above the upper cut,
+    frame() replaces its front coordinate by the front coordinate of the token turned
+    about H by the knee''s angle a: front'' = H_front + (front - H_front) * cos(a)
+    - (height - H_height) * sin(a). Band membership keeps using the unturned height,
+    so the bands still partition the tokens. This replaces the candidate''s shear
+    and its lean from the femur spot. (3) The angle a, per knee, without gradient:
+    a persistent template buffer holds, for each of two groups of sagittal series
+    (T1/PD and fluid-sensitive) and each 8 mm cell of a grid over front in [-48, 48]
+    and height in [-4, 44] mm relative to H, the running mean of the L2-normalised
+    detached token features (the tokens study_frames receives) of the tokens that
+    fall in that cell after being turned back by their knee''s current angle. For
+    a knee, each candidate angle from -30 to +45 degrees in steps of 5 turns the knee''s
+    sagittal tokens within 40 mm of the midline about H, and its score is the mean
+    cosine similarity between each token and its group''s template cell, over cells
+    holding at least 30 tokens'' worth of updates; a is the best candidate refined
+    by a parabola through its two neighbours, minus a running mean of a over training
+    knees (a persistent buffer) so the population mean stays at zero; a = 0 for a
+    knee with fewer than 40 such tokens or without both femur spots, and for every
+    knee until the template has cells with support. The buffers are updated in training
+    only, with momentum 0.99 per step, and read as they are at validation and prediction.
+    (4) Above the upper cut the femur edema targets read the core half and the inner-ring
+    sectors of their side, around the turned axis; in the joint band they read as
+    today.'
+  precedents:
+  - 'outputs/analysis/frame-and-targets/template-bend/: template_bend.py (the check
+    as run: three rounds over the validation knees), template-bend.csv, template-bend.png.'
+  - 'frame-and-targets run notes, runs 3 and 4: the bone head''s spots and the failure
+    of angles read from them.'
+  - 'outputs/training/20261007-101112-side-routed-femur-lean and femur-section-on-spot-placed-cuts-2:
+    the two earlier femur sections and how they failed.'
+  novelty: First frame angle obtained by registering a band of tokens to a template;
+    first that uses neither a landmark pair nor the label gradient.
+  coverage: Every knee with sagittal series and both femur spots; the others keep
+    a straight femur section.
+  exploitation: 'Read both multipliers against the incumbent, PF OA, Effusion, Synovitis
+    and ACL (they read above the lower cut), the four compartment targets and the
+    bone targets'' explained shares, and per epoch on the validation knees the mean
+    and the spread across knees of the angle, the share of knees with a measured angle,
+    the share at either limit of the search, and the correlation across knees between
+    the angle estimated from the T1/PD tokens alone and from the fluid tokens alone.
+    Shown wrong by: that correlation under 0.5 at the last epoch (the template does
+    not hold while the backbone trains), a spread under 3 degrees, or more than 10%
+    of knees at a limit of the search.'
+  budget: Same cost as the incumbent plus the bone head and sixteen table lookups
+    per knee, without gradient.
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    Start from outputs/autoresearch/frame-and-targets/experiments/femur-section-on-spot-placed-cuts-2-20261007T125017Z-e395eccf
+    (source/ and changes.diff): keep its bone head and spot-placed cuts; replace its
+    shear and its lean. The withdrawn mirrored-spot requirement of the first bone-head
+    seed is not a gate. The check script outputs/analysis/frame-and-targets/template-bend/template_bend.py
+    shows the binning, the scoring and the sign of the turn on cached tokens; port
+    its arithmetic into study_frames as torch code on the batch''s tokens, with running
+    buffers in place of its three passes. Create the buffers under torch.random.fork_rng,
+    register them as persistent, and update them only when self.training. Remove what
+    only the landmark tilt and the regressed nod used, keeping the other columns''
+    behaviour; keep frame_rotation callable and zero at the start for the guardrail
+    script, with its nod component multiplied by zero where it is applied. Report
+    on one batch with untrained weights: a = 0 for every knee while the template is
+    empty; after filling the template from that batch and turning one knee''s sagittal
+    tokens about H by a known 15 degrees, the estimate for that knee is 15 degrees
+    to within 3; a token at H keeps its front coordinate for any a. Log val_ and training
+    study_femur_turn_deg (mean and standard deviation across knees), the measured
+    share, the share at a limit and the T1/PD against fluid correlation. Replaces:
+    the landmark tilt, the regressed nod, the shear and the lean from the femur spot.
+    Update SPATIAL_TOKEN_IDENTITY["algorithm"], ["compartment_routing"] and ["initialization_rng"].'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The first source of the femur's direction that passed a check
+    before training; the double cylinder the user asked for.
+  status: completed
+  created_revision: 154
+  seeded: /home/claudio/src/knee-abnormality-side-routed-heads/autoresearch/campaigns/frame-and-targets/template-ideas.yaml
+  experiments:
+  - femur-section-turned-to-a-running-template-20261007T142458Z-9b8ab2cc
+  decision: invalid
+- id: tibia-and-femur-sections-turned-to-running-templates
+  mechanism_id: sections-aligned-to-templates
+  parent_idea_id: null
+  title: Two tilts per knee, the tibia section and the femur section each turned to
+    its own running template about its own bone's spots
+  opportunity: 'The user''s direction in full: one tilt for the tibia and one for
+    the femur. The same template matching that gives the femur band''s direction was
+    checked on the tibia band, hinged at the tibia spots, on the same weights (outputs/analysis/frame-and-targets/template-bend/template-bend-tibia.csv):
+    the estimates from the T1/PD series and from the fluid series of one knee correlate
+    at 0.59 (797 knees), with a spread of 10 degrees; weaker than the femur''s 0.76,
+    at the edge of the 0.6 the check asked for. The tibia and femur angles of a knee
+    correlate at 0.25, so they are mostly separate quantities, as two tilts should
+    be. A guess: that turning the tibia and joint bands by a noisier angle helps more
+    than it costs; the frame''s tilt is zero otherwise, which is wrong for knees whose
+    whole limb is tilted in the coil.'
+  mechanism: 'Everything of the seed femur-section-turned-to-a-running-template, built
+    here in full. In addition the frame''s forward tilt per knee, zero in that seed,
+    becomes the angle b at which the knee''s sagittal tokens of the tibia band best
+    match a second running template: the same construction with the hinge at the midpoint
+    of the knee''s two tibia spots, the grid over front in [-48, 48] and height in
+    [-44, 4] mm relative to that hinge, its own two template buffers and its own running
+    mean. The frame''s rotation is self.frame_rotation() @ R(b) @ basis with R the
+    rotation about the side axis, so the tibia band and the joint band are laid out
+    in a frame turned by b, and the femur section is turned by a about the femur spots
+    on top of it, with a estimated from tokens expressed in the frame already turned
+    by b. Neither angle receives a gradient.'
+  precedents:
+  - 'outputs/analysis/frame-and-targets/template-bend/: template_bend_tibia.py and
+    template-bend-tibia.csv.'
+  - 'frame-and-targets, forward-tilt-from-the-meniscus-front-and-back-spots and frame-read-from-the-spots:
+    a tibia tilt read from attention spots moved with training (9, 15, 21 degrees).'
+  novelty: First frame with a separate, measured tilt for each bone.
+  coverage: Every knee with sagittal series and the four bone spots; each angle falls
+    back to zero on its own.
+  exploitation: 'Read both multipliers against the incumbent and against femur-section-turned-to-a-running-template,
+    the same targets, and per epoch on the validation knees the mean and spread of
+    each angle and of their difference, the shares measured and at a limit, and each
+    angle''s T1/PD against fluid correlation. Shown wrong by: the tibia angle''s correlation
+    under 0.4 at the last epoch, or the four compartment targets each more than one
+    sibling SD below the femur-only seed.'
+  budget: As the femur-only seed plus one more set of lookups.
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    Build on the candidate of femur-section-turned-to-a-running-template if it exists
+    under this campaign''s experiments (its source/ and changes.diff), otherwise as
+    that seed describes. The tibia check script is outputs/analysis/frame-and-targets/template-bend/template_bend_tibia.py
+    (it flips the height axis to reuse the femur code; implement the tibia grid directly,
+    without the flip, and report the sign with the same made-up-turn check as the
+    femur''s: a known turn of the tibia band''s tokens about the tibia hinge is recovered
+    to within 3 degrees). Update SPATIAL_TOKEN_IDENTITY["algorithm"] and ["initialization_rng"].'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The two tilts the user set as the campaign's direction, each
+    obtained the way that passed the check for the femur.
+  status: retired
+  created_revision: 154
+  seeded: /home/claudio/src/knee-abnormality-side-routed-heads/autoresearch/campaigns/frame-and-targets/template-ideas.yaml
+  retired_reason: 'Keeper, 2026-10-07: replaced by its -2 copy with the corrected
+    scoring'
+- id: femur-section-turned-to-a-running-template-2
+  mechanism_id: sections-aligned-to-templates
+  parent_idea_id: null
+  title: A femur section turned about the femur spots by the angle at which the knee's
+    own femur-band tokens best match a running template, with no label gradient and
+    no landmark pair
+  opportunity: 'Evidence-backed gate, a guess for the score. Every attempt to give
+    the femur section its own direction used one or two attention spots or the label
+    gradient, and all failed: spots carry 4 to 6 mm of noise, so two of them 15 to
+    21 mm apart give 15 to 19 degrees of noise (three constructions, bends with spreads
+    of 24 to 28 degrees, uncorrelated with each other: 0.07, 0.02, -0.24); a lean
+    learned from the labels went to one value for every knee and traded against the
+    frame''s tilt. A research review of the runs (keeper''s notes, 2026-10-07) pointed
+    at using all the femur-band tokens at once. Checked without training on the bone-head
+    run''s weights (outputs/analysis/frame-and-targets/template-bend/): for each of
+    the 874 validation knees, the rotation about the femur-spot hinge that best matches
+    the knee''s sagittal tokens to the average token at each place, estimated separately
+    from the T1/PD series and from the fluid series of the same knee, agrees between
+    the two with a correlation of 0.76 (796 knees), with a spread of 12 degrees across
+    knees; drawn on fifteen knees (template-bend.png), the direction follows the visible
+    femur where the two estimates agree. It is the first estimate of the femur''s
+    direction that passes a check. Open: the three knees at the lower limit of the
+    search (-30 degrees) have their femur spots misplaced, and the estimate from axial
+    series does not agree with the sagittal ones (0.17), as expected for slices that
+    each sit at one height.'
+  mechanism: 'Built on the candidate of femur-section-on-spot-placed-cuts-2 (the bone
+    head in the model with its four spots, the two height cuts placed from the spots).
+    Four changes. (1) The frame''s forward tilt is zero for every knee: no landmark
+    tilt, no regressed nod, the shared rotation''s nod component held at zero; roll
+    and turn as today. (2) Hinge and turn: H is the midpoint of the knee''s two femur
+    spots in the frame''s (front, height) plane. For a token above the upper cut,
+    frame() replaces its front coordinate by the front coordinate of the token turned
+    about H by the knee''s angle a: front'' = H_front + (front - H_front) * cos(a)
+    - (height - H_height) * sin(a). Band membership keeps using the unturned height,
+    so the bands still partition the tokens. This replaces the candidate''s shear
+    and its lean from the femur spot. (3) The angle a, per knee, without gradient:
+    a persistent template buffer holds, for each of two groups of sagittal series
+    (T1/PD and fluid-sensitive) and each 8 mm cell of a grid over front in [-48, 48]
+    and height in [-4, 44] mm relative to H, the running mean of the L2-normalised
+    detached token features (the tokens study_frames receives) of the tokens that
+    fall in that cell after being turned back by their knee''s current angle. For
+    a knee, each candidate angle from -30 to +45 degrees in steps of 5 turns the knee''s
+    sagittal tokens within 40 mm of the midline about H, and its score is the mean
+    cosine similarity between each token and its group''s template cell, over cells
+    holding at least 30 tokens'' worth of updates; a is the best candidate refined
+    by a parabola through its two neighbours, minus a running mean of a over training
+    knees (a persistent buffer) so the population mean stays at zero; a = 0 for a
+    knee with fewer than 40 such tokens or without both femur spots, and for every
+    knee until the template has cells with support. The buffers are updated in training
+    only, with momentum 0.99 per step, and read as they are at validation and prediction.
+    (4) Above the upper cut the femur edema targets read the core half and the inner-ring
+    sectors of their side, around the turned axis; in the joint band they read as
+    today.'
+  precedents:
+  - 'outputs/analysis/frame-and-targets/template-bend/: template_bend.py (the check
+    as run: three rounds over the validation knees), template-bend.csv, template-bend.png.'
+  - 'frame-and-targets run notes, runs 3 and 4: the bone head''s spots and the failure
+    of angles read from them.'
+  - 'outputs/training/20261007-101112-side-routed-femur-lean and femur-section-on-spot-placed-cuts-2:
+    the two earlier femur sections and how they failed.'
+  novelty: First frame angle obtained by registering a band of tokens to a template;
+    first that uses neither a landmark pair nor the label gradient.
+  coverage: Every knee with sagittal series and both femur spots; the others keep
+    a straight femur section.
+  exploitation: 'Read both multipliers against the incumbent, PF OA, Effusion, Synovitis
+    and ACL (they read above the lower cut), the four compartment targets and the
+    bone targets'' explained shares, and per epoch on the validation knees the mean
+    and the spread across knees of the angle, the share of knees with a measured angle,
+    the share at either limit of the search, and the correlation across knees between
+    the angle estimated from the T1/PD tokens alone and from the fluid tokens alone.
+    Shown wrong by: that correlation under 0.5 at the last epoch (the template does
+    not hold while the backbone trains), a spread under 3 degrees, or more than 10%
+    of knees at a limit of the search.'
+  budget: Same cost as the incumbent plus the bone head and sixteen table lookups
+    per knee, without gradient.
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    Start from outputs/autoresearch/frame-and-targets/experiments/femur-section-on-spot-placed-cuts-2-20261007T125017Z-e395eccf
+    (source/ and changes.diff): keep its bone head and spot-placed cuts; replace its
+    shear and its lean. The withdrawn mirrored-spot requirement of the first bone-head
+    seed is not a gate. The check script outputs/analysis/frame-and-targets/template-bend/template_bend.py
+    shows the binning, the scoring and the sign of the turn on cached tokens; port
+    its arithmetic into study_frames as torch code on the batch''s tokens, with running
+    buffers in place of its three passes. Create the buffers under torch.random.fork_rng,
+    register them as persistent, and update them only when self.training. Remove what
+    only the landmark tilt and the regressed nod used, keeping the other columns''
+    behaviour; keep frame_rotation callable and zero at the start for the guardrail
+    script, with its nod component multiplied by zero where it is applied. Report
+    on one batch with untrained weights: a = 0 for every knee while the template is
+    empty; after filling the template from that batch and turning one knee''s sagittal
+    tokens about H by a known 15 degrees, the estimate for that knee is 15 degrees
+    to within 3; a token at H keeps its front coordinate for any a. Log val_ and training
+    study_femur_turn_deg (mean and standard deviation across knees), the measured
+    share, the share at a limit and the T1/PD against fluid correlation. Replaces:
+    the landmark tilt, the regressed nod, the shear and the lean from the femur spot.
+    Update SPATIAL_TOKEN_IDENTITY["algorithm"], ["compartment_routing"] and ["initialization_rng"].
+    Keeper''s correction, 2026-10-07, after the first candidate trained four epochs
+    and was aborted: its angles saturated (34 to 56% of knees at a limit of the search,
+    spread 28 to 31 degrees, against 2% and 12 degrees in the offline check). Two
+    causes, both in how an angle is scored. (i) Every sagittal token took part, so
+    at large angles tokens from below the joint turned into the grid and added to
+    the score; only tokens whose unturned place relative to H has height in (-10,
+    55) mm and |front| < 60 mm take part, as in the check script. (ii) The score was
+    the summed similarity divided by a count that did not depend on the angle, so
+    an angle that brought more tokens into supported cells won; the score is the mean
+    similarity over the tokens that land in supported cells at that angle, and an
+    angle with fewer than 40 such tokens is not a candidate; a knee is measured when
+    at least one angle is. The keeper has already made both changes in the first candidate''s
+    workspace, outputs/autoresearch/frame-and-targets/experiments/femur-section-turned-to-a-running-template-20261007T142458Z-9b8ab2cc/workspace
+    (modeling/femur_templates.py): start from that workspace, review the change, rerun
+    the guardrail check and the made-up-turn check, and return prepared.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Keeper's requeue with the scoring corrected; the first candidate's
+    angles saturated.
+  status: queued
+  created_revision: 196
+  seeded: /home/claudio/src/knee-abnormality-side-routed-heads/autoresearch/campaigns/frame-and-targets/template-requeue-ideas.yaml
+- id: tibia-and-femur-sections-turned-to-running-templates-2
+  mechanism_id: sections-aligned-to-templates
+  parent_idea_id: null
+  title: Two tilts per knee, the tibia section and the femur section each turned to
+    its own running template about its own bone's spots
+  opportunity: 'The user''s direction in full: one tilt for the tibia and one for
+    the femur. The same template matching that gives the femur band''s direction was
+    checked on the tibia band, hinged at the tibia spots, on the same weights (outputs/analysis/frame-and-targets/template-bend/template-bend-tibia.csv):
+    the estimates from the T1/PD series and from the fluid series of one knee correlate
+    at 0.59 (797 knees), with a spread of 10 degrees; weaker than the femur''s 0.76,
+    at the edge of the 0.6 the check asked for. The tibia and femur angles of a knee
+    correlate at 0.25, so they are mostly separate quantities, as two tilts should
+    be. A guess: that turning the tibia and joint bands by a noisier angle helps more
+    than it costs; the frame''s tilt is zero otherwise, which is wrong for knees whose
+    whole limb is tilted in the coil.'
+  mechanism: 'Everything of the seed femur-section-turned-to-a-running-template-2,
+    built here in full. In addition the frame''s forward tilt per knee, zero in that
+    seed, becomes the angle b at which the knee''s sagittal tokens of the tibia band
+    best match a second running template: the same construction with the hinge at
+    the midpoint of the knee''s two tibia spots, the grid over front in [-48, 48]
+    and height in [-44, 4] mm relative to that hinge, its own two template buffers
+    and its own running mean. The frame''s rotation is self.frame_rotation() @ R(b)
+    @ basis with R the rotation about the side axis, so the tibia band and the joint
+    band are laid out in a frame turned by b, and the femur section is turned by a
+    about the femur spots on top of it, with a estimated from tokens expressed in
+    the frame already turned by b. Neither angle receives a gradient.'
+  precedents:
+  - 'outputs/analysis/frame-and-targets/template-bend/: template_bend_tibia.py and
+    template-bend-tibia.csv.'
+  - 'frame-and-targets, forward-tilt-from-the-meniscus-front-and-back-spots and frame-read-from-the-spots:
+    a tibia tilt read from attention spots moved with training (9, 15, 21 degrees).'
+  novelty: First frame with a separate, measured tilt for each bone.
+  coverage: Every knee with sagittal series and the four bone spots; each angle falls
+    back to zero on its own.
+  exploitation: 'Read both multipliers against the incumbent and against femur-section-turned-to-a-running-template-2,
+    the same targets, and per epoch on the validation knees the mean and spread of
+    each angle and of their difference, the shares measured and at a limit, and each
+    angle''s T1/PD against fluid correlation. Shown wrong by: the tibia angle''s correlation
+    under 0.4 at the last epoch, or the four compartment targets each more than one
+    sibling SD below the femur-only seed.'
+  budget: As the femur-only seed plus one more set of lookups.
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    Build on the candidate of femur-section-turned-to-a-running-template-2 if it exists
+    under this campaign''s experiments (its source/ and changes.diff), otherwise as
+    that seed describes. The tibia check script is outputs/analysis/frame-and-targets/template-bend/template_bend_tibia.py
+    (it flips the height axis to reuse the femur code; implement the tibia grid directly,
+    without the flip, and report the sign with the same made-up-turn check as the
+    femur''s: a known turn of the tibia band''s tokens about the tibia hinge is recovered
+    to within 3 degrees). Update SPATIAL_TOKEN_IDENTITY["algorithm"] and ["initialization_rng"].
+    Keeper''s correction, 2026-10-07, after the first candidate trained four epochs
+    and was aborted: its angles saturated (34 to 56% of knees at a limit of the search,
+    spread 28 to 31 degrees, against 2% and 12 degrees in the offline check). Two
+    causes, both in how an angle is scored. (i) Every sagittal token took part, so
+    at large angles tokens from below the joint turned into the grid and added to
+    the score; only tokens whose unturned place relative to H has height in (-10,
+    55) mm and |front| < 60 mm take part, as in the check script. (ii) The score was
+    the summed similarity divided by a count that did not depend on the angle, so
+    an angle that brought more tokens into supported cells won; the score is the mean
+    similarity over the tokens that land in supported cells at that angle, and an
+    angle with fewer than 40 such tokens is not a candidate; a knee is measured when
+    at least one angle is. The keeper has already made both changes in the first candidate''s
+    workspace, outputs/autoresearch/frame-and-targets/experiments/femur-section-turned-to-a-running-template-20261007T142458Z-9b8ab2cc/workspace
+    (modeling/femur_templates.py): start from that workspace, review the change, rerun
+    the guardrail check and the made-up-turn check, and return prepared.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Keeper's requeue with the scoring corrected; the first candidate's
+    angles saturated.
+  status: queued
+  created_revision: 196
+  seeded: /home/claudio/src/knee-abnormality-side-routed-heads/autoresearch/campaigns/frame-and-targets/template-requeue-ideas.yaml

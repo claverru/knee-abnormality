@@ -1,143 +1,105 @@
 ideas:
-- id: crops-turned-to-the-frame
-  mechanism_id: frame-aligned-crops
+- id: extensor-tendon-targets-above-and-below-the-kneecap
+  mechanism_id: report-region-targets
   parent_idea_id: null
-  title: Cut each 84 and 93 mm view turned by half the knee's own frame angle, in training and at
-    prediction
-  opportunity: Evidence-backed at prediction, a guess for training. On the height-cuts model's weights,
-    with no training, re-cutting the crops turned to the frame scored +0.0011 at x4 and -0.0002 at
-    x1; turned the wrong way -0.0007 and -0.0009; turned by half the angle +0.0010 and +0.0007, the
-    only variant above the anchor at both multipliers (prior-work.md, Measured on 2026-10-07). The
-    sign of the turn matters with identical resampling, so it is the alignment. It repeats on run
-    24's weights (+0.0007 at x4 with half the angle). Those weights were trained on knees at the scanner's
-    orientation with 10 degrees of rotation augmentation; a model trained on upright knees does not
-    have to spend capacity on the tilt.
-  mechanism: '(1) The canvas port of the routing-and-shifts campaign with data.view_shift_limit_mm:
-    6.0 (a margin of 16 and 14 px, enough for 7.5 degrees). (2) In the model, the frame''s in-plane
-    angle per slice: on coronal views the angle between the frame''s side axis, projected into the
-    slice, and the image columns; on sagittal views the angle between the frame''s up axis and the
-    image rows; clamped to 15 degrees; zero on views without a margin and where the geometry is not
-    valid. (3) The crop is cut turned by 0.5 times that angle about its own centre, in the same single
-    resampling of the canvas as the cut, and patient_maps receive the same transform. (4) At validation
-    and prediction the frame comes from one first look: a no-gradient pass in evaluation mode on the
-    unturned crops, reading for each series row at most as many slices as its view''s configured count,
-    evenly spaced among the row''s valid slices. (5) In training the frame comes from the model''s
-    own last training pass over that knee, kept in a dictionary on the module keyed by study_uid (the
-    frame''s rotation, the study axis and the left probability, detached); a knee not yet seen is
-    cut unturned. The affine augmentation is unchanged and applies after the cut.'
+  title: Two located targets for the extensor tendons, quadriceps above the upper cut and patellar
+    below it, read by one shared head at the front
+  opportunity: 'Evidence-backed counts, a guess for the effect. The upper cut at the front has PF
+    OA, Effusion and Synovitis reading across it and nothing reading it from both sides with different
+    answers. The v5 answer extensor_tendon does: quadriceps only in about 237 reports, patellar only
+    in 183, both in 164, and the two tendons named as normal in about 1,756 and 1,398. On 212 audited
+    reports it is right in 205 with a located precision of 0.943. PF OA and Synovitis decide the ranking
+    of the routed runs and both read this part of the knee. Open: the upper pole of the kneecap may
+    lie near the edge of the 84 and 93 mm views.'
+  mechanism: 'training/report_attributes.py reads the v5 file named in edema-bone-targets-with-the-head-in-the-model.
+    A new located family "extensor_tendon" with two Region entries read by one shared head: quadriceps
+    (options quadriceps and both) on a new route tendon_upper = the three front sectors outside the
+    core in the upper band; patellar (options patellar and both) on a new route tendon_lower = the
+    same sectors in the joint and tibia bands. Unplaced: not_stated. The existing option-level head
+    of extra_extensor_tendons stays. No existing target or region changes.'
   precedents:
-  - 'outputs/analysis/routing-and-shifts-frames-20261007/frame-crops/: the prediction-only check and
-    its controls on the incumbent, run 24 and the ResNet-50.'
-  - 'routing-and-shifts, shift-per-study-from-the-spots: crops moved toward the meniscus midpoint
-    by a trained locator: -0.0004 and -0.0022; a shift, not a turn.'
-  novelty: First training on crops aligned to the knee's own frame; first use of a first look.
-  coverage: Coronal and sagittal 84 and 93 mm views of every knee; the 120 mm axial views are untouched.
-  exploitation: 'Read both multipliers against the incumbent, Fracture, Lateral OA, Lateral Meniscus,
-    MCL and ACL (the targets that moved in the prediction-only check), and per epoch on the validation
-    knees the mean and spread of the applied angle per plane, the share of knees turned in training,
-    and the frame''s own angles (after training on turned crops the roll and nod should shrink only
-    if the frame followed the picture, which it must not: positions are physical). Report the prediction
-    time against the incumbent''s. Shown wrong by: both multipliers below the incumbent by more than
-    a rerun (0.0010), or a prediction time above 1.3 times.'
-  budget: Training as the incumbent plus the larger canvases (the 15 mm canvases of the previous campaign
-    trained in 1,455 s against a limit of 1,595 s; these are smaller). Prediction adds one first look
-    at the multiplier-1 slice count.
-  implementation: 'Follow the environment paragraph of the developer instructions. The base of this
-    campaign is run 24, and outputs/analysis/routing-and-shifts-frames-20261007/builds/rotation-on-run-24/
-    is this change at prediction, written on run 24''s code: the canvas loader (config.py, data/dataset.py,
-    data/preprocessing/, inference/engine.py, inference/reflection.py) and, in modeling/model.py,
-    sample_windows, crop_rectangles, ViewWindows with frame_angles and the rotated cut, and the two-pass
-    forward. Port it; drop the locator_series_index and locator_series_first keys it carries from
-    an older candidate, and replace its config field view_frame_rotation_fraction by a module constant.
-    That build takes the first look on the whole batch and has no training path: add the slice subset
-    for the first look (subset every per-slice tensor of the batch consistently) and the training
-    dictionary. The mirrored pass (a batch carrying "mirrored_study") takes its angle from a first
-    look without that key and reflects after the cut, as the build does. If the incumbent has changed
-    since run 24, apply the port on the incumbent. Report the three topic 2 checks of the contract.
-    Replaces: the cut at the scanner''s orientation. Update SPATIAL_TOKEN_IDENTITY["view_policy"]
-    and ["preparation"].'
+  - 'attributes_v5.md (worktree knee-abnormality-jevk5-attributes-v4): the counts and the check on
+    the audited reports.'
+  - 'Run 31 (PF OA and Effusion on the front half): the front regions are where Effusion gains.'
+  novelty: First report target that sets the front above the kneecap against the front below it.
+  coverage: Training only; the 4,407 studies with reports.
+  exploitation: 'Read both multipliers against the incumbent, PF OA, Effusion and Synovitis, val_report_attribute_bce_<region>
+    for the two new targets with the share each explains, and the upper cut per epoch. Shown wrong
+    by: the two targets explaining under 10% on the validation knees.'
+  budget: Same cost as the incumbent; one more attention column and classifier row.
+  implementation: Follow the environment paragraph of the developer instructions. Two routes appended
+    to ROUTES and _regions (modeling/model.py) and two Region entries; load the extra file as the
+    edema-bone seed describes, building on that candidate's loader if it exists under this campaign's
+    experiments. Report the number of training studies with a target above 0.5 in each of the two.
+    Update SPATIAL_TOKEN_IDENTITY["compartment_routing"].
   open_choices: None.
   dependencies: []
-  priority_rationale: The largest effect measured on 2026-10-07, confirmed by a wrong-way control
-    and on a second set of weights, and never trained.
-- id: crops-turned-and-centred-on-the-frame
-  mechanism_id: frame-aligned-crops
+  priority_rationale: The second v5 answer; a reader on both sides of the cut that PF OA and Synovitis
+    depend on.
+- id: acl-on-its-unrouted-head
+  mechanism_id: routing-table
   parent_idea_id: null
-  title: Cut each 84 and 93 mm view turned by half the frame's angle and moved by half the frame centre's
-    deviation, in training and at prediction
-  opportunity: 'A guess, with the measurements that shape it. Centring the crops on the frame''s centre
-    at prediction only, on the height-cuts model''s weights, scored -0.0004 at x4: it gained Medial
-    Meniscus, ACL, Effusion and Contusion by about 0.002 each and cost Fracture 0.0088 and PF OA 0.0037.
-    It moved crops by 5 to 7 mm at the median, most of it the spots'' own noise (4 to 6 mm), on weights
-    that had never seen a centred knee. Half the angle beat the full angle for the same reason. Training
-    on the moved crops lets the targets that read far from the joint centre adapt. The spread of the
-    frame''s centre around the hand-set position is 2.3 mm side to side, 4.8 mm front to back and
-    7.4 mm up and down.'
-  mechanism: 'Everything of the seed crops-turned-to-the-frame, built here in full, with data.view_shift_limit_mm:
-    14.0 (a 300 px canvas at 84 mm). In addition the crop''s centre moves by 0.5 times the deviation
-    of the knee''s frame centre (study_frame_shift) from its running mean over training knees (a persistent
-    buffer, momentum 0.99, initialised from the first training batch, read as it is at validation
-    and prediction), projected into each slice''s plane and converted to pixels with that slice''s
-    patient map. The move is clamped so that the turned crop stays inside the canvas, and composed
-    with the turn and the cut into one resampling; patient_maps and valid_rects receive the same transform.
-    The frame for the move comes from the same first look or training dictionary as the angle.'
+  title: Give ACL its own channel over the whole knee again, as Contusion and Fracture have, while
+    every other target stays routed
+  opportunity: 'Evidence-backed gap, a guess for the cause. ACL sits at 0.9387 in run 24 and at 0.9406
+    across the routed runs with a spread equal to its noise (sibling SD 0.0014), against 0.9458 for
+    the old recipe without routing on the same fold and seed: the largest per-target gap of the line.
+    Its region (the core and the inner ring of five sectors, joint and upper bands) was widened in
+    height (run 26, +0.0010, inside noise) and its ring cut was removed (-0.0007 macro), and a shared
+    ligament reader gave it +0.0021. Nothing has tested whether the routing itself costs it: an ACL
+    tear is read from secondary signs far from the notch (the bone bruises of the lateral compartment,
+    the anterior shift of the tibia, the effusion), which a region around the axis leaves out.'
+  mechanism: Remove "ACL" from OWN_ROUTES (modeling/model.py) so that ACL's own channel is pooled
+    without a routing weight and without a position prior tied to a route, exactly as Contusion and
+    Fracture are. The route "core" stays in ROUTES for the report questions that use it (QUESTION_ROUTES
+    in training/report_attributes.py). Nothing else changes.
   precedents:
-  - 'outputs/analysis/routing-and-shifts-frames-20261007/frame-crops/frame-crops-x4.npz: centred -0.0004,
-    centred and turned -0.0007, prediction only, full deviation and full angle.'
-  - 'routing-and-shifts, crops-and-frame-share-one-centre-unit-output: a learned centre shared by
-    crops and frame, -0.0037 and -0.0062; learned from the labels, not read from the spots.'
-  novelty: First training on crops both turned and centred by the knee's own frame.
-  coverage: Coronal and sagittal 84 and 93 mm views of every knee.
-  exploitation: 'Read both multipliers against the incumbent and against crops-turned-to-the-frame,
-    Fracture and PF OA (the two that paid for centring at prediction), Medial Meniscus, ACL, Effusion
-    and Contusion (the four that gained), and per epoch on the validation knees the mean and spread
-    of the applied move per plane and direction in millimetres, the share of slices clamped and the
-    applied angle. Report the prediction time. Shown wrong by: Fracture and PF OA each more than one
-    sibling SD below the incumbent while the four others stay inside theirs.'
-  budget: As crops-turned-to-the-frame with 300 px canvases, the size the previous campaign's shift
-    runs trained with inside the limit.
-  implementation: 'Follow the environment paragraph of the developer instructions. Build on the candidate
-    of crops-turned-to-the-frame if it exists under this campaign''s experiments (its source/ and
-    changes.diff), otherwise from the same sources. The centring arithmetic is in outputs/analysis/routing-and-shifts-frames-20261007/builds/scripts/frame_crops.py
-    (function `moves`: the deviation in the knee''s anatomical axes turned into the patient''s axes
-    with the study axis and the side sign, then projected on the slice''s two in-plane directions);
-    it used the fold''s mean, which a candidate replaces by the training running mean. The two halves
-    are module constants with no config field. Create the buffer under torch.random.fork_rng. Report
-    the three topic 2 checks of the contract. Update SPATIAL_TOKEN_IDENTITY["view_policy"], ["preparation"]
-    and ["initialization_rng"].'
+  - 'Old recipe, same fold and seed: ACL 0.9458.'
+  - 'routing-and-shifts, shared-ligament-reader-2: ACL +0.0021, macro -0.0007 and +0.0003.'
+  - 'Run 26 (ACL at all heights): ACL +0.0010; the lower cut then slid and Synovitis lost 0.0072.'
+  novelty: First run of the routed design with ACL unrouted.
+  coverage: Every knee.
+  exploitation: 'Read ACL against the incumbent at both multipliers, the macro, and the core and ring
+    radius per epoch (ACL was the only target reading inside the ring cut alone). Shown wrong by:
+    ACL inside one sibling SD of the incumbent.'
+  budget: Same cost as the incumbent.
+  implementation: 'Follow the environment paragraph of the developer instructions. modeling/model.py:
+    OWN_ROUTES without "ACL", and whatever indexes the routes of own channels must treat ACL as it
+    treats Contusion and Fracture. Check and report on one batch that ACL''s routing weight is 1 for
+    every routable token and that the other targets'' weights equal the incumbent''s. Replaces: ACL''s
+    region. Update SPATIAL_TOKEN_IDENTITY["compartment_routing"].'
   open_choices: None.
   dependencies: []
-  priority_rationale: The user's design for the default crop (turn and move, aligned to the frame);
-    runs after the turn alone so the two are measured apart.
-- id: smaller-rotation-augmentation-on-turned-crops
-  mechanism_id: frame-aligned-crops
+  priority_rationale: The largest known per-target gap, one line to test, and never run.
+- id: five-unplaced-report-questions-without-heads
+  mechanism_id: report-question-set
   parent_idea_id: null
-  title: Crops turned by half the frame's angle, with the random rotation of the affine augmentation
-    halved
-  opportunity: A guess. The affine augmentation turns 70% of series by up to 10 degrees, a range chosen
-    when knees arrived at the scanner's orientation. The frame's in-plane angle has a median of 3.6
-    degrees on coronal views and 5.9 on sagittal (90th percentiles 8.7 and 11.5); once the crops are
-    turned by half of it, about half of that spread is gone, and the augmentation spends its range
-    on orientations the model no longer meets. The validation crops are never augmented, so a narrower
-    range brings training closer to what is predicted on.
-  mechanism: 'Everything of the seed crops-turned-to-the-frame, built here in full, and data.affine_augmentation.rotation_degrees:
-    5.0 in configs/training.yaml in place of 10.0. The probability, the translation and the scale
-    range stay.'
+  title: Train without the heads of the five report questions that locate nothing the routed model
+    can use
+  opportunity: 'A guess, kept open on purpose. Five v4 questions have varied answers but no place
+    in the knee: extra_osteochondral, extra_other_cysts, extra_bursitis, pf_cartilage_surface and
+    baker_ruptured. Every earlier removal of report information cost (low-agreement questions dropped:
+    0.943 public against 0.947; hedged options -0.0015; grade merges -0.0014; completeness options
+    -0.0005), each on a single run with whole-knee heads, before routing. The v5 specification leaves
+    these five to one run with and without them.'
+  mechanism: 'training/report_attributes.py: the five questions get no head and no loss term; their
+    columns are ignored. Nothing else changes.'
   precedents:
-  - 'learnable-views run 17 (jitter 4 mm and 5% in place of 8 mm and 10%, on unaligned views of the
-    old recipe): -0.0008 [-0.0022, +0.0006].'
-  novelty: First change of the affine range on crops aligned to the knee.
-  coverage: Training only; every series the augmentation touches.
-  exploitation: 'Read both multipliers against the incumbent and against crops-turned-to-the-frame,
-    and the gap between the training loss and the validation loss at the last epoch against that run''s.
-    Shown wrong by: both multipliers below crops-turned-to-the-frame by more than a rerun (0.0010).'
-  budget: As crops-turned-to-the-frame.
-  implementation: Follow the environment paragraph of the developer instructions. Build on the candidate
-    of crops-turned-to-the-frame if it exists under this campaign's experiments (its source/ and changes.diff),
-    otherwise from the sources that seed names. The only further change is the one config value. Report
-    the three topic 2 checks of the contract.
+  - 'attributes_v5.md, Dropped or decided by a test: the four recorded removals and their costs.'
+  novelty: First removal of report questions on the routed model.
+  coverage: Training only.
+  exploitation: 'Read both multipliers against the incumbent and every target against its sibling
+    SD. Shown wrong by: a macro more than a rerun (0.0010) below the incumbent at x4, which keeps
+    the five questions in every later question set.'
+  budget: Same cost as the incumbent, five heads fewer.
+  implementation: Follow the environment paragraph of the developer instructions. Exclude the five
+    question ids where ReportAttributeHeads builds its option-level heads, so the remaining heads
+    keep their order and their initial weights (report on one batch that the remaining questions'
+    initial logits equal the incumbent's; create nothing new, and keep the incumbent's random stream
+    by drawing the removed heads' initial weights under torch.random.fork_rng or by constructing and
+    discarding them as the incumbent would). Update SPATIAL_TOKEN_IDENTITY["algorithm"].
   open_choices: None.
   dependencies: []
-  priority_rationale: The user's third element of the aligned default (small augmentation around the
-    aligned crop), measured apart from the turn.
+  priority_rationale: Decides which questions later extractions need, now that a question costs ten
+    minutes to extract.
 exhausted_directions: ''

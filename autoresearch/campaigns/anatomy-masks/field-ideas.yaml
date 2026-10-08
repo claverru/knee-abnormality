@@ -1,0 +1,94 @@
+ideas:
+- id: sagittal-crops-a-ninth-wider
+  mechanism_id: crop-field
+  parent_idea_id: null
+  title: Cut the posed sagittal crops a ninth wider, 93.3 mm for T1/PD and 103.7 mm for the fluid series,
+    at the same 224 px
+  opportunity: 'User-ordered on 2026-10-08, which lifts the contract''s bar on crop widths for this seed.
+    Extents evidence-backed (bone extents on the 550 mask volumes, scripts/adhoc/side_routed_session/field_extents.py
+    and field_cover.py, output in outputs/analysis/anatomy-masks-field/); the gain a guess. With the joint centre 7.4 mm behind and 2.3 mm below the crop centre, the 93.3 mm fluid crop reaches 54.1 mm forward and 49.0 mm up, where the kneecap''s front lies at 55.9 mm (median; 75th percentile 59.1, 95th 64.3) and its top at 54.6 mm (90th 63.0). At 103.7 mm the front edge reaches the kneecap''s 75th percentile: its front is inside for 77% of knees instead of 36%, its top for 48% instead of 22%, the whole kneecap for 44% instead of 13%, and the tissue behind the condyles grows from 16.7 to 22.0 mm (Baker''s). The T1/PD crop at 93.3 mm has the kneecap''s front inside for 36% instead of 11%. The pixel goes from 0.375 and 0.417 mm to 0.417 and 0.463 mm, still finer than the axial views'' 0.536 mm. The two series types keep their difference: T1/PD carries ACL and the menisci, and at 120 mm it cost -0.0012 with Lateral Meniscus -0.0061 (smart-crops). Clinical protocols image the knee at 140 to 160 mm.'
+  mechanism: 'One zoom factor s = 10/9 for the sagittal views and 1 for all others. In ViewWindows (modeling/model.py)
+    the posed cut of a sagittal view samples the canvas on a grid whose pixel pitch is s canvas pixels,
+    so the crop shows s times the view''s field_mm at image_size, in the same single bicubic resampling
+    as the turn; crop_affine carries the scale, so feature_geometry gives every token its true patient
+    position. The joint centre keeps its target in mm from the crop centre (SAGITTAL_JOINT_TARGET_MM),
+    so `geometry` divides that offset by s in crop pixels. A sagittal crop is always resampled: its exact-copy
+    path for a zero angle is removed. So that the wider crop keeps today''s room to move, set data.view_shift_limit_mm
+    to 22.5 (canvases of 344 and 332 px) and replace MAX_VIEW_SHIFT_FRACTION * margin in frame_pose and
+    jitter by a per-view limit in canvas pixels, min(0.75 * margin - (s - 1) * image_size / 2, 0.75 *
+    round(17 mm / pixel pitch)): 12.2 and 11.7 mm for the two sagittal views and today''s 12.75 mm for
+    the coronal ones, whose crops, pose and limits do not change. The first look still reads the central
+    224 px of each canvas at the view''s own field. Axial views, slice counts and image size do not change.'
+  precedents:
+  - 'sagittal-fluid-100 (smart-crops): the fluid sagittal view at 100 mm instead of 93 mm, cut by the loader without pose, -0.0002 with PF OA -0.0024 and Baker''s -0.0020; one run.'
+  - 'mixed-field: a single 160 mm field -0.0034 and a single 120 mm field +0.0011 against the 140 mm reference;
+    the 84/93 mm views replaced 120 mm in smart-crops.'
+  - 'fluid-sagittal-crops-moved-forward-for-the-kneecap (this campaign): 38% of series at the shift limit
+    when 8.6 mm were added inside the 17 mm margin; x4 -0.0005.'
+  novelty: First wider field cut by the pose instead of by the loader, and the first with the margin grown
+    to keep the shift room.
+  coverage: Every sagittal series of every knee, in training and at prediction.
+  exploitation: 'Read both multipliers against the incumbent with PF OA, Effusion, Synovitis and Baker''s (the kneecap and the back of the joint enter) and ACL and both menisci (the pixel grows by a ninth), and per epoch on the
+    validation knees the plane error, the mean and spread of every turn and shift, the share of sagittal
+    series at the shift limit, and the share of kneecap and kneecap-joint tokens per sagittal image. Shown
+    wrong by: PF OA, Effusion and Baker''s all below the incumbent at x4, or Lateral Meniscus and ACL both below it by more than one sibling SD.'
+  budget: Canvases about a fifth larger in area for the sagittal and coronal series; expect training
+    near 1.05 to 1.1 of the incumbent's time, inside the 1.2 ceiling, and prediction inside 1.3.
+  implementation: Follow the environment paragraph of the developer instructions. modeling/model.py and
+    configs/training.yaml (data.view_shift_limit_mm only). Replaces the sagittal crops at the views' own
+    field and the single shift fraction; no flag selects the old field. The developer instructions' sentence
+    against changing widths is lifted for this seed by the user's order; slice counts and image size stay.
+    Report on one batch the field in mm of a sagittal crop measured from the patient positions of its corner
+    tokens (expect 93.3 and 103.7), that the coronal and axial crops are bit-identical to the incumbent's
+    at the same pose, and the largest shift applied in mm. Log crop_field_mm per plane and sagittal_shift_limit_series_fraction
+    once per epoch. Update SPATIAL_TOKEN_IDENTITY['preparation'].
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Ordered by the user; the field comes from the measured extents, not from a sweep.
+- id: coronal-crops-a-ninth-wider
+  mechanism_id: crop-field
+  parent_idea_id: null
+  title: Cut the posed coronal crops a ninth wider, 93.3 mm for T1/PD and 103.7 mm for the fluid series,
+    at the same 224 px
+  opportunity: 'User-ordered on 2026-10-08, which lifts the contract''s bar on crop widths for this seed.
+    Extents evidence-backed (bone extents on the 550 mask volumes, scripts/adhoc/side_routed_session/field_extents.py
+    and field_cover.py, output in outputs/analysis/anatomy-masks-field/); the gain a guess. With the joint centre 1.1 mm from the crop centre across, the crops reach 40.9 mm (84 mm T1/PD) and 45.6 mm (93.3 mm fluid) to each side, where the widest bone edge lies at 40.2 mm (median; 95th percentile 46.9) and the fibular head at 43.5 mm (95th 52.6); the collateral ligaments and the soft tissue where MCL injury and marrow oedema are read lie outside the bone. At 103.7 mm the fluid crop reaches 50.9 mm: the bone edge is inside on both sides for 99% of knees instead of 90%, the bone plus 5 mm for 92% instead of 55%, the fibular head for 91% instead of 63%. The T1/PD crop at 93.3 mm has the bone edge inside for 90% instead of 58% and the bone plus 5 mm for 55% instead of 13%. The MCL runs from about 30 mm above the joint line to 61 mm below it (literature); the lower edge reaches about 51 mm, so its far end stays cut. The pixel goes from 0.375 and 0.417 mm to 0.417 and 0.463 mm, still finer than the axial views'' 0.536 mm. Clinical protocols image the knee at 140 to 160 mm.'
+  mechanism: 'One zoom factor s = 10/9 for the coronal views and 1 for all others. In ViewWindows (modeling/model.py)
+    the posed cut of a coronal view samples the canvas on a grid whose pixel pitch is s canvas pixels,
+    so the crop shows s times the view''s field_mm at image_size, in the same single bicubic resampling
+    as the turn; crop_affine carries the scale, so feature_geometry gives every token its true patient
+    position. The joint centre keeps its target in mm from the crop centre (CORONAL_JOINT_TARGET_MM),
+    so `geometry` divides that offset by s in crop pixels. A coronal crop is always resampled: its exact-copy
+    path for a zero angle is removed. So that the wider crop keeps today''s room to move, set data.view_shift_limit_mm
+    to 22.5 (canvases of 344 and 332 px) and replace MAX_VIEW_SHIFT_FRACTION * margin in frame_pose and
+    jitter by a per-view limit in canvas pixels, min(0.75 * margin - (s - 1) * image_size / 2, 0.75 *
+    round(17 mm / pixel pitch)): 12.2 and 11.7 mm for the two coronal views and today''s 12.75 mm for
+    the sagittal ones, whose crops, pose and limits do not change. The first look still reads the central
+    224 px of each canvas at the view''s own field. Axial views, slice counts and image size do not change.'
+  precedents:
+  - 'Coronal fluid at 93 mm instead of 120 mm (smart-crops): +0.0003 and +0.0004, ACL +0.0018 and +0.0031; axial plus coronal fluid at 120 mm read MCL at 0.910 against 0.855 for coronal fluid at 93 mm alone. Coronal T1/PD width was never changed alone.'
+  - 'mixed-field: a single 160 mm field -0.0034 and a single 120 mm field +0.0011 against the 140 mm reference;
+    the 84/93 mm views replaced 120 mm in smart-crops.'
+  - 'fluid-sagittal-crops-moved-forward-for-the-kneecap (this campaign): 38% of series at the shift limit
+    when 8.6 mm were added inside the 17 mm margin; x4 -0.0005.'
+  novelty: First wider field cut by the pose instead of by the loader, and the first with the margin grown
+    to keep the shift room.
+  coverage: Every coronal series of every knee, in training and at prediction.
+  exploitation: 'Read both multipliers against the incumbent with MCL, Contusion, Fracture, Medial OA and Lateral OA (the sides of the joint enter) and both menisci and ACL (the pixel grows by a ninth), and per epoch on the
+    validation knees the plane error, the mean and spread of every turn and shift, the share of coronal
+    series at the shift limit, and the share of kneecap and kneecap-joint tokens per coronal image. Shown
+    wrong by: MCL not above the incumbent at x4, or Medial Meniscus and Lateral Meniscus both below it by more than one sibling SD.'
+  budget: Canvases about a fifth larger in area for the sagittal and coronal series; expect training
+    near 1.05 to 1.1 of the incumbent's time, inside the 1.2 ceiling, and prediction inside 1.3.
+  implementation: Follow the environment paragraph of the developer instructions. modeling/model.py and
+    configs/training.yaml (data.view_shift_limit_mm only). Replaces the coronal crops at the views' own
+    field and the single shift fraction; no flag selects the old field. The developer instructions' sentence
+    against changing widths is lifted for this seed by the user's order; slice counts and image size stay.
+    Report on one batch the field in mm of a coronal crop measured from the patient positions of its corner
+    tokens (expect 93.3 and 103.7), that the sagittal and axial crops are bit-identical to the incumbent's
+    at the same pose, and the largest shift applied in mm. Log crop_field_mm per plane and coronal_shift_limit_series_fraction
+    once per epoch. Update SPATIAL_TOKEN_IDENTITY['preparation'].
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Ordered by the user; the field comes from the measured extents, not from a sweep.
+exhausted_directions: ''
