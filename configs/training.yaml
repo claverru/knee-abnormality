@@ -7,6 +7,7 @@ paths:
   label_manifest: labels/rebuild-state-v2-label-sources.json
   report_attribute_manifest: labels/jevk5-report-attribute-targets-v4.0.json
   anatomy_targets: ../data/labels/prepared/anatomy-mrannotator-sample550-joints
+  meniscus_targets: ../data/labels/prepared/meniscus-nnunet-knee-dess265
 
 labels:
   source: rebuild_state_v2
@@ -84,7 +85,7 @@ data:
       fluid_sensitive: 0
       fat_suppression: 0
       views:
-        - field_mm: 84.0
+        - field_mm: 93.33333333333334
           slices: 5
           horizontal: {anchor: knee, offset_mm: 7.0}
           vertical: {anchor: image, offset_mm: 10.0}
@@ -92,11 +93,10 @@ data:
       fluid_sensitive: 1
       fat_suppression: 1
       views:
-        - field_mm: 93.33333333333334
+        - field_mm: 84.0
           slices: 5
           horizontal: {anchor: knee, offset_mm: 7.0}
           vertical: {anchor: image, offset_mm: 10.0}
-  view_shift_limit_mm: 17.0
   reference_field_mm: 120.0
   image_size: 224
   lower_quantile: 0.005
@@ -117,6 +117,7 @@ model:
   plane_readout: true
   view_label_bias: true
   anatomical_frame: true
+  meniscus_map: true
   feature_statistics_augmentation:
     probability: 0.5
 
@@ -146,6 +147,7 @@ trainer:
   min_delta: 0.0001
   deterministic: false
   class_balance_exponent: 0.5
-  report_attribute_loss_weight: 0.1
+  report_attribute_loss_weight: 0
   anatomy_loss_weight: 0.1
+  meniscus_loss_weight: 0.1
   scanner_confusion_weight: 0.0

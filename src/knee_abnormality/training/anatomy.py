@@ -14,14 +14,17 @@ ANATOMY_CLASSES = (
     "joint",
     "kneecap_joint",
 )
+MENISCUS_CLASSES = ("neither", "medial_meniscus", "lateral_meniscus")
 OUTSIDE = 255
-SUBSAMPLES = (-0.375, -0.125, 0.125, 0.375)
+ANATOMY_POINTS = 4
+MENISCUS_POINTS = 4
 MINIMUM_COVERAGE = 0.5
 
 
 class AnatomyTargets(nn.Module):
-    def __init__(self, root: Path) -> None:
+    def __init__(self, root: Path, classes: int, points: int) -> None:
         super().__init__()
+        self.classes = classes
         paths = sorted((root / "volumes").glob("*.npz"))
         if not paths:
             raise ValueError(f"No anatomy volumes under {root}")
@@ -61,7 +64,7 @@ class AnatomyTargets(nn.Module):
                     shaft = torch.tensor([knee[f"femur_axis_{axis}"] for axis in "xyz"])
                     planes[row, 6:] = shaft if shaft[2] > 0 else -shaft
         self.register_buffer("planes", planes, persistent=False)
-        offsets = torch.tensor(SUBSAMPLES)
+        offsets = (torch.arange(points) + 0.5) / points - 0.5
         self.register_buffer(
             "grid",
             torch.stack(torch.meshgrid(offsets, offsets, indexing="ij"), -1).flatten(
@@ -111,7 +114,7 @@ class AnatomyTargets(nn.Module):
         values = torch.where(inside, self.labels[flat].long(), OUTSIDE)
         known = values != OUTSIDE
         counts = torch.nn.functional.one_hot(
-            values.clamp_max(len(ANATOMY_CLASSES)), len(ANATOMY_CLASSES) + 1
+            values.clamp_max(self.classes), self.classes + 1
         )[..., :-1].sum(-2)
         total = known.sum(-1)
         shares = counts / total.clamp_min(1)[..., None]
@@ -154,7 +157,10 @@ class AnatomyHead(nn.Module):
 
 
 def anatomy_loss(
-    logits: torch.Tensor, shares: torch.Tensor, mask: torch.Tensor
+    logits: torch.Tensor,
+    shares: torch.Tensor,
+    mask: torch.Tensor,
+    names: tuple[str, ...],
 ) -> tuple[torch.Tensor, dict[str, torch.Tensor]]:
     logits = logits.float()
     if not mask.any():
@@ -174,7 +180,7 @@ def anatomy_loss(
             "agreement": (probability.argmax(-1) == target.argmax(-1)).float().mean(),
             "share_error": (probability - target).abs().sum(-1).mean() / 2,
         }
-        for item, name in enumerate(ANATOMY_CLASSES[1:], start=1):
+        for item, name in enumerate(names[1:], start=1):
             both = probability[:, item].sum() + target[:, item].sum()
             metrics[f"overlap_{name}"] = (
                 2

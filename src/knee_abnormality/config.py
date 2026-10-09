@@ -79,6 +79,7 @@ class PathsConfig(ConfigModel):
     label_manifest: Path
     report_attribute_manifest: Path
     anatomy_targets: Path | None = None
+    meniscus_targets: Path | None = None
 
     @field_validator(
         "data_root",
@@ -86,6 +87,7 @@ class PathsConfig(ConfigModel):
         "label_manifest",
         "report_attribute_manifest",
         "anatomy_targets",
+        "meniscus_targets",
         mode="before",
     )
     @classmethod
@@ -204,7 +206,6 @@ class DataConfig(ConfigModel):
     )
     reference_field_mm: Annotated[float, Field(gt=0)]
     image_size: Annotated[StrictInt, Field(gt=0)]
-    view_shift_limit_mm: PositiveFiniteFloat = 6.0
     lower_quantile: Annotated[float, Field(ge=0, le=1)]
     upper_quantile: Annotated[float, Field(ge=0, le=1)]
     mean: tuple[FiniteFloat, FiniteFloat, FiniteFloat]
@@ -285,6 +286,7 @@ class ModelConfig(ConfigModel):
     plane_readout: bool = False
     view_label_bias: bool = False
     anatomical_frame: bool = False
+    meniscus_map: bool = False
     feature_statistics_augmentation: FeatureStatisticsAugmentationConfig = Field(
         default_factory=FeatureStatisticsAugmentationConfig
     )
@@ -340,6 +342,7 @@ class TrainerConfig(ConfigModel):
     class_balance_exponent: Annotated[float, Field(ge=0, le=1)]
     report_attribute_loss_weight: Annotated[float, Field(ge=0, allow_inf_nan=False)]
     anatomy_loss_weight: Annotated[float, Field(ge=0, allow_inf_nan=False)] = 0.0
+    meniscus_loss_weight: Annotated[float, Field(ge=0, allow_inf_nan=False)] = 0.0
     scanner_confusion_weight: Annotated[float, Field(ge=0, allow_inf_nan=False)]
 
 
