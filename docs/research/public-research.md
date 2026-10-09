@@ -25,6 +25,8 @@ canonical review of public evidence from the current knee competition.
   [the 2026-09-18 section](#slice-density-and-the-board-2026-09-18-re-sweep).
 - **Re-swept on 2026-09-28** for what was new since 09-20; that sweep has its own
   document, [2026-09-28 public re-sweep](2026-09-28-public-resweep.md).
+- **Re-swept on 2026-10-09** for what was new since 09-28:
+  [2026-10-09 public re-sweep](2026-10-09-public-resweep.md).
 - Inspected downloaded source for six public Kaggle code entries: five
   notebooks and one training script. Selection covered the popular baseline,
   higher-resolution DINO, large ensembles, and a different backbone family.
