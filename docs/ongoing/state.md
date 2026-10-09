@@ -1,4 +1,4 @@
-# Project state (2026-10-08)
+# Project state (2026-10-10)
 
 What is in force now: the recipe, the control candidates pair with, the best public submissions and
 the rules every comparison depends on. Pending work is in [next](next.md), active lines have their
@@ -49,6 +49,23 @@ measured outcomes are in the [validation results](../validation/results/INDEX.md
   ×1 0.924650 and **0.959 public (S126), the best submission**, against ×4 0.933209, ×1 0.922934
   and 0.957 (S119) for the ResNet-50 of run 24; training 2,251 s against 2,075 s, ×4 prediction
   67.7 s against 46.0 s.
+- **Meniscus map and posed canvases, since 2026-10-10 (user decision, both configs):** on top of
+  the anatomy-map recipe, four adoptions of the
+  [anatomy-recipe](../../autoresearch/campaigns/anatomy-recipe/INDEX.md) and
+  [view-poses](../../autoresearch/campaigns/view-poses/INDEX.md) campaigns: the report-attribute
+  loss off (`trainer.report_attribute_loss_weight` 0); a three-class meniscus map (neither,
+  medial, lateral) taught at weight 0.1 from the DESS masks on the 14 by 14 grid of the third
+  stage (`model.meniscus_map`, `trainer.meniscus_loss_weight`, `paths.meniscus_targets`);
+  every view posed on a 368 px canvas with shift, turn and a per-knee scale, the axial views
+  included; and the two sagittal views swapped, fluid at 84 mm and T1/PD at 93.33 mm. It is
+  `sagittal-fluid-canvas-fine`, run 7 of view-poses: **×4 0.928121, ×1 0.919392, 0.955 public
+  (S129)**, against ×4 0.927083, ×1 0.917666 and 0.954 (S125) for the anatomy-map recipe;
+  training 1,498 s. A retraining of the same code landed at ×4 0.928120 and ×1 0.918411.
+  `configs/refined-resnet50.yaml` carries the same settings and has no run on them yet; S126
+  (0.959), the best submission, is the ResNet-50 on the anatomy-map recipe. What was tried on
+  top and not adopted (structure routing from the masks, centred and number-free crop poses,
+  per-view losses) and the audit of that line: the campaign's
+  [run notes](../../autoresearch/campaigns/view-poses/run-notes.md).
 - **Model:** the [current model](../modeling/current-model.md), since 2026-09-29 on a
   RadImageNet ResNet-18 (`configs/training.yaml`): repeated middle slice at 224 px and 0.536 mm, a
   120 mm field (since 2026-10-01, with augmentation on that slice only), coronal and sagittal
@@ -244,7 +261,7 @@ measured outcomes are in the [validation results](../validation/results/INDEX.md
 ## Active lines
 
 - [Anatomy recipe](../../autoresearch/campaigns/anatomy-recipe/INDEX.md): the campaign on the
-  recipe in force, validated with seven forced seeds and not started.
+  recipe in force, validated with eight forced seeds and not started.
 - [Label rebuild](../public-labels/label-rebuild.md): adopted; its control scored ×4 0.928288 and
   0.944 public (S78).
 - [RadImageNet backbones](radimagenet-backbone.md): the ResNet-18 recipe ties the ReXNet control

@@ -8,11 +8,35 @@ finished runs and decisions live in the [validation results](../validation/resul
 live under [autoresearch](../../autoresearch/campaigns/INDEX.md). New candidates pair with the
 current control at its fold and seed.
 
-Pending on the recipe in force (anatomy map and posed crops, [state](state.md#recipe-in-force)):
+Pending on the recipe in force (meniscus map and posed canvases, [state](state.md#recipe-in-force)):
 
+- **ResNet-50 on the recipe in force (2026-10-10):** `configs/refined-resnet50.yaml` carries
+  the meniscus map and the posed canvases and has no run yet; the best submission (S126, 0.959)
+  is the ResNet-50 on the anatomy-map recipe.
+- **Open after the structure-routing line (2026-10-09):** the best routing from the masks
+  (`no-side`) is −0.0003 at ×4 on centred crops and −0.0006 on the recipe's crops, with MCL
+  alone carrying more than the gap; the multiplier curve (×1 to ×4) of the recipe against one
+  experiment is not measured. Detail:
+  [view-poses run notes](../../autoresearch/campaigns/view-poses/run-notes.md).
+- **257px full-grid rerun running (2026-10-08, user request):** launched by the user at
+  21:42 CEST, main PID 8726, run `rn18-257-full-9x9-report-loss-off`. Removed the experiment's
+  `interior_anchors` border mask and its identity suffix. All other code and the configuration
+  match `rn18-257-inner-7x7-report-loss-off`: 257px, the same crop fields, fold 1, seed 1110484336,
+  report-attribute loss off. The stride-32 output remains 9×9; border anchors now pass the normal
+  image/canvas validity checks. Verified the saved configuration, labels and class balance
+  match the previous run; the frozen source includes the mask removal. Comparison monitor
+  `knee-monitor-257-full-grid.service` was stopped at the user's request on 2026-10-08.
+  Its last table is `outputs/analysis/r/rn18-257-full-vs-inner-7x7/macro_auc.md`; its log is beside it.
+- **S127 submission in progress (2026-10-08):** `rn18-257-inner-7x7-report-loss-off`, fold 1,
+  seed 1110484336, selected epoch 10: ×1 0.917439, ×4 τ 1 0.926763. User requested Kaggle
+  ×4 τ 0.9. Bundle `outputs/submission/exports/rn18-257-inner-7x7-report-loss-off-f1-x4-tau09`;
+  record `outputs/submission/records/rn18-257-inner-7x7-report-loss-off-f1-x4-tau09.json`.
+  Notebook `claverru/s127-rn18-f1-257px-inner7-report-loss-off`, version 1, is queued on Kaggle;
+  detached service `knee-submit-639229499ca44aa5.service` verifies its output and submits it.
 - **Start the [anatomy-recipe campaign](../../autoresearch/campaigns/anatomy-recipe/INDEX.md):**
-  validated, seven forced seeds, reference `rn18-anatomy-map-centre-control`; about three and a
-  quarter hours for the seeds.
+  validated, eight forced seeds (the last, tokens on the 14 by 14 grid, added 2026-10-08), reference
+  `rn18-anatomy-map-centre-control`; about three and a
+  half hours for the seeds.
 - **Submission ledger:** S122 to S126 are not in it yet.
 - **Submit job:** it cannot pick up a notebook version that has already completed; S126 had to
   be submitted by hand through the API.
@@ -57,7 +81,7 @@ Awaiting a public check:
   out-of-fold predictions); gold agreement 0.9397 against 0.9075 for the base (80% [+0.022,
   +0.043]), teacher alone 0.9271. The fold-0 child `outputs/training/rn18-oof-blend` (control's
   seed) scored ×4 0.929536 against 0.928062: +0.0015, 95% paired report-group [+0.0001, +0.0031],
-  epoch 9 (`outputs/analysis/rn18-oof-blend-vs-rn18-l2sp-no-confusion`). The fold-1–4 teachers
+  epoch 9 (`outputs/analysis/r/rn18-oof-blend-vs-rn18-l2sp-no-confusion`). The fold-1–4 teachers
   trained on fold 0, so that is an upper bound. Public: S87 0.944 at ×4 τ 0.9 (bundle `56787f47`)
   against 0.943 for S86, one rounding step; pending a user decision.
 
@@ -81,7 +105,7 @@ Pending:
   ×4 0.927235, no blend gain).
 - **Read the slice-budget sensitivity run on Kaggle** when it finishes: per-label AUC with each
   series type's slices halved and doubled, on the S93 model
-  (`outputs/analysis/slice-budget-20261002/sensitivity/`).
+  (`outputs/analysis/s/slice-budget-20261002/sensitivity/`).
 
 - **Decide on the `inference-opt` branch.** It runs the Kaggle command in about 270 s against
   429.5 s with bit-identical prepared images, but its GPU preparation changes hashed sources, so

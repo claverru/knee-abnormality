@@ -285,9 +285,9 @@ compartment targets together and the validation loss beside the macro.
 ### Visual inspection and rotation census
 
 Eight validation studies rendered with `scripts/adhoc/render_routing_views.py`
-(`outputs/analysis/side-routed-views-20261005/`), and the rotation of every training series
+(`outputs/analysis/s/side-routed-views-20261005/`), and the rotation of every training series
 measured from headers with `scripts/adhoc/census_knee_rotation.py`
-(`outputs/analysis/knee-rotation-census-20261005/`).
+(`outputs/analysis/k/knee-rotation-census-20261005/`).
 
 - **Front boundary:** on the patellofemoral joint in all eight, 15 to 39 mm ahead of the fitted
   centre over 60 studies (mean 27.2, SD 5.6).
@@ -574,7 +574,7 @@ routed targets' sum (+0.0033, +0.0131, +0.0090 for S112, S113, S114) and not the
 
 ### Octant sketches
 
-`outputs/analysis/octant-sketches-20261005/` (loader only): the cuts drawn on midline sagittal,
+`outputs/analysis/o/octant-sketches-20261005/` (loader only): the cuts drawn on midline sagittal,
 coronal and axial slices of two studies, and `tilt-sheet/sheet.png` with the front cut at 0°,
 25° and 45° on ten validation studies. The fitted centre sits at the notch, about 15 mm above
 the joint line on the coronal slice. With the cut through the centre, a nod of 25° to 45°
@@ -585,7 +585,7 @@ not learned values.
 ### Patient motion between series
 
 Measured by a subagent on the full training set, 2026-10-05
-(`outputs/analysis/inter-series-motion-20261005/`; scripts in `scripts/adhoc/inter_series_motion/`). Every pair of same-plane series is resampled by
+(`outputs/analysis/i/inter-series-motion-20261005/`; scripts in `scripts/adhoc/inter_series_motion/`). Every pair of same-plane series is resampled by
 header geometry onto a 1 mm grid and aligned by a normalised-gradient-field correlation over
 ±20 mm; 12,083 comparable pairs in 4,398 studies (pairs angled more than 3° apart excluded).
 
@@ -667,7 +667,7 @@ learns only through the position prior). The separate OA frame is dropped: its t
 - Learned angles: nod +2.50°, roll +3.52°, turn +3.06° (run 5 with soft cuts: −5.11°, −2.39°, −0.98°).
   The frame turns a few degrees with or without soft boundaries, and the signs are not stable.
 - Knee-level strength: meniscus −0.119, OA +0.0002.
-- Drawings on real slices: `outputs/analysis/octant-sketches-20261006/hard-octants-*.png`
+- Drawings on real slices: `outputs/analysis/o/octant-sketches-20261006/hard-octants-*.png`
   (two-frame model: `tilted-octants-*.png`).
 
 S115, the two-frame adopted model (`separate-oa-frame-with-knee-level-term`, ×4, τ 0.9): 0.953 public,
@@ -675,7 +675,7 @@ equal to S113 (run 4) and against 0.952 for S114 (run 5).
 
 ### Turning the trained frame by hand
 
-`outputs/analysis/side-routing-rotation-sweep-20261006/sweep.csv`: the hard-octant model at ×1, each
+`outputs/analysis/s/side-routing-rotation-sweep-20261006/sweep.csv`: the hard-octant model at ×1, each
 angle moved −30° to +30° around its learned value, inference only. `cuts` turns only the routing;
 `all` also turns the position prior and the own heads' position code.
 
@@ -755,7 +755,7 @@ Run `outputs/training/20261006-084210-side-routed-study-frames`, fold 1, seed 11
 - The nod is common to all knees (same sign everywhere): the height cut drops towards the front, so
   the front-up region reaches the lower kneecap. Turn and the medial and up shifts differ in sign
   between knees. The values swung in the first epochs (roll −19° at epoch 2) and settled after 8.
-- Four studies drawn before and after: `outputs/analysis/octant-sketches-20261006/study-frames-*.png`
+- Four studies drawn before and after: `outputs/analysis/o/octant-sketches-20261006/study-frames-*.png`
   (rows 5, 9, 21, 45: nod +5.1° to +12.8°, turn −1.5° to −5.5°, shifts up to 4.6 mm).
 - S117, this run (×4, τ 0.9): 0.952 public, with S112, S114 and S116; S113 and S115 are 0.953.
 
@@ -851,12 +851,12 @@ Run `outputs/training/20261006-095814-side-routed-fine-fused-routed-reports`, fo
   front-and-up 3%; patellar facet lateral 19%, medial 15%; meniscus tear medial front low. The 33
   question heads all improved (KL −13% to −45% from the first epoch), the shared routed ones in the
   same range as the others.
-- **Moving the trained centre by hand** (`outputs/analysis/side-routing-centre-sweep-20261006/`,
+- **Moving the trained centre by hand** (`outputs/analysis/s/side-routing-centre-sweep-20261006/`,
   ×1, −20 to +15 mm): the learned position is at the top. PF OA 0.8915 at the learned centre,
   0.8925 at 5 mm lower, 0.8883 at 20 mm lower, 0.8737 at 15 mm higher; macro 0.91671 at the learned
   centre and lower everywhere else, on both the up and the front axis. So the frame is not missing a
   better place for PF OA; the nod of about 10° already lowers the height cut at the front.
-- Drawings: `outputs/analysis/octant-sketches-20261006/side-routed-fine-fused-routed-reports-*.png`.
+- Drawings: `outputs/analysis/o/octant-sketches-20261006/side-routed-fine-fused-routed-reports-*.png`.
 - Lesson: the frame can now be placed per knee and sits at a local optimum, and the score does not
   follow. Inside its region each label's attention already selects the tokens that matter, so a
   more exact region changes little. The fine grid also gives back the bag reduction the octants
@@ -901,7 +901,7 @@ Across the four runs with a per-knee frame (8, 9, 10, 11) against run 7: macro �
 
 ## Where each label's attention falls (2026-10-06)
 
-`outputs/analysis/side-routing-attention-by-region-20261006/attention.json`: run 11's model, the 874
+`outputs/analysis/s/side-routing-attention-by-region-20261006/attention.json`: run 11's model, the 874
 validation knees with a fitted centre, attention of each label on its positive knees, binned by
 the fifteen regions of the proposed division (four quadrants plus a core of 14 mm radius; joint
 band ±10 mm around 14 mm below the geometric centre). Geometric coordinates, 7×7 tokens. Routed
@@ -1159,7 +1159,7 @@ Run `outputs/training/20261006-135237-side-routed-regions-soft-gradient-knee-lev
   still rose against run 12 (+0.0019, +0.0033), within their noise.
 - Report fit on the validation set 0.7204 against 0.7194 in run 12: unchanged.
 
-**Drawings** (`outputs/analysis/side-routing-loop-20261006/side-routed-regions-soft-gradient-knee-level/`):
+**Drawings** (`outputs/analysis/s/side-routing-loop-20261006/side-routed-regions-soft-gradient-knee-level/`):
 
 - `attention-*.png`: each label looks where it should. Medial and Lateral Meniscus on the joint
   line of their side, ACL on the notch, MCL on the medial edge, PF OA on the kneecap and trochlea,
@@ -1235,7 +1235,7 @@ at all heights, ACL on the core and the lateral quadrants above the tibia band, 
 - Family means of the ×4 macro: octants (runs 5, 6, 7, 8, 10, 11) 0.92444; eighteen regions with
   overlap (12 to 16) 0.92401; eighteen regions with hard cuts (18, 19, 20) 0.92336. With a run-to-run
   SD of 0.0003 to 0.0004 the last family is about three SDs below the first.
-- Drawings (`outputs/analysis/side-routing-loop-20261006/side-routed-regions-wider-table/`): in study 5
+- Drawings (`outputs/analysis/s/side-routing-loop-20261006/side-routed-regions-wider-table/`): in study 5
   the head moves the centre 8 mm down, onto the joint line, which is anatomically right; and it
   turns the frame −12.9° and rolls it −9.6°, so on the axial slices the midline no longer runs
   along the notch and on the coronal slices the midline and the core lean across a knee that
@@ -1260,7 +1260,7 @@ Run `outputs/training/20261006-151245-side-routed-regions-nod-per-knee` (run 21)
   −0.0029 and Fracture −0.0053 remain.
 - Frame over the validation knees: shared roll −0.9° and turn −1.9°; nod −15.3° (every knee
   negative); centre shift up −3.6 mm; upper cut −0.2 mm, lower cut −30.8 mm, core radius 13.5 mm.
-- Drawings (`outputs/analysis/side-routing-loop-20261006/side-routed-regions-nod-per-knee/`): the
+- Drawings (`outputs/analysis/s/side-routing-loop-20261006/side-routed-regions-nod-per-knee/`): the
   midline is upright on the coronal slices and runs along the notch on the axial ones. On the
   sagittal slices the height cuts now slope down towards the back of the knee, following the
   backward slope of the tibial plateau, so the joint band lies along the plateau. The same slope
@@ -1285,7 +1285,7 @@ and Effusion on the front quadrants above the lower cut plus the core of the fem
 
 **Where the heads look in knees with and without the finding** (this model, 400 validation knees,
 attention-weighted position of each label's ten highest-attention tokens, geometric frame, mm;
-`outputs/analysis/side-routing-loop-20261006/spots-side-routed-regions-kneecap-above-lower-cut.json`):
+`outputs/analysis/s/side-routing-loop-20261006/spots-side-routed-regions-kneecap-above-lower-cut.json`):
 
 | Label | Positive knees: mean (SD) | Negative knees: mean (SD) |
 |---|---|---|
@@ -1327,7 +1327,7 @@ On run 22's build:
 
 Asked by the user: extract where the heads look and find the division of the knee that matches it.
 Scripts in `scripts/adhoc/side_routed_session/` (`extract_attention.py`, `analyse_attention.py`); outputs in
-`outputs/analysis/side-routing-attention-shape-20261006/` (`attention.npz`, `heads-1..4.png`,
+`outputs/analysis/s/side-routing-attention-shape-20261006/` (`attention.npz`, `heads-1..4.png`,
 `emergent-{8,12,18}-{geometric,spots}.png`, `shapes.json`).
 
 - **Source.** Run 11's model on the 874 validation knees with a fitted centre: the 35 report
@@ -1386,7 +1386,7 @@ Run `outputs/training/20261006-160557-side-routed-meniscus-spot-frame-eight-sect
 - Frame from the two meniscus spots, over the validation knees at epoch 8: centre 7.4 mm down and
   2.4 mm back, roll 0.0° (4.0° in absolute value), turn −2.5° (4.9°), nod −17.8°; upper cut −4.8 mm,
   lower cut −13.5 mm, core radius 16.6 mm.
-- Drawings (`outputs/analysis/side-routing-loop-20261006/side-routed-meniscus-spot-frame-eight-sections/`):
+- Drawings (`outputs/analysis/s/side-routing-loop-20261006/side-routed-meniscus-spot-frame-eight-sections/`):
   the midline stays upright on the coronal slices and close to the notch on the axial ones (study
   21: roll −3.2°, turn −5.9°, centre 8.8 mm down, on the joint line). The joint band is thin (9 mm)
   and slopes 18°.
@@ -1510,7 +1510,7 @@ Run `outputs/training/20261006-171738-side-routed-four-anchor-frame` (run 25):
 
 ## The old recipe's attention against the reference's (2026-10-06)
 
-`outputs/analysis/side-routing-old-vs-reference-20261006/` (`old.npz`, `reference.npz`,
+`outputs/analysis/s/side-routing-old-vs-reference-20261006/` (`old.npz`, `reference.npz`,
 `old-vs-reference.png`; scripts `extract_label_attention.py`, `compare_old_reference.py` in the
 `scripts/adhoc/side_routed_session/`). The old recipe (`slab-rule-and-positive-std-requeue`) and run 24 on the 874
 validation knees; both see identical images and tokens, so attention is compared token by token.
@@ -1631,7 +1631,7 @@ Run `outputs/training/20261006-184303-side-routed-midway-cuts` (run 28):
 
 ### Which targets hold each cut
 
-Drawing: `outputs/analysis/side-routing-cut-forces-20261006/cut-forces.png`. A cut is held when
+Drawing: `outputs/analysis/s/side-routing-cut-forces-20261006/cut-forces.png`. A cut is held when
 targets read only one side of it from each side. In the reference's division: medial against
 lateral is held by labels on both sides; front against back by three labels in front and Baker's
 alone behind; the core radius by ACL inside and MCL, Baker's, PF OA and Effusion outside. Not held:
@@ -1642,7 +1642,7 @@ attention's fit, the regions are generous, and the attention inside each region 
 
 ### Run 29 build: only the held cuts, with equal pull from the two sides
 
-Drawing per label: `outputs/analysis/side-routing-cut-forces-20261006/held-cuts-sectors-per-target-3d.png`.
+Drawing per label: `outputs/analysis/s/side-routing-cut-forces-20261006/held-cuts-sectors-per-target-3d.png`.
 The reference's construction (frame on the two meniscus spots, learned nod, sizes regressed per
 knee, hard cuts with the soft gradient) with the division reduced to the three cuts that labels
 hold from both sides:
@@ -1684,7 +1684,7 @@ Run `outputs/training/20261006-192417-side-routed-held-cuts-balanced` (run 29):
 ### The finest division in which labels hold every cut (search, 2026-10-06)
 
 Scripts `search_held_division.py` and `search_symmetric_division.py` in `scripts/adhoc/side_routed_session/`;
-results and drawings in `outputs/analysis/side-routing-cut-forces-20261006/`
+results and drawings in `outputs/analysis/s/side-routing-cut-forces-20261006/`
 (`symmetric-division-<threshold>.json`, `symmetric-division-per-target-3d.png`).
 
 - Input: the old recipe's free attention (ten most attended tokens on positive knees) of the ten
@@ -1830,7 +1830,7 @@ scratchpad `crop-offsets-build`; the worktree is on this build.
   1,263 s. Per label at ×4: Medial OA +0.0019, Lateral OA +0.0015, Synovitis −0.0038, MCL −0.0029,
   Baker's −0.0017, the rest within 0.0009.
 - **The two halves, by predicting with the pattern and at the anchor**
-  (`outputs/analysis/routing-and-shifts-frames-20261007/mcl-spatial-maps/crop-offsets-on-off-x{1,4}.npz`,
+  (`outputs/analysis/r/routing-and-shifts-frames-20261007/mcl-spatial-maps/crop-offsets-on-off-x{1,4}.npz`,
   `incumbent-pattern-on-off-x{1,4}.npz`):
 
   | Weights | Multiplier | Pattern | Anchor | Pattern's effect |
@@ -1920,7 +1920,7 @@ window by the frame centre's deviation from the fold mean, projected into the sl
 turns the window in its plane so that the frame's side axis is level on coronal views and its up
 axis is vertical on the other detail plane (clamped at 15°; 120 mm axial views untouched). Scripts
 `frame_crops.py` and `frame_rotation_controls.py` in `scripts/adhoc/side_routed_session/`; outputs in
-`outputs/analysis/routing-and-shifts-frames-20261007/frame-crops/`.
+`outputs/analysis/r/routing-and-shifts-frames-20261007/frame-crops/`.
 
 | Variant | ×4 (anchor 0.925344) | ×1 (anchor 0.917415) |
 |---|---:|---:|
@@ -1969,7 +1969,7 @@ axis is vertical on the other detail plane (clamped at 15°; 120 mm axial views 
 Asked while discussing a frame of three attached segments instead of one cylinder. Two rule-based
 estimates of each bone's axis on the 874 validation knees, from the series at the full 120 mm
 field (`measure_bend.py`, `measure_bend_marrow.py` in `scripts/adhoc/side_routed_session/`; outputs in
-`outputs/analysis/routing-and-shifts-frames-20261007/knee-bend/`):
+`outputs/analysis/r/routing-and-shifts-frames-20261007/knee-bend/`):
 
 - **Centre of the limb's outline per height.** Below the joint the centre drifts backwards by
   14° on average (SD 9.5°): that is the calf, not the tibia. Above the joint it is straight up to
@@ -2005,7 +2005,7 @@ start, label gradient. Build backup: scratchpad `femur-lean-build`; the worktree
   frame's forward tilt ended at 15° against 6° for the incumbent, the core at 17.4 mm (16.3) and
   the ring at 28.2 mm (29.8).
 - Drawing of the frame per label at epoch 7:
-  `outputs/analysis/routing-and-shifts-frames-20261007/femur-lean-per-label-3d.png`.
+  `outputs/analysis/r/routing-and-shifts-frames-20261007/femur-lean-per-label-3d.png`.
 - **Lesson.** A lean learned from the labels with a start from the spots does not keep the start:
   the labels reading the upper band (PF OA, Effusion, ACL and the top of MCL and Baker's) pull it
   one way and nothing pulls back. Effusion gains with it and PF OA does not.
