@@ -1206,6 +1206,39 @@ code; pose code and data settings identical to run 7).
   medial band 0.576, femoral cartilage 0.572, medial meniscus 0.552, lateral meniscus 0.540,
   patellar cartilage 0.510, medial tibial cartilage 0.503. Training 1,463 s (run 7 1,498).
 
+## The sagittal swap applied to coronal, `rn18-coronal-fluid-canvas-fine` (2026-10-10)
+
+The recipe on main with the two coronal fields swapped, as run 7 did in sagittal: coronal fluid
+93.33 to 84 mm (0.417 to 0.375 mm per pixel), coronal T1/PD 84 to 93.33 mm. Configuration only,
+from the worktree `knee-abnormality-coronal-fluid-canvas-fine`, fold 1, seed 1110484336.
+
+| | Run 7 | Retrained | Coronal swap |
+|---|---|---|---|
+| ×4 macro AUC | 0.928121 | 0.928120 | 0.928026 |
+| Best ×1 macro AUC | 0.919392 | 0.918411 | 0.918941 |
+| Training seconds | 1,498 | | 1,525 |
+
+- **−0.0001 at ×4: level with run 7**, inside what a rerun gives (±0.0003). The swap that gave
+  +0.0016 in sagittal gives nothing in coronal.
+- Per target at ×4 against run 7 (against the retraining): Lateral OA +0.0022 (+0.0019), PF OA
+  +0.0015 (−0.0014), Fracture +0.0012 (+0.0018), Medial OA +0.0010 (+0.0003), Baker's +0.0006
+  (+0.0002), ACL +0.0006 (−0.0011), Synovitis +0.0005 (−0.0006), Lateral Meniscus −0.0001
+  (−0.0019), Medial Meniscus −0.0010 (−0.0002), Effusion −0.0010 (+0.0002), MCL −0.0016
+  (+0.0030), Contusion −0.0051 (−0.0034). Only Contusion is behind both by more than 0.002,
+  only Lateral OA and Fracture ahead of both by more than 0.001.
+- **Each coronal view alone, last epoch, against the same contrast before the swap** (the
+  retraining, which logs the readouts): the T1/PD view, now wider, gains on almost everything
+  (macro 0.7205 to 0.7414; MCL +0.140, Effusion +0.037, Baker's +0.019, Lateral OA +0.015, PF OA
+  +0.012, Fracture +0.010); the fluid view, now finer and narrower, loses (macro 0.8503 to
+  0.8434; MCL −0.020, Contusion −0.016, PF OA −0.014, Synovitis −0.013, Lateral OA −0.009) and
+  gains only Medial OA +0.004 and ACL +0.002. In sagittal the finer fluid view gained on the
+  structure labels; in coronal it does not, and the menisci are −0.002 and −0.005 on it.
+- Validation ×1 per epoch against run 7: +0.0007, −0.0006, −0.0016, +0.0014, +0.0016, −0.0005,
+  +0.0007, −0.0005, −0.0005, −0.0002. Masks as in run 7 (joint 0.759, menisci 0.565 and 0.548).
+- Reading (one run): the coronal T1/PD view at 84 mm loses the MCL, read much better alone at
+  93 mm, yet the model's MCL does not move, so the fluid view was already supplying it. Not
+  adopted; the configuration change stays uncommitted in the worktree.
+
 ## Next experiment: changes agreed while `rn18-every-target-on-a-structure` ran (2026-10-09)
 
 Base: the working copy `/home/claudio/src/knee-abnormality-anatomy-routing` as that run has it
