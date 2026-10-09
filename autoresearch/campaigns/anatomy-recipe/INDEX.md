@@ -1,6 +1,6 @@
 # Anatomy-recipe campaign
 
-**Created on 2026-10-08, not started.** The successor of the
+**Ran on 2026-10-08 and was stopped by the user at 17:20 CEST after seven runs and one adoption (the report-attribute loss off); results are in the [run notes](run-notes.md).** The successor of the
 [anatomy-masks campaign](../anatomy-masks/INDEX.md) on the recipe the user adopted from it: the
 joint centre read from the anatomy map, with the training speed-ups and the two-knee pose fix of
 2026-10-08. Its reference is `rn18-anatomy-map-centre-control`. Seven forced seeds agreed with
