@@ -1239,6 +1239,46 @@ from the worktree `knee-abnormality-coronal-fluid-canvas-fine`, fold 1, seed 111
   93 mm, yet the model's MCL does not move, so the fluid view was already supplying it. Not
   adopted; the configuration change stays uncommitted in the worktree.
 
+## Both coronal views at 93 mm, `rn18-coronal-both-93mm`, and the first pair on the board (2026-10-10)
+
+The recipe on main with coronal T1/PD at 93.33 mm instead of 84 mm (coronal fluid stays at
+93.33 mm): each coronal view at the field where it read better alone in the swap run. One
+configuration line, same worktree, fold 1, seed 1110484336.
+
+| | Run 7 | Retrained | Coronal swap | Both at 93 mm |
+|---|---|---|---|---|
+| ×4 macro AUC | 0.928121 | 0.928120 | 0.928026 | 0.928226 |
+| Best ×1 macro AUC | 0.919392 | 0.918411 | 0.918941 | 0.918769 |
+| Public | 0.955 (S129) | | 0.954 (S131) | not submitted |
+
+- **+0.0001 at ×4: level with run 7**, inside what a rerun gives (±0.0003). Three coronal
+  settings (T1/PD 84 and fluid 93; swapped; both 93) are within 0.0002 of each other at ×4:
+  the coronal fields in this range do not move the model.
+- Per target at ×4 against run 7 (against the retraining; against the swap): Fracture +0.0051
+  (+0.0056; +0.0038), Baker's +0.0026 (+0.0022; +0.0019), ACL +0.0017 (+0.0000; +0.0011),
+  Effusion +0.0004 (+0.0016; +0.0014), Lateral OA +0.0001 (−0.0002; −0.0021), PF OA −0.0001
+  (−0.0030; −0.0016), Contusion −0.0004 (+0.0013; +0.0047), Medial OA −0.0005 (−0.0012;
+  −0.0015), Synovitis −0.0010 (−0.0021; −0.0015), Medial Meniscus −0.0015 (−0.0007; −0.0006),
+  MCL −0.0017 (+0.0029; −0.0001), Lateral Meniscus −0.0033 (−0.0051; −0.0032). Fracture and
+  Baker's are ahead of all three; Lateral Meniscus behind all three.
+- Each coronal view alone at the last epoch ends where it did at 93 mm before: fluid 0.8512
+  (0.8503 in the retraining), T1/PD 0.7395 (0.7414 in the swap run). The single-view gain of
+  the wider T1/PD view (+0.02 macro, MCL +0.14) again does not reach the model.
+- Validation ×1 per epoch against run 7: +0.0022, +0.0001, −0.0017, +0.0000, +0.0007, −0.0021,
+  +0.0002, −0.0004, −0.0006, −0.0004. Training 1,519 s.
+- **S131**, the coronal swap, ×4, τ 0.9, batch 4: **0.954** public (run 7, S129: 0.955).
+- **S132, the first pair: mean of the probabilities of run 7 and the coronal swap**, each at ×4
+  and τ 0.9: **0.955** public. Locally (saved ×4 predictions at τ 1) the mean scores 0.928549,
+  +0.0004 over run 7. The two bundles have different view tables, which one ensemble bundle
+  refuses (members share a loader), so one notebook ran the two existing bundle datasets one
+  after the other and averaged the two files (one-off notebook, record
+  `outputs/submission/records/rn18-ensemble-sag-fine-coronal-fine-f1-x4-tau09.json`).
+- Means of the saved ×4 predictions: run 7 + swap 0.928549, run 7 + both-93 0.928514, swap +
+  both-93 0.928472, all three 0.928593. Every pair adds about +0.0004 to +0.0005 over its
+  members, more than run 7 with its own retraining (+0.0002): models that differ only in the
+  coronal fields are a little less alike than two trainings of the same configuration.
+- Not adopted; the configuration change stays uncommitted in the worktree.
+
 ## Next experiment: changes agreed while `rn18-every-target-on-a-structure` ran (2026-10-09)
 
 Base: the working copy `/home/claudio/src/knee-abnormality-anatomy-routing` as that run has it
