@@ -17,7 +17,7 @@ to its run, fold and epoch, and scores that checkpoint's saved predictions again
 label set: `steven_v4` (`all_5fold_v3`), `combined_v1` (`all_5fold_scanner_v1`) and
 `rebuild_state_v2` (`all_5fold_scanner_v2`). It also scores against their consensus (per label, only
 the studies where all three agree on the hard label) and against the official labels of the
-fold's gold studies. CPU only; artifacts in `outputs/analysis/local-public-metrics-20260928/`.
+fold's gold studies. CPU only; artifacts in `outputs/analysis/l/local-public-metrics-20260928/`.
 
 ```bash
 rtk proxy env CUDA_VISIBLE_DEVICES= uv run --locked python -m scripts.adhoc.correlate_submission_metrics --output-dir outputs/analysis/local-public-metrics-new
@@ -95,7 +95,7 @@ adversarial and confusion runs rank the same way on every metric.
 predictions of the submitted checkpoints: the selected epoch's validation predictions (`val`, 50
 sets, S23–S79) and the ×4 predictions (`x4`, 30 sets, S41–S79). It pairs submissions within the
 cohorts of the [2026-09-28 update](#2026-09-28-update), 317 pairs in all. CPU only, about 20
-minutes; artifacts in `outputs/analysis/grouped-auc-search-20260929/`.
+minutes; artifacts in `outputs/analysis/g/grouped-auc-search-20260929/`.
 
 ```bash
 rtk proxy env CUDA_VISIBLE_DEVICES= uv run --locked python -m scripts.adhoc.correlate_grouped_auc --output-dir outputs/analysis/grouped-auc-search-new
@@ -226,7 +226,7 @@ sets) is the closest analog here and was fixed as primary before the run.
 [`correlate_confidence_pair_auc.py`](../../../scripts/adhoc/correlate_confidence_pair_auc.py)
 scores 40 variants: 4 label sets × {pooled, vendor, vendor × field, scanner model,
 model × field} × {unweighted, confidence}. It uses the same 317 pairs and 5,000 permutations.
-Artifacts are in `outputs/analysis/confidence-pair-auc-20260929/`.
+Artifacts are in `outputs/analysis/c/confidence-pair-auc-20260929/`.
 
 | Variant | Weighted concordance | ×4 decisive | Folds 1–4 |
 |---|---:|---:|---:|
@@ -255,7 +255,7 @@ agrees on 37% of ranked pairs. Gold-only BCE is pure noise.** Since 2026-09-13 n
 ranks the submissions, because their local differences are smaller than one run's training noise.
 
 Reproduce with the [comparison script](../../../scripts/adhoc/compare_local_and_public_scores.py);
-artifacts in `outputs/analysis/local-public-metrics-20260918/`. It reads saved artifacts and
+artifacts in `outputs/analysis/l/local-public-metrics-20260918/`. It reads saved artifacts and
 `scripts/adhoc/submission_public_scores.json` on CPU, refuses an existing output directory, and
 fails if a recomputed macro AUC differs from the run's saved metrics:
 

@@ -289,7 +289,7 @@ ideas:
   - 'Tissue more than 10 mm past 140 mm: 34% of sagittal, 16% of axial and 9% of coronal
     series (prior-work.md, Geometry); only a wider field removes it, since the tissue
     is already centred.'
-  - 'The mask and its checks: outputs/analysis/input-resolution-research-20260915/images/common.py
+  - 'The mask and its checks: outputs/analysis/i/input-resolution-research-20260915/images/common.py
     (tissue_mask) and scripts/adhoc/check_narrow_field_fit.py.'
   novelty: A field chosen per series from measured extent; no trained model in the
     loader.
@@ -571,7 +571,7 @@ ideas:
   - field-120-single +0.0011 (80% [-0.0004, +0.0026]), field-160-single-logged -0.0034,
     mixed-field-140-160 -0.0013 with val_macro_auc_field_narrow 0.9079 against field_wide
     0.9035 (this campaign).
-  - 'Direct 120 against 160 comparison per label: outputs/analysis/mixed-field-120-vs-160.'
+  - 'Direct 120 against 160 comparison per label: outputs/analysis/m/mixed-field-120-vs-160.'
   - 'Single-plane inference on the ReXNet control (older split and labels): axial
     alone loses 0.15-0.22 on the menisci and 0.084 on ACL but only 0.006 on effusion
     and 0.001 on Baker''s cyst; synovitis loses 0.017 from axial or sagittal alone
@@ -628,11 +628,11 @@ ideas:
   precedents:
   - 'This campaign: field-120-single +0.0011 (80% [-0.0004, +0.0026]), plane-weighted-fields
     +0.0011 ([-0.0003, +0.0024]), field-160-single-logged -0.0034, mixed-field-140-160
-    -0.0013; 120 against 160 directly +0.0046 (95% [+0.0016, +0.0076]), outputs/analysis/mixed-field-120-vs-160.'
-  - 'Label reliance by series type: outputs/analysis/type-importance-20260917/label_type_importance.csv
+    -0.0013; 120 against 160 directly +0.0046 (95% [+0.0016, +0.0076]), outputs/analysis/m/mixed-field-120-vs-160.'
+  - 'Label reliance by series type: outputs/analysis/t/type-importance-20260917/label_type_importance.csv
     (docs/validation/results/2026-09-17-plane-contrast-importance.md); older labels
     and backbone, indicative only.'
-  - 'Acquired resolution by contrast: outputs/analysis/input-resolution-research-20260915/acquisition/series_acquisition.parquet
+  - 'Acquired resolution by contrast: outputs/analysis/i/input-resolution-research-20260915/acquisition/series_acquisition.parquet
     (23,173 series): finer-axis resolution at or above 0.5 mm in 50% of series, at
     or above 0.536 mm in 30%.'
   novelty: First field assignment by contrast, first use of 112 mm, and the first

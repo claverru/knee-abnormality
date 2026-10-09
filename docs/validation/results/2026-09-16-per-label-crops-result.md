@@ -21,7 +21,7 @@ targets crop224 lost recovered part of the gap, while effusion and contusion fel
   for the final validation prediction (WSL now at
   47 GiB), 4,380 optimizer steps, peak 19.4 GiB CUDA.
 - **Comparisons:** `scripts/tools/compare_fold_runs.py`, 2,000 paired report-group draws, in
-  `outputs/analysis/per-label-vs-crop224-20260916` and `outputs/analysis/per-label-vs-00-baseline-20260916`.
+  `outputs/analysis/p/per-label-vs-crop224-20260916` and `outputs/analysis/p/per-label-vs-00-baseline-20260916`.
 
 ## Training curve
 
@@ -59,8 +59,8 @@ at 0.8910. Soft-target BCE is 0.44834 (crop224 0.44803). Paired intervals are wi
 ## Placement
 
 `scripts/adhoc/analyze_crop_diversity.py` on the same 48 validation studies (seed 20260916),
-before (`outputs/analysis/crop-diversity-20260916`) and after
-(`outputs/analysis/crop-diversity-per-label-20260916`):
+before (`outputs/analysis/c/crop-diversity-20260916`) and after
+(`outputs/analysis/c/crop-diversity-per-label-20260916`):
 
 | Plane | Cell entropy, bits | Distinct cells of 36 | Modal cell share | Offset std (x, y) mm |
 |---|---|---|---|---|

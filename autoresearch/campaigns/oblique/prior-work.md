@@ -1,7 +1,7 @@
 # Oblique prior work
 
 Evidence map for the [oblique campaign](contract.md); not a backlog. Analysis scripts and outputs
-are in `outputs/analysis/acquisition-geometry-20260922/` unless stated.
+are in `outputs/analysis/a/acquisition-geometry-20260922/` unless stated.
 
 ## Reference run
 

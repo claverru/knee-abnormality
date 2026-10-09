@@ -170,7 +170,7 @@ ideas:
     series outside the slab becomes "centre_outside_slab". Nothing else in the pool
     changes.
   precedents:
-  - 'outputs/analysis/centre-slab-guard-20261005/summary.json: the counts, the miss
+  - 'outputs/analysis/c/centre-slab-guard-20261005/summary.json: the counts, the miss
     distances and the three outcomes.'
   novelty: First run with one rule for a centre outside a slab.
   coverage: 20 series in 20 training studies change sampling; the diagnostic label

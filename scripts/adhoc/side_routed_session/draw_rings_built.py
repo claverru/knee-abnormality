@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 
-OUT = Path("outputs/analysis/side-routing-attention-shape-20261006")
+OUT = Path("outputs/analysis/s/side-routing-attention-shape-20261006")
 SECTORS = ("AM", "A", "AL", "L", "PL", "P", "PM", "M")
 BANDS = ("tibia", "joint", "upper")
 LEVELS = ((-2.0, -1.05), (-0.55, 0.35), (0.85, 1.8))

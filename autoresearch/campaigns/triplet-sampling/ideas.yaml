@@ -303,7 +303,7 @@ ideas:
   opportunity: 'The two contrast slots of a plane (T1/PD and fluid-sensitive) are
     sampled by independent `select_triplets` calls that share the same study centre,
     nearly the same union support and the same equal-mass band structure, so they
-    land on the same depths. Measured on the fold-0 token cache (`outputs/analysis/token-cache-20260917/`,
+    land on the same depths. Measured on the fold-0 token cache (`outputs/analysis/t/token-cache-20260917/`,
     deterministic x1 selection at training budgets 6/6/5/5/5/5): the share of one
     slot''s selected middles lying within 5 mm of a middle selected in the partner
     slot is axial 0.913 (179 studies), coronal 0.951 (674), sagittal 0.968 (803),
@@ -1144,7 +1144,7 @@ ideas:
   opportunity: 'The training draw is `percentiles = (arange(count) + rng("targets").random(count))
     / count` (sampling.py:476-478): every band jitters independently, so adjacent
     bands routinely collide and the realized bag clumps. New measurement on the fold-0
-    token cache (outputs/analysis/token-cache-20260917, 161,466 candidates, three
+    token cache (outputs/analysis/t/token-cache-20260917, 161,466 candidates, three
     frozen checkpoints, training-scale counts 6/6/5/5/5/5, realized mean 25.36 triplets,
     8 repetitions): the minimum gap between selected middles has p10 3.38 mm under
     independent jitter against 9.92 mm for the deterministic bag, and frozen-model
@@ -1166,7 +1166,7 @@ ideas:
     of the deterministic evaluation lattice. The deterministic validation draw is
     the u = 0.5 member of the same family and is not touched.'
   precedents:
-  - outputs/analysis/token-cache-20260917/README.md
+  - outputs/analysis/t/token-cache-20260917/README.md
   - docs/data-preparation/physical-sampling/implemented-sampler.md
   - docs/validation/results/2026-09-19-relative-sampler-width-result.md
   - docs/history/triplet-budget-allocation.md
@@ -1440,7 +1440,7 @@ ideas:
     same support.'
   precedents:
   - docs/history/triplet-budget-allocation.md
-  - outputs/analysis/token-cache-20260917/README.md (scaled-allocation smoke table)
+  - outputs/analysis/t/token-cache-20260917/README.md (scaled-allocation smoke table)
   - docs/validation/results/2026-09-17-test-time-allocation.md
   - 'In-Context Multiple Instance Learning (arXiv 2606.06458): three-stage bag-size
     curriculum from [2,8] to [6,20] instances, with difficulty rising in bag size'
@@ -1694,7 +1694,7 @@ ideas:
     variance-reduction form
   - 'token-cache decomposition recorded at revision 63: regularity of the realized
     set worth ~+0.009-0.013 at matched counts, density shape at most ~+0.002'
-  - outputs/analysis/token-cache-20260917/ (frozen-model scoring path)
+  - outputs/analysis/t/token-cache-20260917/ (frozen-model scoring path)
   novelty: 'OVERLAP DISCLOSED UP FRONT, because it is the one thing an orchestrator
     must weigh. Written as an offset decomposition this is ''a shared coarse offset
     plus a per-band fine residual'', and the revision-94 review forbade ''a residual-per-band-jitter
@@ -2263,7 +2263,7 @@ ideas:
     and by the revision-127 researcher to be inert at the realized level; that null
     bounds the FINE within-sub-band offset and is orthogonal to the temporal order
     of the coarse stratum
-  - outputs/analysis/token-cache-20260917/ (pool geometry); /tmp/ar2/order2.py, /tmp/ar2/lr.py,
+  - outputs/analysis/t/token-cache-20260917/ (pool geometry); /tmp/ar2/order2.py, /tmp/ar2/lr.py,
     /tmp/ar2/verify.py
   novelty: 'No campaign idea has ever changed WHEN a location is visited at fixed
     WHAT and fixed HOW MANY. Every prior and queued arm changes the content of a bag

@@ -120,9 +120,9 @@ Hard AUC by label:
 All three fold-0 numbers are upper bounds. The teachers trained on studies that
 `all_5fold_scanner_v1` fold 0 holds out, so the child learned indirectly from fold-0 labels.
 
-- **Artifacts:** `outputs/analysis/image-blend-vs-k05-clean/`,
-  `outputs/analysis/soft-auc-image-blend-vs-k05-clean/` and
-  `outputs/analysis/calibrated-judge-image-blend/`.
+- **Artifacts:** `outputs/analysis/i/image-blend-vs-k05-clean/`,
+  `outputs/analysis/s/soft-auc-image-blend-vs-k05-clean/` and
+  `outputs/analysis/c/calibrated-judge-image-blend/`.
 - **Allowed differences:** the comparison allowed the label source and manifest, the
   `oblique_tilt_deg` field, and the preprocessing identity. `k05-clean` ran the main tree's
   uncommitted oblique code with the feature off, which follows `HEAD`'s code path.

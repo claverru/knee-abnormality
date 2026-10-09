@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 
-OUT = Path("outputs/analysis/side-routing-cut-forces-20261006")
+OUT = Path("outputs/analysis/s/side-routing-cut-forces-20261006")
 CORE, RADIUS, LOW, CUT, HIGH, GAP = 0.4, 1.5, -1.9, 0.2, 1.8, 0.22
 TILT = np.radians(15.0)
 LABELS = {

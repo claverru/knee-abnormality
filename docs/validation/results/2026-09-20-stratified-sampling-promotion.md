@@ -86,8 +86,8 @@ predictions, 2,000 paired report-group draws and bootstrap seed 20260914.
 
 | Reference | Reference AUC | Sampler minus reference | 95% interval | Artifact |
 |---|---:|---:|---|---|
-| Control A, seed 1133376617 | 0.893221725 | +0.004293197 | [+0.000412218, +0.007858145] | [Comparison](../../../outputs/analysis/stratified-sampling-vs-overnight-20260920-00-control/comparison.json) |
-| Control B, seed 2263738815 | 0.896581669 | +0.000933253 | [-0.002770911, +0.004524506] | [Comparison](../../../outputs/analysis/stratified-sampling-vs-overnight-20260920-13-control-repeat/comparison.json) |
+| Control A, seed 1133376617 | 0.893221725 | +0.004293197 | [+0.000412218, +0.007858145] | [Comparison](../../../outputs/analysis/s/stratified-sampling-vs-overnight-20260920-00-control/comparison.json) |
+| Control B, seed 2263738815 | 0.896581669 | +0.000933253 | [-0.002770911, +0.004524506] | [Comparison](../../../outputs/analysis/s/stratified-sampling-vs-overnight-20260920-13-control-repeat/comparison.json) |
 
 The interval is positive against A and inconclusive against B. This adds control
 comparisons, not a new sampler training seed or independent confirmation. The gain
@@ -124,7 +124,7 @@ uses 2,000 draws across 852 groups, seed 20260914: mean delta −0.002352381,
 95% percentile interval **[−0.006064169, +0.001371058]**. Every draw was valid.
 Saved predictions reproduce both recorded selected-epoch AUCs. Full per-target,
 vendor, timing and provenance results are in the
-[comparison artifact](../../../outputs/analysis/another-stratified-vs-original-20260920/comparison.json).
+[comparison artifact](../../../outputs/analysis/a/another-stratified-vs-original-20260920/comparison.json).
 
 Largest point-estimate drops are lateral meniscus (−0.011011) and synovitis
 (−0.010139); lateral OA increases by +0.005658. These per-label differences are
@@ -154,8 +154,8 @@ valid and saved predictions reproducing the selected-epoch metrics.
 
 | Reference | Reference AUC | New sampler minus reference | 95% interval | Artifact |
 |---|---:|---:|---|---|
-| Control A, seed 1133376617 | 0.893221725 | +0.001955078 | [−0.001943214, +0.005604234] | [Comparison](../../../outputs/analysis/another-stratified-vs-00-control-20260920/comparison.json) |
-| Control B, seed 2263738815 | 0.896581669 | −0.001404866 | [−0.005465397, +0.002501534] | [Comparison](../../../outputs/analysis/another-stratified-vs-13-control-repeat-20260920/comparison.json) |
+| Control A, seed 1133376617 | 0.893221725 | +0.001955078 | [−0.001943214, +0.005604234] | [Comparison](../../../outputs/analysis/a/another-stratified-vs-00-control-20260920/comparison.json) |
+| Control B, seed 2263738815 | 0.896581669 | −0.001404866 | [−0.005465397, +0.002501534] | [Comparison](../../../outputs/analysis/a/another-stratified-vs-13-control-repeat-20260920/comparison.json) |
 
 The new result lies between the two controls, and both intervals include zero.
 Together with its inconclusive comparison against the original sampler, this run

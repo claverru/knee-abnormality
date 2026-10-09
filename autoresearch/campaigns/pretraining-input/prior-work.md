@@ -2,7 +2,7 @@
 
 What is known before the first run. Run rows are one run each and weak evidence. Gap
 measurements are label-free, made on 2026-10-04 with the frozen Refined-RadImageNet ResNet-10t;
-their scripts are in `outputs/analysis/pretraining-gap-20261004/`.
+their scripts are in `outputs/analysis/p/pretraining-gap-20261004/`.
 
 ## How the gap is measured
 

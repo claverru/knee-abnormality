@@ -100,7 +100,7 @@ MRI_CONTEXT = {
 
 class AuditCLI(CLISettings):
     data_root: Path = Path("data/raw")
-    output_dir: Path = Path("outputs/analysis/knee-laterality-20260914")
+    output_dir: Path = Path("outputs/analysis/k/knee-laterality-20260914")
     headers: Path | None = None
     workers: int = Field(default=2, ge=1, le=8)
 

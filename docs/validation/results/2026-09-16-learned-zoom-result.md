@@ -19,8 +19,8 @@ glimpses at inference changes nothing, so the model is in effect a 0.875 mm cont
 - **Run:** `outputs/training/learned-zoom`, best epoch 9.
 - **Cost:** 246–262 s per epoch including validation (shared crops 237 s), 59 s for the final
   validation prediction, peak 22.4 GiB CUDA.
-- **Artifacts:** probes in `outputs/analysis/learned-zoom-probes`, comparisons in
-  `outputs/analysis/zoom-vs-per-label-20260916` and `outputs/analysis/zoom-vs-shared-20260916`.
+- **Artifacts:** probes in `outputs/analysis/l/learned-zoom-probes`, comparisons in
+  `outputs/analysis/z/zoom-vs-per-label-20260916` and `outputs/analysis/z/zoom-vs-shared-20260916`.
 
 ## Training curve
 

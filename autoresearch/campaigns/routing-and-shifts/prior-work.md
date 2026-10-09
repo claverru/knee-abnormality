@@ -98,14 +98,14 @@ Public scores of the line: 0.952 (S112, run 2), 0.953 (S113, run 4), 0.952 (S114
 ## Measured, with drawings
 
 - **Free attention of every target** (old recipe, ten most attended tokens on positive knees,
-  874 validation knees): `outputs/analysis/side-routing-old-vs-reference-20261006/` (`old.npz`,
+  874 validation knees): `outputs/analysis/s/side-routing-old-vs-reference-20261006/` (`old.npz`,
   `reference.npz`, `old-vs-reference.png`). Share of the old model's attention outside the
   incumbent's region: ACL 35% (95% of it below the lower cut), Synovitis 34%, MCL 29%, Effusion
   24%, PF OA 13%, Lateral OA 13%, the rest 6% or less.
 - **Attention spots** in the fitted frame (medial, front, up; mm): Medial Meniscus (26, −7, −7),
   Lateral Meniscus (−29, −5, −7), ACL (−6, −2, −1), PF OA (−2, 32 to 36, 13), Effusion (−6, 26,
   32), Synovitis (−3, 13, 19); each a blob of 15 to 20 mm, the same with and without the finding.
-- **Which targets hold each cut** (`outputs/analysis/side-routing-cut-forces-20261006/cut-forces.png`):
+- **Which targets hold each cut** (`outputs/analysis/s/side-routing-cut-forces-20261006/cut-forces.png`):
   the midline and the core radius have targets on both sides; the ring radius (ACL alone), the
   upper cut (nothing above) and the lower cut (nothing below) do not.
 - **The finest division with every cut held, medial and lateral mirrored**

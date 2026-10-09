@@ -213,7 +213,7 @@ ideas:
     is stratified, not grouped, by scanner. A model that cannot read the scanner from
     its features has to rank by image evidence.'
   mechanism: 'Target: the eight scanner groups of data/folds/all_5fold_scanner_v1/protocol.json,
-    from outputs/analysis/sharing-disagreement-20260914/study_headers.parquet (check
+    from outputs/analysis/s/sharing-disagreement-20260914/study_headers.parquet (check
     SHA-256 8714fa8b025afe0ff47d0811ca735f0ec75c84808b462486db19553d0c3058f4): Siemens,
     Philips and GE split by MagneticFieldStrength into 3T (>= 2), 1.5T (< 2) and unknown;
     every other vendor pooled as minor. Head: a gradient-reversal layer on the study
@@ -966,7 +966,7 @@ ideas:
     \ produce identity modulation. Add no metadata-only disease-logit path or identity\
     \ fields."
   precedents:
-  - '[Header artifact](/home/claudio/src/knee-abnormality/outputs/analysis/sharing-disagreement-20260914/study_headers.parquet),
+  - '[Header artifact](/home/claudio/src/knee-abnormality/outputs/analysis/s/sharing-disagreement-20260914/study_headers.parquet),
     SHA-256 8714fa8b025afe0ff47d0811ca735f0ec75c84808b462486db19553d0c3058f4, supplied
     the measured training coverage. It contains one representative series per study.'
   - A read-only CPU check parsed the five fields from 32 existing representative DICOMs
@@ -1087,7 +1087,7 @@ ideas:
     identity available to a candidate without re-reading every DICOM header.'
   mechanism: 'Same detached head, bounded confusion term, weight 0.1 and ramp as the
     incumbent. One change: the target becomes the study''s (Manufacturer, ManufacturerModelName)
-    from outputs/analysis/sharing-disagreement-20260914/study_headers.parquet (same
+    from outputs/analysis/s/sharing-disagreement-20260914/study_headers.parquet (same
     SHA-256 check), keeping the 30 models with at least 30 studies in the whole table
     and pooling the rest into one "other" class, 31 classes; the prior for the KL
     is the training fold''s class frequencies. Log head accuracy and loss against
@@ -1310,7 +1310,7 @@ ideas:
     saved predictions and export use f(x) alone) on top of the incumbent, with one
     change: the table is 31 x 12 over scanner models instead of 8 x 12 over groups.
     Models follow scanner-model-confusion-target: (Manufacturer, ManufacturerModelName)
-    from outputs/analysis/sharing-disagreement-20260914/study_headers.parquet (same
+    from outputs/analysis/s/sharing-disagreement-20260914/study_headers.parquet (same
     SHA-256 check), the 30 models with at least 30 studies in the whole table, the
     rest pooled into one other class. The incumbent''s 8-group confusion head stays.
     Setting trainer.metadata_heads.site_bias with a model-resolution selector. Log
@@ -1577,7 +1577,7 @@ ideas:
     \ and studies with no surviving coronal tokens. Scanner identity is used only\
     \ to construct targets; it is not a head input. Drop the head at inference."
   precedents:
-  - '[Existing header table](/home/claudio/src/knee-abnormality/outputs/analysis/sharing-disagreement-20260914/study_headers.parquet),
+  - '[Existing header table](/home/claudio/src/knee-abnormality/outputs/analysis/s/sharing-disagreement-20260914/study_headers.parquet),
     SHA-256 8714fa8b025afe0ff47d0811ca735f0ec75c84808b462486db19553d0c3058f4. Training-fold
     analysis used canonical eight-group mapping, not the table''s finer raw scanner_group
     strings.'

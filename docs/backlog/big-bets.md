@@ -189,11 +189,11 @@ the control's.
 - **A balanced batch on widths** (six to eight runs): each run gives every type one of four or
   five widths, arranged so each type's response curve per label comes out of the batch,
   including the untried cells. These runs inform; they are not candidates. The width regression
-  (`outputs/analysis/view-regression-20261002/report.md`, refit with
+  (`outputs/analysis/v/view-regression-20261002/report.md`, refit with
   `scripts/adhoc/fit_view_width_regression.py`) proposes the combination; confirm it with a
   rerun, then outside fold 0.
 - **A budget batch:** reallocations at 26 slices from the per-type sensitivity measured on
-  Kaggle (`outputs/analysis/slice-budget-20261002/sensitivity/`). Evidence against: the learned
+  Kaggle (`outputs/analysis/s/slice-budget-20261002/sensitivity/`). Evidence against: the learned
   budget moves a quarter of a slice and loses 0.0016 on the hand views.
 - **A view added on top of a type's slices, not carved out of them** (guess): a second
   sagittal-fluid view and a zoomed patellofemoral axial-fluid view both lost on the slices they
@@ -437,7 +437,7 @@ oedema poorly, so its weakest label there, contusion (0.848 against 0.906, 14 po
 be recoverable from a reformat. Revisit only if those subsets turn out to fail on the leaderboard
 or a cheaper reformat path appears; the gate would be a frozen-checkpoint fill on fold 0 before
 any training. Counts, protocols and subset scores:
-`outputs/analysis/acquisition-geometry-20260922/` (`missing_slots`, `iso3d_profile`,
+`outputs/analysis/a/acquisition-geometry-20260922/` (`missing_slots`, `iso3d_profile`,
 `fill_composition`, `mpr_subset`).
 
 ### Other parked work

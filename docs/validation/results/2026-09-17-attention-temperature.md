@@ -20,12 +20,12 @@ be recomputed without the backbone.
   count-normalised attention, which subtracts `log(valid tokens contributed by that series)` from
   each token's score before the softmax
   ([proposal](../../backlog/small-changes.md#attention-pooling)).
-- **Caches:** `outputs/analysis/token-cache-20260917/` (`ranked-filtered-seed{42,43,44}`, means
-  over the three) and `outputs/analysis/token-cache-allocation-20260917/`
+- **Caches:** `outputs/analysis/t/token-cache-20260917/` (`ranked-filtered-seed{42,43,44}`, means
+  over the three) and `outputs/analysis/t/token-cache-allocation-20260917/`
   (`allocation-concentration`). Both carry the whole-series intensity window, within 1.2e-4 macro
   AUC of the pipeline at the default allocation.
 - **Check:** τ = 1 reproduces the caches' own pooling to 6–8e-15 and the published numbers exactly.
-- **Outputs and scripts:** `outputs/analysis/pooling-bagsize-20260917/` (`pooling_lib.py`,
+- **Outputs and scripts:** `outputs/analysis/p/pooling-bagsize-20260917/` (`pooling_lib.py`,
   `run_variants.py`, `tau_sweep.py`, `tau_bootstrap.py`, `results_*.json`, `tau_sweep_*.json`,
   `tau_bootstrap.json`, `README.md`).
 

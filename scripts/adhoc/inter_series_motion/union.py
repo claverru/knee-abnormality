@@ -2,7 +2,7 @@ import os
 
 import polars as pl
 
-out = "outputs/analysis/inter-series-motion-20261005/"
+out = "outputs/analysis/i/inter-series-motion-20261005/"
 if os.path.exists(out + "smoke.parquet"):
     os.remove(out + "smoke.parquet")
 c = pl.read_parquet(out + "cross_plane_sample200.parquet").filter(pl.col("kind") == "pair")

@@ -36,7 +36,7 @@ marked with their source; hypotheses are marked as such.
 - **Robust centre.** Refit dropping the worst series above 10 mm, then a sagittal-centre
   fallback; out-of-range series sample locally; token geometry no longer requires physical
   sampling. Implemented 2026-09-23 behind `data.robust_study_center` and removed uncommitted the
-  same day; preserved as `outputs/analysis/robust-center-rescore-20260923/robust_center.patch`,
+  same day; preserved as `outputs/analysis/r/robust-center-rescore-20260923/robust_center.patch`,
   which applies cleanly to `d914079`. Its `identity.py` hunk must move into `RELIABILITY`, since
   `identity.py` is protected.
 - **Robust-centre gate** (measured 2026-09-23, `image-blend` epoch 8, ×4, τ 1, inference only):
@@ -44,12 +44,12 @@ marked with their source; hypotheses are marked as such.
   (80% [−0.00006, +0.00026]); bias alone with centres unchanged +0.00009 (80% [+0.00003,
   +0.00015]), all from the meniscus and OA pairs. Sampling alone therefore adds about +0.00001;
   the value is the geometry every later mechanism needs
-  (`outputs/analysis/robust-center-rescore-20260923/`).
+  (`outputs/analysis/r/robust-center-rescore-20260923/`).
 
 ## Midline
 
 Measured 2026-09-23 on train (n = 4,229 with both values;
-`outputs/analysis/midline-vs-centre-20260923/result.md`):
+`outputs/analysis/m/midline-vs-centre-20260923/result.md`):
 
 - `knee_center_x_mm` is the median of series centre x over all series (`laterality.py`), not the
   fitted centre. The two differ by a median 1.55 mm, p90 5.7 mm, p95 8.6 mm, max 23.7 mm; 12.5%
@@ -65,7 +65,7 @@ Measured 2026-09-23 on train (n = 4,229 with both values;
 ## Knee rotation
 
 Measured 2026-09-23 from headers, 4,410 studies
-(`outputs/analysis/knee-rotation-survey-20260923/result.md`):
+(`outputs/analysis/k/knee-rotation-survey-20260923/result.md`):
 
 - The sagittal slice normal deviates from scanner X about the superior-inferior axis by a median
   6.7°, p90 16.2°, p95 19.3°, max 40.9°; 60% of studies above 5°, 30% above 10°, 12% above 15°.
@@ -80,7 +80,7 @@ Measured 2026-09-23 from headers, 4,410 studies
 
 - **Unknown side:** 170 of 4,410 studies (3.9%; 27 of 905 on fold 0): 107 without metadata and
   centred on the scanner origin, 33 conflicting metadata, 15 coordinates contradicting metadata,
-  14 text only, 1 bilateral tag (`outputs/analysis/knee-side-policy-20260914/studies.parquet`).
+  14 text only, 1 bilateral tag (`outputs/analysis/k/knee-side-policy-20260914/studies.parquet`).
 - **Bilateral studies**
   ([contralateral knee](../../../docs/research/series-filtering-signals.md#contralateral-knee)):
   seven training studies hold two full knee protocols (Philips, `SENSE_HR_KNEE_AC`, one contiguous
@@ -103,7 +103,7 @@ Measured 2026-09-23 from headers, 4,410 studies
   remove sibling pixels from each token.
 - **Trained side mask, `side-mask`** ([result](../../../docs/validation/results/2026-09-23-side-mask-and-token-attention.md#trained-side-mask-side-mask); 2026-09-23, `model.compartment_evidence: side_mask` on the
   `sibling-masking` branch, patch in
-  `outputs/analysis/side-mask-vs-k05-clean/side_mask.patch`, applies to `d914079`): the four
+  `outputs/analysis/s/side-mask-vs-k05-clean/side_mask.patch`, applies to `d914079`): the four
   compartment labels attend only to own-side tokens plus the ±10 mm band; unknown side or invalid
   geometry stays visible to both sides. Epoch 8 selected (×1 0.90191), 1,583 s, 20.9 GB.
   - Macro ×4 0.903969 against 0.902760, **+0.0012**, 80% [−0.0004, +0.0028], misses the rule;
@@ -155,7 +155,7 @@ guide. Family deltas:
 
 - **Usefulness by slice position**
   ([spatial importance map](../../../docs/data-preparation/peripheral-coverage.md#spatial-importance-map),
-  `outputs/analysis/spatial-importance-20260918/axis_marginals.csv`): sagittal has a middle dip
+  `outputs/analysis/s/spatial-importance-20260918/axis_marginals.csv`): sagittal has a middle dip
   (91% of peak) and humps at ±31.5 mm; coronal and axial peak at the centre, coronal staying
   higher anteriorly, axial superiorly. About half the map follows distance from the centre, the
   old sampler's envelope; the dip and humps do not.
@@ -164,7 +164,7 @@ guide. Family deltas:
   ([result](../../../docs/validation/results/2026-09-18-per-plane-sigma-cache.md)).
 - **Density gate on `k05-clean`** (measured 2026-09-23, real prediction pipeline with only
   `select_triplets` swapped; baseline reproduces the saved predictions to 5.5e-5; triplet counts
-  match; `outputs/analysis/two-peak-sagittal-gate-20260923/result.md`):
+  match; `outputs/analysis/t/two-peak-sagittal-gate-20260923/result.md`):
   - Density proportional to each plane's measured curve (sagittal symmetrized, edge value held):
     ×4 −0.00057, 80% [−0.00120, +0.00008]; ×1 −0.0019. Pool depth is positive toward left,
     posterior and superior, matching the curve file; `sampling_curve.py` there is a working
@@ -184,12 +184,12 @@ guide. Family deltas:
 - **Token graph** (kNN message passing with LPS offsets) stayed near initialization in both
   fold-0 runs ([lineage](../../../docs/history/model-lineage.md#retired-token-graph)).
 - **`token-attention`** ([result](../../../docs/validation/results/2026-09-23-side-mask-and-token-attention.md#global-token-attention-token-attention); 2026-09-23, branch `token-attention`, patch in
-  `outputs/analysis/token-attention-vs-k05-clean/token_attention.patch`): one pre-norm transformer
+  `outputs/analysis/t/token-attention-vs-k05-clean/token_attention.patch`): one pre-norm transformer
   block over each study's valid tokens with 3D RoPE on raw patient LPS (not side-normalized,
   relative only), 1D and 2D embeddings dropped, reflected studies negate x. Against `k05-clean`:
   macro ×4 0.901284, −0.0015 (95% [−0.0054, +0.0022]); meniscus +0.0027, OA +0.0035, other eight
   −0.0038 with PF OA −0.0152, Fracture −0.0153, MCL −0.0059; selected checkpoint `best-epoch=09`, 1,624 s
-  (`outputs/analysis/token-attention-vs-k05-clean/comparison.json`). The attention block and the
+  (`outputs/analysis/t/token-attention-vs-k05-clean/comparison.json`). The attention block and the
   dropped embeddings are confounded.
 
 ## Out of scope by user decision

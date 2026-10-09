@@ -3,7 +3,7 @@
 Researched on 2026-09-15 from four sources: an acquisition-header audit of all train and
 example-test series, image measurements on 300 series, this repository's past results, and
 a literature and competition review. Artifacts and scripts are in
-`outputs/analysis/input-resolution-research-20260915/` (`acquisition/`, `images/`). The
+`outputs/analysis/i/input-resolution-research-20260915/` (`acquisition/`, `images/`). The
 [crop-run evidence](#evidence-from-the-crop-runs) was added on 2026-09-16; none of it is a
 controlled resolution test.
 
@@ -72,7 +72,7 @@ the [end of the competition](../backlog/endgame.md#bigger-images).
 - **Baker's cyst clipping was a 112 mm crop-era loss.** Its per-label evidence is the centred-crop
   drop (−0.028) and the 128–130 mm losses. The three Baker's-positive fold-0 studies whose
   prediction fell most under the centred 112 mm crop (0.95 → 0.22, 0.91 → 0.25, 0.92 → 0.32 in
-  `outputs/analysis/crop-placement-20260915/`) were reviewed on fluid-sensitive slices. In two of
+  `outputs/analysis/c/crop-placement-20260915/`) were reviewed on fluid-sensitive slices. In two of
   them (…93267826, …11059491) the cyst lies just outside 112 mm and inside 140 mm; the third is
   unclear.
 - **Placement reopened, 2026-09-21 (user decision):** anatomy-anchored crop placement (joint line
@@ -112,13 +112,13 @@ both at 224 px), with [`check_narrow_field_fit`](../../scripts/adhoc/check_narro
 
 ```bash
 rtk proxy uv run --locked python -m scripts.adhoc.check_narrow_field_fit \
-  --output-dir outputs/analysis/narrow-field-fit-20261001
+  --output-dir outputs/analysis/n/narrow-field-fit-20261001
 ```
 
 It reuses the tissue edges and joint-line offsets of the 300-series sample above (292 with a usable
 mask, middle slice, image-centred fields as the loader crops them) and draws 24 series per plane
 with the fields overlaid. Artifacts: `clip_depth.csv`, `joint_margin.csv` and three contact sheets
-in `outputs/analysis/narrow-field-fit-20261001/`. Shares are population-weighted; with 96–99 series
+in `outputs/analysis/n/narrow-field-fit-20261001/`. Shares are population-weighted; with 96–99 series
 per plane a share near 30% carries about ±9 points.
 
 **An image-centred 120 mm field (0.536 mm) holds the tibiofemoral joint and cuts the periphery.**

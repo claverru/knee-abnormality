@@ -254,7 +254,7 @@ but cannot by themselves resolve an incorrectly specified clinical endpoint.
 The archived command (`f076a09:docs/history/sharing-sources/audit_sharing_disagreements.py.txt`)
 is preserved with [runtime requirements](../sharing-sources/README.md).
 All evidence is under
-[`outputs/analysis/sharing-disagreement-20260914/`](../../../outputs/analysis/sharing-disagreement-20260914):
+[`outputs/analysis/s/sharing-disagreement-20260914/`](../../../outputs/analysis/s/sharing-disagreement-20260914):
 
 - `blind_reports.json`, `rubric.json`, `selection_key.json`: frozen sample,
   review instructions and separately stored unblinding information.

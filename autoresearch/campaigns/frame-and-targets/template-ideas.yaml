@@ -11,7 +11,7 @@ ideas:
     0.02, -0.24); a lean learned from the labels went to one value for every knee and traded
     against the frame's tilt. A research review of the runs (keeper's notes, 2026-10-07) pointed
     at using all the femur-band tokens at once. Checked without training on the bone-head run's
-    weights (outputs/analysis/frame-and-targets/template-bend/): for each of the 874 validation
+    weights (outputs/analysis/f/frame-and-targets/template-bend/): for each of the 874 validation
     knees, the rotation about the femur-spot hinge that best matches the knee's sagittal tokens
     to the average token at each place, estimated separately from the T1/PD series and from the
     fluid series of the same knee, agrees between the two with a correlation of 0.76 (796
@@ -47,7 +47,7 @@ ideas:
     Above the upper cut the femur edema targets read the core half and the inner-ring sectors
     of their side, around the turned axis; in the joint band they read as today.
   precedents:
-  - "outputs/analysis/frame-and-targets/template-bend/: template_bend.py (the check as run: three rounds over the validation knees), template-bend.csv, template-bend.png."
+  - "outputs/analysis/f/frame-and-targets/template-bend/: template_bend.py (the check as run: three rounds over the validation knees), template-bend.csv, template-bend.png."
   - "frame-and-targets run notes, runs 3 and 4: the bone head's spots and the failure of angles read from them."
   - "outputs/training/20261007-101112-side-routed-femur-lean and femur-section-on-spot-placed-cuts-2: the two earlier femur sections and how they failed."
   novelty: First frame angle obtained by registering a band of tokens to a template; first that uses neither a landmark pair nor the label gradient.
@@ -67,7 +67,7 @@ ideas:
     outputs/autoresearch/frame-and-targets/experiments/femur-section-on-spot-placed-cuts-2-20261007T125017Z-e395eccf
     (source/ and changes.diff): keep its bone head and spot-placed cuts; replace its shear and
     its lean. The withdrawn mirrored-spot requirement of the first bone-head seed is not a gate.
-    The check script outputs/analysis/frame-and-targets/template-bend/template_bend.py shows
+    The check script outputs/analysis/f/frame-and-targets/template-bend/template_bend.py shows
     the binning, the scoring and the sign of the turn on cached tokens; port its arithmetic
     into study_frames as torch code on the batch's tokens, with running buffers in place of its
     three passes. Create the buffers under torch.random.fork_rng, register them as persistent,
@@ -93,7 +93,7 @@ ideas:
     The user's direction in full: one tilt for the tibia and one for the femur. The same
     template matching that gives the femur band's direction was checked on the tibia band,
     hinged at the tibia spots, on the same weights
-    (outputs/analysis/frame-and-targets/template-bend/template-bend-tibia.csv): the estimates
+    (outputs/analysis/f/frame-and-targets/template-bend/template-bend-tibia.csv): the estimates
     from the T1/PD series and from the fluid series of one knee correlate at 0.59 (797 knees),
     with a spread of 10 degrees; weaker than the femur's 0.76, at the edge of the 0.6 the check
     asked for. The tibia and femur angles of a knee correlate at 0.25, so they are mostly
@@ -112,7 +112,7 @@ ideas:
     spots on top of it, with a estimated from tokens expressed in the frame already turned by
     b. Neither angle receives a gradient.
   precedents:
-  - "outputs/analysis/frame-and-targets/template-bend/: template_bend_tibia.py and template-bend-tibia.csv."
+  - "outputs/analysis/f/frame-and-targets/template-bend/: template_bend_tibia.py and template-bend-tibia.csv."
   - "frame-and-targets, forward-tilt-from-the-meniscus-front-and-back-spots and frame-read-from-the-spots: a tibia tilt read from attention spots moved with training (9, 15, 21 degrees)."
   novelty: First frame with a separate, measured tilt for each bone.
   coverage: Every knee with sagittal series and the four bone spots; each angle falls back to zero on its own.
@@ -128,7 +128,7 @@ ideas:
     Follow the environment paragraph of the developer instructions. Build on the candidate of
     femur-section-turned-to-a-running-template if it exists under this campaign's experiments
     (its source/ and changes.diff), otherwise as that seed describes. The tibia check script is
-    outputs/analysis/frame-and-targets/template-bend/template_bend_tibia.py (it flips the height
+    outputs/analysis/f/frame-and-targets/template-bend/template_bend_tibia.py (it flips the height
     axis to reuse the femur code; implement the tibia grid directly, without the flip, and
     report the sign with the same made-up-turn check as the femur's: a known turn of the tibia
     band's tokens about the tibia hinge is recovered to within 3 degrees). Update

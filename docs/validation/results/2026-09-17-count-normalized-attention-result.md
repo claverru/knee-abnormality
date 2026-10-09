@@ -20,7 +20,7 @@ count vary between epochs, which is the condition under which count normalisatio
 help. `allocation-concentration` therefore isolates the normalisation.
 
 - **Comparison:** `scripts/tools/compare_fold_runs.py`, 2,000 paired report-group bootstrap draws,
-  artifacts in `outputs/analysis/count-norm-vs-allocation/`. Predictions differ by a mean 0.045.
+  artifacts in `outputs/analysis/c/count-norm-vs-allocation/`. Predictions differ by a mean 0.045.
 - **Macro Δ against `allocation-concentration`:** −0.00346 [−0.00693, −0.00011].
 - **Families:** meniscus −0.0091 [−0.0178, −0.0012], OA −0.0020 [−0.0085, +0.0043], the other eight
   −0.0024 [−0.0067, +0.0017].

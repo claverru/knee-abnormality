@@ -21,7 +21,7 @@ from knee_abnormality.modeling.model import ROUTING_MINIMUM_WEIGHT
 
 RUN = Path(sys.argv[1])
 COUNT = int(sys.argv[2])
-OUT = Path("outputs/analysis/side-routing-loop-20261006") / RUN.name[16:]
+OUT = Path("outputs/analysis/s/side-routing-loop-20261006") / RUN.name[16:]
 OUT.mkdir(parents=True, exist_ok=True)
 config = load_config(RUN / "effective_config.json")
 targets, studies, split = prediction_studies(config, "validation", 1)

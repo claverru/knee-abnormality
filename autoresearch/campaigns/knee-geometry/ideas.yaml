@@ -24,10 +24,10 @@ ideas:
     but its tokens get invalid geometry. (3) Midline: medial_mm uses the fitted centre''s
     x instead of the median series x. Unknown side still gives no bias.'
   precedents:
-  - 'outputs/analysis/robust-center-rescore-20260923/robust_center.patch: robust refit
+  - 'outputs/analysis/r/robust-center-rescore-20260923/robust_center.patch: robust refit
     and fallback, applies to d914079; inference gate +0.0001, bias alone +0.00009
     [80% +0.00003, +0.00015].'
-  - 'outputs/analysis/midline-vs-centre-20260923/result.md: midline vs fitted x, median
+  - 'outputs/analysis/m/midline-vs-centre-20260923/result.md: midline vs fitted x, median
     1.55 mm, p95 8.6 mm, 12.5% above 5 mm; worst cases are off-centre sagittal slabs.'
   - 'docs/research/series-filtering-signals.md#contralateral-knee: seven bilateral
     studies, X sign separates the knees.'
@@ -90,7 +90,7 @@ ideas:
     keep scanner X. Everything else, including the bias and any mask, reads medial_mm
     unchanged.
   precedents:
-  - 'outputs/analysis/knee-rotation-survey-20260923/result.md: median 6.7 deg, 30%
+  - 'outputs/analysis/k/knee-rotation-survey-20260923/result.md: median 6.7 deg, 30%
     above 10 deg; several sagittal series of one study agree (median spread 0 deg).'
   novelty: The medial axis has always been scanner X.
   coverage: Compartment labels through the bias and any mask; matters most in the
@@ -138,10 +138,10 @@ ideas:
     no own-side token falls back to all its tokens. OA and the other eight labels
     are unchanged.
   precedents:
-  - 'outputs/training/side-mask and outputs/analysis/side-mask-vs-k05-clean: trained
+  - 'outputs/training/side-mask and outputs/analysis/s/side-mask-vs-k05-clean: trained
     mask for both families; strata Medial Meniscus +0.0031/+0.0056, Lateral Meniscus
     +0.0063/+0.0047 (sibling-clean/sibling-positive).'
-  - 'outputs/analysis/side-mask-vs-k05-clean/side_mask.patch: implementation (model.compartment_evidence),
+  - 'outputs/analysis/s/side-mask-vs-k05-clean/side_mask.patch: implementation (model.compartment_evidence),
     applies to d914079.'
   novelty: Restricts the measured mask to the family it helped; the OA loss that cancelled
     the gain is removed by design.
@@ -201,7 +201,7 @@ ideas:
     is positive toward left, posterior and superior, matching the file. Local pools,
     triplet counts and validation determinism are unchanged.
   precedents:
-  - 'outputs/analysis/two-peak-sagittal-gate-20260923/result.md: frozen k05-clean
+  - 'outputs/analysis/t/two-peak-sagittal-gate-20260923/result.md: frozen k05-clean
     with the curve density, x4 -0.00057 [80% -0.00120, +0.00008], despite the train-inference
     sampler mismatch; narrow two-peak -0.00153 [-0.00246, -0.00064]; sampling_curve.py
     implements the density.'
@@ -273,7 +273,7 @@ ideas:
     falls back to them; the completion reports metrics for unknown-side and invalid-geometry
     studies separately.'
   precedents:
-  - 'outputs/analysis/token-attention-vs-k05-clean: dropping 1D/2D with only relative,
+  - 'outputs/analysis/t/token-attention-vs-k05-clean: dropping 1D/2D with only relative,
     raw-LPS 3D RoPE gave -0.0015 (PF OA -0.0152, Fracture -0.0153; meniscus +0.0027,
     OA +0.0035), confounded with an added attention block.'
   - 'docs/inference/submissions/2026-09-15-champion-without-3d-at-inference.md: the
@@ -515,7 +515,7 @@ ideas:
     \ rejected despite +0.001562 macro; meniscus +0.003746, OA \u22120.003079, other-eight\
     \ +0.002176. All three family 95% intervals crossed zero. Compartment margins\
     \ deteriorated; the stratum results do not isolate causal component effects."
-  - '[Original midline audit](/home/claudio/src/knee-abnormality/outputs/analysis/midline-vs-centre-20260923/result.md):
+  - '[Original midline audit](/home/claudio/src/knee-abnormality/outputs/analysis/m/midline-vs-centre-20260923/result.md):
     fitted X and median-series X differ by >5 mm in 12.5% of cached studies. All ten
     largest discrepancies involved displaced sagittal slab centres.'
   - '[Campaign ownership](/home/claudio/src/knee-abnormality/autoresearch/campaigns/knee-geometry/prior-work.md):
@@ -681,7 +681,7 @@ ideas:
     \ for both menisci and both OA compartments, with no new coefficients. Keep OA\
     \ whole-knee access and the other eight rows unchanged."
   precedents:
-  - "[Original count-normalization comparison](/home/claudio/src/knee-abnormality/outputs/analysis/count-norm-vs-allocation/comparison.json):\
+  - "[Original count-normalization comparison](/home/claudio/src/knee-abnormality/outputs/analysis/c/count-norm-vs-allocation/comparison.json):\
     \ macro \u22120.00346, meniscus \u22120.00914, OA \u22120.00200; older split and\
     \ different training seeds. That method changed relative acquisition mass, which\
     \ this proposal preserves exactly."
@@ -771,10 +771,10 @@ ideas:
     no own-side token falls back to all its tokens. OA and the other eight labels
     are unchanged.
   precedents:
-  - 'outputs/training/side-mask and outputs/analysis/side-mask-vs-k05-clean: trained
+  - 'outputs/training/side-mask and outputs/analysis/s/side-mask-vs-k05-clean: trained
     mask for both families; strata Medial Meniscus +0.0031/+0.0056, Lateral Meniscus
     +0.0063/+0.0047 (sibling-clean/sibling-positive).'
-  - 'outputs/analysis/side-mask-vs-k05-clean/side_mask.patch: implementation (model.compartment_evidence),
+  - 'outputs/analysis/s/side-mask-vs-k05-clean/side_mask.patch: implementation (model.compartment_evidence),
     applies to d914079.'
   novelty: Parked after its repair could not carry the undecided geometry bundle;
     it never trained. Restricts the measured mask to the family it helped; the OA
@@ -828,7 +828,7 @@ ideas:
     is positive toward left, posterior and superior, matching the file. Local pools,
     triplet counts and validation determinism are unchanged.
   precedents:
-  - 'outputs/analysis/two-peak-sagittal-gate-20260923/result.md: frozen k05-clean
+  - 'outputs/analysis/t/two-peak-sagittal-gate-20260923/result.md: frozen k05-clean
     with the curve density, x4 -0.00057 [80% -0.00120, +0.00008], despite the train-inference
     sampler mismatch; narrow two-peak -0.00153 [-0.00246, -0.00064]; sampling_curve.py
     implements the density.'
@@ -877,7 +877,7 @@ ideas:
     falls back to them; the completion reports metrics for unknown-side and invalid-geometry
     studies separately.'
   precedents:
-  - 'outputs/analysis/token-attention-vs-k05-clean: dropping 1D/2D with only relative,
+  - 'outputs/analysis/t/token-attention-vs-k05-clean: dropping 1D/2D with only relative,
     raw-LPS 3D RoPE gave -0.0015 (PF OA -0.0152, Fracture -0.0153; meniscus +0.0027,
     OA +0.0035), confounded with an added attention block.'
   - 'docs/inference/submissions/2026-09-15-champion-without-3d-at-inference.md: the
@@ -1182,7 +1182,7 @@ ideas:
   - '[Current origin construction](/home/claudio/src/knee-abnormality/outputs/autoresearch/knee-geometry/experiments/meniscus-half-knee-mil-20260923T231102Z-edeb9f68/source/src/knee_abnormality/data/preprocessing/series.py:250)
     and preparation.py:351 confirm slab-relative middle-slice positions still reach
     the model.'
-  - "[Original token-attention comparison](/home/claudio/src/knee-abnormality/outputs/analysis/token-attention-vs-k05-clean/comparison.json):\
+  - "[Original token-attention comparison](/home/claudio/src/knee-abnormality/outputs/analysis/t/token-attention-vs-k05-clean/comparison.json):\
     \ meniscus +0.002658, OA +0.003562, other-eight \u22120.003769; all family 95%\
     \ intervals crossed zero. Attention and removal of both positional embeddings\
     \ changed together."
@@ -1595,7 +1595,7 @@ ideas:
     \ OA +0.002617, 95% [\u22120.002116,+0.007340], accompanied worse assignment diagnostics.\
     \ Meniscus and other-eight also improved; the accepted geometry, mask and auxiliary\
     \ contributions were not isolated."
-  - "[Original trained-mask comparison](/home/claudio/src/knee-abnormality/outputs/analysis/side-mask-vs-k05-clean/comparison.json):\
+  - "[Original trained-mask comparison](/home/claudio/src/knee-abnormality/outputs/analysis/s/side-mask-vs-k05-clean/comparison.json):\
     \ meniscus +0.004549, OA \u22120.004055 and other-eight +0.001689. OA\u2019s exploratory\
     \ 95% interval was [\u22120.008665,+0.000234]. This motivates retaining whole-knee\
     \ OA access."
@@ -1794,9 +1794,9 @@ ideas:
     \ zero logged training exposure means its \u22120.001312 macro change cannot evaluate\
     \ the intended encoding. [Its gate](/home/claudio/src/knee-abnormality/outputs/autoresearch/knee-geometry/experiments/study-anchored-through-plane-position-20260924T013127Z-1123f23d/source/src/knee_abnormality/data/dataset.py:423)\
     \ rejects multiple frame UIDs."
-  - 'New read-only Polars count of the [historical cache](/home/claudio/src/knee-abnormality/outputs/analysis/study-center-extents-20260918/studies.parquet):
+  - 'New read-only Polars count of the [historical cache](/home/claudio/src/knee-abnormality/outputs/analysis/s/study-center-extents-20260918/studies.parquet):
     4,407 studies, all with frames>1; all 4,230 accepted fits also have frames>1.
-    [The generating source](/home/claudio/src/knee-abnormality/outputs/analysis/study-center-extents-20260918/source/scripts/adhoc/analyze_study_center_extents.py:141)
+    [The generating source](/home/claudio/src/knee-abnormality/outputs/analysis/s/study-center-extents-20260918/source/scripts/adhoc/analyze_study_center_extents.py:141)
     defines frames as len(reference.frame_uids). This is not a current-cohort replay
     or proof of the run''s failure cause.'
   - '[DICOM Image Plane Module](https://dicom.nema.org/medical/dicom/current/output/chtml/part03/sect_C.7.6.2.html)

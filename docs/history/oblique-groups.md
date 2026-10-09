@@ -26,11 +26,11 @@ kept.
   started at zero, so an untrained model gave the reference output.
 
 The combined code diff is saved in
-`outputs/analysis/oblique-line-20260923/oblique-groups-and-embedding.diff`. Each run's
+`outputs/analysis/o/oblique-line-20260923/oblique-groups-and-embedding.diff`. Each run's
 `source_snapshot.zip` also holds its implementation (`oblique`, `oblique-clean`,
 `image-blend-oblique`, and the campaign experiments under `outputs/autoresearch/oblique*/`).
 Measurements of tilted-series geometry and coverage are in
-`outputs/analysis/acquisition-geometry-20260922/`.
+`outputs/analysis/a/acquisition-geometry-20260922/`.
 
 ## Paired submissions
 

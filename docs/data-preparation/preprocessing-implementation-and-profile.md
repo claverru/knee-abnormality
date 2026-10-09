@@ -50,7 +50,7 @@ reader and preprocessing package changes. Later percentile and GPU work is plann
 [`measure-intensity-bound-stability`](../../scripts/adhoc/measure_intensity_bound_stability.py)
 on 40 random fold-0 training studies replayed over six training epochs at the current recipe
 (1,338 series draws, 6,432 triplets); artifacts under
-[`outputs/analysis/intensity-bound-stability-20260920`](../../outputs/analysis/intensity-bound-stability-20260920).
+[`outputs/analysis/i/intensity-bound-stability-20260920`](../../outputs/analysis/i/intensity-bound-stability-20260920).
 Spread is `(max - min) / median` of an estimator over the draws of one series.
 
 | Estimator of the high bound | Median spread | p90 | Series above the 0.2 contrast range |

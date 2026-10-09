@@ -85,7 +85,7 @@ for offset in OFFSETS:
         )
     rows.append(row)
 table = pl.DataFrame(rows)
-out = Path("outputs/analysis/side-routing-offset-probe-20261006")
+out = Path("outputs/analysis/s/side-routing-offset-probe-20261006")
 out.mkdir(parents=True, exist_ok=True)
 table.write_csv(out / "offsets.csv")
 with pl.Config(tbl_cols=-1, tbl_width_chars=220):

@@ -157,7 +157,7 @@ Run roots are `outputs/training/spatial-tokens-reflection`, `outputs/training/re
 `outputs/training/overnight-20260913T214822Z-74udtekr/runs/02-central-sampling`.
 The new selected checkpoint is
 `outputs/training/reflection-sigma40/fold_0/best-epoch=06-val_macro_auc=0.89236.ckpt`.
-The [comparison artifact](../../../outputs/analysis/reflection-sigma40-20260914/comparison.json)
+The [comparison artifact](../../../outputs/analysis/r/reflection-sigma40-20260914/comparison.json)
 records full metrics, epoch histories, configuration differences, input checks,
 checkpoint/source/prediction fingerprints and completed public-submission
 records. Adjacent `per_target.csv`, `manufacturer_subgroups.csv` and

@@ -37,7 +37,7 @@ epoch 4, −0.004 at epochs 8–10.
 ## Validation against `k_05`
 
 Paired report-group bootstrap, 2,000 draws, from [`compare_fold_runs`](../fold-run-comparison.md);
-`outputs/analysis/stride16-vs-k05/comparison.json`.
+`outputs/analysis/s/stride16-vs-k05/comparison.json`.
 
 | Group | Δ | 95% interval |
 |---|---:|---|

@@ -30,7 +30,7 @@ unchanged. Production now uses the shared Gaussian sampler documented above.
 The archived 2026-09-12 candidate shifted only the center while retaining the original
 half-span, allowing different weights at the two endpoints.
 
-The [real-data audit](../../outputs/analysis/accurate-centers-20260912/summary.json)
+The [real-data audit](../../outputs/analysis/a/accurate-centers-20260912/summary.json)
 reprocessed the saved 128-study, 721-series sample: 124 accepted studies,
 four RMS rejections, 696 projected series, 24 study-rejection midpoints and
 one out-of-range midpoint. Accepted points differ from the all-slice reference
@@ -38,13 +38,13 @@ by at most 0.00056 mm. Validation allocations changed 2,269 triplet centers;
 per-series deterministic and seeded selections repeated exactly. This sample
 did not exercise missing planes or invalid/mixed-source metadata.
 
-Six training-member [coverage sheets](../../outputs/analysis/accurate-centers-20260912/coverage_00.png)
+Six training-member [coverage sheets](../../outputs/analysis/a/accurate-centers-20260912/coverage_00.png)
 include the out-of-range case, high residuals and large shifts. Yellow boxes
 mark the retained crop and red crosses project the study reference onto native
 images. Reviewed cases preserve knee coverage, but acquisition agreement is
 not local registration evidence or an accuracy result. The series table records
 the selected triplet indices and shifts. The final source audit is saved in
-[`accurate-centers-final-20260912`](../../outputs/analysis/accurate-centers-final-20260912/summary.json).
+[`accurate-centers-final-20260912`](../../outputs/analysis/a/accurate-centers-final-20260912/summary.json).
 The completed audit utility and candidate sampler are preserved together in
 that directory's `source_snapshot.zip` and the training run's source snapshot.
 Extract into a separate directory and use its `src` on `PYTHONPATH` to rerun
@@ -72,7 +72,7 @@ The controlled fold-0 result belongs in [validation](../validation/INDEX.md).
 
 Measured on 2026-09-18 over the whole training split, 4,407 studies and 24,371
 series, with [`analyze-study-center-extents`](../../scripts/adhoc/analyze_study_center_extents.py);
-artifacts in `outputs/analysis/study-center-extents-20260918/`. It reuses the
+artifacts in `outputs/analysis/s/study-center-extents-20260918/`. It reuses the
 production indexer, exclusions, instance guard and reference fit, so the numbers
 describe what the sampler actually sees.
 

@@ -194,7 +194,7 @@ class PreviewCLI(CLISettings):
         default=30, ge=1, le=100, description="CUDA profiling iterations"
     )
     geometry_headers: Path = Field(
-        default=Path("outputs/analysis/geometry-metadata-20260912/headers.parquet"),
+        default=Path("outputs/analysis/g/geometry-metadata-20260912/headers.parquet"),
         description="Header table used for source geometry when present",
     )
 

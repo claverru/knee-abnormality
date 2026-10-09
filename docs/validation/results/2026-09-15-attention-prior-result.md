@@ -40,7 +40,7 @@ fold 0. Artifacts are in `outputs/training/attention-prior/`.
 
 The [encoding diagnostic](../manual-encoding-usage-diagnosis.md) on the selected checkpoint
 reproduced the saved probabilities (maximum difference 3e−8) with no preparation
-conditions. Results are in `outputs/analysis/encoding-usage-attention-prior/`.
+conditions. Results are in `outputs/analysis/e/encoding-usage-attention-prior/`.
 
 | Variant | Macro AUC change | Mean absolute probability change | Paired 95% interval |
 |---|---:|---:|---|

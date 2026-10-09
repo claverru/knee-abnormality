@@ -109,7 +109,7 @@ then researcher follow-ups on whichever mechanisms helped.
 `two-stream-paired-20261001T172835Z-5c197a3e` (ten epochs, 20 slices, 1,736 s): ×4 0.930396, that
 is +0.0008 against the incumbent (80% [−0.0005, +0.0022], rejected), +0.0023 against the original
 reference (80% [+0.0007, +0.0039]) and +0.0012 against `field-120-single` (80% [−0.0001, +0.0024];
-`outputs/analysis/mixed-field-two-stream-vs-reference` and `…-vs-120`).
+`outputs/analysis/m/mixed-field-two-stream-vs-reference` and `…-vs-120`).
 
 **The 140 mm stream did not take part.** The build pools `narrow + tanh(gate) × (joint − narrow)`
 with one scalar gate initialized at zero. The wide backbone and projection receive gradient only

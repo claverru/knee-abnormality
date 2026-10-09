@@ -18,7 +18,7 @@ ideas:
       the model.
     precedents:
       - docs/validation/results/2026-09-22-oblique-groups-result.md (reference run; per-label localization)
-      - outputs/analysis/acquisition-geometry-20260922/protocol_prior.txt (an oblique flag added after training gave -0.0003 to -0.0014, so the gain must come from routing inside the model, not new information)
+      - outputs/analysis/a/acquisition-geometry-20260922/protocol_prior.txt (an oblique flag added after training gave -0.0003 to -0.0014, so the gain must come from routing inside the model, not new information)
       - docs/validation/results/2026-09-14-knee-side-embedding-result.md (a knee-side embedding tied; it marked patient geometry, not acquisition protocol)
       - docs/backlog/small-changes.md#oblique-embedding (transferred general-backlog entry)
     novelty: >-
@@ -155,7 +155,7 @@ ideas:
       the result to that acquisition's tokens. Acquisitions without valid geometry get
       zero.
     precedents:
-      - outputs/analysis/acquisition-geometry-20260922/oblique_axes.txt (rotation axes of each oblique family)
+      - outputs/analysis/a/acquisition-geometry-20260922/oblique_axes.txt (rotation axes of each oblique family)
       - docs/backlog/big-bets.md#3d-embedding-training-time-effect (a patient-position 3D embedding was ignored at inference)
       - docs/data-preparation/reflection-geometry-and-previews.md (normal and side conventions)
     novelty: >-
@@ -199,7 +199,7 @@ ideas:
       each and never above capacity, in training and validation alike. Per-slot, per-study
       and run totals equal the reference exactly.
     precedents:
-      - outputs/analysis/acquisition-geometry-20260922/oblique_reach.txt (windows and run coverage per group)
+      - outputs/analysis/a/acquisition-geometry-20260922/oblique_reach.txt (windows and run coverage per group)
       - docs/validation/results/2026-09-17-test-time-allocation.md#repeated-series-in-one-slot (second-series triplets help on frozen models)
       - docs/validation/results/2026-09-18-overnight-results.md (repeated_series_share took triplets from other types and lost publicly; this split stays inside the slot)
     novelty: >-

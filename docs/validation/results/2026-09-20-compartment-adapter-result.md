@@ -35,8 +35,8 @@ used, which is the definition of an unresolved comparison.
 ## Paired bootstrap
 
 `scripts/tools/compare_fold_runs.py`, 2,000 paired report-group bootstrap draws over 852 groups.
-Artifacts in `outputs/analysis/compartment-adapter-vs-00-control/` and
-`outputs/analysis/compartment-adapter-vs-13-control-repeat/`.
+Artifacts in `outputs/analysis/c/compartment-adapter-vs-00-control/` and
+`outputs/analysis/c/compartment-adapter-vs-13-control-repeat/`.
 
 | Family | vs `00-control` | vs `13-control-repeat` |
 |---|---|---|

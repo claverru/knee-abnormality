@@ -19,7 +19,7 @@ imported eleven. This campaign's seeds carry over only kept ideas.
 
 Evidence map for the [cleaned-source oblique campaign](contract.md); not a backlog. Carried over
 from the [x4 campaign](../oblique-x4/prior-work.md) with its results added. Analysis scripts and
-outputs are in `outputs/analysis/acquisition-geometry-20260922/` unless stated.
+outputs are in `outputs/analysis/a/acquisition-geometry-20260922/` unless stated.
 
 ## Reference run
 
@@ -126,7 +126,7 @@ Scored on the older source against `oblique-x4` at ×4 and τ 1 (0.902373); spli
 ## Results of the retired x1 campaign
 
 Scored at ×1 against the ×1 reference (0.897527); split studies are the 103 fold-0 studies that
-hold a split slot (`outputs/analysis/acquisition-geometry-20260922/localize_campaign.py`).
+hold a split slot (`outputs/analysis/a/acquisition-geometry-20260922/localize_campaign.py`).
 
 | Candidate | All | Split studies | Unchanged | Decision |
 |---|---:|---:|---:|---|
@@ -148,7 +148,7 @@ hold a split slot (`outputs/analysis/acquisition-geometry-20260922/localize_camp
   did not lean on them (−0.05).
 - On `k_05` at ×4, letting the oblique group vote only for ACL improved the 102 affected studies by
   +0.0020 against −0.0001 without the gate
-  (`outputs/analysis/tilted-slot-policies-v2-k05-20260922/results.csv`).
+  (`outputs/analysis/t/tilted-slot-policies-v2-k05-20260922/results.csv`).
 
 ## Sampling coverage of the oblique groups
 

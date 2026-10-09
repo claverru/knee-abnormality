@@ -26,7 +26,7 @@ ideas:
     cyst -0.0062, MCL -0.0015 (findings.md).'
   - 'Per slice, coronal fluid is the most used type for the medial meniscus (1.69 of a uniform
     share) and the MCL (1.41); sagittal fluid for ACL (1.87), PF OA (1.53) and the lateral
-    meniscus (1.42) (outputs/analysis/view-spacing-20261002/report.md).'
+    meniscus (1.42) (outputs/analysis/v/view-spacing-20261002/report.md).'
   - 'No run isolates one of the six series types (same report, What can be read off).'
   novelty: First run that zooms one fluid plane and not the other.
   coverage: Sagittal fluid slices, 18.5% of a study's slices, return to the wide view; the rest
@@ -71,7 +71,7 @@ ideas:
     -0.0015 (findings.md).'
   - 'Coronal fluid at 93.33 mm: more than 20 mm of medial tissue cut in 43% of series, median
     cut 18 mm; 91% of series fully resolved at 5/12 mm
-    (outputs/analysis/view-spacing-20261002/report.md).'
+    (outputs/analysis/v/view-spacing-20261002/report.md).'
   - 'sagittal-fluid-detail-rectangle, -correspondence-fusion and -content-residual added a
     sagittal fluid detail window beside the 120 mm view and tied t1pd-detail-84 (-0.0002,
     +0.0000, +0.0001); none replaced the view (findings.md).'
@@ -116,11 +116,11 @@ ideas:
   precedents:
   - 'Sagittal fluid at the 93.33 mm rule window: median cut 14 mm anterior and 35 mm posterior;
     attention inside the window in positive studies 63% for effusion and Baker''s cyst, 87% for
-    ACL, 88% for PF OA (outputs/analysis/view-spacing-20261002/report.md).'
+    ACL, 88% for PF OA (outputs/analysis/v/view-spacing-20261002/report.md).'
   - 'Reviewed case 93267826: most of a 4.5 cm Baker''s cyst lies outside the sagittal 93.33 mm
     window (docs/data-preparation/plane-fluid-spacing-review.md).'
   - 'Baker''s cyst fell 0.0010 to 0.0095 in eight crop runs that kept the 120 mm view
-    (outputs/analysis/view-spacing-20261002/report.md).'
+    (outputs/analysis/v/view-spacing-20261002/report.md).'
   novelty: First run with a placement offset that differs between the two contrasts.
   coverage: Sagittal fluid slices, 18.5% of a study's slices, move 7 mm posterior; the rest is
     the incumbent.
@@ -159,7 +159,7 @@ ideas:
   precedents:
   - 'Sagittal fluid, finer acquired axis fully kept: 92% at 0.375 mm, 89% at 5/12 mm, 73% at
     0.4464 mm, 60% at 0.5 mm, 44% at 0.5357 mm (n=4,192;
-    outputs/analysis/view-spacing-20261002/report.md).'
+    outputs/analysis/v/view-spacing-20261002/report.md).'
   - 'Sagittal fluid attention inside the rule window, positive studies: effusion 63% at 93 mm,
     69% at 100 mm, 80% at 112 mm; Baker''s cyst 63%, 70%, 81% (same report).'
   novelty: First 100 mm view, and first run that changes the sagittal fluid width alone.
@@ -199,7 +199,7 @@ ideas:
   - 't1pd-detail-acquisition-matched and t1pd-detail-acquired-matrix, 84 to 120 mm per series:
     -0.0002 and -0.0005 against t1pd-detail-84 (findings.md).'
   - 'Coronal and sagittal T1/PD resolution and tissue cut at 84 and 93.33 mm
-    (outputs/analysis/view-spacing-20261002/report.md).'
+    (outputs/analysis/v/view-spacing-20261002/report.md).'
   novelty: First fixed T1/PD detail view at a width other than 84 mm.
   coverage: Coronal and sagittal T1/PD slices, 33.7% of a study's slices; the rest is the
     incumbent.

@@ -13,7 +13,7 @@ ideas:
     Synovitis -0.0050, Effusion -0.0031, PF OA -0.0022, the four tightest. The same search at
     15% gives a division that is still held on every cut and reads more: no target loses more
     than 14% of its attention, against 20%
-    (outputs/analysis/side-routing-cut-forces-20261006/symmetric-division-0.15.json).
+    (outputs/analysis/s/side-routing-cut-forces-20261006/symmetric-division-0.15.json).
   mechanism: >-
     All in modeling/model.py. FRAME_SIZES = ("cut_height", "core_radius"), regressed per knee
     as today, with FRAME_SIZE_START_PITCHES = (0.95, 1.9), about 12 and 24 mm; the lower cut

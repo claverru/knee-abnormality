@@ -27,7 +27,7 @@ attention-kernel cost.
 
 Profiles retain every first-visit study time, the first loader pass, warm
 batch/pass times and operator traces under
-`outputs/analysis/spatial-fusion-20260912/`. First visits are process-cache cold;
+`outputs/analysis/s/spatial-fusion-20260912/`. First visits are process-cache cold;
 the filesystem cache was not flushed. Compiled variants also retain warmup
 costs, which include compilation when not already cached. These are bounded
 local profiles, not hidden Kaggle runtimes. The final control executes the

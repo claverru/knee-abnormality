@@ -2,7 +2,7 @@ from pathlib import Path
 
 import numpy as np
 
-ROOT = Path("outputs/analysis/side-routing-attention-shape-20261006")
+ROOT = Path("outputs/analysis/s/side-routing-attention-shape-20261006")
 data = np.load(ROOT / "attention.npz")
 density = np.load(ROOT / "sections-geometric.npz")["density"]
 names = [str(name) for name in data["names"]]

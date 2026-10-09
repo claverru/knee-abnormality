@@ -114,7 +114,7 @@ In the `two-crops` run, validation took about 70 s of a roughly 340 s epoch and 
 
 Measured on the anatomy-masks recipe (ResNet-18, posed sagittal and coronal crops, first look),
 RTX 3090, with `scripts/tools/bench_training_steps.py` (110 training and 40
-validation steps under the real `Trainer`; outputs in `outputs/analysis/anatomy-masks-speed/`).
+validation steps under the real `Trainer`; outputs in `outputs/analysis/a/anatomy-masks-speed/`).
 
 | | Before | After |
 |---|---:|---:|

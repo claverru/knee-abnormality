@@ -32,7 +32,7 @@ average pooling remains the stronger development reference. A parent/control
 with matching execution settings is still needed for a controlled architecture
 comparison. The active YAML remains set to max until the next pooling decision.
 
-The [comparison record](../../../outputs/analysis/spatial-fusion-max-vs-average-20260913.json)
+The [comparison record](../../../outputs/analysis/s/spatial-fusion-max-vs-average-20260913.json)
 pins selected checkpoint, configuration and prediction hashes, source identities,
 input-identity comparisons, timings and per-target deltas. The max checkpoint is
 `outputs/training/spatial-fusion-max/fold_0/best-epoch=09-val_macro_auc=0.87908.ckpt` (deleted on 2026-09-16),

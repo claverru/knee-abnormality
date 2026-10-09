@@ -8,7 +8,7 @@ ideas:
     of the frame still learned from the labels. It ends anywhere between 6 and 15 degrees across runs
     of the same design (run 24 13.6, the height-cuts model 6.0, the femur-lean run 15.3), it reaches
     21 degrees on a knee whose bones stand upright (validation row 370 of the femur-lean run, drawn
-    in outputs/analysis/routing-and-shifts-frames-20261007/femur-lean/), and it trades against any
+    in outputs/analysis/r/routing-and-shifts-frames-20261007/femur-lean/), and it trades against any
     other free angle (prior-work.md, Measured on 2026-10-07). Turning the crops by half the frame''s
     angle scored better than the full angle at both multipliers, which points at the tilt''s noise.
     In the incumbent the centre and the side axis are already read from spots without gradient and
@@ -90,7 +90,7 @@ ideas:
   precedents:
   - 'routing-and-shifts, height-cuts-from-the-spots-requeue: +0.0003 at both multipliers against run
     24; S120 0.952 against S118 0.953.'
-  - 'outputs/analysis/routing-and-shifts-frames-20261007/height-cuts-from-the-spots/regions-005.png
+  - 'outputs/analysis/r/routing-and-shifts-frames-20261007/height-cuts-from-the-spots/regions-005.png
     and regions-045.png: cuts at the right height that slope with the frame''s tilt and roll.'
   novelty: First frame whose centre, three angles and two cuts are all read from spots.
   coverage: Every knee with the meniscus and kneecap spots; a missing spot falls back per quantity
@@ -205,7 +205,7 @@ ideas:
   - 'outputs/training/20261007-101112-side-routed-femur-lean: the same hinged band with a lean learned
     from the labels: x4 -0.0002, x1 -0.0009, Effusion +0.0021, the lean at -25 degrees for every knee
     and the nod up by 9 degrees.'
-  - 'outputs/analysis/routing-and-shifts-frames-20261007/knee-bend/sagittal-gallery.png: the bend
+  - 'outputs/analysis/r/routing-and-shifts-frames-20261007/knee-bend/sagittal-gallery.png: the bend
     by eye; two rule-based measurements of it failed.'
   novelty: First angle of the frame set by a report-supervised landmark; first femur section that
     can differ between knees.

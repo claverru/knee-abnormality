@@ -422,7 +422,7 @@ both multipliers to be adopted against it.
 
 ### Drawings of the incumbent's frame (2026-10-07 08:45, at the user's request)
 
-`outputs/analysis/routing-and-shifts-frames-20261007/height-cuts-from-the-spots/regions-{005,021,045}.png`
+`outputs/analysis/r/routing-and-shifts-frames-20261007/height-cuts-from-the-spots/regions-{005,021,045}.png`
 (script `draw_experiment_frames.py` in the session scratchpad, which runs the drawing with the
 experiment's frozen source). Study 45: cuts +6 and −8 mm, nod 2°, roll −11°, core 13 mm; study 5:
 cuts +13 and −15 mm, nod 12°, roll −2°, core 19 mm. The joint band lies on the joint line in the
@@ -471,7 +471,7 @@ S120 (the incumbent, ×4, τ 0.9, batch 4): **0.952 public**; S118 (run 24, same
   movers were moved 1 to 2 mm in different directions, their coronal crops look the same with and
   without the shift, and the medial rim is inside the crop either way. The 120 mm axial views are
   not moved at all (no margin at the reference field).
-- Drawing and table: `outputs/analysis/routing-and-shifts-frames-20261007/mcl-spatial-maps/`
+- Drawing and table: `outputs/analysis/r/routing-and-shifts-frames-20261007/mcl-spatial-maps/`
   (`top-movers-crops.png`, `shifts.csv`).
 - Same weights predicted at ×1 with the shift on and switched off (`shift-on-off.npz` in the same
   folder): macro 0.9165 against 0.9163. MCL 0.9190 against 0.9182 (+0.0008, of the +0.0058 at ×4

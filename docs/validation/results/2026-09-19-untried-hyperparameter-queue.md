@@ -34,9 +34,9 @@ Reference on the same recipe, seed 42, from an earlier source snapshot:
 
 | Candidate | Macro AUC delta | 95% interval | Meniscus | OA | Other eight | Artifact |
 |---|---:|---|---:|---:|---:|---|
-| `04-noise-std-0.01-0.04` | +0.00111 | [−0.00260, +0.00474] | +0.0074 | −0.0018 | +0.0002 | `outputs/analysis/04-noise-std-0.01-0.04-vs-00-control/` |
-| `balanced-bce` | +0.00125 | [−0.00275, +0.00535] | +0.0072 | −0.0016 | +0.0005 | `outputs/analysis/balanced-bce-vs-00-control/` |
-| `03-beta1-0.95` | +0.00071 | [−0.00281, +0.00428] | +0.0043 | −0.0056 | +0.0013 | `outputs/analysis/03-beta1-0.95-vs-00-control/` |
+| `04-noise-std-0.01-0.04` | +0.00111 | [−0.00260, +0.00474] | +0.0074 | −0.0018 | +0.0002 | `outputs/analysis/0-9/04-noise-std-0.01-0.04-vs-00-control/` |
+| `balanced-bce` | +0.00125 | [−0.00275, +0.00535] | +0.0072 | −0.0016 | +0.0005 | `outputs/analysis/b/balanced-bce-vs-00-control/` |
+| `03-beta1-0.95` | +0.00071 | [−0.00281, +0.00428] | +0.0043 | −0.0056 | +0.0013 | `outputs/analysis/0-9/03-beta1-0.95-vs-00-control/` |
 
 Largest per-target moves: `04` Baker's +0.0098, contusion −0.0096, medial meniscus +0.0085;
 `03` MCL −0.0211, fracture +0.0178, Baker's +0.0108; `balanced-bce` MCL −0.0172, lateral meniscus

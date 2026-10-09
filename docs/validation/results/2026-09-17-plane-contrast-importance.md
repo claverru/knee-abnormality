@@ -6,7 +6,7 @@ on studies that have the type, averaged over the three 2026-09-17 control checkp
 (`00-control`, `01-control-seed-43`, `02-control-seed-44`,
 [overnight results](2026-09-17-overnight-results.md)), fold-0 validation, series dropout 0.2 as
 trained. Scripts: [snapshots](../../history/series-and-sampling-sources/README.md#type-importance) (`infer.py`, `analyze.py`,
-`capacity.py`, `numerics.py`); outputs: `outputs/analysis/type-importance-20260917/` (`results.json`,
+`capacity.py`, `numerics.py`); outputs: `outputs/analysis/t/type-importance-20260917/` (`results.json`,
 `deltas.csv`, `label_type_importance.csv`, `attention_share.csv`, `availability_vs_prevalence.csv`,
 `intact_auc_by_type_presence.csv`, `validation_triplet_capacity*.csv`).
 

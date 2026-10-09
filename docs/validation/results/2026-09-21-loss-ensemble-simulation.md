@@ -26,7 +26,7 @@ validation predictions. Every one of the 131,071 subsets was scored. Checkpoints
 ensembles cannot be rebuilt as bundles. Each run's epoch was already selected on this fold.
 
 Script: [`simulate_loss_ensembles.py`](../../../scripts/adhoc/simulate_loss_ensembles.py), run on
-the `a960863` tree, with its source copied under the output's `source/`. Output: `outputs/analysis/loss-ensembles-20260921/` (`summary.json`, `subsets.parquet`,
+the `a960863` tree, with its source copied under the output's `source/`. Output: `outputs/analysis/l/loss-ensembles-20260921/` (`summary.json`, `subsets.parquet`,
 `pairs.csv`, `marginal.csv`, `best_by_size.csv`, `top_frequency.csv`, `greedy.csv`,
 `selection_splits.csv`). It reads saved predictions on CPU, about 90 s at 16 workers, and refuses
 an existing output directory:

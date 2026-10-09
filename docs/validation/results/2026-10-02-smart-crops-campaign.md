@@ -117,18 +117,18 @@ followed learned the views instead ([learnable views](2026-10-03-learnable-views
 ## Measurements made for the campaign
 
 - **Attention and saliency probes** of a 140 mm model
-  (`outputs/analysis/label-attention-20261001/`): where each label's attention sits, per plane
+  (`outputs/analysis/l/label-attention-20261001/`): where each label's attention sits, per plane
   and contrast.
-- **Spacing review** (`outputs/analysis/view-spacing-20261002/report.md`): acquired resolution,
+- **Spacing review** (`outputs/analysis/v/view-spacing-20261002/report.md`): acquired resolution,
   stored field and tissue cut per series type on all 24,371 training series. 84 mm and 93 mm
   keep the acquired detail of about nine in ten coronal and sagittal series; the next coarser
   candidate loses 10 to 17 points. A second, image-based review is in
   [plane and fluid spacing](../../data-preparation/plane-fluid-spacing-review.md).
-- **Slice supply** (`outputs/analysis/slice-budget-20261002/`): every series type has a median 28
+- **Slice supply** (`outputs/analysis/s/slice-budget-20261002/`): every series type has a median 28
   to 32 slice positions per study against 5 to 6.5 given at ×1, so supply never limits the
   per-type budget.
 - **Regression of width per type against AUC per label**
-  (`outputs/analysis/view-regression-20261002/report.md`, 17 single-width runs): the adopted
+  (`outputs/analysis/v/view-regression-20261002/report.md`, 17 single-width runs): the adopted
   widths are the best combination among tested widths; every single-type change from them is
   predicted 0.0001 to 0.0005 lower and none is distinguishable from zero. Untested: anything
   finer than 84 mm on T1/PD, 93 mm on fluid or 120 mm on axial.

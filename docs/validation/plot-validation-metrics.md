@@ -6,7 +6,7 @@ Plot epoch metrics from completed run folders with:
 rtk proxy uv run --locked python -m scripts.tools.plot_validation_metrics baseline0 baseline1 baseline4
 ```
 
-The command writes `outputs/analysis/validation_metrics.png` by default with six
+The command writes `outputs/analysis/v/validation_metrics.png` by default with six
 panels in two rows. The top row holds the ranking metrics, where higher is better:
 hard macro AUC, [soft macro AUC](results/2026-09-23-validation-auc-variants.md)
 and gold macro AUC. The bottom row holds training BCE and validation soft-target BCE
@@ -20,7 +20,7 @@ skipped with a note, so a campaign's control and all its experiments plot with o
 
 ```bash
 rtk proxy uv run --locked python -m scripts.tools.plot_validation_metrics k05-clean \
-  outputs/autoresearch/noisy-labels/experiments/*/training --output outputs/analysis/noisy-labels.png
+  outputs/autoresearch/noisy-labels/experiments/*/training --output outputs/analysis/n/noisy-labels.png
 ```
 
 Soft macro AUC is computed from each epoch's saved `validation_epoch_*.csv` against

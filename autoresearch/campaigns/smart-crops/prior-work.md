@@ -36,7 +36,7 @@ row is one run. The mixed-field rows are against `rn18-l2sp-no-confusion` (140 m
 ## Acquired resolution
 
 Share of train series whose finer acquired axis is kept in full at each spacing
-(`outputs/analysis/input-resolution-research-20260915/acquisition/series_acquisition.parquet`,
+(`outputs/analysis/i/input-resolution-research-20260915/acquisition/series_acquisition.parquet`,
 counted 2026-10-01):
 
 | Series type | Series | 0.536 mm | 0.5 mm | 0.4167 mm | 0.375 mm |
@@ -68,7 +68,7 @@ From [input resolution](../../../docs/research/input-resolution.md#what-a-narrow
 
 Attention probe of `no-anatomical-bias`, the reference's recipe at 140 mm, not the reference
 itself: fold 0, ×1, 912 validation studies, attention temperature 1
-(`outputs/analysis/label-attention-20261001/x1`; [scripts](../../../scripts/adhoc/INDEX.md)).
+(`outputs/analysis/l/label-attention-20261001/x1`; [scripts](../../../scripts/adhoc/INDEX.md)).
 Attention mass is not evidence, tokens there are 20 mm wide and their receptive fields cover most
 of the image. Extents are knee-centred millimetres and carry over to the 120 mm field; nothing has
 been measured on a 120 mm model.
@@ -109,7 +109,7 @@ been measured on a 120 mm model.
   - Geometry is trusted on 96–97% of slices.
   - The detail labels' input sensitivity is centred 8–13 mm below the image centre and 5 mm
     anterior of the fitted centre in sagittal slices (input gradients, 300 studies,
-    `outputs/analysis/label-attention-20261001/saliency`); the attention midpoint is 9 mm
+    `outputs/analysis/l/label-attention-20261001/saliency`); the attention midpoint is 9 mm
     anterior. The rule takes 10 mm below and 7 mm anterior.
 - **Contrast does not move the window:** within a plane the percentiles of that sensitivity agree
   within 1–4 mm between T1/PD and fluid series.

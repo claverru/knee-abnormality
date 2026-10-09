@@ -56,7 +56,7 @@ seed 20260914). It excludes training-seed and checkpoint-selection variability; 
 fold cannot establish repeatability or public ranking. Metadata inference,
 embedding and side dropout were changed together.
 
-The [comparison artifact](../../../outputs/analysis/knee-side-embedding-20260914/comparison.json)
+The [comparison artifact](../../../outputs/analysis/k/knee-side-embedding-20260914/comparison.json)
 has per-target, conditional, exclusive-margin, side/source/vendor strata, epoch,
 timing, vector and fingerprint details. It was produced on CPU from saved predictions and checkpoint tensors by
 [the historical analysis](../../history/knee-side-sources/README.md), which did not
@@ -88,5 +88,5 @@ position information cost −0.001461 [−0.00247, −0.00048]; 1D and 2D remova
 Because the 3D term also carries little weight, side-conditioned coordinates
 (research approaches 2 and 3) would act through a branch this checkpoint barely
 uses. The side code was therefore retired rather than extended. These are removal measurements on one checkpoint, not trained ablations.
-Artifacts are in `outputs/analysis/encoding-usage-knee-side-20260914/`
+Artifacts are in `outputs/analysis/e/encoding-usage-knee-side-20260914/`
 (`results.json`, per-variant predictions and the side manifest copy).

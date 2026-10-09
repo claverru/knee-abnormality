@@ -45,7 +45,7 @@ Never committed. The completed run's output, including its `source_snapshot.zip`
 that trained on Kaggle), checkpoint, predictions and logs, is in
 `outputs/kaggle-training/kaggle-fold0-20260924d-output/`; each attempt's launch record is in
 `outputs/kaggle-training/`. The worktree's changes against `70a9a24` are archived in
-`outputs/analysis/kaggle-training-20260924/`: `worktree.patch` (config, dataset, series index,
+`outputs/analysis/k/kaggle-training-20260924/`: `worktree.patch` (config, dataset, series index,
 checkpoints, Lightning module, train script) and `untracked-files.tar.gz` (the launcher, a
 series-index builder and the original status document). The Kaggle datasets
 `claverru/knee-kaggle-training` and `claverru/knee-series-index` and the notebook

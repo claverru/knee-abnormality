@@ -11,7 +11,7 @@ one source that passed its eligibility rules.
   updated since 2026-08-20, plus competition notebooks whose titles mention labels.
 - **Snapshots:** `data/labels/public/<owner>/<slug>/downloaded-20260922/`.
 - **Script:** [`screen_public_label_additions`](../../scripts/adhoc/screen_public_label_additions.py).
-- **Output:** `outputs/analysis/public-label-additions-20260922/` (`screen.csv`, `manifest.json`
+- **Output:** `outputs/analysis/p/public-label-additions-20260922/` (`screen.csv`, `manifest.json`
   with input hashes). CPU only, seconds; refuses an existing output directory:
   `rtk proxy uv run --locked python -m scripts.adhoc.screen_public_label_additions --output-dir outputs/analysis/public-label-additions-new`.
 - **Scoring columns:** Hosseini on its positive-class probability, lvthanhxun on its fused

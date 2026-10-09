@@ -1311,5 +1311,5 @@ Matched-seed control gain +0.0023308413 with positive 80% interval. This is an e
 
 Evidence:
 - /home/claudio/src/knee-abnormality/outputs/autoresearch/adopted/user-adopt-learned-strength-20260921T115849Z-b19e375d/adoption.json
-- /home/claudio/src/knee-abnormality/outputs/analysis/anatomical-strength-vs-control-repeat-ci-levels/adoption_assessment.json
+- /home/claudio/src/knee-abnormality/outputs/analysis/a/anatomical-strength-vs-control-repeat-ci-levels/adoption_assessment.json
 - /home/claudio/src/knee-abnormality/outputs/autoresearch/losses/decisions/user-adopt-learned-strength-20260921T115849Z-b19e375d/pending-events.json

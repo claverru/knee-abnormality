@@ -94,7 +94,7 @@ learned fusion, series dropout 0) on three ReXNet-200s with the control's batch 
 Fold-4 predictions at ×4 on Kaggle T4s in FP16, one bundle per τ through
 `scripts/tools/profile_kaggle_inference.py launch --split-dir data/folds/all_5fold_scanner_v1 --fold 4
 --conditions '["fp16-b4-w16"]'`, scored locally against τ 0.75 with a paired study bootstrap
-(`outputs/analysis/tau-sweep-20260928/`). τ 0.75 stays optimal; Kaggle τ 1 matches the local bf16 τ 1
+(`outputs/analysis/t/tau-sweep-20260928/`). τ 0.75 stays optimal; Kaggle τ 1 matches the local bf16 τ 1
 score within 0.00006.
 
 | τ | 3 × B0 | Δ vs 0.75 (80%) | 3 × ReXNet | Δ vs 0.75 (80%) |

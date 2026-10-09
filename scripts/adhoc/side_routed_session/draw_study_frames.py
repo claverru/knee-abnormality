@@ -18,7 +18,7 @@ from knee_abnormality.inference.checkpoint import load_checkpoint_model
 from knee_abnormality.inference.engine import move_batch
 import json
 
-OUT = Path("outputs/analysis/octant-sketches-20261006")
+OUT = Path("outputs/analysis/o/octant-sketches-20261006")
 OUT.mkdir(parents=True, exist_ok=True)
 ROWS = [int(v) for v in sys.argv[1].split(",")]
 RUN = Path(sys.argv[2])

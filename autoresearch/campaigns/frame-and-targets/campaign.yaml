@@ -72,7 +72,7 @@ policy:
     the experiments of the routing-and-shifts campaign with source/ and changes.diff, the two
     manual runs with source_snapshot.zip (unzip into a temporary directory outside the
     candidate), and the rotation build under
-    outputs/analysis/routing-and-shifts-frames-20261007/builds/. Each was written on run 24
+    outputs/analysis/r/routing-and-shifts-frames-20261007/builds/. Each was written on run 24
     (this campaign's base) or on the height-cuts model as stated there: port the mechanism, do
     not copy files whole.
     Topic 2 facts: prepare_images in data/preprocessing/device.py resamples each slice's view

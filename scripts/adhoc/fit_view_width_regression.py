@@ -429,7 +429,7 @@ class Settings(CLISettings, Bootstrap):
         description="Frozen split with targets.csv and studies.csv",
     )
     output_dir: Path = Field(
-        default=Path("outputs/analysis/view-regression-20261002"),
+        default=Path("outputs/analysis/v/view-regression-20261002"),
         description="Output directory",
     )
     threads: int = Field(default=6, ge=1, le=6, description="Numerical threads")

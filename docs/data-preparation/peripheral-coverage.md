@@ -17,7 +17,7 @@ plateau that [per-plane sampler sigma](../validation/results/2026-09-18-per-plan
 scored as a gain on the cache — at 0.76 its 31.4 mm was inside it. Several labels keep most of
 their evidence out there. Measured read-only
 from the fold-0 token cache and the depth profiles; scripts and tables in
-`outputs/analysis/peripheral-coverage-20260918/`.
+`outputs/analysis/p/peripheral-coverage-20260918/`.
 
 - **The sampler thins with depth.** Selected share ÷ candidate share beyond 40 mm is 0.45–0.59 for
   every type, and beyond 50 mm it falls to 0.36 for coronal fluid and 0.14–0.16 for the sagittal
@@ -47,7 +47,7 @@ from the fold-0 token cache and the depth profiles; scripts and tables in
 ## Spatial importance map
 
 A leave-one-out window-ablation field over the ensemble, exported as a Plotly page outside this
-repository and extracted to `outputs/analysis/spatial-importance-20260918/`. All 12 targets share
+repository and extracted to `outputs/analysis/s/spatial-importance-20260918/`. All 12 targets share
 one 1,092-voxel grid at 9 mm spacing, spanning L [-68, 58], P [-76, 59] and S [-76, 77] mm about
 the study centre; the value is positive LOO utility in within-study SD units, density corrected.
 Support averages 135 studies per voxel but ranges 25-761, highest at the centre.

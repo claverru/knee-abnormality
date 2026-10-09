@@ -15,7 +15,7 @@ is recorded as a secondary, pre-registered prediction before each submission.
   rtk proxy uv run --locked python -m scripts.adhoc.validate_calibrated_judge --output-dir outputs/analysis/calibrated-judge-new
   rtk proxy uv run --locked python -m scripts.adhoc.validate_calibrated_judge --output-dir outputs/analysis/calibrated-judge-compare --reference outputs/training/k_05 --candidate outputs/training/<run>
   ```
-- **Artifacts:** `outputs/analysis/calibrated-judge-20260922/`.
+- **Artifacts:** `outputs/analysis/c/calibrated-judge-20260922/`.
 - **Question it answers:** can a local metric evaluate training-label changes, which fold-0 macro
   AUC misranks ([class-balance exponent](2026-09-21-class-balance-exponent.md))?
 

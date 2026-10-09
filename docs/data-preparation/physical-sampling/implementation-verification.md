@@ -18,9 +18,9 @@ removed on 2026-09-20 with the repaired DICOMs, the cohort contributes two slice
 that earlier runs skipped.
 
 Final artifacts are in
-[`geometry-verified`](../../../outputs/analysis/physical-sampling-implementation-20260913/geometry-verified/summary.json),
-[`preparation-verified`](../../../outputs/analysis/physical-sampling-implementation-20260913/preparation-verified/report.json)
-and the [implementation report](../../../outputs/analysis/physical-sampling-implementation-20260913/implementation-report.json).
+[`geometry-verified`](../../../outputs/analysis/p/physical-sampling-implementation-20260913/geometry-verified/summary.json),
+[`preparation-verified`](../../../outputs/analysis/p/physical-sampling-implementation-20260913/preparation-verified/report.json)
+and the [implementation report](../../../outputs/analysis/p/physical-sampling-implementation-20260913/implementation-report.json).
 Both manifests match the final production preprocessing identity and preserve
 source/config/input identities. Earlier directories in this implementation
 folder are intermediate verification passes.

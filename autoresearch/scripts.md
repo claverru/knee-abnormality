@@ -71,7 +71,7 @@ while the reference is still the starting reference.
 
 The script requires frozen fold files, complete run artifacts including timing and
 source snapshots, and the acquisition metadata specified by `--headers`. Its default
-headers path is `outputs/analysis/sharing-disagreement-20260914/study_headers.parquet`.
+headers path is `outputs/analysis/s/sharing-disagreement-20260914/study_headers.parquet`.
 Selected predictions must reproduce their recorded epoch AUC. Missing or inconsistent
 artifacts are invalid evidence, not permission to weaken these checks silently.
 

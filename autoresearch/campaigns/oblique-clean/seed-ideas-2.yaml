@@ -13,11 +13,11 @@ ideas:
     by that series' capacity, so validation x1 triplets per epoch equal the reference exactly and no oblique
     token is scored.
   precedents:
-  - outputs/analysis/tilted-slot-policies-check-20260922/results.csv (standard-only subset +0.0066 at
+  - outputs/analysis/t/tilted-slot-policies-check-20260922/results.csv (standard-only subset +0.0066 at
     x1)
-  - outputs/analysis/tilted-slot-policies-v2-k05-20260922/results.csv (standard-only subset +0.0011 at
+  - outputs/analysis/t/tilted-slot-policies-v2-k05-20260922/results.csv (standard-only subset +0.0011 at
     x4)
-  - outputs/analysis/acquisition-geometry-20260922/oblique_reach.txt (standard series capacity of 28 windows
+  - outputs/analysis/a/acquisition-geometry-20260922/oblique_reach.txt (standard series capacity of 28 windows
     in coronal fluid and 30 in coronal T1/PD)
   novelty: Uses the oblique views as training data only; no earlier run separated their training value
     from their evaluation value.
@@ -49,7 +49,7 @@ ideas:
     by largest remainder, with at least one triplet each and never above capacity, in training and validation
     alike. Per-slot, per-study and run totals equal the reference exactly.
   precedents:
-  - outputs/analysis/acquisition-geometry-20260922/oblique_reach.txt (windows and run coverage per group)
+  - outputs/analysis/a/acquisition-geometry-20260922/oblique_reach.txt (windows and run coverage per group)
   - docs/validation/results/2026-09-17-test-time-allocation.md#repeated-series-in-one-slot (second-series
     triplets help on frozen models)
   - docs/validation/results/2026-09-18-overnight-results.md (repeated_series_share took triplets from
@@ -128,7 +128,7 @@ ideas:
   - 'Retired ×1 oblique-group-embedding-20260922T115506Z-f5d616dd, the closest mechanism (a constant per-type
     shift before mil_norm): +0.0052 on split studies; split-vs-unchanged pairs net +0.0005, of which Coronal0
     contributed +0.0004 to the su term. View bias ×1: +0.0004 net; residual readout: −0.0005 net (scratch/evidence/x1_candidates.txt).'
-  - 'outputs/analysis/tilted-slot-policies-check-20260922 and -v2check-20260922/results.csv: the tilted-only
+  - 'outputs/analysis/t/tilted-slot-policies-check-20260922 and -v2check-20260922/results.csv: the tilted-only
     slot pass on frozen k_05 and k_075 lost 0.0044–0.0103 subset AUC (confounded by slab coverage, per
     the oblique-feature-adapter record).'
   - 'oblique-feature-adapter, declined by the user as part of the identity family: a learned low-rank

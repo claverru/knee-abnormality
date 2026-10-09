@@ -133,7 +133,7 @@ coverage of failure modes, not a prevalence sample. All six middle-slice overvie
 seven selected nine-slice sheets were inspected; not every slice in every generated stack was
 manually reviewed. Study labels and reports are case-selection evidence, not pixel annotations.
 
-Artifacts: `outputs/analysis/plane-fluid-review-20261002/`. Study suffixes below resolve to full
+Artifacts: `outputs/analysis/p/plane-fluid-review-20261002/`. Study suffixes below resolve to full
 study/series IDs, slice indices and crop offsets in `manifest.json`; reports are in
 `case_reports.csv`.
 
@@ -180,21 +180,21 @@ scripts. The rendering script is
 Run it with `PYTHONPATH` pointing to the archived `source/src` of
 `fluid-detail-93-replacement-20261002T061326Z-c4e4d640`, its
 `training/effective_config.json` as `--config`, and
-`--output-dir outputs/analysis/plane-fluid-review-20261002`.
+`--output-dir outputs/analysis/p/plane-fluid-review-20261002`.
 
 The separate population probes are indexed in [ad-hoc investigations](../../scripts/adhoc/INDEX.md):
 `measure_series_type_resolution.py`, `measure_view_window_cut.py`,
 `summarize_view_window_cut.py` and `analyze_attention_by_series_type.py`. Their artifacts are
-under `outputs/analysis/view-spacing-20261002`; the window measurement records its full-cohort
+under `outputs/analysis/v/view-spacing-20261002`; the window measurement records its full-cohort
 configuration in `window_measurement.json`. Source and input hashes used by this review are in
-`outputs/analysis/plane-fluid-review-20261002/review_provenance.json`.
+`outputs/analysis/p/plane-fluid-review-20261002/review_provenance.json`.
 
 Paired incremental comparisons are the campaign's `comparison/per_label.json` for
 `t1pd-detail-84-20261001T220724Z-00bb3343` and
 `fluid-detail-93-replacement-20261002T061326Z-c4e4d640`. The direct all-120 comparison was
 recomputed with `scripts.tools.compare_fold_runs` and the existing per-label diagnostics;
 results, prediction hashes, identities, configurations and copied analysis sources are in
-`outputs/analysis/plane-fluid-review-20261002/fluid-detail-vs-120/`.
+`outputs/analysis/p/plane-fluid-review-20261002/fluid-detail-vs-120/`.
 
 The comparison permits only name, view policy and output/manifest-path differences, and retains
 the campaign's declared `preprocessing_identity` reference exception. No training, inference,

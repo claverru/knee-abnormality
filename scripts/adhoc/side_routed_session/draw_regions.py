@@ -20,7 +20,7 @@ from knee_abnormality.modeling.model import FRAME_SIZE_START_PITCHES
 
 RUN = Path(sys.argv[1])
 ROWS = [int(v) for v in sys.argv[2].split(",")]
-OUT = Path("outputs/analysis/side-routing-loop-20261006") / RUN.name[16:]
+OUT = Path("outputs/analysis/s/side-routing-loop-20261006") / RUN.name[16:]
 OUT.mkdir(parents=True, exist_ok=True)
 QUADRANTS = {
     (1, 1): (0.89, 0.47, 0.20),

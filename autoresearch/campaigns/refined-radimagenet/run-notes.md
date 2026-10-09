@@ -45,7 +45,7 @@ as its reference. No mask or policy in our training.
 
 - **Against the ResNet-10t reference** (`20261004-094416-rn10t-view-label-bias`, standard
   weights): ×4 0.928777 against 0.927543, **+0.001235**, 95% paired report-group interval
-  [−0.0015, +0.0039] (`outputs/analysis/refined-radimagenet/rn10t-policy-weights-vs-rn10t-reference`);
+  [−0.0015, +0.0039] (`outputs/analysis/r/refined-radimagenet/rn10t-policy-weights-vs-rn10t-reference`);
   ×1 0.923666 (epoch 9) against 0.921848 (+0.0018); soft AUC +0.0016. Training 1,132 s against
   1,141 s. One run: a positive start, not separated from zero.
 - **Against the ResNet-18 incumbent** (the runtime's comparison): 0.928777 against 0.933058,
@@ -71,7 +71,7 @@ checkpoint after their own fine-tuning without the mask, backbone LR 0.0002, L2-
 
 - **Against the ResNet-10t reference:** ×4 0.928671 against 0.927543, **+0.001128**, 95% paired
   report-group interval [−0.0016, +0.0038]
-  (`outputs/analysis/refined-radimagenet/rn10t-policy-ft-weights-vs-rn10t-reference`); ×1
+  (`outputs/analysis/r/refined-radimagenet/rn10t-policy-ft-weights-vs-rn10t-reference`); ×1
   0.923769 against 0.921848 (+0.0019); soft AUC +0.0014. Training 1,113 s.
 - **Against seed 2 (the heated checkpoint):** 0.928671 against 0.928777, −0.0001: the two
   starting points end at the same place.

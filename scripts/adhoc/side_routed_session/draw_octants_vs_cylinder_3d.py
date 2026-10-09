@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 
-OUT = Path("outputs/analysis/octant-sketches-20261006")
+OUT = Path("outputs/analysis/o/octant-sketches-20261006")
 QUADRANTS = {
     (1, 1): ("medial\nfront", (0.89, 0.47, 0.20)),
     (1, -1): ("medial\nback", (0.80, 0.25, 0.33)),

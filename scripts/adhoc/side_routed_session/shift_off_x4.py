@@ -20,7 +20,7 @@ from knee_abnormality.data.splits import STUDY
 from knee_abnormality.inference.checkpoint import load_checkpoint_model
 from knee_abnormality.inference.engine import move_batch
 
-OUT = Path("outputs/analysis/routing-and-shifts-frames-20261007/mcl-spatial-maps")
+OUT = Path("outputs/analysis/r/routing-and-shifts-frames-20261007/mcl-spatial-maps")
 config = load_config(RUN / "training" / "effective_config.json")
 targets, studies, split = prediction_studies(config, "validation", 1)
 studies = studies.sort(STUDY)

@@ -37,7 +37,7 @@ be attributed to centers alone. See the bounded loader measurements and
 A training worker snapshot recorded 280–340 MB unique resident memory per
 worker, without a matched control or a peak claim.
 
-The [control manifest](../../../outputs/analysis/accurate-centers-20260912/control.json)
+The [control manifest](../../../outputs/analysis/a/accurate-centers-20260912/control.json)
 pins checkpoint, config, executed source, input identities, timing and prediction
 hashes. The selected control is
 `outputs/training/crop140mm/fold_0/best-epoch=07-val_macro_auc=0.88612.ckpt` (deleted on 2026-09-16), SHA-256

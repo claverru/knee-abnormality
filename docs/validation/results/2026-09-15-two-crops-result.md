@@ -84,7 +84,7 @@ explain the peripheral losses, and crop placement is label-independent.
 `scripts/adhoc/evaluate_crop_placement.py --modes learned,unweighted` rescored the selected
 checkpoint with the value map's `ŷ(1−ŷ)` set to a constant, so every label's draft
 attention counts equally. The interval is a paired study bootstrap with 2,000 draws.
-Artifacts are in `outputs/analysis/two-crops-unweighted-20260915/`.
+Artifacts are in `outputs/analysis/t/two-crops-unweighted-20260915/`.
 
 | Placement | Macro AUC | vs learned | Paired 95% interval |
 |---|---:|---:|---|
@@ -103,7 +103,7 @@ only on a checkpoint trained with the weighting.
 
 - **Renders:** validation-mode crops with the value map for 10 studies (Baker's cyst, MCL,
   menisci, ACL, fracture, effusion and one negative) are in
-  `outputs/analysis/crop-inspection-two-crops-20260915/` (`render.py`, PNGs).
+  `outputs/analysis/c/crop-inspection-two-crops-20260915/` (`render.py`, PNGs).
 - **What they show:**
   - The first crop sits on the joint center in almost every slice.
   - Further crops shift toward the patella and femur or the edges.

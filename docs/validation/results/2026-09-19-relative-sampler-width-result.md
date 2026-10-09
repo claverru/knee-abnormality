@@ -26,7 +26,7 @@ what the [cache measurement](2026-09-18-per-plane-sigma-cache.md) predicted.
   the distribution across planes and series, not the overall reach.
 - **Geometry behind it:** usable half-reach is axial 61.5, coronal 45.6 and sagittal 51.0 mm, a
   ratio of 1.35 : 1.00 : 1.12 ([acquisition geometry](../../data-preparation/peripheral-coverage.md#acquisition-geometry)).
-- **Scripts:** `outputs/analysis/per-plane-sigma-20260918/`, plus the scratch cell harness described
+- **Scripts:** `outputs/analysis/p/per-plane-sigma-20260918/`, plus the scratch cell harness described
   under [decomposition](#training-versus-drawing).
 
 ## Count multipliers

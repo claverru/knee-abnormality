@@ -1,7 +1,7 @@
 import numpy as np
 
-old = np.load("outputs/analysis/side-routing-old-vs-reference-20261006/old.npz", allow_pickle=True)
-new = np.load("outputs/analysis/side-routing-old-vs-reference-20261006/reference.npz", allow_pickle=True)
+old = np.load("outputs/analysis/s/side-routing-old-vs-reference-20261006/old.npz", allow_pickle=True)
+new = np.load("outputs/analysis/s/side-routing-old-vs-reference-20261006/reference.npz", allow_pickle=True)
 print("knees", len(old["study"]), len(new["study"]), "same token counts", int((old["tokens"] == new["tokens"]).sum()), "same valid counts", int((old["valid_count"] == new["valid_count"]).sum()))
 print("image sums equal", int(np.isclose(old["image_sum"], new["image_sum"], rtol=1e-6).sum()))
 corr_a, corr_b = [], []

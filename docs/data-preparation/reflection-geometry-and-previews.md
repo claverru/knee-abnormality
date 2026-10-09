@@ -92,7 +92,7 @@ These previews do not establish full-dataset eligibility or an accuracy gain.
 The [rejected-center preview](../../outputs/previews/reflection-rejected-center-20260913/preview.html)
 adds one eligible left-source study with `excessive_rms`, six acquisitions and
 54 triplets. Its local acquisitions reflect while every displayed 3D anchor
-remains unavailable. The [bounded metadata screen](../../outputs/analysis/reflection-screen-20260913/report.json)
+remains unavailable. The [bounded metadata screen](../../outputs/analysis/r/reflection-screen-20260913/report.json)
 covered the 29 validation studies present in the saved 128-study header audit:
 two centers were rejected and no acquisition failed reflection eligibility.
 No real ineligible acquisition was found in this bounded selection; that preview

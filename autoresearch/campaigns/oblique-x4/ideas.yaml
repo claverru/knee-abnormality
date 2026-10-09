@@ -18,10 +18,10 @@ ideas:
     slots are unchanged, and split studies always keep their standard tokens, so no
     label loses all its tokens.
   precedents:
-  - outputs/analysis/tilted-slot-policies-v2-k05-20260922/results.csv (additive_acl
+  - outputs/analysis/t/tilted-slot-policies-v2-k05-20260922/results.csv (additive_acl
     +0.0020 and intact_acl +0.0011 on the affected subset against additive -0.0001,
     k_05 at x4 tau 0.75)
-  - outputs/analysis/acquisition-geometry-20260922/localize_campaign.py (split-study
+  - outputs/analysis/a/acquisition-geometry-20260922/localize_campaign.py (split-study
     and unchanged-study macro AUC for the reference, k_05 and each candidate)
   - autoresearch/campaigns/oblique/prior-work.md#what-the-oblique-groups-are (descriptions
     of the fluid obliques)
@@ -89,7 +89,7 @@ ideas:
   - outputs/autoresearch/oblique/experiments/oblique-group-embedding-20260922T115506Z-f5d616dd
     (rejected at 0.899287, +0.00176 against the reference)
   - outputs/autoresearch/oblique/experiments/label-view-attention-bias-20260922T120824Z-29aa5863
-  - outputs/analysis/acquisition-geometry-20260922/localize_campaign.py (split-study
+  - outputs/analysis/a/acquisition-geometry-20260922/localize_campaign.py (split-study
     bootstrap)
   novelty: A composition of the two identity mechanisms; each was tested alone.
   coverage: Sampling and counts identical to the reference.
@@ -260,7 +260,7 @@ ideas:
   precedents:
   - docs/validation/results/2026-09-22-oblique-groups-result.md (reference run; per-label
     localization)
-  - outputs/analysis/acquisition-geometry-20260922/protocol_prior.txt (an oblique
+  - outputs/analysis/a/acquisition-geometry-20260922/protocol_prior.txt (an oblique
     flag added after training gave -0.0003 to -0.0014, so the gain must come from
     routing inside the model, not new information)
   - docs/validation/results/2026-09-14-knee-side-embedding-result.md (a knee-side
@@ -343,7 +343,7 @@ ideas:
     \ per slot, the composition they see in 88% of studies. The oblique view becomes\
     \ an alternative reading of its slot instead of diluting the other slots."
   precedents:
-  - "outputs/analysis/tilted-slot-policies-20260922/partial_log.txt, tilted-slot-policies-check-20260922\
+  - "outputs/analysis/t/tilted-slot-policies-20260922/partial_log.txt, tilted-slot-policies-check-20260922\
     \ and -v2check-20260922/results.csv (scripts/adhoc/score_tilted_slot_policies.py):\
     \ frozen mean_standard_tilted vs additive on the same triplets; the mixture wins\
     \ on the split subset in 9/9 checkpoint\xD7setting cells."
@@ -471,11 +471,11 @@ ideas:
     untested entry for post-projection residual adapters per plane and contrast in
     all studies (after AnyMC3D''s view-specific LoRA). This proposal is an oblique-only
     specialisation; the general entry keeps its ownership.'
-  - 'outputs/analysis/tilted-slot-policies-check-20260922 and -v2check-20260922/results.csv:
+  - 'outputs/analysis/t/tilted-slot-policies-check-20260922 and -v2check-20260922/results.csv:
     tilted-only and additive per-label deltas.'
   - "oblique-group-embedding-20260922T115506Z-f5d616dd: the constant marker was rejected\
     \ (split-study ACL \u22120.0092)."
-  - 'outputs/analysis/acquisition-geometry-20260922/protocol_prior.txt: the model
+  - 'outputs/analysis/a/acquisition-geometry-20260922/protocol_prior.txt: the model
     already recognises the protocol from appearance.'
   - 'docs/validation/results/2026-09-20-compartment-adapter-result.md: a rejected
     nonlinear bottleneck on pooled features, a different location and purpose.'
@@ -541,11 +541,11 @@ ideas:
     budget, to its standard series, capped by that series' capacity, so validation
     x1 triplets per epoch equal the reference exactly and no oblique token is scored.
   precedents:
-  - outputs/analysis/tilted-slot-policies-check-20260922/results.csv (standard-only
+  - outputs/analysis/t/tilted-slot-policies-check-20260922/results.csv (standard-only
     subset +0.0066 at x1)
-  - outputs/analysis/tilted-slot-policies-v2-k05-20260922/results.csv (standard-only
+  - outputs/analysis/t/tilted-slot-policies-v2-k05-20260922/results.csv (standard-only
     subset +0.0011 at x4)
-  - outputs/analysis/acquisition-geometry-20260922/oblique_reach.txt (standard series
+  - outputs/analysis/a/acquisition-geometry-20260922/oblique_reach.txt (standard series
     capacity of 28 windows in coronal fluid and 30 in coronal T1/PD)
   novelty: Uses the oblique views as training data only; no earlier run separated
     their training value from their evaluation value.
@@ -583,7 +583,7 @@ ideas:
     layer and add the result to that acquisition's tokens. Acquisitions without valid
     geometry get zero.
   precedents:
-  - outputs/analysis/acquisition-geometry-20260922/oblique_axes.txt (rotation axes
+  - outputs/analysis/a/acquisition-geometry-20260922/oblique_axes.txt (rotation axes
     of each oblique family)
   - docs/backlog/big-bets.md#3d-embedding-training-time-effect (a patient-position
     3D embedding was ignored at inference)
@@ -624,7 +624,7 @@ ideas:
     one triplet each and never above capacity, in training and validation alike. Per-slot,
     per-study and run totals equal the reference exactly.
   precedents:
-  - outputs/analysis/acquisition-geometry-20260922/oblique_reach.txt (windows and
+  - outputs/analysis/a/acquisition-geometry-20260922/oblique_reach.txt (windows and
     run coverage per group)
   - docs/validation/results/2026-09-17-test-time-allocation.md#repeated-series-in-one-slot
     (second-series triplets help on frozen models)
@@ -889,7 +889,7 @@ ideas:
     \ split-vs-unchanged pairs net +0.0005, of which Coronal0 contributed +0.0004\
     \ to the su term. View bias \xD71: +0.0004 net; residual readout: \u22120.0005\
     \ net (scratch/evidence/x1_candidates.txt)."
-  - "outputs/analysis/tilted-slot-policies-check-20260922 and -v2check-20260922/results.csv:\
+  - "outputs/analysis/t/tilted-slot-policies-check-20260922 and -v2check-20260922/results.csv:\
     \ the tilted-only slot pass on frozen k_05 and k_075 lost 0.0044\u20130.0103 subset\
     \ AUC (confounded by slab coverage, per the oblique-feature-adapter record)."
   - 'oblique-feature-adapter, declined by the user as part of the identity family:

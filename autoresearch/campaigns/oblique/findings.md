@@ -221,7 +221,7 @@ Unresolved concerns:
 Evidence:
 - /home/claudio/src/knee-abnormality/outputs/autoresearch/oblique/experiments/oblique-group-embedding-20260922T115506Z-f5d616dd/comparison/comparison.json (macro, per-label, vendor strata only)
 - /home/claudio/src/knee-abnormality/outputs/autoresearch/oblique/experiments/oblique-group-embedding-20260922T115506Z-f5d616dd/training/oof_predictions.csv vs /home/claudio/src/knee-abnormality/outputs/training/oblique/oof_predictions.csv (split-subset deltas computed ad hoc)
-- /home/claudio/src/knee-abnormality/outputs/analysis/acquisition-geometry-20260922/oblique_reach.parquet (group=='oblique': 103 fold-0 split studies)
+- /home/claudio/src/knee-abnormality/outputs/analysis/a/acquisition-geometry-20260922/oblique_reach.parquet (group=='oblique': 103 fold-0 split studies)
 - /home/claudio/src/knee-abnormality/docs/validation/results/2026-09-22-oblique-groups-result.md:27-37 (same subset, positive counts match; previous ACL gain also sat in unchanged studies)
 - /home/claudio/src/knee-abnormality/outputs/autoresearch/oblique/state.json ideas.axial-t1pd-to-oblique-transfer (proposal left unadmitted)
 - /home/claudio/src/knee-abnormality/autoresearch/campaigns/oblique/prior-work.md#sampling-coverage-of-the-oblique-groups
@@ -307,7 +307,7 @@ Unresolved concerns:
 
 Evidence:
 - /home/claudio/src/knee-abnormality/outputs/autoresearch/oblique/jobs/researcher-20260922T122705Z-20a56bf3/report.json (proposal event)
-- /home/claudio/src/knee-abnormality/outputs/analysis/tilted-slot-policies-v2check-20260922/results.csv and tilted-slot-policies-check-20260922/results.csv (frozen additive/tilted/standard/mixture per-label and subset deltas)
+- /home/claudio/src/knee-abnormality/outputs/analysis/t/tilted-slot-policies-v2check-20260922/results.csv and tilted-slot-policies-check-20260922/results.csv (frozen additive/tilted/standard/mixture per-label and subset deltas)
 - scripts/adhoc/score_tilted_slot_policies.py (frozen policy scorer)
 - docs/validation/results/2026-09-22-oblique-groups-result.md (reference split-study MCL/PF OA costs)
 - docs/validation/results/2026-09-17-count-normalized-attention-result.md (rejected per-acquisition normalisation, −0.0035)

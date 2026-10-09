@@ -53,7 +53,7 @@ The batch-size-16 queue was stopped after `03-lr-linear`; `04-warmup-2` (seed 23
   [ranked-filtered finding](2026-09-17-ranked-filtered-result.md) that a same-seed run can move by
   0.0031: there the *sources* changed. Matched seed plus matched sources is exact; matched seed
   alone is not. The first queue's artifacts were deleted, its control's predictions, metrics,
-  timing and config kept in `outputs/analysis/bs16-control-20260918/`.
+  timing and config kept in `outputs/analysis/b/bs16-control-20260918/`.
 - **`04-b0-ema-0.9999` is void, not a result.** At decay 0.9999 over 4,380 steps the averaged model
   still carries 64.5% of the untrained initialisation (0.9999^4380 = 0.645), so its 0.829248 says
   nothing about EMA. Training loss was normal at 0.4432; only the EMA copy used for validation was

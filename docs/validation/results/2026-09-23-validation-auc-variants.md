@@ -13,10 +13,10 @@ best of the 84 alternatives. The consistency across cohorts and the gold-label e
 support the result more than the corrected p-value does.
 
 Reproduce with [`score_validation_auc_variants`](../../../scripts/adhoc/score_validation_auc_variants.py);
-artifacts in `outputs/analysis/validation-auc-variants-20260923/` (`table.txt` holds the full
+artifacts in `outputs/analysis/v/validation-auc-variants-20260923/` (`table.txt` holds the full
 ranking). It reads saved predictions and `outputs/submission/kaggle-ledger.json` on CPU, with
 cohorts hard-coded by submission number (S48 added by hand, since the ledger predates it) and
-scanner groups from `outputs/analysis/sharing-disagreement-20260914/study_headers.parquet`. Dense
+scanner groups from `outputs/analysis/s/sharing-disagreement-20260914/study_headers.parquet`. Dense
 per-label pair-weight matrices need roughly 6 GB and a few minutes; it refuses an existing output
 directory:
 

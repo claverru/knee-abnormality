@@ -22,9 +22,9 @@ ideas:
     acquisition)'
   - outputs/autoresearch/oblique-clean/jobs/orchestrator-20260922T231642Z-a6d3184d/report.json (orchestrator
     diagnosis and the one-line fix)
-  - outputs/analysis/tilted-slot-policies-v2-k05-20260922/results.csv (additive_acl +0.0020 and intact_acl
+  - outputs/analysis/t/tilted-slot-policies-v2-k05-20260922/results.csv (additive_acl +0.0020 and intact_acl
     +0.0011 on the affected subset against additive -0.0001, k_05 at x4 tau 0.75)
-  - outputs/analysis/acquisition-geometry-20260922/localize_campaign.py (split-study and unchanged-study
+  - outputs/analysis/a/acquisition-geometry-20260922/localize_campaign.py (split-study and unchanged-study
     macro AUC for the reference, k_05 and each candidate)
   - autoresearch/campaigns/oblique/prior-work.md#what-the-oblique-groups-are (descriptions of the fluid
     obliques)

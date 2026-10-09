@@ -249,15 +249,15 @@ blends are diagnostic findings, not additional scheduled experiments.
 The repository HEAD during investigation was `c19c64ddf8733ac368d2ae8fe0140c1f3450b4ff`, with
 unrelated local changes already present. Production input fingerprints, rather than HEAD alone,
 identify the compared tables. Evidence is preserved locally under the Git-ignored
-`outputs/analysis/public-label-investigation-20260927/`:
+`outputs/analysis/p/public-label-investigation-20260927/`:
 
-- [Investigation summary](../../outputs/analysis/public-label-investigation-20260927/deep/investigation_summary.json),
-  [input hashes](../../outputs/analysis/public-label-investigation-20260927/deep/input_fingerprints.json)
+- [Investigation summary](../../outputs/analysis/p/public-label-investigation-20260927/deep/investigation_summary.json),
+  [input hashes](../../outputs/analysis/p/public-label-investigation-20260927/deep/input_fingerprints.json)
   and dataset-discovery metadata retain measured scores and source identities.
-- [403-variant screen](../../outputs/analysis/public-label-investigation-20260927/deep/aggregation_screen.csv),
+- [403-variant screen](../../outputs/analysis/p/public-label-investigation-20260927/deep/aggregation_screen.csv),
   candidate definitions, source families/kappa, held-pair selections and reliability outputs
   record the aggregation comparisons.
-- [Focused candidates](../../outputs/analysis/public-label-investigation-20260927/deep/focused_candidates.json),
+- [Focused candidates](../../outputs/analysis/p/public-label-investigation-20260927/deep/focused_candidates.json),
   bootstrap intervals, training-target effects, driving cases, report challenges, manual cases,
   language diagnostics and guarded-OA results retain the follow-up evidence.
 

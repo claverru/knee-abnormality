@@ -36,6 +36,6 @@ To reproduce a run, use its training source archive rather than these snapshots:
 `outputs/training/graph-forced/source_snapshot.zip` for `graph-forced`, both predating the
 attention prior. Current source, spatial-token and preprocessing identities reject
 both checkpoints, so evaluate them only in an isolated checkout with the archived
-sources. Diagnostic artifacts are under `outputs/analysis/encoding-usage-token-graph/`
-and `outputs/analysis/encoding-usage-graph-forced/`. Run outputs, checkpoints and
+sources. Diagnostic artifacts are under `outputs/analysis/e/encoding-usage-token-graph/`
+and `outputs/analysis/e/encoding-usage-graph-forced/`. Run outputs, checkpoints and
 analyses remain under their local `outputs/` paths and are not version controlled.

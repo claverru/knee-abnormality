@@ -41,13 +41,13 @@ candidate passed the preliminary batch-eight training checks: 350.08 versus
 Those training measurements do not describe the final compiled candidate;
 its failed inference gate stopped further training work.
 
-The [decision artifact](../../../outputs/analysis/spatial-fusion-20260912/decision.json)
+The [decision artifact](../../../outputs/analysis/s/spatial-fusion-20260912/decision.json)
 records the limits, ratios and exact profile directories. Each profile retains
 source hashes, selected-input manifests, all timing samples and an operator
 trace. The final candidate is `candidate-inference-b2-fused`; its reference is
 `submitted-inference-b2-high`, executing the actual submitted bundle. Earlier
 batch-eight profiles used the training snapshot and are explicitly preliminary.
-The [source archive](../../../outputs/analysis/spatial-fusion-20260912/source_snapshot.zip)
+The [source archive](../../../outputs/analysis/s/spatial-fusion-20260912/source_snapshot.zip)
 contains the complete candidate, audit utility and executed plan; SHA-256
 `8c5b2c04f841246ebc04fa6402cc70940db7df77027f4d2a9f561135b811a1d7`.
 It is also extracted under that directory's `candidate-source/`. Reproduction

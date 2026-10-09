@@ -58,7 +58,7 @@ rtk proxy env CUDA_VISIBLE_DEVICES= POLARS_MAX_THREADS=1 OPENBLAS_NUM_THREADS=1 
 ```
 
 The completed evidence is in
-[`outputs/analysis/sharing-generalization-20260914/`](../../../outputs/analysis/sharing-generalization-20260914):
+[`outputs/analysis/s/sharing-generalization-20260914/`](../../../outputs/analysis/s/sharing-generalization-20260914):
 
 - `analysis.json`, `target_metrics.csv` and the archived analysis source: primary
   comparison, bootstrap, epoch curves, input hashes and submission timing.
@@ -74,6 +74,6 @@ The completed evidence is in
   main CLI regenerates the primary comparison, not those auxiliary audits.
 
 Earlier GPU interventions and their intact-prediction parity are preserved in
-`outputs/analysis/compartment-diagnosis-20260913/`. No intervention was rerun for
+`outputs/analysis/c/compartment-diagnosis-20260913/`. No intervention was rerun for
 this investigation. New script lint/format and catalog checks are static checks,
 not model correctness tests or performance benchmarks.

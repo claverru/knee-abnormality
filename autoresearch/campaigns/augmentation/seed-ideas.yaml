@@ -45,7 +45,7 @@ ideas:
     before gamma/contrast, inside the geometric valid region.
   precedents:
   - 'nnU-Net trainer: simulated low resolution is a standard recipe component, not isolated (github.com/MIC-DKFZ/nnUNet, nnUNetTrainer.py).'
-  - 'Acquired-resolution distributions: outputs/analysis/input-resolution-research-20260915/acquisition/distributions_train.csv; docs/research/input-resolution.md.'
+  - 'Acquired-resolution distributions: outputs/analysis/i/input-resolution-research-20260915/acquisition/distributions_train.csv; docs/research/input-resolution.md.'
   - 'Training and evaluating at 0.875 mm cost -0.0228, lateral meniscus -0.106 (docs/validation/results/2026-09-16-learned-zoom-result.md): the range stays inside the measured one.'
   novelty: First resolution augmentation here, one axis at a time, bounded by the measured acquisition distribution.
   coverage: Every acquisition; resolution-sensitive labels (menisci, ligaments) are the ones to watch.

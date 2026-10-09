@@ -17,7 +17,7 @@ Measured at inference only. Training-time sigma is a different quantity and stil
 ## Setup
 
 - **Checkpoints and cache:** `ranked-filtered-seed{42,43,44}` on the fold-0 token cache
-  (`outputs/analysis/token-cache-20260917/`), 904 studies. Selections are exact: sigma is passed
+  (`outputs/analysis/t/token-cache-20260917/`), 904 studies. Selections are exact: sigma is passed
   straight to the snapshot's own `select_triplets`, and the sigma-40 baseline reproduces
   `selections.npz` triplet for triplet. No slot has recorded failures, so the preparation retry is
   a no-op.
@@ -32,7 +32,7 @@ Measured at inference only. Training-time sigma is a different quantity and stil
   `SE ≈ 0.067·p^1.05`, as that rule predicts for a three-checkpoint mean.
 - **Selection-jitter floor:** sigma 39.9 and 40.1 move macro AUC by at most 0.00009, so the
   discrete reshuffling of which triplets get picked is not what the effects below are made of.
-- **Scripts and outputs:** `outputs/analysis/per-plane-sigma-20260918/`
+- **Scripts and outputs:** `outputs/analysis/p/per-plane-sigma-20260918/`
   (`01_score_sigma.py`, `02_coronal_detail.py`, `03_combined.py`, `04_bootstrap.py`).
 
 ## One plane at a time

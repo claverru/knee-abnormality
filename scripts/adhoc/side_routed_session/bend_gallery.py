@@ -15,7 +15,7 @@ from knee_abnormality.data.splits import STUDY
 from knee_abnormality.inference.engine import move_batch
 
 RUN = Path("outputs/training/20261006-163650-side-routed-spot-frame-ring-sectors")
-OUT = Path("outputs/analysis/routing-and-shifts-frames-20261007/knee-bend")
+OUT = Path("outputs/analysis/r/routing-and-shifts-frames-20261007/knee-bend")
 
 
 def wide_data(data: DataConfig) -> DataConfig:

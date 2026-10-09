@@ -35,7 +35,7 @@ Tonylin checkpoint index 8 has SHA-256
 `55a9bf41d281a3abb71f3c96a667942d626538e5460c601fae9dfec0b6126dcd`.
 Submission **56208424** completed at 14:10:54 UTC according to the
 [workflow record](../../../outputs/submission/records/knee-tonylin-soft-v3-20260913.json).
-The [comparison artifact](../../../outputs/analysis/tonylin-vs-steven-20260913/comparison.json)
+The [comparison artifact](../../../outputs/analysis/t/tonylin-vs-steven-20260913/comparison.json)
 pins configs, saved metrics/predictions, input identities and submission records,
 including all per-target scores and the membership/gold/validation comparison.
 See the [submission artifact](../../inference/submissions/2026-09-13-tonylin-submission.md) and

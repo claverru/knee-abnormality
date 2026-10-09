@@ -53,7 +53,7 @@ The exponent remains 0.5. The normal training run records its full class-balance
 provenance. A fixed-original-weight sensitivity is not implemented or scheduled.
 
 Local evidence: [preparation report](../../data/labels/prepared/qwen-lateral-v1/preparation.json)
-and [five-fold data audit](../../outputs/analysis/qwen-lateral-v1/preflight.json).
+and [five-fold data audit](../../outputs/analysis/q/qwen-lateral-v1/preflight.json).
 Ruff and maintained-script help/index checks passed; no tests were written or run.
 
 ## Preparation and execution
@@ -127,7 +127,7 @@ trained away from, while unchanged targets moved by up to ±0.006 (Synovitis +0.
 be judged locally or on the three-decimal leaderboard. It was not submitted, and the Bhavesh
 single-target run is not planned; label work continues as the all-target
 [label rebuild](../public-labels/label-rebuild.md). Comparison:
-`outputs/analysis/qwen-lateral-v1/compare-x4/comparison.json` (config differences allowed:
+`outputs/analysis/q/qwen-lateral-v1/compare-x4/comparison.json` (config differences allowed:
 name, label source/manifest, report-attribute manifest path; input identity differences: label
 manifest, source, training/validation row hashes, the latter only through the informational
 source column).

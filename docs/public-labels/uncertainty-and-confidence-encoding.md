@@ -55,7 +55,7 @@ replacing disease targets with three hard states improves image-model AUC. The
 [backlog proposal](../backlog/small-changes.md#auxiliary-report-state-prediction)
 retains balanced v4 BCE and adds a separate reporting head.
 
-The [audit artifact](../../outputs/analysis/report-state-audit-20260920/audit.json)
+The [audit artifact](../../outputs/analysis/r/report-state-audit-20260920/audit.json)
 records input SHA-256 hashes, methods and all twelve labels' results. It joins
 Steven v1/v2/v4 and official labels by `StudyInstanceUID` across 4,407 studies.
 The diagnostic groups are `v1 < 0.5`, `v1 == 0.5` and `v1 > 0.5`: negative-score,

@@ -20,7 +20,7 @@ LABEL_TABLES = {
     "steven_v4": STEVEN_V4,
     "combined_v1": "data/labels/prepared/combined-v1/labels.csv",
 }
-HEADERS = "outputs/analysis/sharing-disagreement-20260914/study_headers.parquet"
+HEADERS = "outputs/analysis/s/sharing-disagreement-20260914/study_headers.parquet"
 COHORTS = {
     "v3_x2": (5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 17, 18, 19, 20, 23, 24, 25, 26, 27),
     "v3_x1_tau075": (32, 33, 34, 38, 39),

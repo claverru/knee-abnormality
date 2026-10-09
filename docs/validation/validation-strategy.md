@@ -106,7 +106,7 @@ parity is not required for each run or submission.
   half of the split about 1.46× larger, and 0.67–0.91× smaller when averaged over three
   checkpoints. Script and outputs:
   [snapshot](../history/series-and-sampling-sources/README.md#triplet-allocation),
-  `outputs/analysis/detection-floor-20260917/`.
+  `outputs/analysis/d/detection-floor-20260917/`.
 - **Validation multiplier:** scores at ×1 sit about 0.0035 below the same checkpoints at ×2, so
   runs are comparable only with a control at the same multiplier.
 - **Prediction multiplier (since 2026-09-22):** each epoch is still validated at ×1 and the best

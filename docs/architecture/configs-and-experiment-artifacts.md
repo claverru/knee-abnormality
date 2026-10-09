@@ -260,7 +260,7 @@ space rose by 24.74 GiB while a training run was writing, and a separate `uv cac
   `views-budget-jitter-centre`, which have no selection record; the four
   `rn18-l2sp-no-confusion-folds-1-4` teachers, `attributes-v4-w005-candidate` and
   `attributes-v4-w02-candidate`, whose results are recorded nowhere in the docs; and
-  `outputs/analysis/slice-budget-20261002/scratch/bundle-copy/model.ckpt`, outside any run folder.
+  `outputs/analysis/s/slice-budget-20261002/scratch/bundle-copy/model.ckpt`, outside any run folder.
 
 The two cleanups below predate the skill and were user-authorized, hand-reviewed removals of
 obsolete `.ckpt` files. Each manifest lists every removed and
@@ -353,6 +353,37 @@ files in 21 runs, 7.16 GiB. The two checkpoints of its incumbent
 (`height-cuts-from-the-spots-requeue-20261006T232351Z-d2445402`) are kept, as the reference of the
 frame-and-targets campaign. Predictions, logs, frozen source and diffs of every run remain.
 Manifest: `outputs/archive/maintenance/disk-cleanup-20261007T112812Z/manifest.json`.
+
+On 2026-10-09 07:03 CEST the disk-cleanup rules freed 15.75 GiB, plus 0.38 GiB from `uv cache prune`,
+after the Windows drive holding the WSL virtual disk filled up (830 MiB free) and froze WSL twice
+during the view-poses campaign: checkpoints 12.01 GiB in 70 files, export weights
+0.2 GiB in 9, analysis arrays 3.53 GiB in 11, one Codex build folder and one
+session scratchpad. Kept for a decision: the checkpoints and exports whose result is recorded
+nowhere or whose run has no selection record (92 checkpoint and 195 export entries kept in all,
+with their reasons in the manifest). One `.ruff_cache` under `~/.codex/debates` could not be deleted
+(permission denied). The view-poses checkpoints stay: its campaign is running.
+Manifest: `outputs/archive/maintenance/disk-cleanup-20261009T050321Z/manifest.json`.
+
+On 2026-10-09 10:03 CEST the user ordered a deep cleanup beyond the rules, 86.9 GiB in all, because
+the Windows drive holding the WSL virtual disk was full. Every checkpoint went (18.59 GiB) except
+the best epoch of `sagittal-fluid-canvas-fine`, the view-poses incumbent
+(`outputs/autoresearch/view-poses/experiments/sagittal-fluid-canvas-fine-20261009T054235Z-c95da7ce/training/fold_1/best-epoch=08-val_macro_auc=0.91939.ckpt`),
+and every local bundle (7.20 GiB): the submitted models stay on Kaggle as private bundle datasets,
+inference weights only, and runs never submitted can no longer be exported. Also removed: the
+package caches the campaign developer jobs left in `jobs/*/scratch/cache` (37.38 GiB), the campaign
+developer workspaces except the one claimed in view-poses (8.88 GiB; the frozen `source` of every
+run stays), the `.venv` of the `knee-abnormality-jevk5-attributes-v4` worktree (7.43 GiB),
+`outputs/previews` and `outputs/profiling`, every file of 1 MiB or more under `outputs/analysis`
+except the campaign monitor (3.09 GiB; smaller tables and notes stay), and the segmenter cache's
+benchmark folder and weights zip. Predictions, metrics, logs, diffs, the submission ledger and
+records remain. Manifest: `outputs/archive/maintenance/deep-cleanup-20261009T080304Z/manifest.json`.
+
+The same day, at the user's request, two more removals outside the rules: the build output and
+scratch environment of the `variopinta` project (`rust/target`, `benchmarks/.runs` and one scratch
+`.venv`, 6.8 GiB), and the converted input images of the segmenter cache
+(`~/.cache/knee-segmenters/{sample550,val,dess-menisci,balanced750}/images`, about 16 GiB). The
+segmenter masks, their case lists and the prepared targets stay; segmenting again means converting
+the raw series again.
 
 ## Current scope and next execution
 

@@ -57,13 +57,13 @@ All from the 300-series sample of
   130 mm halves most of the cuts for 8% coarser pixels and is the fallback for designs that show a
   slice at one field only, if their per-field AUC shows the periphery labels losing.
 - **Acquired resolution by field** (header audit of 23,173 series,
-  `outputs/analysis/input-resolution-research-20260915/acquisition/series_acquisition.parquet`,
+  `outputs/analysis/i/input-resolution-research-20260915/acquisition/series_acquisition.parquet`,
   counted 2026-10-01): the share of series whose finer acquired axis is at or above the pixel size
   is 15% at 140 mm, 30% at 120 mm, 50% at 112 mm (0.5 mm exactly, the most common value, 13% of
   series), 70% at 100 mm and 91% at 84 mm. T1/PD series are acquired finer than fluid ones: 36%
   against 61% resolved at 112 mm, 11% against 19% at 140 mm.
 - **Label reliance by contrast** (leave-one-type-out on three ReXNet controls,
-  `outputs/analysis/type-importance-20260917/label_type_importance.csv`; older labels, indicative):
+  `outputs/analysis/t/type-importance-20260917/label_type_importance.csv`; older labels, indicative):
   the labels that gained at 120 mm rely 37–62% on T1/PD series (PF OA 42%, ACL 37%, lateral OA
   62%, medial OA 45%, lateral meniscus 61%); those that lost rely 76–100% on fluid series
   (synovitis 76%, Baker's cyst 94%, medial meniscus 78%, contusion 100%).

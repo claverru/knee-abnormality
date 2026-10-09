@@ -33,7 +33,7 @@ class PlotCLI(CLISettings):
         min_length=1, description="Run directories or run IDs under outputs/training"
     )
     output: Path = Field(
-        default=Path("outputs/analysis/validation_metrics.png"),
+        default=Path("outputs/analysis/v/validation_metrics.png"),
         description="PNG to write, relative to the repository root",
     )
 

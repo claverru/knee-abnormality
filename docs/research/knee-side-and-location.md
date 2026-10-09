@@ -210,7 +210,7 @@ A read-only Polars count on the existing geometry audit found recorded `L` or
 L/R values among the sampled headers. `ImageLaterality` was absent in all 26,804
 saved header rows, covering 721 series. This is not a full-dataset coverage or
 correctness audit. The input is
-[`headers.parquet`](../../outputs/analysis/geometry-metadata-20260912/headers.parquet);
+[`headers.parquet`](../../outputs/analysis/g/geometry-metadata-20260912/headers.parquet);
 study coverage counts unique nonempty L/R values in `Laterality`, grouped by
 `StudyInstanceUID`. Its SHA-256 is
 `2523ae738e05b068ae2991bc87a12a3f537863c00126e91b34593448d39ad5ea`.

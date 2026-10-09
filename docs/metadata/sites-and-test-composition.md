@@ -44,7 +44,7 @@ as in the [research provenance](../research/provenance.md).
 [`infer_training_sites.py`](../../scripts/adhoc/infer_training_sites.py) detects each training
 report's language (`langdetect`, seed 0, probability ≥ 0.8), runs script and vocabulary checks,
 and tabulates language by vendor, field strength and model. Artifacts are in
-`outputs/analysis/training-sites-20260929/`.
+`outputs/analysis/t/training-sites-20260929/`.
 
 ```bash
 rtk proxy env CUDA_VISIBLE_DEVICES= uv run --locked --with langdetect python -m scripts.adhoc.infer_training_sites --output-dir outputs/analysis/training-sites-new

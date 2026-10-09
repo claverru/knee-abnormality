@@ -75,8 +75,8 @@ ideas:
       per series in validation and inference.
     precedents:
       - docs/research/input-resolution.md#field-of-view-and-joint-position (joint offsets, tissue width, placement reopened 2026-09-21)
-      - outputs/analysis/input-resolution-research-20260915/images/common.py joint_line heuristic (cross-plane agreement within 10 mm in 96-98% of studies; not validated against ground truth)
-      - outputs/analysis/input-resolution-research-20260915/images/series_metrics_overhang.parquet (tissue width and offsets per plane)
+      - outputs/analysis/i/input-resolution-research-20260915/images/common.py joint_line heuristic (cross-plane agreement within 10 mm in 96-98% of studies; not validated against ground truth)
+      - outputs/analysis/i/input-resolution-research-20260915/images/series_metrics_overhang.parquet (tissue width and offsets per plane)
       - docs/history/crop-selection-investigation.md (learned crop selection dropped 2026-09-16; its anatomical-glimpse option was never run)
       - docs/validation/results/2026-09-12-140-mm-crop-result.md
     novelty: >-

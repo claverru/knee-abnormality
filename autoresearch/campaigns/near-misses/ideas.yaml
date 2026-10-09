@@ -542,7 +542,7 @@ ideas:
     and [anterior-bias completion](/home/claudio/src/knee-abnormality/outputs/autoresearch/near-misses/jobs/orchestrator-20260925T003506Z-b9ee65cb/report.json):
     neither was accepted. The latter reduced PF OA, arguing against simply restoring
     a fixed anterior preference.'
-  - "[Original reseed analysis](/home/claudio/src/knee-abnormality/outputs/analysis/elr-per-label-20260924/elr_per_label.json):\
+  - "[Original reseed analysis](/home/claudio/src/knee-abnormality/outputs/analysis/e/elr-per-label-20260924/elr_per_label.json):\
     \ adopted-new-seed minus meniscus-half-knee-mil moved macro \u22120.006287 and\
     \ PF OA \u22120.015373. This is a two-run yardstick, not an estimated seed distribution."
   - '[Absolute-position MIL research](https://proceedings.mlr.press/v248/krishnamoorthy24a.html)
@@ -887,7 +887,7 @@ ideas:
     within-acquisition-geometry-pooling: blocked without a result. Its mass-conservation
     construction used fixed represented-depth weights; this proposal instead constrains
     the completed learned OA interaction.'
-  - "[Original reseed analysis](/home/claudio/src/knee-abnormality/outputs/analysis/elr-per-label-20260924/elr_per_label.json):\
+  - "[Original reseed analysis](/home/claudio/src/knee-abnormality/outputs/analysis/e/elr-per-label-20260924/elr_per_label.json):\
     \ adopted-new-seed versus the adopted half-knee run moved macro \u22120.006287\
     \ and PF OA \u22120.015373. This two-run comparison is a cautionary yardstick,\
     \ not an estimated seed distribution."
@@ -1171,7 +1171,7 @@ ideas:
     withholding much of the existing compartment trunk credit lost about 0.0039 macro.
     The proposed construction retains the complete base path and isolates only the
     added correction.'
-  - "[Original reseed analysis](/home/claudio/src/knee-abnormality/outputs/analysis/elr-per-label-20260924/elr_per_label.json):\
+  - "[Original reseed analysis](/home/claudio/src/knee-abnormality/outputs/analysis/e/elr-per-label-20260924/elr_per_label.json):\
     \ adopted-new-seed versus the adopted half-knee run moved macro \u22120.006287\
     \ and PF OA \u22120.015373. This is a two-run yardstick. The merged-geometry versus\
     \ adopted-run comparison also changes geometry and is not seed-only evidence."

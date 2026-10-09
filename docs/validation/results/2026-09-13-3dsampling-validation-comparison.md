@@ -44,7 +44,7 @@ the largest gains; PF OA and MCL show the largest losses. Overall AUC is nearly
 unchanged and BCE worsens. One fold and one training seed do not establish a
 repeatable improvement, and the gold subset contains only eleven studies.
 
-The [comparison artifact](../../../outputs/analysis/3dsampling-vs-spatial-tokens-20260913/comparison.json)
+The [comparison artifact](../../../outputs/analysis/0-9/3dsampling-vs-spatial-tokens-20260913/comparison.json)
 records full metrics, deltas, source paths and metric/prediction hashes. Original
 configs, input identities and source snapshots remain in each run directory.
 The [submission record](../../../outputs/submission/records/knee-3dsampling-20260913.json)

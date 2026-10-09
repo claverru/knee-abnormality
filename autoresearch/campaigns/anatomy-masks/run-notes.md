@@ -13,7 +13,7 @@ forced seeds; the first two are adopted whatever their result (contract, Adoptio
   "Baseline data/preprocessing identity differs from historical control". The worktree's
   `modeling/model.py` carried another session's edit of 23:43 (the bicubic cut and the map
   centre, for a prediction on the existing weights), so the source hash was not the reference's.
-  The edit is kept as a patch and a full copy in `outputs/analysis/anatomy-masks-prestart/`,
+  The edit is kept as a patch and a full copy in `outputs/analysis/a/anatomy-masks-prestart/`,
   `model.py` was restored from the reference's `source_snapshot.zip`, the first start's state
   moved to `outputs/autoresearch/anatomy-masks-aborted-start-20261007`, and the campaign started
   again; calibration passed.
@@ -829,7 +829,7 @@ Contrast mixing blends the two contrasts of a plane pixel for pixel (known, and 
 aligned donor lost twice in fixes-and-removals). How far apart the blended pixels are in the
 patient, in the slice plane, on 40 training batches with seed 2's weights
 (output
-`outputs/analysis/anatomy-masks-speed/contrast-mixing-registration.json`):
+`outputs/analysis/a/anatomy-masks-speed/contrast-mixing-registration.json`):
 
 | Crops | Plane | Centre, median (p90) | Corners, median (p90) |
 |---|---|---:|---:|
@@ -874,7 +874,7 @@ one. The control is the reference of the
 
 By a subagent, each run loaded with its own frozen source, ×1, 874 validation knees
 (tables in
-`outputs/analysis/anatomy-masks-frame-compare/`). Verdict: a rerun of seed 2 in effect.
+`outputs/analysis/a/anatomy-masks-frame-compare/`). Verdict: a rerun of seed 2 in effect.
 
 | What differs | Centre, mean (mm) | Plane normal, mean | Crop shift, mean (mm) | Prediction, mean | Macro |
 |---|---:|---:|---:|---:|---:|

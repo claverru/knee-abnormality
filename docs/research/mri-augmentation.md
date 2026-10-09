@@ -25,7 +25,7 @@ protocol coverage.
   ([vendor associations](../metadata/vendor-label-associations.md),
   [validation protocol](../validation/project-validation-protocol.md)).
 - **Acquired in-plane resolution** against the 0.625 mm grid
-  (`outputs/analysis/input-resolution-research-20260915/acquisition/distributions_train.csv`):
+  (`outputs/analysis/i/input-resolution-research-20260915/acquisition/distributions_train.csv`):
   finer axis p5/p50/p95 0.33/0.49/0.70 mm; coarser (phase) axis 0.45/0.625/0.885 mm, p75 0.70 mm,
   GE the coarsest. About a quarter of series are effectively coarser than the grid along one axis
   ([input resolution](input-resolution.md)).

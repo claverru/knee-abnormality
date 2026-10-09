@@ -50,7 +50,7 @@ this checkpoint. The largest gains are lateral OA (+0.002115), synovitis
 (+0.001719) and medial OA (+0.001337). The largest reductions are effusion
 (-0.000342) and ACL (-0.000309). Mean regional attention ranges from 1.53% for
 medial meniscus to 10.17% for medial OA; synovitis receives 9.65%.
-The [per-target plot](../../../outputs/analysis/fusion-usage-20260913/fusion_usage.png)
+The [per-target plot](../../../outputs/analysis/f/fusion-usage-20260913/fusion_usage.png)
 shows both attention and the omission effect.
 
 These are diagnostics of one jointly trained checkpoint. Attention mass is
@@ -61,7 +61,7 @@ The evidence supports a functioning, lightly weighted regional branch with a
 small observed contribution on this fold; it does not establish an advantage
 over the independently trained `crop140mm` control or a public-score gain.
 
-The [result record](../../../outputs/analysis/fusion-usage-20260913/results.json)
+The [result record](../../../outputs/analysis/f/fusion-usage-20260913/results.json)
 pins source/config/checkpoint and input identities, dependency/runtime versions,
 saved-prediction reproduction, per-target metrics and summary distributions.
 Sibling CSVs preserve intact, regional-omitted and original saved predictions;

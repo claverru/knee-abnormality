@@ -18,7 +18,7 @@ ideas:
   precedents:
   - docs/validation/results/2026-09-22-oblique-groups-result.md (reference run; per-label
     localization)
-  - outputs/analysis/acquisition-geometry-20260922/protocol_prior.txt (an oblique
+  - outputs/analysis/a/acquisition-geometry-20260922/protocol_prior.txt (an oblique
     flag added after training gave -0.0003 to -0.0014, so the gain must come from
     routing inside the model, not new information)
   - docs/validation/results/2026-09-14-knee-side-embedding-result.md (a knee-side
@@ -246,7 +246,7 @@ ideas:
     layer and add the result to that acquisition's tokens. Acquisitions without valid
     geometry get zero.
   precedents:
-  - outputs/analysis/acquisition-geometry-20260922/oblique_axes.txt (rotation axes
+  - outputs/analysis/a/acquisition-geometry-20260922/oblique_axes.txt (rotation axes
     of each oblique family)
   - docs/backlog/big-bets.md#3d-embedding-training-time-effect (a patient-position
     3D embedding was ignored at inference)
@@ -304,7 +304,7 @@ ideas:
     one triplet each and never above capacity, in training and validation alike. Per-slot,
     per-study and run totals equal the reference exactly.
   precedents:
-  - outputs/analysis/acquisition-geometry-20260922/oblique_reach.txt (windows and
+  - outputs/analysis/a/acquisition-geometry-20260922/oblique_reach.txt (windows and
     run coverage per group)
   - docs/validation/results/2026-09-17-test-time-allocation.md#repeated-series-in-one-slot
     (second-series triplets help on frozen models)
@@ -414,7 +414,7 @@ ideas:
     \ per slot, the composition they see in 88% of studies. The oblique view becomes\
     \ an alternative reading of its slot instead of diluting the other slots."
   precedents:
-  - "outputs/analysis/tilted-slot-policies-20260922/partial_log.txt, tilted-slot-policies-check-20260922\
+  - "outputs/analysis/t/tilted-slot-policies-20260922/partial_log.txt, tilted-slot-policies-check-20260922\
     \ and -v2check-20260922/results.csv (scripts/adhoc/score_tilted_slot_policies.py):\
     \ frozen mean_standard_tilted vs additive on the same triplets; the mixture wins\
     \ on the split subset in 9/9 checkpoint\xD7setting cells."
@@ -536,11 +536,11 @@ ideas:
     untested entry for post-projection residual adapters per plane and contrast in
     all studies (after AnyMC3D''s view-specific LoRA). This proposal is an oblique-only
     specialisation; the general entry keeps its ownership.'
-  - 'outputs/analysis/tilted-slot-policies-check-20260922 and -v2check-20260922/results.csv:
+  - 'outputs/analysis/t/tilted-slot-policies-check-20260922 and -v2check-20260922/results.csv:
     tilted-only and additive per-label deltas.'
   - "oblique-group-embedding-20260922T115506Z-f5d616dd: the constant marker was rejected\
     \ (split-study ACL \u22120.0092)."
-  - 'outputs/analysis/acquisition-geometry-20260922/protocol_prior.txt: the model
+  - 'outputs/analysis/a/acquisition-geometry-20260922/protocol_prior.txt: the model
     already recognises the protocol from appearance.'
   - 'docs/validation/results/2026-09-20-compartment-adapter-result.md: a rejected
     nonlinear bottleneck on pooled features, a different location and purpose.'

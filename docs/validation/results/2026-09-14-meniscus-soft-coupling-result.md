@@ -110,7 +110,7 @@ That refactor was statically reviewed for unchanged ReXNet behavior; there is
 no contemporaneous unregularized rerun or bitwise training-parity claim.
 The candidate records parent commit `ea19772` and its uncommitted source snapshot.
 
-The [comparison artifact](../../../outputs/analysis/meniscus-coupling-20260914/comparison.json)
+The [comparison artifact](../../../outputs/analysis/m/meniscus-coupling-20260914/comparison.json)
 contains all target, conditional and vendor results, epoch curves, CPU checkpoint
 weight diagnostics, source changes, configurations and file hashes. The
 [CPU analysis](../../history/meniscus-coupling-sources/README.md) left the script catalog

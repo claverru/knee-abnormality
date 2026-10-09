@@ -16,7 +16,7 @@ with the recorded targets; a comparison that does not reproduce to 1e-9 is skipp
 sampling runs, scored before the ×4 predictions were saved). It then scores the same predictions
 against the frozen `all_5fold_scanner_v2` targets with the same paired report-group bootstrap
 (2,000 draws, seed 20260914) and the shared adoption rule. CPU only; output in
-`outputs/analysis/campaign-rescore-rebuild-20260928/comparisons.csv`.
+`outputs/analysis/c/campaign-rescore-rebuild-20260928/comparisons.csv`.
 
 ```bash
 rtk proxy env CUDA_VISIBLE_DEVICES= uv run --locked python -m scripts.adhoc.rescore_campaign_comparisons --output outputs/analysis/campaign-rescore-new/comparisons.csv
@@ -64,7 +64,7 @@ spatial-cluster dropout and −0.0005 for the OA detector.
 ## Main adoptions
 
 The same re-score over the comparisons behind each main adoption
-(`outputs/analysis/campaign-rescore-rebuild-20260928/with-main-adoptions.csv`, adding the manual
+(`outputs/analysis/c/campaign-rescore-rebuild-20260928/with-main-adoptions.csv`, adding the manual
 comparisons below with `--comparisons`). Class-balance k0.5 does not reproduce from its saved
 predictions and class-balanced BCE's candidate predictions are gone; label, split and inference
 adoptions have no paired comparison.

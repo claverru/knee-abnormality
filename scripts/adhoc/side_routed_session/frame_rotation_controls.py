@@ -27,7 +27,7 @@ from knee_abnormality.inference.checkpoint import checkpoint_model, read_checkpo
 from knee_abnormality.inference.engine import move_batch
 from knee_abnormality.modeling.model import crop_rectangles
 
-OUT = Path("outputs/analysis/routing-and-shifts-frames-20261007/frame-crops")
+OUT = Path("outputs/analysis/r/routing-and-shifts-frames-20261007/frame-crops")
 OUT.mkdir(parents=True, exist_ok=True)
 config = load_config(RUN / "effective_config.json")
 config = config.model_copy(update={"data": config.data.model_copy(update={"view_shift_limit_mm": LIMIT})})

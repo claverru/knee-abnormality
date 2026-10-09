@@ -16,7 +16,7 @@ from knee_abnormality.data.sources import build_series_index, prediction_studies
 from knee_abnormality.data.splits import STUDY
 from knee_abnormality.inference.engine import move_batch
 
-OUT = Path("outputs/analysis/octant-sketches-20261006")
+OUT = Path("outputs/analysis/o/octant-sketches-20261006")
 OUT.mkdir(parents=True, exist_ok=True)
 ROWS = [int(v) for v in sys.argv[1].split(",")]
 RUN = Path(

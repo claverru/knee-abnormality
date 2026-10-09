@@ -21,7 +21,7 @@ The control ran before commit 665af0e removed retired options (`gated_attention`
 `residual_readout`, `oa_readout.shared_detector`, `repeated_series_share`, `class_balanced_bce`).
 Its settings used the code paths the current code runs unconditionally, so the source-hash
 difference changes no computation. Comparison:
-`outputs/analysis/report-attribute-heads-vs-oa-detector-control/comparison.json`
+`outputs/analysis/r/report-attribute-heads-vs-oa-detector-control/comparison.json`
 (`scripts.tools.compare_fold_runs`, 874 validation studies, 852 report groups, 2,000 draws).
 
 ## Disease labels (×4, best epoch 10 for both)
@@ -63,8 +63,8 @@ Disease training loss matched the control's once the weighted attribute term is 
 `report-attribute-heads-v31`: same seed, fold, weight and extracted answers, with target set 3.1
 (osteophytes and Hoffa dropped, same-meaning options merged, cartilage extent and PF surface
 gated, reliability weights; [design](../../modeling/report-attribute-heads.md)). Best epoch 9.
-Comparisons: `outputs/analysis/report-attribute-heads-v31-vs-oa-detector-control/` and
-`outputs/analysis/report-attribute-heads-v31-vs-v3/`.
+Comparisons: `outputs/analysis/r/report-attribute-heads-v31-vs-oa-detector-control/` and
+`outputs/analysis/r/report-attribute-heads-v31-vs-v3/`.
 
 | ×4 | Macro AUC | Delta | 95% paired interval | Soft macro | Soft BCE |
 |---|---|---|---|---|---|

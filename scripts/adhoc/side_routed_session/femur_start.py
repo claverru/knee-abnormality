@@ -50,4 +50,4 @@ for i, name in enumerate(("kneecap front, pitches", "kneecap above the upper cut
 print("pitch mm mean", rows[:, 4].mean(), "kneecap front mm", rows[found, 5].mean(), "height mm", rows[found, 6].mean(), "upper cut mm", rows[found, 7].mean())
 for label, chosen in (("bent by eye", (532, 200, 227, 153, 72)), ("straight by eye", (370, 374, 284, 391, 80))):
     print(label, {row: round(float(rows[row, 2]), 1) for row in chosen}, "kneecap front mm", {row: round(float(rows[row, 5]), 1) for row in chosen})
-np.save("outputs/analysis/routing-and-shifts-frames-20261007/knee-bend/femur-start.npy", rows)
+np.save("outputs/analysis/r/routing-and-shifts-frames-20261007/knee-bend/femur-start.npy", rows)

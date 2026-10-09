@@ -23,7 +23,7 @@ ideas:
   precedents:
   - 't1pd-detail-84 against the 120 mm control, +0.0013, 80% [+0.0001, +0.0025] (findings.md).'
   - 'Sagittal T1/PD at the 84 mm rule window, a median 43 mm above the joint line and under
-    40 mm in 36% of series (outputs/analysis/view-spacing-20261002/report.md).'
+    40 mm in 36% of series (outputs/analysis/v/view-spacing-20261002/report.md).'
   - 'coronal-fluid-93-sagittal-fluid-120 and sagittal-fluid-93-coronal-fluid-120 changed one
     fluid plane of the incumbent''s policy and were approved with fluid-detail-93-replacement in
     removed_idea_ids (their manifests).'
@@ -120,7 +120,7 @@ ideas:
   - 't1pd-detail-acquisition-matched and t1pd-detail-acquired-matrix, 84 to 120 mm per series,
     -0.0002 and -0.0005 against t1pd-detail-84 (findings.md).'
   - 'Coronal and sagittal T1/PD resolution and tissue cut at 84 and 93.33 mm
-    (outputs/analysis/view-spacing-20261002/report.md).'
+    (outputs/analysis/v/view-spacing-20261002/report.md).'
   novelty: First fixed T1/PD detail view at a width other than 84 mm.
   coverage: Coronal and sagittal T1/PD slices, 33.7% of a study's slices; the rest is the
     incumbent.

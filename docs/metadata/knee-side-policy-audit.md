@@ -63,7 +63,7 @@ Example tests: the Siemens study is explicit left (+82.6 mm); the Toshiba
 (−88.9 mm) and GE (−93.6 mm) studies are coordinate right knees. Hidden-test
 coverage cannot be measured locally.
 
-Artifacts are in `outputs/analysis/knee-side-policy-20260914/`: `summary.json`,
+Artifacts are in `outputs/analysis/k/knee-side-policy-20260914/`: `summary.json`,
 per-study `studies.parquet`, loader and snapshot assignments, an empty
 `reconciliation.csv`, manufacturer/model side tables, source copy and hashed manifest.
 The `dataset.py` hash predates a later collate-only change that carries side records

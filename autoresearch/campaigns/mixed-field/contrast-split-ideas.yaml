@@ -24,12 +24,12 @@ ideas:
   - 'This campaign: field-120-single +0.0011 (80% [-0.0004, +0.0026]), plane-weighted-fields
     +0.0011 ([-0.0003, +0.0024]), field-160-single-logged -0.0034, mixed-field-140-160 -0.0013;
     120 against 160 directly +0.0046 (95% [+0.0016, +0.0076]),
-    outputs/analysis/mixed-field-120-vs-160.'
-  - 'Label reliance by series type: outputs/analysis/type-importance-20260917/label_type_importance.csv
+    outputs/analysis/m/mixed-field-120-vs-160.'
+  - 'Label reliance by series type: outputs/analysis/t/type-importance-20260917/label_type_importance.csv
     (docs/validation/results/2026-09-17-plane-contrast-importance.md); older labels and backbone,
     indicative only.'
   - 'Acquired resolution by contrast:
-    outputs/analysis/input-resolution-research-20260915/acquisition/series_acquisition.parquet
+    outputs/analysis/i/input-resolution-research-20260915/acquisition/series_acquisition.parquet
     (23,173 series): finer-axis resolution at or above 0.5 mm in 50% of series, at or above
     0.536 mm in 30%.'
   novelty: First field assignment by contrast, first use of 112 mm, and the first mix without

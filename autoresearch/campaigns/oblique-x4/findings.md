@@ -27,8 +27,8 @@ Evidence:
 - autoresearch/campaigns/oblique-x4/prior-work.md#results-of-the-retired-x1-campaign (x1 split and unchanged table, learned view-bias table, ACL-gate inference test)
 - outputs/autoresearch/oblique/experiments/label-view-attention-bias-20260922T120824Z-29aa5863
 - outputs/autoresearch/oblique/experiments/oblique-group-embedding-20260922T115506Z-f5d616dd
-- outputs/analysis/tilted-slot-policies-v2-k05-20260922/results.csv
-- outputs/analysis/acquisition-geometry-20260922/localize_campaign.py
+- outputs/analysis/t/tilted-slot-policies-v2-k05-20260922/results.csv
+- outputs/analysis/a/acquisition-geometry-20260922/localize_campaign.py
 - outputs/autoresearch/oblique-x4/imports/ideas-20260922T133831Z-e422f2c0/report.json
 
 ## proposals-20260922T133831Z-51ff4c56
@@ -57,8 +57,8 @@ Unresolved concerns:
 
 Evidence:
 - /home/claudio/src/knee-abnormality/autoresearch/campaigns/oblique-x4/prior-work.md (user decision not to admit residual readout, orientation embedding, feature adapter or axial transfer; x1 results table)
-- /home/claudio/src/knee-abnormality/outputs/analysis/tilted-slot-policies-check-20260922/results.csv and tilted-slot-policies-v2check-20260922/results.csv (mixture vs joint on the split subset, 9/9 cells)
-- /home/claudio/src/knee-abnormality/outputs/analysis/tilted-slot-policies-v2-k05-20260922/results.csv (ACL-only gate +0.0020 on 102 studies at ×4; standard-only +0.0011)
+- /home/claudio/src/knee-abnormality/outputs/analysis/t/tilted-slot-policies-check-20260922/results.csv and tilted-slot-policies-v2check-20260922/results.csv (mixture vs joint on the split subset, 9/9 cells)
+- /home/claudio/src/knee-abnormality/outputs/analysis/t/tilted-slot-policies-v2-k05-20260922/results.csv (ACL-only gate +0.0020 on 102 studies at ×4; standard-only +0.0011)
 - /home/claudio/src/knee-abnormality/outputs/autoresearch/oblique-x4/imports/ideas-20260922T133831Z-b9d539ef/report.json (proposal texts)
 - /home/claudio/src/knee-abnormality/outputs/autoresearch/oblique/experiments/split-slot-view-mixture-pooling-20260922T125450Z-e32cf52c (cancelled x1 implementation)
 
@@ -138,7 +138,7 @@ Evidence:
 - outputs/autoresearch/oblique-x4/experiments/label-view-attention-bias-20260922T134812Z-7b4fa495/comparison/comparison.json
 - outputs/autoresearch/oblique-x4/experiments/label-view-attention-bias-20260922T134812Z-7b4fa495/comparison/per_label.json
 - outputs/autoresearch/oblique-x4/experiments/label-view-attention-bias-20260922T134812Z-7b4fa495/training/fold_0/triplet_accounting.json
-- outputs/autoresearch/oblique-x4/experiments/label-view-attention-bias-20260922T134812Z-7b4fa495/training/fold_0/validation_predictions.csv vs outputs/training/oblique-x4/fold_0/validation_predictions.csv, split/unchanged via outputs/analysis/acquisition-geometry-20260922/localize_campaign.py (reference path swapped to oblique-x4)
+- outputs/autoresearch/oblique-x4/experiments/label-view-attention-bias-20260922T134812Z-7b4fa495/training/fold_0/validation_predictions.csv vs outputs/training/oblique-x4/fold_0/validation_predictions.csv, split/unchanged via outputs/analysis/a/acquisition-geometry-20260922/localize_campaign.py (reference path swapped to oblique-x4)
 - outputs/autoresearch/oblique-x4/experiments/label-view-attention-bias-20260922T134812Z-7b4fa495/training/fold_0/best-epoch=08-val_macro_auc=0.89930.ckpt (model.view_group_bias 12x9, max |0.18|)
 - autoresearch/campaigns/oblique-x4/prior-work.md#results-of-the-retired-x1-campaign
 
@@ -213,8 +213,8 @@ Evidence:
 - outputs/autoresearch/oblique-x4/experiments/split-slot-view-mixture-pooling-20260922T135314Z-88614e3b/comparison/comparison.json (macro, per-label, prediction_change mean abs 0.0348)
 - outputs/autoresearch/oblique-x4/experiments/split-slot-view-mixture-pooling-20260922T135314Z-88614e3b/training/fold_0/validation_predictions.csv vs outputs/training/oblique-x4/fold_0/validation_predictions.csv
 - /tmp/strata_mix.py output: split 103 +0.0015 80%[−0.0039,+0.0076]; unchanged 802 −0.0000 80%[−0.0021,+0.0021]
-- outputs/analysis/acquisition-geometry-20260922/localize_campaign.py (split-study definition)
-- outputs/analysis/tilted-slot-policies-v2-k05-20260922/results.csv (ACL-only oblique vote +0.0020 on k_05 ×4, tau 0.75)
+- outputs/analysis/a/acquisition-geometry-20260922/localize_campaign.py (split-study definition)
+- outputs/analysis/t/tilted-slot-policies-v2-k05-20260922/results.csv (ACL-only oblique vote +0.0020 on k_05 ×4, tau 0.75)
 - outputs/autoresearch/oblique-x4/jobs/orchestrator-20260922T135920Z-8d9f97cc/report.json (implementation review whose concerns triggered escalation)
 
 ## review-20260922T145700Z-f8922cfe
@@ -300,6 +300,6 @@ Evidence:
 - /home/claudio/src/knee-abnormality/outputs/autoresearch/oblique-x4/experiments/oblique-identity-with-view-bias-20260922T142228Z-7639b62b/comparison/per_label.json
 - /home/claudio/src/knee-abnormality/outputs/autoresearch/oblique-x4/experiments/oblique-identity-with-view-bias-20260922T142228Z-7639b62b/training/fold_0/validation_predictions.csv and triplet_accounting.json
 - /home/claudio/src/knee-abnormality/outputs/training/oblique-x4/fold_0/validation_predictions.csv (x4 reference used for split breakdown)
-- /home/claudio/src/knee-abnormality/outputs/analysis/acquisition-geometry-20260922/localize_campaign.py (split-study definition, 103 fold-0 studies; run with the reference path swapped to oblique-x4)
+- /home/claudio/src/knee-abnormality/outputs/analysis/a/acquisition-geometry-20260922/localize_campaign.py (split-study definition, 103 fold-0 studies; run with the reference path swapped to oblique-x4)
 - /home/claudio/src/knee-abnormality/autoresearch/campaigns/oblique-x4/prior-work.md:82-108 (x1 component results: embedding +0.0052, view bias +0.0068 on split studies)
 - /home/claudio/src/knee-abnormality/outputs/autoresearch/oblique-x4/jobs/orchestrator-20260922T142739Z-37611fed/report.json (implementation review concerns)

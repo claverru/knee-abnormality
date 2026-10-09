@@ -262,7 +262,7 @@ campaign's [run notes](../../autoresearch/campaigns/anatomy-masks/run-notes.md).
   both knees pooled; about eight training studies, unknown in the hidden test set.
 - **Which structure each label depends on** (read-only diagnostic, from the working notes of
   2026-10-07): where each head's attention falls by anatomy class is already measured
-  (`outputs/analysis/frame-and-targets/anatomy-sections-audit/`); what is not is the ablation: at
+  (`outputs/analysis/f/frame-and-targets/anatomy-sections-audit/`); what is not is the ablation: at
   validation, drop the tokens of one predicted class at a time and see which targets fall.
 - **Cleaning rules checked against the masks** (guess, from the same notes): series in which no
   knee is found point at wrong body parts or bad scans; rule-based checks designed against the

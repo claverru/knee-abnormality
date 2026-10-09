@@ -37,7 +37,7 @@ dataset's latest release is pinned by file hash. Snapshots are under
 `data/labels/public/<owner>/<slug>/downloaded-20260921/`.
 
 Script: [`screen_public_label_tables.py`](../../scripts/adhoc/screen_public_label_tables.py).
-Output: `outputs/analysis/public-label-screen-20260921/`, containing `screen.csv`,
+Output: `outputs/analysis/p/public-label-screen-20260921/`, containing `screen.csv`,
 `per_label.csv`, `strict_mcl.json`, `strict_mcl_majority.csv` and `manifest.json` with every input hash.
 It runs on CPU from the saved tables and the fold-0 predictions of control B and learned strength,
 and refuses an existing output directory:

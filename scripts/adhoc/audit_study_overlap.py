@@ -32,7 +32,7 @@ FIELDS = (*GEOMETRY, "PatientID", "FrameOfReferenceUID", "Laterality", "PatientS
 class AuditCLI(CLISettings):
     output_dir: Path
     headers: Path = Path(
-        "outputs/analysis/sharing-disagreement-20260914/study_headers.parquet"
+        "outputs/analysis/s/sharing-disagreement-20260914/study_headers.parquet"
     )
     reports: Path = Path(
         "data/metadata/report_normalization/normalized_reports.parquet"

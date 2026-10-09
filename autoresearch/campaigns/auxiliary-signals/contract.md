@@ -47,7 +47,7 @@ Every rule below applies per study unless stated otherwise.
 - **Head design:** pooling, depth, what the heads read, and heads kept at inference (for example
   feeding predicted attributes into the disease readout).
 - **Metadata heads:** training-only targets from DICOM headers or the scanner-group table
-  (`outputs/analysis/sharing-disagreement-20260914/study_headers.parquet`, SHA-256 `8714fa8b…`,
+  (`outputs/analysis/s/sharing-disagreement-20260914/study_headers.parquet`, SHA-256 `8714fa8b…`,
   groups defined in `data/folds/all_5fold_scanner_v1/protocol.json`), including adversarial
   heads.
 - **Acquisition inputs:** header fields read from the raw DICOMs (field strength, vendor, TR/TE,
