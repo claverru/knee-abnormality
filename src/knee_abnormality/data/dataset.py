@@ -280,12 +280,7 @@ class KneeStudyDataset(Dataset):
                 view.field_mm / self.data.image_size,
                 offset_y,
                 offset_x,
-                round(
-                    self.data.view_shift_limit_mm
-                    / (view.field_mm / self.data.image_size)
-                )
-                if detail
-                else 0,
+                72,
             )
             if detail and window_center is None:
                 window_center, rule_distance = fallback_window_center(

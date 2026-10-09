@@ -69,7 +69,6 @@ def crop_rectangles(
 
 
 MAX_VIEW_ROTATION = math.radians(12.0)
-MAX_VIEW_SHIFT_FRACTION = 0.75
 VIEW_ROTATION_JITTER_DEGREES = 3.0
 VIEW_SHIFT_JITTER_MM = 3.0
 CORONAL_JOINT_TARGET_MM = (-2.075445, 2.031255)
@@ -101,17 +100,36 @@ class ViewWindows(nn.Module):
         self.first_look_width = max(view.slices for view in views)
         with torch.random.fork_rng(devices=[]):
             self.register_buffer(
-                "margin",
+                "margin", torch.full((len(views),), 72.0), persistent=False
+            )
+            self.register_buffer(
+                "pixel_spacing",
+                torch.tensor([view.field_mm / data.image_size for view in views]),
+                persistent=False,
+            )
+            self.register_buffer(
+                "shift_limit",
                 torch.tensor(
                     [
                         round(
-                            data.view_shift_limit_mm / (view.field_mm / data.image_size)
+                            (8.0 if data.series_types[kind].plane == "Axial" else 18.0)
+                            / (view.field_mm / data.image_size)
                         )
-                        if view.field_mm != data.reference_field_mm
-                        else 0
-                        for view in views
+                        for kind, view in data.views
                     ],
                     dtype=torch.float32,
+                ),
+                persistent=False,
+            )
+            self.register_buffer(
+                "rotation_limit",
+                torch.tensor(
+                    [
+                        math.radians(20.0)
+                        if kind.plane == "Axial"
+                        else MAX_VIEW_ROTATION
+                        for kind in data.series_types
+                    ]
                 ),
                 persistent=False,
             )
@@ -195,12 +213,45 @@ class ViewWindows(nn.Module):
         coronal = self.coronal[series][:, None]
         sagittal = self.sagittal[series][:, None]
         movable = (self.margin[batch["view_index"]] > 0)[:, None]
-        usable = usable & movable & (coronal | sagittal)
+        usable = usable & movable
         half = (self.image_size - 1) / 2
         offset = torch.where(
-            coronal[..., None], self.coronal_target, self.sagittal_target
+            coronal[..., None],
+            self.coronal_target,
+            torch.where(sagittal[..., None], self.sagittal_target, 0.0),
         ) / length.clamp_min(1e-4)
         return maps, linear, length, usable, half + offset
+
+    def axial_front_center(self, encoded: dict) -> torch.Tensor:
+        front = encoded["position"].detach().float()[..., 1].flatten()
+        valid = encoded["visual_valid"] & encoded["routable"][:, None]
+        shares = encoded["anatomy_shares"].detach().float()
+        weights = (
+            torch.stack((shares[..., FEMUR_CLASS], shares[..., KNEECAP_CLASS]), -1)
+            * valid[..., None]
+        )
+        member = encoded["study"][:, None].expand_as(valid).flatten()
+        order = front.argsort()
+        order = order[member[order].argsort(stable=True)]
+        ordered_member = member[order]
+        weights = weights.flatten(0, 1)[order]
+        mass = torch.zeros(encoded["batch_size"], 2, device=front.device).index_add(
+            0, ordered_member, weights
+        )
+        before = mass.cumsum(0) - mass
+        cumulative = weights.cumsum(0) - before[ordered_member]
+        target = torch.stack((0.05 * mass[:, 0], 0.95 * mass[:, 1]), -1)[ordered_member]
+        eligible = (cumulative >= target) & (weights > 0)
+        candidates = torch.where(eligible, front[order, None], float("inf"))
+        bounds = torch.full_like(mass, float("inf")).scatter_reduce(
+            0,
+            ordered_member[:, None].expand_as(weights),
+            candidates,
+            reduce="amin",
+            include_self=True,
+        )
+        center = (bounds[:, 0] - 30.0 + bounds[:, 1]) / 2
+        return torch.where((mass > 0).all(-1) & torch.isfinite(center), center, 0.0)
 
     def frame_pose(self, batch: dict, encoded: dict) -> torch.Tensor:
         with torch.autocast(device_type=batch["images"].device.type, enabled=False):
@@ -218,7 +269,8 @@ class ViewWindows(nn.Module):
             )
             side = torch.where(own, torch.where(sign < 0, -1.0, 1.0), side)
             cosine, sine = encoded["study_axis"].float()[study].unbind(-1)
-            up = encoded["study_frame_rotation"].float()[study][:, 2]
+            rotation = encoded["study_frame_rotation"].detach().float()[study]
+            up = rotation[:, 2]
             centre = encoded["study_frame_shift"].float()[study]
 
             def patient(vector: torch.Tensor) -> torch.Tensor:
@@ -249,8 +301,25 @@ class ViewWindows(nn.Module):
                 patient(up),
             ).unbind(-1)
             angle = torch.atan(-across / torch.where(down.abs() < 1e-6, 1e-6, down))
-            angle = angle.clamp(-MAX_VIEW_ROTATION, MAX_VIEW_ROTATION)
-            point = (knee + patient(centre))[:, None] - maps[..., 2]
+            axial = ~(
+                self.sagittal[batch["series_type_index"]]
+                | self.coronal[batch["series_type_index"]]
+            )
+            medial_across, medial_down = torch.einsum(
+                "ntpa,np->nta",
+                linear / length.clamp_min(1e-6)[..., None, :],
+                patient(rotation[:, 0]),
+            ).unbind(-1)
+            axial_angle = torch.atan(
+                medial_down
+                / torch.where(medial_across.abs() < 1e-6, 1e-6, medial_across)
+            )
+            angle = torch.where(axial[:, None], axial_angle, angle)
+            turn_limit = self.rotation_limit[batch["series_type_index"]][:, None]
+            angle = angle.clamp(-turn_limit, turn_limit)
+            front = self.axial_front_center(encoded)[study]
+            center = centre + axial[:, None] * front[:, None] * rotation[:, 1]
+            point = (knee + patient(center))[:, None] - maps[..., 2]
             point = torch.where(torch.isfinite(point), point, 0.0)
             gram = torch.einsum("ntpa,ntpb->ntab", linear, linear)
             gram = gram + 1e-6 * torch.eye(2, device=gram.device)
@@ -258,7 +327,7 @@ class ViewWindows(nn.Module):
                 gram, torch.einsum("ntpa,ntp->nta", linear, point)
             )
             margin = self.margin[batch["view_index"]][:, None, None]
-            limit = MAX_VIEW_SHIFT_FRACTION * margin
+            limit = self.shift_limit[batch["view_index"]][:, None, None]
             shift = (pixel - margin - pivot).clamp(-limit, limit).round()
             usable = usable & torch.isfinite(angle) & torch.isfinite(shift).all(-1)
             pose = torch.cat((angle[..., None], shift), -1)
@@ -276,20 +345,20 @@ class ViewWindows(nn.Module):
                 * (2 * torch.rand((series, 1, 2), device=pose.device) - 1)
                 / length.clamp_min(1e-4)
             ).round()
-            margin = self.margin[batch["view_index"]][:, None, None]
+            limit = self.shift_limit[batch["view_index"]][:, None, None]
+            turn_limit = self.rotation_limit[batch["series_type_index"]][:, None, None]
             moved = torch.cat(
                 (
-                    (pose[..., :1] + turn[..., None]).clamp(
-                        -MAX_VIEW_ROTATION, MAX_VIEW_ROTATION
-                    ),
-                    (pose[..., 1:] + move).clamp(
-                        -MAX_VIEW_SHIFT_FRACTION * margin,
-                        MAX_VIEW_SHIFT_FRACTION * margin,
+                    (pose[..., :1] + turn[..., None]).clamp(-turn_limit, turn_limit),
+                    (pose[..., 1:3] + move).clamp(
+                        -limit,
+                        limit,
                     ),
                 ),
                 -1,
             )
-            return torch.where(usable[..., None], moved, 0.0)
+            moved = torch.where(usable[..., None], moved, 0.0)
+            return torch.cat((moved, pose[..., 3:]), -1)
 
     def forward(
         self,
@@ -308,63 +377,63 @@ class ViewWindows(nn.Module):
                 len(canvas), canvas.shape[1], 1, 1
             )
             if pose is None:
-                crops = sample_windows(
-                    canvas.flatten(0, 1).float(),
-                    origin.flatten(0, 1),
-                    self.image_size,
-                ).view(*canvas.shape[:3], self.image_size, self.image_size)
+                crops = (
+                    sample_windows(
+                        canvas.flatten(0, 1),
+                        origin.flatten(0, 1),
+                        self.image_size,
+                    )
+                    .float()
+                    .view(*canvas.shape[:3], self.image_size, self.image_size)
+                )
                 affine[..., :2, 2] = origin
                 angle = None
             else:
                 angle = pose[..., 0]
-                shift = pose[..., 1:]
-                pivot = self.geometry(batch)[4]
-                cosine, sine = angle.cos(), angle.sin()
+                shift = pose[..., 1:3]
+                canvas_pivot = self.geometry(batch)[4]
+                scale = pose[..., 3]
+                half = (self.image_size - 1) / 2
+                pivot = half + (canvas_pivot - half) / scale[..., None]
+                cosine, sine = scale * angle.cos(), scale * angle.sin()
                 affine[..., 0, 0], affine[..., 0, 1] = cosine, -sine
                 affine[..., 1, 0], affine[..., 1, 1] = sine, cosine
                 affine[..., 0, 2] = (
                     margin
-                    + pivot[..., 0]
+                    + canvas_pivot[..., 0]
                     + shift[..., 0]
                     - (cosine * pivot[..., 0] - sine * pivot[..., 1])
                 )
                 affine[..., 1, 2] = (
                     margin
-                    + pivot[..., 1]
+                    + canvas_pivot[..., 1]
                     + shift[..., 1]
                     - (sine * pivot[..., 0] + cosine * pivot[..., 1])
                 )
                 flat_canvas = canvas.flatten(0, 1)
-                crops = sample_windows(
-                    flat_canvas,
-                    (origin + shift.flip(-1)).flatten(0, 1),
-                    self.image_size,
-                ).float()
-                turned = ((angle != 0) & batch["slice_mask"]).flatten()
-                if turned.any():
-                    lines = torch.arange(
-                        self.image_size, device=canvas.device, dtype=torch.float32
-                    )
-                    rows, columns = torch.meshgrid(lines, lines, indexing="ij")
-                    points = torch.stack((columns, rows, torch.ones_like(rows)), -1)
-                    placed = torch.einsum(
-                        "nij,hwj->nhwi", affine.flatten(0, 1)[turned][:, :2, :], points
-                    )
-                    height, width = canvas.shape[-2:]
-                    grid = torch.stack(
-                        (
-                            (2 * placed[..., 0] + 1) / width - 1,
-                            (2 * placed[..., 1] + 1) / height - 1,
-                        ),
-                        -1,
-                    )
-                    crops[turned] = F.grid_sample(
-                        flat_canvas[turned].float(),
-                        grid,
-                        mode="bicubic",
-                        padding_mode="zeros",
-                        align_corners=False,
-                    ).clamp(0, 255)
+                lines = torch.arange(
+                    self.image_size, device=canvas.device, dtype=torch.float32
+                )
+                rows, columns = torch.meshgrid(lines, lines, indexing="ij")
+                points = torch.stack((columns, rows, torch.ones_like(rows)), -1)
+                placed = torch.einsum(
+                    "nij,hwj->nhwi", affine.flatten(0, 1)[:, :2, :], points
+                )
+                height, width = canvas.shape[-2:]
+                grid = torch.stack(
+                    (
+                        (2 * placed[..., 0] + 1) / width - 1,
+                        (2 * placed[..., 1] + 1) / height - 1,
+                    ),
+                    -1,
+                )
+                crops = F.grid_sample(
+                    flat_canvas.float(),
+                    grid,
+                    mode="bicubic",
+                    padding_mode="zeros",
+                    align_corners=False,
+                ).clamp(0, 255)
                 crops = crops.view(*canvas.shape[:3], self.image_size, self.image_size)
             prepared = {
                 **batch,
@@ -386,7 +455,7 @@ class ViewWindows(nn.Module):
                 else angle,
                 "applied_view_shift": torch.zeros_like(affine[..., :2, 2])
                 if pose is None
-                else pose[..., 1:],
+                else pose[..., 1:3],
             }
             return (
                 reflect_crops(prepared, self.sagittal)
@@ -468,6 +537,7 @@ PLANE_REFITS = 3
 PLANE_REFIT_WIDTH_MM = 12.0
 ANATOMY_CENTRE_WIDTH_MM = 10.0
 ANATOMY_CLASS_COUNT = 7
+MENISCUS_CLASS_COUNT = 3
 FEMUR_CLASS, TIBIA_CLASS, KNEECAP_CLASS, JOINT_CLASS, KNEECAP_JOINT_CLASS = (
     1,
     2,
@@ -731,6 +801,19 @@ class KneeAbnormalityModel(nn.Module):
             torch.tensor(FRAME_SIZE_START_PITCHES),
             persistent=False,
         )
+        self.meniscus_map = model.meniscus_map
+        if self.meniscus_map:
+            self.meniscus_mapping = backbone_mapping(
+                f"{model.backbone}.layer3", self.backbone
+            )
+            with torch.random.fork_rng(devices=[]):
+                block = self.backbone.layer3[-1]
+                self.meniscus_projection = nn.Linear(
+                    getattr(block, "conv3", block.conv2).out_channels, PROJECTION_WIDTH
+                )
+                self.meniscus_head = nn.Linear(PROJECTION_WIDTH, MENISCUS_CLASS_COUNT)
+            nn.init.zeros_(self.meniscus_head.weight)
+            nn.init.zeros_(self.meniscus_head.bias)
         self.anatomical_frame = model.anatomical_frame
         if self.anatomical_frame:
             with torch.random.fork_rng(devices=[]):
@@ -818,13 +901,13 @@ class KneeAbnormalityModel(nn.Module):
         images: torch.Tensor,
         acquisition_index: torch.Tensor,
         acquisition_type: torch.Tensor,
-    ) -> torch.Tensor:
+    ) -> tuple[torch.Tensor, torch.Tensor | None]:
         if self.checkpoint_backbone:
             self.backbone.set_grad_checkpointing(
                 self.training and torch.is_grad_enabled()
             )
         if not self.training or self.feature_statistics_settings.probability == 0:
-            return self.backbone.forward_features(images)
+            return self._backbone_features(images)
         features = self._backbone_to_stride_8(images)
         features, self.feature_statistics_activity = (
             apply_feature_statistics_augmentation(
@@ -834,7 +917,22 @@ class KneeAbnormalityModel(nn.Module):
                 self.feature_statistics_settings,
             )
         )
-        return self._backbone_from_stride_8(features)
+        return self._backbone_stage_outputs(features)
+
+    def _backbone_features(
+        self, images: torch.Tensor
+    ) -> tuple[torch.Tensor, torch.Tensor | None]:
+        if not self.meniscus_map:
+            return self.backbone.forward_features(images), None
+        return self._backbone_stage_outputs(self._backbone_to_stride_8(images))
+
+    def _backbone_stage_outputs(
+        self, features: torch.Tensor
+    ) -> tuple[torch.Tensor, torch.Tensor | None]:
+        if self.meniscus_map:
+            meniscus_maps = self.backbone.layer3(features)
+            return self.backbone.layer4(meniscus_maps), meniscus_maps
+        return self._backbone_from_stride_8(features), None
 
     def _backbone_to_stride_8(self, images: torch.Tensor) -> torch.Tensor:
         backbone = self.backbone
@@ -1565,6 +1663,59 @@ class KneeAbnormalityModel(nn.Module):
         with torch.no_grad():
             first = self._encode_crops(self.view_windows.first_look_batch(batch))
             pose = self.view_windows.frame_pose(batch, first)
+            with torch.autocast(device_type=batch["images"].device.type, enabled=False):
+                position = first["position"].detach().float()
+                medial, front, up = position.unbind(-1)
+                shares = first["anatomy_shares"].detach().float()
+                valid = first["visual_valid"] & first["routable"][:, None]
+                plane = first["image_plane"][:, None]
+                width_weight = (
+                    valid
+                    * ((plane == 0) | (plane == 1))
+                    * (
+                        shares[..., FEMUR_CLASS] * ((up > -5) & (up < 45))
+                        + shares[..., TIBIA_CLASS] * ((up > -30) & (up < 5))
+                    )
+                )
+                depth_weight = (
+                    valid
+                    * ((plane == 0) | (plane == 2))
+                    * shares[..., FEMUR_CLASS]
+                    * torch.exp(-0.5 * ((up - 20) / 20).square())
+                )
+                weights = torch.stack((width_weight, depth_weight), -1)
+                coordinates = torch.stack((medial, front), -1)
+                moments = torch.cat(
+                    (
+                        weights.sum(1),
+                        (weights * coordinates).sum(1),
+                        (weights * coordinates.square()).sum(1),
+                    ),
+                    -1,
+                )
+                totals = torch.zeros(
+                    first["batch_size"], 6, device=position.device
+                ).index_add(0, first["study"], moments)
+                mass, total, square = totals.split(2, -1)
+                denominator = mass.clamp_min(1e-6)
+                spread = (
+                    (square / denominator - (total / denominator).square())
+                    .clamp_min(0)
+                    .sqrt()
+                )
+                size = spread.prod(-1).sqrt()
+                scale = torch.where(
+                    (mass > 0).all(-1), (size / 17.087).clamp(0.87, 1.13), 1.0
+                )
+                pose = torch.cat(
+                    (
+                        pose,
+                        scale[batch["series_study_index"], None, None].expand(
+                            -1, pose.shape[1], -1
+                        ),
+                    ),
+                    -1,
+                )
         self.train(training)
         return pose
 
@@ -1638,7 +1789,9 @@ class KneeAbnormalityModel(nn.Module):
         valid_images = valid_images.sub(self.mean).div_(self.std)
         if self.channels_last:
             valid_images = valid_images.contiguous(memory_format=torch.channels_last)
-        maps = self._encode_images(valid_images, acquisition_index, token_type)
+        maps, meniscus_maps = self._encode_images(
+            valid_images, acquisition_index, token_type
+        )
         features = self.projection(maps.flatten(2).transpose(1, 2))
         visual_valid, prepared_xy = feature_geometry(
             source_valid_rects,
@@ -1779,6 +1932,53 @@ class KneeAbnormalityModel(nn.Module):
                 token_pitch,
                 batch_size,
             )
+            meniscus_scores = None
+            meniscus_encoded = {}
+            if self.meniscus_map:
+                height, width = maps.shape[-2:]
+                fine_height, fine_width = meniscus_maps.shape[-2:]
+                meniscus_features = self.meniscus_projection(
+                    meniscus_maps.flatten(2).transpose(1, 2).float()
+                )
+                deep = (
+                    tokens.float()
+                    .unflatten(1, (height, width))
+                    .repeat_interleave(2, 1)
+                    .repeat_interleave(2, 2)
+                    .flatten(1, 2)
+                )
+                meniscus_scores = self.meniscus_head(meniscus_features + deep)
+                meniscus_valid, meniscus_xy = feature_geometry(
+                    source_valid_rects,
+                    inverse_affine,
+                    (fine_height, fine_width),
+                    self.meniscus_mapping,
+                    channels,
+                    batch["canvas_valid_rects"].flatten(0, 1)[flat_indices],
+                    batch["crop_affine"].flatten(0, 1)[flat_indices],
+                )
+                fine_homogeneous = torch.cat(
+                    (meniscus_xy, torch.ones_like(meniscus_xy[..., :1])), -1
+                )
+                meniscus_position = torch.einsum(
+                    "nij,nkj->nki", middle, fine_homogeneous
+                )
+                meniscus_valid = meniscus_valid & (
+                    valid_position & torch.isfinite(meniscus_position).all((-1, -2))
+                )[:, None]
+                meniscus_encoded = {
+                    "meniscus_visual_valid": meniscus_valid,
+                    "meniscus_patient_position": meniscus_position.detach(),
+                    "meniscus_token_steps": torch.cat(
+                        (steps[:, :2] * 0.5, steps[:, 2:]), 1
+                    ).detach(),
+                    "meniscus_shares": (
+                        meniscus_scores.detach().softmax(-1)
+                        .reshape(-1, height, 2, width, 2, MENISCUS_CLASS_COUNT)
+                        .mean((2, 4))
+                        .flatten(1, 2)
+                    ),
+                }
             anatomy_scores = None
             anatomy_shares = None
             anatomy_diagnostics = {}
@@ -1816,6 +2016,11 @@ class KneeAbnormalityModel(nn.Module):
             "image_type": token_type,
             "crop_angle": batch["applied_view_angle"].flatten()[flat_indices],
             "crop_shift": batch["applied_view_shift"].flatten(0, 1)[flat_indices],
+            **(
+                {"crop_affine": batch["crop_affine"].flatten(0, 1)[flat_indices]}
+                if not self.training and view_pose is not None
+                else {}
+            ),
             "visual_valid": visual_valid,
             **geometry,
             "study_frame_shift": study_shift,
@@ -1825,6 +2030,8 @@ class KneeAbnormalityModel(nn.Module):
             "position": position,
             "fitted_position": fitted_position,
             "anatomy_scores": anatomy_scores,
+            "meniscus_scores": meniscus_scores,
+            **meniscus_encoded,
             **anatomy_diagnostics,
             "patient_position": patient_position.detach(),
             "token_steps": steps.detach(),

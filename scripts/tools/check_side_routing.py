@@ -242,12 +242,14 @@ def main() -> None:
         sagittal = encoded["image_plane"] == 2
         plain = encoded["fitted_position"].unflatten(1, (grid, grid))
         other = mirrored["fitted_position"].unflatten(1, (grid, grid))
-        pitch = float(config.data.reference_field_mm) / grid
+        pitch = encoded["token_steps"][:, :2].norm(dim=-1).amax(1)
         same = plain[certain & sagittal] - other[certain & sagittal]
         flipped = plain[certain & ~sagittal] - other.flip(2)[certain & ~sagittal]
         results["mirrored_pass_keeps_anatomical_position"] = (
             (same.numel() == 0 or float(same.abs().max()) < 1e-2)
-            and (flipped.numel() == 0 or float(flipped.abs().max()) < pitch)
+            and bool(
+                (flipped.abs().flatten(1).amax(1) < pitch[certain & ~sagittal]).all()
+            )
             and bool(valid.any())
         )
 

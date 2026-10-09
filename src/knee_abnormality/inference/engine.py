@@ -28,7 +28,7 @@ BACKBONE_CHUNK_IMAGES = 64
 
 
 def use_fixed_backbone_chunks(model: KneeAbnormalityModel, image_size: int) -> None:
-    features = model.backbone.forward_features
+    features = model._backbone_features
     model.channels_last = True
     model.backbone.to(memory_format=torch.channels_last)
     device = next(model.parameters()).device
@@ -51,20 +51,27 @@ def use_fixed_backbone_chunks(model: KneeAbnormalityModel, image_size: int) -> N
             torch.autocast("cuda", dtype=torch.float16, cache_enabled=False),
             torch.cuda.graph(graph),
         ):
-            static_output = features(static_input)
+            static_output, static_meniscus = features(static_input)
     torch.cuda.synchronize(device)
 
-    def chunked_features(images: torch.Tensor) -> torch.Tensor:
+    def chunked_features(
+        images: torch.Tensor,
+    ) -> tuple[torch.Tensor, torch.Tensor | None]:
         outputs = []
+        meniscus_outputs = []
         for start in range(0, images.shape[0], BACKBONE_CHUNK_IMAGES):
             chunk = images[start : start + BACKBONE_CHUNK_IMAGES]
             static_input[: len(chunk)].copy_(chunk)
             static_input[len(chunk) :].zero_()
             graph.replay()
             outputs.append(static_output[: len(chunk)].clone())
-        return torch.cat(outputs)
+            if static_meniscus is not None:
+                meniscus_outputs.append(static_meniscus[: len(chunk)].clone())
+        return torch.cat(outputs), (
+            torch.cat(meniscus_outputs) if static_meniscus is not None else None
+        )
 
-    model.backbone.forward_features = chunked_features
+    model._backbone_features = chunked_features
 
 
 def resolve_device(requested: Device) -> torch.device:

@@ -37,6 +37,15 @@ BACKBONE_MAPPINGS = {
         "stride": [32.0, 32.0],
         "anchors": "convolution_centers",
     },
+    **{
+        f"{name}.layer3": {
+            "layout": "NCHW",
+            "origin": [0.0, 0.0],
+            "stride": [16.0, 16.0],
+            "anchors": "convolution_centers",
+        }
+        for name in ("resnet18.a1_in1k", "resnet50.a1_in1k")
+    },
     COATNET_BACKBONE: {
         "layout": "NCHW",
         "origin": [12.0, 12.0],
@@ -62,9 +71,10 @@ BACKBONE_MAPPINGS = {
 SPATIAL_TOKEN_IDENTITY = {
     "algorithm": "all_valid_spatial_tokens_rotatable_knee_frame_attention_prior_side_routed_shared_channels_knee_level_term_v14_hard_octants_soft_gradient_own_routes_study_frames_and_landmarks_eighteen_regions_overlap_routed_reports_fixed_frame_own_position_hard_cuts_soft_gradient_knee_level_term_on_every_routed_channel_side_labels_keep_their_half_of_the_core_region_table_from_all_token_attention_synovitis_unrouted_per_study_centre_nod_and_sizes_roll_and_turn_shared_kneecap_region_front_above_the_lower_cut_frame_on_detached_bone_share_centroid_10mm_gaussian_near_anatomy_plane_spot_orientation_and_no_mass_fallback_eight_sections_three_tear_places_per_side_ring_sector_division",
     "projection": "shared_linear_C_to_256",
+    "meniscus_map": "independent_zero_initialized_linear_256_to_three_on_stride16_layer3_projection_plus_nearest_repeated_stride32_normalized_tokens_16px_target_footprint_four_by_four_target_samples_preserve_4px_quadrature_pitch_same_visual_validity_detached_probabilities_mean_of_four_per_stride32_token",
     "token": "projection_plus_plane_contrast_and_detail_view_embeddings_layernorm_two_versions_own_channels_plus_fixed_sinusoid_of_detached_knee_frame_position_42_wavelengths_8_to_512_per_axis_zero_without_fitted_center_shared_channels_position_free",
-    "initialization_rng": "side_head_position_prior_up_width_and_knee_level_scale_parameters_forked_removed_position_draw_count_and_target_sized_scorer_and_readout_draws_preserve_training_stream",
-    "view_policy": "configured_fixed_width_and_slice_counts_84_and_93mm_crops_from_detached_anatomy_plane_and_bone_centroid_clamped_12deg_shift_0.75_canvas_margin_single_no_gradient_eval_central_first_look_evenly_spaced_multiplier_one_training_jitter_3deg_3mm_coronal_target_minus2.075445_2.031255mm_sagittal_target_4.894627_2.727388mm_measured_first_eight_fold1_validation_knees_bicubic_incumbent_epoch09_axial_120mm_unchanged_pose_side_per_series_in_split_studies",
+    "initialization_rng": "side_head_position_prior_up_width_and_knee_level_scale_parameters_forked_removed_position_draw_count_and_target_sized_scorer_and_readout_draws_preserve_training_stream_meniscus_stride16_projection_and_head_forked",
+    "view_policy": "configured_fixed_fields_and_slice_counts_all_six_views_shift_turn_scale_detached_single_eval_central224_first_look_multiplier_one_scale_sqrt_medial_bone_sd_times_front_femur_sd_over17.087_clamp0.87_to1.13_zero_mass_one_sagittal_coronal_incumbent_centres_and12deg_turn_axial_center_midpoint_femur_share5th_front_minus30mm_kneecap_share95th_front_frame_medial_zero_projected_medial_axis20deg_turn_shift18mm_sagittal_coronal8mm_axial_rounded_pixels_training_jitter3deg3mm_all_views_side_per_series_in_split_studies",
     "view_embedding": "zero_initialized_additive_detail_only",
     "view_label_bias": "optional_zero_initialized_additive_attention_score_per_view_and_channel",
     "geometry_dtype": "float32_outside_autocast",
@@ -72,7 +82,7 @@ SPATIAL_TOKEN_IDENTITY = {
     "contrast_order": [[0, 0], [1, 1]],
     "metadata_lookup": "configured_series_types_plane_and_metadata_pair",
     "visual_validity": "all_channel_inverse_augmented_anchors_inside_rotated_crop_bounds_and_original_canvas_rectangles_through_the_same_crop_transform",
-    "preparation": "same_spacing_6mm_margin_uint8_canvas_normalized_with_incumbent_central_window_quantiles_single_rotated_bicubic_resampling_clamped_0_to_255_exact_copy_at_zero_angle_patient_maps_and_valid_rectangles_transformed_together_affine_and_reflection_after_cut",
+    "preparation": "same_spacing_fixed72px_margin368px_uint8_canvas_all_six_views_normalized_with_incumbent_central_window_quantiles_exact_unscaled_central224_first_look_single_scaled_rotated_bicubic_resampling_all_slices_clamped0_to255_patient_maps_and_valid_rectangles_transformed_together_affine_and_reflection_after_cut",
     "augmentation": "kornia_normalized_affine_align_corners_false_v1",
     "aggregation": "layernorm_channel_attention_256_128_9_seven_own_channels_shared_meniscus_and_oa_twelve_target_biases_plus_zero_started_channel_scale_times_position_free_shared_evidence_pooled_by_unrouted_attention_with_same_scores_and_view_bias_no_position_prior",
     "compartment_routing": "log_routing_weight_over_routing_temperature_added_to_attention_scores_weights_are_hard_steps_with_the_gradient_of_a_sigmoid_of_signed_distance_over_the_projected_token_box_extent_eight_45_degree_sectors_centred_on_the_frame_axes_a_core_cylinder_an_outer_ring_and_three_heights_around_the_study_frame_per_target_region_table_from_the_attention_of_run_11_medial_and_lateral_mirrored_floor_1e-6_unrouted_below_one_token_contusion_and_fracture_unrouted",
@@ -203,7 +213,9 @@ def _coatnet_mapping(backbone: nn.Module) -> tuple[float, float, float, float]:
     return mapping
 
 
-def _resnet_mapping(backbone: nn.Module) -> tuple[float, float, float, float]:
+def _resnet_mapping(
+    backbone: nn.Module, stages: int = 4
+) -> tuple[float, float, float, float]:
     stem = (
         backbone.conv1
         if isinstance(backbone.conv1, nn.Sequential)
@@ -212,7 +224,9 @@ def _resnet_mapping(backbone: nn.Module) -> tuple[float, float, float, float]:
     mapping = _spatial_mapping(
         [layer for layer in stem if isinstance(layer, nn.Conv2d)] + [backbone.maxpool]
     )
-    for stage in (backbone.layer1, backbone.layer2, backbone.layer3, backbone.layer4):
+    for stage in (
+        backbone.layer1, backbone.layer2, backbone.layer3, backbone.layer4
+    )[:stages]:
         for block in stage:
             if isinstance(block, Bottleneck):
                 layers = [block.conv1, block.aa, block.conv2, block.conv3]
@@ -269,6 +283,8 @@ _BACKBONE_MAPPING_FUNCTIONS = {
     "resnet50.tv_in1k": _resnet_mapping,
     "resnet50.a1_in1k": _resnet_mapping,
     "resnet18.a1_in1k": _resnet_mapping,
+    "resnet18.a1_in1k.layer3": lambda backbone: _resnet_mapping(backbone, 3),
+    "resnet50.a1_in1k.layer3": lambda backbone: _resnet_mapping(backbone, 3),
     "resnet10t.c3_in1k": _resnet_mapping,
 }
 
