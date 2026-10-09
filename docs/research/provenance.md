@@ -28,6 +28,10 @@ threads and comments dated from 2026-09-20, listed notebooks by score through
 `kernels.KernelsService/ListKernels` (`SCORE_DESCENDING`), downloaded the leaderboard with the CLI
 and pinned the four cited notebooks in the manifest. It decoded, without running, the base64
 inference script embedded in one of them.
+The [2026-10-09 re-sweep](2026-10-09-public-resweep.md) listed topics, threads and scored notebooks
+through the same three calls on `www.kaggle.com/api/i/` without credentials (the CLI's
+`DiscussionApiService` returned 403), with a pause between calls after a 429; a subagent pulled
+and read 43 notebooks, five of them pinned in the manifest.
 
 The [public-label audit](../public-labels/INDEX.md), completed on 2026-09-10,
 downloads and fingerprints the Steven Lee and Pilkwang label datasets plus

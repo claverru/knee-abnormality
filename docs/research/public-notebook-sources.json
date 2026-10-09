@@ -1,6 +1,6 @@
 {
   "checked_on": "2026-09-09",
-  "method": "Kaggle CLI 2.0.2 kernels pull with metadata; source read without executing. Kernel IDs are not source-version IDs. Attached data, weights and their provenance were not audited. Hashes identify downloaded source bytes; later pulls may differ. The 2026-09-20 entries were re-pulled the same way; a source whose URL already appears carries the newest pull's hash, replacing the earlier one. The 2026-09-28 entries were pulled the same way.",
+  "method": "Kaggle CLI 2.0.2 kernels pull with metadata; source read without executing. Kernel IDs are not source-version IDs. Attached data, weights and their provenance were not audited. Hashes identify downloaded source bytes; later pulls may differ. The 2026-09-20 entries were re-pulled the same way; a source whose URL already appears carries the newest pull's hash, replacing the earlier one. The 2026-09-28 entries were pulled the same way. The 2026-10-09 entries were pulled the same way.",
   "sources": [
     {
       "url": "https://www.kaggle.com/code/dreaddevelopment/knee-mri-training-the-twelve-finding-model",
@@ -125,6 +125,46 @@
       "source_filename": "rsna-knee-fast-parent-0-957-v2.ipynb",
       "sha256": "9748cef7eaceaf6e6c4572037e8b02cb94000c212e17242f1e82313b0984075c",
       "checked_on": "2026-09-28"
+    },
+    {
+      "url": "https://www.kaggle.com/code/nartaa/rsna-knee-0949-anatomical-mirror",
+      "kernel_id": 137529884,
+      "source_version_id": null,
+      "source_filename": "rsna-knee-0949-anatomical-mirror.ipynb",
+      "sha256": "8f1f96530b08543bd6caeed48489eea7c01657d6994f22e21a8400047fd4e100",
+      "checked_on": "2026-10-09"
+    },
+    {
+      "url": "https://www.kaggle.com/code/heliosli/rsna-knee-blend-gold",
+      "kernel_id": 137654059,
+      "source_version_id": null,
+      "source_filename": "rsna-knee-blend-gold.ipynb",
+      "sha256": "d001b147ffcb4b7a9271422486046d90e45d910c894d94a7e5d20baf66db2d38",
+      "checked_on": "2026-10-09"
+    },
+    {
+      "url": "https://www.kaggle.com/code/evgendvorkin/rsna-versia-5",
+      "kernel_id": 131711115,
+      "source_version_id": null,
+      "source_filename": "rsna-versia-5.ipynb",
+      "sha256": "610f5bca468a961db892d6225e66b8383278ef16adf5a4fadbc9a13e75c873f7",
+      "checked_on": "2026-10-09"
+    },
+    {
+      "url": "https://www.kaggle.com/code/goodpjw2008/rsna-knee-0-949-coatnet-stack-blend-lb-0-949",
+      "kernel_id": 137582594,
+      "source_version_id": null,
+      "source_filename": "rsna-knee-0-949-coatnet-stack-blend-lb-0-949.ipynb",
+      "sha256": "91ac1af9cf90521af726d1af5a9d6c79075a8b0d0dbfc35e5ba31fb0493eb0f7",
+      "checked_on": "2026-10-09"
+    },
+    {
+      "url": "https://www.kaggle.com/code/hengck23/mavit-288-baseline-01-1-5sec-study-1gpu",
+      "kernel_id": 137599842,
+      "source_version_id": null,
+      "source_filename": "mavit-288-baseline-01-1-5sec-study-1gpu.ipynb",
+      "sha256": "41de28b37abcc1caba51f92a4e7117579ad262b240dc52f881cb5fe25f92d59f",
+      "checked_on": "2026-10-09"
     }
   ]
 }
