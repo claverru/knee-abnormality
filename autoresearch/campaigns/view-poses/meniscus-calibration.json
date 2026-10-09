@@ -1,0 +1,77 @@
+{
+  "run": "/home/claudio/src/knee-abnormality/outputs/autoresearch/view-poses/experiments/canvases-for-the-pose-in-all-six-views-20261009T014728Z-960f75cb/training",
+  "checkpoint": "/home/claudio/src/knee-abnormality/outputs/autoresearch/view-poses/experiments/canvases-for-the-pose-in-all-six-views-20261009T014728Z-960f75cb/training/fold_1/best-epoch=09-val_macro_auc=0.91701.ckpt",
+  "cohort": "fold 1 training studies with a DESS meniscus mask",
+  "studies": 211,
+  "pass": "validation-style dataset at x1, the model's first look (central 224 px crops at scale 1), evaluation mode, FP16",
+  "study_mass": {
+    "definition": "sum over first-look 7x7 tokens with visual_valid and routable of predicted medial plus lateral meniscus share (meniscus_shares, mean of the four 14x14 predictions)",
+    "percentiles": {
+      "1": 2.88489670753479,
+      "5": 3.887433171272278,
+      "10": 4.511054039001465,
+      "25": 6.096655368804932,
+      "50": 8.292632102966309,
+      "75": 10.0961332321167,
+      "90": 12.390789031982422,
+      "95": 13.14512586593628,
+      "99": 15.062808895111086
+    },
+    "mean": 8.340777228793828,
+    "valid_tokens_per_study_mean": 1159.047393364929
+  },
+  "positive_token_shares": {
+    "medial": {
+      "definition": "mask share of this meniscus on 7x7 first-look tokens (mean of the four 14x14 target footprints, all four inside the mask volume), tokens with share above zero",
+      "tokens": 5159,
+      "mask_share_percentiles": {
+        "1": 0.015625,
+        "5": 0.015625,
+        "10": 0.015625,
+        "25": 0.046875,
+        "50": 0.09375,
+        "75": 0.1875,
+        "90": 0.296875,
+        "95": 0.375,
+        "99": 0.546875
+      },
+      "predicted_share_percentiles_on_these_tokens": {
+        "1": 1.34111489614952e-06,
+        "5": 2.1252321676001885e-05,
+        "10": 0.00011700532922986898,
+        "25": 0.0018199437763541937,
+        "50": 0.07576096057891846,
+        "75": 0.2638213336467743,
+        "90": 0.48686203956604,
+        "95": 0.5169103860855101,
+        "99": 0.7691518378257752
+      }
+    },
+    "lateral": {
+      "definition": "mask share of this meniscus on 7x7 first-look tokens (mean of the four 14x14 target footprints, all four inside the mask volume), tokens with share above zero",
+      "tokens": 4663,
+      "mask_share_percentiles": {
+        "1": 0.015625,
+        "5": 0.015625,
+        "10": 0.015625,
+        "25": 0.046875,
+        "50": 0.109375,
+        "75": 0.1875,
+        "90": 0.296875,
+        "95": 0.375,
+        "99": 0.515625
+      },
+      "predicted_share_percentiles_on_these_tokens": {
+        "1": 9.639498557589831e-07,
+        "5": 2.0509499518084346e-05,
+        "10": 0.0001053191488608718,
+        "25": 0.0021826978772878647,
+        "50": 0.08130531013011932,
+        "75": 0.2570131868124008,
+        "90": 0.4733621478080751,
+        "95": 0.5056667447090148,
+        "99": 0.7472877931594849
+      }
+    }
+  }
+}

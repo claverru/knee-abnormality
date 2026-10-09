@@ -1,0 +1,47 @@
+ideas:
+- id: t1pd-joint-crops-centred-on-the-menisci-calibrated
+  mechanism_id: crop-centre-sagittal-and-coronal-t1-pd
+  parent_idea_id: null
+  title: 'T1/PD sagittal and coronal crops: centre on the predicted menisci'
+  opportunity: 'User-ordered on 2026-10-08: adjust where each plane-contrast crop looks, on canvases that
+    give the crop room to get there. Measured premise, effect a guess. The T1/PD joint views are read
+    for the joint line: meniscal signal (the literature rates short-echo sagittal first for tears), bone
+    spurs and fracture lines. The incumbent centres them on the knee''s centre, a point fitted from bone
+    mass. With the meniscus head on the 14 by 14 grid the menisci themselves are located (quote its final
+    validation overlap per class); their centroid is the joint line''s own centre.'
+  mechanism: 'One view''s centre changes; every other view, the turn, the fields and the canvases are
+    the incumbent''s. T1/PD sagittal and T1/PD coronal views: the centre is the share-weighted centroid
+    of the detached medial plus lateral meniscus shares predicted in the first look on the 14 by 14 grid,
+    in the fitted frame. Where the meniscus mass of a study is below the mass a single horn gives (3.89
+    in token-share units: the 5th percentile of the per-study mass on the 211 training DESS knees, measured
+    on the incumbent''s first look and defined in prior-work.md, Meniscus head calibration; the mass is
+    the sum over the first-look 7 by 7 tokens that are visual_valid and routable of the medial plus lateral
+    share in meniscus_shares, and production uses that same definition) the knee''s centre is used. The
+    canvases, the scale and the shift limits are the incumbent''s (368 px and 18 mm for these views once
+    the canvas seed is in); the share of crops at the shift limit is logged, since a target the canvas
+    does not let the crop reach is not a wrong target.'
+  precedents:
+  - 'a-crop-centre-per-contrast: the centre of each plane-contrast read from the framed structures.'
+  - 'kneecap-inside-the-fluid-sagittal-crop-per-knee-2 (anatomy-recipe run 6): the fluid sagittal crop
+    4.1 mm forward on average, PF OA +0.0015, Baker''s -0.0013.'
+  novelty: First crop centre read from a soft-tissue structure.
+  coverage: Every study with a sagittal and coronal T1/PD series.
+  exploitation: 'Read the macro at both multipliers against the incumbent, then both menisci (expected
+    to gain) and none named (expected to pay), with the validation AUC of the sagittal and coronal T1/PD
+    view alone per label against the incumbent''s. Shown wrong by: neither meniscus label above the incumbent
+    on these views alone.'
+  budget: 'Same cost as the incumbent: within 1.02 of its training time.'
+  implementation: 'Follow the environment paragraph of the developer instructions. modeling/model.py and
+    training/lightning.py for the metrics below. The centre is computed once per study inside the existing
+    first look on tensors already there; no loop over studies, no second evaluation of the frame. The
+    review asks for a logged proof that the change is active: log on validation only, through _log_epoch_metric,
+    the mean distance between the meniscus centroid and the knee''s centre in mm and the share of studies
+    using the fallback and the share of this view''s crops at the shift limit. Report on one batch the
+    same numbers and that the crops of every other view are bit-identical to the incumbent''s. Update
+    the view_policy entry of SPATIAL_TOKEN_IDENTITY. The fallback threshold 3.89 and its definition are
+    in prior-work.md (Meniscus head calibration) and meniscus-calibration.json of the campaign: use that
+    number, measure nothing.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: A centre for one plane-contrast, compared with the incumbent's centre for that view.
+exhausted_directions: ''

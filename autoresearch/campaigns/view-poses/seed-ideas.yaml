@@ -1,0 +1,253 @@
+ideas:
+- id: meniscus-head-on-the-14-by-14-grid
+  mechanism_id: meniscus-head-grid
+  parent_idea_id: null
+  title: Teach the menisci on the 14 by 14 grid of the previous backbone stage
+  opportunity: 'User-ordered on 2026-10-08. Measured premise, effect on the labels a guess. In the reference
+    the meniscus head reads the 7 by 7 tokens, 12 to 17 mm a side, and a meniscus horn is about 10 mm
+    wide and 5 to 7 mm thick, so a meniscus is never more than a small part of a token. On validation
+    the head overlaps the mask far less than the bone map does, and the thinner the class the worse: femur
+    and tibia 0.89, joint line 0.75, kneecap joint 0.65, lateral meniscus 0.39, medial meniscus 0.36 at
+    epoch 3 of rn18-meniscus-map (soft Dice per token; read the final values from its metrics.csv and
+    quote them in the report). Everything planned for the menisci, placing a detail crop and routing the
+    meniscus labels, needs their position to a few millimetres.'
+  mechanism: 'The meniscus head moves from the 7 by 7 tokens to the grid of the backbone stage before
+    the last (stride 16, 14 by 14 at 224 px). Its input at each of the 196 positions is the stride-16
+    feature map projected to 256 by a new linear layer, plus the existing 256-wide token of the stride-32
+    cell that contains it, repeated to the finer grid (nearest, each stride-32 cell to its four stride-16
+    cells). The head stays one linear layer to the three classes (neither, medial, lateral), zero-initialised.
+    Its targets are looked up by the existing AnatomyTargets.token_shares at the stride-16 anchors with
+    a footprint of 16 px. The label path, the bone map, the frame, the routing and the pooling stay on
+    the 7 by 7 tokens and are byte-identical. For later use the encoded batch also carries the meniscus
+    shares per 7 by 7 token as the mean of the four finer predictions. The stride-16 anchors come from
+    the verified geometry of that stage: add its mapping to BACKBONE_MAPPINGS in modeling/spatial_tokens.py
+    and check it against the layers as the stride-32 one is. A finer position counts under the same validity
+    rule as a token.'
+  precedents:
+  - 'rn18-meniscus-map (the reference): the same head on 7 by 7 tokens, macro level with report-attribute-loss-off-2
+    through the epochs seen.'
+  - 'stride-16 runs of 2026-09-22 on ReXNet-200: features of that stage alone lost 0.0042 as label tokens;
+    summed with the deep features they tied. The reason this head reads both.'
+  novelty: First use of the finer grid for a taught map, with the label path untouched.
+  coverage: The DESS knees for the head's loss (about 213 in training on fold 1); every study for the
+    features it shapes.
+  exploitation: 'Read the meniscus overlap per class on validation against the reference''s final values,
+    the macro at both multipliers, and the two meniscus labels. Shown wrong by: the overlap of both meniscus
+    classes not above the reference''s.'
+  budget: One linear projection and one head on a feature map the backbone already computes. Within 1.03
+    of the incumbent's training time.
+  implementation: 'Follow the environment paragraph of the developer instructions. modeling/model.py,
+    modeling/spatial_tokens.py, training/lightning.py and training/anatomy.py. No option selects the 7
+    by 7 head. Write nothing that loops over positions or images. The proof of activation is already logged:
+    val_meniscus_overlap_medial_meniscus, val_meniscus_overlap_lateral_meniscus and val_meniscus_tokens
+    (expect about four times the reference''s token count); add no other metric. Report on one batch the
+    number of positions per image (196), the pixel anchors of the first two against the stage''s geometry,
+    and that the label logits are bit-identical to the incumbent''s for the same weights. Update SPATIAL_TOKEN_IDENTITY
+    where it describes the maps.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Ordered first by the user; the menisci have to be sharp before anything is placed
+    or routed by them.
+- id: joint-centre-taught-from-the-masks
+  mechanism_id: joint-centre
+  parent_idea_id: null
+  title: Teach the knee's centre from the masks instead of taking the centroid of bone mass
+  opportunity: 'User decision of 2026-10-08: no hand-measured correction on the centre; improve the learning.
+    Measured premise, effect a guess. Every crop centre and every routing position is built on the knee''s
+    centre, which is the centroid of femur and tibia shares near the joint plane. That is the centre of
+    the bone mass in view, not the plateau centre the masks define: against the mask''s plateau centre
+    it is off by 1.6 to 1.8 mm front to back and 0.8 to 1.0 mm across on the validation mask knees (val_anatomy_centre_error_front_mm_mean
+    and _across_mm_mean in rn18-meniscus-map; quote its final values), and the recipe once carried re-measured
+    crop targets to absorb it. The centre has no target of its own; its error is only logged.'
+  mechanism: A new head on the 7 by 7 tokens (one linear layer to three values, zero-initialised) predicts
+    for each token the offset in millimetres, in patient coordinates, from the token's position to the
+    plateau centre of its knee. It is trained on the knees with masks (the plateau centre is in knees.json
+    of the prepared bone targets, already read by AnatomyTargets.study_centres) with a smooth L1 loss
+    over valid tokens weighted by their detached femur plus tibia share, added to the anatomy loss at
+    the same weight. In KneeAbnormalityModel.anatomical_frames the knee's centre becomes the share-weighted
+    mean over the same tokens of position plus predicted offset, detached, then projected on the joint
+    plane as today; the centroid of bone mass is removed. Where the weight sum is zero the previous centre
+    is kept, as today.
+  precedents:
+  - 'joint-centre-from-the-map-instead-of-the-spots (anatomy-masks seed 2, adopted): the centre read from
+    the map; S125 0.954.'
+  - 'A height predicted per token as the plane''s source (2026-10-07): closed; it replaced the plane fit.
+    This seed keeps the plane fit and teaches only the centre.'
+  novelty: First supervised target for the knee's centre.
+  coverage: The 400 training knees with bone masks for the loss; every study for the centre.
+  exploitation: 'Read val_anatomy_centre_error_front_mm_mean and _across_mm_mean against the incumbent''s,
+    the macro at both multipliers, and the labels routed by side and height (both menisci, both OA labels,
+    PF OA). Shown wrong by: the centre error not below the incumbent''s on both axes.'
+  budget: One linear layer on existing tokens and one masked loss. Within 1.02 of the incumbent's training
+    time.
+  implementation: 'Follow the environment paragraph of the developer instructions. modeling/model.py,
+    training/anatomy.py and training/lightning.py. The proof of activation is already logged (the two
+    centre errors and their spread); add one validation metric, the mean absolute predicted offset in
+    mm. The label loss must not reach the new head through the centre: the centre is read from detached
+    values. Report on one batch the centre error before and after for the same weights with the head at
+    zero (they must be equal to the incumbent''s only if the head''s zero prediction is combined as specified;
+    say which) and that no route or crop reads a second centre. Update SPATIAL_TOKEN_IDENTITY where it
+    describes the centre.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Everything the poses look at is measured from this centre.
+- id: canvases-for-the-pose-in-all-six-views
+  mechanism_id: smart-crops
+  parent_idea_id: null
+  title: 'Canvases of 368 px, scale per knee and the axial pose: smart crops in every view'
+  opportunity: 'User-ordered on 2026-10-08: every experiment after this one runs with shift, turn and
+    scale in all six views, so this seed comes before the seeds that move where the crops look: those
+    moves are 8 to 13 mm, on a knee that already wanders 7 to 8 mm up and down inside the canvas, and
+    the recipe''s 12.75 mm limit would clamp them. Measured premises, effect a guess. (1) Today''s canvases
+    hold the window the pose asks for in 69 to 77% of sagittal and coronal images; 11 to 15% of crops
+    are clamped (3,517 training studies; prior-work.md, Canvas sizes). (2) Knee size varies by 8% and
+    the first look estimates it with r 0.94; one scale per knee on four views gave x4 +0.0003 and x1 +0.0003
+    (anatomy-recipe run 7). (3) Axial crops are never posed: the knee''s centre sits 2.1 to 2.8 mm (sd)
+    from the crop centre, 99% within 8 mm, and the image is turned against the knee''s axes by 5 degrees
+    on average, 95% of knees between -13 and +20 degrees; a crop that turns with the knee holds the same
+    anatomy in up to 27% less field. (4) A canvas of 368 px holds shift, turn, scale 0.87 to 1.13 and
+    jitter for 99% of images in every view: 138 mm at 84 mm fields, 151 mm at 93.3 mm, and 194 mm for
+    a 120 mm axial crop that turns. (5) In the reference the predicted kneecap has 25 to 27% of its mass
+    on the front edge line of the axial crop, while the femur ends 37 mm short of the back edge (874 validation
+    studies, outputs/analysis/m/meniscus-map-preview/structures-in-crops.csv): the axial crop sits too far
+    back.'
+  mechanism: 'The canvas of every view becomes 368 px and the pose gets what the canvas allows. (a) Canvases:
+    a margin of 72 px on each side for all six views, replacing round(data.view_shift_limit_mm / spacing)
+    for sagittal and coronal and 0 for axial (data/dataset.py and ViewWindows.margin); data.view_shift_limit_mm
+    is removed. The shift limit becomes 18 mm for sagittal and coronal and 8 mm for axial (the 99th percentile
+    of the shift asked for). (b) Scale: one size per study from the no-gradient first look, exactly as
+    in the frozen candidate of anatomy-recipe run 7 (scale = clamp(size / 17.087, 0.87, 1.13), 1.0 when
+    a weight sum is zero), on all six views. (c) Axial pose: the crop is centred, front to back, on the
+    box from 30 mm behind the back of the femur shares to the front of the kneecap shares (share-weighted
+    5th and 95th percentiles in the fitted frame, read in the first look), and side to side on the frame''s
+    centre; the crop is rotated so the frame''s medial axis, projected on the image plane, lies along
+    the image row direction, clamped to 20 degrees. The sagittal and coronal centres and turn are the
+    incumbent''s. Training jitter applies to every view. The first look stays the central 224 px of the
+    canvas at scale 1.'
+  precedents:
+  - 'crop-size-per-knee-from-the-first-look (anatomy-recipe run 7): x4 +0.000317, x1 +0.000338, 1.061
+    times the incumbent''s time.'
+  - 'coronal-fluid-crops-at-108-mm-2 and sagittal-fluid-crops-at-112-mm-3: canvases of about 354 and 366
+    px trained at 1.06 and 1.12 times the incumbent.'
+  - 'hand-views-patellofemoral-axial-zoom (learnable-views run 44, 2026-10-03): a second, rule-placed
+    84 mm axial view, -0.0013, before the anatomy map.'
+  novelty: First canvases sized from the measured need, first scale on all six views, first pose of the
+    axial views.
+  coverage: Every study and every view.
+  exploitation: 'Read the macro at both multipliers against the incumbent, then per label with MCL, PF
+    OA, Effusion, Synovitis and Baker''s named, and the validation AUC of axial fluid alone. Report the
+    share of each step spent waiting for data, the peak host memory and the training time: the canvases
+    are the open cost of the campaign. Shown wrong by: the share of crops at a limit not falling below
+    the incumbent''s, the applied axial turn and shift not matching the measured spread, or a mean scale
+    away from 1.00.'
+  budget: Canvases of 368 px against 306 to 314 px (sagittal, coronal) and 224 px (axial), and every slice
+    resampled once. Up to 1.25 times the incumbent's training time from those two causes only.
+  implementation: 'Follow the environment paragraph of the developer instructions. modeling/model.py,
+    data/dataset.py, config.py, configs/training.yaml and training/lightning.py for the metrics below.
+    Reuse the reviewed code for the scale and the cut with a scale inside the affine: /home/claudio/src/knee-abnormality/outputs/autoresearch/anatomy-recipe/experiments/crop-size-per-knee-from-the-first-look-20261008T143648Z-ea93063b/source
+    (changes.diff beside it), extended to the axial views; do not write a second path for axial. Each
+    slice is sampled once. No option selects fixed crops or the old margins. The review asks for a logged
+    proof that the change is active: log on validation only, through _log_epoch_metric, the mean absolute
+    axial shift in mm, the mean absolute axial turn in degrees, the mean and the standard deviation of
+    the scale, and the share of crops at a shift, turn or scale limit (five metrics). Report on one batch
+    that a study given scale 1, zero axial shift and zero axial turn yields crops equal to the incumbent''s
+    within one grey level, and the canvas size of each view. Update the view_policy and preparation entries
+    of SPATIAL_TOKEN_IDENTITY.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Gives every crop the room its pose needs; the centre seeds and the canvas combinations
+    are built on it.
+- id: a-crop-centre-per-contrast
+  mechanism_id: crop-centre
+  parent_idea_id: null
+  title: Give the two contrasts of a plane their own crop centre
+  opportunity: 'User-ordered on 2026-10-08: one crop per plane-contrast is settled, so this seed is the
+    base of every later pose seed. Measured premise, effect a guess. The two series of a plane are read
+    for different things (image study of 102 training studies and the literature; prior-work.md, What
+    each view is read for): the fluid series for effusion, the pouch above the kneecap, the kneecap joint
+    and marrow; the T1/PD series for the joint line (meniscal signal, fracture lines, bone spurs). Each
+    view alone in report-attribute-loss-off-2: sagittal fluid is the best single view for both menisci
+    and PF OA, sagittal T1/PD for ACL. On the masks the kneecap''s front lies 56 mm ahead of the joint
+    centre and its top 55 mm above the joint line, the back of the condyles 23 mm behind, and the bone
+    edges 37 mm to each side; the sagittal crop''s half-width is 47 mm, and the whole kneecap is inside
+    the fluid sagittal crop in 26% of series today. Today both contrasts of a plane share one centre.
+    In the reference 56% of the predicted kneecap''s mass lies on the front edge line of the fluid sagittal
+    crop and 78% on that of the T1/PD one (874 validation studies; prior-work.md), and on the 1 mm masks
+    the whole kneecap is inside the fluid sagittal crop in 26% of series: the move needed is about 13
+    mm forward, more than the recipe''s 12.75 mm limit, which is why this seed follows the canvas seed.'
+  mechanism: 'SAGITTAL_JOINT_TARGET_MM and CORONAL_JOINT_TARGET_MM are removed (modeling/model.py). Each
+    of the four sagittal and coronal views gets its own centre, read per study from the first look''s
+    detached bone shares in the fitted frame, as share-weighted 5th and 95th percentiles along each frame
+    axis; the centre is the box''s midpoint, and where a class has no mass the joint centre is used for
+    that axis. Fluid sagittal: from the back of the femur shares to the front of the kneecap shares, and
+    from the tibia shares within 30 mm below the joint plane to the top of the kneecap shares (forward
+    and up, onto the kneecap joint). T1/PD sagittal: the joint centre, with no offset. Fluid coronal:
+    the femur and tibia shares from 30 mm below the joint plane to 45 mm above it (up, toward the femoral
+    side where the collateral injuries and the pouch are seen). T1/PD coronal: the joint centre, with
+    no offset. The turn, the fields and the axial views are unchanged. The canvases, the scale and the
+    shift limits are the incumbent''s (368 px and 18 mm for these views once the canvas seed is in); the
+    share of crops at the shift limit is logged, since a target the canvas does not let the crop reach
+    is not a wrong target.'
+  precedents:
+  - 'kneecap-inside-the-fluid-sagittal-crop-per-knee-2 (anatomy-recipe run 6): PF OA +0.0015, Baker''s
+    -0.0013, macro -0.0002.'
+  - 'joint-centre-from-the-map-instead-of-the-spots (anatomy-masks seed 2): the centre read from the map,
+    with targets re-measured by hand to absorb its bias; S125 0.954.'
+  novelty: First pose that differs between the two contrasts of a plane.
+  coverage: Every study; the four sagittal and coronal views.
+  exploitation: 'Read the macro at both multipliers against the incumbent, then PF OA, Effusion, Synovitis
+    and Baker''s (fluid views) and both menisci, ACL and Fracture (T1/PD views), with the validation AUC
+    of each of the four views alone against the incumbent''s. Shown wrong by: no view''s own AUC moving
+    for the labels its centre was chosen for.'
+  budget: 'Same cost as the incumbent: weighted percentiles once per study on tensors the first look already
+    holds. Within 1.02 of its training time.'
+  implementation: 'Follow the environment paragraph of the developer instructions. modeling/model.py and
+    training/lightning.py for the metrics below. The boxes are computed once per study inside the existing
+    first look; no loop over studies or views, no second evaluation of the frame. The review asks for
+    a logged proof that the change is active: log on validation only, through _log_epoch_metric, the mean
+    forward position of the fluid and of the T1/PD sagittal centre from the joint centre in mm, the mean
+    upward position of the fluid and of the T1/PD coronal centre, and the share of crops at the shift
+    limit (five metrics). Report on one batch that the two contrasts of a plane now differ in centre and
+    that axial crops are bit-identical to the incumbent''s. Update the view_policy entry of SPATIAL_TOKEN_IDENTITY.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: 'The settled design of the pose: each plane-contrast has its own crop. Later seeds
+    change one view''s centre at a time.'
+- id: t1pd-sagittal-crop-on-the-notch
+  mechanism_id: crop-centre-sagittal-t1-pd
+  parent_idea_id: null
+  title: 'T1/PD sagittal crop: centre on the notch where the cruciates are read'
+  opportunity: 'User-ordered on 2026-10-08: adjust where each plane-contrast crop looks, on canvases that
+    give the crop room to get there. Measured premise, effect a guess. Sagittal T1/PD alone is the best
+    single view for ACL (0.891) and for nothing else. The ACL is read on the one or two slices within
+    7 mm of the middle, in a box from the joint line to 30 mm above it (inspection of 8 positive studies;
+    the literature gives the band against the notch roof). The incumbent centres this view on the joint
+    centre, so half of its field is tibia below the joint line.'
+  mechanism: 'One view''s centre changes; every other view, the turn, the fields and the canvases are
+    the incumbent''s. T1/PD sagittal view, up and down: the centre moves to 15 mm above the joint plane,
+    the middle of the measured 0 to 30 mm box. Front to back stays on the joint centre. The canvases,
+    the scale and the shift limits are the incumbent''s (368 px and 18 mm for these views once the canvas
+    seed is in); the share of crops at the shift limit is logged, since a target the canvas does not let
+    the crop reach is not a wrong target.'
+  precedents:
+  - 'a-crop-centre-per-contrast: the centre of each plane-contrast read from the framed structures.'
+  - 'kneecap-inside-the-fluid-sagittal-crop-per-knee-2 (anatomy-recipe run 6): the fluid sagittal crop
+    4.1 mm forward on average, PF OA +0.0015, Baker''s -0.0013.'
+  novelty: A second answer for where this view looks, against the first.
+  coverage: Every study with a sagittal T1/PD series.
+  exploitation: 'Read the macro at both multipliers against the incumbent, then ACL (expected to gain)
+    and Fracture (tibial lines run to 55 mm below the joint line) (expected to pay), with the validation
+    AUC of the sagittal T1/PD view alone per label against the incumbent''s. Shown wrong by: ACL not above
+    the incumbent on this view alone.'
+  budget: 'Same cost as the incumbent: within 1.02 of its training time.'
+  implementation: 'Follow the environment paragraph of the developer instructions. modeling/model.py and
+    training/lightning.py for the metrics below. The centre is computed once per study inside the existing
+    first look on tensors already there; no loop over studies, no second evaluation of the frame. The
+    review asks for a logged proof that the change is active: log on validation only, through _log_epoch_metric,
+    the mean height of the T1/PD sagittal crop centre above the joint plane in mm and the share of this
+    view''s crops at the shift limit. Report on one batch the same numbers and that the crops of every
+    other view are bit-identical to the incumbent''s. Update the view_policy entry of SPATIAL_TOKEN_IDENTITY.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: A centre for one plane-contrast, compared with the incumbent's centre for that view.
+exhausted_directions: ''

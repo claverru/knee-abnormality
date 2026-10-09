@@ -1,2 +1,1036 @@
-revision: 0
-ideas: []
+revision: 236
+ideas:
+- id: report-attribute-loss-off
+  mechanism_id: report-attribute-weight
+  parent_idea_id: null
+  title: Train without the report-attribute loss
+  opportunity: 'User-ordered on 2026-10-08. A guess. The loss was last measured before
+    the 84/93 mm views and before the anatomy map: removing it cost -0.0006 at x4
+    (80% -0.0011 to -0.0001) and halving it -0.0004 (revisits campaign, docs/modeling/report-attribute-heads.md).
+    The map now draws on the same token features, and three anatomy-masks runs saw
+    Synovitis fall when an auxiliary reading was added (run notes, runs 7 and 8).'
+  mechanism: 'Set trainer.report_attribute_loss_weight: 0 in configs/training.yaml.
+    At zero the training step does not compute the term and validation does not compute
+    its fit; the heads stay in the model untrained. No source change.'
+  precedents:
+  - 'Removing the heads on ResNet-18, 2026-10-01: -0.0006 at x4.'
+  - 'Adding them, 2026-09-25: +0.00105 at x4, 0.940 public against 0.938.'
+  novelty: First measurement of the loss beside the anatomy map.
+  coverage: Every training study with report answers.
+  exploitation: 'Rule: the loss is removed only if this run is at least the control
+    at both x1 and x4, the campaign''s adoption rule; otherwise 0.1 stays. Read per
+    target Synovitis, Effusion, PF OA and both menisci, and the map''s overlap per
+    class and plane error against the control''s, to see whether the two auxiliary
+    losses compete. Shown wrong by: the run below the control at both multipliers.'
+  budget: 'Slightly cheaper than the control: the report step is about 6 ms of a 245
+    ms training step.'
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    configs/training.yaml only (trainer.report_attribute_loss_weight: 0). Changes
+    no source. Report that no report_attribute metric is logged and that the anatomy
+    and side losses are unchanged on one batch.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Ordered first by the user; settles whether the loss still earns
+    its place.
+  status: blocked
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality-side-routed-heads/autoresearch/campaigns/anatomy-recipe/seed-ideas.yaml
+  experiments:
+  - report-attribute-loss-off-20261008T111823Z-9f8e7a71
+  - report-attribute-loss-off-20261008T112219Z-61486994
+  blocked_reason: 'Block this candidate: its one bounded repair has returned without
+    resolving the mandatory activation gate. The supervisor did not amend the explicit
+    source-change prohibition before dispatching the repair. Blocking requires parking
+    the idea at its own implementation review. The supplied full ranking removes only
+    that blocked seed and preserves every remaining user-ordered seed in its existing
+    order; it addresses the previous ranking rejection without changing priorities.
+    This administrative blocker supplies no experimental evidence against the ablation.'
+- id: jitter-shared-by-the-two-contrasts-of-a-plane
+  mechanism_id: crop-jitter
+  parent_idea_id: null
+  title: Draw the crop jitter once per study and plane, so both contrasts of a plane
+    move together
+  opportunity: Measured premise, effect a guess. Contrast mixing blends the two contrasts
+    of a plane pixel for pixel. On 40 training batches the blended pixels are 0.2
+    mm apart at the crop centre with posed crops and 3.1 mm (p90 5.5) once the training
+    jitter is added, because the jitter is drawn per series (run notes, Contrast mixing
+    under posed crops). The 6.6 mm at the corners comes from the 84 against 93.3 mm
+    fields and is not touched here; the donor aligned over the whole crop lost twice
+    (fixes-and-removals).
+  mechanism: 'In ViewWindows.jitter (modeling/model.py) draw the turn and the two
+    shifts once per (study, plane) instead of once per series row, and give every
+    series row of that study and plane the same draw: the turn in degrees and the
+    shift in millimetres, converted to each row''s own pixels as now. The number of
+    random values drawn changes; draw them in one call of size (studies x planes)
+    for the turn and one for the shifts. Ranges, clipping and the pose do not change.'
+  precedents:
+  - 'Posed crops with per-series jitter: the incumbent.'
+  - 'Contrast mixing off on the 2026-10-05 recipe: about -0.0005 on top of the quantile
+    change.'
+  novelty: First jitter that keeps the mixed pair registered at the joint.
+  coverage: Every sagittal and coronal study with both contrasts of a plane, in training.
+  exploitation: 'Read both multipliers against the control with both menisci, ACL
+    and Effusion; report once, on one training batch, the in-plane distance in mm
+    between the two contrasts'' crop centres for mixed pairs (expect about 0.2 mm
+    against 3.1). Shown wrong by: that distance above 1 mm, or the macro below the
+    control at both multipliers.'
+  budget: 'Same cost as the control: within 1.02 of its training time.'
+  implementation: Follow the environment paragraph of the developer instructions.
+    modeling/model.py only. Replaces the per-series draw. Report on one batch that
+    two series of one study and plane receive the same turn and the same shift in
+    mm, and that series of different planes do not. Update SPATIAL_TOKEN_IDENTITY['preparation'].
+  open_choices: None.
+  dependencies: []
+  priority_rationale: A measured misalignment the posed crops introduced.
+  status: completed
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality-side-routed-heads/autoresearch/campaigns/anatomy-recipe/seed-ideas.yaml
+  ranking_rationale: 'Block this candidate: its one bounded repair has returned without
+    resolving the mandatory activation gate. The supervisor did not amend the explicit
+    source-change prohibition before dispatching the repair. Blocking requires parking
+    the idea at its own implementation review. The supplied full ranking removes only
+    that blocked seed and preserves every remaining user-ordered seed in its existing
+    order; it addresses the previous ranking rejection without changing priorities.
+    This administrative blocker supplies no experimental evidence against the ablation.'
+  experiments:
+  - jitter-shared-by-the-two-contrasts-of-a-plane-20261008T112515Z-b6cee3b6
+  - jitter-shared-by-the-two-contrasts-of-a-plane-20261008T112741Z-c1fa4c48
+  decision: reject
+- id: coronal-fluid-crops-at-108-mm
+  mechanism_id: crop-field
+  parent_idea_id: null
+  title: Cut the posed fluid coronal crops at 108 mm instead of 93.3 mm, leaving T1/PD
+    at 84 mm
+  opportunity: 'User-ordered on 2026-10-08, which lifts the bar on crop widths for
+    this seed. Measured premise, effect a guess. The field comes from the bone extents
+    of the 550 mask knees with the incumbent''s joint target: 108 mm is the field
+    at which the bone edge plus 5 mm is inside on the tighter side for 95% of knees,
+    against 45% at 93.3 mm and 87% at 103.7 mm; the fibular head is inside for 93%
+    against 57%. The 5 mm for the collateral ligaments is an assumption. Past 108
+    mm almost nothing is left to gain (99% at 112 mm). Checked on the validation fold
+    with the control''s weights: the 108 mm posed crop lies inside the acquired image
+    for 99.75% of its area, 1.9% of slices under 95% (5.6% at 120 mm); examples in
+    outputs/analysis/a/anatomy-masks-field/fluid-fields/coronal-fluid.png. The run that
+    widened both coronal series to 93.3 and 103.7 mm was level at x4 (+0.00015) with
+    MCL +0.0015, Contusion +0.0013 and the menisci unharmed (anatomy-masks run 11).
+    The pixel goes from 0.417 to 0.482 mm, finer than the axial views'' 0.536 mm.'
+  mechanism: One zoom factor s = 108 / 93.333 for the fluid coronal view only. In
+    ViewWindows (modeling/model.py) its posed cut samples the canvas on a grid whose
+    pixel pitch is s canvas pixels, in the same bicubic resampling as the turn; crop_affine
+    carries the scale; the joint target keeps its offset in mm, so geometry divides
+    it by s in crop pixels; that view is always resampled. Set data.view_shift_limit_mm
+    to 24.5 and replace MAX_VIEW_SHIFT_FRACTION * margin in frame_pose and jitter
+    by a per-view limit in canvas pixels, min(margin - (s - 1) * image_size / 2 -
+    0.25 * round(17 mm / pixel pitch), 0.75 * round(17 mm / pixel pitch)), so every
+    view keeps today's 12.75 mm of shift and today's 4.25 mm of slack to the canvas
+    edge. All other views, the first look, slice counts and image size do not change.
+  precedents:
+  - 'coronal-crops-a-ninth-wider (anatomy-masks run 11): both coronal series wider,
+    x4 +0.00015, x1 -0.00037.'
+  novelty: First wider field on one contrast of a plane.
+  coverage: Every fluid coronal series.
+  exploitation: 'Read both multipliers against the control with MCL, Contusion, Fracture,
+    Medial OA, Lateral OA and both menisci, and on validation only the share of fluid
+    coronal series at the shift limit. Shown wrong by: MCL and Contusion both below
+    the control at x4, or the macro below at both multipliers.'
+  budget: Canvases 354 and 342 px against 314 and 306, about 27% larger in area; training
+    within 1.08 of the control, from the canvases only (an estimate from the 20% larger
+    canvases of anatomy-masks runs 10 and 11, which cost 5 to 7%).
+  implementation: Follow the environment paragraph of the developer instructions.
+    modeling/model.py and configs/training.yaml (data.view_shift_limit_mm only). Replaces
+    the fluid coronal crop at its own field; no flag selects the old one. The run
+    of anatomy-masks that did this for both coronal series is in outputs/autoresearch/anatomy-masks/experiments/coronal-crops-a-ninth-wider-*/changes.diff,
+    including the validity-rectangle repair its review asked for; apply it to one
+    view. Report the field in mm of a fluid coronal crop from its corner tokens (expect
+    108.0) and that every other view's crops are bit-identical to the control's at
+    the same pose. Update SPATIAL_TOKEN_IDENTITY['preparation'].
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The half of the coronal field run that carried its gains, at
+    half its cost.
+  status: completed
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality-side-routed-heads/autoresearch/campaigns/anatomy-recipe/seed-ideas.yaml
+  ranking_rationale: 'Block this candidate: its one bounded repair has returned without
+    resolving the mandatory activation gate. The supervisor did not amend the explicit
+    source-change prohibition before dispatching the repair. Blocking requires parking
+    the idea at its own implementation review. The supplied full ranking removes only
+    that blocked seed and preserves every remaining user-ordered seed in its existing
+    order; it addresses the previous ranking rejection without changing priorities.
+    This administrative blocker supplies no experimental evidence against the ablation.'
+  experiments:
+  - coronal-fluid-crops-at-108-mm-20261008T120101Z-c735e489
+  - coronal-fluid-crops-at-108-mm-20261008T120513Z-520cef92
+  decision: invalid
+- id: sagittal-fluid-crops-at-112-mm
+  mechanism_id: crop-field
+  parent_idea_id: null
+  title: Cut the posed fluid sagittal crops at 112 mm, 0.5 mm per pixel, leaving T1/PD
+    at 84 mm
+  opportunity: 'User-ordered on 2026-10-08, which lifts the bar on crop widths for
+    this seed. Measured premise, effect a guess. On the 550 mask knees with the incumbent''s
+    joint target the kneecap''s front is inside the fluid sagittal crop for 20% of
+    knees at 93.3 mm, 59% at 103.7 mm, 83% at 112 mm and 97% at 120 mm (whole kneecap
+    8%, 36%, 65%, 87%): coverage rises all the way to 120 mm, so the extents alone
+    set no value. 112 mm is taken because it is 0.5 mm per pixel, the most common
+    acquired resolution, so half the series are still fully resolved; 120 mm is the
+    field smart-crops replaced with 93 mm for +0.0005 to +0.0007. Checked on the validation
+    fold with the control''s weights: the 112 mm posed crop lies inside the acquired
+    image for 99.73% of its area, 1.6% of slices under 95% (4.7% at 120 mm); examples
+    in outputs/analysis/a/anatomy-masks-field/fluid-fields/sagittal-fluid.png. The run
+    that widened both sagittal series gained on Baker''s (+0.0024, interval above
+    zero) and PF OA (+0.0017) and lost on Lateral Meniscus (-0.0029) and ACL (-0.0012),
+    which the T1/PD series carries (anatomy-masks run 10).'
+  mechanism: One zoom factor s = 112 / 93.333 for the fluid sagittal view only. In
+    ViewWindows (modeling/model.py) its posed cut samples the canvas on a grid whose
+    pixel pitch is s canvas pixels, in the same bicubic resampling as the turn; crop_affine
+    carries the scale; the joint target keeps its offset in mm, so geometry divides
+    it by s in crop pixels; that view is always resampled. Set data.view_shift_limit_mm
+    to 26.5 and replace MAX_VIEW_SHIFT_FRACTION * margin in frame_pose and jitter
+    by a per-view limit in canvas pixels, min(margin - (s - 1) * image_size / 2 -
+    0.25 * round(17 mm / pixel pitch), 0.75 * round(17 mm / pixel pitch)), so every
+    view keeps today's 12.75 mm of shift and today's 4.25 mm of slack to the canvas
+    edge. All other views, the first look, slice counts and image size do not change.
+  precedents:
+  - 'sagittal-crops-a-ninth-wider (anatomy-masks run 10): both sagittal series wider,
+    x4 -0.0006, x1 -0.0005.'
+  novelty: First wider sagittal field that leaves the T1/PD series at its detail.
+  coverage: Every fluid sagittal series.
+  exploitation: 'Read both multipliers against the control with Baker''s, PF OA, Effusion,
+    Synovitis, Lateral Meniscus and ACL, and on validation only the share of kneecap
+    and kneecap-joint tokens per fluid sagittal image and the share of those series
+    at the shift limit. Shown wrong by: Baker''s and PF OA both below the control
+    at x4, or Lateral Meniscus and ACL both below it by more than one sibling SD.'
+  budget: Canvases 366 and 352 px against 314 and 306, about 35% larger in area; training
+    within 1.1 of the control, from the canvases only (an estimate from the 20% larger
+    canvases of anatomy-masks runs 10 and 11, which cost 5 to 7%).
+  implementation: Follow the environment paragraph of the developer instructions.
+    modeling/model.py and configs/training.yaml (data.view_shift_limit_mm only). Replaces
+    the fluid sagittal crop at its own field. Start from outputs/autoresearch/anatomy-masks/experiments/sagittal-crops-a-ninth-wider-*/changes.diff
+    (the second, repaired candidate) and apply it to one view. Report the field in
+    mm of a fluid sagittal crop (expect 112.0) and that every other view's crops are
+    bit-identical to the control's at the same pose. Update SPATIAL_TOKEN_IDENTITY['preparation'].
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Keeps the gain of the sagittal field run and drops what paid
+    for it.
+  status: blocked
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality-side-routed-heads/autoresearch/campaigns/anatomy-recipe/seed-ideas.yaml
+  ranking_rationale: 'Block this candidate: its one bounded repair has returned without
+    resolving the mandatory activation gate. The supervisor did not amend the explicit
+    source-change prohibition before dispatching the repair. Blocking requires parking
+    the idea at its own implementation review. The supplied full ranking removes only
+    that blocked seed and preserves every remaining user-ordered seed in its existing
+    order; it addresses the previous ranking rejection without changing priorities.
+    This administrative blocker supplies no experimental evidence against the ablation.'
+  experiments:
+  - sagittal-fluid-crops-at-112-mm-20261008T122510Z-82d2b454
+  - sagittal-fluid-crops-at-112-mm-20261008T123024Z-2dc58eb2
+  - sagittal-fluid-crops-at-112-mm-20261008T124447Z-f9e2bd6a
+  blocked_reason: Block and park the sagittal seed because its bounded cost repair
+    remains unresolved. Direct inspection confirms both bicubic samplers execute before
+    output selection; zero-angle unaffected slices discard both results. This violates
+    the explicit cost discipline regardless of eventual runtime. The repair workspace
+    is identical to the preceding candidate source. The one bounded repair is exhausted.
+    The full ranking removes only the blocked seed and preserves every remaining queue
+    entry in its existing order, correcting the previous report's rejected queue representation.
+- id: femur-front-in-the-kneecap-routes
+  mechanism_id: kneecap-route-sections
+  parent_idea_id: null
+  title: Read the femur's front, behind the kneecap, in full in the kneecap routes
+  opportunity: 'Measured premise, effect a guess. With the kneecap route led by the
+    kneecap, PF OA, Effusion and Synovitis still spend 44 to 46% of their attention
+    on femur tokens and 9 to 21% on kneecap-joint tokens (anatomy-masks run notes,
+    run 15, last epoch on validation). The trochlea, the cartilage PF OA is read from,
+    and the pouch above it, where effusion and synovitis show, are femur and tissue
+    in front of the femur at the kneecap''s height; the route weights them at a quarter
+    (FRONT_FLOOR) unless they are kneecap tokens. On the masks the kneecap spans 21.3
+    mm (sd 5.7) to 54.6 mm (sd 6.7) above the joint plane. Checked on the validation
+    fold with the control''s weights: the front tokens in that height window number
+    235 per study, 18% of a study''s tokens, and 57% of them are soft tissue; taking
+    all of them in full would bring back the wide front block that lost PF OA before
+    the kneecap led the route (prior-work.md). Restricted to femur tokens (share above
+    half) they are 60 per study, 4.6% of the tokens, and the kneecap route reads them
+    at a mean weight of 0.31.'
+  mechanism: 'In KneeAbnormalityModel._regions (modeling/model.py) add one membership
+    for the kneecap route and the front-core route: tokens in front_plane whose height
+    above the joint plane lies between 21.3 - 5.7 and 54.6 + 6.7 mm, weighted by the
+    detached femur share alone (not the free share). Where the routes now use behind_kneecap
+    + (1 - behind_kneecap) * FRONT_FLOOR * front_plane * heights, take the larger
+    of that floor term and this membership, so the femur''s front counts in full instead
+    of at a quarter while the soft tissue of the front block stays at the floor. The
+    height is the token''s existing height coordinate in the frame. Nothing else in
+    the routes changes.'
+  precedents:
+  - 'patellar-routing-uses-unsaturated-shares (anatomy-masks run 15): x4 +0.0003,
+    its own targets unmoved.'
+  - 'rn18-anatomy-front-sample550: the kneecap route led by kneecap tokens recovered
+    most of PF OA''s loss.'
+  novelty: First section for the trochlea and the pouch.
+  coverage: Every study; the tokens in front of the femur at kneecap height.
+  exploitation: 'Read PF OA, Effusion and Synovitis at both multipliers against the
+    control. On validation only, log the share of the three targets'' attention on
+    this membership (three metrics). Shown wrong by: PF OA not above the control at
+    either multiplier, or the macro below it at both.'
+  budget: 'Same cost as the control: within 1.02 of its training time. One masked
+    product on tensors that _regions already holds.'
+  implementation: Follow the environment paragraph of the developer instructions.
+    modeling/model.py only. Adds one membership inside the two existing unions and
+    removes nothing; the quarter floor stays for front tokens outside the height window.
+    Report on one batch the mean number of tokens per study in the membership and
+    that routes other than kneecap and front-core are bit-identical. Update SPATIAL_TOKEN_IDENTITY
+    where it describes the kneecap route.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The three targets that pay for the map spend half their attention
+    where the route gives a quarter weight.
+  status: completed
+  created_revision: 1
+  seeded: /home/claudio/src/knee-abnormality-side-routed-heads/autoresearch/campaigns/anatomy-recipe/seed-ideas-2.yaml
+  ranking_rationale: 'Block and park the seed at its own implementation review: its
+    one bounded repair returned blocked without changes, and supervisor reconciliation
+    remains absent. The prescribed larger-canvas mask still fails exact parent equality
+    for unaffected turned crops and introduces additional training-step boolean indexing.
+    No further repair is authorized under the exhausted allowance. Supply the complete
+    remaining queue order to resolve the previous report''s ranking rejection; preserve
+    every remaining user seed''s relative order. This blocks the implementation and
+    supplies no numerical evidence against the wider sagittal field.'
+  experiments:
+  - femur-front-in-the-kneecap-routes-20261008T131454Z-fedd7963
+  - femur-front-in-the-kneecap-routes-20261008T131736Z-bfee5053
+  decision: reject
+- id: kneecap-inside-the-fluid-sagittal-crop-per-knee
+  mechanism_id: crop-target-position
+  parent_idea_id: null
+  title: Move the fluid sagittal crop forward only as far as each knee's kneecap needs
+  opportunity: 'Measured premise, effect a guess. The kneecap''s front lies 55.9 mm
+    in front of the plateau centre (sd 5.3) and the 93 mm fluid sagittal crop reaches
+    51.6 mm with the incumbent''s joint target; a fixed move of 8.6 mm for every knee
+    put 38% of the fluid sagittal series at the shift limit and scored x4 -0.0005
+    (anatomy-masks run 7). Checked on the validation fold with the control''s weights
+    (prior-work.md, Premise checks): the first look predicts kneecap tokens in every
+    knee; the share-weighted mean front coordinate of the kneecap share tracks the
+    mask''s kneecap front with correlation 0.67 on 150 knees (the largest front coordinate
+    among kneecap tokens: 0.56) and lies 11.9 mm behind it on average, leaving a residual
+    of 3.9 mm against 5.3 mm for a constant. The move a knee needs is 7.4 mm on average
+    (p90 14.3) and positive for 93% of knees, on top of pose shifts with a spread
+    of 4 mm, so inside today''s 12.75 mm limit it would be clipped as the fixed move
+    was.'
+  mechanism: In KneeAbnormalityModel.first_look_pose (modeling/model.py), after the
+    frame is fitted, take per study the mean front coordinate, in the frame, of the
+    first look's tokens weighted by their detached kneecap share (valid, routable
+    tokens of every view), add 11.9 mm, and subtract the fluid sagittal crop's forward
+    reach (half the field plus the sagittal target's forward offset). Where the result
+    is positive, shift the fluid sagittal view's crop forward by it in the same call
+    of frame_pose, before the clamp. Set data.view_shift_limit_mm to 22.5 and give
+    the fluid sagittal view the limit 0.75 * margin (16.9 mm) while every other view
+    keeps today's 12.75 mm, as min(0.75 * margin, 0.75 * round(17 mm / pixel pitch))
+    in canvas pixels. One weighted mean over tensors the first look already holds;
+    no extra pass. T1/PD sagittal, coronal and axial crops do not change.
+  precedents:
+  - 'fluid-sagittal-crops-moved-forward-for-the-kneecap (anatomy-masks run 7): fixed
+    8.6 mm, 38% at the limit, x4 -0.0005.'
+  novelty: First crop move set by the knee's own kneecap.
+  coverage: The fluid sagittal series of knees whose kneecap reaches the crop's front
+    edge.
+  exploitation: 'Read PF OA, Effusion and Synovitis at both multipliers against the
+    control. On validation only, log the mean forward move in mm, the share of fluid
+    sagittal series moved and the share at the shift limit (three metrics). Shown
+    wrong by: more than 20% of fluid sagittal series at the shift limit, or PF OA
+    and Effusion both below the control at x4.'
+  budget: Canvases about a fifth larger in area for the sagittal and coronal series;
+    training within 1.08 of the control, from the canvases only.
+  implementation: Follow the environment paragraph of the developer instructions.
+    modeling/model.py and configs/training.yaml (data.view_shift_limit_mm only). Replaces
+    nothing; the fixed sagittal target stays as the starting point. Report on one
+    batch the mean and largest move in mm and that every other view's pose is bit-identical
+    to the control's. Update SPATIAL_TOKEN_IDENTITY['preparation'].
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The kneecap is whole in a minority of fluid sagittal crops,
+    and the fixed move was clipped.
+  status: retired
+  created_revision: 1
+  seeded: /home/claudio/src/knee-abnormality-side-routed-heads/autoresearch/campaigns/anatomy-recipe/seed-ideas-2.yaml
+  ranking_rationale: 'Block and park the seed at its own implementation review: its
+    one bounded repair returned blocked without changes, and supervisor reconciliation
+    remains absent. The prescribed larger-canvas mask still fails exact parent equality
+    for unaffected turned crops and introduces additional training-step boolean indexing.
+    No further repair is authorized under the exhausted allowance. Supply the complete
+    remaining queue order to resolve the previous report''s ranking rejection; preserve
+    every remaining user seed''s relative order. This blocks the implementation and
+    supplies no numerical evidence against the wider sagittal field.'
+  retired_reason: Replaced by the same seed reworded so the review's activation proof
+    is allowed; no change of mechanism.
+- id: joint-centre-offset-from-the-training-knees
+  mechanism_id: joint-centre-offset
+  parent_idea_id: null
+  title: Remove the joint centre's measured offset and restore the crop targets measured
+    with the true centre
+  opportunity: 'Measured. The map''s joint centre sits in front of and to one side
+    of the plateau centre by the same amount in every run: on the training knees with
+    targets its signed error averages +1.23 mm across and +2.07 mm front to back over
+    the control''s last three epochs (anatomy_centre_error_*_mm_mean in its metrics.csv;
+    +0.94 and +1.74 mm on validation), with a spread of 2.4 and 1.9 mm. The incumbent
+    absorbed it by re-measuring the crop targets on eight validation knees (sagittal
+    4.89, 2.73 mm; coronal -2.08, 2.03 mm) instead of the targets measured with the
+    true centre on the masks (sagittal 7.4, 2.3 mm; coronal -1.1, 1.3 mm), so the
+    crops are framed as before but the sections and regions, which are centred on
+    the same point, stay 1 to 2 mm off. Confirmed independently on 150 validation
+    knees with targets, first look: +1.18 mm across and +2.13 mm front (frame comparison,
+    anatomy-masks run notes). The two sets of targets differ by 2.5 mm forward in
+    sagittal and 1.0 mm across in coronal, which is this offset to within half a millimetre.'
+  mechanism: In KneeAbnormalityModel.anatomical_frames (modeling/model.py) subtract
+    (1.23, 2.07) mm from the across and front coordinates of the bone-weighted centroid
+    before it is projected onto the plane. Set CORONAL_JOINT_TARGET_MM back to (-1.1,
+    1.3) and SAGITTAL_JOINT_TARGET_MM back to (7.4, 2.3). Two constants and one subtraction;
+    nothing else changes.
+  precedents:
+  - 'joint-centre-from-the-map-instead-of-the-spots (the incumbent''s centre): x4
+    level, 0.954 public.'
+  - 'joint-centre-with-equal-view-exposure: moved the centre 0.06 mm and scored like
+    a rerun.'
+  novelty: First centre without its fixed bias, and crop targets from 550 knees instead
+    of eight.
+  coverage: 'Every knee: the regions and sections move by 1 to 2 mm, the crops by
+    the difference between the two sets of targets and the offset, under 1 mm on average.'
+  exploitation: 'Read both multipliers against the control with both menisci and the
+    three OA targets, whose regions are centred on this point. The existing validation
+    metrics anatomy_centre_error_across_mm_mean and anatomy_centre_error_front_mm_mean
+    must fall below 0.5 mm in absolute value. Shown wrong by: either mean above 0.5
+    mm, or the macro below the control at both multipliers.'
+  budget: 'Same cost as the control: within 1.02 of its training time.'
+  implementation: Follow the environment paragraph of the developer instructions.
+    modeling/model.py only. Replaces the two re-measured targets and adds the offset;
+    adds no metric. Report on one batch the mean crop shift in mm against the control's
+    for sagittal and coronal series (expect under 1 mm). Update the view_policy entry
+    of SPATIAL_TOKEN_IDENTITY, which names the targets.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: A measured bias with a two-constant repair; last of the agreed
+    seeds.
+  status: retired
+  created_revision: 1
+  seeded: /home/claudio/src/knee-abnormality-side-routed-heads/autoresearch/campaigns/anatomy-recipe/seed-ideas-2.yaml
+  ranking_rationale: 'Block and park the seed at its own implementation review: its
+    one bounded repair returned blocked without changes, and supervisor reconciliation
+    remains absent. The prescribed larger-canvas mask still fails exact parent equality
+    for unaffected turned crops and introduces additional training-step boolean indexing.
+    No further repair is authorized under the exhausted allowance. Supply the complete
+    remaining queue order to resolve the previous report''s ranking rejection; preserve
+    every remaining user seed''s relative order. This blocks the implementation and
+    supplies no numerical evidence against the wider sagittal field.'
+  retired_reason: Replaced by the same seed reworded so the review's activation proof
+    is allowed; no change of mechanism.
+- id: tokens-on-the-14-by-14-grid
+  mechanism_id: token-grid
+  parent_idea_id: null
+  title: Tokens on the 14 by 14 grid, the stride-16 features summed with the stride-32
+    features
+  opportunity: 'Measured premise, effect a guess. A token of the 7 by 7 grid covers
+    12.0 mm (84 mm crops), 13.3 mm (93 mm crops) and 17.1 mm (120 mm axial views)
+    a side, while the map''s targets are sampled from masks at 1 mm. The classes thinner
+    than a token are the ones the map learns worst: femur 0.905 and tibia 0.899 against
+    joint 0.759, kneecap 0.735 and kneecap joint 0.675 (soft Dice per token, 150 validation
+    knees, prior-work.md). The joint plane, the centre, the sections and every route
+    are read from these shares, so a 6 to 8.6 mm token gives all of them a finer map.
+    Before the masks, finer tokens had nothing to place them: on ReXNet-200 truncation
+    at stride 16 lost 0.0042 and the sum of the two scales tied at +0.0011 with the
+    menisci up (docs/history/stride16-feature-fusion.md); those runs had no anatomy
+    map, no sections and no posed crops.'
+  mechanism: 'In KneeAbnormalityModel (modeling/model.py) the backbone keeps all its
+    stages and weights. The tokens are taken on the grid of layer3 (stride 16, 14
+    by 14 at 224 px): token = P16(layer3 features) + P32(layer4 features) repeated
+    to the 14 by 14 grid by nearest-neighbour upsampling (each stride-32 cell to its
+    four stride-16 cells), where P32 is the existing shared projection to 256 and
+    P16 is a new linear projection of layer3''s channels to 256 with the same initialisation.
+    Everything after the projection (embeddings, LayerNorm, position, the map head,
+    the plane fit, the sections, the routes, the pooling, the first look) runs unchanged
+    on 196 tokens per image instead of 49. The token anchors and footprints come from
+    layer3''s verified geometry: add the stride-16 mapping to BACKBONE_MAPPINGS in
+    modeling/spatial_tokens.py and check it against the layers as the stride-32 one
+    is. The feature statistics augmentation stays at stride 8. The map''s targets
+    are looked up at the new anchors by the existing lookup; nothing in the prepared
+    targets changes.'
+  precedents:
+  - 'fusion-sum (2026-09-22, ReXNet-200, no map): x4 +0.0011, menisci +0.0027, same
+    training time and memory as its control.'
+  - 'stride16 truncation (2026-09-22): x4 -0.0042, menisci +0.0063, the other eight
+    labels -0.0073; the reason this seed keeps the stride-32 term.'
+  novelty: First finer grid with a taught anatomy map, sections and posed crops reading
+    it.
+  coverage: Every study, every view, every token.
+  exploitation: 'Read the macro at both multipliers against the control, then the
+    menisci, the cartilage labels and PF OA. The per-epoch map overlap per class and
+    the joint plane''s error are already logged: compare joint, kneecap and kneecap
+    joint with the control''s 0.759, 0.735 and 0.675 and the plane error with 1.73
+    mm. Shown wrong by: the thin classes'' overlap and the plane error not better
+    than the control''s, or the macro below it at both multipliers.'
+  budget: 'Runs whatever it costs, by the user''s decision of 2026-10-08: the campaign''s
+    ceiling was raised to 2.5 times the control''s training time for this seed alone.
+    The backbone is unchanged and the earlier sum on ReXNet-200 trained in its control''s
+    time, so a step much slower than the control''s points to a defect in the candidate
+    (a loop, a second evaluation, a synchronisation), not to the mechanism: report
+    the candidate''s step time and peak memory against the control''s, and repair
+    what is not the four-fold token count. Do not reduce slices, studies, batch or
+    epochs.'
+  implementation: Follow the environment paragraph of the developer instructions.
+    modeling/model.py and modeling/spatial_tokens.py only. No option selects the 7
+    by 7 grid. Write nothing that loops over tokens or images; the upsampling is one
+    repeat_interleave or nearest interpolate on the projected stride-32 map. Report
+    on one batch the token count per image (196), the anchors of the first two tokens
+    in pixels against layer3's geometry, and that the map's target lookup returns
+    the same class for a token as the mask at its anchor. Update SPATIAL_TOKEN_IDENTITY
+    (projection and token) and the backbone mapping identity.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The map's thin classes are thinner than a token, and everything
+    the recipe routes with is read from them.
+  status: retired
+  created_revision: 2
+  seeded: /home/claudio/src/knee-abnormality-side-routed-heads/autoresearch/campaigns/anatomy-recipe/seed-ideas-3.yaml
+  ranking_rationale: 'Block and park the seed at its own implementation review: its
+    one bounded repair returned blocked without changes, and supervisor reconciliation
+    remains absent. The prescribed larger-canvas mask still fails exact parent equality
+    for unaffected turned crops and introduces additional training-step boolean indexing.
+    No further repair is authorized under the exhausted allowance. Supply the complete
+    remaining queue order to resolve the previous report''s ranking rejection; preserve
+    every remaining user seed''s relative order. This blocks the implementation and
+    supplies no numerical evidence against the wider sagittal field.'
+  retired_reason: Replaced by the same seed reworded so the review's activation proof
+    is allowed; no change of mechanism.
+- id: report-attribute-loss-off-2
+  mechanism_id: report-attribute-weight
+  parent_idea_id: null
+  title: Train without the report-attribute loss
+  opportunity: 'User-ordered on 2026-10-08. A guess. The loss was last measured before
+    the 84/93 mm views and before the anatomy map: removing it cost -0.0006 at x4
+    (80% -0.0011 to -0.0001) and halving it -0.0004 (revisits campaign, docs/modeling/report-attribute-heads.md).
+    The map now draws on the same token features, and three anatomy-masks runs saw
+    Synovitis fall when an auxiliary reading was added (run notes, runs 7 and 8).'
+  mechanism: 'Set trainer.report_attribute_loss_weight: 0 in configs/training.yaml.
+    At zero the training step does not compute the term and validation does not compute
+    its fit; the heads stay in the model untrained. One source addition, for the review''s
+    activation proof only: in training/lightning.py log one validation-only metric
+    through _log_epoch_metric, tied to the existing predicate that skips the report
+    step (one when the step is skipped, zero when it runs). Nothing is added to the
+    training step and no forward pass.'
+  precedents:
+  - 'Removing the heads on ResNet-18, 2026-10-01: -0.0006 at x4.'
+  - 'Adding them, 2026-09-25: +0.00105 at x4, 0.940 public against 0.938.'
+  novelty: First measurement of the loss beside the anatomy map.
+  coverage: Every training study with report answers.
+  exploitation: 'Rule: the loss is removed only if this run is at least the control
+    at both x1 and x4, the campaign''s adoption rule; otherwise 0.1 stays. Read per
+    target Synovitis, Effusion, PF OA and both menisci, and the map''s overlap per
+    class and plane error against the control''s, to see whether the two auxiliary
+    losses compete. Shown wrong by: the run below the control at both multipliers.'
+  budget: 'Slightly cheaper than the control: the report step is about 6 ms of a 245
+    ms training step.'
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    configs/training.yaml (trainer.report_attribute_loss_weight: 0) and the one validation
+    metric in training/lightning.py; no other source change. This replaces the first
+    attempt, which the review blocked because the seed forbade the activation metric;
+    that was a harness block, not a result. Report that no report_attribute loss is
+    logged and that the anatomy and side losses are unchanged on one batch.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Ordered first by the user; settles whether the loss still earns
+    its place.
+  status: completed
+  created_revision: 19
+  seeded: /home/claudio/src/knee-abnormality-side-routed-heads/autoresearch/campaigns/anatomy-recipe/seed-ideas-4.yaml
+  experiments:
+  - report-attribute-loss-off-2-20261008T113545Z-45438523
+  decision: provisional_accept
+- id: coronal-fluid-crops-at-108-mm-2
+  mechanism_id: crop-field
+  parent_idea_id: null
+  title: Cut the posed fluid coronal crops at 108 mm instead of 93.3 mm, leaving T1/PD
+    at 84 mm
+  opportunity: 'User-ordered on 2026-10-08, which lifts the bar on crop widths for
+    this seed. Measured premise, effect a guess. The field comes from the bone extents
+    of the 550 mask knees with the incumbent''s joint target: 108 mm is the field
+    at which the bone edge plus 5 mm is inside on the tighter side for 95% of knees,
+    against 45% at 93.3 mm and 87% at 103.7 mm; the fibular head is inside for 93%
+    against 57%. The 5 mm for the collateral ligaments is an assumption. Past 108
+    mm almost nothing is left to gain (99% at 112 mm). Checked on the validation fold
+    with the control''s weights: the 108 mm posed crop lies inside the acquired image
+    for 99.75% of its area, 1.9% of slices under 95% (5.6% at 120 mm); examples in
+    outputs/analysis/a/anatomy-masks-field/fluid-fields/coronal-fluid.png. The run that
+    widened both coronal series to 93.3 and 103.7 mm was level at x4 (+0.00015) with
+    MCL +0.0015, Contusion +0.0013 and the menisci unharmed (anatomy-masks run 11).
+    The pixel goes from 0.417 to 0.482 mm, finer than the axial views'' 0.536 mm.'
+  mechanism: One zoom factor s = 108 / 93.333 for the fluid coronal view only. In
+    ViewWindows (modeling/model.py) its posed cut samples the canvas on a grid whose
+    pixel pitch is s canvas pixels, in the same bicubic resampling as the turn; crop_affine
+    carries the scale; the joint target keeps its offset in mm, so geometry divides
+    it by s in crop pixels; that view is always resampled. Set data.view_shift_limit_mm
+    to 24.5 and replace MAX_VIEW_SHIFT_FRACTION * margin in frame_pose and jitter
+    by a per-view limit in canvas pixels, min(margin - (s - 1) * image_size / 2 -
+    0.25 * round(17 mm / pixel pitch), 0.75 * round(17 mm / pixel pitch)), so every
+    view keeps today's 12.75 mm of shift and today's 4.25 mm of slack to the canvas
+    edge. All other views, the first look, slice counts and image size do not change.
+  precedents:
+  - 'coronal-crops-a-ninth-wider (anatomy-masks run 11): both coronal series wider,
+    x4 +0.00015, x1 -0.00037.'
+  novelty: First wider field on one contrast of a plane.
+  coverage: Every fluid coronal series.
+  exploitation: 'Read both multipliers against the control with MCL, Contusion, Fracture,
+    Medial OA, Lateral OA and both menisci, and on validation only the share of fluid
+    coronal series at the shift limit. Shown wrong by: MCL and Contusion both below
+    the control at x4, or the macro below at both multipliers.'
+  budget: Canvases 354 and 342 px against 314 and 306, about 27% larger in area; training
+    within 1.08 of the control, from the canvases only (an estimate from the 20% larger
+    canvases of anatomy-masks runs 10 and 11, which cost 5 to 7%).
+  implementation: Follow the environment paragraph of the developer instructions.
+    modeling/model.py and configs/training.yaml (data.view_shift_limit_mm only). Replaces
+    the fluid coronal crop at its own field; no flag selects the old one. The run
+    of anatomy-masks that did this for both coronal series is in outputs/autoresearch/anatomy-masks/experiments/coronal-crops-a-ninth-wider-*/changes.diff,
+    including the validity-rectangle repair its review asked for; apply it to one
+    view. Report the field in mm of a fluid coronal crop from its corner tokens (expect
+    108.0) and that every other view's crops are bit-identical to the control's at
+    the same pose. Update SPATIAL_TOKEN_IDENTITY['preparation'].
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The half of the coronal field run that carried its gains, at
+    half its cost.
+  status: completed
+  created_revision: 74
+  seeded: /home/claudio/src/knee-abnormality-side-routed-heads/autoresearch/campaigns/anatomy-recipe/seed-ideas-5.yaml
+  ranking_rationale: Block and park the sagittal seed because its bounded cost repair
+    remains unresolved. Direct inspection confirms both bicubic samplers execute before
+    output selection; zero-angle unaffected slices discard both results. This violates
+    the explicit cost discipline regardless of eventual runtime. The repair workspace
+    is identical to the preceding candidate source. The one bounded repair is exhausted.
+    The full ranking removes only the blocked seed and preserves every remaining queue
+    entry in its existing order, correcting the previous report's rejected queue representation.
+  experiments:
+  - coronal-fluid-crops-at-108-mm-2-20261008T125159Z-a6380fd8
+  decision: reject
+- id: sagittal-fluid-crops-at-112-mm-2
+  mechanism_id: crop-field
+  parent_idea_id: null
+  title: Cut the posed fluid sagittal crops at 112 mm, 0.5 mm per pixel, leaving T1/PD
+    at 84 mm
+  opportunity: 'User-ordered on 2026-10-08, which lifts the bar on crop widths for
+    this seed. Measured premise, effect a guess. On the 550 mask knees with the incumbent''s
+    joint target the kneecap''s front is inside the fluid sagittal crop for 20% of
+    knees at 93.3 mm, 59% at 103.7 mm, 83% at 112 mm and 97% at 120 mm (whole kneecap
+    8%, 36%, 65%, 87%): coverage rises all the way to 120 mm, so the extents alone
+    set no value. 112 mm is taken because it is 0.5 mm per pixel, the most common
+    acquired resolution, so half the series are still fully resolved; 120 mm is the
+    field smart-crops replaced with 93 mm for +0.0005 to +0.0007. Checked on the validation
+    fold with the control''s weights: the 112 mm posed crop lies inside the acquired
+    image for 99.73% of its area, 1.6% of slices under 95% (4.7% at 120 mm); examples
+    in outputs/analysis/a/anatomy-masks-field/fluid-fields/sagittal-fluid.png. The run
+    that widened both sagittal series gained on Baker''s (+0.0024, interval above
+    zero) and PF OA (+0.0017) and lost on Lateral Meniscus (-0.0029) and ACL (-0.0012),
+    which the T1/PD series carries (anatomy-masks run 10).'
+  mechanism: One zoom factor s = 112 / 93.333 for the fluid sagittal view only. In
+    ViewWindows (modeling/model.py) its posed cut samples the canvas on a grid whose
+    pixel pitch is s canvas pixels, in the same bicubic resampling as the turn; crop_affine
+    carries the scale; the joint target keeps its offset in mm, so geometry divides
+    it by s in crop pixels; that view is always resampled. Set data.view_shift_limit_mm
+    to 26.5 and replace MAX_VIEW_SHIFT_FRACTION * margin in frame_pose and jitter
+    by a per-view limit in canvas pixels, min(margin - (s - 1) * image_size / 2 -
+    0.25 * round(17 mm / pixel pitch), 0.75 * round(17 mm / pixel pitch)), so every
+    view keeps today's 12.75 mm of shift and today's 4.25 mm of slack to the canvas
+    edge. All other views, the first look, slice counts and image size do not change.
+  precedents:
+  - 'sagittal-crops-a-ninth-wider (anatomy-masks run 10): both sagittal series wider,
+    x4 -0.0006, x1 -0.0005.'
+  novelty: First wider sagittal field that leaves the T1/PD series at its detail.
+  coverage: Every fluid sagittal series.
+  exploitation: 'Read both multipliers against the control with Baker''s, PF OA, Effusion,
+    Synovitis, Lateral Meniscus and ACL, and on validation only the share of kneecap
+    and kneecap-joint tokens per fluid sagittal image and the share of those series
+    at the shift limit. Shown wrong by: Baker''s and PF OA both below the control
+    at x4, or Lateral Meniscus and ACL both below it by more than one sibling SD.'
+  budget: Canvases 366 and 352 px against 314 and 306, about 35% larger in area; training
+    within 1.1 of the control, from the canvases only (an estimate from the 20% larger
+    canvases of anatomy-masks runs 10 and 11, which cost 5 to 7%).
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    modeling/model.py and configs/training.yaml (data.view_shift_limit_mm only). Replaces
+    the fluid sagittal crop at its own field. Start from outputs/autoresearch/anatomy-masks/experiments/sagittal-crops-a-ninth-wider-*/changes.diff
+    (the second, repaired candidate) and apply it to one view. Report the field in
+    mm of a fluid sagittal crop (expect 112.0) and that every other view''s crops
+    are bit-identical to the control''s at the same pose. Update SPATIAL_TOKEN_IDENTITY[''preparation''].
+    This replaces the first attempt, blocked at review because it ran two full-batch
+    bicubic samplings on every step and discarded most of both with torch.where; that
+    was a harness block, not a result. Cut the crops in one pass as the incumbent
+    does: keep the exact integer sample_windows cut for every slice, then resample
+    once, with one bicubic grid_sample, only the slices selected by the incumbent''s
+    existing selection extended to (turned or of the widened view), using an affine
+    that carries the view''s scale. To keep the unwidened views identical on the larger
+    canvas, multiply the selected canvases once by a per-view mask that zeroes what
+    lies beyond their former margin before that single sampling. No second sampling,
+    no parent canvas copy, no torch.where between two full results.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Keeps the gain of the sagittal field run and drops what paid
+    for it.
+  status: blocked
+  created_revision: 101
+  seeded: /home/claudio/src/knee-abnormality-side-routed-heads/autoresearch/campaigns/anatomy-recipe/seed-ideas-6.yaml
+  experiments:
+  - sagittal-fluid-crops-at-112-mm-2-20261008T130433Z-ea8b1660
+  - sagittal-fluid-crops-at-112-mm-2-20261008T131131Z-f296017f
+  blocked_reason: 'Block and park the seed at its own implementation review: its one
+    bounded repair returned blocked without changes, and supervisor reconciliation
+    remains absent. The prescribed larger-canvas mask still fails exact parent equality
+    for unaffected turned crops and introduces additional training-step boolean indexing.
+    No further repair is authorized under the exhausted allowance. Supply the complete
+    remaining queue order to resolve the previous report''s ranking rejection; preserve
+    every remaining user seed''s relative order. This blocks the implementation and
+    supplies no numerical evidence against the wider sagittal field.'
+- id: sagittal-fluid-crops-at-112-mm-3
+  mechanism_id: crop-field
+  parent_idea_id: null
+  title: Cut the posed fluid sagittal crops at 112 mm, 0.5 mm per pixel, leaving T1/PD
+    at 84 mm
+  opportunity: 'User-ordered on 2026-10-08, which lifts the bar on crop widths for
+    this seed. Measured premise, effect a guess. On the 550 mask knees with the incumbent''s
+    joint target the kneecap''s front is inside the fluid sagittal crop for 20% of
+    knees at 93.3 mm, 59% at 103.7 mm, 83% at 112 mm and 97% at 120 mm (whole kneecap
+    8%, 36%, 65%, 87%): coverage rises all the way to 120 mm, so the extents alone
+    set no value. 112 mm is taken because it is 0.5 mm per pixel, the most common
+    acquired resolution, so half the series are still fully resolved; 120 mm is the
+    field smart-crops replaced with 93 mm for +0.0005 to +0.0007. Checked on the validation
+    fold with the control''s weights: the 112 mm posed crop lies inside the acquired
+    image for 99.73% of its area, 1.6% of slices under 95% (4.7% at 120 mm); examples
+    in outputs/analysis/a/anatomy-masks-field/fluid-fields/sagittal-fluid.png. The run
+    that widened both sagittal series gained on Baker''s (+0.0024, interval above
+    zero) and PF OA (+0.0017) and lost on Lateral Meniscus (-0.0029) and ACL (-0.0012),
+    which the T1/PD series carries (anatomy-masks run 10).'
+  mechanism: One zoom factor s = 112 / 93.333 for the fluid sagittal view only. In
+    ViewWindows (modeling/model.py) its posed cut samples the canvas on a grid whose
+    pixel pitch is s canvas pixels, in the same bicubic resampling as the turn; crop_affine
+    carries the scale; the joint target keeps its offset in mm, so geometry divides
+    it by s in crop pixels; that view is always resampled. Set data.view_shift_limit_mm
+    to 26.5 and replace MAX_VIEW_SHIFT_FRACTION * margin in frame_pose and jitter
+    by a per-view limit in canvas pixels, min(margin - (s - 1) * image_size / 2 -
+    0.25 * round(17 mm / pixel pitch), 0.75 * round(17 mm / pixel pitch)), so every
+    view keeps today's 12.75 mm of shift and today's 4.25 mm of slack to the canvas
+    edge. All other views, the first look, slice counts and image size do not change.
+  precedents:
+  - 'sagittal-crops-a-ninth-wider (anatomy-masks run 10): both sagittal series wider,
+    x4 -0.0006, x1 -0.0005.'
+  novelty: First wider sagittal field that leaves the T1/PD series at its detail.
+  coverage: Every fluid sagittal series.
+  exploitation: 'Read both multipliers against the control with Baker''s, PF OA, Effusion,
+    Synovitis, Lateral Meniscus and ACL, and on validation only the share of kneecap
+    and kneecap-joint tokens per fluid sagittal image and the share of those series
+    at the shift limit. Shown wrong by: Baker''s and PF OA both below the control
+    at x4, or Lateral Meniscus and ACL both below it by more than one sibling SD.'
+  budget: Canvases 366 and 352 px against 314 and 306, about 35% larger in area; training
+    within 1.1 of the control, from the canvases only (an estimate from the 20% larger
+    canvases of anatomy-masks runs 10 and 11, which cost 5 to 7%).
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    modeling/model.py and configs/training.yaml (data.view_shift_limit_mm only). Replaces
+    the fluid sagittal crop at its own field. Start from outputs/autoresearch/anatomy-masks/experiments/sagittal-crops-a-ninth-wider-*/changes.diff
+    (the second, repaired candidate) and apply it to one view. Report the field in
+    mm of a fluid sagittal crop (expect 112.0) and that every other view''s crops
+    are bit-identical to the control''s at the same pose. Update SPATIAL_TOKEN_IDENTITY[''preparation''].
+    This replaces two attempts blocked at review on the cut''s cost and on exact equality
+    of the unwidened views; both were harness blocks, not results. Use the cut the
+    review approved for the coronal seed, whose frozen source is at /home/claudio/src/knee-abnormality/outputs/autoresearch/anatomy-recipe/experiments/coronal-fluid-crops-at-108-mm-2-20261008T125159Z-a6380fd8/source
+    (changes.diff beside it): the widened view''s series and the other series are
+    listed once in the collate, the other series keep the exact integer cut and, when
+    turned, one bicubic sampling from a window of their former canvas size, and the
+    widened series get one bicubic sampling with the scaled affine. Apply the same
+    code to the fluid sagittal view at 112 mm with its own margin instead of the fluid
+    coronal view at 108 mm; if the incumbent already contains that coronal code, extend
+    its view lists and scale table to both views instead of copying it. Each slice
+    is sampled once; no torch.where between two full results and no boolean-mask indexing
+    beyond what that approved cut already has.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Keeps the gain of the sagittal field run and drops what paid
+    for it.
+  status: completed
+  created_revision: 126
+  seeded: /home/claudio/src/knee-abnormality-side-routed-heads/autoresearch/campaigns/anatomy-recipe/seed-ideas-6.yaml
+  experiments:
+  - sagittal-fluid-crops-at-112-mm-3-20261008T133213Z-03c420a9
+  decision: reject
+- id: kneecap-inside-the-fluid-sagittal-crop-per-knee-2
+  mechanism_id: crop-target-position
+  parent_idea_id: null
+  title: Move the fluid sagittal crop forward only as far as each knee's kneecap needs
+  opportunity: 'Measured premise, effect a guess. The kneecap''s front lies 55.9 mm
+    in front of the plateau centre (sd 5.3) and the 93 mm fluid sagittal crop reaches
+    51.6 mm with the incumbent''s joint target; a fixed move of 8.6 mm for every knee
+    put 38% of the fluid sagittal series at the shift limit and scored x4 -0.0005
+    (anatomy-masks run 7). Checked on the validation fold with the control''s weights
+    (prior-work.md, Premise checks): the first look predicts kneecap tokens in every
+    knee; the share-weighted mean front coordinate of the kneecap share tracks the
+    mask''s kneecap front with correlation 0.67 on 150 knees (the largest front coordinate
+    among kneecap tokens: 0.56) and lies 11.9 mm behind it on average, leaving a residual
+    of 3.9 mm against 5.3 mm for a constant. The move a knee needs is 7.4 mm on average
+    (p90 14.3) and positive for 93% of knees, on top of pose shifts with a spread
+    of 4 mm, so inside today''s 12.75 mm limit it would be clipped as the fixed move
+    was.'
+  mechanism: In KneeAbnormalityModel.first_look_pose (modeling/model.py), after the
+    frame is fitted, take per study the mean front coordinate, in the frame, of the
+    first look's tokens weighted by their detached kneecap share (valid, routable
+    tokens of every view), add 11.9 mm, and subtract the fluid sagittal crop's forward
+    reach (half the field plus the sagittal target's forward offset). Where the result
+    is positive, shift the fluid sagittal view's crop forward by it in the same call
+    of frame_pose, before the clamp. Set data.view_shift_limit_mm to 22.5 and give
+    the fluid sagittal view the limit 0.75 * margin (16.9 mm) while every other view
+    keeps today's 12.75 mm, as min(0.75 * margin, 0.75 * round(17 mm / pixel pitch))
+    in canvas pixels. One weighted mean over tensors the first look already holds;
+    no extra pass. T1/PD sagittal, coronal and axial crops do not change.
+  precedents:
+  - 'fluid-sagittal-crops-moved-forward-for-the-kneecap (anatomy-masks run 7): fixed
+    8.6 mm, 38% at the limit, x4 -0.0005.'
+  novelty: First crop move set by the knee's own kneecap.
+  coverage: The fluid sagittal series of knees whose kneecap reaches the crop's front
+    edge.
+  exploitation: 'Read PF OA, Effusion and Synovitis at both multipliers against the
+    control. On validation only, log the mean forward move in mm, the share of fluid
+    sagittal series moved and the share at the shift limit (three metrics). Shown
+    wrong by: more than 20% of fluid sagittal series at the shift limit, or PF OA
+    and Effusion both below the control at x4.'
+  budget: Canvases about a fifth larger in area for the sagittal and coronal series;
+    training within 1.08 of the control, from the canvases only.
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    modeling/model.py and configs/training.yaml (data.view_shift_limit_mm only). Replaces
+    nothing; the fixed sagittal target stays as the starting point. Report on one
+    batch the mean and largest move in mm and that every other view''s pose is bit-identical
+    to the control''s. Update SPATIAL_TOKEN_IDENTITY[''preparation'']. The review
+    asks every candidate for a logged proof that its change is active: add exactly
+    one validation-only metric for it through _log_epoch_metric in training/lightning.py
+    (the mean forward move applied to the fluid sagittal crop, in mm); that file may
+    be edited for this metric alone. Nothing is added to the training step. For the
+    larger canvas, reuse the cut the review approved for the coronal field seed, frozen
+    at /home/claudio/src/knee-abnormality/outputs/autoresearch/anatomy-recipe/experiments/coronal-fluid-crops-at-108-mm-2-20261008T125159Z-a6380fd8/source
+    (changes.diff beside it): the views with their own margin are listed once in the
+    collate (data/dataset.py may be edited for that list), the other series are cut
+    from a window of their former canvas size so they stay bit-identical, and each
+    slice is sampled once. Here no view is rescaled; only the fluid sagittal view''s
+    shift limit grows.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The kneecap is whole in a minority of fluid sagittal crops,
+    and the fixed move was clipped.
+  status: completed
+  created_revision: 157
+  seeded: /home/claudio/src/knee-abnormality-side-routed-heads/autoresearch/campaigns/anatomy-recipe/seed-ideas-7.yaml
+  experiments:
+  - kneecap-inside-the-fluid-sagittal-crop-per-knee-2-20261008T135751Z-53172af5
+  - kneecap-inside-the-fluid-sagittal-crop-per-knee-2-20261008T140718Z-ee3d2052
+  decision: reject
+- id: joint-centre-offset-from-the-training-knees-2
+  mechanism_id: joint-centre-offset
+  parent_idea_id: null
+  title: Remove the joint centre's measured offset and restore the crop targets measured
+    with the true centre
+  opportunity: 'Measured. The map''s joint centre sits in front of and to one side
+    of the plateau centre by the same amount in every run: on the training knees with
+    targets its signed error averages +1.23 mm across and +2.07 mm front to back over
+    the control''s last three epochs (anatomy_centre_error_*_mm_mean in its metrics.csv;
+    +0.94 and +1.74 mm on validation), with a spread of 2.4 and 1.9 mm. The incumbent
+    absorbed it by re-measuring the crop targets on eight validation knees (sagittal
+    4.89, 2.73 mm; coronal -2.08, 2.03 mm) instead of the targets measured with the
+    true centre on the masks (sagittal 7.4, 2.3 mm; coronal -1.1, 1.3 mm), so the
+    crops are framed as before but the sections and regions, which are centred on
+    the same point, stay 1 to 2 mm off. Confirmed independently on 150 validation
+    knees with targets, first look: +1.18 mm across and +2.13 mm front (frame comparison,
+    anatomy-masks run notes). The two sets of targets differ by 2.5 mm forward in
+    sagittal and 1.0 mm across in coronal, which is this offset to within half a millimetre.'
+  mechanism: In KneeAbnormalityModel.anatomical_frames (modeling/model.py) subtract
+    (1.23, 2.07) mm from the across and front coordinates of the bone-weighted centroid
+    before it is projected onto the plane. Set CORONAL_JOINT_TARGET_MM back to (-1.1,
+    1.3) and SAGITTAL_JOINT_TARGET_MM back to (7.4, 2.3). Two constants and one subtraction;
+    nothing else changes.
+  precedents:
+  - 'joint-centre-from-the-map-instead-of-the-spots (the incumbent''s centre): x4
+    level, 0.954 public.'
+  - 'joint-centre-with-equal-view-exposure: moved the centre 0.06 mm and scored like
+    a rerun.'
+  novelty: First centre without its fixed bias, and crop targets from 550 knees instead
+    of eight.
+  coverage: 'Every knee: the regions and sections move by 1 to 2 mm, the crops by
+    the difference between the two sets of targets and the offset, under 1 mm on average.'
+  exploitation: 'Read both multipliers against the control with both menisci and the
+    three OA targets, whose regions are centred on this point. The existing validation
+    metrics anatomy_centre_error_across_mm_mean and anatomy_centre_error_front_mm_mean
+    must fall below 0.5 mm in absolute value. Shown wrong by: either mean above 0.5
+    mm, or the macro below the control at both multipliers.'
+  budget: 'Same cost as the control: within 1.02 of its training time.'
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    modeling/model.py only. Replaces the two re-measured targets and adds the offset;
+    adds no metric to the training step. Report on one batch the mean crop shift in
+    mm against the control''s for sagittal and coronal series (expect under 1 mm).
+    Update the view_policy entry of SPATIAL_TOKEN_IDENTITY, which names the targets.
+    The review asks every candidate for a logged proof that its change is active:
+    add exactly one validation-only metric for it through _log_epoch_metric in training/lightning.py
+    (the mean across and front offset subtracted from the centroid, in mm, read from
+    the tensors the frame already holds); that file may be edited for this metric
+    alone. Nothing is added to the training step.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: A measured bias with a two-constant repair; last of the agreed
+    seeds.
+  status: launched
+  created_revision: 157
+  seeded: /home/claudio/src/knee-abnormality-side-routed-heads/autoresearch/campaigns/anatomy-recipe/seed-ideas-7.yaml
+  experiments:
+  - joint-centre-offset-from-the-training-knees-2-20261008T145050Z-2e74b638
+- id: tokens-on-the-14-by-14-grid-2
+  mechanism_id: token-grid
+  parent_idea_id: null
+  title: Tokens on the 14 by 14 grid, the stride-16 features summed with the stride-32
+    features
+  opportunity: 'Measured premise, effect a guess. A token of the 7 by 7 grid covers
+    12.0 mm (84 mm crops), 13.3 mm (93 mm crops) and 17.1 mm (120 mm axial views)
+    a side, while the map''s targets are sampled from masks at 1 mm. The classes thinner
+    than a token are the ones the map learns worst: femur 0.905 and tibia 0.899 against
+    joint 0.759, kneecap 0.735 and kneecap joint 0.675 (soft Dice per token, 150 validation
+    knees, prior-work.md). The joint plane, the centre, the sections and every route
+    are read from these shares, so a 6 to 8.6 mm token gives all of them a finer map.
+    Before the masks, finer tokens had nothing to place them: on ReXNet-200 truncation
+    at stride 16 lost 0.0042 and the sum of the two scales tied at +0.0011 with the
+    menisci up (docs/history/stride16-feature-fusion.md); those runs had no anatomy
+    map, no sections and no posed crops.'
+  mechanism: 'In KneeAbnormalityModel (modeling/model.py) the backbone keeps all its
+    stages and weights. The tokens are taken on the grid of layer3 (stride 16, 14
+    by 14 at 224 px): token = P16(layer3 features) + P32(layer4 features) repeated
+    to the 14 by 14 grid by nearest-neighbour upsampling (each stride-32 cell to its
+    four stride-16 cells), where P32 is the existing shared projection to 256 and
+    P16 is a new linear projection of layer3''s channels to 256 with the same initialisation.
+    Everything after the projection (embeddings, LayerNorm, position, the map head,
+    the plane fit, the sections, the routes, the pooling, the first look) runs unchanged
+    on 196 tokens per image instead of 49. The token anchors and footprints come from
+    layer3''s verified geometry: add the stride-16 mapping to BACKBONE_MAPPINGS in
+    modeling/spatial_tokens.py and check it against the layers as the stride-32 one
+    is. The feature statistics augmentation stays at stride 8. The map''s targets
+    are looked up at the new anchors by the existing lookup; nothing in the prepared
+    targets changes.'
+  precedents:
+  - 'fusion-sum (2026-09-22, ReXNet-200, no map): x4 +0.0011, menisci +0.0027, same
+    training time and memory as its control.'
+  - 'stride16 truncation (2026-09-22): x4 -0.0042, menisci +0.0063, the other eight
+    labels -0.0073; the reason this seed keeps the stride-32 term.'
+  novelty: First finer grid with a taught anatomy map, sections and posed crops reading
+    it.
+  coverage: Every study, every view, every token.
+  exploitation: 'Read the macro at both multipliers against the control, then the
+    menisci, the cartilage labels and PF OA. The per-epoch map overlap per class and
+    the joint plane''s error are already logged: compare joint, kneecap and kneecap
+    joint with the control''s 0.759, 0.735 and 0.675 and the plane error with 1.73
+    mm. Shown wrong by: the thin classes'' overlap and the plane error not better
+    than the control''s, or the macro below it at both multipliers.'
+  budget: 'Runs whatever it costs, by the user''s decision of 2026-10-08: the campaign''s
+    ceiling was raised to 2.5 times the control''s training time for this seed alone.
+    The backbone is unchanged and the earlier sum on ReXNet-200 trained in its control''s
+    time, so a step much slower than the control''s points to a defect in the candidate
+    (a loop, a second evaluation, a synchronisation), not to the mechanism: report
+    the candidate''s step time and peak memory against the control''s, and repair
+    what is not the four-fold token count. Do not reduce slices, studies, batch or
+    epochs.'
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    modeling/model.py and modeling/spatial_tokens.py only. No option selects the 7
+    by 7 grid. Write nothing that loops over tokens or images; the upsampling is one
+    repeat_interleave or nearest interpolate on the projected stride-32 map. Report
+    on one batch the token count per image (196), the anchors of the first two tokens
+    in pixels against layer3''s geometry, and that the map''s target lookup returns
+    the same class for a token as the mask at its anchor. Update SPATIAL_TOKEN_IDENTITY
+    (projection and token) and the backbone mapping identity. The review asks every
+    candidate for a logged proof that its change is active: add exactly one validation-only
+    metric for it through _log_epoch_metric in training/lightning.py (the number of
+    tokens per image); that file may be edited for this metric alone. Nothing is added
+    to the training step.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The map's thin classes are thinner than a token, and everything
+    the recipe routes with is read from them.
+  status: developing
+  created_revision: 157
+  seeded: /home/claudio/src/knee-abnormality-side-routed-heads/autoresearch/campaigns/anatomy-recipe/seed-ideas-7.yaml
+  experiments:
+  - tokens-on-the-14-by-14-grid-2-20261008T151637Z-eeae308c
+- id: crop-size-per-knee-from-the-first-look
+  mechanism_id: crop-field-per-knee
+  parent_idea_id: null
+  title: Size the sagittal and coronal crops to each knee, from the first look
+  opportunity: 'User-ordered on 2026-10-08. Measured premise, effect a guess. Knee
+    size varies by 8.0% across knees (550 mask knees: femur width 73.7 mm sd 6.3,
+    5th to 95th percentile 65.0 to 83.9; femur back to kneecap front moves with it,
+    correlation 0.76), and the scanner''s field does not normalise it (correlation
+    0.15, 2% of the size variance). With fixed fields the share of the crop a knee''s
+    bones fill varies by 8.7% in the coronal views and 8.2% in the sagittal views.
+    The first look estimates the size from the model alone: on the 150 validation
+    knees of fold 1 with the incumbent''s weights the estimate below correlates 0.939
+    with the masks'' size, residual 2.1 mm (2.8%), and scaling by it brings the fill''s
+    spread to 3.8% (coronal) and 4.1% (sagittal). Widening a view for every knee lost
+    (run 3: x4 -0.0017); here the mean scale is 1, so the average knee keeps today''s
+    crop and resolution. Measurements, tables and drawings: outputs/analysis/k/knee-size-crops/
+    in the campaign root (/home/claudio/src/knee-abnormality-side-routed-heads), q3-constants.json
+    for the constants.'
+  mechanism: 'In the no-gradient first look (KneeAbnormalityModel.first_look_pose,
+    modeling/model.py), after the frame is fitted, compute one size per study from
+    tensors it already holds: position (medial, front, up, in mm in the fitted frame),
+    the detached anatomy shares, valid = visual_valid and routable, and the image
+    plane. Width spread sd_m: weighted standard deviation of the medial coordinate
+    with weights valid * (plane is axial or coronal) * (femur share * [-5 < up < 45]
+    + tibia share * [-30 < up < 5]). Depth spread sd_f: weighted standard deviation
+    of the front coordinate with weights valid * (plane is axial or sagittal) * femur
+    share * exp(-0.5 * ((up - 20) / 20)^2). size = sqrt(sd_m * sd_f); scale = clamp(size
+    / 17.087, 0.87, 1.13), and 1.0 when either weight sum is zero. The scale is one
+    number per knee and multiplies the field of the four sagittal and coronal views
+    (84 mm views become 73.1 to 94.9 mm, 93.3 mm views 81.2 to 105.5 mm); axial views
+    are untouched. It enters the same affine that shifts and turns the crop, as scale
+    times the rotation with the joint''s target offset kept in mm, so each slice is
+    still sampled once. Set data.view_shift_limit_mm to 23.5 (17 + 0.13 * 93.33 /
+    2) and keep every view''s shift limit in mm at today''s value. Token positions
+    stay in true millimetres through the crop''s affine, so nothing else is told the
+    scale. The first look itself is cut at scale 1 as today.'
+  precedents:
+  - 'coronal-fluid-crops-at-108-mm-2 (run 3): one view wider for every knee, x4 -0.0017,
+    x1 -0.0018; its cut with a scale inside the affine passed review.'
+  - 'Knee-size study of 2026-10-08 (outputs/analysis/k/knee-size-crops): estimator against
+    masks r 0.939 on 150 knees; 5.3% of knees reach the clamp.'
+  novelty: First crop whose field in millimetres follows the knee; every earlier field
+    was one constant per view.
+  coverage: Every study; the four sagittal and coronal views.
+  exploitation: 'Read the macro at both multipliers against the incumbent, then per
+    label, and separately the smallest and largest thirds of knees by the logged scale
+    if the comparison allows. Shown wrong by: the macro below the incumbent at both
+    multipliers with the scale confirmed active.'
+  budget: Canvases 21 to 24% larger in area for the sagittal and coronal series and
+    nearly every slice of those views resampled once, where today only turned slices
+    are. Training up to 1.2 times the incumbent's time from those two causes only;
+    report the step time against the incumbent's and remove anything else.
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    modeling/model.py, configs/training.yaml (data.view_shift_limit_mm only), data/dataset.py
+    only if the cut needs the series of each view listed in the collate, and training/lightning.py
+    for the metrics below only. Reuse the cut the review approved for the coronal
+    field seed, frozen at /home/claudio/src/knee-abnormality/outputs/autoresearch/anatomy-recipe/experiments/coronal-fluid-crops-at-108-mm-2-20261008T125159Z-a6380fd8/source
+    (changes.diff beside it): replace its per-view scale constant by the per-knee
+    scale for the four sagittal and coronal views, keep the axial series on the exact
+    integer cut, sample each slice once, and add no torch.where between two full results.
+    The size is computed once per study inside the existing first look, with masked
+    sums on tensors already there: no loop over studies, no second evaluation of the
+    pose or the frame, no extra forward pass. The review asks for a logged proof that
+    the change is active: log on validation only, through _log_epoch_metric, the mean
+    and the standard deviation across knees of the applied scale and the fraction
+    of knees at a clamp (three metrics; expect a mean near 1.00, a deviation near
+    0.07 and about 5% clamped; the reference 17.087 was measured on validation knees,
+    so say what the mean is on the first epoch). Report on one batch that a study
+    given scale 1 yields crops equal to the incumbent''s within one grey level, and
+    that axial crops are bit-identical. Update the view_policy entry of SPATIAL_TOKEN_IDENTITY.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Ordered by the user to run as soon as possible; the size estimate
+    is measured and the cut already passed review.
+  status: completed
+  created_revision: 179
+  seeded: /home/claudio/src/knee-abnormality-side-routed-heads/autoresearch/campaigns/anatomy-recipe/seed-ideas-8.yaml
+  experiments:
+  - crop-size-per-knee-from-the-first-look-20261008T142500Z-b991b6e5
+  - crop-size-per-knee-from-the-first-look-20261008T143648Z-ea93063b
+  decision: reject

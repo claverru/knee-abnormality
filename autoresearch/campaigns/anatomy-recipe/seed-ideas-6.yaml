@@ -1,0 +1,56 @@
+ideas:
+- id: sagittal-fluid-crops-at-112-mm-3
+  mechanism_id: crop-field
+  parent_idea_id: null
+  title: Cut the posed fluid sagittal crops at 112 mm, 0.5 mm per pixel, leaving T1/PD at 84 mm
+  opportunity: 'User-ordered on 2026-10-08, which lifts the bar on crop widths for this seed. Measured
+    premise, effect a guess. On the 550 mask knees with the incumbent''s joint target the kneecap''s front
+    is inside the fluid sagittal crop for 20% of knees at 93.3 mm, 59% at 103.7 mm, 83% at 112 mm and
+    97% at 120 mm (whole kneecap 8%, 36%, 65%, 87%): coverage rises all the way to 120 mm, so the extents
+    alone set no value. 112 mm is taken because it is 0.5 mm per pixel, the most common acquired resolution,
+    so half the series are still fully resolved; 120 mm is the field smart-crops replaced with 93 mm for
+    +0.0005 to +0.0007. Checked on the validation fold with the control''s weights: the 112 mm posed crop
+    lies inside the acquired image for 99.73% of its area, 1.6% of slices under 95% (4.7% at 120 mm);
+    examples in outputs/analysis/a/anatomy-masks-field/fluid-fields/sagittal-fluid.png. The run that widened
+    both sagittal series gained on Baker''s (+0.0024, interval above zero) and PF OA (+0.0017) and lost
+    on Lateral Meniscus (-0.0029) and ACL (-0.0012), which the T1/PD series carries (anatomy-masks run
+    10).'
+  mechanism: One zoom factor s = 112 / 93.333 for the fluid sagittal view only. In ViewWindows (modeling/model.py)
+    its posed cut samples the canvas on a grid whose pixel pitch is s canvas pixels, in the same bicubic
+    resampling as the turn; crop_affine carries the scale; the joint target keeps its offset in mm, so
+    geometry divides it by s in crop pixels; that view is always resampled. Set data.view_shift_limit_mm
+    to 26.5 and replace MAX_VIEW_SHIFT_FRACTION * margin in frame_pose and jitter by a per-view limit
+    in canvas pixels, min(margin - (s - 1) * image_size / 2 - 0.25 * round(17 mm / pixel pitch), 0.75
+    * round(17 mm / pixel pitch)), so every view keeps today's 12.75 mm of shift and today's 4.25 mm of
+    slack to the canvas edge. All other views, the first look, slice counts and image size do not change.
+  precedents:
+  - 'sagittal-crops-a-ninth-wider (anatomy-masks run 10): both sagittal series wider, x4 -0.0006, x1 -0.0005.'
+  novelty: First wider sagittal field that leaves the T1/PD series at its detail.
+  coverage: Every fluid sagittal series.
+  exploitation: 'Read both multipliers against the control with Baker''s, PF OA, Effusion, Synovitis,
+    Lateral Meniscus and ACL, and on validation only the share of kneecap and kneecap-joint tokens per
+    fluid sagittal image and the share of those series at the shift limit. Shown wrong by: Baker''s and
+    PF OA both below the control at x4, or Lateral Meniscus and ACL both below it by more than one sibling
+    SD.'
+  budget: Canvases 366 and 352 px against 314 and 306, about 35% larger in area; training within 1.1 of
+    the control, from the canvases only (an estimate from the 20% larger canvases of anatomy-masks runs
+    10 and 11, which cost 5 to 7%).
+  implementation: 'Follow the environment paragraph of the developer instructions. modeling/model.py and
+    configs/training.yaml (data.view_shift_limit_mm only). Replaces the fluid sagittal crop at its own
+    field. Start from outputs/autoresearch/anatomy-masks/experiments/sagittal-crops-a-ninth-wider-*/changes.diff
+    (the second, repaired candidate) and apply it to one view. Report the field in mm of a fluid sagittal
+    crop (expect 112.0) and that every other view''s crops are bit-identical to the control''s at the
+    same pose. Update SPATIAL_TOKEN_IDENTITY[''preparation'']. This replaces two attempts blocked at review
+    on the cut''s cost and on exact equality of the unwidened views; both were harness blocks, not results.
+    Use the cut the review approved for the coronal seed, whose frozen source is at /home/claudio/src/knee-abnormality/outputs/autoresearch/anatomy-recipe/experiments/coronal-fluid-crops-at-108-mm-2-20261008T125159Z-a6380fd8/source
+    (changes.diff beside it): the widened view''s series and the other series are listed once in the collate,
+    the other series keep the exact integer cut and, when turned, one bicubic sampling from a window of
+    their former canvas size, and the widened series get one bicubic sampling with the scaled affine.
+    Apply the same code to the fluid sagittal view at 112 mm with its own margin instead of the fluid
+    coronal view at 108 mm; if the incumbent already contains that coronal code, extend its view lists
+    and scale table to both views instead of copying it. Each slice is sampled once; no torch.where between
+    two full results and no boolean-mask indexing beyond what that approved cut already has.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Keeps the gain of the sagittal field run and drops what paid for it.
+exhausted_directions: ''

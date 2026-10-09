@@ -1,0 +1,114 @@
+id: view-poses
+recipe: configs/training.yaml
+reference_run: outputs/training/rn18-meniscus-map
+reference_equivalences: {}
+additional_evidence_runs: []
+backlog:
+  refill_below: 3
+  refill_to: 5
+  seed_order: forced
+  rotate_after: 1000000
+budget:
+  mode: range
+  min_fraction: 0.5
+  max_fraction: 1.4
+policy:
+  editable_files:
+  - configs/training.yaml
+  - src/knee_abnormality/config.py
+  - src/knee_abnormality/data/dataset.py
+  - src/knee_abnormality/inference/checkpoint.py
+  - src/knee_abnormality/inference/engine.py
+  - src/knee_abnormality/inference/reflection.py
+  - src/knee_abnormality/training/anatomy.py
+  - src/knee_abnormality/training/lightning.py
+  - src/knee_abnormality/training/report_attributes.py
+  editable_directories:
+  - src/knee_abnormality/modeling
+  - src/knee_abnormality/data/preprocessing
+  config_keys:
+  - trainer.anatomy_loss_weight
+  - trainer.meniscus_loss_weight
+  - data.view_shift_limit_mm
+  config_prefixes: []
+  list_item_fields:
+    data.series_types:
+    - views
+  input_identity_keys:
+  - preprocessing_identity
+  require_source_change: false
+  configuration_only_ideas: true
+  developer_instructions: 'Environment, read this first. (1) You have no GPU and must not use one. Run `rtk proxy
+    uv run --locked python -m scripts.tools.check_side_routing --config configs/training.yaml` from your candidate
+    workspace as it is: the script selects the CPU by itself when no GPU is visible, takes a few minutes there,
+    and that CPU run is the required check. Never return blocked for lack of a GPU. (2) Make every change inside
+    the candidate workspace you were assigned and nowhere else. Do not stage the candidate under /tmp, and do not
+    write source/ or changes.diff in the experiment directory: it is read-only to you by design, and the supervisor
+    freezes the source and the diff from your workspace after you return. (3) When the change is complete and the
+    check passes, return status prepared with the integration and activation declarations and the guardrail JSON
+    in the report. An unwritable experiment directory is never a reason to return blocked. The incumbent is the
+    anatomy-map recipe with the report-attribute loss at zero and a meniscus map (prior-work.md): a seven-class
+    bone map predicted per token by KneeAbnormalityModel.anatomy_head and a separate three-class meniscus head (neither,
+    medial, lateral), both trained in training/anatomy.py and training/lightning.py on targets looked up by AnatomyTargets;
+    a joint plane and centre fitted to the bone map in anatomical_frames; sections and routes in _regions; crops
+    cut by ViewWindows (first_look_batch, frame_pose, jitter, forward) from the pose of first_look_pose. Read contract.md
+    before writing code. Each seed is one design step and says exactly what changes and what it removes; apply it
+    to the incumbent and leave everything outside it byte-identical. Replace what a seed supersedes: no flag, option
+    or config field selects the old behaviour. A seed that says it changes only configuration changes the view table
+    of configs/training.yaml and the validation metrics it names, nothing else. Every seed may add the validation-only
+    metrics it names as its proof of activation; the review requires such a proof, so never return a candidate without
+    one. When a seed names the frozen source of an earlier candidate, read that source and its changes.diff and
+    reuse the reviewed code instead of writing the mechanism again. Keep the speed changes of 2026-10-08 as they
+    are: the loaders send only the middle channel of each canvas (the model must accept one or three channels),
+    tokens, routing weights and position priors are memoised per encoded batch through KneeAbnormalityModel._memo
+    (never read a memo from a dict whose inputs you changed without going through _memo), epoch metrics go through
+    _log_epoch_metric, and model.channels_last stays true. Never run a segmenter and never read the prepared targets
+    outside the training module: nothing from them may be needed at validation or prediction. A candidate that fails
+    any guardrail is repaired or returned blocked, never returned prepared, and the guardrail script is not edited;
+    keep the interface it calls (encode_batch, frame, routing_weights, position_priors, study_tokens, pool_encoded,
+    frame_rotation, KneeModule._side_step and training_step) callable as it calls them, with any new argument optional.
+    New parameters or buffers initialize under torch.random.fork_rng so the incumbent''s random stream is unchanged.
+    The plane, the sections'' shares, the size and the pose are read from detached values: the label loss must not
+    reach a map head through them. Update the matching entries of SPATIAL_TOKEN_IDENTITY when the described behaviour
+    changes. Validation and prediction stay deterministic. The first look is one no-gradient pass of the same model
+    in evaluation mode on the central crops of the canvases at scale 1; it never runs twice and never reads more
+    slices than a x1 pass. Never decode more slices per study than the incumbent, and do not change the image size
+    or slice counts; view fields change only in the seeds that say so. Cost discipline, fixed by the user on 2026-10-08:
+    a seed adds no training time its mechanism does not need. Add no diagnostic to the training step: what a seed
+    asks to be known is reported once on one batch in your report, or logged on validation only, through _log_epoch_metric,
+    and at most six new validation metrics per seed. In code that runs every training step write no .item(), .cpu(),
+    bool() or int() of a tensor, no nonzero, unique or new boolean-mask indexing, no Python loop over studies, series
+    or views, no torch.tensor built from Python values, and no second evaluation of the pose, the frame, the routing
+    weights or the tokens: these force the GPU to synchronise. Add no forward pass. Each slice is sampled once;
+    never compute two full results and choose between them with torch.where. Keep the existing diagnostics as they
+    are; do not extend them. A seed that says ''same cost'' must train within 1.02 of the incumbent''s time; a seed
+    that states a larger figure must stay within it. Training time must stay within 0.5 to 1.4 times the reference''s,
+    a ceiling that exists to hold the adopted canvases, not to be spent; do not reduce epochs, slices or studies.
+    No weight averaging. No tests. Besides the guardrail check, use the existing Python environment for static checks
+    and tiny checks only, and run nothing heavy on the CPU beside a training: a training already uses most of the
+    machine''s memory.'
+  researcher_instructions: 'The campaign has no end: it runs until the user stops it. Never return an empty report
+    and never declare the directions exhausted. Research starts after the forced seeds and moves between the stages
+    of contract.md, staying on one while it has an open lead. Your first product after every completed run is its
+    analysis: both multipliers against the incumbent (score and prediction_macro_auc in fold_1/selected_checkpoint.json),
+    the per-target AUC deltas from the two runs'' fold_1/validation_predictions.csv, the validation AUC of each
+    view alone (val_auc_view_*) for every view the run changed, the bone map''s overlap per class, the meniscus
+    head''s overlap, the plane error, the pose statistics per view (shift, turn, scale, share at a limit) from the
+    logs, and the training and prediction seconds. A macro difference inside +-0.0005 at x4 is inside what two trainings
+    of one recipe give; say for each run whether it is level with a rerun. Adoption is by the contract, not by the
+    runtime''s verdict: a run is adopted when it is at least the incumbent at both multipliers; report both and
+    say which side of that rule the run falls on. Always report the labels a canvas trade names as gaining and as
+    relying on another view. Only then propose. Each idea fills the parts of contract.md (How a seed is written)
+    and is one training run with one mechanism; an idea that only measures is not allowed, so put the measurement
+    in what the run logs. Every idea keeps smart crops in all six views and never proposes a fixed crop. A canvas
+    idea is a trade: it names the view that zooms in, the labels that gain, the view that keeps or gains the field,
+    and shows that every label keeps at least one of its strong views at the field it needs (seed-outline.md, Canvas
+    combinations). Fields and distances come from a cited measurement, never from a sweep on the validation labels.
+    Start every implementation text with the sentence "Follow the environment paragraph of the developer instructions."
+    and name the validation-only metric that proves the idea active. Open leads are in seed-outline.md (Planned
+    seeds after the combinations) and at the end of prior-work.md. Out of bounds: everything in the contract''s
+    out-of-bounds list; anything that needs a segmenter or the prepared targets at validation or prediction; a correction
+    constant measured by hand on the centre, the plane or the pose; letting the label loss move a plane, a centre,
+    an angle, a size or a box; widening a view for every knee without a trade. Cost discipline: every idea states
+    its expected training time against the incumbent and adds no training-step diagnostics; an idea whose run trains
+    longer than it said is reported as a defect of the candidate, not as a result.'

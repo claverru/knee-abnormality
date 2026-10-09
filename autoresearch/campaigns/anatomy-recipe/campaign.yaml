@@ -11,7 +11,7 @@ backlog:
 budget:
   mode: range
   min_fraction: 0.5
-  max_fraction: 1.1
+  max_fraction: 2.5
 policy:
   editable_files:
   - configs/training.yaml
@@ -84,8 +84,9 @@ policy:
     training step time of the control and of your candidate from scripts/tools/bench_training_steps.py
     only if a GPU is visible; otherwise state which lines run per training step. A seed that says ''same
     cost'' must train within 1.02 of the control''s time; the coronal field seed and the kneecap seed
-    within 1.08 and the sagittal field seed within 1.1, from their larger canvases only. Training time
-    must stay within 0.5 to 1.1 times the reference''s; do not reduce epochs, slices or studies. No weight
+    within 1.08 and the sagittal field seed within 1.1, from their larger canvases only. The 14 by 14 seed
+    alone may train up to 2.5 times the control''s time; every other seed stays within 1.1. Training time
+    must stay within 0.5 to 1.1 times the reference''s (2.5 for the 14 by 14 seed); do not reduce epochs, slices or studies. No weight
     averaging. No tests. Besides the guardrail check, use the existing Python environment for static checks
     and tiny checks only, and run nothing heavy on the CPU beside a training: the training with canvases
     already uses most of the machine''s memory.'

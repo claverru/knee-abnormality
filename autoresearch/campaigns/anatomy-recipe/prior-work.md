@@ -16,8 +16,8 @@ ranged from 0.9209 to 0.9368 across runs on 47 positives.
 
 
 The summary the researcher checks proposals against. Every figure below was produced on
-2026-10-07; the audits are under `outputs/analysis/frame-and-targets/anatomy-sections-audit/` and the drawings
-under `outputs/analysis/frame-and-targets/segmenter-benchmark/`. The design the model started
+2026-10-07; the audits are under `outputs/analysis/f/frame-and-targets/anatomy-sections-audit/` and the drawings
+under `outputs/analysis/f/frame-and-targets/segmenter-benchmark/`. The design the model started
 from is in [side-routed shared heads](../../../docs/ongoing/side-routed-heads.md) and the two
 earlier campaigns on it are [routing and shifts](../routing-and-shifts/INDEX.md) and
 [frame and targets](../frame-and-targets/INDEX.md).
@@ -37,7 +37,7 @@ Baker's +0.0041 (interval excludes zero) / +0.0049, MCL +0.0065 / +0.0096, Later
 +0.0041, Medial Meniscus +0.0021 / +0.0039, Effusion +0.0014 / +0.0004, PF OA −0.0007 / +0.0023,
 Contusion +0.0027 / −0.0058, Fracture −0.0018 / −0.0057, ACL −0.0030 / −0.0011, Synovitis −0.0056
 / −0.0083, Lateral Meniscus −0.0046 / −0.0148 (×1 interval excludes zero). Audit:
-`outputs/analysis/frame-and-targets/anatomy-sections-audit/audit-crops.txt`.
+`outputs/analysis/f/frame-and-targets/anatomy-sections-audit/audit-crops.txt`.
 
 Its design, all in `modeling/model.py`, `training/anatomy.py` and `training/lightning.py`:
 
@@ -241,7 +241,7 @@ in AUC ×10000 at ×4 / ×1 against run 24:
 ## Premise checks of the forced seeds (2026-10-08)
 
 On the validation fold with the control's weights (output
-`outputs/analysis/anatomy-masks-speed/recipe-seed-checks.json`).
+`outputs/analysis/a/anatomy-masks-speed/recipe-seed-checks.json`).
 
 - **Wider fluid crops show image, not padding:** a crop a ninth wider lies inside the acquired
   image for 99.7% of its area in coronal and 99.8% in sagittal; 1.7% and 0.7% of slices are
@@ -272,7 +272,7 @@ On the validation fold with the control's weights (output
 The two field seeds no longer use a zoom of 10/9, which was chosen because it maps 84 mm onto
 93.3 mm. On the 550 mask knees with the incumbent's joint target, and on the validation fold with
 the control's weights for the share of a posed crop inside the acquired image
-(figures and `inside-image.json` in `outputs/analysis/anatomy-masks-field/fluid-fields/`):
+(figures and `inside-image.json` in `outputs/analysis/a/anatomy-masks-field/fluid-fields/`):
 
 | Field | mm/px | Coronal: bone edge + 5 mm inside | Sagittal: kneecap front inside | Whole kneecap | Coronal crop inside image | Sagittal crop inside image |
 |---:|---:|---:|---:|---:|---:|---:|
