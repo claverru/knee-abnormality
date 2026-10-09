@@ -18,25 +18,6 @@ Pending on the recipe in force (meniscus map and posed canvases, [state](state.m
   alone carrying more than the gap; the multiplier curve (×1 to ×4) of the recipe against one
   experiment is not measured. Detail:
   [view-poses run notes](../../autoresearch/campaigns/view-poses/run-notes.md).
-- **257px full-grid rerun running (2026-10-08, user request):** launched by the user at
-  21:42 CEST, main PID 8726, run `rn18-257-full-9x9-report-loss-off`. Removed the experiment's
-  `interior_anchors` border mask and its identity suffix. All other code and the configuration
-  match `rn18-257-inner-7x7-report-loss-off`: 257px, the same crop fields, fold 1, seed 1110484336,
-  report-attribute loss off. The stride-32 output remains 9×9; border anchors now pass the normal
-  image/canvas validity checks. Verified the saved configuration, labels and class balance
-  match the previous run; the frozen source includes the mask removal. Comparison monitor
-  `knee-monitor-257-full-grid.service` was stopped at the user's request on 2026-10-08.
-  Its last table is `outputs/analysis/r/rn18-257-full-vs-inner-7x7/macro_auc.md`; its log is beside it.
-- **S127 submission in progress (2026-10-08):** `rn18-257-inner-7x7-report-loss-off`, fold 1,
-  seed 1110484336, selected epoch 10: ×1 0.917439, ×4 τ 1 0.926763. User requested Kaggle
-  ×4 τ 0.9. Bundle `outputs/submission/exports/rn18-257-inner-7x7-report-loss-off-f1-x4-tau09`;
-  record `outputs/submission/records/rn18-257-inner-7x7-report-loss-off-f1-x4-tau09.json`.
-  Notebook `claverru/s127-rn18-f1-257px-inner7-report-loss-off`, version 1, is queued on Kaggle;
-  detached service `knee-submit-639229499ca44aa5.service` verifies its output and submits it.
-- **Start the [anatomy-recipe campaign](../../autoresearch/campaigns/anatomy-recipe/INDEX.md):**
-  validated, eight forced seeds (the last, tokens on the 14 by 14 grid, added 2026-10-08), reference
-  `rn18-anatomy-map-centre-control`; about three and a
-  half hours for the seeds.
 - **Submission ledger:** S122 to S126 are not in it yet.
 - **Submit job:** it cannot pick up a notebook version that has already completed; S126 had to
   be submitted by hand through the API.

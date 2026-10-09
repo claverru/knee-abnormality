@@ -260,8 +260,10 @@ measured outcomes are in the [validation results](../validation/results/INDEX.md
 
 ## Active lines
 
-- [Anatomy recipe](../../autoresearch/campaigns/anatomy-recipe/INDEX.md): the campaign on the
-  recipe in force, validated with eight forced seeds and not started.
+- None. The [anatomy-recipe](../../autoresearch/campaigns/anatomy-recipe/INDEX.md) campaign
+  (stopped 2026-10-08, seven runs, one adoption) and the
+  [view-poses](../../autoresearch/campaigns/view-poses/INDEX.md) campaign (stopped 2026-10-09,
+  seven runs, three adoptions) are closed and their adoptions are the recipe in force.
 - [Label rebuild](../public-labels/label-rebuild.md): adopted; its control scored ×4 0.928288 and
   0.944 public (S78).
 - [RadImageNet backbones](radimagenet-backbone.md): the ResNet-18 recipe ties the ReXNet control
