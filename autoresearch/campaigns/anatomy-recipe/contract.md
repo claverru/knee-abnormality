@@ -116,6 +116,15 @@ an offset pattern or an average over displaced crops at prediction.
 from bone extents measured on the 550 mask volumes; and the bar on the report loss's weight, for
 `report-attribute-loss-off`, which sets it to zero.
 
+**Lifted by the user on 2026-10-08 for one more forced seed:** the bar on finer tokens, for
+`tokens-on-the-14-by-14-grid`, which sums the stride-16 and stride-32 features on the 14 by 14
+grid so that the map's thin classes are no longer thinner than a token.
+
+**Lifted by the user on 2026-10-08 for one more forced seed:** the bar on crop widths, for
+`crop-size-per-knee-from-the-first-look`, whose field follows each knee's size as estimated by the
+first look (constants from the knee-size study in `outputs/analysis/k/knee-size-crops/`); it may
+train up to 1.2 times the incumbent's time, from its larger canvases and resampling only.
+
 Closed by the anatomy-masks campaign ([its run notes](../anatomy-masks/run-notes.md)): a tenth of
 the map's gradient to the backbone; the map's loss without Dice; a first look on fewer slices,
 end or interior; the first look on the whole canvas; both series of a plane a ninth wider; a
@@ -138,7 +147,10 @@ to synchronise (`.item()`, `nonzero`, `unique`, boolean-mask indexing, Python lo
 series or views), no second evaluation of the pose, the frame, the routing weights or the
 tokens, and no extra forward pass. A seed that states the control's cost trains within 1.02 of
 its time; the coronal field seed and the kneecap seed within 1.08 and the sagittal field seed
-within 1.1, from their larger canvases only; the runtime refuses anything above 1.1. Where the
+within 1.1, from their larger canvases only; the 14 by 14 seed runs whatever it
+costs (user, 2026-10-08), for which the runtime's ceiling is 2.5 times the control's time. Every
+other seed stays within 1.1: the keeper aborts one that is heading above it and returns it to the
+developer. Where the
 time of the anatomy-masks runs went is in
 [Training runtime and memory](../../../docs/modeling/training-runtime-and-memory.md#posed-crop-recipe-where-a-step-goes-and-what-was-removed-2026-10-08).
 
@@ -156,21 +168,16 @@ the re-cut crop when the plane is known.
 
 ## Adoption
 
-Fixed by the user and applied by the keeper without asking. The runtime computes its shared
-verdict; the keeper adopts with
-`python -m scripts.tools.autoresearch adopt anatomy-masks --experiment EXPERIMENT_ID`, citing
-this section, every valid run that passed the pre-run guardrails and whose macro AUC is **at
-least the incumbent's at both multipliers**:
+Fixed by the user on 2026-10-08, from run 5 on: the runtime's own verdict decides. A run is
+adopted when the central 80% paired-bootstrap interval of its ×4 macro AUC improvement over the
+incumbent lies strictly above zero; otherwise the incumbent stays. The keeper makes no hand
+adoption and does not stop the campaign for one. No seed is adopted by exception.
 
-- **×1:** the selected checkpoint's validation macro (`score` in `selected_checkpoint.json`);
-- **×4:** the macro of the saved predictions (`prediction_macro_auc`).
+Before that decision the rule was "at least the incumbent at both ×1 and ×4", applied by hand; it
+adopted `report-attribute-loss-off-2` (run 2: ×4 +0.000529, ×1 +0.000268, 80% interval −0.0001 to
++0.0012), which stays the incumbent.
 
-No seed of this campaign is adopted by exception.
-
-A run level or better at one multiplier and lower at the other is not adopted. A run that is not
-adopted leaves the incumbent unchanged and its results feed the next design. Every run reports
-its prediction time against the incumbent's; one above 1.3 times is not adopted, whatever its
-score.
+Every run still reports ×1 and its prediction time against the incumbent's.
 
 ## Duration
 

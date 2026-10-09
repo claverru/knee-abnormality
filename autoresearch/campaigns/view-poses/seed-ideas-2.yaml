@@ -1,0 +1,221 @@
+ideas:
+- id: t1pd-joint-crops-centred-on-the-menisci
+  mechanism_id: crop-centre-sagittal-and-coronal-t1-pd
+  parent_idea_id: null
+  title: 'T1/PD sagittal and coronal crops: centre on the predicted menisci'
+  opportunity: 'User-ordered on 2026-10-08: adjust where each plane-contrast crop looks, on canvases that
+    give the crop room to get there. Measured premise, effect a guess. The T1/PD joint views are read
+    for the joint line: meniscal signal (the literature rates short-echo sagittal first for tears), bone
+    spurs and fracture lines. The incumbent centres them on the knee''s centre, a point fitted from bone
+    mass. With the meniscus head on the 14 by 14 grid the menisci themselves are located (quote its final
+    validation overlap per class); their centroid is the joint line''s own centre.'
+  mechanism: 'One view''s centre changes; every other view, the turn, the fields and the canvases are
+    the incumbent''s. T1/PD sagittal and T1/PD coronal views: the centre is the share-weighted centroid
+    of the detached medial plus lateral meniscus shares predicted in the first look on the 14 by 14 grid,
+    in the fitted frame. Where the meniscus mass of a study is below the mass a single horn gives (the
+    5th percentile of the per-study mass on the training DESS knees, measured once and cited) the knee''s
+    centre is used. The canvases, the scale and the shift limits are the incumbent''s (368 px and 18 mm
+    for these views once the canvas seed is in); the share of crops at the shift limit is logged, since
+    a target the canvas does not let the crop reach is not a wrong target.'
+  precedents:
+  - 'a-crop-centre-per-contrast: the centre of each plane-contrast read from the framed structures.'
+  - 'kneecap-inside-the-fluid-sagittal-crop-per-knee-2 (anatomy-recipe run 6): the fluid sagittal crop
+    4.1 mm forward on average, PF OA +0.0015, Baker''s -0.0013.'
+  novelty: First crop centre read from a soft-tissue structure.
+  coverage: Every study with a sagittal and coronal T1/PD series.
+  exploitation: 'Read the macro at both multipliers against the incumbent, then both menisci (expected
+    to gain) and none named (expected to pay), with the validation AUC of the sagittal and coronal T1/PD
+    view alone per label against the incumbent''s. Shown wrong by: neither meniscus label above the incumbent
+    on these views alone.'
+  budget: 'Same cost as the incumbent: within 1.02 of its training time.'
+  implementation: 'Follow the environment paragraph of the developer instructions. modeling/model.py and
+    training/lightning.py for the metrics below. The centre is computed once per study inside the existing
+    first look on tensors already there; no loop over studies, no second evaluation of the frame. The
+    review asks for a logged proof that the change is active: log on validation only, through _log_epoch_metric,
+    the mean distance between the meniscus centroid and the knee''s centre in mm and the share of studies
+    using the fallback and the share of this view''s crops at the shift limit. Report on one batch the
+    same numbers and that the crops of every other view are bit-identical to the incumbent''s. Update
+    the view_policy entry of SPATIAL_TOKEN_IDENTITY.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: A centre for one plane-contrast, compared with the incumbent's centre for that view.
+- id: sagittal-fluid-canvas-fine
+  mechanism_id: canvas-combination
+  parent_idea_id: null
+  title: Sagittal fluid on the fine canvas, sagittal T1/PD on the coarser one
+  opportunity: 'Measured premise, effect a guess. Sagittal fluid alone is the best single view for both
+    menisci and PF OA (0.917, 0.843, 0.830) and within 0.006 of the best for ACL. Each view alone in report-attribute-loss-off-2
+    (prior-work.md, Each view alone): the T1/PD views have the finest canvases (0.375 mm) and are the
+    best single view for ACL only; the fluid views are best for eleven labels; axial fluid is best for
+    five at 0.536 mm. The fields of the recipe were set in the order they were tried on 2026-10-02 and
+    no assignment was ever compared with another. This run asks whether the sagittal detail belongs on
+    the fluid series.'
+  mechanism: 'Configuration only, on the incumbent with smart crops in all six views: set the field of
+    each view in data.series_types[*].views[*].field_mm of configs/training.yaml to: sagittal fluid 84
+    mm; sagittal T1/PD 93.33333333333334 mm; coronal fluid 93.33333333333334 mm; coronal T1/PD 84 mm;
+    axial fluid 120 mm; axial T1/PD 120 mm. Slices per view, anchors, offsets and data.reference_field_mm
+    stay as they are. The canvas of every view stays 368 px, so a view with a smaller field has a finer
+    pixel and holds fewer millimetres; the pose (centre, shift, turn, scale) is computed as in the incumbent.
+    The trade: menisci, ACL and PF OA gain detail on the sagittal fluid view (0.417 to 0.375 mm); the
+    pouch above the kneecap and Baker''s cyst rely on axial fluid at 120 mm; the sagittal T1/PD view gives
+    the field back (84 to 93.3 mm).'
+  precedents:
+  - 'smart-crops campaign (2026-10-02, fixed crops, before the anatomy map): T1/PD at 84 mm +0.0013; sagittal
+    and coronal fluid at 93 mm +0.0010; sagittal fluid back at 120 mm -0.0007; coronal fluid back at 120
+    mm -0.0004; axial at 130 mm 0.0000, at 140 mm -0.0006.'
+  - 'anatomy-recipe runs 3 and 5 (2026-10-08): one fluid view wider for every knee, -0.0017 and -0.0009.'
+  novelty: First comparison of one assignment of fine and coarse canvases with another, with the crops
+    posed in every view.
+  coverage: Every study; the views whose field changes.
+  exploitation: 'Read the macro at both multipliers against the incumbent, then per label, and the validation
+    AUC of each view alone (val_auc_view_*) for the views whose field changed against the incumbent''s.
+    Shown wrong by: the labels the trade names as gaining not above the incumbent, or the labels it names
+    as relying on another view falling by more than the gain.'
+  budget: 'Same cost as the incumbent: the canvases keep their size in pixels. Within 1.02 of its training
+    time.'
+  implementation: 'Follow the environment paragraph of the developer instructions. configs/training.yaml
+    (data.series_types views field_mm only) and the six validation metrics in training/lightning.py; no
+    other source change. If a field equal to data.reference_field_mm is what marks a view as a wide view
+    in the incumbent, say in the report which views changed kind and that the canvas, the margin and the
+    pose of every view are computed as before. The review asks for a logged proof that the change is active:
+    log on validation only, through _log_epoch_metric in training/lightning.py, the applied pixel size
+    of each view in millimetres (six metrics, one per view; the expected values are the ones in the table
+    of this seed). Nothing is added to the training step.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: User-ordered canvas combination A.
+- id: coronal-fluid-canvas-fine
+  mechanism_id: canvas-combination
+  parent_idea_id: null
+  title: Coronal fluid on the fine canvas, coronal T1/PD on the coarser one
+  opportunity: 'Measured premise, effect a guess. Coronal fluid alone is the best single view for Medial
+    OA, Contusion and Fracture and within 0.004 of the best for the medial meniscus; coronal T1/PD is
+    the best single view for nothing. Each view alone in report-attribute-loss-off-2 (prior-work.md, Each
+    view alone): the T1/PD views have the finest canvases (0.375 mm) and are the best single view for
+    ACL only; the fluid views are best for eleven labels; axial fluid is best for five at 0.536 mm. The
+    fields of the recipe were set in the order they were tried on 2026-10-02 and no assignment was ever
+    compared with another. This run asks whether the coronal detail belongs on the fluid series.'
+  mechanism: 'Configuration only, on the incumbent with smart crops in all six views: set the field of
+    each view in data.series_types[*].views[*].field_mm of configs/training.yaml to: sagittal fluid 93.33333333333334
+    mm; sagittal T1/PD 84 mm; coronal fluid 84 mm; coronal T1/PD 93.33333333333334 mm; axial fluid 120
+    mm; axial T1/PD 120 mm. Slices per view, anchors, offsets and data.reference_field_mm stay as they
+    are. The canvas of every view stays 368 px, so a view with a smaller field has a finer pixel and holds
+    fewer millimetres; the pose (centre, shift, turn, scale) is computed as in the incumbent. The trade:
+    menisci and tibiofemoral OA gain detail on the coronal fluid view; MCL and marrow at the edges rely
+    on axial fluid at 120 mm (the best single view for MCL, 0.924); the coronal T1/PD view gives the field
+    back.'
+  precedents:
+  - 'smart-crops campaign (2026-10-02, fixed crops, before the anatomy map): T1/PD at 84 mm +0.0013; sagittal
+    and coronal fluid at 93 mm +0.0010; sagittal fluid back at 120 mm -0.0007; coronal fluid back at 120
+    mm -0.0004; axial at 130 mm 0.0000, at 140 mm -0.0006.'
+  - 'anatomy-recipe runs 3 and 5 (2026-10-08): one fluid view wider for every knee, -0.0017 and -0.0009.'
+  novelty: First comparison of one assignment of fine and coarse canvases with another, with the crops
+    posed in every view.
+  coverage: Every study; the views whose field changes.
+  exploitation: 'Read the macro at both multipliers against the incumbent, then per label, and the validation
+    AUC of each view alone (val_auc_view_*) for the views whose field changed against the incumbent''s.
+    Shown wrong by: the labels the trade names as gaining not above the incumbent, or the labels it names
+    as relying on another view falling by more than the gain.'
+  budget: 'Same cost as the incumbent: the canvases keep their size in pixels. Within 1.02 of its training
+    time.'
+  implementation: 'Follow the environment paragraph of the developer instructions. configs/training.yaml
+    (data.series_types views field_mm only) and the six validation metrics in training/lightning.py; no
+    other source change. If a field equal to data.reference_field_mm is what marks a view as a wide view
+    in the incumbent, say in the report which views changed kind and that the canvas, the margin and the
+    pose of every view are computed as before. The review asks for a logged proof that the change is active:
+    log on validation only, through _log_epoch_metric in training/lightning.py, the applied pixel size
+    of each view in millimetres (six metrics, one per view; the expected values are the ones in the table
+    of this seed). Nothing is added to the training step.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: User-ordered canvas combination B.
+- id: axial-fluid-canvas-fine
+  mechanism_id: canvas-combination
+  parent_idea_id: null
+  title: Axial fluid on a fine canvas, sagittal fluid wide
+  opportunity: 'Measured premise, effect a guess. Axial fluid alone scores PF OA 0.828 against 0.830 for
+    the best view, at the coarsest pixel of the recipe; it is also the best single view for Effusion,
+    Synovitis and Baker''s, which is the cost side of this trade. Each view alone in report-attribute-loss-off-2
+    (prior-work.md, Each view alone): the T1/PD views have the finest canvases (0.375 mm) and are the
+    best single view for ACL only; the fluid views are best for eleven labels; axial fluid is best for
+    five at 0.536 mm. The fields of the recipe were set in the order they were tried on 2026-10-02 and
+    no assignment was ever compared with another. This run asks whether PF OA, one of the weakest labels
+    (0.90), is limited by 0.54 mm pixels on its strong view, and what the wide labels pay.'
+  mechanism: 'Configuration only, on the incumbent with smart crops in all six views: set the field of
+    each view in data.series_types[*].views[*].field_mm of configs/training.yaml to: sagittal fluid 120
+    mm; sagittal T1/PD 84 mm; coronal fluid 93.33333333333334 mm; coronal T1/PD 84 mm; axial fluid 93.33333333333334
+    mm; axial T1/PD 120 mm. Slices per view, anchors, offsets and data.reference_field_mm stay as they
+    are. The canvas of every view stays 368 px, so a view with a smaller field has a finer pixel and holds
+    fewer millimetres; the pose (centre, shift, turn, scale) is computed as in the incumbent. The trade:
+    PF OA gains detail on axial fluid (0.536 to 0.417 mm; the kneecap joint is a 70 by 40 mm box, which
+    93.3 mm holds with one token of context on each side); Effusion, Synovitis and Baker''s, read best
+    on axial fluid at 120 mm today, move to a sagittal fluid view at 120 mm; MCL keeps coronal fluid.'
+  precedents:
+  - 'smart-crops campaign (2026-10-02, fixed crops, before the anatomy map): T1/PD at 84 mm +0.0013; sagittal
+    and coronal fluid at 93 mm +0.0010; sagittal fluid back at 120 mm -0.0007; coronal fluid back at 120
+    mm -0.0004; axial at 130 mm 0.0000, at 140 mm -0.0006.'
+  - 'anatomy-recipe runs 3 and 5 (2026-10-08): one fluid view wider for every knee, -0.0017 and -0.0009.'
+  novelty: First comparison of one assignment of fine and coarse canvases with another, with the crops
+    posed in every view.
+  coverage: Every study; the views whose field changes.
+  exploitation: 'Read the macro at both multipliers against the incumbent, then per label, and the validation
+    AUC of each view alone (val_auc_view_*) for the views whose field changed against the incumbent''s.
+    Shown wrong by: the labels the trade names as gaining not above the incumbent, or the labels it names
+    as relying on another view falling by more than the gain.'
+  budget: 'Same cost as the incumbent: the canvases keep their size in pixels. Within 1.02 of its training
+    time.'
+  implementation: 'Follow the environment paragraph of the developer instructions. configs/training.yaml
+    (data.series_types views field_mm only) and the six validation metrics in training/lightning.py; no
+    other source change. If a field equal to data.reference_field_mm is what marks a view as a wide view
+    in the incumbent, say in the report which views changed kind and that the canvas, the margin and the
+    pose of every view are computed as before. The review asks for a logged proof that the change is active:
+    log on validation only, through _log_epoch_metric in training/lightning.py, the applied pixel size
+    of each view in millimetres (six metrics, one per view; the expected values are the ones in the table
+    of this seed). Nothing is added to the training step.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: User-ordered canvas combination C.
+- id: both-fluid-joint-canvases-fine
+  mechanism_id: canvas-combination
+  parent_idea_id: null
+  title: Sagittal and coronal fluid on fine canvases, both T1/PD views coarser
+  opportunity: 'Measured premise, effect a guess. The fluid views are the best single view for eleven
+    of twelve labels. Each view alone in report-attribute-loss-off-2 (prior-work.md, Each view alone):
+    the T1/PD views have the finest canvases (0.375 mm) and are the best single view for ACL only; the
+    fluid views are best for eleven labels; axial fluid is best for five at 0.536 mm. The fields of the
+    recipe were set in the order they were tried on 2026-10-02 and no assignment was ever compared with
+    another. This run is the two single swaps together.'
+  mechanism: 'Configuration only, on the incumbent with smart crops in all six views: set the field of
+    each view in data.series_types[*].views[*].field_mm of configs/training.yaml to: sagittal fluid 84
+    mm; sagittal T1/PD 93.33333333333334 mm; coronal fluid 84 mm; coronal T1/PD 93.33333333333334 mm;
+    axial fluid 120 mm; axial T1/PD 120 mm. Slices per view, anchors, offsets and data.reference_field_mm
+    stay as they are. The canvas of every view stays 368 px, so a view with a smaller field has a finer
+    pixel and holds fewer millimetres; the pose (centre, shift, turn, scale) is computed as in the incumbent.
+    The trade: all joint-line detail moves to the fluid views; every wide need (fluid, cysts, pouch, collaterals
+    at the edges) relies on axial fluid at 120 mm; both T1/PD views give the field back.'
+  precedents:
+  - 'smart-crops campaign (2026-10-02, fixed crops, before the anatomy map): T1/PD at 84 mm +0.0013; sagittal
+    and coronal fluid at 93 mm +0.0010; sagittal fluid back at 120 mm -0.0007; coronal fluid back at 120
+    mm -0.0004; axial at 130 mm 0.0000, at 140 mm -0.0006.'
+  - 'anatomy-recipe runs 3 and 5 (2026-10-08): one fluid view wider for every knee, -0.0017 and -0.0009.'
+  novelty: First comparison of one assignment of fine and coarse canvases with another, with the crops
+    posed in every view.
+  coverage: Every study; the views whose field changes.
+  exploitation: 'Read the macro at both multipliers against the incumbent, then per label, and the validation
+    AUC of each view alone (val_auc_view_*) for the views whose field changed against the incumbent''s.
+    Shown wrong by: the labels the trade names as gaining not above the incumbent, or the labels it names
+    as relying on another view falling by more than the gain.'
+  budget: 'Same cost as the incumbent: the canvases keep their size in pixels. Within 1.02 of its training
+    time.'
+  implementation: 'Follow the environment paragraph of the developer instructions. configs/training.yaml
+    (data.series_types views field_mm only) and the six validation metrics in training/lightning.py; no
+    other source change. If a field equal to data.reference_field_mm is what marks a view as a wide view
+    in the incumbent, say in the report which views changed kind and that the canvas, the margin and the
+    pose of every view are computed as before. The review asks for a logged proof that the change is active:
+    log on validation only, through _log_epoch_metric in training/lightning.py, the applied pixel size
+    of each view in millimetres (six metrics, one per view; the expected values are the ones in the table
+    of this seed). Nothing is added to the training step.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: User-ordered canvas combination E.
+exhausted_directions: ''

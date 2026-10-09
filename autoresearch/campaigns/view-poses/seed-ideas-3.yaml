@@ -1,0 +1,39 @@
+ideas:
+- id: meniscus-labels-read-by-meniscus-share
+  mechanism_id: meniscus-routing
+  parent_idea_id: null
+  title: Route the meniscus labels through the predicted menisci
+  opportunity: 'Measured premise, effect a guess. The meniscus labels read regions built from geometry:
+    the joint row on one side of the frame. With the kneecap class leading the kneecap route, PF OA recovered
+    most of what the wide front block had lost (anatomy-masks prior work). Lateral Meniscus is among the
+    weakest labels (0.91) and nothing geometric explains its errors (errors-vs-coverage study). This seed
+    is only meaningful if the head of meniscus-head-on-the-14-by-14-grid is sharp: quote its final validation
+    overlap per class in the report.'
+  mechanism: 'In KneeAbnormalityModel._regions (modeling/model.py) the routes meniscus_medial and meniscus_lateral,
+    and the three tear routes of each side, take as an additional membership the detached predicted share
+    of the medial or lateral meniscus on each 7 by 7 token (the mean of the four finer predictions): the
+    route weight becomes the larger of today''s geometric weight and that share scaled to reach full weight
+    at the share a token holding a whole horn has (the 95th percentile of the positive token shares on
+    the training DESS knees, measured once and cited). The geometric regions stay as the floor. The OA
+    routes are unchanged.'
+  precedents:
+  - 'rn18-anatomy-front-sample550 (2026-10-07): the kneecap route led by kneecap tokens recovered most
+    of PF OA''s loss.'
+  - 'femur-front-in-the-kneecap-routes (anatomy-recipe run 4): a membership that raised weights by 0.017
+    on average moved its targets by 0.001 or less.'
+  novelty: First route led by a soft-tissue structure.
+  coverage: Every study; the meniscus routes.
+  exploitation: 'Read both meniscus labels at both multipliers against the incumbent. Log on validation
+    the share of each meniscus label''s attention on tokens whose predicted meniscus share is above half
+    the full-weight share (two metrics). Shown wrong by: neither meniscus label above the incumbent at
+    either multiplier.'
+  budget: 'Same cost as the incumbent: within 1.02 of its training time.'
+  implementation: Follow the environment paragraph of the developer instructions. modeling/model.py and
+    training/lightning.py for the two metrics. Adds one membership inside existing unions and removes
+    nothing. Report on one batch the mean applied increase of the route weights and that routes other
+    than the meniscus and tear routes are bit-identical. Update SPATIAL_TOKEN_IDENTITY where it describes
+    the meniscus routes.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The use the meniscus head was built for; last because it needs the head adopted.
+exhausted_directions: ''

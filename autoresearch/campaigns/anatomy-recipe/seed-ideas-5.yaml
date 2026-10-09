@@ -1,0 +1,45 @@
+ideas:
+- id: coronal-fluid-crops-at-108-mm-2
+  mechanism_id: crop-field
+  parent_idea_id: null
+  title: Cut the posed fluid coronal crops at 108 mm instead of 93.3 mm, leaving T1/PD at 84 mm
+  opportunity: 'User-ordered on 2026-10-08, which lifts the bar on crop widths for this seed. Measured
+    premise, effect a guess. The field comes from the bone extents of the 550 mask knees with the incumbent''s
+    joint target: 108 mm is the field at which the bone edge plus 5 mm is inside on the tighter side for
+    95% of knees, against 45% at 93.3 mm and 87% at 103.7 mm; the fibular head is inside for 93% against
+    57%. The 5 mm for the collateral ligaments is an assumption. Past 108 mm almost nothing is left to
+    gain (99% at 112 mm). Checked on the validation fold with the control''s weights: the 108 mm posed
+    crop lies inside the acquired image for 99.75% of its area, 1.9% of slices under 95% (5.6% at 120
+    mm); examples in outputs/analysis/a/anatomy-masks-field/fluid-fields/coronal-fluid.png. The run that
+    widened both coronal series to 93.3 and 103.7 mm was level at x4 (+0.00015) with MCL +0.0015, Contusion
+    +0.0013 and the menisci unharmed (anatomy-masks run 11). The pixel goes from 0.417 to 0.482 mm, finer
+    than the axial views'' 0.536 mm.'
+  mechanism: One zoom factor s = 108 / 93.333 for the fluid coronal view only. In ViewWindows (modeling/model.py)
+    its posed cut samples the canvas on a grid whose pixel pitch is s canvas pixels, in the same bicubic
+    resampling as the turn; crop_affine carries the scale; the joint target keeps its offset in mm, so
+    geometry divides it by s in crop pixels; that view is always resampled. Set data.view_shift_limit_mm
+    to 24.5 and replace MAX_VIEW_SHIFT_FRACTION * margin in frame_pose and jitter by a per-view limit
+    in canvas pixels, min(margin - (s - 1) * image_size / 2 - 0.25 * round(17 mm / pixel pitch), 0.75
+    * round(17 mm / pixel pitch)), so every view keeps today's 12.75 mm of shift and today's 4.25 mm of
+    slack to the canvas edge. All other views, the first look, slice counts and image size do not change.
+  precedents:
+  - 'coronal-crops-a-ninth-wider (anatomy-masks run 11): both coronal series wider, x4 +0.00015, x1 -0.00037.'
+  novelty: First wider field on one contrast of a plane.
+  coverage: Every fluid coronal series.
+  exploitation: 'Read both multipliers against the control with MCL, Contusion, Fracture, Medial OA, Lateral
+    OA and both menisci, and on validation only the share of fluid coronal series at the shift limit.
+    Shown wrong by: MCL and Contusion both below the control at x4, or the macro below at both multipliers.'
+  budget: Canvases 354 and 342 px against 314 and 306, about 27% larger in area; training within 1.08
+    of the control, from the canvases only (an estimate from the 20% larger canvases of anatomy-masks
+    runs 10 and 11, which cost 5 to 7%).
+  implementation: Follow the environment paragraph of the developer instructions. modeling/model.py and
+    configs/training.yaml (data.view_shift_limit_mm only). Replaces the fluid coronal crop at its own
+    field; no flag selects the old one. The run of anatomy-masks that did this for both coronal series
+    is in outputs/autoresearch/anatomy-masks/experiments/coronal-crops-a-ninth-wider-*/changes.diff, including
+    the validity-rectangle repair its review asked for; apply it to one view. Report the field in mm of
+    a fluid coronal crop from its corner tokens (expect 108.0) and that every other view's crops are bit-identical
+    to the control's at the same pose. Update SPATIAL_TOKEN_IDENTITY['preparation'].
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The half of the coronal field run that carried its gains, at half its cost.
+exhausted_directions: ''

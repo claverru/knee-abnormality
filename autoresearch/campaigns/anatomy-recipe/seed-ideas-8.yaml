@@ -1,0 +1,66 @@
+ideas:
+- id: crop-size-per-knee-from-the-first-look
+  mechanism_id: crop-field-per-knee
+  parent_idea_id: null
+  title: Size the sagittal and coronal crops to each knee, from the first look
+  opportunity: 'User-ordered on 2026-10-08. Measured premise, effect a guess. Knee size varies by 8.0%
+    across knees (550 mask knees: femur width 73.7 mm sd 6.3, 5th to 95th percentile 65.0 to 83.9; femur
+    back to kneecap front moves with it, correlation 0.76), and the scanner''s field does not normalise
+    it (correlation 0.15, 2% of the size variance). With fixed fields the share of the crop a knee''s
+    bones fill varies by 8.7% in the coronal views and 8.2% in the sagittal views. The first look estimates
+    the size from the model alone: on the 150 validation knees of fold 1 with the incumbent''s weights
+    the estimate below correlates 0.939 with the masks'' size, residual 2.1 mm (2.8%), and scaling by
+    it brings the fill''s spread to 3.8% (coronal) and 4.1% (sagittal). Widening a view for every knee
+    lost (run 3: x4 -0.0017); here the mean scale is 1, so the average knee keeps today''s crop and resolution.
+    Measurements, tables and drawings: outputs/analysis/k/knee-size-crops/ in the campaign root (/home/claudio/src/knee-abnormality-side-routed-heads),
+    q3-constants.json for the constants.'
+  mechanism: 'In the no-gradient first look (KneeAbnormalityModel.first_look_pose, modeling/model.py),
+    after the frame is fitted, compute one size per study from tensors it already holds: position (medial,
+    front, up, in mm in the fitted frame), the detached anatomy shares, valid = visual_valid and routable,
+    and the image plane. Width spread sd_m: weighted standard deviation of the medial coordinate with
+    weights valid * (plane is axial or coronal) * (femur share * [-5 < up < 45] + tibia share * [-30 <
+    up < 5]). Depth spread sd_f: weighted standard deviation of the front coordinate with weights valid
+    * (plane is axial or sagittal) * femur share * exp(-0.5 * ((up - 20) / 20)^2). size = sqrt(sd_m *
+    sd_f); scale = clamp(size / 17.087, 0.87, 1.13), and 1.0 when either weight sum is zero. The scale
+    is one number per knee and multiplies the field of the four sagittal and coronal views (84 mm views
+    become 73.1 to 94.9 mm, 93.3 mm views 81.2 to 105.5 mm); axial views are untouched. It enters the
+    same affine that shifts and turns the crop, as scale times the rotation with the joint''s target offset
+    kept in mm, so each slice is still sampled once. Set data.view_shift_limit_mm to 23.5 (17 + 0.13 *
+    93.33 / 2) and keep every view''s shift limit in mm at today''s value. Token positions stay in true
+    millimetres through the crop''s affine, so nothing else is told the scale. The first look itself is
+    cut at scale 1 as today.'
+  precedents:
+  - 'coronal-fluid-crops-at-108-mm-2 (run 3): one view wider for every knee, x4 -0.0017, x1 -0.0018; its
+    cut with a scale inside the affine passed review.'
+  - 'Knee-size study of 2026-10-08 (outputs/analysis/k/knee-size-crops): estimator against masks r 0.939
+    on 150 knees; 5.3% of knees reach the clamp.'
+  novelty: First crop whose field in millimetres follows the knee; every earlier field was one constant
+    per view.
+  coverage: Every study; the four sagittal and coronal views.
+  exploitation: 'Read the macro at both multipliers against the incumbent, then per label, and separately
+    the smallest and largest thirds of knees by the logged scale if the comparison allows. Shown wrong
+    by: the macro below the incumbent at both multipliers with the scale confirmed active.'
+  budget: Canvases 21 to 24% larger in area for the sagittal and coronal series and nearly every slice
+    of those views resampled once, where today only turned slices are. Training up to 1.2 times the incumbent's
+    time from those two causes only; report the step time against the incumbent's and remove anything
+    else.
+  implementation: 'Follow the environment paragraph of the developer instructions. modeling/model.py,
+    configs/training.yaml (data.view_shift_limit_mm only), data/dataset.py only if the cut needs the series
+    of each view listed in the collate, and training/lightning.py for the metrics below only. Reuse the
+    cut the review approved for the coronal field seed, frozen at /home/claudio/src/knee-abnormality/outputs/autoresearch/anatomy-recipe/experiments/coronal-fluid-crops-at-108-mm-2-20261008T125159Z-a6380fd8/source
+    (changes.diff beside it): replace its per-view scale constant by the per-knee scale for the four sagittal
+    and coronal views, keep the axial series on the exact integer cut, sample each slice once, and add
+    no torch.where between two full results. The size is computed once per study inside the existing first
+    look, with masked sums on tensors already there: no loop over studies, no second evaluation of the
+    pose or the frame, no extra forward pass. The review asks for a logged proof that the change is active:
+    log on validation only, through _log_epoch_metric, the mean and the standard deviation across knees
+    of the applied scale and the fraction of knees at a clamp (three metrics; expect a mean near 1.00,
+    a deviation near 0.07 and about 5% clamped; the reference 17.087 was measured on validation knees,
+    so say what the mean is on the first epoch). Report on one batch that a study given scale 1 yields
+    crops equal to the incumbent''s within one grey level, and that axial crops are bit-identical. Update
+    the view_policy entry of SPATIAL_TOKEN_IDENTITY.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Ordered by the user to run as soon as possible; the size estimate is measured and
+    the cut already passed review.
+exhausted_directions: ''

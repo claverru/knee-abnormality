@@ -1,0 +1,35 @@
+ideas:
+- id: report-attribute-loss-off-2
+  mechanism_id: report-attribute-weight
+  parent_idea_id: null
+  title: Train without the report-attribute loss
+  opportunity: 'User-ordered on 2026-10-08. A guess. The loss was last measured before the 84/93 mm views
+    and before the anatomy map: removing it cost -0.0006 at x4 (80% -0.0011 to -0.0001) and halving it
+    -0.0004 (revisits campaign, docs/modeling/report-attribute-heads.md). The map now draws on the same
+    token features, and three anatomy-masks runs saw Synovitis fall when an auxiliary reading was added
+    (run notes, runs 7 and 8).'
+  mechanism: 'Set trainer.report_attribute_loss_weight: 0 in configs/training.yaml. At zero the training
+    step does not compute the term and validation does not compute its fit; the heads stay in the model
+    untrained. One source addition, for the review''s activation proof only: in training/lightning.py
+    log one validation-only metric through _log_epoch_metric, tied to the existing predicate that skips
+    the report step (one when the step is skipped, zero when it runs). Nothing is added to the training
+    step and no forward pass.'
+  precedents:
+  - 'Removing the heads on ResNet-18, 2026-10-01: -0.0006 at x4.'
+  - 'Adding them, 2026-09-25: +0.00105 at x4, 0.940 public against 0.938.'
+  novelty: First measurement of the loss beside the anatomy map.
+  coverage: Every training study with report answers.
+  exploitation: 'Rule: the loss is removed only if this run is at least the control at both x1 and x4,
+    the campaign''s adoption rule; otherwise 0.1 stays. Read per target Synovitis, Effusion, PF OA and
+    both menisci, and the map''s overlap per class and plane error against the control''s, to see whether
+    the two auxiliary losses compete. Shown wrong by: the run below the control at both multipliers.'
+  budget: 'Slightly cheaper than the control: the report step is about 6 ms of a 245 ms training step.'
+  implementation: 'Follow the environment paragraph of the developer instructions. configs/training.yaml
+    (trainer.report_attribute_loss_weight: 0) and the one validation metric in training/lightning.py;
+    no other source change. This replaces the first attempt, which the review blocked because the seed
+    forbade the activation metric; that was a harness block, not a result. Report that no report_attribute
+    loss is logged and that the anatomy and side losses are unchanged on one batch.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Ordered first by the user; settles whether the loss still earns its place.
+exhausted_directions: ''

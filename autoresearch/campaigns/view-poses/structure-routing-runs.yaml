@@ -1,0 +1,134 @@
+title: Structure routing (after view-poses)
+fold: 1
+reference:
+  name: sagittal-fluid-canvas-fine (reference)
+  run: outputs/autoresearch/view-poses/experiments/sagittal-fluid-canvas-fine-20261009T054235Z-c95da7ce/training
+runs:
+- name: soft-tissue routing, additive
+  run: outputs/training/rn18-soft-tissue-routing
+  note: seven-class soft-tissue head; mask shares added on top of the geometric halves
+  curves: false
+- name: no soft-tissue head
+  run: outputs/training/rn18-no-soft-tissue-head
+  note: reference without the soft-tissue head and its loss
+  curves: false
+- name: per-token mask routes (stopped at epoch 6)
+  run: outputs/training/rn18-anatomy-routing-attempt3-stopped
+  note: five joint labels read their structure's tokens only
+  curves: false
+- name: structure-centred routes (stopped at epoch 6)
+  run: outputs/training/rn18-structure-centred-routes-stopped-epoch6
+  note: five joint labels read a neighbourhood around their structure
+  curves: false
+- name: every target on a structure
+  run: outputs/training/rn18-every-target-on-a-structure
+  note: all twelve labels anchored; notch, medial band and posterior region derived from the bone masks; two-way link
+  curves: false
+- name: structure routes, no side prediction
+  run: outputs/training/rn18-structure-routes-no-side
+  unit: knee-structure-no-side
+  note: PF OA on the kneecap joint, bone for Contusion and Fracture, side head, position priors and geometric regions removed
+  curves: false
+- name: confidence by peak share (stopped at epoch 1)
+  run: outputs/training/rn18-structure-routes-confident
+  unit: knee-structure-confident
+  note: three-class meniscus head beside a cartilage head, both reading the bone map; routes blended by the head's confidence; learned anchor mix; no route constants
+  curves: false
+- name: concentration and learned anchors (stopped at epoch 6)
+  run: outputs/training/rn18-structure-routes-concentration
+  unit: knee-structure-concentration
+  note: as the stopped run, but a route trusts its structure by how concentrated it is in the knee instead of by its peak share
+  curves: false
+- name: union of structure neighbourhoods
+  run: outputs/training/rn18-structure-routes-union
+  unit: knee-structure-union
+  note: each label reads a learned union of per-structure neighbourhoods (bones included), members weighted by how well located they are, slow fall-off instead of a Gaussian
+  curves: false
+- name: union, members count when present
+  run: outputs/training/rn18-structure-routes-union-present
+  unit: knee-structure-union-present
+  note: as the union run without the concentration trust (it penalised long thin structures); a structure counts when present in the knee; the side from the fibula is a plain left-or-right decision again
+  curves: false
+- name: include and exclude
+  run: outputs/training/rn18-structure-routes-include-exclude
+  unit: knee-structure-include-exclude
+  note: a label can exclude a structure's neighbourhood as well as include it; the two soft-tissue head losses averaged so their weight equals the reference's single head
+  curves: false
+- name: three labels unanchored
+  run: outputs/training/rn18-structure-routes-unanchored-three
+  unit: knee-structure-unanchored-three
+  note: Effusion, Synovitis and Fracture start from the whole knee and learn exclusions; Contusion reads tokens by their own bone share; include and exclude kept
+  curves: false
+- name: mask heads read the position
+  run: outputs/training/rn18-structure-routes-positioned-masks
+  unit: knee-structure-positioned-masks
+  note: the meniscus and cartilage heads also read each token's position in the knee frame, signed toward the fibula from the bone map, to tell medial from lateral
+  curves: false
+- name: hard mask regions (stopped at epoch 6)
+  run: outputs/training/rn18-mask-regions-hard
+  unit: knee-mask-regions-hard
+  note: hard in-or-out regions grown from each structure's predicted extent, exact medial-lateral partition, masks one-way, no height table; Contusion by bone share, Fracture unrouted
+  curves: false
+- name: territories (stopped at epoch 6)
+  run: outputs/training/rn18-mask-territories
+  unit: knee-mask-territories
+  note: each token goes to its nearest of six landmark groups from the masks; a label reads a union of territories; derived regions on their own head; bone map back to seven classes
+  curves: false
+- name: territories, crop targets restored (stopped at epoch 6)
+  run: outputs/training/rn18-mask-territories-crop-targets
+  unit: knee-mask-territories-crop-targets
+  note: the territories build with the two joint-centre crop targets of the reference restored; nothing else changed
+  curves: false
+- name: reference retrained
+  run: outputs/training/rn18-reference-retrained
+  unit: knee-reference-retrained
+  note: the reference's own code and configuration (per-epoch logging only), same seed and fold, trained again
+  curves: false
+- name: territories, medial labels on the medial territory
+  run: outputs/training/rn18-mask-territories-medial-alone
+  unit: knee-mask-territories-medial-alone
+  note: crop targets kept; Medial Meniscus and Medial OA read the medial territory alone, like the lateral pair
+  curves: false
+- name: no side prediction, crop targets restored (stopped at epoch 4, the user does not want the targets)
+  run: outputs/training/rn18-structure-routes-no-side-crop-targets
+  unit: knee-no-side-crop-targets
+  note: the closest finished build (soft structure routes, no side head) with the two crop targets of the reference restored; nothing else changed
+  curves: false
+- name: no side prediction, regions on their own head (stopped at launch by the user)
+  run: outputs/training/rn18-no-side-own-region-head
+  unit: knee-no-side-own-region-head
+  note: the closest finished build (soft structure routes, no side head, centred crops) with notch, medial band and posterior region on a head of their own and the bone map back to seven classes
+  curves: false
+- name: reference with centred crops
+  run: outputs/training/rn18-reference-centred-crops
+  unit: knee-reference-centred-crops
+  note: the reference unchanged except that the two hardcoded joint-centre crop targets are removed (joint centre at the middle of the crop)
+  curves: false
+- name: reference with per-view losses
+  run: outputs/training/rn18-reference-view-heads
+  unit: knee-reference-view-heads
+  note: 'the reference unchanged, plus an auxiliary loss: each of the six views pooled alone and trained on the study labels, at the weight of the joint loss'
+  curves: false
+- name: per-view losses plus a detached MLP
+  run: outputs/training/rn18-reference-view-mlp
+  note: the per-view-loss run plus a detached two-layer MLP on the six views logits that corrects the joint answer; the final prediction
+  curves: false
+- name: per-view heads only, detached cross layer on top (stopped at epoch 6 by the user)
+  run: outputs/training/rn18-reference-view-cross-pure
+  note: 'no joint loss: the six views are trained only by their own losses; final answer = mean of the present views logits plus a detached cross layer (x times (Wx+b) plus x) and a linear readout'
+  curves: false
+- name: per-view heads only, detached MLP with view dropout (stopped at epoch 5 by the user)
+  run: outputs/training/rn18-reference-view-mlp-dropout
+  note: no joint loss; final answer = mean of the present views logits plus a detached two-layer MLP; in training each present view is hidden from the MLP with probability 0.2
+  curves: false
+- name: reference with a small per-view loss
+  run: outputs/training/rn18-reference-view-loss-small
+  note: the reference unchanged, plus the per-view loss (each view pooled alone, graded on the study labels) at a small weight (trainer.view_loss_weight, 0.1 unless overridden at launch)
+  curves: false
+- name: small per-view loss, crops without typed numbers
+  run: outputs/training/rn18-reference-free-crops
+  note: 'the small-per-view-loss recipe with a crop pose free of typed numbers: joint at the crop centre, shift limited by the canvas, no turn limit, axial centre from the femur and kneecap centroid, scale from the running mean knee size'
+  curves: false
+- name: no side prediction, reference crops
+  run: outputs/training/rn18-structure-routes-no-side-reference-crops
+  note: the best structure routing (soft structure neighbourhoods, no side head, no position priors, no geometric regions) on the crops of the reference, with its two joint-centre crop targets; the finished no-side run had centred crops

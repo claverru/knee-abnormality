@@ -1,0 +1,151 @@
+ideas:
+- id: kneecap-inside-the-fluid-sagittal-crop-per-knee-2
+  mechanism_id: crop-target-position
+  parent_idea_id: null
+  title: Move the fluid sagittal crop forward only as far as each knee's kneecap needs
+  opportunity: 'Measured premise, effect a guess. The kneecap''s front lies 55.9 mm in front of the plateau
+    centre (sd 5.3) and the 93 mm fluid sagittal crop reaches 51.6 mm with the incumbent''s joint target;
+    a fixed move of 8.6 mm for every knee put 38% of the fluid sagittal series at the shift limit and
+    scored x4 -0.0005 (anatomy-masks run 7). Checked on the validation fold with the control''s weights
+    (prior-work.md, Premise checks): the first look predicts kneecap tokens in every knee; the share-weighted
+    mean front coordinate of the kneecap share tracks the mask''s kneecap front with correlation 0.67
+    on 150 knees (the largest front coordinate among kneecap tokens: 0.56) and lies 11.9 mm behind it
+    on average, leaving a residual of 3.9 mm against 5.3 mm for a constant. The move a knee needs is 7.4
+    mm on average (p90 14.3) and positive for 93% of knees, on top of pose shifts with a spread of 4 mm,
+    so inside today''s 12.75 mm limit it would be clipped as the fixed move was.'
+  mechanism: In KneeAbnormalityModel.first_look_pose (modeling/model.py), after the frame is fitted, take
+    per study the mean front coordinate, in the frame, of the first look's tokens weighted by their detached
+    kneecap share (valid, routable tokens of every view), add 11.9 mm, and subtract the fluid sagittal
+    crop's forward reach (half the field plus the sagittal target's forward offset). Where the result
+    is positive, shift the fluid sagittal view's crop forward by it in the same call of frame_pose, before
+    the clamp. Set data.view_shift_limit_mm to 22.5 and give the fluid sagittal view the limit 0.75 *
+    margin (16.9 mm) while every other view keeps today's 12.75 mm, as min(0.75 * margin, 0.75 * round(17
+    mm / pixel pitch)) in canvas pixels. One weighted mean over tensors the first look already holds;
+    no extra pass. T1/PD sagittal, coronal and axial crops do not change.
+  precedents:
+  - 'fluid-sagittal-crops-moved-forward-for-the-kneecap (anatomy-masks run 7): fixed 8.6 mm, 38% at the
+    limit, x4 -0.0005.'
+  novelty: First crop move set by the knee's own kneecap.
+  coverage: The fluid sagittal series of knees whose kneecap reaches the crop's front edge.
+  exploitation: 'Read PF OA, Effusion and Synovitis at both multipliers against the control. On validation
+    only, log the mean forward move in mm, the share of fluid sagittal series moved and the share at the
+    shift limit (three metrics). Shown wrong by: more than 20% of fluid sagittal series at the shift limit,
+    or PF OA and Effusion both below the control at x4.'
+  budget: Canvases about a fifth larger in area for the sagittal and coronal series; training within 1.08
+    of the control, from the canvases only.
+  implementation: 'Follow the environment paragraph of the developer instructions. modeling/model.py and
+    configs/training.yaml (data.view_shift_limit_mm only). Replaces nothing; the fixed sagittal target
+    stays as the starting point. Report on one batch the mean and largest move in mm and that every other
+    view''s pose is bit-identical to the control''s. Update SPATIAL_TOKEN_IDENTITY[''preparation'']. The
+    review asks every candidate for a logged proof that its change is active: add exactly one validation-only
+    metric for it through _log_epoch_metric in training/lightning.py (the mean forward move applied to
+    the fluid sagittal crop, in mm); that file may be edited for this metric alone. Nothing is added to
+    the training step. For the larger canvas, reuse the cut the review approved for the coronal field
+    seed, frozen at /home/claudio/src/knee-abnormality/outputs/autoresearch/anatomy-recipe/experiments/coronal-fluid-crops-at-108-mm-2-20261008T125159Z-a6380fd8/source
+    (changes.diff beside it): the views with their own margin are listed once in the collate (data/dataset.py
+    may be edited for that list), the other series are cut from a window of their former canvas size so
+    they stay bit-identical, and each slice is sampled once. Here no view is rescaled; only the fluid
+    sagittal view''s shift limit grows.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The kneecap is whole in a minority of fluid sagittal crops, and the fixed move was
+    clipped.
+- id: joint-centre-offset-from-the-training-knees-2
+  mechanism_id: joint-centre-offset
+  parent_idea_id: null
+  title: Remove the joint centre's measured offset and restore the crop targets measured with the true
+    centre
+  opportunity: 'Measured. The map''s joint centre sits in front of and to one side of the plateau centre
+    by the same amount in every run: on the training knees with targets its signed error averages +1.23
+    mm across and +2.07 mm front to back over the control''s last three epochs (anatomy_centre_error_*_mm_mean
+    in its metrics.csv; +0.94 and +1.74 mm on validation), with a spread of 2.4 and 1.9 mm. The incumbent
+    absorbed it by re-measuring the crop targets on eight validation knees (sagittal 4.89, 2.73 mm; coronal
+    -2.08, 2.03 mm) instead of the targets measured with the true centre on the masks (sagittal 7.4, 2.3
+    mm; coronal -1.1, 1.3 mm), so the crops are framed as before but the sections and regions, which are
+    centred on the same point, stay 1 to 2 mm off. Confirmed independently on 150 validation knees with
+    targets, first look: +1.18 mm across and +2.13 mm front (frame comparison, anatomy-masks run notes).
+    The two sets of targets differ by 2.5 mm forward in sagittal and 1.0 mm across in coronal, which is
+    this offset to within half a millimetre.'
+  mechanism: In KneeAbnormalityModel.anatomical_frames (modeling/model.py) subtract (1.23, 2.07) mm from
+    the across and front coordinates of the bone-weighted centroid before it is projected onto the plane.
+    Set CORONAL_JOINT_TARGET_MM back to (-1.1, 1.3) and SAGITTAL_JOINT_TARGET_MM back to (7.4, 2.3). Two
+    constants and one subtraction; nothing else changes.
+  precedents:
+  - 'joint-centre-from-the-map-instead-of-the-spots (the incumbent''s centre): x4 level, 0.954 public.'
+  - 'joint-centre-with-equal-view-exposure: moved the centre 0.06 mm and scored like a rerun.'
+  novelty: First centre without its fixed bias, and crop targets from 550 knees instead of eight.
+  coverage: 'Every knee: the regions and sections move by 1 to 2 mm, the crops by the difference between
+    the two sets of targets and the offset, under 1 mm on average.'
+  exploitation: 'Read both multipliers against the control with both menisci and the three OA targets,
+    whose regions are centred on this point. The existing validation metrics anatomy_centre_error_across_mm_mean
+    and anatomy_centre_error_front_mm_mean must fall below 0.5 mm in absolute value. Shown wrong by: either
+    mean above 0.5 mm, or the macro below the control at both multipliers.'
+  budget: 'Same cost as the control: within 1.02 of its training time.'
+  implementation: 'Follow the environment paragraph of the developer instructions. modeling/model.py only.
+    Replaces the two re-measured targets and adds the offset; adds no metric to the training step. Report
+    on one batch the mean crop shift in mm against the control''s for sagittal and coronal series (expect
+    under 1 mm). Update the view_policy entry of SPATIAL_TOKEN_IDENTITY, which names the targets. The
+    review asks every candidate for a logged proof that its change is active: add exactly one validation-only
+    metric for it through _log_epoch_metric in training/lightning.py (the mean across and front offset
+    subtracted from the centroid, in mm, read from the tensors the frame already holds); that file may
+    be edited for this metric alone. Nothing is added to the training step.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: A measured bias with a two-constant repair; last of the agreed seeds.
+- id: tokens-on-the-14-by-14-grid-2
+  mechanism_id: token-grid
+  parent_idea_id: null
+  title: Tokens on the 14 by 14 grid, the stride-16 features summed with the stride-32 features
+  opportunity: 'Measured premise, effect a guess. A token of the 7 by 7 grid covers 12.0 mm (84 mm crops),
+    13.3 mm (93 mm crops) and 17.1 mm (120 mm axial views) a side, while the map''s targets are sampled
+    from masks at 1 mm. The classes thinner than a token are the ones the map learns worst: femur 0.905
+    and tibia 0.899 against joint 0.759, kneecap 0.735 and kneecap joint 0.675 (soft Dice per token, 150
+    validation knees, prior-work.md). The joint plane, the centre, the sections and every route are read
+    from these shares, so a 6 to 8.6 mm token gives all of them a finer map. Before the masks, finer tokens
+    had nothing to place them: on ReXNet-200 truncation at stride 16 lost 0.0042 and the sum of the two
+    scales tied at +0.0011 with the menisci up (docs/history/stride16-feature-fusion.md); those runs had
+    no anatomy map, no sections and no posed crops.'
+  mechanism: 'In KneeAbnormalityModel (modeling/model.py) the backbone keeps all its stages and weights.
+    The tokens are taken on the grid of layer3 (stride 16, 14 by 14 at 224 px): token = P16(layer3 features)
+    + P32(layer4 features) repeated to the 14 by 14 grid by nearest-neighbour upsampling (each stride-32
+    cell to its four stride-16 cells), where P32 is the existing shared projection to 256 and P16 is a
+    new linear projection of layer3''s channels to 256 with the same initialisation. Everything after
+    the projection (embeddings, LayerNorm, position, the map head, the plane fit, the sections, the routes,
+    the pooling, the first look) runs unchanged on 196 tokens per image instead of 49. The token anchors
+    and footprints come from layer3''s verified geometry: add the stride-16 mapping to BACKBONE_MAPPINGS
+    in modeling/spatial_tokens.py and check it against the layers as the stride-32 one is. The feature
+    statistics augmentation stays at stride 8. The map''s targets are looked up at the new anchors by
+    the existing lookup; nothing in the prepared targets changes.'
+  precedents:
+  - 'fusion-sum (2026-09-22, ReXNet-200, no map): x4 +0.0011, menisci +0.0027, same training time and
+    memory as its control.'
+  - 'stride16 truncation (2026-09-22): x4 -0.0042, menisci +0.0063, the other eight labels -0.0073; the
+    reason this seed keeps the stride-32 term.'
+  novelty: First finer grid with a taught anatomy map, sections and posed crops reading it.
+  coverage: Every study, every view, every token.
+  exploitation: 'Read the macro at both multipliers against the control, then the menisci, the cartilage
+    labels and PF OA. The per-epoch map overlap per class and the joint plane''s error are already logged:
+    compare joint, kneecap and kneecap joint with the control''s 0.759, 0.735 and 0.675 and the plane
+    error with 1.73 mm. Shown wrong by: the thin classes'' overlap and the plane error not better than
+    the control''s, or the macro below it at both multipliers.'
+  budget: 'Runs whatever it costs, by the user''s decision of 2026-10-08: the campaign''s ceiling was
+    raised to 2.5 times the control''s training time for this seed alone. The backbone is unchanged and
+    the earlier sum on ReXNet-200 trained in its control''s time, so a step much slower than the control''s
+    points to a defect in the candidate (a loop, a second evaluation, a synchronisation), not to the mechanism:
+    report the candidate''s step time and peak memory against the control''s, and repair what is not the
+    four-fold token count. Do not reduce slices, studies, batch or epochs.'
+  implementation: 'Follow the environment paragraph of the developer instructions. modeling/model.py and
+    modeling/spatial_tokens.py only. No option selects the 7 by 7 grid. Write nothing that loops over
+    tokens or images; the upsampling is one repeat_interleave or nearest interpolate on the projected
+    stride-32 map. Report on one batch the token count per image (196), the anchors of the first two tokens
+    in pixels against layer3''s geometry, and that the map''s target lookup returns the same class for
+    a token as the mask at its anchor. Update SPATIAL_TOKEN_IDENTITY (projection and token) and the backbone
+    mapping identity. The review asks every candidate for a logged proof that its change is active: add
+    exactly one validation-only metric for it through _log_epoch_metric in training/lightning.py (the
+    number of tokens per image); that file may be edited for this metric alone. Nothing is added to the
+    training step.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The map's thin classes are thinner than a token, and everything the recipe routes
+    with is read from them.
+exhausted_directions: ''
