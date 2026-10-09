@@ -22,6 +22,7 @@
 | Read when | Section |
 |---|---|
 | Checking current backbone, input and training settings | [Model recipe](current-model.md#recipe) |
+| Checking where the ResNet's tokens sit in the 224 px crop and why 225 or 257 px was not adopted | [Token grid alignment](../validation/results/2026-10-08-token-grid-alignment.md#the-224-px-grid) |
 | Finding when a recipe change was adopted, its paired evidence and the control retrained after it (seeds, folds) | [Adoption history](current-model.md#adoption-history) |
 | Reproducing the current model run | [Model reproduction](current-model.md#reproduce) |
 | Checking per-label positive and negative BCE weights | [Class-balanced BCE](supervision.md#fixed-class-balanced-bce) |
