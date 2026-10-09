@@ -199,7 +199,9 @@ def label(name: str) -> str:
 def epoch_metrics(fold: Path) -> dict[int, dict]:
     metrics = {}
     for path in sorted((fold / "epochs").glob("metrics_epoch_*.json")):
-        metrics[int(path.stem.rsplit("_", 1)[1])] = json.loads(path.read_text())
+        text = path.read_text()
+        if text.strip():
+            metrics[int(path.stem.rsplit("_", 1)[1])] = json.loads(text)
     return metrics
 
 
