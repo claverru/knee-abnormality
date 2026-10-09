@@ -32,9 +32,9 @@ class Settings(CLISettings):
     run_dir: Path = Path("outputs/training/oblique-x4")
     output_dir: Path = Field(description="Fresh output directory")
     census: Path = Path(
-        "outputs/analysis/series-filtering-20260917/series_flags_with_triplets.parquet"
+        "outputs/analysis/s/series-filtering-20260917/series_flags_with_triplets.parquet"
     )
-    files: Path = Path("outputs/analysis/repeated-series-20260922/files.parquet")
+    files: Path = Path("outputs/analysis/r/repeated-series-20260922/files.parquet")
     fold: int = 0
     threads: int = 16
     workers: int = 4

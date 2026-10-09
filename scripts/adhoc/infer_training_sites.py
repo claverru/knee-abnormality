@@ -7,7 +7,7 @@ from pydantic import Field
 from knee_abnormality.cli import CLISettings, describe
 from knee_abnormality.data.splits import STUDY
 
-HEADERS = Path("outputs/analysis/sharing-disagreement-20260914/study_headers.parquet")
+HEADERS = Path("outputs/analysis/s/sharing-disagreement-20260914/study_headers.parquet")
 SCRIPT_CHECKS = {
     "mongolian_letters": r"[өүӨҮ]",
     "cyrillic": r"[Ѐ-ӿ]",

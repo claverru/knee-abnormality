@@ -243,7 +243,7 @@ What these tables add:
 ## Slice budget: what each series type can supply
 
 All 4,407 training studies, headers only (`scripts/adhoc/measure_slice_capacity.py`, outputs in
-`outputs/analysis/slice-budget-20261002/`). "Positions" are distinct slice positions in the
+`outputs/analysis/s/slice-budget-20261002/`). "Positions" are distinct slice positions in the
 sampler's pool for that type. The budget in the config is 6 slices per axial type and 5 per
 coronal or sagittal type, with a study total of at least 26.
 
@@ -382,7 +382,7 @@ Newest first within each group. x4 unless marked x1.
 ### Measurements
 
 - **Regression of width per type against AUC per label** (17 single-width runs, 2026-10-02;
-  `outputs/analysis/view-regression-20261002/report.md`, refit with
+  `outputs/analysis/v/view-regression-20261002/report.md`, refit with
   `uv run --locked python -m scripts.adhoc.fit_view_width_regression`).
   - The incumbent's widths are the best combination among tested widths, but every single-type
     change from it is predicted only 0.0001 to 0.0005 lower, none distinguishable from zero.
@@ -410,7 +410,7 @@ Newest first within each group. x4 unless marked x1.
   in `t1pd-detail-84`, against 0.35 to 0.43 for the plane and contrast embeddings.
 - **Positions.** Zoomed tokens carry their true position in the 120 mm frame of their series,
   through the same resampling maps that cut the window.
-- **Spacing review** (`outputs/analysis/view-spacing-20261002/report.md`): 84 mm and 93 mm keep
+- **Spacing review** (`outputs/analysis/v/view-spacing-20261002/report.md`): 84 mm and 93 mm keep
   the acquired detail of about nine in ten coronal and sagittal series; the next coarser
   candidate loses 10 to 17 points.
 

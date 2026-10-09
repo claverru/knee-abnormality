@@ -15,7 +15,7 @@ from knee_abnormality.inference.checkpoint import checkpoint_model, read_checkpo
 from knee_abnormality.inference.engine import move_batch
 
 RUN = Path("outputs/training/20261006-163650-side-routed-spot-frame-ring-sectors")
-OUT = Path("outputs/analysis/routing-and-shifts-frames-20261007/knee-bend")
+OUT = Path("outputs/analysis/r/routing-and-shifts-frames-20261007/knee-bend")
 OUT.mkdir(parents=True, exist_ok=True)
 BINS = np.arange(-60.0, 75.0, 5.0)
 UPPER, LOWER = (30.0, 65.0), (-50.0, -15.0)

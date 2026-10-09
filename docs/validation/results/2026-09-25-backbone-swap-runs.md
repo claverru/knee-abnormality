@@ -22,7 +22,7 @@ registered at origin 15.5, stride 32) against `knee-geometry-merged-2`, fold 0 o
 
 - **Every family lost:** meniscus −0.0129, OA −0.0262 (PF OA −0.0454, Lateral OA −0.0348), the
   other eight −0.0191 (ACL −0.0300, Synovitis −0.0291, MCL −0.0261); only Baker's gained
-  (+0.0061). Selected epoch 9 (`outputs/analysis/convnext-atto-vs-knee-geometry-merged-2/comparison.json`).
+  (+0.0061). Selected epoch 9 (`outputs/analysis/c/convnext-atto-vs-knee-geometry-merged-2/comparison.json`).
 - **Half the time, a quarter of the memory,** but the AUC gap is too large for a cost trade.
 - **Runtime finding:** its first contiguous-NCHW BF16 run left the RTX 3090 at 1–33% utilization
   with the autograd thread CPU-bound, because every distinct flattened triplet count paid a new
@@ -37,7 +37,7 @@ registered at origin 15.5, stride 32) against `knee-geometry-merged-2`, fold 0 o
 `rexnetr-200`, 2026-09-25, config `configs/rexnetr-200.yaml` in the worktree:
 `rexnetr_200.sw_in12k_ft_in1k` against `oa-detector-control`, fold 1, seed 1485198267, all rates
 unchanged. ×4 macro 0.8952 against 0.9006, **−0.0053**, paired report-group bootstrap 95%
-[−0.0098, −0.0010] (`outputs/analysis/rexnetr-200-vs-oa-detector-control/comparison.json`).
+[−0.0098, −0.0010] (`outputs/analysis/r/rexnetr-200-vs-oa-detector-control/comparison.json`).
 Training took 1607 s against 1639 s, with the same peak memory. The worktree's older OA-detector
 port changes the preprocessing source hash; the comparison allowed that difference.
 

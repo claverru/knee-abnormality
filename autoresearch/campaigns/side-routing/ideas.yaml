@@ -108,7 +108,7 @@ ideas:
     and Medial OA and Lateral OA, which gave up the whole front of their side, fell
     from +0.0030 and +0.0022 (fourth run, front tokens counted for their side) to
     +0.0013 and +0.0003, while PF OA stayed above all 12 sibling runs (+0.0071). The
-    drawings of 2026-10-05 (outputs/analysis/octant-sketches-20261005, docs/ongoing/side-routed-heads.md,
+    drawings of 2026-10-05 (outputs/analysis/o/octant-sketches-20261005, docs/ongoing/side-routed-heads.md,
     Octant sketches) show why a vertical cut costs them: the fitted centre sits at
     the notch, about 15 mm above the joint line, so the front-and-low region holds
     the front of the tibial plateau, its cartilage and the anterior meniscal horns,
@@ -771,7 +771,7 @@ ideas:
     \ difference, or active separation that retains the routed tradeoff without valid\
     \ macro improvement."
   precedents:
-  - Geometry was inspected in /home/claudio/src/knee-abnormality/outputs/analysis/octant-sketches-20261005/octants-005.png
+  - Geometry was inspected in /home/claudio/src/knee-abnormality/outputs/analysis/o/octant-sketches-20261005/octants-005.png
     and tilt-sheet/sheet.png. The latter shows cuts on ten studies at illustrative
     angles. Those angles are not initialization values or model-selection candidates.
   - "front-and-up-region-for-pf-oa: the common nod ended +3.5744\xB0 versus the incumbent's\
@@ -1290,7 +1290,7 @@ ideas:
   - "The same run's training/fold_1/logs/version_0/metrics.csv: OA-frame attention\
     \ TV rises 0.0094\u21920.0724, height TV remains 0.2866 at epoch 9, and the two\
     \ frame turns diverge."
-  - "/home/claudio/src/knee-abnormality/outputs/analysis/octant-sketches-20261005/tilt-sheet/sheet.png:\
+  - "/home/claudio/src/knee-abnormality/outputs/analysis/o/octant-sketches-20261005/tilt-sheet/sheet.png:\
     \ loader-only drawings on ten studies at 0\xB0, 25\xB0 and 45\xB0. They show the\
     \ front and height planes co-rotating; the angles are illustrations, not candidate\
     \ settings."
@@ -1793,7 +1793,7 @@ ideas:
     \ finishes at 0.9161. This is an active structural failure, rather than an absent\
     \ mechanism or a clear need to shorten training."
   - "[Geometry evidence](/home/claudio/src/knee-abnormality-side-routed-heads/docs/ongoing/side-routed-heads.md#visual-inspection-and-rotation-census)\
-    \ and [octant drawing](/home/claudio/src/knee-abnormality/outputs/analysis/octant-sketches-20261005/octants-002.png):\
+    \ and [octant drawing](/home/claudio/src/knee-abnormality/outputs/analysis/o/octant-sketches-20261005/octants-002.png):\
     \ the fitted centre lies at the notch and measured front-boundary distances span\
     \ 15\u201339 mm. These support retaining the measured origin and existing partition\
     \ table; no illustrated offset or angle becomes a parameter."
@@ -1904,12 +1904,12 @@ ideas:
     prior while leaving the freshly initialized rotations at zero and subtracts target
     biases for its side comparison. Thus its passing result does not establish learned-angle
     side symmetry.
-  - '[Header rotation census](/home/claudio/src/knee-abnormality/outputs/analysis/knee-rotation-census-20261005/summary.json):
+  - '[Header rotation census](/home/claudio/src/knee-abnormality/outputs/analysis/k/knee-rotation-census-20261005/summary.json):
     4,407 studies and 24,128 series, with axial/coronal rotation correlation 0.8288.
     Retain measured header alignment; this proposal changes only composition of the
     existing global residual rotation and side assignment.'
   - '[Octant sketches](/home/claudio/src/knee-abnormality-side-routed-heads/docs/ongoing/side-routed-heads.md#octant-sketches)
-    and [inspected study drawing](/home/claudio/src/knee-abnormality/outputs/analysis/octant-sketches-20261005/octants-002.png)
+    and [inspected study drawing](/home/claudio/src/knee-abnormality/outputs/analysis/o/octant-sketches-20261005/octants-002.png)
     locate the centre and existing zero-offset regions on studies. Keep that origin
     and the front-up/rest table. The plotted historical offsets and illustrative tilts
     are not imported.'
@@ -2236,7 +2236,7 @@ ideas:
   - 'Incumbent modeling/model.py::frame, position_priors, position_code and pool_encoded:
     meniscus and own priors share frame_rotation_logit; own codes detach those coordinates.
     Independent OA rotation already exists.'
-  - "[Rotation census](/home/claudio/src/knee-abnormality/outputs/analysis/knee-rotation-census-20261005/summary.json):\
+  - "[Rotation census](/home/claudio/src/knee-abnormality/outputs/analysis/k/knee-rotation-census-20261005/summary.json):\
     \ axial/coronal rotation correlation 0.8288 and median absolute difference 1.751\
     \ mm-equivalent degrees of angle, specifically 1.751\xB0; the measured header\
     \ alignment remains the geometric starting point."
@@ -2335,7 +2335,7 @@ ideas:
     \ mismatch between posterior averaging and nonlinear feature evaluation. Predictive\
     \ benefit from preserving spatial features during side uncertainty is a hypothesis."
   precedents:
-  - '[Side/centre census](/home/claudio/src/knee-abnormality/outputs/analysis/knee-side-centre-census-20261005/summary.json):
+  - '[Side/centre census](/home/claudio/src/knee-abnormality/outputs/analysis/k/knee-side-centre-census-20261005/summary.json):
     4,407 studies; 2,072 explicit_coordinates_agree, 2,082 coordinate-source, 83 explicit_coordinates_inconclusive
     and 170 with no assigned side. Counts cover the full dataset census, not the candidate''s
     fold-training cohort.'
@@ -2556,14 +2556,14 @@ ideas:
     \ change: move expectation outside nonlinear routing products and attention normalization.\
     \ Predictive benefit is a hypothesis."
   precedents:
-  - '[Side census](/home/claudio/src/knee-abnormality/outputs/analysis/knee-side-centre-census-20261005/summary.json):
+  - '[Side census](/home/claudio/src/knee-abnormality/outputs/analysis/k/knee-side-centre-census-20261005/summary.json):
     2,072 explicit_coordinates_agree, 2,082 coordinate-source, 83 explicit_coordinates_inconclusive
     and 170 unassigned studies. dataset.py treats only explicit_coordinates_agree
     as certain; these counts cover the full census, not the candidate training cohort.'
   - '[Incumbent source](/home/claudio/src/knee-abnormality/outputs/autoresearch/side-routing/experiments/separate-oa-frame-with-knee-level-term-20261006T020231Z-52418f08/source/src/knee_abnormality/modeling/model.py:533):
     conditional sigmoid coordinates are averaged before OA products; positional priors
     and one shared attention normalization then consume averaged quantities.'
-  - '[Existing geometry drawings](/home/claudio/src/knee-abnormality/outputs/analysis/octant-sketches-20261005/tilt-sheet/sheet.png):
+  - '[Existing geometry drawings](/home/claudio/src/knee-abnormality/outputs/analysis/o/octant-sketches-20261005/tilt-sheet/sheet.png):
     ten studies drawn at three tilts. Retain the existing cuts, fitted origin and
     region topology; this proposal changes uncertainty aggregation rather than moving
     a boundary.'
@@ -2782,7 +2782,7 @@ ideas:
   - '[Feature geometry](/home/claudio/src/knee-abnormality/outputs/autoresearch/side-routing/experiments/separate-oa-frame-with-knee-level-term-20261006T020231Z-52418f08/source/src/knee_abnormality/modeling/spatial_tokens.py:288)
     supplies measured mapping and inverse-augmentation coordinates. The current ResNet-18
     mapping has a 32-pixel stride; physical cell size follows each patient map.'
-  - '[Ten-study geometry drawing](/home/claudio/src/knee-abnormality/outputs/analysis/octant-sketches-20261005/tilt-sheet/sheet.png)
+  - '[Ten-study geometry drawing](/home/claudio/src/knee-abnormality/outputs/analysis/o/octant-sketches-20261005/tilt-sheet/sheet.png)
     provides the existing visual inspection of front/up geometry. This proposal retains
     those partition formulas and changes their spatial integration.'
   - '[Latest frame report](/home/claudio/src/knee-abnormality/outputs/autoresearch/side-routing/experiments/side-equivariant-shared-frames-with-independent-own-frame-20261006T055659Z-04656333/side_routing_report.json)

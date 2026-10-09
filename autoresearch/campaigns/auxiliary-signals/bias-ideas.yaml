@@ -48,7 +48,7 @@ ideas:
   mechanism: >-
     Same detached head, bounded confusion term, weight 0.1 and ramp as the incumbent. One change:
     the target becomes the study's (Manufacturer, ManufacturerModelName) from
-    outputs/analysis/sharing-disagreement-20260914/study_headers.parquet (same SHA-256 check),
+    outputs/analysis/s/sharing-disagreement-20260914/study_headers.parquet (same SHA-256 check),
     keeping the 30 models with at least 30 studies in the whole table and pooling the rest into
     one "other" class, 31 classes; the prior for the KL is the training fold's class frequencies.
     Log head accuracy and loss against the majority rate and the frequency entropy of the new

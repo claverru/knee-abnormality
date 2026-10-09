@@ -85,7 +85,7 @@ for (mode, (axis, delta)), values in logits.items():
         }
     )
 table = pl.DataFrame(rows)
-out = Path("outputs/analysis/side-routing-rotation-sweep-20261006")
+out = Path("outputs/analysis/s/side-routing-rotation-sweep-20261006")
 out.mkdir(parents=True, exist_ok=True)
 table.write_csv(out / "sweep.csv")
 with pl.Config(tbl_rows=60, tbl_cols=-1, tbl_width_chars=230):

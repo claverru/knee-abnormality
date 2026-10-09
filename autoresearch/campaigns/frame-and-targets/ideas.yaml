@@ -9,7 +9,7 @@ ideas:
     is the one angle of the frame still learned from the labels. It ends anywhere
     between 6 and 15 degrees across runs of the same design (run 24 13.6, the height-cuts
     model 6.0, the femur-lean run 15.3), it reaches 21 degrees on a knee whose bones
-    stand upright (validation row 370 of the femur-lean run, drawn in outputs/analysis/routing-and-shifts-frames-20261007/femur-lean/),
+    stand upright (validation row 370 of the femur-lean run, drawn in outputs/analysis/r/routing-and-shifts-frames-20261007/femur-lean/),
     and it trades against any other free angle (prior-work.md, Measured on 2026-10-07).
     Turning the crops by half the frame''s angle scored better than the full angle
     at both multipliers, which points at the tilt''s noise. In the incumbent the centre
@@ -112,7 +112,7 @@ ideas:
   precedents:
   - 'routing-and-shifts, height-cuts-from-the-spots-requeue: +0.0003 at both multipliers
     against run 24; S120 0.952 against S118 0.953.'
-  - 'outputs/analysis/routing-and-shifts-frames-20261007/height-cuts-from-the-spots/regions-005.png
+  - 'outputs/analysis/r/routing-and-shifts-frames-20261007/height-cuts-from-the-spots/regions-005.png
     and regions-045.png: cuts at the right height that slope with the frame''s tilt
     and roll.'
   novelty: First frame whose centre, three angles and two cuts are all read from spots.
@@ -264,7 +264,7 @@ ideas:
   - 'outputs/training/20261007-101112-side-routed-femur-lean: the same hinged band
     with a lean learned from the labels: x4 -0.0002, x1 -0.0009, Effusion +0.0021,
     the lean at -25 degrees for every knee and the nod up by 9 degrees.'
-  - 'outputs/analysis/routing-and-shifts-frames-20261007/knee-bend/sagittal-gallery.png:
+  - 'outputs/analysis/r/routing-and-shifts-frames-20261007/knee-bend/sagittal-gallery.png:
     the bend by eye; two rule-based measurements of it failed.'
   novelty: First angle of the frame set by a report-supervised landmark; first femur
     section that can differ between knees.
@@ -538,7 +538,7 @@ ideas:
     not yet seen is cut unturned. The affine augmentation is unchanged and applies
     after the cut.'
   precedents:
-  - 'outputs/analysis/routing-and-shifts-frames-20261007/frame-crops/: the prediction-only
+  - 'outputs/analysis/r/routing-and-shifts-frames-20261007/frame-crops/: the prediction-only
     check and its controls on the height-cuts model, on run 24 (this campaign''s base,
     +0.0007 at x4 with half the angle) and on the ResNet-50.'
   - 'routing-and-shifts, shift-per-study-from-the-spots: crops moved toward the meniscus
@@ -559,7 +559,7 @@ ideas:
     the previous campaign trained in 1,455 s against a limit of 1,595 s; these are
     smaller). Prediction adds one first look at the multiplier-1 slice count.
   implementation: 'Follow the environment paragraph of the developer instructions.
-    The base of this campaign is run 24, and outputs/analysis/routing-and-shifts-frames-20261007/builds/rotation-on-run-24/
+    The base of this campaign is run 24, and outputs/analysis/r/routing-and-shifts-frames-20261007/builds/rotation-on-run-24/
     is this change at prediction, written on run 24''s code: the canvas loader (config.py,
     data/dataset.py, data/preprocessing/, inference/engine.py, inference/reflection.py)
     and, in modeling/model.py, sample_windows, crop_rectangles, ViewWindows with frame_angles
@@ -616,7 +616,7 @@ ideas:
     receive the same transform. The frame for the move comes from the same first look
     or training dictionary as the angle.'
   precedents:
-  - 'outputs/analysis/routing-and-shifts-frames-20261007/frame-crops/frame-crops-x4.npz:
+  - 'outputs/analysis/r/routing-and-shifts-frames-20261007/frame-crops/frame-crops-x4.npz:
     centred -0.0004, centred and turned -0.0007, prediction only, full deviation and
     full angle.'
   - 'routing-and-shifts, crops-and-frame-share-one-centre-unit-output: a learned centre
@@ -636,7 +636,7 @@ ideas:
   implementation: 'Follow the environment paragraph of the developer instructions.
     Build on the candidate of crops-turned-to-the-frame if it exists under this campaign''s
     experiments (its source/ and changes.diff), otherwise from the same sources. The
-    centring arithmetic is in outputs/analysis/routing-and-shifts-frames-20261007/builds/scripts/frame_crops.py
+    centring arithmetic is in outputs/analysis/r/routing-and-shifts-frames-20261007/builds/scripts/frame_crops.py
     (function `moves`: the deviation in the knee''s anatomical axes turned into the
     patient''s axes with the study axis and the side sign, then projected on the slice''s
     two in-plane directions); it used the fold''s mean, which a candidate replaces
@@ -754,7 +754,7 @@ ideas:
   - 'outputs/training/20261007-101112-side-routed-femur-lean: one hinged band with
     a lean learned from the labels: x4 -0.0002, x1 -0.0009, Effusion +0.0021; the
     lean at -25 degrees for every knee and the tilt up by 9 degrees.'
-  - 'outputs/analysis/routing-and-shifts-frames-20261007/knee-bend/sagittal-gallery.png:
+  - 'outputs/analysis/r/routing-and-shifts-frames-20261007/knee-bend/sagittal-gallery.png:
     the tibia near vertical and the femur leaning by 0 to 30 degrees, by eye; two
     rule-based measurements of the bend failed.'
   - 'Crops turned by the frame''s angle at prediction: +0.0007 at x4 on run 24''s
@@ -850,7 +850,7 @@ ideas:
   - 'outputs/training/20261007-101112-side-routed-femur-lean: the same hinged band
     with a lean learned from the labels: x4 -0.0002, x1 -0.0009, Effusion +0.0021,
     the lean at -25 degrees for every knee and the nod up by 9 degrees.'
-  - 'outputs/analysis/routing-and-shifts-frames-20261007/knee-bend/sagittal-gallery.png:
+  - 'outputs/analysis/r/routing-and-shifts-frames-20261007/knee-bend/sagittal-gallery.png:
     the bend by eye; two rule-based measurements of it failed.'
   novelty: First angle of the frame set by a report-supervised landmark; first femur
     section that can differ between knees.
@@ -960,7 +960,7 @@ ideas:
   - 'outputs/training/20261007-101112-side-routed-femur-lean: one hinged band with
     a lean learned from the labels: x4 -0.0002, x1 -0.0009, Effusion +0.0021; the
     lean at -25 degrees for every knee and the tilt up by 9 degrees.'
-  - 'outputs/analysis/routing-and-shifts-frames-20261007/knee-bend/sagittal-gallery.png:
+  - 'outputs/analysis/r/routing-and-shifts-frames-20261007/knee-bend/sagittal-gallery.png:
     the tibia near vertical and the femur leaning by 0 to 30 degrees, by eye; two
     rule-based measurements of the bend failed.'
   - 'Crops turned by the frame''s angle at prediction: +0.0007 at x4 on run 24''s
@@ -1171,7 +1171,7 @@ ideas:
   - 'outputs/training/20261007-101112-side-routed-femur-lean: the same hinged band
     with a lean learned from the labels: x4 -0.0002, x1 -0.0009, Effusion +0.0021,
     the lean at -25 degrees for every knee and the nod up by 9 degrees.'
-  - 'outputs/analysis/routing-and-shifts-frames-20261007/knee-bend/sagittal-gallery.png:
+  - 'outputs/analysis/r/routing-and-shifts-frames-20261007/knee-bend/sagittal-gallery.png:
     the bend by eye; two rule-based measurements of it failed.'
   novelty: First angle of the frame set by a report-supervised landmark; first femur
     section that can differ between knees.
@@ -1276,7 +1276,7 @@ ideas:
   - 'outputs/training/20261007-101112-side-routed-femur-lean: one hinged band with
     a lean learned from the labels: x4 -0.0002, x1 -0.0009, Effusion +0.0021; the
     lean at -25 degrees for every knee and the tilt up by 9 degrees.'
-  - 'outputs/analysis/routing-and-shifts-frames-20261007/knee-bend/sagittal-gallery.png:
+  - 'outputs/analysis/r/routing-and-shifts-frames-20261007/knee-bend/sagittal-gallery.png:
     the tibia near vertical and the femur leaning by 0 to 30 degrees, by eye; two
     rule-based measurements of the bend failed.'
   - 'Crops turned by the frame''s angle at prediction: +0.0007 at x4 on run 24''s
@@ -1375,7 +1375,7 @@ ideas:
   - 'outputs/autoresearch/frame-and-targets/experiments/crops-turned-to-the-frame-20261007T131425Z-d88162fd:
     the remembered-frame version; its per-epoch angles in training and validation
     (crop_turn_*_deg, val_crop_turn_*_deg).'
-  - 'outputs/analysis/routing-and-shifts-frames-20261007/frame-crops/: the prediction-only
+  - 'outputs/analysis/r/routing-and-shifts-frames-20261007/frame-crops/: the prediction-only
     check and its controls.'
   novelty: First training in which the crop follows the frame of the same step.
   coverage: Coronal and sagittal 84 and 93 mm views of every knee; the 120 mm axial
@@ -1646,7 +1646,7 @@ ideas:
     learned from the labels went to one value for every knee and traded against the
     frame''s tilt. A research review of the runs (keeper''s notes, 2026-10-07) pointed
     at using all the femur-band tokens at once. Checked without training on the bone-head
-    run''s weights (outputs/analysis/frame-and-targets/template-bend/): for each of
+    run''s weights (outputs/analysis/f/frame-and-targets/template-bend/): for each of
     the 874 validation knees, the rotation about the femur-spot hinge that best matches
     the knee''s sagittal tokens to the average token at each place, estimated separately
     from the T1/PD series and from the fluid series of the same knee, agrees between
@@ -1686,7 +1686,7 @@ ideas:
     sectors of their side, around the turned axis; in the joint band they read as
     today.'
   precedents:
-  - 'outputs/analysis/frame-and-targets/template-bend/: template_bend.py (the check
+  - 'outputs/analysis/f/frame-and-targets/template-bend/: template_bend.py (the check
     as run: three rounds over the validation knees), template-bend.csv, template-bend.png.'
   - 'frame-and-targets run notes, runs 3 and 4: the bone head''s spots and the failure
     of angles read from them.'
@@ -1711,7 +1711,7 @@ ideas:
     Start from outputs/autoresearch/frame-and-targets/experiments/femur-section-on-spot-placed-cuts-2-20261007T125017Z-e395eccf
     (source/ and changes.diff): keep its bone head and spot-placed cuts; replace its
     shear and its lean. The withdrawn mirrored-spot requirement of the first bone-head
-    seed is not a gate. The check script outputs/analysis/frame-and-targets/template-bend/template_bend.py
+    seed is not a gate. The check script outputs/analysis/f/frame-and-targets/template-bend/template_bend.py
     shows the binning, the scoring and the sign of the turn on cached tokens; port
     its arithmetic into study_frames as torch code on the batch''s tokens, with running
     buffers in place of its three passes. Create the buffers under torch.random.fork_rng,
@@ -1744,7 +1744,7 @@ ideas:
     its own running template about its own bone's spots
   opportunity: 'The user''s direction in full: one tilt for the tibia and one for
     the femur. The same template matching that gives the femur band''s direction was
-    checked on the tibia band, hinged at the tibia spots, on the same weights (outputs/analysis/frame-and-targets/template-bend/template-bend-tibia.csv):
+    checked on the tibia band, hinged at the tibia spots, on the same weights (outputs/analysis/f/frame-and-targets/template-bend/template-bend-tibia.csv):
     the estimates from the T1/PD series and from the fluid series of one knee correlate
     at 0.59 (797 knees), with a spread of 10 degrees; weaker than the femur''s 0.76,
     at the edge of the 0.6 the check asked for. The tibia and femur angles of a knee
@@ -1764,7 +1764,7 @@ ideas:
     on top of it, with a estimated from tokens expressed in the frame already turned
     by b. Neither angle receives a gradient.'
   precedents:
-  - 'outputs/analysis/frame-and-targets/template-bend/: template_bend_tibia.py and
+  - 'outputs/analysis/f/frame-and-targets/template-bend/: template_bend_tibia.py and
     template-bend-tibia.csv.'
   - 'frame-and-targets, forward-tilt-from-the-meniscus-front-and-back-spots and frame-read-from-the-spots:
     a tibia tilt read from attention spots moved with training (9, 15, 21 degrees).'
@@ -1781,7 +1781,7 @@ ideas:
   implementation: 'Follow the environment paragraph of the developer instructions.
     Build on the candidate of femur-section-turned-to-a-running-template if it exists
     under this campaign''s experiments (its source/ and changes.diff), otherwise as
-    that seed describes. The tibia check script is outputs/analysis/frame-and-targets/template-bend/template_bend_tibia.py
+    that seed describes. The tibia check script is outputs/analysis/f/frame-and-targets/template-bend/template_bend_tibia.py
     (it flips the height axis to reuse the femur code; implement the tibia grid directly,
     without the flip, and report the sign with the same made-up-turn check as the
     femur''s: a known turn of the tibia band''s tokens about the tibia hinge is recovered
@@ -1809,7 +1809,7 @@ ideas:
     learned from the labels went to one value for every knee and traded against the
     frame''s tilt. A research review of the runs (keeper''s notes, 2026-10-07) pointed
     at using all the femur-band tokens at once. Checked without training on the bone-head
-    run''s weights (outputs/analysis/frame-and-targets/template-bend/): for each of
+    run''s weights (outputs/analysis/f/frame-and-targets/template-bend/): for each of
     the 874 validation knees, the rotation about the femur-spot hinge that best matches
     the knee''s sagittal tokens to the average token at each place, estimated separately
     from the T1/PD series and from the fluid series of the same knee, agrees between
@@ -1849,7 +1849,7 @@ ideas:
     sectors of their side, around the turned axis; in the joint band they read as
     today.'
   precedents:
-  - 'outputs/analysis/frame-and-targets/template-bend/: template_bend.py (the check
+  - 'outputs/analysis/f/frame-and-targets/template-bend/: template_bend.py (the check
     as run: three rounds over the validation knees), template-bend.csv, template-bend.png.'
   - 'frame-and-targets run notes, runs 3 and 4: the bone head''s spots and the failure
     of angles read from them.'
@@ -1874,7 +1874,7 @@ ideas:
     Start from outputs/autoresearch/frame-and-targets/experiments/femur-section-on-spot-placed-cuts-2-20261007T125017Z-e395eccf
     (source/ and changes.diff): keep its bone head and spot-placed cuts; replace its
     shear and its lean. The withdrawn mirrored-spot requirement of the first bone-head
-    seed is not a gate. The check script outputs/analysis/frame-and-targets/template-bend/template_bend.py
+    seed is not a gate. The check script outputs/analysis/f/frame-and-targets/template-bend/template_bend.py
     shows the binning, the scoring and the sign of the turn on cached tokens; port
     its arithmetic into study_frames as torch code on the batch''s tokens, with running
     buffers in place of its three passes. Create the buffers under torch.random.fork_rng,
@@ -1919,7 +1919,7 @@ ideas:
     its own running template about its own bone's spots
   opportunity: 'The user''s direction in full: one tilt for the tibia and one for
     the femur. The same template matching that gives the femur band''s direction was
-    checked on the tibia band, hinged at the tibia spots, on the same weights (outputs/analysis/frame-and-targets/template-bend/template-bend-tibia.csv):
+    checked on the tibia band, hinged at the tibia spots, on the same weights (outputs/analysis/f/frame-and-targets/template-bend/template-bend-tibia.csv):
     the estimates from the T1/PD series and from the fluid series of one knee correlate
     at 0.59 (797 knees), with a spread of 10 degrees; weaker than the femur''s 0.76,
     at the edge of the 0.6 the check asked for. The tibia and femur angles of a knee
@@ -1939,7 +1939,7 @@ ideas:
     about the femur spots on top of it, with a estimated from tokens expressed in
     the frame already turned by b. Neither angle receives a gradient.'
   precedents:
-  - 'outputs/analysis/frame-and-targets/template-bend/: template_bend_tibia.py and
+  - 'outputs/analysis/f/frame-and-targets/template-bend/: template_bend_tibia.py and
     template-bend-tibia.csv.'
   - 'frame-and-targets, forward-tilt-from-the-meniscus-front-and-back-spots and frame-read-from-the-spots:
     a tibia tilt read from attention spots moved with training (9, 15, 21 degrees).'
@@ -1956,7 +1956,7 @@ ideas:
   implementation: 'Follow the environment paragraph of the developer instructions.
     Build on the candidate of femur-section-turned-to-a-running-template-2 if it exists
     under this campaign''s experiments (its source/ and changes.diff), otherwise as
-    that seed describes. The tibia check script is outputs/analysis/frame-and-targets/template-bend/template_bend_tibia.py
+    that seed describes. The tibia check script is outputs/analysis/f/frame-and-targets/template-bend/template_bend_tibia.py
     (it flips the height axis to reuse the femur code; implement the tibia grid directly,
     without the flip, and report the sign with the same made-up-turn check as the
     femur''s: a known turn of the tibia band''s tokens about the tibia hinge is recovered

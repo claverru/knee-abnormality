@@ -24,7 +24,7 @@ seed 42 unless stated, one change per run against `00-control`.
 
 ## Single changes against `00-control`
 
-Paired report-group bootstrap (2,000 draws), artifacts in `outputs/analysis/overnight-20260917/`.
+Paired report-group bootstrap (2,000 draws), artifacts in `outputs/analysis/o/overnight-20260917/`.
 Epochs are numbered from one.
 
 | Run | Change | Selected epoch | Macro AUC | Δ [95%] | Mean of last 3 (Δ) | Training |

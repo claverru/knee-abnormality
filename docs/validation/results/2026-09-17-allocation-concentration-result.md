@@ -17,7 +17,7 @@ allocation rules can now be searched on a checkpoint that was not trained on one
   [result](2026-09-17-ranked-filtered-result.md)). The code differs by the option, so the
   comparison allowed the preprocessing-identity difference.
 - **Comparison:** `scripts/tools/compare_fold_runs.py`, 2,000 paired report-group bootstrap draws.
-  Artifacts: `outputs/analysis/allocation-concentration-vs-ranked-filtered-seed42/`.
+  Artifacts: `outputs/analysis/a/allocation-concentration-vs-ranked-filtered-seed42/`.
 
 | | Selected epoch | Macro AUC | Training | Peak CUDA |
 |---|---:|---:|---:|---:|

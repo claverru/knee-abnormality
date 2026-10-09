@@ -153,7 +153,7 @@ ideas:
     PreparedSeries field through collate_studies to the model.
   precedents:
   - docs/validation/results/2026-09-22-oblique-groups-result.md (reference run; per-label localization)
-  - outputs/analysis/acquisition-geometry-20260922/protocol_prior.txt (an oblique flag added after training
+  - outputs/analysis/a/acquisition-geometry-20260922/protocol_prior.txt (an oblique flag added after training
     gave -0.0003 to -0.0014, so the gain must come from routing inside the model, not new information)
   - docs/validation/results/2026-09-14-knee-side-embedding-result.md (a knee-side embedding tied; it marked
     patient geometry, not acquisition protocol)
@@ -197,9 +197,9 @@ ideas:
     parameters. Standard series and non-split slots are unchanged, and split studies always keep their
     standard tokens, so no label loses all its tokens.
   precedents:
-  - outputs/analysis/tilted-slot-policies-v2-k05-20260922/results.csv (additive_acl +0.0020 and intact_acl
+  - outputs/analysis/t/tilted-slot-policies-v2-k05-20260922/results.csv (additive_acl +0.0020 and intact_acl
     +0.0011 on the affected subset against additive -0.0001, k_05 at x4 tau 0.75)
-  - outputs/analysis/acquisition-geometry-20260922/localize_campaign.py (split-study and unchanged-study
+  - outputs/analysis/a/acquisition-geometry-20260922/localize_campaign.py (split-study and unchanged-study
     macro AUC for the reference, k_05 and each candidate)
   - autoresearch/campaigns/oblique/prior-work.md#what-the-oblique-groups-are (descriptions of the fluid
     obliques)

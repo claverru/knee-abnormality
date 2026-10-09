@@ -304,7 +304,7 @@ Ensemble evidence is stronger than a new retrospective metric: B0 single 0.934 �
 0.940 → TTA 0.941, and mixed ten-model TTA 0.943
 ([results](../inference/submissions/2026-09-19-ensemble-submissions.md)). Saved seed predictions
 have rank correlations near 0.95 yet averaging gains about 0.0034–0.0035 over their mean single
-AUC ([agreement artifacts](../../outputs/analysis/prediction-agreement-20260917/summary.json)).
+AUC ([agreement artifacts](../../outputs/analysis/p/prediction-agreement-20260917/summary.json)).
 
 ## Reproduction and limits
 
@@ -341,10 +341,10 @@ Primary artifact locations, relative to repository root:
   `data/labels/public/lixin73/version-1/labels_llm_gpt56sol.csv`,
   `data/labels/prepared/tonylin-soft-v3/labels.csv`; source identities in
   [public-label configuration](../../configs/labels/public-label-sources.json).
-- Study headers: `outputs/analysis/sharing-disagreement-20260914/study_headers.parquet`;
+- Study headers: `outputs/analysis/s/sharing-disagreement-20260914/study_headers.parquet`;
   counts: `data/metadata/train_series_image_counts.parquet`; geometry/slabs:
-  `outputs/analysis/peripheral-coverage-20260918/`; tokens/selections/series:
-  `outputs/analysis/token-cache-20260917/`. Headers represent one series per study, which limits
+  `outputs/analysis/p/peripheral-coverage-20260918/`; tokens/selections/series:
+  `outputs/analysis/t/token-cache-20260917/`. Headers represent one series per study, which limits
   scanner/geometry interpretations. Report summaries use `data/raw/train.csv`; no raw text is reproduced.
 
 Public scores are rounded to three decimals; models, checkpoints, labels and diagnostics were

@@ -37,7 +37,7 @@ and series identities match; preprocessing identity and sources differ by the gr
 the removed 3D embedding, and the earlier CoAtNet refactor and knee-side retirement.
 The run changes the graph and 3D removal together, and intervals exclude training-seed and
 checkpoint-selection variability. The
-[comparison artifact](../../../outputs/analysis/token-graph-vs-reflection-sigma40/comparison.json)
+[comparison artifact](../../../outputs/analysis/t/token-graph-vs-reflection-sigma40/comparison.json)
 was produced by the [fold-run comparison](../fold-run-comparison.md); its run-file
 fingerprints were rechecked against the current run.
 
@@ -82,7 +82,7 @@ Following the plan's reading rule (`f076a09:docs/history/token-graph-sources/tok
 an unused graph is retired whatever its macro AUC. The result rejects this optimization
 setup (zero-initialized residual update before LayerNorm, head learning rate and weight
 decay, ten epochs), not every possible form of token interaction. Artifacts are in
-`outputs/analysis/encoding-usage-token-graph/`.
+`outputs/analysis/e/encoding-usage-token-graph/`.
 
 ## 2026-09-15 forced graph training: still unused
 
@@ -118,4 +118,4 @@ unchanged (0.9690/0.8783 intact). Starting the graph with active messages, a hig
 learning rate and post-norm placement therefore did not make message passing useful.
 The model adapted to near-initial messages instead of learning from them. 1D and 2D
 position mattered more than in earlier checkpoints. Artifacts are in
-`outputs/analysis/encoding-usage-graph-forced/`.
+`outputs/analysis/e/encoding-usage-graph-forced/`.

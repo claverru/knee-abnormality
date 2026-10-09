@@ -11,11 +11,11 @@ frames are at or below 0.00001. No model was retrained for these measurements; `
 - **Method:** intact predictions for the affected studies are remade in the same process, so
   unaffected studies are identical in both arms. Intact reproduces the saved fold-0 macro AUC
   (0.902379 against 0.902373). The full-fold delta uses 2,000 report-group bootstrap draws.
-- **Artifacts:** `outputs/analysis/series-cleaning-rules-20260922/`, produced by the
+- **Artifacts:** `outputs/analysis/s/series-cleaning-rules-20260922/`, produced by the
   [scoring script](../../../scripts/adhoc/score_series_cleaning_rules.py).
 - **Reproduction:** CPU only, about 3.5 s per study at ×4 with 16 threads. Inputs are the run
   directory's `effective_config.json`, selected checkpoint and saved validation predictions, the
-  series-filtering census and `outputs/analysis/repeated-series-20260922/files.parquet`. The
+  series-filtering census and `outputs/analysis/r/repeated-series-20260922/files.parquet`. The
   checkpoint must match the executing preprocessing identity; the script was written against
   `b483140` and may not run on later source:
   `rtk proxy env CUDA_VISIBLE_DEVICES= uv run --locked python -m scripts.adhoc.score_series_cleaning_rules --output-dir outputs/analysis/series-cleaning-rules-new`.
@@ -82,7 +82,7 @@ contrast. Same-plane series are used only when both contrasts exist in that plan
 
 The production path reproduces 11 moves, all census mislabels, each moved to the census target slot.
 Scratch evaluation scripts are not kept; the rule's inputs are the census parquets in
-`outputs/analysis/series-filtering-20260917/`.
+`outputs/analysis/s/series-filtering-20260917/`.
 
 ## Retrained with cleaning
 

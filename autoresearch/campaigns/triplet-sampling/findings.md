@@ -60,7 +60,7 @@ Queue depth is 2, below the refill threshold of 4, so a researcher refill toward
 
 Durable findings from this proposals event, for prior-work.md.
 
-1. Cross-slot depth duplication is the largest unexploited weakness measured so far, and it concentrates in the scored bag. On the fold-0 token cache (outputs/analysis/token-cache-20260917/, deterministic x1 at budgets 6/6/5/5/5/5) the share of one contrast slot's selected middles within 5 mm of a partner-slot middle is axial 0.913 (179 studies), coronal 0.951 (674), sagittal 0.968 (803), median nearest cross-slot distance 0.00 mm. Under training jitter the same statistic falls to 0.581/0.561/0.556. Confirmed not to be a bookkeeping artifact: 0 of 1,656 plane instances share a series between slots, so this is co-prescribed geometry being sampled twice by two independent `select_triplets` calls that share a study centre and near-identical support. Consequence: a two-contrast plane contributes ~5-6 distinct depths to a study bag, not ~10-12, and the redundancy is worst in the deterministic selection that is actually evaluated.
+1. Cross-slot depth duplication is the largest unexploited weakness measured so far, and it concentrates in the scored bag. On the fold-0 token cache (outputs/analysis/t/token-cache-20260917/, deterministic x1 at budgets 6/6/5/5/5/5) the share of one contrast slot's selected middles within 5 mm of a partner-slot middle is axial 0.913 (179 studies), coronal 0.951 (674), sagittal 0.968 (803), median nearest cross-slot distance 0.00 mm. Under training jitter the same statistic falls to 0.581/0.561/0.556. Confirmed not to be a bookkeeping artifact: 0 of 1,656 plane instances share a series between slots, so this is co-prescribed geometry being sampled twice by two independent `select_triplets` calls that share a study centre and near-identical support. Consequence: a two-contrast plane contributes ~5-6 distinct depths to a study bag, not ~10-12, and the redundancy is worst in the deterministic selection that is actually evaluated.
 
 2. Verified source facts underpinning three of the four accepted ideas (checked directly against the sealed baseline source, not taken from the report). (a) Training jitter is `percentiles = (arange(count) + rng("targets").random(count)) / count` and the epoch enters the sampler only through `operation_seed`, so cross-epoch coupling is currently pure independence — the campaign's named "evolution across training" axis is entirely untouched. (b) The supplier draw is asymmetric between phases: training uses `choices[supplier_rng.integers(len(choices))]`, validation uses `max(choices, key=lambda s: entitlement[s] - assigned[s])`, and `entitlement` is already accumulated as exact Fractions on both paths but discarded in training. The uniform draw matches entitlement only in expectation, so within an epoch a repeated-type slot's whole budget can land on a superseded retake or reformat. (c) `preparation.py:125-130` raises "Triplet slices must be consecutive in the indexed series", which is a hard blocker for any change to triplet channel stride.
 
@@ -345,7 +345,7 @@ REFILL. Depth is 3, below the threshold of 4, so a researcher refill toward 5 is
 
 Durable findings from this proposals event, for prior-work.md.
 
-1. CAMPAIGN-LEVEL DECOMPOSITION - THE SINGLE MOST USEFUL RESULT RECORDED SO FAR, AND IT EXPLAINS THREE NULLS. On the fold-0 token cache (outputs/analysis/token-cache-20260917, 161,466 candidates, three retired sigma-40 ranked-filtered checkpoints, training-scale counts 6/6/5/5/5/5, procedure validated by reproducing the documented deterministic macro AUC 0.88727 to five decimals), frozen-model bag quality at MATCHED counts decomposes as: stratified truncated Gaussian 0.88746, equal-spaced stratified 0.88559, i.i.d. truncated Gaussian with the same marginal but no stratification 0.87823, uniform random over candidates 0.87540, uniform random over geometry groups 0.87423, most-central groups 0.87414. Reading: REGULARITY of the realized depth set is worth about +0.009 to +0.013; the SHAPE of the density over an unchanged candidate set is worth at most about +0.002. This is a quantitative explanation for the three closed shape nulls (common-factor sigma sweeps, coronal side-relative widths, per-plane widths) and it redirects the campaign: rank regularity, coupling, coverage, content, source and triplet-definition mechanisms above any further density reshaping. Standing caveat: this is frozen-model bag quality on the VALIDATION cohort, not a training effect, and the same evidence class has failed three times to predict a training outcome.
+1. CAMPAIGN-LEVEL DECOMPOSITION - THE SINGLE MOST USEFUL RESULT RECORDED SO FAR, AND IT EXPLAINS THREE NULLS. On the fold-0 token cache (outputs/analysis/t/token-cache-20260917, 161,466 candidates, three retired sigma-40 ranked-filtered checkpoints, training-scale counts 6/6/5/5/5/5, procedure validated by reproducing the documented deterministic macro AUC 0.88727 to five decimals), frozen-model bag quality at MATCHED counts decomposes as: stratified truncated Gaussian 0.88746, equal-spaced stratified 0.88559, i.i.d. truncated Gaussian with the same marginal but no stratification 0.87823, uniform random over candidates 0.87540, uniform random over geometry groups 0.87423, most-central groups 0.87414. Reading: REGULARITY of the realized depth set is worth about +0.009 to +0.013; the SHAPE of the density over an unchanged candidate set is worth at most about +0.002. This is a quantitative explanation for the three closed shape nulls (common-factor sigma sweeps, coronal side-relative widths, per-plane widths) and it redirects the campaign: rank regularity, coupling, coverage, content, source and triplet-definition mechanisms above any further density reshaping. Standing caveat: this is frozen-model bag quality on the VALIDATION cohort, not a training effect, and the same evidence class has failed three times to predict a training outcome.
 
 2. THE INCUMBENT TRAINING DRAW IS MEASURABLY WORSE THAN ITS OWN DETERMINISTIC COUNTERPART, AT IDENTICAL COUNTS AND IDENTICAL MARGINALS. Independent per-band jitter makes adjacent bands collide: minimum gap between selected middles has p10 3.38 mm and median 7.97 mm under the training draw, against 9.92 mm and 13.71 mm for the deterministic bag, and frozen-model macro AUC 0.88494 (sd 0.00060) against 0.88730. So the training draw sits about 0.0023 below the deterministic bag purely through within-bag clumping. Halving the jitter amplitude recovers about half of that gap (0.88612); a shared per-bag offset (Cranley-Patterson rotation of the equal-mass lattice) recovers about 91% of it (0.88703) at full amplitude with coverage measured unchanged (23.63 vs 23.73 distinct geometry groups per pool over ten epochs). Record the annealing variant as measured-and-dominated so it is not proposed again.
 
@@ -1348,9 +1348,9 @@ Evidence:
 - outputs/autoresearch/triplet-sampling/decisions/user-reject-run-level-stratified-jitter-20260920T093252Z-093b47be/decision.json
 - docs/validation/results/2026-09-20-stratified-sampling-promotion.md
 - outputs/autoresearch/triplet-sampling/experiments/run-level-stratified-jitter-20260919T183826Z-f211c7ce/evaluation.json
-- outputs/analysis/another-stratified-vs-original-20260920/comparison.json
-- outputs/analysis/another-stratified-vs-00-control-20260920/comparison.json
-- outputs/analysis/another-stratified-vs-13-control-repeat-20260920/comparison.json
+- outputs/analysis/a/another-stratified-vs-original-20260920/comparison.json
+- outputs/analysis/a/another-stratified-vs-00-control-20260920/comparison.json
+- outputs/analysis/a/another-stratified-vs-13-control-repeat-20260920/comparison.json
 
 ## user-adopt-control-b-20260920T095302Z-1c278cc7
 
@@ -1360,7 +1360,7 @@ This is a user-directed reference replacement, not a campaign experiment verdict
 
 Evidence:
 - outputs/autoresearch/triplet-sampling/decisions/user-adopt-control-b-20260920T095302Z-1c278cc7/decision.json
-- outputs/analysis/another-stratified-vs-13-control-repeat-20260920/comparison.json
+- outputs/analysis/a/another-stratified-vs-13-control-repeat-20260920/comparison.json
 - outputs/training/overnight-20260919T235434Z-8ol_1c30/runs/13-control-repeat/source_snapshot.zip
 - outputs/training/overnight-20260919T235434Z-8ol_1c30/runs/13-control-repeat/effective_config.json
 - outputs/training/overnight-20260919T235434Z-8ol_1c30/runs/13-control-repeat/fold_0/input_identity.json
@@ -1401,5 +1401,5 @@ Matched-seed control gain +0.0023308413 with positive 80% interval. This is an e
 
 Evidence:
 - /home/claudio/src/knee-abnormality/outputs/autoresearch/adopted/user-adopt-learned-strength-20260921T115849Z-b19e375d/adoption.json
-- /home/claudio/src/knee-abnormality/outputs/analysis/anatomical-strength-vs-control-repeat-ci-levels/adoption_assessment.json
+- /home/claudio/src/knee-abnormality/outputs/analysis/a/anatomical-strength-vs-control-repeat-ci-levels/adoption_assessment.json
 - /home/claudio/src/knee-abnormality/outputs/autoresearch/triplet-sampling/decisions/user-adopt-learned-strength-20260921T115849Z-b19e375d/pending-events.json

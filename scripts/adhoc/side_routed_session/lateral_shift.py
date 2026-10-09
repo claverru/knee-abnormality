@@ -1,6 +1,6 @@
 import polars as pl
 
-table = pl.read_csv("outputs/analysis/side-routed-views-20261005/studies.csv")
+table = pl.read_csv("outputs/analysis/s/side-routed-views-20261005/studies.csv")
 table = table.with_columns(left=pl.col("left_probability") > 0.5).with_columns(
     lateral=pl.when("left")
     .then(pl.col("shift_midline_mm"))

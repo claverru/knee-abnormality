@@ -37,7 +37,7 @@ ideas:
   - 'outputs/training/20261007-101112-side-routed-femur-lean: the same hinged band with a lean learned
     from the labels: x4 -0.0002, x1 -0.0009, Effusion +0.0021, the lean at -25 degrees for every knee
     and the nod up by 9 degrees.'
-  - 'outputs/analysis/routing-and-shifts-frames-20261007/knee-bend/sagittal-gallery.png: the bend
+  - 'outputs/analysis/r/routing-and-shifts-frames-20261007/knee-bend/sagittal-gallery.png: the bend
     by eye; two rule-based measurements of it failed.'
   novelty: First angle of the frame set by a report-supervised landmark; first femur section that
     can differ between knees.
@@ -117,7 +117,7 @@ ideas:
   - 'outputs/training/20261007-101112-side-routed-femur-lean: one hinged band with a lean learned
     from the labels: x4 -0.0002, x1 -0.0009, Effusion +0.0021; the lean at -25 degrees for every knee
     and the tilt up by 9 degrees.'
-  - 'outputs/analysis/routing-and-shifts-frames-20261007/knee-bend/sagittal-gallery.png: the tibia
+  - 'outputs/analysis/r/routing-and-shifts-frames-20261007/knee-bend/sagittal-gallery.png: the tibia
     near vertical and the femur leaning by 0 to 30 degrees, by eye; two rule-based measurements of
     the bend failed.'
   - 'Crops turned by the frame''s angle at prediction: +0.0007 at x4 on run 24''s weights with half

@@ -32,7 +32,7 @@ class NarrowFieldFitCLI(CLISettings):
 
     metrics: Path = Field(
         default=Path(
-            "outputs/analysis/input-resolution-research-20260915/images/series_metrics_overhang.parquet"
+            "outputs/analysis/i/input-resolution-research-20260915/images/series_metrics_overhang.parquet"
         ),
         description="Per-series tissue edges and joint-line offsets of the sampled series",
     )

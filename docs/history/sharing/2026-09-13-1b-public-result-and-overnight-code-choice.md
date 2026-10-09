@@ -82,7 +82,7 @@ their effect; reflection remains the public benchmark. A full 1C search is an
 exploration of an unsubmitted architecture, whereas reflection is the choice
 supported by the best observed public result.
 
-The [audit artifact](../../../outputs/analysis/1b-public-result-20260913/analysis.json)
+The [audit artifact](../../../outputs/analysis/0-9/1b-public-result-20260913/analysis.json)
 pins submissions, bundle/checkpoint/source hashes, configurations, per-target
 deltas and the active queue's first-run identity. It also extends the
 [local/public comparison](../../validation/results/2026-09-13-local-and-public-agreement-after-the-split-change.md)

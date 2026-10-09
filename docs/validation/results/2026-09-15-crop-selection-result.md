@@ -58,7 +58,7 @@ changing only where crops go:
 - **center:** one crop per canvas on the selectable cell nearest the center.
 
 Intervals are paired study bootstraps with 2,000 draws. Artifacts are in
-`outputs/analysis/crop-placement-20260915/`.
+`outputs/analysis/c/crop-placement-20260915/`.
 
 | Placement | Macro AUC | vs learned | Paired 95% interval | Gold (11) |
 |---|---:|---:|---|---:|

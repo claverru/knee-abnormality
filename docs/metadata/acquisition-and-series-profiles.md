@@ -5,7 +5,7 @@
 The later [disagreement audit](../history/sharing/oa-and-meniscus-disagreement-audit.md#acquisition-inventory-and-population-sensitivity)
 read one representative DICOM header for all 4,407 studies on 2026-09-14,
 without pixel decoding or GPU use. Its
-`outputs/analysis/sharing-disagreement-20260914/study_headers.parquet` records
+`outputs/analysis/s/sharing-disagreement-20260914/study_headers.parquet` records
 manufacturer/model, field strength, sex and representative acquisition settings.
 All reads succeeded; manufacturer/model are present throughout, with 238 missing
 field-strength and sex values each. One header per study does not establish

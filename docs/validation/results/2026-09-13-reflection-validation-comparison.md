@@ -50,7 +50,7 @@ comes from Baker's (-0.166667) and medial meniscus (-0.033333), partly offset by
 ACL (+0.033333); other gold targets are unchanged. Eleven gold studies, one fold
 and one training seed cannot establish a repeatable gain or predict the public score.
 
-The [comparison artifact](../../../outputs/analysis/reflection-vs-3dsampling-20260913/comparison.json)
+The [comparison artifact](../../../outputs/analysis/r/reflection-vs-3dsampling-20260913/comparison.json)
 records complete metrics, deltas, matched input identities, preprocessing identities,
 timing and SHA-256 hashes for checkpoints, configurations, metrics, predictions,
 provenance and source snapshots. No fresh training, local inference or tests were

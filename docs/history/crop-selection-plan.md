@@ -9,7 +9,7 @@ recorded in the [crop-selection result](../validation/results/2026-09-15-crop-se
 covered-footprint bookkeeping) and a value map that keeps its twelve per-label values: summing
 them collapsed crops to one habit per plane, 1–4 mm apart between studies with and without a
 finding, while the per-label argmax cells on one canvas sit 56.7 mm apart
-(`outputs/analysis/crop-diversity-20260916/crop_diversity.json`). A per-label round-robin under
+(`outputs/analysis/c/crop-diversity-20260916/crop_diversity.json`). A per-label round-robin under
 a shared `crop_canvas_fraction` budget then gave way, the same day, to **label-private crops**:
 each label independently takes exactly `data.crops_per_label` (2) crops on distinct canvases,
 preferring planes it has not used yet; once its canvases run out it adds cells at least 3 scout
@@ -234,7 +234,7 @@ backbone.
   - 140 mm clips posterior tissue in 34% of sagittal series (150 mm: 8%);
   - the joint line sits 12–17 mm below the image center;
   - 130 mm crops lost on MCL, Baker's, effusion and medial meniscus.
-- Visual inspection (2026-09-15, `outputs/analysis/crop-inspection-20260915/`):
+- Visual inspection (2026-09-15, `outputs/analysis/c/crop-inspection-20260915/`):
   - three lesions (bucket-handle fragment, ACL tear, plateau edema) are recognizable
     at 0.625 mm;
   - 0.3125 mm adds noise texture but no new structure;

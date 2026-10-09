@@ -91,7 +91,7 @@ ideas:
   - 't1pd-detail-84 against the 120 mm control, +0.0013, 80% [+0.0001, +0.0025] (findings.md).'
   - 'Sagittal T1/PD at the 84 mm rule window, a median 43 mm above the joint line and under
     40 mm in 36% of series; coronal T1/PD, more than 20 mm of medial tissue cut in 58%
-    (outputs/analysis/view-spacing-20261002/report.md).'
+    (outputs/analysis/v/view-spacing-20261002/report.md).'
   - 'The fluid split, coronal zoom +0.0003 and sagittal zoom +0.0005 to +0.0007, additive
     (findings.md).'
   novelty: First run that zooms one T1/PD plane and not the other.
@@ -171,7 +171,7 @@ ideas:
   precedents:
   - 'Sagittal margins at the rule window, T1/PD 84 mm a median 43 mm above and 41 mm below the
     joint line, under 40 mm above in 36% and under 30 mm below in 13%; fluid 93.33 mm 48 mm above
-    and 45 mm below, 16% and 7% (outputs/analysis/view-spacing-20261002/report.md).'
+    and 45 mm below, 16% and 7% (outputs/analysis/v/view-spacing-20261002/report.md).'
   - 'Image review, the sagittal detail window excludes the superior patella and the
     suprapatellar fluid in some slices (docs/data-preparation/plane-fluid-spacing-review.md).'
   novelty: First change of the vertical placement.

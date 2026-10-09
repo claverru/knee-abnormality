@@ -83,10 +83,10 @@ An image-based side predictor is a separate unimplemented proposal. Training
 reports cannot supply a side input at hidden-test inference. These findings do
 not authorize changing model code, dropping studies or assigning conflict cases.
 
-The [reviewed summary](../../outputs/analysis/knee-laterality-20260914/reviewed/summary.json),
-[study assignments](../../outputs/analysis/knee-laterality-20260914/reviewed/studies.parquet),
-[field evidence](../../outputs/analysis/knee-laterality-20260914/reviewed/evidence.parquet)
-and [manifest](../../outputs/analysis/knee-laterality-20260914/reviewed/manifest.json)
+The [reviewed summary](../../outputs/analysis/k/knee-laterality-20260914/reviewed/summary.json),
+[study assignments](../../outputs/analysis/k/knee-laterality-20260914/reviewed/studies.parquet),
+[field evidence](../../outputs/analysis/k/knee-laterality-20260914/reviewed/evidence.parquet)
+and [manifest](../../outputs/analysis/k/knee-laterality-20260914/reviewed/manifest.json)
 preserve counts, paths, metadata values, versions and hashes. Original DICOM
 files were not fully hashed to avoid reading pixel data; the header snapshots
 are fingerprinted. No pixels were decoded, models executed, tests run or GPU used.
@@ -94,7 +94,7 @@ are fingerprinted. No pixels were decoded, models executed, tests run or GPU use
 Reproduce the reviewed analysis without rereading DICOMs:
 
 ```bash
-rtk proxy env CUDA_VISIBLE_DEVICES= POLARS_MAX_THREADS=1 uv run --locked python -m scripts.adhoc.audit_knee_laterality --headers outputs/analysis/knee-laterality-20260914/headers.parquet --output-dir outputs/analysis/knee-laterality-reanalysis
+rtk proxy env CUDA_VISIBLE_DEVICES= POLARS_MAX_THREADS=1 uv run --locked python -m scripts.adhoc.audit_knee_laterality --headers outputs/analysis/k/knee-laterality-20260914/headers.parquet --output-dir outputs/analysis/knee-laterality-reanalysis
 ```
 
 Omit `--headers` to collect a fresh snapshot from the official local inventories.

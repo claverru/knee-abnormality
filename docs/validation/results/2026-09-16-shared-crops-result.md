@@ -20,10 +20,10 @@ reached **0.879626** fold-0 macro AUC at epoch 8: +0.0345 against
 - **Cost:** 237 s per epoch including validation (label-private 234 s), 43 s for the final
   validation prediction, 4,380 optimizer steps, peak 22.5 GiB CUDA. Removing the duplicated coarse pass and
   the FiLM split saved nothing measurable.
-- **Artifacts:** comparisons in `outputs/analysis/shared-vs-per-label-20260916` and
-  `outputs/analysis/shared-vs-label-private-20260916`, probes in
-  `outputs/analysis/shared-crops-probes-20260916`, placement in
-  `outputs/analysis/crop-diversity-shared-20260916`.
+- **Artifacts:** comparisons in `outputs/analysis/s/shared-vs-per-label-20260916` and
+  `outputs/analysis/s/shared-vs-label-private-20260916`, probes in
+  `outputs/analysis/s/shared-crops-probes-20260916`, placement in
+  `outputs/analysis/c/crop-diversity-shared-20260916`.
 
 ## Training curve
 

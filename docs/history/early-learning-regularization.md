@@ -35,7 +35,7 @@ reproduce `evaluation.metrics` exactly on the unweighted draw.
 - **Seed noise:** `adopted-new-seed` against `meniscus-half-knee-mil`, the same recipe at two
   seeds.
 
-**Artifacts:** `outputs/analysis/elr-per-label-20260924/` (`elr_per_label.py`,
+**Artifacts:** `outputs/analysis/e/elr-per-label-20260924/` (`elr_per_label.py`,
 `elr_per_label.json`), computed on 2026-09-24 at commit `70a9a24`.
 
 ### Against `k05-clean`

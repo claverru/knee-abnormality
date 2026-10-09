@@ -39,13 +39,13 @@ ideas:
   - 'Medial OA at x4 against rn18-field-120-control (0.9388): sagittal-fluid-detail-rectangle
     +0.0036, two-views-112-fluid-140 +0.0034, sagittal-fluid-content-residual +0.0032,
     two-views-fluid-140 +0.0028, fluid-detail-93-replacement +0.0022; the six T1/PD crop runs
-    -0.0011 to +0.0023 (outputs/analysis/view-spacing-20261002/run_label_deltas.csv).'
+    -0.0011 to +0.0023 (outputs/analysis/v/view-spacing-20261002/run_label_deltas.csv).'
   - 'crop-compartments at x1, last epoch, crop tokens alone against wide tokens alone: medial OA
     0.897 against 0.935, lateral OA 0.849 against 0.906 (its metrics.csv).'
   - 'crop-own-loss: crop-only logits under the disease loss at weight 0.1; medial OA +0.0023,
     lateral OA +0.0034, macro -0.0003 (findings.md).'
   - 'Coronal attention per slice against uniform: medial OA 1.28 on coronal fluid and 1.06 on
-    coronal T1/PD (outputs/analysis/view-spacing-20261002/report.md).'
+    coronal T1/PD (outputs/analysis/v/view-spacing-20261002/report.md).'
   novelty: First crops on fluid slices, first side-specific routing of crop tokens and first
     crop loss restricted to the labels the crop is meant for.
   coverage: About 18 crops per study, on the 4.0 coronal T1/PD and 5.1 coronal fluid slices.

@@ -26,7 +26,7 @@ ideas:
   - 'field-120-single +0.0011 (80% [-0.0004, +0.0026]), field-160-single-logged -0.0034,
     mixed-field-140-160 -0.0013 with val_macro_auc_field_narrow 0.9079 against field_wide 0.9035
     (this campaign).'
-  - 'Direct 120 against 160 comparison per label: outputs/analysis/mixed-field-120-vs-160.'
+  - 'Direct 120 against 160 comparison per label: outputs/analysis/m/mixed-field-120-vs-160.'
   - 'Single-plane inference on the ReXNet control (older split and labels): axial alone loses
     0.15-0.22 on the menisci and 0.084 on ACL but only 0.006 on effusion and 0.001 on Baker''s
     cyst; synovitis loses 0.017 from axial or sagittal alone

@@ -66,13 +66,13 @@ any disagreement before interpreting small intervention effects.
 
 The pre-graph version replaced 3D with `unknown_3d` and measured the
 [knee-side checkpoint](results/2026-09-14-knee-side-embedding-result.md#side-interventions-the-checkpoint-ignores-knee-side); its
-source is snapshotted under `outputs/analysis/encoding-usage-knee-side-20260914/source/`.
+source is snapshotted under `outputs/analysis/e/encoding-usage-knee-side-20260914/source/`.
 Its side interventions (suppression, swapping and seeded corruption) are preserved by
 the [archived patch](../history/knee-side-sources/README.md). The token-graph version
 added graph and edge-type removals and per-plane edge statistics; it is preserved with
 the [historical token-graph sources](../history/token-graph-sources/README.md), and its
-artifacts are under `outputs/analysis/encoding-usage-token-graph/` and
-`outputs/analysis/encoding-usage-graph-forced/`.
+artifacts are under `outputs/analysis/e/encoding-usage-token-graph/` and
+`outputs/analysis/e/encoding-usage-graph-forced/`.
 
 These interventions measure reliance. Embeddings and planes
 overlap and interact, effects need not add, and they cannot be assigned unique

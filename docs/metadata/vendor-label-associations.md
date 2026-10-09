@@ -73,4 +73,4 @@ page owns the corpus-level rates behind it.
 Join `data/folds/all_5fold_v3/targets.csv` (thresholded at `>= 0.5`, the
 [validation protocol](../validation/project-validation-protocol.md)'s frozen effective labels)
 and `data/raw/train.csv` reports to the per-study `vendor` column of
-`outputs/analysis/sharing-disagreement-20260914/study_headers.parquet`, then group by vendor.
+`outputs/analysis/s/sharing-disagreement-20260914/study_headers.parquet`, then group by vendor.

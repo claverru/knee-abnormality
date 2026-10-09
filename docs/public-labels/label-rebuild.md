@@ -280,7 +280,7 @@ them (`fold4_training_positives.json`).
   `data/labels/prepared/rebuild-mean-v1/labels.csv` (`0db443ab…`); manifests
   [`rebuild-state-v1`](../../configs/labels/rebuild-state-v1-label-sources.json) and
   [`rebuild-mean-v1`](../../configs/labels/rebuild-mean-v1-label-sources.json).
-- Analysis: `outputs/analysis/label-rebuild-20260928/` (`report.json` with families, kappa,
+- Analysis: `outputs/analysis/l/label-rebuild-20260928/` (`report.json` with families, kappa,
   tempering, states, calibration and gold evaluation; `state_model.json`;
   `fold4_training_positives.json`).
 - Launch (user, from the worktree, after checking GPU use; pairs with `scanner-confusion-control`,
@@ -335,8 +335,8 @@ them (`fold4_training_positives.json`).
 ### Source audit result (2026-09-28)
 
 380 sampled disagreements (371 unique report/target cells) were judged blind from the report
-text alone ([judgments](../../outputs/analysis/label-rebuild-20260928/source_audit/judgments.csv),
-[scores](../../outputs/analysis/label-rebuild-20260928/source_audit/scores.json), script
+text alone ([judgments](../../outputs/analysis/l/label-rebuild-20260928/source_audit/judgments.csv),
+[scores](../../outputs/analysis/l/label-rebuild-20260928/source_audit/scores.json), script
 [`audit_label_sources.py`](../../scripts/adhoc/audit_label_sources.py)).
 
 | Root | Strong-dissent rate | Outlier precision (80% Wilson) | Precision without HEDGED cells | Rule |
@@ -427,7 +427,7 @@ defects there, found after S76 by the source audit and a per-code inspection:
   so it voted as a separate family in A.
 
 A2 (`rebuild_state_v2`, maintained tool, v1 generator snapshotted at
-`outputs/analysis/label-rebuild-20260928/source/prepare_rebuilt_labels_v1.py`, SHA-256
+`outputs/analysis/l/label-rebuild-20260928/source/prepare_rebuilt_labels_v1.py`, SHA-256
 `0a6226d2`) changes only these: codes whose anchor map or silent symbol (`nm`, `unk`,
 `NOT_MENTIONED…`) means not mentioned, below threshold or hedged take those three rates before
 averaging, negative and positive codes keep each source's value, and Zhen v7 joins the Pilkwang
@@ -446,7 +446,7 @@ Fold 4: validation and gold training targets identical to `combined_v1`; trainin
 Medial OA 760 (A 689), Lateral OA 370 (A 345). Table
 `data/labels/prepared/rebuild-state-v2/labels.csv` (`5877acaf…`), manifest
 `configs/labels/rebuild-state-v2-label-sources.json`, analysis
-`outputs/analysis/label-rebuild-20260928/v2/`. Launch (user):
+`outputs/analysis/l/label-rebuild-20260928/v2/`. Launch (user):
 
 ```bash
 rtk proxy nohup uv run --locked python -u -m scripts.pipeline.train configs/training.yaml --name rebuild-state-v2-labels --paths.label-manifest configs/labels/rebuild-state-v2-label-sources.json --labels.source rebuild_state_v2 --run-id rebuild-state-v2-candidate > outputs/training/rebuild-state-v2-candidate.log 2>&1 < /dev/null &

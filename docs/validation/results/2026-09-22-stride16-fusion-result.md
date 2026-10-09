@@ -29,7 +29,7 @@ at ×1; the ×1 curve was still rising (0.8976 at epoch 9, 0.8988 at epoch 10), 
 ## Validation
 
 Paired report-group bootstrap, 2,000 draws, from [`compare_fold_runs`](../fold-run-comparison.md);
-`outputs/analysis/fusion-sum-vs-k05/` and `outputs/analysis/fusion-sum-vs-stride16/`.
+`outputs/analysis/f/fusion-sum-vs-k05/` and `outputs/analysis/f/fusion-sum-vs-stride16/`.
 
 | Group | vs `k_05` | vs `stride16` |
 |---|---|---|
@@ -61,7 +61,7 @@ failure to keep it is not established by the between-run comparison alone. Gold 
 ## Branch ablation
 
 [`diagnose_fusion_branches`](../../../scripts/adhoc/diagnose_fusion_branches.py) re-predicted the selected
-checkpoint at ×4 three times (`outputs/analysis/fusion-branches-fusion-sum/summary.json`). The
+checkpoint at ×4 three times (`outputs/analysis/f/fusion-branches-fusion-sum/summary.json`). The
 unmodified pass reproduced the recorded 0.903516 within 2.5e-7. Zeroing a term also shifts the
 LayerNorm input, so the deep-zeroed drop overstates dependence; the fine-zeroed pass is the
 informative one. The fusion model code is not in the tree, so the script runs only from the

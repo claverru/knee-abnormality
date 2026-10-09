@@ -18,7 +18,7 @@ Part of the [triplet budget allocation investigation](../../history/triplet-budg
 ## Setup
 
 - **Checkpoints and cache:** `ranked-filtered-seed{42,43,44}` on the fold-0 token cache
-  (`outputs/analysis/token-cache-20260917/`). Selections are exact. The whole-series intensity
+  (`outputs/analysis/t/token-cache-20260917/`). Selections are exact. The whole-series intensity
   window is within 1.2e-4 macro AUC of the pipeline at the default allocation.
 - **Counts:** evaluation triplets, which are twice the training counts. The default is
   12/12/10/10/10/10 in slot order (axial T1/PD, axial fluid, coronal T1/PD, coronal fluid,
@@ -163,7 +163,7 @@ label (positive minus negative mean contribution):
 
 A second cache was built on `allocation-concentration`, the checkpoint trained with random
 per-type splits ([result](2026-09-17-allocation-concentration-result.md)), to score allocations
-on-distribution. Cache: `outputs/analysis/token-cache-allocation-20260917/` (its selections, split
+on-distribution. Cache: `outputs/analysis/t/token-cache-allocation-20260917/` (its selections, split
 and targets were verified identical to the first cache and reused; 8,368 selections compared with
 no mismatch). Its emulated default reproduces the run's saved predictions to 1.3e-4 macro AUC.
 

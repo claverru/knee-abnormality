@@ -7,7 +7,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 
-OUT = Path("outputs/analysis/octant-sketches-20261006")
+OUT = Path("outputs/analysis/o/octant-sketches-20261006")
 OUT.mkdir(parents=True, exist_ok=True)
 GAP = 0.14
 COLOURS = {

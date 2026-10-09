@@ -25,7 +25,7 @@ TYPE = ["Anatomical_Plane", "Fluid_Sensitive", "Fat_Suppression"]
 class Settings(CLISettings):
     data_root: Path = Path("data/raw")
     split: str = "train"
-    ground_truth: Path = Path("outputs/analysis/repeated-series-20260922/pairs.parquet")
+    ground_truth: Path = Path("outputs/analysis/r/repeated-series-20260922/pairs.parquet")
     output_dir: Path = Field(description="Fresh output directory for the simulation")
     workers: int = 12
     studies: int | None = None

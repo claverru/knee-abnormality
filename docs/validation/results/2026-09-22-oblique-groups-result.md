@@ -24,7 +24,7 @@ to 27.37 training triplets at ×1 and from 104.0 to 106.0 at ×4.
 
 ## Per label at ×1
 
-Paired comparison: `outputs/analysis/oblique-vs-k05/comparison.json`
+Paired comparison: `outputs/analysis/o/oblique-vs-k05/comparison.json`
 ([fold-run comparison](../fold-run-comparison.md)). The inputs of the 802 unchanged studies are
 identical in both runs, so their deltas measure training divergence alone.
 
@@ -42,7 +42,7 @@ changed studies the deltas are small-sample noise leaning negative.
 
 ## Temperature and count
 
-`outputs/analysis/tau-sweep-oblique/` (`run_sweep.sh`, one full fold-0 inference per setting).
+`outputs/analysis/t/tau-sweep-oblique/` (`run_sweep.sh`, one full fold-0 inference per setting).
 
 | τ | 0.60 | 0.65 | 0.70 | 0.75 | 0.80 | 0.90 | 1.00 |
 |---|---:|---:|---:|---:|---:|---:|---:|
@@ -59,7 +59,7 @@ one rounding step, matching `k_05`'s best (S41, ×4 τ 0.75). Fold 0 put the sam
   ACL-oblique view from the standard series of the same slot only by appearance.
 - Their training coverage is already high: over ten epochs the coronal fluid oblique groups see
   89% of their triplet windows and the coronal T1/PD ones 85%
-  (`outputs/analysis/acquisition-geometry-20260922/oblique_reach.txt`). Denser sampling of the
+  (`outputs/analysis/a/acquisition-geometry-20260922/oblique_reach.txt`). Denser sampling of the
   same series has little room; 13 of 54 coronal fluid oblique slabs sit off the study centre,
   reach under 10 mm and a narrow Gaussian width, without losing run coverage.
 - The studies they serve are already ranked well: `k_05`'s ACL AUC is 0.930 inside studies with a

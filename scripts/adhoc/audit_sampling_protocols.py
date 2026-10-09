@@ -44,7 +44,7 @@ REDUCED = [
 
 
 class Settings(CLISettings):
-    headers: Path = Path("outputs/analysis/geometry-metadata-20260912/headers.parquet")
+    headers: Path = Path("outputs/analysis/g/geometry-metadata-20260912/headers.parquet")
     inventory: Path = Path("data/metadata/train_series_image_counts.parquet")
     output_dir: Path = Field(description="Output directory for the audit artifacts")
 

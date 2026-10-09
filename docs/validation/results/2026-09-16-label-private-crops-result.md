@@ -19,8 +19,8 @@ finding.
   the last.
 - **Cost:** about 234 s per epoch including validation (per-label and crop224: about 200 s), 45 s
   for the final validation prediction, 4,380 optimizer steps, peak 22.4 GiB CUDA.
-- **Probes and placement:** `outputs/analysis/label-private-probes-20260916` (inference-only
-  variants, BF16) and `outputs/analysis/crop-diversity-label-private-20260916`.
+- **Probes and placement:** `outputs/analysis/l/label-private-probes-20260916` (inference-only
+  variants, BF16) and `outputs/analysis/c/crop-diversity-label-private-20260916`.
 
 ## Training curve
 
@@ -87,7 +87,7 @@ trained through one label's loss instead of twelve, and fine tokens alone score 
 The same checkpoint with shared pooling, changing only the per-label value that selection ranks.
 The classifier is linear, so each coarse token has an exact per-label evidence score
 `s = W_t·x + b_t` (a class-activation map). Paired study bootstraps (1,000 draws) against
-attention; artifacts in `outputs/analysis/label-private-selection-probe-20260916/` and
+attention; artifacts in `outputs/analysis/l/label-private-selection-probe-20260916/` and
 `outputs/previews/label-private-cam-20260916/`.
 
 | Selection value | Macro AUC | vs attention [95% interval] | Map entropy | Chosen-canvas share | Edge-slice crops |

@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 
-OUT = Path("outputs/analysis/side-routing-cut-forces-20261006")
+OUT = Path("outputs/analysis/s/side-routing-cut-forces-20261006")
 division = json.loads((OUT / "symmetric-division-0.20.json").read_text())
 ANGLES = division["angles"]
 SECTORS = ("front-medial", "front-lateral", "back-lateral", "back-medial")

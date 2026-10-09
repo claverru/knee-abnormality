@@ -19,7 +19,7 @@ fold 0 of `all_5fold_v3` (904 studies, 5,061 series) for the inference check. CP
 inference check. Scripts: [snapshots](../history/series-and-sampling-sources/README.md#series-filtering) (`index_all.py`, `geometry_signals.py`,
 `contrast.py`, `planes.py`, `flags.py`, `census.py`, `precision.py`, `infer.py`, `analyze.py`,
 `sheets.py`, `study_sheets.py`, `verdicts_*.txt`). Outputs:
-`outputs/analysis/series-filtering-20260917/` (`series_flags_with_triplets.parquet`,
+`outputs/analysis/s/series-filtering-20260917/` (`series_flags_with_triplets.parquet`,
 `category_counts.csv`, `precision.json`, `inference_results.json`, `inference_deltas.csv`,
 contact sheets in `sheets/`).
 
@@ -241,7 +241,7 @@ Kaggle inference it must run on the same tags and thresholds.
 ## Follow-up measurements (2026-09-17)
 
 Measured, CPU only. Script: `followup_geometry.py` (`041bd16:docs/history/series-and-sampling-sources/series-filtering/followup_geometry.py.txt`), which reruns the
-loader's indexing. Tables: `outputs/analysis/series-filtering-20260917/followup/`
+loader's indexing. Tables: `outputs/analysis/s/series-filtering-20260917/followup/`
 (`reference_after_drops.parquet`, `reflection_eligibility_series.parquet`,
 `items_1_2_summary.json`).
 
@@ -301,7 +301,7 @@ ineligible.
 ### Labelled findings in off-knee series
 
 Reports and Steven v4 labels of the 8 non-knee studies (measured), plus a rough visual check of
-three series (`outputs/analysis/series-filtering-20260917/offknee-review.png`, 27 thumbnails,
+three series (`outputs/analysis/s/series-filtering-20260917/offknee-review.png`, 27 thumbnails,
 `render.py` (`041bd16:docs/history/series-and-sampling-sources/offknee-review/render.py.txt`)):
 
 - The ankle study `…93672103` has a knee-only report and labels; the ankle series carry nothing
@@ -339,7 +339,7 @@ Preprocessing identity `ranked_filtered_physical_gaussian_overlap_spatial_tokens
   implemented (evidence above).
 
 Verification, CPU, all 24,386 series of the 4,407 training and 3 example-test studies (
-`index_census.py` (`041bd16:docs/history/series-and-sampling-sources/deterministic-selection/index_census.py.txt`); `outputs/analysis/deterministic-selection-20260917/`
+`index_census.py` (`041bd16:docs/history/series-and-sampling-sources/deterministic-selection/index_census.py.txt`); `outputs/analysis/d/deterministic-selection-20260917/`
 `index_report.json`, `index_series.parquet`, `index_studies.parquet`):
 
 | Check | Result |
@@ -384,4 +384,4 @@ differences, and a pixel comparison of every frame. CPU only, 58 s with 6 worker
   rule removes before the copy rule sees them.
 
 Script: `scripts/adhoc/census_series_deletions.py`. Outputs:
-`outputs/analysis/series-deletion-census-20261005/` (`pairs.parquet`, `summary.json`).
+`outputs/analysis/s/series-deletion-census-20261005/` (`pairs.parquet`, `summary.json`).

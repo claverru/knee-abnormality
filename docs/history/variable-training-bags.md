@@ -23,7 +23,7 @@ run stopped after three of ten epochs, behind its control at every epoch.
 ## Simulation
 
 On the 3,533 fold-1 training studies over 50 shuffled epochs of batches of 8
-(`outputs/analysis/bag-capacity-20260925/`, `outputs/analysis/variable-bags-scale-20260925/`): average
+(`outputs/analysis/b/bag-capacity-20260925/`, `outputs/analysis/v/variable-bags-scale-20260925/`): average
 1.000× today's triplets; per study median 0.83×, 2.3% of visits at ≥3× (about 80 per epoch), 0.75% at
 ≥4×, 7.7% below 0.8× (all from the ceiling); per batch median 206 and maximum 270 triplets, 13% of
 batches shrunk. 17% of studies cannot supply 4× and 37% cannot supply 5×.
@@ -46,6 +46,6 @@ Three early epochs of one run are weak evidence; the idea was not measured to co
 
 Never committed. The worktree's changes against `665af0e` (configuration, dataset batching, the
 sampler's bag draw and ceiling, Lightning logging and the documentation above) are archived in
-`outputs/analysis/variable-bags-worktree-20260925/` as `worktree.patch`, with
+`outputs/analysis/v/variable-bags-worktree-20260925/` as `worktree.patch`, with
 `untracked-files.tar.gz` holding `configs/variable-bags.yaml` and the two simulation scripts. The
 run's `source_snapshot.zip` holds the code that trained.

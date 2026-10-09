@@ -21,7 +21,7 @@ Evidence:
 - /home/claudio/src/knee-abnormality/autoresearch/campaigns/oblique-clean/prior-work.md (user seed decision; x4 and x1 result tables; the ACL tradeoff)
 - /home/claudio/src/knee-abnormality/outputs/autoresearch/oblique-clean/imports/ideas-20260922T225710Z-f37b6a62/report.json
 - /home/claudio/src/knee-abnormality/autoresearch/campaigns/oblique-clean/seed-ideas.yaml
-- outputs/analysis/tilted-slot-policies-v2-k05-20260922/results.csv (ACL gate +0.0020 on the affected studies)
+- outputs/analysis/t/tilted-slot-policies-v2-k05-20260922/results.csv (ACL gate +0.0020 on the affected studies)
 - outputs/autoresearch/oblique-x4/jobs/researcher-20260922T142228Z-40754723/scratch/evidence/depth_frame.txt and split_x4.txt
 - outputs/autoresearch/oblique/experiments/oblique-group-embedding-20260922T115506Z-f5d616dd (x1 reject)
 
@@ -46,8 +46,8 @@ Unresolved concerns:
 
 Evidence:
 - /home/claudio/src/knee-abnormality/autoresearch/campaigns/oblique-clean/prior-work.md (x1 and x4 campaign results, inference-only slot policies, oblique_reach coverage)
-- /home/claudio/src/knee-abnormality/outputs/analysis/tilted-slot-policies-check-20260922/results.csv (k_05 x1 standard-only: subset +0.0066, full −0.00007)
-- /home/claudio/src/knee-abnormality/outputs/analysis/acquisition-geometry-20260922/oblique_reach.txt (per-group window capacity)
+- /home/claudio/src/knee-abnormality/outputs/analysis/t/tilted-slot-policies-check-20260922/results.csv (k_05 x1 standard-only: subset +0.0066, full −0.00007)
+- /home/claudio/src/knee-abnormality/outputs/analysis/a/acquisition-geometry-20260922/oblique_reach.txt (per-group window capacity)
 - /home/claudio/src/knee-abnormality/outputs/autoresearch/oblique-clean/imports/ideas-20260922T225710Z-34c81e6d/report.json
 
 ## review-20260922T231531Z-bdeb5404
@@ -115,7 +115,7 @@ Unresolved concerns:
 - `series_oblique_gated` is still missing from `MODEL_BATCH_KEYS` in the non-editable inference/engine.py; the model must move the flag to the device itself. Confirm at review that this does not break the CUDA-graph or GPU preparation path.
 
 Evidence:
-- outputs/analysis/tilted-slot-policies-v2-k05-20260922/results.csv rows `additive_acl` and `intact_acl` (whole-cohort deltas -0.000023 and -0.00017)
+- outputs/analysis/t/tilted-slot-policies-v2-k05-20260922/results.csv rows `additive_acl` and `intact_acl` (whole-cohort deltas -0.000023 and -0.00017)
 - outputs/autoresearch/oblique-clean/jobs/orchestrator-20260922T231642Z-a6d3184d/report.json (invalid-run diagnosis: flag not expanded to 49 spatial tokens)
 - outputs/autoresearch/oblique-clean/experiments/acl-gated-oblique-tokens-20260922T230650Z-8ff84619 (diff to reuse)
 - outputs/autoresearch/oblique-clean/imports/ideas-20260923T045453Z-0e8e935d/report.json
@@ -292,7 +292,7 @@ Unresolved concerns:
 
 Evidence:
 - /home/claudio/src/knee-abnormality/outputs/autoresearch/oblique-clean/experiments/acl-gated-oblique-tokens-token-mask-20260923T045644Z-0bfce9ce/comparison/comparison.json (macro, per_target, paired_report_group_bootstrap: meniscus −0.0035, oa +0.0051 [+0.0004, +0.0102])
-- Split/unchanged analysis: outputs/analysis/acquisition-geometry-20260922/localize_campaign.py with the references swapped to outputs/training/oblique-clean and k05-clean and all 12 labels printed (a /tmp copy; the original was not modified)
+- Split/unchanged analysis: outputs/analysis/a/acquisition-geometry-20260922/localize_campaign.py with the references swapped to outputs/training/oblique-clean and k05-clean and all 12 labels printed (a /tmp copy; the original was not modified)
 - Candidate predictions: .../acl-gated-oblique-tokens-token-mask-20260923T045644Z-0bfce9ce/training/fold_0/validation_predictions.csv (best epoch 8)
 - Candidate triplet_accounting.json and timing.json: counts match the sealed limits; training 1,598 s plus ×4 prediction 49.9 s
 - Prior review: /home/claudio/src/knee-abnormality/outputs/autoresearch/oblique-clean/jobs/orchestrator-20260923T050201Z-81f589f9/report.json

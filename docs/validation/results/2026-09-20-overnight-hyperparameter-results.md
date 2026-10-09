@@ -55,11 +55,11 @@ bootstrapped; no claim is made that every candidate received a bootstrap compari
 
 | Candidate | Reference | AUC delta | 95% interval | Evidence |
 |---|---|---:|---|---|
-| Milder scale | Control A | +0.002646 | [-0.000955, +0.006478] | [Artifact](../../../outputs/analysis/overnight-20260920-scale-vs-00-control/comparison.json) |
-| Milder scale | Control B | -0.000714 | [-0.004289, +0.002950] | [Artifact](../../../outputs/analysis/overnight-20260920-scale-vs-13-control-repeat/comparison.json) |
-| Stronger contrast | Control A | -0.003316 | [-0.007352, +0.000775] | [Artifact](../../../outputs/analysis/overnight-20260920-contrast-vs-00-control/comparison.json) |
-| Stronger contrast | Control B | -0.006675 | [-0.010681, -0.002738] | [Artifact](../../../outputs/analysis/overnight-20260920-contrast-vs-13-control-repeat/comparison.json) |
-| Control B | Control A | +0.003360 | [-0.000219, +0.007073] | [Artifact](../../../outputs/analysis/overnight-20260920-control-repeat/comparison.json) |
+| Milder scale | Control A | +0.002646 | [-0.000955, +0.006478] | [Artifact](../../../outputs/analysis/o/overnight-20260920-scale-vs-00-control/comparison.json) |
+| Milder scale | Control B | -0.000714 | [-0.004289, +0.002950] | [Artifact](../../../outputs/analysis/o/overnight-20260920-scale-vs-13-control-repeat/comparison.json) |
+| Stronger contrast | Control A | -0.003316 | [-0.007352, +0.000775] | [Artifact](../../../outputs/analysis/o/overnight-20260920-contrast-vs-00-control/comparison.json) |
+| Stronger contrast | Control B | -0.006675 | [-0.010681, -0.002738] | [Artifact](../../../outputs/analysis/o/overnight-20260920-contrast-vs-13-control-repeat/comparison.json) |
+| Control B | Control A | +0.003360 | [-0.000219, +0.007073] | [Artifact](../../../outputs/analysis/o/overnight-20260920-control-repeat/comparison.json) |
 
 Both scale-versus-control comparisons and the control-to-control comparison are
 inconclusive at 95%: each macro-AUC interval includes zero. The scale comparisons

@@ -25,7 +25,7 @@ Why the run was made: [sites and test composition](../../metadata/sites-and-test
 - **Reference:** `rn18-no-series-dropout`, the incumbent: fold 0 at ×4, 3090 in bf16, trained
   from the same code.
 - **Artifacts:** `outputs/kaggle-training/sites-out-rn18-20260929-output/` and
-  `outputs/analysis/sites-out-20260929/score.json`. Launch records:
+  `outputs/analysis/s/sites-out-20260929/score.json`. Launch records:
   `outputs/kaggle-training/sites-out-rn18-20260929.json`.
 - **Code:** branch `sites-out` (worktree `../knee-abnormality-sites-out`): the Kaggle-training
   hardware options, `scripts/adhoc/build_sites_out_split.py`, `launch_kaggle_sites_out.py`,
@@ -57,7 +57,7 @@ seen-site counterpart for studies outside fold 0, so these are levels, not costs
 
 The campaign control `sites-out-control` is the same recipe and split trained locally (3090,
 bf16, cuDNN on; epoch 7 selected, ×1 0.92517, training 916 s). Its held-out prediction took
-51 s. Scored the same way (`outputs/analysis/sites-out-control-20260929/score.json`):
+51 s. Scored the same way (`outputs/analysis/s/sites-out-control-20260929/score.json`):
 
 | | Kaggle run | Local control |
 |---|---:|---:|

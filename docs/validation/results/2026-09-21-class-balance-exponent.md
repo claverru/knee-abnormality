@@ -74,7 +74,7 @@ validation, and never a higher public score.
 
 ## Rescoring against other label sources
 
-Script and output: `outputs/analysis/label-source-rescoring-20260921/`. Fold-0 predictions were
+Script and output: `outputs/analysis/l/label-source-rescoring-20260921/`. Fold-0 predictions were
 scored against each public report extractor, thresholded at 0.5, on the 892 non-gold studies. The
 table shows macro Δ against k=1.
 

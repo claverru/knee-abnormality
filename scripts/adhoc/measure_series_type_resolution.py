@@ -32,7 +32,7 @@ class Settings(CLISettings):
 
     acquisition: Path = Field(
         default=Path(
-            "outputs/analysis/input-resolution-research-20260915/acquisition/"
+            "outputs/analysis/i/input-resolution-research-20260915/acquisition/"
             "series_acquisition.parquet"
         ),
         description="Per-series table written by the acquisition-header audit",

@@ -85,7 +85,7 @@ this result does not establish its performance with a different training budget.
 1C recorded 1811.77s training, 34.45s selected-checkpoint prediction and 18.965 GiB peak allocated CUDA memory.
 These are recorded run costs, not a controlled runtime benchmark.
 
-The [comparison artifact](../../../outputs/analysis/disease-compartment-vs-controls-20260913/comparison.json)
+The [comparison artifact](../../../outputs/analysis/d/disease-compartment-vs-controls-20260913/comparison.json)
 preserves all four runs' metrics, subgroup counts, within-study rankings, epoch
 curves, configs, input identities, timing and hashes of checkpoints, predictions
 and source snapshots. The process finished its selected-checkpoint prediction

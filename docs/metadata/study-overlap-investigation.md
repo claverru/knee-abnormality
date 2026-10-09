@@ -19,7 +19,7 @@ normalized characters. Existing exact report groups are excluded from report
 candidates because the split already keeps those together. Unicode/punctuation
 normalization preserves word order, laterality, negation and numbers.
 
-Artifacts: `outputs/analysis/study-overlap-20260920/`. The manifest preserves input
+Artifacts: `outputs/analysis/s/study-overlap-20260920/`. The manifest preserves input
 hashes and the executed source snapshot. A later source snapshot and separate
 manifest preserve the supplementary approximate-pixel analysis.
 

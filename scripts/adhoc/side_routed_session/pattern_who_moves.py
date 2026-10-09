@@ -3,7 +3,7 @@ from pathlib import Path
 import numpy as np
 import polars as pl
 
-OUT = Path("outputs/analysis/routing-and-shifts-frames-20261007/mcl-spatial-maps")
+OUT = Path("outputs/analysis/r/routing-and-shifts-frames-20261007/mcl-spatial-maps")
 data = np.load(next(OUT.glob("pattern-content-or-position-*-x4.npz")), allow_pickle=True)
 labels = list(data["labels"])
 names = pl.DataFrame({"StudyInstanceUID": list(data["names"])})

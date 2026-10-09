@@ -115,7 +115,7 @@ the clearest case: every text source misses 14 or more of its 27 gold positives.
   output paths. The manifest pins every input's hash and also lists `steven_v4`, so one manifest
   serves both label sources.
 - Evidence: `scripts.adhoc.analyze_label_combination` wrote
-  `outputs/analysis/label-combination-20260921/`, with `per_target.csv`,
+  `outputs/analysis/l/label-combination-20260921/`, with `per_target.csv`,
   `silver_agreement.csv` and `summary.json`. It runs on CPU in about a minute, refuses an existing
   output directory and fails if its selection differs from the prepared table:
 

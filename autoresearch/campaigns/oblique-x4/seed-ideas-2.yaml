@@ -22,7 +22,7 @@ ideas:
     one series per slot, the composition they see in 88% of studies. The oblique view becomes an alternative
     reading of its slot instead of diluting the other slots.
   precedents:
-  - 'outputs/analysis/tilted-slot-policies-20260922/partial_log.txt, tilted-slot-policies-check-20260922
+  - 'outputs/analysis/t/tilted-slot-policies-20260922/partial_log.txt, tilted-slot-policies-check-20260922
     and -v2check-20260922/results.csv (scripts/adhoc/score_tilted_slot_policies.py): frozen mean_standard_tilted
     vs additive on the same triplets; the mixture wins on the split subset in 9/9 checkpoint×setting cells.'
   - 'Same artifacts: mean_intact_standard (two passes without the tilted series) gains +0.0000 to +0.0037
@@ -108,11 +108,11 @@ ideas:
     by that series' capacity, so validation x1 triplets per epoch equal the reference exactly and no oblique
     token is scored.
   precedents:
-  - outputs/analysis/tilted-slot-policies-check-20260922/results.csv (standard-only subset +0.0066 at
+  - outputs/analysis/t/tilted-slot-policies-check-20260922/results.csv (standard-only subset +0.0066 at
     x1)
-  - outputs/analysis/tilted-slot-policies-v2-k05-20260922/results.csv (standard-only subset +0.0011 at
+  - outputs/analysis/t/tilted-slot-policies-v2-k05-20260922/results.csv (standard-only subset +0.0011 at
     x4)
-  - outputs/analysis/acquisition-geometry-20260922/oblique_reach.txt (standard series capacity of 28 windows
+  - outputs/analysis/a/acquisition-geometry-20260922/oblique_reach.txt (standard series capacity of 28 windows
     in coronal fluid and 30 in coronal T1/PD)
   novelty: Uses the oblique views as training data only; no earlier run separated their training value
     from their evaluation value.
@@ -144,7 +144,7 @@ ideas:
     by largest remainder, with at least one triplet each and never above capacity, in training and validation
     alike. Per-slot, per-study and run totals equal the reference exactly.
   precedents:
-  - outputs/analysis/acquisition-geometry-20260922/oblique_reach.txt (windows and run coverage per group)
+  - outputs/analysis/a/acquisition-geometry-20260922/oblique_reach.txt (windows and run coverage per group)
   - docs/validation/results/2026-09-17-test-time-allocation.md#repeated-series-in-one-slot (second-series
     triplets help on frozen models)
   - docs/validation/results/2026-09-18-overnight-results.md (repeated_series_share took triplets from

@@ -13,9 +13,9 @@ ideas:
     a study-target with no own-side token falls back to all its tokens. OA and the other eight labels
     are unchanged.
   precedents:
-  - 'outputs/training/side-mask and outputs/analysis/side-mask-vs-k05-clean: trained mask for both families;
+  - 'outputs/training/side-mask and outputs/analysis/s/side-mask-vs-k05-clean: trained mask for both families;
     strata Medial Meniscus +0.0031/+0.0056, Lateral Meniscus +0.0063/+0.0047 (sibling-clean/sibling-positive).'
-  - 'outputs/analysis/side-mask-vs-k05-clean/side_mask.patch: implementation (model.compartment_evidence),
+  - 'outputs/analysis/s/side-mask-vs-k05-clean/side_mask.patch: implementation (model.compartment_evidence),
     applies to d914079.'
   novelty: Parked after its repair could not carry the undecided geometry bundle; it never trained. Restricts
     the measured mask to the family it helped; the OA loss that cancelled the gain is removed by design.
@@ -48,7 +48,7 @@ ideas:
     is positive toward left, posterior and superior, matching the file. Local pools, triplet counts and
     validation determinism are unchanged.
   precedents:
-  - 'outputs/analysis/two-peak-sagittal-gate-20260923/result.md: frozen k05-clean with the curve density,
+  - 'outputs/analysis/t/two-peak-sagittal-gate-20260923/result.md: frozen k05-clean with the curve density,
     x4 -0.00057 [80% -0.00120, +0.00008], despite the train-inference sampler mismatch; narrow two-peak
     -0.00153 [-0.00246, -0.00064]; sampling_curve.py implements the density.'
   - 'docs/validation/results/2026-09-18-per-plane-sigma-cache.md: coronal narrower than 40 mm gains +0.00135
@@ -87,7 +87,7 @@ ideas:
     so no study falls back to them; the completion reports metrics for unknown-side and invalid-geometry
     studies separately.'
   precedents:
-  - 'outputs/analysis/token-attention-vs-k05-clean: dropping 1D/2D with only relative, raw-LPS 3D RoPE
+  - 'outputs/analysis/t/token-attention-vs-k05-clean: dropping 1D/2D with only relative, raw-LPS 3D RoPE
     gave -0.0015 (PF OA -0.0152, Fracture -0.0153; meniscus +0.0027, OA +0.0035), confounded with an added
     attention block.'
   - 'docs/inference/submissions/2026-09-15-champion-without-3d-at-inference.md: the additive, non-side-normalized

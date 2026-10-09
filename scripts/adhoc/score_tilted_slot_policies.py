@@ -64,7 +64,7 @@ class PolicyCLI(CLISettings):
         ]
     )
     census: Path = Path(
-        "outputs/analysis/series-filtering-20260917/series_flags_with_triplets.parquet"
+        "outputs/analysis/s/series-filtering-20260917/series_flags_with_triplets.parquet"
     )
     output_dir: Path
     thresholds: list[float] = Field(default_factory=lambda: [30.0, 20.0])

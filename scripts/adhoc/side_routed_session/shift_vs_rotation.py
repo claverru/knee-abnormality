@@ -1,14 +1,14 @@
 import numpy as np
 import polars as pl
 
-shifts = pl.read_csv("outputs/analysis/side-routed-views-20261005/studies.csv")
+shifts = pl.read_csv("outputs/analysis/s/side-routed-views-20261005/studies.csv")
 shifts = shifts.with_columns(left=pl.col("left_probability") > 0.5).with_columns(
     lateral=pl.when("left")
     .then(pl.col("shift_midline_mm"))
     .otherwise(-pl.col("shift_midline_mm")),
     sign=pl.when("left").then(1.0).otherwise(-1.0),
 )
-series = pl.read_parquet("outputs/analysis/knee-rotation-census-20261005/series.parquet")
+series = pl.read_parquet("outputs/analysis/k/knee-rotation-census-20261005/series.parquet")
 key = shifts.columns[1]
 rotation = (
     series.filter(pl.col("plane") != "Sagittal")

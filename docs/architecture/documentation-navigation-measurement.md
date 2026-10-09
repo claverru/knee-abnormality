@@ -81,11 +81,11 @@ measurement as provisional evidence, without treating its percentages as a gener
 Frozen documents and policy files, SHA-256 manifests, questions, the prespecified rubric,
 instrumented traces, both answer reports, the answer review, helper source and metric summary are
 stored under
-`outputs/analysis/documentation-navigation-20260920T104254Z/`.
+`outputs/analysis/d/documentation-navigation-20260920T104254Z/`.
 
-- [Setup](../../outputs/analysis/documentation-navigation-20260920T104254Z/setup.json)
-- [Metrics](../../outputs/analysis/documentation-navigation-20260920T104254Z/summary.json)
-- [Answer review](../../outputs/analysis/documentation-navigation-20260920T104254Z/answer-review.json)
+- [Setup](../../outputs/analysis/d/documentation-navigation-20260920T104254Z/setup.json)
+- [Metrics](../../outputs/analysis/d/documentation-navigation-20260920T104254Z/summary.json)
+- [Answer review](../../outputs/analysis/d/documentation-navigation-20260920T104254Z/answer-review.json)
 
 The evidence directory is ignored by Git. The tracked report retains the measurements and their
 limits; raw artifacts require the local output directory.

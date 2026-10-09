@@ -33,7 +33,7 @@ study-target with no own-side token falls back to all tokens. It is the trained 
   are real evidence). This split motivated the adopted meniscus-only mask.
 - **Not run:** `side_mask_shared_head`, a hard tie of one classifier per family on the masked
   pools.
-- **Artifacts:** `outputs/training/side-mask/`, `outputs/analysis/side-mask-vs-k05-clean/`
+- **Artifacts:** `outputs/training/side-mask/`, `outputs/analysis/s/side-mask-vs-k05-clean/`
   (`side_mask.patch`).
 
 ## Global token attention (`token-attention`)
@@ -49,5 +49,5 @@ position embeddings are dropped; reflected studies negate x.
 - **Reading:** the attention block and the dropped embeddings are confounded. The losses sit on
   labels that need absolute position (patellofemoral, fracture), consistent with relative-only
   position.
-- **Artifacts:** `outputs/training/token-attention/`, `outputs/analysis/token-attention-vs-k05-clean/`
+- **Artifacts:** `outputs/training/token-attention/`, `outputs/analysis/t/token-attention-vs-k05-clean/`
   (`comparison.json`, `token_attention.patch`).

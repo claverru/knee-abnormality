@@ -13,13 +13,13 @@ Unresolved concerns:
 - All prior performance signals cited here come from limited historical runs or frozen-checkpoint gates; they do not establish a valid gain for any new candidate.
 
 Evidence:
-- outputs/analysis/robust-center-rescore-20260923/result.json: rescued-study count and inference-only macro deltas and intervals.
-- outputs/analysis/midline-vs-centre-20260923/result.md, ‘all’ and ‘fold 0’: fitted-centre versus current midline measurements.
+- outputs/analysis/r/robust-center-rescore-20260923/result.json: rescued-study count and inference-only macro deltas and intervals.
+- outputs/analysis/m/midline-vs-centre-20260923/result.md, ‘all’ and ‘fold 0’: fitted-centre versus current midline measurements.
 - docs/research/series-filtering-signals.md:122-165: bilateral series audit, reports, and unresolved study-level label assignment.
-- outputs/analysis/side-mask-vs-k05-clean/comparison.json, paired_report_group_bootstrap.intervals: meniscus, OA and other-eight deltas.
-- outputs/analysis/knee-rotation-survey-20260923/result.md, ‘Distribution’ and ‘mm translation’: measured rotation and its prescription caveat.
-- outputs/analysis/two-peak-sagittal-gate-20260923/result.md: curve-density method, reproduction check and ×4 gate.
-- outputs/analysis/token-attention-vs-k05-clean/comparison.json; autoresearch/campaigns/knee-geometry/prior-work.md, ‘Position encoding’: prior 3D result and its confounded changes.
+- outputs/analysis/s/side-mask-vs-k05-clean/comparison.json, paired_report_group_bootstrap.intervals: meniscus, OA and other-eight deltas.
+- outputs/analysis/k/knee-rotation-survey-20260923/result.md, ‘Distribution’ and ‘mm translation’: measured rotation and its prescription caveat.
+- outputs/analysis/t/two-peak-sagittal-gate-20260923/result.md: curve-density method, reproduction check and ×4 gate.
+- outputs/analysis/t/token-attention-vs-k05-clean/comparison.json; autoresearch/campaigns/knee-geometry/prior-work.md, ‘Position encoding’: prior 3D result and its confounded changes.
 
 ## proposals-20260923T221518Z-dcf8dd83
 
@@ -37,8 +37,8 @@ Evidence:
 - /home/claudio/src/knee-abnormality/outputs/autoresearch/knee-geometry/imports/ideas-20260923T221518Z-c349ef81/report.json: imported mechanisms, implementation plans and declared dependencies.
 - /home/claudio/src/knee-abnormality/outputs/autoresearch/knee-geometry/jobs/orchestrator-20260923T222429Z-947aee66/report.json: prior admission and five-idea ranking.
 - /home/claudio/src/knee-abnormality/autoresearch/campaigns/knee-geometry/prior-work.md:101: token receptive-field leak and side-mask results; :124: sharing precedents; :145: invalid half-knee run; :177: position-encoding evidence.
-- /home/claudio/src/knee-abnormality/outputs/analysis/side-mask-vs-k05-clean/comparison.json: paired family deltas and intervals for the trained four-label mask.
-- /home/claudio/src/knee-abnormality/outputs/analysis/two-peak-sagittal-gate-20260923/result.md:65: curve-density gate; :134: frozen-checkpoint and sampler-envelope limitations.
+- /home/claudio/src/knee-abnormality/outputs/analysis/s/side-mask-vs-k05-clean/comparison.json: paired family deltas and intervals for the trained four-label mask.
+- /home/claudio/src/knee-abnormality/outputs/analysis/t/two-peak-sagittal-gate-20260923/result.md:65: curve-density gate; :134: frozen-checkpoint and sampler-envelope limitations.
 - /home/claudio/src/knee-abnormality/autoresearch/campaigns/medial-lateral-transfer/findings.md:1144: shared-family-channel result; :1230: half-knee dtype failure.
 
 ## review-20260923T223421Z-0866f9ea
@@ -182,10 +182,10 @@ Unresolved concerns:
 Evidence:
 - /home/claudio/src/knee-abnormality/outputs/autoresearch/knee-geometry/jobs/orchestrator-20260923T230841Z-71ce761f/report.json
 - /home/claudio/src/knee-abnormality/outputs/autoresearch/knee-geometry/jobs/researcher-20260923T231102Z-48dfe17a/report.json
-- /home/claudio/src/knee-abnormality/outputs/analysis/midline-vs-centre-20260923/result.md
+- /home/claudio/src/knee-abnormality/outputs/analysis/m/midline-vs-centre-20260923/result.md
 - /home/claudio/src/knee-abnormality/outputs/autoresearch/knee-geometry/jobs/researcher-20260923T231102Z-48dfe17a/scratch/coronal-sagittal-axis-probe.json
 - /home/claudio/src/knee-abnormality/outputs/autoresearch/knee-geometry/jobs/researcher-20260923T231102Z-48dfe17a/scratch/centre-sensitivity.json
-- /home/claudio/src/knee-abnormality/outputs/analysis/count-norm-vs-allocation/comparison.json
+- /home/claudio/src/knee-abnormality/outputs/analysis/c/count-norm-vs-allocation/comparison.json
 - /home/claudio/src/knee-abnormality/outputs/autoresearch/knee-geometry/baseline/source/src/knee_abnormality/modeling/model.py:220
 - https://essr.org/content-essr/uploads/2016/10/ESSR-MRI-Protocols-Knee.pdf
 
@@ -202,11 +202,11 @@ Unresolved concerns:
 
 Evidence:
 - /home/claudio/src/knee-abnormality/outputs/autoresearch/knee-geometry/imports/ideas-20260923T233851Z-ab954fbb/report.json
-- /home/claudio/src/knee-abnormality/outputs/analysis/side-mask-vs-k05-clean/comparison.json
+- /home/claudio/src/knee-abnormality/outputs/analysis/s/side-mask-vs-k05-clean/comparison.json
 - /home/claudio/src/knee-abnormality/autoresearch/campaigns/knee-geometry/prior-work.md:96
 - /home/claudio/src/knee-abnormality/outputs/autoresearch/knee-geometry/jobs/orchestrator-20260923T230841Z-71ce761f/report.json
 - /home/claudio/src/knee-abnormality/outputs/autoresearch/knee-geometry/jobs/orchestrator-20260923T232130Z-a5e45d2b/report.json
-- /home/claudio/src/knee-abnormality/outputs/analysis/two-peak-sagittal-gate-20260923/result.md
+- /home/claudio/src/knee-abnormality/outputs/analysis/t/two-peak-sagittal-gate-20260923/result.md
 
 ## completion-20260923T233907Z-305f7257
 

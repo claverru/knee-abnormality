@@ -11,7 +11,7 @@ ideas:
     model that cannot read the scanner from its features has to rank by image evidence.
   mechanism: >-
     Target: the eight scanner groups of data/folds/all_5fold_scanner_v1/protocol.json, from
-    outputs/analysis/sharing-disagreement-20260914/study_headers.parquet (check SHA-256
+    outputs/analysis/s/sharing-disagreement-20260914/study_headers.parquet (check SHA-256
     8714fa8b025afe0ff47d0811ca735f0ec75c84808b462486db19553d0c3058f4): Siemens, Philips and GE
     split by MagneticFieldStrength into 3T (>= 2), 1.5T (< 2) and unknown; every other vendor
     pooled as minor. Head: a gradient-reversal layer on the study tokens the disease head pools,

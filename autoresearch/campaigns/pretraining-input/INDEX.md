@@ -48,7 +48,7 @@ researcher never ran.
   recipe runs, and every option switched on does what its row says.
 - **Reference:** `20261004-203750-rn10t-radimagenet-normalization`, trained before the build;
   the options are off by default, so the source hash is a declared exception.
-- **Gap-meter scripts:** `outputs/analysis/pretraining-gap-20261004/`.
+- **Gap-meter scripts:** `outputs/analysis/p/pretraining-gap-20261004/`.
 - **Start (as it was run):** `rtk proxy uv run --locked just autoresearch start pretraining-input --provider codex`
   from the worktree; `start` imports the seed files itself.
 

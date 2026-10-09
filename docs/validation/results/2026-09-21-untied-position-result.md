@@ -55,4 +55,4 @@ not show that every positional separation or geometry mechanism fails: the
 [anatomical attention](2026-09-21-anatomical-attention-result.md) line on the same data was
 adopted.
 
-Artifacts: `outputs/analysis/untied-position-vs-control-b/` (`comparison.json`, `per_label.json`).
+Artifacts: `outputs/analysis/u/untied-position-vs-control-b/` (`comparison.json`, `per_label.json`).

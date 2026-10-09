@@ -103,7 +103,7 @@ rule itself.
 
 Measured, CPU only, on fold 0 at the validation budget. Script:
 `followup_coverage.py` (`041bd16:docs/history/series-and-sampling-sources/tiebreak-design/followup_coverage.py.txt`). Tables:
-`outputs/analysis/series-filtering-20260917/followup/tiebreak_coverage.json` and
+`outputs/analysis/s/series-filtering-20260917/followup/tiebreak_coverage.json` and
 `tiebreak_coverage_series.parquet`. The re-run reproduces the proposed rule's triplets in all 661
 slots.
 
@@ -180,7 +180,7 @@ first rather than flagging both older series equally.
 ### Verification
 
 CPU, [snapshot scripts](../../history/series-and-sampling-sources/README.md#deterministic-selection) (`index_census.py`, `check_design_orders.py`,
-`determinism.py`); outputs in `outputs/analysis/deterministic-selection-20260917/`
+`determinism.py`); outputs in `outputs/analysis/d/deterministic-selection-20260917/`
 (`index_report.json`, `index_slots.parquet`, `determinism.json`).
 
 - **Against the design:** on the 661 fold-0 slots of the follow-up, the implemented ranking equals
@@ -207,7 +207,7 @@ CPU, [snapshot scripts](../../history/series-and-sampling-sources/README.md#dete
 
 Inference only, RTX 3090, bf16, batch size 8 in dataset order, fold 0 (904 studies), new code with
 the preprocessing-identity check bypassed in the scratch script only (
-`rescore.py` (`041bd16:docs/history/series-and-sampling-sources/deterministic-selection/rescore.py.txt`); `outputs/analysis/deterministic-selection-20260917/rescore/`
+`rescore.py` (`041bd16:docs/history/series-and-sampling-sources/deterministic-selection/rescore.py.txt`); `outputs/analysis/d/deterministic-selection-20260917/rescore/`
 `rescore.json` and per-checkpoint predictions). "Saved" is each run's selected-epoch validation
 (its own training seed decided the old ties); the saved prediction files reproduce the selected
 scores. Paired report-group bootstrap, 2,000 draws.

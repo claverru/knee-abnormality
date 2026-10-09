@@ -749,7 +749,7 @@ scratchpad. Every run is one run; the spread of the 28 learned runs (SD 0.0008 a
 
 A read-only review of the 33 trained and scored ideas, the reference and the three controls,
 asked by the user: which mechanisms move which label, whether each learned quantity learns, and
-what the per-epoch curves show. Tables and scripts: `outputs/analysis/learnable-views-review-20261003/`
+what the per-epoch curves show. Tables and scripts: `outputs/analysis/l/learnable-views-review-20261003/`
 (`runs_deltas.csv`, `single_change_pairs.csv`, `mechanism_by_label.csv`,
 `learned_parameter_summary.csv`, `label_bias_by_view_label.csv`, `per_epoch_curves.csv`,
 `curve_summary.csv`). Every idea is one run. Yardstick over the 34 learned runs: ×4 SD 0.00083,

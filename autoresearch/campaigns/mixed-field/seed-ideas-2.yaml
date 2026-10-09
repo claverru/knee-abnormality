@@ -45,7 +45,7 @@ ideas:
   precedents:
   - 'Tissue more than 10 mm past 140 mm: 34% of sagittal, 16% of axial and 9% of coronal series (prior-work.md,
     Geometry); only a wider field removes it, since the tissue is already centred.'
-  - 'The mask and its checks: outputs/analysis/input-resolution-research-20260915/images/common.py (tissue_mask)
+  - 'The mask and its checks: outputs/analysis/i/input-resolution-research-20260915/images/common.py (tissue_mask)
     and scripts/adhoc/check_narrow_field_fit.py.'
   novelty: A field chosen per series from measured extent; no trained model in the loader.
   coverage: About a third of sagittal series and a tenth of the others change; the rest keep the reference

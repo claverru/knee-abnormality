@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.colors import to_rgba
 
-OUT = Path("outputs/analysis/side-routing-cut-forces-20261006")
+OUT = Path("outputs/analysis/s/side-routing-cut-forces-20261006")
 RADIUS, CORE, LOW, HIGH = 45.0, 13.0, -45.0, 45.0
 PLANE_DEG, PLANE_OFFSET = 15.0, 6.0
 STEP = 4.5

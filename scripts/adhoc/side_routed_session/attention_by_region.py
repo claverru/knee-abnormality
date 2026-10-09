@@ -103,5 +103,5 @@ for number, name in enumerate(targets):
                 for c in range(len(REGIONS))
             )
         )
-Path("outputs/analysis/side-routing-attention-by-region-20261006").mkdir(parents=True, exist_ok=True)
-Path("outputs/analysis/side-routing-attention-by-region-20261006/attention.json").write_text(json.dumps(out))
+Path("outputs/analysis/s/side-routing-attention-by-region-20261006").mkdir(parents=True, exist_ok=True)
+Path("outputs/analysis/s/side-routing-attention-by-region-20261006/attention.json").write_text(json.dumps(out))

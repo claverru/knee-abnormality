@@ -73,7 +73,7 @@ epoch 9 then declines slightly to 0.890950 at epoch 10.
 
 One fold and one seed do not establish a repeatable gain or loss; no uncertainty
 interval or new public score was computed. The
-[comparison artifact](../../../outputs/analysis/meniscus-vs-reflection-20260913/comparison.json)
+[comparison artifact](../../../outputs/analysis/m/meniscus-vs-reflection-20260913/comparison.json)
 preserves all metrics, subgroup counts, epoch curves, configuration and input
 identities, timing, and hashes of predictions, checkpoints and source snapshots.
 No fresh training, inference or tests were run.

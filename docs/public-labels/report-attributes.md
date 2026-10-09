@@ -18,7 +18,7 @@ agreement ([below](#consensus-mean-rule-tested-on-gold)), so it was not trained 
 - **Script:** [`check_report_attributes`](../../scripts/adhoc/check_report_attributes.py), CPU only,
   under a minute, no LLM calls; refuses an existing output directory:
   `rtk proxy uv run --locked python -m scripts.adhoc.check_report_attributes --output-dir outputs/analysis/report-attributes-new`.
-- **Artifacts:** `outputs/analysis/report-attributes-20260922/`, holding the tables, input hashes and
+- **Artifacts:** `outputs/analysis/r/report-attributes-20260922/`, holding the tables, input hashes and
   a source snapshot.
 - **Scope:** training rows are folds 1–4 of `all_5fold_scanner_v1` (3,502 studies), with targets
   from [`combined_v1`](combined-labels.md). Grounding uses the `k_05` fold-0 predictions at ×4

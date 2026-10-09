@@ -5,7 +5,7 @@ checkpoint tensors read raw, without building a model, so runs from retired mode
 still compare:
 
 ```bash
-rtk proxy env CUDA_VISIBLE_DEVICES= POLARS_MAX_THREADS=1 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 uv run --locked python -m scripts.tools.compare_fold_runs --reference outputs/training/overnight-20260914T220805Z-ozsz4qbu/runs/00-baseline --candidate outputs/training/overnight-20260914T220805Z-ozsz4qbu/runs/03-min-lr-0.1 --output-dir outputs/analysis/min-lr-0.1-vs-00-baseline --allowed-config-differences name,optimizer.minimum_lr_ratio
+rtk proxy env CUDA_VISIBLE_DEVICES= POLARS_MAX_THREADS=1 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 uv run --locked python -m scripts.tools.compare_fold_runs --reference outputs/training/overnight-20260914T220805Z-ozsz4qbu/runs/00-baseline --candidate outputs/training/overnight-20260914T220805Z-ozsz4qbu/runs/03-min-lr-0.1 --output-dir outputs/analysis/m/min-lr-0.1-vs-00-baseline --allowed-config-differences name,optimizer.minimum_lr_ratio
 ```
 
 The example compares the `03-min-lr-0.1` candidate with its `00-baseline` control. Add

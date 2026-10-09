@@ -96,7 +96,7 @@ Of 3,503 training studies, including 47 gold, masking excluded **10,548** target
 entries and retained **31,488**, including all **564** gold targets. Forty-six
 studies had no supervised targets left. All 904 validation studies and 10,848
 validation entries were retained, with the same complete label-row hash as
-reflection. The [label-loading summary](../../outputs/analysis/label-masking-20260913/label-summary.json)
+reflection. The [label-loading summary](../../outputs/analysis/l/label-masking-20260913/label-summary.json)
 records source hashes, identities and per-target counts.
 
 The policy field, evidence requirement, training-mask application, empty-batch

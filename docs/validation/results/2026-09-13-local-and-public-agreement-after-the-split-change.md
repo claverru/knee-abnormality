@@ -40,11 +40,11 @@ public AUC falls to 0.921. Preserve the correlation above as the measured
 Steven-v4 cohort result; it does not establish reliable ranking across changes
 in training-label source.
 
-The [comparison artifact](../../../outputs/analysis/local-public-all-5fold-v3-20260913/comparison.json)
+The [comparison artifact](../../../outputs/analysis/l/local-public-all-5fold-v3-20260913/comparison.json)
 records every checkpoint, bundle and submission identity, saved local metrics,
 completed API scores, matching input identities and exclusions. The
-[scatter plot](../../../outputs/analysis/local-public-all-5fold-v3-20260913/local-public.png)
+[scatter plot](../../../outputs/analysis/l/local-public-all-5fold-v3-20260913/local-public.png)
 is also available as an
-[SVG](../../../outputs/analysis/local-public-all-5fold-v3-20260913/local-public.svg).
+[SVG](../../../outputs/analysis/l/local-public-all-5fold-v3-20260913/local-public.svg).
 This analysis only reads saved metrics and submission records; no training,
 inference or tests were run.

@@ -71,7 +71,7 @@ ablation that removes the scanner-confusion term (user, 2026-09-29):
 ## Training-site labels
 
 Ideas that need a training site take it only from
-`outputs/analysis/training-sites-20260929/study_languages.parquet`
+`outputs/analysis/t/training-sites-20260929/study_languages.parquet`
 (SHA-256 `8cc7d5628daf5a5e0cdeb70b4dc11b6eba84f0c9281fce4e0bc7a5aa81856fc3`):
 - **Cluster rule:** each cluster is `language/vendor`, with Toshiba, Canon, FUJIFILM and Hitachi
   pooled as `minor`. Clusters under 30 training studies are pooled as `other`, which leaves 12

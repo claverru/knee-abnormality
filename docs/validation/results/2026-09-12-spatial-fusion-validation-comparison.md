@@ -19,7 +19,7 @@ exception. This supports complementary predictions on this fold, without
 establishing that spatial geometry causes the benefit or that it generalizes.
 No blend weights were tuned and no uncertainty estimate was computed.
 
-The [comparison record](../../../outputs/analysis/spatial-fusion-vs-crop140mm-20260912.json)
+The [comparison record](../../../outputs/analysis/s/spatial-fusion-vs-crop140mm-20260912.json)
 pins prediction/label hashes, alignment, checkpoint epochs and metrics.
 This analysis only read saved CSVs with Polars/NumPy/scikit-learn on CPU;
 both individual metrics reproduced their saved results within `1e-6`.

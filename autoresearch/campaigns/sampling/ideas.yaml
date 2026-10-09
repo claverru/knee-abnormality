@@ -99,10 +99,10 @@ ideas:
   precedents:
   - docs/research/input-resolution.md#field-of-view-and-joint-position (joint offsets,
     tissue width, placement reopened 2026-09-21)
-  - outputs/analysis/input-resolution-research-20260915/images/common.py joint_line
+  - outputs/analysis/i/input-resolution-research-20260915/images/common.py joint_line
     heuristic (cross-plane agreement within 10 mm in 96-98% of studies; not validated
     against ground truth)
-  - outputs/analysis/input-resolution-research-20260915/images/series_metrics_overhang.parquet
+  - outputs/analysis/i/input-resolution-research-20260915/images/series_metrics_overhang.parquet
     (tissue width and offsets per plane)
   - docs/history/crop-selection-investigation.md (learned crop selection dropped 2026-09-16;
     its anatomical-glimpse option was never run)
@@ -1028,7 +1028,7 @@ ideas:
     \ 0.00 mm), so the change there is conjunction, not coverage."
   precedents:
   - 'Probe this job: scratch/probe/contrast_registration.py, t1pd_partner_reach.py
-    on outputs/analysis/geometry-metadata-20260912/headers.parquet (128 studies; not
+    on outputs/analysis/g/geometry-metadata-20260912/headers.parquet (128 studies; not
     the sealed cohort). Figures are in the opportunity field.'
   - 'triplet-sampling findings item 2: validation middles coincide across contrast
     slots (0.91-0.97 within 5 mm, median 0.00 mm). Removing co-location was slightly

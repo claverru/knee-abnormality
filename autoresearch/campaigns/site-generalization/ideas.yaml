@@ -426,7 +426,7 @@ ideas:
   implementation: 'Options under site_generalization: subspace_rank (8; 0 disables
     everything and keeps P the identity), subspace_margin (0.2), subspace_scale (16),
     subspace_minimum_studies (30). Identity head and probe in training/auxiliary;
-    identities from outputs/analysis/sharing-disagreement-20260914/study_headers.parquet
+    identities from outputs/analysis/s/sharing-disagreement-20260914/study_headers.parquet
     (ManufacturerModelName x field group: MagneticFieldStrength >= 2 is 3T, < 2 is
     1.5T, missing is unknown), counted on the splits training folds only (fold !=
     0 of all_5fold_scanner_v2_sites_out). The P buffer and its application in modeling/model.py:

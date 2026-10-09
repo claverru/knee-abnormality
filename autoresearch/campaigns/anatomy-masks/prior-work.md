@@ -1,8 +1,8 @@
 # Prior work for the anatomy-masks campaign
 
 The summary the researcher checks proposals against. Every figure below was produced on
-2026-10-07; the audits are under `outputs/analysis/frame-and-targets/anatomy-sections-audit/` and the drawings
-under `outputs/analysis/frame-and-targets/segmenter-benchmark/`. The design the model started
+2026-10-07; the audits are under `outputs/analysis/f/frame-and-targets/anatomy-sections-audit/` and the drawings
+under `outputs/analysis/f/frame-and-targets/segmenter-benchmark/`. The design the model started
 from is in [side-routed shared heads](../../../docs/ongoing/side-routed-heads.md) and the two
 earlier campaigns on it are [routing and shifts](../routing-and-shifts/INDEX.md) and
 [frame and targets](../frame-and-targets/INDEX.md).
@@ -22,7 +22,7 @@ Baker's +0.0041 (interval excludes zero) / +0.0049, MCL +0.0065 / +0.0096, Later
 +0.0041, Medial Meniscus +0.0021 / +0.0039, Effusion +0.0014 / +0.0004, PF OA −0.0007 / +0.0023,
 Contusion +0.0027 / −0.0058, Fracture −0.0018 / −0.0057, ACL −0.0030 / −0.0011, Synovitis −0.0056
 / −0.0083, Lateral Meniscus −0.0046 / −0.0148 (×1 interval excludes zero). Audit:
-`outputs/analysis/frame-and-targets/anatomy-sections-audit/audit-crops.txt`.
+`outputs/analysis/f/frame-and-targets/anatomy-sections-audit/audit-crops.txt`.
 
 Its design, all in `modeling/model.py`, `training/anatomy.py` and `training/lightning.py`:
 

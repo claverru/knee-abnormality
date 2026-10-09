@@ -35,7 +35,7 @@ all sampled regional queries; plane coverage is 89.90% axial, 88.95% coronal
 and 92.51% sagittal, counting rejected centers as uncovered. These describe
 this pre-augmentation sample, not training-wide coverage or model accuracy.
 
-The [measurement record](../../outputs/analysis/fusion-coverage-20260913/results.json)
+The [measurement record](../../outputs/analysis/f/fusion-coverage-20260913/results.json)
 preserves the effective config, split/label provenance, input and source hashes,
 and quantiles. Its sibling `inputs.json`, `nearest_anchors.parquet` and `source/`
 preserve selected paths, geometry hashes, per-query distances and executable

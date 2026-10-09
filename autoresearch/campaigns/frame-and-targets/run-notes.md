@@ -52,7 +52,7 @@ seeds the result calls for are added.
   the measured plateau line and the tilt run 24 learned differ by about 22°; the shared learned
   rotation has moved the frame about 6° back toward the learned side. Upper cut +15.5 mm, lower cut
   +3.9 mm (run 24: +13.7, −1.8): both learned cuts now lie above the joint level.
-- **Drawings** (`outputs/analysis/frame-and-targets/forward-tilt-from-the-meniscus-front-and-back-spots/frames.png`,
+- **Drawings** (`outputs/analysis/f/frame-and-targets/forward-tilt-from-the-meniscus-front-and-back-spots/frames.png`,
   rows 532, 200, 370, 374, 45, 5): in all six knees the whole-meniscus spot, its front spot and
   its back spot lie on the joint line, about 10 mm apart on each side, and the frame's joint level
   follows the visible joint space in both planes, including the knee whose plateau slopes 14°
@@ -93,7 +93,7 @@ fifteen minutes.
 - Geometry, validation, last epoch: measured tilt 20.8° (spread 10.2°), against 14.6° in run 1
   with the same tilt rule; the frame's forward angle −15.8° (run 24 +13.6°); cuts from the spots
   +7.6 and −8.5 mm (the previous campaign's model: +10.8, −12.9); core 14.0 mm, ring 25.7 mm.
-- **Drawings** (`outputs/analysis/frame-and-targets/frame-read-from-the-spots/frames.png`): the
+- **Drawings** (`outputs/analysis/f/frame-and-targets/frame-read-from-the-spots/frames.png`): the
   two cuts now bracket the joint, as intended. The tilt overshoots: in rows 374 (−26°), 5 (−11°)
   and 200 (−8°) the frame's joint level is steeper than the visible joint line, with the front
   spot sitting above the meniscus on the condyle and the back spot below it. In run 1 the same
@@ -124,7 +124,7 @@ fifteen minutes.
   2.3 mm forward (SD 4.0). Found in every knee. Knees whose report has edema (392) and knees
   without (482) give the same places within a millimetre or two, so the head looks at the marrow
   of each bone whether or not there is edema.
-- **Drawings** (`outputs/analysis/frame-and-targets/edema-bone-targets-with-the-head-in-the-model-2/bone-spots.png`):
+- **Drawings** (`outputs/analysis/f/frame-and-targets/edema-bone-targets-with-the-head-in-the-model-2/bone-spots.png`):
   in all six knees the femur spot lies in the femoral condyle and the tibia spot in the plateau
   just under the joint line. The head tells the two bones apart.
 - **But the spots sit next to the joint, and a line through them is not the bone's direction.** The
@@ -156,7 +156,7 @@ fifteen minutes.
 - Geometry, validation, last epoch: femur lean 60° with a spread of 27° across knees, applied in
   85% of knees; the frame's learned forward tilt went from −17° at epoch 1 to −38°; cuts from the
   spots +2.6 and −5.8 mm, drifting inwards over training.
-- **Drawings** (`outputs/analysis/frame-and-targets/femur-section-on-spot-placed-cuts-2/bone-spots.png`):
+- **Drawings** (`outputs/analysis/f/frame-and-targets/femur-section-on-spot-placed-cuts-2/bone-spots.png`):
   in every knee the two cuts run diagonally across the joint at 35° to 40°, through femur and
   tibia alike. The femur spot sits a few millimetres above the upper cut, so the lean it gives is
   near its limit for most knees, and the labels turned the whole frame the other way to
@@ -229,7 +229,7 @@ reports.
   spots with a true rotation; hand marks on 100 to 200 knees as a truth; front readers on the
   kneecap spot along the measured line.
 - **Check of the template idea without training**
-  (`outputs/analysis/frame-and-targets/template-bend/`, bone-head weights, 874 validation knees,
+  (`outputs/analysis/f/frame-and-targets/template-bend/`, bone-head weights, 874 validation knees,
   ×2): the rotation about the femur-spot hinge that best matches a knee's sagittal tokens to the
   average token per 8 mm cell, estimated separately from the T1/PD and the fluid series of the
   same knee, correlates at 0.76 between the two (796 knees), spread 12°. On fifteen knees drawn

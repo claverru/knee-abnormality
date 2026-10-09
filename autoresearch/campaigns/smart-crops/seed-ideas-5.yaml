@@ -37,14 +37,14 @@ ideas:
     crop-attention +0.0048, crop-rule +0.0043, crop-own-loss +0.0034,
     crop-full-context-ranking-locator +0.0033, crop-evidence-utility-placement +0.0032;
     t1pd-detail-84 -0.0017; fluid-detail-93-replacement +0.0019
-    (outputs/analysis/view-spacing-20261002/run_label_deltas.csv).'
+    (outputs/analysis/v/view-spacing-20261002/run_label_deltas.csv).'
   - 'crop-compartments at x1, last epoch: lateral OA 0.9055 from the wide tokens alone, 0.849
     from the crop tokens alone, attention mass on crop tokens 0.147; control 0.9020 (its
     metrics.csv and epoch metrics).'
   - 'Placement adds nothing over the rule: five placements within 0.0006 of each other
     (findings.md), so the crops stay at the rule positions in every epoch.'
   - 'Identical field changes differ by up to 0.0067 on one label between runs
-    (outputs/analysis/view-spacing-20261002/report.md), so one run reads the direction only.'
+    (outputs/analysis/v/view-spacing-20261002/report.md), so one run reads the direction only.'
   novelty: First crop whose tokens are routed to a label group, and first crop on top of the
     zoomed views.
   coverage: About 8 crops per study, on the 4.0 coronal T1/PD slices; the two crops reach 10 mm

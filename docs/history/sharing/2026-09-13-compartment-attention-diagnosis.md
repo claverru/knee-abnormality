@@ -94,11 +94,11 @@ more overlapping. The factor carries substantial information, but its score SD i
 below the disease-score SD in both 1C families (1.179 meniscus, 1.270 OA); vector
 norm alone does not establish that it dominates the model.
 
-[Intervention figure](../../../outputs/analysis/compartment-diagnosis-20260913/intervention-effects.png)
-([PDF](../../../outputs/analysis/compartment-diagnosis-20260913/intervention-effects.pdf))
+[Intervention figure](../../../outputs/analysis/c/compartment-diagnosis-20260913/intervention-effects.png)
+([PDF](../../../outputs/analysis/c/compartment-diagnosis-20260913/intervention-effects.pdf))
 compares AUC effects and learned contrast strength.
-[Attention examples](../../../outputs/analysis/compartment-diagnosis-20260913/attention-examples.png)
-([PDF](../../../outputs/analysis/compartment-diagnosis-20260913/attention-examples.pdf)) show
+[Attention examples](../../../outputs/analysis/c/compartment-diagnosis-20260913/attention-examples.png)
+([PDF](../../../outputs/analysis/c/compartment-diagnosis-20260913/attention-examples.pdf)) show
 identical prepared coronal inputs under 1B and 1C. Each selected study changed its
 OA ranking outcome; the displayed triplet maximizes combined 1B+1C OA attention
 mass among coronal inputs. Positive relative contrast favors medial and negative
@@ -125,7 +125,7 @@ primary local AUC metric, which initially favored 1B. Its later public loss
 superseded that recommendation. Current development uses reflection/sigma 40;
 these interventions remain evidence about the historical trained models.
 
-The [summary](../../../outputs/analysis/compartment-diagnosis-20260913/summary.json)
+The [summary](../../../outputs/analysis/c/compartment-diagnosis-20260913/summary.json)
 links both raw result hashes and records corrected constant-margin metrics,
 selected-input agreement, weight/attention summaries and the loss decomposition.
 Each run directory preserves per-intervention predictions/logits, source snapshot,
@@ -145,4 +145,4 @@ into `scripts/adhoc/`, and run there with `PYTHONPATH` pointing to its `src`, th
 project's environment Python, `--architecture 1b`, and absolute run/output/example
 paths. The runtime must match the saved checkpoint; no checkpoint identities are
 rewritten. Example IDs map to descriptive filenames in
-`outputs/analysis/compartment-diagnosis-20260913/examples.json`.
+`outputs/analysis/c/compartment-diagnosis-20260913/examples.json`.

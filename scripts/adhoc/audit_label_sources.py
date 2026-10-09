@@ -22,7 +22,7 @@ LOW_OTHERS, HIGH_OTHERS = 0.3, 0.7
 
 class Paths(BaseModel):
     output_dir: Path = Field(
-        default=Path("outputs/analysis/label-rebuild-20260928/source_audit"),
+        default=Path("outputs/analysis/l/label-rebuild-20260928/source_audit"),
         description="Audit directory for the blind items, key, rates, judgments and scores",
     )
 

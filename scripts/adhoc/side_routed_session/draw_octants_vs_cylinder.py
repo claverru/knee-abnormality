@@ -15,7 +15,7 @@ from knee_abnormality.data.sources import build_series_index, prediction_studies
 from knee_abnormality.data.splits import STUDY
 from knee_abnormality.inference.engine import move_batch
 
-OUT = Path("outputs/analysis/octant-sketches-20261006")
+OUT = Path("outputs/analysis/o/octant-sketches-20261006")
 ROWS = [int(v) for v in sys.argv[1].split(",")]
 CORE_MM, PERIPHERY_MM, JOINT_MM, BAND_MM = 14.0, 38.0, -14.0, 8.0
 QUADRANTS = {

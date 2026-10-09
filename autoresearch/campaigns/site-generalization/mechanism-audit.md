@@ -85,7 +85,7 @@ suppress), **reweights**.
 - **Consequence:** image-feature debiasing targets something that is not the cause. Features
   already rank as well within an unseen site; what is missing there is the site's label base rates
   (case mix and probably reporting conventions), which invariance cannot supply. Analysis scripts
-  and outputs: `outputs/analysis/site-probes-20260930/`.
+  and outputs: `outputs/analysis/s/site-probes-20260930/`.
 
 ## Manual round after the campaign (2026-09-30)
 

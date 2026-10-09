@@ -14,7 +14,7 @@ outputs column names them.
 
 ## tiebreak-design
 
-Evaluation tie-break investigation: seed sensitivity, candidate-pool statistics, DICOM header inventory, ranking rules and the coverage follow-up. Findings: [record](../../data-preparation/physical-sampling/evaluation-tie-break-investigation.md). Outputs: `outputs/analysis/series-filtering-20260917/followup/ (coverage); logs and pickles were not kept`.
+Evaluation tie-break investigation: seed sensitivity, candidate-pool statistics, DICOM header inventory, ranking rules and the coverage follow-up. Findings: [record](../../data-preparation/physical-sampling/evaluation-tie-break-investigation.md). Outputs: `outputs/analysis/s/series-filtering-20260917/followup/ (coverage); logs and pickles were not kept`.
 
 | Original file | Snapshot | SHA-256 |
 |---|---|---|
@@ -29,7 +29,7 @@ Evaluation tie-break investigation: seed sensitivity, candidate-pool statistics,
 
 ## type-importance
 
-Plane/contrast importance: leave-one-type-out inference on the three 2026-09-17 controls, attention shares, availability and triplet capacity. Findings: [record](../../validation/results/2026-09-17-plane-contrast-importance.md). Outputs: `outputs/analysis/type-importance-20260917/`.
+Plane/contrast importance: leave-one-type-out inference on the three 2026-09-17 controls, attention shares, availability and triplet capacity. Findings: [record](../../validation/results/2026-09-17-plane-contrast-importance.md). Outputs: `outputs/analysis/t/type-importance-20260917/`.
 
 | Original file | Snapshot | SHA-256 |
 |---|---|---|
@@ -41,7 +41,7 @@ Plane/contrast importance: leave-one-type-out inference on the three 2026-09-17 
 
 ## triplet-allocation
 
-Triplet budget allocation investigation: exact per-type logit contributions of the three ranked-filtered checkpoints (`infer.py` ran with `PYTHONPATH` on the checkpoints' extracted `source_snapshot.zip`; `summarize.py` builds the tables), a paired-bootstrap detection floor for test-time variants of one checkpoint (`detection_floor.py`, CPU, outputs in `outputs/analysis/detection-floor-20260917/`), the fold-0 token cache (`token-cache-20260917/*.py`, which stay runnable in that output folder with their own copy of the archived sources; `cache_lib.py` and `exact.py` are its API, documented in the folder's `README.md`), the phase-2 allocation analyses on that cache (`allocation-{curves,substitution,series,neyman,search-theory}-20260917/`, each script run from the repository root; the Neyman scripts ran from the session scratchpad and were copied into their output folder, and the two `*_confirm.py` series scripts are the search scripts rerun on the confirm half), the attention-temperature and bag-size rescoring of both caches (`pooling-bagsize-20260917/*.py`, CPU, findings in the [temperature record](../../validation/results/2026-09-17-attention-temperature.md)), and a simulation of the specified missing-type fill on the fold-0 triplet capacities of the [type-importance](#type-importance) outputs (`fill_sim.py`, run from the repository root, printed only). Findings: [record](../../validation/results/2026-09-17-type-contribution.md) and the [ongoing investigation](../triplet-budget-allocation.md) and the [test-time allocation record](../../validation/results/2026-09-17-test-time-allocation.md). Outputs: `outputs/analysis/type-contribution-20260917/`, `outputs/analysis/token-cache-20260917/`.
+Triplet budget allocation investigation: exact per-type logit contributions of the three ranked-filtered checkpoints (`infer.py` ran with `PYTHONPATH` on the checkpoints' extracted `source_snapshot.zip`; `summarize.py` builds the tables), a paired-bootstrap detection floor for test-time variants of one checkpoint (`detection_floor.py`, CPU, outputs in `outputs/analysis/d/detection-floor-20260917/`), the fold-0 token cache (`token-cache-20260917/*.py`, which stay runnable in that output folder with their own copy of the archived sources; `cache_lib.py` and `exact.py` are its API, documented in the folder's `README.md`), the phase-2 allocation analyses on that cache (`allocation-{curves,substitution,series,neyman,search-theory}-20260917/`, each script run from the repository root; the Neyman scripts ran from the session scratchpad and were copied into their output folder, and the two `*_confirm.py` series scripts are the search scripts rerun on the confirm half), the attention-temperature and bag-size rescoring of both caches (`pooling-bagsize-20260917/*.py`, CPU, findings in the [temperature record](../../validation/results/2026-09-17-attention-temperature.md)), and a simulation of the specified missing-type fill on the fold-0 triplet capacities of the [type-importance](#type-importance) outputs (`fill_sim.py`, run from the repository root, printed only). Findings: [record](../../validation/results/2026-09-17-type-contribution.md) and the [ongoing investigation](../triplet-budget-allocation.md) and the [test-time allocation record](../../validation/results/2026-09-17-test-time-allocation.md). Outputs: `outputs/analysis/t/type-contribution-20260917/`, `outputs/analysis/t/token-cache-20260917/`.
 
 | Original file | Snapshot | SHA-256 |
 |---|---|---|
@@ -79,7 +79,7 @@ Triplet budget allocation investigation: exact per-type logit contributions of t
 
 ## series-filtering
 
-Series filtering and cleaning census: indexing of all training series, geometry and contrast signals, review contact sheets, flag precision, removal inference check, centre-rescue follow-up and robust-centre re-score. Findings: [record](../../metadata/series-filtering-census.md). Outputs: `outputs/analysis/series-filtering-20260917/`.
+Series filtering and cleaning census: indexing of all training series, geometry and contrast signals, review contact sheets, flag precision, removal inference check, centre-rescue follow-up and robust-centre re-score. Findings: [record](../../metadata/series-filtering-census.md). Outputs: `outputs/analysis/s/series-filtering-20260917/`.
 
 | Original file | Snapshot | SHA-256 |
 |---|---|---|
@@ -110,7 +110,7 @@ Series filtering and cleaning census: indexing of all training series, geometry 
 
 ## deterministic-selection
 
-Implementation verification of series filtering and source ranking: indexing census, design-order check, determinism check and re-score of the 2026-09-17 checkpoints. Findings: [record](../../data-preparation/physical-sampling/evaluation-tie-break-investigation.md#implementation-2026-09-17). Outputs: `outputs/analysis/deterministic-selection-20260917/`.
+Implementation verification of series filtering and source ranking: indexing census, design-order check, determinism check and re-score of the 2026-09-17 checkpoints. Findings: [record](../../data-preparation/physical-sampling/evaluation-tie-break-investigation.md#implementation-2026-09-17). Outputs: `outputs/analysis/d/deterministic-selection-20260917/`.
 
 | Original file | Snapshot | SHA-256 |
 |---|---|---|
@@ -121,7 +121,7 @@ Implementation verification of series filtering and source ranking: indexing cen
 
 ## prediction-agreement
 
-Pairwise agreement of fold-0 predictions between the ranked-filtered runs and the seed controls. Findings: [record](../../validation/results/2026-09-17-ranked-filtered-result.md#prediction-agreement). Outputs: `outputs/analysis/prediction-agreement-20260917/`.
+Pairwise agreement of fold-0 predictions between the ranked-filtered runs and the seed controls. Findings: [record](../../validation/results/2026-09-17-ranked-filtered-result.md#prediction-agreement). Outputs: `outputs/analysis/p/prediction-agreement-20260917/`.
 
 | Original file | Snapshot | SHA-256 |
 |---|---|---|
@@ -129,7 +129,7 @@ Pairwise agreement of fold-0 predictions between the ranked-filtered runs and th
 
 ## offknee-review
 
-Rough visual check of three off-knee series against their studies' sagittal series. Findings: [record](../../metadata/series-filtering-census.md#labelled-findings-in-off-knee-series). Outputs: `outputs/analysis/series-filtering-20260917/offknee-review.png`.
+Rough visual check of three off-knee series against their studies' sagittal series. Findings: [record](../../metadata/series-filtering-census.md#labelled-findings-in-off-knee-series). Outputs: `outputs/analysis/s/series-filtering-20260917/offknee-review.png`.
 
 | Original file | Snapshot | SHA-256 |
 |---|---|---|
@@ -137,7 +137,7 @@ Rough visual check of three off-knee series against their studies' sagittal seri
 
 ## robust-center-implementation
 
-Verification of the `data.robust_center_outlier_mm` implementation: study centres and evaluation pools for all training studies under HEAD and under the option at null, 20 and 10 mm (run as `census.py <src root> <output pickle> <options JSON>`), their comparison with the re-score patch, and the fold-0 re-score of `ranked-filtered-seed42` with the identity check bypassed. Findings: [record](../../data-preparation/current-preparation.md#robust-study-centre-removed). Outputs: `outputs/analysis/robust-center-implementation-20260917/` (`report.json`, `rescore.json`); pickles were not kept.
+Verification of the `data.robust_center_outlier_mm` implementation: study centres and evaluation pools for all training studies under HEAD and under the option at null, 20 and 10 mm (run as `census.py <src root> <output pickle> <options JSON>`), their comparison with the re-score patch, and the fold-0 re-score of `ranked-filtered-seed42` with the identity check bypassed. Findings: [record](../../data-preparation/current-preparation.md#robust-study-centre-removed). Outputs: `outputs/analysis/r/robust-center-implementation-20260917/` (`report.json`, `rescore.json`); pickles were not kept.
 
 | Original file | Snapshot | SHA-256 |
 |---|---|---|

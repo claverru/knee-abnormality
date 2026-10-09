@@ -9,7 +9,7 @@ interaction layer was implemented as a token graph on 2026-09-14 and
 [attention prior](../history/model-lineage.md#retired-attention-prior) was implemented
 on 2026-09-15, regressed and was retired on 2026-09-16, together with the per-token patient points; nothing else proposed here is implemented or scheduled. Measured numbers come from saved fold-0 artifacts. The CPU
 analysis scripts that produced the new numbers are preserved in
-`outputs/analysis/position-research-20260914/scripts/` but not cataloged.
+`outputs/analysis/p/position-research-20260914/scripts/` but not cataloged.
 
 ## Answer
 

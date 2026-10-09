@@ -32,7 +32,7 @@ follows the `all_5fold_v3` design below with three differences:
   Siemens, Philips and GE are split by `MagneticFieldStrength` into 3T (≥ 2), 1.5T (< 2) and
   unknown. Toshiba, Canon, Fujifilm and Hitachi are pooled as `minor`, one English-reporting site
   ([vendor associations](../metadata/vendor-label-associations.md)). The groups come from
-  `outputs/analysis/sharing-disagreement-20260914/study_headers.parquet`, whose hash
+  `outputs/analysis/s/sharing-disagreement-20260914/study_headers.parquet`, whose hash
   `protocol.json` records.
 - **Fold sizes** differ from `all_5fold_v3`:
 

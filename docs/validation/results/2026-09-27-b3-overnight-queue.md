@@ -81,8 +81,8 @@ Peak memory was 18.2 GiB for every run.
   the schedule's start matters more than its floor or the head rate.
 - **Against ReXNet** (`half-stack-control`, ×4 0.905205): `03-warmup-2` is +0.0004, 95%
   [−0.0029, +0.0040]; OA −0.0030, meniscus +0.0003, the other eight +0.0014, with MCL +0.017
-  and Effusion −0.0055 (`outputs/analysis/b3-warmup-2-vs-half-stack-control/comparison.json`,
-  `outputs/analysis/b3-warmup-2-vs-b3-lr-0.00045/comparison.json`).
+  and Effusion −0.0055 (`outputs/analysis/b/b3-warmup-2-vs-half-stack-control/comparison.json`,
+  `outputs/analysis/b/b3-warmup-2-vs-b3-lr-0.00045/comparison.json`).
 - **The head rate and the cosine floor are flat or negative** (−0.0000 to −0.0013), and 20 epochs
   selected epoch 15 and lost 0.0009 at ×4 while gaining soft AUC (+0.0020), as in the first queue.
 - **Not submitted.** Single runs below 0.002 are within seed noise; the recipe has since moved to

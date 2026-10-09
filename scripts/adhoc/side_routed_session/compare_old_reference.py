@@ -8,7 +8,7 @@ import numpy as np
 import polars as pl
 from sklearn.metrics import roc_auc_score
 
-ROOT = Path("outputs/analysis/side-routing-old-vs-reference-20261006")
+ROOT = Path("outputs/analysis/s/side-routing-old-vs-reference-20261006")
 old = np.load(ROOT / "old.npz", allow_pickle=True)
 new = np.load(ROOT / "reference.npz", allow_pickle=True)
 targets = [str(name) for name in new["targets"]]

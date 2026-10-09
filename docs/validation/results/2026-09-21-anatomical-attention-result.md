@@ -95,7 +95,7 @@ exactly and raw probabilities within 2.98e-8.
 - **Reading:** the trained checkpoint relies on the prior for compartment discrimination. It does
   not show that training with the prior beats training without it: the weights co-adapted to it.
 
-Artifacts: `outputs/analysis/anatomical-bias-ablation/` (`paired_report_group.json`,
+Artifacts: `outputs/analysis/a/anatomical-bias-ablation/` (`paired_report_group.json`,
 `intact.csv`, `without_anatomical_bias.csv`).
 
 ## Learned strength against fixed bias
@@ -125,8 +125,8 @@ Artifacts: `outputs/analysis/anatomical-bias-ablation/` (`paired_report_group.js
 only −0.000169. The Lateral OA gain over the fixed-bias run lives in the trained weights, not in
 the final coefficient's direct effect. Other-eight predictions unchanged.
 
-Artifacts: `outputs/analysis/anatomical-learned-vs-fixed/`,
-`outputs/analysis/anatomical-learned-vs-control-b/`, `outputs/analysis/learned-strength-reset/`.
+Artifacts: `outputs/analysis/a/anatomical-learned-vs-fixed/`,
+`outputs/analysis/a/anatomical-learned-vs-control-b/`, `outputs/analysis/l/learned-strength-reset/`.
 
 ## Learned width against learned strength
 
@@ -145,8 +145,8 @@ the biased labels. Against B: −0.002280, 95% [−0.005798, +0.001127]. Selecte
 (meniscus) and 16.72296 mm (OA), strengths 1.47983 and 1.12414: a sharper transition did not help.
 Rejected; no further training on this refinement.
 
-Artifacts: `outputs/analysis/anatomical-width-vs-strength/`,
-`outputs/analysis/anatomical-width-vs-control-b/`.
+Artifacts: `outputs/analysis/a/anatomical-width-vs-strength/`,
+`outputs/analysis/a/anatomical-width-vs-control-b/`.
 
 ## Control repeat on repaired data
 
@@ -176,8 +176,8 @@ off) retrains it on the repaired data and current code.
 - Preprocessing code matches between learned strength and the control repeat; input identities
   differ only in source hash.
 
-Artifacts: `outputs/analysis/control-repeat-vs-control-b/`,
-`outputs/analysis/anatomical-strength-vs-control-repeat/`.
+Artifacts: `outputs/analysis/c/control-repeat-vs-control-b/`,
+`outputs/analysis/a/anatomical-strength-vs-control-repeat/`.
 
 ## Choice of the 80% interval
 
@@ -194,7 +194,7 @@ The user then fixed gain ≥ 0.001 plus a positive 80% lower bound as the adopti
 later work ([shared evaluation](../../../autoresearch/protocol.md#shared-evaluation-and-adoption)).
 The confidence level was picked after observing this result, so this run must not be presented as
 confirming the rule or the mechanism. The production assessment returns `provisional_accept` from
-the saved predictions (`outputs/analysis/anatomical-strength-vs-control-repeat-ci-levels/`).
+the saved predictions (`outputs/analysis/a/anatomical-strength-vs-control-repeat-ci-levels/`).
 
 ## Adoption and campaign transition
 

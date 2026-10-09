@@ -49,11 +49,11 @@ label/split/membership/series/training/validation identities match. Architecture
 and execution changes prevent attributing the difference to 3D coordinates or
 any one embedding. The manual encoding diagnostic below has not been run.
 
-The [comparison artifact](../../../outputs/analysis/spatial-tokens-vs-crop140mm-20260913/comparison.json)
+The [comparison artifact](../../../outputs/analysis/s/spatial-tokens-vs-crop140mm-20260913/comparison.json)
 pins prediction, label and run-artifact identities, all per-target results,
 bootstrap settings and analysis-source identity. The
-[learning curves and target deltas](../../../outputs/analysis/spatial-tokens-vs-crop140mm-20260913/validation-comparison.png)
+[learning curves and target deltas](../../../outputs/analysis/s/spatial-tokens-vs-crop140mm-20260913/validation-comparison.png)
 are also available as an
-[SVG](../../../outputs/analysis/spatial-tokens-vs-crop140mm-20260913/validation-comparison.svg).
+[SVG](../../../outputs/analysis/s/spatial-tokens-vs-crop140mm-20260913/validation-comparison.svg).
 This analysis reads saved CSVs and metrics on CPU; no model execution, tests,
 new training, encoding diagnostic or blend submission was performed.

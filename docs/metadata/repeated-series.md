@@ -28,7 +28,7 @@ The three chunk-only matches are near-empty volume-edge slices of 3D sagittal se
 non-zero pixels) whose central 8 KB coincide. Full-frame verification rejects them. A filter
 therefore needs a full-frame hash, or a chunk hash confirmed on the full frame.
 
-Artifacts: `outputs/analysis/repeated-series-20260922/`, which holds per-file hashes, per-series
+Artifacts: `outputs/analysis/r/repeated-series-20260922/`, which holds per-file hashes, per-series
 headers, verified pairs, the summary, the manifest and a source snapshot. Pairs are classed as
 identical, subset or partial over their distinct informative chunks.
 
@@ -66,7 +66,7 @@ whose bounded search did not reach this pair.
 The filter has to run per study at inference, so it is simulated with the
 [online script](../../scripts/adhoc/simulate_online_series_dedup.py) on the production
 `index_series` output for all 4,407 training studies
-(`outputs/analysis/online-series-dedup-20260922/`):
+(`outputs/analysis/o/online-series-dedup-20260922/`):
 
 1. **Header key (no extra I/O):** series with the same slot, slice count, matrix and sorted slice
    positions (rounded to 0.01 mm) form a bucket. Those headers are already in memory, and bucketing
@@ -87,7 +87,7 @@ For scale: at x4, prediction already reads about 180 headers and decodes 149 fra
 The check therefore adds about 0.3% to frame reads. This is an I/O-count estimate that has not been timed on Kaggle.
 
 Reproduction (CPU only, fresh output directory; ground truth is the audit's
-`outputs/analysis/repeated-series-20260922/pairs.parquet`). It runs `index_series` per series on one
+`outputs/analysis/r/repeated-series-20260922/pairs.parquet`). It runs `index_series` per series on one
 thread, so its indexing time is not the threaded inference loader's, and its frame-read timings are local:
 
 ```bash

@@ -10,14 +10,14 @@ The production sampler was implemented on 2026-09-13 using the decisions below.
 The historical analysis remains evidence for the initial width and acquisition
 policy, not an accuracy result. Its prototype and old-sampler comparison are
 preserved with their original source under
-`outputs/analysis/physical-sampling-20260913/geometry-v3/source/`.
+`outputs/analysis/p/physical-sampling-20260913/geometry-v3/source/`.
 
 ## Cohort and reproduction
 
 The saved geometry sample contains all 26,804 headers from 721 series in 128
 studies, originally selected without replacement from sorted training-study UIDs
 with NumPy seed 42. Its selection and input identity are in
-`outputs/analysis/geometry-metadata-20260912/selection.json`. The current geometry
+`outputs/analysis/g/geometry-metadata-20260912/selection.json`. The current geometry
 rules accept all 721 series and the shared reference in 124 studies; four studies
 fail the maximum RMS criterion. The sampling comparison therefore contains 595
 study/plane/contrast groups, including 95 repeated groups with 197 acquisitions.

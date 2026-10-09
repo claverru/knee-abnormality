@@ -967,7 +967,7 @@ ResNet-18 incumbent config (`radimagenet-input-statistics-20261004T103433Z-ff2f3
 checkpoint normalization, seed 1533697213, fold 0, ten epochs) with `model.slice_upper_quantile`
 0.98 and `data.contrast_mixing_augmentation.probability` 0.0, trained from this worktree's
 build. Reference: that incumbent run, trained from the earlier source without the build's
-options. Comparison in `outputs/analysis/rn18-slice-quantile-no-mixing-vs-rn18-reference/`.
+options. Comparison in `outputs/analysis/r/rn18-slice-quantile-no-mixing-vs-rn18-reference/`.
 
 - **Result:** ×4 0.931789 against 0.933058, **−0.001269**, 95% [−0.003347, +0.000695]; soft AUC
   −0.000749. One run. On the ResNet-10t the same two changes were +0.002668 over its reference.
@@ -990,7 +990,7 @@ options. Comparison in `outputs/analysis/rn18-slice-quantile-no-mixing-vs-rn18-r
 
 `outputs/training/20261005-101600-rn18-slice-quantile-098`: the same ResNet-18 reference config
 with `model.slice_upper_quantile` 0.98 only (contrast mixing on at 0.3). Comparison in
-`outputs/analysis/rn18-slice-quantile-098-vs-rn18-reference/`. A run with contrast mixing off
+`outputs/analysis/r/rn18-slice-quantile-098-vs-rn18-reference/`. A run with contrast mixing off
 alone was started first and stopped after two minutes on the user's choice, because that
 question already has a ResNet-18 answer (`rn18-native-contrast-preservation`, +0.000551, 80%
 [−0.001057, +0.002199], in the `radimagenet-rn18` campaign).

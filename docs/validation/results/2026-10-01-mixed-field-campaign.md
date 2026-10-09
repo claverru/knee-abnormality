@@ -46,7 +46,7 @@ the time budget; none of the three produced a score.
   120 mm). At a fixed image size 160 mm costs resolution (0.714 mm); 160 mm at the same pixel size
   is the [bigger-images](../../backlog/endgame.md#bigger-images) test.
 - **120 mm beats 160 mm directly:** +0.0046 (95% [+0.0016, +0.0076]), menisci +0.0086, the three
-  OA labels +0.0075 (`outputs/analysis/mixed-field-120-vs-160`). Per label 120 mm leads clearly on
+  OA labels +0.0075 (`outputs/analysis/m/mixed-field-120-vs-160`). Per label 120 mm leads clearly on
   the lateral meniscus (+0.0161), ACL (+0.0134), medial OA and effusion; 160 mm leads outside
   noise only on synovitis (+0.0097).
 - **120 mm alone is worth about +0.0011 to +0.0012,** measured twice (`field-120-single` and the

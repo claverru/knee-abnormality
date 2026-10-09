@@ -123,6 +123,6 @@ its robustness locally; proving the hidden frequencies requires evidence we do
 not have. Current inference code remains unchanged. Kaggle GPU profiling was
 explicitly deferred; it resumed as [loading speedup](../../backlog/loading-speedup/INDEX.md).
 
-Artifacts: `outputs/analysis/sharing-case-mix-20260914/analysis.json`, archived
+Artifacts: `outputs/analysis/s/sharing-case-mix-20260914/analysis.json`, archived
 command and helper source. The command and its CPU-only reproduction recipe are
 preserved with [historical source requirements](../sharing-sources/README.md).

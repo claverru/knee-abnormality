@@ -136,7 +136,7 @@ figure.text(
     ha="center",
     fontsize=10,
 )
-out = Path("outputs/analysis/side-routing-cut-forces-20261006/cut-forces.png")
+out = Path("outputs/analysis/s/side-routing-cut-forces-20261006/cut-forces.png")
 out.parent.mkdir(parents=True, exist_ok=True)
 figure.savefig(out, dpi=95)
 print(out)

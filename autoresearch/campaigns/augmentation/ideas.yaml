@@ -72,7 +72,7 @@ ideas:
   precedents:
   - 'nnU-Net trainer: simulated low resolution is a standard recipe component, not
     isolated (github.com/MIC-DKFZ/nnUNet, nnUNetTrainer.py).'
-  - 'Acquired-resolution distributions: outputs/analysis/input-resolution-research-20260915/acquisition/distributions_train.csv;
+  - 'Acquired-resolution distributions: outputs/analysis/i/input-resolution-research-20260915/acquisition/distributions_train.csv;
     docs/research/input-resolution.md.'
   - 'Training and evaluating at 0.875 mm cost -0.0228, lateral meniscus -0.106 (docs/validation/results/2026-09-16-learned-zoom-result.md):
     the range stays inside the measured one.'
@@ -893,7 +893,7 @@ ideas:
   - "This campaign: dsu-feature-statistics-20260926T034836Z-6298ea10 gained +0.002155\
     \ (80% [\u22120.00048, +0.00462], soft AUC +0.0043) on top of smoothing at seed\
     \ 1704794368. The user's rerun without smoothing at seed 2464012069 gained +0.00124\
-    \ (95% [\u22120.0016, +0.0042]); see outputs/analysis/dsu-without-smoothing-vs-report-attributes-control/comparison.json.\
+    \ (95% [\u22120.0016, +0.0042]); see outputs/analysis/d/dsu-without-smoothing-vs-report-attributes-control/comparison.json.\
     \ The per-label and vendor deltas of the two runs disagree."
   - "Zhang et al., Domain Generalization with Correlated Style Uncertainty (WACV 2024,\
     \ arXiv:2212.09950) perturbs by \u03B5\xB7\u03A3^\xBD from the batch covariance\

@@ -108,7 +108,7 @@ for colour, title, text in rows:
     panel.text(0.02, y - 0.028, text, color="#222222", fontsize=10.5, va="top")
     y -= 0.062 + 0.026 * text.count("\n")
 figure.suptitle("The incumbent's frame: what is placed from the heads' attention, what is learned, and what is fixed", fontsize=15, y=0.975)
-out = Path("outputs/analysis/routing-and-shifts-frames-20261007/fixed-and-learned-3d.png")
+out = Path("outputs/analysis/r/routing-and-shifts-frames-20261007/fixed-and-learned-3d.png")
 out.parent.mkdir(parents=True, exist_ok=True)
 figure.savefig(out, dpi=90)
 print(out)

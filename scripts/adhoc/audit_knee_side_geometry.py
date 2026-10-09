@@ -31,8 +31,8 @@ EXTRA_TAGS = [
 
 
 class GeometryCLI(CLISettings):
-    metadata_dir: Path = Path("outputs/analysis/knee-laterality-20260914/reviewed")
-    output_dir: Path = Path("outputs/analysis/knee-side-geometry-20260914")
+    metadata_dir: Path = Path("outputs/analysis/k/knee-laterality-20260914/reviewed")
+    output_dir: Path = Path("outputs/analysis/k/knee-side-geometry-20260914")
     enriched_headers: Path | None = None
     workers: int = Field(default=2, ge=1, le=8)
 

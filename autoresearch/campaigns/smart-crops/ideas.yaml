@@ -1232,7 +1232,7 @@ ideas:
     validation changed-slice share 0.092764, median fields 84 mm, and 34 whole-series
     wide fallbacks. These diagnostics distinguish activation of resampling from activation
     of the intended acquisition rule.'
-  - '[Acquisition probe](/home/claudio/src/knee-abnormality/outputs/analysis/input-resolution-research-20260915/acquisition/series_acquisition.parquet):
+  - '[Acquisition probe](/home/claudio/src/knee-abnormality/outputs/analysis/i/input-resolution-research-20260915/acquisition/series_acquisition.parquet):
     among quality-ok T1/PD series, acquired finer-axis resolution exceeds stored finer-axis
     spacing by more than 5% in 64.5% of coronal and 64.9% of sagittal series. Counts
     are unweighted series counts, not fixed-fold slice exposure.'
@@ -1777,18 +1777,18 @@ ideas:
     \ backbone and append physically positioned crop tokens from the first step. Add\
     \ no local loss or label-specific gate."
   precedents:
-  - '[Acquisition artifact](/home/claudio/src/knee-abnormality/outputs/analysis/input-resolution-research-20260915/acquisition/series_acquisition.parquet):
+  - '[Acquisition artifact](/home/claudio/src/knee-abnormality/outputs/analysis/i/input-resolution-research-20260915/acquisition/series_acquisition.parquet):
     CPU filter split=train, plane=Axial, Fluid_Sensitive=1, acq_estimate_quality=ok
     gives 3,690 series. At 5/12 mm, 3,282 (88.94%) preserve the finer acquired axis,
     versus 35.31% at 120/224 mm. Ambiguous and 3D estimates were excluded from this
     basis.'
-  - "[Attention artifact](/home/claudio/src/knee-abnormality/outputs/analysis/label-attention-20261001/x1/tokens.parquet):\
+  - "[Attention artifact](/home/claudio/src/knee-abnormality/outputs/analysis/l/label-attention-20261001/x1/tokens.parquet):\
     \ reaggregated 5,935 axial-fluid slices, filtering trusted and valid tokens; among\
     \ nine contiguous 5\xD75 blocks, each slice selects the block maximizing mean\
     \ attention across all 12 labels. Baker's capture rises 0.8860\u21920.9480, effusion\
     \ 0.8731\u21920.8975 and synovitis 0.8541\u21920.8809. Outer anchors span 80 mm;\
     \ these are point-token coverage proxies."
-  - '[Probe analysis](/home/claudio/src/knee-abnormality/outputs/analysis/label-attention-20261001/x1/analysis.json):
+  - '[Probe analysis](/home/claudio/src/knee-abnormality/outputs/analysis/l/label-attention-20261001/x1/analysis.json):
     axial fluid supplies substantial peripheral attention, and Baker''s positive-minus-negative
     axial centroid differs by approximately 15 mm. The probe belongs to the older
     140 mm model.'
@@ -1927,7 +1927,7 @@ ideas:
   - '[Acquired resolution](/home/claudio/src/knee-abnormality-smart-crops/autoresearch/campaigns/smart-crops/prior-work.md#acquired-resolution):
     coronal / sagittal fluid fully resolved in 37% / 44% of series at 0.536 mm, 91%
     / 89% at 0.4167 mm, 94% / 92% at 0.375 mm.'
-  - "[Attention probe tokens](/home/claudio/src/knee-abnormality/outputs/analysis/label-attention-20261001/x1/tokens.parquet),\
+  - "[Attention probe tokens](/home/claudio/src/knee-abnormality/outputs/analysis/l/label-attention-20261001/x1/tokens.parquet),\
     \ reaggregated on CPU for this refill over 912 studies: per label, attention share\
     \ by series type and the part outside the central 5\xD75 block. Coronal fluid:\
     \ medial meniscus 0.319 (0.052 outside), MCL 0.266 (0.042), effusion 0.139 (0.032).\
@@ -2234,7 +2234,7 @@ ideas:
     \ anatomical axes, half-knee and OA regions follow the actual window through view_to_wide\
     \ and the patient maps."
   precedents:
-  - '[Attention probe tokens](/home/claudio/src/knee-abnormality/outputs/analysis/label-attention-20261001/x1/tokens.parquet),
+  - '[Attention probe tokens](/home/claudio/src/knee-abnormality/outputs/analysis/l/label-attention-20261001/x1/tokens.parquet),
     reaggregated on CPU for this refill over 912 studies: mean share of a study''s
     attention on its top 5 / top 20 tokens is 0.167 / 0.478 (medial meniscus), 0.120
     / 0.338 (ACL), 0.109 / 0.322 (lateral meniscus), 0.106 / 0.301 (PF OA), 0.132
@@ -2465,7 +2465,7 @@ ideas:
     Baker''s cyst -0.0062, MCL -0.0015 (findings.md).'
   - Per slice, coronal fluid is the most used type for the medial meniscus (1.69 of
     a uniform share) and the MCL (1.41); sagittal fluid for ACL (1.87), PF OA (1.53)
-    and the lateral meniscus (1.42) (outputs/analysis/view-spacing-20261002/report.md).
+    and the lateral meniscus (1.42) (outputs/analysis/v/view-spacing-20261002/report.md).
   - No run isolates one of the six series types (same report, What can be read off).
   novelty: First run that zooms one fluid plane and not the other.
   coverage: Sagittal fluid slices, 18.5% of a study's slices, return to the wide view;
@@ -2513,7 +2513,7 @@ ideas:
   - 'fluid-detail-93-replacement against t1pd-detail-84: +0.0010; Baker''s cyst -0.0062,
     MCL -0.0015 (findings.md).'
   - 'Coronal fluid at 93.33 mm: more than 20 mm of medial tissue cut in 43% of series,
-    median cut 18 mm; 91% of series fully resolved at 5/12 mm (outputs/analysis/view-spacing-20261002/report.md).'
+    median cut 18 mm; 91% of series fully resolved at 5/12 mm (outputs/analysis/v/view-spacing-20261002/report.md).'
   - sagittal-fluid-detail-rectangle, -correspondence-fusion and -content-residual
     added a sagittal fluid detail window beside the 120 mm view and tied t1pd-detail-84
     (-0.0002, +0.0000, +0.0001); none replaced the view (findings.md).
@@ -2562,11 +2562,11 @@ ideas:
   precedents:
   - 'Sagittal fluid at the 93.33 mm rule window: median cut 14 mm anterior and 35
     mm posterior; attention inside the window in positive studies 63% for effusion
-    and Baker''s cyst, 87% for ACL, 88% for PF OA (outputs/analysis/view-spacing-20261002/report.md).'
+    and Baker''s cyst, 87% for ACL, 88% for PF OA (outputs/analysis/v/view-spacing-20261002/report.md).'
   - 'Reviewed case 93267826: most of a 4.5 cm Baker''s cyst lies outside the sagittal
     93.33 mm window (docs/data-preparation/plane-fluid-spacing-review.md).'
   - Baker's cyst fell 0.0010 to 0.0095 in eight crop runs that kept the 120 mm view
-    (outputs/analysis/view-spacing-20261002/report.md).
+    (outputs/analysis/v/view-spacing-20261002/report.md).
   novelty: First run with a placement offset that differs between the two contrasts.
   coverage: Sagittal fluid slices, 18.5% of a study's slices, move 7 mm posterior;
     the rest is the incumbent.
@@ -2607,7 +2607,7 @@ ideas:
     no crop, no second view.'
   precedents:
   - 'Sagittal fluid, finer acquired axis fully kept: 92% at 0.375 mm, 89% at 5/12
-    mm, 73% at 0.4464 mm, 60% at 0.5 mm, 44% at 0.5357 mm (n=4,192; outputs/analysis/view-spacing-20261002/report.md).'
+    mm, 73% at 0.4464 mm, 60% at 0.5 mm, 44% at 0.5357 mm (n=4,192; outputs/analysis/v/view-spacing-20261002/report.md).'
   - 'Sagittal fluid attention inside the rule window, positive studies: effusion 63%
     at 93 mm, 69% at 100 mm, 80% at 112 mm; Baker''s cyst 63%, 70%, 81% (same report).'
   novelty: First 100 mm view, and first run that changes the sagittal fluid width
@@ -2653,7 +2653,7 @@ ideas:
   - 't1pd-detail-84 against the 120 mm control: +0.0013, 80% [+0.0001, +0.0025] (findings.md).'
   - 't1pd-detail-acquisition-matched and t1pd-detail-acquired-matrix, 84 to 120 mm
     per series: -0.0002 and -0.0005 against t1pd-detail-84 (findings.md).'
-  - Coronal and sagittal T1/PD resolution and tissue cut at 84 and 93.33 mm (outputs/analysis/view-spacing-20261002/report.md).
+  - Coronal and sagittal T1/PD resolution and tissue cut at 84 and 93.33 mm (outputs/analysis/v/view-spacing-20261002/report.md).
   novelty: First fixed T1/PD detail view at a width other than 84 mm.
   coverage: Coronal and sagittal T1/PD slices, 33.7% of a study's slices; the rest
     is the incumbent.
@@ -2720,13 +2720,13 @@ ideas:
   - 'Lateral OA at x4 against rn18-field-120-control (0.9064): crop-compartments +0.0054,
     crop-attention +0.0048, crop-rule +0.0043, crop-own-loss +0.0034, crop-full-context-ranking-locator
     +0.0033, crop-evidence-utility-placement +0.0032; t1pd-detail-84 -0.0017; fluid-detail-93-replacement
-    +0.0019 (outputs/analysis/view-spacing-20261002/run_label_deltas.csv).'
+    +0.0019 (outputs/analysis/v/view-spacing-20261002/run_label_deltas.csv).'
   - 'crop-compartments at x1, last epoch: lateral OA 0.9055 from the wide tokens alone,
     0.849 from the crop tokens alone, attention mass on crop tokens 0.147; control
     0.9020 (its metrics.csv and epoch metrics).'
   - 'Placement adds nothing over the rule: five placements within 0.0006 of each other
     (findings.md), so the crops stay at the rule positions in every epoch.'
-  - Identical field changes differ by up to 0.0067 on one label between runs (outputs/analysis/view-spacing-20261002/report.md),
+  - Identical field changes differ by up to 0.0067 on one label between runs (outputs/analysis/v/view-spacing-20261002/report.md),
     so one run reads the direction only.
   novelty: First crop whose tokens are routed to a label group, and first crop on
     top of the zoomed views.
@@ -2805,13 +2805,13 @@ ideas:
   - 'Medial OA at x4 against rn18-field-120-control (0.9388): sagittal-fluid-detail-rectangle
     +0.0036, two-views-112-fluid-140 +0.0034, sagittal-fluid-content-residual +0.0032,
     two-views-fluid-140 +0.0028, fluid-detail-93-replacement +0.0022; the six T1/PD
-    crop runs -0.0011 to +0.0023 (outputs/analysis/view-spacing-20261002/run_label_deltas.csv).'
+    crop runs -0.0011 to +0.0023 (outputs/analysis/v/view-spacing-20261002/run_label_deltas.csv).'
   - 'crop-compartments at x1, last epoch, crop tokens alone against wide tokens alone:
     medial OA 0.897 against 0.935, lateral OA 0.849 against 0.906 (its metrics.csv).'
   - 'crop-own-loss: crop-only logits under the disease loss at weight 0.1; medial
     OA +0.0023, lateral OA +0.0034, macro -0.0003 (findings.md).'
   - 'Coronal attention per slice against uniform: medial OA 1.28 on coronal fluid
-    and 1.06 on coronal T1/PD (outputs/analysis/view-spacing-20261002/report.md).'
+    and 1.06 on coronal T1/PD (outputs/analysis/v/view-spacing-20261002/report.md).'
   novelty: First crops on fluid slices, first side-specific routing of crop tokens
     and first crop loss restricted to the labels the crop is meant for.
   coverage: About 18 crops per study, on the 4.0 coronal T1/PD and 5.1 coronal fluid
@@ -3021,7 +3021,7 @@ ideas:
   - t1pd-detail-84 against the 120 mm control, +0.0013, 80% [+0.0001, +0.0025] (findings.md).
   - Sagittal T1/PD at the 84 mm rule window, a median 43 mm above the joint line and
     under 40 mm in 36% of series; coronal T1/PD, more than 20 mm of medial tissue
-    cut in 58% (outputs/analysis/view-spacing-20261002/report.md).
+    cut in 58% (outputs/analysis/v/view-spacing-20261002/report.md).
   - The fluid split, coronal zoom +0.0003 and sagittal zoom +0.0005 to +0.0007, additive
     (findings.md).
   novelty: First run that zooms one T1/PD plane and not the other.
@@ -3130,7 +3130,7 @@ ideas:
   precedents:
   - Sagittal margins at the rule window, T1/PD 84 mm a median 43 mm above and 41 mm
     below the joint line, under 40 mm above in 36% and under 30 mm below in 13%; fluid
-    93.33 mm 48 mm above and 45 mm below, 16% and 7% (outputs/analysis/view-spacing-20261002/report.md).
+    93.33 mm 48 mm above and 45 mm below, 16% and 7% (outputs/analysis/v/view-spacing-20261002/report.md).
   - Image review, the sagittal detail window excludes the superior patella and the
     suprapatellar fluid in some slices (docs/data-preparation/plane-fluid-spacing-review.md).
   novelty: First change of the vertical placement.
@@ -3179,7 +3179,7 @@ ideas:
   precedents:
   - t1pd-detail-84 against the 120 mm control, +0.0013, 80% [+0.0001, +0.0025] (findings.md).
   - Sagittal T1/PD at the 84 mm rule window, a median 43 mm above the joint line and
-    under 40 mm in 36% of series (outputs/analysis/view-spacing-20261002/report.md).
+    under 40 mm in 36% of series (outputs/analysis/v/view-spacing-20261002/report.md).
   - coronal-fluid-93-sagittal-fluid-120 and sagittal-fluid-93-coronal-fluid-120 changed
     one fluid plane of the incumbent's policy and were approved with fluid-detail-93-replacement
     in removed_idea_ids (their manifests).
@@ -3298,7 +3298,7 @@ ideas:
   - t1pd-detail-84 against the 120 mm control, +0.0013, 80% [+0.0001, +0.0025] (findings.md).
   - t1pd-detail-acquisition-matched and t1pd-detail-acquired-matrix, 84 to 120 mm
     per series, -0.0002 and -0.0005 against t1pd-detail-84 (findings.md).
-  - Coronal and sagittal T1/PD resolution and tissue cut at 84 and 93.33 mm (outputs/analysis/view-spacing-20261002/report.md).
+  - Coronal and sagittal T1/PD resolution and tissue cut at 84 and 93.33 mm (outputs/analysis/v/view-spacing-20261002/report.md).
   novelty: First fixed T1/PD detail view at a width other than 84 mm.
   coverage: Coronal and sagittal T1/PD slices, 33.7% of a study's slices; the rest
     is the incumbent.

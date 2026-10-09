@@ -54,7 +54,7 @@ every existing checkpoint. It is the first seed of the
 adopted there by user decision.
 
 Script: `scripts/adhoc/score_tta_detail_coordinates.py`. Outputs:
-`outputs/analysis/tta-detail-coordinates-20261005b/` (`report.json`, `predictions.parquet`).
+`outputs/analysis/t/tta-detail-coordinates-20261005b/` (`report.json`, `predictions.parquet`).
 
 ## F04 and F05: knee side and centre census
 
@@ -79,7 +79,7 @@ and an origin more than 40 mm off the midline; the hidden test sites are not cov
 | Studies with trusted geometry where every contributing series has its own frame UID | 4,238 of 4,238 |
 
 Script: `scripts/adhoc/census_knee_side_and_centre.py`. Outputs:
-`outputs/analysis/knee-side-centre-census-20261005/` (`studies.parquet`, `summary.json`).
+`outputs/analysis/k/knee-side-centre-census-20261005/` (`studies.parquet`, `summary.json`).
 
 ## F06: bag-dependent normalization
 
@@ -100,4 +100,4 @@ the ±10% contrast augmentation in one series out of ten; a window fixed per ser
 (not run).
 
 Script: `scripts/adhoc/measure_bag_normalization_drift.py`. Outputs:
-`outputs/analysis/bag-normalization-drift-20261005/` (`series.parquet`, `summary.json`).
+`outputs/analysis/b/bag-normalization-drift-20261005/` (`series.parquet`, `summary.json`).

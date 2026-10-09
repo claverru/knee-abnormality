@@ -13,7 +13,7 @@ from knee_abnormality.evaluation.metrics import soft_auc
 from scripts.adhoc.correlate_submission_metrics import label_sets, submitted_checkpoint
 from scripts.tools.validation import MAJOR_VENDORS, scanner_groups
 
-HEADERS = Path("outputs/analysis/sharing-disagreement-20260914/study_headers.parquet")
+HEADERS = Path("outputs/analysis/s/sharing-disagreement-20260914/study_headers.parquet")
 CURRENT = "rebuild_state_v2|hard|pooled"
 SCANNER_GROUP_SOFT = "rebuild_state_v2|soft|scanner_group|equal|m5"
 REFERENCES = [

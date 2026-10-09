@@ -29,4 +29,4 @@ The initial longer notebook name was rejected with HTTP 400 after dataset
 upload; the successful retry reused the same private dataset version. The
 failed attempt created no competition submission. Exact export, both workflow
 launches and monitoring commands are retained in the
-[command log](../../../outputs/analysis/spatial-tokens-vs-crop140mm-20260913/submission-commands.md).
+[command log](../../../outputs/analysis/s/spatial-tokens-vs-crop140mm-20260913/submission-commands.md).

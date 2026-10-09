@@ -27,7 +27,7 @@ label's attention and `w`, `b` the head, and `Σ_t C[k, t] = logit[k] − b[k]`.
   - *Variance share:* `cov(C[k, t], logit[k]) / var(logit[k])`.
   - *Efficiency:* separation share ÷ token share.
 - **Scripts:** [snapshots](../../history/series-and-sampling-sources/README.md#triplet-allocation)
-  (`infer.py`, `summarize.py`). Outputs: `outputs/analysis/type-contribution-20260917/`
+  (`infer.py`, `summarize.py`). Outputs: `outputs/analysis/t/type-contribution-20260917/`
   (`type_label_summary.csv`, `type_label_summary_macro.csv`, `label_group_counts.csv`,
   `raw/*.npz`, `raw/inference.json`). The `sep_share_min_pct`/`max_pct` columns of the macro file
   span labels, not runs; the run spread below was computed from `raw/`.

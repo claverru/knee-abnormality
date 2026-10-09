@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 
-OUT = Path("outputs/analysis/routing-and-shifts-frames-20261007")
+OUT = Path("outputs/analysis/r/routing-and-shifts-frames-20261007")
 CORE, RING, OUTER = 15.4, 28.7, 45.0
 BOTTOM, TOP, LOW, HIGH = -11.2, 10.7, -42.0, 46.0
 LEAN, NOD = np.radians(-25.0), np.radians(7.0)

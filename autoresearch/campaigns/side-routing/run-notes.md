@@ -486,7 +486,7 @@ report-attribute heads, next in the queue, put six more meniscus questions on th
 
 **Probe (2026-10-06 00:45, inference only, ×1, the incumbent's checkpoint):** shifting the
 midline towards lateral does not bring the mark back
-(`outputs/analysis/side-routing-offset-probe-20261006/offsets.csv`).
+(`outputs/analysis/s/side-routing-offset-probe-20261006/offsets.csv`).
 
 | Lateral shift | Medial Meniscus localisation | Lateral Meniscus localisation | Medial OA localisation |
 |---:|---:|---:|---:|

@@ -45,7 +45,7 @@ with the result of each. Do not propose them again.
 |---|---|
 | Rotation of each series against the scanner's axes (76% of knees turned outward, over 10° in 19%) | `scripts/adhoc/census_knee_rotation.py`, plan: Visual inspection and rotation census |
 | Patient motion between series (median 0.4 mm, 99% under 2.7 mm) | `scripts/adhoc/inter_series_motion/`, plan: Patient motion between series |
-| Cuts drawn on studies; the front cut at three tilts on ten studies | `outputs/analysis/octant-sketches-20261005/`, plan: Octant sketches |
+| Cuts drawn on studies; the front cut at three tilts on ten studies | `outputs/analysis/o/octant-sketches-20261005/`, plan: Octant sketches |
 | Routing, boundaries and one target's position prior drawn per study | `scripts/adhoc/render_routing_views.py` |
 
 ## Sibling runs for the run report

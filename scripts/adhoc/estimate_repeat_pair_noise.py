@@ -32,7 +32,7 @@ PAIRS = [
     RepeatPair(
         mechanism="dsu-feature-statistics",
         first=EXPERIMENTS / "augmentation/experiments/dsu-feature-statistics-20260926T034836Z-6298ea10/comparison/comparison.json",
-        second=Path("outputs/analysis/dsu-without-smoothing-vs-report-attributes-control/comparison.json"),
+        second=Path("outputs/analysis/d/dsu-without-smoothing-vs-report-attributes-control/comparison.json"),
     ),
     RepeatPair(
         mechanism="run-level-stratified-jitter",

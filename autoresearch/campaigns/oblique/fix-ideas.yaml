@@ -18,8 +18,8 @@ ideas:
       prior with no learned parameters. Standard series and non-split slots are unchanged,
       and split studies always keep their standard tokens, so no label loses all its tokens.
     precedents:
-      - outputs/analysis/tilted-slot-policies-v2-k05-20260922/results.csv (additive_acl +0.0020 and intact_acl +0.0011 on the affected subset against additive -0.0001, k_05 at x4 tau 0.75)
-      - outputs/analysis/acquisition-geometry-20260922/localize_campaign.py (split-study and unchanged-study macro AUC for the reference, k_05 and each candidate)
+      - outputs/analysis/t/tilted-slot-policies-v2-k05-20260922/results.csv (additive_acl +0.0020 and intact_acl +0.0011 on the affected subset against additive -0.0001, k_05 at x4 tau 0.75)
+      - outputs/analysis/a/acquisition-geometry-20260922/localize_campaign.py (split-study and unchanged-study macro AUC for the reference, k_05 and each candidate)
       - autoresearch/campaigns/oblique/prior-work.md#what-the-oblique-groups-are (descriptions of the fluid obliques)
       - outputs/autoresearch/oblique/experiments/oblique-group-embedding-20260922T115506Z-f5d616dd/changes.diff (flag plumbing to reuse)
     novelty: >-
@@ -65,7 +65,7 @@ ideas:
     precedents:
       - outputs/autoresearch/oblique/experiments/oblique-group-embedding-20260922T115506Z-f5d616dd (rejected at 0.899287, +0.00176 against the reference)
       - outputs/autoresearch/oblique/experiments/label-view-attention-bias-20260922T120824Z-29aa5863
-      - outputs/analysis/acquisition-geometry-20260922/localize_campaign.py (split-study bootstrap)
+      - outputs/analysis/a/acquisition-geometry-20260922/localize_campaign.py (split-study bootstrap)
     novelty: >-
       A composition of the two identity mechanisms; each was tested alone.
     coverage: >-
@@ -98,9 +98,9 @@ ideas:
       standard series, capped by that series' capacity, so validation x1 triplets per epoch
       equal the reference exactly and no oblique token is scored.
     precedents:
-      - outputs/analysis/tilted-slot-policies-check-20260922/results.csv (standard-only subset +0.0066 at x1)
-      - outputs/analysis/tilted-slot-policies-v2-k05-20260922/results.csv (standard-only subset +0.0011 at x4)
-      - outputs/analysis/acquisition-geometry-20260922/oblique_reach.txt (standard series capacity of 28 windows in coronal fluid and 30 in coronal T1/PD)
+      - outputs/analysis/t/tilted-slot-policies-check-20260922/results.csv (standard-only subset +0.0066 at x1)
+      - outputs/analysis/t/tilted-slot-policies-v2-k05-20260922/results.csv (standard-only subset +0.0011 at x4)
+      - outputs/analysis/a/acquisition-geometry-20260922/oblique_reach.txt (standard series capacity of 28 windows in coronal fluid and 30 in coronal T1/PD)
     novelty: >-
       Uses the oblique views as training data only; no earlier run separated their training
       value from their evaluation value.

@@ -19,7 +19,7 @@ ideas:
     no weight decay; validation, selection, saved predictions and export use f(x) alone) on top of
     the incumbent, with one change: the table is 31 x 12 over scanner models instead of 8 x 12 over
     groups. Models follow scanner-model-confusion-target: (Manufacturer, ManufacturerModelName) from
-    outputs/analysis/sharing-disagreement-20260914/study_headers.parquet (same SHA-256 check), the 30
+    outputs/analysis/s/sharing-disagreement-20260914/study_headers.parquet (same SHA-256 check), the 30
     models with at least 30 studies in the whole table, the rest pooled into one other class. The
     incumbent's 8-group confusion head stays. Setting trainer.metadata_heads.site_bias with a
     model-resolution selector. Log per epoch the mean absolute bias per label and the largest

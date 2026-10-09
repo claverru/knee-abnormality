@@ -100,17 +100,17 @@ than the tag audit alone suggested. The resulting abstaining rule is the
 tuned on disease validation. Image-based alternatives remain deferred. No labels were installed, training
 started, inference changed or GPU used.
 
-The [reviewed summary](../../outputs/analysis/knee-side-geometry-20260914/reviewed/summary.json),
-[study coordinates](../../outputs/analysis/knee-side-geometry-20260914/reviewed/studies.parquet),
-[agreement table](../../outputs/analysis/knee-side-geometry-20260914/reviewed/agreement.csv),
-[report cross-check](../../outputs/analysis/knee-side-geometry-20260914/reviewed/report_agreement.csv)
-and [manifest](../../outputs/analysis/knee-side-geometry-20260914/reviewed/manifest.json)
+The [reviewed summary](../../outputs/analysis/k/knee-side-geometry-20260914/reviewed/summary.json),
+[study coordinates](../../outputs/analysis/k/knee-side-geometry-20260914/reviewed/studies.parquet),
+[agreement table](../../outputs/analysis/k/knee-side-geometry-20260914/reviewed/agreement.csv),
+[report cross-check](../../outputs/analysis/k/knee-side-geometry-20260914/reviewed/report_agreement.csv)
+and [manifest](../../outputs/analysis/k/knee-side-geometry-20260914/reviewed/manifest.json)
 retain the 73,158 successfully parsed headers, field evidence, sources and hashes.
 The script uses only CPU metadata and source text; no pixels or models are read.
 Reproduce from the enriched snapshot without another DICOM scan:
 
 ```bash
-rtk proxy env CUDA_VISIBLE_DEVICES= POLARS_MAX_THREADS=1 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 uv run --locked python -m scripts.adhoc.audit_knee_side_geometry --enriched-headers outputs/analysis/knee-side-geometry-20260914/headers.parquet --output-dir outputs/analysis/knee-side-geometry-reanalysis
+rtk proxy env CUDA_VISIBLE_DEVICES= POLARS_MAX_THREADS=1 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 uv run --locked python -m scripts.adhoc.audit_knee_side_geometry --enriched-headers outputs/analysis/k/knee-side-geometry-20260914/headers.parquet --output-dir outputs/analysis/knee-side-geometry-reanalysis
 ```
 
 Omit `--enriched-headers` to reread dimensions and coil fields from the DICOM headers, starting from

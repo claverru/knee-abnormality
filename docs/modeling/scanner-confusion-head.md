@@ -31,7 +31,7 @@ outside `KneeAbnormalityModel`, so prediction, export and checkpoint loading are
 
 - **Targets:** the 8 scanner groups of the split protocol (Siemens, Philips and GE × 1.5T, 3T and
   unknown field strength; every other vendor pooled as minor), from
-  `outputs/analysis/sharing-disagreement-20260914/study_headers.parquet`, checked against the
+  `outputs/analysis/s/sharing-disagreement-20260914/study_headers.parquet`, checked against the
   scanner-table SHA-256 in the configured split's `protocol.json` (the same table for
   `all_5fold_scanner_v1` and `v2`).
 - **Head:** one attention query (256 → 128 → 1) over the tokens the disease head pools, then a

@@ -49,8 +49,8 @@ analyzed in [bias_free.md](../../../bias_free.md), the report-versus-image label
 | 21 | Per-site bias + 31-model confusion | confusion | −0.00030 | [−0.0024, +0.0017] | reject | |
 
 Hand comparisons (rows 14 and 19) are in
-`outputs/analysis/scanner-confusion-backbone-features-vs-incumbent/` and
-`outputs/analysis/predicted-attribute-residual-readout-vs-incumbent/`. Three ideas were blocked at
+`outputs/analysis/s/scanner-confusion-backbone-features-vs-incumbent/` and
+`outputs/analysis/p/predicted-attribute-residual-readout-vs-incumbent/`. Three ideas were blocked at
 review without a run: the completeness bias on report length (outside permitted data), its v3
 rebuild (logit offset on the fixed disease loss), and per-scanner token harmonization (needs
 prediction-loader inputs).

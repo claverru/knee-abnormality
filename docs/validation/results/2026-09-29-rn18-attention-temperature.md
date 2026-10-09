@@ -29,5 +29,5 @@ the shift comes from the backbone or from removing series dropout is not separat
 ## Reproduce
 
 ```bash
-rtk proxy env CUDA_VISIBLE_DEVICES= uv run --locked python -m scripts.adhoc.score_temperature_sweep --sweep-dir outputs/analysis/tau-sweep-rn18-20260929/scored --split-dir data/folds/all_5fold_scanner_v2 --fold 0 --reference-tau 0.75 --seed 20260914
+rtk proxy env CUDA_VISIBLE_DEVICES= uv run --locked python -m scripts.adhoc.score_temperature_sweep --sweep-dir outputs/analysis/t/tau-sweep-rn18-20260929/scored --split-dir data/folds/all_5fold_scanner_v2 --fold 0 --reference-tau 0.75 --seed 20260914
 ```
