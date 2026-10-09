@@ -1249,7 +1249,7 @@ configuration line, same worktree, fold 1, seed 1110484336.
 |---|---|---|---|---|
 | ×4 macro AUC | 0.928121 | 0.928120 | 0.928026 | 0.928226 |
 | Best ×1 macro AUC | 0.919392 | 0.918411 | 0.918941 | 0.918769 |
-| Public | 0.955 (S129) | | 0.954 (S131) | not submitted |
+| Public | 0.955 (S129) | | 0.954 (S131) | 0.954 (S133) |
 
 - **+0.0001 at ×4: level with run 7**, inside what a rerun gives (±0.0003). Three coronal
   settings (T1/PD 84 and fluid 93; swapped; both 93) are within 0.0002 of each other at ×4:
@@ -1277,6 +1277,8 @@ configuration line, same worktree, fold 1, seed 1110484336.
   both-93 0.928472, all three 0.928593. Every pair adds about +0.0004 to +0.0005 over its
   members, more than run 7 with its own retraining (+0.0002): models that differ only in the
   coronal fields are a little less alike than two trainings of the same configuration.
+- **S133**, both coronal views at 93 mm, ×4, τ 0.9, batch 4: **0.954** public. Both coronal
+  variants are one board step below run 7 while level with it locally.
 - Not adopted; the configuration change stays uncommitted in the worktree.
 
 ## Next experiment: changes agreed while `rn18-every-target-on-a-structure` ran (2026-10-09)
