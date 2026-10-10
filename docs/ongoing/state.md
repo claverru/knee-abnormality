@@ -66,6 +66,13 @@ measured outcomes are in the [validation results](../validation/results/INDEX.md
   top and not adopted (structure routing from the masks, centred and number-free crop poses,
   per-view losses) and the audit of that line: the campaign's
   [run notes](../../autoresearch/campaigns/view-poses/run-notes.md).
+  **View sizes on it (2026-10-10, four runs, nothing adopted):** sagittal fluid at 84 mm is the
+  one field that matters (+0.0015 at ×4, four runs at 84 mm against two at 93 mm); sagittal
+  T1/PD and both coronal fields are level (three coronal settings within 0.0002); a second
+  view on sagittal fluid taking slices from the first lost 0.0027. Submitted: the coronal swap
+  0.954 (S131), both coronal at 93 mm 0.954 (S133), and the first pair, the mean of the recipe
+  and the coronal swap, 0.955 (S132). Single-view readouts prefer 93 mm everywhere and do not
+  predict the fused model.
 - **Model:** the [current model](../modeling/current-model.md), since 2026-09-29 on a
   RadImageNet ResNet-18 (`configs/training.yaml`): repeated middle slice at 224 px and 0.536 mm, a
   120 mm field (since 2026-10-01, with augmentation on that slice only), coronal and sagittal
