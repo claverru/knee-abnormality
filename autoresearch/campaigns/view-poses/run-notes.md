@@ -1281,6 +1281,76 @@ configuration line, same worktree, fold 1, seed 1110484336.
   variants are one board step below run 7 while level with it locally.
 - Not adopted; the configuration change stays uncommitted in the worktree.
 
+## Sagittal fields: both at 93 mm, the fluid view split in two, and the comparison of the view-size runs (2026-10-10)
+
+Two more configuration-only runs on main's recipe, fold 1, seed 1110484336, and an analysis of
+the seven view-size trainings from their saved ×4 predictions.
+
+| Sagittal T1/PD | Sagittal fluid | Run | ×4 | Best ×1 | Training |
+|---|---|---|---|---|---|
+| 84 | 93 | Parent (run 3) | 0.926563 | 0.917013 | 1,486 s |
+| 93 | 93 | `rn18-sagittal-both-93mm` | 0.926621 | 0.918390 | 1,540 s (GPU shared) |
+| 93 | 84 | Run 7 | 0.928121 | 0.919392 | 1,498 s |
+| 93 | 72 ×3 + 112 ×2 slices | `rn18-sagittal-fluid-72-and-112mm` | 0.925384 | 0.918100 | 2,232 s |
+
+- **Both sagittal at 93 mm equals the parent (+0.00006):** widening the T1/PD view gave nothing;
+  the swap's +0.0016 came from the finer fluid view. Per target against run 7: Synovitis
+  +0.0036, ACL +0.0023, PF OA +0.0003, Medial OA +0.0003, Baker's −0.0004, Effusion −0.0008,
+  Medial Meniscus −0.0011, Lateral Meniscus −0.0016, Lateral OA −0.0022, Fracture −0.0039,
+  Contusion −0.0050, MCL −0.0095. The sagittal fluid view alone read 0.862 at 93 mm, the
+  highest single-view figure, while the model was 0.0015 lower.
+- **The fluid view split into 72 mm (3 slices) and 112 mm (2 slices): −0.0027.** Per target
+  against run 7 (against the retraining): ACL +0.0047 (+0.0031), PF OA +0.0019 (−0.0009),
+  Fracture +0.0010 (+0.0016), Lateral Meniscus −0.0006 (−0.0024), Medial Meniscus −0.0012
+  (−0.0004), Effusion −0.0012 (−0.0000), Lateral OA −0.0014 (−0.0017), Medial OA −0.0023
+  (−0.0029), Synovitis −0.0024 (−0.0035), Baker's −0.0048 (−0.0051), Contusion −0.0089
+  (−0.0073), MCL −0.0177 (−0.0131). MCL, Contusion and Baker's are −0.0026 of the −0.0027; ACL
+  is the one gain. Lateral Meniscus led at ×1 in all ten epochs and not at ×4. The same 3 + 2
+  split lost 0.0020 on the recipe of 3 October (run 37 of learnable-views). 128 mm was
+  refused: a placed view must be narrower than `data.reference_field_mm`.
+- **Not a clean test of two scales** (audit of the code with two views on one type, no defect
+  found): the two views pick slices independently and overlap at ×4 (63 shared slices on 16
+  studies, 277 distinct against 334); each view's first look at ×4 takes its end slices (four
+  of five sagittal fluid first-look slices at the stack edge); contrast mixing blends the 93 mm
+  T1/PD pixel by pixel with a 72 or 112 mm crop; the feature-statistics spread is pooled per
+  type across the two zooms; readout weights are per type, so only the per-view attention bias
+  tells the zooms apart; the slice refill rounds per view (sagittal fluid image share 0.184 to
+  0.193, axial fluid 0.243 to 0.235); the 72 px canvas margin is 23 mm at 72 mm.
+- **1.47 times slower at the same image count** (151 s to about 220 s per epoch). Not explained:
+  loader time per study is equal, entries +18%, padded slots +5% at ×1, nothing found that
+  scales worse than linearly. Runs with 7 to 12 views on the recipe of 2 to 3 October (before
+  posed canvases) were not slower (1,007 to 1,302 s against a six-view median of 1,107 s).
+- **Measured from the masks** (549 knees, 36 with menisci; knee frame, from the plateau centre):
+  in the sagittal plane both menisci, the joint zone and the notch fit a 64 mm box centred 2 mm
+  ahead and 14 mm above (56 mm cuts 6% of knees); a 93 mm crop at the joint holds the whole
+  kneecap in 1 to 16% of knees, 112 mm centred 7 ahead and 20 above in 97%. In the coronal
+  plane the menisci span 85 mm and the MCL band reaches 53 mm medial: 84 mm holds the whole
+  band in 15% of knees, 93 mm in 56%, 112 mm in 99%.
+
+**Seven view-size trainings compared** (parent, run 7, its retraining, coronal swap, both
+coronal 93, both sagittal 93, the split):
+
+- **Sagittal fluid at 84 mm is the one repeated macro effect:** four runs at 84 against two at
+  93, +0.0015, all eight run-against-run differences +0.0014 to +0.0017. Per label, repeating
+  and above the rerun pair's difference: MCL +0.0056, Contusion +0.0043, Fracture +0.0038,
+  Lateral OA +0.0034 (8 of 8, the cleanest), Synovitis −0.0023.
+- **Sagittal T1/PD and both coronal fields are level at macro** (one pair at +0.00006; three
+  coronal settings within 0.0002), trading labels at n = 1 each: coronal T1/PD at 93 gives
+  Fracture +0.0053 and Baker's +0.0024 and costs Lateral Meniscus −0.0042.
+- **The model does not follow the single views.** Every sagittal and coronal view read alone
+  prefers 93 mm (sagittal fluid 0.860 against 0.851, coronal T1/PD 0.742 against 0.721), while
+  ×4 prefers 84 mm for sagittal fluid and is flat elsewhere; per-label signs agree on 2 to 7
+  of 12. Single-view readouts should not set fields.
+- **As ensemble members:** logit correlation 0.9969 for the rerun pair, 0.9943 for pairs that
+  differ in coronal fields, 0.9902 in sagittal. Means of probabilities: run 7 + retraining
+  0.92833 (+0.0002); best pair retraining + coronal swap 0.92861; best triple retraining +
+  coronal swap + both coronal 93 0.92872 (+0.0004 over the rerun pair's ensemble, bootstrap
+  P 0.84); all seven 0.92841. Sagittal variants decorrelate more but start 0.0015 or more
+  lower and net out below.
+- **Reading each label from its best run is selection optimism:** 0.93013 in-sample (+0.0020),
+  −0.0004 against run 7 when chosen on one half of the studies and scored on the other (500
+  splits).
+
 ## Next experiment: changes agreed while `rn18-every-target-on-a-structure` ran (2026-10-09)
 
 Base: the working copy `/home/claudio/src/knee-abnormality-anatomy-routing` as that run has it
