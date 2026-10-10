@@ -18,7 +18,15 @@ Pending on the recipe in force (meniscus map and posed canvases, [state](state.m
   alone carrying more than the gap; the multiplier curve (×1 to ×4) of the recipe against one
   experiment is not measured. Detail:
   [view-poses run notes](../../autoresearch/campaigns/view-poses/run-notes.md).
-- **Submission ledger:** S122 to S126 are not in it yet.
+- **Left open by the view-size runs (2026-10-10):** both sagittal views at 84 mm was prepared
+  and not run (one line: sagittal T1/PD 93.33 to 84); the first look's tokens are computed and
+  discarded and could be pooled; a second view on one series type trains 1.47 times slower at
+  the same image count, cause not found (a step timing of both configs is the next step).
+  Detail: [view-poses run notes](../../autoresearch/campaigns/view-poses/run-notes.md).
+- **Soft-tissue masks line, started 2026-10-10:** worktree `knee-abnormality-soft-tissue-masks`;
+  first idea, reading the meniscus and OA labels from third-stage features under the predicted
+  masks. Working list in `SOFT_TISSUE_MASK_IDEAS.md` at that worktree's root, uncommitted.
+- **Submission ledger:** S122 to S133 are not in it yet.
 - **Submit job:** it cannot pick up a notebook version that has already completed; S126 had to
   be submitted by hand through the API.
 
