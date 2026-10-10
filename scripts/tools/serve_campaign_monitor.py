@@ -9,13 +9,15 @@ import time
 from datetime import datetime
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+from ipaddress import ip_address, ip_network
 from pathlib import Path
+from urllib.parse import parse_qs
 
 import plotly
 import plotly.graph_objects as go
 import yaml
 from plotly.offline import get_plotlyjs
-from pydantic import Field
+from pydantic import BaseModel, Field
 
 from knee_abnormality.autoresearch.runtime.layout import (
     PREDICTIONS,
@@ -26,6 +28,8 @@ from knee_abnormality.cli import CLISettings, describe
 
 CONTROL = "control"
 WATCHDOG = "watchdog"
+MAXIMUM_MESSAGE_BYTES = 20000
+TAILNET = (ip_network("100.64.0.0/10"), ip_network("fd7a:115c:a1e0::/48"))
 GAINS: dict[tuple, list[float]] = {}
 PLOTLY_JS = f"plotly-{plotly.__version__}.min.js"
 BANNER = {
@@ -117,6 +121,13 @@ table.jobs th, table.jobs td { border-bottom: none; padding: 4px 5px; white-spac
 table.jobs td:nth-child(2), table.jobs td:nth-child(3) { color: var(--ink2); }
 table.jobs th:nth-child(2), table.jobs td:nth-child(2) { text-align: left; }
 .up { color: var(--good); font-weight: 600; } .down { color: var(--bad); font-weight: 600; }
+.thread { max-height: 320px; overflow-y: auto; }
+.message { margin: 6px 0; padding-left: 8px; border-left: 3px solid var(--s1); white-space: pre-wrap; }
+.waiting { color: var(--warn); font-weight: 600; }
+form.send { display: flex; gap: 8px; margin-top: 8px; align-items: flex-end; }
+form.send textarea { flex: 1; min-height: 56px; font: inherit; color: var(--ink); background: var(--bg);
+  border: 1px solid var(--grid); border-radius: 6px; padding: 6px; }
+form.send button { font: inherit; padding: 6px 14px; }
 """
 SCRIPT = """
 const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -137,22 +148,25 @@ function theme() {
 }
 const age = document.getElementById("age");
 const interval = Number(age.dataset.interval) * 1000;
+const draft = document.getElementById("draft");
+const thread = document.getElementById("thread");
 let lastTouch = 0;
 function touched() { lastTouch = Date.now(); }
 function describeAge() {
   const minutes = (Date.now() - Number(age.dataset.updated)) / 60000;
   const stale = minutes * 60000 > 2.5 * interval;
   age.textContent = "updated " + Math.round(minutes) + " min ago" + (stale ? " · updater may be down" : "")
-    + " · reloads every " + Math.round(interval / 1000) + " s unless you are zooming";
+    + " · reloads every " + Math.round(interval / 1000) + " s unless you are zooming or writing";
   age.className = stale ? "stale" : "";
 }
 window.addEventListener("load", () => {
   document.querySelectorAll(".js-plotly-plot").forEach(gd => Plotly.Plots.resize(gd));
   theme();
   describeAge();
+  thread.scrollTop = thread.scrollHeight;
 });
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change", theme);
-setInterval(() => { describeAge(); if (Date.now() - lastTouch > interval) location.reload(); }, interval);
+setInterval(() => { describeAge(); if (Date.now() - lastTouch > interval && !draft.value) location.reload(); }, interval);
 """
 PAGE = """<!doctype html>
 <html><head><meta charset="utf-8">
@@ -190,6 +204,32 @@ class MonitorCLI(CLISettings):
     interval: int = Field(
         default=120, ge=30, description="Seconds between automatic page reloads"
     )
+
+
+class Message(BaseModel):
+    time: datetime
+    text: str
+
+
+def messages_path(campaign: str) -> Path:
+    return Path(f"outputs/autoresearch/{campaign}/messages.jsonl")
+
+
+def read_messages(campaign: str) -> list[Message]:
+    path = messages_path(campaign)
+    if not path.is_file():
+        return []
+    return [
+        Message.model_validate_json(line)
+        for line in path.read_text().splitlines()
+        if line.strip()
+    ]
+
+
+def append_message(campaign: str, text: str) -> None:
+    message = Message(time=datetime.now().astimezone(), text=text)
+    with messages_path(campaign).open("a") as file:
+        file.write(message.model_dump_json() + "\n")
 
 
 def label(name: str) -> str:
@@ -853,6 +893,30 @@ def activity(status: str, state: dict) -> str:
     )
 
 
+def messages(campaign: str) -> str:
+    entries = read_messages(campaign)
+    seen = messages_path(campaign).with_suffix(".seen")
+    delivered = int(seen.read_text()) if seen.is_file() else 0
+    rows = "".join(
+        "<div class='message'><div class='sub'>"
+        f"{entry.time.astimezone():%d %b %H:%M} · "
+        + (
+            "delivered to the keeper"
+            if index < delivered
+            else "<span class='waiting'>waiting for the keeper</span>"
+        )
+        + f"</div>{html.escape(entry.text)}</div>"
+        for index, entry in enumerate(entries)
+    )
+    return (
+        "<h2>Messages to the keeper</h2><div class='card'>"
+        f"<div class='thread' id='thread'>{rows or "<div class='sub'>none yet</div>"}</div>"
+        "<form class='send' method='post' action='/messages'>"
+        f"<textarea id='draft' name='text' maxlength='{MAXIMUM_MESSAGE_BYTES // 4}' required></textarea>"
+        "<button>Send</button></form></div>"
+    )
+
+
 def regenerate(settings: MonitorCLI) -> None:
     settings.directory.mkdir(parents=True, exist_ok=True)
     if not (settings.directory / PLOTLY_JS).exists():
@@ -900,6 +964,7 @@ def regenerate(settings: MonitorCLI) -> None:
     body = (
         tiles(control, runs, fold)
         + activity(status, state)
+        + messages(settings.campaign)
         + "<h2>Results</h2>"
         + results(control, runs)
         + comparison(control, runs, fold)
@@ -953,6 +1018,25 @@ class Handler(SimpleHTTPRequestHandler):
         if self.path.split("?")[0] in {"/", "/index.html"}:
             fresh(self.settings)
         super().do_GET()
+
+    def do_POST(self) -> None:
+        sender = ip_address(self.client_address[0])
+        if not any(sender in network for network in TAILNET):
+            self.send_error(403)
+            return
+        length = int(self.headers.get("Content-Length", 0))
+        if self.path != "/messages" or not 0 < length <= MAXIMUM_MESSAGE_BYTES:
+            self.send_error(400)
+            return
+        form = parse_qs(self.rfile.read(length).decode())
+        text = form.get("text", [""])[0].replace("\r\n", "\n").strip()
+        if text:
+            with REGENERATION:
+                append_message(self.settings.campaign, text)
+                last_regeneration[0] = float("-inf")
+        self.send_response(303)
+        self.send_header("Location", "/")
+        self.end_headers()
 
     def end_headers(self) -> None:
         if not self.path.endswith(".js"):
