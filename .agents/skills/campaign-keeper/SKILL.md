@@ -20,8 +20,11 @@ Anything else is fine as long as the campaign keeps working.
 - **Monitor page:** on every start or resume, run
   `bash .agents/skills/campaign-keeper/monitor.sh CAMPAIGN ROOT` and check that port 8765
   answers. It serves the campaign's page as the systemd user unit `campaign-plots`, replacing
-  the previous campaign's; Tailscale Funnel publishes it at https://claudio.tail14383c.ts.net.
-  Leave it running when the campaign stops.
+  the previous campaign's, and is reachable only inside the tailnet. Leave it running when the
+  campaign stops.
+- **Messages:** the user writes to you in the page's message box, and the watch prints each
+  new text once as `MESSAGE from the user`. These are light indications while the user is away,
+  such as dropping, adding or reordering a seed: follow them with your own judgment.
 - **Watch:** Monitor `bash .agents/skills/campaign-keeper/watch.sh CAMPAIGN ROOT` at the maximum
   timeout, and re-arm it on every expiry.
 - **Repair:** fix the cause, then `resume`, in each of these cases:

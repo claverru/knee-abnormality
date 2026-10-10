@@ -2,6 +2,8 @@
 campaign="$1"
 root="$2"
 cd "$root" || exit 1
+messages="outputs/autoresearch/$campaign/messages.jsonl"
+seen="outputs/autoresearch/$campaign/messages.seen"
 previous=""
 same=0
 while true; do
@@ -27,5 +29,15 @@ while true; do
   if ! echo "$header" | grep -q "supervisor alive"; then
     echo "$(date +%H:%M) ALERT supervisor not alive: $header"
   fi
-  sleep 120
+  for _ in $(seq 12); do
+    total=0
+    [ -f "$messages" ] && total=$(wc -l < "$messages")
+    delivered=$(cat "$seen" 2>/dev/null || echo 0)
+    if [ "$total" -gt "$delivered" ]; then
+      echo "$(date +%H:%M) MESSAGE from the user on the monitor page:"
+      tail -n +$((delivered + 1)) "$messages" | sed 's/^/    /'
+      echo "$total" > "$seen"
+    fi
+    sleep 10
+  done
 done
