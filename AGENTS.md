@@ -7,6 +7,7 @@ Workspace for the [RSNA Knee Abnormality Detection competition on Kaggle](https:
 - Keep indexes navigation-only, with distinctive "read when" descriptions and section links for common lookups. Update entries when documents are added, moved, removed, change purpose, or their navigation needs repair; a changed result inside a document does not require an index update.
 - Use the repository's [$scripts-maintainer](.agents/skills/scripts-maintainer/SKILL.md) to find, create, update, move, or retire scripts. Open known paths directly or start at `scripts/INDEX.md`; keep the script indexes current in the same change.
 - Use the repository's [$disk-cleanup](.agents/skills/disk-cleanup/SKILL.md) to free disk space; it deletes by fixed rules without asking and records the cleanup.
+- Use the repository's [$submit-to-kaggle](.agents/skills/submit-to-kaggle/SKILL.md) to make a Kaggle submission: export, launch, relaunch a queued or slow notebook, and record the score.
 - Prefer Polars for tabular data processing.
 - Use Lightning for the training framework.
 - Use `pydantic-settings` for CLIs.

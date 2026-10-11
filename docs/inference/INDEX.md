@@ -11,6 +11,7 @@
 | Preparing exports and detached submissions | [Fast submission preparation](fast-submission-preparation.md) |
 | Running training-to-submission commands | [Justfile recipes](justfile-recipes.md) |
 | Operating the Kaggle submission workflow | [Kaggle submission workflow](kaggle-submission-workflow.md) |
+| Cancelling a queued or running Kaggle notebook from the API, or finding its session id | [Cancelling a notebook run](kaggle-submission-workflow.md#cancelling-a-notebook-run) |
 | Configuring GPU processes, loader workers, backbone precision and warm-up | [Independent GPU inference processes](independent-gpu-inference-processes.md) |
 | Checking physical-sampling identity and seed compatibility | [Physical-sampling runtime identity](physical-sampling-runtime-identity.md) |
 

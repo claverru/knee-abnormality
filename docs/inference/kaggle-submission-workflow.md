@@ -130,6 +130,37 @@ These limits came from API and client inspection. The active baseline3 attempt
 exercises the supported workflow but does not replace the final successful
 scored-run check.
 
+## Cancelling a notebook run
+
+The Kaggle client has no cancel command. Three ways work from the API, tested on 2026-10-11 with
+private sample notebooks (CPU scripts and one GPU script, client 2.0.2); none has been tried on a
+notebook stuck in the queue, since every sample started within 8 seconds.
+
+- **Delete the notebook.** `kaggle kernels delete -y OWNER/SLUG` was accepted on a `QUEUED`
+  notebook, and a running session ended within 20 seconds of it. The slug took a new push 35
+  seconds later, as a new notebook at version 1. This is the relaunch step of
+  [`submit-to-kaggle`](../../.agents/skills/submit-to-kaggle/SKILL.md).
+- **Cancel by session id.** `kernels_api_client.cancel_kernel_session` with `kernel_session_id`
+  moves the run to `CANCEL_REQUESTED` and, within 15 to 20 seconds, `CANCEL_ACKNOWLEDGED`. The
+  same slug accepted a push 2 seconds after the call. Pushing a new version alone does not stop
+  the previous run.
+- **Finding the session id.** No push, status or metadata response carries it, and the search API
+  (`search_api_client.list_entities`) returns only the last finished session, 0 during the first
+  run. Two sources work:
+  - Inside the notebook, `KAGGLE_CONTAINER_NAME` ends in `-<session id>-webtier`. A notebook that
+    prints it can be read while it runs with a POST to
+    `https://api.kaggle.com/v1/kernels.KernelsApiService/GetKernelSessionLogsStream` and the body
+    `{"userName": OWNER, "kernelSlug": SLUG, "waitForLogsUrlSeconds": 30}`, sent on the client's
+    authenticated session. The first read seconds after the start can come back empty; retry.
+  - Ids are global and grow with push time, 2 to 3 a second. A small CPU script pushed just before
+    and just after the target, each printing its id, left a window of 7 to 10 ids. The same
+    request with `{"kernelSessionId": ID}` answers 200 for our own sessions and 403 for anyone
+    else's, which singled out a GPU sample's id without reading its log. The answer for a session
+    of ours that has not started is not known.
+- **Cookie trap.** The first log request sets a cookie, and every later request on that session
+  returns 401 until `session.cookies.clear()` is called.
+- The website's internal API (`www.kaggle.com/api/i/...`) rejects the API token.
+
 ## Notebook assembly and submission workflow
 
 1. Export the selected checkpoint with the fast preparation command above.
