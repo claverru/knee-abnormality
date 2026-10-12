@@ -109,7 +109,9 @@ def load_fold_labels(config: ExperimentConfig, fold: int) -> FoldLabels:
             for target in targets
         )
     )
-    training = base.filter(pl.col("fold") != fold).sort(STUDY)
+    training = base.filter(
+        ~pl.col("fold").is_in([fold, *config.validation.unused_folds])
+    ).sort(STUDY)
     validation = (
         base.filter(pl.col("fold") == fold)
         .drop([f"target_{target}" for target in targets])
@@ -139,3 +141,83 @@ def load_fold_labels(config: ExperimentConfig, fold: int) -> FoldLabels:
         "selected": selected_provenance,
     }
     return FoldLabels(targets, training, validation, protocol, provenance)
+
+
+def distilled(config: ExperimentConfig, labels: FoldLabels) -> FoldLabels:
+    share = config.distillation.teacher_share
+    if share == 0:
+        return labels
+    path = config.paths.teacher_table
+    if path is None:
+        raise ValueError(
+            "distillation.teacher_share above zero needs paths.teacher_table"
+        )
+    targets = labels.targets
+    table = pl.read_parquet(path).filter(pl.col("reading") == "joint")
+    require_unique_ids(table, "Teacher table")
+    if table.columns != [STUDY, "fold", "reading", *targets]:
+        raise ValueError("Teacher table schema differs from the frozen protocol")
+    teacher = labels.training.select(STUDY, "fold").join(
+        table.select(
+            STUDY,
+            pl.col("fold").alias("teacher_fold"),
+            *(pl.col(target).alias(f"teacher_{target}") for target in targets),
+        ),
+        on=STUDY,
+        how="left",
+        validate="1:1",
+        maintain_order="left",
+    )
+    if (
+        teacher["teacher_fold"].null_count()
+        or (teacher["teacher_fold"] != teacher["fold"]).any()
+    ):
+        raise ValueError(
+            "Teacher table must give every training study a value from the teacher that held it out"
+        )
+    logits = teacher.select(f"teacher_{target}" for target in targets).to_numpy()
+    if not np.isfinite(logits).all():
+        raise ValueError("Teacher table logits must be finite")
+    training = (
+        labels.training.join(
+            teacher.drop("fold", "teacher_fold"),
+            on=STUDY,
+            how="left",
+            validate="1:1",
+            maintain_order="left",
+        )
+        .with_columns(
+            pl.when(pl.col("is_gold"))
+            .then(pl.col(f"target_{target}"))
+            .otherwise(
+                (1 - share) * pl.col(f"target_{target}")
+                + share / (1 + (-pl.col(f"teacher_{target}")).exp())
+            )
+            .cast(pl.Float32)
+            .alias(f"target_{target}")
+            for target in targets
+        )
+        .drop([f"teacher_{target}" for target in targets])
+    )
+    columns = [f"target_{target}" for target in targets]
+    shift = float(
+        np.abs(
+            training.select(columns).to_numpy()
+            - labels.training.select(columns).to_numpy()
+        ).mean()
+    )
+    return FoldLabels(
+        targets,
+        training,
+        labels.validation,
+        labels.protocol,
+        {
+            **labels.provenance,
+            "teacher": {
+                "path": str(path),
+                "sha256": sha256_file(path),
+                "share": share,
+                "target_shift": shift,
+            },
+        },
+    )

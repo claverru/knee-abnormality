@@ -9,6 +9,9 @@ paths:
   anatomy_targets: ../data/labels/prepared/anatomy-mrannotator-sample550-joints
   meniscus_targets: ../data/labels/prepared/meniscus-nnunet-knee-dess265
 
+distillation:
+  teacher_share: 0.0
+
 labels:
   source: rebuild_state_v2
 

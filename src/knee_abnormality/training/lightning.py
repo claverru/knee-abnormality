@@ -25,7 +25,7 @@ from knee_abnormality.config import (
     SWAConfig,
 )
 from knee_abnormality.data.dataset import KneeStudyDataset, build_data_loader
-from knee_abnormality.data.labels import FoldLabels, load_fold_labels
+from knee_abnormality.data.labels import FoldLabels, distilled, load_fold_labels
 from knee_abnormality.data.preprocessing.device import with_images
 from knee_abnormality.data.report_attributes import load_report_attribute_targets
 from knee_abnormality.data.sources import build_series_index
@@ -206,7 +206,7 @@ class KneeDataModule(L.LightningDataModule):
     def setup(self, stage: str | None = None) -> None:
         if self.labels is not None:
             return
-        self.labels = load_fold_labels(self.config, self.fold)
+        self.labels = distilled(self.config, load_fold_labels(self.config, self.fold))
         index = build_series_index(
             self.config.paths.data_root, self.config.data, "train"
         )
@@ -976,6 +976,13 @@ class KneeModule(L.LightningModule):
             loss = loss + anchor_penalty
             self._log_epoch_metric(
                 "anchor_penalty", anchor_penalty, len(batch["study_uid"])
+            )
+        teacher = self.trainer.datamodule.labels.provenance.get("teacher")
+        if teacher is not None:
+            self._log_epoch_metric(
+                "teacher_target_shift",
+                teacher["target_shift"],
+                len(batch["study_uid"]),
             )
         self.log(
             "train_loss",
