@@ -186,6 +186,7 @@ def predict_loader(
         if reflection_tta
         else None
     )
+    middle_only = all(model.repeated_middle_slice for model in models)
     logging.getLogger(__name__).info(
         "Inference runtime device=%s precision=%s", device, actual_precision
     )
@@ -229,15 +230,9 @@ def predict_loader(
             batch = move_batch(batch, device)
             if copy_events is not None:
                 copy_events[1].record()
-            batch = with_images(batch)
+            batch = with_images(batch, middle_only)
             mirrored = (
-                reflect_batch(
-                    batch,
-                    sagittal,
-                    all(model.repeated_middle_slice for model in models),
-                )
-                if reflection_tta
-                else None
+                reflect_batch(batch, sagittal, middle_only) if reflection_tta else None
             )
             with torch.autocast(
                 device_type=device.type,

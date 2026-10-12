@@ -320,6 +320,7 @@ def run_fold(
         config.trainer,
         INFERENCE_BATCH_SIZE,
         num_workers=INFERENCE_NUM_WORKERS,
+        middle_only=data.middle_only,
     )
     prediction_started = time.perf_counter()
     study_ids, predictions, _ = predict_loader([model], prediction_loader, device)

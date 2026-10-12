@@ -8,7 +8,11 @@ from knee_abnormality.data.preprocessing.intensity import (
     quantile_bounds,
 )
 from knee_abnormality.data.preprocessing.preparation import shared_empty
-from knee_abnormality.data.preprocessing.spatial import resample_block, resample_plan
+from knee_abnormality.data.preprocessing.spatial import (
+    resample_block,
+    resample_plan,
+    resample_window,
+)
 
 RAW_KEYS = (
     "frames",
@@ -120,31 +124,83 @@ def _region(frame: tuple, buffers: list[torch.Tensor]) -> np.ndarray:
     return region
 
 
-def _prepare_on_cpu(batch: dict) -> dict:
+def _central_values(
+    frame: tuple, buffers: list[torch.Tensor], rows: tuple, columns: tuple
+) -> np.ndarray:
+    if rows[1] <= rows[0] or columns[1] <= columns[0]:
+        return np.empty(0, dtype=np.float32)
+    native, signed, buffer, offset, height, width, first, last = frame[:8]
+    slope, intercept, (_, _, rect_rows, rect_columns), plan_key = frame[8:]
+    values = buffers[buffer].numpy()
+    if not native:
+        return (
+            values[offset : offset + rect_rows * rect_columns]
+            .reshape(rect_rows, rect_columns)[
+                rows[0] : rows[1], columns[0] : columns[1]
+            ]
+            .reshape(-1)
+        )
+    block = values[offset : offset + height * width]
+    block = block.view(np.int16 if signed else np.uint16).reshape(height, width)
+    region = resample_window(
+        block[:, first:last], resample_plan(*plan_key), rows, columns
+    )
+    if slope != 1.0 or intercept != 0.0:
+        region *= np.float32(slope)
+        region += np.float32(intercept)
+    return region.reshape(-1)
+
+
+def _prepare_on_cpu(batch: dict, middle_only: bool) -> dict:
     buffers = batch["frame_buffers"]
     frames = batch["frames"]
     size = batch["canvas_size"]
-    normalized = np.zeros((len(frames), size, size), dtype=np.uint8)
+    positions = batch["image_positions"].numpy()
+    sources = batch["image_sources"].numpy()
+    channels = 3
+    if middle_only:
+        middle = positions % 3 == 1
+        positions = positions[middle] // 3
+        sources = sources[middle]
+        channels = 1
+    order = np.argsort(sources, kind="stable")
+    sources = sources[order]
+    positions = positions[order]
+    slice_mask = batch["slice_mask"]
+    images = shared_empty(slice_mask.numel() * channels * size * size, torch.uint8)
+    images = images.view(*slice_mask.shape, channels, size, size)
+    flat = images.view(-1, size, size).numpy()
     constant = torch.zeros(len(batch["series_frames"]), dtype=torch.bool)
     for row, (start, count, (lower, upper, fraction), margin) in enumerate(
         batch["series_frames"]
     ):
         rects = np.asarray([frame[10] for frame in frames[start : start + count]])
-        canvas = np.zeros((count, size, size), dtype=np.float32)
-        for index, (top, left, rows, columns) in enumerate(rects):
-            canvas[index, top : top + rows, left : left + columns] = _region(
+        first, last = np.searchsorted(sources, (start, start + count))
+        used, inverse = np.unique(sources[first:last] - start, return_inverse=True)
+        slots = np.full(count, -1)
+        slots[used] = np.arange(len(used))
+        canvas = np.zeros((len(used), size, size), dtype=np.float32)
+        central = []
+        for index, rect in enumerate(rects):
+            top, left, rows, columns = rect
+            y, x, height, width = central_rectangle(rect, margin, batch["image_size"])
+            slot = slots[index]
+            if slot < 0:
+                central.append(
+                    _central_values(
+                        frames[start + index],
+                        buffers,
+                        (y - top, y - top + height),
+                        (x - left, x - left + width),
+                    )
+                )
+                continue
+            canvas[slot, top : top + rows, left : left + columns] = _region(
                 frames[start + index], buffers
             )
+            central.append(canvas[slot, y : y + height, x : x + width].reshape(-1))
         low, high = quantile_bounds(
-            np.concatenate(
-                [
-                    canvas[index, top : top + rows, left : left + columns].reshape(-1)
-                    for index, (top, left, rows, columns) in enumerate(
-                        central_rectangle(rect, margin, batch["image_size"])
-                        for rect in rects
-                    )
-                ]
-            ),
+            np.concatenate(central),
             np.asarray(lower),
             np.asarray(upper),
             np.asarray(fraction, dtype=np.float32),
@@ -152,13 +208,9 @@ def _prepare_on_cpu(batch: dict) -> dict:
         constant[row] = bool(
             not np.isfinite(low) or not np.isfinite(high) or high <= low
         )
-        normalized[start : start + count] = normalize_pixels(canvas, rects, low, high)
-    slice_mask = batch["slice_mask"]
-    images = shared_empty(slice_mask.numel() * 3 * size * size, torch.uint8)
-    images = images.view(*slice_mask.shape, 3, size, size)
-    images.view(-1, size, size)[batch["image_positions"]] = torch.from_numpy(
-        normalized
-    )[batch["image_sources"]]
+        flat[positions[first:last]] = normalize_pixels(canvas, rects[used], low, high)[
+            inverse
+        ]
     return {
         **{key: value for key, value in batch.items() if key not in RAW_KEYS},
         "images": images,
@@ -167,9 +219,9 @@ def _prepare_on_cpu(batch: dict) -> dict:
     }
 
 
-def prepare_images(batch: dict) -> dict:
+def prepare_images(batch: dict, middle_only: bool = False) -> dict:
     if batch["slice_mask"].device.type == "cpu":
-        return _prepare_on_cpu(batch)
+        return _prepare_on_cpu(batch, middle_only)
     buffers = batch["frame_buffers"]
     device = batch["slice_mask"].device
     frames = batch["frames"]
@@ -217,14 +269,34 @@ def prepare_images(batch: dict) -> dict:
     )
     for row, value in enumerate(values):
         padded[row, : len(value)] = value
-    ordered = padded.sort(dim=1).values
-    ranks = torch.tensor(
-        [(*lower, *upper) for _, _, (lower, upper, _), _ in series], dtype=torch.int64
-    ).to(device, non_blocking=True)
+    lengths = [len(value) for value in values]
+    ranks = [(*lower, *upper) for _, _, (lower, upper, _), _ in series]
+    low_count = min(padded.shape[1], max(max(rank[0], rank[2]) for rank in ranks) + 1)
+    high_count = min(
+        padded.shape[1],
+        max(
+            length - min(rank[1], rank[3])
+            for length, rank in zip(lengths, ranks, strict=True)
+        ),
+    )
+    smallest = padded.topk(low_count, dim=1, largest=False).values
+    for row, length in enumerate(lengths):
+        padded[row, length:] = -torch.inf
+    largest = padded.topk(max(1, high_count), dim=1).values
+    lengths = torch.tensor(lengths).to(device, non_blocking=True)
+    ranks = torch.tensor(ranks, dtype=torch.int64).to(device, non_blocking=True)
     fraction = torch.tensor(
         [tuple(fraction) for _, _, (_, _, fraction), _ in series], dtype=torch.float32
     ).to(device, non_blocking=True)
-    statistics = ordered.gather(1, ranks)
+    lower_ranks = smallest.gather(1, ranks[:, 0::2])
+    upper_ranks = largest.gather(
+        1, (lengths[:, None] - 1 - ranks[:, 1::2]).clamp_min(0)
+    )
+    statistics = torch.stack(
+        (lower_ranks[:, 0], upper_ranks[:, 0], lower_ranks[:, 1], upper_ranks[:, 1]),
+        dim=1,
+    )
+    statistics[lengths == 0] = torch.inf
     lower_values = statistics[:, :2]
     bounds = lower_values + (statistics[:, 2:] - lower_values) * fraction
     low, high = bounds[:, 0], bounds[:, 1]
@@ -233,6 +305,16 @@ def prepare_images(batch: dict) -> dict:
     owner = torch.tensor(
         [row for row, (_, count, _, _) in enumerate(series) for _ in range(count)]
     ).to(device, non_blocking=True)
+    rects = torch.tensor([frame[10] for frame in frames]).to(device, non_blocking=True)
+    positions = batch["image_positions"]
+    sources = batch["image_sources"]
+    channels = 3
+    if middle_only:
+        middle = positions % 3 == 1
+        positions = torch.div(positions[middle], 3, rounding_mode="floor")
+        used, sources = torch.unique(sources[middle], return_inverse=True)
+        canvas, owner, rects = canvas[used], owner[used], rects[used]
+        channels = 1
     frame_low = low[owner][:, None, None]
     normalized = torch.minimum(
         torch.maximum(canvas, frame_low), high[owner][:, None, None]
@@ -240,7 +322,6 @@ def prepare_images(batch: dict) -> dict:
     normalized = normalized - frame_low
     normalized = normalized * gain[owner][:, None, None]
     normalized = torch.round(normalized).to(torch.uint8)
-    rects = torch.tensor([frame[10] for frame in frames]).to(device, non_blocking=True)
     lines = torch.arange(size, device=device)
     tops, lefts = rects[:, 0, None], rects[:, 1, None]
     inside_rows = (lines >= tops) & (lines < tops + rects[:, 2, None])
@@ -249,11 +330,9 @@ def prepare_images(batch: dict) -> dict:
     normalized = normalized * ~constant[owner][:, None, None]
     slice_mask = batch["slice_mask"]
     images = torch.zeros(
-        (*slice_mask.shape, 3, size, size), dtype=torch.uint8, device=device
+        (*slice_mask.shape, channels, size, size), dtype=torch.uint8, device=device
     )
-    images.view(-1, size, size)[batch["image_positions"]] = normalized[
-        batch["image_sources"]
-    ]
+    images.view(-1, size, size)[positions] = normalized[sources]
     return {
         **{key: value for key, value in batch.items() if key not in RAW_KEYS},
         "images": images,
@@ -262,5 +341,5 @@ def prepare_images(batch: dict) -> dict:
     }
 
 
-def with_images(batch: dict) -> dict:
-    return batch if "images" in batch else prepare_images(batch)
+def with_images(batch: dict, middle_only: bool = False) -> dict:
+    return batch if "images" in batch else prepare_images(batch, middle_only)

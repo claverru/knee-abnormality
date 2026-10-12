@@ -38,14 +38,14 @@ def _crop_geometry(
     return source_top, source_left, output_top, output_left, rows, columns
 
 
-@lru_cache(maxsize=128)
-def _axis_filter(source: int, target: int, first: int, count: int) -> csr_matrix:
+@lru_cache(maxsize=1024)
+def _full_axis_filter(source: int, target: int) -> csr_matrix:
     scale = source / target
     support = max(1.0, scale)
     rows = []
     columns = []
     values = []
-    for output_index in range(first, first + count):
+    for output_index in range(target):
         center = (output_index + 0.5) * scale - 0.5
         start = math.floor(center - support)
         end = math.ceil(center + support)
@@ -57,7 +57,7 @@ def _axis_filter(source: int, target: int, first: int, count: int) -> csr_matrix
             weights[index] = weight
         total = sum(weights.values())
         for index, weight in weights.items():
-            rows.append(output_index - first)
+            rows.append(output_index)
             columns.append(index)
             values.append(weight / total)
     return csr_matrix(
@@ -65,9 +65,14 @@ def _axis_filter(source: int, target: int, first: int, count: int) -> csr_matrix
             np.asarray(values, dtype=np.float32),
             (rows, columns),
         ),
-        shape=(count, source),
+        shape=(target, source),
         dtype=np.float32,
     )
+
+
+@lru_cache(maxsize=128)
+def _axis_filter(source: int, target: int, first: int, count: int) -> csr_matrix:
+    return _full_axis_filter(source, target)[first : first + count]
 
 
 @dataclass(frozen=True)
@@ -188,6 +193,42 @@ def resample_plan(
 def resample_block(block: np.ndarray, plan: ResamplePlan) -> np.ndarray:
     middle = plan.vertical_matrix.dot(block.astype(np.float32))
     return plan.horizontal_matrix.dot(middle.T).T
+
+
+@lru_cache(maxsize=512)
+def _window_filters(
+    key: tuple[int, ...], rows: tuple[int, int], columns: tuple[int, int]
+) -> tuple[csr_matrix, csr_matrix, int, int, int, int]:
+    plan = resample_plan(*key)
+    vertical = plan.vertical_matrix[rows[0] : rows[1]]
+    horizontal = plan.horizontal_matrix[columns[0] : columns[1]]
+    first_row = int(vertical.indices.min())
+    last_row = int(vertical.indices.max()) + 1
+    first_column = int(horizontal.indices.min())
+    last_column = int(horizontal.indices.max()) + 1
+    return (
+        vertical[:, first_row:last_row],
+        horizontal[:, first_column:last_column],
+        first_row,
+        last_row,
+        first_column,
+        last_column,
+    )
+
+
+def resample_window(
+    block: np.ndarray,
+    plan: ResamplePlan,
+    rows: tuple[int, int],
+    columns: tuple[int, int],
+) -> np.ndarray:
+    vertical, horizontal, first_row, last_row, first_column, last_column = (
+        _window_filters(plan.key, rows, columns)
+    )
+    middle = vertical.dot(
+        block[first_row:last_row, first_column:last_column].astype(np.float32)
+    )
+    return horizontal.dot(middle.T).T
 
 
 def resample_crop(
