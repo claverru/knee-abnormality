@@ -22,6 +22,7 @@ from pytorch_lightning.loggers import CSVLogger
 from knee_abnormality.autoresearch.scoring.accounting import TripletAccounting
 from knee_abnormality.config import (
     INFERENCE_BATCH_SIZE,
+    INFERENCE_NUM_WORKERS,
     ConfigOptions,
     ExperimentConfig,
     load_config,
@@ -318,6 +319,7 @@ def run_fold(
         ),
         config.trainer,
         INFERENCE_BATCH_SIZE,
+        num_workers=INFERENCE_NUM_WORKERS,
     )
     prediction_started = time.perf_counter()
     study_ids, predictions, _ = predict_loader([model], prediction_loader, device)
