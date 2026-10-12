@@ -20,6 +20,29 @@ Fold membership is new: v2 fold 0 draws 214 / 179 / 184 / 167 / 168 studies from
 | 3 | 3,525 | 882 | 11 | 234 / 158 | 124 / 138 | 140 / 16 / 22 | 50 |
 | 4 | 3,543 | 864 | 11 | 228 / 158 | 120 / 133 | 138 / 15 / 22 | 50 |
 
+## gold_holdout_5fold_v1
+
+**A split for comparing ways of training students from teachers, not for the recipe's control.**
+Built on 2026-10-10 for the
+[student-distillation campaign](../../autoresearch/campaigns/student-distillation/contract.md#the-split)
+with `validation prepare --gold-holdout` (seed 1110484336, `rebuild_state_v2`): every report
+group that holds a gold study goes to fold 0, and the other report groups are stratified over
+the five folds on the effective labels and the scanner groups as in `all_5fold_scanner_v2`.
+
+| Fold | Studies | Gold | Use |
+|---|---:|---:|---|
+| 0 | 932 | 58 | held out: scoring only, on the whole fold and on its gold studies |
+| 1 | 880 | 0 | teacher fold |
+| 2 | 861 | 0 | teacher fold |
+| 3 | 857 | 0 | teacher fold |
+| 4 | 877 | 0 | teacher fold |
+
+No report group is split across folds; fold 0 holds the 62 studies of the gold report groups.
+Both classes of every label are in every fold (fewest positives: MCL 42, fracture 56) and in
+fold 0's gold studies (fewest: MCL 9 positives). Scores on it are not comparable with scores on
+`all_5fold_scanner_v2`. Without `--gold-holdout` the tool still reproduces
+`all_5fold_scanner_v2` byte for byte.
+
 ## all_5fold_scanner_v1
 
 The default split from 2026-09-21 to 2026-09-28. It is produced by `scripts.tools.validation prepare
