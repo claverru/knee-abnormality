@@ -42,7 +42,6 @@ Widen any narrow local audit before shipping ([audit requirements](measuring.md#
 
 | Change | Est. saved (cold-100) | Conf | Effort | Audit and notes |
 |---|---:|---|---|---|
-| **Order statistics by `topk` in `prepare_images`** — the four ranks per series from two `topk` calls on the padded values instead of a full sort, and fewer small launches | ~50–80 ms of the ~142 ms per batch | med | S | Exact: order statistics do not depend on the selection algorithm. The full sort alone measured 34 ms per batch |
 | **Cache the per-series header decoding** — side fields, character set and `header_side` are decoded per file with pydicom helpers | ~1–2% of loader CPU | med | S | Headers are now ~30% of loader CPU; key the cache on the raw bytes so it stays exact |
 | Vectorise `summarize_series` (16.1 µs/file serial, 15% of serial `index_series`) | 1–1.5 s | low-med | M | Float-order risk; audit poses and bounds |
 | `PREFIX_BYTES` 12288 → 2048–4096 | 0–2 s, lands in the indexing row | low | XS | The pre-payload header is p50 1,482, p99 1,738, **max 1,758 bytes over 20,000 files**, and a 2,048-byte prefix truncated 0 of 1,200. The win is 219 MiB → 37 MiB over NFS and 6x less prefix RAM. Only extend-and-retry protects a longer hidden-test header; confirm before shrinking |
@@ -50,16 +49,29 @@ Widen any narrow local audit before shipping ([audit requirements](measuring.md#
 | **One file access per selected frame.** Indexing already records the payload offset, yet the payload read opens the file again and `fstat`s it to revalidate size and mtime | unquantified | low | M | The `fstat` is 1.6 µs/frame locally, 24 ms per 14,882 frames, so only the NFS round trip could justify it, and the attribute cache may already absorb it. Minimising reopens is the sanctioned small-file lever on network filesystems. A payload read must still fail closed when the file changed. No probe exists |
 | **Bounded ordered payload window** in `decode_series` — submit a window of reads, decode in record order, release consumed bytes (`preparation.py`) | unmeasured; −80% transient RAM | low-med | M | Refines the earlier prefetch-window proposal: `pool.map` submits eagerly and the tuple retains every payload through the decode loop, so peak live memory holds raw payloads and resampled outputs at once (~83 MB of payloads per worker at x4, ~1.3 GB across 16). `buffersize` is not available on the bundled Python, so the window must be explicit. May trade memory for waiting — measure throughput, not just RSS |
 
-## Unused neighbour slices (identity-changing, not bit-exact)
+## Unused neighbour slices
 
 With `model.slice_channels: repeated_middle` (both ResNet recipes) the model reads only the middle
-slice of each three-slice input. Since 2026-10-01 reflection, contrast mixing, augmentation and
-mirror TTA handle that slice alone, but the loader still reads and decodes all three slices and
-the device still resamples all three. Preparing only the middle slice would cut reads and GPU
-resampling by up to two thirds per input. It is not bit-exact: the per-series intensity bounds are
-computed over every decoded slice, so they would move, and `prepare_series` requires complete
-triplets. Unmeasured on Kaggle; needs a retrain and a prepared-image comparison
-([profile](../../validation/results/2026-10-01-mixed-field-campaign.md#middle-slice-augmentation)).
+slice of each three-slice input. The bit-exact part is done since 2026-10-12: the neighbours are
+still read and resampled where the intensity bounds are taken, but only the middle slices are
+normalised and stored
+([profile](../../inference/2026-10-12-middle-slice-preparation-and-loader-speed.md)).
+
+| Change | Est. saved | Exact | Notes |
+|---|---|---|---|
+| **Central-window resampling of neighbours in GPU preparation** — the loader already resamples a neighbour only in the central window; `prepare_images` on the GPU still resamples its whole rectangle | unmeasured; the loader version gained 13% of loader throughput | yes | Split each resampling group into middle and neighbour members and slice the plan's taps to the window rows and columns |
+| **Intensity bounds from the middle slices only**, so neighbours are not read at all | up to two thirds of slice reads and resampling per input, in training and inference | **no** | The per-series bounds move, and `prepare_series` requires complete triplets. Needs a retrain and a prepared-image comparison ([middle-slice augmentation](../../validation/results/2026-10-01-mixed-field-campaign.md#middle-slice-augmentation)) |
+
+## Model-side cost (changes the output)
+
+Measured on the 2026-10-12 host: a training step is about two thirds forward and one quarter
+backward, and the forward runs the backbone twice, the first look for the view pose (about 73 ms of
+a 317 ms profiled step) and the read.
+
+| Change | Est. saved | Notes |
+|---|---|---|
+| **Cheaper first look** — fewer or smaller images for the pose estimate | up to a quarter of a training step, and inference time | Changes the pose the crops are placed by: an experiment on the model |
+| **Compiled backbone** | 10–20% of model time, a guess | Results near-equal, not bit-exact; needs a prediction comparison and a fixed chunk shape |
 
 ## Reading less per study (trades score for wall)
 

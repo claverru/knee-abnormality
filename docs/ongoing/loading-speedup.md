@@ -4,6 +4,18 @@ Investigation started 2026-09-17 with the user. Candidates, closed regressions, 
 protocol and prior art live in [loading speedup](../backlog/loading-speedup/INDEX.md); each
 measured step has a dated profile in [inference](../inference/INDEX.md#runtime-and-memory).
 
+## State on 2026-10-12
+
+**Six bit-exact preparation changes for `repeated_middle` recipes are built and verified**: training
+steps 3.05 to 4.27 per second on the measured host, the Kaggle ×4 forward loop 4% shorter and peak
+GPU memory about 23% lower
+([profile](../inference/2026-10-12-middle-slice-preparation-and-loader-speed.md)). They edit hashed
+preprocessing sources, so they take effect with the next trained checkpoints; `adjacent` slices keep
+the previous paths.
+
+Left open: the same central-window resampling on the GPU, and the changes that alter the prepared
+images or the model ([candidates](../backlog/loading-speedup/candidates.md)).
+
 ## State on 2026-09-22
 
 **The full Kaggle command at ×4 over 1,300 studies is about 270 s on branch `inference-opt`

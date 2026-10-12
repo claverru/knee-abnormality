@@ -671,9 +671,7 @@ def collate_prepared(items: list[dict]) -> dict:
 
 
 def collate_prepared_middle(items: list[dict]) -> dict:
-    batch = collate_prepared(items)
-    batch["images"] = batch["images"][:, :, 1:2].contiguous()
-    return batch
+    return prepare_images(collate_studies(items), middle_only=True)
 
 
 def build_data_loader(

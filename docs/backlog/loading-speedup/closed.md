@@ -187,3 +187,18 @@ Measured on Kaggle at ×4 over 1,300 studies, one run each, on hosts that vary b
 | Page-locked copy on a feeder thread | the copy fell 252 → 33 ms per batch, but the thread's GIL use stretched the GPU loop ~25 s per GPU; 278.7 and 264.3 s against 273.3 s inline |
 | `TORCH_CUDNN_V8_API_DISABLED=1` to skip the 9 s warm-up | warm-up 10.9 → 0.8 s, but each 64-image FP16 chunk 96 → 197 ms |
 | `torch.backends.cudnn.benchmark` | warm-up 19 s at the same chunk speed |
+
+## Closed 2026-10-12
+
+Bit-exact trials on the training loader, measured loader-only on 80 fixed batches of the main
+ResNet-50 recipe on the host of the
+[2026-10-12 profile](../../inference/2026-10-12-middle-slice-preparation-and-loader-speed.md), on
+top of the middle-slice preparation.
+
+| Candidate | Result |
+|---|---|
+| Series index built once in the parent and inherited by the workers | 5.10 to 5.36 batches/s at 8 workers, 4.60 to 4.55 at 16: not worth the start-up pass |
+| Plain instead of shared-memory raw frame buffers in training | 5.10 to 5.16 batches/s |
+| glibc `MALLOC_MMAP_THRESHOLD_`, `MALLOC_TRIM_THRESHOLD_` and `MALLOC_TOP_PAD_` for the loader workers | 2.86 against 2.85 batches/s on the old code |
+| More loader workers | 24 workers trained fold 4 in 2,415 s against 2,247 s for fold 3 at 16; the loader is bound by memory bandwidth, not cores |
+| Unpinned batches in training | +9% steps/s on the old code (2.74 to 2.99), −4% on the new (4.12 to 3.94): pinning stays on |
