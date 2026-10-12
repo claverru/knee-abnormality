@@ -5,7 +5,7 @@
 | Starting here: what autoresearch is and which campaigns are active or retired | [Overview](README.md) |
 | Applying the directory's agent and documentation ownership rules | [Agent guidance](AGENTS.md) |
 | Checking authority, scope, ownership, backlog ranking policy and what agents receive | [Protocol](protocol.md) |
-| Checking the metric, bootstrap and 80%-interval adoption rule every campaign shares | [Shared evaluation and adoption](protocol.md#shared-evaluation-and-adoption) |
+| Checking the metric, the bootstrap and the adoption rule (better at ×1 and ×4) every campaign shares | [Shared evaluation and adoption](protocol.md#shared-evaluation-and-adoption) |
 | Checking which seed a candidate trains with, what an adoption makes the incumbent, or where the campaign fold comes from | [Training seed policy](protocol.md#training-seed-policy) |
 | Checking which completions the cheap reporter handles and when it escalates | [Restricted completion reporting](protocol.md#restricted-completion-reporting) |
 | Following one idea from claim through development, gates, review, reconciliation, launch, comparison and completion | [Idea lifecycle](lifecycle.md) |

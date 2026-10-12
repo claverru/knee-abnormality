@@ -12,6 +12,7 @@ from knee_abnormality.autoresearch.reporting.progress import (
     interval_text,
     progress_lines,
     score_text,
+    validation_delta,
 )
 from knee_abnormality.autoresearch.runtime.layout import (
     campaign_fold,
@@ -113,11 +114,14 @@ def job_line(job, state):
 
 def result_rows(completed):
     width = max(len(exp["idea"]) for exp in completed)
-    rows = [f"  {'idea':<{width}}  {'delta':>9}  {'adoption 80% CI':<24}  verdict"]
+    rows = [
+        f"  {'idea':<{width}}  {'x4 delta':>9}  {'x1 delta':>9}  {'80% CI of x4':<24}  verdict"
+    ]
     for exp in completed:
         delta, bounds = adoption_result(exp)
         rows.append(
             f"  {exp['idea']:<{width}}  {score_text(delta, True):>9}  "
+            f"{score_text(validation_delta(exp), True):>9}  "
             f"{interval_text(bounds):<24}  {decision_text(exp)}"
         )
     return rows

@@ -1,7 +1,12 @@
 import math
 from pathlib import Path
 
-from knee_abnormality.autoresearch.campaign.gates import evaluate, run_limits, verdict
+from knee_abnormality.autoresearch.campaign.gates import (
+    evaluate,
+    run_limits,
+    validation_scores,
+    verdict,
+)
 from knee_abnormality.autoresearch.runtime.layout import (
     campaign_fold,
     comparison_path,
@@ -52,6 +57,7 @@ def completion_blockers(state, event):
             verdict(report, macro_bootstrap) != event["eligible_decision"]
             or macro_bootstrap != evidence.get("adoption_bootstrap")
             or scores != evidence["macro_auc"]
+            or validation_scores(report) != evidence["validation_macro_auc"]
             or bootstrap != evidence["bootstrap"]
             or bootstrap["valid_draws"] != state["limits"]["bootstrap_draws"]
             or not all(math.isfinite(value) for value in scores.values())

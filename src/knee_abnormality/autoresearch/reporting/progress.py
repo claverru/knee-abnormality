@@ -117,12 +117,22 @@ def metric_line(exp):
     adoption_bounds = (evidence.get("adoption_bootstrap") or {}).get(
         "delta_percentile_80"
     )
+    validation = evidence.get("validation_macro_auc", {})
     return (
         f"AUC: {score_text(reference)} -> {score_text(candidate)}; "
         f"delta {score_text(difference(candidate, reference), True)}; 95% CI {interval_text(bounds)}"
         + (
-            f"; adoption 80% CI {interval_text(adoption_bounds)}"
+            f"; 80% CI {interval_text(adoption_bounds)}"
             if adoption_bounds is not None
+            else ""
+        )
+        + (
+            "; x1 delta "
+            + score_text(
+                difference(validation.get("candidate"), validation.get("reference")),
+                True,
+            )
+            if validation
             else ""
         )
     )
@@ -169,6 +179,11 @@ def adoption_result(exp):
     return delta, bounds
 
 
+def validation_delta(exp):
+    scores = exp.get("evidence", {}).get("validation_macro_auc", {})
+    return difference(scores.get("candidate"), scores.get("reference"))
+
+
 def findings_summary(state, campaign):
     log = Path(campaign["artifacts_root"]) / "findings.md"
     lines = [
@@ -186,8 +201,9 @@ def findings_summary(state, campaign):
         delta, bounds = adoption_result(exp)
         soft = exp.get("evidence", {}).get("soft_macro_auc")
         lines.append(
-            f"- `{exp['idea']}`: {decision_text(exp)}, macro AUC delta "
-            f"{score_text(delta, True)}, adoption 80% CI {interval_text(bounds)}"
+            f"- `{exp['idea']}`: {decision_text(exp)}, macro AUC delta x4 "
+            f"{score_text(delta, True)}, x1 {score_text(validation_delta(exp), True)}, "
+            f"80% CI of x4 {interval_text(bounds)}"
             + (f", soft AUC delta {score_text(soft['delta'], True)}" if soft else "")
         )
     return "\n".join([*lines, ""])

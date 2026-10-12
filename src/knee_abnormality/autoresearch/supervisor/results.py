@@ -11,6 +11,7 @@ from knee_abnormality.autoresearch.campaign.gates import (
     evaluate,
     run_limits,
     validate_config,
+    validation_scores,
     verdict,
 )
 from knee_abnormality.autoresearch.campaign.reports import (
@@ -207,6 +208,7 @@ class ResultMixin:
                 {
                     "comparison": str(comparison),
                     "macro_auc": report["family_means"]["all"],
+                    "validation_macro_auc": validation_scores(report),
                     "adoption_bootstrap": macro_bootstrap,
                     "per_label": str(diagnostics_path(comparison)),
                     "bootstrap": report["paired_report_group_bootstrap"]["intervals"][

@@ -14,15 +14,18 @@ EVALUATION = {
 }
 ACCEPTANCE_RULE = {
     "metric": "candidate_minus_incumbent_macro_auc",
+    "multipliers": [1, 4],
+    "change_at_every_multiplier_strictly_above": 0.0,
     "bootstrap_confidence_level": 0.8,
-    "bootstrap_lower_bound_strictly_above": 0.0,
     "reporting_confidence_level": 0.95,
 }
 
 
 def acceptance_text():
     return (
-        f"adopt only when the central {ACCEPTANCE_RULE['bootstrap_confidence_level']:.0%} "
-        "paired-bootstrap lower bound of the valid macro AUC improvement is strictly above "
-        f"{ACCEPTANCE_RULE['bootstrap_lower_bound_strictly_above']:g}; otherwise discard"
+        "adopt only when the valid macro AUC is strictly above the incumbent's at both image "
+        "multipliers, x1 (the selected checkpoint's epoch validation) and x4 (its saved "
+        "predictions); otherwise discard. The central "
+        f"{ACCEPTANCE_RULE['bootstrap_confidence_level']:.0%} paired-bootstrap interval of the "
+        "x4 change is reported and does not decide"
     )

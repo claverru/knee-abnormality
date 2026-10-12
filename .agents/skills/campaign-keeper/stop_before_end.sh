@@ -20,6 +20,7 @@ print(
     f"reference {macro['reference']:.6f}",
     f"candidate {macro['candidate']:.6f}",
     f"delta {macro['candidate'] - macro['reference']:+.6f}",
+    f"x1 delta {evaluation['validation_macro_auc']['candidate'] - evaluation['validation_macro_auc']['reference']:+.6f}",
     "80%",
     [round(value, 6) for value in evaluation["adoption_bootstrap"]["delta_percentile_80"]],
 )

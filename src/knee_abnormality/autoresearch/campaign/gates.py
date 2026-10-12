@@ -353,11 +353,23 @@ def evaluate(experiment: Path, fold: int, limits: dict, receipt: dict):
     return reasons
 
 
+def validation_scores(report):
+    return {
+        name: next(
+            epoch["macro_auc"]
+            for epoch in run["epochs"]
+            if epoch["epoch"] == run["selected_epoch"]
+        )
+        for name, run in report["runs"].items()
+    }
+
+
 def verdict(report, macro_bootstrap):
     bootstrap = report["paired_report_group_bootstrap"]
     interval = bootstrap["intervals"]["all"]
     bounds = interval["delta_percentile_95"]
     scores = report["family_means"]["all"]
+    validation = validation_scores(report)
     adoption_bounds = (macro_bootstrap or {}).get("delta_percentile_80")
     if (
         not bounds
@@ -370,11 +382,16 @@ def verdict(report, macro_bootstrap):
         or not bounds[0] <= adoption_bounds[0] <= adoption_bounds[1] <= bounds[1]
         or macro_bootstrap["valid_draws"] != interval["valid_draws"]
         or not all(
-            math.isfinite(scores[key]) and 0 <= scores[key] <= 1
+            math.isfinite(values[key]) and 0 <= values[key] <= 1
+            for values in (scores, validation)
             for key in ("reference", "candidate")
         )
     ):
         return "invalid"
-    if adoption_bounds[0] > ACCEPTANCE_RULE["bootstrap_lower_bound_strictly_above"]:
+    if all(
+        values["candidate"] - values["reference"]
+        > ACCEPTANCE_RULE["change_at_every_multiplier_strictly_above"]
+        for values in (scores, validation)
+    ):
         return "provisional_accept"
     return "reject"
