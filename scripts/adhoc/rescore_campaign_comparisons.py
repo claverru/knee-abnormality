@@ -5,7 +5,6 @@ import numpy as np
 import polars as pl
 from pydantic import Field
 
-from knee_abnormality.autoresearch.campaign.rules import ACCEPTANCE_RULE
 from knee_abnormality.cli import CLISettings, describe
 from knee_abnormality.data.splits import STUDY, TARGET_THRESHOLD, load_split
 from knee_abnormality.evaluation.metrics import aucs, bootstrap_auc
@@ -50,7 +49,7 @@ def macro_delta(truth: np.ndarray, reference: np.ndarray, candidate: np.ndarray,
     valid = ((positive > 0) & (positive < counts.sum(axis=1, keepdims=True))).all(axis=1)
     draws = bootstrap_auc(truth, candidate, counts[valid]) - bootstrap_auc(truth, reference, counts[valid])
     low, high = np.percentile(draws, [10, 90])
-    accepted = low > ACCEPTANCE_RULE["bootstrap_lower_bound_strictly_above"]
+    accepted = low > 0
     return {"delta": point, "low80": float(low), "high80": float(high), "accepted": bool(accepted)}
 
 

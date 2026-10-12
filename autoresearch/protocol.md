@@ -76,10 +76,11 @@ topics needs a new campaign sealed on the shared evaluation.
 
 ### Adoption policy
 
-For each valid new experiment, adopt the implementation when the central 80% paired
-report-group bootstrap interval of its macro AUC change against the pinned incumbent
-has a strictly positive lower bound; otherwise discard it. This is the only
-condition, using unrounded values. Code computes the verdict: `provisional_accept`
+For each valid new experiment, adopt the implementation when its macro AUC is strictly
+above the pinned incumbent's at both image multipliers; otherwise discard it. The ×1
+score is the selected checkpoint's epoch validation, the ×4 score the macro of its saved
+predictions; both are read from the comparison record. This is the only condition, using
+unrounded values (user decision, 2026-10-10). Code computes the verdict: `provisional_accept`
 when it holds, `reject` when it fails, `invalid`
 for invalid evidence, leakage, seed mismatch, or contract or resource breaches.
 `provisional_accept` is a practical working-recipe choice, not statistical
@@ -90,14 +91,15 @@ schedule confirmation runs after each experiment. Preserve findings, configs and
 provenance for discarded attempts without keeping their rejected implementations in
 the active recipe.
 
-The 80% macro interval uses the 10th and 90th percentiles of the same paired
-report-group draws as the retained 95% interval. Per-label and 95% intervals inform
-interpretation; they add no further adoption gate. Missing 80% evidence prevents
-adoption. The 80% level is a fixed engineering choice, not
-independent confirmation, and repeated selection can still overfit the campaign's
+The 80% macro interval of the ×4 change uses the 10th and 90th percentiles of the same
+paired report-group draws as the retained 95% interval. It is reported with every run and,
+like the per-label and 95% intervals, informs interpretation without deciding. Missing
+bootstrap evidence makes the run `invalid`. The two multipliers read different slices of
+the same knees, so they are two partly separate readings of one model, not independent
+confirmation, and repeated selection can still overfit the campaign's
 fold. This user-directed rule replaced a positive-95%-lower-bound gate, a briefly
-used gain-only rule and, on 2026-10-02, a rule that also required a gain of at least
-0.001; evaluation records written before that date carry the older rule. Review approvals bind the rule and evaluation records carry it;
+used gain-only rule, on 2026-10-02 a rule that also required a gain of at least
+0.001 and, on 2026-10-10, the positive lower bound of the 80% interval; evaluation records written before that date carry the older rule. Review approvals bind the rule and evaluation records carry it;
 role prompts override older gates in frozen contracts without modifying archived
 source. Adopted methods become the next reference for both additions and replacements.
 

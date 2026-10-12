@@ -91,6 +91,7 @@ def family_ledger(state):
             continue
         idea = state["ideas"][exp["idea"]]
         scores = exp.get("evidence", {}).get("macro_auc")
+        validation = exp.get("evidence", {}).get("validation_macro_auc")
         bounds = (exp.get("evidence", {}).get("adoption_bootstrap") or {}).get(
             "delta_percentile_80"
         )
@@ -101,6 +102,10 @@ def family_ledger(state):
                 "decision": exp["decision"],
                 "macro_delta": scores["candidate"] - scores["reference"]
                 if scores
+                else None,
+                "validation_macro_delta": validation["candidate"]
+                - validation["reference"]
+                if validation
                 else None,
                 "adoption_interval_80": bounds,
             }

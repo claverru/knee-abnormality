@@ -94,8 +94,6 @@ class IntegrationPlan(Report):
         names = [name.strip() for group in groups for name in group]
         if not all(names) or len(names) != len(set(names)):
             raise ValueError("Integration components must be nonempty and distinct")
-        if not self.added_components and not self.removed_components:
-            raise ValueError("Integration must add or remove a component")
         if len(self.removed_idea_ids) != len(set(self.removed_idea_ids)):
             raise ValueError("Removed idea IDs must be unique")
         if self.removed_idea_ids and not self.removed_components:

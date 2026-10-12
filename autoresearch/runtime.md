@@ -126,7 +126,7 @@ training jobs show their idea, epoch and latest validation AUC. **Backlog** list
 ranked queue with the campaign's refill thresholds and the next candidate. **Score**
 shows the original reference AUC, current incumbent AUC, raw change since the start
 and retained experimental gain. **Results** tabulates every decided experiment with
-its delta, adoption 80% interval and verdict. **Cost** gives recorded agent usage by
+its ×4 and ×1 deltas, the 80% interval of the ×4 change and verdict. **Cost** gives recorded agent usage by
 role/event; it includes failed calls and marks partial or unavailable usage, and
 unparseable usage counts as unavailable and never blocks result processing or status.
 For a live display with no model calls:
@@ -375,8 +375,8 @@ own accounting enforces the counts in the attempt's `run-limits.json`.
 Each candidate trains at the current incumbent's recorded seed
 ([seed policy](protocol.md#training-seed-policy)); the supervisor binds it into review
 and records it in the experiment and launch config. The bootstrap resampling seed is
-separate and fixed. Code computes the verdict from the saved paired report-group
-bootstrap under the [adoption policy](protocol.md#adoption-policy). The runtime
+separate and fixed. Code computes the verdict from the comparison record
+under the [adoption policy](protocol.md#adoption-policy). The runtime
 derives the macro 80% interval from the same resamples used for per-label
 diagnostics, verifies their macro 95% summary against the frozen evaluator, and
 stores both in `per_label.json`. Partial evidence, scope violations and budget
