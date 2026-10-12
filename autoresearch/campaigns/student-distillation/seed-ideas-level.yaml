@@ -1,0 +1,86 @@
+ideas:
+- id: teacher-residual-at-silver-level
+  mechanism_id: silver-level-residual
+  parent_idea_id: null
+  title: Keep the teacher's ordering of studies inside each silver level and drop its pull of the silver labels toward the middle
+  opportunity: 'Measured premise, effect on the student a guess. The incumbent label is silver + 0.25
+    * (p - silver), p the sigmoid of the raw joint teacher logit. Split p - silver per label into a level
+    part m(silver) - silver, with m the mean teacher value among studies of the same silver level (20
+    equal-count silver bins, folds 1 to 4), and a residual p - m(silver). The level part is a function
+    of the silver value alone, so it carries nothing the silver label does not have: it is the teacher''s
+    regression to the mean. Measured on the 3,475 studies: it is +0.089 on cells with silver < 0.1 (macro;
+    +0.052 ACL to +0.154 PF OA and synovitis) and -0.167 on cells with silver >= 0.5 (-0.101 medial OA
+    to -0.270 MCL), and holds 32% of the squared teacher-silver difference (23% Baker''s, 25% contusion,
+    up to 43% PF OA and 44% synovitis). The residual is the part only the teacher has, and it is not image
+    noise: between studies that share a report (38 groups, 154 studies, 116 degrees of freedom) its within-group
+    sd is 0.043 to 0.120 against 0.125 to 0.184 overall, so 76% of its variance repeats inside a report
+    (58% medial meniscus to 89% lateral OA). Across the twelve labels the level part''s size ranks with
+    the loss as the share rose: Spearman -0.60 against the x4 change of 0.75 against 0.25, -0.60 against
+    1.0 against 0.5 (n = 12, the two not independent; weak to moderate). Synovitis, the label that loses
+    most with more teacher, has the largest level part; contusion and Baker''s, which lose least, the
+    smallest. The three rejected reshapings (per label, Platt, plane agreement) and the queued gate all
+    keep the level part inside whatever teacher they keep.'
+  mechanism: 'In data/labels.py, per label, over the training studies of folds 1 to 4 pooled: p = sigmoid(raw
+    joint teacher logit). Sort the studies by the silver value (float32 as loaded), ties by StudyInstanceUID,
+    and cut the sorted list into 20 consecutive bins of equal count (numpy.array_split: 15 bins of 174
+    and 5 of 173). m = mean of p over the study''s bin. Label = clip(silver + 0.25 * (p - m), 0, 1).
+    distillation.teacher_share stays 0.25 and distillation.teacher_level_bins: 20 is the one new constant.
+    Equivalently label = incumbent label - 0.25 * (m - silver): the incumbent''s table minus a per-label
+    function of the silver bin, so within a bin every study keeps exactly the incumbent''s differences
+    to the other studies and the bin''s mean label returns to its mean silver value. 20 bins: with 50
+    the mean absolute change against the incumbent moves from 0.02158 to 0.02137, so the result does
+    not hang on it; 174 studies per bin put the error of m near 0.011. No rounding, nothing fitted on
+    labels, teacher values raw, no fold-wise step.'
+  precedents:
+  - 'Share range on fold 0, x4: 0.25 0.935809, 0.5 0.934171, 0.75 0.932562, 1.0 0.931358; every quarter
+    of share adds a quarter of the level part.'
+  - 'teacher-share-per-label: the four labels with the teacher removed moved +0.0037 synovitis, +0.0019
+    MCL, +0.0015 lateral OA, +0.0001 PF OA; they are four of the five labels with the largest level part
+    (0.44, 0.35, 0.33, 0.43; fracture 0.34 is the fifth).'
+  - 'recalibrated-fold-teachers-rerun (+0.0002 at x4): Platt scaling makes the teacher calibrated given
+    its own value and leaves its mean given silver regressed, so it did not remove the level part.'
+  novelty: 'First recipe that separates what the teacher adds beyond the silver label from its restatement
+    of the silver label. Not a share, a preparation per fold, a gate on the size of the difference or
+    a use of the plane readings: the amount of teacher residual is the incumbent''s in every cell.'
+  coverage: 'Every training study and label. Mean absolute change against the incumbent''s labels 0.02158
+    (0.0158 ACL to 0.0349 PF OA), almost twice the gate seed''s 0.0111 and all of it in one direction
+    per silver level: low-silver cells down by 0.013 to 0.039, cells with silver >= 0.5 up by 0.025 to
+    0.067.'
+  exploitation: 'Report before training, from the label table: teacher_level_shift, the mean absolute
+    difference to the incumbent''s mix (expect 0.02158; per label 0.0158 ACL, 0.0166 MCL, 0.0274 medial
+    meniscus, 0.0246 lateral meniscus, 0.0217 medial OA, 0.0205 lateral OA, 0.0349 PF OA, 0.0232 effusion,
+    0.0229 synovitis, 0.0159 Baker''s, 0.0162 contusion, 0.0193 fracture); teacher_target_shift (expect
+    0.02578 against the incumbent''s 0.02833); cells crossing 0.5 against the incumbent (expect 0.31%);
+    cells clipped at 0 (expect 1.68%, of which medial meniscus 11.8% of its cells, each by less than
+    0.013) and at 1 (expect 0.03%); label macro AUC against silver (expect 0.99971, incumbent 0.99964);
+    the mean of label - silver per bin (expect 0 up to the clipping). Read both scores against the incumbent
+    and the per-label table against the level part: the seed predicts the largest gains on synovitis,
+    PF OA, MCL, fracture and lateral OA and the smallest on Baker''s and contusion. Fracture separates
+    it from plain less-teacher: it fell under recalibration and plane agreement and has a large level
+    part (0.34), so it should rise here. Shown wrong by: the overall AUC at x4 below the incumbent by
+    more than the 0.0004 a retraining gives, which says the teacher''s shrinkage of the silver labels
+    toward the middle is the helpful part of distillation and its study-level knowledge is not; then
+    the recipe''s gain is label smoothing and needs no teacher ordering. A gain says the fall along the
+    share range came from the level part, and the share of the residual is the open number for the recipe
+    applied outside the campaign.'
+  budget: Same cost as the incumbent; the labels are built once before training.
+  implementation: 'src/knee_abnormality/config.py (DistillationConfig gains teacher_level_bins, a positive
+    integer), src/knee_abnormality/data/labels.py (distilled computes m per label from the joined training
+    frame and builds the label above; gold rows keep their branch), src/knee_abnormality/training/lightning.py
+    (logs teacher_level_shift beside teacher_target_shift) and configs/training.yaml (distillation.teacher_level_bins:
+    20, teacher_share unchanged at 0.25). Replaces the incumbent''s mix in every cell: no flag, option
+    or field selects the plain mix, and the only config changes are under distillation. teacher_level_shift
+    is the mean absolute difference between the labels built and the labels the plain mix (1 - share)
+    * silver + share * p would give, measured when the label table is built and stored in the provenance
+    beside target_shift: 0.02158, and exactly 0 for the incumbent. Activation: teacher_level_shift > 0.0213
+    at epoch 0. Bins are computed on the training frame only (folds 1 to 4), in float64, the label cast
+    to float32 after the clip; validation frame, scoring targets and row order unchanged; nothing read
+    from fold 0, from gold labels or from the single-plane readings.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: 'Last run of the campaign and the one that says what the teacher is for: every
+    run so far changed how much teacher or which cells take it, none separated its information from its
+    smoothing. It moves the table twice as far as the gate seed in a direction no run has tried, its two
+    constants are the incumbent''s share and a bin count the result does not depend on, and both outcomes
+    change the recipe carried to the ResNet-50.'
+exhausted_directions: ''

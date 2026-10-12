@@ -1,0 +1,119 @@
+ideas:
+- id: teacher-share-050
+  mechanism_id: teacher-share
+  parent_idea_id: null
+  title: Train the student on half silver labels and half raw teacher predictions
+  opportunity: 'Evidence-backed. This is the first-round recipe: students beat their teachers on every
+    fold (ResNet-50 +0.0034 and ReXNet-200 +0.0090 pooled out of fold) and five ResNet-50 students scored
+    0.957 public against 0.954 for one teacher (prior-work.md, The first round). Those gains were measured
+    on folds four of five teachers had trained on; this run measures the same recipe on a fold no teacher
+    has seen.'
+  mechanism: 'Set distillation.teacher_share: 0.5 in configs/training.yaml. For every study of folds 1
+    to 4 and every label the training label is 0.5 * silver + 0.5 * teacher, where teacher is the sigmoid
+    of the joint logit of the teacher table and silver is the rebuild_state_v2 value. The teacher values
+    are raw. No source change.'
+  precedents:
+  - 'rn18-oof-blend, ResNet-18 fold 0, leaky: +0.0015 at x4 (95% +0.0001 to +0.0031).'
+  - 'Refined ResNet-50, five folds, leaky: +0.0034 pooled out of fold; 0.957 public (S106).'
+  novelty: First measurement of the first-round recipe on a held-out fold and on gold labels.
+  coverage: Every training study.
+  exploitation: 'Adopted without a comparison (contract, Reference): it is the incumbent every later
+    seed is compared with. Report its overall macro AUC at x1 and x4 and its gold macro AUC at x4 on fold
+    0, and both per label.'
+  budget: 'Same cost as the reference: the labels are built once before training.'
+  implementation: 'configs/training.yaml only (distillation.teacher_share: 0.5). Changes no source. Report
+    the label-table figures of the developer instructions.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: First, and adopted by the definition's forced_adoptions.
+- id: teacher-share-025
+  mechanism_id: teacher-share
+  parent_idea_id: null
+  title: Train the student on three quarters silver labels and one quarter teacher predictions
+  opportunity: 'A guess. The share of the first round was a convention and has never been varied. The
+    2026-09-23 image-blend test used 0.7 silver and 0.3 teacher of older models and gave +0.0035 on fold
+    0 and a public tie (prior-work.md, Precedents).'
+  mechanism: 'Set distillation.teacher_share: 0.25 in configs/training.yaml, whatever the incumbent''s
+    share is. Label = 0.75 * silver + 0.25 * teacher, raw joint teacher values. No source change.'
+  precedents:
+  - 'Image-blend labels at 0.7 / 0.3, ReXNet-200 fold 0: +0.0035, a public tie.'
+  novelty: First point below 0.5 on the clean split.
+  coverage: Every training study.
+  exploitation: 'Read both scores against the incumbent and against the run at 0.5. Shown wrong by: the
+    overall AUC at x4 below the run at 0.5.'
+  budget: Same cost as the incumbent.
+  implementation: 'configs/training.yaml only (distillation.teacher_share: 0.25). Changes no source.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: One side of the share range.
+- id: teacher-share-075
+  mechanism_id: teacher-share
+  parent_idea_id: null
+  title: Train the student on one quarter silver labels and three quarters teacher predictions
+  opportunity: 'A guess, with one measurement behind it: on the 58 gold studies the ResNet-50 teacher
+    alone agreed with the radiologists almost as well as the half-and-half table (0.9354 against 0.9358)
+    and far better than the silver labels (0.9075), so the silver half may be adding little (prior-work.md,
+    What is settled).'
+  mechanism: 'Set distillation.teacher_share: 0.75 in configs/training.yaml, whatever the incumbent''s
+    share is. Label = 0.25 * silver + 0.75 * teacher, raw joint teacher values. No source change.'
+  precedents:
+  - 'Gold agreement of label tables, 2026-10-04: silver 0.9075, ResNet-50 teacher 0.9354, half and half
+    0.9394 with that teacher alone.'
+  novelty: First point above 0.5.
+  coverage: Every training study.
+  exploitation: 'Read both scores against the incumbent and against the run at 0.5; the gold score is
+    the one this run is expected to move. Shown wrong by: the gold AUC below the run at 0.5 by more than
+    0.002.'
+  budget: Same cost as the incumbent.
+  implementation: 'configs/training.yaml only (distillation.teacher_share: 0.75). Changes no source.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The other side of the share range.
+- id: teacher-share-100
+  mechanism_id: teacher-share
+  parent_idea_id: null
+  title: Train the student on teacher predictions alone
+  opportunity: 'A guess. The end of the share range: the student never sees a silver label, only what
+    the teachers learned from them. It says how much of the silver labels'' information the teachers already
+    carry.'
+  mechanism: 'Set distillation.teacher_share: 1.0 in configs/training.yaml, whatever the incumbent''s
+    share is. Label = teacher, raw joint teacher values. No source change.'
+  precedents:
+  - 'None on this dataset.'
+  novelty: First student trained without silver labels.
+  coverage: Every training study.
+  exploitation: 'Read both scores against the incumbent and the other three shares, and the per-label
+    table: labels where the teacher alone wins say where the silver label is the weaker source. Shown
+    wrong by: the overall AUC at x4 below the reference.'
+  budget: Same cost as the incumbent.
+  implementation: 'configs/training.yaml only (distillation.teacher_share: 1.0). Changes no source.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Closes the share range before the other choices are tried on the incumbent.
+- id: teacher-share-per-label
+  mechanism_id: teacher-share
+  parent_idea_id: null
+  title: Give each label its own teacher share, from how well the teachers predict that label
+  opportunity: 'A guess. The teachers are not equally good on every label, so one share for all twelve
+    gives a weak teacher label as much weight as a strong one. The teachers'' own out-of-fold AUC per label
+    against the silver labels of folds 1 to 4 is known without touching fold 0.'
+  mechanism: 'Replace the single share by twelve, distillation.teacher_share_per_label. Compute each label''s
+    AUC of the teacher table''s joint value against the silver label (thresholded at 0.5) over folds 1
+    to 4. Rank the twelve labels by that AUC; the four highest take the incumbent''s share plus 0.25, the
+    four lowest the incumbent''s share minus 0.25, the middle four the incumbent''s share, each clipped
+    to 0 to 1. Write the twelve values into configs/training.yaml and report the ranking.'
+  precedents:
+  - 'A temperature per label at inference, 2026-10-04: a free value per label did not replicate, the stable
+    part was two labels moving together.'
+  novelty: First share that differs between labels.
+  coverage: Every training study.
+  exploitation: 'Read both scores against the incumbent and the per-label table split by the three groups.
+    Shown wrong by: the four labels given more teacher losing on average on both scores.'
+  budget: Same cost as the incumbent.
+  implementation: 'config.py (the per-label field replaces the single share), data/labels.py (the mix
+    reads the label''s share) and configs/training.yaml. Replaces the single share. Report the twelve
+    AUCs, the three groups and the label-table figures.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Uses the share runs' incumbent and needs no reading from the planes.
+exhausted_directions: ''

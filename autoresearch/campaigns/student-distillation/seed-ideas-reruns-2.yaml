@@ -1,0 +1,29 @@
+ideas:
+- id: recalibrated-fold-teachers-rerun
+  mechanism_id: teacher-preparation
+  parent_idea_id: null
+  title: Recalibrate each fold teacher per label against the silver labels of its own fold
+  opportunity: 'Measured premise, effect on the student a guess. The other way to put the fold teachers
+    on one scale keeps the shape of their values: two numbers per teacher and label. On the 2026-10-04
+    ResNet-50 teachers the pooled label scores 0.932594 after it, against 0.931720 raw; part of that is
+    optimistic because the two numbers are fitted on the targets it is scored on (prior-work.md, Fold
+    teachers are levelled differently).'
+  mechanism: 'In data/labels.py, before the mix: for each teacher fold and label fit a logistic regression
+    of the silver label (thresholded at 0.5) on the teacher''s joint logit over the studies of that fold,
+    slope and offset, and replace the teacher value by its fitted probability. The fit uses folds 1 to
+    5 only. The mix with the silver labels is the incumbent''s.'
+  precedents:
+  - 'Pooled teacher predictions as a label, ResNet-50: raw 0.931720, recalibrated 0.932594.'
+  - 'Gold, 58 studies: raw 0.9354, recalibrated 0.9330 for ResNet-50; ReXNet-200 0.9169 to 0.9206.'
+  novelty: First student trained on recalibrated teachers.
+  coverage: Every training study.
+  exploitation: 'Read both scores against the incumbent and against the reranked run; report the fitted
+    slope and offset per teacher and label. Shown wrong by: the overall AUC at x4 below the incumbent.'
+  budget: Same cost as the incumbent.
+  implementation: 'data/labels.py and config.py (distillation.teacher_preparation: recalibrated). Replaces
+    the incumbent''s preparation. Fit without regularisation; a label with one class in a fold keeps its
+    raw values. Report the label-table figures.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The alternative to reranking, run after it so the two are read against each other.
+exhausted_directions: ''

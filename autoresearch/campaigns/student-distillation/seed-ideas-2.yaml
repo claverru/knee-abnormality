@@ -1,0 +1,119 @@
+ideas:
+- id: reranked-fold-teachers
+  mechanism_id: teacher-preparation
+  parent_idea_id: null
+  title: Rerank each fold teacher's values per label before mixing them with the silver labels
+  opportunity: 'Measured premise, effect on the student a guess. Each study takes its value from the one
+    teacher that held it out, and the four teachers do not share a level: on the ResNet-50 teachers of
+    2026-10-04 the mean prediction of a label differs between teachers by 0.01 to 0.04, and the pooled
+    predictions score 0.931720 as a label against 0.932043 for the mean of the fold scores. Reranking
+    each teacher per label recovers the gap exactly, 0.932046 (prior-work.md, Fold teachers are levelled
+    differently).'
+  mechanism: 'In data/labels.py, before the mix and per label: within each teacher fold replace the joint
+    logit of every study by its rank within that fold divided by the fold''s size, then map each rank
+    to the value at that quantile of the pooled distribution of the four teachers'' sigmoid values for
+    that label. The order inside a fold is unchanged and all four folds end with the same distribution.
+    The mix with the silver labels is the incumbent''s.'
+  precedents:
+  - 'Pooled teacher predictions as a label, ResNet-50: raw 0.931720, reranked 0.932046, mean of the fold
+    scores 0.932043.'
+  - 'Gold, 58 studies: raw 0.9354, reranked 0.9309; too few to decide.'
+  novelty: First student trained on teachers put on a common scale.
+  coverage: Every training study.
+  exploitation: 'Read both scores against the incumbent; report before training the spread of the per-fold
+    mean of the teacher values per label before and after (expect the spread to vanish). Shown wrong by:
+    the overall AUC at x4 below the incumbent with the spread removed.'
+  budget: Same cost as the incumbent.
+  implementation: 'data/labels.py and config.py (distillation.teacher_preparation: reranked replaces raw).
+    Replaces the raw teacher values. Ties in rank take the mean rank. Report the label-table figures.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The one preparation with a measured gain in label quality and nothing fitted.
+- id: recalibrated-fold-teachers
+  mechanism_id: teacher-preparation
+  parent_idea_id: null
+  title: Recalibrate each fold teacher per label against the silver labels of its own fold
+  opportunity: 'Measured premise, effect on the student a guess. The other way to put the fold teachers
+    on one scale keeps the shape of their values: two numbers per teacher and label. On the 2026-10-04
+    ResNet-50 teachers the pooled label scores 0.932594 after it, against 0.931720 raw; part of that
+    is optimistic because the two numbers are fitted on the targets it is scored on (prior-work.md, Fold
+    teachers are levelled differently).'
+  mechanism: 'In data/labels.py, before the mix: for each teacher fold and label fit a logistic regression
+    of the silver label (thresholded at 0.5) on the teacher''s joint logit over the studies of that fold,
+    slope and offset, and replace the teacher value by its fitted probability. The fit uses folds 1 to
+    5 only. The mix with the silver labels is the incumbent''s.'
+  precedents:
+  - 'Pooled teacher predictions as a label, ResNet-50: raw 0.931720, recalibrated 0.932594.'
+  - 'Gold, 58 studies: raw 0.9354, recalibrated 0.9330 for ResNet-50; ReXNet-200 0.9169 to 0.9206.'
+  novelty: First student trained on recalibrated teachers.
+  coverage: Every training study.
+  exploitation: 'Read both scores against the incumbent and against the reranked run; report the fitted
+    slope and offset per teacher and label. Shown wrong by: the overall AUC at x4 below the incumbent.'
+  budget: Same cost as the incumbent.
+  implementation: 'data/labels.py and config.py (distillation.teacher_preparation: recalibrated). Replaces
+    the incumbent''s preparation. Fit without regularisation; a label with one class in a fold keeps its
+    raw values. Report the label-table figures.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The alternative to reranking, run after it so the two are read against each other.
+- id: share-from-plane-agreement
+  mechanism_id: plane-agreement
+  parent_idea_id: null
+  title: Lean on the teacher where its planes agree against the silver label, and on the silver label where they disagree
+  opportunity: 'A guess. A teacher can be read one series type at a time. When its sagittal, coronal
+    and axial readings each say positive and the silver label says negative, the silver label is likely
+    wrong; when the planes disagree among themselves the teacher is unsure. A fixed share treats both cases
+    alike. Nothing is known yet about the single-plane readings (prior-work.md, Single-plane readings),
+    so this run also reports them.'
+  mechanism: 'In data/labels.py, per study and label: take the sigmoid of the single-plane logits of
+    the series types the study has, and their standard deviation d. The share is s = clip(s0 * (1 - d
+    / d90) + s0 * 0.5, 0, 1) with s0 the incumbent''s share and d90 the 90th percentile of d for that
+    label over folds 1 to 4, so full agreement gives 1.5 * s0 and the most divided tenth 0.5 * s0. The
+    teacher value mixed in stays the joint one, prepared as in the incumbent.'
+  precedents:
+  - 'None: no run has saved or used single-plane readings.'
+  novelty: First share that differs between studies.
+  coverage: Every training study with at least two series types; the others keep the incumbent's share.
+  exploitation: 'Report before training, from the teacher table: the AUC of each series type''s reading
+    per label against the silver labels, and the share of cells where all planes are on the other side
+    of 0.5 from the silver label. Read both scores against the incumbent; the gold score is the one this
+    run is expected to move. Shown wrong by: single-plane AUCs near 0.5, or the gold AUC below the incumbent
+    by more than 0.002.'
+  budget: Same cost as the incumbent.
+  implementation: 'data/labels.py and config.py (distillation.share_from_agreement: true). Replaces the
+    fixed share per study and label. Report the label-table figures and the two measurements above.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The first use of the single-plane readings, and a label-table change only.
+- id: target-per-plane
+  mechanism_id: plane-targets
+  parent_idea_id: null
+  title: Train each series type's readout against the teacher's reading from that series type, beside the joint target
+  opportunity: 'A guess. The student has one classifier vector per series type and label, but it is only
+    ever trained through the joint prediction, so a series type that the attention ignores for a label
+    learns nothing for it. The teacher''s single-plane readings give each of them its own target: up to
+    six targets per label and study instead of one. It should matter most for studies with missing or
+    unusual series.'
+  mechanism: 'In the training step, besides the joint loss: for each series type present in the study
+    pool the student''s tokens of that type alone (pool_encoded with the view) and add the soft-target
+    BCE of that logit against the sigmoid of the teacher''s reading from the same series type, averaged
+    over the types present, weighted by distillation.plane_target_weight: 0.5. The teacher''s single-plane
+    values are prepared as the incumbent prepares the joint ones. Validation and prediction are unchanged.'
+  precedents:
+  - 'Per-view classifiers are listed in the auxiliary-loss campaign of the backlog, unrun.'
+  novelty: First target per series type.
+  coverage: Every training study; a study with one series type gets one extra target.
+  exploitation: 'Log on validation the AUC of each series type''s own reading per label. Read both scores
+    against the incumbent, and the overall AUC on fold-0 studies with fewer than six series types. Shown
+    wrong by: the single-plane validation AUCs rising while both scores fall.'
+  budget: 'Up to 1.08 of the incumbent''s training time: six extra poolings of tokens already encoded,
+    no extra forward pass.'
+  implementation: 'training/lightning.py (the added loss), data/labels.py (the per-type targets) and config.py
+    (distillation.plane_target_weight). Adds no forward pass: reuse the encoded batch of the joint loss.
+    At most five new validation metrics. Report on one batch the joint loss unchanged with the weight
+    at zero.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The only seed that changes what the student is trained on; last, on the settled
+    labels.
+exhausted_directions: ''
