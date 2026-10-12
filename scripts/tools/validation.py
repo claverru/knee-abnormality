@@ -41,6 +41,7 @@ def make_folds(
     targets: list[str],
     n_splits: int = 5,
     seed: int = 42,
+    gold_holdout: bool = False,
 ):
     require_unique_ids(train, "Training table", reject_blank=True)
     if n_splits < 2 or not targets or len(set(targets)) != len(targets):
@@ -119,7 +120,15 @@ def make_folds(
     if groups.height < n_splits:
         raise ValueError("Too few independent report groups")
     group_indicators = groups.drop("report_group")
-    group_classes = group_indicators.to_numpy().astype(int)
+    stratified = np.ones(groups.height, dtype=bool)
+    if gold_holdout:
+        stratified = ~groups["is_gold"].to_numpy()
+        group_indicators = group_indicators.select(
+            name
+            for name in group_indicators.columns
+            if name != "is_gold" and not name.startswith("gold_")
+        )
+    group_classes = group_indicators.to_numpy().astype(int)[stratified]
     for indicator, count in zip(
         group_indicators.columns, group_classes.sum(axis=0), strict=True
     ):
@@ -130,11 +139,12 @@ def make_folds(
     splitter = MultilabelStratifiedKFold(
         n_splits=n_splits, shuffle=True, random_state=seed
     )
-    assignment = np.full(groups.height, -1, dtype=np.int64)
+    assignment = np.zeros(groups.height, dtype=np.int64)
+    members = np.flatnonzero(stratified)
     for fold, (_, valid) in enumerate(
-        splitter.split(np.zeros((groups.height, 1)), group_classes)
+        splitter.split(np.zeros((len(members), 1)), group_classes)
     ):
-        assignment[valid] = fold
+        assignment[members[valid]] = fold
     groups = groups.select("report_group").with_columns(pl.Series("fold", assignment))
     manifest = (
         studies.select(STUDY, "report_group", "is_gold")
@@ -158,7 +168,11 @@ def make_folds(
                 raise ValueError(
                     f"Fold {fold}, {target}: both classes are required; revise the split design"
                 )
-            if min(gold_positive, gold_negative) == 0:
+            if gold_holdout and fold and gold.height:
+                raise ValueError(
+                    f"Fold {fold} holds gold studies outside the held-out fold"
+                )
+            if min(gold_positive, gold_negative) == 0 and not (gold_holdout and fold):
                 raise ValueError(
                     f"Fold {fold}, gold {target}: both classes are required; revise the split design"
                 )
@@ -194,6 +208,7 @@ def prepare(
     config: ExperimentConfig,
     scanner_table: Path,
     label_source: str,
+    gold_holdout: bool,
 ) -> dict:
     train = pl.read_csv(data_dir / "train.csv", infer_schema_length=None)
     sample = pl.read_csv(data_dir / "sample_submission.csv")
@@ -208,7 +223,7 @@ def prepare(
     )
     scanners = scanner_groups(pl.read_parquet(scanner_table))
     manifest, counts, evaluation, scanner_counts = make_folds(
-        train, source, scanners, targets, n_splits, seed
+        train, source, scanners, targets, n_splits, seed, gold_holdout
     )
     csv = manifest.write_csv()
     evaluation_csv = evaluation.write_csv()
@@ -217,7 +232,10 @@ def prepare(
         "n_splits": n_splits,
         "seed": seed,
         "targets": targets,
-        "stratification": "iterative multilabel over all report groups; positive and negative effective-label and gold-only target indicators, scanner-group indicators plus is_gold; both classes required per target in every full and gold validation fold",
+        "stratification": "every report group with a gold study in fold 0; iterative multilabel over the other report groups; positive and negative effective-label target indicators and scanner-group indicators; both classes required per target in every fold and in fold 0's gold studies"
+        if gold_holdout
+        else "iterative multilabel over all report groups; positive and negative effective-label and gold-only target indicators, scanner-group indicators plus is_gold; both classes required per target in every full and gold validation fold",
+        **({"gold_holdout_fold": 0} if gold_holdout else {}),
         "scanner_groups": {
             "table": str(scanner_table),
             "sha256": sha256_file(scanner_table),
@@ -345,6 +363,10 @@ class Prepare(ValidationCommand):
     label_source: str | None = Field(
         default=None, description="Label source; defaults to the config's"
     )
+    gold_holdout: bool = Field(
+        default=False,
+        description="Put every report group with a gold study in fold 0 and stratify the other groups over all folds",
+    )
 
     def cli_cmd(self) -> None:
         config, data_dir, split_dir = self.locations()
@@ -356,6 +378,7 @@ class Prepare(ValidationCommand):
             config,
             self.scanner_table,
             config.labels.source if self.label_source is None else self.label_source,
+            self.gold_holdout,
         )
         print(json.dumps(result, indent=2))
 
