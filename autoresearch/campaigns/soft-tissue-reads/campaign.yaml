@@ -1,0 +1,118 @@
+id: soft-tissue-reads
+recipe: configs/training.yaml
+reference_run: outputs/training/rn18-soft-tissue-added-read-bone-routes
+reference_equivalences: {}
+additional_evidence_runs: []
+backlog:
+  refill_below: 3
+  refill_to: 5
+  seed_order: forced
+  rotate_after: 1000000
+budget:
+  mode: range
+  min_fraction: 0.75
+  max_fraction: 1.25
+policy:
+  editable_files:
+  - configs/training.yaml
+  - src/knee_abnormality/config.py
+  - src/knee_abnormality/inference/checkpoint.py
+  - src/knee_abnormality/inference/engine.py
+  - src/knee_abnormality/training/anatomy.py
+  - src/knee_abnormality/training/lightning.py
+  - src/knee_abnormality/data/dataset.py
+  - src/knee_abnormality/data/preprocessing/sampling.py
+  editable_directories:
+  - src/knee_abnormality/modeling
+  config_keys:
+  - trainer.meniscus_loss_weight
+  - data.training_context_slices
+  - model.soft_tissue_routing
+  - data.series_types
+  - trainer.max_epochs
+  config_prefixes: []
+  list_item_fields: {}
+  input_identity_keys:
+  - preprocessing_identity
+  require_source_change: false
+  configuration_only_ideas: true
+  developer_instructions: 'Environment, read this first. (1) You have no GPU and must not use one. A training
+    already uses most of the machine''s memory: run nothing heavy on the CPU. Allowed checks: static checks with
+    the existing Python environment, loading configs/training.yaml through the config model, and tiny no-gradient
+    checks of the changed functions on synthetic tensors or on at most two studies; a forward-and-backward pass
+    of the whole model on the CPU is not allowed, so show gradient paths on the changed heads with small synthetic
+    inputs. Never return blocked for lack of a GPU. (2) Make every change inside the candidate workspace you were
+    assigned and nowhere else. Do not stage the candidate under /tmp, and do not write source/ or changes.diff
+    in the experiment directory: it is read-only to you by design, and the supervisor freezes the source and the
+    diff from your workspace after you return. (3) When the change is complete and the checks pass, return status
+    prepared with the integration and activation declarations in the report. An unwritable experiment directory
+    is never a reason to return blocked. The incumbent starts as rn18-soft-tissue-added-read-bone-routes (prior-work.md,
+    The reference): the seven-class soft-tissue map head (KneeAbnormalityModel.meniscus_head on the 14 by 14 third-stage
+    grid, taught in training/anatomy.py and training/lightning.py), the fourth-stage read A (_pool_tokens) and
+    the third-stage cell read B (_soft_tissue_tokens, _soft_tissue_pool, _soft_tissue_routing_weights), summed
+    in pool_encoded. Read contract.md before writing code. Each seed is one design step and says exactly what
+    changes and what it replaces; apply it to the incumbent you are assigned and leave everything outside it byte-identical.
+    Replace what a seed supersedes: no flag, option or config field selects the old behaviour. Every seed names
+    the validation-only metrics that prove it active; the review requires such a proof, so never return a candidate
+    without one. When a seed names the frozen source of an earlier candidate or a diff in the campaign directory,
+    read it and reuse the reviewed code instead of writing the mechanism again. Keep the speed rules of the recipe:
+    tokens, routing weights and position priors are memoised per encoded batch through KneeAbnormalityModel._memo
+    (never read a memo from a dict whose inputs you changed without going through _memo), epoch metrics go through
+    _log_epoch_metric, and model.channels_last stays true. Never run a segmenter and never read the prepared targets
+    outside the training module: nothing from them may be needed at validation or prediction. New parameters or
+    buffers initialise under torch.random.fork_rng so the incumbent''s random stream is unchanged, and new readouts
+    start at zero so the model starts as the incumbent. Shares, centres, regions and routing weights are read
+    from detached values: the label loss must not reach a map head through them. Do not detach the cell features
+    of B: its loss reaches backbone stages 1 to 3 by the user''s decision. Never add a loss on B''s own logit.
+    Any new key read from the batch in modeling/ must be in MODEL_BATCH_KEYS of inference/engine.py. Update the
+    matching entries of SPATIAL_TOKEN_IDENTITY when the described behaviour changes. Validation and prediction
+    stay deterministic. Do not change the image size, the views, the crops, slice counts, epochs or the backbone.
+    Cost discipline: a seed adds no training time its mechanism does not need. Add no diagnostic to the training
+    step: what a seed asks to be known is reported once on one batch in your report, or logged on validation only,
+    through _log_epoch_metric, at most six new validation metrics per seed. In code that runs every training step
+    write no .item(), .cpu(), bool() or int() of a tensor, no nonzero, unique or new boolean-mask indexing, no
+    Python loop over studies, series or views, no torch.tensor built from Python values, and no second evaluation
+    of the maps, the frame, the routing weights or the tokens: these force the GPU to synchronise. Add no forward
+    pass. A seed that says ''same cost'' must train within 1.03 of the incumbent''s time; a seed that states a
+    larger figure must stay within it. Training time must stay within 0.75 to 1.25 times the reference''s (1,199
+    to 1,998 s), a ceiling that exists to hold what gets adopted, not to be spent. No weight averaging. No tests.
+    Wider scope since 2026-10-11 (contract.md, section Wider scope): a seed may add training-only slices encoded
+    without gradient (data/dataset.py, data/preprocessing/sampling.py, config key data.training_context_slices;
+    validation and prediction unchanged), teach the map of one plane from the detached map of another plane of
+    the same study, fold the cell features into the fourth-stage read or remove the cell read B, and combine mechanisms
+    that already ran (Bundles). Where a seed removes B, the instruction never to detach B''s cell features no
+    longer applies to that seed. Never fewer epochs, never less input per study than the incumbent at validation
+    or prediction: a run over the time range is fixed by removing cost the mechanism does not need, or returned
+    blocked.'
+  researcher_instructions: 'The campaign has no end: it runs until the user stops it. Never return an empty report
+    and never declare the directions exhausted. Research starts after the forced seeds. Your first product after
+    every completed run is its analysis: both multipliers against the incumbent (the x1 change is the selected
+    epoch''s validation macro, the x4 change the saved predictions''), the per-label AUC changes from the two
+    runs'' fold_1/validation_predictions.csv sorted from largest gain to largest loss, A alone against A + B for
+    the five soft-tissue labels where the run logs them, the map''s overlap per class (val_meniscus_overlap_*),
+    B''s effective open cells, routed share and mean absolute logit per label (val_soft_tissue_*), and the training
+    and prediction seconds. Read the mask scanner''s 52 validation studies (MAGNETOM Avanto fit) apart from the
+    other 822. Adoption is by the runtime: strictly above the incumbent at both multipliers; say which side of
+    that rule the run falls on. One run is a starting point, never a verdict on a mechanism: for a run that was
+    not adopted list what it shares with the other runs that moved the same labels and name candidate causes;
+    do not write that a reference was lucky or that a difference is noise. Only then propose. The scope is exploiting
+    the soft-tissue masks better on the incumbent''s line: the map taught from the masks, the routing read from
+    it, the cell read B and how A and B are trained together (contract.md). B is worth what A lacks: an idea names
+    the fine local detail B gains and does not hand B evidence A already has. Each idea fills the parts of contract.md
+    (How a seed is written), is one training run with one mechanism, marks every claim as evidence-backed or a
+    guess, and cites its numbers from prior-work.md or a run; an idea that only measures is not allowed, so put
+    the measurement in what the run logs. Numbers set by hand come from a cited measurement on the masks or on
+    saved runs, never from a sweep on the validation labels. Start every implementation text with the sentence
+    ''Follow the environment paragraph of the developer instructions.'' and name the validation-only metrics that
+    prove the idea active. Open leads are at the end of prior-work.md. Out of bounds: everything in the contract''s
+    out-of-bounds list, among it new mask sets and masks predicted by a model, a loss on B''s own logit, B reading
+    other compartments, crops, views, image size, the backbone, changes to the bone routing, weight averaging,
+    reflection probabilities, gold-study weighting, per-run controls and confirmation or multi-seed runs. Cost
+    discipline: every idea states its expected training time against the incumbent and adds no training-step diagnostics.
+    Wider scope since 2026-10-11 (contract.md, section Wider scope): ideas may use the training bag, the model''s
+    own map as a cross-plane target, fold B into A or drop B, and combine earlier mechanisms; ''one mechanism
+    per run'' is lifted for bundles. Read results as the contract now says: per-label effects on the x1 AUC averaged
+    over epochs 6 to 10 together with x4, against the level and spread of the earlier runs in run-notes.md; one
+    run resolves about 0.0004 macro at x4. The nineteen earlier runs behave as retrainings of one model and B
+    adds nothing measurable on its five labels: do not propose another change to B''s routing, attention, projection
+    or readout alone.'

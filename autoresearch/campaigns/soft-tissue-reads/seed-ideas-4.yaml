@@ -1,0 +1,175 @@
+ideas:
+- id: bundle-area-normalised-attention-with-the-detail-adapter
+  mechanism_id: bundle
+  parent_idea_id: cell-attention-normalized-by-routed-area-per-view
+  title: Combine the per-view area normalisation of the cell read's attention with the block-detail adapter
+  opportunity: 'Evidence for the parts, guess for the sum. The two runs level with the incumbent at x4 are
+    run 16 (cell-attention-normalized-by-routed-area-per-view: x4 -0.00002, x1 +0.0007, ahead at all ten
+    epochs) and run 12 (cell-projection-with-a-coarse-block-detail-adapter: x4 -0.00006, x1 -0.0004). Their
+    per-label results at x4 are complementary. Run 16 gains Fracture +0.0064, ACL +0.0025, Contusion +0.0010
+    and loses Lateral Meniscus -0.0031, Lateral OA -0.0029, Medial OA -0.0026, with the largest cell-read
+    logit of the campaign (0.109 to 0.220 against 0.073 to 0.155). Run 12 gains MCL +0.0031 (the label that
+    falls by 0.003 or more in six of sixteen runs), ACL +0.0014, Medial OA +0.0005 and is level on Lateral
+    OA (-0.0003, where the sixteen runs average -0.0019), with the cell read unable to move the projection
+    the map uses. Guess, medium: together above the incumbent at both multipliers.'
+  mechanism: 'Two mechanisms of this campaign in one model, both exactly as their runs built them. (1) From
+    run 16: the cell read''s softmax weighs each cell by its routing measure divided by the detached total
+    routed measure of its view, q_i proportional to exp(s_i) * u_i / R_v, with the inherited floor, temperature,
+    own-compartment support, unrouted fallback and readout. (2) From run 12: the cell read''s features are
+    f_B = linear(h3, W_map.detach(), b_map.detach()) + R(d3), where d3 is h3 minus its valid-cell mean within
+    each aligned 2 by 2 third-stage block and R is a zero-initialised bias-free linear projection; the map
+    keeps training W_map. Nothing else changes.'
+  precedents:
+  - 'cell-attention-normalized-by-routed-area-per-view (run 16, rejected by 0.00002 at x4): source in outputs/autoresearch/soft-tissue-reads/experiments/cell-attention-normalized-by-routed-area-per-view-20261011T045006Z-adb2fc02/source
+    and changes.diff beside it.'
+  - 'cell-projection-with-a-coarse-block-detail-adapter (run 12, rejected, x4 -0.00006): source in outputs/autoresearch/soft-tissue-reads/experiments/cell-projection-with-a-coarse-block-detail-adapter-20261011T031329Z-0d2df0f2/source.'
+  novelty: First bundle of the campaign, allowed by the Bundles section of the contract; the two runs nearest
+    to the incumbent at x4.
+  coverage: Every routed study; the five soft-tissue labels, and the other seven through the shared path.
+  exploitation: 'Read all twelve labels against the incumbent at both multipliers, and against runs 12 and
+    16. Log on validation only the metrics the two parent runs logged: the attention mass the normalisation
+    moves per label (five), and the adapter feature scale (one). Shown wrong by: MCL and Lateral OA both below
+    their run-12 values while Fracture and ACL are below their run-16 values.'
+  budget: 'Within 1.03 of the incumbent''s training time: both parents trained in 1,545 s and 1,549 s against
+    1,599 s.'
+  implementation: 'Follow the environment paragraph of the developer instructions. Apply both parents'' reviewed
+    diffs to the incumbent; they touch different parts of _soft_tissue_pool (the features before the layer
+    norm, and the softmax). Files: modeling/model.py, modeling/spatial_tokens.py, training/lightning.py for
+    the six metrics. No option. Report on one batch that the logits equal the incumbent''s at initialisation
+    apart from the normalisation, and that with the adapter at zero the logits equal run 16''s formula. Apply
+    to the incumbent as assigned.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The two runs level with the incumbent, with per-label gains and losses that do not overlap.
+- id: bundle-attention-adapter-cell-zone-own-pf-reader-and-position
+  mechanism_id: bundle
+  parent_idea_id: cell-attention-normalized-by-routed-area-per-view
+  title: The best cell read with what is known - area-normalised attention, detail adapter, bone zone on the cells, PF OA's own reader and the cell position
+  opportunity: 'Evidence for the parts, guess for the sum. Across the sixteen runs the labels move with a
+    common signature against the incumbent (Lateral OA -0.0019 on average, MCL -0.0018, Lateral Meniscus -0.0013,
+    PF OA -0.0010, Medial OA -0.0010; Effusion +0.0007, ACL +0.0005), so a run''s own contribution is read against
+    that average. On that reading: run 16 (area normalisation) gives Fracture +0.0062 and ACL +0.0020 and the
+    best x1 (+0.0007); run 12 (detail adapter) gives MCL +0.0049 and Lateral OA +0.0016; run 7 (bone zone on
+    the cell grid) gives Medial OA +0.0023, PF OA +0.0018 and ACL +0.0021, with the zone overlap 0.750 against
+    0.533 for the copy; run 4 (PF OA''s own reader) gives PF OA +0.0014 and Lateral OA +0.0019, with the two
+    OA readouts ending unrelated (cosine -0.07); run 3 (cell position) gives Lateral Meniscus +0.0028 and Medial
+    Meniscus +0.0011 and was above the incumbent at x1 (+0.0004). Each part covers labels the others leave.
+    Guess, medium-low: the sum is above the incumbent at both multipliers.'
+  mechanism: 'Five mechanisms of this campaign in one model, each exactly as its run built it. (1) Run 16:
+    per-view area normalisation of the cell read''s softmax. (2) Run 12: the cell read''s features are the
+    map''s projection read with detached parameters plus the zero-initialised 2 by 2 block-detail adapter.
+    (3) Run 7: a zero-initialised bone-class head on the 14 by 14 cells taught from the bone targets at the
+    run''s loss weight; the OA routing reads its joint and kneecap-joint shares instead of the copy from
+    the 7 by 7 token. (4) Run 4: PF OA has its own attention and readout channel in the cell read, apart
+    from Medial and Lateral OA. (5) Run 3: each cell''s three-value position relative to its own structure''s
+    centre, through a zero-initialised linear layer per reader added to that reader''s tokens before the
+    layer norm; PF OA''s reader gets its own layer. The position is added after the adapter''s features.
+    The bone routing of Contusion and Fracture is unchanged.'
+  precedents:
+  - 'Sources under outputs/autoresearch/soft-tissue-reads/experiments/: cell-attention-normalized-by-routed-area-per-view-20261011T045006Z-adb2fc02,
+    cell-projection-with-a-coarse-block-detail-adapter-20261011T031329Z-0d2df0f2, bone-zone-taught-on-the-cell-grid-20261011T003842Z-fadcd542,
+    pf-oa-own-cell-reader-20261010T231515Z-c9fae9cf, cell-position-inside-the-structure-20261010T224740Z-30588502
+    (source and changes.diff in each).'
+  - 'Per-run results and diagnostics: run-notes.md, runs 3, 4, 7, 12 and 16.'
+  novelty: The largest bundle of the campaign, by the Bundles section of the contract.
+  coverage: Every routed study; all twelve labels.
+  exploitation: 'Read all twelve labels against the incumbent at both multipliers. Log on validation only
+    six metrics: the attention mass moved by the normalisation averaged over the five labels, the adapter
+    feature scale, the cell-grid zone overlap for the joint and for the kneecap joint, the cosine between
+    PF OA''s and the shared OA readout, and the mean norm of the position weights. Shown wrong by: a macro
+    AUC below run 16''s at both multipliers.'
+  budget: 'Within 1.05 of the incumbent''s training time: the five parents trained in 1,541 to 1,557 s against
+    1,599 s, and each adds one small head or layer.'
+  implementation: 'Follow the environment paragraph of the developer instructions. Start from run 16''s candidate
+    source and apply the other four reviewed diffs in this order: run 12, run 7, run 4, run 3; resolve overlaps
+    in _soft_tissue_pool and _soft_tissue_routing_weights by keeping every mechanism. Files: modeling/model.py,
+    modeling/spatial_tokens.py, training/anatomy.py and training/lightning.py as the parents used them. No
+    option. All new parameters zero-initialised under torch.random.fork_rng so the model starts as the incumbent
+    apart from the normalisation and the cell-grid zone. Report on one batch each parent''s own check. Apply
+    to the incumbent as assigned.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Every part has a measured effect on labels the other parts do not cover.
+- id: bundle-the-three-runs-ahead-at-one-image-multiplier
+  mechanism_id: bundle
+  parent_idea_id: cell-attention-normalized-by-routed-area-per-view
+  title: Combine the three runs that beat the incumbent at x1 - area-normalised attention, the cell read's own projection and the cell position
+  opportunity: 'Evidence for the parts, guess for the sum. Three of sixteen runs are above the incumbent at
+    x1: run 16 (area normalisation, +0.0007), run 3 (cell position, +0.0004) and run 9 (own third-stage projection
+    for the cell read, +0.0003); at x4 they are -0.00002, -0.0008 and -0.0002. All three let the cell read
+    say more: mean absolute logit on the menisci 0.153 and 0.172 (run 16), 0.105 and 0.109 (run 3), 0.134
+    and 0.158 (run 9) against 0.094 and 0.095. Run 9 is the only run of the sixteen with a clear gain on Lateral
+    OA (+0.0014; the sixteen average -0.0019), run 3 has the best Lateral Meniscus (+0.0015; average -0.0013),
+    and those two labels are run 16''s largest losses (-0.0029, -0.0031). Guess, medium-low: the x1 gains add
+    and the x4 result follows.'
+  mechanism: 'Three mechanisms of this campaign in one model, each exactly as its run built it. (1) Run 16:
+    per-view area normalisation of the cell read''s softmax. (2) Run 9: the cell read has its own projection
+    of the third stage, initialised as a copy of the map''s; the map keeps its own; nothing detached. (3)
+    Run 3: each cell''s three-value position relative to its own structure''s centre, through a zero-initialised
+    linear layer per reader added to that reader''s tokens before the layer norm.'
+  precedents:
+  - 'Sources under outputs/autoresearch/soft-tissue-reads/experiments/: cell-attention-normalized-by-routed-area-per-view-20261011T045006Z-adb2fc02,
+    cell-read-own-third-stage-projection-20261011T013527Z-3e8266ec, cell-position-inside-the-structure-20261010T224740Z-30588502.'
+  - 'Per-run results and diagnostics: run-notes.md, runs 3, 9 and 16.'
+  novelty: The free-projection alternative to the detail-adapter bundles; the three x1 winners together.
+  coverage: Every routed study; the five soft-tissue labels.
+  exploitation: 'Read all twelve labels against the incumbent at both multipliers. Log on validation only:
+    the attention mass moved by the normalisation averaged over the five labels, the cosine between the cell
+    read''s projection and the map''s, and the mean norm of the position weights. Shown wrong by: x1 below
+    run 16''s.'
+  budget: 'Within 1.03 of the incumbent''s training time: the parents trained in 1,549 to 1,557 s against
+    1,599 s.'
+  implementation: 'Follow the environment paragraph of the developer instructions. Start from run 16''s candidate
+    source and apply run 9''s and run 3''s reviewed diffs. Files: modeling/model.py, modeling/spatial_tokens.py,
+    training/lightning.py for the three metrics. No option. Report on one batch each parent''s own check.
+    Apply to the incumbent as assigned.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The only three runs ahead at x1, with complementary lateral labels.
+- id: bundle-fine-map-routing-a-fine-cartilage-read-with-area-normalised-attention
+  mechanism_id: bundle
+  parent_idea_id: soft-tissue-map-on-the-28-by-28-grid
+  title: Route the fine cartilage read by the map taught on the 28 by 28 grid, with area-normalised attention
+  opportunity: 'Evidence for the parts, guess for the sum. Run 5 (soft-tissue-map-on-the-28-by-28-grid) made
+    the map better on every class (overlap on the cells +0.06 to +0.08; 0.575 and 0.574 for the menisci on
+    the 28 by 28 grid itself) and gave Fracture +0.0049 and Medial Meniscus +0.0016, but its better map was
+    read only after averaging down to the 14 by 14 cells. Run 6 (oa-cartilage-read-from-second-stage-cells)
+    added a read of the 28 by 28 cells for the OA labels, the nearest forced seed to the incumbent at x4 (-0.0003,
+    MCL +0.0014, Medial OA +0.0007), but routed it by the 14 by 14 map repeated 2 by 2, so its routing was
+    no finer than the cell read''s. Run 15 tried a fine routing from a head on detached features and that
+    head did not learn (overlap 0.185). The fine read routed by a map that is taught on its own grid has
+    not run. Cartilage fills half a third-stage cell in 4 to 16% of its mass and half a second-stage cell
+    in 56 to 63% (88 mask knees). Run 16 adds the attention that was ahead at x1 through the whole training.
+    Guess, medium-low: +0.001 to +0.002 on the OA labels with run 5''s Fracture gain kept.'
+  mechanism: 'Three mechanisms of this campaign in one model. (1) Run 5 as built: the seven-class map is predicted
+    and taught on the 28 by 28 grid and averaged down to the 14 by 14 cells for the cell read''s routing.
+    (2) Run 6''s third read for the three OA labels on the 28 by 28 features, zero-started and added to A
+    + B, with one change: its cartilage rim is computed from the detached 28 by 28 map at its own resolution
+    (the same rim formula as the cell read, on the fine grid), not from the 14 by 14 rim repeated 2 by 2.
+    (3) Run 16: per-view area normalisation of the softmax, applied to the cell read and to the fine read.'
+  precedents:
+  - 'Sources under outputs/autoresearch/soft-tissue-reads/experiments/: soft-tissue-map-on-the-28-by-28-grid-20261010T234919Z-19922fc3,
+    oa-cartilage-read-from-second-stage-cells-20261011T001040Z-d69aece5, cell-attention-normalized-by-routed-area-per-view-20261011T045006Z-adb2fc02.'
+  - 'fine-cartilage-read-with-mask-guided-subcell-weights (run 15): the fine head on detached features did
+    not learn; do not reuse it.'
+  novelty: The first fine read routed by a map taught on the fine grid.
+  coverage: Every routed study; the three OA labels for the fine read, the five soft-tissue labels for the
+    rest.
+  exploitation: 'Read all twelve labels against the incumbent at both multipliers and against runs 5 and 6.
+    Log on validation only: the map overlap on the 28 by 28 grid averaged over the four cartilage classes,
+    the fine read''s mean absolute logit per OA label (three), the fine read''s effective open cells averaged
+    over the OA labels, and the attention mass moved by the normalisation averaged over the labels. Shown
+    wrong by: the three OA labels below run 6''s.'
+  budget: 'Within 1.08 of the incumbent''s training time: run 5 trained in 1,569 s and run 6 in 1,612 s against
+    1,599 s. Return blocked above 1.10.'
+  implementation: 'Follow the environment paragraph of the developer instructions. Start from run 5''s candidate
+    source, apply run 6''s reviewed diff with the routing change of the mechanism, then run 16''s. Compute
+    the fine rim once per forward pass and memoise it; the fine read and the cell read share the detached
+    map. Files: modeling/model.py, modeling/spatial_tokens.py, training/anatomy.py and training/lightning.py
+    as the parents used them. No option. Report on one batch that the fine read''s logit is zero at initialisation
+    and that its routing differs among the four sub-cells of a third-stage cell. Apply to the incumbent as
+    assigned.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The combination runs 5, 6 and 15 left untested, on the labels with the most measured room.
+exhausted_directions: ''

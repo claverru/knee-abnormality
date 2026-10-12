@@ -1,0 +1,35 @@
+ideas:
+- id: sagittal-fluid-detail-view-on-the-same-slices
+  mechanism_id: detail-view
+  parent_idea_id: null
+  title: Read each sagittal fluid slice a second time in a 64 mm box at 0.286 mm per pixel
+  opportunity: 'Evidence for the direction, guess for the gain. Sagittal fluid going from 0.417 to 0.375 mm
+    per pixel is the one effect that repeats in the view-size runs: +0.0014 to +0.0017 in eight run pairs.
+    Earlier second views lost because they took slices from the first view (-0.0027 and -0.0020); this one
+    reuses the first view''s slices. A 64 mm box holds both menisci, the joint zone and the notch. Guess,
+    low-medium: the menisci and ACL gain +0.001 to +0.003.'
+  mechanism: 'A second view row for the sagittal fluid series type: field 64 mm at 224 pixels (0.286 mm per
+    pixel), centred on the joint centre as the first view, sharing the first view''s slice picks so no slice
+    is added or taken. Its tokens are open only to Medial Meniscus, Lateral Meniscus, Medial OA, Lateral
+    OA, PF OA and ACL. It is excluded from the first look, from contrast mixing and from feature-statistics
+    mixing. The cell read and the maps treat it as any view.'
+  precedents:
+  - 'docs/validation/results: the view-size runs of 2026-10-10 (sagittal fluid 84 mm against 93 mm).'
+  - 'The earlier second sagittal fluid view (-0.0027) and the split fluid view (-0.0020): both divided the
+    slices.'
+  novelty: First detail view that adds pixels without taking slices; one plane, by the time range.
+  coverage: Every study with a sagittal fluid series (4,130 of 4,142 outside the mask scanner).
+  exploitation: 'Read the six labels that read the view against the incumbent at both multipliers. Log on
+    validation only the share of each of the six labels'' fourth-stage attention on the detail view (six
+    metrics). Shown wrong by: the view taking attention while the six labels do not rise.'
+  budget: 'About 1.19 of the incumbent''s training time (estimate): about five more images per study. Return
+    blocked above 1.22.'
+  implementation: 'Follow the environment paragraph of the developer instructions. Files: configs/training.yaml
+    (the view row), config.py, modeling/model.py and modeling/spatial_tokens.py for the label gate and the
+    exclusions, data/dataset.py and data/preprocessing/sampling.py for the shared slice picks. Views are
+    inside the campaign''s scope for this seed by the user''s decision of 2026-10-11. Report on one batch
+    that the two sagittal fluid views hold the same slices. Apply to the incumbent as assigned.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The one repeated resolution effect of the view-size line, applied without its known cost.
+exhausted_directions: ''

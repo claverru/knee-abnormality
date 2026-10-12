@@ -1,0 +1,113 @@
+--- a/src/knee_abnormality/modeling/model.py
++++ b/src/knee_abnormality/modeling/model.py
+@@ -31,7 +31,9 @@
+     SpatialTokens,
+     backbone_mapping,
+     backbone_mapping_identity,
++    cells_to_tokens,
+     feature_geometry,
++    tokens_to_cells,
+ )
+ from knee_abnormality.training.anatomy import MENISCUS_POINTS
+ 
+@@ -2073,12 +2075,12 @@
+                     meniscus_maps.flatten(2).transpose(1, 2).float()
+                 )
+                 deep = (
+-                    tokens.float()
+-                    .unflatten(1, (height, width))
+-                    .repeat_interleave(2, 1)
+-                    .repeat_interleave(2, 2)
+-                    [:, :fine_height, :fine_width]
+-                    .flatten(1, 2)
++                    tokens_to_cells(
++                        tokens.float().transpose(1, 2).unflatten(2, (height, width)),
++                        (fine_height, fine_width),
++                    )
++                    .flatten(2)
++                    .transpose(1, 2)
+                 )
+                 meniscus_scores = self.meniscus_head(meniscus_features + deep)
+                 meniscus_valid, meniscus_xy = feature_geometry(
+@@ -2106,15 +2108,11 @@
+                     "meniscus_token_steps": torch.cat(
+                         (steps[:, :2] * 0.5, steps[:, 2:]), 1
+                     ).detach(),
+-                    "meniscus_shares": F.avg_pool2d(
++                    "meniscus_shares": cells_to_tokens(
+                         meniscus_scores.detach()
+                         .softmax(-1)
+                         .transpose(1, 2)
+-                        .unflatten(2, (fine_height, fine_width)),
+-                        2,
+-                        2,
+-                        ceil_mode=True,
+-                        count_include_pad=False,
++                        .unflatten(2, (fine_height, fine_width))
+                     )
+                     .flatten(2)
+                     .transpose(1, 2),
+@@ -2339,13 +2337,15 @@
+                 )
+             )
+             zone = (
+-                encoded["anatomy_shares"]
+-                .float()[..., [JOINT_CLASS, JOINT_CLASS, KNEECAP_JOINT_CLASS]]
+-                .unflatten(1, ((side + 1) // 2, (side + 1) // 2))
+-                .repeat_interleave(2, 1)
+-                .repeat_interleave(2, 2)
+-                [:, :side, :side]
+-                .flatten(1, 2)
++                tokens_to_cells(
++                    encoded["anatomy_shares"]
++                    .float()[..., [JOINT_CLASS, JOINT_CLASS, KNEECAP_JOINT_CLASS]]
++                    .transpose(1, 2)
++                    .unflatten(2, ((side + 1) // 2, (side + 1) // 2)),
++                    (side, side),
++                )
++                .flatten(2)
++                .transpose(1, 2)
+             )
+             cartilage_weight = (
+                 torch.where(known, torch.maximum(rim, zone) * own, zone)
+--- a/src/knee_abnormality/modeling/spatial_tokens.py
++++ b/src/knee_abnormality/modeling/spatial_tokens.py
+@@ -1,4 +1,5 @@
+ import torch
++import torch.nn.functional as F
+ from timm.layers import to_2tuple
+ from timm.models._efficientnet_blocks import (
+     ConvBnAct,
+@@ -70,10 +71,10 @@
+ 
+ SPATIAL_TOKEN_IDENTITY = {
+     "bone_routing": "contusion_and_fracture_routed_by_each_tokens_detached_bone_map_share_of_femur_tibia_kneecap_and_fibula_unrouted_below_one_token",
+-    "soft_tissue_routing": "meniscus_and_oa_targets_keep_their_stride32_read_and_add_a_logit_read_from17x17_stride16_layer3_cells_own_layernorm_attention_256_128_2_and_zero_initialized_plane_contrast_readout_no_bias_no_position_prior_no_knee_level_term_seven_class_map_head_routing_weights_detached_menisci_core_at_one_over_32_of_knee_peak_grown_one_cell_weight_max_of_share_and_3x3_mean_kept_nearer_own_meniscus_centre_oa_cells_assigned_to_nearest_of_three_compartment_centres_own_cartilage_plus_assigned_femoral_cartilage_over_self_weighted_mean_share_capped_at_one_3x3_mean_max_with_bone_map_joint_or_kneecap_joint_share_of_parent_token_nearest_repeated9x9_trimmed_to17x17_bone_zone_alone_without_anchors_unrouted_below_one_cell",
++    "soft_tissue_routing": "meniscus_and_oa_targets_keep_their_stride32_read_and_add_a_logit_read_from17x17_stride16_layer3_cells_own_layernorm_attention_256_128_2_and_zero_initialized_plane_contrast_readout_no_bias_no_position_prior_no_knee_level_term_seven_class_map_head_routing_weights_detached_menisci_core_at_one_over_32_of_knee_peak_grown_one_cell_weight_max_of_share_and_3x3_mean_kept_nearer_own_meniscus_centre_oa_cells_assigned_to_nearest_of_three_compartment_centres_own_cartilage_plus_assigned_femoral_cartilage_over_self_weighted_mean_share_capped_at_one_3x3_mean_max_with_bone_map_joint_or_kneecap_joint_share_of_9x9_tokens_bilinear_align_corners_to17x17_cells_bone_zone_alone_without_anchors_unrouted_below_one_cell",
+     "algorithm": "all_valid_9x9_stride32_spatial_tokens_symmetric_0_to256px_in257px_crop_rotatable_knee_frame_attention_prior_side_routed_shared_channels_knee_level_term_v14_hard_octants_soft_gradient_own_routes_study_frames_and_landmarks_eighteen_regions_overlap_routed_reports_fixed_frame_own_position_hard_cuts_soft_gradient_knee_level_term_on_every_routed_channel_side_labels_keep_their_half_of_the_core_region_table_from_all_token_attention_synovitis_unrouted_per_study_centre_nod_and_sizes_roll_and_turn_shared_kneecap_region_front_above_the_lower_cut_frame_on_detached_bone_share_centroid_10mm_gaussian_near_anatomy_plane_spot_orientation_and_no_mass_fallback_eight_sections_three_tear_places_per_side_ring_sector_division",
+     "projection": "shared_linear_C_to_256",
+-    "meniscus_map": "independent_zero_initialized_linear_256_to_three_on17x17_stride16_layer3_projection_plus_nearest_repeated9x9_stride32_normalized_tokens_trimmed_to17x17_16px_target_footprint_four_by_four_target_samples_preserve_4px_quadrature_pitch_same_visual_validity_detached_probabilities_mean_of_available2x2_cells_per_stride32_token_last_row_or_column_two_cells_corner_one_cell",
++    "meniscus_map": "independent_zero_initialized_linear_256_to_three_on17x17_stride16_layer3_projection_plus_9x9_stride32_normalized_tokens_bilinear_align_corners_to17x17_16px_target_footprint_four_by_four_target_samples_preserve_4px_quadrature_pitch_same_visual_validity_detached_probabilities_quarter_half_quarter_per_axis_over_the_three_cells_centred_on_each_stride32_token_renormalized_at_borders",
+     "token": "projection_plus_plane_contrast_and_detail_view_embeddings_layernorm_two_versions_own_channels_plus_fixed_sinusoid_of_detached_knee_frame_position_42_wavelengths_8_to_512_per_axis_zero_without_fitted_center_shared_channels_position_free",
+     "initialization_rng": "side_head_position_prior_up_width_and_knee_level_scale_parameters_forked_removed_position_draw_count_and_target_sized_scorer_and_readout_draws_preserve_training_stream_meniscus_stride16_projection_and_head_forked",
+     "view_policy": "sagittal_fluid_second_73.428571mm_view_reuses_first_view_exact_slice_selection_and_budget_excluded_from_first_look_shared_patient_shift_jitter_and_turn_configured_fixed_fields_and_slice_counts_all_six_views_shift_turn_scale_detached_single_eval_central257_first_look_multiplier_one_scale_sqrt_medial_bone_sd_times_front_femur_sd_over17.087_clamp0.87_to1.13_zero_mass_one_sagittal_coronal_incumbent_centres_and12deg_turn_axial_center_midpoint_femur_share5th_front_minus30mm_kneecap_share95th_front_frame_medial_zero_projected_medial_axis20deg_turn_shift18mm_sagittal_coronal8mm_axial_rounded_pixels_training_jitter3deg3mm_all_views_side_per_series_in_split_studies",
+@@ -96,6 +97,19 @@
+ }
+ 
+ 
++def cells_to_tokens(values: torch.Tensor) -> torch.Tensor:
++    kernel = values.new_tensor([0.25, 0.5, 0.25])
++    kernel = (kernel[:, None] * kernel)[None, None]
++    cells = values.flatten(0, 1)[:, None]
++    total = F.conv2d(cells, kernel, stride=2, padding=1)
++    weight = F.conv2d(torch.ones_like(cells[:1]), kernel, stride=2, padding=1)
++    return (total / weight)[:, 0].unflatten(0, values.shape[:2])
++
++
++def tokens_to_cells(values: torch.Tensor, shape: tuple[int, int]) -> torch.Tensor:
++    return F.interpolate(values, size=shape, mode="bilinear", align_corners=True)
++
++
+ def backbone_mapping_identity(name: str) -> dict:
+     if name not in BACKBONE_MAPPINGS:
+         raise ValueError(f"Unsupported spatial feature mapping for backbone: {name}")

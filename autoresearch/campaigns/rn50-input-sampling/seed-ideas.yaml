@@ -1,0 +1,126 @@
+ideas:
+- id: aligned-contrast-mixing
+  mechanism_id: contrast-mixing
+  parent_idea_id: null
+  title: Align the donor contrast to the target before contrast mixing blends them
+  opportunity: 'The user''s seed (2026-10-11): a known bug whose fix never paid on the ResNet-18 and has never been
+    tried on the ResNet-50. Contrast mixing (probability 0.3) blends the two contrasts of a plane pixel for pixel
+    although the two series lie on different grids. On the ResNet-18 the aligned donor scored -0.0008 at x4 and
+    the aligned and feathered blend -0.0011 (fixes-and-removals, F02, 2026-10-05); the mixing itself is worth keeping
+    (off: -0.0025). The changes that reached the ResNet-50 are the ones that make the input more faithful or more
+    informative (prior-work.md); a blend of two misregistered images is an unfaithful input the larger backbone
+    may be able to exploit less or be hurt by more. Guess, low-medium: +0 to +0.001 macro.'
+  mechanism: 'In contrast mixing the donor image is resampled onto the target image''s grid in patient coordinates
+    before the blend, as the reviewed candidate contrast-mixing-aligned-donor-requeue did: the donor slice nearest
+    in position to the target slice is taken, mapped through the two series'' patient transforms onto the target''s
+    pixel grid, and pixels the donor does not cover keep the target''s value. Probability, weight range and eligibility
+    are unchanged. The 64 mm detail view stays outside contrast mixing as in the incumbent.'
+  precedents:
+  - 'fixes-and-removals, F02: outputs/autoresearch/fixes-and-removals/experiments/contrast-mixing-aligned-donor-requeue-20261005T130844Z-22da8214
+    (source and changes.diff); the posed crops of 2026-10-07 changed the pair''s geometry since, so port the mechanism
+    onto the current augmentation code, do not copy the file.'
+  novelty: First run of the aligned donor on the ResNet-50 and on the posed-crop recipe.
+  coverage: Every study with both contrasts of a plane; all labels.
+  exploitation: 'Read the macro and the eight larger labels against the incumbent at both multipliers and on the
+    x1 mean of epochs 6 to 10. Activation: the existing training metric of contrast-mixing activity stays as it
+    is, plus one training-side scalar already computed by the mechanism, the mean absolute difference between the
+    aligned and the unaligned donor on mixed images, logged through the epoch-metric path (one metric). Shown wrong
+    by: the macro below the incumbent at both multipliers with the eight larger labels down as a group.'
+  budget: 'Within 1.03 of the reference''s training time: one resampling of the donor on the GPU for 30% of the
+    eligible images.'
+  implementation: 'Follow the environment paragraph of the developer instructions. Files: modeling/augmentation.py,
+    modeling/model.py where the mixing is called, modeling/spatial_tokens.py for the identity string. Keep the resampling
+    on the GPU inside the existing augmentation pass, with no host synchronisation. No option: the unaligned blend
+    is removed. Report on two studies that a donor aligned to itself reproduces the image and that the blend weight
+    is unchanged. Apply to the incumbent as assigned.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user's seed; a correction to what the input shows the model, the class of change that
+    reached the ResNet-50.
+- id: centred-token-grid-by-last-stage-phase
+  mechanism_id: token-grid
+  parent_idea_id: null
+  title: Centre the 7 by 7 token grid in the 224 px crop by shifting the last stage's sampling phase
+  opportunity: 'The user''s seed (2026-10-11). At 224 px the tokens of the last stage are centred at pixels 0, 32,
+    ..., 192: 15.5 px up and left of the crop centre where the knee is placed (5.8 mm on the 84 mm views, 6.5 on
+    the 93 mm, 8.3 on the 120 mm), with a token on the left and top borders and none within 31 px of the right and
+    bottom. Left and right knees are read differently (MCL puts 58 to 61% of its coronal medial-edge attention for
+    one image side and 21 to 22% for the other, 3,517 studies), and border tokens are valid 60% of the time in training
+    and always at prediction. Centring the grid by a larger image was level on the ResNet-18 (257 px: -0.0004 and
+    -0.0005 at x4 at 1.2 of the time). The same centring is available at 224 px with no extra compute: the third
+    stage has 14 positions at 0, 16, ..., 208, and keeping the odd ones puts the tokens at 16, 48, ..., 208, with
+    16 and 15 px of margin. Never tried on either backbone. Guess, low-medium: +0 to +0.001 macro, MCL and the side-dependent
+    labels first.'
+  mechanism: 'In the first block of the backbone''s last stage (a bottleneck in resnet50.a1_in1k: 3 by 3 convolution
+    with stride 2 and padding 1; shortcut 1 by 1 convolution with stride 2) the stride-2 sampling starts at the
+    second position instead of the first. The 3 by 3 convolution runs with padding 0 on its input padded by (0,
+    2) on the right and bottom, so output i covers inputs 2i to 2i+2 and is centred at 2i+1; the shortcut convolution
+    reads its input from the second row and column on. Pretrained weights are loaded unchanged. The last-stage spatial
+    mapping becomes origin 16 px, stride 32 px, and every consumer of token positions (validity, patient positions,
+    regions, the bone map on the tokens and its targets, the copy of maps between the 14 by 14 cells and the 7 by
+    7 tokens) follows that mapping: token k now sits over cells 2k+1 and 2k+2 minus half a cell, so the cell-to-token
+    pooling of the maps and of the routing takes the 2 by 2 block of cells (2k, 2k+1) to (2k+1, 2k+2) centred on
+    the token, edge blocks clipped. The third stage and its 14 by 14 cells are unchanged.'
+  precedents:
+  - 'docs/validation/results/2026-10-08-token-grid-alignment.md: the grid at 224 px and the 225 and 257 px runs.'
+  - prior-work.md, The token grid at 224 px.
+  novelty: First centred grid at 224 px; no change of image size or compute.
+  coverage: Every image; all labels.
+  exploitation: 'Read the macro, MCL and the eight larger labels against the incumbent at both multipliers. Log
+    on validation only: the share of tokens that are valid in the first and in the last row and column (two metrics;
+    equal after the change), and the mean distance in mm between the grid centre and the posed knee centre (one
+    metric, near zero after the change). Shown wrong by: those diagnostics unchanged, or the macro below the incumbent
+    at both multipliers.'
+  budget: 'The reference''s training time: the same number of tokens and convolutions.'
+  implementation: 'Follow the environment paragraph of the developer instructions. Files: modeling/model.py (the
+    backbone wrapper and every use of the last-stage mapping), modeling/spatial_tokens.py (BACKBONE_MAPPINGS and
+    the cell-to-token relations, identity strings), training/anatomy.py and training/lightning.py only where they
+    assume origin 0. Do not edit the timm model class: wrap the first block of the last stage. No option. Report
+    on synthetic inputs that an impulse at pixel (112, 112) peaks at the central token, that the output is 7 by
+    7, and that the centres are 16 + 32k. Apply to the incumbent as assigned.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user's seed; fixes the offset and the uneven borders at no cost.
+- id: centred-token-grid-at-257-px
+  mechanism_id: token-grid
+  parent_idea_id: null
+  title: Feed 257 px images, where the token grid is symmetric, keeping the pixel sizes
+  opportunity: 'The user''s seed (2026-10-11): the second known bug whose fix did not pay on the ResNet-18, untried
+    on the ResNet-50. A symmetric grid exists at image sizes of 32k + 1. On the ResNet-18 two 257 px runs with the
+    pixel sizes kept matched the 224 px recipe (9 by 9 tokens -0.0004, inner 7 by 7 -0.0005 at x4; both 0.954 public
+    against 0.954) at 1.2 of the training time; 225 px lost 0.0024 for a reason not established. At 257 px with
+    the pixel sizes kept each view also shows 15% more field per side, which is acquired anatomy the crops cut today
+    (prior-work.md: crops hold 28 to 34% of the stored field in coronal and sagittal). Guess, low-medium: +0 to
+    +0.0015 macro on the ResNet-50.'
+  mechanism: 'data.image_size 257 with every view''s mm per pixel unchanged (each field_mm multiplied by 257/224,
+    reference_field_mm likewise), 9 by 9 tokens of the last stage all counted and 17 by 17 cells of the third stage,
+    as the run rn18-257-full-9x9-report-loss-off did. Canvas and margins follow the image size by the recipe''s
+    own rule. Nothing else changes. The copies between the two grids are exact for token k on cell 2k, as the user
+    ordered on 2026-10-11 after a review found the first candidate''s copies half a cell (8 px) off and not mirror-symmetric:
+    tokens to cells by bilinear interpolation with aligned corners, cells to tokens by weights 1/4, 1/2, 1/4 per
+    axis on cells 2k-1, 2k, 2k+1 renormalised at the borders (functions tokens_to_cells and cells_to_tokens of exact-grid-transfers-257.diff
+    in the campaign directory, at the three sites that diff changes).'
+  precedents:
+  - 'outputs/training/rn18-257-full-9x9-report-loss-off (source_snapshot.zip, effective_config.json): the ResNet-18
+    run to follow for what a 257 px image needs in the code.'
+  - docs/validation/results/2026-10-08-token-grid-alignment.md.
+  novelty: First 257 px run on the ResNet-50; the only seed allowed to change the image size.
+  coverage: Every image; all labels.
+  exploitation: 'Read the macro and all labels against the incumbent at both multipliers, with the training seconds
+    and the peak GPU memory. Activation: the logged number of tokens per image at validation (81) through the existing
+    epoch-metric path (one metric). Shown wrong by: the macro below the incumbent at both multipliers.'
+  budget: 'The user''s exception of 2026-10-12 for this seed: training time up to 1.35 of the reference''s (3,578
+    s, the sealed ceiling since then) and peak GPU memory up to the card''s 24 GB. Estimate calibrated on the 224
+    and 225 px ResNet-50 runs: 3,407 s and 22.7 GB. Do not block on cost inside those figures.'
+  implementation: 'Follow the environment paragraph of the developer instructions. Files: configs/training.yaml
+    (image_size, field_mm of every view, reference_field_mm), and whatever the 257 px ResNet-18 snapshot changed
+    in modeling/ and data/ for the token and cell counts. No option. Report from the config model the mm per pixel
+    of every view before and after (equal) and the token and cell counts. Apply to the incumbent as assigned. Start
+    from the first candidate''s frozen source (outputs/autoresearch/rn50-input-sampling/experiments/centred-token-grid-at-257-px-20261011T202734Z-5b8edc1d/source,
+    its changes.diff) and apply autoresearch/campaigns/rn50-input-sampling/exact-grid-transfers-257.diff, which
+    was written against it; port both onto the incumbent you are assigned. Report on synthetic tensors that a position
+    ramp is reproduced exactly by tokens_to_cells on all 17 cells and that a mirrored input gives a mirrored output.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user's seed.
+exhausted_directions: ''

@@ -1,0 +1,1405 @@
+revision: 308
+ideas:
+- id: aligned-contrast-mixing
+  mechanism_id: contrast-mixing
+  parent_idea_id: null
+  title: Align the donor contrast to the target before contrast mixing blends them
+  opportunity: 'The user''s seed (2026-10-11): a known bug whose fix never paid on
+    the ResNet-18 and has never been tried on the ResNet-50. Contrast mixing (probability
+    0.3) blends the two contrasts of a plane pixel for pixel although the two series
+    lie on different grids. On the ResNet-18 the aligned donor scored -0.0008 at x4
+    and the aligned and feathered blend -0.0011 (fixes-and-removals, F02, 2026-10-05);
+    the mixing itself is worth keeping (off: -0.0025). The changes that reached the
+    ResNet-50 are the ones that make the input more faithful or more informative (prior-work.md);
+    a blend of two misregistered images is an unfaithful input the larger backbone
+    may be able to exploit less or be hurt by more. Guess, low-medium: +0 to +0.001
+    macro.'
+  mechanism: 'In contrast mixing the donor image is resampled onto the target image''s
+    grid in patient coordinates before the blend, as the reviewed candidate contrast-mixing-aligned-donor-requeue
+    did: the donor slice nearest in position to the target slice is taken, mapped
+    through the two series'' patient transforms onto the target''s pixel grid, and
+    pixels the donor does not cover keep the target''s value. Probability, weight
+    range and eligibility are unchanged. The 64 mm detail view stays outside contrast
+    mixing as in the incumbent.'
+  precedents:
+  - 'fixes-and-removals, F02: outputs/autoresearch/fixes-and-removals/experiments/contrast-mixing-aligned-donor-requeue-20261005T130844Z-22da8214
+    (source and changes.diff); the posed crops of 2026-10-07 changed the pair''s geometry
+    since, so port the mechanism onto the current augmentation code, do not copy the
+    file.'
+  novelty: First run of the aligned donor on the ResNet-50 and on the posed-crop recipe.
+  coverage: Every study with both contrasts of a plane; all labels.
+  exploitation: 'Read the macro and the eight larger labels against the incumbent
+    at both multipliers and on the x1 mean of epochs 6 to 10. Activation: the existing
+    training metric of contrast-mixing activity stays as it is, plus one training-side
+    scalar already computed by the mechanism, the mean absolute difference between
+    the aligned and the unaligned donor on mixed images, logged through the epoch-metric
+    path (one metric). Shown wrong by: the macro below the incumbent at both multipliers
+    with the eight larger labels down as a group.'
+  budget: 'Within 1.03 of the reference''s training time: one resampling of the donor
+    on the GPU for 30% of the eligible images.'
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    Files: modeling/augmentation.py, modeling/model.py where the mixing is called,
+    modeling/spatial_tokens.py for the identity string. Keep the resampling on the
+    GPU inside the existing augmentation pass, with no host synchronisation. No option:
+    the unaligned blend is removed. Report on two studies that a donor aligned to
+    itself reproduces the image and that the blend weight is unchanged. Apply to the
+    incumbent as assigned.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user's seed; a correction to what the input shows the model,
+    the class of change that reached the ResNet-50.
+  status: completed
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality-soft-tissue-masks/autoresearch/campaigns/rn50-input-sampling/seed-ideas.yaml
+  experiments:
+  - aligned-contrast-mixing-20261011T193029Z-8b3ae1ca
+  - aligned-contrast-mixing-20261011T193748Z-9f6912be
+  decision: provisional_accept
+- id: centred-token-grid-by-last-stage-phase
+  mechanism_id: token-grid
+  parent_idea_id: null
+  title: Centre the 7 by 7 token grid in the 224 px crop by shifting the last stage's
+    sampling phase
+  opportunity: 'The user''s seed (2026-10-11). At 224 px the tokens of the last stage
+    are centred at pixels 0, 32, ..., 192: 15.5 px up and left of the crop centre
+    where the knee is placed (5.8 mm on the 84 mm views, 6.5 on the 93 mm, 8.3 on
+    the 120 mm), with a token on the left and top borders and none within 31 px of
+    the right and bottom. Left and right knees are read differently (MCL puts 58 to
+    61% of its coronal medial-edge attention for one image side and 21 to 22% for
+    the other, 3,517 studies), and border tokens are valid 60% of the time in training
+    and always at prediction. Centring the grid by a larger image was level on the
+    ResNet-18 (257 px: -0.0004 and -0.0005 at x4 at 1.2 of the time). The same centring
+    is available at 224 px with no extra compute: the third stage has 14 positions
+    at 0, 16, ..., 208, and keeping the odd ones puts the tokens at 16, 48, ..., 208,
+    with 16 and 15 px of margin. Never tried on either backbone. Guess, low-medium:
+    +0 to +0.001 macro, MCL and the side-dependent labels first.'
+  mechanism: 'In the first block of the backbone''s last stage (a bottleneck in resnet50.a1_in1k:
+    3 by 3 convolution with stride 2 and padding 1; shortcut 1 by 1 convolution with
+    stride 2) the stride-2 sampling starts at the second position instead of the first.
+    The 3 by 3 convolution runs with padding 0 on its input padded by (0, 2) on the
+    right and bottom, so output i covers inputs 2i to 2i+2 and is centred at 2i+1;
+    the shortcut convolution reads its input from the second row and column on. Pretrained
+    weights are loaded unchanged. The last-stage spatial mapping becomes origin 16
+    px, stride 32 px, and every consumer of token positions (validity, patient positions,
+    regions, the bone map on the tokens and its targets, the copy of maps between
+    the 14 by 14 cells and the 7 by 7 tokens) follows that mapping: token k now sits
+    over cells 2k+1 and 2k+2 minus half a cell, so the cell-to-token pooling of the
+    maps and of the routing takes the 2 by 2 block of cells (2k, 2k+1) to (2k+1, 2k+2)
+    centred on the token, edge blocks clipped. The third stage and its 14 by 14 cells
+    are unchanged.'
+  precedents:
+  - 'docs/validation/results/2026-10-08-token-grid-alignment.md: the grid at 224 px
+    and the 225 and 257 px runs.'
+  - prior-work.md, The token grid at 224 px.
+  novelty: First centred grid at 224 px; no change of image size or compute.
+  coverage: Every image; all labels.
+  exploitation: 'Read the macro, MCL and the eight larger labels against the incumbent
+    at both multipliers. Log on validation only: the share of tokens that are valid
+    in the first and in the last row and column (two metrics; equal after the change),
+    and the mean distance in mm between the grid centre and the posed knee centre
+    (one metric, near zero after the change). Shown wrong by: those diagnostics unchanged,
+    or the macro below the incumbent at both multipliers.'
+  budget: 'The reference''s training time: the same number of tokens and convolutions.'
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    Files: modeling/model.py (the backbone wrapper and every use of the last-stage
+    mapping), modeling/spatial_tokens.py (BACKBONE_MAPPINGS and the cell-to-token
+    relations, identity strings), training/anatomy.py and training/lightning.py only
+    where they assume origin 0. Do not edit the timm model class: wrap the first block
+    of the last stage. No option. Report on synthetic inputs that an impulse at pixel
+    (112, 112) peaks at the central token, that the output is 7 by 7, and that the
+    centres are 16 + 32k. Apply to the incumbent as assigned.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user's seed; fixes the offset and the uneven borders at
+    no cost.
+  status: blocked
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality-soft-tissue-masks/autoresearch/campaigns/rn50-input-sampling/seed-ideas.yaml
+  experiments:
+  - centred-token-grid-by-last-stage-phase-20261011T194042Z-2dc075ca
+  blocked_reason: 'Aborted by the user at epoch 5 on 2026-10-11 22:55 CEST: superseded
+    by centred-token-grid-by-phase-exact-copies'
+- id: centred-token-grid-at-257-px
+  mechanism_id: token-grid
+  parent_idea_id: null
+  title: Feed 257 px images, where the token grid is symmetric, keeping the pixel
+    sizes
+  opportunity: 'The user''s seed (2026-10-11): the second known bug whose fix did
+    not pay on the ResNet-18, untried on the ResNet-50. A symmetric grid exists at
+    image sizes of 32k + 1. On the ResNet-18 two 257 px runs with the pixel sizes
+    kept matched the 224 px recipe (9 by 9 tokens -0.0004, inner 7 by 7 -0.0005 at
+    x4; both 0.954 public against 0.954) at 1.2 of the training time; 225 px lost
+    0.0024 for a reason not established. At 257 px with the pixel sizes kept each
+    view also shows 15% more field per side, which is acquired anatomy the crops cut
+    today (prior-work.md: crops hold 28 to 34% of the stored field in coronal and
+    sagittal). Guess, low-medium: +0 to +0.0015 macro on the ResNet-50.'
+  mechanism: 'data.image_size 257 with every view''s mm per pixel unchanged (each
+    field_mm multiplied by 257/224, reference_field_mm likewise), 9 by 9 tokens of
+    the last stage all counted and 17 by 17 cells of the third stage, as the run rn18-257-full-9x9-report-loss-off
+    did. Canvas and margins follow the image size by the recipe''s own rule. Nothing
+    else changes. The copies between the two grids are exact for token k on cell 2k,
+    as the user ordered on 2026-10-11 after a review found the first candidate''s
+    copies half a cell (8 px) off and not mirror-symmetric: tokens to cells by bilinear
+    interpolation with aligned corners, cells to tokens by weights 1/4, 1/2, 1/4 per
+    axis on cells 2k-1, 2k, 2k+1 renormalised at the borders (functions tokens_to_cells
+    and cells_to_tokens of exact-grid-transfers-257.diff in the campaign directory,
+    at the three sites that diff changes).'
+  precedents:
+  - 'outputs/training/rn18-257-full-9x9-report-loss-off (source_snapshot.zip, effective_config.json):
+    the ResNet-18 run to follow for what a 257 px image needs in the code.'
+  - docs/validation/results/2026-10-08-token-grid-alignment.md.
+  novelty: First 257 px run on the ResNet-50; the only seed allowed to change the
+    image size.
+  coverage: Every image; all labels.
+  exploitation: 'Read the macro and all labels against the incumbent at both multipliers,
+    with the training seconds and the peak GPU memory. Activation: the logged number
+    of tokens per image at validation (81) through the existing epoch-metric path
+    (one metric). Shown wrong by: the macro below the incumbent at both multipliers.'
+  budget: 'The user''s exception of 2026-10-12 for this seed: training time up to
+    1.35 of the reference''s (3,578 s, the sealed ceiling since then) and peak GPU
+    memory up to the card''s 24 GB. Estimate calibrated on the 224 and 225 px ResNet-50
+    runs: 3,407 s and 22.7 GB. Do not block on cost inside those figures.'
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    Files: configs/training.yaml (image_size, field_mm of every view, reference_field_mm),
+    and whatever the 257 px ResNet-18 snapshot changed in modeling/ and data/ for
+    the token and cell counts. No option. Report from the config model the mm per
+    pixel of every view before and after (equal) and the token and cell counts. Apply
+    to the incumbent as assigned. Start from the first candidate''s frozen source
+    (outputs/autoresearch/rn50-input-sampling/experiments/centred-token-grid-at-257-px-20261011T202734Z-5b8edc1d/source,
+    its changes.diff) and apply autoresearch/campaigns/rn50-input-sampling/exact-grid-transfers-257.diff,
+    which was written against it; port both onto the incumbent you are assigned. Report
+    on synthetic tensors that a position ramp is reproduced exactly by tokens_to_cells
+    on all 17 cells and that a mirrored input gives a mirrored output.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user's seed.
+  status: blocked
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality-soft-tissue-masks/autoresearch/campaigns/rn50-input-sampling/seed-ideas.yaml
+  experiments:
+  - centred-token-grid-at-257-px-20261011T202734Z-5b8edc1d
+  - centred-token-grid-at-257-px-20261011T215514Z-01cbbefb
+  - centred-token-grid-at-257-px-20261011T224452Z-17a93a62
+  blocked_reason: 'Trained ten epochs (x1 0.924376); the memory guard killed the run
+    at the start of its x4 prediction on 2026-10-12 01:47 CEST. The keeper ran the
+    x4 prediction on its own: 0.933649, -0.001621 against the incumbent. Not adopted;
+    see run-notes.md.'
+- id: sagittal-fluid-ten-distinct-slices
+  mechanism_id: slice-budget
+  parent_idea_id: null
+  title: Give sagittal fluid ten distinct slices in place of five slices and five
+    magnified copies
+  opportunity: 'Measured (prior-work.md): the 64 mm detail view is finer than both
+    acquired axes in 98% of 4,192 sagittal fluid series, so 16% of the reference''s
+    images re-present pixels the wide view has; a training bag reads 21% of a sagittal
+    fluid series'' slice positions with 18.5 mm between picks against an acquired
+    step of 3.3 mm; on the ResNet-50 x4 over x1 is +0.0081. Precedents on the ResNet-18:
+    study_slice_total 26 to 36 gave +0.0018; slices without gradient lost (run 23),
+    so the new slices take gradient. The detail view did not reach the ResNet-50 (x4
+    0.933292 against 0.933265 without it). Guess, medium: +0.0005 to +0.0015 macro
+    from ACL, Lateral Meniscus, Lateral OA, Contusion and MCL.'
+  mechanism: Configuration only. The sagittal fluid series type has one view (84 mm)
+    with slices 10 instead of two views with 5 shared slices; data.study_slice_total
+    31 instead of 26. Images per study stay at about 31.8 in training; at x4 sagittal
+    fluid is read whole (about 110.7 images against 123).
+  precedents:
+  - 'docs/validation/results: study_slice_total 26 to 36 on the ResNet-18 (+0.0018).'
+  - soft-tissue reads run notes, runs 23 and 29 to 32.
+  novelty: First slice-count run on the ResNet-50; same image count as the reference.
+  coverage: Every study with a sagittal fluid series.
+  exploitation: 'Read all labels against the incumbent at both multipliers and the
+    size of the step from x1 to x4, which should shrink. Activation: the logged mean
+    number of sagittal fluid images per study in training through the existing view
+    logs (one metric, about 10). Shown wrong by: x4 not above the incumbent by more
+    than 0.0005 and the x1 to x4 step unchanged.'
+  budget: About 1.04 of the reference's training time (five more distinct slices take
+    the first look); GPU 16.5 GB; RAM as the reference.
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    Files: configs/training.yaml only, unless removing the second view leaves code
+    that assumes it (then remove that code, no option). Report the images per study
+    from the loader on two studies. Apply to the incumbent as assigned.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The largest measured loss of acquired information, at the reference's
+    cost.
+  status: blocked
+  created_revision: 1
+  seeded: /home/claudio/src/knee-abnormality-soft-tissue-masks/autoresearch/campaigns/rn50-input-sampling/seed-ideas-2.yaml
+  ranking_rationale: "Block and park the 257 px seed at its own implementation review.\
+    \ Its declared estimate gate requires blocking above 1.25\xD7 reference training\
+    \ time or 22 GB. The ResNet-50-calibrated estimates are 3406.58 seconds versus\
+    \ the 3312.747-second ceiling and 22.679 GB versus 22 GB. No compliant bounded\
+    \ repair is established. Correct the rejected report's ranking by explicitly listing\
+    \ every remaining live queue entry exactly once, preserving their supplied relative\
+    \ order."
+  experiments:
+  - sagittal-fluid-ten-distinct-slices-20261011T235637Z-498f4d27
+  - sagittal-fluid-ten-distinct-slices-20261012T000132Z-a0129087
+  blocked_reason: 'Trained ten epochs (x1 0.931363 at epoch 9, +0.003087 against the
+    incumbent); the memory guard killed the run in its x4 prediction on 2026-10-12
+    03:30 CEST. The keeper ran the x4 prediction on its own: 0.935225, -0.000044 against
+    the incumbent. Not above the incumbent at x4; see run-notes.md.'
+- id: axial-fluid-kneecap-tile-at-native-pixels
+  mechanism_id: native-tile
+  parent_idea_id: null
+  title: Move the shared-slice second view to axial fluid as a 100 mm tile on the
+    kneecap
+  opportunity: 'Measured (prior-work.md): axial fluid at 120 mm keeps the finer acquired
+    axis in 35% of 4,474 series and at 100 mm in 85%; that axis runs front to back,
+    across the patellar cartilage. Axial fluid is PF OA''s primary plane with the
+    coarsest cells of the recipe (8.6 mm). Precedent on the ResNet-18: an 84 mm patellofemoral
+    axial view gave PF OA +0.0027 and macro -0.0013, the loss on the labels that lost
+    the three slices it took; a view on shared slices takes none. This is the detail-view
+    mechanism on the one type where magnifying adds acquired detail. Guess, medium-low:
+    PF OA +0.002 to +0.004, Effusion and Synovitis up to +0.002, macro +0.0003 to
+    +0.0008.'
+  mechanism: 'The second view on shared slices belongs to axial fluid instead of sagittal
+    fluid: sagittal fluid keeps its 84 mm view alone; axial fluid gets a second view
+    of field 100 mm reusing the first view''s slices, pose turn and augmentation draws.
+    Its centre is the kneecap front point the first look already computes for axial
+    views (axial_front_center: kneecap and femur shares), with its shift limit raised
+    from 8 mm to what the 368 px canvas allows. Its tokens are open only to PF OA,
+    Effusion and Synovitis; it stays out of the first look and of contrast mixing
+    and feature-statistics mixing, as the detail view is.'
+  precedents:
+  - The incumbent's detail-view code (view_sources in config.py, detail_target_allowed
+    in modeling/model.py).
+  - 'docs/validation/results: the 84 mm patellofemoral axial view.'
+  novelty: The cleanest test of native pixels against magnification.
+  coverage: Every study with an axial fluid series; PF OA, Effusion, Synovitis.
+  exploitation: 'Read PF OA, Effusion, Synovitis and the macro against the incumbent
+    at both multipliers. Log on validation only the share of each of the three labels''
+    attention on the tile (three metrics). Shown wrong by: PF OA not up by 0.002 while
+    the tile holds more than 5% of its attention.'
+  budget: About 1.04 of the reference's training time (33.3 images per study, 127.8
+    at x4); GPU about 17.3 GB.
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    Files: configs/training.yaml, config.py (view_sources), modeling/model.py (the
+    gate list, the tile''s centre and shift limit), modeling/spatial_tokens.py for
+    identity strings, training/lightning.py for the three metrics. No option. Report
+    on two studies that the two axial fluid views hold the same slices and where the
+    tile is centred. Apply to the incumbent as assigned.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Tests the campaign's hypothesis directly on the label with the
+    clearest precedent.
+  status: completed
+  created_revision: 1
+  seeded: /home/claudio/src/knee-abnormality-soft-tissue-masks/autoresearch/campaigns/rn50-input-sampling/seed-ideas-2.yaml
+  ranking_rationale: "Block and park the 257 px seed at its own implementation review.\
+    \ Its declared estimate gate requires blocking above 1.25\xD7 reference training\
+    \ time or 22 GB. The ResNet-50-calibrated estimates are 3406.58 seconds versus\
+    \ the 3312.747-second ceiling and 22.679 GB versus 22 GB. No compliant bounded\
+    \ repair is established. Correct the rejected report's ranking by explicitly listing\
+    \ every remaining live queue entry exactly once, preserving their supplied relative\
+    \ order."
+  experiments:
+  - axial-fluid-kneecap-tile-at-native-pixels-20261012T004328Z-6863e5e9
+  decision: reject
+- id: one-more-slice-on-every-series-type
+  mechanism_id: slice-budget
+  parent_idea_id: null
+  title: Spread the detail view's five images as one more slice on every series type
+  opportunity: 'Measured (prior-work.md): every series type is read at 21 to 23% of
+    its positions per training bag; Effusion and Synovitis errors follow axial reach
+    (0.948 to 0.872 and 0.914 to 0.848 between thirds of studies, 871 studies), MCL
+    follows sagittal medial reach. Precedent: study_slice_total 26 to 36 gave +0.0018
+    on the ResNet-18 with the OA labels up and the menisci down. Guess, medium: +0.0005
+    to +0.0015 macro; the OA labels and Effusion up, menisci uncertain.'
+  mechanism: Configuration only. The second sagittal fluid view is removed; slices
+    per series type become 7, 7, 6, 6, 6, 6 (axial T1/PD, axial fluid, coronal T1/PD,
+    coronal fluid, sagittal T1/PD, sagittal fluid) and data.study_slice_total 31.
+    About 31.9 images per study in training, 118.4 at x4.
+  precedents:
+  - 'sagittal-fluid-ten-distinct-slices: the same budget on one type; the two together
+    say which slot''s slices matter.'
+  novelty: The reference's image count spent entirely on distinct slices of all types.
+  coverage: Every study; all labels.
+  exploitation: 'Read all labels against the incumbent at both multipliers and the
+    x1 to x4 step. Activation: the logged mean images per study in training per series
+    type through the existing view logs. Shown wrong by: x4 not above the incumbent
+    by more than 0.0005 and the x1 to x4 step unchanged.'
+  budget: About 1.04 of the reference's training time; GPU 16.6 GB.
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    Files: configs/training.yaml only, unless removing the second view leaves code
+    that assumes it (then remove that code). Report the images per study from the
+    loader on two studies. Apply to the incumbent as assigned.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The precedent with the largest effect, at the reference's cost.
+  status: blocked
+  created_revision: 1
+  seeded: /home/claudio/src/knee-abnormality-soft-tissue-masks/autoresearch/campaigns/rn50-input-sampling/seed-ideas-2.yaml
+  ranking_rationale: "Block and park the 257 px seed at its own implementation review.\
+    \ Its declared estimate gate requires blocking above 1.25\xD7 reference training\
+    \ time or 22 GB. The ResNet-50-calibrated estimates are 3406.58 seconds versus\
+    \ the 3312.747-second ceiling and 22.679 GB versus 22 GB. No compliant bounded\
+    \ repair is established. Correct the rejected report's ranking by explicitly listing\
+    \ every remaining live queue entry exactly once, preserving their supplied relative\
+    \ order."
+  experiments:
+  - one-more-slice-on-every-series-type-20261012T013628Z-ae10fe0e
+  blocked_reason: 'Trained ten epochs (x1 0.931204 at epoch 9, +0.002928 against the
+    incumbent); the memory guard killed the run in its x4 prediction on 2026-10-12
+    05:13 CEST. The keeper ran the x4 prediction on its own: 0.935771, +0.000502 against
+    the incumbent. ABOVE THE INCUMBENT AT BOTH MULTIPLIERS by that scoring; the harness
+    did not complete, adoption awaits the user. See run-notes.md.'
+- id: sagittal-fluid-context-view-106-mm
+  mechanism_id: context-view
+  parent_idea_id: null
+  title: Turn the second sagittal fluid view into a 106 mm context view on the same
+    slices
+  opportunity: 'Measured (prior-work.md): the whole kneecap is inside the sagittal
+    crop in 7.8% of series at 84 mm, 49% of patellar cartilage is inside it, and the
+    sagittal zoom to 84 mm cost Baker''s 0.004; at 106 mm the finer acquired axis
+    is still kept in 63% of series and the view covers 1.6 times the area. Precedent:
+    a Baker''s-only 120 mm view gave Baker''s +0.0023 with the macro level. The 64
+    mm view it replaces is magnification of acquired pixels. Guess, low-medium: Baker''s
+    +0.002 to +0.004, PF OA and Effusion +0.001, macro +0.0003 to +0.0008.'
+  mechanism: The second sagittal fluid view keeps the first view's slices, pose and
+    augmentation draws and changes its field from 64 mm to 106 mm; its tokens are
+    open to PF OA, Effusion, Synovitis and Baker's instead of the menisci, the OA
+    labels and ACL. Everything else of the incumbent is unchanged.
+  precedents:
+  - 'The incumbent''s detail-view code; docs/validation/results: the Baker''s-only
+    view.'
+  novelty: The shared-slice second view used for field instead of magnification.
+  coverage: Every study with a sagittal fluid series; four labels.
+  exploitation: 'Read Baker''s, PF OA, Effusion, Synovitis and the macro against the
+    incumbent at both multipliers. Log on validation only the share of each of the
+    four labels'' attention on the view (four metrics). Shown wrong by: Baker''s and
+    PF OA both flat.'
+  budget: 'The reference''s training time: the same images.'
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    Files: configs/training.yaml (field_mm), modeling/model.py (the gate list), modeling/spatial_tokens.py
+    for identity strings, training/lightning.py for the four metrics. Check that a
+    106 mm window fits the canvas and the first look''s frame; say so in the report.
+    No option. Apply to the incumbent as assigned.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Acquired anatomy the crop cuts, at no cost.
+  status: completed
+  created_revision: 1
+  seeded: /home/claudio/src/knee-abnormality-soft-tissue-masks/autoresearch/campaigns/rn50-input-sampling/seed-ideas-2.yaml
+  ranking_rationale: "Block and park the 257 px seed at its own implementation review.\
+    \ Its declared estimate gate requires blocking above 1.25\xD7 reference training\
+    \ time or 22 GB. The ResNet-50-calibrated estimates are 3406.58 seconds versus\
+    \ the 3312.747-second ceiling and 22.679 GB versus 22 GB. No compliant bounded\
+    \ repair is established. Correct the rejected report's ranking by explicitly listing\
+    \ every remaining live queue entry exactly once, preserving their supplied relative\
+    \ order."
+  experiments:
+  - sagittal-fluid-context-view-106-mm-20261012T022629Z-34b75d28
+  decision: reject
+- id: axial-views-at-100-mm
+  mechanism_id: axial-field
+  parent_idea_id: null
+  title: Feed both axial views at 100 mm instead of 120 mm
+  opportunity: 'Measured (prior-work.md): axial is the only plane fed below its acquired
+    resolution; at 100 mm the finer axis is kept in 85% of fluid series (35% at 120
+    mm) and 59% of T1/PD (11%). The step to 84/93 mm on the other two planes is the
+    input change that reached the ResNet-50 (+0.0027, public 0.948 to 0.954). Against:
+    axial 130 and 140 mm tied 120 mm on the ResNet-18, and 42% of axial fluid series
+    already cut posterior tissue at 120 mm. Guess, low: PF OA up, Baker''s at risk,
+    macro -0.0005 to +0.0010.'
+  mechanism: field_mm 100 on both axial series types; the axial shift limit in the
+    view windows follows the smaller field by the recipe's own rule (posed crop inside
+    the 368 px canvas). Nothing else changes.
+  precedents:
+  - 'docs/validation/results: the 84/93 mm views and the axial field runs.'
+  novelty: The axial counterpart of the step that carried.
+  coverage: Every study with an axial series.
+  exploitation: 'Read PF OA, Baker''s, Effusion and the macro against the incumbent
+    at both multipliers. Activation: the logged mm per pixel of the axial views at
+    validation through the existing canvas logs (one metric, 0.446). Shown wrong by:
+    PF OA flat and Baker''s down.'
+  budget: The reference's training time.
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    Files: configs/training.yaml, modeling/model.py only if the shift limit is a constant
+    tied to 120 mm. No option. Report the axial mm per pixel and the shift limit before
+    and after. Apply to the incumbent as assigned.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The one plane with native resolution left to gain.
+  status: completed
+  created_revision: 1
+  seeded: /home/claudio/src/knee-abnormality-soft-tissue-masks/autoresearch/campaigns/rn50-input-sampling/seed-ideas-2.yaml
+  ranking_rationale: "Block and park the 257 px seed at its own implementation review.\
+    \ Its declared estimate gate requires blocking above 1.25\xD7 reference training\
+    \ time or 22 GB. The ResNet-50-calibrated estimates are 3406.58 seconds versus\
+    \ the 3312.747-second ceiling and 22.679 GB versus 22 GB. No compliant bounded\
+    \ repair is established. Correct the rejected report's ranking by explicitly listing\
+    \ every remaining live queue entry exactly once, preserving their supplied relative\
+    \ order."
+  experiments:
+  - axial-views-at-100-mm-20261012T032234Z-2a809fc6
+  decision: reject
+- id: thirty-five-distinct-slices
+  mechanism_id: slice-budget
+  parent_idea_id: sagittal-fluid-ten-distinct-slices
+  title: Ten sagittal fluid slices and one more on every other type, 35 distinct slices
+    in all
+  opportunity: 'The next dose of the two slice seeds (sagittal-fluid-ten-distinct-slices
+    and one-more-slice-on-every-series-type): a training bag reads 21 to 23% of each
+    series'' positions, and x4 over x1 is +0.0081 on the ResNet-50. The 40-slice follow-up
+    on the ResNet-18 lost against 36, but with an epoch removed, which confounds it.
+    Guess, low-medium: above the better of the two slice seeds.'
+  mechanism: Configuration only. No second sagittal fluid view; slices per series
+    type 7, 7, 6, 6, 6, 10; data.study_slice_total 35. About 36 images per study in
+    training.
+  precedents:
+  - The two slice seeds of this campaign; read their results first and say in the
+    report which one this run is compared with.
+  novelty: More distinct slices than any run of the line at ten epochs.
+  coverage: Every study; all labels.
+  exploitation: 'Read all labels against the incumbent and against the two slice seeds
+    at both multipliers. Activation: the logged mean images per study in training.
+    Shown wrong by: not above the better of the two slice seeds at x4.'
+  budget: About 1.18 of the reference's training time; GPU about 19 GB (largest study
+    42 images); RAM about 0.5 GB more of prefetched batches. Return blocked above
+    1.25 or 22 GB.
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    Files: configs/training.yaml only. Report the images per study from the loader
+    on two studies. Apply to the incumbent as assigned.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The dose after the two slice seeds.
+  status: completed
+  created_revision: 2
+  seeded: /home/claudio/src/knee-abnormality-soft-tissue-masks/autoresearch/campaigns/rn50-input-sampling/seed-ideas-3.yaml
+  ranking_rationale: "Block and park the 257 px seed at its own implementation review.\
+    \ Its declared estimate gate requires blocking above 1.25\xD7 reference training\
+    \ time or 22 GB. The ResNet-50-calibrated estimates are 3406.58 seconds versus\
+    \ the 3312.747-second ceiling and 22.679 GB versus 22 GB. No compliant bounded\
+    \ repair is established. Correct the rejected report's ranking by explicitly listing\
+    \ every remaining live queue entry exactly once, preserving their supplied relative\
+    \ order."
+  experiments:
+  - thirty-five-distinct-slices-20261012T040950Z-efaa20b4
+  decision: provisional_accept
+- id: sagittal-fluid-kneecap-and-pouch-tile
+  mechanism_id: native-tile
+  parent_idea_id: sagittal-fluid-context-view-106-mm
+  title: Place the second sagittal fluid view as a 93 mm tile on the kneecap and pouch
+  opportunity: 'As sagittal-fluid-context-view-106-mm, at native pixels and on the
+    structure: at 93 mm the finer acquired axis is kept in 89% of series; the whole
+    kneecap is inside a centred 93 mm crop in 26% of series; PF OA is 0.045 lower
+    when the kneecap is not whole in the crop (95% interval -0.097 to +0.024). Guess,
+    low: PF OA +0.002, Effusion +0.001.'
+  mechanism: 'The second sagittal fluid view has field 93 mm on the first view''s
+    slices and is centred on the kneecap: the centre of the bone map''s kneecap share
+    on the first look of the same image, bounded to the stored image instead of the
+    image-centred 120 mm frame. Its tokens are open to PF OA, Effusion, Synovitis
+    and Baker''s. It stays out of the first look and of contrast and feature-statistics
+    mixing.'
+  precedents:
+  - The incumbent's detail-view code; view_position in modeling/model.py.
+  novelty: A native-resolution tile placed by the model's own map.
+  coverage: Every study with a sagittal fluid series.
+  exploitation: 'Read PF OA, Effusion and the macro against the incumbent at both
+    multipliers. Log on validation only the share of PF OA''s and Effusion''s attention
+    on the tile and the share of tiles that hold the kneecap centre (three metrics).
+    Shown wrong by: PF OA flat while the tile holds attention.'
+  budget: The reference's training time.
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    Files: configs/training.yaml, modeling/model.py, modeling/spatial_tokens.py, training/lightning.py
+    for the metrics. The tile''s centre is detached. No option. Apply to the incumbent
+    as assigned.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The structure-placed form of the context view.
+  status: blocked
+  created_revision: 2
+  seeded: /home/claudio/src/knee-abnormality-soft-tissue-masks/autoresearch/campaigns/rn50-input-sampling/seed-ideas-3.yaml
+  ranking_rationale: "Block and park the 257 px seed at its own implementation review.\
+    \ Its declared estimate gate requires blocking above 1.25\xD7 reference training\
+    \ time or 22 GB. The ResNet-50-calibrated estimates are 3406.58 seconds versus\
+    \ the 3312.747-second ceiling and 22.679 GB versus 22 GB. No compliant bounded\
+    \ repair is established. Correct the rejected report's ranking by explicitly listing\
+    \ every remaining live queue entry exactly once, preserving their supplied relative\
+    \ order."
+  experiments:
+  - sagittal-fluid-kneecap-and-pouch-tile-20261012T045658Z-db6cdd0d
+  - sagittal-fluid-kneecap-and-pouch-tile-20261012T051059Z-ae262a03
+  - sagittal-fluid-kneecap-and-pouch-tile-20261012T055018Z-fe784a40
+  blocked_reason: 'Block and park the tile seed at its own implementation review.
+    Inspection confirms unresolved merge conflicts and an absent replacement target:
+    the bound incumbent has no second sagittal fluid view. No prepared changes.diff,
+    integration declaration or activation binding exists, so the failed gate cannot
+    be approved. Resolving this requires the supervisor to specify which behavior
+    the tile replaces, which accepted components remain or are removed, and the resulting
+    input/time budget. Correct the rejected report''s queue representation by explicitly
+    listing the complete remaining queue after parking; the slab seed retains its
+    user-ordered position.'
+- id: three-dimensional-series-read-as-slabs
+  mechanism_id: slab-read
+  parent_idea_id: null
+  title: Read a pick of a 3D series as the mean of its three decoded thin slices
+  opportunity: 'Measured (prior-work.md): 836 series in 659 studies are 3D with steps
+    of 0.4 to 1.2 mm, so a pick is one thin slice (0.6 mm for the 317 axial fluid
+    ones) against about 3 mm for a 2D stack, and the loader already decodes three
+    slices per pick of which the model reads the middle one. Guess, low: within +-0.0005
+    macro, on the 15% of studies concerned.'
+  mechanism: For a series flagged 3D by the loader (slice step below 1.5 mm) the image
+    of a pick is the mean of the three decoded slices instead of the middle one; 2D
+    series are unchanged. The flag is computed per series from the slice positions
+    the loader already has.
+  precedents:
+  - prior-work.md, Acquired against fed.
+  novelty: First use of the two decoded neighbours the recipe discards.
+  coverage: 659 studies with a 3D series.
+  exploitation: 'Read the macro on the studies with a 3D series apart from the others,
+    against the incumbent at both multipliers. Activation: the logged share of images
+    read as slabs at validation (one metric). Shown wrong by: that subgroup not above
+    the incumbent.'
+  budget: The reference's training time.
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    Files: data/dataset.py for the flag, modeling/model.py and training/lightning.py
+    where the middle slice is selected, inference/engine.py if prediction selects
+    it separately. The 1.5 mm threshold comes from the measured gap between 3D steps
+    (0.4 to 1.2 mm) and 2D steps (3.3 to 4.0 mm). No option. Apply to the incumbent
+    as assigned.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Acquired slices the loader already decodes.
+  status: completed
+  created_revision: 2
+  seeded: /home/claudio/src/knee-abnormality-soft-tissue-masks/autoresearch/campaigns/rn50-input-sampling/seed-ideas-3.yaml
+  ranking_rationale: 'Block and park the tile seed at its own implementation review.
+    Inspection confirms unresolved merge conflicts and an absent replacement target:
+    the bound incumbent has no second sagittal fluid view. No prepared changes.diff,
+    integration declaration or activation binding exists, so the failed gate cannot
+    be approved. Resolving this requires the supervisor to specify which behavior
+    the tile replaces, which accepted components remain or are removed, and the resulting
+    input/time budget. Correct the rejected report''s queue representation by explicitly
+    listing the complete remaining queue after parking; the slab seed retains its
+    user-ordered position.'
+  experiments:
+  - three-dimensional-series-read-as-slabs-20261012T055454Z-79f81a09
+  decision: reject
+- id: centred-grids-at-225-px-exact-copies
+  mechanism_id: token-grid
+  parent_idea_id: centred-token-grid-at-257-px
+  title: Feed 225 px images, where both feature grids are centred, with exact copies
+    between them
+  opportunity: 'The user''s order (2026-10-11): both the third-stage cells and the
+    fourth-stage tokens must be centred. Verified numerically on the backbone: at
+    224 px the cells sit at 0 to 208 px (7.5 px off the crop centre) and the tokens
+    at 0 to 192 (15.5 px off), and no shift of sampling phase centres both, because
+    a token always sits on a cell. At 225 px the stock backbone gives 15 by 15 cells
+    at 0, 16, ..., 224 and 8 by 8 tokens at 0, 32, ..., 224: both centred on pixel
+    112, token k on cell 2k, at about 1.01 of the pixels (257 px does the same at
+    1.32). A review of the 257 px candidate found the copies between the two grids
+    half a cell (8 px, 2.3 to 4.3 mm) off and not mirror-symmetric, inherited from
+    the 224 px recipe: tokens to cells by repetition (cell j takes token j//2) and
+    cells to tokens by a 2 by 2 mean of cells 2k and 2k+1. Precedent: 225 px on the
+    ResNet-18 lost 0.0024 for a cause not established, with those inherited copies.
+    Guess, low-medium: +0 to +0.001 macro.'
+  mechanism: 'data.image_size 225 with every view''s mm per pixel unchanged (each
+    field_mm and reference_field_mm multiplied by 225/224); all 8 by 8 tokens and
+    15 by 15 cells counted. The copies between the grids are exact for token k on
+    cell 2k: tokens to cells by bilinear interpolation with aligned corners (even
+    cells take their own token, odd cells the mean of the two neighbours); cells to
+    tokens by weights 1/4, 1/2, 1/4 per axis on cells 2k-1, 2k, 2k+1, renormalised
+    at the borders. These are the functions tokens_to_cells and cells_to_tokens of
+    exact-grid-transfers-257.diff in the campaign directory, which are generic in
+    the grid size (cells = 2 * tokens - 1), used at the three sites that diff changes
+    (the fourth-stage context added to the soft-tissue map, the anatomy zone on the
+    cells, the map shares pooled onto the tokens).'
+  precedents:
+  - 'autoresearch/campaigns/rn50-input-sampling/exact-grid-transfers-257.diff: the
+    reviewed correction, written against the frozen source of the 257 px candidate
+    (outputs/autoresearch/rn50-input-sampling/experiments/centred-token-grid-at-257-px-20261011T202734Z-5b8edc1d/source);
+    take that candidate''s odd-size handling from its changes.diff and this diff''s
+    copies, with 225 in place of 257.'
+  - 'docs/validation/results/2026-10-08-token-grid-alignment.md: the 225 px run on
+    the ResNet-18.'
+  novelty: First run with both grids centred and exact copies between them, at the
+    reference's cost.
+  coverage: Every image; all labels.
+  exploitation: 'Read the macro and all labels against the incumbent at both multipliers.
+    Activation: the logged number of tokens per image at validation (64) through the
+    existing epoch-metric path (one metric). Shown wrong by: the macro below the incumbent
+    at both multipliers.'
+  budget: About 1.01 to 1.05 of the reference's training time (0.9% more pixels, 64
+    tokens against 49); GPU about 17.5 GB (estimate).
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    The user ordered this second image size on 2026-10-11; it is allowed for this
+    seed. Files: configs/training.yaml (image_size, field_mm of every view, reference_field_mm),
+    modeling/model.py and modeling/spatial_tokens.py as the two diffs named in the
+    precedents, training/lightning.py for the one metric. No option. Report from the
+    config model the mm per pixel of every view before and after (equal), the token
+    and cell counts, and on synthetic tensors that a position ramp is reproduced exactly
+    by tokens_to_cells on all 15 cells, that cells_to_tokens returns each interior
+    token''s own position, and that a mirrored input gives a mirrored output. Apply
+    to the incumbent as assigned.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user's order; both grids centred at the reference's cost.
+  status: completed
+  created_revision: 48
+  seeded: /home/claudio/src/knee-abnormality-soft-tissue-masks/autoresearch/campaigns/rn50-input-sampling/seed-ideas-4.yaml
+  experiments:
+  - centred-grids-at-225-px-exact-copies-20261011T205850Z-df49b2a7
+  decision: reject
+- id: centred-token-grid-by-phase-exact-copies
+  mechanism_id: token-grid
+  parent_idea_id: centred-token-grid-by-last-stage-phase
+  title: The last-stage phase shift at 224 px with exact copies between cells and
+    tokens
+  opportunity: 'The user''s order (2026-10-11): requeue the phase-shift seed in its
+    corrected form. A review with numeric checks found the first candidate correct
+    for its seed (tokens at 16, 48, ..., 208; both residual branches on the same phase;
+    weights unchanged; declared mappings true) with one inherited inexactness: token
+    k sits on cell 2k+1 but takes the mean of cells 2k+1 and 2k+2, 8 px (2.3 to 4.3
+    mm) down and right of the token, and cells take the nearest token with ties resolved
+    one way. The cells themselves stay at 0 to 208 px (7.5 px off centre): at 224
+    px both grids cannot be centred. Guess, low: within 0.0005 of the first candidate.'
+  mechanism: 'The first candidate (frozen source outputs/autoresearch/rn50-input-sampling/experiments/centred-token-grid-by-last-stage-phase-20261011T194042Z-2dc075ca/source,
+    its changes.diff) with exact-grid-transfers-224.diff of the campaign directory
+    applied: tokens_to_cells interpolates linearly at each cell''s true position in
+    token units, clamped to the token range; cells_to_tokens weighs cells 2k, 2k+1,
+    2k+2 by 1/4, 1/2, 1/4 per axis with border renormalisation; the grid diagnostic
+    returns after its edge metrics when the posed patient map is absent.'
+  precedents:
+  - autoresearch/campaigns/rn50-input-sampling/exact-grid-transfers-224.diff, written
+    against the first candidate's frozen source; port both onto the incumbent you
+    are assigned.
+  novelty: The corrected form of the phase-shift seed.
+  coverage: Every image; all labels.
+  exploitation: 'Read the macro, MCL and the eight larger labels against the incumbent
+    and against the first candidate at both multipliers. Activation: the first candidate''s
+    validation metrics of the grid (the centred fraction and the two edge validity
+    shares). Shown wrong by: those diagnostics unchanged, or the macro below the incumbent
+    at both multipliers.'
+  budget: The reference's training time.
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    Files: modeling/model.py, modeling/spatial_tokens.py, training/anatomy.py and
+    training/lightning.py as the first candidate changed them, plus the diff. No option.
+    Report on synthetic tensors that a position ramp is reproduced by tokens_to_cells
+    on cells 1 to 13 and by cells_to_tokens on tokens 0 to 5. Apply to the incumbent
+    as assigned.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user's order.
+  status: completed
+  created_revision: 48
+  seeded: /home/claudio/src/knee-abnormality-soft-tissue-masks/autoresearch/campaigns/rn50-input-sampling/seed-ideas-4.yaml
+  experiments:
+  - centred-token-grid-by-phase-exact-copies-20261011T210434Z-3e0d43a0
+  decision: reject
+- id: cosine-schedule-with-warm-restarts
+  mechanism_id: learning-rate-schedule
+  parent_idea_id: null
+  title: Restart the cosine learning-rate schedule twice within the ten epochs
+  opportunity: 'The user''s order (2026-10-11): let the learning rate go up and down
+    so the training can leave the optimum it settled in and find a better one. The
+    recipe has one warm-up epoch from 0.1 of the peak and then a single cosine decay
+    over epochs 2 to 10 down to 0.01 of the peak; the rate never rises again. Never
+    tried in this project on either backbone. The validation macro at x1 of the reference
+    and of the three runs since still rises through epoch 10 (0.9257, 0.9268, 0.9273
+    for the reference''s last three epochs), so the single decay has not flattened;
+    whether a restart helps is a guess, low-medium confidence, within +-0.001 macro.'
+  mechanism: 'The schedule multiplier of training/lightning.py keeps the first epoch''s
+    linear warm-up from optimizer.warmup_start_ratio to 1 and then runs three cosine
+    cycles of three epochs each (epochs 2 to 4, 5 to 7, 8 to 10). Each cycle decays
+    from its peak to optimizer.minimum_lr_ratio; the peaks are 1, 0.5 and 0.25 of
+    the configured rates, so each restart is half the previous one and the last cycle
+    ends the training at the same floor as today. The backbone and head rates, weight
+    decay, the anchor (L2-SP) weights and the ten epochs are unchanged; the single
+    cosine decay is removed. The two constants, cycle length 3 epochs and peak ratio
+    0.5, are module constants beside the schedule: (10 - 1 warm-up) epochs divide
+    into three equal cycles, and halving is the conventional decayed restart.'
+  precedents:
+  - 'training/lightning.py, configure_optimizers: the schedule function.'
+  novelty: First schedule with restarts in the project.
+  coverage: Every step of the training; all labels.
+  exploitation: 'Read the macro and all labels against the incumbent at both multipliers,
+    and the x1 validation macro at the end of each cycle (epochs 4, 7 and 10) against
+    the incumbent''s at the same epochs: a restart that helps shows a higher end of
+    cycle each time. Activation: the learning rate the recipe already logs per step;
+    report in the developer report the multiplier at the first and last step of each
+    cycle from the schedule function on its own (expected 1, 0.01, 0.5, 0.01, 0.25,
+    0.01). No new metric. Shown wrong by: the macro below the incumbent at both multipliers,
+    or the end of cycle two below the end of cycle one.'
+  budget: 'The reference''s training time: the same steps.'
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    The user ordered this change of schedule on 2026-10-11: the instruction not to
+    change the optimizer does not apply to the schedule multiplier in this seed; the
+    optimizer, its rates and its weight decay stay. Files: training/lightning.py only
+    (the schedule function and two module constants). No option and no config field:
+    the single decay is replaced. Keep the anchor-weight switch between early and
+    late where it is. Apply to the incumbent as assigned.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user's order.
+  status: completed
+  created_revision: 70
+  seeded: /home/claudio/src/knee-abnormality-soft-tissue-masks/autoresearch/campaigns/rn50-input-sampling/seed-ideas-5.yaml
+  ranking_rationale: "Block and park the 257 px seed at its own implementation review.\
+    \ Its declared estimate gate requires blocking above 1.25\xD7 reference training\
+    \ time or 22 GB. The ResNet-50-calibrated estimates are 3406.58 seconds versus\
+    \ the 3312.747-second ceiling and 22.679 GB versus 22 GB. No compliant bounded\
+    \ repair is established. Correct the rejected report's ranking by explicitly listing\
+    \ every remaining live queue entry exactly once, preserving their supplied relative\
+    \ order."
+  experiments:
+  - cosine-schedule-with-warm-restarts-20261011T220208Z-601f15fd
+  - cosine-schedule-with-warm-restarts-20261011T224841Z-490d6399
+  decision: reject
+- id: acquired-endpoints-in-every-slice-bag
+  mechanism_id: slice-budget
+  parent_idea_id: thirty-five-distinct-slices
+  title: "Keep both acquired depth endpoints while retaining the incumbent\u2019s\
+    \ distinct-slice budget"
+  opportunity: "Measured: thirty-five-distinct-slices improved x1 by 0.005264 and\
+    \ x4 by 0.001696. Its x1-to-x4 gain shrank from 0.006994 to 0.003426. However,\
+    \ the sampler still scales its Gaussian by the shorter acquired reach. Prior work\
+    \ reports 18 mm between training picks versus acquired steps of 3.3\u20134.0 mm,\
+    \ and substantial Effusion, Synovitis and MCL differences across reach strata.\
+    \ Hypothesis: preserving the outer usable positions can recover peripheral anatomy\
+    \ without increasing image count."
+  mechanism: Reserve the lowest and highest distinct usable middle-slice geometry
+    groups in each series-type pool. Assign the remaining budget with the existing
+    Gaussian strata and supplier rules, excluding the reserved groups. Endpoints come
+    from acquired geometry, not validation labels or hand-set distances. Preserve
+    maximum-cardinality selection, gap handling, decoding repair, availability redistribution
+    and deterministic evaluation. Pools with fewer than two groups retain every available
+    group. This replaces the outer Gaussian choices, rather than adding images.
+  precedents:
+  - 'thirty-five-distinct-slices: x1 +0.005264, x4 +0.001696; central 80% x4 interval
+    [0.000554, 0.002901]; training 2989.8 s, peak CUDA allocation 18.50 GB.'
+  - "prior_work, Acquired against fed: training reads 21\u201323% of slice positions;\
+    \ picks are approximately 18 mm apart; reach-stratum AUC differences motivate\
+    \ coverage, without identifying a causal label effect."
+  - "Incumbent preprocessing/sampling.py:335\u2013377 and 454\u2013506: limiting_reach\
+    \ uses the shorter reach; target_depths draws stratified truncated-Gaussian targets."
+  novelty: The accepted run added distinct positions. This follow-up changes which
+    positions survive at the same budget, guaranteeing acquired boundary coverage
+    while retaining interior sampling. It does not repeat the blocked constituent
+    seeds or introduce learned depth transport.
+  coverage: All six series types, including acquisition-local pools when patient-space
+    geometry is unavailable. No label-specific sampling or supervision is introduced.
+  exploitation: Log val_forced_endpoint_input_share, val_endpoint_geometry_coverage_fraction
+    and val_selected_physical_span_mm. Activation requires positive visually valid
+    participation from groups actually reserved by the endpoint assignment. Metrics
+    do not decide adoption.
+  budget: "Ten epochs at supervisor seed 1110484336. Full-availability inputs remain\
+    \ 42/study in training and 168 at x4; current measured x1 averages are 35.924\
+    \ training and 35.835 validation. Realized x4 counts remain unknown. Planning\
+    \ estimate: 2990\u20133060 s training, 18.5\u201318.8 GB peak GPU allocation.\
+    \ RAM planning estimate: approximately 35.1 GB used, 3.9 GB free on a 39 GB host,\
+    \ extrapolating all reference RAM use by the measured input-count ratio; this\
+    \ is conservative arithmetic, not an incumbent measurement."
+  implementation: Follow the environment paragraph of the developer instructions.
+    Replace outer-stratum assignment in preprocessing/sampling.py; carry executed
+    endpoint membership through dataset.py and aggregate the three named metrics during
+    existing validation in training/lightning.py. Update the affected sampling/input
+    identity. Retain aligned contrast mixing, distinct budgets, fields, first-look
+    selection, backbone and all existing reads. Remove the superseded outer Gaussian
+    selection rather than retaining a selector. Develop against the newly accepted
+    incumbent, preserving unrelated winners; reconcile an overlapping sampler replacement
+    before implementation.
+  open_choices: 'Use existing source ranking to break endpoint ties. Report selected-span
+    and decoding-shortfall changes: peripheral positions may contain little knee anatomy,
+    and the reach evidence does not establish that endpoint reservation will improve
+    macro AUC.'
+  dependencies: []
+  priority_rationale: 'First: builds directly on the strongest measured input gain,
+    adds negligible backbone cost, and attacks a documented coverage weakness with
+    geometry-derived choices.'
+  source_change: true
+  targeted_curve: "thirty-five-distinct-slices, epochs 6\u201310: x1 macro approaches\
+    \ 0.9335 while loss continues falling; Effusion and Lateral Meniscus still decline\
+    \ at x4. Improve coverage at the same count and raise both macro scores."
+  status: launched
+  created_revision: 268
+  ranking_rationale: 'Admit four proposals with satisfied proposal_admission dependencies.
+    Endpoints rank first as the unchanged-count extension of the strongest measured
+    input gain. Acquisition-depth support ranks second: inspected mixing code matches
+    the nearest selected donor without bounding normal displacement, so this materially
+    differs from earlier in-plane alignment and feathering runs. Primary 106 mm context
+    ranks third because ten distinct primary inputs materially differ from the rejected
+    restricted duplicate view; its negative macro precedent limits expected yield.
+    Fractional canvases rank fourth as a bounded retry addressing historical storage
+    and consumed-input activation defects. Historical sig-compact-fractional-intensities
+    already proposed the same float16/model-entry correction, but remains queued without
+    experiments; this is a transfer of an unmeasured proposal, not a novel mechanism
+    or repeated measured run. Leave posed-resampling-with-acquired-support proposed:
+    participating support loss is unmeasured, and signed bicubic normalization needs
+    a clearer numerical justification before it merits a queue slot. Searches of docs/validation/results
+    and docs/history found related sampling, field and aligned-mixing runs but no
+    measured equivalent of the admitted mechanisms.'
+  experiments:
+  - acquired-endpoints-in-every-slice-bag-20261012T063137Z-f83190b4
+- id: contrast-mixing-with-acquisition-depth-support
+  mechanism_id: contrast-mixing
+  parent_idea_id: aligned-contrast-mixing
+  title: Restrict aligned contrast mixing to overlapping acquired depth support
+  opportunity: 'Measured: aligned mixing gained 0.000985 at x1 but lost 0.000301 at
+    x4, despite persistent alignment activity near 0.024. Its supplied active status
+    is retained. Source diagnosis: donor matching minimizes depth distance without
+    limiting that distance; in-plane alignment projects away the remaining normal
+    displacement. Hypothesis: sparse picks can therefore blend different anatomy,
+    especially when acquired steps are much smaller than sampled gaps.'
+  mechanism: "Derive each donor middle slice\u2019s depth cell from the midplanes\
+    \ to its two decoded neighbours. During the existing alignment, compute where\
+    \ target patient coordinates lie relative to that donor cell. Apply donor contribution\
+    \ only where acquired depth support and existing in-plane support overlap; elsewhere\
+    \ retain the target. Keep probability, direction and lambda draws unchanged. This\
+    \ replaces unconditional projection of the nearest selected donor with a physical\
+    \ support restriction, without inventing interpolated slices or adding a hand-set\
+    \ distance threshold."
+  precedents:
+  - "aligned-contrast-mixing: \u0394x1 +0.000985, \u0394x4 \u22120.000301; central\
+    \ 80% x4 interval [\u22120.001063, 0.000442]. Activation was observed and training\
+    \ took 2660.5 s."
+  - "Incumbent modeling/augmentation.py:235\u2013318: nearest-depth matching has no\
+    \ overlap restriction, followed by patient-coordinate in-plane resampling."
+  - "Incumbent dataset.py:551\u2013615 retains patient maps for all three decoded\
+    \ records. Existing sampling support already uses neighbour midplanes."
+  - "prior_work: acquired steps 3.3\u20134.0 mm versus approximately 18 mm between\
+    \ training picks; ResNet-18 aligned and feathered variants did not establish a\
+    \ transferable benefit."
+  novelty: Fixes through-plane correspondence left unresolved by the accepted in-plane
+    alignment. The restriction depends on actual acquisition geometry, rather than
+    changing mixing probability or donor strength.
+  coverage: All eligible same-plane contrast pairs. The original target survives wherever
+    correspondence cannot be established; evaluation remains unmixed.
+  exploitation: Reuse existing contrast_mixing_effective_probability, contrast_mixing_pixel_change
+    and contrast_mixing_alignment_change. Add validation-only geometric summaries
+    val_contrast_depth_nonoverlap_share and val_contrast_supported_pair_share from
+    the already encoded maps, without blending validation images. Positive rejected
+    support demonstrates that the new gate has something to correct.
+  budget: "Ten epochs, current supervisor seed. Inputs remain nominally 42 training/168\
+    \ x4, approximately 35.9 per study at x1; realized x4 counts are unknown. Planning\
+    \ estimate: 2990\u20133100 s, 18.6\u201318.9 GB GPU allocation, approximately\
+    \ 35.1\u201335.3 GB host RAM used. Geometry arithmetic joins the existing donor\
+    \ warp; no extra backbone, map evaluation or decoding is required."
+  implementation: Follow the environment paragraph of the developer instructions.
+    Replace unrestricted donor support in modeling/augmentation.py and pass the required
+    neighbouring geometry through model.py; extend existing validation logging in
+    training/lightning.py with the two named geometric summaries. Retain the accepted
+    alignment, reflection handling, all draws, distinct-slice budgets and unrelated
+    incumbent behavior. Remove unconditional nearest-donor projection, with no legacy
+    option. If the running slab reader becomes incumbent, derive support from its
+    executed averaging footprint instead of assuming a middle-only read; its result
+    is not a dependency of this proposal.
+  open_choices: The gap between decoded centres defines support, not measured slice
+    thickness. Oblique planes require patient-coordinate support calculations rather
+    than canonical-axis distances. Actual donor-gap distributions are unmeasured;
+    gating could substantially reduce mixing participation.
+  dependencies:
+  - aligned-contrast-mixing
+  priority_rationale: 'Second: repairs a concrete correspondence omission with no
+    added images. Effect size is uncertain, but it is a structural retry rather than
+    a mixing-strength sweep.'
+  source_change: true
+  targeted_curve: "Aligned mixing, epochs 6\u201310: x1 continues rising while x4\
+    \ loses 0.000301, including Lateral Meniscus and Contusion decreases. Preserve\
+    \ useful aligned mixing while removing unsupported depth contributions."
+  status: prepared
+  created_revision: 268
+  ranking_rationale: 'Admit crop projection and the thin-channel retry: proposal_admission
+    reports their dependencies satisfied, and neither repeats a measured implementation.
+    Projection directly corrects executed placement after rotation, scale and jitter;
+    historical clipping-gradient failures changed learning signals instead. The thin-channel
+    retry materially differs from slab averaging and historical all-series adjacent
+    inputs through thin-series restriction, neighbor registration and an unchanged
+    middle first look. Rank projection ahead of thin channels because it adds no host
+    image buffers, whereas thin channels have tight RAM headroom and stronger negative
+    adjacent-input precedents. Leave posed-bicubic-with-local-intensity-bounds proposed:
+    participating overshoot is unmeasured, the late loss/AUC divergence does not diagnose
+    interpolation, and sixteen-tap gathers add uncertain cost. Leave the existing
+    support-normalization proposal proposed for the same unmeasured-participation
+    limitation; it remains distinct from placement projection.'
+  experiments:
+  - contrast-mixing-with-acquisition-depth-support-20261012T065812Z-8fdf0afc
+  - contrast-mixing-with-acquisition-depth-support-20261012T071008Z-d1824e69
+- id: sagittal-fluid-primary-context-on-distinct-slices
+  mechanism_id: context-view
+  parent_idea_id: sagittal-fluid-context-view-106-mm
+  title: Feed 106 mm context on the ten distinct sagittal fluid slices
+  opportunity: "Measured: the gated duplicate 106 mm view lost macro AUC at both multipliers,\
+    \ but Baker\u2019s gained 0.001985 at x4 and 0.000861 in the epochs-6\u201310\
+    \ x1 average. PF OA declined at both. That run also removed restricted sagittal-detail\
+    \ participation. The current incumbent already removed those copies and feeds\
+    \ ten distinct primary sagittal fluid slices. Hypothesis: context may work better\
+    \ as the primary, all-label input on those distinct positions."
+  mechanism: Replace the primary sagittal fluid field of 84 mm with the previously
+    evaluated 106 mm field on its existing ten distinct slices. Retain the six-view
+    layout, counts, primary first-look participation and existing label eligibility.
+    This supplies additional acquired anatomy without adding duplicate views or restoring
+    the removed detail view. The fixed value 106 comes from the forced context run,
+    not a validation sweep; its 0.473 mm nominal pixel spacing trades some resolution
+    for coverage.
+  precedents:
+  - "sagittal-fluid-context-view-106-mm: \u0394x1 \u22120.002043, \u0394x4 \u2212\
+    0.000805; central 80% interval [\u22120.001760, 0.000114]. Baker\u2019s improved,\
+    \ while PF OA declined. Training took 2675.5 s."
+  - 'prior_work: the entire kneecap was inside only 7.8% of 84 mm sagittal crops;
+    approximately 49% of patellar cartilage was inside in the inspected 36 knees.'
+  - thirty-five-distinct-slices removed shared copies and retained ten primary sagittal
+    fluid positions; full-availability inputs are 42/168.
+  - The blocked sagittal kneecap/pouch tile report establishes that adding a second
+    view now creates ten shared copies, 52/208 nominal inputs. This proposal adds
+    none.
+  novelty: Changes context participation from a restricted duplicate view to the primary
+    view on distinct positions. It addresses the observed replacement/gating confound
+    rather than repeating the earlier second-view experiment.
+  coverage: Every primary sagittal fluid input and its existing reads. Other fields,
+    label targets and routing remain intact.
+  exploitation: Existing validation metrics val_view_share_sagittal_fluid_106mm and
+    val_attention_mass_sagittal_fluid_106mm_baker's establish participation of the
+    new primary view. Retain val_distinct_slice_inputs_per_study and complete input
+    accounting. Newly covered anatomy itself remains unmeasured.
+  budget: "Ten epochs at current supervisor seed. Nominal inputs remain 42 training/168\
+    \ x4; expected realized x1 counts remain approximately 35.9. Planning estimate:\
+    \ 2990\u20133100 s training, 18.5\u201318.9 GB GPU allocation, approximately 35.1\u2013\
+    35.4 GB host RAM used. Wider native regions can increase decoding/preparation\
+    \ cost; realized x4 counts and incumbent RAM minimum are unavailable."
+  implementation: Follow the environment paragraph of the developer instructions.
+    Change only the sagittal fluid primary field_mm value in configs/training.yaml
+    from 84 to 106. Retain ten distinct slices, redistribution floor 35, aligned mixing,
+    all other fields and existing reads. Add no second view, gate, offset or compatibility
+    option. Existing configuration-derived geometry and metric names handle the field
+    replacement. Apply to the new incumbent while retaining unrelated winners; if
+    its primary sagittal coverage already supersedes this proposal, report that overlap
+    instead of restoring an old view.
+  open_choices: "The wider square field can discard fine acquired detail in some series\
+    \ and pose extrema can still truncate tissue. Baker\u2019s improvement motivates\
+    \ the mechanism but supplies no per-label objective or evidence of a macro win."
+  dependencies: []
+  priority_rationale: 'Third: gives the context family one specific follow-up addressing
+    its participation confound, with unchanged encoding count and minimal implementation
+    cost.'
+  source_change: false
+  targeted_curve: "106 mm context, epochs 6\u201310: macro nearly flattens near 0.9262;\
+    \ Baker\u2019s improves while PF OA loses at x1 and x4. Seek a macro gain by presenting\
+    \ context through all ten primary distinct slices."
+  status: queued
+  created_revision: 268
+  ranking_rationale: 'Admit crop projection and the thin-channel retry: proposal_admission
+    reports their dependencies satisfied, and neither repeats a measured implementation.
+    Projection directly corrects executed placement after rotation, scale and jitter;
+    historical clipping-gradient failures changed learning signals instead. The thin-channel
+    retry materially differs from slab averaging and historical all-series adjacent
+    inputs through thin-series restriction, neighbor registration and an unchanged
+    middle first look. Rank projection ahead of thin channels because it adds no host
+    image buffers, whereas thin channels have tight RAM headroom and stronger negative
+    adjacent-input precedents. Leave posed-bicubic-with-local-intensity-bounds proposed:
+    participating overshoot is unmeasured, the late loss/AUC divergence does not diagnose
+    interpolation, and sixteen-tap gathers add uncertain cost. Leave the existing
+    support-normalization proposal proposed for the same unmeasured-participation
+    limitation; it remains distinct from placement projection.'
+- id: fractional-canvases-at-half-storage
+  mechanism_id: continuous-preaugmentation-intensity-preservation
+  parent_idea_id: null
+  title: Preserve fractional canvas intensities with half storage and activation after
+    gathering
+  opportunity: 'Source measurement: device preparation rounds normalized values to
+    uint8, then ViewWindows converts them back to float before its pose warp. The
+    current macro curve flattens late despite falling loss. Hypothesis: early rounding
+    removes weak acquired intensity differences. Historical continuous-normalization
+    attempts were parked because their activation could pass before gathering even
+    if consumed images were rounded; no valid AUC outcome was established.'
+  mechanism: "Keep acquisition-local quantile bounds, clipping and 0\u2013255 scaling,\
+    \ but store normalized and gathered canvases as float16 without integer rounding.\
+    \ Both preparation paths must deliver fractional values to the actual reader input.\
+    \ Float16\u2019s largest step below 256 is 0.125, versus the incumbent\u2019s\
+    \ integer step of 1; this limits storage to twice uint8 rather than the historical\
+    \ float32 proposal\u2019s fourfold storage. This is a resource-bounded retry with\
+    \ corrected consumed-input activation."
+  precedents:
+  - "Incumbent preprocessing/device.py: normalized and gathered canvases are uint8;\
+    \ modeling/model.py:398\u2013464 converts the canvas to float for posed bicubic\
+    \ sampling."
+  - 'mri-signal-preservation/state.json, sig-continuous-normalization: historical
+    ResNet-18 attempts had no valid measured AUC. The parked record diagnoses activation
+    on a separate normalized tensor before gathering.'
+  - "Historical sig-continuous-normalization used float32 storage and seed 1533697213\
+    \ on fold 0; those settings and outcomes are historical, not this candidate\u2019\
+    s seed or evaluator."
+  novelty: The historical mechanism was unvalidated. The named changes are half storage
+    and activation on the tensor actually consumed after gathering, directly addressing
+    its memory concern and diagnosed false-positive activation route. Bounds and clipping
+    are not bundled into the retry.
+  coverage: All acquisitions and both first-look and posed reads. Padding, constant-series
+    handling and the final model intensity scale remain unchanged.
+  exploitation: "Log val_consumed_canvas_fractional_pixel_share and val_consumed_canvas_rounding_error\
+    \ from valid pixels of batch images after gathering and device preparation, before\
+    \ the reader\u2019s pose warp. Positive fractional participation cannot be supplied\
+    \ by an unused intermediate normalized tensor."
+  budget: "Ten epochs; nominal inputs 42 training/168 x4, expected x1 average approximately\
+    \ 35.9. Planning estimate: 3010\u20133120 s and 18.7\u201319.0 GB GPU allocation.\
+    \ An 8-study, 42-input, three-channel, 368 px batch adds approximately 0.137 GB\
+    \ per gathered buffer when storage doubles. Host RAM planning estimate is 35.2\u2013\
+    35.5 GB used; actual incumbent RAM headroom remains unknown."
+  implementation: Follow the environment paragraph of the developer instructions.
+    Replace integer normalization/storage in both paths of preprocessing/device.py
+    and add the two validation metrics in training/lightning.py; update input identity.
+    Implement the CPU fractional mapping there without changing protected intensity.py.
+    Retain quantile selection, normalization bounds, scale, sampling, fields, mixing
+    and all reads. Remove active rounding and uint8 gathered buffers rather than introducing
+    a precision switch. Preserve newly accepted slab or field behavior. If a newer
+    input implementation already preserves fractional consumed canvases, report supersession
+    instead of repeating the run.
+  open_choices: "Use float32 arithmetic for normalization, then float16 storage and\
+    \ the reader\u2019s existing float32 conversion. Do not add training-step diagnostics.\
+    \ CPU/device arithmetic agreement and performance are unmeasured; the earlier\
+    \ invalid attempts provide no quality estimate."
+  dependencies: []
+  priority_rationale: 'Fourth: a narrowly diagnosed historical retry, with a concrete
+    resource change and an activation signature that reaches the consumed input.'
+  source_change: true
+  targeted_curve: "Current incumbent, epochs 8\u201310: loss falls 0.5145\u21920.5092\
+    \ while x1 macro approaches 0.9335 and then declines slightly. Preserve weak input\
+    \ intensity differences without changing exposure or schedule."
+  status: retired
+  created_revision: 268
+  ranking_rationale: 'Admit four proposals with satisfied proposal_admission dependencies.
+    Endpoints rank first as the unchanged-count extension of the strongest measured
+    input gain. Acquisition-depth support ranks second: inspected mixing code matches
+    the nearest selected donor without bounding normal displacement, so this materially
+    differs from earlier in-plane alignment and feathering runs. Primary 106 mm context
+    ranks third because ten distinct primary inputs materially differ from the rejected
+    restricted duplicate view; its negative macro precedent limits expected yield.
+    Fractional canvases rank fourth as a bounded retry addressing historical storage
+    and consumed-input activation defects. Historical sig-compact-fractional-intensities
+    already proposed the same float16/model-entry correction, but remains queued without
+    experiments; this is a transfer of an unmeasured proposal, not a novel mechanism
+    or repeated measured run. Leave posed-resampling-with-acquired-support proposed:
+    participating support loss is unmeasured, and signed bicubic normalization needs
+    a clearer numerical justification before it merits a queue slot. Searches of docs/validation/results
+    and docs/history found related sampling, field and aligned-mixing runs but no
+    measured equivalent of the admitted mechanisms.'
+  retired_reason: 'Keeper, 2026-10-12 08:35 CEST, pending the user: float16 canvases
+    double the loader''s image buffers; the final x4 prediction already queues about
+    18 GB of uint8 batches on a 39 GB machine and dips available RAM to 2.6 GB on
+    the incumbent, so this run would exhaust memory at its end. To be reconsidered
+    once the prediction loader uses fewer workers.'
+- id: posed-resampling-with-acquired-support
+  mechanism_id: pose-support
+  parent_idea_id: null
+  title: Normalize posed interpolation by its acquired pixel support
+  opportunity: "Source evidence: native resampling renormalizes available filter taps,\
+    \ but the subsequent posed bicubic warp samples a zero-padded canvas. The incumbent\
+    \ logs pose-limit fractions around 0.14\u20130.15 late in training; this is not\
+    \ a measurement of missing interpolation support. Hypothesis: partial interpolation\
+    \ footprints can alter valid boundary intensities, particularly in axial fields\
+    \ whose posterior coverage is already limited."
+  mechanism: Construct support from the existing acquired valid rectangles. Warp intensity
+    and support with the same posed bicubic grid, and normalize the intensity sum
+    by the retained support sum for geometrically covered output centres with partial
+    kernel support. Keep uncovered pixels zero and retain the existing intensity clamp.
+    This corrects how acquired pixels are resampled; it neither extrapolates anatomy
+    nor changes fields, offsets, pose limits, augmentation probabilities or token/readout
+    structure.
+  precedents:
+  - "Incumbent preprocessing/spatial.py:42\u201367 renormalizes available native interpolation\
+    \ taps; model.py:445\u2013477 uses zero-padded posed bicubic sampling without\
+    \ that normalization."
+  - 'prior_work: more than 10 mm of posterior tissue was excluded in 42% of axial
+    fluid series at 120 mm. This motivates examining support but does not establish
+    the interpolation effect.'
+  - The official [SimpleITK resampling documentation](https://simpleitk.readthedocs.io/en/master/fundamentalConcepts.html#resampling)
+    describes physical grids and constant values outside source extent. Predictive
+    benefit from support normalization is a hypothesis.
+  novelty: "Addresses interpolation at acquired boundaries rather than changing crop\
+    \ size, placement offsets, token phase or magnification. It carries the existing\
+    \ native resampler\u2019s support-preservation principle into the posed input\
+    \ warp."
+  coverage: All posed inputs with valid acquisition rectangles. Existing geometric
+    token eligibility and routing remain intact; no tissue outside acquired support
+    is admitted.
+  exploitation: Log val_pose_partial_kernel_pixel_share, val_pose_corrected_valid_pixel_share
+    and val_pose_support_renorm_abs_change. Activation requires changed valid pixels
+    whose interpolation stencil actually crosses acquired support, avoiding an apparent
+    activation from floating-point differences on fully supported kernels.
+  budget: "Ten epochs at current supervisor seed. Inputs remain nominally 42 training/168\
+    \ x4 and approximately 35.9 at x1. Planning estimate: 3010\u20133130 s training,\
+    \ 18.7\u201319.0 GB GPU allocation and 35.1\u201335.4 GB host RAM used. The additional\
+    \ support warp is required input computation; no second backbone, map or token\
+    \ evaluation is added."
+  implementation: Follow the environment paragraph of the developer instructions.
+    Replace the posed zero-padding interpolation handling in modeling/model.py with
+    intensity/support resampling; use existing valid rectangles and aggregate the
+    three named metrics during validation in training/lightning.py. Update input identity.
+    Retain aligned mixing, distinct budgets, fields, pose limits, reflection, normalization
+    scale and existing validity/readout rules. Remove the unnormalized partial-support
+    behavior without a legacy selector. If a slab reader or fractional canvas becomes
+    incumbent, use its executed support and dtype while retaining that accepted behavior.
+  open_choices: 'Bicubic weights are signed: normalization must preserve fully supported
+    kernels and avoid dividing outside acquired coverage. The prevalence and intensity
+    effect of partial support are unmeasured; this mechanism may have little participating
+    anatomy. No benefit is inferred from pose-limit counts alone.'
+  dependencies: []
+  priority_rationale: 'Fifth: a distinct input-placement correction with modest expected
+    cost, but lower priority because participating support loss has not yet been measured.'
+  source_change: true
+  targeted_curve: "Current incumbent, epochs 6\u201310: falling loss accompanies a\
+    \ late macro plateau; axial-fluid view macro stays near 0.838. Correct partial-support\
+    \ input interpolation and seek improvement in both macro multipliers."
+  status: proposed
+  created_revision: 268
+- id: thin-series-channels-with-middle-first-look
+  mechanism_id: slab-read
+  parent_idea_id: three-dimensional-series-read-as-slabs
+  title: Preserve thin-slice differences in separate channels while keeping the middle-slice
+    first look
+  opportunity: "Measured: the slab mean changed 3.46% of valid \xD71 inputs but failed\
+    \ adoption, with \u0394\xD71 \u22120.000337 and \u0394\xD74 \u22120.000078. Mean\
+    \ \xD71 AUC over epochs 6\u201310 improved for both menisci but declined for ACL,\
+    \ Contusion and lateral OA. Source evidence: the reduction discards through-slice\
+    \ differences and changes the first-look images used to place every subsequent\
+    \ crop. Hypothesis: retaining the unsmoothed middle image and separate neighboring\
+    \ evidence can avoid these two confounds. Neither smoothing nor changed pose is\
+    \ established as the cause."
+  mechanism: For physically thin series, feed lower, middle and upper acquired slices
+    through the existing three backbone channels on final posed reads. Register neighboring
+    in-plane coordinates to the middle grid using existing patient maps, while retaining
+    their distinct through-plane content. Keep first-look pose estimation on the original
+    middle slice. Repeat the middle for other series. Preserve the middle channel
+    exactly; fill unsupported neighbor pixels with the middle value and retain middle-slice
+    token support. Use the rejected implementation's existing median-positive-spacing
+    <1.5 mm criterion, with reliable geometry and complete triplets required for separate
+    channels. Retain all pretrained kernels. This replaces the slab mean rather than
+    adding another view or backbone pass.
+  precedents:
+  - "[Completed slab analysis](/home/claudio/src/knee-abnormality/outputs/autoresearch/rn50-input-sampling/jobs/researcher-20261012T065813Z-773c1d58/scratch/slab-completed-run-analysis.json):\
+    \ original prediction AUCs, late \xD71 label changes, shared patterns, accounting\
+    \ and resource measurements."
+  - '[Slab implementation](/home/claudio/src/knee-abnormality/outputs/autoresearch/rn50-input-sampling/experiments/three-dimensional-series-read-as-slabs-20261012T055454Z-79f81a09/source/src/knee_abnormality/modeling/model.py:39)
+    averages before both reads and retains middle geometry without neighbor registration.'
+  - "Historical rn18-mean-init-adjacent-slices rejected at \u0394\xD74 \u22120.003869.\
+    \ It changed every series to adjacent channels and replaced conv1 initialization.\
+    \ This proposal restricts the change to thin series, retains kernels and preserves\
+    \ the first look; that negative precedent limits expectations."
+  - "[Prior acquisition measurements](/home/claudio/src/knee-abnormality-soft-tissue-masks/autoresearch/campaigns/rn50-input-sampling/prior-work.md):\
+    \ 836 thin 3D series in 659 studies, with acquired steps of 0.4\u20131.2 mm."
+  novelty: 'A structural retry of the lossy slab representation: preserve neighboring
+    slices separately, preserve the pose estimator''s middle image, and correct in-plane
+    correspondence. It differs from historical all-series adjacent channels and kernel
+    reinitialization. Benefit remains a hypothesis.'
+  coverage: Reliable thin-series triplets in every plane and contrast, for all labels.
+    Other inputs retain middle repetition. Training and prediction use the same acquisition
+    rule; no label-specific selection or objective is introduced.
+  exploitation: Log val_thin_neighbor_encoded_image_share, val_thin_neighbor_channel_abs_difference
+    and val_thin_neighbor_supported_pixel_share. Measure the actual final backbone
+    input after gathering, registration and normalization. Activation requires positive
+    nonidentical neighboring-channel participation on visually valid encoded images;
+    classification metadata alone cannot pass.
+  budget: "One ten-epoch run at supervisor seed 1110484336. Nominal inputs remain\
+    \ 42 training/168 at \xD74; bound-run averages are 35.92 training and 35.84 \xD7\
+    1 validation. Planning estimates from the 2,988.8 s slab run: 3,050\u20133,280\
+    \ s training, 18.9\u201319.4 GB GPU. Pack only valid uint8 neighbor planes, with\
+    \ no dense float canvas. Assuming \xD74 participation matches the measured 3.46%\
+    \ \xD71 share, two extra planes on approximately 18 GB of queued middle buffers\
+    \ add about 1.25 GB RAM, leaving roughly 1.35 GB from the keeper's recorded 2.6\
+    \ GB minimum. Actual \xD74 participation and packing overhead are unknown; this\
+    \ is the refill's largest memory concern."
+  implementation: Follow the environment paragraph of the developer instructions.
+    Change data/dataset.py, modeling/model.py, inference/engine.py, training/lightning.py
+    and modeling/spatial_tokens.py. Reuse compact thin-series identification and transfer
+    handling, but pack only lower/upper valid planes. Construct neighboring channels
+    only for final posed reads; leave first-look middle images intact. Remove the
+    three-slice mean, redundant middle packing and its intersection-only validity
+    reduction. Retain backbone kernels, normalization bounds, aligned contrast mixing,
+    reflection semantics, distinct-slice allocation, routing and readout. Log the
+    three named consumed-input metrics during validation. Preserve unrelated newly
+    accepted input changes and recompute resource estimates against their actual budget;
+    if they already preserve these neighboring channels, report supersession.
+  open_choices: "Thin spacing is a proxy for dimensionality. Unknown or unreliable\
+    \ geometry keeps middle repetition as the fixed acquisition rule. Registration\
+    \ preserves separate depth levels; it does not reconstruct a volume. Preserve\
+    \ existing random draws and mixing weights. Exact \xD74 packed-buffer volume must\
+    \ be derived from selected metadata during development because the available RAM\
+    \ estimate is tight."
+  dependencies: []
+  priority_rationale: 'First refill slot: the newly open slab family needs its concrete
+    follow-up. The representation and first-look confounds are identifiable in source,
+    while the near-zero macro result and historical adjacent-channel rejection limit
+    expected yield. Compact memory handling is essential.'
+  source_change: true
+  targeted_curve: "Slab run, epochs 6\u201310: retain meniscus gains while addressing\
+    \ late ACL \u22120.002010, Contusion \u22120.001958 and lateral OA \u22120.001867\
+    \ without label-specific objectives. Seek macro improvement over the incumbent\
+    \ at both multipliers."
+  status: queued
+  created_revision: 300
+  ranking_rationale: 'Admit crop projection and the thin-channel retry: proposal_admission
+    reports their dependencies satisfied, and neither repeats a measured implementation.
+    Projection directly corrects executed placement after rotation, scale and jitter;
+    historical clipping-gradient failures changed learning signals instead. The thin-channel
+    retry materially differs from slab averaging and historical all-series adjacent
+    inputs through thin-series restriction, neighbor registration and an unchanged
+    middle first look. Rank projection ahead of thin channels because it adds no host
+    image buffers, whereas thin channels have tight RAM headroom and stronger negative
+    adjacent-input precedents. Leave posed-bicubic-with-local-intensity-bounds proposed:
+    participating overshoot is unmeasured, the late loss/AUC divergence does not diagnose
+    interpolation, and sixteen-tap gathers add uncertain cost. Leave the existing
+    support-normalization proposal proposed for the same unmeasured-participation
+    limitation; it remains distinct from placement projection.'
+- id: posed-crops-projected-into-acquired-support
+  mechanism_id: crop-support-projection
+  parent_idea_id: null
+  title: Project posed crop translations into each slice's acquired support
+  opportunity: "Source evidence: frame_pose clamps translation to fixed shift limits,\
+    \ while the later warp applies rotation and scale against acquired rectangles.\
+    \ Those limits do not ensure that the rotated crop lies inside acquired support.\
+    \ Measured incumbent diagnostics show late pose-limit fractions around 0.14\u2013\
+    0.15 and axial-fluid view macro near 0.838; neither measures corner overflow.\
+    \ Hypothesis: avoidable sampling outside acquired support removes useful tissue\
+    \ and contributes to the late plateau."
+  mechanism: After existing pose estimation and training jitter, transform the four
+    output corners using the existing angle and scale. Derive per-axis translation
+    intervals that keep their bounding box inside the middle slice's acquired rectangle,
+    intersected with the current shift limits. Project the requested integer translation
+    to the closest feasible integer translation. When complete containment is impossible,
+    choose the bounded integer translation minimizing maximum corner overflow, with
+    proximity to the requested pose breaking ties. Keep angle, scale, field and image
+    size unchanged. This changes placement using each knee's acquired support; it
+    introduces no measured constant offset or learned locator.
+  precedents:
+  - '[Current pose construction](/home/claudio/src/knee-abnormality/outputs/autoresearch/rn50-input-sampling/experiments/thirty-five-distinct-slices-20261012T040950Z-efaa20b4/source/src/knee_abnormality/modeling/model.py:278)
+    clamps requested shifts independently of the subsequent rotated crop footprint.'
+  - '[Prior field measurements](/home/claudio/src/knee-abnormality-soft-tissue-masks/autoresearch/campaigns/rn50-input-sampling/prior-work.md):
+    more than 10 mm of posterior tissue is excluded in 42% of axial-fluid series at
+    120 mm. This motivates preserving coverage but does not measure posed overflow.'
+  - "Historical view-clipping-feasibility-gradient and view-clipping-inward-image-gradient\
+    \ rejected at \u0394\xD74 \u22120.000855 and \u22120.000943. They changed learning\
+    \ signals for view parameters; this proposal directly projects an executed fixed-field\
+    \ pose without adding gradients."
+  - Existing posed-resampling-with-acquired-support owns interpolation-weight normalization
+    at boundaries. This proposal changes crop placement and leaves that proposed operation
+    to its existing ID.
+  novelty: Enforces acquisition support after rotation, scaling and jitter. It differs
+    from learned crop sizes, locator gradients, hand-set field changes and interpolation-support
+    normalization. The prevalence and usefulness of corrected crops remain unmeasured.
+  coverage: Every posed primary input with usable geometry and nonempty acquired support.
+    The support comes from that input's images. Fields, slice allocations, anatomical
+    routing and label eligibility remain unchanged.
+  exploitation: Log val_support_projected_encoded_image_share, val_support_projection_mm
+    and val_crop_corner_excess_reduction_mm. Activation requires a changed translation
+    on a visually valid encoded input with reduced corner overflow. Existing pose-limit
+    counts alone cannot establish activity. Derive diagnostics from the corner calculations
+    already required by projection.
+  budget: "Ten epochs at the incumbent seed. Inputs remain nominally 42 training/168\
+    \ \xD74, with current realized \xD71 averages about 35.92/35.84. Planning estimates\
+    \ anchored to the incumbent's 2,989.8 s and 18.50 GB allocation: 3,000\u20133,120\
+    \ s training and 18.5\u201318.7 GB GPU. Host image buffers do not grow; estimated\
+    \ \xD74 available RAM remains approximately the keeper-recorded 2.6 GB. Only small\
+    \ pose tensors are added, with no additional decoding or model evaluation."
+  implementation: Follow the environment paragraph of the developer instructions.
+    Replace final translation handling in modeling/model.py with the support projection
+    after scale and jitter are known. Preserve the first look and existing angle,
+    scale and shift limits. Keep patient_maps, crop_affine and validity calculations
+    consistent with the executed translation. Add the three named validation metrics
+    in training/lightning.py and update modeling/spatial_tokens.py input identity.
+    Retain aligned mixing, distinct-slice sampling, fields, interpolation, reflection,
+    backbone and readout. Remove the unsupported final placement behavior without
+    a selector. For a newly accepted incumbent, retain its fields and input representation
+    and project against its actual consumed support.
+  open_choices: Containment can be impossible for a large rotated field; use the specified
+    minimax overflow solution, not a field reduction. Integer bounds must account
+    for rounding. Moving inward may exclude diagnostically useful peripheral tissue
+    even while reducing padding. That tradeoff is a hypothesis to evaluate by the
+    unchanged macro rule.
+  dependencies: []
+  priority_rationale: 'Second: a distinct placement correction with low memory and
+    compute cost. Its source-level omission is clear, but corrected-input prevalence
+    and anatomical benefit are unknown. Historical view-learning failures argue for
+    a narrow direct geometric change.'
+  source_change: true
+  targeted_curve: "Current incumbent, epochs 6\u201310: axial-fluid view macro stays\
+    \ near 0.838 while training loss falls and overall \xD71 macro plateaus near 0.9335.\
+    \ Reduce executed corner overflow and seek higher macro AUC at both multipliers."
+  status: queued
+  created_revision: 300
+  ranking_rationale: 'Admit crop projection and the thin-channel retry: proposal_admission
+    reports their dependencies satisfied, and neither repeats a measured implementation.
+    Projection directly corrects executed placement after rotation, scale and jitter;
+    historical clipping-gradient failures changed learning signals instead. The thin-channel
+    retry materially differs from slab averaging and historical all-series adjacent
+    inputs through thin-series restriction, neighbor registration and an unchanged
+    middle first look. Rank projection ahead of thin channels because it adds no host
+    image buffers, whereas thin channels have tight RAM headroom and stronger negative
+    adjacent-input precedents. Leave posed-bicubic-with-local-intensity-bounds proposed:
+    participating overshoot is unmeasured, the late loss/AUC divergence does not diagnose
+    interpolation, and sixteen-tap gathers add uncertain cost. Leave the existing
+    support-normalization proposal proposed for the same unmeasured-participation
+    limitation; it remains distinct from placement projection.'
+- id: posed-bicubic-with-local-intensity-bounds
+  mechanism_id: local-intensity-range
+  parent_idea_id: null
+  title: Limit posed bicubic interpolation to the local acquired intensity range
+  opportunity: "Source evidence: the posed reader uses bicubic interpolation followed\
+    \ by a global 0\u2013255 clamp. Bicubic interpolation can overshoot its contributing\
+    \ values; global clipping still permits extrema outside a local tissue neighborhood.\
+    \ The incumbent's late loss falls from 0.5145 to 0.5092 while \xD71 macro peaks\
+    \ then declines. Hypothesis: interpolation-created bright or dark extrema distort\
+    \ subtle acquired edges. Their frequency and predictive effect have not been measured."
+  mechanism: "Keep the existing posed bicubic grid and kernel. For an output whose\
+    \ complete 4\xD74 contributing stencil lies inside acquired support, bound its\
+    \ interpolated value by that stencil's minimum and maximum, then retain the existing\
+    \ global intensity clamp. Leave partially supported stencils under the existing\
+    \ boundary behavior so this run isolates interior range preservation. The 4\xD7\
+    4 neighborhood follows the bicubic kernel, not a validation-selected size. Compute\
+    \ local bounds with bounded gathers rather than materializing a full sixteen-tap\
+    \ image tensor."
+  precedents:
+  - '[Current posed warp](/home/claudio/src/knee-abnormality/outputs/autoresearch/rn50-input-sampling/experiments/thirty-five-distinct-slices-20261012T040950Z-efaa20b4/source/src/knee_abnormality/modeling/model.py:458)
+    uses bicubic sampling and a global clamp.'
+  - '[PyTorch grid_sample documentation](https://docs.pytorch.org/docs/2.14/generated/torch.nn.functional.grid_sample.html)
+    explicitly describes bicubic overshoot. This supports the numerical opportunity,
+    not a knee-AUC benefit.'
+  - '[Fritsch and Carlson, 1980](https://doi.org/10.1137/0717021) establishes shape-preserving
+    cubic interpolation as a numerical precedent. The proposed local range limiter
+    is simpler and does not claim their monotonicity guarantees.'
+  - Fractional canvases were retired for host-memory growth; boundary support normalization
+    remains proposed. This mechanism retains uint8 host storage and acts on fully
+    supported interior interpolation.
+  novelty: Corrects local extrema introduced by the posed input interpolation. It
+    changes neither sampling phase nor resolution, performs no sharpening or magnification,
+    and differs from fractional storage and boundary-weight normalization.
+  coverage: Fully supported posed interpolation stencils across all series types.
+    It preserves the first look, acquired-support boundaries, crop geometry and subsequent
+    augmentation probabilities. No labels receive special handling.
+  exploitation: Log val_pose_local_range_violation_pixel_share, val_pose_local_range_correction_abs_change
+    and val_pose_local_range_corrected_encoded_image_share. Count changes relative
+    to the existing globally clipped output on valid interior pixels actually consumed
+    by the backbone. Positive executed correction proves activation; an unused intermediate
+    overshoot count cannot pass.
+  budget: "Ten epochs at the current incumbent seed, nominally 42 training/168 \xD7\
+    4 inputs. Planning estimates from the 2,989.8 s incumbent: 3,140\u20133,350 s\
+    \ training and 18.6\u201319.0 GB GPU allocation. Retain uint8 loader buffers;\
+    \ estimated \xD74 RAM headroom stays near the recorded 2.6 GB. Local gathers are\
+    \ required input computation. Avoid a full sixteen-tap tensor, extra backbone\
+    \ evaluation and training-step diagnostics. Runtime remains uncertain until the\
+    \ scheduled run."
+  implementation: Follow the environment paragraph of the developer instructions.
+    Add local acquired-range limiting to the existing posed warp in modeling/model.py.
+    Retain the bicubic output and global clamp, replacing global-only handling on
+    fully supported stencils with the local bound. Reuse acquired rectangles and executed
+    grid coordinates; preserve partially supported boundary handling. Add the three
+    named validation metrics in training/lightning.py and update modeling/spatial_tokens.py
+    input identity. Retain normalization, aligned mixing, distinct-slice allocation,
+    pose, fields, backbone and readout. Add no strength or legacy selector. Preserve
+    newly accepted placement or channel behavior and apply bounds separately to each
+    consumed channel.
+  open_choices: Local bounding may remove useful subpixel contrast as well as artificial
+    extrema. It guarantees a range bound, not monotonicity or recovery of native signal.
+    Activation prevalence is unknown. Use float32 bounds and output arithmetic and
+    keep the existing loader storage; numerical tolerances must follow arithmetic
+    precision rather than validation scores.
+  dependencies: []
+  priority_rationale: 'Third: a new numerical input mechanism with primary-source
+    support and no host-buffer growth. Its plausible benefit is less certain than
+    the diagnosed slab follow-up or geometric projection, and sixteen-tap bound computation
+    has a larger runtime risk.'
+  source_change: true
+  targeted_curve: "Current incumbent, epochs 8\u201310: training loss decreases but\
+    \ \xD71 macro peaks at epoch 9 and then falls. Preserve local acquired intensity\
+    \ ranges during pose interpolation and seek improvement in both macro multipliers."
+  status: proposed
+  created_revision: 300

@@ -1,0 +1,35 @@
+ideas:
+- id: incumbent-recipe-retrained-unchanged
+  mechanism_id: control
+  parent_idea_id: null
+  title: Retrain the incumbent's recipe with no change at all
+  opportunity: 'A control asked for by the user on 2026-10-11. Every one of 19 complete runs differs from
+    the incumbent by the same per-epoch curve at x1 (mean +0.0013 and +0.0010 at epochs 3 and 4, -0.0007,
+    -0.0005 and -0.0007 at epochs 8 to 10), carried by Fracture early (the incumbent 0.0103 below the runs''
+    mean at epochs 3 and 4, below the lowest of them) and by Lateral Meniscus, PF OA and Baker''s late. No
+    run shares the incumbent''s pattern in detail (highest correlation over the epoch-by-label cells 0.31).
+    Source, lock file, effective config, seed, steps and augmentation counts are identical between the incumbent
+    and the runs, and the near no-op run (cell-attention-excludes-exact-routing-zeros) followed the runs''
+    curve, not the incumbent''s. The incumbent was trained by the user outside the harness. This run tells
+    whether the recipe retrained by the harness follows the runs'' curve (the incumbent is the top draw
+    of one distribution: x4 0.92834 +- 0.00039 expected) or the incumbent''s own curve (the runs share something
+    the incumbent lacks).'
+  mechanism: 'No change. The candidate is the incumbent''s source and configuration, byte for byte. Nothing
+    is added, removed or logged.'
+  precedents:
+  - 'run-notes.md, sections "Why the runs share one epoch curve against the reference" and run 17.'
+  novelty: The first exact retraining of the incumbent's recipe inside the harness.
+  coverage: Every study; all twelve labels.
+  exploitation: 'Read the x1 curve per epoch against the incumbent and against family-curve.txt, Fracture at
+    epochs 3 and 4, and x4 against the incumbent and the family. Activation: the existing validation metric
+    val_soft_tissue_routed_pf_oa above 0.9, which the incumbent logs at 1.0; it only shows the recipe ran.
+    Not a candidate for adoption: if it lands above the incumbent at both multipliers the keeper reports
+    it and the user decides.'
+  budget: 'The incumbent''s training time: 1,599 s on a free machine.'
+  implementation: 'Change no file. Return the incumbent''s source and configuration unchanged as the candidate,
+    with the activation signature above. Do not add a diagnostic, a comment or a formatting change. A no-op
+    candidate is what this seed asks for; the campaign''s policy allows it (require_source_change is false).'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user's control; it decides how every other run of the campaign is read.
+exhausted_directions: ''

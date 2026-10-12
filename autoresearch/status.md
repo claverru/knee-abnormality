@@ -6,6 +6,11 @@ in the [campaigns](campaigns/INDEX.md) and the
 
 ## Current state (2026-09-28)
 
+- **Adoption rule (2026-10-10):** the runtime adopts a run strictly above the incumbent at both
+  ×1 and ×4 ([adoption policy](protocol.md#adoption-policy)); the 80% interval is reported only.
+- **Stopped by the user 2026-10-11 20:37 CEST after 34 runs; one adoption (the sagittal fluid detail view):** [soft-tissue reads](campaigns/soft-tissue-reads/INDEX.md), in the
+  worktree `knee-abnormality-soft-tissue-masks`.
+- **Stopped by the user 2026-10-12 09:50 CEST after 14 runs; aligned contrast mixing on main, 35 distinct slices adopted by the runtime and not carried to main:** [ResNet-50 input sampling](campaigns/rn50-input-sampling/INDEX.md).
 - **No campaign is running.** Every campaign under `outputs/autoresearch/` is stopped, and the
   watchdog is stopped. The last one recorded on main,
   [fixes-and-removals](campaigns/fixes-and-removals/INDEX.md), was stopped by the user on

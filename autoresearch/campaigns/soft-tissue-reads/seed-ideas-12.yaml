@@ -1,0 +1,30 @@
+ideas:
+- id: incumbent-recipe-with-twelve-epochs
+  mechanism_id: control
+  parent_idea_id: null
+  title: Train the incumbent's recipe for twelve epochs instead of ten, nothing else changed
+  opportunity: 'A look asked for by the user on 2026-10-11 ("I just want to see what happens"), not a candidate
+    for adoption. The incumbent trains at about 160 s an epoch, so twelve epochs take about 1,919 s, 1.20
+    of its training time and inside the 0.75 to 1.25 range. Across the campaign''s runs the x1 validation
+    macro is still rising at the end (family mean about +0.0009 from epoch 8 to 9 and selected epochs 8 to
+    10). Guess: two more epochs on a stretched schedule move x1 and x4 by an amount this run measures.'
+  mechanism: 'Configuration only: trainer.max_epochs 12 instead of 10. The learning-rate schedule stretches
+    over the twelve epochs by its own rule; the one warm-up epoch and everything else are unchanged. No source
+    change.'
+  precedents:
+  - 'incumbent-recipe-retrained-unchanged: the ten-epoch control queued just before this one; read the two
+    together.'
+  novelty: First run of the campaign with a different number of epochs.
+  coverage: Every study; all twelve labels.
+  exploitation: 'Read x1 per epoch against the incumbent and the family curve through epoch 10 and the two
+    added epochs on their own, the selected epoch, and x4 against the incumbent, the unchanged rerun and
+    the family (0.92834 +- 0.00039). Activation: the existing validation metric val_soft_tissue_routed_pf_oa
+    above 0.9. If the runtime adopts it, the keeper withdraws the adoption by the user''s instruction and
+    reports the result.'
+  budget: 'About 1.20 of the incumbent''s training time (1,919 s of 1,998 s): the plain recipe, two more epochs.'
+  implementation: 'Change only trainer.max_epochs to 12 in configs/training.yaml. No source file, no diagnostic.
+    This is the more-epochs direction, not fewer; the campaign''s range budget leaves the epoch count free.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user's question; cheap and read against the unchanged rerun.
+exhausted_directions: ''

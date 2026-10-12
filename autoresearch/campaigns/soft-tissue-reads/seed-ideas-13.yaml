@@ -1,0 +1,42 @@
+ideas:
+- id: incumbent-with-a-small-label-loss-on-each-plane-read
+  mechanism_id: plane-read-loss
+  parent_idea_id: null
+  title: Add a small label loss on the read of each plane alone, at weight 0.05
+  opportunity: 'The user''s seed of 2026-10-11: the incumbent with a tiny loss per plane read at weight 0.05.
+    Evidence for the direction, guess for the gain. The model is trained only on the read of the whole bag,
+    so a plane that the others cover is never asked to stand alone: single-view reads of the incumbent range
+    widely (Medial OA 0.882 on coronal fluid against 0.837 on coronal T1/PD; PF OA 0.841 on sagittal fluid
+    and 0.826 on axial fluid against 0.765 and 0.668 on the coronal views), and the model gains +0.010 macro
+    from x1 to x4 through coverage. Isolated positives are the misses (Effusion 0.759 with 12 positives, Lateral
+    Meniscus 0.802 with 23). Guess, low-medium: asking each plane to carry the label a little makes every
+    plane''s features more complete and the full read steadier.'
+  mechanism: 'The incumbent unchanged, plus one loss term. For each of the three planes (sagittal, coronal,
+    axial) present in a study, the existing read is evaluated on the tokens and cells of that plane''s images
+    only (both contrasts together), through the same heads, regions, routing, priors and knee-level term as
+    the full read, giving twelve logits per plane. The term is the existing class-balanced label loss of
+    those logits against the study''s targets, averaged over the planes present and over the studies, times
+    0.05, added to the training loss. A plane without a valid image in the study is left out. The full-bag
+    loss, the prediction and validation are unchanged.'
+  precedents:
+  - 'pool_encoded(encoded, view) and _soft_tissue_pool(encoded, view) already restrict the read to one view
+    for the logged single-view AUCs; the plane read is the same restriction over the two views of a plane.'
+  - 'run-notes.md, section "Audit of the OA labels in the reference": the single-view AUCs.'
+  novelty: First loss on a partial read of the bag in this line.
+  coverage: Every study; all twelve labels.
+  exploitation: 'Read all twelve labels against the incumbent and the family (x4 0.92834, x1 0.91834) at both
+    multipliers, and the logged single-view AUCs against the incumbent''s. Activation: the training metric
+    of the new term''s value, logged once per epoch through the existing epoch-metric path (one metric);
+    no validation-side addition. Shown wrong by: single-view AUCs not rising while the macro falls.'
+  budget: 'Within 1.08 of the incumbent''s training time: three more evaluations of the heads on features
+    already computed; no backbone pass. Return blocked above 1.15.'
+  implementation: 'Follow the environment paragraph of the developer instructions. Files: modeling/model.py
+    (a read restricted to a plane, reusing the memoised tokens, routing weights and priors; no second evaluation
+    of the maps or the backbone), training/lightning.py (the term and its one logged value). The weight 0.05
+    is a constant in training/lightning.py beside the other loss weights; no config option. Report on one
+    batch that the full-bag logits are unchanged and that a study with one plane gives a plane read equal
+    to its full read. Apply to the incumbent as assigned.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user's seed.
+exhausted_directions: ''

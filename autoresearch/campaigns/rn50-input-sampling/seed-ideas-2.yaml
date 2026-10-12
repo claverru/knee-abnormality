@@ -1,0 +1,148 @@
+ideas:
+- id: sagittal-fluid-ten-distinct-slices
+  mechanism_id: slice-budget
+  parent_idea_id: null
+  title: Give sagittal fluid ten distinct slices in place of five slices and five magnified copies
+  opportunity: 'Measured (prior-work.md): the 64 mm detail view is finer than both acquired axes in 98% of 4,192
+    sagittal fluid series, so 16% of the reference''s images re-present pixels the wide view has; a training
+    bag reads 21% of a sagittal fluid series'' slice positions with 18.5 mm between picks against an acquired
+    step of 3.3 mm; on the ResNet-50 x4 over x1 is +0.0081. Precedents on the ResNet-18: study_slice_total
+    26 to 36 gave +0.0018; slices without gradient lost (run 23), so the new slices take gradient. The detail
+    view did not reach the ResNet-50 (x4 0.933292 against 0.933265 without it). Guess, medium: +0.0005 to
+    +0.0015 macro from ACL, Lateral Meniscus, Lateral OA, Contusion and MCL.'
+  mechanism: 'Configuration only. The sagittal fluid series type has one view (84 mm) with slices 10 instead
+    of two views with 5 shared slices; data.study_slice_total 31 instead of 26. Images per study stay at about
+    31.8 in training; at x4 sagittal fluid is read whole (about 110.7 images against 123).'
+  precedents:
+  - 'docs/validation/results: study_slice_total 26 to 36 on the ResNet-18 (+0.0018).'
+  - 'soft-tissue reads run notes, runs 23 and 29 to 32.'
+  novelty: First slice-count run on the ResNet-50; same image count as the reference.
+  coverage: Every study with a sagittal fluid series.
+  exploitation: 'Read all labels against the incumbent at both multipliers and the size of the step from x1
+    to x4, which should shrink. Activation: the logged mean number of sagittal fluid images per study in
+    training through the existing view logs (one metric, about 10). Shown wrong by: x4 not above the incumbent
+    by more than 0.0005 and the x1 to x4 step unchanged.'
+  budget: 'About 1.04 of the reference''s training time (five more distinct slices take the first look); GPU
+    16.5 GB; RAM as the reference.'
+  implementation: 'Follow the environment paragraph of the developer instructions. Files: configs/training.yaml
+    only, unless removing the second view leaves code that assumes it (then remove that code, no option).
+    Report the images per study from the loader on two studies. Apply to the incumbent as assigned.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The largest measured loss of acquired information, at the reference's cost.
+- id: axial-fluid-kneecap-tile-at-native-pixels
+  mechanism_id: native-tile
+  parent_idea_id: null
+  title: Move the shared-slice second view to axial fluid as a 100 mm tile on the kneecap
+  opportunity: 'Measured (prior-work.md): axial fluid at 120 mm keeps the finer acquired axis in 35% of 4,474
+    series and at 100 mm in 85%; that axis runs front to back, across the patellar cartilage. Axial fluid is
+    PF OA''s primary plane with the coarsest cells of the recipe (8.6 mm). Precedent on the ResNet-18: an 84
+    mm patellofemoral axial view gave PF OA +0.0027 and macro -0.0013, the loss on the labels that lost the
+    three slices it took; a view on shared slices takes none. This is the detail-view mechanism on the one
+    type where magnifying adds acquired detail. Guess, medium-low: PF OA +0.002 to +0.004, Effusion and Synovitis
+    up to +0.002, macro +0.0003 to +0.0008.'
+  mechanism: 'The second view on shared slices belongs to axial fluid instead of sagittal fluid: sagittal fluid
+    keeps its 84 mm view alone; axial fluid gets a second view of field 100 mm reusing the first view''s slices,
+    pose turn and augmentation draws. Its centre is the kneecap front point the first look already computes
+    for axial views (axial_front_center: kneecap and femur shares), with its shift limit raised from 8 mm
+    to what the 368 px canvas allows. Its tokens are open only to PF OA, Effusion and Synovitis; it stays
+    out of the first look and of contrast mixing and feature-statistics mixing, as the detail view is.'
+  precedents:
+  - 'The incumbent''s detail-view code (view_sources in config.py, detail_target_allowed in modeling/model.py).'
+  - 'docs/validation/results: the 84 mm patellofemoral axial view.'
+  novelty: The cleanest test of native pixels against magnification.
+  coverage: Every study with an axial fluid series; PF OA, Effusion, Synovitis.
+  exploitation: 'Read PF OA, Effusion, Synovitis and the macro against the incumbent at both multipliers. Log
+    on validation only the share of each of the three labels'' attention on the tile (three metrics). Shown
+    wrong by: PF OA not up by 0.002 while the tile holds more than 5% of its attention.'
+  budget: 'About 1.04 of the reference''s training time (33.3 images per study, 127.8 at x4); GPU about 17.3
+    GB.'
+  implementation: 'Follow the environment paragraph of the developer instructions. Files: configs/training.yaml,
+    config.py (view_sources), modeling/model.py (the gate list, the tile''s centre and shift limit), modeling/spatial_tokens.py
+    for identity strings, training/lightning.py for the three metrics. No option. Report on two studies that
+    the two axial fluid views hold the same slices and where the tile is centred. Apply to the incumbent as
+    assigned.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Tests the campaign's hypothesis directly on the label with the clearest precedent.
+- id: one-more-slice-on-every-series-type
+  mechanism_id: slice-budget
+  parent_idea_id: null
+  title: Spread the detail view's five images as one more slice on every series type
+  opportunity: 'Measured (prior-work.md): every series type is read at 21 to 23% of its positions per training
+    bag; Effusion and Synovitis errors follow axial reach (0.948 to 0.872 and 0.914 to 0.848 between thirds
+    of studies, 871 studies), MCL follows sagittal medial reach. Precedent: study_slice_total 26 to 36 gave
+    +0.0018 on the ResNet-18 with the OA labels up and the menisci down. Guess, medium: +0.0005 to +0.0015
+    macro; the OA labels and Effusion up, menisci uncertain.'
+  mechanism: 'Configuration only. The second sagittal fluid view is removed; slices per series type become 7,
+    7, 6, 6, 6, 6 (axial T1/PD, axial fluid, coronal T1/PD, coronal fluid, sagittal T1/PD, sagittal fluid)
+    and data.study_slice_total 31. About 31.9 images per study in training, 118.4 at x4.'
+  precedents:
+  - 'sagittal-fluid-ten-distinct-slices: the same budget on one type; the two together say which slot''s
+    slices matter.'
+  novelty: The reference's image count spent entirely on distinct slices of all types.
+  coverage: Every study; all labels.
+  exploitation: 'Read all labels against the incumbent at both multipliers and the x1 to x4 step. Activation:
+    the logged mean images per study in training per series type through the existing view logs. Shown wrong
+    by: x4 not above the incumbent by more than 0.0005 and the x1 to x4 step unchanged.'
+  budget: 'About 1.04 of the reference''s training time; GPU 16.6 GB.'
+  implementation: 'Follow the environment paragraph of the developer instructions. Files: configs/training.yaml
+    only, unless removing the second view leaves code that assumes it (then remove that code). Report the
+    images per study from the loader on two studies. Apply to the incumbent as assigned.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The precedent with the largest effect, at the reference's cost.
+- id: sagittal-fluid-context-view-106-mm
+  mechanism_id: context-view
+  parent_idea_id: null
+  title: Turn the second sagittal fluid view into a 106 mm context view on the same slices
+  opportunity: 'Measured (prior-work.md): the whole kneecap is inside the sagittal crop in 7.8% of series at
+    84 mm, 49% of patellar cartilage is inside it, and the sagittal zoom to 84 mm cost Baker''s 0.004; at 106
+    mm the finer acquired axis is still kept in 63% of series and the view covers 1.6 times the area. Precedent:
+    a Baker''s-only 120 mm view gave Baker''s +0.0023 with the macro level. The 64 mm view it replaces is
+    magnification of acquired pixels. Guess, low-medium: Baker''s +0.002 to +0.004, PF OA and Effusion +0.001,
+    macro +0.0003 to +0.0008.'
+  mechanism: 'The second sagittal fluid view keeps the first view''s slices, pose and augmentation draws and
+    changes its field from 64 mm to 106 mm; its tokens are open to PF OA, Effusion, Synovitis and Baker''s
+    instead of the menisci, the OA labels and ACL. Everything else of the incumbent is unchanged.'
+  precedents:
+  - 'The incumbent''s detail-view code; docs/validation/results: the Baker''s-only view.'
+  novelty: The shared-slice second view used for field instead of magnification.
+  coverage: Every study with a sagittal fluid series; four labels.
+  exploitation: 'Read Baker''s, PF OA, Effusion, Synovitis and the macro against the incumbent at both multipliers.
+    Log on validation only the share of each of the four labels'' attention on the view (four metrics). Shown
+    wrong by: Baker''s and PF OA both flat.'
+  budget: 'The reference''s training time: the same images.'
+  implementation: 'Follow the environment paragraph of the developer instructions. Files: configs/training.yaml
+    (field_mm), modeling/model.py (the gate list), modeling/spatial_tokens.py for identity strings, training/lightning.py
+    for the four metrics. Check that a 106 mm window fits the canvas and the first look''s frame; say so in
+    the report. No option. Apply to the incumbent as assigned.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Acquired anatomy the crop cuts, at no cost.
+- id: axial-views-at-100-mm
+  mechanism_id: axial-field
+  parent_idea_id: null
+  title: Feed both axial views at 100 mm instead of 120 mm
+  opportunity: 'Measured (prior-work.md): axial is the only plane fed below its acquired resolution; at 100 mm
+    the finer axis is kept in 85% of fluid series (35% at 120 mm) and 59% of T1/PD (11%). The step to 84/93
+    mm on the other two planes is the input change that reached the ResNet-50 (+0.0027, public 0.948 to 0.954).
+    Against: axial 130 and 140 mm tied 120 mm on the ResNet-18, and 42% of axial fluid series already cut
+    posterior tissue at 120 mm. Guess, low: PF OA up, Baker''s at risk, macro -0.0005 to +0.0010.'
+  mechanism: 'field_mm 100 on both axial series types; the axial shift limit in the view windows follows the
+    smaller field by the recipe''s own rule (posed crop inside the 368 px canvas). Nothing else changes.'
+  precedents:
+  - 'docs/validation/results: the 84/93 mm views and the axial field runs.'
+  novelty: The axial counterpart of the step that carried.
+  coverage: Every study with an axial series.
+  exploitation: 'Read PF OA, Baker''s, Effusion and the macro against the incumbent at both multipliers. Activation:
+    the logged mm per pixel of the axial views at validation through the existing canvas logs (one metric,
+    0.446). Shown wrong by: PF OA flat and Baker''s down.'
+  budget: 'The reference''s training time.'
+  implementation: 'Follow the environment paragraph of the developer instructions. Files: configs/training.yaml,
+    modeling/model.py only if the shift limit is a constant tied to 120 mm. No option. Report the axial mm
+    per pixel and the shift limit before and after. Apply to the incumbent as assigned.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The one plane with native resolution left to gain.
+exhausted_directions: ''

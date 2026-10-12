@@ -1,0 +1,46 @@
+ideas:
+- id: pseudo-volumes-on-the-untaught-views-with-the-masks-at-half
+  mechanism_id: pseudo-map
+  parent_idea_id: map-taught-on-every-study-from-the-reference-pseudo-volumes
+  title: Use the pseudo-volumes only on the views the masks never cover, with the real masks keeping half of the map loss
+  opportunity: 'Evidence for the cause, guess for the fix. In map-taught-on-every-study-from-the-reference-pseudo-volumes
+    (run 22, one run: x4 -0.0013, x1 -0.0017) the pseudo-volumes took over the map: 16.8 million map-supervised
+    tokens per epoch against 0.9 million, so the real masks were about 5% of the map''s supervision, and the
+    map''s overlap with the real masks fell on every class on the 52 validation mask knees (menisci 0.525
+    and 0.503 against 0.554 and 0.542; medial tibial cartilage 0.436 against 0.483). MCL, which reads neither
+    the map nor the cell read, lost 0.0098. The pseudo-volumes are needed only where the masks do not reach:
+    20 of the 265 mask knees have a sagittal fluid series and 20 a coronal T1/PD series, and on those few
+    knees these two views agree worst with the real masks on the menisci (sagittal fluid 0.134 and 0.171,
+    coronal T1/PD 0.188 and 0.156, against 0.21 to 0.27 for the taught views), while the fused volume is built
+    mostly from the taught views. Guess, medium-low: the map keeps its overlap on the masks, learns the two
+    untaught views, and the five soft-tissue labels gain off the mask scanner.'
+  mechanism: 'Two changes to run 22''s candidate. (1) A pseudo-volume supervises only the cells of sagittal
+    fluid and coronal T1/PD images; cells of the other four series types of a study without masks get no
+    map target, as in the incumbent. Real mask volumes supervise every series of their study as today. (2)
+    The map loss is the mean of two terms, each the existing anatomy loss averaged over its own tokens: L
+    = 0.5 * L_masks + 0.5 * L_pseudo, where a term with no token in the batch is zero. trainer.meniscus_loss_weight
+    is unchanged. The logged map overlap in validation still comes from the 52 mask knees.'
+  precedents:
+  - 'Run 22 candidate source: outputs/autoresearch/soft-tissue-reads/experiments/map-taught-on-every-study-from-the-reference-pseudo-volumes-20261011T081354Z-7bd1c60d/source
+    and changes.diff.'
+  - 'run-notes.md, run 22 and the section "Wider scope and the pseudo-volumes" (agreement of each view with
+    the real masks).'
+  novelty: The pseudo-volumes restricted to the measured gap, with the masks protected by the loss split.
+  coverage: Every training study with a sagittal fluid or coronal T1/PD series; the map.
+  exploitation: 'Read the five soft-tissue labels and the macro against the incumbent and against the family
+    of earlier runs (x4 0.92834, x1 0.91834) at both multipliers, the mask scanner''s 52 validation studies
+    apart from the other 822. The map overlap per class on validation is already logged and must not fall
+    as in run 22. Activation: the training metric meniscus_tokens, already logged, above the incumbent''s.
+    Shown wrong by: the validation map overlap falling as in run 22, or the five labels on the 822 studies
+    not above the incumbent.'
+  budget: 'Within 1.05 of the incumbent''s training time: run 22 trained in 1,721 s (1.08) with every series
+    supervised; two series types of six are supervised here.'
+  implementation: 'Follow the environment paragraph of the developer instructions. Start from run 22''s candidate
+    source. Files: training/anatomy.py and training/lightning.py. Select the two series types by the plane
+    and contrast of each encoded image, on the GPU, with no host synchronisation; compute the two means in
+    one pass over the tokens. No option. Report on one batch the token counts of each term and that a mask
+    knee''s targets are unchanged. Apply to the incumbent as assigned.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Addresses the two measured causes of run 22's result with the targets already built.
+exhausted_directions: ''

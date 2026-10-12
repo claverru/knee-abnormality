@@ -1,0 +1,44 @@
+ideas:
+- id: bundle-transition-map-with-area-normalised-attention-and-the-detail-adapter
+  mechanism_id: bundle
+  parent_idea_id: soft-tissue-map-learns-adjacent-share-transitions
+  title: Add the share-transition map loss to the area-normalised attention and the block-detail adapter
+  opportunity: 'Evidence for the parts, guess for the sum. Run 18 (soft-tissue-map-learns-adjacent-share-transitions)
+    is level at x4 (-0.00008) and is the first run where the five soft-tissue labels rise as a group (+0.0005
+    on average against -0.0010 for the sixteen runs before it; Lateral Meniscus +0.0024, the best of the campaign,
+    Medial OA +0.0007), with the map better on every class without leaving the 14 by 14 grid (overlap 0.59
+    to 0.65 against 0.48 to 0.58). Run 16 (area-normalised attention) is level at x4 (-0.00002), the best
+    at x1 (+0.0007), and its largest losses are Lateral Meniscus -0.0031 and Lateral OA -0.0029, with Fracture
+    +0.0064 and ACL +0.0025. Run 12 (block-detail adapter) is level at x4 (-0.00006) with MCL +0.0031, the
+    label run 18 loses most with Synovitis (-0.0011). A retraining of practically the incumbent (run 17)
+    lands -0.0003 at x4, so all three are level with or above a retraining. Guess, medium: the sum is above
+    the incumbent at both multipliers.'
+  mechanism: 'Three mechanisms of this campaign in one model, each exactly as its run built it. (1) Run 18:
+    the seven-class map''s regional Dice term is replaced by the normalised adjacent-share transition error
+    on right and down neighbouring pairs with valid targets; cross-entropy and meniscus_loss_weight unchanged.
+    (2) Run 16: the cell read''s softmax weighs each cell by its routing measure divided by the detached
+    total routed measure of its view. (3) Run 12: the cell read''s features are the map''s projection read
+    with detached parameters plus a zero-initialised projection of the detail inside each 2 by 2 block.'
+  precedents:
+  - 'Sources under outputs/autoresearch/soft-tissue-reads/experiments/: soft-tissue-map-learns-adjacent-share-transitions-20261011T054719Z-86cf6cb5, cell-attention-normalized-by-routed-area-per-view-20261011T045006Z-adb2fc02,
+    cell-projection-with-a-coarse-block-detail-adapter-20261011T031329Z-0d2df0f2 (source and changes.diff in
+    each).'
+  - 'bundle-area-normalised-attention-with-the-detail-adapter: the same bundle without the map loss; reuse
+    its candidate source if it has been reviewed.'
+  novelty: The three runs level with the incumbent at x4, one on the map, one on the attention, one on the features.
+  coverage: Every routed study; all twelve labels.
+  exploitation: 'Read all twelve labels against the incumbent at both multipliers. Log on validation only:
+    the transition loss, the attention mass moved by the normalisation averaged over the five labels, and
+    the adapter feature scale; the map overlap per class is already logged. Shown wrong by: the five soft-tissue
+    labels below run 18''s on average.'
+  budget: 'Within 1.03 of the incumbent''s training time: the three parents trained in 1,545 to 1,549 s against
+    1,599 s.'
+  implementation: 'Follow the environment paragraph of the developer instructions. Apply the three reviewed
+    diffs to the incumbent; run 18 touches the map loss in training, the other two touch _soft_tissue_pool.
+    Files: modeling/model.py, modeling/spatial_tokens.py, training/anatomy.py and training/lightning.py as
+    the parents used them. No option. Report on one batch each parent''s own check. Apply to the incumbent
+    as assigned.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The three level runs act on three different parts and their per-label losses do not overlap.
+exhausted_directions: ''
