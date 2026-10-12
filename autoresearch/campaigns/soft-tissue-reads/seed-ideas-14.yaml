@@ -1,0 +1,98 @@
+ideas:
+- id: detail-view-open-to-all-twelve-labels
+  mechanism_id: detail-view
+  parent_idea_id: sagittal-fluid-detail-view-on-the-same-slices
+  title: Let every label read the 64 mm sagittal fluid detail view
+  opportunity: 'Evidence for the direction, guess for the gain. The detail view (the incumbent, one run: x4
+    0.929467, +0.0008 over the plain recipe''s three trainings at 0.92870 +- 0.0003) is open to six labels
+    only. The earlier sagittal fluid change from 93 to 84 mm moved MCL +0.0056, Contusion +0.0043, Fracture
+    +0.0038 and Lateral OA +0.0034 in at least seven of eight run pairs; three of those four labels are gated
+    out of the detail view. MCL is the one label below all three plain trainings in the incumbent (x1 0.922
+    to 0.926 against 0.927 to 0.934 at epochs 7 to 10; -0.0041 at x4), while the labels the view was built
+    for (the menisci and ACL) did not move (within +-0.0007). The per-view label bias already lets a label
+    turn a view down. Guess, medium-low: MCL returns to the plain level (+0.003 to +0.005) and Contusion and
+    Fracture gain +0.001 to +0.003; Baker''s and Effusion are the labels to watch, since a 64 mm box clips
+    the pouch and the popliteal fossa.'
+  mechanism: 'Remove the label gate of the detail view: every label''s target attention and the knee-level
+    attention may read the 64 mm sagittal fluid tokens, as they read any other view. In modeling/model.py
+    delete detail_target_allowed, detail_channel_allowed, target_gate and the knee-level gate. Everything
+    else of the incumbent is unchanged: the shared slices, pose and augmentation draws, and the exclusions
+    from the first look, contrast mixing and feature-statistics mixing.'
+  precedents:
+  - 'run-notes.md, run 29 and "Where run 29''s gain came from".'
+  - 'docs: the view-size runs of 2026-10-10 (sagittal fluid 93 to 84 mm).'
+  novelty: Removes code from the incumbent; tests whether the gate costs the labels the field effect moved.
+  coverage: Every study with a sagittal fluid series; all twelve labels.
+  exploitation: 'Read all twelve labels against the incumbent and against the plain recipe (x4 0.92870 +- 0.0003;
+    x1 single runs span 0.0015) at both multipliers and on the x1 mean of epochs 6 to 10. Log on validation
+    only the share of fourth-stage attention on the detail view for MCL, Contusion, Fracture, Effusion, Baker''s
+    and Synovitis (six metrics, replacing the six of the incumbent). Shown wrong by: MCL, Contusion and Fracture
+    putting more than 0.1 of their attention on the view while their x1 epochs 6 to 10 stay at or below the
+    plain mean; or Baker''s falling by more than 0.0015.'
+  budget: 'The incumbent''s training time (1,775 s, 1.11 of the reference); no extra crop.'
+  implementation: 'Follow the environment paragraph of the developer instructions. Files: modeling/model.py,
+    modeling/spatial_tokens.py for the identity strings, training/lightning.py for the six metrics. No option.
+    Report on one batch that with the gate removed the six formerly open labels'' logits are unchanged at
+    initialisation. Apply to the incumbent as assigned.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Free, removes code, and aims at the labels the measured field effect moved.
+- id: detail-view-on-three-of-the-five-slices
+  mechanism_id: detail-view
+  parent_idea_id: sagittal-fluid-detail-view-on-the-same-slices
+  title: Read the detail view on the first, middle and last slice of the wide view's pick
+  opportunity: 'Evidence for the question, guess for the answer. The detail view costs 18.5% more images in
+    training and at prediction (26.8 to 31.7 per study; prediction 74.8 s against 62.5 to 66.3 s) and about
+    45 s of training per extra image per study. Its share of attention falls every epoch from the third (ACL
+    0.218 to 0.171, PF OA 0.123 to 0.085), and on the 822 validation studies that have the view the incumbent
+    equals the best plain training. Guess, medium: three detail slices keep what the view gives at 60% of
+    its cost.'
+  mechanism: 'The 64 mm sagittal fluid view reads three of the wide view''s five slices: the first, the middle
+    and the last of the wide view''s selection in slice order (all of them when the wide view holds three
+    or fewer). Pose, augmentation draws, label gate and exclusions are the incumbent''s. In data/dataset.py
+    the shared selection of the detail view becomes that positional subset; shared_view_budgets and the collate
+    source indices follow.'
+  precedents:
+  - 'run-notes.md, "Where run 29''s gain came from": cost per image and the attention decay.'
+  novelty: First cut of the detail view's cost; frees about 90 s of the time budget for later seeds.
+  coverage: Every study with a sagittal fluid series.
+  exploitation: 'Read PF OA and Lateral OA (the two readers that rose in the incumbent) and the macro against
+    the incumbent and the plain recipe at both multipliers; report images per study and prediction seconds.
+    The incumbent''s six attention metrics stay. Shown wrong by: PF OA and Lateral OA back at the plain mean
+    at both multipliers.'
+  budget: 'About 1.05 of the reference''s training time (about 1,686 s); about 119 crops per study at x4 against
+    127.'
+  implementation: 'Follow the environment paragraph of the developer instructions. Files: data/dataset.py,
+    data/preprocessing/sampling.py, config.py if the subset rule needs a field, modeling/spatial_tokens.py
+    for the identity string. No option. Report on one batch the slice indices of the two sagittal fluid views.
+    Apply to the incumbent as assigned.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Tells whether the adopted view can cost less at inference.
+- id: detail-view-shares-the-feature-statistics-draw
+  mechanism_id: detail-view
+  parent_idea_id: sagittal-fluid-detail-view-on-the-same-slices
+  title: Give the detail view the wide view's feature-statistics mixing draw
+  opportunity: 'A guess with one observation behind it. The detail view trains without feature-statistics
+    mixing and without contrast mixing, unlike every other view, and its share of attention decays every epoch
+    from the third (ACL 0.218 to 0.171, PF OA 0.123 to 0.085): compatible with a less regularised view that
+    the heads learn to trust less. Guess, low: +0 to +0.0005 macro.'
+  mechanism: 'The detail view takes part in feature-statistics mixing with the draw of its wide view: the same
+    eligibility and the same noise sample as the wide view of the same image, applied to the detail view''s
+    own channel mean and spread. In modeling/augmentation.py the draws are indexed by source acquisition
+    instead of being padded for the detail view. Contrast mixing stays off for it, and nothing else changes.'
+  precedents:
+  - 'run-notes.md, "Where run 29''s gain came from": the attention decay.'
+  novelty: Brings the detail view under the regularisation the other views train with.
+  coverage: Every study with a sagittal fluid series.
+  exploitation: 'Read the macro and the six labels that read the view against the incumbent and the plain recipe
+    at both multipliers; the incumbent''s six attention metrics per epoch tell whether the decay changed.
+    Shown wrong by: the same decay and level labels.'
+  budget: 'The incumbent''s training time (1.11 of the reference); no extra crop.'
+  implementation: 'Follow the environment paragraph of the developer instructions. Files: modeling/augmentation.py,
+    modeling/spatial_tokens.py for the identity string. No option. Report on one batch that a wide view and
+    its detail view received the same eligibility and noise. Apply to the incumbent as assigned.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Cheap, and the only variant aimed at why the view's share shrinks.
+exhausted_directions: ''

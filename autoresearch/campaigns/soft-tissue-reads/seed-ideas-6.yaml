@@ -1,0 +1,46 @@
+ideas:
+- id: bundle-pf-oa-rim-without-padding-cell-zone-own-reader-and-transition-map
+  mechanism_id: bundle
+  parent_idea_id: pf-oa-own-cell-reader
+  title: Give PF OA what the audit of the reference found it lacks - an unpadded rim, a zone taught on the cells, its own reader and the better map
+  opportunity: 'Evidence from an audit of the reference''s code and logs (2026-10-11), guess for the sum. PF
+    OA is the cell read''s weakest label (0.719 alone against 0.807 and 0.808) and differs from Medial and
+    Lateral OA in four ways. (1) The cartilage rim and the meniscus spread use avg_pool2d(..., 3, 1, 1), which
+    counts the zero padding: a rim cell on the image edge loses a third of its weight and a corner cell 5/9;
+    32% of patellar cartilage volume lies in the outer 6 mm of the 84 mm sagittal crop against 0% of tibial
+    and 5% of femoral cartilage (36 knees with both mask sets). (2) Its bone zone is the worse-mapped class
+    (kneecap joint 0.676 against joint 0.760 on the 7 by 7 map) and the copy to the cells overlaps the cell-grid
+    target 0.518; run 7 taught it on the cells and reached 0.686, with PF OA +0.0008 and Medial OA +0.0013.
+    (3) In the cell read PF OA owns nothing but its region: its validation logit swings between epochs (0.044
+    to 0.177) while Medial and Lateral stay within 0.065 to 0.155, and in run 4 its own readout ended unrelated
+    to the shared one (cosine -0.07; PF OA +0.0004). (4) Its cartilage class is among the worst of the map
+    (patellar 0.504); run 18''s transition loss lifted it to 0.596 with the five soft-tissue labels up as
+    a group. Guess, medium-low: PF OA above the incumbent by 0.001 to 0.003, the other OA labels level.'
+  mechanism: 'Four changes in one model. (1) New: every 3 by 3 mean in _soft_tissue_routing_weights (the cartilage
+    rim and the meniscus spread) uses count_include_pad=False, so edge cells are averaged over the cells that
+    exist. (2) Run 7 as built: a zero-initialised bone-class head on the 14 by 14 cells taught from the bone
+    targets; the OA routing reads its joint and kneecap-joint shares instead of the copy from the 7 by 7
+    token. (3) Run 4 as built: PF OA has its own attention and readout channel in the cell read. (4) Run
+    18 as built: the map''s regional Dice term is replaced by the adjacent-share transition error. The bone
+    routing of Contusion and Fracture is unchanged.'
+  precedents:
+  - 'Sources under outputs/autoresearch/soft-tissue-reads/experiments/: bone-zone-taught-on-the-cell-grid-20261011T003842Z-fadcd542,
+    pf-oa-own-cell-reader-20261010T231515Z-c9fae9cf, soft-tissue-map-learns-adjacent-share-transitions-20261011T054719Z-86cf6cb5 (source and changes.diff in each).'
+  - 'Audit of the reference, run-notes.md section "Audit of the OA labels in the reference".'
+  novelty: The first seed built from a code audit of how the three OA labels are treated; the padding fix has not run.
+  coverage: Every routed study; the three OA labels and, through the unpadded spread, the two meniscus labels.
+  exploitation: 'Read the three OA labels and the macro against the incumbent at both multipliers. Log on validation
+    only: the mean routing weight of PF OA on cells of the image border and off it (two metrics), the cell-grid
+    zone overlap for the kneecap joint, the cosine between PF OA''s and the shared OA readout, and the map
+    overlap of patellar cartilage (already logged). Shown wrong by: PF OA below the incumbent at both multipliers.'
+  budget: 'Within 1.03 of the incumbent''s training time: the three parents trained in 1,541 to 1,551 s against
+    1,599 s and the padding change is free.'
+  implementation: 'Follow the environment paragraph of the developer instructions. Apply the three reviewed
+    diffs to the incumbent and change the pooling flag. Files: modeling/model.py, modeling/spatial_tokens.py,
+    training/anatomy.py and training/lightning.py as the parents used them. No option. Report on one batch
+    that an edge cell''s rim equals the mean over its existing neighbours, and each parent''s own check.
+    Apply to the incumbent as assigned.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Each part answers a measured way in which the reference treats PF OA worse than the other two OA labels.
+exhausted_directions: ''

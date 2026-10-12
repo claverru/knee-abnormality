@@ -1,0 +1,69 @@
+--- a/src/knee_abnormality/modeling/spatial_tokens.py
++++ b/src/knee_abnormality/modeling/spatial_tokens.py
+@@ -76,10 +76,10 @@
+ 
+ SPATIAL_TOKEN_IDENTITY = {
+     "bone_routing": "contusion_and_fracture_routed_by_each_tokens_detached_bone_map_share_of_femur_tibia_kneecap_and_fibula_unrouted_below_one_token",
+-    "soft_tissue_routing": "meniscus_and_oa_targets_keep_their_stride32_read_and_add_a_logit_read_from_stride16_layer3_cells_own_layernorm_attention_256_128_2_and_zero_initialized_plane_contrast_readout_no_bias_no_position_prior_no_knee_level_term_seven_class_map_head_routing_weights_detached_menisci_core_at_one_over_32_of_knee_peak_grown_one_cell_weight_max_of_share_and_3x3_mean_kept_nearer_own_meniscus_centre_oa_cells_assigned_to_nearest_of_three_compartment_centres_own_cartilage_plus_assigned_femoral_cartilage_over_self_weighted_mean_share_capped_at_one_3x3_mean_max_with_bone_map_joint_or_kneecap_joint_share_of_nearest_token_by_verified_origins_clipped_edges_bone_zone_alone_without_anchors_unrouted_below_one_cell",
++    "soft_tissue_routing": "meniscus_and_oa_targets_keep_their_stride32_read_and_add_a_logit_read_from_stride16_layer3_cells_own_layernorm_attention_256_128_2_and_zero_initialized_plane_contrast_readout_no_bias_no_position_prior_no_knee_level_term_seven_class_map_head_routing_weights_detached_menisci_core_at_one_over_32_of_knee_peak_grown_one_cell_weight_max_of_share_and_3x3_mean_kept_nearer_own_meniscus_centre_oa_cells_assigned_to_nearest_of_three_compartment_centres_own_cartilage_plus_assigned_femoral_cartilage_over_self_weighted_mean_share_capped_at_one_3x3_mean_max_with_bone_map_joint_or_kneecap_joint_share_of_tokens_linearly_interpolated_at_cell_positions_by_verified_origins_clamped_edges_bone_zone_alone_without_anchors_unrouted_below_one_cell",
+     "algorithm": "all_valid_spatial_tokens_rotatable_knee_frame_attention_prior_side_routed_shared_channels_knee_level_term_v14_hard_octants_soft_gradient_own_routes_study_frames_and_landmarks_eighteen_regions_overlap_routed_reports_fixed_frame_own_position_hard_cuts_soft_gradient_knee_level_term_on_every_routed_channel_side_labels_keep_their_half_of_the_core_region_table_from_all_token_attention_synovitis_unrouted_per_study_centre_nod_and_sizes_roll_and_turn_shared_kneecap_region_front_above_the_lower_cut_frame_on_detached_bone_share_centroid_10mm_gaussian_near_anatomy_plane_spot_orientation_and_no_mass_fallback_eight_sections_three_tear_places_per_side_ring_sector_division",
+     "projection": "shared_linear_C_to_256",
+-    "meniscus_map": "independent_zero_initialized_linear_256_to_three_on_stride16_layer3_projection_plus_nearest_stride32_normalized_tokens_using_verified_origins_clipped_edges_16px_target_footprint_four_by_four_target_samples_preserve_4px_quadrature_pitch_same_visual_validity_detached_probabilities_mean_of_shifted_two_by_two_cells_per_stride32_token_clipped_edges",
++    "meniscus_map": "independent_zero_initialized_linear_256_to_three_on_stride16_layer3_projection_plus_stride32_normalized_tokens_linearly_interpolated_at_cell_positions_by_verified_origins_clamped_edges_16px_target_footprint_four_by_four_target_samples_preserve_4px_quadrature_pitch_same_visual_validity_detached_probabilities_quarter_half_quarter_per_axis_over_the_three_cells_centred_on_each_stride32_token_renormalized_at_borders",
+     "last_stage_phase": "resnet50_a1_last_stage_first_bottleneck_main_3x3_padding_zero_right_bottom_pad_two_shortcut_starts_row_column_one_origin16_stride32_layer3_unchanged_all_geometry_and_cell_token_transfers_follow_verified_origins",
+     "token": "projection_plus_plane_contrast_and_detail_view_embeddings_layernorm_two_versions_own_channels_plus_fixed_sinusoid_of_detached_knee_frame_position_42_wavelengths_8_to_512_per_axis_zero_without_fitted_center_shared_channels_position_free",
+     "initialization_rng": "side_head_position_prior_up_width_and_knee_level_scale_parameters_forked_removed_position_draw_count_and_target_sized_scorer_and_readout_draws_preserve_training_stream_meniscus_stride16_projection_and_head_forked",
+@@ -144,22 +144,31 @@
+ 
+ 
+ def cells_to_tokens(values: torch.Tensor, shift: tuple[int, int]) -> torch.Tensor:
+-    return F.avg_pool2d(
+-        values[:, :, shift[0] :, shift[1] :],
+-        2,
+-        2,
+-        ceil_mode=True,
+-        count_include_pad=False,
+-    )
++    kernel = values.new_tensor([0.25, 0.5, 0.25])
++    kernel = (kernel[:, None] * kernel)[None, None]
++    cells = values.flatten(0, 1)[:, None]
++    padding = (1 - shift[1], 1, 1 - shift[0], 1)
++    total = F.conv2d(F.pad(cells, padding), kernel, stride=2)
++    weight = F.conv2d(F.pad(torch.ones_like(cells[:1]), padding), kernel, stride=2)
++    return (total / weight)[:, 0].unflatten(0, values.shape[:2])
+ 
+ 
+ def tokens_to_cells(
+     values: torch.Tensor, shape: tuple[int, int], shift: tuple[int, int]
+ ) -> torch.Tensor:
+-    repeated = values.repeat_interleave(2, -2).repeat_interleave(2, -1)
+-    return F.pad(repeated, (shift[1], 0, shift[0], 0), mode="replicate")[
+-        :, :, : shape[0], : shape[1]
+-    ]
++    for axis in (-2, -1):
++        last = values.shape[axis] - 1
++        place = (
++            (torch.arange(shape[axis], device=values.device) - shift[axis]) / 2
++        ).clamp(0, last)
++        lower = place.floor().long()
++        share = (place - lower).to(values.dtype)
++        if axis == -2:
++            share = share[:, None]
++        values = values.index_select(axis, lower).lerp(
++            values.index_select(axis, (lower + 1).clamp(max=last)), share
++        )
++    return values
+ 
+ 
+ def backbone_mapping_identity(name: str) -> dict:
+--- a/src/knee_abnormality/training/lightning.py
++++ b/src/knee_abnormality/training/lightning.py
+@@ -1515,6 +1515,8 @@
+                 (rows.float().mean() + columns.float().mean()) / 2,
+                 rows.numel() + columns.numel(),
+             )
++        if "posed_patient_map" not in encoded:
++            return
+         patient_map = encoded["posed_patient_map"].float()
+         pivot = (self.config.data.image_size - 1) / 2
+         posed_centre = patient_map[..., 2] + pivot * patient_map[..., :2].sum(-1)

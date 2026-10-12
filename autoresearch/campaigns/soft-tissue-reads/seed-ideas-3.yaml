@@ -1,0 +1,47 @@
+ideas:
+- id: cell-position-for-the-meniscus-reader-only
+  mechanism_id: cell-position
+  parent_idea_id: cell-position-inside-the-structure
+  title: Give the position inside the structure to the meniscus reader of the cell read only
+  opportunity: 'Evidence for the pattern, guess for the fix. In cell-position-inside-the-structure (run
+    3 of this campaign, one run) both readers of the cell read got the position. The two meniscus labels
+    gained at x4: Lateral Meniscus +0.0015 (135 positives), Medial Meniscus +0.0013 (339), with a larger
+    cell-read logit (0.105 and 0.109 against 0.094 and 0.095). The three OA labels lost: Lateral OA -0.0020
+    (95), PF OA -0.0015 (290), Medial OA -0.0009 (189), with a smaller cell-read logit (0.133, 0.049 and
+    0.100 against 0.155, 0.073 and 0.110). The run was above the incumbent at x1 (+0.0004) and below at
+    x4 (-0.0008). Prior work measured the location dependence on the menisci only (lateral anterior horn
+    +0.052, lateral posterior -0.028). Guess, medium-low: the meniscus gain is kept and the OA labels
+    return to the incumbent.'
+  mechanism: 'Exactly the position of cell-position-inside-the-structure, for the meniscus reader only.
+    Each cell gets a three-value position: its patient offset (soft_tissue_offset) minus the nearer of
+    the two share-weighted meniscus centres, expressed on the knee frame''s axes (across, front, up) and
+    divided by the knee''s size from the study frame. The across value is multiplied by the sign of the
+    own centre''s across coordinate, so outward is positive on both sides. One zero-initialised linear
+    layer maps the three values to the token width and is added to the meniscus reader''s tokens before
+    the layer norm. Cells of a study without the centre get zero. All inputs detached. The OA reader''s
+    tokens are the incumbent''s, unchanged.'
+  precedents:
+  - 'cell-position-inside-the-structure (this campaign, rejected): x4 -0.0008, x1 +0.0004; menisci +0.0015
+    and +0.0013, OA labels -0.0009 to -0.0020. Its reviewed candidate source is the starting point.'
+  - 'rn18-soft-tissue-cells (run 1) and rn18-soft-tissue-read-loss-wide-regions (run 3): the same sign
+    of the location effect on the menisci in both (lateral anterior horn +0.052 and +0.055).'
+  novelty: The position restricted to the reader whose labels gained from it.
+  coverage: Every study with a found meniscus centre; the two meniscus labels.
+  exploitation: 'Read the two meniscus labels and the three OA labels against the incumbent at both multipliers.
+    Log on validation only the norm of the meniscus reader''s position weights (one metric) and the share
+    of meniscus cells with a position (one metric). Shown wrong by: the OA labels still below the incumbent
+    by as much as in the parent run, or neither meniscus label above the incumbent at either multiplier.'
+  budget: 'Within 1.03 of the incumbent''s training time: one small linear layer on values the routing
+    already computes. The parent run trained in 1,557 s against 1,599 s.'
+  implementation: 'Follow the environment paragraph of the developer instructions. Start from the candidate
+    source of cell-position-inside-the-structure and remove the OA reader''s position layer, its tokens
+    and its metric; no option. Files: modeling/model.py, training/lightning.py for the two metrics, spatial_tokens.py.
+    Reuse the centres from the memoised routing weights. New parameters under torch.random.fork_rng, zero-initialised,
+    so the model starts as the incumbent. Report on one batch that mirroring a study leaves the positions
+    unchanged and that the logits equal the incumbent''s at initialisation. Apply to the incumbent as
+    assigned.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The parent run gained on exactly the labels this keeps and lost on the ones it leaves
+    out.
+exhausted_directions: ''

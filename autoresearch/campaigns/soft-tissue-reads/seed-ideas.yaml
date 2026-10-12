@@ -1,0 +1,222 @@
+ideas:
+- id: residual-cell-read-on-a-detached-fourth-stage
+  mechanism_id: read-training
+  parent_idea_id: null
+  title: Train the fourth-stage read alone and the cell read as a correction on it, with the wide regions
+  opportunity: 'The user''s design (2026-10-10). Evidence. The five soft-tissue labels get one logit, the
+    fourth-stage read (A) plus the third-stage cell read (B), and one loss on the sum, so whatever B learns
+    A stops learning. Run 4 (wide regions): B added +0.0016 mean AUC over the five labels, more than the
+    reference''s +0.0012, but A alone ended 0.0018 lower, so the sum was level with the recipe. Run 3 (a
+    loss on B''s own logit): B took over (0.89 to 0.946 alone) and A collapsed (0.73 to 0.83), so B must be
+    trained as a correction on A, not on its own logit. Guess, medium confidence: A stays at its level
+    and B adds about +0.0016 on five labels, +0.0007 macro; B''s gain was measured with A co-adapted and
+    may be smaller against a full-strength A.'
+  mechanism: 'Training only. (1) A takes the label loss alone on its own logit, for all twelve labels,
+    exactly the loss call the training step makes today but on the logits of KneeAbnormalityModel._pool_tokens;
+    A no longer sees B. (2) B takes the same loss on A.detach() + B, restricted to the five labels (the
+    columns of soft_target), each label term weighing exactly as in the main loss: the function applied
+    to those five columns times 5/12. B''s gradient cannot reach A''s head or the fourth stage; it still
+    reaches backbone stages 1 to 3 through the cell features, which is intended and must not be detached.
+    (3) The wide regions of run 4 come back: the OA rim is the larger of one and two 3 by 3 mean passes,
+    and a meniscus label also opens the cartilage rim of its own compartment (the larger of the meniscus
+    rule and that rim). (4) The bone routing of Contusion and Fracture stays. Prediction and validation
+    are unchanged: logit = A + B.'
+  precedents:
+  - 'rn18-soft-tissue-added-read-bone-routes (the reference): one loss on A + B; B adds +0.0012 on the
+    five labels, x4 0.928909.'
+  - 'rn18-soft-tissue-wide-regions (run 4): the wide regions with one loss on the sum; B +0.0016, A
+    -0.0018, x4 0.928123.'
+  - 'rn18-soft-tissue-read-loss-wide-regions (run 3): a loss on B''s own logit; the reads swapped, x4
+    0.927004.'
+  novelty: First run where B is trained as a residual of a detached A. Runs 2 and 4 shared one loss; run
+    3 gave B a loss of its own.
+  coverage: Every study; the five soft-tissue labels in B, all twelve in A.
+  exploitation: 'Read against the incumbent at both multipliers and per label. Log on validation only,
+    through _log_epoch_metric, the macro AUC of the five labels from A alone and from A + B (two metrics,
+    computed from the same forward pass at epoch end), and keep the existing soft_tissue_* metrics. Shown
+    wrong by: A alone below the reference''s A (0.9454, 0.9104, 0.9275, 0.9104, 0.9027 at x4) with B''s
+    gain not above run 4''s.'
+  budget: 'Same cost as the incumbent: within 1.03 of its training time. One extra loss term on logits
+    already computed; no extra pooling pass.'
+  implementation: 'Follow the environment paragraph of the developer instructions. Files: training/lightning.py
+    (training_step) and modeling/model.py; spatial_tokens.py for the identity text. Replaces the summed
+    loss; adds no option and no config field. In the training step get A and B from one encode and one
+    pooling of each (expose the two logits of pool_encoded without pooling twice). Take the wide regions
+    from autoresearch/campaigns/soft-tissue-reads/wide-regions.diff, the routing hunks only: do not add
+    soft_bias, soft_tissue_logits or any loss on B''s own logit. Report on one batch that A''s loss has
+    no gradient on soft_attention and soft_head, that B''s loss has none on the fourth-stage heads and
+    on layer4, and that it has one on layer3. Update SPATIAL_TOKEN_IDENTITY["soft_tissue_routing"].'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: First because it removes the measured trade between the two reads; every later
+    seed makes B able to do more, which only pays once A is protected.
+- id: oa-cartilage-and-bone-zone-pooled-apart
+  mechanism_id: oa-cell-pools
+  parent_idea_id: null
+  title: Read the cartilage cells and the bone-zone cells of an OA label in two pools
+  opportunity: 'Evidence for the deficit, guess for the cause. An OA label''s cell read weights each cell
+    by the larger of its cartilage rim and the bone map''s joint zone, in one softmax. The bone zone holds
+    60 to 67% of that weight and receives 35 to 57% of the attention (run 1 diagnosis). The cell reader
+    trained alone (run 1) is level with the references on full-thickness damage (PF OA -0.0015, 109 positives;
+    Lateral OA -0.002, 35) and behind on partial damage: PF OA partial low grade -0.031 (42), partial
+    high grade -0.028 (33), focal -0.062 (15); Lateral OA partial high grade -0.093 (8). Partial-thickness
+    damage lives in the cartilage layer alone, the fine local detail B should add to A. Guess: +0.001 to
+    +0.002 on each OA label.'
+  mechanism: 'In KneeAbnormalityModel._soft_tissue_routing_weights return two weights per OA label instead
+    of their maximum: the cartilage weight (the incumbent''s rim, in the label''s own compartment) and the
+    bone-zone weight (the bone map''s joint or kneecap-joint share, in the own compartment; the whole zone
+    when the study has no anchors, as today). In _soft_tissue_pool each OA label gets two attention pools
+    over the same cell tokens, one routed by each weight, each with its own softmax, its own attention
+    channel and its own zero-started readout channel; B for the label is the sum of the two pooled logits.
+    A pool whose total weight in the study is below one cell contributes zero. The meniscus labels are
+    unchanged.'
+  precedents:
+  - 'rn18-soft-tissue-cells (run 1): cells-only reader; partial damage behind, full thickness level;
+    bone zone 60 to 67% of the weight.'
+  - 'rn18-soft-tissue-wide-regions (run 4): a wider cartilage rim raised B''s gain on Lateral OA (+0.0033
+    against +0.0022) but not on Medial OA or PF OA.'
+  novelty: First read where the cartilage layer has an attention pool of its own.
+  coverage: Every study; Medial OA, Lateral OA and PF OA.
+  exploitation: 'Read the three OA labels against the incumbent at both multipliers. Log on validation
+    only the mean absolute logit of each pool per OA label (six metrics). Shown wrong by: the cartilage
+    pool''s logit staying near zero while the bone pool carries B, or no OA label above the incumbent
+    at either multiplier.'
+  budget: 'Within 1.03 of the incumbent''s training time: one more softmax over the cells for three labels,
+    no new tokens.'
+  implementation: 'Follow the environment paragraph of the developer instructions. Files: modeling/model.py,
+    training/lightning.py for the six metrics, spatial_tokens.py for the identity text. Replaces the
+    single OA pool; no option. New parameters initialise under torch.random.fork_rng with zero readouts,
+    so the model starts as the incumbent with B''s bone pool equal to nothing learned. Keep the routing
+    statistics (open cells, weight, routed) per pool only in the report, on one batch. Report on one
+    batch that the sum of the two weights'' supports equals the incumbent''s support and that the meniscus
+    labels'' logits are bit-identical to the incumbent''s. Apply to the incumbent as assigned, whichever
+    way the earlier seeds went.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Three labels, and the deficit it aims at is the largest one measured for the cell
+    read.
+- id: cell-position-inside-the-structure
+  mechanism_id: cell-position
+  parent_idea_id: null
+  title: Tell each cell of the cell read where it lies relative to its own structure's centre
+  opportunity: 'Evidence for the pattern, guess for the fix. The cell read''s tokens are the third-stage
+    features plus the plane and contrast embeddings: they carry no position, while the fourth-stage read
+    has a position prior. The cell reader trained alone (run 1) gains or loses by where the tear is:
+    lateral anterior horn +0.052 (10 positives; run 3 +0.055), medial body +0.010 (16), medial posterior
+    horn and body -0.009 (107), lateral posterior -0.028 (21). A reader shared by both sides that cannot
+    tell a horn from the body treats all of a meniscus alike. Guess, medium-low: +0.001 to +0.002 on the
+    meniscus labels.'
+  mechanism: 'For the cell read only. Each cell gets a three-value position: its patient offset (soft_tissue_offset)
+    minus the centre of its own structure, expressed on the knee frame''s axes (across, front, up) and divided
+    by the knee''s size from the study frame. Own structure: for the meniscus reader, the nearer of the
+    two share-weighted meniscus centres; for the OA reader, the nearest of the three compartment centres,
+    both already computed in _soft_tissue_routing_weights. The across value is multiplied by the sign
+    of the own centre''s across coordinate, so outward is positive on both sides and the shared reader
+    stays blind to the side. A zero-initialised linear layer per reader maps the three values to the
+    token width and is added to that reader''s tokens before the layer norm. Cells of a study without the
+    centre get zero. All inputs detached.'
+  precedents:
+  - 'rn18-soft-tissue-cells (run 1) and rn18-soft-tissue-read-loss-wide-regions (run 3): the same sign
+    of the location effect in both (lateral anterior horn +0.052 and +0.055).'
+  - 'The fourth-stage read has carried a position prior in the knee frame since the side-routed line.'
+  novelty: First position input of the cell read; relative to the structure, not to the knee.
+  coverage: Every study with a found centre; the five soft-tissue labels.
+  exploitation: 'Read the two meniscus labels against the incumbent at both multipliers. Log on validation
+    only the norm of each reader''s position weights (two metrics) and the share of cells with a position
+    (one metric). Shown wrong by: weights staying at zero, or neither meniscus label above the incumbent
+    at either multiplier.'
+  budget: 'Within 1.03 of the incumbent''s training time: one small linear layer on values the routing
+    already computes.'
+  implementation: 'Follow the environment paragraph of the developer instructions. Files: modeling/model.py,
+    training/lightning.py for the three metrics, spatial_tokens.py. Adds to the cell read''s tokens and
+    removes nothing; no option. The tokens become one set per reader: memoise each through _memo. Reuse
+    the centres from the memoised routing weights instead of computing them again. New parameters under
+    torch.random.fork_rng, zero-initialised, so the model starts as the incumbent. Report on one batch
+    that mirroring a study leaves the positions unchanged and that the logits equal the incumbent''s at
+    initialisation. Apply to the incumbent as assigned.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The cell read's clearest wins over the fourth-stage read are local and depend on
+    location.
+- id: pf-oa-own-cell-reader
+  mechanism_id: pf-reader
+  parent_idea_id: null
+  title: Give PF OA its own attention and readout in the cell read
+  opportunity: 'Evidence for the deficit, guess for the fix. In the cell read one attention channel and
+    one readout channel are shared by Medial OA, Lateral OA and PF OA. PF OA is where that reader is weakest:
+    0.719 alone in the reference against 0.807 and 0.808 for the other two, the smallest gain from B
+    (+0.0005; +0.0003 in run 4), and -0.010 when read from the cells alone (run 1). Its structure differs
+    from the other two: patellar cartilage and the trochlea, read mostly in the axial and sagittal views,
+    against tibial plateaus. PF OA is the second-weakest label (0.903) with 290 positives. Guess: PF
+    OA up to the lateral labels'' gain from B, +0.002.'
+  mechanism: 'In the cell read only, PF OA gets its own channel: soft_attention and soft_head output one
+    more channel and soft_target_channel sends PF OA to it. The new readout channel starts at zero and
+    the new attention channel under torch.random.fork_rng. Medial OA and Lateral OA keep sharing theirs.
+    The fourth-stage read and its shared classifiers are unchanged.'
+  precedents:
+  - 'rn18-soft-tissue-added-read-bone-routes (the reference): B alone 0.719 on PF OA, 0.807 and 0.808
+    on Medial and Lateral OA.'
+  - 'near-misses campaign: a PF OA bias and a three-compartment detector on the fourth-stage read were
+    rejected; this seed touches only the cell read.'
+  novelty: First split of the cell read's OA reader.
+  coverage: Every study; PF OA.
+  exploitation: 'Read PF OA against the incumbent at both multipliers, and Medial and Lateral OA for a
+    side effect. Log on validation only the cosine between the PF OA readout and the shared OA readout
+    (one metric); soft_tissue_logit_abs_pf_oa already exists. Shown wrong by: the cosine staying near one,
+    or PF OA not above the incumbent at either multiplier.'
+  budget: Same cost as the incumbent, within 1.02 of its training time.
+  implementation: 'Follow the environment paragraph of the developer instructions. Files: modeling/model.py,
+    training/lightning.py for the metric, spatial_tokens.py. Replaces PF OA''s use of the shared OA channel
+    in the cell read; no option. If the incumbent already pools the OA labels in two pools, PF OA gets
+    its own channel in both. Report on one batch that the Medial OA, Lateral OA and meniscus logits are
+    bit-identical to the incumbent''s and that the PF OA cell logit is zero at initialisation.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: One label only, but nearly free and on the label where the cell read adds least.
+- id: soft-tissue-map-on-the-28-by-28-grid
+  mechanism_id: map-grid
+  parent_idea_id: null
+  title: Predict and teach the soft-tissue map on the second-stage grid and average it down to the cells
+  opportunity: 'Evidence for the map, guess for the labels. The routing is only as good as the map. Its
+    overlap rose from 0.45 on the 7 by 7 tokens to 0.55 on the 14 by 14 cells, and on the tokens it was
+    flat from epoch 5 with training equal to validation: the grid is the ceiling. In the reference it
+    is 0.54 and 0.55 for the menisci and 0.48 to 0.58 for the cartilages, layers 2 to 4 mm thick on cells
+    of 6 to 8.6 mm. Where the map is good the cell reader beats the fourth-stage read: on the mask scanner''s
+    52 validation studies run 1 is +0.021 on three labels (98% of resamples), and behind on the other 822.
+    Known limit: the 1 mm masks were judged safe down to 4 mm cells; the 28 by 28 cells are 3.0 to 4.3
+    mm. Guess: +0.0005 to +0.001 macro through sharper routing.'
+  mechanism: 'The seven-class head predicts on the second-stage grid (28 by 28): its input is a new linear
+    projection of the second-stage features to the token width, plus the third-stage projection and the
+    fourth-stage tokens, each repeated to 28 by 28 as the fourth-stage tokens are repeated to 14 by 14
+    today. The map loss is taken on the 28 by 28 grid, with targets sampled at that grid''s cell positions
+    (feature_geometry with the second stage''s mapping, the same quadrature per cell). The shares used
+    by the routing, the frame''s meniscus spots and the 7 by 7 meniscus shares are the detached 28 by 28
+    probabilities averaged down. The cell read stays on the 14 by 14 third-stage features; the routing
+    rules are unchanged.'
+  precedents:
+  - 'meniscus-head-on-the-14-by-14-grid (view poses run 1): moving the head from 7 by 7 to 14 by 14 raised
+    overlap by 0.11 and 0.13 at 0.988 of the training time.'
+  - 'rn18-soft-tissue-cells (run 1): the mask-scanner result and the map''s centres within 2.3 to 3.6
+    mm of the masks.'
+  novelty: First map finer than the cells it routes.
+  coverage: Every study for the routing; the 211 training mask knees for the map loss.
+  exploitation: 'Read against the incumbent at both multipliers. Log on validation only the overlap
+    per class of the map averaged down to 14 by 14, under the existing val_meniscus_overlap_* names so
+    it compares with the incumbent, and the overlap of the two menisci on the 28 by 28 grid (two new
+    metrics). Shown wrong by: no class overlapping better at 14 by 14 than the incumbent''s map.'
+  budget: 'Up to 1.15 of the incumbent''s training time, and inside the campaign''s 1.25 ceiling against
+    the reference: the head runs on four times the positions; the backbone is unchanged. State the measured
+    step time of one batch against the incumbent in the report.'
+  implementation: 'Follow the environment paragraph of the developer instructions. Files: modeling/model.py,
+    modeling/spatial_tokens.py (the second stage''s mapping and the identity texts), training/anatomy.py
+    and training/lightning.py for the targets and the loss on the finer grid. Replaces the 14 by 14 map
+    head; no option. Keep the head zero-initialised and new parameters under torch.random.fork_rng. The
+    target lookup for 28 by 28 runs once per batch; do not keep the 14 by 14 lookup beside it. Report on
+    one batch the number of supervised positions (four times the incumbent''s) and that averaging the
+    targets down reproduces the incumbent''s 14 by 14 targets. If the training time cannot stay within
+    the budget, return blocked with the measured time instead of cutting anything.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Highest ceiling, since it sharpens the routing of all five labels; last of the
+    forced seeds because it is the one that changes cost.
+exhausted_directions: ''

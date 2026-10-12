@@ -1,0 +1,73 @@
+--- a/src/knee_abnormality/modeling/model.py
++++ b/src/knee_abnormality/modeling/model.py
+@@ -860,6 +860,7 @@
+                     PROJECTION_WIDTH, len(SHARED_CHANNELS), bias=False
+                 )
+                 nn.init.zeros_(self.soft_head.weight)
++                self.soft_bias = nn.Parameter(torch.zeros(len(soft_target)))
+                 if self.plane_readout:
+                     self.soft_head = PlaneContrastReadout(
+                         self.soft_head, len(data.series_types)
+@@ -2195,11 +2196,9 @@
+             distance = distances(centres(meniscus)).masked_fill(
+                 ~(peak > 0)[study][:, None], torch.inf
+             )
+-            meniscus_weight = (
+-                cells(torch.where(opened, torch.maximum(grid(meniscus), spread), 0.0))
+-                * (distance <= distance.flip(-1))
+-                * valid[..., None]
+-            )
++            meniscus_weight = cells(
++                torch.where(opened, torch.maximum(grid(meniscus), spread), 0.0)
++            ) * (distance <= distance.flip(-1))
+ 
+             anchors = (
+                 torch.stack(
+@@ -2235,17 +2234,17 @@
+             typical = per_study(cartilage.square()) / per_study(cartilage).clamp_min(
+                 tiny
+             )
+-            rim = cells(
+-                nn.functional.avg_pool2d(
+-                    grid(
+-                        (cartilage / typical[study][:, None].clamp_min(tiny)).clamp(
+-                            max=1
+-                        )
+-                    ),
+-                    3,
+-                    1,
+-                    1,
+-                )
++            rim = nn.functional.avg_pool2d(
++                grid(
++                    (cartilage / typical[study][:, None].clamp_min(tiny)).clamp(max=1)
++                ),
++                3,
++                1,
++                1,
++            )
++            rim = cells(torch.maximum(rim, nn.functional.avg_pool2d(rim, 3, 1, 1)))
++            meniscus_weight = (
++                torch.maximum(meniscus_weight, (rim * own)[..., :2]) * valid[..., None]
+             )
+             zone = (
+                 encoded["anatomy_shares"]
+@@ -2338,6 +2337,7 @@
+             logits = torch.einsum("btn,nt->bt", attention, evidence)
+             if view is None:
+                 self.soft_tissue_routing_stats["logit_abs"] = logits.detach().abs()
++                self.soft_tissue_logits = logits + self.soft_bias.float()
+             return logits
+ 
+     def pool_encoded(self, encoded: dict, view: int | None = None) -> torch.Tensor:
+--- a/src/knee_abnormality/modeling/spatial_tokens.py
++++ b/src/knee_abnormality/modeling/spatial_tokens.py
+@@ -70,7 +70,7 @@
+ 
+ SPATIAL_TOKEN_IDENTITY = {
+     "bone_routing": "contusion_and_fracture_routed_by_each_tokens_detached_bone_map_share_of_femur_tibia_kneecap_and_fibula_unrouted_below_one_token",
+-    "soft_tissue_routing": "meniscus_and_oa_targets_keep_their_stride32_read_and_add_a_logit_read_from_stride16_layer3_cells_own_layernorm_attention_256_128_2_and_zero_initialized_plane_contrast_readout_no_bias_no_position_prior_no_knee_level_term_seven_class_map_head_routing_weights_detached_menisci_core_at_one_over_32_of_knee_peak_grown_one_cell_weight_max_of_share_and_3x3_mean_kept_nearer_own_meniscus_centre_oa_cells_assigned_to_nearest_of_three_compartment_centres_own_cartilage_plus_assigned_femoral_cartilage_over_self_weighted_mean_share_capped_at_one_3x3_mean_max_with_bone_map_joint_or_kneecap_joint_share_of_parent_token_bone_zone_alone_without_anchors_unrouted_below_one_cell",
++    "soft_tissue_routing": "meniscus_and_oa_targets_keep_their_stride32_read_and_add_a_logit_read_from_stride16_layer3_cells_own_layernorm_attention_256_128_2_and_zero_initialized_plane_contrast_readout_no_bias_no_position_prior_no_knee_level_term_seven_class_map_head_routing_weights_detached_menisci_core_at_one_over_32_of_knee_peak_grown_one_cell_weight_max_of_share_and_3x3_mean_kept_nearer_own_meniscus_centre_oa_cells_assigned_to_nearest_of_three_compartment_centres_own_cartilage_plus_assigned_femoral_cartilage_over_self_weighted_mean_share_capped_at_one_3x3_mean_max_with_bone_map_joint_or_kneecap_joint_share_of_parent_token_bone_zone_alone_without_anchors_unrouted_below_one_cell_second_version_the_cell_read_plus_its_own_zero_started_bias_also_takes_the_label_loss_alone_at_the_five_labels_share_of_the_targets_oa_rim_is_the_max_of_one_and_two_3x3_mean_passes_meniscus_weight_is_the_max_of_the_meniscus_rule_and_that_cartilage_rim_of_the_own_compartment",
+     "algorithm": "all_valid_spatial_tokens_rotatable_knee_frame_attention_prior_side_routed_shared_channels_knee_level_term_v14_hard_octants_soft_gradient_own_routes_study_frames_and_landmarks_eighteen_regions_overlap_routed_reports_fixed_frame_own_position_hard_cuts_soft_gradient_knee_level_term_on_every_routed_channel_side_labels_keep_their_half_of_the_core_region_table_from_all_token_attention_synovitis_unrouted_per_study_centre_nod_and_sizes_roll_and_turn_shared_kneecap_region_front_above_the_lower_cut_frame_on_detached_bone_share_centroid_10mm_gaussian_near_anatomy_plane_spot_orientation_and_no_mass_fallback_eight_sections_three_tear_places_per_side_ring_sector_division",
+     "projection": "shared_linear_C_to_256",
+     "meniscus_map": "independent_zero_initialized_linear_256_to_three_on_stride16_layer3_projection_plus_nearest_repeated_stride32_normalized_tokens_16px_target_footprint_four_by_four_target_samples_preserve_4px_quadrature_pitch_same_visual_validity_detached_probabilities_mean_of_four_per_stride32_token",

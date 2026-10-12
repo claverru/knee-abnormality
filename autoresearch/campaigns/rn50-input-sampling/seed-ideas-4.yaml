@@ -1,0 +1,81 @@
+ideas:
+- id: centred-grids-at-225-px-exact-copies
+  mechanism_id: token-grid
+  parent_idea_id: centred-token-grid-at-257-px
+  title: Feed 225 px images, where both feature grids are centred, with exact copies between them
+  opportunity: 'The user''s order (2026-10-11): both the third-stage cells and the fourth-stage tokens must be
+    centred. Verified numerically on the backbone: at 224 px the cells sit at 0 to 208 px (7.5 px off the crop
+    centre) and the tokens at 0 to 192 (15.5 px off), and no shift of sampling phase centres both, because a
+    token always sits on a cell. At 225 px the stock backbone gives 15 by 15 cells at 0, 16, ..., 224 and 8
+    by 8 tokens at 0, 32, ..., 224: both centred on pixel 112, token k on cell 2k, at about 1.01 of the pixels
+    (257 px does the same at 1.32). A review of the 257 px candidate found the copies between the two grids
+    half a cell (8 px, 2.3 to 4.3 mm) off and not mirror-symmetric, inherited from the 224 px recipe: tokens
+    to cells by repetition (cell j takes token j//2) and cells to tokens by a 2 by 2 mean of cells 2k and
+    2k+1. Precedent: 225 px on the ResNet-18 lost 0.0024 for a cause not established, with those inherited
+    copies. Guess, low-medium: +0 to +0.001 macro.'
+  mechanism: 'data.image_size 225 with every view''s mm per pixel unchanged (each field_mm and reference_field_mm
+    multiplied by 225/224); all 8 by 8 tokens and 15 by 15 cells counted. The copies between the grids are
+    exact for token k on cell 2k: tokens to cells by bilinear interpolation with aligned corners (even cells
+    take their own token, odd cells the mean of the two neighbours); cells to tokens by weights 1/4, 1/2,
+    1/4 per axis on cells 2k-1, 2k, 2k+1, renormalised at the borders. These are the functions tokens_to_cells
+    and cells_to_tokens of exact-grid-transfers-257.diff in the campaign directory, which are generic in
+    the grid size (cells = 2 * tokens - 1), used at the three sites that diff changes (the fourth-stage context
+    added to the soft-tissue map, the anatomy zone on the cells, the map shares pooled onto the tokens).'
+  precedents:
+  - 'autoresearch/campaigns/rn50-input-sampling/exact-grid-transfers-257.diff: the reviewed correction, written
+    against the frozen source of the 257 px candidate (outputs/autoresearch/rn50-input-sampling/experiments/centred-token-grid-at-257-px-20261011T202734Z-5b8edc1d/source);
+    take that candidate''s odd-size handling from its changes.diff and this diff''s copies, with 225 in
+    place of 257.'
+  - 'docs/validation/results/2026-10-08-token-grid-alignment.md: the 225 px run on the ResNet-18.'
+  novelty: First run with both grids centred and exact copies between them, at the reference's cost.
+  coverage: Every image; all labels.
+  exploitation: 'Read the macro and all labels against the incumbent at both multipliers. Activation: the logged
+    number of tokens per image at validation (64) through the existing epoch-metric path (one metric). Shown
+    wrong by: the macro below the incumbent at both multipliers.'
+  budget: 'About 1.01 to 1.05 of the reference''s training time (0.9% more pixels, 64 tokens against 49);
+    GPU about 17.5 GB (estimate).'
+  implementation: 'Follow the environment paragraph of the developer instructions. The user ordered this second
+    image size on 2026-10-11; it is allowed for this seed. Files: configs/training.yaml (image_size, field_mm
+    of every view, reference_field_mm), modeling/model.py and modeling/spatial_tokens.py as the two diffs
+    named in the precedents, training/lightning.py for the one metric. No option. Report from the config
+    model the mm per pixel of every view before and after (equal), the token and cell counts, and on synthetic
+    tensors that a position ramp is reproduced exactly by tokens_to_cells on all 15 cells, that cells_to_tokens
+    returns each interior token''s own position, and that a mirrored input gives a mirrored output. Apply
+    to the incumbent as assigned.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user's order; both grids centred at the reference's cost.
+- id: centred-token-grid-by-phase-exact-copies
+  mechanism_id: token-grid
+  parent_idea_id: centred-token-grid-by-last-stage-phase
+  title: The last-stage phase shift at 224 px with exact copies between cells and tokens
+  opportunity: 'The user''s order (2026-10-11): requeue the phase-shift seed in its corrected form. A review
+    with numeric checks found the first candidate correct for its seed (tokens at 16, 48, ..., 208; both
+    residual branches on the same phase; weights unchanged; declared mappings true) with one inherited inexactness:
+    token k sits on cell 2k+1 but takes the mean of cells 2k+1 and 2k+2, 8 px (2.3 to 4.3 mm) down and right
+    of the token, and cells take the nearest token with ties resolved one way. The cells themselves stay at
+    0 to 208 px (7.5 px off centre): at 224 px both grids cannot be centred. Guess, low: within 0.0005 of
+    the first candidate.'
+  mechanism: 'The first candidate (frozen source outputs/autoresearch/rn50-input-sampling/experiments/centred-token-grid-by-last-stage-phase-20261011T194042Z-2dc075ca/source,
+    its changes.diff) with exact-grid-transfers-224.diff of the campaign directory applied: tokens_to_cells
+    interpolates linearly at each cell''s true position in token units, clamped to the token range; cells_to_tokens
+    weighs cells 2k, 2k+1, 2k+2 by 1/4, 1/2, 1/4 per axis with border renormalisation; the grid diagnostic
+    returns after its edge metrics when the posed patient map is absent.'
+  precedents:
+  - 'autoresearch/campaigns/rn50-input-sampling/exact-grid-transfers-224.diff, written against the first
+    candidate''s frozen source; port both onto the incumbent you are assigned.'
+  novelty: The corrected form of the phase-shift seed.
+  coverage: Every image; all labels.
+  exploitation: 'Read the macro, MCL and the eight larger labels against the incumbent and against the first
+    candidate at both multipliers. Activation: the first candidate''s validation metrics of the grid (the
+    centred fraction and the two edge validity shares). Shown wrong by: those diagnostics unchanged, or the
+    macro below the incumbent at both multipliers.'
+  budget: 'The reference''s training time.'
+  implementation: 'Follow the environment paragraph of the developer instructions. Files: modeling/model.py,
+    modeling/spatial_tokens.py, training/anatomy.py and training/lightning.py as the first candidate changed
+    them, plus the diff. No option. Report on synthetic tensors that a position ramp is reproduced by tokens_to_cells
+    on cells 1 to 13 and by cells_to_tokens on tokens 0 to 5. Apply to the incumbent as assigned.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user's order.
+exhausted_directions: ''

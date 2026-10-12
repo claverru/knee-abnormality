@@ -1,0 +1,79 @@
+ideas:
+- id: thirty-five-distinct-slices
+  mechanism_id: slice-budget
+  parent_idea_id: sagittal-fluid-ten-distinct-slices
+  title: Ten sagittal fluid slices and one more on every other type, 35 distinct slices in all
+  opportunity: 'The next dose of the two slice seeds (sagittal-fluid-ten-distinct-slices and one-more-slice-on-every-series-type):
+    a training bag reads 21 to 23% of each series'' positions, and x4 over x1 is +0.0081 on the ResNet-50.
+    The 40-slice follow-up on the ResNet-18 lost against 36, but with an epoch removed, which confounds it.
+    Guess, low-medium: above the better of the two slice seeds.'
+  mechanism: 'Configuration only. No second sagittal fluid view; slices per series type 7, 7, 6, 6, 6, 10; data.study_slice_total
+    35. About 36 images per study in training.'
+  precedents:
+  - 'The two slice seeds of this campaign; read their results first and say in the report which one this
+    run is compared with.'
+  novelty: More distinct slices than any run of the line at ten epochs.
+  coverage: Every study; all labels.
+  exploitation: 'Read all labels against the incumbent and against the two slice seeds at both multipliers.
+    Activation: the logged mean images per study in training. Shown wrong by: not above the better of the
+    two slice seeds at x4.'
+  budget: 'About 1.18 of the reference''s training time; GPU about 19 GB (largest study 42 images); RAM about
+    0.5 GB more of prefetched batches. Return blocked above 1.25 or 22 GB.'
+  implementation: 'Follow the environment paragraph of the developer instructions. Files: configs/training.yaml
+    only. Report the images per study from the loader on two studies. Apply to the incumbent as assigned.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The dose after the two slice seeds.
+- id: sagittal-fluid-kneecap-and-pouch-tile
+  mechanism_id: native-tile
+  parent_idea_id: sagittal-fluid-context-view-106-mm
+  title: Place the second sagittal fluid view as a 93 mm tile on the kneecap and pouch
+  opportunity: 'As sagittal-fluid-context-view-106-mm, at native pixels and on the structure: at 93 mm the finer
+    acquired axis is kept in 89% of series; the whole kneecap is inside a centred 93 mm crop in 26% of series;
+    PF OA is 0.045 lower when the kneecap is not whole in the crop (95% interval -0.097 to +0.024). Guess,
+    low: PF OA +0.002, Effusion +0.001.'
+  mechanism: 'The second sagittal fluid view has field 93 mm on the first view''s slices and is centred on the
+    kneecap: the centre of the bone map''s kneecap share on the first look of the same image, bounded to the
+    stored image instead of the image-centred 120 mm frame. Its tokens are open to PF OA, Effusion, Synovitis
+    and Baker''s. It stays out of the first look and of contrast and feature-statistics mixing.'
+  precedents:
+  - 'The incumbent''s detail-view code; view_position in modeling/model.py.'
+  novelty: A native-resolution tile placed by the model's own map.
+  coverage: Every study with a sagittal fluid series.
+  exploitation: 'Read PF OA, Effusion and the macro against the incumbent at both multipliers. Log on validation
+    only the share of PF OA''s and Effusion''s attention on the tile and the share of tiles that hold the
+    kneecap centre (three metrics). Shown wrong by: PF OA flat while the tile holds attention.'
+  budget: 'The reference''s training time.'
+  implementation: 'Follow the environment paragraph of the developer instructions. Files: configs/training.yaml,
+    modeling/model.py, modeling/spatial_tokens.py, training/lightning.py for the metrics. The tile''s centre
+    is detached. No option. Apply to the incumbent as assigned.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The structure-placed form of the context view.
+- id: three-dimensional-series-read-as-slabs
+  mechanism_id: slab-read
+  parent_idea_id: null
+  title: Read a pick of a 3D series as the mean of its three decoded thin slices
+  opportunity: 'Measured (prior-work.md): 836 series in 659 studies are 3D with steps of 0.4 to 1.2 mm, so a
+    pick is one thin slice (0.6 mm for the 317 axial fluid ones) against about 3 mm for a 2D stack, and the
+    loader already decodes three slices per pick of which the model reads the middle one. Guess, low: within
+    +-0.0005 macro, on the 15% of studies concerned.'
+  mechanism: 'For a series flagged 3D by the loader (slice step below 1.5 mm) the image of a pick is the mean
+    of the three decoded slices instead of the middle one; 2D series are unchanged. The flag is computed per
+    series from the slice positions the loader already has.'
+  precedents:
+  - 'prior-work.md, Acquired against fed.'
+  novelty: First use of the two decoded neighbours the recipe discards.
+  coverage: 659 studies with a 3D series.
+  exploitation: 'Read the macro on the studies with a 3D series apart from the others, against the incumbent
+    at both multipliers. Activation: the logged share of images read as slabs at validation (one metric).
+    Shown wrong by: that subgroup not above the incumbent.'
+  budget: 'The reference''s training time.'
+  implementation: 'Follow the environment paragraph of the developer instructions. Files: data/dataset.py for
+    the flag, modeling/model.py and training/lightning.py where the middle slice is selected, inference/engine.py
+    if prediction selects it separately. The 1.5 mm threshold comes from the measured gap between 3D steps
+    (0.4 to 1.2 mm) and 2D steps (3.3 to 4.0 mm). No option. Apply to the incumbent as assigned.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Acquired slices the loader already decodes.
+exhausted_directions: ''

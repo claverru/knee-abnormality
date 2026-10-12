@@ -1,0 +1,101 @@
+id: rn50-input-sampling
+recipe: configs/training.yaml
+reference_run: outputs/training/rn50-detail-view-teacher-025
+reference_equivalences: {}
+additional_evidence_runs: []
+backlog:
+  refill_below: 3
+  refill_to: 5
+  seed_order: forced
+  rotate_after: 1000000
+budget:
+  mode: range
+  min_fraction: 0.75
+  max_fraction: 1.25
+policy:
+  editable_files:
+  - configs/training.yaml
+  - src/knee_abnormality/config.py
+  - src/knee_abnormality/inference/checkpoint.py
+  - src/knee_abnormality/inference/engine.py
+  - src/knee_abnormality/training/anatomy.py
+  - src/knee_abnormality/training/lightning.py
+  - src/knee_abnormality/data/dataset.py
+  - src/knee_abnormality/data/preprocessing/sampling.py
+  - src/knee_abnormality/data/preprocessing/spatial.py
+  - src/knee_abnormality/data/preprocessing/device.py
+  editable_directories:
+  - src/knee_abnormality/modeling
+  config_keys:
+  - data.series_types
+  - data.study_slice_total
+  - data.image_size
+  - data.reference_field_mm
+  config_prefixes: []
+  list_item_fields: {}
+  input_identity_keys:
+  - preprocessing_identity
+  require_source_change: false
+  configuration_only_ideas: true
+  developer_instructions: 'Environment, read this first. (1) You have no GPU and must not use one. A ResNet-50 training
+    already uses most of the machine''s memory (about 7 GB of 39 free at its tightest): run nothing heavy on the
+    CPU. Allowed checks: static checks with the existing Python environment, loading configs/training.yaml through
+    the config model, the loader on at most two studies, and tiny no-gradient checks of the changed functions on
+    synthetic tensors; never build the ResNet-50 with its weights and never run a forward-and-backward pass of the
+    whole model on the CPU. Never return blocked for lack of a GPU. (2) Make every change inside the candidate workspace
+    you were assigned and nowhere else. Do not stage the candidate under /tmp, and do not write source/ or changes.diff
+    in the experiment directory: it is read-only to you by design, and the supervisor freezes the source and the
+    diff from your workspace after you return. (3) When the change is complete and the checks pass, return status
+    prepared with the integration and activation declarations in the report. An unwritable experiment directory
+    is never a reason to return blocked. The incumbent starts as rn50-detail-view-teacher-025 (prior-work.md, The
+    reference): a Refined-RadImageNet ResNet-50 on the sagittal fluid detail-view recipe with 0.25 teacher share.
+    Read contract.md before writing code. Each seed is one design step and says exactly what changes and what it
+    replaces; apply it to the incumbent you are assigned and leave everything outside it byte-identical. Replace
+    what a seed supersedes: no flag, option or config field selects the old behaviour. Every seed names the metrics
+    that prove it active; the review requires such a proof, so never return a candidate without one. When a seed
+    names the frozen source of an earlier candidate or run, read it and port the mechanism onto the current code
+    instead of copying the file. Do not change the backbone, the weights it starts from, the labels, distillation.teacher_share,
+    paths, the epochs, the optimizer or the prediction settings. data.image_size changes only in the seeds centred-token-grid-at-257-px
+    and centred-grids-at-225-px-exact-copies (the user''s order of 2026-10-11). Keep the speed rules of the recipe:
+    tokens, routing weights and position priors are memoised per encoded batch through KneeAbnormalityModel._memo,
+    epoch metrics go through _log_epoch_metric, model.channels_last stays true. New parameters or buffers initialise
+    under torch.random.fork_rng so the incumbent''s random stream is unchanged. Any new key read from the batch
+    in modeling/ must be in MODEL_BATCH_KEYS of inference/engine.py. Update the matching entries of SPATIAL_TOKEN_IDENTITY
+    when the described behaviour changes. Validation and prediction stay deterministic. Nothing from the prepared
+    targets may be needed at validation or prediction, and no trained model runs in the loader. Cost discipline:
+    a seed adds no training time its mechanism does not need. Add no diagnostic to the training step: what a seed
+    asks to be known is reported once in your report or logged on validation only, at most six new metrics per seed
+    (a mechanism that acts only in training may log one training-side scalar it already computes). In code that
+    runs every training step write no .item(), .cpu(), bool() or int() of a tensor, no nonzero, unique or new boolean-mask
+    indexing, no Python loop over studies, series or views, no torch.tensor built from Python values, and no second
+    evaluation of maps, routing or tokens. Add no forward pass beyond what the seed states. State in the report
+    the images per study in training and at x4, and the expected GPU memory. A seed that says ''the reference''s
+    training time'' must train within 1.03 of the incumbent; a seed that states a larger figure must stay within
+    it. Training time must stay within 0.75 to 1.25 of the reference''s; never fewer epochs: a run over the range
+    is fixed by removing cost the mechanism does not need, or returned blocked. No weight averaging. No tests.'
+  researcher_instructions: 'The campaign has no end: it runs until the user stops it. Never return an empty report
+    and never declare the directions exhausted. Research starts after the forced seeds. Your first product after
+    every completed run is its analysis: both multipliers against the incumbent (the x1 change is the selected epoch''s
+    validation macro, the x4 change the saved predictions''), the per-label AUC changes from the two runs'' fold_1/validation_predictions.csv
+    sorted from largest gain to largest loss, the eight larger labels and the four rare ones (MCL, Lateral OA, Contusion,
+    Fracture) apart, the step from x1 to x4, the images per study, the training and prediction seconds and the peak
+    GPU memory. Adoption is by the runtime: strictly above the incumbent at both multipliers; say which side of
+    that rule the run falls on. One run is a starting point, never a verdict on a mechanism: for a run that was
+    not adopted list what it shares with the other runs that moved the same labels and name candidate causes; do
+    not write that a reference was lucky or that a difference is noise. Only then propose. The scope is what the
+    ResNet-50 is fed (contract.md): which slices and how many distinct ones, which fields and where they are placed,
+    the pixel size against the acquired resolution, and the faithfulness of the input (alignment, mixing, the token
+    grid). Each idea is one training run, marks every claim as evidence-backed or a guess, cites its numbers from
+    prior-work.md or a run, and states its images per study in training and at x4, its expected training time and
+    its GPU and RAM estimate. An idea feeds acquired information the model does not have or corrects how the input
+    is placed or mixed; magnifying pixels the model already has is not an idea. Numbers set by hand come from a
+    cited measurement, never from a sweep on the validation labels. An idea that only measures is not allowed: put
+    the measurement in what the run logs. Start every implementation text with the sentence ''Follow the environment
+    paragraph of the developer instructions.'' and name the metrics that prove the idea active. Out of bounds: everything
+    in the contract''s out-of-bounds list, among it another backbone, image sizes other than 224 px, fewer epochs,
+    the labels and the teacher share, new routing, attention or readout structure on the same features, ensembling,
+    weight averaging, test-time augmentation, reflection probabilities, gold-study weighting, trained models in
+    the loader, fixed measured offsets on the joint centre or pose, per-run controls and confirmation or multi-seed
+    runs. Read results as the contract says: per-label effects on the x1 AUC averaged over epochs 6 to 10 together
+    with x4; the ResNet-50''s own rerun spread is not yet known, the ResNet-18''s is 0.0003 at x4 and 0.0015 at
+    x1.'

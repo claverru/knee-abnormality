@@ -1,0 +1,50 @@
+ideas:
+- id: bundle-chosen-per-label-from-the-epoch-curves
+  mechanism_id: bundle
+  parent_idea_id: cell-attention-normalized-by-routed-area-per-view
+  title: Combine the parts each label supports at both multipliers - area-normalised attention, transition map loss, the cell read's own projection, and the unpadded rim
+  opportunity: 'Evidence per label from two readings of every run: the x1 validation AUC of each label averaged
+    over epochs 6 to 10 against the incumbent at the same epochs (five epochs, steadier than one endpoint),
+    and the x4 result. Across the nineteen runs the x1 reading has a common level per label (Lateral Meniscus
+    -0.0028, Baker''s -0.0015, PF OA -0.0010, Effusion +0.0012, MCL +0.0011) and a spread between runs of
+    0.0006 to 0.0029, so a part is kept for a label only when it stands out from that level at x1 and agrees
+    at x4. (1) Run 16, area-normalised attention: the only run above the incumbent on PF OA at x1 (+0.0009;
+    level -0.0010, spread 0.0008), above on ten of twelve labels at x1 (macro +0.0008, the best), level at
+    x4. (2) Run 18, transition map loss: the menisci at x1 +0.0008 and -0.0003 (levels -0.0003 and -0.0028)
+    and at x4 +0.0001 and +0.0024, with the map overlap up 0.06 to 0.10 on every class. (3) Run 9, own projection
+    for the cell read: Lateral OA +0.0016 at x1 and +0.0014 at x4, the only part that agrees on that label
+    (run 8 has +0.0026 at x1 and -0.0043 at x4; run 1 +0.0016 and -0.0016). Parts dropped because the two
+    readings disagree or the x1 reading is below the level: PF OA''s own reader (PF OA -0.0008 at x1), the
+    bone zone on the cells (PF OA -0.0025 at x1), the cell position (Lateral Meniscus -0.0029 at x1, +0.0015
+    at x4), the block-detail adapter (nothing above the level at x1). Medial OA moves with no part (spread
+    0.0006). (4) New, from the audit of the reference: the 3 by 3 means of the routing count the zero padding,
+    and 32% of patellar cartilage volume lies in the outer 6 mm of the sagittal crop. Guess, medium: above
+    the incumbent at both multipliers.'
+  mechanism: 'Four changes in one model. (1) Run 16 as built: the cell read''s softmax weighs each cell by
+    its routing measure divided by the detached total routed measure of its view. (2) Run 18 as built: the
+    map''s regional Dice term is replaced by the normalised adjacent-share transition error on right and
+    down neighbouring pairs with valid targets. (3) Run 9 as built: the cell read has its own projection
+    of the third stage, initialised as a copy of the map''s; nothing detached. (4) New: every 3 by 3 mean
+    in _soft_tissue_routing_weights (the cartilage rim and the meniscus spread) uses count_include_pad=False.'
+  precedents:
+  - 'Sources under outputs/autoresearch/soft-tissue-reads/experiments/: cell-attention-normalized-by-routed-area-per-view-20261011T045006Z-adb2fc02,
+    soft-tissue-map-learns-adjacent-share-transitions-20261011T054719Z-86cf6cb5, cell-read-own-third-stage-projection-20261011T013527Z-3e8266ec (source and changes.diff in each).'
+  - 'run-notes.md, section "Per-label curves": the table of the x1 reading for every run.'
+  novelty: The first bundle whose parts were chosen label by label from the epoch curves and x4 together.
+  coverage: Every routed study; the five soft-tissue labels.
+  exploitation: 'Read the five soft-tissue labels and the macro against the incumbent at both multipliers and
+    on the epoch 6 to 10 mean. Log on validation only: the attention mass moved by the normalisation averaged
+    over the five labels, the transition loss, the cosine between the cell read''s projection and the map''s,
+    and PF OA''s mean routing weight on border cells and off them (two metrics). Shown wrong by: the five
+    soft-tissue labels below run 16''s on the epoch 6 to 10 mean.'
+  budget: 'Within 1.03 of the incumbent''s training time: the three parents trained in 1,549 to 1,553 s against
+    1,599 s and the padding change is free.'
+  implementation: 'Follow the environment paragraph of the developer instructions. Start from run 16''s candidate
+    source, apply run 18''s and run 9''s reviewed diffs and change the pooling flag. Files: modeling/model.py,
+    modeling/spatial_tokens.py, training/anatomy.py and training/lightning.py as the parents used them. No
+    option. Report on one batch each parent''s own check and that an edge cell''s rim equals the mean over
+    its existing neighbours. Apply to the incumbent as assigned.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Each part is the one a label supports at x1 over five epochs and at x4, against the level and spread of nineteen runs.
+exhausted_directions: ''

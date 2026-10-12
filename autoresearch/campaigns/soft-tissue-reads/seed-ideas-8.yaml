@@ -1,0 +1,190 @@
+ideas:
+- id: map-taught-on-every-study-from-the-reference-pseudo-volumes
+  mechanism_id: pseudo-map
+  parent_idea_id: null
+  title: Teach the soft-tissue map on every training study, from volumes the reference's own map predicted
+  opportunity: 'The user''s idea. Evidence for the gap, guess for the gain. The map is taught on 211 training
+    knees of one scanner whose protocol differs from the rest: 20 of the 265 mask knees have a sagittal fluid
+    series and 20 a coronal T1/PD series, against 4,130 of the other 4,142 studies with sagittal fluid. So
+    the map is almost never taught on the best single view of six labels, and every map overlap of this campaign
+    was measured on the 52 in-protocol validation studies. The cell read trained alone is +0.024 on those
+    52 studies and -0.009 on the other 822 (three labels with at least 12 positives). The keeper built a
+    prepared set (2026-10-11, scripts/tools/prepare_soft_tissue_pseudo_targets.py): the reference''s selected
+    checkpoint predicted the seven-class map on every view of each fold-1 training study at four times the
+    slices, and the cell predictions of all views were averaged into one 2 mm volume per study in patient
+    coordinates, so a view is taught what the other views of the same knee saw. Its classes.json holds the
+    agreement of each view with the other views and with the real masks. Guess, medium-low: the map transfers
+    to the routine protocol and the five soft-tissue labels gain on the 822 studies.'
+  mechanism: 'The map loss covers every training study. The prepared mask set (paths.meniscus_targets, unchanged)
+    now holds a folder pseudo_volumes beside volumes: one npz for each fold-1 training study without a real
+    mask (none for validation studies), with labels (uint8, one class drawn per voxel from the predicted shares,
+    255 where no cell covered the voxel), shares (uint8, the predicted share of each of the seven classes
+    times 255), origin and spacing (2 mm). AnatomyTargets also loads pseudo_volumes when the folder exists.
+    For a study with a pseudo-volume a cell''s target share is the mean of the stored shares at its sample
+    points, and its coverage is the fraction of points on covered voxels; the real mask volumes are read as
+    today and always win over a pseudo-volume of the same study. The loss formula and trainer.meniscus_loss_weight
+    are unchanged. Validation is unchanged: the logged map overlap still comes from the 52 validation mask
+    knees.'
+  precedents:
+  - 'The pseudo-volumes and their agreement figures: pseudo_volumes/ and pseudo.json inside the prepared mask set (data/labels/prepared/soft-tissue-nnunet-knee-dess265).'
+  - 'run-notes.md, section "Cross-run analysis by a subagent": the protocol finding.'
+  novelty: First run in which the map is supervised outside the mask scanner.
+  coverage: Every training study; the map, and through it the cell read's routing on all scanners.
+  exploitation: 'Read the five soft-tissue labels and the macro against the incumbent at both multipliers and
+    on the epoch 6 to 10 mean at x1, and the mask scanner''s 52 validation studies apart from the other 822.
+    Log on validation only the existing map overlap per class; log in training the number of map-supervised
+    tokens (already logged as meniscus_tokens). Shown wrong by: the five labels on the 822 studies not above
+    the incumbent while the map overlap on the 52 falls.'
+  budget: 'Within 1.05 of the incumbent''s training time: the map loss runs on about sixteen times the tokens,
+    all on the GPU; the stored labels of about 3,300 volumes add under 1 GB of GPU memory.'
+  implementation: 'Follow the environment paragraph of the developer instructions. Files: training/anatomy.py
+    (load pseudo_volumes, read shares), training/lightning.py only if the token count needs it. The config
+    path does not change.
+    Keep the gather on the GPU and one lookup per token as today. No option: a pseudo-volume is read
+    soft, a real mask volume as labels. Report on one batch that a mask knee''s targets are unchanged and
+    that a pseudo study yields covered cells with fractional shares. Apply to the incumbent as assigned.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The measured gap between the mask protocol and the other 94% of studies, addressed with targets that already exist.
+- id: dense-context-slices-in-the-training-bag
+  mechanism_id: training-bag
+  parent_idea_id: null
+  title: Train on thirteen more slices per study, encoded without gradient and entering every pool
+  opportunity: 'Evidence for the gap, guess for the gain. The same model scores +0.0100 macro at x4 over x1
+    (Lateral Meniscus +0.027, Lateral OA +0.019, Fracture +0.017, Contusion +0.014, PF OA +0.011, ACL +0.011),
+    and it is coverage, not stability: the mean of 18 runs'' predictions at x1 gives only +0.0008. At x4
+    the logit of positives rises by +0.08 to +0.12 on those labels against -0.02 to +0.035 on negatives.
+    Isolated positives are the misses (Effusion 0.759 with 12 positives, Lateral Meniscus 0.802 with 23, ACL
+    0.806 with 16). The model is trained on 26 slices and read on 104. Guess, medium-low: training the pools
+    on a denser bag gives the six coverage labels a tenth to a quarter of their x1 to x4 gap; x1 may fall.'
+  mechanism: 'New config key data.training_context_slices: 13. In training each study''s slice budget is data.study_slice_total
+    + 13, shared among its series by the existing study_budgets rule. In the model''s image encoding a random
+    26 of a study''s slices (proportional per view) pass the backbone with gradient and the other 13 under
+    torch.no_grad(); the feature maps are reassembled in their order, and every pool, the routing and the
+    knee-level term read all 39. The map and bone losses are computed on the gradient slices only. Validation
+    and prediction are unchanged (data.validation_image_multiplier and prediction_image_multiplier as they
+    are). Replaces nothing.'
+  precedents:
+  - 'run-notes.md, section "Cross-run analysis by a subagent": the x1 against x4 figures.'
+  - 'docs/backlog/big-bets.md, "Pooling head at the inference bag size": the same aim by another route.'
+  novelty: First change to what the pools see in training; no new head, loss or inference change.
+  coverage: Every study and all twelve labels.
+  exploitation: 'Read all twelve labels against the incumbent at both multipliers; the six coverage labels
+    as a group at x4. Log in training only the mean number of slices per study with and without gradient
+    (two metrics). Shown wrong by: the six labels not up as a group at x4.'
+  budget: 'About 1.12 to 1.18 of the incumbent''s training time (estimate): thirteen more decoded slices and
+    forward passes without gradient per study. Return blocked above 1.22.'
+  implementation: 'Follow the environment paragraph of the developer instructions. Files: config.py and configs/training.yaml
+    (the key), data/dataset.py and data/preprocessing/sampling.py (the training budget), modeling/model.py
+    (the split forward). The no-gradient slices use the same batch-norm mode as the others. Keep one backbone
+    call per group, no second evaluation of maps or routing. Report on one batch the slice counts and that
+    gradients reach only the 26. Apply to the incumbent as assigned.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The only lever of size 0.010 the runs measured.
+- id: map-agreement-across-planes-in-patient-space
+  mechanism_id: cross-plane-map
+  parent_idea_id: null
+  title: Teach each plane's map toward the detached map of the other planes of the same knee
+  opportunity: 'Evidence for the gap, guess for the gain. The map is taught on masks of one protocol that almost
+    never includes sagittal fluid or coronal T1/PD (20 of 265 mask knees have each), so those views'' maps
+    are never corrected. Cells of different planes fall in the same place of the knee: where they do, the
+    planes that were taught can teach the ones that were not, on every study and online, without a prepared
+    target. Guess, low-medium: the five labels gain +0.001 to +0.003 on the 822 studies off the mask scanner.'
+  mechanism: 'New term in the map step for studies without masks. Voxel of a cell: floor(patient position /
+    6 mm) per study. S_p[v] is the mean detached map share of plane p''s cells in voxel v. The target of a
+    cell of plane p is the mean of S_q[v] over the other planes q that have cells in v; cells whose voxel
+    holds no other plane are left out. Loss: 0.05 * KL(target || softmax(scores)) averaged over those cells,
+    zero through epoch 2 and ramped linearly to full at epoch 4. The mask loss is unchanged. Replaces nothing.'
+  precedents:
+  - 'map-taught-on-every-study-from-the-reference-pseudo-volumes: the same aim with a fixed teacher and prepared
+    volumes; this seed is the online form.'
+  - 'Run 10 (stronger early map loss, -0.0010) and run 18 (a different map loss, level): hence the low weight
+    and the late start.'
+  novelty: First cross-view consistency term; first map supervision on studies without masks made inside the run.
+  coverage: Every training study with two planes sharing a voxel.
+  exploitation: 'Read the five soft-tissue labels against the incumbent at both multipliers, the 52 mask-scanner
+    studies apart. Log on validation only: the cross-plane agreement (mean overlap of a plane''s map with
+    the other planes'' in shared voxels) on mask studies and on the others (two metrics), and the share of
+    cells with a cross-plane target. Shown wrong by: agreement rising while the five labels on the 822 do
+    not.'
+  budget: 'Within 1.03 of the incumbent''s training time: one scatter per batch on values already computed.'
+  implementation: 'Follow the environment paragraph of the developer instructions. Files: training/anatomy.py
+    (the consensus), training/lightning.py (the term and the three metrics). Use meniscus_patient_position
+    and the view index already in the encoded batch; all on the GPU, no host synchronisation. No option.
+    Report on one batch that the term is zero before epoch 3 and that targets are detached. Apply to the
+    incumbent as assigned.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The online counterpart of the pseudo-volume seed, at no preparation cost.
+- id: structure-tokens-in-the-fourth-stage-bag
+  mechanism_id: structure-tokens
+  parent_idea_id: null
+  title: Replace the cell read by structure tokens in the fourth-stage read's bag
+  opportunity: 'Evidence, guess for the gain. The cell read B adds nothing measurable on its five labels:
+    their mean at x4 is 0.91946 over 18 runs with B and 0.92039 for the incumbent, against 0.91907 and 0.92003
+    for the two recipe trainings without B, at 7% more training time. Across the runs the five-label change
+    and the seven-label change correlate -0.46: B and the other labels trade through the backbone. Run 8
+    showed what B reads is mostly the average open cell (0.25 to 0.61 of logit against 0.04 to 0.07 from
+    its attention), and run 3 of the line showed two readers under one loss swap roles. One reader and one
+    loss can hold the same evidence. Guess, low-medium: level to +0.0005 macro, with the trade removed.'
+  mechanism: 'Each encoded image adds five tokens to the fourth-stage read''s bag, one per soft-tissue label:
+    S[n,k] = sum_c w[k,n,c] * f[n,c] / sum_c w[k,n,c], where f are the projected third-stage cell features
+    of image n and w the detached routing weights of label k from _soft_tissue_routing_weights, plus the
+    plane and contrast embeddings and a learned structure embedding per label. A structure token is open only
+    to its own label''s attention, with a learned attention bias starting at -4, and takes no position prior;
+    an image whose label is unrouted adds no token for it. Replaces _soft_tissue_pool, soft_attention, soft_head
+    and soft_norm: the prediction is the fourth-stage read alone.'
+  precedents:
+  - 'run-notes.md, run 8 and the section "Cross-run analysis by a subagent".'
+  - 'rn18-soft-tissue-read-loss-wide-regions (run 3 of the line): the two readers swapped.'
+  novelty: First design with one reader over both scales; allowed by the Wider scope section of the contract.
+  coverage: Every routed study; the five soft-tissue labels.
+  exploitation: 'Read the five soft-tissue labels and the other seven against the incumbent at both multipliers.
+    Log on validation only: the share of each label''s attention on its structure tokens (five metrics).
+    Shown wrong by: structure tokens taking almost no attention at the selected epoch, or the five-label
+    mean below the trainings without B (0.9191 to 0.9200).'
+  budget: 'At most 1.0 of the incumbent''s training time: the cell softmax and readout are removed.'
+  implementation: 'Follow the environment paragraph of the developer instructions. Files: modeling/model.py,
+    modeling/spatial_tokens.py, training/lightning.py for the metrics and to drop the soft-tissue logs that
+    no longer exist. Remove the superseded cell-read modules; no option. Compute the routing weights once
+    through the existing memo. Report on one batch that with the attention bias at -4 the logits are within
+    0.02 of the model without structure tokens. Apply to the incumbent as assigned.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Keeps the cell evidence and removes the second reader whose gain the runs could not measure.
+- id: soft-tissue-map-as-a-side-task-with-the-transition-loss
+  mechanism_id: map-side-task
+  parent_idea_id: soft-tissue-map-learns-adjacent-share-transitions
+  title: Keep the soft-tissue map as a side task with the transition loss and remove the cell read
+  opportunity: 'Evidence, guess for the gain. The map as a side task shows on the seven labels outside the
+    cell read: 0.9325 at x4 without any map against 0.9346 to 0.9350 with it (one run), while the cell read
+    adds nothing measurable on its own five (0.91946 with B over 18 runs, 0.91907 and 0.92003 without). Run
+    18''s transition loss made the map better on every class (overlap 0.59 to 0.65 against 0.48 to 0.58) and
+    is the one run with the five soft-tissue labels up as a group at x4 (+0.0005; level -0.0010). Guess,
+    low-medium: the recipe without B, with the better-taught map, is level or above the incumbent in less
+    training time.'
+  mechanism: 'Two changes. (1) Run 18 as built: the seven-class map''s regional Dice term is replaced by the
+    normalised adjacent-share transition error on right and down neighbouring pairs with valid targets; cross-entropy
+    and trainer.meniscus_loss_weight unchanged. (2) The cell read is removed: model.soft_tissue_routing off
+    and its modules deleted, so the five labels read the fourth stage alone as in the recipe before run 2.
+    The bone routing of Contusion and Fracture stays.'
+  precedents:
+  - 'Run 18 source: outputs/autoresearch/soft-tissue-reads/experiments/ (soft-tissue-map-learns-adjacent-share-transitions),
+    source and changes.diff.'
+  - 'sagittal-fluid-canvas-fine and rn18-reference-retrained: the recipe without the cell read, x4 0.928121
+    and 0.928120.'
+  novelty: The map's value tested where the analysis found it, on the labels that do not read it.
+  coverage: Every study; all twelve labels.
+  exploitation: 'Read the seven labels outside the cell read and the five inside it against the incumbent
+    at both multipliers. The map overlap per class is already logged. Shown wrong by: the seven-label mean
+    below the incumbent''s (0.93499 at x4).'
+  budget: 'About 0.93 of the incumbent''s training time: the cell read is gone.'
+  implementation: 'Follow the environment paragraph of the developer instructions. Apply run 18''s reviewed
+    diff to the incumbent and remove the cell read and its logs. Files: modeling/model.py, modeling/spatial_tokens.py,
+    training/anatomy.py, training/lightning.py, configs/training.yaml. No option is kept for the removed
+    read. Apply to the incumbent as assigned.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The two parts the cross-run analysis supports, the map as a side task and its better loss, without the part it could not measure.
+exhausted_directions: ''

@@ -1,4 +1,4 @@
-# Project state (2026-10-10)
+# Project state (2026-10-12)
 
 What is in force now: the recipe, the control candidates pair with, the best public submissions and
 the rules every comparison depends on. Pending work is in [next](next.md), active lines have their
@@ -73,6 +73,23 @@ measured outcomes are in the [validation results](../validation/results/INDEX.md
   0.954 (S131), both coronal at 93 mm 0.954 (S133), and the first pair, the mean of the recipe
   and the coronal swap, 0.955 (S132). Single-view readouts prefer 93 mm everywhere and do not
   predict the fused model.
+- **Soft-tissue line, detail view and aligned contrast mixing, since 2026-10-12 (user decision,
+  both configs, usual labels):** on top of the meniscus-map recipe, a seven-class soft-tissue map
+  taught from the DESS masks (`paths.meniscus_targets` on `soft-tissue-nnunet-knee-dess265`), a
+  read of the third-stage cells routed by that map and added to the fourth-stage read for the
+  meniscus and OA targets (`model.soft_tissue_routing`), Contusion and Fracture routed by the
+  bone map, a 64 mm second view of each sagittal fluid slice on the same slices, pose and
+  augmentation (open to the menisci, the OA labels and ACL), and contrast mixing with the donor
+  resampled onto the target's grid in patient coordinates. The teacher share is 0 in both
+  configs. Measured pieces: ResNet-18 with the detail view and the unaligned blend ×4 0.929467,
+  ×1 0.919142; ResNet-50 the same on the usual labels ×4 0.933292, 0.959 public (S142), and at
+  0.25 teacher share ×4 0.935570, **0.960 public (S143)**; aligned mixing on top of that ×4
+  0.935270, ×1 0.928276, no public score. **No run exists on exactly the configs' setting**
+  (aligned mixing with the usual labels) on either backbone. Thirty-five distinct slices per
+  study without the detail view: ×4 0.936965 locally and 0.959 public (S146) against 0.960
+  (S143), not in force. `INFERENCE_NUM_WORKERS` is 8 and the training's final ×4 prediction
+  uses it. Results:
+  [2026-10-12](../validation/results/2026-10-12-soft-tissue-reads-and-rn50-input-sampling.md).
 - **Model:** the [current model](../modeling/current-model.md), since 2026-09-29 on a
   RadImageNet ResNet-18 (`configs/training.yaml`): repeated middle slice at 224 px and 0.536 mm, a
   120 mm field (since 2026-10-01, with augmentation on that slice only), coronal and sagittal
@@ -283,6 +300,14 @@ measured outcomes are in the [validation results](../validation/results/INDEX.md
   follow-up are open.
 
 ## Recently closed
+
+- **2026-10-12:** the `rn50-input-sampling` autoresearch campaign (what the ResNet-50 is fed:
+  alignment, token grids, slices, fields), stopped by the user after 14 runs; aligned contrast
+  mixing kept, 35 distinct slices adopted by the runtime and not carried to main after 0.959
+  public. [Campaign](../../autoresearch/campaigns/rn50-input-sampling/INDEX.md).
+- **2026-10-11:** the `soft-tissue-reads` autoresearch campaign (the soft-tissue map and the
+  routed cell read on the ResNet-18), stopped by the user after 34 runs; the sagittal fluid
+  detail view adopted. [Campaign](../../autoresearch/campaigns/soft-tissue-reads/INDEX.md).
 
 - **2026-10-08:** the `anatomy-masks` autoresearch campaign (the anatomy map, sections read from
   it, posed crops, measurements from the masks as targets), stopped by the user after 18 trained

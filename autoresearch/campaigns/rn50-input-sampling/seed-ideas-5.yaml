@@ -1,0 +1,42 @@
+ideas:
+- id: cosine-schedule-with-warm-restarts
+  mechanism_id: learning-rate-schedule
+  parent_idea_id: null
+  title: Restart the cosine learning-rate schedule twice within the ten epochs
+  opportunity: 'The user''s order (2026-10-11): let the learning rate go up and down so the training can leave
+    the optimum it settled in and find a better one. The recipe has one warm-up epoch from 0.1 of the peak
+    and then a single cosine decay over epochs 2 to 10 down to 0.01 of the peak; the rate never rises again.
+    Never tried in this project on either backbone. The validation macro at x1 of the reference and of the
+    three runs since still rises through epoch 10 (0.9257, 0.9268, 0.9273 for the reference''s last three
+    epochs), so the single decay has not flattened; whether a restart helps is a guess, low-medium confidence,
+    within +-0.001 macro.'
+  mechanism: 'The schedule multiplier of training/lightning.py keeps the first epoch''s linear warm-up from
+    optimizer.warmup_start_ratio to 1 and then runs three cosine cycles of three epochs each (epochs 2 to
+    4, 5 to 7, 8 to 10). Each cycle decays from its peak to optimizer.minimum_lr_ratio; the peaks are 1,
+    0.5 and 0.25 of the configured rates, so each restart is half the previous one and the last cycle ends
+    the training at the same floor as today. The backbone and head rates, weight decay, the anchor (L2-SP)
+    weights and the ten epochs are unchanged; the single cosine decay is removed. The two constants, cycle
+    length 3 epochs and peak ratio 0.5, are module constants beside the schedule: (10 - 1 warm-up) epochs
+    divide into three equal cycles, and halving is the conventional decayed restart.'
+  precedents:
+  - 'training/lightning.py, configure_optimizers: the schedule function.'
+  novelty: First schedule with restarts in the project.
+  coverage: Every step of the training; all labels.
+  exploitation: 'Read the macro and all labels against the incumbent at both multipliers, and the x1 validation
+    macro at the end of each cycle (epochs 4, 7 and 10) against the incumbent''s at the same epochs: a restart
+    that helps shows a higher end of cycle each time. Activation: the learning rate the recipe already logs
+    per step; report in the developer report the multiplier at the first and last step of each cycle from
+    the schedule function on its own (expected 1, 0.01, 0.5, 0.01, 0.25, 0.01). No new metric. Shown wrong
+    by: the macro below the incumbent at both multipliers, or the end of cycle two below the end of cycle
+    one.'
+  budget: 'The reference''s training time: the same steps.'
+  implementation: 'Follow the environment paragraph of the developer instructions. The user ordered this change
+    of schedule on 2026-10-11: the instruction not to change the optimizer does not apply to the schedule
+    multiplier in this seed; the optimizer, its rates and its weight decay stay. Files: training/lightning.py
+    only (the schedule function and two module constants). No option and no config field: the single decay
+    is replaced. Keep the anchor-weight switch between early and late where it is. Apply to the incumbent
+    as assigned.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user's order.
+exhausted_directions: ''
