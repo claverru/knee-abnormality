@@ -119,6 +119,11 @@ table.agents th:nth-child(3), table.agents td:nth-child(3) { text-align: left; }
 table.jobs { margin-top: 6px; font-size: 13px; }
 table.jobs th, table.jobs td { border-bottom: none; padding: 4px 5px; white-space: normal; }
 table.jobs td:nth-child(2), table.jobs td:nth-child(3) { color: var(--ink2); }
+table.jobs:not(.agents) td:first-child { overflow-wrap: anywhere; }
+table.jobs:not(.agents) th:nth-child(n+3), table.jobs:not(.agents) td:nth-child(n+3) { white-space: nowrap; }
+.jobs-scroll { overflow-x: auto; }
+@media (max-width: 720px) { table.jobs:not(.agents) { font-size: 12px; }
+  table.jobs:not(.agents) th, table.jobs:not(.agents) td { padding: 4px 3px; } }
 table.jobs th:nth-child(2), table.jobs td:nth-child(2) { text-align: left; }
 .up { color: var(--good); font-weight: 600; } .down { color: var(--bad); font-weight: 600; }
 .thread { max-height: 320px; overflow-y: auto; }
@@ -875,8 +880,8 @@ def agents(state: dict) -> str:
 def activity(status: str, state: dict) -> str:
     rows = "".join(job(line) for line in status_lines(status, "Now"))
     jobs = (
-        "<table class='jobs'><tr><th>run</th><th>stage</th><th>time</th><th>epoch</th><th>×1</th>"
-        f"<th title='×1 macro AUC minus the incumbent at the same epoch'>Δ inc.</th></tr>{rows}</table>"
+        "<div class='jobs-scroll'><table class='jobs'><tr><th>run</th><th>stage</th><th>time</th><th>epoch</th><th>×1</th>"
+        f"<th title='×1 macro AUC minus the incumbent at the same epoch'>Δ inc.</th></tr>{rows}</table></div>"
         if rows
         else "<div class='sub'>idle</div>"
     )
