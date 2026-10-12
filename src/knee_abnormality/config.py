@@ -242,6 +242,18 @@ class DataConfig(ConfigModel):
         )
 
     @property
+    def view_sources(self) -> tuple[int, ...]:
+        sources = []
+        for kind in self.series_types:
+            first = len(sources)
+            for order, _ in enumerate(kind.views):
+                shared = (
+                    kind.plane == "Sagittal" and kind.fluid_sensitive == 1 and order > 0
+                )
+                sources.append(first if shared else len(sources))
+        return tuple(sources)
+
+    @property
     def view_names(self) -> tuple[str, ...]:
         names: list[str] = []
         for slot, view in self.views:
@@ -293,6 +305,7 @@ class ModelConfig(ConfigModel):
     view_label_bias: bool = False
     anatomical_frame: bool = False
     meniscus_map: bool = False
+    soft_tissue_routing: bool = False
     feature_statistics_augmentation: FeatureStatisticsAugmentationConfig = Field(
         default_factory=FeatureStatisticsAugmentationConfig
     )
@@ -302,6 +315,12 @@ class ModelConfig(ConfigModel):
         if self.checkpoint_backbone and not self.backbone_eval:
             raise ValueError(
                 "checkpoint_backbone requires backbone_eval=true to preserve training-mode BatchNorm"
+            )
+        if self.soft_tissue_routing and not (
+            self.meniscus_map and self.anatomical_frame
+        ):
+            raise ValueError(
+                "soft_tissue_routing requires meniscus_map and anatomical_frame"
             )
         return self
 

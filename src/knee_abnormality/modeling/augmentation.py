@@ -158,6 +158,7 @@ class ContrastMixingActivity:
     mean_lambda: torch.Tensor
     mean_pixel_change: torch.Tensor
     effective_probability: torch.Tensor
+    mean_alignment_change: torch.Tensor
 
 
 def sample_contrast_mixing_parameters(
@@ -179,18 +180,53 @@ def sample_contrast_mixing_lambda(
     return low + (high - low) * torch.rand(count, device=device, generator=generator)
 
 
-def mix_matched_slices(
-    images: torch.Tensor,
-    target_rows: torch.Tensor,
-    matched_rows: torch.Tensor,
-    lam: torch.Tensor,
+def aligned_contrast_donors(
+    donors: torch.Tensor,
+    target_maps: torch.Tensor,
+    donor_maps: torch.Tensor,
+    column_reflected: torch.Tensor,
 ) -> torch.Tensor:
-    lam = lam[:, None, None, None]
-    target = images[target_rows]
-    other = images[matched_rows]
-    mixed = torch.where(other == 0, target, lam * target + (1 - lam) * other)
-    images[target_rows] = mixed.masked_fill(target == 0, 0)
-    return images
+    with torch.autocast(device_type=donors.device.type, enabled=False):
+        height, width = donors.shape[-2:]
+        identity = torch.eye(3, device=donors.device, dtype=torch.float32)
+        reversal = identity.clone()
+        reversal[0, 0] = -1
+        reversal[0, 2] = width - 1
+        pixel_transform = torch.where(
+            column_reflected[:, None, None], reversal, identity
+        )
+        target_maps = target_maps.float() @ pixel_transform
+        donor_maps = donor_maps.float() @ pixel_transform
+        donor_basis = donor_maps[..., :2]
+        gram = donor_basis.transpose(1, 2) @ donor_basis
+        a, b, c = gram[:, 0, 0], gram[:, 0, 1], gram[:, 1, 1]
+        inverse = torch.stack((c, -b, -b, a), -1).view(-1, 2, 2)
+        inverse = inverse / (a * c - b.square()).clamp_min(1e-12)[:, None, None]
+        relative_maps = target_maps.clone()
+        relative_maps[..., 2] -= donor_maps[..., 2]
+        affine = inverse @ donor_basis.transpose(1, 2) @ relative_maps
+        normalized_to_pixel = identity.clone()
+        normalized_to_pixel[0, 0] = width / 2
+        normalized_to_pixel[1, 1] = height / 2
+        normalized_to_pixel[0, 2] = (width - 1) / 2
+        normalized_to_pixel[1, 2] = (height - 1) / 2
+        theta = affine @ normalized_to_pixel
+        theta[:, 0, 2] -= (width - 1) / 2
+        theta[:, 1, 2] -= (height - 1) / 2
+        theta[:, 0] *= 2 / width
+        theta[:, 1] *= 2 / height
+        grid = F.affine_grid(theta, donors.shape, align_corners=False)
+        aligned = F.grid_sample(
+            donors.float(),
+            grid,
+            mode="bilinear",
+            padding_mode="zeros",
+            align_corners=False,
+        )
+        covered = (grid[..., 0].abs() <= 1 - 1 / width + 1e-6) & (
+            grid[..., 1].abs() <= 1 - 1 / height + 1e-6
+        )
+        return aligned.masked_fill(~covered[:, None], 0)
 
 
 def apply_contrast_mixing(
@@ -204,6 +240,7 @@ def apply_contrast_mixing(
     token_plane: torch.Tensor,
     patient_maps: torch.Tensor,
     geometry_valid: torch.Tensor,
+    reflected: torch.Tensor,
 ) -> tuple[torch.Tensor, ContrastMixingActivity]:
     device = images.device
     zero = torch.zeros((), device=device)
@@ -221,7 +258,7 @@ def apply_contrast_mixing(
         mixed_acquisitions = 0
         mixed_studies: set[int] = set()
         mixed_groups = 0
-        lambdas, changes = [], []
+        lambdas, targets, matches, groups = [], [], [], []
         for study in range(parameters.applied.shape[0]):
             study_rows = (token_study == study) & geometry_valid
             for plane, (slot_a, slot_b) in enumerate(pairs):
@@ -251,21 +288,52 @@ def apply_contrast_mixing(
                 lam = sample_contrast_mixing_lambda(
                     len(unique_acquisitions), weight_range, device
                 )[inverse]
-                before = images[target_rows]
-                images = mix_matched_slices(images, target_rows, matched_rows, lam)
-                changes.append((images[target_rows] - before).abs().mean())
                 lambdas.append(lam)
+                targets.append(target_rows)
+                matches.append(matched_rows)
+                groups.append(torch.full_like(target_rows, mixed_groups))
                 mixed_acquisitions += len(unique_acquisitions)
                 mixed_studies.add(study)
                 mixed_groups += 1
+        pixel_change = alignment_change = zero
+        if targets:
+            target_rows = torch.cat(targets)
+            matched_rows = torch.cat(matches)
+            group_index = torch.cat(groups)
+            before = images[target_rows]
+            donors = images[matched_rows]
+            other = aligned_contrast_donors(
+                donors,
+                patient_maps[target_rows, 1],
+                patient_maps[matched_rows, 1],
+                reflected[target_rows] & (token_plane[target_rows] != 2),
+            )
+            lam = torch.cat(lambdas)[:, None, None, None]
+            alignment_change = (
+                ((1 - lam) * (other - donors).abs())
+                .masked_fill((before == 0) | (other == 0), 0)
+                .mean()
+            )
+            mixed = torch.where(other == 0, before, lam * before + (1 - lam) * other)
+            mixed = mixed.masked_fill(before == 0, 0)
+            images[target_rows] = mixed
+            row_changes = (mixed - before).abs().mean((1, 2, 3))
+            group_changes = zero.new_zeros(mixed_groups).index_add_(
+                0, group_index, row_changes
+            )
+            group_counts = zero.new_zeros(mixed_groups).index_add_(
+                0, group_index, torch.ones_like(row_changes)
+            )
+            pixel_change = (group_changes / group_counts).mean()
     return images, ContrastMixingActivity(
         torch.tensor(float(mixed_acquisitions), device=device),
         torch.tensor(float(len(mixed_studies)), device=device),
         torch.cat(lambdas).mean() if lambdas else zero,
-        torch.stack(changes).mean() if changes else zero,
+        pixel_change,
         torch.tensor(
             mixed_groups / max(int(parameters.eligible.sum()), 1), device=device
         ),
+        alignment_change,
     )
 
 
@@ -791,6 +859,9 @@ class ImageAugmentation(nn.Module):
         matrices: torch.Tensor | None = None,
         valid_rects: torch.Tensor | None = None,
         inverse_affine: torch.Tensor | None = None,
+        *,
+        source_image_index: torch.Tensor,
+        primary_image_index: torch.Tensor,
     ) -> torch.Tensor:
         if not self.training:
             return images
@@ -830,7 +901,10 @@ class ImageAugmentation(nn.Module):
             )
             background = images == 0
             noise = sample_noise_values(
-                images, series_index, parameters.noise, generator
+                images[: len(primary_image_index)],
+                series_index[: len(primary_image_index)],
+                parameters.noise,
+                generator,
             )
             smoothing = sample_smoothing_parameters(
                 self.smoothing_settings, series_count, device, generator
@@ -863,7 +937,20 @@ class ImageAugmentation(nn.Module):
             images, gin_activity = filter_regions(
                 images, background, series_index, gin, prepared_mask, apply_gin_filter
             )
-            images = self._add_noise(images, series_index, parameters.noise, noise)
+            original = images[: len(primary_image_index)]
+            noisy = self._add_noise(
+                original.clone(),
+                series_index[: len(primary_image_index)],
+                parameters.noise,
+                noise,
+            )
+            delta = (noisy - original).index_select(0, source_image_index)
+            primary = source_image_index == torch.arange(len(images), device=device)
+            images = torch.where(
+                primary[:, None, None, None],
+                noisy.index_select(0, source_image_index),
+                (images + delta).clamp(0, 1),
+            )
             self.activity = {
                 "smoothing": smoothing_activity,
                 "resolution": resolution_activity,
@@ -877,6 +964,8 @@ def apply_feature_statistics_augmentation(
     acquisition_index: torch.Tensor,
     acquisition_type: torch.Tensor,
     settings: FeatureStatisticsAugmentationConfig,
+    primary_image: torch.Tensor,
+    primary_count: int,
     generator: torch.Generator | None = None,
 ) -> tuple[torch.Tensor, FeatureStatisticsActivity]:
     dtype = features.dtype
@@ -911,20 +1000,26 @@ def apply_feature_statistics_augmentation(
         acquisition_type_value = torch.zeros(
             group_count, dtype=acquisition_type.dtype, device=values.device
         ).scatter_(0, group, acquisition_type)
+        primary_group = torch.zeros(
+            group_count, dtype=torch.bool, device=values.device
+        ).scatter_(0, group, primary_image)
+        primary_weight = primary_group.float()
         _, type_group = torch.unique(acquisition_type_value, return_inverse=True)
         type_count = int(type_group.max()) + 1
-        type_totals = values.new_zeros(type_count).index_add_(
-            0, type_group, values.new_ones(group_count)
+        type_totals = (
+            values.new_zeros(type_count)
+            .index_add_(0, type_group, primary_weight)
+            .clamp_min(1)
         )
         type_mean_of_mean = (
             values.new_zeros(type_count, channel_count).index_add_(
-                0, type_group, acquisition_mean
+                0, type_group, acquisition_mean * primary_weight[:, None]
             )
             / type_totals[:, None]
         )
         type_mean_of_std = (
             values.new_zeros(type_count, channel_count).index_add_(
-                0, type_group, acquisition_std
+                0, type_group, acquisition_std * primary_weight[:, None]
             )
             / type_totals[:, None]
         )
@@ -933,7 +1028,8 @@ def apply_feature_statistics_augmentation(
             .index_add_(
                 0,
                 type_group,
-                (acquisition_mean - type_mean_of_mean[type_group]).square(),
+                (acquisition_mean - type_mean_of_mean[type_group]).square()
+                * primary_weight[:, None],
             )
             .div_(type_totals[:, None])
             .clamp_min_(1e-12)
@@ -942,27 +1038,52 @@ def apply_feature_statistics_augmentation(
         spread_std = (
             values.new_zeros(type_count, channel_count)
             .index_add_(
-                0, type_group, (acquisition_std - type_mean_of_std[type_group]).square()
+                0,
+                type_group,
+                (acquisition_std - type_mean_of_std[type_group]).square()
+                * primary_weight[:, None],
             )
             .div_(type_totals[:, None])
             .clamp_min_(1e-12)
             .sqrt_()[type_group]
         )
-        eligible = (type_totals[type_group] >= 2) & (
-            torch.rand(group_count, device=values.device, generator=generator)
-            < settings.probability
+        eligible = (
+            primary_group
+            & (type_totals[type_group] >= 2)
+            & (
+                nn.functional.pad(
+                    torch.rand(
+                        primary_count, device=values.device, generator=generator
+                    ),
+                    (0, group_count - primary_count),
+                    value=1.0,
+                )
+                < settings.probability
+            )
         )
         resampled_mean = (
             acquisition_mean
-            + torch.randn(
-                group_count, channel_count, device=values.device, generator=generator
+            + nn.functional.pad(
+                torch.randn(
+                    primary_count,
+                    channel_count,
+                    device=values.device,
+                    generator=generator,
+                ),
+                (0, 0, 0, group_count - primary_count),
             )
             * spread_mean
         )
         resampled_std = (
             acquisition_std
-            + torch.randn(
-                group_count, channel_count, device=values.device, generator=generator
+            + nn.functional.pad(
+                torch.randn(
+                    primary_count,
+                    channel_count,
+                    device=values.device,
+                    generator=generator,
+                ),
+                (0, 0, 0, group_count - primary_count),
             )
             * spread_std
         )

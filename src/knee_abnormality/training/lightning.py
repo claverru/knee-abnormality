@@ -40,6 +40,7 @@ from knee_abnormality.modeling.model import (
     POSITION_AXES,
     ROUTES,
     ROUTING_WIDTHS,
+    TARGET_ROUTES,
     KneeAbnormalityModel,
 )
 from knee_abnormality.training.anatomy import (
@@ -47,6 +48,7 @@ from knee_abnormality.training.anatomy import (
     ANATOMY_POINTS,
     MENISCUS_CLASSES,
     MENISCUS_POINTS,
+    SOFT_TISSUE_CLASSES,
     AnatomyHead,
     AnatomyTargets,
     anatomy_loss,
@@ -327,8 +329,15 @@ class KneeModule(L.LightningModule):
                 "go together"
             )
         if config.model.meniscus_map:
+            self.meniscus_classes = (
+                SOFT_TISSUE_CLASSES
+                if config.model.soft_tissue_routing
+                else MENISCUS_CLASSES
+            )
             self.meniscus_targets = AnatomyTargets(
-                config.paths.meniscus_targets, len(MENISCUS_CLASSES), MENISCUS_POINTS
+                config.paths.meniscus_targets,
+                len(self.meniscus_classes),
+                MENISCUS_POINTS,
             )
         self.scanner_confusion_head = None
         self.scanner_group_counts = None
@@ -360,7 +369,16 @@ class KneeModule(L.LightningModule):
         self.live_validation_rows: list[
             tuple[list[str], np.ndarray, np.ndarray, np.ndarray]
         ] = []
-        self.view_names = config.data.view_names
+        self.view_names = tuple(
+            name
+            for index, name in enumerate(config.data.view_names)
+            if config.data.view_sources[index] == index
+        )
+        self.shared_view_names = tuple(
+            (index, name)
+            for index, name in enumerate(config.data.view_names)
+            if config.data.view_sources[index] != index
+        )
         self.series_type_names = tuple(
             f"{kind.plane.lower()}_{'fluid' if kind.fluid_sensitive else 't1pd'}"
             for kind in config.data.series_types
@@ -496,7 +514,7 @@ class KneeModule(L.LightningModule):
         if self.model.view_label_bias is not None:
             for name, bias in zip(
                 self.view_names,
-                self.model.view_label_bias.detach().float(),
+                self.model.view_label_bias[: len(self.view_names)].detach().float(),
                 strict=True,
             ):
                 for channel, value in zip(self.model.channels, bias, strict=True):
@@ -781,6 +799,7 @@ class KneeModule(L.LightningModule):
                 ("lambda", mixing.mean_lambda),
                 ("pixel_change", mixing.mean_pixel_change),
                 ("effective_probability", mixing.effective_probability),
+                ("alignment_change", mixing.mean_alignment_change),
             ):
                 self._log_epoch_metric(f"contrast_mixing_{name}", value, study_count)
 
@@ -795,9 +814,11 @@ class KneeModule(L.LightningModule):
             0, batch["series_study_index"], centre_without_side.float()
         )
         centre_without_side_studies = centre_without_side_counts > 0
-        detail_views = self.model.detail_view[batch["view_index"]] & batch[
-            "slice_mask"
-        ].any(-1)
+        detail_views = (
+            self.model.detail_view[batch["view_index"]]
+            & ~self.model.shared_slice_view[batch["view_index"]]
+            & batch["slice_mask"].any(-1)
+        )
         for name, value in (
             ("studies", centre_without_side_studies.sum()),
             (
@@ -812,9 +833,12 @@ class KneeModule(L.LightningModule):
             self._log_epoch_metric(
                 f"{prefix}centre_without_side_{name}", value.float(), 1, "sum"
             )
-        valid = encoded["visual_valid"].any(-1)
+        valid = (
+            encoded["visual_valid"].any(-1)
+            & ~self.model.shared_slice_view[encoded["view_index"]]
+        )
         count = int(valid.sum())
-        mass = self.model.attention_mass_view.mean(1)
+        mass = self.model.attention_mass_view[: len(self.view_names)].mean(1)
         for view, (name, values) in enumerate(zip(self.view_names, mass, strict=True)):
             if count:
                 self._log_epoch_metric(
@@ -833,9 +857,21 @@ class KneeModule(L.LightningModule):
                 values.mean(),
                 len(batch["study_uid"]),
             )
-        selected = self.model.detail_view[batch["view_index"]] & batch[
-            "slice_mask"
-        ].any(-1)
+        if prefix:
+            for view, name in self.shared_view_names:
+                values = self.model.attention_mass_view[view].mean(0)
+                for label, value in zip(self.targets, values, strict=True):
+                    if label in (*TARGET_ROUTES, "ACL"):
+                        self._log_epoch_metric(
+                            f"val_attention_mass_{name}_{label.lower().replace(' ', '_')}",
+                            value,
+                            len(batch["study_uid"]),
+                        )
+        selected = (
+            self.model.detail_view[batch["view_index"]]
+            & ~self.model.shared_slice_view[batch["view_index"]]
+            & batch["slice_mask"].any(-1)
+        )
         views = batch["view_index"][selected]
         rows = (
             torch.cat(
@@ -1135,7 +1171,7 @@ class KneeModule(L.LightningModule):
         )
         mask = covered & encoded["meniscus_visual_valid"] & encoded["routable"][:, None]
         loss, metrics = anatomy_loss(
-            encoded["meniscus_scores"], shares, mask, MENISCUS_CLASSES
+            encoded["meniscus_scores"], shares, mask, self.meniscus_classes
         )
         tokens = int(mask.sum())
         if tokens:
@@ -1143,7 +1179,32 @@ class KneeModule(L.LightningModule):
             for name, value in metrics.items():
                 self._log_epoch_metric(f"{prefix}meniscus_{name}", value, tokens)
         self._log_epoch_metric(f"{prefix}meniscus_tokens", float(tokens), 1, "sum")
+        if self.config.model.soft_tissue_routing:
+            self._log_soft_tissue_routing(encoded, prefix)
         return self.config.trainer.meniscus_loss_weight * loss
+
+    def _log_soft_tissue_routing(self, encoded: dict, prefix: str) -> None:
+        model = (
+            self.averaged
+            if prefix and self.weight_averaging is not None
+            else self.model
+        )
+        stats = model.soft_tissue_routing_stats
+        studies = encoded["batch_size"]
+        for number, target in enumerate(TARGET_ROUTES):
+            label = target.lower().replace(" ", "_")
+            for name in ("open_cells", "weight", "routed", "logit_abs"):
+                self._log_epoch_metric(
+                    f"{prefix}soft_tissue_{name}_{label}",
+                    stats[name][:, number].mean(),
+                    studies,
+                )
+        for number, name in enumerate(("medial", "lateral", "kneecap")):
+            self._log_epoch_metric(
+                f"{prefix}soft_tissue_compartment_found_{name}",
+                stats["compartment_found"][:, number].mean(),
+                studies,
+            )
 
     def _anatomy_step(
         self, model, encoded: dict, batch: dict, prefix: str
