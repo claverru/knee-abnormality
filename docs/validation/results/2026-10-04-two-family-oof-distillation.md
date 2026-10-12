@@ -222,6 +222,32 @@ label on four folds and applied to the fifth, against the global pair chosen the
   test studies want a sharper temperature than the training folds do is untested: the sharp end
   of the grid (0.7) is where the ResNet-50 and the ligament and meniscus labels already sit.
 
+## Fold teachers are levelled differently
+
+**Each study's teacher value comes from a different model, and the five models of a family do
+not share a level; aligning them per fold and label removes the cost, rounding does not.** The
+mean prediction of a label differs between the five ResNet-50 teachers by 0.01 to 0.04, and
+between the five ReXNet-200 teachers by up to 0.09 (PF OA) and 0.06 to 0.07 (menisci). Pooled,
+the teacher predictions score below the mean of their own fold scores for that reason.
+Out-of-fold teacher predictions at ×4 scored as a label (macro AUC against the split targets):
+
+| Teacher predictions | ResNet-50 | ReXNet-200 |
+|---|---:|---:|
+| Mean of the five fold scores | 0.932043 | 0.926976 |
+| Pooled, raw (what `oof_blend_v2` uses) | 0.931720 | 0.925785 |
+| Pooled, each teacher rank-normalised per label | 0.932046 | 0.926987 |
+| Pooled, each teacher recalibrated per label (logistic, two numbers per teacher and label) | 0.932594 | 0.927604 |
+| Pooled, rounded to 0.25 | 0.9099 | not computed |
+
+- Rank normalisation recovers exactly the gap to the fold mean. Recalibration is fitted on the
+  targets it is scored against here, so part of its extra gain is optimistic.
+- On the 58 gold studies: ResNet-50 raw 0.9354, rank-normalised 0.9309, recalibrated 0.9330;
+  ReXNet-200 raw 0.9169, rank-normalised 0.9181, recalibrated 0.9206. Too few studies to choose
+  between the two alignments.
+- Rounding to 0.25 turns 47% of the cells into an exact 0 and costs the label 0.022 (0.024 on
+  gold); rounding to 0.1 costs 0.008. The fine differences at the low end order the studies.
+- Not tried on a child: no run has trained on aligned teacher predictions.
+
 ## Sweep pitfalls
 
 - **Mixed-precision weight cache.** `torch.autocast` caches the cast copy of a weight for the

@@ -250,7 +250,17 @@ same option also serves speed (*Speed* below).
   round with the children as teachers (their blend agrees with the 58 gold studies at 0.9375
   against 0.9288 for the teachers'; one ResNet-50 on fold 0 first, against today's child), and
   the teacher share of the labels (0.5 was a convention; the ResNet-50 teacher alone is 0.9354 on
-  gold against 0.9358 for the blended table and 0.9075 for the silver labels).
+  gold against 0.9358 for the blended table and 0.9075 for the silver labels). Before mixing,
+  align the fold teachers per label (rank normalisation or a logistic recalibration per teacher):
+  they differ in level by 0.01 to 0.04 and the raw pooled predictions lose 0.0003 as a label
+  ([measured](../validation/results/2026-10-04-two-family-oof-distillation.md#fold-teachers-are-levelled-differently)).
+- *ResNet-18 round at 0.5/0.5 (2026-09-30, user request):* teachers, the five
+  `rn18-l2sp-no-confusion` folds (×4 0.928062, 0.919191, 0.929444, 0.919376, 0.922596); labels
+  `oof_blend_v1`, half `rebuild_state_v2` and half their ×4 out-of-fold predictions (gold
+  agreement 0.9397 against 0.9075 for the base, 80% [+0.022, +0.043]; teacher alone 0.9271). The
+  fold-0 child scored ×4 0.929536 against 0.928062 (+0.0015, 95% paired report-group [+0.0001,
+  +0.0031]), an upper bound since the fold-1 to 4 teachers trained on fold 0. Public: S87 0.944
+  against 0.943 for S86, one rounding step. Superseded by the two-family round above.
 - *First test ([result](../validation/results/2026-09-23-image-blend-labels-result.md)):* one
   fold-0 child at 0.5/0.5, with the on-hand teacher described below. It gave:
   - gold agreement of the label table +0.020 [+0.006, +0.036];

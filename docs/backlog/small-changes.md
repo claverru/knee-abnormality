@@ -61,28 +61,36 @@ attention temperature τ 0.75 is adopted at inference and carries the best submi
 
 The head trains on about 30 triplets per study and predicts on 115 to 160 at ×4 to ×6; the only
 correction in use is one attention temperature per model. Measured on the ten children of
-2026-10-04 ([result](../validation/results/2026-10-04-two-family-oof-distillation.md)); all three are inference-only on existing checkpoints.
+2026-10-04 ([result](../validation/results/2026-10-04-two-family-oof-distillation.md)) and on the
+three-fold ResNet-50 of 2026-10-12
+([result](../validation/results/2026-10-12-dense-bag-pooling-on-the-resnet-50.md)); all are
+inference-only on existing checkpoints. On the 2026-10-12 model ×4 at τ 0.9 is the best setting
+on all three folds, so these matter only for bags larger than ×4 or for a model without a sweep.
 
-- **A softer temperature for effusion and synovitis** (measured, one sweep, labels chosen after
-  seeing it). With τ 1.1 on both families for those two labels and the S103 pair (0.7, 1.0) for
-  the other ten, the blend gains +0.0003 at ×4, ×5 and ×6 (80% [+0.0002, +0.0004] at each, four of
-  five folds). A free τ per label and family is not stable: cross-fitted it gives +0.0004 at ×6
-  and −0.0001 at ×4. τ 1.1 is the top of the grid, so softer values are untested. Needs a τ per
-  label in `apply_attention_temperature` (it divides the scorer's row, the compartment sign and
-  the view label bias of that label) and in export. **Submitted as S105: 0.954 public against
-  0.955 for S103**, one rounding step down, so the local gain is not confirmed. Open instead: the
-  sharp side, τ below 0.7 for the ResNet-50 and for ACL, MCL and the menisci, which sit on the
-  edge of the grid (needs one GPU pass).
-- **Type share together with the tuned temperature, at bags larger than ×6** (measured on one
-  ResNet-18: +0.0009 at full coverage with τ 0.9; untested on these models). S104 tested type
-  share with τ 1 and scored 0.951 against 0.955, which confounds the two. Score tuned τ or τ 1,
-  with and without type share, at ×6, ×8 and full coverage in one out-of-fold pass; also the
-  tempered form `λ · log(reference / count)` at λ 0.5 (Shimodaira 2000, hypothesis). The option
-  exists on the unmerged branch `pooling-options` (`export --type-share`), beside the per-target
-  temperature (`export --label-attention-temperature`).
+- **Each series at its ×1 share of the attention, as an inference option** (measured on fold 0 of
+  the ResNet-50: +0.00006 at ×4, +0.00029 at ×6, +0.00084 at ×8 over the best single τ, with
+  τ 0.9; on one ResNet-18 earlier +0.0009 at full coverage). It makes the multiplier nearly
+  indifferent (spread 0.0005 against 0.0011) and does not lift ×6 or ×8 above ×4. S104 tested the
+  per-type form with τ 1 and scored 0.951 against 0.955, which confounds the two. Needs the ×1
+  count per series in the engine and an offset on the scores of the main and soft-tissue
+  scorers; not built (the earlier `pooling-options` branch is deleted).
+- **A temperature per label** (measured, not a recipe). The best τ per label differs between
+  trained models: three values fitted on fold 0 give +0.00105 there and −0.00064 and −0.00069 on
+  folds 1 and 2; within fold 0 they hold on unseen halves (+0.00076). S147 (fold 0 with its own
+  values) scored 0.959 public without a like-for-like reference; S105 (τ 1.1 for effusion and
+  synovitis on the ten children) scored 0.954 against 0.955 for S103. Open: values fitted per
+  model on its own validation fold, which is the small form of the
+  [head refit](big-bets.md#pooling-head-at-the-inference-bag-size). The export option
+  (`--label-attention-temperature`) is in the worktree `knee-abnormality-label-temperature`,
+  uncommitted.
 - **τ = ln N_train / ln N_test as the default for an unswept model or multiplier** (measured by
-  interpolation). It gives 0.84, 0.83 and 0.81 at ×4, ×5 and ×6 and sits 0.0001 below one tuned τ
-  per family and 0.0003 to 0.0004 below the joint pair. It replaces tuning; it does not beat it.
+  interpolation on the ten children). It gives 0.84, 0.83 and 0.81 at ×4, ×5 and ×6 and sits
+  0.0001 below one tuned τ per family and 0.0003 to 0.0004 below the joint pair. It replaces
+  tuning; it does not beat it. Applied per study from its own token count it loses 0.0002 to
+  0.0003 to one τ.
+- Measured and closed on 2026-10-12: a separate τ for the soft-tissue read, slices weighted by
+  the training sampling density, the top ×1-sized set of tokens, and matching the ×1 attention
+  entropy per study.
 
 ### Plane/contrast-specific feature adapters
 

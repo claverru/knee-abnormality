@@ -84,8 +84,10 @@ measured outcomes are in the [validation results](../validation/results/INDEX.md
   configs. Measured pieces: ResNet-18 with the detail view and the unaligned blend ×4 0.929467,
   ×1 0.919142; ResNet-50 the same on the usual labels ×4 0.933292, 0.959 public (S142), and at
   0.25 teacher share ×4 0.935570, **0.960 public (S143)**; aligned mixing on top of that ×4
-  0.935270, ×1 0.928276, no public score. **No run exists on exactly the configs' setting**
-  (aligned mixing with the usual labels) on either backbone. Thirty-five distinct slices per
+  0.935270, ×1 0.928276, no public score. The configs' own setting (aligned
+  mixing with the usual labels, teacher share 0) is trained on the ResNet-50 on folds 0, 1 and 2
+  (`rn50-aligned-mixing-folds-0-2`: ×4 0.940906, 0.933392, 0.937000; fold 0 as S147, 0.959 with
+  per-label temperatures) and has no ResNet-18 run. Thirty-five distinct slices per
   study without the detail view: ×4 0.936965 locally and 0.959 public (S146) against 0.960
   (S143), not in force. `INFERENCE_NUM_WORKERS` is 8 and the training's final ×4 prediction
   uses it. Results:
@@ -193,10 +195,18 @@ measured outcomes are in the [validation results](../validation/results/INDEX.md
 
 ## Best public submissions
 
-- **0.959:** S126, the Refined-RadImageNet ResNet-50 of the recipe in force (anatomy map, posed
-  crops, the map's joint centre), alone, fold 1 at ×4, τ 0.9, no TTA (×4 0.933265): the best
-  submission and the best single model, +0.002 over the same backbone without the anatomy map
-  (S119, 0.957). It was submitted by hand from the notebook's first completed version through
+- **0.961:** S140, the five Refined ResNet-50 teachers of the student distillation in one bundle
+  at ×6 with reflection TTA and τ 0.85: the best submission. S141, the same with the view
+  stacker, also 0.961.
+- **0.960:** three single ResNet-50s on fold 1 at ×4, τ 0.9, no TTA: S138 (student at teacher
+  share 0.5), S143 (detail view at teacher share 0.25, ×4 0.935570) and S144 (aligned contrast
+  mixing on top, ×4 0.935270): the best single models.
+- **0.959:** S142 (the detail view on the usual labels, ×4 0.933292), S145 and S146 (35 distinct
+  slices, ×4 0.936965) and S147 (fold 0 of the aligned-mixing recipe at teacher share 0 with
+  per-label temperatures and TTA, ×4 0.942268), all single ResNet-50s.
+- **0.959:** S126, the Refined-RadImageNet ResNet-50 on the anatomy-map recipe (anatomy map, posed
+  crops, the map's joint centre), alone, fold 1 at ×4, τ 0.9, no TTA (×4 0.933265), +0.002 over
+  the same backbone without the anatomy map (S119, 0.957). It was submitted by hand from the notebook's first completed version through
   the Kaggle API after the submit job lost it in Kaggle's queue; the output was not downloaded
   and validated first.
 - **0.957:** S106, the five Refined ResNet-50 children of the
@@ -308,6 +318,14 @@ measured outcomes are in the [validation results](../validation/results/INDEX.md
 - **2026-10-11:** the `soft-tissue-reads` autoresearch campaign (the soft-tissue map and the
   routed cell read on the ResNet-18), stopped by the user after 34 runs; the sagittal fluid
   detail view adopted. [Campaign](../../autoresearch/campaigns/soft-tissue-reads/INDEX.md).
+- **2026-10-12:** dense-bag pooling on the three-fold ResNet-50: ×4 at τ 0.9 stays the setting;
+  a temperature per label holds within one model and not across folds; S147 0.959
+  ([result](../validation/results/2026-10-12-dense-bag-pooling-on-the-resnet-50.md)).
+- **2026-10-10:** the `student-distillation` autoresearch campaign, closed by the user after 16
+  forced seeds: recipe 0.75 × silver + 0.25 × the raw joint teacher prediction (fold-0 ×4
+  0.935809 on `gold_holdout_5fold_v1`). Its training code is on main; its per-campaign adoption
+  rule and the view stacker were not merged and their branch was deleted on 2026-10-12 (last
+  commit `b8763bf`). [Campaign](../../autoresearch/campaigns/student-distillation/INDEX.md).
 
 - **2026-10-08:** the `anatomy-masks` autoresearch campaign (the anatomy map, sections read from
   it, posed crops, measurements from the masks as targets), stopped by the user after 18 trained
