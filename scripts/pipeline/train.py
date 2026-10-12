@@ -1,8 +1,11 @@
 import hashlib
 import json
 import logging
+import multiprocessing
 import os
 import shutil
+import signal
+import sys
 import time
 import zipfile
 from datetime import UTC, datetime
@@ -357,14 +360,36 @@ def run_fold(
     )
 
 
-def main() -> None:
-    args, overrides = parse_experiment_arguments(TrainOptions)
+def run_fold_process(
+    config: ExperimentConfig,
+    fold: int,
+    fold_dir: Path,
+    resume: Path | None,
+    limit_train: int | None,
+) -> None:
+    multiprocessing.set_start_method("fork", force=True)
     for module in (KneeStudyDataset.__module__, predict_loader.__module__):
         logging.getLogger(module).setLevel(logging.ERROR)
+    torch.set_float32_matmul_precision("high")
+    run_fold(
+        config,
+        fold,
+        fold_dir,
+        resume,
+        read_checkpoint(resume) if resume is not None else None,
+        limit_train,
+    )
+
+
+def terminated(signum, frame) -> None:
+    sys.exit(128 + signum)
+
+
+def main() -> None:
+    args, overrides = parse_experiment_arguments(TrainOptions)
     configure_cuda_allocator()
     config_path = args.config.expanduser().resolve()
     config = load_config(config_path, overrides=overrides)
-    torch.set_float32_matmul_precision("high")
     if args.resume is not None and len(config.validation.folds) != 1:
         raise ValueError("--resume requires exactly one selected fold")
     resume_checkpoint = (
@@ -393,17 +418,26 @@ def main() -> None:
         )
         + "\n"
     )
+    context = multiprocessing.get_context("spawn")
+    signal.signal(signal.SIGTERM, terminated)
     for fold in config.validation.folds:
         fold_dir = run_dir / f"fold_{fold}"
         fold_dir.mkdir()
-        run_fold(
-            config,
-            fold,
-            fold_dir,
-            args.resume,
-            resume_checkpoint,
-            args.limit_train,
+        process = context.Process(
+            target=run_fold_process,
+            args=(config, fold, fold_dir, args.resume, args.limit_train),
         )
+        process.start()
+        try:
+            process.join()
+        finally:
+            if process.is_alive():
+                process.terminate()
+                process.join()
+        if process.exitcode != 0:
+            raise RuntimeError(
+                f"Fold {fold} training exited with code {process.exitcode}"
+            )
     predictions = pl.concat(
         [
             pl.read_csv(run_dir / f"fold_{fold}" / "validation_predictions.csv")

@@ -6,6 +6,7 @@ EVALUATION = {
     "validation": {
         "split": "all_5fold_scanner_v2",
         "prediction_image_multiplier": 4,
+        "unused_folds": [],
     },
     "validation_image_multiplier": 1,
     "bootstrap_draws": 2000,

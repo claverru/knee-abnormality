@@ -33,7 +33,7 @@ INFERENCE_IO_THREADS = 8
 INFERENCE_LOADER_NICENESS = 10
 SERIES_LISTING_THREADS = 16
 STUDY_HEADERS = Path(
-    "outputs/analysis/sharing-disagreement-20260914/study_headers.parquet"
+    "outputs/analysis/s/sharing-disagreement-20260914/study_headers.parquet"
 )
 
 Identifier = Annotated[str, StringConstraints(pattern=r"^[A-Za-z0-9][A-Za-z0-9_.-]*$")]
@@ -80,6 +80,7 @@ class PathsConfig(ConfigModel):
     report_attribute_manifest: Path
     anatomy_targets: Path | None = None
     meniscus_targets: Path | None = None
+    teacher_table: Path | None = None
 
     @field_validator(
         "data_root",
@@ -88,6 +89,7 @@ class PathsConfig(ConfigModel):
         "report_attribute_manifest",
         "anatomy_targets",
         "meniscus_targets",
+        "teacher_table",
         mode="before",
     )
     @classmethod
@@ -99,6 +101,10 @@ class PathsConfig(ConfigModel):
             base = (info.context or {}).get("config_dir", Path.cwd())
             return (path if path.is_absolute() else base / path).resolve()
         return value
+
+
+class DistillationConfig(ConfigModel):
+    teacher_share: UnitFloat = 0.0
 
 
 class LabelsConfig(ConfigModel):
@@ -350,13 +356,20 @@ class ValidationConfig(ConfigModel):
     split: Identifier
     folds: Annotated[tuple[Fold, ...], Field(min_length=1)]
     prediction_image_multiplier: Annotated[StrictInt, Field(gt=0)] = 1
+    unused_folds: tuple[Fold, ...] = ()
 
-    @field_validator("folds")
+    @field_validator("folds", "unused_folds")
     @classmethod
     def distinct_folds(cls, value: tuple[int, ...]) -> tuple[int, ...]:
         if len(set(value)) != len(value):
             raise ValueError("folds must be distinct")
         return value
+
+    @model_validator(mode="after")
+    def unused_folds_are_not_validated(self) -> "ValidationConfig":
+        if set(self.folds) & set(self.unused_folds):
+            raise ValueError("unused_folds must not hold a validation fold")
+        return self
 
 
 class ExperimentConfig(ConfigModel):
@@ -364,6 +377,7 @@ class ExperimentConfig(ConfigModel):
     seed: Annotated[StrictInt, Field(ge=0, lt=2**32)] | None = None
     paths: PathsConfig
     labels: LabelsConfig
+    distillation: DistillationConfig = DistillationConfig()
     validation: ValidationConfig
     data: DataConfig
     model: ModelConfig
