@@ -1,6 +1,7 @@
 import logging
 from dataclasses import replace
 from functools import partial
+from itertools import accumulate
 from multiprocessing import Value
 from pathlib import Path
 
@@ -32,7 +33,7 @@ from knee_abnormality.data.preprocessing.preparation import (
 from knee_abnormality.data.preprocessing.sampling import (
     build_pool,
     select_triplets,
-    study_budgets,
+    shared_view_budgets,
     usable_local_order,
     valid_runs,
 )
@@ -326,10 +327,11 @@ class KneeStudyDataset(Dataset):
     def _study_budgets(self, slot_sources):
         multiplier = self.image_limit_multiplier
         base = tuple(view.slices * multiplier for _, view in self.data.views)
-        return study_budgets(
+        return shared_view_budgets(
             base,
             tuple(len(slot_sources[slot][1]) for slot, _ in self.data.views),
             self.data.study_slice_total * multiplier,
+            self.data.view_sources,
         )
 
     def _prepare_slot(self, study, slot, candidates, sources, budgets, failures):
@@ -353,15 +355,20 @@ class KneeStudyDataset(Dataset):
             )
             values, selections, new_paths, new_sources = [], [], set(), set()
             for order, (view_index, view) in enumerate(views):
-                selection = select_triplets(
-                    pool,
-                    budgets[view_index],
-                    self.data.sampling_sigma_fraction,
-                    radius,
-                    study.uid,
-                    (*kind_key, order) if order else kind_key,
-                    self.training_seed,
-                    self.epoch.value,
+                source = self.data.view_sources[view_index]
+                selection = (
+                    selections[0]
+                    if source != view_index
+                    else select_triplets(
+                        pool,
+                        budgets[view_index],
+                        self.data.sampling_sigma_fraction,
+                        radius,
+                        study.uid,
+                        (*kind_key, order) if order else kind_key,
+                        self.training_seed,
+                        self.epoch.value,
+                    )
                 )
                 selections.append(selection)
                 for uid in sorted({t.uid for t in selection.triplets}):
@@ -463,6 +470,7 @@ class KneeStudyDataset(Dataset):
             "target_observed": observed,
             "failures": tuple(failures),
             "sampling": tuple(sampling),
+            "view_sources": self.data.view_sources,
             "reflection_reasons": tuple(
                 sorted(
                     {
@@ -503,6 +511,40 @@ def collate_studies(items: list[dict]) -> dict:
             presence[study_index, type_index] = bool(acquisitions)
             for series in acquisitions:
                 entries.append((study_index, type_index, series))
+    view_sources = items[0]["view_sources"]
+    primary = [
+        entry
+        for entry in entries
+        if view_sources[entry[2].view_index] == entry[2].view_index
+    ]
+    shared = [
+        entry
+        for entry in entries
+        if view_sources[entry[2].view_index] != entry[2].view_index
+    ]
+    entries = primary + shared
+    source_lookup = {
+        (study, kind, series.uid, series.view_index): index
+        for index, (study, kind, series) in enumerate(primary)
+    }
+    source_series = tuple(
+        source_lookup[(study, kind, series.uid, view_sources[series.view_index])]
+        for study, kind, series in entries
+    )
+    source_series_index = torch.empty(len(entries), dtype=torch.long)
+    primary_series_index = torch.arange(len(primary), dtype=torch.long)
+    image_starts = tuple(
+        accumulate([0] + [series.triplet_count for _, _, series in entries])
+    )
+    source_image_index = torch.cat(
+        [
+            torch.arange(series.triplet_count, dtype=torch.long) + image_starts[source]
+            for (_, _, series), source in zip(
+                entries, source_series, strict=True
+            )
+        ]
+    )
+    primary_image_index = torch.arange(image_starts[len(primary)], dtype=torch.long)
     max_slices = max(series.triplet_count for _, _, series in entries)
     positions = torch.zeros((len(entries), max_slices), dtype=torch.float32)
     slice_mask = torch.zeros((len(entries), max_slices), dtype=torch.bool)
@@ -554,6 +596,7 @@ def collate_studies(items: list[dict]) -> dict:
         )
         count = series.triplet_count
         view_index[series_index] = series.view_index
+        source_series_index[series_index] = source_series[series_index]
         window_center[series_index] = torch.tensor(series.window_center_mm)
         window_rule_distance[series_index] = series.window_rule_distance_mm
         first = series_index * max_slices * SLICES_PER_INPUT
@@ -588,6 +631,10 @@ def collate_studies(items: list[dict]) -> dict:
         "patient_maps": patient_maps,
         "geometry_valid": geometry_valid,
         "view_index": view_index,
+        "source_series_index": source_series_index,
+        "primary_series_index": primary_series_index,
+        "source_image_index": source_image_index,
+        "primary_image_index": primary_image_index,
         "window_center_mm": window_center,
         "window_rule_distance_mm": window_rule_distance,
         "knee_side_sign": knee_side_sign,

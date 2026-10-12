@@ -33,6 +33,7 @@ from knee_abnormality.modeling.spatial_tokens import (
     backbone_mapping_identity,
     feature_geometry,
 )
+from knee_abnormality.training.anatomy import MENISCUS_POINTS
 
 
 def sample_windows(
@@ -160,6 +161,31 @@ class ViewWindows(nn.Module):
             )
 
     def first_look_batch(self, batch: dict) -> dict:
+        primary_count = len(batch["primary_series_index"])
+        batch = {
+            **batch,
+            **{
+                key: batch[key][:primary_count]
+                for key in (
+                    "images",
+                    "slice_mask",
+                    "slice_positions",
+                    "valid_rects",
+                    "patient_maps",
+                    "geometry_valid",
+                    "view_index",
+                    "series_study_index",
+                    "series_type_index",
+                    "window_center_mm",
+                    "window_rule_distance_mm",
+                    "knee_side_sign",
+                    "knee_center_x_mm",
+                    "knee_center_y_mm",
+                    "knee_center_z_mm",
+                    "source_series_index",
+                )
+            },
+        }
         mask = batch["slice_mask"]
         count = mask.sum(-1)
         budget = torch.minimum(count, self.first_look_slices[batch["view_index"]])
@@ -336,13 +362,15 @@ class ViewWindows(nn.Module):
     def jitter(self, batch: dict, pose: torch.Tensor) -> torch.Tensor:
         with torch.autocast(device_type=pose.device.type, enabled=False):
             _, _, length, usable, _ = self.geometry(batch)
-            series = len(pose)
-            turn = math.radians(VIEW_ROTATION_JITTER_DEGREES) * (
-                2 * torch.rand((series, 1), device=pose.device) - 1
+            source = batch["source_series_index"]
+            series = len(batch["primary_series_index"])
+            turn = (
+                math.radians(VIEW_ROTATION_JITTER_DEGREES)
+                * (2 * torch.rand((series, 1), device=pose.device) - 1)[source]
             )
             move = (
                 VIEW_SHIFT_JITTER_MM
-                * (2 * torch.rand((series, 1, 2), device=pose.device) - 1)
+                * (2 * torch.rand((series, 1, 2), device=pose.device) - 1)[source]
                 / length.clamp_min(1e-4)
             ).round()
             limit = self.shift_limit[batch["view_index"]][:, None, None]
@@ -486,6 +514,7 @@ ROUTES = (
     "tear_lateral_posterior",
     "facet_medial",
     "facet_lateral",
+    "bones",
 )
 TARGET_ROUTES = {
     "Medial Meniscus": ("meniscus", "meniscus_medial"),
@@ -500,6 +529,8 @@ OWN_ROUTES = {
     "MCL": "collateral_medial",
     "Effusion": "kneecap",
     "Baker's": "baker",
+    "Contusion": "bones",
+    "Fracture": "bones",
 }
 FRAME_SIZES = ("band_top", "band_bottom", "core_radius", "ring_radius")
 FRAME_SIZE_START_PITCHES = (1.3, -0.9, 1.1, 2.2)
@@ -538,13 +569,24 @@ PLANE_REFIT_WIDTH_MM = 12.0
 ANATOMY_CENTRE_WIDTH_MM = 10.0
 ANATOMY_CLASS_COUNT = 7
 MENISCUS_CLASS_COUNT = 3
-FEMUR_CLASS, TIBIA_CLASS, KNEECAP_CLASS, JOINT_CLASS, KNEECAP_JOINT_CLASS = (
-    1,
-    2,
-    3,
-    5,
-    6,
-)
+SOFT_TISSUE_CLASS_COUNT = 7
+(
+    MEDIAL_MENISCUS_CLASS,
+    LATERAL_MENISCUS_CLASS,
+    MEDIAL_TIBIAL_CARTILAGE_CLASS,
+    LATERAL_TIBIAL_CARTILAGE_CLASS,
+    FEMORAL_CARTILAGE_CLASS,
+    PATELLAR_CARTILAGE_CLASS,
+) = range(1, SOFT_TISSUE_CLASS_COUNT)
+MENISCUS_CORE_SHARE = 1 / (2 * MENISCUS_POINTS**2)
+(
+    FEMUR_CLASS,
+    TIBIA_CLASS,
+    KNEECAP_CLASS,
+    FIBULA_CLASS,
+    JOINT_CLASS,
+    KNEECAP_JOINT_CLASS,
+) = range(1, ANATOMY_CLASS_COUNT)
 SECTION_LOGIT = 2.0
 SECTION_RATE = 5.0
 KNEECAP_FULL_SHARE = 0.3
@@ -567,6 +609,7 @@ ROUTE_SECTIONS = {
     "tear_lateral_posterior": (0, 1, 0),
     "facet_medial": (1, 0, 0),
     "facet_lateral": (1, 0, 0),
+    "bones": (1, 1, 1),
 }
 ANATOMICAL_BAND_PITCHES = (0.5, -0.5)
 SIDE_COORDINATE_LOG_ODDS = 4.33
@@ -811,9 +854,43 @@ class KneeAbnormalityModel(nn.Module):
                 self.meniscus_projection = nn.Linear(
                     getattr(block, "conv3", block.conv2).out_channels, PROJECTION_WIDTH
                 )
-                self.meniscus_head = nn.Linear(PROJECTION_WIDTH, MENISCUS_CLASS_COUNT)
+                self.meniscus_head = nn.Linear(
+                    PROJECTION_WIDTH,
+                    SOFT_TISSUE_CLASS_COUNT
+                    if model.soft_tissue_routing
+                    else MENISCUS_CLASS_COUNT,
+                )
             nn.init.zeros_(self.meniscus_head.weight)
             nn.init.zeros_(self.meniscus_head.bias)
+        self.soft_tissue_routing = model.soft_tissue_routing
+        if self.soft_tissue_routing:
+            soft_target = [targets.index(target) for target in TARGET_ROUTES]
+            self.register_buffer(
+                "soft_target", torch.tensor(soft_target), persistent=False
+            )
+            self.register_buffer(
+                "soft_target_channel",
+                torch.tensor(
+                    [SHARED_CHANNELS.index(route[0]) for route in TARGET_ROUTES.values()]
+                ),
+                persistent=False,
+            )
+            with torch.random.fork_rng(devices=[]):
+                self.soft_norm = nn.LayerNorm(PROJECTION_WIDTH)
+                self.soft_attention = nn.Sequential(
+                    nn.Linear(PROJECTION_WIDTH, MIL_ATTENTION_WIDTH),
+                    nn.Tanh(),
+                    nn.Dropout(model.dropout),
+                    nn.Linear(MIL_ATTENTION_WIDTH, len(SHARED_CHANNELS)),
+                )
+                self.soft_head = nn.Linear(
+                    PROJECTION_WIDTH, len(SHARED_CHANNELS), bias=False
+                )
+                nn.init.zeros_(self.soft_head.weight)
+                if self.plane_readout:
+                    self.soft_head = PlaneContrastReadout(
+                        self.soft_head, len(data.series_types)
+                    )
         self.anatomical_frame = model.anatomical_frame
         if self.anatomical_frame:
             with torch.random.fork_rng(devices=[]):
@@ -881,6 +958,29 @@ class KneeAbnormalityModel(nn.Module):
             ),
             persistent=False,
         )
+        with torch.random.fork_rng(devices=[]):
+            self.register_buffer(
+                "shared_slice_view",
+                torch.tensor(
+                    [index != source for index, source in enumerate(data.view_sources)]
+                ),
+                persistent=False,
+            )
+            self.register_buffer(
+                "detail_target_allowed",
+                torch.tensor([target in (*TARGET_ROUTES, "ACL") for target in targets]),
+                persistent=False,
+            )
+            self.register_buffer(
+                "detail_channel_allowed",
+                torch.tensor(
+                    [channel in (*SHARED_CHANNELS, "ACL") for channel in self.channels]
+                ),
+                persistent=False,
+            )
+        self.primary_view_count = sum(
+            index == source for index, source in enumerate(data.view_sources)
+        )
         self.view_label_bias = (
             nn.Parameter(torch.zeros(len(data.views), len(self.channels)))
             if model.view_label_bias
@@ -901,6 +1001,8 @@ class KneeAbnormalityModel(nn.Module):
         images: torch.Tensor,
         acquisition_index: torch.Tensor,
         acquisition_type: torch.Tensor,
+        primary_image: torch.Tensor,
+        primary_count: int,
     ) -> tuple[torch.Tensor, torch.Tensor | None]:
         if self.checkpoint_backbone:
             self.backbone.set_grad_checkpointing(
@@ -915,6 +1017,8 @@ class KneeAbnormalityModel(nn.Module):
                 acquisition_index,
                 acquisition_type,
                 self.feature_statistics_settings,
+                primary_image,
+                primary_count,
             )
         )
         return self._backbone_stage_outputs(features)
@@ -975,6 +1079,7 @@ class KneeAbnormalityModel(nn.Module):
         token_plane: torch.Tensor,
         patient_maps: torch.Tensor,
         geometry_valid: torch.Tensor,
+        reflected: torch.Tensor,
     ) -> torch.Tensor:
         settings = self.augmentation_settings.contrast_mixing_augmentation
         if not self.training or settings.probability == 0:
@@ -996,6 +1101,7 @@ class KneeAbnormalityModel(nn.Module):
             token_plane,
             patient_maps,
             geometry_valid,
+            reflected,
         )
         return images
 
@@ -1004,6 +1110,10 @@ class KneeAbnormalityModel(nn.Module):
         images: torch.Tensor,
         slice_mask: torch.Tensor,
         valid_rects: torch.Tensor,
+        source_series_index: torch.Tensor,
+        primary_series_index: torch.Tensor,
+        source_image_index: torch.Tensor,
+        primary_image_index: torch.Tensor,
     ) -> tuple[torch.Tensor, torch.Tensor]:
         settings = self.augmentation_settings
         if not self.training or not any(
@@ -1021,9 +1131,10 @@ class KneeAbnormalityModel(nn.Module):
                 len(images), -1, -1
             )
         parameters = sample_augmentation_parameters(
-            settings, slice_mask.shape[0], images.device
+            settings, len(primary_series_index), images.device
         )
         series_index = slice_mask.nonzero(as_tuple=True)[0]
+        series_index = source_series_index[series_index]
         matrices = affine_matrices(parameters.affine, *images.shape[-2:])
         inverse = augmented_to_prepared(matrices, *images.shape[-2:])
         return self.image_augmentation(
@@ -1033,6 +1144,8 @@ class KneeAbnormalityModel(nn.Module):
             matrices=matrices,
             valid_rects=valid_rects,
             inverse_affine=inverse[series_index],
+            source_image_index=source_image_index,
+            primary_image_index=primary_image_index,
         ), inverse[series_index]
 
     def routing_widths(self) -> torch.Tensor:
@@ -1459,6 +1572,9 @@ class KneeAbnormalityModel(nn.Module):
                     ringed * sector["posterolateral"] * heights[14],
                     kneecap * medial_side,
                     kneecap * lateral_side,
+                    shares[
+                        ..., [FEMUR_CLASS, TIBIA_CLASS, KNEECAP_CLASS, FIBULA_CLASS]
+                    ].sum(-1),
                 )
             )
         return torch.stack(
@@ -1485,6 +1601,7 @@ class KneeAbnormalityModel(nn.Module):
                 ringed * sector["posterolateral"] * joint,
                 kneecap * medial_side,
                 kneecap * lateral_side,
+                torch.ones_like(core),
             )
         )
 
@@ -1578,7 +1695,12 @@ class KneeAbnormalityModel(nn.Module):
         with torch.autocast(device_type=tokens.device.type, enabled=False):
             routing = routing.float()
             weights = torch.cat((routing, torch.ones_like(routing[:1])))
-            routed = (membership.float() @ weights.T >= 1)[:, self.target_route]
+            target_gate = (
+                ~self.shared_slice_view[token_view][None]
+                | self.detail_target_allowed[:, None]
+            )
+            target_weights = weights[self.target_route] * target_gate
+            routed = membership.float() @ target_weights.T >= 1
             log_weights = (
                 weights.clamp_min(ROUTING_MINIMUM_WEIGHT).log()
                 / self.routing_temperature
@@ -1590,14 +1712,21 @@ class KneeAbnormalityModel(nn.Module):
                     routed[:, :, None], log_weights[self.target_route][None], 0.0
                 )
             )
-            attention = attention.masked_fill(~allowed[:, None], -torch.inf).softmax(-1)
-            if diagnostic:
-                attention = attention.masked_fill(empty_study[:, None, None], 0.0)
-            else:
+            target_allowed = allowed[:, None] & target_gate[None]
+            target_empty = empty_study[:, None] | ~target_allowed.any(-1)
+            target_allowed = target_allowed.clone()
+            target_allowed[:, :, 0] |= target_empty
+            attention = attention.masked_fill(~target_allowed, -torch.inf).softmax(-1)
+            attention = attention.masked_fill(target_empty[:, :, None], 0.0)
+            if not diagnostic:
                 self.attention_mass_view = torch.stack(
                     [
                         (attention * (token_view == view)[None, None]).sum(-1)
-                        for view in range(len(self.detail_view))
+                        for view in range(
+                            self.primary_view_count
+                            if self.training
+                            else len(self.detail_view)
+                        )
                     ]
                 ).detach()
                 self.routing_mean = (
@@ -1623,14 +1752,17 @@ class KneeAbnormalityModel(nn.Module):
                     ),
                     nn.functional.linear(tokens.float(), self.head.weight.float()),
                 )
-            knee_attention = scores.float()[None]
-            knee_attention = knee_attention.masked_fill(
-                ~allowed[:, None], -torch.inf
-            ).softmax(-1)
-            if diagnostic:
-                knee_attention = knee_attention.masked_fill(
-                    empty_study[:, None, None], 0.0
-                )
+            knee_allowed = allowed[:, None] & (
+                ~self.shared_slice_view[token_view][None, None]
+                | self.detail_channel_allowed[None, :, None]
+            )
+            knee_empty = empty_study[:, None] | ~knee_allowed.any(-1)
+            knee_allowed = knee_allowed.clone()
+            knee_allowed[:, :, 0] |= knee_empty
+            knee_attention = (
+                scores.float()[None].masked_fill(~knee_allowed, -torch.inf).softmax(-1)
+            )
+            knee_attention = knee_attention.masked_fill(knee_empty[:, :, None], 0.0)
             knee_evidence = torch.einsum("bcn,nc->bc", knee_attention, evidence)
             channel_contribution = (
                 knee_evidence
@@ -1764,15 +1896,19 @@ class KneeAbnormalityModel(nn.Module):
             and self.augmentation_settings.reflection_augmentation.probability > 0
         ):
             valid_images = apply_reflection(valid_images, reflected, sagittal)
+        view_index = batch["view_index"][keep_series][acquisition_index]
+        primary_image = ~self.shared_slice_view[view_index]
+        mixing_type = torch.where(primary_image, token_type, -1)
         valid_images = self._mix_contrast(
             valid_images,
             effective,
             acquisition_index,
             token_study,
-            token_type,
+            mixing_type,
             token_plane,
             patient_maps,
             geometry_valid,
+            reflected,
         )
         valid_images, inverse_affine = self._augment_images(
             valid_images,
@@ -1780,6 +1916,10 @@ class KneeAbnormalityModel(nn.Module):
             reflection_valid_rects(
                 valid_rects, reflected, sagittal, valid_images.shape[-1]
             ),
+            batch["source_series_index"],
+            batch["primary_series_index"],
+            batch["source_image_index"],
+            batch["primary_image_index"],
         )
         inverse_affine = reflection_inverse(
             inverse_affine, reflected, sagittal, valid_images.shape[-1]
@@ -1790,7 +1930,11 @@ class KneeAbnormalityModel(nn.Module):
         if self.channels_last:
             valid_images = valid_images.contiguous(memory_format=torch.channels_last)
         maps, meniscus_maps = self._encode_images(
-            valid_images, acquisition_index, token_type
+            valid_images,
+            acquisition_index,
+            token_type,
+            primary_image,
+            len(batch["primary_series_index"]),
         )
         features = self.projection(maps.flatten(2).transpose(1, 2))
         visual_valid, prepared_xy = feature_geometry(
@@ -1802,7 +1946,6 @@ class KneeAbnormalityModel(nn.Module):
             batch["canvas_valid_rects"].flatten(0, 1)[flat_indices],
             batch["crop_affine"].flatten(0, 1)[flat_indices],
         )
-        view_index = batch["view_index"][keep_series][acquisition_index]
         detail_view = self.detail_view[view_index]
         batch_size = len(presence)
         mirrored_study = batch.get("mirrored_study", reflected_study)
@@ -1924,14 +2067,6 @@ class KneeAbnormalityModel(nn.Module):
             fitted_position = torch.stack(
                 (sign * knee_x, anterior_axis, superior_axis), -1
             )
-            study_shift, study_rotation, landmarks, study_sizes = self.study_frames(
-                tokens,
-                fitted_position,
-                visual_valid & valid_position[:, None],
-                token_study,
-                token_pitch,
-                batch_size,
-            )
             meniscus_scores = None
             meniscus_encoded = {}
             if self.meniscus_map:
@@ -1963,6 +2098,7 @@ class KneeAbnormalityModel(nn.Module):
                 meniscus_position = torch.einsum(
                     "nij,nkj->nki", middle, fine_homogeneous
                 )
+                soft_tissue_valid = meniscus_valid
                 meniscus_valid = meniscus_valid & (
                     valid_position & torch.isfinite(meniscus_position).all((-1, -2))
                 )[:, None]
@@ -1974,11 +2110,32 @@ class KneeAbnormalityModel(nn.Module):
                     ).detach(),
                     "meniscus_shares": (
                         meniscus_scores.detach().softmax(-1)
-                        .reshape(-1, height, 2, width, 2, MENISCUS_CLASS_COUNT)
+                        .reshape(
+                            -1, height, 2, width, 2, meniscus_scores.shape[-1]
+                        )
                         .mean((2, 4))
                         .flatten(1, 2)
                     ),
                 }
+                if self.soft_tissue_routing:
+                    meniscus_encoded |= {
+                        "soft_tissue_features": meniscus_features,
+                        "soft_tissue_shares": meniscus_scores.detach().softmax(-1),
+                        "soft_tissue_valid": soft_tissue_valid,
+                        "soft_tissue_offset": torch.where(
+                            meniscus_valid[..., None],
+                            meniscus_position - center[:, None],
+                            0.0,
+                        ).detach(),
+                    }
+            study_shift, study_rotation, landmarks, study_sizes = self.study_frames(
+                tokens,
+                fitted_position,
+                visual_valid & valid_position[:, None],
+                token_study,
+                token_pitch,
+                batch_size,
+            )
             anatomy_scores = None
             anatomy_shares = None
             anatomy_diagnostics = {}
@@ -2070,7 +2227,220 @@ class KneeAbnormalityModel(nn.Module):
             ).to(tokens.dtype)
         return self.mil_norm(tokens.flatten(0, 1))
 
+    def soft_tissue_routing_weights(
+        self, encoded: dict
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        return self._memo(
+            encoded,
+            "memo_soft_tissue_routing_weights",
+            lambda: self._soft_tissue_routing_weights(encoded),
+        )
+
+    @torch.no_grad()
+    def _soft_tissue_routing_weights(
+        self, encoded: dict
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        shares = encoded["soft_tissue_shares"]
+        with torch.autocast(device_type=shares.device.type, enabled=False):
+            shares = shares.float()
+            valid = encoded["meniscus_visual_valid"]
+            offset = encoded["soft_tissue_offset"].float()
+            study = encoded["study"]
+            batch_size = encoded["batch_size"]
+            side = math.isqrt(valid.shape[1])
+            tiny = torch.finfo(torch.float32).tiny
+
+            def per_study(values: torch.Tensor) -> torch.Tensor:
+                return torch.zeros(
+                    (batch_size, *values.shape[2:]), device=values.device
+                ).index_add(0, study, values.sum(1))
+
+            def grid(values: torch.Tensor) -> torch.Tensor:
+                return values.transpose(1, 2).unflatten(2, (side, side))
+
+            def cells(values: torch.Tensor) -> torch.Tensor:
+                return values.flatten(2).transpose(1, 2)
+
+            def centres(mass: torch.Tensor) -> torch.Tensor:
+                return per_study(
+                    mass[..., None] * offset[:, :, None]
+                ) / per_study(mass).clamp_min(tiny)[..., None]
+
+            def distances(centre: torch.Tensor) -> torch.Tensor:
+                return (offset[:, :, None] - centre[study][:, None]).norm(dim=-1)
+
+            meniscus = (
+                shares[..., [MEDIAL_MENISCUS_CLASS, LATERAL_MENISCUS_CLASS]]
+                * valid[..., None]
+            )
+            peak = torch.zeros((batch_size, 2), device=shares.device).index_reduce_(
+                0, study, meniscus.amax(1), "amax"
+            )
+            core = (meniscus > 0) & (
+                meniscus >= MENISCUS_CORE_SHARE * peak[study][:, None]
+            )
+            opened = nn.functional.max_pool2d(grid(core.float()), 3, 1, 1) > 0
+            spread = nn.functional.avg_pool2d(grid(meniscus), 3, 1, 1)
+            distance = distances(centres(meniscus)).masked_fill(
+                ~(peak > 0)[study][:, None], torch.inf
+            )
+            meniscus_weight = (
+                cells(torch.where(opened, torch.maximum(grid(meniscus), spread), 0.0))
+                * (distance <= distance.flip(-1))
+                * valid[..., None]
+            )
+
+            anchors = (
+                torch.stack(
+                    (
+                        shares[..., MEDIAL_TIBIAL_CARTILAGE_CLASS]
+                        + shares[..., MEDIAL_MENISCUS_CLASS],
+                        shares[..., LATERAL_TIBIAL_CARTILAGE_CLASS]
+                        + shares[..., LATERAL_MENISCUS_CLASS],
+                        shares[..., PATELLAR_CARTILAGE_CLASS],
+                    ),
+                    -1,
+                )
+                * valid[..., None]
+            )
+            found = per_study(anchors) >= 1
+            known = found[study][:, None]
+            distance = distances(centres(anchors)).masked_fill(~known, torch.inf)
+            own = (
+                nn.functional.one_hot(distance.argmin(-1), anchors.shape[-1]).bool()
+                & known
+            )
+            cartilage = (
+                shares[
+                    ...,
+                    [
+                        MEDIAL_TIBIAL_CARTILAGE_CLASS,
+                        LATERAL_TIBIAL_CARTILAGE_CLASS,
+                        PATELLAR_CARTILAGE_CLASS,
+                    ],
+                ]
+                + own * shares[..., FEMORAL_CARTILAGE_CLASS, None]
+            ) * valid[..., None]
+            typical = per_study(cartilage.square()) / per_study(cartilage).clamp_min(
+                tiny
+            )
+            rim = cells(
+                nn.functional.avg_pool2d(
+                    grid(
+                        (cartilage / typical[study][:, None].clamp_min(tiny)).clamp(
+                            max=1
+                        )
+                    ),
+                    3,
+                    1,
+                    1,
+                )
+            )
+            zone = (
+                encoded["anatomy_shares"]
+                .float()[..., [JOINT_CLASS, JOINT_CLASS, KNEECAP_JOINT_CLASS]]
+                .unflatten(1, (side // 2, side // 2))
+                .repeat_interleave(2, 1)
+                .repeat_interleave(2, 2)
+                .flatten(1, 2)
+            )
+            cartilage_weight = (
+                torch.where(known, torch.maximum(rim, zone) * own, zone)
+                * valid[..., None]
+            )
+            return (
+                torch.cat((meniscus_weight, cartilage_weight), -1).permute(2, 0, 1),
+                found,
+            )
+
+    def _soft_tissue_tokens(self, encoded: dict) -> torch.Tensor:
+        tokens = (
+            encoded["soft_tissue_features"].float()
+            + encoded["plane"][:, None].float()
+            + encoded["contrast"][:, None].float()
+            + encoded["detail_view"][:, None, None]
+            * self.detail_view_embedding.float()[None, None]
+        )
+        return self.soft_norm(tokens.flatten(0, 1))
+
+    def _soft_tissue_pool(self, encoded: dict, view: int | None) -> torch.Tensor:
+        valid = encoded["soft_tissue_valid"]
+        if view is not None:
+            valid = valid & (encoded["view_index"] == view)[:, None]
+        study = encoded["study"][:, None].expand_as(valid).flatten()
+        cell_view = encoded["view_index"][:, None].expand_as(valid).flatten()
+        valid = valid.flatten()
+        batch_size = encoded["batch_size"]
+        with torch.autocast(device_type=valid.device.type, enabled=False):
+            tokens = self._memo(
+                encoded,
+                "memo_soft_tissue_tokens",
+                lambda: self._soft_tissue_tokens(encoded),
+            )
+            scores = self.soft_attention(tokens).transpose(0, 1)[
+                self.soft_target_channel
+            ]
+            if self.view_label_bias is not None:
+                scores = scores + self.view_label_bias.float()[cell_view][
+                    :, self.target_channel[self.soft_target]
+                ].transpose(0, 1)
+            membership = (
+                torch.arange(batch_size, device=valid.device)[:, None] == study[None]
+            ) & valid[None]
+            empty_study = ~membership.any(-1)
+            if view is None and empty_study.any():
+                raise ValueError("A study has no visually valid soft-tissue cells")
+            allowed = membership.clone()
+            allowed[:, 0] |= empty_study
+            routing, found = self.soft_tissue_routing_weights(encoded)
+            routing = routing.flatten(1)
+            total = membership.float() @ routing.T
+            routed = total >= 1
+            attention = scores[None] + torch.where(
+                routed[:, :, None],
+                (
+                    routing.clamp_min(ROUTING_MINIMUM_WEIGHT).log()
+                    / self.routing_temperature
+                )[None],
+                0.0,
+            )
+            attention = attention.masked_fill(~allowed[:, None], -torch.inf).softmax(-1)
+            if view is not None:
+                attention = attention.masked_fill(empty_study[:, None, None], 0.0)
+            else:
+                self.soft_tissue_routing_stats = {
+                    "open_cells": (
+                        total.square()
+                        / (membership.float() @ routing.square().T).clamp_min(
+                            torch.finfo(torch.float32).tiny
+                        )
+                    ).detach(),
+                    "weight": total.detach(),
+                    "routed": routed.float(),
+                    "compartment_found": found.float(),
+                }
+            evidence = (
+                self.soft_head(tokens, encoded["image_type"])
+                if self.plane_readout
+                else nn.functional.linear(tokens, self.soft_head.weight.float())
+            )[:, self.soft_target_channel]
+            logits = torch.einsum("btn,nt->bt", attention, evidence)
+            if view is None:
+                self.soft_tissue_routing_stats["logit_abs"] = logits.detach().abs()
+            return logits
+
     def pool_encoded(self, encoded: dict, view: int | None = None) -> torch.Tensor:
+        logits = self._pool_tokens(encoded, view)
+        if not self.soft_tissue_routing:
+            return logits
+        soft = self._soft_tissue_pool(encoded, view)
+        if not torch.isfinite(soft).all():
+            raise RuntimeError("Soft-tissue pooling produced non-finite logits")
+        logits = logits.clone()
+        logits[:, self.soft_target] += soft.to(logits.dtype)
+        return logits
+
+    def _pool_tokens(self, encoded: dict, view: int | None = None) -> torch.Tensor:
         return self._attention_pool(
             self.study_tokens(encoded),
             self.study_tokens(encoded, shared=True),

@@ -7,7 +7,7 @@ paths:
   label_manifest: labels/rebuild-state-v2-label-sources.json
   report_attribute_manifest: labels/jevk5-report-attribute-targets-v4.0.json
   anatomy_targets: ../data/labels/prepared/anatomy-mrannotator-sample550-joints
-  meniscus_targets: ../data/labels/prepared/meniscus-nnunet-knee-dess265
+  meniscus_targets: ../data/labels/prepared/soft-tissue-nnunet-knee-dess265
 
 distillation:
   teacher_share: 0.0
@@ -100,6 +100,10 @@ data:
           slices: 5
           horizontal: {anchor: knee, offset_mm: 7.0}
           vertical: {anchor: image, offset_mm: 10.0}
+        - field_mm: 64.0
+          slices: 5
+          horizontal: {anchor: knee, offset_mm: 7.0}
+          vertical: {anchor: image, offset_mm: 10.0}
   reference_field_mm: 120.0
   image_size: 224
   lower_quantile: 0.005
@@ -121,6 +125,7 @@ model:
   view_label_bias: true
   anatomical_frame: true
   meniscus_map: true
+  soft_tissue_routing: true
   feature_statistics_augmentation:
     probability: 0.5
 

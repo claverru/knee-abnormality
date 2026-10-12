@@ -33,6 +33,7 @@ SAMPLING_IDENTITY = {
     "assignment": "maximum_cardinality_then_supplier_changes_then_squared_error",
     "fallback": "union_uniform_acquisition_local_affine_run_support_unknown_xyz",
     "normalization": "unique_retained_complete_triplet_slices_once",
+    "detail_view": "sagittal_fluid_second_view_reuses_first_view_selection_and_budget_no_reallocation",
     "retry": "split_original_runs_at_failed_paths_fixed_center_and_spacing",
     "seed": "sha256_training_seed_study_type_operation_epoch_evaluation_unseeded",
 }
@@ -430,6 +431,24 @@ def study_budgets(
         counts = largest_remainder(total, counts.astype(float))
     counts = np.where(present, counts, np.asarray(base, dtype=np.int64))
     return tuple(int(value) for value in counts)
+
+
+def shared_view_budgets(
+    base: tuple[int, ...],
+    sources: tuple[int, ...],
+    total: int,
+    view_sources: tuple[int, ...],
+) -> tuple[int, ...]:
+    primary = tuple(
+        index for index, source in enumerate(view_sources) if index == source
+    )
+    counts = study_budgets(
+        tuple(base[index] for index in primary),
+        tuple(sources[index] for index in primary),
+        total,
+    )
+    lookup = dict(zip(primary, counts, strict=True))
+    return tuple(lookup[source] for source in view_sources)
 
 
 def select_triplets(

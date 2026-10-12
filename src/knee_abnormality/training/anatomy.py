@@ -14,7 +14,16 @@ ANATOMY_CLASSES = (
     "joint",
     "kneecap_joint",
 )
-MENISCUS_CLASSES = ("neither", "medial_meniscus", "lateral_meniscus")
+SOFT_TISSUE_CLASSES = (
+    "neither",
+    "medial_meniscus",
+    "lateral_meniscus",
+    "medial_tibial_cartilage",
+    "lateral_tibial_cartilage",
+    "femoral_cartilage",
+    "patellar_cartilage",
+)
+MENISCUS_CLASSES = SOFT_TISSUE_CLASSES[:3]
 OUTSIDE = 255
 ANATOMY_POINTS = 4
 MENISCUS_POINTS = 4
