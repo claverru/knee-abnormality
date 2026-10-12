@@ -279,9 +279,15 @@ reproduces it.
 trained on ×1 bags and used on ×4 to ×6 bags; these two remove the mismatch instead. Tuned τ is
 worth +0.0011 over τ 1 on the ten-children blend at ×6
 ([result](../validation/results/2026-10-04-two-family-oof-distillation.md)), so the expected prize is of that order.
+On the three-fold ResNet-50 of 2026-10-12 one tuned τ is worth +0.0003 over τ 1 at ×4, and the
+best τ per label differs between trained models while holding on unseen studies of the same model
+(+0.00076 for three values on fold 0), which is what a sharpness fitted per model and label would
+capture ([result](../validation/results/2026-10-12-dense-bag-pooling-on-the-resnet-50.md)).
 The inference-only alternatives are in
-[small changes](small-changes.md#pooling-dense-bags-at-inference); the earlier measurements are
-on the `better-than-tau` branch (`docs/ongoing/dense-bag-pooling.md` there, uncommitted).
+[small changes](small-changes.md#pooling-dense-bags-at-inference). Per-token scores and evidence
+of fold 0 are cached at ×1 to ×8 in `outputs/analysis/pooling-token-cache/fold0`, so the small
+form can be fitted without a backbone pass; the `better-than-tau` branch with the earlier
+measurements no longer exists.
 
 1. **Refit only the pooling head on dense bags** (Touvron et al. 2019, "Fixing the train-test
    resolution discrepancy"). Freeze the backbone, cache the training folds' tokens at ×4 to ×6
@@ -299,7 +305,7 @@ on the `better-than-tau` branch (`docs/ongoing/dense-bag-pooling.md` there, unco
 Not pursued, with the reason: sparse attention (the effective share of attended tokens stays at
 about 13% at every bag size, so no tail grows), averaging training-sized sub-bags (worse than
 joint pooling here and in the whole-slide literature), further rules from token count to τ (the
-log-n rule already takes what the count explains), and dense-to-sparse distillation (the children
+log-n rule already takes what the count explains, and per study it loses to one τ), and dense-to-sparse distillation (the children
 already train ×1 bags against ×4 teacher predictions and still want τ 0.7 to 0.9).
 
 ## Per-plane teacher readings

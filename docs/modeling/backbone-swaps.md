@@ -141,7 +141,11 @@ convolution in module order is exact only for single-path networks with static p
 mappings.** Proposed 2026-09-25; ReXNet-R is implemented in the `convnext-atto` worktree and lost its first
 run (−0.0053) with a measured over-large learning rate; its follow-up at `backbone_lr` 8e-5 is
 open. ConvNeXt-Atto, run outside this list, lost −0.0192 and is closed
-([backbone swap runs](../validation/results/2026-09-25-backbone-swap-runs.md)). ConvNeXt-nano and
+([backbone swap runs](../validation/results/2026-09-25-backbone-swap-runs.md)). ConvNeXt-Tiny and
+ConvNeXt-Small with DINOv3 and supervised ImageNet weights, tried on 2026-10-03 as a third blend
+family on the ReXNet-style recipe (fold 0, four runs), reached ×4 0.927235 at best against
+0.932477 for the ResNet-18 control and added nothing to a blend; the worktree and its run notes
+were removed on 2026-10-12. ConvNeXt-nano and
 HGNetV2-B3 are unimplemented. Three timm backbones of about ReXNet-200's
 size (13.8M parameters, 1.53 GMACs at 224 px) that could replace it. Each needs only a
 `BACKBONE_MAPPINGS` entry with a verified origin; `model.backbone` is the option
