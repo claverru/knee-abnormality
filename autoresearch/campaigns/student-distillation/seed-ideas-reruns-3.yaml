@@ -1,0 +1,37 @@
+ideas:
+- id: reranked-fold-teachers-rerun
+  mechanism_id: teacher-preparation
+  parent_idea_id: null
+  title: Rerank each fold teacher's values per label before mixing them with the silver labels
+  opportunity: 'Measured premise, effect on the student a guess. Each study takes its value from the one
+    teacher that held it out, and the four teachers do not share a level: on the ResNet-50 teachers of
+    2026-10-04 the mean prediction of a label differs between teachers by 0.01 to 0.04, and the pooled
+    predictions score 0.931720 as a label against 0.932043 for the mean of the fold scores. Reranking
+    each teacher per label recovers the gap exactly, 0.932046 (prior-work.md, Fold teachers are levelled
+    differently).'
+  mechanism: 'In data/labels.py, before the mix and per label: within each teacher fold replace the joint
+    logit of every study by its rank within that fold divided by the fold''s size, then map each rank
+    to the value at that quantile of the pooled distribution of the four teachers'' sigmoid values for
+    that label. The order inside a fold is unchanged and all four folds end with the same distribution.
+    The mix with the silver labels is the incumbent''s.'
+  precedents:
+  - 'Pooled teacher predictions as a label, ResNet-50: raw 0.931720, reranked 0.932046, mean of the fold
+    scores 0.932043.'
+  - 'Gold, 58 studies: raw 0.9354, reranked 0.9309; too few to decide.'
+  novelty: First student trained on teachers put on a common scale.
+  coverage: Every training study.
+  exploitation: 'Read both scores against the incumbent; report before training the spread of the per-fold
+    mean of the teacher values per label before and after (expect the spread to vanish). Shown wrong by:
+    the overall AUC at x4 below the incumbent with the spread removed.'
+  budget: Same cost as the incumbent.
+  implementation: 'data/labels.py and config.py (distillation.teacher_preparation: reranked replaces raw).
+    Replaces the raw teacher values. Ties in rank take the mean rank. Report the label-table figures.
+    A prepared and checked implementation exists: apply autoresearch/campaigns/student-distillation/prepared/reranked-fold-teachers/changes.diff
+    from the repository root of /home/claudio/src/knee-abnormality-student-distillation to the workspace
+    with patch -p1, confirm it against that folder''s report.md, and take the integration plan, the activation
+    signature (teacher_rerank_shift > 0.0024 at epoch 0) and the label-table figures from report.md instead
+    of rewriting them. It adds no configuration field.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The one preparation with a measured gain in label quality and nothing fitted.
+exhausted_directions: ''

@@ -1,0 +1,45 @@
+ideas:
+- id: teacher-share-025-rerun
+  mechanism_id: teacher-share
+  parent_idea_id: null
+  title: Train the student on three quarters silver labels and one quarter teacher predictions
+  opportunity: A guess. The share of the first round was a convention and has never been varied. The 2026-09-23
+    image-blend test used 0.7 silver and 0.3 teacher of older models and gave +0.0035 on fold 0 and a
+    public tie (prior-work.md, Precedents).
+  mechanism: 'Set distillation.teacher_share: 0.25 in configs/training.yaml, whatever the incumbent''s
+    share is. Label = 0.75 * silver + 0.25 * teacher, raw joint teacher values. No source change.'
+  precedents:
+  - 'Image-blend labels at 0.7 / 0.3, ReXNet-200 fold 0: +0.0035, a public tie.'
+  novelty: First point below 0.5 on the clean split.
+  coverage: Every training study.
+  exploitation: 'Read both scores against the incumbent and against the run at 0.5. Shown wrong by: the
+    overall AUC at x4 below the run at 0.5.'
+  budget: Same cost as the incumbent.
+  implementation: 'configs/training.yaml only (distillation.teacher_share: 0.25). Changes no source.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: One side of the share range.
+- id: teacher-share-075-rerun
+  mechanism_id: teacher-share
+  parent_idea_id: null
+  title: Train the student on one quarter silver labels and three quarters teacher predictions
+  opportunity: 'A guess, with one measurement behind it: on the 58 gold studies the ResNet-50 teacher
+    alone agreed with the radiologists almost as well as the half-and-half table (0.9354 against 0.9358)
+    and far better than the silver labels (0.9075), so the silver half may be adding little (prior-work.md,
+    What is settled).'
+  mechanism: 'Set distillation.teacher_share: 0.75 in configs/training.yaml, whatever the incumbent''s
+    share is. Label = 0.25 * silver + 0.75 * teacher, raw joint teacher values. No source change.'
+  precedents:
+  - 'Gold agreement of label tables, 2026-10-04: silver 0.9075, ResNet-50 teacher 0.9354, half and half
+    0.9394 with that teacher alone.'
+  novelty: First point above 0.5.
+  coverage: Every training study.
+  exploitation: 'Read both scores against the incumbent and against the run at 0.5; the gold score is
+    the one this run is expected to move. Shown wrong by: the gold AUC below the run at 0.5 by more than
+    0.002.'
+  budget: Same cost as the incumbent.
+  implementation: 'configs/training.yaml only (distillation.teacher_share: 0.75). Changes no source.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The other side of the share range.
+exhausted_directions: ''

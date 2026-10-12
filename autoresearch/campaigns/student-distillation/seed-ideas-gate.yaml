@@ -1,0 +1,59 @@
+ideas:
+- id: teacher-beyond-repeat-noise
+  mechanism_id: disagreement-gate
+  parent_idea_id: null
+  title: Mix the teacher in only where it disagrees with the silver label by more than its own repeat noise
+  opportunity: 'Measured premise, effect on the student a guess. The share range falls with every quarter
+    of teacher (0.935809, 0.934171, 0.932562, 0.931358 at x4) and the four labels that lost the teacher
+    in teacher-share-per-label all rose or held, so part of what the teacher adds is harmful. Measured
+    on folds 1 to 4: 35 report groups of 2 to 7 studies (91 studies, 56 degrees of freedom per label)
+    share one report and so one silver value (within-group silver sd 0.004), and the teacher''s sigmoid
+    value differs between their studies with a within-group sd of 0.092 (macro rms; 0.050 fracture to
+    0.148 medial meniscus). The median absolute teacher-silver difference is 0.035 to 0.120 per label,
+    so in most cells the teacher''s move is smaller than what the teacher gives for another study of the
+    same report. Those cells are 79.7% of the table and carry 39.3% of the incumbent''s label shift: jitter
+    laid over the silver value. It weighs most where the silver values are narrow: teacher-silver difference
+    sd over silver sd is 0.91 fracture, 0.86 MCL, 0.83 synovitis, 0.73 lateral OA, against 0.53 ACL and
+    0.56 medial meniscus; synovitis (94% of silver values between 0.1 and 0.9, half of them between 0.20
+    and 0.31) is the label that loses most as the share rises.'
+  mechanism: 'In data/labels.py, per training study and label: p = sigmoid(joint teacher logit), raw;
+    d = p - silver. Label = silver + 0.25 * d where |d| > 0.18, and label = silver elsewhere. 0.18 is
+    twice the measured repeat sd of 0.092, one constant for the twelve labels, set as distillation.teacher_gate:
+    0.18; distillation.teacher_share stays 0.25. Cells beyond the gate keep exactly the incumbent''s
+    label; the others return to the silver value. No rounding: kept cells take the raw teacher value.'
+  precedents:
+  - 'teacher-share-per-label: the four labels with the teacher removed moved +0.0037, +0.0019, +0.0015
+    and +0.0001 at x4 on the whole fold.'
+  - 'Share range on fold 0, x4: 0.25 0.935809, 0.5 0.934171, 0.75 0.932562, 1.0 0.931358.'
+  - 'Gold agreement of label tables, 2026-10-04: silver 0.9075, ResNet-50 teacher 0.9354, so the teacher
+    does correct silver cells; a correction is a large difference by construction.'
+  novelty: First recipe where the teacher enters by cell from the size of its disagreement with the silver
+    label; the share, the teacher's preparation and the plane readings are untouched.
+  coverage: 'Every training study; 20.3% of the 41,700 cells take the teacher (13.2% ACL to 34.8% PF
+    OA; synovitis 25.2%), the others take the silver value.'
+  exploitation: 'Report before training: the share of cells beyond the gate per label (expect 0.2033
+    overall), teacher_target_shift (expect 0.01720 against the incumbent''s 0.02833), the mean absolute
+    change against the incumbent''s labels (expect 0.01113; 0.0086 fracture to 0.0136 effusion), cells
+    crossing 0.5 against the incumbent (expect 0.15%) and the label macro AUC against silver (expect 0.999684,
+    incumbent 0.999636). Read both scores against the incumbent, and synovitis, MCL, fracture and lateral
+    OA first. Shown wrong by: the overall AUC at x4 below the incumbent, which says the small differences
+    are the helpful part of the teacher and the large ones the harmful one; the next seed is then the
+    complement (teacher only where |d| <= 0.18). A gain alone does not separate the gate from less teacher:
+    the table''s shift equals that of a plain share of 0.152, so a gain is read with the per-label table,
+    where the gate predicts the largest gains on the labels with the highest jitter ratio.'
+  budget: Same cost as the incumbent; the labels are built once before training.
+  implementation: 'src/knee_abnormality/config.py (DistillationConfig gains teacher_gate, a unit float),
+    src/knee_abnormality/data/labels.py (distilled applies the gate in the mix), src/knee_abnormality/training/lightning.py
+    (logs teacher_gate_shift beside teacher_target_shift) and configs/training.yaml (distillation.teacher_gate:
+    0.18). Replaces the incumbent''s mix of every cell: no flag or field selects the ungated mix, and the
+    only config changes are under distillation. teacher_gate_shift is the mean absolute difference between
+    the labels built and the labels the ungated mix would give, measured when the label table is built
+    and stored in the provenance: 0.01113, and exactly 0 without the gate. Activation: teacher_gate_shift
+    > 0.0110 at epoch 0. Validation frame, scoring targets and row order unchanged; nothing read from
+    fold 0 or from gold labels.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: 'The only seed that tests which part of the teacher''s values carries the harm, with
+    its one constant measured on the tables; a label-table change only, and either outcome names the next
+    seed.'
+exhausted_directions: ''

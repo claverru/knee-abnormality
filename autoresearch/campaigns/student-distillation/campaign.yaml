@@ -1,0 +1,83 @@
+id: student-distillation
+recipe: configs/training.yaml
+reference_run: outputs/training/student-distillation-reference
+reference_equivalences:
+  distillation.teacher_share: 0.0
+  validation.unused_folds: []
+  paths.teacher_table: /home/claudio/src/knee-abnormality/data/labels/prepared/student-distillation-teachers/teacher_table.parquet
+reference_config_exceptions:
+- validation.split
+- validation.folds
+- paths.label_manifest
+- paths.report_attribute_manifest
+reference_identity_exceptions:
+- split_protocol_sha256
+- membership_sha256
+- training_rows_sha256
+- validation_rows_sha256
+- preprocessing_identity
+additional_evidence_runs: []
+backlog:
+  refill_below: 3
+  refill_to: 5
+  seed_order: forced
+  rotate_after: 1000000
+budget:
+  mode: range
+  min_fraction: 0.5
+  max_fraction: 1.33
+acceptance:
+  overall_x4_min: 0.0009
+  overall_x1_min: 0.0
+  gold_x4_min: -0.002
+forced_adoptions:
+- teacher-share-050
+policy:
+  editable_files:
+  - configs/training.yaml
+  - src/knee_abnormality/config.py
+  - src/knee_abnormality/data/labels.py
+  - src/knee_abnormality/training/lightning.py
+  editable_directories: []
+  config_keys: []
+  config_prefixes:
+  - distillation
+  list_item_fields: {}
+  input_identity_keys:
+  - training_rows_sha256
+  require_source_change: false
+  configuration_only_ideas: true
+  developer_instructions: 'Read contract.md before writing code. The incumbent trains on labels built
+    in data/labels.py from two sources: the silver table rebuild_state_v2 and the teacher table of this
+    campaign (contract, Teachers and their predictions), mixed as the distillation section of configs/training.yaml
+    says. Each seed is one change to that construction, or, for the per-plane seed, one added target in
+    the training step. Apply the seed to the incumbent and leave everything outside it byte-identical.
+    Replace what a seed supersedes: no flag, option or config field selects the old behaviour, and the
+    only config changes a seed may make are under distillation. Never read the teacher table at validation
+    or prediction, never read fold 0''s rows of any table when building training labels, and never read
+    gold labels: training labels come from the silver table and the teacher table for the studies of folds
+    1 to 4 only. The validation frame and the scoring targets do not change; a candidate whose validation
+    identity differs is invalid. Before training, report once from the label table itself: the mean absolute
+    change of the training labels against the incumbent''s per label, the share of cells that cross 0.5,
+    and the macro AUC of the new training labels against the silver labels on folds 1 to 4. Validation
+    logs the overall macro AUC and the gold macro AUC of fold 0 at every epoch through the existing epoch
+    metrics; add no other diagnostic to the training step. The recipe already logs teacher_target_shift at every
+    epoch: the mean absolute change of the training labels of the run against the silver labels, measured
+    in data/labels.py when the label table is built. It is the activation metric of a seed that changes
+    the label table, configuration-only seeds included: bind it at epoch 0 with a threshold just below
+    the value you computed from the label table before training. You have no GPU and must not use one. Use the
+    existing Python environment for static checks and tiny checks only, and run nothing heavy on the CPU
+    beside a training. No weight averaging. No tests. Training time must stay within 0.5 to 1.1 times
+    the reference''s; do not reduce epochs, slices or studies.'
+  researcher_instructions: 'Research starts after the forced seeds and stays on the four choices of contract.md
+    (what the teacher gives, how its values are prepared, how teacher and silver are mixed, what the student
+    is trained on). Your first product after every completed run is its analysis: the overall macro AUC
+    at x1 and x4 and the gold macro AUC at x4, each against the incumbent and against the reference with
+    its paired bootstrap interval, and the per-label differences of both scores sorted from the largest
+    gain to the largest loss; then the row of run-notes.md. Say for every run whether its overall and gold
+    differences point the same way. Only then propose. Each idea fills the five parts of contract.md (How
+    a seed is written) and is one training run with one mechanism; an idea that only measures is not allowed.
+    Every number an idea sets comes from the teacher table, the silver table or a saved run on folds 1
+    to 4, never from fold 0. Out of bounds: everything in the contract''s out-of-bounds list; other backbones
+    or pretraining as teacher or student; retraining the teachers; rounding the teacher''s values; a second
+    stage on the student''s outputs; anything read from the teacher table at validation or prediction.'
