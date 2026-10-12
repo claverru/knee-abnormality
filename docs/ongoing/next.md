@@ -9,9 +9,9 @@ live under [autoresearch](../../autoresearch/campaigns/INDEX.md). New candidates
 current control at its fold and seed.
 
 **Closed on 2026-10-10: the
-[student-distillation campaign](../../autoresearch/campaigns/student-distillation/INDEX.md)**, in
-the worktree `../knee-abnormality-student-distillation`; its training code is on main, its
-per-campaign adoption rule and the view stacker are not. Recipe found on the split
+[student-distillation campaign](../../autoresearch/campaigns/student-distillation/INDEX.md)**. Its
+training code is on main; the branch `student-distillation` keeps its
+per-campaign adoption rule and the view stacker, unmerged. Recipe found on the split
 `gold_holdout_5fold_v1`: 0.75 × silver + 0.25 × the raw joint teacher prediction (fold-0 ×4
 0.935809). Not done: applying it to the Refined ResNet-50 on the five folds of
 `all_5fold_scanner_v2`, the share below 0.25 and the share-0 control on this split
