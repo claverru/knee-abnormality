@@ -1,0 +1,65 @@
+ideas:
+- id: blur-pool-at-the-stage-transitions-on-average-pool-shortcuts
+  mechanism_id: backbone-anti-aliased-downsampling
+  parent_idea_id: null
+  title: Anti-alias the three stride-two 3 by 3 convolutions of the ResNet-50 with a blur pool, on the
+    same weights
+  opportunity: 'Forced by the user on 2026-10-13 as an exception to the contract''s settled backbone:
+    the same weights in the same places, with a fixed blur added at three places. A stride-two convolution
+    aliases: a one-pixel shift of the input changes which positions are kept, and thin structures flicker
+    between neighbouring tokens. Blur-pool (Making Convolutional Networks Shift-Invariant Again, arXiv
+    1904.11486) runs the convolution at stride 1 and downsamples with a fixed low-pass filter. The crops
+    here are posed from predicted geometry and shifted by augmentation, so the same knee reaches the backbone
+    at different sub-token offsets. The method''s author initialises anti-aliased networks from baseline
+    weights and fine-tunes (evidence, medium, no numbers found); on pretrained weights the function changes
+    slightly at the start (0.013 relative on random weights for the full variant, measured by the modernisation
+    review of 2026-10-13). Guess, low: -0.0005 to +0.001 macro. Never run here. Requeued by the keeper
+    on 2026-10-13: the first run of this seed was cancelled 275 s into training when the user stopped
+    the campaign to adopt the average-pool shortcuts (run 27), so it has no result. This run applies the
+    same change to the new incumbent, whose three stride-two shortcuts are already (average pool, 1 by
+    1 convolution at stride 1, batch norm); those shortcuts stay as the incumbent has them.'
+  mechanism: 'In modeling/model.py, after the ResNet backbone is created with today''s arguments and the
+    RadImageNet weights are loaded strictly as today, the first block of layer2, layer3 and layer4 is
+    changed in place: its 3 by 3 convolution conv2 runs at stride 1 with the same weight tensor, and the
+    block''s anti-aliasing slot (block.aa, applied by timm''s Bottleneck after the activation that follows
+    bn2) becomes timm.layers.BlurPool2d(channels of conv2''s output, filt_size=3, stride=2). This is what
+    timm builds for these blocks with aa_layer=BlurPool2d; the stem''s max pool and the shortcuts stay
+    as they are, so the stem keeps its memory and no 112 by 112 map is added. The blur has no trainable
+    parameter; no key is added to or missing from the load. The L2-SP anchors and the optimizer groups
+    are unchanged. Validation, prediction and Kaggle inference run the same backbone. No option and no
+    config field.'
+  precedents:
+  - 'docs/ongoing/radimagenet-backbone.md: how the Refined-RadImageNet weights are loaded.'
+  - 'docs/research/input-resolution.md: downsampling must be antialiased; the repository resampler is,
+    the backbone is not.'
+  novelty: First anti-aliased downsampling inside the backbone.
+  coverage: Every image, at the three stride-two transitions.
+  exploitation: 'Read the macro and the per-label table at both multipliers, the menisci, MCL and ACL
+    first (the thinnest structures), and the step from x1 to x4. Activation: the report states the three
+    blocks'' conv2 stride (1) and aa module (BlurPool2d, stride 2), that the strict load passed, the stage
+    outputs'' shapes (28, 14 and 7 at 224 px), and the relative difference between the backbone''s output
+    with and without the blur on a synthetic batch of two images with the same weights (above 0). Nothing
+    new is logged in training. Shown wrong by: the macro below the incumbent at both multipliers.'
+  budget: 'Three 3 by 3 convolutions run at four times their output positions (56, 28 and 14 instead of
+    28, 14 and 7), about 1.0 of the backbone''s 4.1 GMACs more, and their outputs are stored at that size.
+    Estimate, not measured: training time 1.15 to 1.20 of the incumbent''s (about 3,000 to 3,150 s, inside
+    the campaign''s 3,364 s), prediction time the same share, and peak GPU memory 0.5 to 1.0 GB above
+    the incumbent''s 16.7 GB, within 18.5 GB. State both estimates in the report; never fewer epochs,
+    images or slices to fit. The cancelled first run started at about 1.1 steps per second in its first
+    minute against the incumbent''s 1.9 after warm-up; report the measured rate, and if the projected
+    training time exceeds the campaign''s 3,364 s remove cost the mechanism does not need before returning.'
+  implementation: 'Follow the environment paragraph of the developer instructions. Files: modeling/model.py.
+    Read timm/models/resnet.py (Bottleneck: use_aa, conv2''s stride, self.aa) and build the three blocks
+    the way timm does with aa_layer, by changing the existing modules after the load or by creating the
+    backbone with aa_layer and restoring the stem''s max pool; either way the result must be exactly:
+    stem unchanged, conv2 of layer2.0, layer3.0 and layer4.0 at stride 1 followed by BlurPool2d at stride
+    2, shortcuts unchanged. Check on the CPU with a randomly initialised timm resnet50 and no project
+    model that the base state dict loads strictly and that backbone_mapping, the stage outputs'' shapes
+    and group_matcher resolve as before; if the feature mapping needs the blur''s footprint for the token
+    positions, extend it and say so. If an adopted incumbent holds modules in the blocks'' attention slot,
+    they are untouched. model.channels_last stays true.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user's forced seed of 2026-10-13, requeued after its first run was cancelled
+    for an adoption.
+exhausted_directions: None; one seed requeued after a cancelled run.

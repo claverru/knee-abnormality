@@ -18,9 +18,6 @@ an adopted removal deletes the code.
 
 - **Half-knee loss off:** the term is not added in the training step.
 - **Meniscus own-side mask off.**
-- **Plane-contrast readouts off.**
-- **Detail-view embedding off.**
-- **Report-attribute heads off** (−0.0006, 80% [−0.0011, −0.0001], on the 2026-10-01 recipe).
 
 ## Per-slot budget split between its own series
 
@@ -128,15 +125,11 @@ trainable ReXNet is a project adaptation of that idea, not a reproduction or a m
     validation targets and masks unchanged. Compare with full supervision, recording retained
     positive and negative counts per target. This is separate from the rejected source-evidence
     mask.
-- **Hard versus soft report-derived targets** (untested). Change only report-derived training
-  targets; retain original gold labels and frozen validation targets. The completed
-  [Tonylin source comparison](../validation/results/2026-09-13-tonylin-label-comparison.md) did
-  not answer this question.
-- **Source-aware uncertainty weighting** (untested; the binary variant was measured and
-  rejected). Compare reduced supervision weights against full soft-target supervision. The
-  [binary mask was rejected](../history/sharing/2026-09-13-label-masking-result.md); partial
-  weighting remains unimplemented. Preserve gold labels and original evidence indicators; Steven
-  v4 probabilities are not calibrated confidence.
+- **Graded uncertainty weight on Synovitis and Effusion only** (follow-up of the
+  targets-and-inputs campaign; untested). Weighting every report cell by its target's distance
+  from 0.5 raised Synovitis (+0.0047) and Effusion (+0.0017) and lost 0.0010 on the macro through
+  PF OA and labels with few uncertain cells; hard targets lost 0.0029
+  ([result](../validation/results/2026-10-13-targets-and-inputs-campaign.md#targets)). One run with the weight on those two labels, fixed before the run.
 
 ### Auxiliary report-state prediction
 
@@ -179,6 +172,12 @@ bias field, channel reversal and stochastic depth were measured in the
 rejected candidates with their reasons are in
 [MRI augmentation research](../research/mri-augmentation.md#rejected-or-deferred).
 
+- **Intensity and noise augmentation on the fluid series only** (follow-up of the
+  targets-and-inputs campaign; untested). Removing either augmentation, GIN or the resolution
+  degradation lowers Effusion at ×4 in all four runs (−0.0019 to −0.0035) and raises Fracture in
+  all four (+0.0012 to +0.0079); the removals lose or tie on the macro
+  ([result](../validation/results/2026-10-13-targets-and-inputs-campaign.md#inputs-and-augmentation)). One run with the intensity and noise augmentations
+  kept on the fluid-sensitive series and off on the others.
 - **Transform ordering and selected interactions** (hypothesis; untested). Nine image families
   now run in a fixed order; the campaign showed their gains do not add. Keep supervision,
   sampling, model and training budget fixed against a matched reference, and record which findings
@@ -209,24 +208,17 @@ Feedback-driven allocation ran in the
 
 ### Weighting strength: exponent and prevalence definition
 
-**Damping exponent implemented, 2026-09-21, and set to 0.5 in the recipe; soft-prevalence
-comparison untested.** The implemented weights set `w_pos/w_neg = ((1 - r_c) / r_c) ** k` with
+**Damping exponent implemented, 2026-09-21, and set to 0.5 in the recipe. Soft prevalence was
+run on 2026-10-12 and 13: +0.0005 at ×4 and 0.960 against 0.959 public on the recipe before the mask
+decoder and the OA detector, −0.0009 on the recipe with them; not in the recipe
+([result](../validation/results/2026-10-13-targets-and-inputs-campaign.md#soft-prevalence-class-weights-read-publicly)).** The implemented weights set `w_pos/w_neg = ((1 - r_c) / r_c) ** k` with
 `k = trainer.class_balance_exponent`, on the thresholded positive fraction; see
 [supervision](../modeling/supervision.md#fixed-class-balanced-bce) for the exact formula. Full
 balancing (k = 1) reaches 12.9:1 on Fracture and 6.8:1 on Synovitis, whose report-derived targets are
 among the least reliable. The [k=0.5 and unweighted runs](../validation/results/2026-09-21-class-balance-exponent.md)
 lost on fold-0 validation but beat k=1 on the public leaderboard. An external
 recipe seen on 2026-09-19 uses the square root of that ratio, computed on soft prevalence, as a
-`pos_weight`; the entry below isolates that remaining knob separately, keeping our cell weighting
-and mean-weight-one normalisation. One change per run against a fresh control.
-
-- **Soft instead of thresholded prevalence** (one new option, off by default). Compute `p_c` as
-  the mean of the observed soft targets rather than the `y >= 0.5` fraction, leaving the weight
-  formula untouched. This is not a small refinement: the report-derived values sit at 0.25 and
-  0.355, so soft prevalence is far above the thresholded fraction on exactly the rare labels
-  (Synovitis 0.341 against 0.126, Fracture 0.187 against 0.073, Baker's 0.358 against 0.249,
-  Lateral Meniscus 0.228 against 0.158), and it damps their weights accordingly. It confounds
-  with the exponent, so run it only against the same control, never in the same arm.
+`pos_weight`.
 
 A 1→0 ramped exponent tied on fold 0 and scored 0.941 public (S53) against 0.942 for S48
 ([noisy-labels campaign](../validation/results/2026-09-23-noisy-labels-campaign.md#class-weighting-changes-need-the-public-board)).
@@ -234,9 +226,7 @@ A 1→0 ramped exponent tied on fold 0 and scored 0.941 public (S53) against 0.9
 Later [soft-mass weighting](../../autoresearch/campaigns/losses/findings.md#completion-20260920t161203z-14ae6e65)
 and [prior-offset](../../autoresearch/campaigns/losses/findings.md#completion-20260920t181036z-45163c52)
 runs lost about 0.0092 and 0.0119 macro AUC.
-They changed other loss semantics, so neither settles the soft-prevalence alternative. It remains
-lower priority: retain one isolated comparison, with original soft targets, fixed training-fold
-counts and observed-cell reduction, rather than a sweep.
+They changed other loss semantics.
 Both runs, and two ranking losses, gain on soft AUC; they are parked on a
 [watch list](../validation/results/2026-09-23-validation-auc-variants.md#losses-campaign-rescored-2026-09-24).
 

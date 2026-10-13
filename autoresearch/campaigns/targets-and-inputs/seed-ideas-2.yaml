@@ -1,0 +1,189 @@
+ideas:
+- id: intensity-augmentation-off
+  mechanism_id: intensity-augmentation
+  parent_idea_id: null
+  title: Train without the gamma and contrast augmentation
+  opportunity: >-
+    The intensity augmentation (probability 0.5, gamma 0.85 to 1.15, contrast 0.9 to 1.1) dates from
+    the first recipes and was never removed alone on a RadImageNet backbone; the fixes-and-removals
+    campaign queued the removal and never ran it. The recipe has since gained GIN, feature-statistics
+    augmentation, smoothing, resolution and contrast mixing, which also vary intensity. Guess, low:
+    -0.001 to +0.001 macro; a tie removes a mechanism.
+  mechanism: >-
+    In configs/training.yaml, data.intensity_augmentation.probability becomes 0 (it is 0.5). The
+    gamma_range and contrast_range lines stay. Nothing else changes.
+  precedents:
+  - 'docs/backlog/overnight.md, next queue: the entry this seed runs.'
+  - 'prior-work.md, precedents: the augmentation campaign on ReXNet-200; contrast mixing off lost 0.0025 on the ResNet-18.'
+  novelty: First removal of this family on a RadImageNet backbone.
+  coverage: Half of the training images.
+  exploitation: >-
+    Read the macro at both multipliers and the x1 curve over the epochs against the incumbent's.
+    Activation: the run's effective_config.json records the probability 0; this family logs no
+    activity metric and none is added. Shown wrong by: the macro below the incumbent at both
+    multipliers.
+  budget: The reference's training time or slightly less.
+  implementation: >-
+    Follow the environment paragraph of the developer instructions. Configuration only: change that
+    one value in configs/training.yaml; no source change. Check: the config loads through the config
+    model.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Free; never tested on this backbone.
+- id: noise-augmentation-off
+  mechanism_id: noise-augmentation
+  parent_idea_id: null
+  title: Train without the additive noise augmentation
+  opportunity: >-
+    The noise augmentation (probability 0.15, standard deviation 0.005 to 0.02) dates from the first
+    recipes and was never removed alone on a RadImageNet backbone; queued by the fixes-and-removals
+    campaign and never run. Guess, low: -0.0005 to +0.0005 macro; a tie removes a mechanism.
+  mechanism: >-
+    In configs/training.yaml, data.noise_augmentation.probability becomes 0 (it is 0.15). The
+    std_range line stays. Nothing else changes.
+  precedents:
+  - 'docs/backlog/overnight.md, next queue: the entry this seed runs.'
+  novelty: First removal of this family on a RadImageNet backbone.
+  coverage: 15% of the training images.
+  exploitation: >-
+    Read the macro at both multipliers. Activation: the run's effective_config.json records the
+    probability 0; this family logs no activity metric and none is added. Shown wrong by: the macro
+    below the incumbent at both multipliers.
+  budget: The reference's training time.
+  implementation: >-
+    Follow the environment paragraph of the developer instructions. Configuration only: change that
+    one value in configs/training.yaml; no source change. Check: the config loads through the config
+    model.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Free; never tested on this backbone.
+- id: balanced-target-columns
+  mechanism_id: balanced-target-columns
+  parent_idea_id: null
+  title: Balance each label by which cells enter the loss, not by weighting them
+  opportunity: >-
+    The class weights balance the two groups of a label by scaling their loss, so a rare label's
+    positives count 2 to 3.7 times (prior-work.md). The alternative that was never run balances by
+    selection: every positive cell and an equal expected number of negative cells enter the loss, all
+    at weight one, and each step sees a different set of negatives. Guess, low: -0.001 to +0.001
+    macro, the rare labels (MCL, Fracture, Contusion, Lateral OA) first.
+  mechanism: >-
+    Today the loss gives a cell the positive class weight when its target is >= 0.5 and the negative
+    one otherwise, and averages over the observed cells of the batch. Change: per label, the group
+    with fewer training cells (positives for all twelve labels; counted with target >= 0.5 over the
+    fold's observed training cells, as fixed_class_balance counts them) always stays in the loss; a
+    cell of the other group stays with probability p_label = minority count / majority count (0.05
+    for MCL to 0.63 for Medial Meniscus), drawn independently at every training step. Kept cells keep
+    their soft targets and all have weight one. The average is over the kept observed cells. Studies,
+    images and the other labels of a dropped cell's study are unchanged.
+  precedents:
+  - 'docs/backlog/small-changes.md, report-label supervision, balance each target column through training masks: the entry this seed implements, with the mask drawn per step instead of per epoch.'
+  - 'prior-work.md, precedents: class-balanced BCE about +0.008 over none; the binary evidence mask rejected.'
+  novelty: First run that balances by selection instead of by weight.
+  coverage: Per step MCL keeps about 10% of its cells, Fracture 13%, Medial Meniscus 77%.
+  exploitation: >-
+    Read the four rare labels and the macro at both multipliers. Activation: the twelve p_label values
+    listed in the report, and one training-side epoch metric through _log_epoch_metric, the share of
+    observed cells kept per batch (expected about 0.35). Shown wrong by: the macro below the incumbent
+    at both multipliers.
+  budget: The reference's training time; one random draw of batch-by-twelve values per step.
+  implementation: >-
+    Follow the environment paragraph of the developer instructions. File: training/lightning.py only.
+    fixed_class_balance keeps its dictionary shape and version 1 (validated_class_balance_weights and
+    the resume check in the protected training/checkpoints.py read it) and returns positive_weight and
+    negative_weight 1.0 for every label, with the counts as now; p_label is computed from those
+    counts once and kept as a buffer. In training_step the keep mask is torch.rand of the target's
+    shape from a dedicated torch.Generator on the training device, seeded once from the run's seed, so
+    the incumbent's other random streams are unchanged; the mask is combined with
+    batch["target_observed"] before the average. Replaces the class weights; no option, no config
+    field. Validation is unchanged. If hard-report-targets or uncertain-report-targets-weigh-less is
+    in the incumbent, keep its targets or cell weights and apply the mask on top.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The selection form of the class balance; overlaps the weights already in the recipe.
+- id: hard-pair-final-phase
+  mechanism_id: hard-pair-mining
+  parent_idea_id: null
+  title: In the last three epochs put the worst-ordered pairs in the same batch and add a pair term
+  opportunity: >-
+    One unverified external report: another participant's best setup ends with three epochs of hard
+    mining. The metric is a ranking and the loss is not; the in-batch ranking term tried earlier saw
+    random pairs (about 118 per step) and was neutral (+0.0007). Mining decides which pairs share a
+    batch. Guess, low: -0.001 to +0.001 macro.
+  mechanism: >-
+    Epochs 1 to 7 are unchanged, except that every training step stores its detached logits in a
+    buffer indexed by the study's row in the training frame (no host synchronisation). Before each of
+    epochs 8, 9 and 10 the training order is rebuilt from the previous epoch's stored logits. Mining:
+    per label, among training studies whose target is >= 0.75 (positives) or <= 0.25 (negatives), the
+    200 positive-negative pairs with the largest negative-minus-positive logit. Order: the mined pairs
+    of all labels are visited from most to least wrong; a pair whose two studies are both still
+    unplaced is placed in the current batch, and a batch closes at four pairs; when no pair is left,
+    the unplaced studies fill the remaining batches in the epoch's shuffled order. Every study is
+    still seen exactly once per epoch and the number of steps is unchanged; the batches are then drawn
+    in shuffled order. Loss in those three epochs: the usual loss plus 0.1 times a pair term, the mean
+    over labels with at least one pair of softplus(negative logit - positive logit) over all
+    positive-negative pairs of that label inside the batch (same 0.75 and 0.25 rule). Validation and
+    prediction are unchanged.
+  precedents:
+  - 'docs/backlog/big-bets.md, hard-pair mining phase: the entry this seed implements.'
+  - 'prior-work.md, precedents: the always-on in-batch ranking term +0.0007; shared balanced focal -0.0026.'
+  novelty: First mined-pair batches; first pair term on a RadImageNet backbone.
+  coverage: The last 30% of the optimizer steps; at most 2,400 mined pairs per epoch, fewer after studies shared between pairs are placed once.
+  exploitation: >-
+    Read the macro at both multipliers and the x1 curve over epochs 8 to 10 against the incumbent's.
+    Activation: two training-side epoch metrics through _log_epoch_metric in epochs 8 to 10, the pair
+    term's value and the number of in-batch pairs per step, and in the report the number of mined
+    pairs placed per epoch. Shown wrong by: the x1 curve below the incumbent's in all three mined
+    epochs.
+  budget: >-
+    No extra forward pass: mining uses logits the training already computes. The reference's training
+    time; the mining itself is a few tensor operations on 3,532 by 12 values, three times.
+  implementation: >-
+    Follow the environment paragraph of the developer instructions. Files: data/dataset.py (each item
+    carries its row index in the training frame, collated as a long tensor under a new batch key that
+    is not read in modeling/; the training loader takes a batch sampler whose order for an epoch can
+    be set from outside, falling back to the present shuffled order when none is set),
+    training/lightning.py (the logit buffer, the mining at the start of epochs 8 to 10 in the main
+    process, the pair term). Adds a phase; no option, no config field: the numbers 200 pairs per
+    label, 0.75 and 0.25, four pairs per batch, weight 0.1 and three epochs are fixed here. Epochs are
+    counted from 1; with trainer.max_epochs 10 the mined epochs are current_epoch 7, 8 and 9. The
+    sampler's shuffled order for epochs 1 to 7 must reproduce the incumbent's. A resumed run that
+    starts inside the mined phase without stored logits uses the shuffled order for that epoch.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The weakest premise of the ten; kept because the metric is a ranking.
+- id: plane-contrast-readouts-off
+  mechanism_id: plane-contrast-readouts
+  parent_idea_id: null
+  title: Read every token's evidence with one head instead of one per plane and contrast
+  opportunity: >-
+    The plane-contrast readouts were adopted on the ResNet-18 before the view label bias, the routing
+    and the maps existed, and were never removed alone since; the fixes-and-removals campaign queued
+    the removal and never ran it. Type-specific readouts after pooling lost 0.0006 on ReXNet-200.
+    Guess, low: -0.001 to +0.0005 macro; a tie removes a mechanism.
+  mechanism: >-
+    In configs/training.yaml, model.plane_readout becomes false (it is true). The model then reads
+    every token's evidence with one linear head per channel (the else branch of _attention_pool and of
+    _soft_tissue_pool in modeling/model.py) instead of one head per series type. Nothing else changes.
+  precedents:
+  - 'docs/backlog/small-changes.md, removals of active mechanisms: the entry this seed runs.'
+  - 'prior-work.md, precedents: plane-contrast readouts adopted in the revisits campaign (Lateral OA +0.0054).'
+  novelty: First removal on the current recipe and on the ResNet-50.
+  coverage: Every label's evidence head, main and soft-tissue.
+  exploitation: >-
+    Read Lateral OA and the macro at both multipliers. Activation: the run's effective_config.json
+    records false, and the report gives the parameter counts of the evidence heads before and after.
+    Shown wrong by: the macro below the incumbent at both multipliers.
+  budget: The reference's training time.
+  implementation: >-
+    Follow the environment paragraph of the developer instructions. Configuration only when the model
+    builds with the value false: check that the config loads and that the model's constructor accepts
+    it on the current recipe (construct with load_pretrained false and no weights on the CPU, no
+    forward pass). If construction or the config validation refuses the combination with
+    model.soft_tissue_routing or model.view_label_bias, repair the non-readout path in
+    modeling/model.py without changing behaviour when the value is true, and say exactly what was
+    repaired.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: A removal; ranked last by potential.
+exhausted_directions: None; these are the last five of ten forced seeds.

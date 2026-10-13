@@ -7,7 +7,8 @@ defined by [`configs/training.yaml`](../../configs/training.yaml). Since
 [project state](../ongoing/state.md#current-control), and each adoption is listed in the
 [adoption history](#adoption-history).
 
-- **Inputs:** a RadImageNet-pretrained ResNet-18 reads every sampled triplet's middle slice,
+- **Inputs:** a Refined-RadImageNet ResNet-50 (since 2026-10-13 the only recipe; a ResNet-18
+  before) reads every sampled triplet's middle slice,
   repeated on all three channels, at 224 px, 0.536 mm spacing and a 120 mm field (since
   2026-10-01; 0.625 mm and 140 mm before). Coronal and sagittal
   series are read through a narrower, finer window in place of that view: T1/PD at 84 mm
@@ -16,11 +17,11 @@ defined by [`configs/training.yaml`](../../configs/training.yaml). Since
   inside the 120 mm window and the stored image; a series without trusted geometry is centred
   horizontally on the image. Axial series keep the image-centred 120 mm view. Tokens of the
   narrower views carry their position in the 120 mm frame and a learned additive view embedding
-  (since 2026-10-02; written as the [view table](#view-table) of `configs/training.yaml`). The same
-  recipe on the Refined-RadImageNet ResNet-50 is
-  [`configs/refined-resnet50.yaml`](../../configs/refined-resnet50.yaml), the submission model
-  (backbone only differs; +0.0047 ×4 at 1.69× the training time); ResNet-18 stays the control
-  because what helps it has carried over so far (user decision, 2026-10-01).
+  (since 2026-10-02; written as the [view table](#view-table) of `configs/training.yaml`). Until
+  2026-10-13 the recipe ran on a ResNet-18 with the ResNet-50 in `configs/refined-resnet50.yaml`
+  as the submission model (+0.0047 ×4 at 1.69× the training time); the ResNet-18's structure
+  gains did not carry to the ResNet-50, which is now `configs/training.yaml` itself
+  ([result](../validation/results/2026-10-12-soft-tissue-reads-and-rn50-input-sampling.md#what-reaches-the-resnet-50)).
   The ReXNet-200 recipe (ImageNet `timm` weights, three adjacent slices, `backbone_lr` 2e-4, no
   L2-SP anchoring) was retired on 2026-10-04 and its config removed; the model code still
   supports it, since those files are hashed into every checkpoint's identity.
@@ -65,6 +66,7 @@ comparable.
 
 | Adopted | Change | Evidence | Control after adoption |
 |---|---|---|---|
+| 2026-10-13 | `configs/training.yaml` becomes the Refined-RadImageNet ResNet-50 on fold 2 and the ResNet-18 recipe and `configs/refined-resnet50.yaml` are removed. Three adoptions of the targets-and-inputs campaign: a mask decoder trained beside the labels (second to fourth stage maps, bone and soft-tissue classes on the 28 by 28 grid, weight 0.1 each, not run at prediction); the three-compartment OA detector as a correction beside the routed shared OA head; average-pool shortcuts in the ResNet-50 on the same weights (user decision against the rule's ×1 side) | Fold 2, seed 1110484336, one run each against the incumbent of its time: decoder ×4 +0.0005 (80% [−0.0002, +0.0013]), ×1 +0.0014; detector ×4 +0.0011 ([+0.0004, +0.0018]), ×1 +0.0014; shortcuts ×4 +0.0010 ([+0.0002, +0.0019]), ×1 −0.0003. Together ×4 0.939634 against 0.937000, ×1 0.930902 against 0.928460. No public score ([result](../validation/results/2026-10-13-targets-and-inputs-campaign.md)) | None retrained; the campaign's run 27 is the reference |
 | 2026-10-10 | Meniscus map and posed canvases on ResNet-18 and the ResNet-50 config: report-attribute loss off; a three-class meniscus map taught at weight 0.1 from the DESS masks on the 14 by 14 grid; every view posed on a 368 px canvas with shift, turn and per-knee scale, axial included; sagittal fluid at 84 mm and sagittal T1/PD at 93.33 mm | Fold 1, seed 1110484336, one run per step in the anatomy-recipe and view-poses campaigns: report loss off ×4 0.927291; meniscus head on 14 by 14 +0.0001 (80% interval −0.0006 to +0.0008); canvases +0.00002 (−0.0014 to +0.0014); sagittal swap +0.0016 (+0.0004 to +0.0027). Together ×4 0.928121 against 0.927083, 0.955 public (S129) against 0.954 (S125). The two middle steps were adopted under a both-multipliers rule used for that campaign only | `sagittal-fluid-canvas-fine` (×4 0.928121, ×1 0.919392), not retrained; a retraining of the same code gave ×4 0.928120 |
 | 2026-10-08 | Anatomy map and posed crops on the side-routed ResNet-18: a seven-class anatomy map taught per token from an offline segmenter's masks (training only), the joint plane and the joint centre read from it, sections by anatomy, sagittal and coronal crops turned and shifted to the knee's pose after a no-gradient first look and cut with bicubic interpolation; `model.channels_last` on; each series of a two-knee study posed with its own knee's side | Fold 1, seed 1110484336, one run per step: the campaign's reference ×4 0.925885 against run 24's 0.925067 (0.953 public for both, S122 and S118); the bicubic cut +0.0012 (95% [+0.0000, +0.0024]); the map's centre +0.0000 on top (adopted by user decision); 0.954 public (S125); the ResNet-50 config carries the same settings and scored 0.959 public (S126) against 0.957 without the map (S119) ([run notes](../../autoresearch/campaigns/anatomy-masks/run-notes.md)) | `rn18-anatomy-map-centre-control`: ×4 0.926762, ×1 0.917074, 1,391 s |
 | 2026-10-07 | Side-routed shared heads on ResNet-18 and the ResNet-50 config: one shared classifier for the two meniscus targets and one for the three OA targets, routed by a frame inferred per knee from the heads' meniscus attention spots, eight sectors, a core, two rings and three heights, routed v4.0 report targets and a knee-level term per routed channel; both configs at fold 1, seed 1110484336 | Run 24 of the line: ×4 0.925067 against 0.924049 without routing on the same fold and seed; 0.953 public (S118) against 0.950; the ResNet-50 0.957 (S119) ([design and runs](../ongoing/side-routed-heads.md)) | Run 24, `outputs/training/20261006-163650-side-routed-spot-frame-ring-sectors`: ×4 0.925067, ×1 0.917070 |

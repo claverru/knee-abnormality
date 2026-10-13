@@ -1,0 +1,106 @@
+ideas:
+- id: mask-decoder-loss-weight-equal-to-the-map-heads
+  mechanism_id: mask-decoder
+  parent_idea_id: mask-decoder-beside-the-labels
+  title: Give the mask decoder's two losses the same share of the training loss as the two existing map heads
+  opportunity: >-
+    The mask decoder was adopted in run 5 (x4 0.937529 against 0.937000, x1 0.929885 against 0.928460).
+    The audit of that run (run-notes.md, run 5, the audit) found the gain at x1 in the labels with no
+    soft-tissue routed read (ACL, MCL, Effusion, Synovitis, Baker's: +0.0024 against the three
+    no-decoder campaign runs, 80% interval [+0.0010, +0.0038]) and the weights of stage four and of
+    the token projection moved 1.14 and 1.37 times as far from the reference as a no-decoder run's,
+    while stages one to three moved no more than run to run (1.01 to 1.03). Evidence, medium, one run:
+    the decoder acts through the late features. At weight 0.1 each the decoder's two terms carry
+    0.0465 of the training loss at epoch 10 against 0.1281 for the two existing map heads, and its
+    losses are flat from epoch 7 (bone 0.2659 at epoch 7, 0.2730 at epoch 10). Guess, low: +0 to
+    +0.001 macro, the labels without a routed read first.
+  mechanism: >-
+    In _mask_decoder_step (training/lightning.py) the bone loss and the soft-tissue loss of the mask
+    decoder are each added to the training loss at weight 0.3 instead of 0.1. The value comes from the
+    measured ratio: 0.1281 / 0.0465 = 2.75, so 0.3 gives the decoder 0.1395 of the loss, the share of
+    the two map heads. The decoder, its targets, its coverage rule and everything else are unchanged.
+    The weight stays a constant in the code: no option and no config field.
+  precedents:
+  - 'run-notes.md, run 5: the decoder at weight 0.1, adopted.'
+  - 'prior-work.md, precedents: the anatomy map and posed crops on the ResNet-50.'
+  novelty: First run with the decoder at another weight.
+  coverage: The studies with prepared volumes, as in run 5 (14.2 million supervised cells per epoch).
+  exploitation: >-
+    Read ACL, MCL, Effusion, Synovitis and Baker's at x1 and x4 first, then the menisci and the OA
+    labels, then the macro. Activation: mask_decoder_bone_loss and mask_decoder_soft_tissue_loss at
+    epoch 10 below the incumbent's (0.2730 and 0.1921), and val_anatomy_loss and val_meniscus_loss
+    against the incumbent's 0.6333 and 0.5921. Also log one new training-side epoch metric through
+    _log_epoch_metric, train_label_loss, the label loss alone before any side-task term is added, so
+    this run and later ones can separate the label fit from the side tasks. Shown wrong by: the macro
+    below the incumbent at both multipliers while the decoder losses fall further.
+  budget: The incumbent's training time (2,617 s) and GPU memory (16.7 GB peak allocated); nothing is added to the step.
+  implementation: >-
+    Follow the environment paragraph of the developer instructions. Files: training/lightning.py only.
+    Change the two weights of the decoder terms from 0.1 to 0.3 and add the train_label_loss epoch
+    metric from the tensor that already holds the label loss, without a second evaluation and without
+    .item(). Check on synthetic tensors that the summed loss equals label and existing terms plus 0.3
+    times each decoder loss.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The keeper's follow-up to the adopted decoder, asked for by the user on 2026-10-12; the zero-cost test of whether more of the same supervision gives more.
+- id: mask-decoder-stage-one-level
+  mechanism_id: mask-decoder
+  parent_idea_id: mask-decoder-beside-the-labels
+  title: Add a 56 by 56 level to the mask decoder from the first stage's map, with the mask heads on it
+  opportunity: >-
+    The audit of run 5 found the decoder's 28 by 28 task far easier than the existing heads' and
+    exhausted early: its bone loss is 0.2730 at epoch 10 against 0.6655 for the existing heads' terms
+    and flat from epoch 7, while the 7 by 7 and 14 by 14 maps it shares stages with still improved at
+    every epoch (val_anatomy_loss 0.6333 against 0.6400 to 0.6431 without the decoder,
+    val_meniscus_loss 0.5921 against 0.6023 to 0.6049; overlaps of the kneecap, the fibula, the medial
+    tibial cartilage and the lateral meniscus outside the no-decoder range). Evidence, medium, one
+    run: finer mask supervision improves the coarser maps. The masks exist at 1 mm and a 28 by 28 cell
+    is 3 to 4 mm wide; a 56 by 56 cell is 1.5 to 2 mm, the scale of cartilage and of the meniscal
+    horns. Guess, low: +0 to +0.001 macro, MCL, the menisci and the OA labels first.
+  mechanism: >-
+    In training only, the mask decoder gains one level. The first-stage output of the main pass (56 by
+    56, 256 channels on this backbone) goes through a 1 by 1 convolution to 32 channels; the decoder's
+    existing 28 by 28 map (64 channels) goes through a 1 by 1 convolution to 32 channels, is upsampled
+    by 2 (bilinear) and added to it; a 3 by 3 convolution with batch norm and ReLU at 32 channels
+    follows. The two 1 by 1 heads (seven bone classes, seven soft-tissue classes) move to this 56 by
+    56 map; the 28 by 28 map keeps no head. Targets: the class shares of each 56 by 56 cell from the
+    prepared volumes, obtained as the decoder's 28 by 28 targets are, with half the step and the
+    stride-four anchors of the first stage. Loss: as in the incumbent, anatomy_loss with its coverage
+    rule once per head, each at the incumbent's weight. The existing per-token and per-cell map heads,
+    their losses, the routing that reads them and everything in validation and prediction are
+    unchanged.
+  precedents:
+  - 'run-notes.md, run 5: the decoder on the 28 by 28 grid, adopted.'
+  - 'docs/backlog/big-bets.md, anatomy masks, segmentation before the labels.'
+  novelty: First mask supervision at the first stage's resolution.
+  coverage: The studies with prepared volumes; four times the supervised cells of run 5 (about 57 million per epoch).
+  exploitation: >-
+    Read MCL, the menisci, the three OA labels and ACL, then the macro, at both multipliers.
+    Activation: mask_decoder_bone_loss and mask_decoder_soft_tissue_loss still falling between epochs
+    7 and 10 (they are flat there in the incumbent), mask_decoder_supervised_cells about four times
+    the incumbent's 14.2 million, and val_anatomy_loss and val_meniscus_loss against the incumbent's
+    0.6333 and 0.5921. Nothing new is logged on validation. Shown wrong by: the macro below the
+    incumbent at both multipliers while the decoder losses fall.
+  budget: >-
+    No extra backbone pass. One 1 by 1 and one 3 by 3 convolution at 32 channels on 56 by 56 maps and
+    four times the target lookups, for about 250 images per step. Estimate, not measured: training
+    time within 1.08 of the incumbent's 2,617 s (about 2,830 s, inside the campaign's 3,364 s) and
+    peak GPU memory about 17.7 GB allocated, within 18.5 GB; state both estimates and the parameter
+    count in the report. If the estimate from the tensor sizes exceeds 18.5 GB, compute the 56 by 56
+    level and its loss under torch.autocast as the rest of the step is and compute the target shares
+    without gradient before anything else is cut; never fewer cells or images.
+  implementation: >-
+    Follow the environment paragraph of the developer instructions. Files: modeling/model.py,
+    training/lightning.py, training/anatomy.py only if the target lookup needs a small
+    generalisation. In the training branch that keeps the second-stage tensor for the decoder, keep
+    the first-stage tensor too and pass it in the encoded dictionary; do not change the signature or
+    the return value of _backbone_features, which Kaggle inference replaces with fixed chunks. The 56
+    by 56 cells' validity, patient positions and steps are derived the way the 28 by 28 ones are
+    (feature_geometry with the first stage's mapping, half the decoder's step). New parameters
+    initialise under torch.random.fork_rng; the decoder's existing layers keep their initialisation
+    stream. The decoder is called only when self.training is true, and its parameters are in the
+    optimizer as the incumbent's are. No option and no config field.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The keeper's follow-up to the adopted decoder, asked for by the user on 2026-10-12; extends the supervision where the audit found the 28 by 28 task exhausted.
+exhausted_directions: None; two follow-ups to the adopted mask decoder, written by the keeper from the audit of run 5 at the user's request on 2026-10-12.

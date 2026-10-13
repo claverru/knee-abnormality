@@ -1,0 +1,68 @@
+ideas:
+- id: squeeze-excitation-in-the-resnet-blocks
+  mechanism_id: backbone-channel-attention
+  parent_idea_id: null
+  title: Add a squeeze-and-excitation module to every bottleneck of the ResNet-50, started as the identity, keeping the Refined-RadImageNet weights
+  opportunity: >-
+    Forced by the user on 2026-10-13 as an exception to the contract's settled backbone: the backbone
+    stays resnet50.a1_in1k with the Refined-RadImageNet weights, and gains channel attention inside
+    its blocks. timm builds it from the same model name: with block_args=dict(attn_layer='se') every
+    one of the sixteen bottlenecks gets an SEModule after its third batch norm, and the pretrained
+    state dict still fills every existing tensor (checked on timm 1.0.26: 64 new tensors, all under
+    layerN.M.se, none unexpected, 2,530,992 new parameters). The backbone has never had channel
+    attention in this project; the gain of adding it to an already pretrained network during
+    fine-tuning is a guess, low: -0.0005 to +0.001 macro.
+  mechanism: >-
+    In modeling/model.py, where the backbone is created (timm.create_model(model.backbone, ...)), a
+    ResNet backbone is created with block_args=dict(attn_layer='se') in addition to today's
+    arguments. The RadImageNet weights are then loaded as today, except that the load accepts exactly
+    the SE tensors as missing: load with strict=False and raise unless the unexpected keys are empty
+    and every missing key contains '.se.'. Each SE module must start as the identity so the network
+    computes the pretrained function at step 0: its gate is 2 * sigmoid(x) instead of sigmoid(x) (a
+    small module passed as the SE gate_layer through attn_layer, for example
+    partial(SEModule, gate_layer=...), or the module's gate replaced after creation), fc2's weight
+    and bias are zero, and fc1 keeps timm's default initialisation, drawn under torch.random.fork_rng
+    so no other initialisation moves. With that, the gate is exactly 1 for every channel at the
+    start and its gradient is not saturated. The SE reduction stays timm's default (one sixteenth).
+    Optimizer and anchor, for the new tensors only: parameters whose name contains '.se.' are not
+    anchored by L2-SP (they have no pretrained value; skip them in the loop that builds
+    anchor_parameters and backbone_origin) and train in the head group (head_lr and the head's weight
+    decay rule) instead of backbone_lr. Every other parameter keeps its group, rate, decay and
+    anchor. Validation, prediction and Kaggle inference run the same backbone: the SE modules are
+    inside the stages, so use_fixed_backbone_chunks and the stage outputs the heads and the mask
+    decoder read are untouched in shape. No option and no config field: the ResNet backbones of this
+    recipe have SE from this run on.
+  precedents:
+  - 'docs/ongoing/radimagenet-backbone.md: how the Refined-RadImageNet weights are loaded and what was tried on the backbone.'
+  - 'run-notes.md, run 5 and its audit: the last gain came through stage four and the token projection, the features the SE gates rescale.'
+  novelty: First change inside the backbone's blocks.
+  coverage: Every image, at all four stages.
+  exploitation: >-
+    Read the macro and the per-label table at both multipliers. Activation: one validation-side
+    epoch metric through _log_epoch_metric, the mean absolute deviation of the SE gates from 1 over
+    the sixteen modules on the validation batches (0 at initialisation, above 0 after training),
+    computed from the gate values the forward pass already produces, without a second pass; and in
+    the report the count of missing keys at load (64) and the maximum absolute difference between
+    the backbone's output with and without the SE modules at initialisation on a synthetic batch of
+    two images, which must be 0. Shown wrong by: the macro below the incumbent at both multipliers
+    while the gates move away from 1.
+  budget: >-
+    Sixteen global average pools and thirty-two 1 by 1 convolutions on pooled vectors per image:
+    estimate, not measured, training time within 1.05 of the incumbent's and peak GPU memory within
+    0.5 GB of it (the channel-wise multiply keeps one more activation per block for the backward
+    pass); state both estimates and the parameter count in the report. Prediction time rises by the
+    same share.
+  implementation: >-
+    Follow the environment paragraph of the developer instructions. Files: modeling/model.py for the
+    creation, the gate and the load; training/lightning.py for the anchor loop, the optimizer group
+    of the '.se.' parameters and the one metric. Check on the CPU with a randomly initialised timm
+    resnet50 and no project model: the SE variant loads the base state dict with only '.se.' keys
+    missing, and on a batch of two 224 px images without gradient its output equals the base
+    network's exactly. Check that build_optimizer puts the '.se.' parameters in the head-rate group
+    and that no anchor buffer is registered for them. The backbone feature mapping
+    (backbone_mapping) and group_matcher must still resolve; say so in the report. model.channels_last
+    stays true.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user's forced seed of 2026-10-13, written by the keeper after checking that timm builds it with the same weights.
+exhausted_directions: None; one seed asked for by the user on 2026-10-13, an exception to the contract's settled backbone.

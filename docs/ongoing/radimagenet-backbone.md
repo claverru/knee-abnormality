@@ -18,7 +18,9 @@ ResNet-18 recipe unchanged it scored ×4 0.934423 against 0.929835 (+0.0046, 80%
 TTA it scored 0.951 (S89), the best public score. It ran in the
 [revisits campaign](../validation/results/2026-10-01-revisits-campaign.md#backbones) and is
 `configs/refined-resnet50.yaml` since 2026-10-01: the ResNet-18 recipe on `resnet50.a1_in1k`. It
-is the submission model; ResNet-18 stays the control for iteration speed (user decision).
+is the submission model; ResNet-18 stays the control for iteration speed (user decision). Since
+2026-10-13 the ResNet-50 is `configs/training.yaml` and the ResNet-18 recipe is removed
+([changes inside the backbone](#changes-inside-the-resnet-50-on-the-same-weights-2026-10-13)).
 
 Other RadImageNet-pretrained weights are in
 [RadImageNet weights](../research/radimagenet-weights.md).
@@ -109,3 +111,26 @@ the control's 0.924637; it fell behind from epoch 3 while its training loss stay
 the control's. Its final prediction step failed because the worktree sources were edited during
 training, which changes the preprocessing identity. The validation predictions were recovered
 from the run's own `source_snapshot.zip` (`recovered.json` in the run folder).
+
+## Changes inside the ResNet-50 on the same weights (2026-10-13)
+
+From the [targets-and-inputs campaign](../validation/results/2026-10-13-targets-and-inputs-campaign.md#modules-inside-the-backbone), on fold 2.
+
+- **In the recipe:** average-pool shortcuts (timm's `avg_down`, the shortcut keys renamed before
+  the strict load). No new parameter, L2-SP anchor intact.
+- **Not in the recipe:** squeeze-and-excitation, global context and coordinate attention in the
+  blocks, started as the identity. Free of the anchor at the head rate they move the function far
+  from the pretrained one while the L2-SP penalty reads lower; pulled toward the identity at the
+  L2-SP strength the gates stay shut and the model is the incumbent again. Blur-pool at the three
+  stride-two convolutions adds nothing on top of the average-pool shortcuts and doubles the ×4
+  prediction time.
+- **Rule for a new module in the blocks (user decision):** pull its last layer toward the
+  identity at `optimizer.anchor_alpha_late` with weight decay 0, log how far it moves, and do not
+  adopt a free module on a local fold.
+- **How timm switches each on, what loads and what it costs:** the review of 2026-10-13 checked
+  `block_args=dict(attn_layer=...)`, `avg_down`, `aa_layer`, `output_stride`, activation swaps and
+  stochastic depth on timm 1.0.26; stochastic depth lost 0.0035 on the ResNet-18
+  ([revisits](../validation/results/2026-10-01-revisits-campaign.md)), activation swaps change the
+  function with no recovering initialisation, and output stride 16 or 8 costs 57% or five times
+  the backbone.
+

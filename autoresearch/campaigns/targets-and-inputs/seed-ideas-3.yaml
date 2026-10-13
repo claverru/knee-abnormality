@@ -1,0 +1,127 @@
+ideas:
+- id: oa-detector-beside-the-shared-head
+  mechanism_id: shared-oa-detector-across-compartments
+  parent_idea_id: null
+  title: Restore the three-compartment OA detector as a correction on top of the routed shared OA head
+  opportunity: >-
+    Forced by the user on 2026-10-12 as an exception to the contract's exclusion of new readout
+    structure. The detector was adopted on 2026-09-25 (ReXNet, +0.0013 at x4, PF OA +0.0102, 0.944
+    public against 0.940, S58 against S55) and removed on 2026-10-06 on a ResNet-18 at a local tie
+    that leaned its way (x4 0.924815 with it against 0.924347 without). Kaggle's score order, read on
+    2026-10-12, puts the model with it (S108) just above the one without (S111), both 0.950: evidence,
+    weak, one pair. The removal notes list its return on the final recipe and on the ResNet-50 as
+    open. It has never run beside the routed shared OA head, which arrived a day after the removal.
+    PF OA lost in the campaign's first three runs. Guess, low: -0.0005 to +0.001 macro, PF OA first.
+  mechanism: >-
+    The code is in git, in the parent of the commit that removed it: 5145374^ (the removal itself is
+    `git show 5145374 -- src/knee_abnormality/modeling/model.py src/knee_abnormality/modeling/spatial_tokens.py
+    src/knee_abnormality/training/lightning.py`; every removed line of that diff that names the
+    detector, anterior_axis, trusted_geometry or patient_y is the detector). Read
+    `git show 5145374^:src/knee_abnormality/modeling/model.py`: lines 201 to 207 build it, lines 415
+    to 441 apply it, and the region inputs are built where medial_axis is (search anterior_axis and
+    trusted_geometry). Restore it unchanged in what it computes: one linear detector without bias on
+    the tokens (xavier start, created under torch.random.fork_rng so no other initialization moves);
+    three regions per study, the medial half (medial_axis > COMPARTMENT_MIDLINE_BAND_MM), the lateral
+    half (medial_axis < -COMPARTMENT_MIDLINE_BAND_MM) and the front of the knee centre (anterior_axis
+    > 0, with anterior_axis = knee_center_y_mm - patient_y), each limited to tokens with trusted
+    geometry; a smooth maximum of the detector's score over each region (logsumexp minus the log of
+    the region's token count, 0 for an empty region); and that value times a per-label scale that
+    starts at zero, added to the logits of Medial OA, Lateral OA and PF OA in this order. In today's
+    model the three OA logits come out of the shared "oa" channel in _attention_pool (TARGET_ROUTES in
+    modeling/model.py); the correction is added to those three logits after the knee-level term.
+    The routed shared head, its routes, the soft-tissue read and everything else stay as they are.
+    The detector reads the same own tokens it read then (the tokens argument, not shared_tokens), and
+    the regions use the original definition from knee_side_sign, knee_center_x_mm, knee_center_y_mm
+    and the middle slice's patient map, not the learned frame.
+  precedents:
+  - 'docs/validation/results/2026-09-25-near-misses-campaign.md: the detector adopted, PF OA +0.0102; learned scales 0.040, 0.050 and 0.017 by epoch 9.'
+  - 'docs/validation/results/2026-10-05-fixes-and-removals-campaign.md: the removal, run 9 oa-detector-off, -0.000468 at x4, 80% interval [-0.001017, +0.000110]; S108 and S111 both 0.950.'
+  - 'autoresearch/campaigns/near-misses/seed-ideas-2.yaml, three-compartment-oa-detector: the original seed.'
+  novelty: First run of the detector with the routed shared OA head, on the ResNet-50 and on the current recipe.
+  coverage: The three OA labels; other labels only through the shared token features.
+  exploitation: >-
+    Read Medial OA, Lateral OA and PF OA at both multipliers, then the macro. Activation: the three
+    learned scales logged once per epoch (oa_detector_scale_medial, _lateral, _pf) leave zero, and the
+    detector's weight norm is logged beside them. Shown wrong by: the macro below the incumbent at
+    both multipliers, or the three scales staying under 0.005 at epoch 10.
+  budget: >-
+    The reference's training time; one linear layer of PROJECTION_WIDTH weights and three scalars, so
+    no measurable change (guess). GPU memory as the reference (16.2 GB peak in run 3), RAM unchanged.
+  implementation: >-
+    Follow the environment paragraph of the developer instructions. A source change in modeling/model.py,
+    modeling/spatial_tokens.py and training/lightning.py, with no new configuration option. Port the
+    removed lines from 5145374^ into today's code by hand, since the files have changed since: the
+    region inputs go where the token geometry is built in _encode_crops, the correction goes at the
+    end of _attention_pool, and the entry oa_shared_detector_regions returns to
+    SPATIAL_TOKEN_IDENTITY with its old value. From the old lightning.py restore only the logging of
+    the three scales and of the weight norm at the end of the epoch (5145374^ lines 499 to 520), not
+    the per-step activity logging (lines 727 to 770): the contract allows no new diagnostics in the
+    training step. Pass medial_axis from the original definition even where today's code reads the
+    side from the frame; if the middle slice's patient map is not available for a view, say which and
+    leave those tokens out of every region, as untrusted geometry was. Check on the CPU that the model
+    builds without weights, that the three scales are zero at the start and that the logits then equal
+    the incumbent's code on one synthetic batch.
+  open_choices: None; every number is the removed code's.
+  dependencies: []
+  priority_rationale: The user's forced seed after reading Kaggle's score order; one addition, nothing replaced.
+- id: oa-detector-instead-of-the-shared-head
+  mechanism_id: separate-oa-heads-with-detector
+  parent_idea_id: null
+  title: Read the three OA labels with three separate heads plus the OA detector, in place of the routed shared OA head
+  opportunity: >-
+    Forced by the user on 2026-10-12 as an exception to the contract's exclusion of new readout
+    structure. Until 2026-10-06 the three OA labels each had their own attention and evidence head
+    and shared only the detector's correction; since 2026-10-07 one routed head reads all three. The
+    two arrangements were never compared for OA alone: the side-routing adoption (x4 0.925067 against
+    0.924049, 0.953 against 0.950 public) changed the menisci and OA together, on a ResNet-18. This
+    run puts the September arrangement back for the OA labels only and leaves the meniscus routing
+    in place. Guess, low: -0.001 to +0.001 macro on the three OA labels.
+  mechanism: >-
+    Medial OA, Lateral OA and PF OA leave the shared "oa" channel (TARGET_ROUTES and SHARED_CHANNELS
+    in modeling/model.py). Each becomes an own channel like the seven labels of OWN_ROUTES: its own
+    attention scores and its own evidence head on the own tokens, with the view label bias and the
+    plane-contrast readout as every own channel has them. Unlike those seven, the three OA channels
+    get no route: their attention runs over every allowed token of the study, with no routing weight,
+    no position prior of the shared "oa" kind and no knee-level term, as before 2026-10-07. The
+    detector of the seed oa-detector-beside-the-shared-head is then added to their three logits,
+    restored from the same commit in the same way (5145374^, model.py lines 201 to 207 and 415 to
+    441; original regions from knee_side_sign, knee_center_x_mm, knee_center_y_mm and the patient
+    map; scales starting at zero). The meniscus targets keep the shared "meniscus" channel and their
+    routes; the frame, the maps and every other label are untouched. The soft-tissue read that is
+    added to the OA logits stays as it is today if it does not need the shared "oa" channel; if it
+    does, keep it reading the cells it reads today through a channel of its own and say so.
+  precedents:
+  - 'docs/ongoing/side-routed-heads.md: the routed shared heads, run 24, adopted for the menisci and OA together.'
+  - 'docs/validation/results/2026-09-25-near-misses-campaign.md: separate OA heads with the detector, PF OA +0.0102.'
+  - 'docs/validation/results/2026-10-05-fixes-and-removals-campaign.md: the last model of that arrangement, S108, 0.950.'
+  novelty: First comparison of separate OA heads with the detector against the routed shared OA head with the menisci held fixed.
+  coverage: The three OA labels; the menisci only through the frame the OA head no longer shapes.
+  exploitation: >-
+    Read Medial OA, Lateral OA and PF OA at both multipliers against the incumbent and against the
+    seed oa-detector-beside-the-shared-head, then the macro and the two meniscus labels. Activation:
+    the three scales logged once per epoch leave zero; the report gives the channel list with the
+    three OA labels as own channels and "oa" absent from the shared ones, and the parameter counts of
+    the attention and evidence heads before and after. Shown wrong by: the three OA labels below the
+    incumbent at both multipliers.
+  budget: >-
+    The reference's training time; two more attention channels and no routing for three labels, so no
+    measurable change (guess). GPU memory as the reference (16.2 GB peak in run 3), RAM unchanged.
+  implementation: >-
+    Follow the environment paragraph of the developer instructions. A source change in modeling/model.py,
+    modeling/spatial_tokens.py and training/lightning.py, with no new configuration option. Start
+    from the detector port described in the seed oa-detector-beside-the-shared-head (same commit,
+    same lines, same logging rule: scales and weight norm once per epoch only). Then move the three
+    OA targets out of TARGET_ROUTES into own channels without a route; every table indexed by
+    SHARED_CHANNELS, SHARED_PRIORS, PRIOR_VARIANTS, ROUTES or the routed-channel mask must stay
+    consistent with "meniscus" as the only shared channel, and the routes oa_medial and oa_lateral are
+    no longer read by any label (the kneecap route stays for Effusion). The training code in
+    lightning.py and training/anatomy.py that addresses the shared channels by name or position
+    (routed report terms, frame losses) must still run with one shared channel; the report-attribute
+    loss is off in this recipe. Check on the CPU that the model builds without weights, that twelve
+    logits come out in the label order of the config, and that the two meniscus logits equal the
+    incumbent's code on one synthetic batch when the OA parameters are left out of the comparison.
+    Say exactly which tables changed and what happened to the soft-tissue read for OA.
+  open_choices: None; the detector's numbers are the removed code's and the OA channels take the own channels' existing settings.
+  dependencies: []
+  priority_rationale: The user's forced seed; the second arm of the same question, two changes at once by design.
+exhausted_directions: None; two forced seeds added by the user on 2026-10-12 after the ten.

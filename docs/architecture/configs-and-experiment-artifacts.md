@@ -385,6 +385,15 @@ scratch environment of the `variopinta` project (`rust/target`, `benchmarks/.run
 segmenter masks, their case lists and the prepared targets stay; segmenting again means converting
 the raw series again.
 
+**2026-10-13, targets-and-inputs campaign (user order: keep only the incumbent).** 57 checkpoints
+of `outputs/autoresearch/targets-and-inputs/experiments` were deleted, 21 GB: `last.ckpt` and the
+selected checkpoint of every run except the incumbent's selected one
+(`average-pool-shortcuts-in-the-resnet-20261013T122134Z-1fc0acea/training/fold_2/best-epoch=09-val_macro_auc=0.93090.ckpt`),
+by the rules of `free_disk` applied to that campaign alone. The cleanup script was not run across
+the worktrees: with the submission ledger stale since 2026-10-03 its export rule would have
+removed the wheels of bundles another session was still using. Predictions, metrics, configs,
+sources and the campaign state are kept; the weights of S150 and S151 are on Kaggle.
+
 ## Current scope and next execution
 
 The config, fold-aware labels, on-the-fly image preparation, study dataset,

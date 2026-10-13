@@ -1,0 +1,128 @@
+ideas:
+- id: sagittal-fluid-detail-view-off
+  mechanism_id: sagittal-fluid-detail-view
+  parent_idea_id: null
+  title: Train without the 64 mm second view of the sagittal fluid slices
+  opportunity: >-
+    Forced by the user on 2026-10-12 as an exception to the contract's exclusion of view changes.
+    The 64 mm view was adopted on the ResNet-18 in the soft-tissue-reads campaign at the plain
+    recipe's level; on the ResNet-50 the routed cell read and this view together gave +0.00004 at x4
+    (0.933292 against 0.933256). It costs encoder time on every sagittal fluid slice. Evidence,
+    medium. Guess: -0.0005 to +0.0005 macro, and a shorter training.
+  mechanism: >-
+    In configs/training.yaml, under data.series_types, the Sagittal series type with fluid_sensitive
+    1 and fat_suppression 1 keeps its first view (field_mm 84.0) and loses its second (field_mm
+    64.0). No other series type changes. The model then has no view that shares another view's
+    slices (the shared_slice_view buffer is all false), so the gates that open that view to the
+    menisci, the OA labels and ACL have nothing to act on.
+  precedents:
+  - 'docs/validation/results/2026-10-12-soft-tissue-reads-and-rn50-input-sampling.md: the view on both backbones.'
+  - 'autoresearch/campaigns/soft-tissue-reads/run-notes.md, ResNet-18 against ResNet-50: the cell read and detail view, +0.0013 against +0.00004.'
+  novelty: First removal of the view alone on the ResNet-50.
+  coverage: Every study with a sagittal fluid series; the menisci, the OA labels and ACL read it.
+  exploitation: >-
+    Read the menisci, the three OA labels and ACL at both multipliers, then the macro and the
+    training time. Activation: effective_config.json lists one view for the sagittal fluid type,
+    and the report gives the tokens per study before and after. Shown wrong by: the macro below the
+    incumbent at both multipliers.
+  budget: >-
+    Below the reference's training time (guess: 5 to 10% less); it must stay above the 0.75 floor
+    (2,018 s). GPU memory at or below the reference, RAM unchanged.
+  implementation: >-
+    Follow the environment paragraph of the developer instructions. Configuration only when the
+    data pipeline and the model build with one view on that series type: load the config and
+    construct the dataset's view table and the model on the CPU without weights. If a path assumes
+    a shared-slice view exists (view_sources, detail_target_allowed, the attention mass per view),
+    repair it without changing behaviour when the view is present, and say exactly what was repaired.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user's forced seed; a removal that also saves time.
+- id: detail-view-embedding-off
+  mechanism_id: removal-detail-view-embedding
+  parent_idea_id: null
+  title: Train without the learned vector added to the tokens of every view that is not at 120 mm
+  opportunity: >-
+    Forced by the user on 2026-10-12. One learned vector is added to every token of a view whose
+    field differs from the 120 mm reference (all coronal and sagittal views today). It came with the
+    84/93 mm views on 2026-10-02 and its removal, queued in the fixes-and-removals campaign, never
+    ran. The plane and contrast embeddings and the view label bias already tell the model which view
+    a token is from. Guess, low: -0.0005 to +0.0005 macro.
+  mechanism: >-
+    In KneeAbnormalityModel._base_tokens and in _soft_tissue_tokens (modeling/model.py, the two
+    places that add encoded["detail_view"] * self.detail_view_embedding) the term is not added. The
+    parameter leaves the model. Nothing else changes; the detail_view buffer stays for whatever
+    else reads it.
+  precedents:
+  - 'autoresearch/campaigns/fixes-and-removals/seed-ideas-3.yaml, detail-view-embedding-off: the seed that never ran.'
+  - 'docs/validation/results/2026-10-02-smart-crops-campaign.md: the views adopted with the embedding in place.'
+  novelty: First removal of the embedding.
+  coverage: The tokens of every coronal and sagittal view.
+  exploitation: >-
+    Read the macro and the per-label table at both multipliers. Activation: the report gives the
+    norm of the reference checkpoint's embedding (how much it carried) and the parameter count
+    before and after. Shown wrong by: the macro below the incumbent at both multipliers.
+  budget: The reference's training time. GPU memory and RAM as the reference.
+  implementation: >-
+    Follow the environment paragraph of the developer instructions. A source change in
+    modeling/model.py only, with no configuration option. Remove the parameter under its
+    fork_rng block so no other initialization moves, and check on the CPU that the model builds
+    without weights and that every other parameter starts at the incumbent code's values.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user's forced seed; a removal that never ran.
+- id: gin-augmentation-off
+  mechanism_id: gin-augmentation
+  parent_idea_id: null
+  title: Train without the random-convolution intensity augmentation (GIN)
+  opportunity: >-
+    Forced by the user on 2026-10-12. GIN entered with the half-stack augmentation on 2026-09-26,
+    adopted as a bundle on ReXNet-200 (+0.0011 at x4, 0.943 against 0.940 public for the bundle);
+    its parts were never run alone and never on a RadImageNet backbone, whose pretraining saw real
+    MR contrast. Guess, low: -0.001 to +0.0005 macro.
+  mechanism: >-
+    In configs/training.yaml, data.gin_augmentation.probability becomes 0.0 (it is 0.3). Nothing
+    else changes.
+  precedents:
+  - 'docs/validation/results/2026-09-26-augmentation-campaign.md: the half stack adopted as a bundle.'
+  - 'The seeds intensity-augmentation-off and noise-augmentation-off of this campaign: the same question for two older parts.'
+  novelty: First removal of GIN alone.
+  coverage: 30% of training images.
+  exploitation: >-
+    Read the macro and the per-label table at both multipliers, and the x1 curve per epoch.
+    Activation: effective_config.json records 0.0. Shown wrong by: the macro below the incumbent at
+    both multipliers.
+  budget: The reference's training time or slightly less. GPU memory and RAM as the reference.
+  implementation: >-
+    Follow the environment paragraph of the developer instructions. Configuration only: check that
+    the config loads with probability 0.0 and that the augmentation is then skipped.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user's forced seed; one part of a bundle adopted on another backbone.
+- id: resolution-augmentation-off
+  mechanism_id: resolution-augmentation
+  parent_idea_id: null
+  title: Train without the one-axis resolution degradation
+  opportunity: >-
+    Forced by the user on 2026-10-12. The degradation (probability 0.25, 70 to 100% of one axis kept)
+    entered with the half-stack augmentation on 2026-09-26, adopted as a bundle on ReXNet-200 at 140
+    mm; since then the fields went to 84 to 120 mm and the views are posed on canvases, and it was
+    never run alone. Guess, low: -0.001 to +0.0005 macro.
+  mechanism: >-
+    In configs/training.yaml, data.resolution_augmentation.probability becomes 0.0 (it is 0.25).
+    Nothing else changes.
+  precedents:
+  - 'docs/validation/results/2026-09-26-augmentation-campaign.md: the half stack adopted as a bundle.'
+  novelty: First removal of the degradation alone.
+  coverage: 25% of training images.
+  exploitation: >-
+    Read the macro and the per-label table at both multipliers, the menisci first (the finest
+    structures). Activation: effective_config.json records 0.0. Shown wrong by: the macro below the
+    incumbent at both multipliers.
+  budget: The reference's training time or slightly less. GPU memory and RAM as the reference.
+  implementation: >-
+    Follow the environment paragraph of the developer instructions. Configuration only: check that
+    the config loads with probability 0.0 and that the augmentation is then skipped.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user's forced seed; one part of a bundle adopted on another backbone.
+exhausted_directions: None; the last four of eight forced seeds added by the user on 2026-10-12, revisiting adoptions with thin evidence.

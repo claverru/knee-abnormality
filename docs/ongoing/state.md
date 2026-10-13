@@ -1,4 +1,4 @@
-# Project state (2026-10-12)
+# Project state (2026-10-13)
 
 What is in force now: the recipe, the control candidates pair with, the best public submissions and
 the rules every comparison depends on. Pending work is in [next](next.md), active lines have their
@@ -9,6 +9,19 @@ measured outcomes are in the [validation results](../validation/results/INDEX.md
 
 ## Recipe in force
 
+- **The recipe is the ResNet-50 on fold 2, since 2026-10-13 (user decision):** `configs/training.yaml`
+  is the Refined-RadImageNet `resnet50.a1_in1k` on fold 2 of `all_5fold_scanner_v2`, seed
+  1110484336; `configs/refined-resnet50.yaml` and the ResNet-18 recipe are removed, and every
+  mention of them below describes earlier states. On top of the aligned-contrast-mixing recipe it
+  carries the three adoptions of the
+  [targets-and-inputs campaign](../validation/results/2026-10-13-targets-and-inputs-campaign.md): a mask decoder trained beside the
+  labels (bone and soft-tissue classes on the 28 by 28 grid, weight 0.1 each, training only), the
+  three-compartment OA detector beside the routed shared OA head, and average-pool shortcuts in
+  the ResNet-50 on the same weights. The campaign's incumbent, run 27: ×4 0.939634, ×1 0.930902,
+  training 2,696 s, 16.9 GB; it has no public score. The starting recipe on the same fold: ×4
+  0.937000, ×1 0.928460, 0.959 public (S151). Checkpoints trained before 2026-10-13 do not load
+  into the current model (new parameters, renamed shortcut keys, a changed token identity);
+  export them from their `source_snapshot.zip`.
 - **Labels and split, since 2026-09-28 (user decision):** training and evaluation use
   [`rebuild_state_v2`](../public-labels/label-rebuild.md#a2-common-state-scale-and-the-zhen-lineage-fix-2026-09-28)
   (A2 of the label rebuild) and the label-stratified split
@@ -122,6 +135,14 @@ measured outcomes are in the [validation results](../validation/results/INDEX.md
 
 ## Current control
 
+- **Run 27 of the targets-and-inputs campaign** is the reference for the recipe since
+  2026-10-13:
+  `outputs/autoresearch/targets-and-inputs/experiments/average-pool-shortcuts-in-the-resnet-20261013T122134Z-1fc0acea/training`,
+  fold 2, seed 1110484336, ×4 0.939634, ×1 0.930902. It was trained by the campaign from its
+  frozen source; main's code loads its checkpoint strictly and has not retrained it. A repeat of
+  the recipe with an inert module scored ×4 0.938639 and ×1 0.929592
+  ([distance between trainings](../validation/results/2026-10-13-targets-and-inputs-campaign.md#how-far-two-trainings-of-one-recipe-are-apart)). The entries
+  below are the ResNet-18 controls of earlier recipes.
 - **`rn18-anatomy-map-centre-control`** (`outputs/training/rn18-anatomy-map-centre-control`), the
   control since 2026-10-08: the recipe in force trained from the current sources, fold 1, seed
   1110484336: ×4 0.926762, ×1 0.917074 (epoch 9 of 10), training 1,391 s. Candidates pair with it
@@ -195,6 +216,12 @@ measured outcomes are in the [validation results](../validation/results/INDEX.md
 
 ## Best public submissions
 
+- **0.962 and 0.961 (2026-10-12 and 13):** S148 and S149, a single ResNet-50 on fold 3 trained
+  jointly with pseudo-labelled fastMRI (worktree `knee-abnormality-fastmri-pretraining`); S148 is
+  the best submission.
+- **0.960, first of the 0.960 in Kaggle's score order (2026-10-13):** S150, the fold-2 ResNet-50
+  with soft-prevalence class weights, against 0.959 for its reference S151
+  ([pair](../validation/results/2026-10-13-targets-and-inputs-campaign.md#soft-prevalence-class-weights-read-publicly)).
 - **0.961:** S140, the five Refined ResNet-50 teachers of the student distillation in one bundle
   at ×6 with reflection TTA and τ 0.85: the best submission. S141, the same with the view
   stacker, also 0.961.
@@ -264,6 +291,13 @@ measured outcomes are in the [validation results](../validation/results/INDEX.md
 
 ## Measurement and adoption rules in force
 
+- **Distance between two trainings of the ResNet-50 recipe (2026-10-13):** two inert-module
+  repeats landed 0.0007 and 0.0010 below their incumbents at ×4 and 0.0012 and 0.0013 below at
+  ×1; read a single-run difference under about 0.001 at ×4 as inside that distance
+  ([result](../validation/results/2026-10-13-targets-and-inputs-campaign.md#how-far-two-trainings-of-one-recipe-are-apart)).
+- **No adoption of a generalization risk on a local fold (user decision, 2026-10-13):** a change
+  that frees capacity from the L2-SP anchor or removes a robustness augmentation is not adopted
+  on local AUC alone ([modules inside the backbone](../validation/results/2026-10-13-targets-and-inputs-campaign.md#modules-inside-the-backbone)).
 - **Adoption:** the local rule is a macro gain ≥ 0.001 with a positive lower bound of the central
   80% paired report-group interval; the 95% interval is diagnostic
   ([controlled comparisons](../validation/validation-strategy.md#controlled-comparisons)). Recent
@@ -311,6 +345,11 @@ measured outcomes are in the [validation results](../validation/results/INDEX.md
 
 ## Recently closed
 
+- **2026-10-13:** the `targets-and-inputs` autoresearch campaign (targets in the loss, the
+  intensity pipeline, augmentation removals, revisits of thin adoptions, modules inside the
+  backbone), stopped by the user after 29 runs; the mask decoder, the OA detector and average-pool
+  shortcuts adopted. [Result](../validation/results/2026-10-13-targets-and-inputs-campaign.md),
+  [campaign](../../autoresearch/campaigns/targets-and-inputs/INDEX.md).
 - **2026-10-12:** the `rn50-input-sampling` autoresearch campaign (what the ResNet-50 is fed:
   alignment, token grids, slices, fields), stopped by the user after 14 runs; aligned contrast
   mixing kept, 35 distinct slices adopted by the runtime and not carried to main after 0.959

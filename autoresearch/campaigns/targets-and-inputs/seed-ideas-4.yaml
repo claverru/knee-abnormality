@@ -1,0 +1,150 @@
+ideas:
+- id: report-attribute-loss-on
+  mechanism_id: report-attribute-heads
+  parent_idea_id: null
+  title: Train the report-attribute heads again at weight 0.1
+  opportunity: >-
+    Forced by the user on 2026-10-12, one of eight seeds that revisit adoptions with thin evidence.
+    The heads were adopted on 2026-09-25 with a public gain (0.940 against 0.938, S62 against S60)
+    and their removal on the 2026-10-01 recipe lost 0.0006 (80% [-0.0011, -0.0001]). They were
+    switched off on 2026-10-08 on a ResNet-18 (x4 0.927291 against the control's 0.926762), with no
+    public pair, and the ResNet-50 has never been trained with them on this recipe. Evidence, medium.
+    Guess: -0.0005 to +0.001 macro.
+  mechanism: >-
+    In configs/training.yaml, trainer.report_attribute_loss_weight becomes 0.1 (it is 0), the value
+    in force until 2026-10-08. The heads and their loss are in the code (training/lightning.py, the
+    branch on report_attribute_loss_weight > 0; training/report_attributes.py) and read the manifest
+    the config already names (paths.report_attribute_manifest, target set v4.0). Nothing else changes.
+  precedents:
+  - 'docs/validation/results/2026-09-25-report-attribute-heads.md: the adoption, +0.00105 at x4, 0.940 against 0.938 public.'
+  - 'docs/backlog/small-changes.md, removals of active mechanisms: heads off -0.0006 on the 2026-10-01 recipe.'
+  - 'autoresearch/campaigns/anatomy-recipe: the loss switched off, x4 0.927291.'
+  novelty: First run with the heads on the ResNet-50 on the current recipe.
+  coverage: Every training study with report attributes; a training-only loss.
+  exploitation: >-
+    Read the macro and the per-label table at both multipliers. Activation: effective_config.json
+    records 0.1 and the report-attribute loss is logged above zero from the first epoch. Shown wrong
+    by: the macro below the incumbent at both multipliers.
+  budget: The reference's training time plus the heads' loss, under 3% (guess). GPU memory and RAM as the reference.
+  implementation: >-
+    Follow the environment paragraph of the developer instructions. Configuration only. Check on the
+    CPU that the config loads, that the Lightning module builds the heads from the v4.0 manifest
+    without weights, and that the names of the logged report-attribute metrics exist; no forward pass
+    on the GPU.
+  open_choices: None; 0.1 is the weight the recipe carried.
+  dependencies: []
+  priority_rationale: The user's forced seed; the removal with the least evidence behind it.
+- id: scanner-confusion-head-beside-l2sp
+  mechanism_id: scanner-confusion-head
+  parent_idea_id: null
+  title: Train the scanner confusion head again at weight 0.1, with L2-SP kept
+  opportunity: >-
+    Forced by the user on 2026-10-12. The head was adopted on 2026-09-27 with a public gain (0.948
+    against 0.947, S67 against S68) and removed on 2026-09-30 in the same step that added L2-SP.
+    That step ties locally (+0.0003 at x4) and its model sits below its control in Kaggle's score
+    order (S86 under S82, both 0.943; S82 still had the head and no L2-SP). L2-SP stays by user
+    decision, so the head is the part left to test. Evidence for the doubt, weak; that the head is
+    the cause is a guess. Guess: -0.0005 to +0.0005 macro.
+  mechanism: >-
+    In configs/training.yaml, trainer.scanner_confusion_weight becomes 0.1 (it is 0.0), the adopted
+    value (configs/training.yaml at commit 1f6d8ac). The head, its ramp and its step are in the code
+    (training/auxiliary/scanner_confusion.py and _scanner_confusion_step in training/lightning.py,
+    built when the weight is above zero). L2-SP (optimizer.anchor_alpha_early and _late) is
+    untouched. Nothing else changes.
+  precedents:
+  - 'docs/modeling/scanner-confusion-head.md: the adoption and its evidence, S67 0.948.'
+  - 'docs/validation/results/2026-09-30-rn18-l2sp-no-confusion.md: L2-SP added and the head removed together, 0.943 for both S86 and S82.'
+  novelty: First run of the head together with L2-SP, and on the ResNet-50.
+  coverage: Every training study with a scanner group; a training-only loss on the pooled tokens.
+  exploitation: >-
+    Read the macro and the per-label table at both multipliers. Activation: effective_config.json
+    records 0.1, and the head's accuracy and loss are logged per epoch (0.311 and 1.732 at the
+    adoption's control). Shown wrong by: the macro below the incumbent at both multipliers.
+  budget: The reference's training time plus the head's step, under 5% (guess). GPU memory and RAM as the reference.
+  implementation: >-
+    Follow the environment paragraph of the developer instructions. Configuration only when the
+    Lightning module builds with the weight above zero on the current recipe: check on the CPU that
+    it loads the scanner groups, builds the prior for fold 2 and constructs the head without
+    weights. If _scanner_confusion_step no longer matches what the model's encoder returns (the
+    token dictionary changed since 2026-09-30), repair the step without changing behaviour when the
+    weight is zero, and say exactly what was repaired.
+  open_choices: None; 0.1 is the adopted weight.
+  dependencies: []
+  priority_rationale: The user's forced seed; the half of a bundled adoption that never ran alone.
+- id: view-label-bias-off
+  mechanism_id: view-label-bias
+  parent_idea_id: null
+  title: Train without the learned attention bias per view and label
+  opportunity: >-
+    Forced by the user on 2026-10-12. The bias was adopted on 2026-10-03 at +0.0007 at x4 on the
+    hand views, inside the spread of comparable runs; main's retrained control came out -0.0004
+    against the run without it. In Kaggle's score order the same recipe trained twice lands on both
+    sides of its no-bias control (S101 0.951 above S93 0.950 above S100 0.950). The ResNet-50 took
+    it together with the 84/93 mm views (+0.0027 for both). Evidence, weak. Guess: -0.001 to +0.0005.
+  mechanism: >-
+    In configs/training.yaml, model.view_label_bias becomes false (it is true). The model then adds
+    no per-view, per-label term to the attention. Nothing else changes.
+  precedents:
+  - 'docs/modeling/current-model.md, adoption history, 2026-10-03: the adoption and its control.'
+  - 'docs/validation/results/2026-10-03-learnable-views-campaign.md: the bias as the learned recipe''s own gain (+0.0017).'
+  novelty: First removal on the ResNet-50 and on the current recipe.
+  coverage: The attention of every label over every view.
+  exploitation: >-
+    Read the macro, Baker's cyst and Effusion (the labels the learned table moved most) at both
+    multipliers. Activation: effective_config.json records false, and the report gives the bias
+    table's parameter count before and after. Shown wrong by: the macro below the incumbent at both
+    multipliers.
+  budget: The reference's training time. GPU memory and RAM as the reference.
+  implementation: >-
+    Follow the environment paragraph of the developer instructions. Configuration only when the
+    model builds with the value false: construct it on the CPU without weights. If the routing, the
+    soft-tissue read or the detail view assume the bias table exists, repair that path without
+    changing behaviour when the value is true, and say exactly what was repaired.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user's forced seed; an adoption inside the rerun spread.
+- id: anatomical-attention-bias-back
+  mechanism_id: anatomical-attention-bias
+  parent_idea_id: null
+  title: Restore the learned medial-lateral attention bias for the two meniscus and the two tibiofemoral OA labels
+  opportunity: >-
+    Forced by the user on 2026-10-12. On 2026-10-01 the plane-contrast readouts were added and this
+    bias removed in one adoption, at +0.0009 each at x4, just under the rule; the model with both
+    changes sits below the one without them in Kaggle's score order (S92 under S90, both 0.947).
+    The seed plane-contrast-readouts-off tests the first half; this one tests the second. Evidence,
+    weak, one pair. The routed heads now place these four labels by the knee frame, so the bias
+    may add nothing. Guess: -0.0005 to +0.0005 macro.
+  mechanism: >-
+    The code is in git at 609a489^, the last commit that still had it behind model.anatomical_bias:
+    `git show 609a489^:src/knee_abnormality/modeling/model.py`, lines 150 to 175 (the compartment
+    signs and families and the parameter anatomical_log_strength, one log strength per family,
+    zero start) and lines 373 to 377 (the term). Restore the term as it was: for Medial Meniscus,
+    Lateral Meniscus, Medial OA and Lateral OA, sign * exp(log strength of the label's family) *
+    tanh(medial_axis / 20 mm) is added to the label's attention scores before the softmax, sign +1
+    for the medial label and -1 for the lateral one. In today's _attention_pool the attention of a
+    label is scores[target_channel] + prior + the routing term; the bias is added to those four
+    labels' rows there. medial_axis is the original one, side * (patient x - knee_center_x_mm) from
+    knee_side_sign, knee_center_x_mm and the middle slice's patient map, zero where the side or the
+    geometry is unknown, not the learned frame's axis. PF OA and the other labels get no bias.
+  precedents:
+  - 'docs/validation/results/2026-09-21-anatomical-attention-result.md: the adoption, +0.0023.'
+  - 'docs/validation/results/2026-10-01-revisits-campaign.md: its removal, +0.0009 at x4 (80% [+0.0002, +0.0016]).'
+  novelty: First run of the bias with the routed shared heads and on the ResNet-50.
+  coverage: Four labels' attention; other labels only through the shared token features.
+  exploitation: >-
+    Read the four labels and the macro at both multipliers. Activation: the two strengths
+    (anatomical_strength_meniscus, anatomical_strength_oa) logged once per epoch move from 1.0.
+    Shown wrong by: the macro below the incumbent at both multipliers.
+  budget: The reference's training time; two scalars. GPU memory and RAM as the reference.
+  implementation: >-
+    Follow the environment paragraph of the developer instructions. A source change in
+    modeling/model.py and training/lightning.py with no new configuration option: the bias is on.
+    Port the lines from 609a489^ by hand, since _attention_pool has changed; from the old
+    lightning.py restore the per-epoch logging of the strengths (609a489^ lines 488 to 495). If
+    the seed oa-detector-beside-the-shared-head has run, reuse its construction of the original
+    medial_axis. Check on the CPU that the model builds without weights and that with the strengths'
+    term multiplied by zero the logits equal the incumbent's code on one synthetic batch.
+  open_choices: None; the 20 mm width and the zero start are the removed code's.
+  dependencies: []
+  priority_rationale: The user's forced seed; the second half of the 2026-10-01 adoption.
+exhausted_directions: None; the first four of eight forced seeds added by the user on 2026-10-12, revisiting adoptions with thin evidence.

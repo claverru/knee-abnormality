@@ -1,0 +1,238 @@
+ideas:
+- id: global-context-in-the-resnet-blocks
+  mechanism_id: backbone-global-context
+  parent_idea_id: null
+  title: Add an additive global-context block to the bottlenecks of stages two to four, started at zero, keeping the Refined-RadImageNet weights
+  opportunity: >-
+    Forced by the user on 2026-10-13 under the contract's exception for modules inside the blocks
+    that keep every pretrained weight and start as the identity. A global-context block pools the
+    whole feature map with one learned attention map and adds a per-channel term to every position:
+    each token of a slice then sees the rest of the slice inside the backbone, which the ResNet-50
+    otherwise gets only from its receptive field. It is the one block-level attention with direct
+    evidence for insertion into an already trained network: GCNet (arXiv 1904.11492) inserts it into
+    a trained ResNet-50 and fine-tunes, 76.88 to 77.70 top-1 with the baseline given the same extra
+    epochs: evidence, medium, another task. Never run in this project (searched docs and campaigns
+    on 2026-10-13). Guess, low: -0.0005 to +0.001 macro.
+  mechanism: >-
+    In modeling/model.py, after the ResNet backbone is created and before the RadImageNet weights
+    are loaded, each of the thirteen bottlenecks of layer2, layer3 and layer4 gets
+    timm.layers.GlobalContext(channels of the block's output, use_attn=True, fuse_add=True,
+    fuse_scale=False, rd_ratio=1/16) in the block's attention slot (block.se, which timm's
+    Bottleneck applies after bn3 and before the residual sum). If an adopted incumbent already holds
+    a module in that slot, the slot becomes nn.Sequential(existing module, global-context block).
+    Layer1 gets none. The block must start as zero: the weight and the bias of its last convolution
+    (mlp_add.fc2) are set to zero (timm's init_last_zero leaves the bias); every other new tensor
+    keeps timm's default initialisation, drawn under torch.random.fork_rng. The network then
+    computes the pretrained function exactly at step 0. The RadImageNet load accepts exactly the new
+    tensors as missing: strict=False, and raise unless the unexpected keys are empty and every
+    missing key contains '.se.'. Optimizer and anchor, for the new tensors only: parameters whose
+    name contains '.se.' are not anchored by L2-SP and train in the head group (head_lr and the
+    head's weight decay rule); every other parameter keeps its group, rate, decay and anchor.
+    Validation, prediction and Kaggle inference run the same backbone. No option and no config
+    field.
+  precedents:
+  - 'docs/ongoing/radimagenet-backbone.md: how the Refined-RadImageNet weights are loaded.'
+  - 'seed-ideas-7.yaml, squeeze-excitation-in-the-resnet-blocks: the same slot, load rule and optimizer treatment.'
+  novelty: First spatial context module inside the backbone.
+  coverage: Every image, at stages two to four.
+  exploitation: >-
+    Read the macro and the per-label table at both multipliers. Activation: one validation-side
+    epoch metric through _log_epoch_metric, the mean over the thirteen blocks of the root mean
+    square of the added term divided by the root mean square of the block's bn3 output (0 at
+    initialisation), from tensors the forward pass already has; and in the report the count of
+    missing keys at load and the maximum absolute difference between the backbone's output with
+    and without the blocks at initialisation on a synthetic batch of two images, which must be 0.
+    Shown wrong by: the macro below the incumbent at both multipliers while the added term grows.
+  budget: >-
+    One 1 by 1 attention convolution, one pooled vector and a two-layer bottleneck per block; the
+    addition stores no extra feature map. Estimate, not measured: training time within 1.02 of the
+    incumbent's and peak GPU memory within 0.2 GB of it; about 4.75 million new parameters. State
+    both estimates and the parameter count in the report.
+  implementation: >-
+    Follow the environment paragraph of the developer instructions. Files: modeling/model.py for the
+    modules, their initialisation and the load; training/lightning.py for the anchor loop, the
+    optimizer group of the '.se.' parameters and the one metric. Check on the CPU with a randomly
+    initialised timm resnet50 and no project model: the variant loads the base state dict with only
+    '.se.' keys missing, and on a batch of two 224 px images without gradient its output equals the
+    base network's exactly. Check that build_optimizer puts the '.se.' parameters in the head-rate
+    group and registers no anchor buffer for them, and that backbone_mapping and group_matcher still
+    resolve. model.channels_last stays true.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user's forced seed of 2026-10-13; the block-level change with direct fine-tuning evidence.
+- id: coordinate-attention-in-the-late-resnet-blocks
+  mechanism_id: backbone-coordinate-attention
+  parent_idea_id: null
+  title: Add coordinate attention to the bottlenecks of stages three and four, started as the identity, keeping the Refined-RadImageNet weights
+  opportunity: >-
+    Forced by the user on 2026-10-13 under the contract's exception for modules inside the blocks.
+    Coordinate attention (arXiv 2103.02907) gates each channel by one profile along the height and
+    one along the width of the feature map, so the gate knows where on the slice a structure is,
+    which a squeeze-and-excitation gate does not. The knee's labels are tied to positions on the
+    slice (compartments, the joint line, the kneecap). Its published evidence is for networks
+    trained from scratch; the gain when added to a trained network is a guess, low: -0.0005 to
+    +0.001 macro. Never run inside the backbone here (the per-target Gaussian coordinate priors of
+    the medial-lateral-transfer campaign acted on the pooling, not on the backbone).
+  mechanism: >-
+    In modeling/model.py, after the ResNet backbone is created and before the RadImageNet weights
+    are loaded, each of the nine bottlenecks of layer3 and layer4 gets timm.layers.coord_attn.CoordAttn(channels
+    of the block's output) with timm's defaults except the gate, in the block's attention slot
+    (block.se, applied after bn3 and before the residual sum). If an adopted incumbent already holds
+    a module in that slot, the slot becomes nn.Sequential(existing module, coordinate attention).
+    Layers 1 and 2 get none. The module must start as the identity: its gate is 2 * sigmoid(x)
+    instead of sigmoid(x) (a small module passed as gate_layer), and the weights of its two output
+    convolutions (the height one and the width one; their biases too if they have one) are zero, so
+    both profiles are exactly 1 at the start. Every other new tensor keeps timm's default
+    initialisation, drawn under torch.random.fork_rng. The RadImageNet load accepts exactly the new
+    tensors as missing: strict=False, and raise unless the unexpected keys are empty and every
+    missing key contains '.se.'. Optimizer and anchor, for the new tensors only: parameters whose
+    name contains '.se.' are not anchored by L2-SP and train in the head group (head_lr and the
+    head's weight decay rule); every other parameter keeps its group, rate, decay and anchor. The
+    module's own batch norm trains as the backbone's batch norms do. Validation, prediction and
+    Kaggle inference run the same backbone. No option and no config field.
+  precedents:
+  - 'seed-ideas-7.yaml, squeeze-excitation-in-the-resnet-blocks: the same slot, identity gate, load rule and optimizer treatment.'
+  - 'run-notes.md, run 5, the audit: the last backbone-side gain came through stage four and the token projection.'
+  novelty: First position-aware gate inside the backbone.
+  coverage: Every image, at stages three and four (14 by 14 and 7 by 7 maps).
+  exploitation: >-
+    Read the macro and the per-label table at both multipliers, the compartment labels (menisci,
+    the three OA labels) first. Activation: one validation-side epoch metric through
+    _log_epoch_metric, the mean absolute deviation of the product of the two profiles from 1 over
+    the nine modules (0 at initialisation), from values the forward pass already produces; and in
+    the report the count of missing keys at load and the maximum absolute difference between the
+    backbone's output with and without the modules at initialisation on a synthetic batch of two
+    images, which must be 0. Shown wrong by: the macro below the incumbent at both multipliers while
+    the profiles move away from 1.
+  budget: >-
+    Two pooled profiles and three small convolutions per block on 14 by 14 and 7 by 7 maps, and one
+    more stored feature map per gated block. Estimate, not measured: training time within 1.03 of
+    the incumbent's and peak GPU memory within 0.3 GB of it. State both estimates and the parameter
+    count in the report.
+  implementation: >-
+    Follow the environment paragraph of the developer instructions. Files: modeling/model.py for the
+    modules, the gate, the initialisation and the load; training/lightning.py for the anchor loop,
+    the optimizer group of the '.se.' parameters and the one metric. Read timm/layers/coord_attn.py
+    for the names of the two output convolutions and the gate argument. Check on the CPU with a
+    randomly initialised timm resnet50 and no project model, in eval mode: the variant loads the
+    base state dict with only '.se.' keys missing, and on a batch of two 224 px images without
+    gradient its output equals the base network's exactly. Check that build_optimizer puts the
+    '.se.' parameters in the head-rate group and registers no anchor buffer for them, and that
+    backbone_mapping and group_matcher still resolve. model.channels_last stays true.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user's forced seed of 2026-10-13; the position-aware variant of the channel gate.
+- id: average-pool-shortcuts-in-the-resnet
+  mechanism_id: backbone-shortcut-downsampling
+  parent_idea_id: null
+  title: Downsample the three stride-two shortcuts of the ResNet-50 with an average pool before the 1 by 1 convolution (ResNet-D), on the same weights
+  opportunity: >-
+    Forced by the user on 2026-10-13 as an exception to the contract's settled backbone: the same
+    weights in the same places, with one fixed operation changed. In the ResNet-50 the shortcut of
+    the first block of layer2, layer3 and layer4 is a 1 by 1 convolution with stride 2, which reads
+    one pixel in four and discards the rest. ResNet-D (Bag of Tricks, arXiv 1812.01187) averages the
+    2 by 2 neighbourhood first and applies the same convolution at stride 1; the weight tensor has
+    the same shape. At 224 px a meniscus is a few pixels wide, so the discarded positions carry
+    structure. The published gain is for networks trained from scratch; on pretrained weights the
+    function changes slightly at the start (0.018 relative on random weights, measured by the
+    modernisation review of 2026-10-13) and fine-tuning adapts: guess, low, -0.0005 to +0.0005
+    macro. Never run here; the token mapping already handles these shortcuts
+    (docs/ongoing/radimagenet-backbone.md).
+  mechanism: >-
+    In modeling/model.py the ResNet backbone is created with avg_down=True in addition to today's
+    arguments. timm then builds each shortcut as (average pool, 1 by 1 convolution at stride 1,
+    batch norm), so the shortcut's tensors move from downsample.0 and downsample.1 to downsample.1
+    and downsample.2. Before the strict load, the RadImageNet state dict's keys are renamed
+    accordingly for every block that has a shortcut (layerN.0.downsample.0.* to
+    layerN.0.downsample.1.*, layerN.0.downsample.1.* to layerN.0.downsample.2.*); the load stays
+    strict and every pretrained tensor is used. No parameter is added. The L2-SP anchors and the
+    optimizer groups are built from the loaded parameters as today. Validation, prediction and
+    Kaggle inference run the same backbone. No option and no config field.
+  precedents:
+  - 'docs/ongoing/radimagenet-backbone.md: _resnet_mapping walks ResNet-D average-pool shortcuts.'
+  - 'docs/modeling/backbone-swaps.md: how the feature mapping checks each residual shortcut.'
+  novelty: First change to the backbone's downsampling.
+  coverage: Every image, at the three stride-two transitions.
+  exploitation: >-
+    Read the macro and the per-label table at both multipliers, the menisci first. Activation: the
+    report states that the three stride-two shortcuts are (AvgPool2d, Conv2d with stride 1,
+    BatchNorm2d), the number of renamed keys, that the strict load passed, and the relative
+    difference between the backbone's output with avg_down and without it on a synthetic batch of
+    two images with the same weights (above 0). Nothing new is logged in training. Shown wrong by:
+    the macro below the incumbent at both multipliers.
+  budget: >-
+    Three average pools; the three shortcut convolutions see the same number of output positions.
+    Estimate, not measured: the incumbent's training time and GPU memory within 1%.
+  implementation: >-
+    Follow the environment paragraph of the developer instructions. Files: modeling/model.py and,
+    for the key rename, modeling/radimagenet.py or the load site. Check on the CPU with a randomly
+    initialised timm resnet50 and no project model: the renamed base state dict loads strictly into
+    the avg_down variant, and backbone_mapping, the stage outputs' shapes (28, 14 and 7 at 224 px)
+    and group_matcher resolve as before. If an adopted incumbent holds modules in the blocks'
+    attention slot, they are untouched. model.channels_last stays true.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user's forced seed of 2026-10-13; the free downsampling change.
+- id: blur-pool-at-the-resnet-stage-transitions
+  mechanism_id: backbone-anti-aliased-downsampling
+  parent_idea_id: null
+  title: Anti-alias the three stride-two 3 by 3 convolutions of the ResNet-50 with a blur pool, on the same weights
+  opportunity: >-
+    Forced by the user on 2026-10-13 as an exception to the contract's settled backbone: the same
+    weights in the same places, with a fixed blur added at three places. A stride-two convolution
+    aliases: a one-pixel shift of the input changes which positions are kept, and thin structures
+    flicker between neighbouring tokens. Blur-pool (Making Convolutional Networks Shift-Invariant
+    Again, arXiv 1904.11486) runs the convolution at stride 1 and downsamples with a fixed low-pass
+    filter. The crops here are posed from predicted geometry and shifted by augmentation, so the
+    same knee reaches the backbone at different sub-token offsets. The method's author initialises
+    anti-aliased networks from baseline weights and fine-tunes (evidence, medium, no numbers found);
+    on pretrained weights the function changes slightly at the start (0.013 relative on random
+    weights for the full variant, measured by the modernisation review of 2026-10-13). Guess, low:
+    -0.0005 to +0.001 macro. Never run here.
+  mechanism: >-
+    In modeling/model.py, after the ResNet backbone is created with today's arguments and the
+    RadImageNet weights are loaded strictly as today, the first block of layer2, layer3 and layer4
+    is changed in place: its 3 by 3 convolution conv2 runs at stride 1 with the same weight tensor,
+    and the block's anti-aliasing slot (block.aa, applied by timm's Bottleneck after the activation
+    that follows bn2) becomes timm.layers.BlurPool2d(channels of conv2's output, filt_size=3,
+    stride=2). This is what timm builds for these blocks with aa_layer=BlurPool2d; the stem's max
+    pool and the shortcuts stay as they are, so the stem keeps its memory and no 112 by 112 map is
+    added. The blur has no trainable parameter; no key is added to or missing from the load. The
+    L2-SP anchors and the optimizer groups are unchanged. Validation, prediction and Kaggle
+    inference run the same backbone. No option and no config field.
+  precedents:
+  - 'docs/ongoing/radimagenet-backbone.md: how the Refined-RadImageNet weights are loaded.'
+  - 'docs/research/input-resolution.md: downsampling must be antialiased; the repository resampler is, the backbone is not.'
+  novelty: First anti-aliased downsampling inside the backbone.
+  coverage: Every image, at the three stride-two transitions.
+  exploitation: >-
+    Read the macro and the per-label table at both multipliers, the menisci, MCL and ACL first (the
+    thinnest structures), and the step from x1 to x4. Activation: the report states the three
+    blocks' conv2 stride (1) and aa module (BlurPool2d, stride 2), that the strict load passed, the
+    stage outputs' shapes (28, 14 and 7 at 224 px), and the relative difference between the
+    backbone's output with and without the blur on a synthetic batch of two images with the same
+    weights (above 0). Nothing new is logged in training. Shown wrong by: the macro below the
+    incumbent at both multipliers.
+  budget: >-
+    Three 3 by 3 convolutions run at four times their output positions (56, 28 and 14 instead of
+    28, 14 and 7), about 1.0 of the backbone's 4.1 GMACs more, and their outputs are stored at that
+    size. Estimate, not measured: training time 1.15 to 1.20 of the incumbent's (about 3,000 to
+    3,150 s, inside the campaign's 3,364 s), prediction time the same share, and peak GPU memory
+    0.5 to 1.0 GB above the incumbent's 16.7 GB, within 18.5 GB. State both estimates in the
+    report; never fewer epochs, images or slices to fit.
+  implementation: >-
+    Follow the environment paragraph of the developer instructions. Files: modeling/model.py. Read
+    timm/models/resnet.py (Bottleneck: use_aa, conv2's stride, self.aa) and build the three blocks
+    the way timm does with aa_layer, by changing the existing modules after the load or by creating
+    the backbone with aa_layer and restoring the stem's max pool; either way the result must be
+    exactly: stem unchanged, conv2 of layer2.0, layer3.0 and layer4.0 at stride 1 followed by
+    BlurPool2d at stride 2, shortcuts unchanged. Check on the CPU with a randomly initialised timm
+    resnet50 and no project model that the base state dict loads strictly and that
+    backbone_mapping, the stage outputs' shapes and group_matcher resolve as before; if the feature
+    mapping needs the blur's footprint for the token positions, extend it and say so. If an adopted
+    incumbent holds modules in the blocks' attention slot, they are untouched. model.channels_last
+    stays true.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user's forced seed of 2026-10-13; the costliest of the four, last.
+exhausted_directions: None; four seeds the user chose on 2026-10-13 from the ResNet-50 modernisation review, exceptions to the contract's settled backbone. Stochastic depth and Stochastic Normalization were left out by the user.

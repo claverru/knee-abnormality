@@ -4,9 +4,11 @@ Pending work only. The recipe, control and rules in force are in the [project st
 finished runs and decisions live in the [validation results](../validation/results/INDEX.md), the
 [history](../history/INDEX.md) and the canonical topic documents; this file is not a log.
 
-**No campaign is active.** Starting one is a separate user action; historical queues and decisions
-live under [autoresearch](../../autoresearch/campaigns/INDEX.md). New candidates pair with the
-current control at its fold and seed.
+**No campaign is active.** The [targets-and-inputs campaign](../../autoresearch/campaigns/targets-and-inputs/INDEX.md)
+was stopped by the user on 2026-10-13 and its adoptions are on main. Starting one is a separate
+user action; historical queues and decisions live under
+[autoresearch](../../autoresearch/campaigns/INDEX.md). New candidates pair with the current
+control at its fold and seed.
 
 ## Decisions waiting for the user
 
@@ -15,6 +17,9 @@ current control at its fold and seed.
   `export --label-attention-temperature`). The values do not carry between models, so it is
   useful only with values fitted per model
   ([result](../validation/results/2026-10-12-dense-bag-pooling-on-the-resnet-50.md#a-temperature-per-label)).
+- **Submit the recipe in force:** run 27 of the targets-and-inputs campaign has no public score;
+  S151 (0.959) is the starting recipe on the same fold at ×4 τ 0.9
+  ([open items](../validation/results/2026-10-13-targets-and-inputs-campaign.md#open)).
 - **S147's reference:** the same fold-0 weights at ×4, TTA and τ 0.9 were not submitted, so
   S147's 0.959 cannot be attributed to its per-label values.
 - **The mask-trained (heated) ResNet-50 weights:** two runs were started and stopped before
@@ -29,9 +34,13 @@ current control at its fold and seed.
 
 ## Open on the recipe in force
 
-- **ResNet-50 folds:** `rn50-aligned-mixing-folds-0-2` holds folds 0, 1 and 2 of
-  `configs/refined-resnet50.yaml` as on main; folds 3 and 4 are not trained
-  ([result](../validation/results/2026-10-12-dense-bag-pooling-on-the-resnet-50.md#models)).
+- **ResNet-50 folds:** `rn50-aligned-mixing-folds-0-2` holds folds 0, 1 and 2 of the recipe
+  before the targets-and-inputs adoptions; the recipe in force is trained on fold 2 only
+  ([result](../validation/results/2026-10-13-targets-and-inputs-campaign.md)).
+- **The reference's PF OA and the distance between trainings:** fold 2 of the three-fold run
+  scores PF OA 0.9155, above 25 of the 26 campaign runs, and two inert repeats sit about 0.001
+  below their incumbents at ×4; a retraining of the recipe in force would separate a high draw
+  from a difference in how the runs were launched ([open items](../validation/results/2026-10-13-targets-and-inputs-campaign.md#open)).
 - **Teacher share on the ResNet-50:** the
   [student-distillation](../../autoresearch/campaigns/student-distillation/INDEX.md) recipe
   (0.75 silver + 0.25 raw joint teacher) is measured on one ResNet-50 fold (S143, 0.960); not
@@ -41,9 +50,6 @@ current control at its fold and seed.
 - **Dense-bag pooling:** each series at its ×1 share as an inference option, and a sharpness per
   label fitted per model ([small changes](../backlog/small-changes.md#pooling-dense-bags-at-inference),
   [big bets](../backlog/big-bets.md#pooling-head-at-the-inference-bag-size)).
-- **Check the OA detector's removal before a submission relies on it:** one run with the
-  detector restored on the recipe in force, read on the three OA labels, and on the ResNet-50
-  ([open items](../validation/results/2026-10-05-fixes-and-removals-campaign.md#open)).
 - **After the structure-routing line (2026-10-09):** the best routing from the masks (`no-side`)
   is −0.0003 at ×4 on centred crops and −0.0006 on the recipe's crops, with MCL alone carrying
   more than the gap; the multiplier curve (×1 to ×4) of the recipe against one experiment is not
@@ -60,8 +66,8 @@ current control at its fold and seed.
 
 ## Tooling
 
-- **Submission ledger:** S122 to S133 and S147 are not in it; the update of 2026-10-12 stopped on
-  Kaggle's rate limit (429).
+- **Submission ledger:** S122 to S133 and S147 to S151 are not in it; the updates of 2026-10-12
+  and 2026-10-13 stopped on Kaggle's rate limit (429).
 - **Submit job:** it cannot pick up a notebook version that has already completed (S126 was
   submitted by hand through the API), and its description shows `tau1` for a bundle with
   per-label temperatures.
