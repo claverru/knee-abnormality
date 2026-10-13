@@ -495,6 +495,12 @@ class KneeModule(L.LightningModule):
             dataset.set_epoch(self.current_epoch)
 
     def on_train_epoch_end(self) -> None:
+        for region, scale in zip(
+            ("medial", "lateral", "pf"),
+            self.model.oa_detector_scale.detach().float(),
+            strict=True,
+        ):
+            self._log_epoch_metric(f"oa_detector_scale_{region}", scale, 1)
         for outcome, count in sorted(self.train_sampling_sources.items()):
             self._log_epoch_metric(f"sampling_sources_{outcome}", float(count), 1)
         self._log_epoch_metric(
@@ -1002,6 +1008,7 @@ class KneeModule(L.LightningModule):
             loss = loss + self._anatomy_step(self.model, encoded, batch, "")
         if self.config.model.meniscus_map:
             loss = loss + self._meniscus_step(encoded, batch, "")
+        loss = loss + self._mask_decoder_step(encoded)
         if self.scanner_confusion_head is not None:
             loss = loss + self._scanner_confusion_step(encoded, batch)
         if self.anchor_parameters:
@@ -1163,9 +1170,14 @@ class KneeModule(L.LightningModule):
         return self.config.trainer.report_attribute_loss_weight * loss
 
     def _meniscus_step(self, encoded: dict, batch: dict, prefix: str) -> torch.Tensor:
-        shares, covered = self.meniscus_targets.token_shares(
+        rows = self.meniscus_targets.token_rows(
             batch["study_uid"],
             encoded["study"],
+        )
+        if not prefix:
+            encoded["soft_tissue_target_rows"] = rows
+        shares, covered = self.meniscus_targets.token_shares(
+            rows,
             encoded["meniscus_patient_position"],
             encoded["meniscus_token_steps"],
         )
@@ -1182,6 +1194,39 @@ class KneeModule(L.LightningModule):
         if self.config.model.soft_tissue_routing:
             self._log_soft_tissue_routing(encoded, prefix)
         return self.config.trainer.meniscus_loss_weight * loss
+
+    def _mask_decoder_step(self, encoded: dict) -> torch.Tensor:
+        bone_scores, soft_tissue_scores = self.model.mask_decoder(
+            *encoded["decoder_maps"]
+        )
+        position = encoded["decoder_patient_position"]
+        steps = encoded["decoder_token_steps"]
+        valid = encoded["decoder_visual_valid"] & encoded["routable"][:, None]
+        bone_shares, bone_covered = self.anatomy_targets.token_shares(
+            encoded["anatomy_target_rows"], position, steps
+        )
+        bone_mask = bone_covered & valid
+        bone_loss, _ = anatomy_loss(
+            bone_scores, bone_shares, bone_mask, ANATOMY_CLASSES, diagnostics=False
+        )
+        soft_tissue_shares, soft_tissue_covered = self.meniscus_targets.token_shares(
+            encoded["soft_tissue_target_rows"], position, steps
+        )
+        soft_tissue_mask = soft_tissue_covered & valid
+        soft_tissue_loss, _ = anatomy_loss(
+            soft_tissue_scores,
+            soft_tissue_shares,
+            soft_tissue_mask,
+            SOFT_TISSUE_CLASSES,
+            diagnostics=False,
+        )
+        self._log_epoch_metric(
+            "mask_decoder_bone_loss", bone_loss, encoded["batch_size"]
+        )
+        self._log_epoch_metric(
+            "mask_decoder_soft_tissue_loss", soft_tissue_loss, encoded["batch_size"]
+        )
+        return 0.1 * bone_loss + 0.1 * soft_tissue_loss
 
     def _log_soft_tissue_routing(self, encoded: dict, prefix: str) -> None:
         model = (
@@ -1209,9 +1254,14 @@ class KneeModule(L.LightningModule):
     def _anatomy_step(
         self, model, encoded: dict, batch: dict, prefix: str
     ) -> torch.Tensor:
-        shares, covered = self.anatomy_targets.token_shares(
+        rows = self.anatomy_targets.token_rows(
             batch["study_uid"],
             encoded["study"],
+        )
+        if not prefix:
+            encoded["anatomy_target_rows"] = rows
+        shares, covered = self.anatomy_targets.token_shares(
+            rows,
             encoded["patient_position"],
             encoded["token_steps"],
         )
