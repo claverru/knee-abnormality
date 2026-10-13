@@ -6,6 +6,7 @@ import torch.nn.functional as F
 from torch import nn
 
 from knee_abnormality.config import SLICES_PER_INPUT, DataConfig, ModelConfig
+from knee_abnormality.evaluation.metrics import COMPARTMENT_PAIRS
 from knee_abnormality.inference.reflection import reflect_crops
 from knee_abnormality.modeling.augmentation import (
     ImageAugmentation,
@@ -25,6 +26,7 @@ from knee_abnormality.modeling.plane_readout import PlaneContrastReadout
 from knee_abnormality.modeling.radimagenet import (
     RADIMAGENET_WEIGHTS,
     radimagenet_state_dict,
+    resnet_avg_down_state_dict,
 )
 from knee_abnormality.modeling.spatial_tokens import (
     COATNET_BACKBONE,
@@ -493,6 +495,7 @@ class ViewWindows(nn.Module):
 
 
 PROJECTION_WIDTH = 256
+COMPARTMENT_MIDLINE_BAND_MM = 10.0
 MIL_ATTENTION_WIDTH = 128
 REXNET_STRIDE_8_BLOCK_COUNT = 5
 SHARED_CHANNELS = ("meniscus", "oa")
@@ -624,6 +627,40 @@ def channel_linear(layer: nn.Linear, rows: list[int], bias: bool) -> nn.Linear:
     return selected
 
 
+class MaskDecoder(nn.Module):
+    def __init__(self, widths: tuple[int, int, int]) -> None:
+        super().__init__()
+        self.second = nn.Conv2d(widths[0], 64, 1)
+        self.third = nn.Conv2d(widths[1], 64, 1)
+        self.fourth = nn.Conv2d(widths[2], 64, 1)
+        self.third_block = nn.Sequential(
+            nn.Conv2d(64, 64, 3, padding=1), nn.BatchNorm2d(64), nn.ReLU()
+        )
+        self.second_block = nn.Sequential(
+            nn.Conv2d(64, 64, 3, padding=1), nn.BatchNorm2d(64), nn.ReLU()
+        )
+        self.bone = nn.Conv2d(64, ANATOMY_CLASS_COUNT, 1)
+        self.soft_tissue = nn.Conv2d(64, SOFT_TISSUE_CLASS_COUNT, 1)
+
+    def forward(
+        self, second: torch.Tensor, third: torch.Tensor, fourth: torch.Tensor
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        merged = self.third_block(
+            self.third(third)
+            + F.interpolate(
+                self.fourth(fourth), scale_factor=2, mode="bilinear", align_corners=False
+            )
+        )
+        merged = self.second_block(
+            self.second(second)
+            + F.interpolate(merged, scale_factor=2, mode="bilinear", align_corners=False)
+        )
+        return (
+            self.bone(merged).flatten(2).transpose(1, 2),
+            self.soft_tissue(merged).flatten(2).transpose(1, 2),
+        )
+
+
 class KneeAbnormalityModel(nn.Module):
     def __init__(
         self,
@@ -660,6 +697,8 @@ class KneeAbnormalityModel(nn.Module):
                 f"RadImageNet weights require one of {sorted(RADIMAGENET_WEIGHTS)}"
             )
         backbone_kwargs = {}
+        if model.backbone == "resnet50.a1_in1k":
+            backbone_kwargs["avg_down"] = True
         if model.backbone == COATNET_BACKBONE:
             if data.image_size % 32:
                 raise ValueError(
@@ -675,9 +714,10 @@ class KneeAbnormalityModel(nn.Module):
             **backbone_kwargs,
         )
         if pretrained and model.pretrained_weights == "radimagenet":
-            self.backbone.load_state_dict(
-                radimagenet_state_dict(model.backbone), strict=True
-            )
+            state = radimagenet_state_dict(model.backbone)
+            if model.backbone == "resnet50.a1_in1k":
+                state = resnet_avg_down_state_dict(state)
+            self.backbone.load_state_dict(state, strict=True)
         self.feature_mapping = backbone_mapping(model.backbone, self.backbone)
         self.resnet_stages = hasattr(self.backbone, "layer2")
         if self.feature_statistics_settings.probability > 0 and not (
@@ -949,6 +989,13 @@ class KneeAbnormalityModel(nn.Module):
                 torch.full((len(ROUTING_WIDTHS),), initial_logit)
             )
             self.knee_level_scale = nn.Parameter(torch.zeros(len(self.channels)))
+        self.oa_indices = tuple(
+            targets.index(name) for name in (*COMPARTMENT_PAIRS["oa"], "PF OA")
+        )
+        with torch.random.fork_rng(devices=[]):
+            self.oa_detector = nn.Linear(PROJECTION_WIDTH, 1, bias=False)
+            nn.init.xavier_uniform_(self.oa_detector.weight)
+            self.oa_detector_scale = nn.Parameter(torch.zeros(3))
         with torch.random.fork_rng(devices=[]):
             self.detail_view_embedding = nn.Parameter(torch.zeros(PROJECTION_WIDTH))
         self.register_buffer(
@@ -988,6 +1035,20 @@ class KneeAbnormalityModel(nn.Module):
         )
         with torch.random.fork_rng(devices=[]):
             self.view_windows = ViewWindows(data)
+            self.mask_decoder = MaskDecoder(
+                tuple(
+                    getattr(stage[-1], "conv3", stage[-1].conv2).out_channels
+                    for stage in (
+                        self.backbone.layer2,
+                        self.backbone.layer3,
+                        self.backbone.layer4,
+                    )
+                )
+            )
+        self.decoder_mapping = (
+            *self.meniscus_mapping[:2],
+            *(step * 0.5 for step in self.meniscus_mapping[2:]),
+        )
         self.train(self.training)
 
     def train(self, mode: bool = True) -> "KneeAbnormalityModel":
@@ -1003,25 +1064,28 @@ class KneeAbnormalityModel(nn.Module):
         acquisition_type: torch.Tensor,
         primary_image: torch.Tensor,
         primary_count: int,
-    ) -> tuple[torch.Tensor, torch.Tensor | None]:
+    ) -> tuple[torch.Tensor, torch.Tensor | None, torch.Tensor | None]:
         if self.checkpoint_backbone:
             self.backbone.set_grad_checkpointing(
                 self.training and torch.is_grad_enabled()
             )
-        if not self.training or self.feature_statistics_settings.probability == 0:
-            return self._backbone_features(images)
+        if not self.training:
+            maps, meniscus_maps = self._backbone_features(images)
+            return maps, meniscus_maps, None
         features = self._backbone_to_stride_8(images)
-        features, self.feature_statistics_activity = (
-            apply_feature_statistics_augmentation(
-                features,
-                acquisition_index,
-                acquisition_type,
-                self.feature_statistics_settings,
-                primary_image,
-                primary_count,
+        if self.feature_statistics_settings.probability > 0:
+            features, self.feature_statistics_activity = (
+                apply_feature_statistics_augmentation(
+                    features,
+                    acquisition_index,
+                    acquisition_type,
+                    self.feature_statistics_settings,
+                    primary_image,
+                    primary_count,
+                )
             )
-        )
-        return self._backbone_stage_outputs(features)
+        maps, meniscus_maps = self._backbone_stage_outputs(features)
+        return maps, meniscus_maps, features
 
     def _backbone_features(
         self, images: torch.Tensor
@@ -1650,6 +1714,9 @@ class KneeAbnormalityModel(nn.Module):
         batch_size: int,
         routing: torch.Tensor,
         prior: torch.Tensor,
+        medial_axis: torch.Tensor,
+        anterior_axis: torch.Tensor,
+        trusted_geometry: torch.Tensor,
         token_view: torch.Tensor,
         diagnostic: bool = False,
     ) -> torch.Tensor:
@@ -1778,6 +1845,27 @@ class KneeAbnormalityModel(nn.Module):
                 + channel_contribution[:, self.target_channel]
                 + self.target_bias.float()
             )
+            regions = (
+                torch.stack(
+                    (
+                        medial_axis.float() > COMPARTMENT_MIDLINE_BAND_MM,
+                        medial_axis.float() < -COMPARTMENT_MIDLINE_BAND_MM,
+                        anterior_axis.float() > 0,
+                    )
+                )
+                & trusted_geometry[None]
+            )
+            region_membership = membership[:, None] & regions[None]
+            counts = region_membership.sum(-1)
+            empty = counts == 0
+            safe_membership = region_membership.clone()
+            safe_membership[..., 0] |= empty
+            evidence = self.oa_detector(tokens.float()).squeeze(-1)
+            scores = evidence[None, None].masked_fill(~safe_membership, -torch.inf)
+            pooled_evidence = torch.logsumexp(scores, -1) - counts.clamp_min(1).log()
+            pooled_evidence = torch.where(empty, 0.0, pooled_evidence)
+            correction = pooled_evidence * self.oa_detector_scale.float()[None]
+            logits[:, self.oa_indices] += correction
         if not torch.isfinite(logits).all():
             raise RuntimeError("Study attention pooling produced non-finite logits")
         return logits
@@ -1929,7 +2017,7 @@ class KneeAbnormalityModel(nn.Module):
         valid_images = valid_images.sub(self.mean).div_(self.std)
         if self.channels_last:
             valid_images = valid_images.contiguous(memory_format=torch.channels_last)
-        maps, meniscus_maps = self._encode_images(
+        maps, meniscus_maps, decoder_maps = self._encode_images(
             valid_images,
             acquisition_index,
             token_type,
@@ -1954,6 +2042,8 @@ class KneeAbnormalityModel(nn.Module):
             **self.spatial_tokens(token_type, features.dtype),
             "detail_view": detail_view,
         }
+        if self.training:
+            encoded["decoder_maps"] = (decoder_maps, meniscus_maps, maps)
         tokens = self.mil_norm(self._base_tokens(encoded))
         with torch.autocast(device_type=features.device.type, enabled=False):
             homogeneous = torch.cat(
@@ -2025,6 +2115,19 @@ class KneeAbnormalityModel(nn.Module):
                 batch["knee_side_left"],
             )
             sign = batch["knee_side_sign"][keep_series][acquisition_index]
+            oa_trusted_geometry = (
+                geometry_valid[:, None] & (sign[:, None] != 0) & visual_valid
+            )
+            oa_medial_axis = torch.where(
+                geometry_valid[:, None] & (sign[:, None] != 0),
+                sign[:, None] * (patient_position[..., 0] - center[:, :1]),
+                0.0,
+            )
+            oa_anterior_axis = torch.where(
+                geometry_valid[:, None] & (sign[:, None] != 0),
+                center[:, 1:2] - patient_position[..., 1],
+                0.0,
+            )
             certain = batch["knee_side_certain"][token_study]
             metadata_side = certain | (
                 batch["knee_side_split"][token_study] & (sign != 0)
@@ -2117,6 +2220,31 @@ class KneeAbnormalityModel(nn.Module):
                         .flatten(1, 2)
                     ),
                 }
+                if self.training:
+                    decoder_valid, decoder_xy = feature_geometry(
+                        source_valid_rects,
+                        inverse_affine,
+                        decoder_maps.shape[-2:],
+                        self.decoder_mapping,
+                        channels,
+                        batch["canvas_valid_rects"].flatten(0, 1)[flat_indices],
+                        batch["crop_affine"].flatten(0, 1)[flat_indices],
+                    )
+                    decoder_homogeneous = torch.cat(
+                        (decoder_xy, torch.ones_like(decoder_xy[..., :1])), -1
+                    )
+                    decoder_position = torch.einsum(
+                        "nij,nkj->nki", middle, decoder_homogeneous
+                    )
+                    meniscus_encoded |= {
+                        "decoder_visual_valid": decoder_valid
+                        & (
+                            valid_position
+                            & torch.isfinite(decoder_position).all((-1, -2))
+                        )[:, None],
+                        "decoder_patient_position": decoder_position.detach(),
+                        "decoder_token_steps": (steps[:, :2] * 0.25).detach(),
+                    }
                 if self.soft_tissue_routing:
                     meniscus_encoded |= {
                         "soft_tissue_features": meniscus_features,
@@ -2179,6 +2307,9 @@ class KneeAbnormalityModel(nn.Module):
                 else {}
             ),
             "visual_valid": visual_valid,
+            "oa_medial_axis": oa_medial_axis,
+            "oa_anterior_axis": oa_anterior_axis,
+            "oa_trusted_geometry": oa_trusted_geometry,
             **geometry,
             "study_frame_shift": study_shift,
             "study_frame_rotation": study_rotation,
@@ -2464,6 +2595,9 @@ class KneeAbnormalityModel(nn.Module):
                     ),
                 ).flatten(1),
             ),
+            encoded["oa_medial_axis"].flatten(),
+            encoded["oa_anterior_axis"].flatten(),
+            encoded["oa_trusted_geometry"].flatten(),
             encoded["view_index"][:, None].expand_as(encoded["visual_valid"]).flatten(),
             diagnostic=view is not None,
         )

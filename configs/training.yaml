@@ -1,4 +1,4 @@
-name: radimagenet-resnet18
+name: refined-radimagenet-resnet50
 seed: 1110484336
 
 paths:
@@ -17,7 +17,7 @@ labels:
 
 validation:
   split: all_5fold_scanner_v2
-  folds: [1]
+  folds: [2]
   prediction_image_multiplier: 4
 
 data:
@@ -112,7 +112,7 @@ data:
   std: [0.3213, 0.3213, 0.3213]
 
 model:
-  backbone: resnet18.a1_in1k
+  backbone: resnet50.a1_in1k
   pretrained: true
   pretrained_weights: radimagenet
   slice_channels: repeated_middle

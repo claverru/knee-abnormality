@@ -82,17 +82,21 @@ class AnatomyTargets(nn.Module):
             persistent=False,
         )
 
-    def token_shares(
+    def token_rows(
         self,
         study_uids: list[str],
         token_study: torch.Tensor,
+    ) -> torch.Tensor:
+        return torch.tensor(
+            [self.rows.get(uid, -1) for uid in study_uids], device=token_study.device
+        )[token_study]
+
+    def token_shares(
+        self,
+        row: torch.Tensor,
         patient_position: torch.Tensor,
         token_steps: torch.Tensor,
     ) -> tuple[torch.Tensor, torch.Tensor]:
-        device = patient_position.device
-        row = torch.tensor(
-            [self.rows.get(uid, -1) for uid in study_uids], device=device
-        )[token_study]
         known_study = row >= 0
         row = row.clamp_min(0)
         steps = token_steps.float()
@@ -170,8 +174,28 @@ def anatomy_loss(
     shares: torch.Tensor,
     mask: torch.Tensor,
     names: tuple[str, ...],
+    *,
+    diagnostics: bool = True,
 ) -> tuple[torch.Tensor, dict[str, torch.Tensor]]:
     logits = logits.float()
+    if not diagnostics:
+        weight = mask[..., None].float()
+        target = shares * weight
+        log_probability = logits.log_softmax(-1)
+        probability = log_probability.exp() * weight
+        count = weight.sum()
+        cross_entropy = -(target * log_probability).sum() / count.clamp_min(1)
+        dimensions = tuple(range(logits.ndim - 1))
+        present = target.sum(dimensions) > 0
+        overlap = (
+            2
+            * (probability * target).sum(dimensions)
+            / (probability.sum(dimensions) + target.sum(dimensions)).clamp_min(1e-6)
+        )
+        loss = cross_entropy + (
+            (1 - overlap) * present
+        ).sum() / present.sum().clamp_min(1)
+        return loss, {}
     if not mask.any():
         return logits.sum() * 0.0, {}
     chosen = logits[mask]

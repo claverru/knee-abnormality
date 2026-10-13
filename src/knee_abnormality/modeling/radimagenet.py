@@ -60,6 +60,22 @@ def radimagenet_path(backbone: str) -> Path:
     )
 
 
+def resnet_avg_down_state_dict(
+    state: dict[str, torch.Tensor],
+) -> dict[str, torch.Tensor]:
+    renamed = {}
+    for key, value in state.items():
+        parts = key.split(".")
+        if (
+            parts[0] in ("layer1", "layer2", "layer3", "layer4")
+            and parts[1:3] == ["0", "downsample"]
+            and parts[3] in ("0", "1")
+        ):
+            parts[3] = str(int(parts[3]) + 1)
+        renamed[".".join(parts)] = value
+    return renamed
+
+
 def radimagenet_state_dict(backbone: str) -> dict[str, torch.Tensor]:
     weights = RADIMAGENET_WEIGHTS[backbone]
     path = radimagenet_path(backbone)
