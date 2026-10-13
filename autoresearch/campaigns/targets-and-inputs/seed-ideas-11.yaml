@@ -1,0 +1,79 @@
+ideas:
+- id: coordinate-attention-late-stages-pulled-to-identity
+  mechanism_id: backbone-coordinate-attention
+  parent_idea_id: null
+  title: Add coordinate attention to the bottlenecks of stages three and four, started as the identity
+    and pulled toward it as L2-SP pulls the weights around it, keeping the Refined-RadImageNet weights
+  opportunity: 'Forced by the user on 2026-10-13 under the contract''s exception for modules inside the
+    blocks. Coordinate attention (arXiv 2103.02907) gates each channel by one profile along the height
+    and one along the width of the feature map, so the gate knows where on the slice a structure is, which
+    a squeeze-and-excitation gate does not. The knee''s labels are tied to positions on the slice (compartments,
+    the joint line, the kneecap). Its published evidence is for networks trained from scratch; the gain
+    when added to a trained network is a guess, low: -0.0005 to +0.001 macro. Never run inside the backbone
+    here (the per-target Gaussian coordinate priors of the medial-lateral-transfer campaign acted on the
+    pooling, not on the backbone). Changed by the user on 2026-10-13 before it ran: run 22 put a free
+    squeeze-and-excitation gate at the head rate in the blocks and lost 0.0010 at x4, with a lower training
+    loss (0.5672 against 0.5717), a validation loss no lower and a lower L2-SP penalty (0.0191 against
+    0.0210): evidence, medium, one run, that free gates take over adaptation from the anchored convolutions.
+    This seed therefore pulls its gates toward the identity.'
+  mechanism: 'In modeling/model.py, after the ResNet backbone is created and before the RadImageNet weights
+    are loaded, each of the nine bottlenecks of layer3 and layer4 gets timm.layers.coord_attn.CoordAttn(channels
+    of the block''s output) with timm''s defaults except the gate, in the block''s attention slot (block.se,
+    applied after bn3 and before the residual sum). If an adopted incumbent already holds a module in
+    that slot, the slot becomes nn.Sequential(existing module, coordinate attention). Layers 1 and 2 get
+    none. The module must start as the identity: its gate is 2 * sigmoid(x) instead of sigmoid(x) (a small
+    module passed as gate_layer), and the weights of its two output convolutions (the height one and the
+    width one; their biases too if they have one) are zero, so both profiles are exactly 1 at the start.
+    Every other new tensor keeps timm''s default initialisation, drawn under torch.random.fork_rng. The
+    RadImageNet load accepts exactly the new tensors as missing: strict=False, and raise unless the unexpected
+    keys are empty and every missing key contains ''.se.''. Optimizer, for the new tensors only: parameters
+    whose name contains ''.se.'' train in the head group at head_lr with weight decay 0 and are not anchored
+    by L2-SP to their initial values; every other parameter keeps its group, rate, decay and anchor. A
+    pull toward the identity replaces the decay: the training loss gains optimizer.anchor_alpha_late (0.001,
+    the strength L2-SP applies to the pretrained weights of these stages) times the sum over the nine
+    modules of the squared entries of the weights of the two output convolutions (the height one and the
+    width one, and their biases if they have one), added where the L2-SP penalty is added and logged in
+    a separate training-side epoch metric coordinate_identity_penalty through _log_epoch_metric. The module
+    is the identity exactly when those two convolutions are zero, so this is L2-SP with the identity as
+    the anchor; the module''s first convolution and its batch norm have no pull. The module''s own batch
+    norm trains as the backbone''s batch norms do. Validation, prediction and Kaggle inference run the
+    same backbone. No option and no config field.'
+  precedents:
+  - 'seed-ideas-7.yaml, squeeze-excitation-in-the-resnet-blocks: the same slot, identity gate, load rule
+    and optimizer treatment.'
+  - 'run-notes.md, run 5, the audit: the last backbone-side gain came through stage four and the token
+    projection.'
+  - run-notes.md, run 22, and seed-ideas-10.yaml, squeeze-excitation-late-stages-pulled-to-identity, the
+    same pull on the squeeze-and-excitation gates.
+  novelty: First position-aware gate inside the backbone.
+  coverage: Every image, at stages three and four (14 by 14 and 7 by 7 maps).
+  exploitation: 'Read the macro and the per-label table at both multipliers, the compartment labels (menisci,
+    the three OA labels) first. Activation: one validation-side epoch metric through _log_epoch_metric,
+    the mean absolute deviation of the product of the two profiles from 1 over the nine modules (0 at
+    initialisation), from values the forward pass already produces; and in the report the count of missing
+    keys at load and the maximum absolute difference between the backbone''s output with and without the
+    modules at initialisation on a synthetic batch of two images, which must be 0. Shown wrong by: the
+    macro below the incumbent at both multipliers while the profiles move away from 1. Also read from
+    logged values: coordinate_identity_penalty above 0, the training loss at epoch 10 against the incumbent''s,
+    and the L2-SP penalty against the incumbent''s.'
+  budget: 'Two pooled profiles and three small convolutions per block on 14 by 14 and 7 by 7 maps, and
+    one more stored feature map per gated block. Estimate, not measured: training time within 1.03 of
+    the incumbent''s and peak GPU memory within 0.3 GB of it. State both estimates and the parameter count
+    in the report.'
+  implementation: 'Follow the environment paragraph of the developer instructions. Files: modeling/model.py
+    for the modules, the gate, the initialisation and the load; training/lightning.py for the anchor loop,
+    the optimizer group of the ''.se.'' parameters and the one metric. Read timm/layers/coord_attn.py
+    for the names of the two output convolutions and the gate argument. Check on the CPU with a randomly
+    initialised timm resnet50 and no project model, in eval mode: the variant loads the base state dict
+    with only ''.se.'' keys missing, and on a batch of two 224 px images without gradient its output equals
+    the base network''s exactly. Check that build_optimizer puts the ''.se.'' parameters in the head-rate
+    group and registers no anchor buffer for them, and that backbone_mapping and group_matcher still resolve.
+    model.channels_last stays true. The pull is one sum over eighteen small tensors, written without .item()
+    in the training step. Check that build_optimizer gives the ''.se.'' parameters head_lr and weight
+    decay 0.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user's forced seed of 2026-10-13, replacing coordinate-attention-in-the-late-resnet-blocks
+    with the identity pull added before it ran.
+exhausted_directions: None; one seed that replaces coordinate-attention-in-the-late-resnet-blocks at the
+  user's request on 2026-10-13.

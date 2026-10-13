@@ -1,0 +1,1935 @@
+revision: 586
+ideas:
+- id: soft-prevalence-class-weights
+  mechanism_id: class-weights
+  parent_idea_id: null
+  title: Compute the class weights from the mean soft target of each label instead
+    of its thresholded fraction
+  opportunity: 'The class weights (exponent 0.5) are computed from the fraction of
+    training cells at or above 0.5. The targets are soft, and on the labels with many
+    uncertain cells the two prevalences differ most: Synovitis 0.124 thresholded against
+    0.310 soft, Fracture 0.064 against 0.125, MCL 0.050 against 0.098, Effusion 0.272
+    against 0.347 (prior-work.md, the training targets). Synovitis is the reference''s
+    weakest label (0.8954) and its positive weight is 2.16 although a third of its
+    cells are uncertain. Guess, low-medium: +0 to +0.001 macro, Synovitis, Fracture
+    and Effusion first. Class weighting has disagreed with the public board before,
+    so an adoption is provisional.'
+  mechanism: 'Today fixed_class_balance (training/lightning.py) sets, per label, fraction
+    = (observed training cells with target >= 0.5) / (observed training cells), then
+    rho = ((1 - fraction) / fraction) ** exponent, negative_weight = 1 / (fraction
+    * rho + 1 - fraction), positive_weight = rho * negative_weight. The change is
+    one line: fraction = the mean of the label''s observed training targets (column
+    target_<label>, gold studies included with their official values). Everything
+    after it is unchanged, and so is the loss, which still gives a cell the positive
+    weight when its target is >= 0.5 and the negative weight otherwise. The returned
+    dictionary keeps its keys: positive and negative stay the thresholded counts,
+    positive_fraction holds the soft mean. Expected positive weights, computed on
+    the non-gold studies: about 1.29 for Synovitis (from 2.16), 2.19 for Fracture
+    (from 3.15), 2.55 for MCL (from 3.66), 1.21 for Effusion (from 1.38).'
+  precedents:
+  - 'prior-work.md, precedents: exponent 0.5 lost on fold 0 and won publicly; a ramped
+    exponent tied; soft-mass weighting and a prior offset lost 0.0092 and 0.0119 while
+    changing other loss semantics.'
+  - 'docs/backlog/small-changes.md, weighting strength: the entry this seed implements.'
+  novelty: First isolated run of soft prevalence; first class-weight change on a RadImageNet
+    backbone.
+  coverage: Every training cell of every label; the weights change most on Synovitis,
+    Fracture, MCL and Baker's.
+  exploitation: 'Read Synovitis, Fracture, MCL, Baker''s and Effusion, then the macro,
+    at both multipliers and on the x1 mean of epochs 6 to 10. Activation: the twelve
+    positive_fraction and positive_weight values of the run''s fold_2/class_balance.json,
+    listed in the report beside the reference''s. No new metric. Shown wrong by: the
+    macro below the incumbent at both multipliers with Synovitis and Fracture down.'
+  budget: The reference's training time; the weights are computed once per fold.
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    File: training/lightning.py, function fixed_class_balance only. Replaces the thresholded
+    fraction; no option, no config field. Keep the dictionary''s keys and its version
+    1, because validated_class_balance_weights and the resume check in the protected
+    training/checkpoints.py read them. Check without a GPU: call fixed_class_balance
+    on the fold-2 training frame from load_fold_labels and print the twelve fractions
+    and weights before and after. If hard-report-targets is in the incumbent the soft
+    mean equals the thresholded fraction on non-gold cells: return blocked and say
+    so.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Ranked first by the user's ordering; one function, aimed at
+    the weakest label.
+  status: completed
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality-targets-and-inputs/autoresearch/campaigns/targets-and-inputs/seed-ideas.yaml
+  experiments:
+  - soft-prevalence-class-weights-20261012T164257Z-743f1d48
+  decision: provisional_accept
+- id: stable-intensity-bounds
+  mechanism_id: intensity-bounds
+  parent_idea_id: null
+  title: Take a series' clipping bounds from a fixed set of its slices instead of
+    the slices drawn
+  opportunity: 'The 0.005 and 0.995 quantiles that clip and scale a series are taken
+    over the slices selected for the bag, so the same slice gets different pixel values
+    when its companions change: between epochs, and between training (five or six
+    triplets of a series) and x4 prediction (most of the series). Measured on 40 studies:
+    the high bound moves 0.072 at the median and 0.245 at the 90th percentile between
+    draws, more than the 0.2 range of the contrast augmentation in 14.2% of series,
+    mostly series with few triplets (prior-work.md). The effect on AUC was never measured.
+    Guess, low-medium: +0 to +0.001 macro, more at x4 than at x1.'
+  mechanism: 'Today: prepare_series (data/preprocessing/preparation.py) decodes the
+    unique slices of the selected triplets into PreparedSeries.frames and sets quantile_ranks
+    from their pixel count; device.py (_prepare_on_cpu and prepare_images) then takes
+    the two quantiles over the central image-size window (central_rectangle) of every
+    frame of the series, and normalises the frames that carry an image. Change: the
+    quantiles are taken over a reference set R of the series that does not depend
+    on the selection. R is the slices at positions round(i * (n - 1) / (k - 1)), i
+    = 0..k-1, k = min(n, 7), of the series'' n indexed slices in original_index order
+    (all of them when n <= 7; the one slice when n = 1). Frames of R that no selected
+    triplet uses are decoded with the same decoder and cache and appended to the series''
+    frames as frames without an image; device.py already supports such frames (the
+    slot < 0 branch of _prepare_on_cpu, which reads only their central window). Each
+    frame carries a flag saying whether it is in R; the quantile population and the
+    pixel count given to quantile_ranks are the central windows of the flagged frames
+    only, so a selected slice outside R is normalised by the bounds and does not enter
+    them. The quantile levels, the central window, the normalisation and every image
+    pixel path are unchanged.'
+  precedents:
+  - 'docs/data-preparation/preprocessing-implementation-and-profile.md, clipping-bound
+    stability across draws: the measurement.'
+  - 'docs/backlog/big-bets.md, sampling-independent intensity bounds: the entry this
+    seed implements.'
+  - 'prior-work.md, precedents: other quantile levels lost 0.0003 and 0.0021; this
+    changes the pixel population, not the levels.'
+  novelty: First run with bounds independent of the drawn slices.
+  coverage: Every series; series with few selected triplets most.
+  exploitation: 'Read the macro at x4 and x1 and the step from x1 to x4 against the
+    incumbent''s. Activation: in the report, for two studies, the low and high bound
+    of every series at x1 and at x4 and in two epochs of the training selection, which
+    must be identical four times, beside the bounds the old code gives for the same
+    four selections. No new metric in training or validation. Shown wrong by: both
+    multipliers below the incumbent.'
+  budget: Up to seven extra slice decodes per series in the loader workers (a study
+    has about six series; 4 to 5 of the 16 workers are busy today). Training time
+    within 1.10 of the reference's. Report the loader seconds per study on two studies
+    before and after; if the measured increase would push an epoch past 1.10, lower
+    k to 5 and say so.
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    Files: data/preprocessing/preparation.py (prepare_series takes the series'' reference
+    records beside the selected ones, returns the extra frames, the per-frame flag
+    and the pixel count of R), data/dataset.py (the caller passes the reference records
+    of the indexed series; the collate carries the flag in the frame tuples), data/preprocessing/device.py
+    (both _prepare_on_cpu and prepare_images restrict the quantile population to flagged
+    frames; _region_values on the GPU path likewise), data/preprocessing/intensity.py
+    only if a helper is needed. Replaces the old population; no option. R is chosen
+    by slice order alone, with no randomness, and is the same for the 84 mm, 93 mm
+    and 64 mm views of one series. A reference slice that fails to decode is dropped
+    from R; if R is empty the series is handled as an undecodable series is today.
+    The preprocessing identity changes, which the campaign permits.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The only seed whose premise is a measurement on our data.
+  status: completed
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality-targets-and-inputs/autoresearch/campaigns/targets-and-inputs/seed-ideas.yaml
+  experiments:
+  - stable-intensity-bounds-20261012T164746Z-9b6d5a0b
+  decision: reject
+- id: uncertain-report-targets-weigh-less
+  mechanism_id: target-uncertainty-weights
+  parent_idea_id: null
+  title: Weigh each report-derived training cell by how far its target is from 0.5
+  opportunity: 'A report-derived target near 0.5 means the sources disagree or the
+    report hedges; the loss pulls the prediction of such a cell to the middle with
+    full weight. The labels with most such cells include the two weakest: 33% of Synovitis
+    cells, 34% of Effusion and 24% of PF OA lie between 0.25 and 0.75, against 3 to
+    8% for the menisci, ACL and Fracture (prior-work.md). An all-or-nothing mask of
+    low-evidence cells was rejected early; a graded weight was never run. Guess, low-medium:
+    +0 to +0.001 macro, Synovitis, Effusion and PF OA first.'
+  mechanism: 'Today masked_binary_cross_entropy_with_logits (training/lightning.py)
+    computes the BCE of every cell against its soft target, multiplies it by the positive
+    or negative class weight, and averages over the observed cells of the batch. Change:
+    before the average, the loss of a cell of a non-gold study is also multiplied
+    by u = abs(2 * t - 1) / m_label, t the cell''s target and m_label the mean of
+    abs(2 * t - 1) over the observed non-gold training cells of that label in the
+    fold (0.538 for Synovitis to 0.856 for MCL), so each label keeps its total loss
+    mass. Cells of gold studies keep u = 1. The targets, the class weights and the
+    average over observed cells are unchanged. A cell at exactly 0.5 contributes nothing.'
+  precedents:
+  - 'prior-work.md, precedents: the binary mask of low-evidence cells was rejected;
+    shared balanced focal, which up-weights hard cells, lost 0.0026.'
+  - 'docs/backlog/small-changes.md, report-label supervision, source-aware uncertainty
+    weighting: the entry this seed implements with the target itself as the evidence.'
+  novelty: First graded uncertainty weight; the direction opposite to focal weighting.
+  coverage: Every non-gold cell; a third of Synovitis and Effusion cells lose most
+    of their weight.
+  exploitation: 'Read Synovitis, Effusion, PF OA and Medial OA, then the macro, at
+    both multipliers. Activation: the twelve m_label values listed in the report,
+    and one training-side epoch metric through _log_epoch_metric, the mean u of the
+    batch''s observed cells (it must stay near 1). Shown wrong by: those four labels
+    down as a group at both multipliers.'
+  budget: The reference's training time; one multiplication per cell.
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    File: training/lightning.py only. The batch already carries is_gold (one boolean
+    per study), target and target_observed. Compute the twelve m_label once per fold
+    from the training frame where the class balance is computed, keep them as a buffer,
+    and pass them with batch["is_gold"] to the loss. Adds a cell weight; no option,
+    no config field. Validation is not weighed. If hard-report-targets is in the incumbent
+    every non-gold target is 0 or 1 and u is 1: return blocked and say so.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Aims at the weak labels through the property they share.
+  status: completed
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality-targets-and-inputs/autoresearch/campaigns/targets-and-inputs/seed-ideas.yaml
+  experiments:
+  - uncertain-report-targets-weigh-less-20261012T173603Z-69f926e2
+  - uncertain-report-targets-weigh-less-20261012T174108Z-4e5bafa3
+  decision: reject
+- id: hard-report-targets
+  mechanism_id: hard-report-targets
+  parent_idea_id: null
+  title: Train the report-derived cells on 0 or 1 instead of their soft values
+  opportunity: 'The evaluation is on hard labels and the training targets are soft.
+    Whether the soft values help has never been tested on the current labels: the
+    rebuild calibrated them on 58 gold studies, and the labels where soft and hard
+    differ most (Synovitis 0.310 soft against 0.124 thresholded, Effusion, PF OA)
+    include the two weakest (prior-work.md). Guess, low: -0.001 to +0.001 macro; informative
+    either way for the two weighting seeds.'
+  mechanism: 'Today load_fold_labels (data/labels.py) builds target_<label> for a
+    training study as the official value when the study is gold and the rebuild_state_v2
+    value otherwise. Change: for training rows that are not gold, target_<label> is
+    1.0 when the table''s value is >= 0.5 and 0.0 otherwise (null stays null). Gold
+    training rows, the validation frame and its targets are unchanged. The class weights
+    are unchanged by construction, since they already count cells at or above 0.5.'
+  precedents:
+  - 'docs/backlog/small-changes.md, report-label supervision, hard versus soft report-derived
+    targets: the entry this seed implements.'
+  - 'prior-work.md, the training targets: where soft and hard differ.'
+  novelty: First hard-target run on rebuild_state_v2.
+  coverage: Every non-gold cell that is not already 0 or 1; a third of Synovitis and
+    Effusion cells move by more than 0.25.
+  exploitation: 'Read Synovitis, Effusion, PF OA and Medial OA, then the macro, at
+    both multipliers. The validation loss and val_soft_macro_auc change by construction
+    and decide nothing. Activation: per label, the share of non-gold training cells
+    whose target changed, listed in the report. No new metric. Shown wrong by: the
+    macro below the incumbent at both multipliers.'
+  budget: The reference's training time.
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    File: data/labels.py only, in the training frame after the gold override; the
+    validation frame must stay byte-identical (the comparison rejects a changed one).
+    Replaces the soft training targets; no option, no config field. Check without
+    a GPU: load the fold-2 labels before and after and report that the validation
+    frame is equal and how many training cells changed per label. If soft-prevalence-class-weights
+    is in the incumbent, its soft mean now equals the thresholded fraction: say so
+    in the report.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The blunt form of the two weighting seeds; its sign tells whether
+    softness carries signal.
+  status: completed
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality-targets-and-inputs/autoresearch/campaigns/targets-and-inputs/seed-ideas.yaml
+  experiments:
+  - hard-report-targets-20261012T182129Z-0aaaf2e3
+  decision: invalid
+- id: mask-decoder-beside-the-labels
+  mechanism_id: mask-decoder
+  parent_idea_id: null
+  title: Teach the backbone the masks through a decoder at the second stage's resolution,
+    in training only
+  opportunity: 'The bone and soft-tissue maps are taught per fourth-stage token (7
+    by 7) and per third-stage cell (14 by 14), 6 to 17 mm wide, from masks that exist
+    at 1 mm. The per-token map was worth +0.002 public on this backbone (S126 against
+    S119) with +0.0017 at x1. A decoder that predicts the masks on the second stage''s
+    28 by 28 grid asks the earlier stages for the boundaries the labels depend on
+    (cartilage, menisci, the joint line). Guess, low-medium: +0 to +0.001 macro, the
+    meniscus and OA labels first.'
+  mechanism: 'In training only, a decoder reads three feature maps of the main pass:
+    the second-stage output (28 by 28, the tensor _backbone_to_stride_8 returns),
+    the third-stage output (14 by 14) and the fourth-stage output (7 by 7). Each goes
+    through a 1 by 1 convolution to 64 channels; the 7 by 7 map is upsampled by 2
+    (bilinear) and added to the 14 by 14 one, a 3 by 3 convolution with batch norm
+    and ReLU follows, the result is upsampled by 2 and added to the 28 by 28 one,
+    and a second 3 by 3 convolution with batch norm and ReLU follows. Two 1 by 1 heads
+    on that map predict the seven bone classes and the seven soft-tissue classes per
+    cell. Targets: the class shares of each cell from the prepared volumes, obtained
+    as the existing map targets are (AnatomyTargets.token_shares in training/anatomy.py,
+    given each cell''s patient position and its two step vectors), for the 28 by 28
+    cells of every image. Loss: the existing anatomy_loss with its coverage rule,
+    once per head, each added to the training loss at weight 0.1. The existing per-token
+    and per-cell map heads, their losses, the routing that reads them and everything
+    in validation and prediction are unchanged.'
+  precedents:
+  - 'prior-work.md, precedents: the anatomy map and posed crops on the ResNet-50.'
+  - 'docs/backlog/big-bets.md, anatomy masks, segmentation before the labels: the
+    entry this seed implements as a side task.'
+  novelty: First dense mask supervision finer than the third-stage grid.
+  coverage: The studies with prepared volumes (about 400 knees for bone, 265 for soft
+    tissue); the backbone's stages one to four.
+  exploitation: 'Read the menisci, the three OA labels and ACL, then the macro, at
+    both multipliers. Activation: two training-side epoch metrics through _log_epoch_metric,
+    the decoder''s bone loss and its soft-tissue loss, which must fall over the epochs,
+    and the number of supervised cells per epoch (one metric, reduce sum). Nothing
+    is logged on validation: the decoder does not run there. Shown wrong by: the macro
+    below the incumbent at both multipliers while both decoder losses fall.'
+  budget: No extra backbone pass. The decoder adds two 3 by 3 convolutions at 64 channels
+    on 14 by 14 and 28 by 28 maps for about 250 images per step. Training time within
+    1.10 of the reference's and peak GPU memory within 18 GB (16.2 GB now); state
+    both estimates and the parameter count in the report.
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    Files: modeling/model.py, training/lightning.py, training/anatomy.py only if token_shares
+    needs a small generalisation. Adds a training-only module; no option, no config
+    field. In the training branch of the method that calls _backbone_to_stride_8 and
+    _backbone_stage_outputs, keep the second-stage tensor and put the three maps in
+    the encoded dictionary; do not change the signature or the return value of _backbone_features,
+    which Kaggle inference replaces with fixed chunks (use_fixed_backbone_chunks in
+    inference/engine.py). The 28 by 28 cells'' patient positions and steps are derived
+    the way the 14 by 14 cells'' are (meniscus_patient_position, meniscus_token_steps)
+    with half the step. Build the decoder under torch.random.fork_rng. Its parameters
+    are part of the model, so strict loading holds; it is called only when self.training
+    is true. The decoder takes the features after the feature-statistics augmentation,
+    as the stages do.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Extends the one side task that reached the ResNet-50.
+  status: completed
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality-targets-and-inputs/autoresearch/campaigns/targets-and-inputs/seed-ideas.yaml
+  experiments:
+  - mask-decoder-beside-the-labels-20261012T190728Z-8fe9f980
+  decision: provisional_accept
+- id: intensity-augmentation-off
+  mechanism_id: intensity-augmentation
+  parent_idea_id: null
+  title: Train without the gamma and contrast augmentation
+  opportunity: 'The intensity augmentation (probability 0.5, gamma 0.85 to 1.15, contrast
+    0.9 to 1.1) dates from the first recipes and was never removed alone on a RadImageNet
+    backbone; the fixes-and-removals campaign queued the removal and never ran it.
+    The recipe has since gained GIN, feature-statistics augmentation, smoothing, resolution
+    and contrast mixing, which also vary intensity. Guess, low: -0.001 to +0.001 macro;
+    a tie removes a mechanism.'
+  mechanism: In configs/training.yaml, data.intensity_augmentation.probability becomes
+    0 (it is 0.5). The gamma_range and contrast_range lines stay. Nothing else changes.
+  precedents:
+  - 'docs/backlog/overnight.md, next queue: the entry this seed runs.'
+  - 'prior-work.md, precedents: the augmentation campaign on ReXNet-200; contrast
+    mixing off lost 0.0025 on the ResNet-18.'
+  novelty: First removal of this family on a RadImageNet backbone.
+  coverage: Half of the training images.
+  exploitation: 'Read the macro at both multipliers and the x1 curve over the epochs
+    against the incumbent''s. Activation: the run''s effective_config.json records
+    the probability 0; this family logs no activity metric and none is added. Shown
+    wrong by: the macro below the incumbent at both multipliers.'
+  budget: The reference's training time or slightly less.
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    Configuration only: change that one value in configs/training.yaml; no source
+    change. Check: the config loads through the config model.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Free; never tested on this backbone.
+  status: completed
+  created_revision: 1
+  seeded: /home/claudio/src/knee-abnormality-targets-and-inputs/autoresearch/campaigns/targets-and-inputs/seed-ideas-2.yaml
+  experiments:
+  - intensity-augmentation-off-20261012T195306Z-bb8b1a2a
+  - intensity-augmentation-off-20261012T204005Z-11f10a0b
+  decision: reject
+- id: noise-augmentation-off
+  mechanism_id: noise-augmentation
+  parent_idea_id: null
+  title: Train without the additive noise augmentation
+  opportunity: 'The noise augmentation (probability 0.15, standard deviation 0.005
+    to 0.02) dates from the first recipes and was never removed alone on a RadImageNet
+    backbone; queued by the fixes-and-removals campaign and never run. Guess, low:
+    -0.0005 to +0.0005 macro; a tie removes a mechanism.'
+  mechanism: In configs/training.yaml, data.noise_augmentation.probability becomes
+    0 (it is 0.15). The std_range line stays. Nothing else changes.
+  precedents:
+  - 'docs/backlog/overnight.md, next queue: the entry this seed runs.'
+  novelty: First removal of this family on a RadImageNet backbone.
+  coverage: 15% of the training images.
+  exploitation: 'Read the macro at both multipliers. Activation: the run''s effective_config.json
+    records the probability 0; this family logs no activity metric and none is added.
+    Shown wrong by: the macro below the incumbent at both multipliers.'
+  budget: The reference's training time.
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    Configuration only: change that one value in configs/training.yaml; no source
+    change. Check: the config loads through the config model.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Free; never tested on this backbone.
+  status: completed
+  created_revision: 1
+  seeded: /home/claudio/src/knee-abnormality-targets-and-inputs/autoresearch/campaigns/targets-and-inputs/seed-ideas-2.yaml
+  experiments:
+  - noise-augmentation-off-20261012T204224Z-ae40e1df
+  - noise-augmentation-off-20261012T204431Z-620c84c2
+  decision: reject
+- id: balanced-target-columns
+  mechanism_id: balanced-target-columns
+  parent_idea_id: null
+  title: Balance each label by which cells enter the loss, not by weighting them
+  opportunity: 'The class weights balance the two groups of a label by scaling their
+    loss, so a rare label''s positives count 2 to 3.7 times (prior-work.md). The alternative
+    that was never run balances by selection: every positive cell and an equal expected
+    number of negative cells enter the loss, all at weight one, and each step sees
+    a different set of negatives. Guess, low: -0.001 to +0.001 macro, the rare labels
+    (MCL, Fracture, Contusion, Lateral OA) first.'
+  mechanism: 'Today the loss gives a cell the positive class weight when its target
+    is >= 0.5 and the negative one otherwise, and averages over the observed cells
+    of the batch. Change: per label, the group with fewer training cells (positives
+    for all twelve labels; counted with target >= 0.5 over the fold''s observed training
+    cells, as fixed_class_balance counts them) always stays in the loss; a cell of
+    the other group stays with probability p_label = minority count / majority count
+    (0.05 for MCL to 0.63 for Medial Meniscus), drawn independently at every training
+    step. Kept cells keep their soft targets and all have weight one. The average
+    is over the kept observed cells. Studies, images and the other labels of a dropped
+    cell''s study are unchanged.'
+  precedents:
+  - 'docs/backlog/small-changes.md, report-label supervision, balance each target
+    column through training masks: the entry this seed implements, with the mask drawn
+    per step instead of per epoch.'
+  - 'prior-work.md, precedents: class-balanced BCE about +0.008 over none; the binary
+    evidence mask rejected.'
+  novelty: First run that balances by selection instead of by weight.
+  coverage: Per step MCL keeps about 10% of its cells, Fracture 13%, Medial Meniscus
+    77%.
+  exploitation: 'Read the four rare labels and the macro at both multipliers. Activation:
+    the twelve p_label values listed in the report, and one training-side epoch metric
+    through _log_epoch_metric, the share of observed cells kept per batch (expected
+    about 0.35). Shown wrong by: the macro below the incumbent at both multipliers.'
+  budget: The reference's training time; one random draw of batch-by-twelve values
+    per step.
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    File: training/lightning.py only. fixed_class_balance keeps its dictionary shape
+    and version 1 (validated_class_balance_weights and the resume check in the protected
+    training/checkpoints.py read it) and returns positive_weight and negative_weight
+    1.0 for every label, with the counts as now; p_label is computed from those counts
+    once and kept as a buffer. In training_step the keep mask is torch.rand of the
+    target''s shape from a dedicated torch.Generator on the training device, seeded
+    once from the run''s seed, so the incumbent''s other random streams are unchanged;
+    the mask is combined with batch["target_observed"] before the average. Replaces
+    the class weights; no option, no config field. Validation is unchanged. If hard-report-targets
+    or uncertain-report-targets-weigh-less is in the incumbent, keep its targets or
+    cell weights and apply the mask on top.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The selection form of the class balance; overlaps the weights
+    already in the recipe.
+  status: retired
+  created_revision: 1
+  seeded: /home/claudio/src/knee-abnormality-targets-and-inputs/autoresearch/campaigns/targets-and-inputs/seed-ideas-2.yaml
+  retired_reason: Dropped by the user on 2026-10-12 after reading the seed; no reason
+    given
+- id: hard-pair-final-phase
+  mechanism_id: hard-pair-mining
+  parent_idea_id: null
+  title: In the last three epochs put the worst-ordered pairs in the same batch and
+    add a pair term
+  opportunity: 'One unverified external report: another participant''s best setup
+    ends with three epochs of hard mining. The metric is a ranking and the loss is
+    not; the in-batch ranking term tried earlier saw random pairs (about 118 per step)
+    and was neutral (+0.0007). Mining decides which pairs share a batch. Guess, low:
+    -0.001 to +0.001 macro.'
+  mechanism: 'Epochs 1 to 7 are unchanged, except that every training step stores
+    its detached logits in a buffer indexed by the study''s row in the training frame
+    (no host synchronisation). Before each of epochs 8, 9 and 10 the training order
+    is rebuilt from the previous epoch''s stored logits. Mining: per label, among
+    training studies whose target is >= 0.75 (positives) or <= 0.25 (negatives), the
+    200 positive-negative pairs with the largest negative-minus-positive logit. Order:
+    the mined pairs of all labels are visited from most to least wrong; a pair whose
+    two studies are both still unplaced is placed in the current batch, and a batch
+    closes at four pairs; when no pair is left, the unplaced studies fill the remaining
+    batches in the epoch''s shuffled order. Every study is still seen exactly once
+    per epoch and the number of steps is unchanged; the batches are then drawn in
+    shuffled order. Loss in those three epochs: the usual loss plus 0.1 times a pair
+    term, the mean over labels with at least one pair of softplus(negative logit -
+    positive logit) over all positive-negative pairs of that label inside the batch
+    (same 0.75 and 0.25 rule). Validation and prediction are unchanged.'
+  precedents:
+  - 'docs/backlog/big-bets.md, hard-pair mining phase: the entry this seed implements.'
+  - 'prior-work.md, precedents: the always-on in-batch ranking term +0.0007; shared
+    balanced focal -0.0026.'
+  novelty: First mined-pair batches; first pair term on a RadImageNet backbone.
+  coverage: The last 30% of the optimizer steps; at most 2,400 mined pairs per epoch,
+    fewer after studies shared between pairs are placed once.
+  exploitation: 'Read the macro at both multipliers and the x1 curve over epochs 8
+    to 10 against the incumbent''s. Activation: two training-side epoch metrics through
+    _log_epoch_metric in epochs 8 to 10, the pair term''s value and the number of
+    in-batch pairs per step, and in the report the number of mined pairs placed per
+    epoch. Shown wrong by: the x1 curve below the incumbent''s in all three mined
+    epochs.'
+  budget: 'No extra forward pass: mining uses logits the training already computes.
+    The reference''s training time; the mining itself is a few tensor operations on
+    3,532 by 12 values, three times.'
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    Files: data/dataset.py (each item carries its row index in the training frame,
+    collated as a long tensor under a new batch key that is not read in modeling/;
+    the training loader takes a batch sampler whose order for an epoch can be set
+    from outside, falling back to the present shuffled order when none is set), training/lightning.py
+    (the logit buffer, the mining at the start of epochs 8 to 10 in the main process,
+    the pair term). Adds a phase; no option, no config field: the numbers 200 pairs
+    per label, 0.75 and 0.25, four pairs per batch, weight 0.1 and three epochs are
+    fixed here. Epochs are counted from 1; with trainer.max_epochs 10 the mined epochs
+    are current_epoch 7, 8 and 9. The sampler''s shuffled order for epochs 1 to 7
+    must reproduce the incumbent''s. A resumed run that starts inside the mined phase
+    without stored logits uses the shuffled order for that epoch.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The weakest premise of the ten; kept because the metric is a
+    ranking.
+  status: completed
+  created_revision: 1
+  seeded: /home/claudio/src/knee-abnormality-targets-and-inputs/autoresearch/campaigns/targets-and-inputs/seed-ideas-2.yaml
+  experiments:
+  - hard-pair-final-phase-20261012T212740Z-d12e8ed8
+  decision: reject
+- id: plane-contrast-readouts-off
+  mechanism_id: plane-contrast-readouts
+  parent_idea_id: null
+  title: Read every token's evidence with one head instead of one per plane and contrast
+  opportunity: 'The plane-contrast readouts were adopted on the ResNet-18 before the
+    view label bias, the routing and the maps existed, and were never removed alone
+    since; the fixes-and-removals campaign queued the removal and never ran it. Type-specific
+    readouts after pooling lost 0.0006 on ReXNet-200. Guess, low: -0.001 to +0.0005
+    macro; a tie removes a mechanism.'
+  mechanism: In configs/training.yaml, model.plane_readout becomes false (it is true).
+    The model then reads every token's evidence with one linear head per channel (the
+    else branch of _attention_pool and of _soft_tissue_pool in modeling/model.py)
+    instead of one head per series type. Nothing else changes.
+  precedents:
+  - 'docs/backlog/small-changes.md, removals of active mechanisms: the entry this
+    seed runs.'
+  - 'prior-work.md, precedents: plane-contrast readouts adopted in the revisits campaign
+    (Lateral OA +0.0054).'
+  novelty: First removal on the current recipe and on the ResNet-50.
+  coverage: Every label's evidence head, main and soft-tissue.
+  exploitation: 'Read Lateral OA and the macro at both multipliers. Activation: the
+    run''s effective_config.json records false, and the report gives the parameter
+    counts of the evidence heads before and after. Shown wrong by: the macro below
+    the incumbent at both multipliers.'
+  budget: The reference's training time.
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    Configuration only when the model builds with the value false: check that the
+    config loads and that the model''s constructor accepts it on the current recipe
+    (construct with load_pretrained false and no weights on the CPU, no forward pass).
+    If construction or the config validation refuses the combination with model.soft_tissue_routing
+    or model.view_label_bias, repair the non-readout path in modeling/model.py without
+    changing behaviour when the value is true, and say exactly what was repaired.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: A removal; ranked last by potential.
+  status: completed
+  created_revision: 1
+  seeded: /home/claudio/src/knee-abnormality-targets-and-inputs/autoresearch/campaigns/targets-and-inputs/seed-ideas-2.yaml
+  experiments:
+  - plane-contrast-readouts-off-20261012T221317Z-b555d765
+  decision: reject
+- id: oa-detector-beside-the-shared-head
+  mechanism_id: shared-oa-detector-across-compartments
+  parent_idea_id: null
+  title: Restore the three-compartment OA detector as a correction on top of the routed
+    shared OA head
+  opportunity: 'Forced by the user on 2026-10-12 as an exception to the contract''s
+    exclusion of new readout structure. The detector was adopted on 2026-09-25 (ReXNet,
+    +0.0013 at x4, PF OA +0.0102, 0.944 public against 0.940, S58 against S55) and
+    removed on 2026-10-06 on a ResNet-18 at a local tie that leaned its way (x4 0.924815
+    with it against 0.924347 without). Kaggle''s score order, read on 2026-10-12,
+    puts the model with it (S108) just above the one without (S111), both 0.950: evidence,
+    weak, one pair. The removal notes list its return on the final recipe and on the
+    ResNet-50 as open. It has never run beside the routed shared OA head, which arrived
+    a day after the removal. PF OA lost in the campaign''s first three runs. Guess,
+    low: -0.0005 to +0.001 macro, PF OA first.'
+  mechanism: 'The code is in git, in the parent of the commit that removed it: 5145374^
+    (the removal itself is `git show 5145374 -- src/knee_abnormality/modeling/model.py
+    src/knee_abnormality/modeling/spatial_tokens.py src/knee_abnormality/training/lightning.py`;
+    every removed line of that diff that names the detector, anterior_axis, trusted_geometry
+    or patient_y is the detector). Read `git show 5145374^:src/knee_abnormality/modeling/model.py`:
+    lines 201 to 207 build it, lines 415 to 441 apply it, and the region inputs are
+    built where medial_axis is (search anterior_axis and trusted_geometry). Restore
+    it unchanged in what it computes: one linear detector without bias on the tokens
+    (xavier start, created under torch.random.fork_rng so no other initialization
+    moves); three regions per study, the medial half (medial_axis > COMPARTMENT_MIDLINE_BAND_MM),
+    the lateral half (medial_axis < -COMPARTMENT_MIDLINE_BAND_MM) and the front of
+    the knee centre (anterior_axis > 0, with anterior_axis = knee_center_y_mm - patient_y),
+    each limited to tokens with trusted geometry; a smooth maximum of the detector''s
+    score over each region (logsumexp minus the log of the region''s token count,
+    0 for an empty region); and that value times a per-label scale that starts at
+    zero, added to the logits of Medial OA, Lateral OA and PF OA in this order. In
+    today''s model the three OA logits come out of the shared "oa" channel in _attention_pool
+    (TARGET_ROUTES in modeling/model.py); the correction is added to those three logits
+    after the knee-level term. The routed shared head, its routes, the soft-tissue
+    read and everything else stay as they are. The detector reads the same own tokens
+    it read then (the tokens argument, not shared_tokens), and the regions use the
+    original definition from knee_side_sign, knee_center_x_mm, knee_center_y_mm and
+    the middle slice''s patient map, not the learned frame.'
+  precedents:
+  - 'docs/validation/results/2026-09-25-near-misses-campaign.md: the detector adopted,
+    PF OA +0.0102; learned scales 0.040, 0.050 and 0.017 by epoch 9.'
+  - 'docs/validation/results/2026-10-05-fixes-and-removals-campaign.md: the removal,
+    run 9 oa-detector-off, -0.000468 at x4, 80% interval [-0.001017, +0.000110]; S108
+    and S111 both 0.950.'
+  - 'autoresearch/campaigns/near-misses/seed-ideas-2.yaml, three-compartment-oa-detector:
+    the original seed.'
+  novelty: First run of the detector with the routed shared OA head, on the ResNet-50
+    and on the current recipe.
+  coverage: The three OA labels; other labels only through the shared token features.
+  exploitation: 'Read Medial OA, Lateral OA and PF OA at both multipliers, then the
+    macro. Activation: the three learned scales logged once per epoch (oa_detector_scale_medial,
+    _lateral, _pf) leave zero, and the detector''s weight norm is logged beside them.
+    Shown wrong by: the macro below the incumbent at both multipliers, or the three
+    scales staying under 0.005 at epoch 10.'
+  budget: The reference's training time; one linear layer of PROJECTION_WIDTH weights
+    and three scalars, so no measurable change (guess). GPU memory as the reference
+    (16.2 GB peak in run 3), RAM unchanged.
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    A source change in modeling/model.py, modeling/spatial_tokens.py and training/lightning.py,
+    with no new configuration option. Port the removed lines from 5145374^ into today''s
+    code by hand, since the files have changed since: the region inputs go where the
+    token geometry is built in _encode_crops, the correction goes at the end of _attention_pool,
+    and the entry oa_shared_detector_regions returns to SPATIAL_TOKEN_IDENTITY with
+    its old value. From the old lightning.py restore only the logging of the three
+    scales and of the weight norm at the end of the epoch (5145374^ lines 499 to 520),
+    not the per-step activity logging (lines 727 to 770): the contract allows no new
+    diagnostics in the training step. Pass medial_axis from the original definition
+    even where today''s code reads the side from the frame; if the middle slice''s
+    patient map is not available for a view, say which and leave those tokens out
+    of every region, as untrusted geometry was. Check on the CPU that the model builds
+    without weights, that the three scales are zero at the start and that the logits
+    then equal the incumbent''s code on one synthetic batch.'
+  open_choices: None; every number is the removed code's.
+  dependencies: []
+  priority_rationale: The user's forced seed after reading Kaggle's score order; one
+    addition, nothing replaced.
+  status: completed
+  created_revision: 92
+  seeded: /home/claudio/src/knee-abnormality-targets-and-inputs/autoresearch/campaigns/targets-and-inputs/seed-ideas-3.yaml
+  experiments:
+  - oa-detector-beside-the-shared-head-20261012T225837Z-fc638744
+  decision: provisional_accept
+- id: oa-detector-instead-of-the-shared-head
+  mechanism_id: separate-oa-heads-with-detector
+  parent_idea_id: null
+  title: Read the three OA labels with three separate heads plus the OA detector,
+    in place of the routed shared OA head
+  opportunity: 'Forced by the user on 2026-10-12 as an exception to the contract''s
+    exclusion of new readout structure. Until 2026-10-06 the three OA labels each
+    had their own attention and evidence head and shared only the detector''s correction;
+    since 2026-10-07 one routed head reads all three. The two arrangements were never
+    compared for OA alone: the side-routing adoption (x4 0.925067 against 0.924049,
+    0.953 against 0.950 public) changed the menisci and OA together, on a ResNet-18.
+    This run puts the September arrangement back for the OA labels only and leaves
+    the meniscus routing in place. Guess, low: -0.001 to +0.001 macro on the three
+    OA labels.'
+  mechanism: 'Medial OA, Lateral OA and PF OA leave the shared "oa" channel (TARGET_ROUTES
+    and SHARED_CHANNELS in modeling/model.py). Each becomes an own channel like the
+    seven labels of OWN_ROUTES: its own attention scores and its own evidence head
+    on the own tokens, with the view label bias and the plane-contrast readout as
+    every own channel has them. Unlike those seven, the three OA channels get no route:
+    their attention runs over every allowed token of the study, with no routing weight,
+    no position prior of the shared "oa" kind and no knee-level term, as before 2026-10-07.
+    The detector of the seed oa-detector-beside-the-shared-head is then added to their
+    three logits, restored from the same commit in the same way (5145374^, model.py
+    lines 201 to 207 and 415 to 441; original regions from knee_side_sign, knee_center_x_mm,
+    knee_center_y_mm and the patient map; scales starting at zero). The meniscus targets
+    keep the shared "meniscus" channel and their routes; the frame, the maps and every
+    other label are untouched. The soft-tissue read that is added to the OA logits
+    stays as it is today if it does not need the shared "oa" channel; if it does,
+    keep it reading the cells it reads today through a channel of its own and say
+    so.'
+  precedents:
+  - 'docs/ongoing/side-routed-heads.md: the routed shared heads, run 24, adopted for
+    the menisci and OA together.'
+  - 'docs/validation/results/2026-09-25-near-misses-campaign.md: separate OA heads
+    with the detector, PF OA +0.0102.'
+  - 'docs/validation/results/2026-10-05-fixes-and-removals-campaign.md: the last model
+    of that arrangement, S108, 0.950.'
+  novelty: First comparison of separate OA heads with the detector against the routed
+    shared OA head with the menisci held fixed.
+  coverage: The three OA labels; the menisci only through the frame the OA head no
+    longer shapes.
+  exploitation: 'Read Medial OA, Lateral OA and PF OA at both multipliers against
+    the incumbent and against the seed oa-detector-beside-the-shared-head, then the
+    macro and the two meniscus labels. Activation: the three scales logged once per
+    epoch leave zero; the report gives the channel list with the three OA labels as
+    own channels and "oa" absent from the shared ones, and the parameter counts of
+    the attention and evidence heads before and after. Shown wrong by: the three OA
+    labels below the incumbent at both multipliers.'
+  budget: The reference's training time; two more attention channels and no routing
+    for three labels, so no measurable change (guess). GPU memory as the reference
+    (16.2 GB peak in run 3), RAM unchanged.
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    A source change in modeling/model.py, modeling/spatial_tokens.py and training/lightning.py,
+    with no new configuration option. Start from the detector port described in the
+    seed oa-detector-beside-the-shared-head (same commit, same lines, same logging
+    rule: scales and weight norm once per epoch only). Then move the three OA targets
+    out of TARGET_ROUTES into own channels without a route; every table indexed by
+    SHARED_CHANNELS, SHARED_PRIORS, PRIOR_VARIANTS, ROUTES or the routed-channel mask
+    must stay consistent with "meniscus" as the only shared channel, and the routes
+    oa_medial and oa_lateral are no longer read by any label (the kneecap route stays
+    for Effusion). The training code in lightning.py and training/anatomy.py that
+    addresses the shared channels by name or position (routed report terms, frame
+    losses) must still run with one shared channel; the report-attribute loss is off
+    in this recipe. Check on the CPU that the model builds without weights, that twelve
+    logits come out in the label order of the config, and that the two meniscus logits
+    equal the incumbent''s code on one synthetic batch when the OA parameters are
+    left out of the comparison. Say exactly which tables changed and what happened
+    to the soft-tissue read for OA.'
+  open_choices: None; the detector's numbers are the removed code's and the OA channels
+    take the own channels' existing settings.
+  dependencies: []
+  priority_rationale: The user's forced seed; the second arm of the same question,
+    two changes at once by design.
+  status: completed
+  created_revision: 92
+  seeded: /home/claudio/src/knee-abnormality-targets-and-inputs/autoresearch/campaigns/targets-and-inputs/seed-ideas-3.yaml
+  experiments:
+  - oa-detector-instead-of-the-shared-head-20261012T234442Z-0635224b
+  - oa-detector-instead-of-the-shared-head-20261013T003050Z-59d11443
+  - oa-detector-instead-of-the-shared-head-20261013T003453Z-50bfbf0c
+  decision: reject
+- id: report-attribute-loss-on
+  mechanism_id: report-attribute-heads
+  parent_idea_id: null
+  title: Train the report-attribute heads again at weight 0.1
+  opportunity: 'Forced by the user on 2026-10-12, one of eight seeds that revisit
+    adoptions with thin evidence. The heads were adopted on 2026-09-25 with a public
+    gain (0.940 against 0.938, S62 against S60) and their removal on the 2026-10-01
+    recipe lost 0.0006 (80% [-0.0011, -0.0001]). They were switched off on 2026-10-08
+    on a ResNet-18 (x4 0.927291 against the control''s 0.926762), with no public pair,
+    and the ResNet-50 has never been trained with them on this recipe. Evidence, medium.
+    Guess: -0.0005 to +0.001 macro.'
+  mechanism: In configs/training.yaml, trainer.report_attribute_loss_weight becomes
+    0.1 (it is 0), the value in force until 2026-10-08. The heads and their loss are
+    in the code (training/lightning.py, the branch on report_attribute_loss_weight
+    > 0; training/report_attributes.py) and read the manifest the config already names
+    (paths.report_attribute_manifest, target set v4.0). Nothing else changes.
+  precedents:
+  - 'docs/validation/results/2026-09-25-report-attribute-heads.md: the adoption, +0.00105
+    at x4, 0.940 against 0.938 public.'
+  - 'docs/backlog/small-changes.md, removals of active mechanisms: heads off -0.0006
+    on the 2026-10-01 recipe.'
+  - 'autoresearch/campaigns/anatomy-recipe: the loss switched off, x4 0.927291.'
+  novelty: First run with the heads on the ResNet-50 on the current recipe.
+  coverage: Every training study with report attributes; a training-only loss.
+  exploitation: 'Read the macro and the per-label table at both multipliers. Activation:
+    effective_config.json records 0.1 and the report-attribute loss is logged above
+    zero from the first epoch. Shown wrong by: the macro below the incumbent at both
+    multipliers.'
+  budget: The reference's training time plus the heads' loss, under 3% (guess). GPU
+    memory and RAM as the reference.
+  implementation: Follow the environment paragraph of the developer instructions.
+    Configuration only. Check on the CPU that the config loads, that the Lightning
+    module builds the heads from the v4.0 manifest without weights, and that the names
+    of the logged report-attribute metrics exist; no forward pass on the GPU.
+  open_choices: None; 0.1 is the weight the recipe carried.
+  dependencies: []
+  priority_rationale: The user's forced seed; the removal with the least evidence
+    behind it.
+  status: completed
+  created_revision: 93
+  seeded: /home/claudio/src/knee-abnormality-targets-and-inputs/autoresearch/campaigns/targets-and-inputs/seed-ideas-4.yaml
+  experiments:
+  - report-attribute-loss-on-20261013T003808Z-fa36229e
+  decision: reject
+- id: scanner-confusion-head-beside-l2sp
+  mechanism_id: scanner-confusion-head
+  parent_idea_id: null
+  title: Train the scanner confusion head again at weight 0.1, with L2-SP kept
+  opportunity: 'Forced by the user on 2026-10-12. The head was adopted on 2026-09-27
+    with a public gain (0.948 against 0.947, S67 against S68) and removed on 2026-09-30
+    in the same step that added L2-SP. That step ties locally (+0.0003 at x4) and
+    its model sits below its control in Kaggle''s score order (S86 under S82, both
+    0.943; S82 still had the head and no L2-SP). L2-SP stays by user decision, so
+    the head is the part left to test. Evidence for the doubt, weak; that the head
+    is the cause is a guess. Guess: -0.0005 to +0.0005 macro.'
+  mechanism: In configs/training.yaml, trainer.scanner_confusion_weight becomes 0.1
+    (it is 0.0), the adopted value (configs/training.yaml at commit 1f6d8ac). The
+    head, its ramp and its step are in the code (training/auxiliary/scanner_confusion.py
+    and _scanner_confusion_step in training/lightning.py, built when the weight is
+    above zero). L2-SP (optimizer.anchor_alpha_early and _late) is untouched. Nothing
+    else changes.
+  precedents:
+  - 'docs/modeling/scanner-confusion-head.md: the adoption and its evidence, S67 0.948.'
+  - 'docs/validation/results/2026-09-30-rn18-l2sp-no-confusion.md: L2-SP added and
+    the head removed together, 0.943 for both S86 and S82.'
+  novelty: First run of the head together with L2-SP, and on the ResNet-50.
+  coverage: Every training study with a scanner group; a training-only loss on the
+    pooled tokens.
+  exploitation: 'Read the macro and the per-label table at both multipliers. Activation:
+    effective_config.json records 0.1, and the head''s accuracy and loss are logged
+    per epoch (0.311 and 1.732 at the adoption''s control). Shown wrong by: the macro
+    below the incumbent at both multipliers.'
+  budget: The reference's training time plus the head's step, under 5% (guess). GPU
+    memory and RAM as the reference.
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    Configuration only when the Lightning module builds with the weight above zero
+    on the current recipe: check on the CPU that it loads the scanner groups, builds
+    the prior for fold 2 and constructs the head without weights. If _scanner_confusion_step
+    no longer matches what the model''s encoder returns (the token dictionary changed
+    since 2026-09-30), repair the step without changing behaviour when the weight
+    is zero, and say exactly what was repaired.'
+  open_choices: None; 0.1 is the adopted weight.
+  dependencies: []
+  priority_rationale: The user's forced seed; the half of a bundled adoption that
+    never ran alone.
+  status: completed
+  created_revision: 93
+  seeded: /home/claudio/src/knee-abnormality-targets-and-inputs/autoresearch/campaigns/targets-and-inputs/seed-ideas-4.yaml
+  experiments:
+  - scanner-confusion-head-beside-l2sp-20261013T012333Z-40236972
+  decision: reject
+- id: view-label-bias-off
+  mechanism_id: view-label-bias
+  parent_idea_id: null
+  title: Train without the learned attention bias per view and label
+  opportunity: 'Forced by the user on 2026-10-12. The bias was adopted on 2026-10-03
+    at +0.0007 at x4 on the hand views, inside the spread of comparable runs; main''s
+    retrained control came out -0.0004 against the run without it. In Kaggle''s score
+    order the same recipe trained twice lands on both sides of its no-bias control
+    (S101 0.951 above S93 0.950 above S100 0.950). The ResNet-50 took it together
+    with the 84/93 mm views (+0.0027 for both). Evidence, weak. Guess: -0.001 to +0.0005.'
+  mechanism: In configs/training.yaml, model.view_label_bias becomes false (it is
+    true). The model then adds no per-view, per-label term to the attention. Nothing
+    else changes.
+  precedents:
+  - 'docs/modeling/current-model.md, adoption history, 2026-10-03: the adoption and
+    its control.'
+  - 'docs/validation/results/2026-10-03-learnable-views-campaign.md: the bias as the
+    learned recipe''s own gain (+0.0017).'
+  novelty: First removal on the ResNet-50 and on the current recipe.
+  coverage: The attention of every label over every view.
+  exploitation: 'Read the macro, Baker''s cyst and Effusion (the labels the learned
+    table moved most) at both multipliers. Activation: effective_config.json records
+    false, and the report gives the bias table''s parameter count before and after.
+    Shown wrong by: the macro below the incumbent at both multipliers.'
+  budget: The reference's training time. GPU memory and RAM as the reference.
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    Configuration only when the model builds with the value false: construct it on
+    the CPU without weights. If the routing, the soft-tissue read or the detail view
+    assume the bias table exists, repair that path without changing behaviour when
+    the value is true, and say exactly what was repaired.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user's forced seed; an adoption inside the rerun spread.
+  status: completed
+  created_revision: 93
+  seeded: /home/claudio/src/knee-abnormality-targets-and-inputs/autoresearch/campaigns/targets-and-inputs/seed-ideas-4.yaml
+  experiments:
+  - view-label-bias-off-20261013T020955Z-c0a4e0b8
+  decision: reject
+- id: anatomical-attention-bias-back
+  mechanism_id: anatomical-attention-bias
+  parent_idea_id: null
+  title: Restore the learned medial-lateral attention bias for the two meniscus and
+    the two tibiofemoral OA labels
+  opportunity: 'Forced by the user on 2026-10-12. On 2026-10-01 the plane-contrast
+    readouts were added and this bias removed in one adoption, at +0.0009 each at
+    x4, just under the rule; the model with both changes sits below the one without
+    them in Kaggle''s score order (S92 under S90, both 0.947). The seed plane-contrast-readouts-off
+    tests the first half; this one tests the second. Evidence, weak, one pair. The
+    routed heads now place these four labels by the knee frame, so the bias may add
+    nothing. Guess: -0.0005 to +0.0005 macro.'
+  mechanism: 'The code is in git at 609a489^, the last commit that still had it behind
+    model.anatomical_bias: `git show 609a489^:src/knee_abnormality/modeling/model.py`,
+    lines 150 to 175 (the compartment signs and families and the parameter anatomical_log_strength,
+    one log strength per family, zero start) and lines 373 to 377 (the term). Restore
+    the term as it was: for Medial Meniscus, Lateral Meniscus, Medial OA and Lateral
+    OA, sign * exp(log strength of the label''s family) * tanh(medial_axis / 20 mm)
+    is added to the label''s attention scores before the softmax, sign +1 for the
+    medial label and -1 for the lateral one. In today''s _attention_pool the attention
+    of a label is scores[target_channel] + prior + the routing term; the bias is added
+    to those four labels'' rows there. medial_axis is the original one, side * (patient
+    x - knee_center_x_mm) from knee_side_sign, knee_center_x_mm and the middle slice''s
+    patient map, zero where the side or the geometry is unknown, not the learned frame''s
+    axis. PF OA and the other labels get no bias.'
+  precedents:
+  - 'docs/validation/results/2026-09-21-anatomical-attention-result.md: the adoption,
+    +0.0023.'
+  - 'docs/validation/results/2026-10-01-revisits-campaign.md: its removal, +0.0009
+    at x4 (80% [+0.0002, +0.0016]).'
+  novelty: First run of the bias with the routed shared heads and on the ResNet-50.
+  coverage: Four labels' attention; other labels only through the shared token features.
+  exploitation: 'Read the four labels and the macro at both multipliers. Activation:
+    the two strengths (anatomical_strength_meniscus, anatomical_strength_oa) logged
+    once per epoch move from 1.0. Shown wrong by: the macro below the incumbent at
+    both multipliers.'
+  budget: The reference's training time; two scalars. GPU memory and RAM as the reference.
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    A source change in modeling/model.py and training/lightning.py with no new configuration
+    option: the bias is on. Port the lines from 609a489^ by hand, since _attention_pool
+    has changed; from the old lightning.py restore the per-epoch logging of the strengths
+    (609a489^ lines 488 to 495). If the seed oa-detector-beside-the-shared-head has
+    run, reuse its construction of the original medial_axis. Check on the CPU that
+    the model builds without weights and that with the strengths'' term multiplied
+    by zero the logits equal the incumbent''s code on one synthetic batch.'
+  open_choices: None; the 20 mm width and the zero start are the removed code's.
+  dependencies: []
+  priority_rationale: The user's forced seed; the second half of the 2026-10-01 adoption.
+  status: completed
+  created_revision: 93
+  seeded: /home/claudio/src/knee-abnormality-targets-and-inputs/autoresearch/campaigns/targets-and-inputs/seed-ideas-4.yaml
+  experiments:
+  - anatomical-attention-bias-back-20261013T025606Z-9b1c0062
+  decision: reject
+- id: sagittal-fluid-detail-view-off
+  mechanism_id: sagittal-fluid-detail-view
+  parent_idea_id: null
+  title: Train without the 64 mm second view of the sagittal fluid slices
+  opportunity: 'Forced by the user on 2026-10-12 as an exception to the contract''s
+    exclusion of view changes. The 64 mm view was adopted on the ResNet-18 in the
+    soft-tissue-reads campaign at the plain recipe''s level; on the ResNet-50 the
+    routed cell read and this view together gave +0.00004 at x4 (0.933292 against
+    0.933256). It costs encoder time on every sagittal fluid slice. Evidence, medium.
+    Guess: -0.0005 to +0.0005 macro, and a shorter training.'
+  mechanism: In configs/training.yaml, under data.series_types, the Sagittal series
+    type with fluid_sensitive 1 and fat_suppression 1 keeps its first view (field_mm
+    84.0) and loses its second (field_mm 64.0). No other series type changes. The
+    model then has no view that shares another view's slices (the shared_slice_view
+    buffer is all false), so the gates that open that view to the menisci, the OA
+    labels and ACL have nothing to act on.
+  precedents:
+  - 'docs/validation/results/2026-10-12-soft-tissue-reads-and-rn50-input-sampling.md:
+    the view on both backbones.'
+  - 'autoresearch/campaigns/soft-tissue-reads/run-notes.md, ResNet-18 against ResNet-50:
+    the cell read and detail view, +0.0013 against +0.00004.'
+  novelty: First removal of the view alone on the ResNet-50.
+  coverage: Every study with a sagittal fluid series; the menisci, the OA labels and
+    ACL read it.
+  exploitation: 'Read the menisci, the three OA labels and ACL at both multipliers,
+    then the macro and the training time. Activation: effective_config.json lists
+    one view for the sagittal fluid type, and the report gives the tokens per study
+    before and after. Shown wrong by: the macro below the incumbent at both multipliers.'
+  budget: 'Below the reference''s training time (guess: 5 to 10% less); it must stay
+    above the 0.75 floor (2,018 s). GPU memory at or below the reference, RAM unchanged.'
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    Configuration only when the data pipeline and the model build with one view on
+    that series type: load the config and construct the dataset''s view table and
+    the model on the CPU without weights. If a path assumes a shared-slice view exists
+    (view_sources, detail_target_allowed, the attention mass per view), repair it
+    without changing behaviour when the view is present, and say exactly what was
+    repaired.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user's forced seed; a removal that also saves time.
+  status: completed
+  created_revision: 94
+  seeded: /home/claudio/src/knee-abnormality-targets-and-inputs/autoresearch/campaigns/targets-and-inputs/seed-ideas-5.yaml
+  experiments:
+  - sagittal-fluid-detail-view-off-20261013T034129Z-886df76d
+  decision: reject
+- id: detail-view-embedding-off
+  mechanism_id: removal-detail-view-embedding
+  parent_idea_id: null
+  title: Train without the learned vector added to the tokens of every view that is
+    not at 120 mm
+  opportunity: 'Forced by the user on 2026-10-12. One learned vector is added to every
+    token of a view whose field differs from the 120 mm reference (all coronal and
+    sagittal views today). It came with the 84/93 mm views on 2026-10-02 and its removal,
+    queued in the fixes-and-removals campaign, never ran. The plane and contrast embeddings
+    and the view label bias already tell the model which view a token is from. Guess,
+    low: -0.0005 to +0.0005 macro.'
+  mechanism: In KneeAbnormalityModel._base_tokens and in _soft_tissue_tokens (modeling/model.py,
+    the two places that add encoded["detail_view"] * self.detail_view_embedding) the
+    term is not added. The parameter leaves the model. Nothing else changes; the detail_view
+    buffer stays for whatever else reads it.
+  precedents:
+  - 'autoresearch/campaigns/fixes-and-removals/seed-ideas-3.yaml, detail-view-embedding-off:
+    the seed that never ran.'
+  - 'docs/validation/results/2026-10-02-smart-crops-campaign.md: the views adopted
+    with the embedding in place.'
+  novelty: First removal of the embedding.
+  coverage: The tokens of every coronal and sagittal view.
+  exploitation: 'Read the macro and the per-label table at both multipliers. Activation:
+    the report gives the norm of the reference checkpoint''s embedding (how much it
+    carried) and the parameter count before and after. Shown wrong by: the macro below
+    the incumbent at both multipliers.'
+  budget: The reference's training time. GPU memory and RAM as the reference.
+  implementation: Follow the environment paragraph of the developer instructions.
+    A source change in modeling/model.py only, with no configuration option. Remove
+    the parameter under its fork_rng block so no other initialization moves, and check
+    on the CPU that the model builds without weights and that every other parameter
+    starts at the incumbent code's values.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user's forced seed; a removal that never ran.
+  status: completed
+  created_revision: 94
+  seeded: /home/claudio/src/knee-abnormality-targets-and-inputs/autoresearch/campaigns/targets-and-inputs/seed-ideas-5.yaml
+  experiments:
+  - detail-view-embedding-off-20261013T042702Z-c21eca07
+  decision: reject
+- id: gin-augmentation-off
+  mechanism_id: gin-augmentation
+  parent_idea_id: null
+  title: Train without the random-convolution intensity augmentation (GIN)
+  opportunity: 'Forced by the user on 2026-10-12. GIN entered with the half-stack
+    augmentation on 2026-09-26, adopted as a bundle on ReXNet-200 (+0.0011 at x4,
+    0.943 against 0.940 public for the bundle); its parts were never run alone and
+    never on a RadImageNet backbone, whose pretraining saw real MR contrast. Guess,
+    low: -0.001 to +0.0005 macro.'
+  mechanism: In configs/training.yaml, data.gin_augmentation.probability becomes 0.0
+    (it is 0.3). Nothing else changes.
+  precedents:
+  - 'docs/validation/results/2026-09-26-augmentation-campaign.md: the half stack adopted
+    as a bundle.'
+  - 'The seeds intensity-augmentation-off and noise-augmentation-off of this campaign:
+    the same question for two older parts.'
+  novelty: First removal of GIN alone.
+  coverage: 30% of training images.
+  exploitation: 'Read the macro and the per-label table at both multipliers, and the
+    x1 curve per epoch. Activation: effective_config.json records 0.0. Shown wrong
+    by: the macro below the incumbent at both multipliers.'
+  budget: The reference's training time or slightly less. GPU memory and RAM as the
+    reference.
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    Configuration only: check that the config loads with probability 0.0 and that
+    the augmentation is then skipped.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user's forced seed; one part of a bundle adopted on another
+    backbone.
+  status: completed
+  created_revision: 94
+  seeded: /home/claudio/src/knee-abnormality-targets-and-inputs/autoresearch/campaigns/targets-and-inputs/seed-ideas-5.yaml
+  experiments:
+  - gin-augmentation-off-20261013T050758Z-71223833
+  decision: reject
+- id: resolution-augmentation-off
+  mechanism_id: resolution-augmentation
+  parent_idea_id: null
+  title: Train without the one-axis resolution degradation
+  opportunity: 'Forced by the user on 2026-10-12. The degradation (probability 0.25,
+    70 to 100% of one axis kept) entered with the half-stack augmentation on 2026-09-26,
+    adopted as a bundle on ReXNet-200 at 140 mm; since then the fields went to 84
+    to 120 mm and the views are posed on canvases, and it was never run alone. Guess,
+    low: -0.001 to +0.0005 macro.'
+  mechanism: In configs/training.yaml, data.resolution_augmentation.probability becomes
+    0.0 (it is 0.25). Nothing else changes.
+  precedents:
+  - 'docs/validation/results/2026-09-26-augmentation-campaign.md: the half stack adopted
+    as a bundle.'
+  novelty: First removal of the degradation alone.
+  coverage: 25% of training images.
+  exploitation: 'Read the macro and the per-label table at both multipliers, the menisci
+    first (the finest structures). Activation: effective_config.json records 0.0.
+    Shown wrong by: the macro below the incumbent at both multipliers.'
+  budget: The reference's training time or slightly less. GPU memory and RAM as the
+    reference.
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    Configuration only: check that the config loads with probability 0.0 and that
+    the augmentation is then skipped.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user's forced seed; one part of a bundle adopted on another
+    backbone.
+  status: completed
+  created_revision: 94
+  seeded: /home/claudio/src/knee-abnormality-targets-and-inputs/autoresearch/campaigns/targets-and-inputs/seed-ideas-5.yaml
+  experiments:
+  - resolution-augmentation-off-20261013T055340Z-8a19edcd
+  decision: reject
+- id: mask-decoder-loss-weight-equal-to-the-map-heads
+  mechanism_id: mask-decoder
+  parent_idea_id: mask-decoder-beside-the-labels
+  title: Give the mask decoder's two losses the same share of the training loss as
+    the two existing map heads
+  opportunity: 'The mask decoder was adopted in run 5 (x4 0.937529 against 0.937000,
+    x1 0.929885 against 0.928460). The audit of that run (run-notes.md, run 5, the
+    audit) found the gain at x1 in the labels with no soft-tissue routed read (ACL,
+    MCL, Effusion, Synovitis, Baker''s: +0.0024 against the three no-decoder campaign
+    runs, 80% interval [+0.0010, +0.0038]) and the weights of stage four and of the
+    token projection moved 1.14 and 1.37 times as far from the reference as a no-decoder
+    run''s, while stages one to three moved no more than run to run (1.01 to 1.03).
+    Evidence, medium, one run: the decoder acts through the late features. At weight
+    0.1 each the decoder''s two terms carry 0.0465 of the training loss at epoch 10
+    against 0.1281 for the two existing map heads, and its losses are flat from epoch
+    7 (bone 0.2659 at epoch 7, 0.2730 at epoch 10). Guess, low: +0 to +0.001 macro,
+    the labels without a routed read first.'
+  mechanism: 'In _mask_decoder_step (training/lightning.py) the bone loss and the
+    soft-tissue loss of the mask decoder are each added to the training loss at weight
+    0.3 instead of 0.1. The value comes from the measured ratio: 0.1281 / 0.0465 =
+    2.75, so 0.3 gives the decoder 0.1395 of the loss, the share of the two map heads.
+    The decoder, its targets, its coverage rule and everything else are unchanged.
+    The weight stays a constant in the code: no option and no config field.'
+  precedents:
+  - 'run-notes.md, run 5: the decoder at weight 0.1, adopted.'
+  - 'prior-work.md, precedents: the anatomy map and posed crops on the ResNet-50.'
+  novelty: First run with the decoder at another weight.
+  coverage: The studies with prepared volumes, as in run 5 (14.2 million supervised
+    cells per epoch).
+  exploitation: 'Read ACL, MCL, Effusion, Synovitis and Baker''s at x1 and x4 first,
+    then the menisci and the OA labels, then the macro. Activation: mask_decoder_bone_loss
+    and mask_decoder_soft_tissue_loss at epoch 10 below the incumbent''s (0.2730 and
+    0.1921), and val_anatomy_loss and val_meniscus_loss against the incumbent''s 0.6333
+    and 0.5921. Also log one new training-side epoch metric through _log_epoch_metric,
+    train_label_loss, the label loss alone before any side-task term is added, so
+    this run and later ones can separate the label fit from the side tasks. Shown
+    wrong by: the macro below the incumbent at both multipliers while the decoder
+    losses fall further.'
+  budget: The incumbent's training time (2,617 s) and GPU memory (16.7 GB peak allocated);
+    nothing is added to the step.
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    Files: training/lightning.py only. Change the two weights of the decoder terms
+    from 0.1 to 0.3 and add the train_label_loss epoch metric from the tensor that
+    already holds the label loss, without a second evaluation and without .item().
+    Check on synthetic tensors that the summed loss equals label and existing terms
+    plus 0.3 times each decoder loss.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The keeper's follow-up to the adopted decoder, asked for by
+    the user on 2026-10-12; the zero-cost test of whether more of the same supervision
+    gives more.
+  status: completed
+  created_revision: 147
+  seeded: /home/claudio/src/knee-abnormality-targets-and-inputs/autoresearch/campaigns/targets-and-inputs/seed-ideas-6.yaml
+  experiments:
+  - mask-decoder-loss-weight-equal-to-the-map-heads-20261013T063859Z-e5c2aba8
+  decision: reject
+- id: mask-decoder-stage-one-level
+  mechanism_id: mask-decoder
+  parent_idea_id: mask-decoder-beside-the-labels
+  title: Add a 56 by 56 level to the mask decoder from the first stage's map, with
+    the mask heads on it
+  opportunity: 'The audit of run 5 found the decoder''s 28 by 28 task far easier than
+    the existing heads'' and exhausted early: its bone loss is 0.2730 at epoch 10
+    against 0.6655 for the existing heads'' terms and flat from epoch 7, while the
+    7 by 7 and 14 by 14 maps it shares stages with still improved at every epoch (val_anatomy_loss
+    0.6333 against 0.6400 to 0.6431 without the decoder, val_meniscus_loss 0.5921
+    against 0.6023 to 0.6049; overlaps of the kneecap, the fibula, the medial tibial
+    cartilage and the lateral meniscus outside the no-decoder range). Evidence, medium,
+    one run: finer mask supervision improves the coarser maps. The masks exist at
+    1 mm and a 28 by 28 cell is 3 to 4 mm wide; a 56 by 56 cell is 1.5 to 2 mm, the
+    scale of cartilage and of the meniscal horns. Guess, low: +0 to +0.001 macro,
+    MCL, the menisci and the OA labels first.'
+  mechanism: 'In training only, the mask decoder gains one level. The first-stage
+    output of the main pass (56 by 56, 256 channels on this backbone) goes through
+    a 1 by 1 convolution to 32 channels; the decoder''s existing 28 by 28 map (64
+    channels) goes through a 1 by 1 convolution to 32 channels, is upsampled by 2
+    (bilinear) and added to it; a 3 by 3 convolution with batch norm and ReLU at 32
+    channels follows. The two 1 by 1 heads (seven bone classes, seven soft-tissue
+    classes) move to this 56 by 56 map; the 28 by 28 map keeps no head. Targets: the
+    class shares of each 56 by 56 cell from the prepared volumes, obtained as the
+    decoder''s 28 by 28 targets are, with half the step and the stride-four anchors
+    of the first stage. Loss: as in the incumbent, anatomy_loss with its coverage
+    rule once per head, each at the incumbent''s weight. The existing per-token and
+    per-cell map heads, their losses, the routing that reads them and everything in
+    validation and prediction are unchanged.'
+  precedents:
+  - 'run-notes.md, run 5: the decoder on the 28 by 28 grid, adopted.'
+  - docs/backlog/big-bets.md, anatomy masks, segmentation before the labels.
+  novelty: First mask supervision at the first stage's resolution.
+  coverage: The studies with prepared volumes; four times the supervised cells of
+    run 5 (about 57 million per epoch).
+  exploitation: 'Read MCL, the menisci, the three OA labels and ACL, then the macro,
+    at both multipliers. Activation: mask_decoder_bone_loss and mask_decoder_soft_tissue_loss
+    still falling between epochs 7 and 10 (they are flat there in the incumbent),
+    mask_decoder_supervised_cells about four times the incumbent''s 14.2 million,
+    and val_anatomy_loss and val_meniscus_loss against the incumbent''s 0.6333 and
+    0.5921. Nothing new is logged on validation. Shown wrong by: the macro below the
+    incumbent at both multipliers while the decoder losses fall.'
+  budget: 'No extra backbone pass. One 1 by 1 and one 3 by 3 convolution at 32 channels
+    on 56 by 56 maps and four times the target lookups, for about 250 images per step.
+    Estimate, not measured: training time within 1.08 of the incumbent''s 2,617 s
+    (about 2,830 s, inside the campaign''s 3,364 s) and peak GPU memory about 17.7
+    GB allocated, within 18.5 GB; state both estimates and the parameter count in
+    the report. If the estimate from the tensor sizes exceeds 18.5 GB, compute the
+    56 by 56 level and its loss under torch.autocast as the rest of the step is and
+    compute the target shares without gradient before anything else is cut; never
+    fewer cells or images.'
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    Files: modeling/model.py, training/lightning.py, training/anatomy.py only if the
+    target lookup needs a small generalisation. In the training branch that keeps
+    the second-stage tensor for the decoder, keep the first-stage tensor too and pass
+    it in the encoded dictionary; do not change the signature or the return value
+    of _backbone_features, which Kaggle inference replaces with fixed chunks. The
+    56 by 56 cells'' validity, patient positions and steps are derived the way the
+    28 by 28 ones are (feature_geometry with the first stage''s mapping, half the
+    decoder''s step). New parameters initialise under torch.random.fork_rng; the decoder''s
+    existing layers keep their initialisation stream. The decoder is called only when
+    self.training is true, and its parameters are in the optimizer as the incumbent''s
+    are. No option and no config field.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The keeper's follow-up to the adopted decoder, asked for by
+    the user on 2026-10-12; extends the supervision where the audit found the 28 by
+    28 task exhausted.
+  status: completed
+  created_revision: 147
+  seeded: /home/claudio/src/knee-abnormality-targets-and-inputs/autoresearch/campaigns/targets-and-inputs/seed-ideas-6.yaml
+  experiments:
+  - mask-decoder-stage-one-level-20261013T072438Z-0d47a3e0
+  decision: reject
+- id: squeeze-excitation-in-the-resnet-blocks
+  mechanism_id: backbone-channel-attention
+  parent_idea_id: null
+  title: Add a squeeze-and-excitation module to every bottleneck of the ResNet-50,
+    started as the identity, keeping the Refined-RadImageNet weights
+  opportunity: 'Forced by the user on 2026-10-13 as an exception to the contract''s
+    settled backbone: the backbone stays resnet50.a1_in1k with the Refined-RadImageNet
+    weights, and gains channel attention inside its blocks. timm builds it from the
+    same model name: with block_args=dict(attn_layer=''se'') every one of the sixteen
+    bottlenecks gets an SEModule after its third batch norm, and the pretrained state
+    dict still fills every existing tensor (checked on timm 1.0.26: 64 new tensors,
+    all under layerN.M.se, none unexpected, 2,530,992 new parameters). The backbone
+    has never had channel attention in this project; the gain of adding it to an already
+    pretrained network during fine-tuning is a guess, low: -0.0005 to +0.001 macro.'
+  mechanism: 'In modeling/model.py, where the backbone is created (timm.create_model(model.backbone,
+    ...)), a ResNet backbone is created with block_args=dict(attn_layer=''se'') in
+    addition to today''s arguments. The RadImageNet weights are then loaded as today,
+    except that the load accepts exactly the SE tensors as missing: load with strict=False
+    and raise unless the unexpected keys are empty and every missing key contains
+    ''.se.''. Each SE module must start as the identity so the network computes the
+    pretrained function at step 0: its gate is 2 * sigmoid(x) instead of sigmoid(x)
+    (a small module passed as the SE gate_layer through attn_layer, for example partial(SEModule,
+    gate_layer=...), or the module''s gate replaced after creation), fc2''s weight
+    and bias are zero, and fc1 keeps timm''s default initialisation, drawn under torch.random.fork_rng
+    so no other initialisation moves. With that, the gate is exactly 1 for every channel
+    at the start and its gradient is not saturated. The SE reduction stays timm''s
+    default (one sixteenth). Optimizer and anchor, for the new tensors only: parameters
+    whose name contains ''.se.'' are not anchored by L2-SP (they have no pretrained
+    value; skip them in the loop that builds anchor_parameters and backbone_origin)
+    and train in the head group (head_lr and the head''s weight decay rule) instead
+    of backbone_lr. Every other parameter keeps its group, rate, decay and anchor.
+    Validation, prediction and Kaggle inference run the same backbone: the SE modules
+    are inside the stages, so use_fixed_backbone_chunks and the stage outputs the
+    heads and the mask decoder read are untouched in shape. No option and no config
+    field: the ResNet backbones of this recipe have SE from this run on.'
+  precedents:
+  - 'docs/ongoing/radimagenet-backbone.md: how the Refined-RadImageNet weights are
+    loaded and what was tried on the backbone.'
+  - 'run-notes.md, run 5 and its audit: the last gain came through stage four and
+    the token projection, the features the SE gates rescale.'
+  novelty: First change inside the backbone's blocks.
+  coverage: Every image, at all four stages.
+  exploitation: 'Read the macro and the per-label table at both multipliers. Activation:
+    one validation-side epoch metric through _log_epoch_metric, the mean absolute
+    deviation of the SE gates from 1 over the sixteen modules on the validation batches
+    (0 at initialisation, above 0 after training), computed from the gate values the
+    forward pass already produces, without a second pass; and in the report the count
+    of missing keys at load (64) and the maximum absolute difference between the backbone''s
+    output with and without the SE modules at initialisation on a synthetic batch
+    of two images, which must be 0. Shown wrong by: the macro below the incumbent
+    at both multipliers while the gates move away from 1.'
+  budget: 'Sixteen global average pools and thirty-two 1 by 1 convolutions on pooled
+    vectors per image: estimate, not measured, training time within 1.05 of the incumbent''s
+    and peak GPU memory within 0.5 GB of it (the channel-wise multiply keeps one more
+    activation per block for the backward pass); state both estimates and the parameter
+    count in the report. Prediction time rises by the same share.'
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    Files: modeling/model.py for the creation, the gate and the load; training/lightning.py
+    for the anchor loop, the optimizer group of the ''.se.'' parameters and the one
+    metric. Check on the CPU with a randomly initialised timm resnet50 and no project
+    model: the SE variant loads the base state dict with only ''.se.'' keys missing,
+    and on a batch of two 224 px images without gradient its output equals the base
+    network''s exactly. Check that build_optimizer puts the ''.se.'' parameters in
+    the head-rate group and that no anchor buffer is registered for them. The backbone
+    feature mapping (backbone_mapping) and group_matcher must still resolve; say so
+    in the report. model.channels_last stays true.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user's forced seed of 2026-10-13, written by the keeper
+    after checking that timm builds it with the same weights.
+  status: completed
+  created_revision: 334
+  seeded: /home/claudio/src/knee-abnormality-targets-and-inputs/autoresearch/campaigns/targets-and-inputs/seed-ideas-7.yaml
+  experiments:
+  - squeeze-excitation-in-the-resnet-blocks-20261013T081049Z-5cba6662
+  decision: reject
+- id: global-context-in-the-resnet-blocks
+  mechanism_id: backbone-global-context
+  parent_idea_id: null
+  title: Add an additive global-context block to the bottlenecks of stages two to
+    four, started at zero, keeping the Refined-RadImageNet weights
+  opportunity: 'Forced by the user on 2026-10-13 under the contract''s exception for
+    modules inside the blocks that keep every pretrained weight and start as the identity.
+    A global-context block pools the whole feature map with one learned attention
+    map and adds a per-channel term to every position: each token of a slice then
+    sees the rest of the slice inside the backbone, which the ResNet-50 otherwise
+    gets only from its receptive field. It is the one block-level attention with direct
+    evidence for insertion into an already trained network: GCNet (arXiv 1904.11492)
+    inserts it into a trained ResNet-50 and fine-tunes, 76.88 to 77.70 top-1 with
+    the baseline given the same extra epochs: evidence, medium, another task. Never
+    run in this project (searched docs and campaigns on 2026-10-13). Guess, low: -0.0005
+    to +0.001 macro.'
+  mechanism: 'In modeling/model.py, after the ResNet backbone is created and before
+    the RadImageNet weights are loaded, each of the thirteen bottlenecks of layer2,
+    layer3 and layer4 gets timm.layers.GlobalContext(channels of the block''s output,
+    use_attn=True, fuse_add=True, fuse_scale=False, rd_ratio=1/16) in the block''s
+    attention slot (block.se, which timm''s Bottleneck applies after bn3 and before
+    the residual sum). If an adopted incumbent already holds a module in that slot,
+    the slot becomes nn.Sequential(existing module, global-context block). Layer1
+    gets none. The block must start as zero: the weight and the bias of its last convolution
+    (mlp_add.fc2) are set to zero (timm''s init_last_zero leaves the bias); every
+    other new tensor keeps timm''s default initialisation, drawn under torch.random.fork_rng.
+    The network then computes the pretrained function exactly at step 0. The RadImageNet
+    load accepts exactly the new tensors as missing: strict=False, and raise unless
+    the unexpected keys are empty and every missing key contains ''.se.''. Optimizer
+    and anchor, for the new tensors only: parameters whose name contains ''.se.''
+    are not anchored by L2-SP and train in the head group (head_lr and the head''s
+    weight decay rule); every other parameter keeps its group, rate, decay and anchor.
+    Validation, prediction and Kaggle inference run the same backbone. No option and
+    no config field.'
+  precedents:
+  - 'docs/ongoing/radimagenet-backbone.md: how the Refined-RadImageNet weights are
+    loaded.'
+  - 'seed-ideas-7.yaml, squeeze-excitation-in-the-resnet-blocks: the same slot, load
+    rule and optimizer treatment.'
+  novelty: First spatial context module inside the backbone.
+  coverage: Every image, at stages two to four.
+  exploitation: 'Read the macro and the per-label table at both multipliers. Activation:
+    one validation-side epoch metric through _log_epoch_metric, the mean over the
+    thirteen blocks of the root mean square of the added term divided by the root
+    mean square of the block''s bn3 output (0 at initialisation), from tensors the
+    forward pass already has; and in the report the count of missing keys at load
+    and the maximum absolute difference between the backbone''s output with and without
+    the blocks at initialisation on a synthetic batch of two images, which must be
+    0. Shown wrong by: the macro below the incumbent at both multipliers while the
+    added term grows.'
+  budget: 'One 1 by 1 attention convolution, one pooled vector and a two-layer bottleneck
+    per block; the addition stores no extra feature map. Estimate, not measured: training
+    time within 1.02 of the incumbent''s and peak GPU memory within 0.2 GB of it;
+    about 4.75 million new parameters. State both estimates and the parameter count
+    in the report.'
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    Files: modeling/model.py for the modules, their initialisation and the load; training/lightning.py
+    for the anchor loop, the optimizer group of the ''.se.'' parameters and the one
+    metric. Check on the CPU with a randomly initialised timm resnet50 and no project
+    model: the variant loads the base state dict with only ''.se.'' keys missing,
+    and on a batch of two 224 px images without gradient its output equals the base
+    network''s exactly. Check that build_optimizer puts the ''.se.'' parameters in
+    the head-rate group and registers no anchor buffer for them, and that backbone_mapping
+    and group_matcher still resolve. model.channels_last stays true.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user's forced seed of 2026-10-13; the block-level change
+    with direct fine-tuning evidence.
+  status: completed
+  created_revision: 386
+  seeded: /home/claudio/src/knee-abnormality-targets-and-inputs/autoresearch/campaigns/targets-and-inputs/seed-ideas-8.yaml
+  experiments:
+  - global-context-in-the-resnet-blocks-20261013T090033Z-3e365bed
+  decision: reject
+- id: coordinate-attention-in-the-late-resnet-blocks
+  mechanism_id: backbone-coordinate-attention
+  parent_idea_id: null
+  title: Add coordinate attention to the bottlenecks of stages three and four, started
+    as the identity, keeping the Refined-RadImageNet weights
+  opportunity: 'Forced by the user on 2026-10-13 under the contract''s exception for
+    modules inside the blocks. Coordinate attention (arXiv 2103.02907) gates each
+    channel by one profile along the height and one along the width of the feature
+    map, so the gate knows where on the slice a structure is, which a squeeze-and-excitation
+    gate does not. The knee''s labels are tied to positions on the slice (compartments,
+    the joint line, the kneecap). Its published evidence is for networks trained from
+    scratch; the gain when added to a trained network is a guess, low: -0.0005 to
+    +0.001 macro. Never run inside the backbone here (the per-target Gaussian coordinate
+    priors of the medial-lateral-transfer campaign acted on the pooling, not on the
+    backbone).'
+  mechanism: 'In modeling/model.py, after the ResNet backbone is created and before
+    the RadImageNet weights are loaded, each of the nine bottlenecks of layer3 and
+    layer4 gets timm.layers.coord_attn.CoordAttn(channels of the block''s output)
+    with timm''s defaults except the gate, in the block''s attention slot (block.se,
+    applied after bn3 and before the residual sum). If an adopted incumbent already
+    holds a module in that slot, the slot becomes nn.Sequential(existing module, coordinate
+    attention). Layers 1 and 2 get none. The module must start as the identity: its
+    gate is 2 * sigmoid(x) instead of sigmoid(x) (a small module passed as gate_layer),
+    and the weights of its two output convolutions (the height one and the width one;
+    their biases too if they have one) are zero, so both profiles are exactly 1 at
+    the start. Every other new tensor keeps timm''s default initialisation, drawn
+    under torch.random.fork_rng. The RadImageNet load accepts exactly the new tensors
+    as missing: strict=False, and raise unless the unexpected keys are empty and every
+    missing key contains ''.se.''. Optimizer and anchor, for the new tensors only:
+    parameters whose name contains ''.se.'' are not anchored by L2-SP and train in
+    the head group (head_lr and the head''s weight decay rule); every other parameter
+    keeps its group, rate, decay and anchor. The module''s own batch norm trains as
+    the backbone''s batch norms do. Validation, prediction and Kaggle inference run
+    the same backbone. No option and no config field.'
+  precedents:
+  - 'seed-ideas-7.yaml, squeeze-excitation-in-the-resnet-blocks: the same slot, identity
+    gate, load rule and optimizer treatment.'
+  - 'run-notes.md, run 5, the audit: the last backbone-side gain came through stage
+    four and the token projection.'
+  novelty: First position-aware gate inside the backbone.
+  coverage: Every image, at stages three and four (14 by 14 and 7 by 7 maps).
+  exploitation: 'Read the macro and the per-label table at both multipliers, the compartment
+    labels (menisci, the three OA labels) first. Activation: one validation-side epoch
+    metric through _log_epoch_metric, the mean absolute deviation of the product of
+    the two profiles from 1 over the nine modules (0 at initialisation), from values
+    the forward pass already produces; and in the report the count of missing keys
+    at load and the maximum absolute difference between the backbone''s output with
+    and without the modules at initialisation on a synthetic batch of two images,
+    which must be 0. Shown wrong by: the macro below the incumbent at both multipliers
+    while the profiles move away from 1.'
+  budget: 'Two pooled profiles and three small convolutions per block on 14 by 14
+    and 7 by 7 maps, and one more stored feature map per gated block. Estimate, not
+    measured: training time within 1.03 of the incumbent''s and peak GPU memory within
+    0.3 GB of it. State both estimates and the parameter count in the report.'
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    Files: modeling/model.py for the modules, the gate, the initialisation and the
+    load; training/lightning.py for the anchor loop, the optimizer group of the ''.se.''
+    parameters and the one metric. Read timm/layers/coord_attn.py for the names of
+    the two output convolutions and the gate argument. Check on the CPU with a randomly
+    initialised timm resnet50 and no project model, in eval mode: the variant loads
+    the base state dict with only ''.se.'' keys missing, and on a batch of two 224
+    px images without gradient its output equals the base network''s exactly. Check
+    that build_optimizer puts the ''.se.'' parameters in the head-rate group and registers
+    no anchor buffer for them, and that backbone_mapping and group_matcher still resolve.
+    model.channels_last stays true.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user's forced seed of 2026-10-13; the position-aware variant
+    of the channel gate.
+  status: retired
+  created_revision: 386
+  seeded: /home/claudio/src/knee-abnormality-targets-and-inputs/autoresearch/campaigns/targets-and-inputs/seed-ideas-8.yaml
+  retired_reason: 'User, 2026-10-13: replaced before it ran by coordinate-attention-late-stages-pulled-to-identity,
+    the same seed with a pull toward the identity, after run 22''s free squeeze-and-excitation
+    gates.'
+- id: average-pool-shortcuts-in-the-resnet
+  mechanism_id: backbone-shortcut-downsampling
+  parent_idea_id: null
+  title: Downsample the three stride-two shortcuts of the ResNet-50 with an average
+    pool before the 1 by 1 convolution (ResNet-D), on the same weights
+  opportunity: 'Forced by the user on 2026-10-13 as an exception to the contract''s
+    settled backbone: the same weights in the same places, with one fixed operation
+    changed. In the ResNet-50 the shortcut of the first block of layer2, layer3 and
+    layer4 is a 1 by 1 convolution with stride 2, which reads one pixel in four and
+    discards the rest. ResNet-D (Bag of Tricks, arXiv 1812.01187) averages the 2 by
+    2 neighbourhood first and applies the same convolution at stride 1; the weight
+    tensor has the same shape. At 224 px a meniscus is a few pixels wide, so the discarded
+    positions carry structure. The published gain is for networks trained from scratch;
+    on pretrained weights the function changes slightly at the start (0.018 relative
+    on random weights, measured by the modernisation review of 2026-10-13) and fine-tuning
+    adapts: guess, low, -0.0005 to +0.0005 macro. Never run here; the token mapping
+    already handles these shortcuts (docs/ongoing/radimagenet-backbone.md).'
+  mechanism: In modeling/model.py the ResNet backbone is created with avg_down=True
+    in addition to today's arguments. timm then builds each shortcut as (average pool,
+    1 by 1 convolution at stride 1, batch norm), so the shortcut's tensors move from
+    downsample.0 and downsample.1 to downsample.1 and downsample.2. Before the strict
+    load, the RadImageNet state dict's keys are renamed accordingly for every block
+    that has a shortcut (layerN.0.downsample.0.* to layerN.0.downsample.1.*, layerN.0.downsample.1.*
+    to layerN.0.downsample.2.*); the load stays strict and every pretrained tensor
+    is used. No parameter is added. The L2-SP anchors and the optimizer groups are
+    built from the loaded parameters as today. Validation, prediction and Kaggle inference
+    run the same backbone. No option and no config field.
+  precedents:
+  - 'docs/ongoing/radimagenet-backbone.md: _resnet_mapping walks ResNet-D average-pool
+    shortcuts.'
+  - 'docs/modeling/backbone-swaps.md: how the feature mapping checks each residual
+    shortcut.'
+  novelty: First change to the backbone's downsampling.
+  coverage: Every image, at the three stride-two transitions.
+  exploitation: 'Read the macro and the per-label table at both multipliers, the menisci
+    first. Activation: the report states that the three stride-two shortcuts are (AvgPool2d,
+    Conv2d with stride 1, BatchNorm2d), the number of renamed keys, that the strict
+    load passed, and the relative difference between the backbone''s output with avg_down
+    and without it on a synthetic batch of two images with the same weights (above
+    0). Nothing new is logged in training. Shown wrong by: the macro below the incumbent
+    at both multipliers.'
+  budget: 'Three average pools; the three shortcut convolutions see the same number
+    of output positions. Estimate, not measured: the incumbent''s training time and
+    GPU memory within 1%.'
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    Files: modeling/model.py and, for the key rename, modeling/radimagenet.py or the
+    load site. Check on the CPU with a randomly initialised timm resnet50 and no project
+    model: the renamed base state dict loads strictly into the avg_down variant, and
+    backbone_mapping, the stage outputs'' shapes (28, 14 and 7 at 224 px) and group_matcher
+    resolve as before. If an adopted incumbent holds modules in the blocks'' attention
+    slot, they are untouched. model.channels_last stays true.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user's forced seed of 2026-10-13; the free downsampling
+    change.
+  status: completed
+  created_revision: 386
+  seeded: /home/claudio/src/knee-abnormality-targets-and-inputs/autoresearch/campaigns/targets-and-inputs/seed-ideas-8.yaml
+  experiments:
+  - average-pool-shortcuts-in-the-resnet-20261013T122134Z-1fc0acea
+  decision: provisional_accept
+- id: blur-pool-at-the-resnet-stage-transitions
+  mechanism_id: backbone-anti-aliased-downsampling
+  parent_idea_id: null
+  title: Anti-alias the three stride-two 3 by 3 convolutions of the ResNet-50 with
+    a blur pool, on the same weights
+  opportunity: 'Forced by the user on 2026-10-13 as an exception to the contract''s
+    settled backbone: the same weights in the same places, with a fixed blur added
+    at three places. A stride-two convolution aliases: a one-pixel shift of the input
+    changes which positions are kept, and thin structures flicker between neighbouring
+    tokens. Blur-pool (Making Convolutional Networks Shift-Invariant Again, arXiv
+    1904.11486) runs the convolution at stride 1 and downsamples with a fixed low-pass
+    filter. The crops here are posed from predicted geometry and shifted by augmentation,
+    so the same knee reaches the backbone at different sub-token offsets. The method''s
+    author initialises anti-aliased networks from baseline weights and fine-tunes
+    (evidence, medium, no numbers found); on pretrained weights the function changes
+    slightly at the start (0.013 relative on random weights for the full variant,
+    measured by the modernisation review of 2026-10-13). Guess, low: -0.0005 to +0.001
+    macro. Never run here.'
+  mechanism: 'In modeling/model.py, after the ResNet backbone is created with today''s
+    arguments and the RadImageNet weights are loaded strictly as today, the first
+    block of layer2, layer3 and layer4 is changed in place: its 3 by 3 convolution
+    conv2 runs at stride 1 with the same weight tensor, and the block''s anti-aliasing
+    slot (block.aa, applied by timm''s Bottleneck after the activation that follows
+    bn2) becomes timm.layers.BlurPool2d(channels of conv2''s output, filt_size=3,
+    stride=2). This is what timm builds for these blocks with aa_layer=BlurPool2d;
+    the stem''s max pool and the shortcuts stay as they are, so the stem keeps its
+    memory and no 112 by 112 map is added. The blur has no trainable parameter; no
+    key is added to or missing from the load. The L2-SP anchors and the optimizer
+    groups are unchanged. Validation, prediction and Kaggle inference run the same
+    backbone. No option and no config field.'
+  precedents:
+  - 'docs/ongoing/radimagenet-backbone.md: how the Refined-RadImageNet weights are
+    loaded.'
+  - 'docs/research/input-resolution.md: downsampling must be antialiased; the repository
+    resampler is, the backbone is not.'
+  novelty: First anti-aliased downsampling inside the backbone.
+  coverage: Every image, at the three stride-two transitions.
+  exploitation: 'Read the macro and the per-label table at both multipliers, the menisci,
+    MCL and ACL first (the thinnest structures), and the step from x1 to x4. Activation:
+    the report states the three blocks'' conv2 stride (1) and aa module (BlurPool2d,
+    stride 2), that the strict load passed, the stage outputs'' shapes (28, 14 and
+    7 at 224 px), and the relative difference between the backbone''s output with
+    and without the blur on a synthetic batch of two images with the same weights
+    (above 0). Nothing new is logged in training. Shown wrong by: the macro below
+    the incumbent at both multipliers.'
+  budget: 'Three 3 by 3 convolutions run at four times their output positions (56,
+    28 and 14 instead of 28, 14 and 7), about 1.0 of the backbone''s 4.1 GMACs more,
+    and their outputs are stored at that size. Estimate, not measured: training time
+    1.15 to 1.20 of the incumbent''s (about 3,000 to 3,150 s, inside the campaign''s
+    3,364 s), prediction time the same share, and peak GPU memory 0.5 to 1.0 GB above
+    the incumbent''s 16.7 GB, within 18.5 GB. State both estimates in the report;
+    never fewer epochs, images or slices to fit.'
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    Files: modeling/model.py. Read timm/models/resnet.py (Bottleneck: use_aa, conv2''s
+    stride, self.aa) and build the three blocks the way timm does with aa_layer, by
+    changing the existing modules after the load or by creating the backbone with
+    aa_layer and restoring the stem''s max pool; either way the result must be exactly:
+    stem unchanged, conv2 of layer2.0, layer3.0 and layer4.0 at stride 1 followed
+    by BlurPool2d at stride 2, shortcuts unchanged. Check on the CPU with a randomly
+    initialised timm resnet50 and no project model that the base state dict loads
+    strictly and that backbone_mapping, the stage outputs'' shapes and group_matcher
+    resolve as before; if the feature mapping needs the blur''s footprint for the
+    token positions, extend it and say so. If an adopted incumbent holds modules in
+    the blocks'' attention slot, they are untouched. model.channels_last stays true.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user's forced seed of 2026-10-13; the costliest of the four,
+    last.
+  status: completed
+  created_revision: 386
+  seeded: /home/claudio/src/knee-abnormality-targets-and-inputs/autoresearch/campaigns/targets-and-inputs/seed-ideas-8.yaml
+  experiments:
+  - blur-pool-at-the-resnet-stage-transitions-20261013T131154Z-3fa1a2ac
+  decision: invalid
+- id: soft-prevalence-class-weights-on-the-incumbent
+  mechanism_id: class-weights
+  parent_idea_id: soft-prevalence-class-weights
+  title: Compute the class weights from the mean soft target of each label, on the
+    current incumbent
+  opportunity: 'The user''s decision of 2026-10-13: adopt the soft-prevalence class
+    weights. Run 1 tested them on the reference (x4 0.937509 against 0.937000, x1
+    0.929788 against 0.928460, soft AUC +0.000871) and passed the rule; the keeper
+    took it out of the incumbent on 2026-10-12 because class weighting had disagreed
+    with the public board before. The pair is now read publicly at the same settings
+    (single model, x4, tau 0.9): S150 with the soft-prevalence weights 0.960, fifth
+    in Kaggle''s score order, against its reference S151 0.959, thirteenth. Evidence,
+    medium, one pair on fold 2: local and public agree in sign. The incumbent has
+    since gained the mask decoder and the OA detector without these weights, so the
+    change is applied to it in one run and that run becomes the incumbent by the user''s
+    decision.'
+  mechanism: 'Exactly the change of run 1, on the current incumbent''s source. In
+    fixed_class_balance (training/lightning.py) the per-label fraction is the mean
+    of the label''s observed training targets (column target_<label>, gold studies
+    included with their official values) instead of (observed training cells with
+    target >= 0.5) / (observed training cells). Everything after it is unchanged:
+    rho = ((1 - fraction) / fraction) ** exponent, negative_weight = 1 / (fraction
+    * rho + 1 - fraction), positive_weight = rho * negative_weight, and the loss still
+    gives a cell the positive weight when its target is >= 0.5 and the negative weight
+    otherwise. The returned dictionary keeps its keys: positive and negative stay
+    the thresholded counts, positive_fraction holds the soft mean. Run 1''s diff is
+    at outputs/autoresearch/targets-and-inputs/experiments/soft-prevalence-class-weights-20261012T164257Z-743f1d48/changes.diff:
+    port it unchanged. Expected positive weights as in run 1: about 1.29 for Synovitis
+    (from 2.16), 2.19 for Fracture (from 3.15), 2.55 for MCL (from 3.66), 1.21 for
+    Effusion (from 1.38).'
+  precedents:
+  - run-notes.md, run 1 with its public pair S150 and S151, and the proxies for the
+    public direction.
+  - 'prior-work.md, precedents: exponent 0.5 lost on fold 0 and won publicly; a ramped
+    exponent tied.'
+  novelty: First run of the soft-prevalence weights together with the mask decoder
+    and the OA detector.
+  coverage: Every training cell of every label; the weights change most on Synovitis,
+    Fracture, MCL and Baker's.
+  exploitation: 'Read Synovitis, Fracture, MCL, Baker''s, Effusion and PF OA, then
+    the macro, at both multipliers, against the incumbent and against run 1''s per-label
+    changes (Fracture +0.0042, Contusion +0.0031, Effusion +0.0017, PF OA -0.0028,
+    Synovitis -0.0036 at x4). Activation: the twelve positive_fraction and positive_weight
+    values of the run''s fold_2/class_balance.json, listed in the report beside the
+    incumbent''s and beside run 1''s, which they must equal. No new metric.'
+  budget: The incumbent's training time and GPU memory; the weights are computed once
+    per fold.
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    File: training/lightning.py, function fixed_class_balance only. Replaces the thresholded
+    fraction; no option, no config field. Keep the dictionary''s keys and its version
+    1, because validated_class_balance_weights and the resume check in the protected
+    training/checkpoints.py read them. Check without a GPU: call fixed_class_balance
+    on the fold-2 training frame from load_fold_labels and print the twelve fractions
+    and weights, and compare them with run 1''s class_balance.json.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user's adoption decision of 2026-10-13, after the public
+    pair S150 against S151; first in the queue so the backbone seeds build on it.
+  status: completed
+  created_revision: 435
+  seeded: /home/claudio/src/knee-abnormality-targets-and-inputs/autoresearch/campaigns/targets-and-inputs/seed-ideas-9.yaml
+  experiments:
+  - soft-prevalence-class-weights-on-the-incumbent-20261013T095217Z-3e243c6e
+  decision: reject
+- id: squeeze-excitation-late-stages-pulled-to-identity
+  mechanism_id: backbone-channel-attention
+  parent_idea_id: squeeze-excitation-in-the-resnet-blocks
+  title: Squeeze-and-excitation in the bottlenecks of stages three and four only,
+    with its gates pulled toward the identity as L2-SP pulls the weights around them
+  opportunity: 'Forced by the user on 2026-10-13, a bundle of changes to run 22 chosen
+    from its evidence. Run 22 put a squeeze-and-excitation module in all sixteen bottlenecks,
+    free of any anchor at the head rate: x4 0.937619 against 0.938618 (-0.0010), with
+    MCL alone (-0.0105, interval below zero) carrying 0.0009 of it and the other eleven
+    labels summing to -0.0001. Its gates moved 12% from 1 (val_se_gate_abs_deviation
+    0.122), its training loss was lower than the incumbent''s at every epoch (0.5672
+    against 0.5717 at epoch 10) while the validation loss was not (0.3983 against
+    0.3979), and its L2-SP penalty was lower (0.0191 against 0.0210): evidence, medium,
+    one run, that the free gates took over adaptation from the anchored convolutions
+    and fitted the training set more. The mask-decoder audit (run-notes.md, run 5)
+    found the last backbone-side gain in stage four and the token projection, with
+    stages one to three unmoved. Run 22 cost 19% more GPU memory (20.1 GB on the card)
+    and 14% more training time. Guess, low: -0.0005 to +0.0008 macro; what the reading
+    predicts is the eleven labels level or better without the MCL loss.'
+  mechanism: 'Run 22''s implementation with three changes; its diff is at outputs/autoresearch/targets-and-inputs/experiments/squeeze-excitation-in-the-resnet-blocks-20261013T081049Z-5cba6662/changes.diff
+    and is the starting point. Unchanged from it: timm''s SEModule in the block''s
+    attention slot after bn3, reduction one sixteenth, the gate 2 * sigmoid(x), fc2''s
+    weight and bias at zero and fc1 at timm''s default drawn under torch.random.fork_rng,
+    so the network computes the pretrained function exactly at step 0; the RadImageNet
+    load with strict=False that raises unless the unexpected keys are empty and every
+    missing key contains ''.se.''; the ''.se.'' parameters in the head-rate group
+    (head_lr); the metric val_se_gate_abs_deviation. Change 1, placement: only the
+    nine bottlenecks of layer3 and layer4 get the module; layer1 and layer2 keep no
+    attention module (36 new tensors instead of 64). Change 2, a pull toward the identity:
+    the training loss gains anchor_alpha_late (0.001, the strength L2-SP applies to
+    the pretrained weights of these stages) times the sum over the nine modules of
+    the squared entries of fc2''s weight and of fc2''s bias, added where the L2-SP
+    penalty is added and logged with it in a separate epoch metric se_identity_penalty
+    through _log_epoch_metric. The module is the identity exactly when fc2 is zero,
+    so this is L2-SP with the identity as the anchor; fc1 has no pull. Change 3, weight
+    decay: the ''.se.'' parameters get weight decay 0, as the L2-SP-anchored backbone
+    weights do, since the pull replaces it. Every other parameter keeps its group,
+    rate, decay and anchor. Validation, prediction and Kaggle inference run the same
+    backbone. No option and no config field beyond reading optimizer.anchor_alpha_late,
+    which exists.'
+  precedents:
+  - 'run-notes.md, run 22: squeeze-and-excitation in all sixteen blocks, free gates.'
+  - 'run-notes.md, run 5, the audit: stage four and the token projection moved, stages
+    one to three did not.'
+  novelty: First anchored attention module in the backbone; first restricted to the
+    late stages.
+  coverage: Every image, at stages three and four (14 by 14 and 7 by 7 maps).
+  exploitation: 'Read MCL first, then the eleven other labels and the macro, at both
+    multipliers, against the incumbent and against run 22''s per-label changes. Activation
+    and the test of the reading, all from logged values: val_se_gate_abs_deviation
+    above 0 and below run 22''s 0.122 at epoch 10; se_identity_penalty above 0; the
+    training loss at epoch 10 against the incumbent''s 0.5717 and run 22''s 0.5672;
+    the L2-SP penalty against 0.0210 and 0.0191. In the report: the count of missing
+    keys at load (36) and the maximum absolute difference between the backbone''s
+    output with and without the modules at initialisation on a synthetic batch of
+    two images, which must be 0. Shown wrong by: the macro below the incumbent at
+    both multipliers with MCL down again while the gates stay closer to 1 than in
+    run 22.'
+  budget: 'Nine modules on 14 by 14 and 7 by 7 maps instead of sixteen on all stages.
+    Estimate from run 22 (19% more memory and 14% more time for all stages, most of
+    it in stages one and two): training time within 1.05 of the incumbent''s 2,602
+    s and peak GPU memory about 17.5 GB on the card, within 18.5 GB. State both estimates
+    and the parameter count in the report.'
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    Files: modeling/model.py for the placement; training/lightning.py for the penalty,
+    its metric, and the weight decay of the ''.se.'' parameters in build_optimizer.
+    In code that runs every training step write no .item() and no Python loop over
+    studies; the penalty is one sum over eighteen small tensors. Check on the CPU
+    with a randomly initialised timm resnet50 and no project model: only layer3 and
+    layer4 blocks hold a module, the base state dict loads with only ''.se.'' keys
+    missing, and on a batch of two 224 px images without gradient the output equals
+    the base network''s exactly. Check that build_optimizer gives the ''.se.'' parameters
+    head_lr and weight decay 0 and that no L2-SP anchor buffer is registered for them.
+    backbone_mapping and group_matcher must still resolve. model.channels_last stays
+    true.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user's forced seed of 2026-10-13, the configuration the
+    keeper proposed from run 22's evidence, asked for as one bundled run.
+  status: completed
+  created_revision: 455
+  seeded: /home/claudio/src/knee-abnormality-targets-and-inputs/autoresearch/campaigns/targets-and-inputs/seed-ideas-10.yaml
+  experiments:
+  - squeeze-excitation-late-stages-pulled-to-identity-20261013T135910Z-51a685d1
+  - squeeze-excitation-late-stages-pulled-to-identity-20261013T140648Z-21b35c2f
+  decision: reject
+- id: coordinate-attention-late-stages-pulled-to-identity
+  mechanism_id: backbone-coordinate-attention
+  parent_idea_id: null
+  title: Add coordinate attention to the bottlenecks of stages three and four, started
+    as the identity and pulled toward it as L2-SP pulls the weights around it, keeping
+    the Refined-RadImageNet weights
+  opportunity: 'Forced by the user on 2026-10-13 under the contract''s exception for
+    modules inside the blocks. Coordinate attention (arXiv 2103.02907) gates each
+    channel by one profile along the height and one along the width of the feature
+    map, so the gate knows where on the slice a structure is, which a squeeze-and-excitation
+    gate does not. The knee''s labels are tied to positions on the slice (compartments,
+    the joint line, the kneecap). Its published evidence is for networks trained from
+    scratch; the gain when added to a trained network is a guess, low: -0.0005 to
+    +0.001 macro. Never run inside the backbone here (the per-target Gaussian coordinate
+    priors of the medial-lateral-transfer campaign acted on the pooling, not on the
+    backbone). Changed by the user on 2026-10-13 before it ran: run 22 put a free
+    squeeze-and-excitation gate at the head rate in the blocks and lost 0.0010 at
+    x4, with a lower training loss (0.5672 against 0.5717), a validation loss no lower
+    and a lower L2-SP penalty (0.0191 against 0.0210): evidence, medium, one run,
+    that free gates take over adaptation from the anchored convolutions. This seed
+    therefore pulls its gates toward the identity.'
+  mechanism: 'In modeling/model.py, after the ResNet backbone is created and before
+    the RadImageNet weights are loaded, each of the nine bottlenecks of layer3 and
+    layer4 gets timm.layers.coord_attn.CoordAttn(channels of the block''s output)
+    with timm''s defaults except the gate, in the block''s attention slot (block.se,
+    applied after bn3 and before the residual sum). If an adopted incumbent already
+    holds a module in that slot, the slot becomes nn.Sequential(existing module, coordinate
+    attention). Layers 1 and 2 get none. The module must start as the identity: its
+    gate is 2 * sigmoid(x) instead of sigmoid(x) (a small module passed as gate_layer),
+    and the weights of its two output convolutions (the height one and the width one;
+    their biases too if they have one) are zero, so both profiles are exactly 1 at
+    the start. Every other new tensor keeps timm''s default initialisation, drawn
+    under torch.random.fork_rng. The RadImageNet load accepts exactly the new tensors
+    as missing: strict=False, and raise unless the unexpected keys are empty and every
+    missing key contains ''.se.''. Optimizer, for the new tensors only: parameters
+    whose name contains ''.se.'' train in the head group at head_lr with weight decay
+    0 and are not anchored by L2-SP to their initial values; every other parameter
+    keeps its group, rate, decay and anchor. A pull toward the identity replaces the
+    decay: the training loss gains optimizer.anchor_alpha_late (0.001, the strength
+    L2-SP applies to the pretrained weights of these stages) times the sum over the
+    nine modules of the squared entries of the weights of the two output convolutions
+    (the height one and the width one, and their biases if they have one), added where
+    the L2-SP penalty is added and logged in a separate training-side epoch metric
+    coordinate_identity_penalty through _log_epoch_metric. The module is the identity
+    exactly when those two convolutions are zero, so this is L2-SP with the identity
+    as the anchor; the module''s first convolution and its batch norm have no pull.
+    The module''s own batch norm trains as the backbone''s batch norms do. Validation,
+    prediction and Kaggle inference run the same backbone. No option and no config
+    field.'
+  precedents:
+  - 'seed-ideas-7.yaml, squeeze-excitation-in-the-resnet-blocks: the same slot, identity
+    gate, load rule and optimizer treatment.'
+  - 'run-notes.md, run 5, the audit: the last backbone-side gain came through stage
+    four and the token projection.'
+  - run-notes.md, run 22, and seed-ideas-10.yaml, squeeze-excitation-late-stages-pulled-to-identity,
+    the same pull on the squeeze-and-excitation gates.
+  novelty: First position-aware gate inside the backbone.
+  coverage: Every image, at stages three and four (14 by 14 and 7 by 7 maps).
+  exploitation: 'Read the macro and the per-label table at both multipliers, the compartment
+    labels (menisci, the three OA labels) first. Activation: one validation-side epoch
+    metric through _log_epoch_metric, the mean absolute deviation of the product of
+    the two profiles from 1 over the nine modules (0 at initialisation), from values
+    the forward pass already produces; and in the report the count of missing keys
+    at load and the maximum absolute difference between the backbone''s output with
+    and without the modules at initialisation on a synthetic batch of two images,
+    which must be 0. Shown wrong by: the macro below the incumbent at both multipliers
+    while the profiles move away from 1. Also read from logged values: coordinate_identity_penalty
+    above 0, the training loss at epoch 10 against the incumbent''s, and the L2-SP
+    penalty against the incumbent''s.'
+  budget: 'Two pooled profiles and three small convolutions per block on 14 by 14
+    and 7 by 7 maps, and one more stored feature map per gated block. Estimate, not
+    measured: training time within 1.03 of the incumbent''s and peak GPU memory within
+    0.3 GB of it. State both estimates and the parameter count in the report.'
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    Files: modeling/model.py for the modules, the gate, the initialisation and the
+    load; training/lightning.py for the anchor loop, the optimizer group of the ''.se.''
+    parameters and the one metric. Read timm/layers/coord_attn.py for the names of
+    the two output convolutions and the gate argument. Check on the CPU with a randomly
+    initialised timm resnet50 and no project model, in eval mode: the variant loads
+    the base state dict with only ''.se.'' keys missing, and on a batch of two 224
+    px images without gradient its output equals the base network''s exactly. Check
+    that build_optimizer puts the ''.se.'' parameters in the head-rate group and registers
+    no anchor buffer for them, and that backbone_mapping and group_matcher still resolve.
+    model.channels_last stays true. The pull is one sum over eighteen small tensors,
+    written without .item() in the training step. Check that build_optimizer gives
+    the ''.se.'' parameters head_lr and weight decay 0.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user's forced seed of 2026-10-13, replacing coordinate-attention-in-the-late-resnet-blocks
+    with the identity pull added before it ran.
+  status: completed
+  created_revision: 456
+  seeded: /home/claudio/src/knee-abnormality-targets-and-inputs/autoresearch/campaigns/targets-and-inputs/seed-ideas-11.yaml
+  experiments:
+  - coordinate-attention-late-stages-pulled-to-identity-20261013T113055Z-25295378
+  decision: reject
+- id: global-context-pulled-to-identity
+  mechanism_id: backbone-global-context
+  parent_idea_id: global-context-in-the-resnet-blocks
+  title: Additive global-context blocks in the bottlenecks of stages two to four,
+    started at zero and pulled toward zero as L2-SP pulls the weights around them
+  opportunity: 'Forced by the user on 2026-10-13. The free global-context blocks (global-context-in-the-resnet-blocks,
+    training at the head rate with no anchor) reached at epoch 8 an added term about
+    half the size of the block output it is added to (val_global_context_rms_ratio
+    0.53 at epoch 1, 0.48 at epoch 8) while the L2-SP penalty read lower than the
+    incumbent''s (0.0194 against 0.0221), stage four drifted less from the pretrained
+    weights (0.0991 against 0.1090) and the training loss was lower (0.5752 against
+    0.5780), with the x1 validation AUC level at that epoch. Evidence, medium, one
+    run: the unanchored blocks move the backbone''s function further from the pretrained
+    one than the anchor lets the weights move, the opposite of what L2-SP is in the
+    recipe for (site generalisation), and a single fold cannot show the cost. Run
+    22 showed the same pattern with squeeze-and-excitation gates. This seed keeps
+    the block and pulls it toward doing nothing. Guess, low: -0.0005 to +0.0008 macro
+    against the incumbent; the aim is the free run''s level with a much smaller added
+    term.'
+  mechanism: 'In modeling/model.py, after the ResNet backbone is created and before
+    the RadImageNet weights are loaded, each of the thirteen bottlenecks of layer2,
+    layer3 and layer4 gets timm.layers.GlobalContext(channels of the block''s output,
+    use_attn=True, fuse_add=True, fuse_scale=False, rd_ratio=1/16) in the block''s
+    attention slot (block.se, which timm''s Bottleneck applies after bn3 and before
+    the residual sum). If an adopted incumbent already holds a module in that slot,
+    the slot becomes nn.Sequential(existing module, global-context block). Layer1
+    gets none. The block must start as zero: the weight and the bias of its last convolution
+    (mlp_add.fc2) are set to zero (timm''s init_last_zero leaves the bias); every
+    other new tensor keeps timm''s default initialisation, drawn under torch.random.fork_rng.
+    The network then computes the pretrained function exactly at step 0. The RadImageNet
+    load accepts exactly the new tensors as missing: strict=False, and raise unless
+    the unexpected keys are empty and every missing key contains ''.se.''. Optimizer,
+    for the new tensors only: parameters whose name contains ''.se.'' train in the
+    head group at head_lr with weight decay 0 and are not anchored by L2-SP to their
+    initial values; every other parameter keeps its group, rate, decay and anchor.
+    A pull toward zero replaces the decay: the training loss gains optimizer.anchor_alpha_late
+    (0.001, the strength L2-SP applies to the pretrained weights of stages two to
+    four) times the sum over the thirteen blocks of the squared entries of the weight
+    and of the bias of the block''s last convolution (mlp_add.fc2), added where the
+    L2-SP penalty is added and logged in a separate training-side epoch metric global_context_identity_penalty
+    through _log_epoch_metric. The block adds nothing exactly when that convolution
+    is zero, so this is L2-SP with the identity as the anchor; the attention convolution,
+    the first convolution and the layer norm have no pull. The implementation of the
+    free run is the starting point where it exists: outputs/autoresearch/targets-and-inputs/experiments/,
+    the directory whose name starts with global-context-in-the-resnet-blocks, file
+    changes.diff. Validation, prediction and Kaggle inference run the same backbone.
+    No option and no config field.'
+  precedents:
+  - 'run-notes.md, the global-context run and run 22: free modules at the head rate.'
+  - 'seed-ideas-10.yaml and seed-ideas-11.yaml: the same pull on squeeze-and-excitation
+    and on coordinate attention.'
+  - 'docs/ongoing/radimagenet-backbone.md: how the Refined-RadImageNet weights are
+    loaded.'
+  novelty: First global-context block held near the identity.
+  coverage: Every image, at stages two to four.
+  exploitation: 'Read the macro and the per-label table at both multipliers against
+    the incumbent and against the free run. The test of the reading, from logged values:
+    val_global_context_rms_ratio above 0 and well below the free run''s 0.48 at epoch
+    8; global_context_identity_penalty above 0; the L2-SP penalty and backbone_drift_stage4
+    against the incumbent''s (0.0210 and 0.1068 at epoch 10) and the free run''s;
+    the training loss at epoch 10 against the incumbent''s 0.5717. In the report:
+    the count of missing keys at load and the maximum absolute difference between
+    the backbone''s output with and without the blocks at initialisation on a synthetic
+    batch of two images, which must be 0. Shown wrong by: the macro below the incumbent
+    at both multipliers while the added term stays small.'
+  budget: 'As the free run measured: about 18.7 GB on the card and its training time;
+    the pull is one sum over twenty-six small tensors. State the estimates and the
+    parameter count in the report.'
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    Files: modeling/model.py for the modules, their initialisation and the load; training/lightning.py
+    for the anchor loop, the optimizer group of the ''.se.'' parameters and the one
+    metric. Check on the CPU with a randomly initialised timm resnet50 and no project
+    model: the variant loads the base state dict with only ''.se.'' keys missing,
+    and on a batch of two 224 px images without gradient its output equals the base
+    network''s exactly. Check that build_optimizer puts the ''.se.'' parameters in
+    the head-rate group and registers no anchor buffer for them, and that backbone_mapping
+    and group_matcher still resolve. model.channels_last stays true. The pull is written
+    without .item() in the training step. Check that build_optimizer gives the ''.se.''
+    parameters head_lr and weight decay 0.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user's forced seed of 2026-10-13, the global-context block
+    made consistent with L2-SP.
+  status: completed
+  created_revision: 459
+  seeded: /home/claudio/src/knee-abnormality-targets-and-inputs/autoresearch/campaigns/targets-and-inputs/seed-ideas-12.yaml
+  experiments:
+  - global-context-pulled-to-identity-20261013T104255Z-50249551
+  decision: reject
+- id: blur-pool-at-the-stage-transitions-on-average-pool-shortcuts
+  mechanism_id: backbone-anti-aliased-downsampling
+  parent_idea_id: null
+  title: Anti-alias the three stride-two 3 by 3 convolutions of the ResNet-50 with
+    a blur pool, on the same weights
+  opportunity: 'Forced by the user on 2026-10-13 as an exception to the contract''s
+    settled backbone: the same weights in the same places, with a fixed blur added
+    at three places. A stride-two convolution aliases: a one-pixel shift of the input
+    changes which positions are kept, and thin structures flicker between neighbouring
+    tokens. Blur-pool (Making Convolutional Networks Shift-Invariant Again, arXiv
+    1904.11486) runs the convolution at stride 1 and downsamples with a fixed low-pass
+    filter. The crops here are posed from predicted geometry and shifted by augmentation,
+    so the same knee reaches the backbone at different sub-token offsets. The method''s
+    author initialises anti-aliased networks from baseline weights and fine-tunes
+    (evidence, medium, no numbers found); on pretrained weights the function changes
+    slightly at the start (0.013 relative on random weights for the full variant,
+    measured by the modernisation review of 2026-10-13). Guess, low: -0.0005 to +0.001
+    macro. Never run here. Requeued by the keeper on 2026-10-13: the first run of
+    this seed was cancelled 275 s into training when the user stopped the campaign
+    to adopt the average-pool shortcuts (run 27), so it has no result. This run applies
+    the same change to the new incumbent, whose three stride-two shortcuts are already
+    (average pool, 1 by 1 convolution at stride 1, batch norm); those shortcuts stay
+    as the incumbent has them.'
+  mechanism: 'In modeling/model.py, after the ResNet backbone is created with today''s
+    arguments and the RadImageNet weights are loaded strictly as today, the first
+    block of layer2, layer3 and layer4 is changed in place: its 3 by 3 convolution
+    conv2 runs at stride 1 with the same weight tensor, and the block''s anti-aliasing
+    slot (block.aa, applied by timm''s Bottleneck after the activation that follows
+    bn2) becomes timm.layers.BlurPool2d(channels of conv2''s output, filt_size=3,
+    stride=2). This is what timm builds for these blocks with aa_layer=BlurPool2d;
+    the stem''s max pool and the shortcuts stay as they are, so the stem keeps its
+    memory and no 112 by 112 map is added. The blur has no trainable parameter; no
+    key is added to or missing from the load. The L2-SP anchors and the optimizer
+    groups are unchanged. Validation, prediction and Kaggle inference run the same
+    backbone. No option and no config field.'
+  precedents:
+  - 'docs/ongoing/radimagenet-backbone.md: how the Refined-RadImageNet weights are
+    loaded.'
+  - 'docs/research/input-resolution.md: downsampling must be antialiased; the repository
+    resampler is, the backbone is not.'
+  novelty: First anti-aliased downsampling inside the backbone.
+  coverage: Every image, at the three stride-two transitions.
+  exploitation: 'Read the macro and the per-label table at both multipliers, the menisci,
+    MCL and ACL first (the thinnest structures), and the step from x1 to x4. Activation:
+    the report states the three blocks'' conv2 stride (1) and aa module (BlurPool2d,
+    stride 2), that the strict load passed, the stage outputs'' shapes (28, 14 and
+    7 at 224 px), and the relative difference between the backbone''s output with
+    and without the blur on a synthetic batch of two images with the same weights
+    (above 0). Nothing new is logged in training. Shown wrong by: the macro below
+    the incumbent at both multipliers.'
+  budget: 'Three 3 by 3 convolutions run at four times their output positions (56,
+    28 and 14 instead of 28, 14 and 7), about 1.0 of the backbone''s 4.1 GMACs more,
+    and their outputs are stored at that size. Estimate, not measured: training time
+    1.15 to 1.20 of the incumbent''s (about 3,000 to 3,150 s, inside the campaign''s
+    3,364 s), prediction time the same share, and peak GPU memory 0.5 to 1.0 GB above
+    the incumbent''s 16.7 GB, within 18.5 GB. State both estimates in the report;
+    never fewer epochs, images or slices to fit. The cancelled first run started at
+    about 1.1 steps per second in its first minute against the incumbent''s 1.9 after
+    warm-up; report the measured rate, and if the projected training time exceeds
+    the campaign''s 3,364 s remove cost the mechanism does not need before returning.'
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    Files: modeling/model.py. Read timm/models/resnet.py (Bottleneck: use_aa, conv2''s
+    stride, self.aa) and build the three blocks the way timm does with aa_layer, by
+    changing the existing modules after the load or by creating the backbone with
+    aa_layer and restoring the stem''s max pool; either way the result must be exactly:
+    stem unchanged, conv2 of layer2.0, layer3.0 and layer4.0 at stride 1 followed
+    by BlurPool2d at stride 2, shortcuts unchanged. Check on the CPU with a randomly
+    initialised timm resnet50 and no project model that the base state dict loads
+    strictly and that backbone_mapping, the stage outputs'' shapes and group_matcher
+    resolve as before; if the feature mapping needs the blur''s footprint for the
+    token positions, extend it and say so. If an adopted incumbent holds modules in
+    the blocks'' attention slot, they are untouched. model.channels_last stays true.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user's forced seed of 2026-10-13, requeued after its first
+    run was cancelled for an adoption.
+  status: launched
+  created_revision: 545
+  seeded: /home/claudio/src/knee-abnormality-targets-and-inputs/autoresearch/campaigns/targets-and-inputs/seed-ideas-13.yaml
+  experiments:
+  - blur-pool-at-the-stage-transitions-on-average-pool-shortcuts-20261013T141353Z-a5bc1f23

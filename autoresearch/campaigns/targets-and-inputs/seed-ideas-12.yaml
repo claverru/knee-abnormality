@@ -1,0 +1,71 @@
+ideas:
+- id: global-context-pulled-to-identity
+  mechanism_id: backbone-global-context
+  parent_idea_id: global-context-in-the-resnet-blocks
+  title: Additive global-context blocks in the bottlenecks of stages two to four, started at zero and
+    pulled toward zero as L2-SP pulls the weights around them
+  opportunity: 'Forced by the user on 2026-10-13. The free global-context blocks (global-context-in-the-resnet-blocks,
+    training at the head rate with no anchor) reached at epoch 8 an added term about half the size of
+    the block output it is added to (val_global_context_rms_ratio 0.53 at epoch 1, 0.48 at epoch 8) while
+    the L2-SP penalty read lower than the incumbent''s (0.0194 against 0.0221), stage four drifted less
+    from the pretrained weights (0.0991 against 0.1090) and the training loss was lower (0.5752 against
+    0.5780), with the x1 validation AUC level at that epoch. Evidence, medium, one run: the unanchored
+    blocks move the backbone''s function further from the pretrained one than the anchor lets the weights
+    move, the opposite of what L2-SP is in the recipe for (site generalisation), and a single fold cannot
+    show the cost. Run 22 showed the same pattern with squeeze-and-excitation gates. This seed keeps the
+    block and pulls it toward doing nothing. Guess, low: -0.0005 to +0.0008 macro against the incumbent;
+    the aim is the free run''s level with a much smaller added term.'
+  mechanism: 'In modeling/model.py, after the ResNet backbone is created and before the RadImageNet weights
+    are loaded, each of the thirteen bottlenecks of layer2, layer3 and layer4 gets timm.layers.GlobalContext(channels
+    of the block''s output, use_attn=True, fuse_add=True, fuse_scale=False, rd_ratio=1/16) in the block''s
+    attention slot (block.se, which timm''s Bottleneck applies after bn3 and before the residual sum).
+    If an adopted incumbent already holds a module in that slot, the slot becomes nn.Sequential(existing
+    module, global-context block). Layer1 gets none. The block must start as zero: the weight and the
+    bias of its last convolution (mlp_add.fc2) are set to zero (timm''s init_last_zero leaves the bias);
+    every other new tensor keeps timm''s default initialisation, drawn under torch.random.fork_rng. The
+    network then computes the pretrained function exactly at step 0. The RadImageNet load accepts exactly
+    the new tensors as missing: strict=False, and raise unless the unexpected keys are empty and every
+    missing key contains ''.se.''. Optimizer, for the new tensors only: parameters whose name contains
+    ''.se.'' train in the head group at head_lr with weight decay 0 and are not anchored by L2-SP to their
+    initial values; every other parameter keeps its group, rate, decay and anchor. A pull toward zero
+    replaces the decay: the training loss gains optimizer.anchor_alpha_late (0.001, the strength L2-SP
+    applies to the pretrained weights of stages two to four) times the sum over the thirteen blocks of
+    the squared entries of the weight and of the bias of the block''s last convolution (mlp_add.fc2),
+    added where the L2-SP penalty is added and logged in a separate training-side epoch metric global_context_identity_penalty
+    through _log_epoch_metric. The block adds nothing exactly when that convolution is zero, so this is
+    L2-SP with the identity as the anchor; the attention convolution, the first convolution and the layer
+    norm have no pull. The implementation of the free run is the starting point where it exists: outputs/autoresearch/targets-and-inputs/experiments/,
+    the directory whose name starts with global-context-in-the-resnet-blocks, file changes.diff. Validation,
+    prediction and Kaggle inference run the same backbone. No option and no config field.'
+  precedents:
+  - 'run-notes.md, the global-context run and run 22: free modules at the head rate.'
+  - 'seed-ideas-10.yaml and seed-ideas-11.yaml: the same pull on squeeze-and-excitation and on coordinate
+    attention.'
+  - 'docs/ongoing/radimagenet-backbone.md: how the Refined-RadImageNet weights are loaded.'
+  novelty: First global-context block held near the identity.
+  coverage: Every image, at stages two to four.
+  exploitation: 'Read the macro and the per-label table at both multipliers against the incumbent and
+    against the free run. The test of the reading, from logged values: val_global_context_rms_ratio above
+    0 and well below the free run''s 0.48 at epoch 8; global_context_identity_penalty above 0; the L2-SP
+    penalty and backbone_drift_stage4 against the incumbent''s (0.0210 and 0.1068 at epoch 10) and the
+    free run''s; the training loss at epoch 10 against the incumbent''s 0.5717. In the report: the count
+    of missing keys at load and the maximum absolute difference between the backbone''s output with and
+    without the blocks at initialisation on a synthetic batch of two images, which must be 0. Shown wrong
+    by: the macro below the incumbent at both multipliers while the added term stays small.'
+  budget: 'As the free run measured: about 18.7 GB on the card and its training time; the pull is one
+    sum over twenty-six small tensors. State the estimates and the parameter count in the report.'
+  implementation: 'Follow the environment paragraph of the developer instructions. Files: modeling/model.py
+    for the modules, their initialisation and the load; training/lightning.py for the anchor loop, the
+    optimizer group of the ''.se.'' parameters and the one metric. Check on the CPU with a randomly initialised
+    timm resnet50 and no project model: the variant loads the base state dict with only ''.se.'' keys
+    missing, and on a batch of two 224 px images without gradient its output equals the base network''s
+    exactly. Check that build_optimizer puts the ''.se.'' parameters in the head-rate group and registers
+    no anchor buffer for them, and that backbone_mapping and group_matcher still resolve. model.channels_last
+    stays true. The pull is written without .item() in the training step. Check that build_optimizer gives
+    the ''.se.'' parameters head_lr and weight decay 0.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user's forced seed of 2026-10-13, the global-context block made consistent with
+    L2-SP.
+exhausted_directions: None; one seed asked for by the user on 2026-10-13 after the free global-context
+  run's logged values.

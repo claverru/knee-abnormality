@@ -1,0 +1,239 @@
+ideas:
+- id: soft-prevalence-class-weights
+  mechanism_id: class-weights
+  parent_idea_id: null
+  title: Compute the class weights from the mean soft target of each label instead of its thresholded fraction
+  opportunity: >-
+    The class weights (exponent 0.5) are computed from the fraction of training cells at or above 0.5.
+    The targets are soft, and on the labels with many uncertain cells the two prevalences differ most:
+    Synovitis 0.124 thresholded against 0.310 soft, Fracture 0.064 against 0.125, MCL 0.050 against
+    0.098, Effusion 0.272 against 0.347 (prior-work.md, the training targets). Synovitis is the
+    reference's weakest label (0.8954) and its positive weight is 2.16 although a third of its cells
+    are uncertain. Guess, low-medium: +0 to +0.001 macro, Synovitis, Fracture and Effusion first.
+    Class weighting has disagreed with the public board before, so an adoption is provisional.
+  mechanism: >-
+    Today fixed_class_balance (training/lightning.py) sets, per label, fraction = (observed training
+    cells with target >= 0.5) / (observed training cells), then rho = ((1 - fraction) / fraction) **
+    exponent, negative_weight = 1 / (fraction * rho + 1 - fraction), positive_weight = rho *
+    negative_weight. The change is one line: fraction = the mean of the label's observed training
+    targets (column target_<label>, gold studies included with their official values). Everything
+    after it is unchanged, and so is the loss, which still gives a cell the positive weight when its
+    target is >= 0.5 and the negative weight otherwise. The returned dictionary keeps its keys:
+    positive and negative stay the thresholded counts, positive_fraction holds the soft mean. Expected
+    positive weights, computed on the non-gold studies: about 1.29 for Synovitis (from 2.16), 2.19 for
+    Fracture (from 3.15), 2.55 for MCL (from 3.66), 1.21 for Effusion (from 1.38).
+  precedents:
+  - 'prior-work.md, precedents: exponent 0.5 lost on fold 0 and won publicly; a ramped exponent tied; soft-mass weighting and a prior offset lost 0.0092 and 0.0119 while changing other loss semantics.'
+  - 'docs/backlog/small-changes.md, weighting strength: the entry this seed implements.'
+  novelty: First isolated run of soft prevalence; first class-weight change on a RadImageNet backbone.
+  coverage: Every training cell of every label; the weights change most on Synovitis, Fracture, MCL and Baker's.
+  exploitation: >-
+    Read Synovitis, Fracture, MCL, Baker's and Effusion, then the macro, at both multipliers and on the
+    x1 mean of epochs 6 to 10. Activation: the twelve positive_fraction and positive_weight values of
+    the run's fold_2/class_balance.json, listed in the report beside the reference's. No new metric.
+    Shown wrong by: the macro below the incumbent at both multipliers with Synovitis and Fracture down.
+  budget: The reference's training time; the weights are computed once per fold.
+  implementation: >-
+    Follow the environment paragraph of the developer instructions. File: training/lightning.py,
+    function fixed_class_balance only. Replaces the thresholded fraction; no option, no config field.
+    Keep the dictionary's keys and its version 1, because validated_class_balance_weights and the
+    resume check in the protected training/checkpoints.py read them. Check without a GPU: call
+    fixed_class_balance on the fold-2 training frame from load_fold_labels and print the twelve
+    fractions and weights before and after. If hard-report-targets is in the incumbent the soft mean
+    equals the thresholded fraction on non-gold cells: return blocked and say so.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Ranked first by the user's ordering; one function, aimed at the weakest label.
+- id: stable-intensity-bounds
+  mechanism_id: intensity-bounds
+  parent_idea_id: null
+  title: Take a series' clipping bounds from a fixed set of its slices instead of the slices drawn
+  opportunity: >-
+    The 0.005 and 0.995 quantiles that clip and scale a series are taken over the slices selected for
+    the bag, so the same slice gets different pixel values when its companions change: between epochs,
+    and between training (five or six triplets of a series) and x4 prediction (most of the series).
+    Measured on 40 studies: the high bound moves 0.072 at the median and 0.245 at the 90th percentile
+    between draws, more than the 0.2 range of the contrast augmentation in 14.2% of series, mostly
+    series with few triplets (prior-work.md). The effect on AUC was never measured. Guess, low-medium:
+    +0 to +0.001 macro, more at x4 than at x1.
+  mechanism: >-
+    Today: prepare_series (data/preprocessing/preparation.py) decodes the unique slices of the selected
+    triplets into PreparedSeries.frames and sets quantile_ranks from their pixel count; device.py
+    (_prepare_on_cpu and prepare_images) then takes the two quantiles over the central image-size
+    window (central_rectangle) of every frame of the series, and normalises the frames that carry an
+    image. Change: the quantiles are taken over a reference set R of the series that does not depend
+    on the selection. R is the slices at positions round(i * (n - 1) / (k - 1)), i = 0..k-1, k =
+    min(n, 7), of the series' n indexed slices in original_index order (all of them when n <= 7; the
+    one slice when n = 1). Frames of R that no selected triplet uses are decoded with the same decoder
+    and cache and appended to the series' frames as frames without an image; device.py already
+    supports such frames (the slot < 0 branch of _prepare_on_cpu, which reads only their central
+    window). Each frame carries a flag saying whether it is in R; the quantile population and the
+    pixel count given to quantile_ranks are the central windows of the flagged frames only, so a
+    selected slice outside R is normalised by the bounds and does not enter them. The quantile levels,
+    the central window, the normalisation and every image pixel path are unchanged.
+  precedents:
+  - 'docs/data-preparation/preprocessing-implementation-and-profile.md, clipping-bound stability across draws: the measurement.'
+  - 'docs/backlog/big-bets.md, sampling-independent intensity bounds: the entry this seed implements.'
+  - 'prior-work.md, precedents: other quantile levels lost 0.0003 and 0.0021; this changes the pixel population, not the levels.'
+  novelty: First run with bounds independent of the drawn slices.
+  coverage: Every series; series with few selected triplets most.
+  exploitation: >-
+    Read the macro at x4 and x1 and the step from x1 to x4 against the incumbent's. Activation: in the
+    report, for two studies, the low and high bound of every series at x1 and at x4 and in two epochs
+    of the training selection, which must be identical four times, beside the bounds the old code
+    gives for the same four selections. No new metric in training or validation. Shown wrong by: both
+    multipliers below the incumbent.
+  budget: >-
+    Up to seven extra slice decodes per series in the loader workers (a study has about six series;
+    4 to 5 of the 16 workers are busy today). Training time within 1.10 of the reference's. Report the
+    loader seconds per study on two studies before and after; if the measured increase would push an
+    epoch past 1.10, lower k to 5 and say so.
+  implementation: >-
+    Follow the environment paragraph of the developer instructions. Files:
+    data/preprocessing/preparation.py (prepare_series takes the series' reference records beside the
+    selected ones, returns the extra frames, the per-frame flag and the pixel count of R),
+    data/dataset.py (the caller passes the reference records of the indexed series; the collate
+    carries the flag in the frame tuples), data/preprocessing/device.py (both _prepare_on_cpu and
+    prepare_images restrict the quantile population to flagged frames; _region_values on the GPU path
+    likewise), data/preprocessing/intensity.py only if a helper is needed. Replaces the old
+    population; no option. R is chosen by slice order alone, with no randomness, and is the same for
+    the 84 mm, 93 mm and 64 mm views of one series. A reference slice that fails to decode is dropped
+    from R; if R is empty the series is handled as an undecodable series is today. The preprocessing
+    identity changes, which the campaign permits.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The only seed whose premise is a measurement on our data.
+- id: uncertain-report-targets-weigh-less
+  mechanism_id: target-uncertainty-weights
+  parent_idea_id: null
+  title: Weigh each report-derived training cell by how far its target is from 0.5
+  opportunity: >-
+    A report-derived target near 0.5 means the sources disagree or the report hedges; the loss pulls
+    the prediction of such a cell to the middle with full weight. The labels with most such cells
+    include the two weakest: 33% of Synovitis cells, 34% of Effusion and 24% of PF OA lie between 0.25
+    and 0.75, against 3 to 8% for the menisci, ACL and Fracture (prior-work.md). An all-or-nothing mask
+    of low-evidence cells was rejected early; a graded weight was never run. Guess, low-medium: +0 to
+    +0.001 macro, Synovitis, Effusion and PF OA first.
+  mechanism: >-
+    Today masked_binary_cross_entropy_with_logits (training/lightning.py) computes the BCE of every
+    cell against its soft target, multiplies it by the positive or negative class weight, and averages
+    over the observed cells of the batch. Change: before the average, the loss of a cell of a non-gold
+    study is also multiplied by u = abs(2 * t - 1) / m_label, t the cell's target and m_label the mean
+    of abs(2 * t - 1) over the observed non-gold training cells of that label in the fold (0.538 for
+    Synovitis to 0.856 for MCL), so each label keeps its total loss mass. Cells of gold studies keep u
+    = 1. The targets, the class weights and the average over observed cells are unchanged. A cell at
+    exactly 0.5 contributes nothing.
+  precedents:
+  - 'prior-work.md, precedents: the binary mask of low-evidence cells was rejected; shared balanced focal, which up-weights hard cells, lost 0.0026.'
+  - 'docs/backlog/small-changes.md, report-label supervision, source-aware uncertainty weighting: the entry this seed implements with the target itself as the evidence.'
+  novelty: First graded uncertainty weight; the direction opposite to focal weighting.
+  coverage: Every non-gold cell; a third of Synovitis and Effusion cells lose most of their weight.
+  exploitation: >-
+    Read Synovitis, Effusion, PF OA and Medial OA, then the macro, at both multipliers. Activation: the
+    twelve m_label values listed in the report, and one training-side epoch metric through
+    _log_epoch_metric, the mean u of the batch's observed cells (it must stay near 1). Shown wrong by:
+    those four labels down as a group at both multipliers.
+  budget: The reference's training time; one multiplication per cell.
+  implementation: >-
+    Follow the environment paragraph of the developer instructions. File: training/lightning.py only.
+    The batch already carries is_gold (one boolean per study), target and target_observed. Compute the
+    twelve m_label once per fold from the training frame where the class balance is computed, keep
+    them as a buffer, and pass them with batch["is_gold"] to the loss. Adds a cell weight; no option,
+    no config field. Validation is not weighed. If hard-report-targets is in the incumbent every
+    non-gold target is 0 or 1 and u is 1: return blocked and say so.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Aims at the weak labels through the property they share.
+- id: hard-report-targets
+  mechanism_id: hard-report-targets
+  parent_idea_id: null
+  title: Train the report-derived cells on 0 or 1 instead of their soft values
+  opportunity: >-
+    The evaluation is on hard labels and the training targets are soft. Whether the soft values help
+    has never been tested on the current labels: the rebuild calibrated them on 58 gold studies, and
+    the labels where soft and hard differ most (Synovitis 0.310 soft against 0.124 thresholded,
+    Effusion, PF OA) include the two weakest (prior-work.md). Guess, low: -0.001 to +0.001 macro;
+    informative either way for the two weighting seeds.
+  mechanism: >-
+    Today load_fold_labels (data/labels.py) builds target_<label> for a training study as the
+    official value when the study is gold and the rebuild_state_v2 value otherwise. Change: for
+    training rows that are not gold, target_<label> is 1.0 when the table's value is >= 0.5 and 0.0
+    otherwise (null stays null). Gold training rows, the validation frame and its targets are
+    unchanged. The class weights are unchanged by construction, since they already count cells at or
+    above 0.5.
+  precedents:
+  - 'docs/backlog/small-changes.md, report-label supervision, hard versus soft report-derived targets: the entry this seed implements.'
+  - 'prior-work.md, the training targets: where soft and hard differ.'
+  novelty: First hard-target run on rebuild_state_v2.
+  coverage: Every non-gold cell that is not already 0 or 1; a third of Synovitis and Effusion cells move by more than 0.25.
+  exploitation: >-
+    Read Synovitis, Effusion, PF OA and Medial OA, then the macro, at both multipliers. The validation
+    loss and val_soft_macro_auc change by construction and decide nothing. Activation: per label, the
+    share of non-gold training cells whose target changed, listed in the report. No new metric. Shown
+    wrong by: the macro below the incumbent at both multipliers.
+  budget: The reference's training time.
+  implementation: >-
+    Follow the environment paragraph of the developer instructions. File: data/labels.py only, in the
+    training frame after the gold override; the validation frame must stay byte-identical (the
+    comparison rejects a changed one). Replaces the soft training targets; no option, no config
+    field. Check without a GPU: load the fold-2 labels before and after and report that the validation
+    frame is equal and how many training cells changed per label. If soft-prevalence-class-weights is
+    in the incumbent, its soft mean now equals the thresholded fraction: say so in the report.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The blunt form of the two weighting seeds; its sign tells whether softness carries signal.
+- id: mask-decoder-beside-the-labels
+  mechanism_id: mask-decoder
+  parent_idea_id: null
+  title: Teach the backbone the masks through a decoder at the second stage's resolution, in training only
+  opportunity: >-
+    The bone and soft-tissue maps are taught per fourth-stage token (7 by 7) and per third-stage cell
+    (14 by 14), 6 to 17 mm wide, from masks that exist at 1 mm. The per-token map was worth +0.002
+    public on this backbone (S126 against S119) with +0.0017 at x1. A decoder that predicts the masks
+    on the second stage's 28 by 28 grid asks the earlier stages for the boundaries the labels depend
+    on (cartilage, menisci, the joint line). Guess, low-medium: +0 to +0.001 macro, the meniscus and OA
+    labels first.
+  mechanism: >-
+    In training only, a decoder reads three feature maps of the main pass: the second-stage output (28
+    by 28, the tensor _backbone_to_stride_8 returns), the third-stage output (14 by 14) and the
+    fourth-stage output (7 by 7). Each goes through a 1 by 1 convolution to 64 channels; the 7 by 7
+    map is upsampled by 2 (bilinear) and added to the 14 by 14 one, a 3 by 3 convolution with batch
+    norm and ReLU follows, the result is upsampled by 2 and added to the 28 by 28 one, and a second 3
+    by 3 convolution with batch norm and ReLU follows. Two 1 by 1 heads on that map predict the seven
+    bone classes and the seven soft-tissue classes per cell. Targets: the class shares of each cell
+    from the prepared volumes, obtained as the existing map targets are (AnatomyTargets.token_shares
+    in training/anatomy.py, given each cell's patient position and its two step vectors), for the 28
+    by 28 cells of every image. Loss: the existing anatomy_loss with its coverage rule, once per head,
+    each added to the training loss at weight 0.1. The existing per-token and per-cell map heads, their
+    losses, the routing that reads them and everything in validation and prediction are unchanged.
+  precedents:
+  - 'prior-work.md, precedents: the anatomy map and posed crops on the ResNet-50.'
+  - 'docs/backlog/big-bets.md, anatomy masks, segmentation before the labels: the entry this seed implements as a side task.'
+  novelty: First dense mask supervision finer than the third-stage grid.
+  coverage: The studies with prepared volumes (about 400 knees for bone, 265 for soft tissue); the backbone's stages one to four.
+  exploitation: >-
+    Read the menisci, the three OA labels and ACL, then the macro, at both multipliers. Activation: two
+    training-side epoch metrics through _log_epoch_metric, the decoder's bone loss and its soft-tissue
+    loss, which must fall over the epochs, and the number of supervised cells per epoch (one metric,
+    reduce sum). Nothing is logged on validation: the decoder does not run there. Shown wrong by: the
+    macro below the incumbent at both multipliers while both decoder losses fall.
+  budget: >-
+    No extra backbone pass. The decoder adds two 3 by 3 convolutions at 64 channels on 14 by 14 and 28
+    by 28 maps for about 250 images per step. Training time within 1.10 of the reference's and peak GPU
+    memory within 18 GB (16.2 GB now); state both estimates and the parameter count in the report.
+  implementation: >-
+    Follow the environment paragraph of the developer instructions. Files: modeling/model.py,
+    training/lightning.py, training/anatomy.py only if token_shares needs a small generalisation. Adds
+    a training-only module; no option, no config field. In the training branch of the method that
+    calls _backbone_to_stride_8 and _backbone_stage_outputs, keep the second-stage tensor and put the
+    three maps in the encoded dictionary; do not change the signature or the return value of
+    _backbone_features, which Kaggle inference replaces with fixed chunks (use_fixed_backbone_chunks
+    in inference/engine.py). The 28 by 28 cells' patient positions and steps are derived the way the
+    14 by 14 cells' are (meniscus_patient_position, meniscus_token_steps) with half the step. Build
+    the decoder under torch.random.fork_rng. Its parameters are part of the model, so strict loading
+    holds; it is called only when self.training is true. The decoder takes the features after the
+    feature-statistics augmentation, as the stages do.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Extends the one side task that reached the ResNet-50.
+exhausted_directions: None; these are the first five of ten forced seeds.

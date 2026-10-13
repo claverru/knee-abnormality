@@ -1,0 +1,51 @@
+ideas:
+- id: soft-prevalence-class-weights-on-the-incumbent
+  mechanism_id: class-weights
+  parent_idea_id: soft-prevalence-class-weights
+  title: Compute the class weights from the mean soft target of each label, on the current incumbent
+  opportunity: >-
+    The user's decision of 2026-10-13: adopt the soft-prevalence class weights. Run 1 tested them on
+    the reference (x4 0.937509 against 0.937000, x1 0.929788 against 0.928460, soft AUC +0.000871)
+    and passed the rule; the keeper took it out of the incumbent on 2026-10-12 because class
+    weighting had disagreed with the public board before. The pair is now read publicly at the same
+    settings (single model, x4, tau 0.9): S150 with the soft-prevalence weights 0.960, fifth in
+    Kaggle's score order, against its reference S151 0.959, thirteenth. Evidence, medium, one pair
+    on fold 2: local and public agree in sign. The incumbent has since gained the mask decoder and
+    the OA detector without these weights, so the change is applied to it in one run and that run
+    becomes the incumbent by the user's decision.
+  mechanism: >-
+    Exactly the change of run 1, on the current incumbent's source. In fixed_class_balance
+    (training/lightning.py) the per-label fraction is the mean of the label's observed training
+    targets (column target_<label>, gold studies included with their official values) instead of
+    (observed training cells with target >= 0.5) / (observed training cells). Everything after it is
+    unchanged: rho = ((1 - fraction) / fraction) ** exponent, negative_weight = 1 / (fraction * rho
+    + 1 - fraction), positive_weight = rho * negative_weight, and the loss still gives a cell the
+    positive weight when its target is >= 0.5 and the negative weight otherwise. The returned
+    dictionary keeps its keys: positive and negative stay the thresholded counts, positive_fraction
+    holds the soft mean. Run 1's diff is at
+    outputs/autoresearch/targets-and-inputs/experiments/soft-prevalence-class-weights-20261012T164257Z-743f1d48/changes.diff:
+    port it unchanged. Expected positive weights as in run 1: about 1.29 for Synovitis (from 2.16),
+    2.19 for Fracture (from 3.15), 2.55 for MCL (from 3.66), 1.21 for Effusion (from 1.38).
+  precedents:
+  - 'run-notes.md, run 1 with its public pair S150 and S151, and the proxies for the public direction.'
+  - 'prior-work.md, precedents: exponent 0.5 lost on fold 0 and won publicly; a ramped exponent tied.'
+  novelty: First run of the soft-prevalence weights together with the mask decoder and the OA detector.
+  coverage: Every training cell of every label; the weights change most on Synovitis, Fracture, MCL and Baker's.
+  exploitation: >-
+    Read Synovitis, Fracture, MCL, Baker's, Effusion and PF OA, then the macro, at both multipliers,
+    against the incumbent and against run 1's per-label changes (Fracture +0.0042, Contusion
+    +0.0031, Effusion +0.0017, PF OA -0.0028, Synovitis -0.0036 at x4). Activation: the twelve
+    positive_fraction and positive_weight values of the run's fold_2/class_balance.json, listed in
+    the report beside the incumbent's and beside run 1's, which they must equal. No new metric.
+  budget: The incumbent's training time and GPU memory; the weights are computed once per fold.
+  implementation: >-
+    Follow the environment paragraph of the developer instructions. File: training/lightning.py,
+    function fixed_class_balance only. Replaces the thresholded fraction; no option, no config field.
+    Keep the dictionary's keys and its version 1, because validated_class_balance_weights and the
+    resume check in the protected training/checkpoints.py read them. Check without a GPU: call
+    fixed_class_balance on the fold-2 training frame from load_fold_labels and print the twelve
+    fractions and weights, and compare them with run 1's class_balance.json.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user's adoption decision of 2026-10-13, after the public pair S150 against S151; first in the queue so the backbone seeds build on it.
+exhausted_directions: None; one seed that applies an adoption the user decided on 2026-10-13 to the current incumbent.

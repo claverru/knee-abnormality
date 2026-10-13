@@ -76,36 +76,6 @@ levels lost: 0.001/0.999 by 0.0003 and 0.01/0.99 by 0.0021
   1.20) and varying slice to slice in 23 of 30 series, so they are neither a tighter nor a
   sampling-independent bound.
 
-## Sampling-independent intensity bounds
-
-**Code observation; size measured, harm on the metric unmeasured.** `prepare_series`
-(`src/knee_abnormality/data/preprocessing/preparation.py`) takes the intensity quantiles over the
-unique slices of the selected triplets, so the same source slice gets different normalized pixels
-when its companion slices change: between training epochs, and between training and the 2×
-validation bag. The variability may also act as useful augmentation.
-
-1. **Measured 2026-09-20** on 40 studies over six epochs
-   ([bound stability](../data-preparation/preprocessing-implementation-and-profile.md#clipping-bound-stability-across-draws)):
-   the high bound moves 0.072 at the median and 0.245 at p90 between draws of one series, against
-   the 0.2 relative range of the contrast augmentation, and 14.2% of series exceed it. The spread
-   is a small-sample effect concentrated in series with few triplets (0.150 at two or fewer, 0.025
-   above six), not a property of the estimator: robust estimators calibrated to the same clip level
-   gain about one point, and per-triplet bounds are four times worse. Not measured: normalized-pixel
-   and clipping differences on shared source slices, the 1× versus 2× bags, or any effect on AUC.
-2. **Only if material:** estimate the bounds from a deterministic sparse reference sample of each
-   acquisition, independent of epoch, bag size and selected windows, identical in training,
-   validation and inference, at the current quantile levels. Define short-series and
-   decode-failure fallbacks. It changes the preprocessing identity; cache scalar bounds only under
-   an identity that prevents stale reuse.
-
-- *Distinct from* the quantile-level runs and the learned bounds above: it changes the pixel
-  population, not the levels or the estimator.
-- *Cost:* extra decoding, against the
-  [select-before-decoding](../architecture/data-flow-and-iteration-speed.md#iteration-speed) rule
-  that the [loading speedups](loading-speedup/INDEX.md) rely on.
-- *Stop if* the variability is negligible, the runtime cost is disproportionate, or a controlled
-  run gains nothing.
-
 ## Auxiliary-loss campaign
 
 **Requested by the user on 2026-09-22; undefined and unstarted.** An autoresearch campaign on
@@ -211,29 +181,6 @@ the control's.
   kept it on sagittal fluid), separate normalisation statistics per pixel size.
 - **Not confirmed outside fold 0:** about 30 view choices have been made on the same 912
   studies; a second fold or a public submission is the check.
-
-## Hard-pair mining phase
-
-**One unverified external report; untested here (added 2026-09-25).** Another participant says
-their best setup ends with 3 epochs of hard mining: score the training set, mine the pairs the model
-orders worst, batch each pair together and train on those batches. Their loss and mining schedule
-are unknown; ask for both before designing anything.
-
-- **Why batching matters:** our only pair term is the within-microbatch ranking loss (batch size 8,
-  about 118 usable pairs per step). With random batches most hard pairs never share a batch, which
-  may explain why the always-on hybrid
-  [was neutral](../../autoresearch/campaigns/losses/findings.md#completion-20260920t121537z-5b39b418)
-  (+0.0007, interval spanning zero). Mining changes the pairs the term sees, not its formula.
-- **Without a pair term** it reduces to oversampling hard studies, and the nearest measured
-  relative, [shared balanced focal](../../autoresearch/campaigns/losses/findings.md#completion-20260920t124339z-2948d523)
-  (up-weighting hard cells), lost 0.0026. The losses campaign's `shared-ranking-memory-bank`
-  (pairs against stored scores beyond the batch) is the closest unrun relative, still blocked.
-- **Design constraints:** one mining rule shared by all twelve labels; mine only training studies;
-  training-set scores partly reflect memorization, so the hardness source is an open choice; hard
-  pairs under soft labels can be label noise rather than signal, the
-  [OA audit](../history/sharing/oa-and-meniscus-disagreement-audit.md) found such cells.
-- **Test:** the incumbent recipe plus a final mined phase against a fresh control at the same
-  total budget.
 
 ## Patellofemoral OA evidence
 
@@ -348,8 +295,16 @@ and the posed crops. All are guesses about the score; the segmenter never runs a
 - **Masks for every training knee.** About 400 of 3,500 training knees carry targets; the map
   already reaches 0.90 overlap on femur and tibia with them, so what the rest would add is
   unknown.
-- **Segmentation before the labels.** A stage that teaches the backbone to segment knees, or a
-  full decoder beside the labels dropped at prediction, instead of the per-token map head.
+- **Segmentation before the labels.** A stage that teaches the backbone to segment knees before
+  the label training. The decoder beside the labels is in the recipe since 2026-10-13
+  ([result](../validation/results/2026-10-13-targets-and-inputs-campaign.md#what-was-adopted)); more decoder weight and a finer level added nothing.
+- **The label path reads the mask decoder's features** (untested; kept out of the
+  targets-and-inputs campaign by its contract). The decoder's 64-channel 28 by 28 map pooled to
+  the token grid and added to the tokens through a zero-started projection, or the soft-tissue
+  routing reading the decoder's class shares pooled to 14 by 14 in place of the cell head's. It
+  is the direct test of whether the decoder's gain is a feature effect; the decoder then runs at
+  prediction, on the model's own features.
+
 ## Parked until a specific need
 
 ### Fused study volume and 3D model

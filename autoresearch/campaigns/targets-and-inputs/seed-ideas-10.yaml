@@ -1,0 +1,73 @@
+ideas:
+- id: squeeze-excitation-late-stages-pulled-to-identity
+  mechanism_id: backbone-channel-attention
+  parent_idea_id: squeeze-excitation-in-the-resnet-blocks
+  title: Squeeze-and-excitation in the bottlenecks of stages three and four only, with its gates pulled toward the identity as L2-SP pulls the weights around them
+  opportunity: >-
+    Forced by the user on 2026-10-13, a bundle of changes to run 22 chosen from its evidence. Run 22
+    put a squeeze-and-excitation module in all sixteen bottlenecks, free of any anchor at the head
+    rate: x4 0.937619 against 0.938618 (-0.0010), with MCL alone (-0.0105, interval below zero)
+    carrying 0.0009 of it and the other eleven labels summing to -0.0001. Its gates moved 12% from 1
+    (val_se_gate_abs_deviation 0.122), its training loss was lower than the incumbent's at every
+    epoch (0.5672 against 0.5717 at epoch 10) while the validation loss was not (0.3983 against
+    0.3979), and its L2-SP penalty was lower (0.0191 against 0.0210): evidence, medium, one run,
+    that the free gates took over adaptation from the anchored convolutions and fitted the training
+    set more. The mask-decoder audit (run-notes.md, run 5) found the last backbone-side gain in
+    stage four and the token projection, with stages one to three unmoved. Run 22 cost 19% more GPU
+    memory (20.1 GB on the card) and 14% more training time. Guess, low: -0.0005 to +0.0008 macro;
+    what the reading predicts is the eleven labels level or better without the MCL loss.
+  mechanism: >-
+    Run 22's implementation with three changes; its diff is at
+    outputs/autoresearch/targets-and-inputs/experiments/squeeze-excitation-in-the-resnet-blocks-20261013T081049Z-5cba6662/changes.diff
+    and is the starting point. Unchanged from it: timm's SEModule in the block's attention slot
+    after bn3, reduction one sixteenth, the gate 2 * sigmoid(x), fc2's weight and bias at zero and
+    fc1 at timm's default drawn under torch.random.fork_rng, so the network computes the pretrained
+    function exactly at step 0; the RadImageNet load with strict=False that raises unless the
+    unexpected keys are empty and every missing key contains '.se.'; the '.se.' parameters in the
+    head-rate group (head_lr); the metric val_se_gate_abs_deviation. Change 1, placement: only the
+    nine bottlenecks of layer3 and layer4 get the module; layer1 and layer2 keep no attention
+    module (36 new tensors instead of 64). Change 2, a pull toward the identity: the training loss
+    gains anchor_alpha_late (0.001, the strength L2-SP applies to the pretrained weights of these
+    stages) times the sum over the nine modules of the squared entries of fc2's weight and of fc2's
+    bias, added where the L2-SP penalty is added and logged with it in a separate epoch metric
+    se_identity_penalty through _log_epoch_metric. The module is the identity exactly when fc2 is
+    zero, so this is L2-SP with the identity as the anchor; fc1 has no pull. Change 3, weight
+    decay: the '.se.' parameters get weight decay 0, as the L2-SP-anchored backbone weights do,
+    since the pull replaces it. Every other parameter keeps its group, rate, decay and anchor.
+    Validation, prediction and Kaggle inference run the same backbone. No option and no config
+    field beyond reading optimizer.anchor_alpha_late, which exists.
+  precedents:
+  - 'run-notes.md, run 22: squeeze-and-excitation in all sixteen blocks, free gates.'
+  - 'run-notes.md, run 5, the audit: stage four and the token projection moved, stages one to three did not.'
+  novelty: First anchored attention module in the backbone; first restricted to the late stages.
+  coverage: Every image, at stages three and four (14 by 14 and 7 by 7 maps).
+  exploitation: >-
+    Read MCL first, then the eleven other labels and the macro, at both multipliers, against the
+    incumbent and against run 22's per-label changes. Activation and the test of the reading, all
+    from logged values: val_se_gate_abs_deviation above 0 and below run 22's 0.122 at epoch 10;
+    se_identity_penalty above 0; the training loss at epoch 10 against the incumbent's 0.5717 and
+    run 22's 0.5672; the L2-SP penalty against 0.0210 and 0.0191. In the report: the count of
+    missing keys at load (36) and the maximum absolute difference between the backbone's output
+    with and without the modules at initialisation on a synthetic batch of two images, which must
+    be 0. Shown wrong by: the macro below the incumbent at both multipliers with MCL down again
+    while the gates stay closer to 1 than in run 22.
+  budget: >-
+    Nine modules on 14 by 14 and 7 by 7 maps instead of sixteen on all stages. Estimate from run 22
+    (19% more memory and 14% more time for all stages, most of it in stages one and two): training
+    time within 1.05 of the incumbent's 2,602 s and peak GPU memory about 17.5 GB on the card, within
+    18.5 GB. State both estimates and the parameter count in the report.
+  implementation: >-
+    Follow the environment paragraph of the developer instructions. Files: modeling/model.py for
+    the placement; training/lightning.py for the penalty, its metric, and the weight decay of the
+    '.se.' parameters in build_optimizer. In code that runs every training step write no .item()
+    and no Python loop over studies; the penalty is one sum over eighteen small tensors. Check on
+    the CPU with a randomly initialised timm resnet50 and no project model: only layer3 and layer4
+    blocks hold a module, the base state dict loads with only '.se.' keys missing, and on a batch
+    of two 224 px images without gradient the output equals the base network's exactly. Check that
+    build_optimizer gives the '.se.' parameters head_lr and weight decay 0 and that no L2-SP anchor
+    buffer is registered for them. backbone_mapping and group_matcher must still resolve.
+    model.channels_last stays true.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user's forced seed of 2026-10-13, the configuration the keeper proposed from run 22's evidence, asked for as one bundled run.
+exhausted_directions: None; one bundled seed asked for by the user on 2026-10-13 after run 22.

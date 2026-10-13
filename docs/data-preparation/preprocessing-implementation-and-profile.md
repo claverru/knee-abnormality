@@ -85,6 +85,8 @@ to the GPU on 2026-09-22, so run it against the source of `ab49830` or earlier:
 rtk proxy uv run --locked python -m scripts.adhoc.measure_intensity_bound_stability --output-dir outputs/analysis/intensity-bound-stability-new --studies 40 --epochs 6
 ```
 
+**Effect on the metric, measured 2026-10-12:** bounds from a fixed set of up to seven slices per series, independent of the draw, scored ×1 +0.0006 and ×4 −0.0003 against the reference on the ResNet-50, fold 2, and were not adopted ([result](../validation/results/2026-10-13-targets-and-inputs-campaign.md#inputs-and-augmentation)).
+
 ## Earlier profile
 
 On 2026-09-10, a bounded profile used eight fold-0 training studies with seed 42:
