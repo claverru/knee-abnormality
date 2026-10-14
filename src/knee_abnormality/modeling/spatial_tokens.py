@@ -10,7 +10,10 @@ from timm.models.maxxvit import Downsample2d, MbConvBlock, TransformerBlock2d
 from timm.models.resnet import BasicBlock, Bottleneck
 from torch import nn
 
+from knee_abnormality.modeling.staged_backbones import STAGED_BACKBONES
+
 COATNET_BACKBONE = "coatnet_rmlp_2_rw_224.sw_in12k_ft_in1k"
+CONVNEXT_BACKBONES = ("convnext_tiny.in12k_ft_in1k",)
 
 BACKBONE_MAPPINGS = {
     "rexnet_200.nav_in1k": {
@@ -46,11 +49,48 @@ BACKBONE_MAPPINGS = {
         }
         for name in ("resnet18.a1_in1k", "resnet50.a1_in1k")
     },
+    **{
+        name: {
+            "layout": "NCHW",
+            "origin": [15.5, 15.5],
+            "stride": [32.0, 32.0],
+            "anchors": "patch_stem_and_downsample_centers",
+        }
+        for name in CONVNEXT_BACKBONES
+    },
+    **{
+        f"{name}.layer3": {
+            "layout": "NCHW",
+            "origin": [7.5, 7.5],
+            "stride": [16.0, 16.0],
+            "anchors": "patch_stem_and_downsample_centers",
+        }
+        for name in CONVNEXT_BACKBONES
+    },
+    **{
+        f"{name}.layer2": {
+            "layout": "NCHW",
+            "origin": [3.5, 3.5],
+            "stride": [8.0, 8.0],
+            "anchors": "patch_stem_and_downsample_centers",
+        }
+        for name in CONVNEXT_BACKBONES
+    },
     COATNET_BACKBONE: {
         "layout": "NCHW",
         "origin": [12.0, 12.0],
         "stride": [32.0, 32.0],
         "anchors": "mbconv_main_branch_and_attention_pool_centers",
+    },
+    **{
+        f"{name}{suffix}": {
+            "layout": "NCHW",
+            "origin": [0.0, 0.0],
+            "stride": [stride, stride],
+            "anchors": "convolution_centers",
+        }
+        for name in STAGED_BACKBONES
+        for suffix, stride in (("", 32.0), (".layer3", 16.0), (".layer2", 8.0))
     },
     **{
         name: {
@@ -216,6 +256,30 @@ def _coatnet_mapping(backbone: nn.Module) -> tuple[float, float, float, float]:
     return mapping
 
 
+def _convnext_mapping(
+    backbone: nn.Module, stages: int = 4
+) -> tuple[float, float, float, float]:
+    stem = [layer for layer in backbone.stem if isinstance(layer, nn.Conv2d)]
+    if len(stem) != 1:
+        raise ValueError("ConvNeXt spatial anchors require a single patch convolution")
+    mapping = _spatial_mapping(stem)
+    for stage in backbone.stages[:stages]:
+        if not isinstance(stage.downsample, nn.Identity):
+            mapping = _spatial_mapping(
+                [layer for layer in stage.downsample if isinstance(layer, nn.Conv2d)],
+                mapping,
+            )
+        for block in stage.blocks:
+            if (
+                not isinstance(block.shortcut, nn.Identity)
+                or _spatial_mapping([block.conv_dw], mapping) != mapping
+            ):
+                raise ValueError(
+                    "ConvNeXt residual geometry differs from verified anchors"
+                )
+    return mapping
+
+
 def _resnet_mapping(
     backbone: nn.Module, stages: int = 4
 ) -> tuple[float, float, float, float]:
@@ -289,6 +353,22 @@ _BACKBONE_MAPPING_FUNCTIONS = {
     "resnet18.a1_in1k.layer3": lambda backbone: _resnet_mapping(backbone, 3),
     "resnet50.a1_in1k.layer3": lambda backbone: _resnet_mapping(backbone, 3),
     "resnet10t.c3_in1k": _resnet_mapping,
+    **{
+        f"{name}{suffix}": lambda backbone, stages=stages: _spatial_mapping(
+            backbone.geometry_layers(stages)
+        )
+        for name in STAGED_BACKBONES
+        for suffix, stages in (("", 4), (".layer3", 3), (".layer2", 2))
+    },
+    **{name: _convnext_mapping for name in CONVNEXT_BACKBONES},
+    **{
+        f"{name}.layer3": lambda backbone: _convnext_mapping(backbone, 3)
+        for name in CONVNEXT_BACKBONES
+    },
+    **{
+        f"{name}.layer2": lambda backbone: _convnext_mapping(backbone, 2)
+        for name in CONVNEXT_BACKBONES
+    },
 }
 
 

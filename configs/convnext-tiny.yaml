@@ -1,0 +1,163 @@
+name: convnext-tiny
+seed: 1110484336
+
+paths:
+  data_root: ../data
+  output_root: ../outputs/training
+  label_manifest: labels/rebuild-state-v2-label-sources.json
+  report_attribute_manifest: labels/jevk5-report-attribute-targets-v4.0.json
+  anatomy_targets: ../data/labels/prepared/anatomy-mrannotator-sample550-joints
+  meniscus_targets: ../data/labels/prepared/soft-tissue-nnunet-knee-dess265
+
+distillation:
+  teacher_share: 0.0
+
+labels:
+  source: rebuild_state_v2
+
+validation:
+  split: all_5fold_scanner_v2
+  folds: [2]
+  prediction_image_multiplier: 4
+
+data:
+  reflection_augmentation:
+    probability: 0.5
+  contrast_mixing_augmentation:
+    probability: 0.3
+    target_weight_range: [0.5, 1.0]
+  sampling_sigma_fraction: 0.867
+  validation_image_multiplier: 1
+  study_slice_total: 26
+  intensity_augmentation:
+    probability: 0.5
+    gamma_range: [0.85, 1.15]
+    contrast_range: [0.9, 1.1]
+  affine_augmentation:
+    probability: 0.7
+    rotation_degrees: 10.0
+    translation_fraction: 0.04
+    scale_range: [0.95, 1.05]
+  noise_augmentation:
+    probability: 0.15
+    std_range: [0.005, 0.02]
+  smoothing_augmentation:
+    probability: 0.2
+    spatial_sigma: 1.0
+    range_sigma_range: [0.05, 0.1]
+  resolution_augmentation:
+    probability: 0.25
+    keep_fraction_range: [0.70, 1.0]
+  gin_augmentation:
+    probability: 0.3
+    blend_max: 0.5
+  series_types:
+    - plane: Axial
+      fluid_sensitive: 0
+      fat_suppression: 0
+      views:
+        - field_mm: 120.0
+          slices: 6
+          horizontal: {anchor: image, offset_mm: 0.0}
+          vertical: {anchor: image, offset_mm: 0.0}
+    - plane: Axial
+      fluid_sensitive: 1
+      fat_suppression: 1
+      views:
+        - field_mm: 120.0
+          slices: 6
+          horizontal: {anchor: image, offset_mm: 0.0}
+          vertical: {anchor: image, offset_mm: 0.0}
+    - plane: Coronal
+      fluid_sensitive: 0
+      fat_suppression: 0
+      views:
+        - field_mm: 84.0
+          slices: 5
+          horizontal: {anchor: knee, offset_mm: 0.0}
+          vertical: {anchor: image, offset_mm: 10.0}
+    - plane: Coronal
+      fluid_sensitive: 1
+      fat_suppression: 1
+      views:
+        - field_mm: 93.33333333333334
+          slices: 5
+          horizontal: {anchor: knee, offset_mm: 0.0}
+          vertical: {anchor: image, offset_mm: 10.0}
+    - plane: Sagittal
+      fluid_sensitive: 0
+      fat_suppression: 0
+      views:
+        - field_mm: 93.33333333333334
+          slices: 5
+          horizontal: {anchor: knee, offset_mm: 7.0}
+          vertical: {anchor: image, offset_mm: 10.0}
+    - plane: Sagittal
+      fluid_sensitive: 1
+      fat_suppression: 1
+      views:
+        - field_mm: 84.0
+          slices: 5
+          horizontal: {anchor: knee, offset_mm: 7.0}
+          vertical: {anchor: image, offset_mm: 10.0}
+        - field_mm: 64.0
+          slices: 5
+          horizontal: {anchor: knee, offset_mm: 7.0}
+          vertical: {anchor: image, offset_mm: 10.0}
+  reference_field_mm: 120.0
+  image_size: 224
+  lower_quantile: 0.005
+  upper_quantile: 0.995
+  mean: [0.485, 0.456, 0.406]
+  std: [0.229, 0.224, 0.225]
+
+model:
+  backbone: convnext_tiny.in12k_ft_in1k
+  pretrained: true
+  pretrained_weights: timm
+  slice_channels: repeated_middle
+  channels_last: true
+  checkpoint_backbone: false
+  backbone_eval: false
+  dropout: 0.0
+  stochastic_depth: 0.1
+  series_dropout: 0.0
+  plane_readout: true
+  view_label_bias: true
+  anatomical_frame: true
+  meniscus_map: true
+  soft_tissue_routing: true
+  feature_statistics_augmentation:
+    probability: 0.5
+
+optimizer:
+  backbone_lr: 0.0001
+  backbone_lr_stage_decay: 0.7
+  head_lr: 0.0006
+  weight_decay: 0.01
+  anchor_alpha_early: 0.01
+  anchor_alpha_late: 0.0001
+  beta1: 0.9
+  beta2: 0.999
+  epsilon: 0.00000001
+  warmup_epochs: 1
+  warmup_start_ratio: 0.1
+  minimum_lr_ratio: 0.01
+  weight_averaging: null
+
+trainer:
+  max_epochs: 10
+  batch_size: 8
+  accumulate_grad_batches: 1
+  gradient_clip_val: 1.0
+  num_workers: 16
+  persistent_workers: true
+  prefetch_factor: 2
+  patience: 10
+  min_delta: 0.0001
+  deterministic: false
+  class_balance_exponent: 0.5
+  report_attribute_loss_weight: 0
+  anatomy_loss_weight: 0.1
+  meniscus_loss_weight: 0.1
+  scanner_confusion_weight: 0.0

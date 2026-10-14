@@ -8,9 +8,12 @@ version = "0.1.0"
 description = "RSNA Knee Abnormality Detection experiments"
 requires-python = ">=3.12,<3.13"
 dependencies = [
+    "einops==0.8.1",
     "kornia==0.8.3",
     "kornia-rs==0.1.14",
     "lightning-utilities==0.15.3",
+    "mamba-ssm==2.3.2.post1",
+    "mambavision==1.2.0",
     "numpy==2.0.2",
     "pillow==11.3.0",
     "polars==1.35.2",
@@ -55,6 +58,17 @@ environments = ["sys_platform == 'linux' and platform_machine == 'x86_64'"]
 [tool.uv.sources]
 torch = { index = "pytorch-cu128" }
 torchvision = { index = "pytorch-cu128" }
+mamba-ssm = { url = "https://github.com/state-spaces/mamba/releases/download/v2.3.2.post1/mamba_ssm-2.3.2.post1%2Bcu12torch2.10cxx11abiTRUE-cp312-cp312-linux_x86_64.whl" }
+
+[[tool.uv.dependency-metadata]]
+name = "mamba-ssm"
+version = "2.3.2.post1+cu12torch2.10cxx11abitrue"
+requires-dist = ["einops", "torch", "triton"]
+
+[[tool.uv.dependency-metadata]]
+name = "mambavision"
+version = "1.2.0"
+requires-dist = ["einops", "mamba-ssm", "timm"]
 
 [[tool.uv.index]]
 name = "pytorch-cu128"

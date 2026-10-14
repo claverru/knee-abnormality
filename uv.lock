@@ -8,6 +8,18 @@ supported-markers = [
     "platform_machine == 'x86_64' and sys_platform == 'linux'",
 ]
 
+[manifest]
+
+[[manifest.dependency-metadata]]
+name = "mamba-ssm"
+version = "2.3.2.post1+cu12torch2.10cxx11abitrue"
+requires-dist = ["einops", "torch", "triton"]
+
+[[manifest.dependency-metadata]]
+name = "mambavision"
+version = "1.2.0"
+requires-dist = ["einops", "mamba-ssm", "timm"]
+
 [[package]]
 name = "aiohappyeyeballs"
 version = "2.7.1"
@@ -204,6 +216,15 @@ sdist = { url = "https://files.pythonhosted.org/packages/f2/aa/12037145b7a56eaa5
 wheels = [
     { url = "https://files.pythonhosted.org/packages/bf/09/59324b903599031ff9faaec1758292409f6561a0ec2492fe4b703327705a/debugpy-1.8.21-cp312-cp312-manylinux_2_34_x86_64.whl", hash = "sha256:c193d474f0a211191f2b4449d2d06157c689013035bd952f3b617e0ef422b176", size = 3968900, upload-time = "2026-06-01T19:30:52.341Z" },
     { url = "https://files.pythonhosted.org/packages/95/51/67e7cf11a53e40694f720457d5b3a1cdaaa3d5a9a633e482f225456b93ff/debugpy-1.8.21-py2.py3-none-any.whl", hash = "sha256:b1e37d333663c8851516a47364ef473da127f9caebe4417e6df6f5825a7e9a92", size = 5352888, upload-time = "2026-06-01T19:31:25.186Z" },
+]
+
+[[package]]
+name = "einops"
+version = "0.8.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/e5/81/df4fbe24dff8ba3934af99044188e20a98ed441ad17a274539b74e82e126/einops-0.8.1.tar.gz", hash = "sha256:de5d960a7a761225532e0f1959e5315ebeafc0cd43394732f103ca44b9837e84", size = 54805, upload-time = "2025-02-09T03:17:00.434Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/87/62/9773de14fe6c45c23649e98b83231fffd7b9892b6cf863251dc2afa73643/einops-0.8.1-py3-none-any.whl", hash = "sha256:919387eb55330f5757c6bea9165c5ff5cfe63a642682ea788a6d472576d81737", size = 64359, upload-time = "2025-02-09T03:17:01.998Z" },
 ]
 
 [[package]]
@@ -571,9 +592,12 @@ name = "knee-abnormality"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "einops" },
     { name = "kornia" },
     { name = "kornia-rs" },
     { name = "lightning-utilities" },
+    { name = "mamba-ssm" },
+    { name = "mambavision" },
     { name = "numpy" },
     { name = "pillow" },
     { name = "polars" },
@@ -608,9 +632,12 @@ tools = [
 
 [package.metadata]
 requires-dist = [
+    { name = "einops", specifier = "==0.8.1" },
     { name = "kornia", specifier = "==0.8.3" },
     { name = "kornia-rs", specifier = "==0.1.14" },
     { name = "lightning-utilities", specifier = "==0.15.3" },
+    { name = "mamba-ssm", url = "https://github.com/state-spaces/mamba/releases/download/v2.3.2.post1/mamba_ssm-2.3.2.post1%2Bcu12torch2.10cxx11abiTRUE-cp312-cp312-linux_x86_64.whl" },
+    { name = "mambavision", specifier = "==1.2.0" },
     { name = "numpy", specifier = "==2.0.2" },
     { name = "pillow", specifier = "==11.3.0" },
     { name = "polars", specifier = "==1.35.2" },
@@ -677,6 +704,40 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/f1/45/7fa8f56b17dc0f0a41ec70dd307ecd6787254483549843bef4c30ab5adce/lightning_utilities-0.15.3.tar.gz", hash = "sha256:792ae0204c79f6859721ac7f386c237a33b0ed06ba775009cb894e010a842033", size = 33553, upload-time = "2026-02-22T14:48:53.348Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/25/f4/ead6e0e37209b07c9baa3e984ccdb0348ca370b77cea3aaea8ddbb097e00/lightning_utilities-0.15.3-py3-none-any.whl", hash = "sha256:6c55f1bee70084a1cbeaa41ada96e4b3a0fea5909e844dd335bd80f5a73c5f91", size = 31906, upload-time = "2026-02-22T14:48:52.488Z" },
+]
+
+[[package]]
+name = "mamba-ssm"
+version = "2.3.2.post1+cu12torch2.10cxx11abitrue"
+source = { url = "https://github.com/state-spaces/mamba/releases/download/v2.3.2.post1/mamba_ssm-2.3.2.post1%2Bcu12torch2.10cxx11abiTRUE-cp312-cp312-linux_x86_64.whl" }
+dependencies = [
+    { name = "einops" },
+    { name = "torch" },
+    { name = "triton" },
+]
+wheels = [
+    { url = "https://github.com/state-spaces/mamba/releases/download/v2.3.2.post1/mamba_ssm-2.3.2.post1%2Bcu12torch2.10cxx11abiTRUE-cp312-cp312-linux_x86_64.whl", hash = "sha256:7a67070c1e7e99c95abd1319623f044e8a1b3fb46f774bfdea949f0a4fc79638" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "einops" },
+    { name = "torch" },
+    { name = "triton" },
+]
+
+[[package]]
+name = "mambavision"
+version = "1.2.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "einops" },
+    { name = "mamba-ssm" },
+    { name = "timm" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/c0/9d/ffee12a297ae37ca91e843cf63a9b024f9bada7629896033819e6e1f094b/mambavision-1.2.0.tar.gz", hash = "sha256:f55aa293419242ad6aba5d23022b02ae91dd152bf3e89ce975f073517b2d66e1", size = 51291, upload-time = "2025-07-22T22:13:05.604Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/6f/30/6796a347590c501ec5d863d81e26b34eca38ab7464af54fde0351f5349db/mambavision-1.2.0-py3-none-any.whl", hash = "sha256:3a811c581d925cef1862d35312478dfbdf920e6128859eef1678f864fb1dc313", size = 60015, upload-time = "2025-07-22T22:13:04.257Z" },
 ]
 
 [[package]]

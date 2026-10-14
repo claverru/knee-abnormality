@@ -705,6 +705,7 @@ def create_preview(args: PreviewCLI) -> dict:
                     "modeling/augmentation.py",
                     "modeling/model.py",
                     "modeling/spatial_tokens.py",
+                    "modeling/view_windows.py",
                 )
             ),
             Path("src/knee_abnormality/data/preprocessing"),

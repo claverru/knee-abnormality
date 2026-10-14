@@ -74,6 +74,11 @@ GRADIENT_DIAGNOSTIC_INTERVAL = 10
 HEIGHT_TARGET_LIMIT_MM = 80.0
 JOINT_PLANE_ABOVE_PLATEAU_MM = 6.4
 SIDE_LOSS_WEIGHT = 0.1
+EARLY_ANCHOR_PREFIXES = ("conv1.", "bn1.", "layer1.", "stem.", "stages.0.")
+LR_DECAYS = {
+    "cosine": lambda progress: 0.5 * (1 + math.cos(math.pi * progress)),
+    "linear": lambda progress: 1 - progress,
+}
 
 
 def build_optimizer(
@@ -91,11 +96,24 @@ def build_optimizer(
             for name, parameter in head.named_parameters()
         ),
     ]
+    stages = group_parameters(model.backbone, model.backbone.group_matcher(coarse=True))
+    deepest = max(
+        index
+        for index, names in stages.items()
+        if not all(name.startswith("head.") for name in names)
+    )
+    depth = {
+        f"backbone.{parameter_name}": max(deepest - index, 0)
+        for index, names in stages.items()
+        for parameter_name in names
+    }
     for name, parameter in named:
         if not parameter.requires_grad:
             continue
         learning_rate = (
-            settings.backbone_lr if name.startswith("backbone.") else settings.head_lr
+            settings.backbone_lr * settings.backbone_lr_stage_decay ** depth[name]
+            if name.startswith("backbone.")
+            else settings.head_lr
         )
         weight_decay = (
             0.0
@@ -423,24 +441,27 @@ class KneeModule(L.LightningModule):
         }
         settings = config.optimizer
         self.anchor_parameters: list[tuple[str, torch.nn.Parameter, str, float]] = []
+        self.scheduled_anchors: set[str] = set()
         self.backbone_origin = {}
         early_anchors = 0
         for index, (name, parameter) in enumerate(backbone.named_parameters()):
             if parameter.ndim < 2:
                 continue
-            early = name.startswith(("conv1.", "bn1.", "layer1."))
+            early = name.startswith(EARLY_ANCHOR_PREFIXES)
             early_anchors += early
             alpha = settings.anchor_alpha_early if early else settings.anchor_alpha_late
             if alpha > 0:
                 buffer_name = f"anchor_weight_{index}"
                 self.register_buffer(buffer_name, parameter.detach().float().clone())
                 self.anchor_parameters.append((name, parameter, buffer_name, alpha))
+                if settings.late_anchor_follows_lr and not early:
+                    self.scheduled_anchors.add(buffer_name)
             else:
                 self.backbone_origin[name] = parameter.detach().float().cpu().clone()
         if settings.anchor_alpha_early > 0 and not early_anchors:
             raise ValueError(
                 "optimizer.anchor_alpha_early matches no backbone layer; the early "
-                "anchor is defined by ResNet stem and layer1 names"
+                "anchor is defined by the stem and first stage names"
             )
 
     def forward(self, batch: dict) -> torch.Tensor:
@@ -1012,8 +1033,14 @@ class KneeModule(L.LightningModule):
         if self.scanner_confusion_head is not None:
             loss = loss + self._scanner_confusion_step(encoded, batch)
         if self.anchor_parameters:
+            backbone_group = self.trainer.optimizers[0].param_groups[
+                self.backbone_optimizer_group_index
+            ]
+            lr_ratio = backbone_group["lr"] / backbone_group["initial_lr"]
             anchor_penalty = sum(
-                alpha * (parameter.float() - getattr(self, buffer_name)).square().sum()
+                alpha
+                * lr_ratio ** (buffer_name in self.scheduled_anchors)
+                * (parameter.float() - getattr(self, buffer_name)).square().sum()
                 for _, parameter, buffer_name, alpha in self.anchor_parameters
             )
             loss = loss + anchor_penalty
@@ -1648,6 +1675,16 @@ class KneeModule(L.LightningModule):
             ),
             frozenset(f"backbone.{name}" for name, _, _, _ in self.anchor_parameters),
         )
+        backbone_parameter_ids = {
+            id(parameter) for parameter in self.model.backbone.parameters()
+        }
+        self.backbone_optimizer_group_index = next(
+            index
+            for index, group in enumerate(optimizer.param_groups)
+            if any(
+                id(parameter) in backbone_parameter_ids for parameter in group["params"]
+            )
+        )
         total_steps = self.trainer.estimated_stepping_batches
         steps_per_epoch = max(
             1, math.ceil(total_steps / self.config.trainer.max_epochs)
@@ -1666,9 +1703,12 @@ class KneeModule(L.LightningModule):
             if warmup_steps and step < warmup_steps:
                 start = settings.warmup_start_ratio
                 return start + (1 - start) * step / warmup_steps
-            progress = (step - warmup_steps) / max(1, total_steps - warmup_steps)
-            cosine = 0.5 * (1 + math.cos(math.pi * min(1.0, progress)))
-            return settings.minimum_lr_ratio + (1 - settings.minimum_lr_ratio) * cosine
+            progress = min(
+                1.0, (step - warmup_steps) / max(1, total_steps - warmup_steps)
+            )
+            return settings.minimum_lr_ratio + (
+                1 - settings.minimum_lr_ratio
+            ) * LR_DECAYS[settings.lr_decay](progress)
 
         return {
             "optimizer": optimizer,
