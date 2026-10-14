@@ -1,0 +1,39 @@
+ideas:
+- id: stage-rates-on-freed-anchors
+  mechanism_id: backbone-rate
+  parent_idea_id: stage-rates-by-weight-scale
+  title: 'Stage-wise backbone rates again, on the incumbent with the weight-scale anchors: 6e-4 on the last stage,
+    0.6 times less per stage'
+  opportunity: 'Evidence (run-notes.md, runs 1 to 3): run 1 tried these rates against the anchors of the ResNet-50
+    recipe and measured the anchor, not the rates: the last stage ended 0.26% from its pretrained weights, closer
+    than the reference. Run 3 freed the anchors and the weights moved (third stage 10.2%, the ResNet-50''s figure;
+    last stage 3.6% against the ResNet-50''s 10.6%; stem 3.7% against 0.8%) for +0.0101 at x4. With one rate of
+    2e-4 the last stage still moves a third of the ResNet-50''s relative distance and the stem four times it. The
+    weight-scale rates give the last stage three times the incumbent''s rate and the stem 0.4 times. Guess: +0.001
+    to +0.004 macro, on Fracture and Lateral OA first, the two labels furthest behind the ResNet-50 in run 3
+    (-0.0230, -0.0169).'
+  mechanism: 'optimizer.backbone_lr_stage_decay 0.6 with optimizer.backbone_lr 6e-4: the backbone''s parameter groups
+    get backbone_lr times decay to the power of the number of stages above them (stages.3 and the final norm 6e-4,
+    stages.2 3.6e-4, stages.1 2.16e-4, stages.0 1.3e-4, the stem 7.8e-5). Warm-up and cosine schedule scale every
+    group alike. Anchors, head rate and everything else as the incumbent has them.'
+  precedents:
+  - 'Run 1 of this campaign, stage-rates-by-weight-scale: its frozen source and changes.diff under outputs/autoresearch/mambavision-settings/experiments/
+    hold the reviewed implementation (config.py field with default 1.0, build_optimizer grouping by stage, one logged
+    rate per stage). Port it onto the incumbent; do not copy the files.'
+  novelty: First run of stage-wise rates on anchors that let the weights move.
+  coverage: Every study and every label.
+  exploitation: 'Read x4 and x1 against the incumbent, the training loss per epoch against the incumbent''s (0.896
+    falling to 0.558) and the labels from largest gain to largest loss, with the drift per stage beside the incumbent''s.
+    Activation: one logged learning rate per backbone stage in the ratio 0.1296 : 0.216 : 0.36 : 0.6 : 1 (five metrics)
+    and the last stage''s drift at the last epoch above the incumbent''s 0.036. Shown wrong by: drift up and both
+    multipliers below the incumbent.'
+  budget: The incumbent's training time (2,593 s) within 1.05; no change to memory (12.7 GB peak).
+  implementation: 'Follow the environment paragraph of the developer instructions. Files: src/knee_abnormality/config.py
+    (the field, default 1.0), src/knee_abnormality/training/lightning.py (build_optimizer groups by stage through
+    the backbone''s group_matcher), configs/training.yaml. With decay 1.0 the optimizer must be identical to the
+    incumbent''s. Apply to the incumbent as assigned; the rates are these whichever single rate the incumbent holds.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The missing cell of the first three runs; added by the keeper after run 3 showed that run 1
+    could not measure its mechanism.
+exhausted_directions: ''

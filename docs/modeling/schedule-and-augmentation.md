@@ -9,7 +9,14 @@ epochs toward 1% of the peak learning rates. Warm-up rises linearly from
 to the peak at the end of `warmup_epochs`. The start ratio changes only the warm-up steps; warm-up
 length also sets where the cosine decay begins. `patience: 10` prevents ordinary
 validation fluctuations from stopping this ten-epoch budget early. Best and
-latest checkpoints remain separate. The peak backbone/head learning rates are
+latest checkpoints remain separate.
+
+Per config: `optimizer.lr_decay` picks cosine (default) or linear decay to the same floor;
+`optimizer.backbone_lr_stage_decay` multiplies the backbone rate by its value once per stage below
+the last (1.0 by default, 0.7 for ConvNeXt-Tiny); `optimizer.late_anchor_follows_lr` scales the late
+L2-SP anchor by the backbone rate over its peak (off by default). MambaVision-T uses linear decay
+and the scaled late anchor over twelve epochs
+([recipe](mambavision-backbone.md#recipe)). The peak backbone/head learning rates are
 `2e-4` and `6e-4`, adopted in the training config (then `configs/baseline.yaml`) on 2026-09-12 from
 the [overnight comparison](../validation/results/2026-09-12-overnight-results.md).
 

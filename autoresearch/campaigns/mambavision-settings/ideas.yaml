@@ -1,0 +1,1514 @@
+revision: 429
+ideas:
+- id: stage-rates-by-weight-scale
+  mechanism_id: backbone-rate
+  parent_idea_id: null
+  title: 'Stage-wise backbone rates matched to the weight scale: 6e-4 on the last
+    stage, 0.6 times less per stage'
+  opportunity: 'Evidence (prior-work.md, Why it underfits): this backbone''s pretrained
+    weights are 1.5 to 12.7 times larger than the ResNet-50''s stage by stage (weight
+    RMS 0.092 against 0.0073 in the last stage), and Adam moves every weight by about
+    the rate per step whatever its size. At 5e-5 the last stage moved 0.4% from ImageNet
+    by the end of the reference against 10.6% for the ResNet-50''s. The rates that
+    give each stage the ResNet-50''s relative step are 5e-5 times the RMS ratio: stem
+    7e-5, stages 1.8e-4, 2.6e-4, 3.5e-4 and 6.3e-4. A top rate of 6e-4 with 0.6 per
+    stage gives 7.8e-5, 1.3e-4, 2.2e-4, 3.6e-4 and 6e-4. Guess on size: +0.005 to
+    +0.012 macro.'
+  mechanism: 'A new optimizer.backbone_lr_stage_decay (0.6). The backbone''s parameter
+    groups get backbone_lr times decay to the power of the number of stages above
+    them: stages.3 and the final norm at backbone_lr, stages.2 at 0.6, stages.1 at
+    0.36, stages.0 at 0.216, the stem at 0.1296. optimizer.backbone_lr is 6e-4. Warm-up
+    and cosine schedule scale every group alike. Head rate unchanged.'
+  precedents:
+  - The uncommitted training/lightning.py and config.py of the worktree knee-abnormality-fastmri-pretraining
+    carry backbone_lr_stage_decay for ConvNeXt (1e-4, 0.7); port the mechanism onto
+    this code, do not copy the file.
+  novelty: First run of this backbone at rates set from its weight scale.
+  coverage: Every study and every label; the largest gaps to the ResNet-50 are Lateral
+    OA, Fracture, PF OA, ACL and Lateral Meniscus (prior-work.md).
+  exploitation: 'Read x4 and x1 against the incumbent, the training loss per epoch
+    against the reference''s (0.934 falling to 0.593), and the labels from largest
+    gain to largest loss. Activation: one logged learning rate per backbone stage
+    in the ratio 0.1296 : 0.216 : 0.36 : 0.6 : 1 (five metrics), and the last stage''s
+    drift at the last epoch above 0.03 (0.0036 in the reference). Shown wrong by:
+    drift up and both multipliers below the incumbent, or a training loss that diverges
+    in the warm-up.'
+  budget: The reference's training time (2,594 s) within 1.05; no change to memory
+    (12.7 GB peak).
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    Files: src/knee_abnormality/config.py (the field, default 1.0), src/knee_abnormality/training/lightning.py
+    (build_optimizer groups by stage through the backbone''s group_matcher, already
+    used for the stage metrics), configs/training.yaml. With decay 1.0 the optimizer
+    must be identical to the incumbent''s. Apply to the incumbent as assigned.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The measured cause of the underfit, corrected stage by stage.
+  status: completed
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality-new-backbones/autoresearch/campaigns/mambavision-settings/seed-ideas.yaml
+  experiments:
+  - stage-rates-by-weight-scale-20261013T210724Z-8d596180
+  decision: reject
+- id: backbone-rate-2e-4
+  mechanism_id: backbone-rate
+  parent_idea_id: null
+  title: One backbone rate of 2e-4, four times the reference's
+  opportunity: 'Evidence (prior-work.md, Why it underfits): this backbone''s pretrained
+    weights are 1.5 to 12.7 times larger than the ResNet-50''s stage by stage (weight
+    RMS 0.092 against 0.0073 in the last stage), and Adam moves every weight by about
+    the rate per step whatever its size. At 5e-5 the last stage moved 0.4% from ImageNet
+    by the end of the reference against 10.6% for the ResNet-50''s. A single rate
+    of 2e-4 gives the middle stages about the ResNet-50''s relative step and the last
+    stage a third of it. Guess: +0.003 to +0.008 macro; the run brackets the stage-wise
+    seed from below and says whether the shape over stages matters.'
+  mechanism: optimizer.backbone_lr 0.0002 with one rate for the whole backbone (stage
+    decay 1.0 if the incumbent has the option). Nothing else changes.
+  precedents:
+  - 'ConvNeXt-Tiny flat 2e-4, 2026-10-04: -0.0048 against 1e-4 (another model, with
+    other changes in the same run).'
+  novelty: First run of MambaVision-T at 2e-4.
+  coverage: Every study and every label; the largest gaps to the ResNet-50 are Lateral
+    OA, Fracture, PF OA, ACL and Lateral Meniscus (prior-work.md).
+  exploitation: 'Read x4 and x1 against the incumbent, the training loss per epoch
+    against the reference''s (0.934 falling to 0.593), and the labels from largest
+    gain to largest loss. Activation: the logged backbone learning rate peaks at 2e-4
+    and the last stage''s drift is above the reference''s 0.0036. Shown wrong by:
+    both multipliers below the incumbent.'
+  budget: The reference's training time (2,594 s) within 1.05; no change to memory
+    (12.7 GB peak).
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    Configuration only: configs/training.yaml. Apply to the incumbent as assigned.
+    The rate is one value of 2e-4 whichever rates the incumbent holds.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The conservative form of the same correction; configuration
+    only.
+  status: completed
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality-new-backbones/autoresearch/campaigns/mambavision-settings/seed-ideas.yaml
+  experiments:
+  - backbone-rate-2e-4-20261013T211134Z-674ea2eb
+  - backbone-rate-2e-4-20261013T211343Z-e334e448
+  decision: provisional_accept
+- id: backbone-rate-4e-4
+  mechanism_id: backbone-rate
+  parent_idea_id: null
+  title: One backbone rate of 4e-4, eight times the reference's
+  opportunity: 'Evidence (prior-work.md, Why it underfits): this backbone''s pretrained
+    weights are 1.5 to 12.7 times larger than the ResNet-50''s stage by stage (weight
+    RMS 0.092 against 0.0073 in the last stage), and Adam moves every weight by about
+    the rate per step whatever its size. At 5e-5 the last stage moved 0.4% from ImageNet
+    by the end of the reference against 10.6% for the ResNet-50''s. 4e-4 gives the
+    last two stages about the ResNet-50''s relative step and the stem and first stage
+    two to six times more than theirs. Guess: at or above the 2e-4 run on the late
+    stages'' labels, with a risk in the early stages that the stage-wise seed avoids.'
+  mechanism: optimizer.backbone_lr 0.0004 with one rate for the whole backbone (stage
+    decay 1.0 if the incumbent has the option). Nothing else changes.
+  precedents:
+  - None on this model.
+  novelty: First run of MambaVision-T at 4e-4.
+  coverage: Every study and every label; the largest gaps to the ResNet-50 are Lateral
+    OA, Fracture, PF OA, ACL and Lateral Meniscus (prior-work.md).
+  exploitation: 'Read x4 and x1 against the incumbent, the training loss per epoch
+    against the reference''s (0.934 falling to 0.593), and the labels from largest
+    gain to largest loss. Activation: the logged backbone learning rate peaks at 4e-4.
+    Shown wrong by: both multipliers below the incumbent and below the 2e-4 run; read
+    the three rate runs together to place the optimum and to say whether the early
+    stages need the lower rate.'
+  budget: The reference's training time (2,594 s) within 1.05; no change to memory
+    (12.7 GB peak).
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    Configuration only: configs/training.yaml. Apply to the incumbent as assigned.
+    The rate is one value of 4e-4 whichever rates the incumbent holds.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Brackets the single rate from above; with the other two rate
+    runs it separates level from shape.
+  status: completed
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality-new-backbones/autoresearch/campaigns/mambavision-settings/seed-ideas.yaml
+  experiments:
+  - backbone-rate-4e-4-20261013T224526Z-b6bc8156
+  - backbone-rate-4e-4-20261013T233118Z-0f53f1b4
+  decision: reject
+- id: anchors-by-weight-scale
+  mechanism_id: weight-anchor
+  parent_idea_id: null
+  title: 'Weight anchors matched to the weight scale: 0.001 early and 0.00001 late'
+  opportunity: 'Evidence (prior-work.md, Why it underfits): the anchor penalises the
+    squared absolute distance from the pretrained weights, so on weights 7 to 12.7
+    times larger the same relative movement costs 48 to 161 times more than on the
+    ResNet-50; the drift of the first and the last stage shrank from epoch 2 on (0.0088
+    to 0.0057, 0.0053 to 0.0036) as the rate fell. Dividing by the squared RMS ratio
+    gives about 2e-5 and 6e-6 for the last two stages and 0.001 to 0.005 for the stem
+    and first stage. Guess: +0.002 to +0.006 macro, more beside a higher rate.'
+  mechanism: optimizer.anchor_alpha_early 0.001 and optimizer.anchor_alpha_late 0.00001.
+    The anchors stay on every weight they hold in the incumbent.
+  precedents:
+  - 'ConvNeXt-Tiny tuned recipe: late anchor 0.0001 (prior-work.md, Precedents).'
+  novelty: First run of this backbone at an anchor strength set from its weight scale.
+  coverage: Every study and every label; the largest gaps to the ResNet-50 are Lateral
+    OA, Fracture, PF OA, ACL and Lateral Meniscus (prior-work.md).
+  exploitation: 'Read x4 and x1 against the incumbent, the training loss per epoch
+    against the reference''s (0.934 falling to 0.593), and the labels from largest
+    gain to largest loss. Activation: the logged anchor penalty and the drift of every
+    stage against the incumbent''s. Shown wrong by: drift unchanged, or both multipliers
+    below the incumbent. The anchors exist for unseen sites: the device stays on at
+    the strength it has on the ResNet-50 in relative terms.'
+  budget: The reference's training time (2,594 s) within 1.05; no change to memory
+    (12.7 GB peak).
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    Configuration only: configs/training.yaml. Apply to the incumbent as assigned.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The second measured cause, independent of the rate; keeps the
+    site-generalisation device instead of removing it.
+  status: completed
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality-new-backbones/autoresearch/campaigns/mambavision-settings/seed-ideas.yaml
+  experiments:
+  - anchors-by-weight-scale-20261013T215716Z-932e0cad
+  - anchors-by-weight-scale-20261013T215910Z-9a732c13
+  - anchors-by-weight-scale-20261013T224316Z-a79dd1d2
+  decision: provisional_accept
+- id: twelve-epochs
+  mechanism_id: schedule-length
+  parent_idea_id: null
+  title: Train for twelve epochs on the same schedule shape
+  opportunity: 'Evidence: the reference underfits and its validation AUC still rose
+    in the last epochs (0.9141, 0.9142, 0.9150) while the cosine rate was near its
+    floor. Guess: +0.001 to +0.003 macro on the reference''s rates, less once the
+    rates are corrected. Twelve epochs by the user''s decision of 2026-10-13.'
+  mechanism: trainer.max_epochs 12; trainer.patience 12 so early stopping stays out
+    of play as in the reference. One warm-up epoch, cosine to the same minimum ratio
+    over the twelve epochs.
+  precedents:
+  - None on this model.
+  novelty: First longer training of MambaVision-T.
+  coverage: Every study and every label; the largest gaps to the ResNet-50 are Lateral
+    OA, Fracture, PF OA, ACL and Lateral Meniscus (prior-work.md).
+  exploitation: 'Read x4 and x1 against the incumbent, the training loss per epoch
+    against the reference''s (0.934 falling to 0.593), and the labels from largest
+    gain to largest loss. Compare epochs 1 to 10 with the incumbent''s and read epochs
+    11 and 12 for what the extra steps add. Activation: twelve epoch records. Shown
+    wrong by: no gain after epoch 10 at x1 and x4 at or below the incumbent.'
+  budget: 1.2 times the incumbent's training time (about 3,110 s on the reference),
+    inside the 1.3 bound; memory unchanged.
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    Configuration only: configs/training.yaml. Apply to the incumbent as assigned.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Whether the underfit is also a matter of steps; the one seed
+    that uses the budget's upper range.
+  status: completed
+  created_revision: 1
+  seeded: /home/claudio/src/knee-abnormality-new-backbones/autoresearch/campaigns/mambavision-settings/seed-ideas-2.yaml
+  experiments:
+  - twelve-epochs-20261013T233318Z-ec77a3dc
+  - twelve-epochs-20261013T233635Z-27038682
+  decision: provisional_accept
+- id: feature-statistics-augmentation-off
+  mechanism_id: feature-augmentation
+  parent_idea_id: null
+  title: Turn the feature-statistics augmentation off
+  opportunity: 'Evidence: the augmentation''s logged mean absolute change of the stride-8
+    features is 0.035 to 0.040 on this backbone against 0.014 on the ResNet-50, 2.5
+    to 2.9 times stronger, on a model that underfits. It was tuned on ResNet features
+    (512 channels); here it acts on 160. Guess: off raises the fit and the fold score
+    by +0.001 to +0.004.'
+  mechanism: model.feature_statistics_augmentation.probability 0.
+  precedents:
+  - On the ResNet line the augmentation was adopted for robustness to scanner differences.
+  novelty: First run of this backbone without it.
+  coverage: Every study and every label; the largest gaps to the ResNet-50 are Lateral
+    OA, Fracture, PF OA, ACL and Lateral Meniscus (prior-work.md).
+  exploitation: 'Read x4 and x1 against the incumbent, the training loss per epoch
+    against the reference''s (0.934 falling to 0.593), and the labels from largest
+    gain to largest loss. Activation: the logged feature-statistics activity is zero.
+    Shown wrong by: both multipliers below the incumbent. A gain is a fold-score gain
+    only: the augmentation exists for unseen scanners, which this fold does not measure,
+    so the run tells what the device costs here and whether a weaker setting is worth
+    a seed.'
+  budget: The reference's training time (2,594 s) within 1.05; no change to memory
+    (12.7 GB peak).
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    Configuration only: configs/training.yaml. Apply to the incumbent as assigned.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: A ResNet-tuned regulariser that measures almost three times
+    stronger on this model.
+  status: completed
+  created_revision: 1
+  seeded: /home/claudio/src/knee-abnormality-new-backbones/autoresearch/campaigns/mambavision-settings/seed-ideas-2.yaml
+  experiments:
+  - feature-statistics-augmentation-off-20261014T011537Z-c081202e
+  - feature-statistics-augmentation-off-20261014T011738Z-15005455
+  decision: reject
+- id: gradient-clipping-at-10
+  mechanism_id: gradient-clipping
+  parent_idea_id: null
+  title: Clip the gradient norm at 10 instead of 1
+  opportunity: 'Evidence: the reference''s gradient norm is 9.5 falling to 4.3 per
+    epoch against 1.0 to 1.5 for the ResNet-50, so the clip at 1.0 rescales every
+    step instead of catching rare ones, and the stem''s gradients (RMS 15 to 30 times
+    the ResNet-50''s) set the factor for the whole model. Adam removes a constant
+    factor, so the effect is on how steps are weighted against each other. Guess,
+    low: +0 to +0.002 macro.'
+  mechanism: trainer.gradient_clip_val 10.0.
+  precedents:
+  - None.
+  novelty: First run of this backbone with the clip above its usual gradient norm.
+  coverage: Every study and every label; the largest gaps to the ResNet-50 are Lateral
+    OA, Fracture, PF OA, ACL and Lateral Meniscus (prior-work.md).
+  exploitation: 'Read x4 and x1 against the incumbent, the training loss per epoch
+    against the reference''s (0.934 falling to 0.593), and the labels from largest
+    gain to largest loss. Activation: the logged gradient norm against the incumbent''s
+    and the share of steps above 10. Shown wrong by: both multipliers below the incumbent.'
+  budget: The reference's training time (2,594 s) within 1.05; no change to memory
+    (12.7 GB peak).
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    Configuration only: configs/training.yaml. Apply to the incumbent as assigned.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: A measured mismatch of a ResNet-set threshold; cheap, low expected
+    gain.
+  status: completed
+  created_revision: 1
+  seeded: /home/claudio/src/knee-abnormality-new-backbones/autoresearch/campaigns/mambavision-settings/seed-ideas-2.yaml
+  experiments:
+  - gradient-clipping-at-10-20261014T020940Z-101ecbce
+  - gradient-clipping-at-10-20261014T021222Z-f1e07dad
+  decision: reject
+- id: stage-rates-on-freed-anchors
+  mechanism_id: backbone-rate
+  parent_idea_id: stage-rates-by-weight-scale
+  title: 'Stage-wise backbone rates again, on the incumbent with the weight-scale
+    anchors: 6e-4 on the last stage, 0.6 times less per stage'
+  opportunity: 'Evidence (run-notes.md, runs 1 to 3): run 1 tried these rates against
+    the anchors of the ResNet-50 recipe and measured the anchor, not the rates: the
+    last stage ended 0.26% from its pretrained weights, closer than the reference.
+    Run 3 freed the anchors and the weights moved (third stage 10.2%, the ResNet-50''s
+    figure; last stage 3.6% against the ResNet-50''s 10.6%; stem 3.7% against 0.8%)
+    for +0.0101 at x4. With one rate of 2e-4 the last stage still moves a third of
+    the ResNet-50''s relative distance and the stem four times it. The weight-scale
+    rates give the last stage three times the incumbent''s rate and the stem 0.4 times.
+    Guess: +0.001 to +0.004 macro, on Fracture and Lateral OA first, the two labels
+    furthest behind the ResNet-50 in run 3 (-0.0230, -0.0169).'
+  mechanism: 'optimizer.backbone_lr_stage_decay 0.6 with optimizer.backbone_lr 6e-4:
+    the backbone''s parameter groups get backbone_lr times decay to the power of the
+    number of stages above them (stages.3 and the final norm 6e-4, stages.2 3.6e-4,
+    stages.1 2.16e-4, stages.0 1.3e-4, the stem 7.8e-5). Warm-up and cosine schedule
+    scale every group alike. Anchors, head rate and everything else as the incumbent
+    has them.'
+  precedents:
+  - 'Run 1 of this campaign, stage-rates-by-weight-scale: its frozen source and changes.diff
+    under outputs/autoresearch/mambavision-settings/experiments/ hold the reviewed
+    implementation (config.py field with default 1.0, build_optimizer grouping by
+    stage, one logged rate per stage). Port it onto the incumbent; do not copy the
+    files.'
+  novelty: First run of stage-wise rates on anchors that let the weights move.
+  coverage: Every study and every label.
+  exploitation: 'Read x4 and x1 against the incumbent, the training loss per epoch
+    against the incumbent''s (0.896 falling to 0.558) and the labels from largest
+    gain to largest loss, with the drift per stage beside the incumbent''s. Activation:
+    one logged learning rate per backbone stage in the ratio 0.1296 : 0.216 : 0.36
+    : 0.6 : 1 (five metrics) and the last stage''s drift at the last epoch above the
+    incumbent''s 0.036. Shown wrong by: drift up and both multipliers below the incumbent.'
+  budget: The incumbent's training time (2,593 s) within 1.05; no change to memory
+    (12.7 GB peak).
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    Files: src/knee_abnormality/config.py (the field, default 1.0), src/knee_abnormality/training/lightning.py
+    (build_optimizer groups by stage through the backbone''s group_matcher), configs/training.yaml.
+    With decay 1.0 the optimizer must be identical to the incumbent''s. Apply to the
+    incumbent as assigned; the rates are these whichever single rate the incumbent
+    holds.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The missing cell of the first three runs; added by the keeper
+    after run 3 showed that run 1 could not measure its mechanism.
+  status: completed
+  created_revision: 97
+  seeded: /home/claudio/src/knee-abnormality-new-backbones/autoresearch/campaigns/mambavision-settings/seed-ideas-3.yaml
+  experiments:
+  - stage-rates-on-freed-anchors-20261014T001828Z-18c382e8
+  - stage-rates-on-freed-anchors-20261014T011252Z-52948760
+  decision: reject
+- id: late-anchor-follows-learning-rate
+  mechanism_id: weight-anchor
+  parent_idea_id: anchors-by-weight-scale
+  title: Reduce the late-stage anchor as the learning rate decays
+  opportunity: "Evidence: weight-scale anchors improved \xD74 by 0.010086 and \xD7\
+    1 by 0.009323. Their final loss excluding the logged anchor penalty fell from\
+    \ 0.575493 to 0.548855, so the improvement is not explained solely by subtracting\
+    \ a smaller penalty. In twelve-epochs, stage-4 drift nevertheless retreats from\
+    \ 0.0382 at epochs 6\u20137 to 0.0369 at epoch 12 while the anchor penalty remains\
+    \ near 0.0101. Higher-rate runs also show retreating stage-4 drift and Fracture\
+    \ declines. Hypothesis: the constant late anchor increasingly opposes task adaptation\
+    \ during the low-rate tail. Guess: +0.0005 to +0.002 macro AUC at both multipliers."
+  mechanism: 'Change one anchor policy: multiply the incumbent late-anchor coefficient
+    by the actual backbone learning-rate multiplier, including its existing minimum
+    ratio. On the assigned recipe, late alpha therefore starts at 1e-5 and ends at
+    1e-7; early alpha stays 0.001 throughout. Use the existing schedule''s multiplier
+    rather than fitting a new decay or choosing an epoch from label results. Retain
+    anchor parameter coverage and weight-decay exclusions even as the multiplier falls.
+    This adds temporal relaxation to the successful anchor mechanism without increasing
+    backbone rates.'
+  precedents:
+  - "Evidence: anchors-by-weight-scale and twelve-epochs in the supplied run_curves\
+    \ and their original metrics.csv files. The former improved all twelve \xD74 labels;\
+    \ the latter's stage-4 drift turns inward during its tail."
+  - 'Evidence: the assigned configs/training.yaml supplies late alpha 1e-5 and minimum_lr_ratio
+    0.01; these determine the endpoint 1e-7 without a strength sweep.'
+  - 'Evidence: external fastmri-joint adopted fastmri-weight-follows-learning-rate.
+    That is a different loss and training population; it motivates scheduling a competing
+    training term, not an expected effect size.'
+  novelty: The campaign has tested constant anchor strengths, not a late anchor whose
+    effective strength follows the schedule. It retains the successful early anchor
+    rather than repeating the previously removed no-anchor seed.
+  coverage: Every training study and all twelve labels. Fracture and the retreating
+    late-stage drift motivate the hypothesis; adoption remains exclusively the fixed
+    macro rule.
+  exploitation: "Log late_anchor_schedule_factor, effective_anchor_alpha_late, anchor_penalty,\
+    \ backbone_drift_stage4 and backbone_lr. Actual coefficients consumed by the penalty\
+    \ must establish the scheduled release; drift is diagnostic, not activation proof.\
+    \ Inspect task-composite loss as total loss minus the logged penalty. Compare\
+    \ both macro multipliers and report the existing \xD74 interval and ResNet blend."
+  budget: "Guess: approximately 3,120\u20133,250 training seconds and 12.73 GB peak\
+    \ allocation, versus the incumbent's measured 3,117.8 seconds and 12.73 GB. Scalar\
+    \ coefficient multiplication should add negligible work. Retain twelve epochs,\
+    \ batch 8 and the incumbent seed; the supervisor measures compliance with 1,945.5\u2013\
+    3,372.2 seconds."
+  implementation: Follow the environment paragraph of the developer instructions.
+    In src/knee_abnormality/training/lightning.py, replace constant application of
+    late alpha with base alpha times the actual schedule multiplier; retain constant
+    early alpha, pretrained buffers, coverage and AdamW exclusions. Add the five named
+    observational metrics, deriving effective alpha from the coefficient actually
+    used. Retain accepted rates, horizon, augmentation and any newly accepted clipping
+    change. Reconcile against a newly accepted incumbent before development; preserve
+    unrelated improvements and use its current schedule multiplier without restoring
+    historical settings.
+  open_choices: No strength or boundary sweep. The transfer benefit of keeping a constant
+    early anchor is a hypothesis; unseen-site robustness is unmeasured here. Scheduling
+    must not silently reintroduce AdamW decay on anchored parameters.
+  dependencies:
+  - anchors-by-weight-scale
+  priority_rationale: 'First: extends the largest measured gain and directly addresses
+    a remaining drift pattern shared by several runs. Small implementation and runtime
+    cost; uncertainty remains about whether inward drift is undesirable.'
+  source_change: true
+  targeted_curve: "twelve-epochs, epochs 7\u201312: stage-4 drift 0.0382\u21920.0369\
+    \ and nearly constant anchor penalty despite falling rates. Hypothesis: reduce\
+    \ this retreat and improve late \xD71 macro and selected \xD74 macro by roughly\
+    \ 0.0005\u20130.002."
+  status: completed
+  created_revision: 186
+  ranking_rationale: 'Admit four proposals; proposal_admission reports their dependencies
+    satisfied. Rank scheduled late anchoring first because it extends the largest
+    measured gain with negligible expected preparation and training cost. Linear decay
+    follows: it extends an accepted schedule line, although that win is modest and
+    its transfer evidence supports a value, not an expected gain. The initial feature-statistics
+    bypass is a materially different retry of rejected full removal, preserving random
+    consumption and later perturbation. Two-epoch warm-up ranks fourth: author-supported
+    duration and inexpensive implementation, but indirect evidence and a plausible
+    underfit cost. The family ledger, prior-work precedent table and targeted searches
+    of docs/validation/results and docs/history revealed related runs, but no measured
+    duplicate of these four MambaVision mechanisms. Historical two-epoch warm-ups
+    on EfficientNet and other backbones do not duplicate the proposed hybrid-backbone
+    adaptation. Leave final-batchnorm-fixed-for-two-epoch-tail proposed: no running-statistics
+    mismatch is measured, and the two-epoch boundary borrows a schedule result without
+    establishing a normalization weakness. Its expected yield is weaker than the four
+    admitted ideas; filling all five queue positions is unnecessary.'
+  experiments:
+  - late-anchor-follows-learning-rate-20261014T032155Z-6715982e
+  decision: provisional_accept
+- id: twelve-epoch-linear-decay
+  mechanism_id: schedule-length
+  parent_idea_id: twelve-epochs
+  title: Retain twelve epochs and replace cosine decay with linear decay
+  opportunity: "Evidence: twelve-epochs improved \xD71 by 0.002300 and \xD74 by 0.001530,\
+    \ but simultaneously added updates and slowed cosine decay. Its last two epochs\
+    \ reduce loss 0.5590\u21920.5489 and raise \xD71 macro 0.929598\u21920.930634.\
+    \ Epoch-11 backbone LR is only about 6.01e-6. Hypothesis: a longer useful low-rate\
+    \ tail can improve adaptation within the same twelve-epoch time budget. Guess:\
+    \ +0.0005 to +0.002 macro; slower initial progress is a material risk."
+  mechanism: 'Replace only the post-warm-up cosine shape with linear decay: multiplier
+    = minimum_lr_ratio + (1-minimum_lr_ratio)*(1-progress), with progress clamped
+    to [0,1]. Retain the incumbent horizon, warm-up, peak group rates and minimum
+    ratio. On the assigned twelve-epoch recipe, epoch-11 backbone LR becomes about
+    2e-5 rather than 6.01e-6, while the endpoint remains 2e-6. The linear power 1.0
+    comes from the authors'' MambaVision-T segmentation configuration; its other settings
+    are not imported.'
+  precedents:
+  - "Evidence: twelve-epochs selected epoch 12, \xD71 0.930634 and \xD74 0.936187;\
+    \ central 80% \xD74 change interval [+0.000437,+0.002629]."
+  - 'Evidence: [authors'' MambaVision-T segmentation configuration](https://raw.githubusercontent.com/NVlabs/MambaVision/main/semantic_segmentation/configs/mamba_vision/mamba_vision_160k_ade20k-512x512_tiny.py)
+    uses PolyLR with power 1.0. Verified 2026-10-14; transferring the shape to this
+    task is a hypothesis.'
+  - 'Evidence: external rn18 warmup-stable-decay was rejected. This proposal uses
+    linear decay on MambaVision and preserves the current warm-up; it does not repeat
+    that constant-rate schedule.'
+  novelty: Separates schedule shape from additional epochs. No campaign run has used
+    linear decay, and this does not repeat the adopted twelve-epoch cosine run.
+  coverage: All studies, heads and labels, with the same common scheduler multiplier
+    applied to every optimizer group. Late Lateral Meniscus and PF OA movement motivates
+    inspecting the tail, without label-specific objectives.
+  exploitation: 'Activation through actual backbone_lr and a logged lr_schedule_factor:
+    the epoch-11 rate should reflect linear decay. Retain optimizer_updates_beyond_ten_epochs.
+    Inspect every epoch''s macro, loss, penalty and stage drift, including whether
+    the initially lower linear rates delay learning. Use only the existing two-multiplier
+    adoption rule.'
+  budget: 'Guess: approximately 3,118 seconds and 12.73 GB, with no extra forward
+    passes or optimizer updates. Twelve epochs and 5,304 updates are retained on the
+    assigned incumbent, safely below the 3,372.2-second ceiling at its measured speed.'
+  implementation: Follow the environment paragraph of the developer instructions.
+    Replace the cosine calculation in configure_optimizers in src/knee_abnormality/training/lightning.py
+    with the stated linear formula; add lr_schedule_factor logging if needed. Retain
+    warm-up, floor, group-rate ratios, twelve epochs and all unrelated accepted components.
+    Remove the superseded cosine implementation for this candidate rather than leaving
+    an unused compatibility branch. If the incumbent changes during development, port
+    this shape replacement onto its scheduler while retaining its accepted peak rates,
+    warm-up and horizon.
+  open_choices: No power sweep, floor change or extra epoch. The authors use a zero
+    endpoint; this candidate deliberately retains the incumbent's 0.01 floor so decay
+    shape remains the sole setting change.
+  dependencies:
+  - twelve-epochs
+  priority_rationale: 'Second: the extended schedule helped and earns a follow-up.
+    This targets continued tail learning without the approximately 3,377.7 seconds
+    projected for thirteen epochs. Effect size is uncertain because early learning
+    rates also change.'
+  source_change: true
+  targeted_curve: "twelve-epochs, epochs 10\u201312: loss 0.5590\u21920.5489 and \xD7\
+    1 macro 0.929598\u21920.930634 as backbone LR approaches its floor. Hypothesis:\
+    \ linear decay raises useful tail updates and gains 0.0005\u20130.002 macro within\
+    \ twelve epochs."
+  status: completed
+  created_revision: 186
+  ranking_rationale: 'Admit four proposals; proposal_admission reports their dependencies
+    satisfied. Rank scheduled late anchoring first because it extends the largest
+    measured gain with negligible expected preparation and training cost. Linear decay
+    follows: it extends an accepted schedule line, although that win is modest and
+    its transfer evidence supports a value, not an expected gain. The initial feature-statistics
+    bypass is a materially different retry of rejected full removal, preserving random
+    consumption and later perturbation. Two-epoch warm-up ranks fourth: author-supported
+    duration and inexpensive implementation, but indirect evidence and a plausible
+    underfit cost. The family ledger, prior-work precedent table and targeted searches
+    of docs/validation/results and docs/history revealed related runs, but no measured
+    duplicate of these four MambaVision mechanisms. Historical two-epoch warm-ups
+    on EfficientNet and other backbones do not duplicate the proposed hybrid-backbone
+    adaptation. Leave final-batchnorm-fixed-for-two-epoch-tail proposed: no running-statistics
+    mismatch is measured, and the two-epoch boundary borrows a schedule result without
+    establishing a normalization weakness. Its expected yield is weaker than the four
+    admitted ideas; filling all five queue positions is unnecessary.'
+  experiments:
+  - twelve-epoch-linear-decay-20261014T035629Z-5a23dbda
+  - twelve-epoch-linear-decay-20261014T045111Z-e6fa7b62
+  - twelve-epoch-linear-decay-20261014T045248Z-29ca2ce5
+  decision: provisional_accept
+- id: feature-statistics-after-first-epoch
+  mechanism_id: feature-augmentation
+  parent_idea_id: feature-statistics-augmentation-off
+  title: Bypass feature-statistics perturbation for the first epoch while retaining
+    its random draws
+  opportunity: "Evidence: augmentation-off starts faster, with epoch-1 \xD71 0.850130\
+    \ versus 0.841430 and loss 0.8861 versus 0.8963. It later loses both macro comparisons:\
+    \ selected \xD71 \u22120.001304 and \xD74 \u22120.001107. Final loss excluding\
+    \ anchor penalty is almost identical, 0.538861 versus 0.538792. Contusion falls\
+    \ 0.010245. Its GIN and contrast-mixing activity also differs, so turning off\
+    \ augmentation changed subsequent random draws. Hypothesis: bypassing perturbation\
+    \ only during initial adaptation can retain the faster start while keeping later\
+    \ robustness. Guess: +0.0003 to +0.0015 macro."
+  mechanism: 'Change one temporal augmentation policy: discard the feature-statistics
+    perturbation during the first training epoch, then use the incumbent augmentation
+    normally. Still execute the original augmentation draw and calculation during
+    that first epoch, but pass the unperturbed features onward. This preserves the
+    random-number consumption that wholesale removal changed. The one-epoch boundary
+    comes from the assigned recipe''s recorded warm-up, and the off/on values come
+    from the campaign''s tested 0/0.5 endpoints.'
+  precedents:
+  - "Evidence: feature-statistics-augmentation-off original selected_checkpoint.json\
+    \ selects epoch 11 at \xD71 0.929330. The completion narrative's 0.928986 is the\
+    \ final epoch, not the selected checkpoint."
+  - "Evidence: incumbent feature-statistics change is about 0.036\u20130.042 versus\
+    \ the ResNet reference's approximately 0.014 in prior-work.md; augmentation-off\
+    \ improves the initial macro but weakens its late curve."
+  - 'Evidence: external augmentation adopted DSU and rejected correlated-style and
+    study-coherent variants. This keeps the existing perturbation and acquisition
+    scope, changing only its initial application.'
+  novelty: A phase-specific, random-draw-preserving retry, not another probability
+    or strength sweep and not a repeat of full removal.
+  coverage: All training acquisitions eligible for the incumbent augmentation and
+    all twelve labels. Contusion and Effusion declines are diagnostic evidence about
+    the full-removal run, not separate optimization targets.
+  exploitation: Log feature_statistics_initial_bypass_calls, feature_statistics_applied_calls
+    and the existing feature_statistics_effective_probability. Actual bypass calls
+    in epoch 1 and actual perturbation applications from epoch 2 prove both phases.
+    Keep the initial boundary fixed at one epoch if a later warm-up proposal is accepted.
+    Compare early speed and late macro recovery, with the fixed adoption rule.
+  budget: "Guess: approximately 3,118\u20133,230 seconds and 12.73 GB because discarded\
+    \ perturbations are still calculated. Do not claim the full-removal run's 66-second\
+    \ saving for this policy. Retain twelve epochs, the same inputs and seed."
+  implementation: Follow the environment paragraph of the developer instructions.
+    In src/knee_abnormality/modeling/model.py, keep the existing augmentation call
+    but discard its output during epoch 0; apply it normally thereafter. In src/knee_abnormality/training/lightning.py,
+    set the training phase and log actual bypass/application counts. Preserve random
+    draw order, gradients through unperturbed features, acquisition grouping and all
+    other augmentations. Replace always-applied timing only. Rebase onto a new incumbent
+    and retain its unrelated improvements and accepted augmentation strength; explicitly
+    reconcile any competing augmentation-timing change.
+  open_choices: The faster start is measured; its cause is not established. Later
+    robustness and random-stream coupling are competing hypotheses. Preserve original
+    random consumption rather than attributing the full-removal result solely to DSU.
+  dependencies: []
+  priority_rationale: 'Third: completes the open retry with a named fix for the observed
+    early-versus-late pattern and removes a random-stream confound. Small source change,
+    modest expected gain and substantial uncertainty.'
+  source_change: true
+  targeted_curve: 'augmentation-off versus twelve-epochs: epoch 1 improves macro by
+    0.008700, but selected late macro loses 0.001304 with almost equal final non-anchor
+    loss. Hypothesis: retain an early advantage and recover late macro through restored
+    perturbations.'
+  status: completed
+  created_revision: 186
+  ranking_rationale: "Admit the protected-warm-up anchor follow-up and clipping retry:\
+    \ proposal_admission marks their declared dependencies satisfied, and each changes\
+    \ a measured policy's timing materially. The ledger and prior-work precedent table\
+    \ were checked; targeted rg across docs/validation/results/ and docs/history/\
+    \ found no measured duplicate of either phase policy. Preserve the reserved head\
+    \ and existing warm-up priority. The anchor predecessor's \xD71 gain of only 0.000054\
+    \ is weak against unknown seed variation, so its open extend line does not justify\
+    \ overtaking the queued warm-up experiment. Rank it ahead of clipping because\
+    \ its historical gains span both multipliers, while constant clipping at 10 lost\
+    \ both. Leave final-batchnorm-momentum-follows-decay and the existing final-BatchNorm\
+    \ freeze proposal proposed: normalization mismatch remains unmeasured, and these\
+    \ competing new directions have weaker support than the bounded follow-ups."
+  experiments:
+  - feature-statistics-after-first-epoch-20261014T045503Z-e8d6d240
+  - feature-statistics-after-first-epoch-20261014T054944Z-c15c9423
+  decision: reject
+- id: final-batchnorm-fixed-for-two-epoch-tail
+  mechanism_id: final-normalization-training
+  parent_idea_id: null
+  title: Hold final BatchNorm running statistics fixed during the last two training
+    epochs
+  opportunity: "Evidence: MambaVision ends with a 640-channel BatchNorm after its\
+    \ LayerNorm-based late stages; this ResNet recipe has no equivalent final normalization,\
+    \ as recorded in prior-work.md and confirmed in the incumbent wrapper and vendor\
+    \ source. Twelve-epochs continues reducing loss in epochs 11\u201312, but gains\
+    \ only 0.001037 in \xD71 macro over epoch 10. Hypothesis: evolving final population\
+    \ statistics partly limit the benefit of this tail or couple training to acquisition\
+    \ composition. No running-statistics mismatch has been measured. Guess: +0.0003\
+    \ to +0.0015 macro, with a clear risk of worse optimization."
+  mechanism: During the incumbent's final two epochs, put only its existing final
+    BatchNorm into evaluation mode so training uses accumulated MRI running statistics.
+    Keep its affine parameters trainable and all earlier BatchNorm layers in their
+    incumbent training modes. Keep architecture, forward routing, DSU and prediction
+    behavior unchanged. The two-epoch tail comes from the successful ten-to-twelve-epoch
+    extension; this is not a whole-backbone eval-mode run or ImageNet-statistics freeze.
+  precedents:
+  - 'Evidence: src/knee_abnormality/modeling/model.py:_final_norm and _deep_stages
+    use the existing final norm; src/knee_abnormality/modeling/staged_backbones.py
+    retains original.norm. The linked local vendor source constructs it as BatchNorm2d(num_features).'
+  - "Evidence: twelve-epochs gains \xD74 0.001530 over its ten-epoch parent while\
+    \ final training loss falls to 0.548892."
+  - 'Evidence: external site-generalization rejected site-frozen-backbone-batchnorm.
+    That froze a different backbone''s normalization policy; this proposal targets
+    only MambaVision''s final norm after ten epochs of adaptation.'
+  novelty: First campaign run isolating training mode of the final BatchNorm. It retains
+    adaptation in all other normalization layers and avoids freezing pretrained statistics
+    from the start.
+  coverage: Every training image passing through the existing final normalization
+    and all twelve labels. There is no plane-, vendor- or label-conditioned behavior.
+  exploitation: Log final_bn_tail_training_calls, final_bn_tracked_updates and final_bn_affine_grad_rms.
+    Training calls using the norm's running statistics must be positive in both tail
+    epochs, while tracked-statistic updates remain zero; nonzero affine gradients
+    distinguish this from parameter freezing. Inspect tail macro and loss. Adopt solely
+    by the existing macro rule.
+  budget: "Guess: approximately 3,100\u20133,230 seconds and 12.73 GB. No additional\
+    \ images, forward passes or recalibration pass. Any efficiency difference from\
+    \ evaluation-mode BatchNorm remains unmeasured."
+  implementation: Follow the environment paragraph of the developer instructions.
+    Add the tail phase in src/knee_abnormality/training/lightning.py and enforce only
+    _final_norm().eval() during training in src/knee_abnormality/modeling/model.py,
+    including after Lightning restores train mode. Retain affine requires_grad, existing
+    buffers, earlier normalization modes and all accepted components. Add the three
+    actual-execution diagnostics. Reconcile with a newly accepted incumbent, retaining
+    its unrelated improvements and defining the tail as its last two epochs; do not
+    replace the norm, alter inference or refresh statistics afterward.
+  open_choices: The proposed statistical mismatch is unmeasured, so this is a lower-confidence
+    new direction. Do not conflate unchanged running buffers with frozen affine parameters.
+    It must remain a training-mode setting, not a new normalization architecture.
+  dependencies:
+  - twelve-epochs
+  priority_rationale: 'Fourth: a distinct, architecture-specific training setting
+    with bounded source and runtime cost. Lower priority because current curves do
+    not establish a normalization failure.'
+  source_change: true
+  targeted_curve: "twelve-epochs, epochs 11\u201312: loss falls 0.5549\u21920.5489\
+    \ while \xD71 rises only 0.000362. Hypothesis: holding final normalization statistics\
+    \ fixed lets the existing tail improve macro by another 0.0003\u20130.0015."
+  status: retired
+  created_revision: 186
+  retired_reason: 'Removed by the user''s decision of 2026-10-14 (''remove the existing
+    seeds and add these''): replaced by five forced seeds on the full recipe.'
+- id: two-epoch-warmup-on-weight-scale-anchors
+  mechanism_id: warmup-duration
+  parent_idea_id: null
+  title: Use two warm-up epochs while retaining incumbent peak rates
+  opportunity: 'Evidence: twelve-epochs has sampled pre-clipping model-gradient norm
+    5.454 in epoch 1 versus 1.449 in epoch 2. Both higher-rate follow-ups start below
+    their bound parent and catch up late. The successful anchor correction improves
+    the start substantially, but does not test warm-up duration. Hypothesis: a gentler
+    initial adaptation helps ImageNet weights and the hybrid late stages before reaching
+    the accepted rate. Guess: +0.0003 to +0.0015 macro; spending another epoch below
+    peak could instead worsen underfit.'
+  mechanism: Set optimizer.warmup_epochs to 2 in configs/training.yaml only. Retain
+    warmup_start_ratio 0.1, twelve epochs, incumbent peak rates, cosine or any newly
+    accepted decay shape, and minimum ratio. This means 884 warm-up updates on the
+    assigned cohort. The authors' MambaVision-T detection recipe warms up for 1,000
+    updates; two epochs approximate that duration using the existing integer-epoch
+    setting. The transfer and rounding are hypotheses, not an author recommendation
+    for this MRI recipe.
+  precedents:
+  - 'Evidence: [authors'' MambaVision-T detection configuration](https://raw.githubusercontent.com/NVlabs/MambaVision/main/object_detection/configs/mamba_vision/cascade_mask_rcnn_mamba_vision_tiny_3x_coco.py)
+    uses a 1,000-update warm-up. Verified 2026-10-14; its start factor and other settings
+    are not imported.'
+  - 'Evidence: all decided campaign runs use one warm-up epoch; twelve-epochs records
+    442 updates per epoch.'
+  - 'Evidence: external rn18 warmup-start-ratio-05 was rejected. That changed the
+    starting fraction on a ResNet, not duration on MambaVision.'
+  novelty: First duration change in this campaign. Peak rates and their stage distribution
+    stay intact, so it does not reopen the closed backbone-rate family.
+  coverage: All optimizer groups under the existing scheduler, all training studies
+    and labels. No backbone freezing, head-only phase or input change.
+  exploitation: Recorded effective configuration and inherited backbone_lr prove activation.
+    On the assigned uniform-rate recipe, epoch-1 LR should be approximately 1.1e-4
+    and epoch-2 LR 2e-4, versus reaching 2e-4 in epoch 1 currently. Inspect sampled
+    grad_norm, early macro and subsequent catch-up. No additional confirmation run
+    or adoption threshold.
+  budget: 'Guess: approximately 3,118 seconds and 12.73 GB, with unchanged twelve
+    epochs and 5,304 updates. The change adds no computation beyond the existing scheduler.'
+  implementation: Follow the environment paragraph of the developer instructions.
+    Change only optimizer.warmup_epochs from 1 to 2 in configs/training.yaml; retain
+    the existing Python scheduler and logging. Preserve accepted rates, anchors, horizon
+    and all unrelated improvements from a newly accepted incumbent. Preserve any separately
+    adopted augmentation phase boundary rather than silently moving it. If a new incumbent
+    already uses two warm-up epochs, report this proposal as duplicate instead of
+    retraining it.
+  open_choices: Use exactly two epochs; no duration or starting-fraction sweep. Evidence
+    for reducing first-epoch disturbance is indirect, and the longer warm-up may sacrifice
+    useful adaptation time.
+  dependencies: []
+  priority_rationale: 'Fifth: inexpensive, configuration-only and grounded in the
+    authors'' update count. Lower expected benefit than the observed anchor and tail
+    mechanisms, with a plausible underfit tradeoff.'
+  source_change: false
+  targeted_curve: "twelve-epochs epoch 1: sampled grad_norm 5.454 and macro 0.841430;\
+    \ higher-rate candidates also show slower starts. Hypothesis: soften initial adaptation\
+    \ without lowering peak rates, improving selected macro by 0.0003\u20130.0015."
+  status: completed
+  created_revision: 186
+  ranking_rationale: 'Admit the grouped schedule follow-up: proposal_admission reports
+    its dependency satisfied, twelve-epochs remains active, and the proposal combines
+    two measured trajectories without changing peaks, anchors, horizon or inputs.
+    The inspected incumbent applies one linear LambdaLR function to every optimizer
+    group, so separating backbone and head decay is a material change. Ledger, prior-work
+    precedents and searches of docs/validation/results/ and docs/history/ in both
+    source locations found no measured duplicate. Historical cosine warm restarts
+    changed temporal restart behavior rather than group-specific decay. Preserve the
+    reserved warm-up head and rank the new follow-up after clipping: linear''s +0.001020
+    gain is comparable to documented ResNet seed spread, and head-specific causation
+    is unmeasured, so the open extend line does not warrant overtaking the existing
+    retry. Leave equal-study BatchNorm moments and Adam-history reset proposed, alongside
+    the existing normalization proposals. Their harmful weighting/history premises
+    remain unmeasured; neither currently warrants queue expansion.'
+  experiments:
+  - two-epoch-warmup-on-weight-scale-anchors-20261014T055244Z-9d7a288c
+  - two-epoch-warmup-on-weight-scale-anchors-20261014T055437Z-9d18a6bd
+  decision: invalid
+- id: late-anchor-decay-with-protected-warmup
+  mechanism_id: weight-anchor
+  parent_idea_id: late-anchor-follows-learning-rate
+  title: Keep the late anchor constant during warm-up, then follow learning-rate decay
+  opportunity: "Evidence: late-anchor-follows-learning-rate gained +0.001447 at \xD7\
+    4 and +0.000054 at selected-epoch \xD71 against twelve-epochs. Final stage-4 drift\
+    \ increased from 0.036899 to 0.044812. However, its epoch-1 late-anchor multiplier\
+    \ was already 0.5485, and epoch-2 macro was 0.891567 versus 0.884412. The result\
+    \ therefore combines initial release with subsequent decay. Hypothesis: protecting\
+    \ initial pretrained adaptation while retaining later release could preserve the\
+    \ \xD74 benefit and improve the narrow \xD71 margin. Guess: +0.0003\u20130.0015\
+    \ macro against the assigned incumbent; benefit is unmeasured."
+  mechanism: Change one temporal anchor policy. During the configured warm-up, retain
+    the incumbent late alpha of 0.00001. After warm-up, multiply that alpha by the
+    actual backbone optimizer-group lr/initial_lr ratio. With the assigned cosine
+    schedule and 0.01 floor, the endpoint remains 0.0000001. Early alpha remains 0.001
+    throughout. Values and the boundary come from twelve-epochs and the completed
+    scheduled-anchor run. This introduces the historical method onto the assigned
+    fixed-anchor incumbent with an explicitly different warm-up policy; it does not
+    assume that historical method is active.
+  precedents:
+  - "Evidence: late-anchor-follows-learning-rate-20261014T032155Z-6715982e, selected\
+    \ epoch 11, \xD71 0.930688867 and \xD74 0.937634105; central 80% \xD74 interval\
+    \ [+0.000462,+0.002492]. Its original logs distinguish warm-up release from later\
+    \ decay."
+  - 'Evidence: twelve-epochs-20261013T233635Z-27038682 has constant late alpha 0.00001,
+    one warm-up epoch and minimum_lr_ratio 0.01. Stage-4 drift declines from approximately
+    0.0382 to 0.0369 in the tail.'
+  - "Evidence: anchors-by-weight-scale improved every \xD74 label against its bound\
+    \ parent and reduced final loss excluding the anchor from 0.575493 to 0.548855.\
+    \ Retaining its coverage and early restraint preserves the successful mechanism."
+  - 'Detailed original-artifact tables and comparisons: [campaign curve analysis](/home/claudio/src/knee-abnormality/outputs/autoresearch/mambavision-settings/jobs/researcher-20261014T045504Z-762b8699/scratch/campaign-curve-analysis.md).'
+  novelty: The completed scheduled-anchor run scales during both warm-up and decay.
+    This follow-up retains full late restraint during warm-up and releases it only
+    afterward. It neither repeats constant-strength anchors nor restores the removed
+    no-anchor seed.
+  coverage: All training studies and all twelve labels. Fracture and PF OA gains in
+    the predecessor motivate inspecting adaptation, while its Medial OA and meniscus
+    losses remain material diagnostics. No label-specific coefficient or objective
+    is introduced.
+  exploitation: 'Use at most six mechanism scalars: warmup_late_anchor_factor, late_anchor_schedule_factor,
+    effective_anchor_alpha_late, late_anchor_penalty_reduction, anchor_penalty and
+    backbone_drift_stage4. The consumed warm-up factor must equal 1; positive applied
+    penalty reduction after warm-up proves release. Inspect total loss minus anchor
+    alongside both macro multipliers. These activation observations add no adoption
+    criterion.'
+  budget: "Guess: 3,110\u20133,250 training seconds and approximately 12.73 GB peak\
+    \ allocation, based on twelve-epochs at 3,117.8 s and the predecessor at 3,110.2\
+    \ s. Scalar scheduling and existing anchor partitions require no additional images\
+    \ or forward passes. Retain twelve epochs, batch 8 and supervisor-assigned seed\
+    \ 1110484336. Future launch accounting must reconcile the assignment's stale ten-epoch/4,420-update\
+    \ limits with the retained twelve-epoch/5,304-update recipe without changing the\
+    \ 1,945.5\u20133,372.2 s training range."
+  implementation: Follow the environment paragraph of the developer instructions.
+    In src/knee_abnormality/training/lightning.py, replace constant late-anchor application
+    with the warm-up-protected multiplier, using the actual backbone optimizer group's
+    rate. Retain pretrained buffers, parameter coverage, constant early alpha and
+    AdamW exclusions. Add the six named execution diagnostics; derive coefficients
+    from those actually consumed by the loss. No compatibility switch is needed. On
+    the assigned incumbent this adds scheduled release; if the historical scheduled-anchor
+    method becomes active during development, replace its warm-up scaling with the
+    protected policy. Preserve all unrelated newly accepted settings, including rates,
+    horizon, warm-up duration, clipping and augmentation.
+  open_choices: "No strength sweep or extra training. The predecessor's loss reduction\
+    \ partly follows mechanically from reduced penalty: its final non-anchor loss\
+    \ improves only 0.001478. Its \xD71 gain is narrow, and seed variation remains\
+    \ unknown. The follow-up tests a phase hypothesis without claiming the tail caused\
+    \ the historical gain."
+  dependencies:
+  - anchors-by-weight-scale
+  priority_rationale: "First: supplies the open weight-anchor family's follow-up.\
+    \ Both multipliers improved, and the positive central 80% interval supports giving\
+    \ the mechanism another step. The narrow \xD71 margin and warm-up confound lower\
+    \ confidence; implementation and runtime costs are small."
+  source_change: true
+  targeted_curve: "Twelve-epochs, epochs 7\u201312: stage-4 drift retreats toward\
+    \ 0.036899. The scheduled-anchor predecessor removes that retreat but changes\
+    \ epoch 1 too. Preserve incumbent warm-up, retain outward tail adaptation, and\
+    \ seek +0.0003\u20130.0015 macro at both multipliers."
+  status: retired
+  created_revision: 243
+  ranking_rationale: "Admit the protected-warm-up anchor follow-up and clipping retry:\
+    \ proposal_admission marks their declared dependencies satisfied, and each changes\
+    \ a measured policy's timing materially. The ledger and prior-work precedent table\
+    \ were checked; targeted rg across docs/validation/results/ and docs/history/\
+    \ found no measured duplicate of either phase policy. Preserve the reserved head\
+    \ and existing warm-up priority. The anchor predecessor's \xD71 gain of only 0.000054\
+    \ is weak against unknown seed variation, so its open extend line does not justify\
+    \ overtaking the queued warm-up experiment. Rank it ahead of clipping because\
+    \ its historical gains span both multipliers, while constant clipping at 10 lost\
+    \ both. Leave final-batchnorm-momentum-follows-decay and the existing final-BatchNorm\
+    \ freeze proposal proposed: normalization mismatch remains unmeasured, and these\
+    \ competing new directions have weaker support than the bounded follow-ups."
+  retired_reason: 'Standing user rule (2026-10): no adoption of a run whose mechanism
+    could cost site generalization, even when it passes the local rule. This idea
+    weakens the late L2-SP anchor, the recipe''s site-generalization device, to 1%
+    by the end, as late-anchor-follows-learning-rate did; that run was taken back
+    out of the incumbent at 06:52 under the same rule, so this run could not be adopted.
+    Removed by the keeper to save the GPU slot.'
+- id: gradient-clipping-relaxed-after-warmup
+  mechanism_id: gradient-clipping
+  parent_idea_id: gradient-clipping-at-10
+  title: Retain clipping at 1 during warm-up and relax it to 10 afterward
+  opportunity: "Evidence: gradient-clipping-at-10 lost \u22120.000251 at \xD71 and\
+    \ \u22120.000334 at \xD74. Relaxation activated: epoch-1 mean post-clip optimizer\
+    \ norm was 3.1531, falling to 1.2310 and 1.1454 in the next two epochs and mostly\
+    \ near or below 1 later. The assigned incumbent's sampled pre-clip norm averaged\
+    \ 5.4541 in epoch 1. MCL fell 0.010147 despite an early macro advantage. Hypothesis:\
+    \ initial unclipped updates change adaptation in ways that later relaxation cannot\
+    \ recover; protect that phase while permitting subsequent gradients above 1. Guess:\
+    \ +0.0002\u20130.0010 macro against the incumbent."
+  mechanism: 'Replace the constant global cap with one phase-dependent cap: 1.0 while
+    global_step is below the existing configured warmup_steps, then 10.0. Both caps
+    come from the incumbent and completed candidate; the boundary comes from the existing
+    scheduler. This preserves global clipping and optimizer structure while changing
+    when relaxation activates. It is a temporal retry, not a different cap strength
+    or reseed.'
+  precedents:
+  - "Evidence: gradient-clipping-at-10-20261014T021222Z-f1e07dad activated and completed\
+    \ within budget. Its epoch-1 post-clip norm was 3.1531; \xD74 central 80% change\
+    \ interval [\u22120.001451,+0.000727]."
+  - 'Evidence: twelve-epochs uses clip 1.0 and one warm-up epoch. Its sampled pre-clip
+    norms exceed 1 at every recorded epoch-1 observation, but only a subset later.'
+  - 'Evidence: backbone-rate-4e-4 and the clipping candidate both lose MCL, Contusion
+    and Effusion and gain ACL and Synovitis against their own parents. Their different
+    rate and clipping policies prevent attributing this shared pattern to one cause.'
+  - 'Evidence: prior-work.md, Why it underfits, records unusually large MambaVision
+    stem gradients and global clipping. Those reference measurements motivate inspecting
+    phase and coupling; they do not establish the current failure''s cause.'
+  novelty: The rejected run relaxed clipping throughout training. This preserves the
+    incumbent's initial cap and changes only the post-warm-up phase. It does not revisit
+    the closed backbone-rate family or the historical separate-module clipping method.
+  coverage: Every optimizer gradient, study and label. MCL's decline motivates the
+    diagnosis but receives no special clipping, loss or adoption objective.
+  exploitation: Log gradient_clip_applied_cap, post_clip_grad_norm, warmup_clip_calls
+    and post_warmup_gradients_above_one. Warm-up calls must use cap 1.0; positive
+    post-warm-up gradients actually presented above 1 establish activation even if
+    their epoch mean is below 1. Compare early stage drift, all epoch losses and label
+    curves with the incumbent and rejected constant-cap run. Adopt only under the
+    fixed macro rule.
+  budget: "Guess: 3,110\u20133,250 training seconds and approximately 12.73 GB peak\
+    \ allocation, against the completed constant-cap run's 3,112.4 s and 12.73 GB.\
+    \ Preserve twelve epochs and 5,304 optimizer updates. No extra batches, forward\
+    \ passes or randomness are needed. Supervisor measures compliance with the existing\
+    \ training-time range and reconciles the stale step limits before launch."
+  implementation: Follow the environment paragraph of the developer instructions.
+    Set trainer.gradient_clip_val to 10 in configs/training.yaml for the relaxed phase.
+    In src/knee_abnormality/training/lightning.py, implement one clipping hook that
+    delegates once to Lightning with cap 1 during configured warm-up and the configured
+    cap afterward. Replace the constant-cap policy and add the four named actual-execution
+    diagnostics without compatibility branches. Retain anchors, rates, sampling, schedule,
+    model, losses and evaluation. Reconcile onto any newly accepted incumbent, preserving
+    unrelated improvements and its warm-up boundary; replace overlapping clipping
+    behavior explicitly rather than applying two clipping passes.
+  open_choices: The phase diagnosis is a hypothesis supported by the measured clipping
+    pattern, not evidence that cap 10 caused harm. Global gradient coupling is an
+    alternative cause. The predecessor's final loss excluding anchors improves only
+    about 0.000797, so a large optimization benefit is unsupported. No intermediate-cap
+    sweep or confirmation run.
+  dependencies: []
+  priority_rationale: 'Second: fills the diagnosed clipping family''s retry slot.
+    The first attempt activated, and its effect was concentrated early, giving a concrete
+    phase change to try. Potential is modest and the interval crosses zero; implementation
+    remains bounded.'
+  source_change: true
+  targeted_curve: "Gradient-clipping-at-10, epochs 1\u20133: post-clip norm 3.1531\u2192\
+    1.2310\u21921.1454, followed by mixed macro catch-up and MCL \u22120.010147 at\
+    \ \xD74. Preserve incumbent warm-up updates, then permit relaxation; seek +0.0002\u2013\
+    0.0010 macro without label-specific behavior."
+  status: retired
+  created_revision: 243
+  ranking_rationale: 'Admit the grouped schedule follow-up: proposal_admission reports
+    its dependency satisfied, twelve-epochs remains active, and the proposal combines
+    two measured trajectories without changing peaks, anchors, horizon or inputs.
+    The inspected incumbent applies one linear LambdaLR function to every optimizer
+    group, so separating backbone and head decay is a material change. Ledger, prior-work
+    precedents and searches of docs/validation/results/ and docs/history/ in both
+    source locations found no measured duplicate. Historical cosine warm restarts
+    changed temporal restart behavior rather than group-specific decay. Preserve the
+    reserved warm-up head and rank the new follow-up after clipping: linear''s +0.001020
+    gain is comparable to documented ResNet seed spread, and head-specific causation
+    is unmeasured, so the open extend line does not warrant overtaking the existing
+    retry. Leave equal-study BatchNorm moments and Adam-history reset proposed, alongside
+    the existing normalization proposals. Their harmful weighting/history premises
+    remain unmeasured; neither currently warrants queue expansion.'
+  experiments:
+  - gradient-clipping-relaxed-after-warmup-20261014T064659Z-1762f238
+  retired_reason: 'Removed by the user''s decision of 2026-10-14 (''remove the existing
+    seeds and add these''): replaced by five forced seeds on the full recipe.'
+- id: final-batchnorm-momentum-follows-decay
+  mechanism_id: final-normalization-training
+  parent_idea_id: null
+  title: Reduce final BatchNorm running-statistic momentum as learning rates decay
+  opportunity: "Evidence: MambaVision has a final 640-channel BatchNorm after its\
+    \ LayerNorm-based late stages; the ResNet recipe lacks that final normalization.\
+    \ Twelve-epochs improves loss from 0.559004 to 0.548892 over epochs 10\u201312,\
+    \ while macro moves 0.929598\u21920.930634. The scheduled-anchor run's loss continues\
+    \ falling but macro peaks at epoch 11 and falls 0.000431 in epoch 12. Hypothesis:\
+    \ short-memory final population statistics limit stable tail evaluation after\
+    \ feature updates become small. No normalization mismatch has been measured. Guess:\
+    \ +0.0002\u20130.0010 macro; stale statistics could instead worsen it."
+  mechanism: Change only the final BatchNorm's running-statistic momentum during training.
+    Keep its authors' default 0.1 throughout warm-up, then use 0.1 times the actual
+    final-norm optimizer-group lr/initial_lr ratio. The assigned scheduler floor produces
+    a minimum momentum of 0.001. Retain training-mode batch normalization and trainable
+    affine parameters throughout. Values derive from the existing BatchNorm default
+    and incumbent schedule; the proposed coupling is a hypothesis, not an authors'
+    recommendation. Earlier normalization layers retain their policies.
+  precedents:
+  - 'Evidence: the local vendor constructs final norm as BatchNorm2d(num_features),
+    retained by src/knee_abnormality/modeling/staged_backbones.py and model.py:_final_norm.
+    The [authors'' source](https://raw.githubusercontent.com/NVlabs/MambaVision/main/mambavision/models/mamba_vision.py)
+    confirms this construction.'
+  - 'Evidence: [PyTorch BatchNorm documentation](https://docs.pytorch.org/docs/2.14/generated/torch.nn.BatchNorm2d.html)
+    specifies default momentum 0.1 and distinguishes running-statistic updates from
+    training normalization. Verified 2026-10-14.'
+  - 'Closest pending precedent: final-batchnorm-fixed-for-two-epoch-tail is already
+    proposed. It switches the training forward to running statistics and stops their
+    updates. This proposal instead retains batch-statistic training and continuously
+    updates buffers with declining momentum; no result for the pending idea is assumed.'
+  - 'Historical external precedent: site-frozen-backbone-batchnorm was rejected on
+    a different backbone. This proposal changes only MambaVision''s final buffer update
+    rule and does not freeze the backbone.'
+  novelty: 'No decided campaign run schedules normalization-buffer momentum. It differs
+    behaviorally from the existing final-BatchNorm freeze proposal: training normalization
+    continues using batch statistics, with nonzero running-statistic updates through
+    the tail.'
+  coverage: All images passing through the existing final norm and all twelve labels.
+    No vendor, plane, compartment or label conditioning. Validation and prediction
+    retain their existing evaluation mode and use the buffers produced by training.
+  exploitation: Log final_bn_applied_momentum from actual training calls, final_bn_training_calls,
+    final_bn_tracked_updates and final_bn_buffer_step_rms. Momentum below 0.1 after
+    warm-up plus positive tracked updates proves the proposed behavior and distinguishes
+    it from freezing. Training loss should remain approximately unchanged because
+    the training forward still uses batch statistics. Inspect tail macro and every
+    label; the fixed macro rule alone decides.
+  budget: "Guess: 3,100\u20133,250 training seconds and approximately 12.73 GB peak\
+    \ allocation, based on the incumbent's 3,117.8 s. Only scalar momentum updates\
+    \ and small buffer diagnostics are added; no refresh pass, additional images or\
+    \ weight averaging. Retain incumbent epochs, batch size, seed and the existing\
+    \ training-time range."
+  implementation: Follow the environment paragraph of the developer instructions.
+    In src/knee_abnormality/training/lightning.py, locate the existing final norm
+    through self.model._final_norm(), identify its actual optimizer group and update
+    momentum before training forwards. Replace constant final-norm momentum with the
+    stated policy; retain affine gradients, training mode, buffers and all earlier
+    normalization behavior. Add the four named execution diagnostics, observing actual
+    calls. No vendor edits or new option are needed. Preserve unrelated improvements
+    from a newly accepted incumbent and consume its scheduler. If the pending final-norm
+    tail freeze becomes accepted first, this alternative replaces that overlapping
+    freeze policy and removes its phase enforcement rather than stacking both.
+  open_choices: Normalization mismatch remains unmeasured, so this is lower confidence.
+    Declining momentum may lag still-changing features. It should not be credited
+    with better fitting if only buffer-driven validation changes. No independent momentum
+    or epoch sweep, statistics refresh, inference-mode change or additional adoption
+    threshold.
+  dependencies: []
+  priority_rationale: 'Third: distinct architecture-specific training behavior with
+    negligible expected runtime cost. It addresses remaining tail instability without
+    reopening rate sweeps or adding regularization to an unproven overfitting diagnosis.
+    Lower priority than the two family follow-ups because the suspected normalization
+    limitation is unmeasured.'
+  source_change: true
+  targeted_curve: "Twelve-epochs and scheduled-anchor, epochs 10\u201312: training\
+    \ loss falls while macro gains are small or reverse in the final epoch. Hypothesis:\
+    \ smoother final running statistics improve selected \xD71 and \xD74 macro by\
+    \ 0.0002\u20130.0010, with approximately unchanged training-loss curves."
+  status: retired
+  created_revision: 243
+  retired_reason: 'Removed by the user''s decision of 2026-10-14 (''remove the existing
+    seeds and add these''): replaced by five forced seeds on the full recipe.'
+- id: linear-backbone-cosine-head-decay
+  mechanism_id: schedule-length
+  parent_idea_id: twelve-epoch-linear-decay
+  title: Retain linear backbone decay and restore cosine decay for the heads
+  opportunity: "Evidence: linear decay improved selected \xD71 by 0.001192 and \xD7\
+    4 by 0.001020 versus twelve-epochs. Its training loss improved in epochs 3\u2013\
+    7 but worsened in epochs 8\u201311. Medial Meniscus ended at \xD71 0.944727 versus\
+    \ 0.948930 for cosine; its \xD74 change was \u22120.001715. Contusion and Synovitis\
+    \ instead improved. Hypothesis: applying the same decay shape to the pretrained\
+    \ hybrid backbone and newly initialized heads compromises their different adaptation\
+    \ needs. Label differences motivate examining this shared optimization policy;\
+    \ they do not establish a head-specific cause or authorize label-specific objectives."
+  mechanism: "Replace the shared scheduler multiplier with two functions. Backbone\
+    \ groups retain the accepted post-warm-up linear multiplier. Every non-backbone\
+    \ group uses the twelve-epochs predecessor's cosine multiplier. Both retain the\
+    \ incumbent's configured warm-up, peak rates, minimum multiplier and twelve-epoch\
+    \ horizon. This combines the named twelve-epochs and twelve-epoch-linear-decay\
+    \ schedules through one change to schedule distribution. Cosine gives heads higher\
+    \ early post-warm-up rates and lower late rates than linear. Guess: preserve useful\
+    \ backbone adaptation while improving head fitting and tail stability, with a\
+    \ possible macro gain of 0.0002\u20130.0010."
+  precedents:
+  - "Evidence: twelve-epoch-linear-decay-20261014T045248Z-29ca2ce5 passed both macro\
+    \ comparisons. Its \xD74 central 80% interval was [\u22120.000078,+0.002234];\
+    \ this interval does not decide adoption."
+  - "Evidence: twelve-epochs-20261013T233635Z-27038682 supplies the exact cosine shape,\
+    \ warm-up and floor. Its selected \xD71/\xD74 scores were 0.930634/0.936187; linear\
+    \ reached 0.931826/0.937208."
+  - "Evidence: linear's largest \xD74 gains versus cosine were Fracture +0.004070,\
+    \ Synovitis +0.003596 and Contusion +0.003540. Losses included Medial Meniscus\
+    \ \u22120.001715, Medial OA \u22120.001378 and Lateral Meniscus \u22120.001353.\
+    \ All per-label 95% intervals crossed zero."
+  - 'Evidence: prior-work.md describes ImageNet initialization, LayerNorm and mixed
+    scan/attention stages in MambaVision, unlike the RadImageNet ResNet backbone.
+    The surrounding heads remain newly trained components.'
+  - '[Original per-run epoch, diagnostic, label and blend tables](/home/claudio/src/knee-abnormality/outputs/autoresearch/mambavision-settings/jobs/researcher-20261014T055246Z-06fc5f25/scratch/campaign-curve-analysis.md).'
+  novelty: Previous decided runs used one decay shape for all optimizer groups. This
+    preserves linear decay for the backbone while changing the heads' trajectory.
+    It introduces neither a new peak-rate profile nor a label-conditioned schedule,
+    and does not reopen the closed backbone-rate family.
+  coverage: All training studies and all twelve labels. Every non-backbone trainable
+    component follows the same head schedule, including existing auxiliary components.
+    Loss coefficients, image sampling and evaluation remain fixed.
+  exploitation: Log backbone_lr_schedule_factor, head_lr_schedule_factor and head_minus_backbone_schedule_factor
+    from consumed optimizer rates. Their positive difference early after warm-up and
+    negative difference late prove group-specific scheduling. Compare every epoch's
+    macro, loss, stage drift and label curves with linear and cosine. The fixed standalone
+    two-multiplier macro rule alone decides.
+  budget: "Guess: 3,100\u20133,250 training seconds and approximately 12.73 GB peak\
+    \ allocation, based on linear's 3,114.6 s and cosine's 3,117.8 s. Scheduler arithmetic\
+    \ adds no forward passes, images or optimizer updates. Retain twelve epochs, batch\
+    \ 8, 5,304 updates and supervisor-assigned seed 1110484336. The supervisor must\
+    \ reconcile the stale ten-epoch/4,420-update limits while preserving the 1,945.5\u2013\
+    3,372.2 s training range."
+  implementation: Follow the environment paragraph of the developer instructions.
+    In src/knee_abnormality/training/lightning.py, assign schedule functions by backbone
+    parameter ownership and replace the shared LambdaLR function with group-specific
+    functions. Retain the backbone linear formula, cosine predecessor formula, configured
+    warm-up, floor, peaks, anchors and extra-update diagnostic. Replace the two shared
+    schedule diagnostics with the three named consumed-rate diagnostics. Identify
+    twelve-epoch-linear-decay's global scheduling policy as superseded by this grouped
+    policy; retain its backbone component and all unrelated accepted improvements.
+    Reconcile onto a newly accepted incumbent using its current warm-up and horizon.
+    Replace overlapping scheduler behavior explicitly, without compatibility switches
+    or duplicated schedulers.
+  open_choices: The label tradeoff could arise from backbone adaptation, stochastic
+    training or normalization rather than head scheduling. No causal head diagnosis
+    has been measured. Use the two completed shapes unchanged; no interpolation sweep,
+    confirmation training or additional adoption threshold.
+  dependencies:
+  - twelve-epochs
+  priority_rationale: 'First: supplies the helped schedule family''s required follow-up.
+    It uses two measured trajectories, costs essentially nothing and preserves the
+    accepted backbone shape. The interval crossing zero and uncertain head attribution
+    limit confidence.'
+  source_change: true
+  targeted_curve: "Linear versus cosine, epochs 8\u201312: higher linear training\
+    \ loss during epochs 8\u201311 and lower Medial Meniscus \xD71, despite rising\
+    \ Contusion/Synovitis. Restore the heads' cosine trajectory while retaining linear\
+    \ backbone decay; guessed macro improvement 0.0002\u20130.0010."
+  status: retired
+  created_revision: 276
+  ranking_rationale: 'Admit the grouped schedule follow-up: proposal_admission reports
+    its dependency satisfied, twelve-epochs remains active, and the proposal combines
+    two measured trajectories without changing peaks, anchors, horizon or inputs.
+    The inspected incumbent applies one linear LambdaLR function to every optimizer
+    group, so separating backbone and head decay is a material change. Ledger, prior-work
+    precedents and searches of docs/validation/results/ and docs/history/ in both
+    source locations found no measured duplicate. Historical cosine warm restarts
+    changed temporal restart behavior rather than group-specific decay. Preserve the
+    reserved warm-up head and rank the new follow-up after clipping: linear''s +0.001020
+    gain is comparable to documented ResNet seed spread, and head-specific causation
+    is unmeasured, so the open extend line does not warrant overtaking the existing
+    retry. Leave equal-study BatchNorm moments and Adam-history reset proposed, alongside
+    the existing normalization proposals. Their harmful weighting/history premises
+    remain unmeasured; neither currently warrants queue expansion.'
+  retired_reason: 'Removed by the user''s decision of 2026-10-14 (''remove the existing
+    seeds and add these''): replaced by five forced seeds on the full recipe.'
+- id: final-batchnorm-equal-study-moments
+  mechanism_id: final-normalization-training
+  parent_idea_id: null
+  title: Give each study equal weight in final BatchNorm training moments
+  opportunity: 'Evidence: MambaVision adds a shared 640-channel final BatchNorm after
+    its late LayerNorm stages; the ResNet recipe lacks this final norm. model.py constructs
+    token_study before encoding ragged study/view images, but native BatchNorm pools
+    images and spatial positions equally. Hypothesis: studies contributing more images
+    disproportionately influence the final training normalization and running buffers.
+    Linear''s tail still has mixed label trajectories while macro rises, and its validation
+    center-displacement scalar fluctuates despite generally falling loss. A harmful
+    study-weight imbalance has not been measured.'
+  mechanism: "Change only the final BatchNorm's training moment estimator. For each\
+    \ represented study, calculate channel mean and within-study variance across its\
+    \ images and spatial positions. Average study means equally; calculate total variance\
+    \ as the equal average of within-study variance plus squared study-mean displacement.\
+    \ Normalize every image with those shared moments and retain the existing affine\
+    \ parameters and epsilon. Update existing running buffers using the current momentum\
+    \ and the corresponding weighted finite-sample variance correction. Weights are\
+    \ determined by actual study counts, not a tuned coefficient. Validation and prediction\
+    \ continue using native evaluation-mode BatchNorm. Guess: +0.0002\u20130.0010\
+    \ macro through more balanced population estimates."
+  precedents:
+  - "Evidence: src/knee_abnormality/modeling/model.py:2047 constructs token_study;\
+    \ :2093 invokes _encode_images; :1145\u20131161 places the existing final norm\
+    \ after the fourth stage. No change to input selection is required."
+  - 'Evidence: the [MambaVision authors'' source](https://raw.githubusercontent.com/NVlabs/MambaVision/main/mambavision/models/mamba_vision.py)
+    constructs the final BatchNorm. The proposal retains that layer''s parameters
+    and architecture.'
+  - 'Evidence: [PyTorch BatchNorm documentation](https://docs.pytorch.org/docs/2.14/generated/torch.nn.BatchNorm2d.html)
+    describes pooled training moments, running-buffer updates and evaluation behavior.
+    Equal study weighting is the proposed extension, not a documented recommendation.'
+  - 'Primary precedent: [Ioffe''s Batch Renormalization paper](https://arxiv.org/abs/1702.03275)
+    identifies small or non-independent minibatches as a BatchNorm limitation. It
+    motivates inspecting correlated study images; this proposal does not implement
+    Batch Renormalization.'
+  - Pending precedents final-batchnorm-fixed-for-two-epoch-tail and final-batchnorm-momentum-follows-decay
+    remain supervisor-owned. They change mode or update timing; this proposal changes
+    statistical weighting. Neither has a measured result.
+  - '[Complete campaign curves and checkpoint observations](/home/claudio/src/knee-abnormality/outputs/autoresearch/mambavision-settings/jobs/researcher-20261014T055246Z-06fc5f25/scratch/campaign-curve-analysis.md).'
+  novelty: No decided run balances final-normalization moments by study. Unlike the
+    existing freeze and momentum proposals, this changes which observations contribute
+    how much while retaining training-mode normalization and the existing buffer-update
+    policy.
+  coverage: Every represented training study contributes equal total mass; every existing
+    image still passes through the model. All labels share the same normalization.
+    No vendor, plane, compartment, label or gold-study conditioning is introduced.
+  exploitation: Log final_bn_equal_study_calls, final_bn_study_weight_max_gap, final_bn_mean_change_rms
+    and final_bn_buffer_updates. Positive consumed weight differences and applied
+    moment differences prove a behavioral change; the call counter alone is insufficient.
+    Inspect all macro, loss and label curves without choosing a label objective.
+  budget: "Guess: 3,150\u20133,330 training seconds and 12.8\u201313.1 GB peak allocation.\
+    \ The incumbent took 3,114.6 s at 12.73 GB; weighted reductions operate only on\
+    \ the final feature maps and require no additional encoder pass. Retain twelve\
+    \ epochs, batch 8, 5,304 updates, current seed and the existing time range. Runtime\
+    \ and temporary-buffer memory remain unmeasured."
+  implementation: Follow the environment paragraph of the developer instructions.
+    In src/knee_abnormality/modeling/model.py, pass the existing token_study mapping
+    into encoding and separate fourth-stage execution from final normalization sufficiently
+    to apply study-weighted training moments. Retain the original registered final
+    norm, state keys, pretrained parameters, affine gradients, epsilon and native
+    evaluation path. Compute moments in float32, preserve output dtype, and update
+    buffers once. Add the four named scalars through src/knee_abnormality/training/lightning.py.
+    This replaces image-pooled training moments only. Preserve newly accepted unrelated
+    settings, including augmentation, clipping and schedule. If final-norm mode or
+    momentum behavior is accepted first, retain it and apply balanced moments only
+    during actual training-mode calls.
+  open_choices: Unequal moment weighting and its predictive effect are unmeasured.
+    Equal study weighting may increase variance or lag the desired image population.
+    The weighted variance correction is a convention, not a claim that correlated
+    MRI positions are independent. No statistics refresh, inference adaptation or
+    new architecture.
+  dependencies: []
+  priority_rationale: 'Second: an architecture-specific normalization hypothesis with
+    modest expected cost and a direct activation measurement. It differs materially
+    from pending buffer-timing proposals, but has weaker evidence than the schedule
+    follow-up.'
+  source_change: true
+  targeted_curve: "Linear, epochs 7\u201312: validation center displacement fluctuates\
+    \ and label trajectories diverge while loss falls. Hypothesis: equal study mass\
+    \ in final normalization improves macro by 0.0002\u20130.0010 and reduces normalization-driven\
+    \ fluctuations; no mismatch is yet measured."
+  status: retired
+  created_revision: 276
+  retired_reason: 'Removed by the user''s decision of 2026-10-14 (''remove the existing
+    seeds and add these''): replaced by five forced seeds on the full recipe.'
+- id: backbone-adam-history-reset-after-warmup
+  mechanism_id: optimizer-moment-history
+  parent_idea_id: null
+  title: Restart backbone Adam moments once when warm-up ends
+  opportunity: 'Evidence: linear''s sampled model-only pre-clip norm falls from 4.4765
+    in epoch 1 to 1.1257 in epoch 2 and 0.9786 in epoch 3. Its stem gradient RMS falls
+    from about 0.0244 to 0.0065. The selected checkpoint confirms continuous Adam
+    state age 5,304 and beta2 0.999. An existing second-moment contribution decays
+    by only 0.6426 over 442 additional updates; the geometric memory is approximately
+    2.26 epochs. Hypothesis: moments accumulated during the initial MRI adaptation
+    phase impede the subsequent backbone trajectory. Clipping changes the gradients
+    entering Adam, so the logged norms do not prove harmful accumulated moments.'
+  mechanism: "At the incumbent's configured warm-up boundary, restart the backbone's\
+    \ first and second Adam moments and per-parameter bias-correction age exactly\
+    \ once. Preserve the candidate's current weights, pretrained anchors, gradients,\
+    \ optimizer groups, rates and scheduler position. Head optimizer history continues\
+    \ uninterrupted. Zero state is standard Adam initialization; beta1 0.9, beta2\
+    \ 0.999 and epsilon 1e-8 remain the recorded recipe values. This changes optimizer\
+    \ history rather than warm-up duration, clipping strength or peak rates. Guess:\
+    \ improve post-warm-up fitting and macro by 0.0002\u20130.0010; a cold optimizer\
+    \ at peak rate could instead destabilize adaptation."
+  precedents:
+  - 'Evidence: linear''s original metrics.csv supplies the early gradient transition;
+    its selected checkpoint has all populated Adam states at age 5,304. Continuous
+    history is measured; detrimental history is not.'
+  - 'Evidence: S/U2 with strong anchors and U4/SF with larger rates show slow starts
+    or middle-epoch catch-up. Accepted weight-scale anchors improve adaptation, but
+    different early update policies still produce mixed later curves. These patterns
+    motivate phase inspection without establishing a shared cause.'
+  - 'Evidence: [the authors'' MambaVision-T configuration](https://raw.githubusercontent.com/NVlabs/MambaVision/main/mambavision/configs/mambavision_tiny_1k.yaml)
+    uses beta values 0.9/0.999 and epsilon 1e-8. Those values are retained; its LAMB
+    optimizer is not imported into this proposal.'
+  - 'Algorithm reference: [PyTorch AdamW documentation](https://docs.pytorch.org/docs/2.14/generated/torch.optim.AdamW.html)
+    specifies zero moment initialization and age-dependent bias correction. The warm-up
+    reset is a hypothesis, not an authors'' recommendation.'
+  - The developing two-epoch warm-up and queued post-warm-up clipping retry alter
+    early updates or later clipping. This proposal preserves their behavior if accepted
+    and changes only carried optimizer state.
+  - '[Full-precision curves and optimizer-state observations](/home/claudio/src/knee-abnormality/outputs/autoresearch/mambavision-settings/jobs/researcher-20261014T055246Z-06fc5f25/scratch/campaign-curve-analysis.json).'
+  novelty: No decided candidate restarts optimizer history within training. Unlike
+    a learning-rate restart, the schedule never rises again; unlike linear probing,
+    the backbone trains throughout warm-up. It is not another fixed stage-rate profile.
+  coverage: All existing trainable backbone parameters and all studies and labels.
+    Heads retain their accumulated state. Anchor coefficients, parameter coverage
+    and losses remain unchanged.
+  exploitation: Log backbone_adam_reset_events, backbone_adam_reset_parameter_count,
+    backbone_adam_pre_reset_second_moment_rms, backbone_adam_age and head_adam_age.
+    One event clearing populated state, followed by backbone age 1 while head age
+    continues, proves activation. Compare post-warm-up loss, stage drift and all macro/label
+    curves. These diagnostics introduce no adoption threshold.
+  budget: "Guess: 3,100\u20133,250 training seconds and approximately 12.73 GB peak\
+    \ allocation. Clear existing tensors in place once; no added images, batches or\
+    \ forward passes. Retain twelve epochs, 5,304 optimizer updates, batch 8 and supervisor-assigned\
+    \ seed. The current time range and unresolved sealed-step discrepancy remain unchanged."
+  implementation: Follow the environment paragraph of the developer instructions.
+    In src/knee_abnormality/training/lightning.py, add a once-only reset before the
+    first optimizer step after configured warm-up. Select parameters by self.model.backbone
+    membership, zero exp_avg and exp_avg_sq in place and reset their Adam step tensors.
+    Retain head state, current parameter values, scheduler state, clipping hooks and
+    all anchor behavior. Place reset execution outside the sampled-diagnostic early
+    return. Preserve the reset event across checkpoint save/load so repair cannot
+    repeat it. Add the five named consumed-state diagnostics. This replaces continuous
+    backbone history at one boundary. Reconcile onto a newly accepted incumbent using
+    its warm-up boundary while retaining unrelated settings.
+  open_choices: Parameter-level warm-up moment excess has not been measured, and clipping
+    may reduce the apparent gradient contrast substantially. Resetting first moments
+    may remove useful direction; resetting variance may cause larger updates. Rank
+    below mechanisms with stronger evidence. No beta sweep, rate restart or confirmation
+    run.
+  dependencies: []
+  priority_rationale: 'Third: distinct optimizer-history hypothesis with negligible
+    expected cost and unambiguous activation. The early gradient transition and long
+    second-moment memory motivate it, but direct evidence of a harmful state is missing.'
+  source_change: true
+  targeted_curve: "Linear, epochs 1\u20134: sampled gradient norm changes 4.4765\u2192\
+    1.1257\u21920.9786, while \xD71 macro stalls around 0.9103 in epochs 3\u20134.\
+    \ Restart backbone history at warm-up completion; guessed faster post-warm-up\
+    \ fitting and +0.0002\u20130.0010 macro."
+  status: retired
+  created_revision: 276
+  retired_reason: 'Removed by the user''s decision of 2026-10-14 (''remove the existing
+    seeds and add these''): replaced by five forced seeds on the full recipe.'
+- id: late-anchor-follows-rate-on-linear-decay
+  mechanism_id: weight-anchor
+  parent_idea_id: late-anchor-follows-learning-rate
+  title: The late anchor scaled by the backbone rate over its peak, on the linear-decay
+    incumbent
+  opportunity: 'Evidence (run-notes.md, runs 9 and 10): run 9 scaled the late anchor
+    by the backbone rate over its peak on the twelve-epoch cosine incumbent and passed
+    both multipliers (x4 +0.001447, 80% interval [+0.000462, +0.002492]; x1 +0.000054).
+    The runtime adopted it; the keeper took it back out under a generalisation rule
+    that the user has since scoped to RadImageNet-weight models only, so it does not
+    apply here. Meanwhile run 10 (linear decay) was adopted on the cosine incumbent.
+    The two changes were never combined. In run 5 the last stage''s drift retreated
+    from 0.0382 to 0.0369 over the last five epochs while the anchor penalty stayed
+    near 0.0101; under linear decay the rate stays higher for longer, so the scheduled
+    anchor weakens later. Guess: +0.0005 to +0.0015 macro at x4, on Fracture and Lateral
+    OA first (the two labels furthest from the ResNet-50 in run 10, -0.0139 and -0.0135).'
+  mechanism: 'Run 9''s mechanism, ported onto the linear-decay incumbent: the late
+    anchor penalty (stages beyond the first, alpha 0.00001) is multiplied every step
+    by the backbone optimizer group''s current rate over its initial rate; the early
+    anchor (0.001) is unchanged. Under the incumbent''s linear schedule the factor
+    follows the warm-up, then falls linearly to the 0.01 floor. Everything else as
+    the incumbent has it.'
+  precedents:
+  - 'Run 9, late-anchor-follows-learning-rate: its frozen source and changes.diff
+    under outputs/autoresearch/mambavision-settings/experiments/late-anchor-follows-learning-rate-20261014T032155Z-6715982e
+    hold the reviewed implementation (separate early and late anchor lists, the schedule
+    factor from the backbone optimizer group, the metrics late_anchor_schedule_factor
+    and effective_anchor_alpha_late). Port it onto the incumbent; do not copy the
+    files.'
+  novelty: First combination of the scheduled late anchor with linear decay.
+  coverage: Every study and every label.
+  exploitation: 'Read x4 and x1 against the incumbent, the training loss and the drift
+    per stage per epoch against the incumbent''s, and the labels from largest gain
+    to largest loss, with run 9 beside it. Activation: the logged late_anchor_schedule_factor
+    falls below 0.05 by the last epoch and effective_anchor_alpha_late follows it.
+    Shown wrong by: both multipliers below the incumbent.'
+  budget: The incumbent's training time (about 3,120 s) within 1.05; no change to
+    memory (12.7 GB peak).
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    Files: src/knee_abnormality/training/lightning.py only. With the schedule factor
+    fixed at 1 the anchor penalty must equal the incumbent''s. Apply to the incumbent
+    as assigned.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Restores, on the current incumbent, the one passing run that
+    was taken out under a rule that turned out not to apply to this model.
+  status: completed
+  created_revision: 292
+  seeded: /home/claudio/src/knee-abnormality-new-backbones/autoresearch/campaigns/mambavision-settings/seed-ideas-4.yaml
+  decision: provisional_accept
+  experiments:
+  - late-anchor-follows-rate-on-linear-decay-20261014T095230Z-c63b90a0
+- id: anchors-per-stage-by-weight-scale
+  mechanism_id: weight-anchor
+  parent_idea_id: null
+  title: One anchor strength per backbone stage, each matched to that stage's weight
+    scale
+  opportunity: 'Evidence (prior-work.md, Why it underfits; run-notes.md, run 3): matching
+    the anchors to the weight scale gave +0.010 at x4, the campaign''s largest gain,
+    but with two values only. The ResNet-50''s anchor divided by the squared ratio
+    of weight RMS, stage by stage (ratios 1.47, 3.67, 5.26, 6.94, 12.66), gives stem
+    4.6e-3, first stage 7.4e-4, second 3.6e-5, third 2.1e-5, last 6.2e-6. The incumbent
+    holds 1e-3 on the stem and first stage and 1e-5 on the rest: the stem is anchored
+    4.6 times too weakly, the second and third stages 2 to 3.6 times too weakly, the
+    last stage 1.6 times too strongly. In the incumbent the stem moved 3.7% from its
+    pretrained weights against the ResNet-50''s 0.8%. Guess: +0.001 to +0.003 macro.'
+  mechanism: 'Each backbone stage gets its own anchor strength: stem 0.0046, stages.0
+    0.00074, stages.1 0.000036, stages.2 0.000021, stages.3 0.0000062. The late-anchor
+    schedule keeps scaling the anchors of stages.1 to stages.3 by the backbone rate
+    over its peak, as in the incumbent; the stem and stages.0 stay constant.'
+  precedents:
+  - Run 3 of this campaign, anchors-by-weight-scale; the weight RMS table in prior-work.md.
+  novelty: First run of this setting on the full adopted recipe.
+  coverage: Every study and every label; the labels furthest from the ResNet-50 are
+    Lateral OA (-0.0149), Fracture (-0.0081) and MCL (-0.0054).
+  exploitation: 'Read x4 and x1 against the incumbent (x4 0.937801, x1 0.929880),
+    the training loss and the drift per stage per epoch against the incumbent''s,
+    the labels from largest gain to largest loss, and the equal blend with the ResNet-50
+    (incumbent +0.001785 over the ResNet-50 alone). Activation: one logged anchor
+    strength per stage equal to the five values, and the stem''s drift at the last
+    epoch below the incumbent''s. Shown wrong by: both multipliers below the incumbent.'
+  budget: The incumbent's training time (3,106 s) within 1.05; no change to memory
+    (12.7 GB peak).
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    Files: src/knee_abnormality/config.py (replace anchor_alpha_early and anchor_alpha_late
+    by one list of strengths ordered by the backbone''s group_matcher stages, validated
+    against the stage count), src/knee_abnormality/training/lightning.py (anchor each
+    backbone weight with its stage''s strength, keep the late-anchor schedule on the
+    stages after the first), configs/training.yaml. With the list [0.001, 0.001, 0.00001,
+    0.00001, 0.00001] the penalty must equal the incumbent''s. Apply to the incumbent
+    as assigned.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The largest lever of the campaign, applied at the resolution
+    the measurement gives.
+  status: completed
+  created_revision: 299
+  seeded: /home/claudio/src/knee-abnormality-new-backbones/autoresearch/campaigns/mambavision-settings/seed-ideas-5.yaml
+  experiments:
+  - anchors-per-stage-by-weight-scale-20261014T095922Z-83d92cca
+  - anchors-per-stage-by-weight-scale-20261014T122205Z-7c496342
+  decision: reject
+- id: stochastic-depth-0-1-on-a-fitted-model
+  mechanism_id: regularisation
+  parent_idea_id: null
+  title: Stochastic depth 0.1, now that the model fits
+  opportunity: 'Evidence: this seed was removed before the start because the reference
+    underfit. That no longer holds: the adopted runs end with training loss below
+    the ResNet-50''s (0.549 against 0.571) while x4 stays 0.0018 below it, the pattern
+    a regulariser addresses. MambaVision-T was pretrained with stochastic depth 0.2;
+    the tuned ConvNeXt-Tiny used 0.1. Guess: +0.0005 to +0.002 macro.'
+  mechanism: 'model.stochastic_depth 0.1: the rate rises linearly over the backbone''s
+    DropPath modules up to 0.1, as staged_backbones already does.'
+  precedents:
+  - 'ConvNeXt-Tiny tuned recipe: stochastic depth 0.1 (prior-work.md, Precedents).'
+  novelty: First run of this setting on the full adopted recipe.
+  coverage: Every study and every label; the labels furthest from the ResNet-50 are
+    Lateral OA (-0.0149), Fracture (-0.0081) and MCL (-0.0054).
+  exploitation: 'Read x4 and x1 against the incumbent (x4 0.937801, x1 0.929880),
+    the training loss and the drift per stage per epoch against the incumbent''s,
+    the labels from largest gain to largest loss, and the equal blend with the ResNet-50
+    (incumbent +0.001785 over the ResNet-50 alone). Activation: the effective config
+    records 0.1 and the training loss is above the incumbent''s. Shown wrong by: both
+    multipliers below the incumbent.'
+  budget: The incumbent's training time (3,106 s) within 1.05; no change to memory
+    (12.7 GB peak).
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    Configuration only: configs/training.yaml. Apply to the incumbent as assigned.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The one regulariser the model was pretrained with, now that
+    the reason for leaving it out is gone.
+  status: completed
+  created_revision: 299
+  seeded: /home/claudio/src/knee-abnormality-new-backbones/autoresearch/campaigns/mambavision-settings/seed-ideas-5.yaml
+  experiments:
+  - stochastic-depth-0-1-on-a-fitted-model-20261014T123011Z-bde6fbec
+  - stochastic-depth-0-1-on-a-fitted-model-20261014T123233Z-443babe9
+  decision: reject
+- id: two-warm-up-epochs
+  mechanism_id: warm-up
+  parent_idea_id: null
+  title: Two warm-up epochs
+  opportunity: 'Evidence: the gradient norm is 5 to 9 in the first epoch against about
+    1 after it in every adopted run, and every run with higher rates started slow.
+    This seed was aborted in its second epoch by the user''s stop and has no result.
+    The late anchor follows the rate, so a longer warm-up also keeps it weak for two
+    epochs: read the result as warm-up plus a looser start. Guess: +0.0005 to +0.0015
+    macro.'
+  mechanism: optimizer.warmup_epochs 2. Peak rates, the linear decay to the same floor
+    at the end of epoch 12 and everything else unchanged.
+  precedents:
+  - The aborted experiment two-epoch-warmup-on-weight-scale-anchors-20261014T055437Z-9d18a6bd
+    (no result).
+  novelty: First run of this setting on the full adopted recipe.
+  coverage: Every study and every label; the labels furthest from the ResNet-50 are
+    Lateral OA (-0.0149), Fracture (-0.0081) and MCL (-0.0054).
+  exploitation: 'Read x4 and x1 against the incumbent (x4 0.937801, x1 0.929880),
+    the training loss and the drift per stage per epoch against the incumbent''s,
+    the labels from largest gain to largest loss, and the equal blend with the ResNet-50
+    (incumbent +0.001785 over the ResNet-50 alone). Activation: the logged backbone
+    rate reaches its peak at the end of the second epoch. Shown wrong by: both multipliers
+    below the incumbent.'
+  budget: The incumbent's training time (3,106 s) within 1.05; no change to memory
+    (12.7 GB peak).
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    Configuration only: configs/training.yaml. Apply to the incumbent as assigned.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Measured symptom at the start of every run, never tested to
+    the end.
+  status: completed
+  created_revision: 299
+  seeded: /home/claudio/src/knee-abnormality-new-backbones/autoresearch/campaigns/mambavision-settings/seed-ideas-5.yaml
+  experiments:
+  - two-warm-up-epochs-20261014T132406Z-431beace
+  - two-warm-up-epochs-20261014T132648Z-e8109a1e
+  decision: reject
+- id: head-rate-twice
+  mechanism_id: head-rate
+  parent_idea_id: null
+  title: Twice the head learning rate
+  opportunity: 'Guess: the heads stayed at 6e-4 while the backbone rate went from
+    5e-5 to 2e-4, so their ratio fell from 12 to 3. The head rate was tuned for the
+    ResNet-50''s ratio and never re-tuned for this model. +0 to +0.0015 macro.'
+  mechanism: optimizer.head_lr 0.0012. Backbone rate, anchors and schedule unchanged.
+  precedents:
+  - None on this model.
+  novelty: First run of this setting on the full adopted recipe.
+  coverage: Every study and every label; the labels furthest from the ResNet-50 are
+    Lateral OA (-0.0149), Fracture (-0.0081) and MCL (-0.0054).
+  exploitation: 'Read x4 and x1 against the incumbent (x4 0.937801, x1 0.929880),
+    the training loss and the drift per stage per epoch against the incumbent''s,
+    the labels from largest gain to largest loss, and the equal blend with the ResNet-50
+    (incumbent +0.001785 over the ResNet-50 alone). Activation: the logged head rate
+    peaks at 1.2e-3. Shown wrong by: both multipliers below the incumbent.'
+  budget: The incumbent's training time (3,106 s) within 1.05; no change to memory
+    (12.7 GB peak).
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    Configuration only: configs/training.yaml. Apply to the incumbent as assigned.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: A setting carried over from the ResNet-50 that the backbone-rate
+    change made inconsistent.
+  status: completed
+  created_revision: 299
+  seeded: /home/claudio/src/knee-abnormality-new-backbones/autoresearch/campaigns/mambavision-settings/seed-ideas-5.yaml
+  experiments:
+  - head-rate-twice-20261014T141944Z-fdb18146
+  - head-rate-twice-20261014T142236Z-01cacbe4
+  decision: reject
+- id: early-anchor-follows-learning-rate
+  mechanism_id: weight-anchor
+  parent_idea_id: null
+  title: The anchors of the stem and first stage follow the backbone rate, as the
+    late anchors do
+  opportunity: 'Guess, built on evidence: the late-anchor schedule raised x4 both
+    times it was trained (+0.0014 on cosine, +0.0006 with linear decay). The stem
+    and first stage keep a constant anchor. Run after anchors-per-stage-by-weight-scale,
+    since both change these anchors. +0 to +0.001 macro.'
+  mechanism: The anchor penalty of the stem and first stage is multiplied every step
+    by the backbone optimizer group's rate over its initial rate, the factor the late
+    anchors already use. The strengths themselves are the incumbent's.
+  precedents:
+  - 'Runs 9 and the incumbent: late_anchor_schedule_factor in training/lightning.py.'
+  novelty: First run of this setting on the full adopted recipe.
+  coverage: Every study and every label; the labels furthest from the ResNet-50 are
+    Lateral OA (-0.0149), Fracture (-0.0081) and MCL (-0.0054).
+  exploitation: 'Read x4 and x1 against the incumbent (x4 0.937801, x1 0.929880),
+    the training loss and the drift per stage per epoch against the incumbent''s,
+    the labels from largest gain to largest loss, and the equal blend with the ResNet-50
+    (incumbent +0.001785 over the ResNet-50 alone). Activation: one logged metric,
+    the factor applied to the early anchors, below 0.05 at the last epoch. Shown wrong
+    by: both multipliers below the incumbent.'
+  budget: The incumbent's training time (3,106 s) within 1.05; no change to memory
+    (12.7 GB peak).
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    Files: src/knee_abnormality/training/lightning.py only. With the factor fixed
+    at 1 the early penalty must equal the incumbent''s. Apply to the incumbent as
+    assigned.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Extends the one schedule change that raised x4 twice to the
+    anchors it left constant.
+  status: launched
+  created_revision: 299
+  seeded: /home/claudio/src/knee-abnormality-new-backbones/autoresearch/campaigns/mambavision-settings/seed-ideas-5.yaml
+  experiments:
+  - early-anchor-follows-learning-rate-20261014T151439Z-ab804af1

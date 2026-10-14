@@ -1,0 +1,38 @@
+ideas:
+- id: late-anchor-follows-rate-on-linear-decay
+  mechanism_id: weight-anchor
+  parent_idea_id: late-anchor-follows-learning-rate
+  title: The late anchor scaled by the backbone rate over its peak, on the linear-decay incumbent
+  opportunity: 'Evidence (run-notes.md, runs 9 and 10): run 9 scaled the late anchor by the backbone rate over its
+    peak on the twelve-epoch cosine incumbent and passed both multipliers (x4 +0.001447, 80% interval [+0.000462,
+    +0.002492]; x1 +0.000054). The runtime adopted it; the keeper took it back out under a generalisation rule
+    that the user has since scoped to RadImageNet-weight models only, so it does not apply here. Meanwhile run 10
+    (linear decay) was adopted on the cosine incumbent. The two changes were never combined. In run 5 the last
+    stage''s drift retreated from 0.0382 to 0.0369 over the last five epochs while the anchor penalty stayed near
+    0.0101; under linear decay the rate stays higher for longer, so the scheduled anchor weakens later. Guess: +0.0005
+    to +0.0015 macro at x4, on Fracture and Lateral OA first (the two labels furthest from the ResNet-50 in run
+    10, -0.0139 and -0.0135).'
+  mechanism: 'Run 9''s mechanism, ported onto the linear-decay incumbent: the late anchor penalty (stages beyond
+    the first, alpha 0.00001) is multiplied every step by the backbone optimizer group''s current rate over its
+    initial rate; the early anchor (0.001) is unchanged. Under the incumbent''s linear schedule the factor follows
+    the warm-up, then falls linearly to the 0.01 floor. Everything else as the incumbent has it.'
+  precedents:
+  - 'Run 9, late-anchor-follows-learning-rate: its frozen source and changes.diff under outputs/autoresearch/mambavision-settings/experiments/late-anchor-follows-learning-rate-20261014T032155Z-6715982e
+    hold the reviewed implementation (separate early and late anchor lists, the schedule factor from the backbone
+    optimizer group, the metrics late_anchor_schedule_factor and effective_anchor_alpha_late). Port it onto the
+    incumbent; do not copy the files.'
+  novelty: First combination of the scheduled late anchor with linear decay.
+  coverage: Every study and every label.
+  exploitation: 'Read x4 and x1 against the incumbent, the training loss and the drift per stage per epoch against
+    the incumbent''s, and the labels from largest gain to largest loss, with run 9 beside it. Activation: the logged
+    late_anchor_schedule_factor falls below 0.05 by the last epoch and effective_anchor_alpha_late follows it.
+    Shown wrong by: both multipliers below the incumbent.'
+  budget: The incumbent's training time (about 3,120 s) within 1.05; no change to memory (12.7 GB peak).
+  implementation: 'Follow the environment paragraph of the developer instructions. Files: src/knee_abnormality/training/lightning.py
+    only. With the schedule factor fixed at 1 the anchor penalty must equal the incumbent''s. Apply to the incumbent
+    as assigned.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Restores, on the current incumbent, the one passing run that was taken out under a rule
+    that turned out not to apply to this model.
+exhausted_directions: ''

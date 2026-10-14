@@ -66,7 +66,7 @@ cross-cutting pieces:
 |---|---|
 | `data/` | `sources.py`: torch-free raw-directory discovery, series index and prediction study lists. `splits.py`: the study-ID column and target threshold, frozen split protocol checks and frozen evaluation targets, protected from autoresearch topics. `labels.py`: pinned label-source loading, gold/silver training targets and the fold's training and validation frames. `dataset.py`: study/acquisition selection, preparation, collation and data loaders |
 | `data/preprocessing/` | `dicom.py` parses headers and reads frames with the pydicom fallback; `series.py` indexes metadata-only slice records and centers physical positions; `geometry.py` validates series center lines, solves the plane-balanced study reference; `sampling.py` indexes runs and selects triplets; `spatial.py` builds the cached resampling plans and the scipy resample, `intensity.py` the exact quantile ranks, bounds and normalization; `preparation.py` reads selected records into raw support rows and keeps decoder injection for profiling; `device.py` resamples, normalizes and gathers the uint8 inputs on CPU in loader workers or on the GPU after transfer |
-| `modeling/` | `model.py`: timm backbone, series dropout, study reflection and triplet augmentation, spatial tokens with four additive embeddings and target-specific attention MIL. `spatial_tokens.py`: verified backbone anchors, visual validity, 2D coordinates and metadata embeddings. `augmentation.py`: reflection plus shared affine, gamma/contrast and noise transforms |
+| `modeling/` | `model.py`: timm backbone, series dropout, study reflection and triplet augmentation, spatial tokens with four additive embeddings and target-specific attention MIL. `spatial_tokens.py`: verified backbone anchors, visual validity, 2D coordinates and metadata embeddings. `augmentation.py`: reflection plus shared affine, gamma/contrast and noise transforms. `backbone_stages.py`: one stage adapter per backbone family (ResNet, ConvNeXt, MambaVision). `staged_backbones.py`: the MambaVision-T wrapper. `view_windows.py`: view windows and crop placement. `mask_decoder.py`: the mask decoder and segmentation classes |
 | `training/` | `lightning.py`: `KneeDataModule`, `KneeModule`, the optimizer groups and fixed BF16 precision. `checkpoints.py`: resume validation, checkpoint relocation and training input identities. `cuda.py`: CUDA allocator setup |
 | `evaluation/` | `metrics.py`: per-target, macro, subgroup, bootstrap and compartment metrics. `scoring.py`: out-of-fold scoring against the frozen split. `predictions.py`: validated study-level prediction tables |
 | `inference/` | `engine.py`: prediction datasets, device and precision policy, batch transfer, FP16 backbone chunks and the prediction loop. `checkpoint.py`: the single checkpoint reader, checkpoint validation and strict model construction. `processes.py`: serialized worker requests and one prediction process per visible GPU, without importing PyTorch. `bundle.py`: bundle schema, file inventory, verification and Kaggle data-root discovery |
@@ -113,9 +113,9 @@ with no configuration flag or persistent pixel/header cache. See the
 [integration evidence](../data-preparation/production-dicom-integration.md) for
 layout limits, equivalence checks, performance and per-worker memory bounds.
 
-Keep experiment logic explicit. A new backbone or pooling alternative can be
-a small constructor/function in `src/knee_abnormality/modeling/model.py`; it does not
-need a plugin registry or a parallel copy of the training loop. Put runnable
+Keep experiment logic explicit. A new backbone family needs a stage adapter in
+`src/knee_abnormality/modeling/backbone_stages.py`; a pooling alternative can be a
+small function in `modeling/model.py`. Neither needs a parallel copy of the training loop. Put runnable
 behavior behind a main guard so scripts can also expose useful functions.
 
 ### Maintained workflow versus ad-hoc work

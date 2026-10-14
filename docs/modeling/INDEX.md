@@ -14,6 +14,7 @@
 | Recovering retired side embeddings and classifier-sharing variants | [Retired side and compartment variants](retired-side-and-compartment-variants.md) |
 | Reviewing the historical regional fusion model | [Historical regional fusion](historical-regional-fusion.md) |
 | Changing backbones and checking spatial mapping | [Swapping a backbone](backbone-swaps.md) |
+| Training MambaVision-T or ConvNeXt-Tiny beside the ResNet-50: stage adapters per backbone family, the MambaVision wrapper and its `mamba-ssm` import, the release and Kaggle wheels, new-batch-size cost and padding, training time of six backbones on the 3090, the weight-scale recipe | [MambaVision-T and stem-staged backbones](mambavision-backbone.md) |
 | Comparing backbone compute, per-label AUC and bootstrap uncertainty | [Fast backbone search](backbone-search.md) |
 | Finding unverified model, augmentation, loss and ensemble experiments | [Unverified modeling notes](unverified-modeling-notes.md) |
 
