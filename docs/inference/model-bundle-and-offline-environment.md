@@ -233,7 +233,10 @@ cp312 codec wheels, then on a missing `pydantic-settings`). The wheels that work
 are the export defaults since 2026-10-04 (`KAGGLE_PYTHON`, `KAGGLE_WHEELS` and the pinned
 `OFFLINE_WHEELS` in `src/knee_abnormality/kaggle.py`), `prepare-codecs` downloads all five, and
 export refuses a wheel directory that lacks one. S98 to S102 passed the folder and version as
-flags. The local project stays on Python 3.12.
+flags. The local project stays on Python 3.12. Backbones with compiled kernels add their own
+folder, listed in `BACKBONE_WHEELS`: export copies it for every member with that backbone, so a
+MambaVision-T bundle carries `kaggle-py313-mambavision`
+([wheels](../modeling/mambavision-backbone.md#dependencies)).
 
 Inspect the notebook's Python, Torch/CUDA build, GPU compute capability and
 compiled architecture support before selecting wheels. A local RTX 3090

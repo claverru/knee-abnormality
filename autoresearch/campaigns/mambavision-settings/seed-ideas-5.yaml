@@ -1,0 +1,134 @@
+ideas:
+- id: anchors-per-stage-by-weight-scale
+  mechanism_id: weight-anchor
+  parent_idea_id: null
+  title: One anchor strength per backbone stage, each matched to that stage's weight scale
+  opportunity: 'Evidence (prior-work.md, Why it underfits; run-notes.md, run 3): matching the anchors to the weight
+    scale gave +0.010 at x4, the campaign''s largest gain, but with two values only. The ResNet-50''s anchor divided
+    by the squared ratio of weight RMS, stage by stage (ratios 1.47, 3.67, 5.26, 6.94, 12.66), gives stem 4.6e-3,
+    first stage 7.4e-4, second 3.6e-5, third 2.1e-5, last 6.2e-6. The incumbent holds 1e-3 on the stem and first
+    stage and 1e-5 on the rest: the stem is anchored 4.6 times too weakly, the second and third stages 2 to 3.6
+    times too weakly, the last stage 1.6 times too strongly. In the incumbent the stem moved 3.7% from its pretrained
+    weights against the ResNet-50''s 0.8%. Guess: +0.001 to +0.003 macro.'
+  mechanism: 'Each backbone stage gets its own anchor strength: stem 0.0046, stages.0 0.00074, stages.1 0.000036,
+    stages.2 0.000021, stages.3 0.0000062. The late-anchor schedule keeps scaling the anchors of stages.1 to stages.3
+    by the backbone rate over its peak, as in the incumbent; the stem and stages.0 stay constant.'
+  precedents:
+  - Run 3 of this campaign, anchors-by-weight-scale; the weight RMS table in prior-work.md.
+  novelty: First run of this setting on the full adopted recipe.
+  coverage: Every study and every label; the labels furthest from the ResNet-50 are Lateral OA (-0.0149), Fracture
+    (-0.0081) and MCL (-0.0054).
+  exploitation: 'Read x4 and x1 against the incumbent (x4 0.937801, x1 0.929880), the training loss and the drift
+    per stage per epoch against the incumbent''s, the labels from largest gain to largest loss, and the equal blend
+    with the ResNet-50 (incumbent +0.001785 over the ResNet-50 alone). Activation: one logged anchor strength per
+    stage equal to the five values, and the stem''s drift at the last epoch below the incumbent''s. Shown wrong
+    by: both multipliers below the incumbent.'
+  budget: The incumbent's training time (3,106 s) within 1.05; no change to memory (12.7 GB peak).
+  implementation: 'Follow the environment paragraph of the developer instructions. Files: src/knee_abnormality/config.py
+    (replace anchor_alpha_early and anchor_alpha_late by one list of strengths ordered by the backbone''s group_matcher
+    stages, validated against the stage count), src/knee_abnormality/training/lightning.py (anchor each backbone
+    weight with its stage''s strength, keep the late-anchor schedule on the stages after the first), configs/training.yaml.
+    With the list [0.001, 0.001, 0.00001, 0.00001, 0.00001] the penalty must equal the incumbent''s. Apply to the
+    incumbent as assigned.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The largest lever of the campaign, applied at the resolution the measurement gives.
+- id: stochastic-depth-0-1-on-a-fitted-model
+  mechanism_id: regularisation
+  parent_idea_id: null
+  title: Stochastic depth 0.1, now that the model fits
+  opportunity: 'Evidence: this seed was removed before the start because the reference underfit. That no longer
+    holds: the adopted runs end with training loss below the ResNet-50''s (0.549 against 0.571) while x4 stays 0.0018
+    below it, the pattern a regulariser addresses. MambaVision-T was pretrained with stochastic depth 0.2; the tuned
+    ConvNeXt-Tiny used 0.1. Guess: +0.0005 to +0.002 macro.'
+  mechanism: 'model.stochastic_depth 0.1: the rate rises linearly over the backbone''s DropPath modules up to 0.1,
+    as staged_backbones already does.'
+  precedents:
+  - 'ConvNeXt-Tiny tuned recipe: stochastic depth 0.1 (prior-work.md, Precedents).'
+  novelty: First run of this setting on the full adopted recipe.
+  coverage: Every study and every label; the labels furthest from the ResNet-50 are Lateral OA (-0.0149), Fracture
+    (-0.0081) and MCL (-0.0054).
+  exploitation: 'Read x4 and x1 against the incumbent (x4 0.937801, x1 0.929880), the training loss and the drift
+    per stage per epoch against the incumbent''s, the labels from largest gain to largest loss, and the equal blend
+    with the ResNet-50 (incumbent +0.001785 over the ResNet-50 alone). Activation: the effective config records
+    0.1 and the training loss is above the incumbent''s. Shown wrong by: both multipliers below the incumbent.'
+  budget: The incumbent's training time (3,106 s) within 1.05; no change to memory (12.7 GB peak).
+  implementation: 'Follow the environment paragraph of the developer instructions. Configuration only: configs/training.yaml.
+    Apply to the incumbent as assigned.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The one regulariser the model was pretrained with, now that the reason for leaving it out
+    is gone.
+- id: two-warm-up-epochs
+  mechanism_id: warm-up
+  parent_idea_id: null
+  title: Two warm-up epochs
+  opportunity: 'Evidence: the gradient norm is 5 to 9 in the first epoch against about 1 after it in every adopted
+    run, and every run with higher rates started slow. This seed was aborted in its second epoch by the user''s
+    stop and has no result. The late anchor follows the rate, so a longer warm-up also keeps it weak for two epochs:
+    read the result as warm-up plus a looser start. Guess: +0.0005 to +0.0015 macro.'
+  mechanism: optimizer.warmup_epochs 2. Peak rates, the linear decay to the same floor at the end of epoch 12 and
+    everything else unchanged.
+  precedents:
+  - The aborted experiment two-epoch-warmup-on-weight-scale-anchors-20261014T055437Z-9d18a6bd (no result).
+  novelty: First run of this setting on the full adopted recipe.
+  coverage: Every study and every label; the labels furthest from the ResNet-50 are Lateral OA (-0.0149), Fracture
+    (-0.0081) and MCL (-0.0054).
+  exploitation: 'Read x4 and x1 against the incumbent (x4 0.937801, x1 0.929880), the training loss and the drift
+    per stage per epoch against the incumbent''s, the labels from largest gain to largest loss, and the equal blend
+    with the ResNet-50 (incumbent +0.001785 over the ResNet-50 alone). Activation: the logged backbone rate reaches
+    its peak at the end of the second epoch. Shown wrong by: both multipliers below the incumbent.'
+  budget: The incumbent's training time (3,106 s) within 1.05; no change to memory (12.7 GB peak).
+  implementation: 'Follow the environment paragraph of the developer instructions. Configuration only: configs/training.yaml.
+    Apply to the incumbent as assigned.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Measured symptom at the start of every run, never tested to the end.
+- id: head-rate-twice
+  mechanism_id: head-rate
+  parent_idea_id: null
+  title: Twice the head learning rate
+  opportunity: 'Guess: the heads stayed at 6e-4 while the backbone rate went from 5e-5 to 2e-4, so their ratio fell
+    from 12 to 3. The head rate was tuned for the ResNet-50''s ratio and never re-tuned for this model. +0 to +0.0015
+    macro.'
+  mechanism: optimizer.head_lr 0.0012. Backbone rate, anchors and schedule unchanged.
+  precedents:
+  - None on this model.
+  novelty: First run of this setting on the full adopted recipe.
+  coverage: Every study and every label; the labels furthest from the ResNet-50 are Lateral OA (-0.0149), Fracture
+    (-0.0081) and MCL (-0.0054).
+  exploitation: 'Read x4 and x1 against the incumbent (x4 0.937801, x1 0.929880), the training loss and the drift
+    per stage per epoch against the incumbent''s, the labels from largest gain to largest loss, and the equal blend
+    with the ResNet-50 (incumbent +0.001785 over the ResNet-50 alone). Activation: the logged head rate peaks at
+    1.2e-3. Shown wrong by: both multipliers below the incumbent.'
+  budget: The incumbent's training time (3,106 s) within 1.05; no change to memory (12.7 GB peak).
+  implementation: 'Follow the environment paragraph of the developer instructions. Configuration only: configs/training.yaml.
+    Apply to the incumbent as assigned.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: A setting carried over from the ResNet-50 that the backbone-rate change made inconsistent.
+- id: early-anchor-follows-learning-rate
+  mechanism_id: weight-anchor
+  parent_idea_id: null
+  title: The anchors of the stem and first stage follow the backbone rate, as the late anchors do
+  opportunity: 'Guess, built on evidence: the late-anchor schedule raised x4 both times it was trained (+0.0014
+    on cosine, +0.0006 with linear decay). The stem and first stage keep a constant anchor. Run after anchors-per-stage-by-weight-scale,
+    since both change these anchors. +0 to +0.001 macro.'
+  mechanism: The anchor penalty of the stem and first stage is multiplied every step by the backbone optimizer group's
+    rate over its initial rate, the factor the late anchors already use. The strengths themselves are the incumbent's.
+  precedents:
+  - 'Runs 9 and the incumbent: late_anchor_schedule_factor in training/lightning.py.'
+  novelty: First run of this setting on the full adopted recipe.
+  coverage: Every study and every label; the labels furthest from the ResNet-50 are Lateral OA (-0.0149), Fracture
+    (-0.0081) and MCL (-0.0054).
+  exploitation: 'Read x4 and x1 against the incumbent (x4 0.937801, x1 0.929880), the training loss and the drift
+    per stage per epoch against the incumbent''s, the labels from largest gain to largest loss, and the equal blend
+    with the ResNet-50 (incumbent +0.001785 over the ResNet-50 alone). Activation: one logged metric, the factor
+    applied to the early anchors, below 0.05 at the last epoch. Shown wrong by: both multipliers below the incumbent.'
+  budget: The incumbent's training time (3,106 s) within 1.05; no change to memory (12.7 GB peak).
+  implementation: 'Follow the environment paragraph of the developer instructions. Files: src/knee_abnormality/training/lightning.py
+    only. With the factor fixed at 1 the early penalty must equal the incumbent''s. Apply to the incumbent as assigned.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Extends the one schedule change that raised x4 twice to the anchors it left constant.
+exhausted_directions: ''

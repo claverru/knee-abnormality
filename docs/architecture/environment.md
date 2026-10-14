@@ -111,6 +111,11 @@ Kornia 0.8.3 and kornia-rs 0.1.14 are additional local dependencies used by
 the implemented affine, intensity and noise augmentations. They are pinned in
 `pyproject.toml`; matching Kaggle-image versions have not been established.
 
+MambaVision-T adds `einops` 0.8.1, `mambavision` 1.2.0 and `mamba-ssm` 2.3.2.post1 from the
+prebuilt release wheel for CUDA 12 and torch 2.10, with trimmed dependency metadata so that neither
+pulls in `transformers` or its own pins. Kaggle installs a T4 build instead; both are described in
+[MambaVision-T dependencies](../modeling/mambavision-backbone.md#dependencies).
+
 ## Lightning training framework
 
 Installed and locked as project dependencies, aligned with the inspected

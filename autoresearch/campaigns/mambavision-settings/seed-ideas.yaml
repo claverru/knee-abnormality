@@ -1,0 +1,119 @@
+ideas:
+- id: stage-rates-by-weight-scale
+  mechanism_id: backbone-rate
+  parent_idea_id: null
+  title: 'Stage-wise backbone rates matched to the weight scale: 6e-4 on the last stage, 0.6 times less per stage'
+  opportunity: 'Evidence (prior-work.md, Why it underfits): this backbone''s pretrained weights are 1.5 to 12.7
+    times larger than the ResNet-50''s stage by stage (weight RMS 0.092 against 0.0073 in the last stage), and Adam
+    moves every weight by about the rate per step whatever its size. At 5e-5 the last stage moved 0.4% from ImageNet
+    by the end of the reference against 10.6% for the ResNet-50''s. The rates that give each stage the ResNet-50''s
+    relative step are 5e-5 times the RMS ratio: stem 7e-5, stages 1.8e-4, 2.6e-4, 3.5e-4 and 6.3e-4. A top rate
+    of 6e-4 with 0.6 per stage gives 7.8e-5, 1.3e-4, 2.2e-4, 3.6e-4 and 6e-4. Guess on size: +0.005 to +0.012 macro.'
+  mechanism: 'A new optimizer.backbone_lr_stage_decay (0.6). The backbone''s parameter groups get backbone_lr times
+    decay to the power of the number of stages above them: stages.3 and the final norm at backbone_lr, stages.2
+    at 0.6, stages.1 at 0.36, stages.0 at 0.216, the stem at 0.1296. optimizer.backbone_lr is 6e-4. Warm-up and
+    cosine schedule scale every group alike. Head rate unchanged.'
+  precedents:
+  - The uncommitted training/lightning.py and config.py of the worktree knee-abnormality-fastmri-pretraining carry
+    backbone_lr_stage_decay for ConvNeXt (1e-4, 0.7); port the mechanism onto this code, do not copy the file.
+  novelty: First run of this backbone at rates set from its weight scale.
+  coverage: Every study and every label; the largest gaps to the ResNet-50 are Lateral OA, Fracture, PF OA, ACL
+    and Lateral Meniscus (prior-work.md).
+  exploitation: 'Read x4 and x1 against the incumbent, the training loss per epoch against the reference''s (0.934
+    falling to 0.593), and the labels from largest gain to largest loss. Activation: one logged learning rate per
+    backbone stage in the ratio 0.1296 : 0.216 : 0.36 : 0.6 : 1 (five metrics), and the last stage''s drift at the
+    last epoch above 0.03 (0.0036 in the reference). Shown wrong by: drift up and both multipliers below the incumbent,
+    or a training loss that diverges in the warm-up.'
+  budget: The reference's training time (2,594 s) within 1.05; no change to memory (12.7 GB peak).
+  implementation: 'Follow the environment paragraph of the developer instructions. Files: src/knee_abnormality/config.py
+    (the field, default 1.0), src/knee_abnormality/training/lightning.py (build_optimizer groups by stage through
+    the backbone''s group_matcher, already used for the stage metrics), configs/training.yaml. With decay 1.0 the
+    optimizer must be identical to the incumbent''s. Apply to the incumbent as assigned.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The measured cause of the underfit, corrected stage by stage.
+- id: backbone-rate-2e-4
+  mechanism_id: backbone-rate
+  parent_idea_id: null
+  title: One backbone rate of 2e-4, four times the reference's
+  opportunity: 'Evidence (prior-work.md, Why it underfits): this backbone''s pretrained weights are 1.5 to 12.7
+    times larger than the ResNet-50''s stage by stage (weight RMS 0.092 against 0.0073 in the last stage), and Adam
+    moves every weight by about the rate per step whatever its size. At 5e-5 the last stage moved 0.4% from ImageNet
+    by the end of the reference against 10.6% for the ResNet-50''s. A single rate of 2e-4 gives the middle stages
+    about the ResNet-50''s relative step and the last stage a third of it. Guess: +0.003 to +0.008 macro; the run
+    brackets the stage-wise seed from below and says whether the shape over stages matters.'
+  mechanism: optimizer.backbone_lr 0.0002 with one rate for the whole backbone (stage decay 1.0 if the incumbent
+    has the option). Nothing else changes.
+  precedents:
+  - 'ConvNeXt-Tiny flat 2e-4, 2026-10-04: -0.0048 against 1e-4 (another model, with other changes in the same run).'
+  novelty: First run of MambaVision-T at 2e-4.
+  coverage: Every study and every label; the largest gaps to the ResNet-50 are Lateral OA, Fracture, PF OA, ACL
+    and Lateral Meniscus (prior-work.md).
+  exploitation: 'Read x4 and x1 against the incumbent, the training loss per epoch against the reference''s (0.934
+    falling to 0.593), and the labels from largest gain to largest loss. Activation: the logged backbone learning
+    rate peaks at 2e-4 and the last stage''s drift is above the reference''s 0.0036. Shown wrong by: both multipliers
+    below the incumbent.'
+  budget: The reference's training time (2,594 s) within 1.05; no change to memory (12.7 GB peak).
+  implementation: 'Follow the environment paragraph of the developer instructions. Configuration only: configs/training.yaml.
+    Apply to the incumbent as assigned. The rate is one value of 2e-4 whichever rates the incumbent holds.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The conservative form of the same correction; configuration only.
+- id: backbone-rate-4e-4
+  mechanism_id: backbone-rate
+  parent_idea_id: null
+  title: One backbone rate of 4e-4, eight times the reference's
+  opportunity: 'Evidence (prior-work.md, Why it underfits): this backbone''s pretrained weights are 1.5 to 12.7
+    times larger than the ResNet-50''s stage by stage (weight RMS 0.092 against 0.0073 in the last stage), and Adam
+    moves every weight by about the rate per step whatever its size. At 5e-5 the last stage moved 0.4% from ImageNet
+    by the end of the reference against 10.6% for the ResNet-50''s. 4e-4 gives the last two stages about the ResNet-50''s
+    relative step and the stem and first stage two to six times more than theirs. Guess: at or above the 2e-4 run
+    on the late stages'' labels, with a risk in the early stages that the stage-wise seed avoids.'
+  mechanism: optimizer.backbone_lr 0.0004 with one rate for the whole backbone (stage decay 1.0 if the incumbent
+    has the option). Nothing else changes.
+  precedents:
+  - None on this model.
+  novelty: First run of MambaVision-T at 4e-4.
+  coverage: Every study and every label; the largest gaps to the ResNet-50 are Lateral OA, Fracture, PF OA, ACL
+    and Lateral Meniscus (prior-work.md).
+  exploitation: 'Read x4 and x1 against the incumbent, the training loss per epoch against the reference''s (0.934
+    falling to 0.593), and the labels from largest gain to largest loss. Activation: the logged backbone learning
+    rate peaks at 4e-4. Shown wrong by: both multipliers below the incumbent and below the 2e-4 run; read the three
+    rate runs together to place the optimum and to say whether the early stages need the lower rate.'
+  budget: The reference's training time (2,594 s) within 1.05; no change to memory (12.7 GB peak).
+  implementation: 'Follow the environment paragraph of the developer instructions. Configuration only: configs/training.yaml.
+    Apply to the incumbent as assigned. The rate is one value of 4e-4 whichever rates the incumbent holds.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Brackets the single rate from above; with the other two rate runs it separates level from
+    shape.
+- id: anchors-by-weight-scale
+  mechanism_id: weight-anchor
+  parent_idea_id: null
+  title: 'Weight anchors matched to the weight scale: 0.001 early and 0.00001 late'
+  opportunity: 'Evidence (prior-work.md, Why it underfits): the anchor penalises the squared absolute distance from
+    the pretrained weights, so on weights 7 to 12.7 times larger the same relative movement costs 48 to 161 times
+    more than on the ResNet-50; the drift of the first and the last stage shrank from epoch 2 on (0.0088 to 0.0057,
+    0.0053 to 0.0036) as the rate fell. Dividing by the squared RMS ratio gives about 2e-5 and 6e-6 for the last
+    two stages and 0.001 to 0.005 for the stem and first stage. Guess: +0.002 to +0.006 macro, more beside a higher
+    rate.'
+  mechanism: optimizer.anchor_alpha_early 0.001 and optimizer.anchor_alpha_late 0.00001. The anchors stay on every
+    weight they hold in the incumbent.
+  precedents:
+  - 'ConvNeXt-Tiny tuned recipe: late anchor 0.0001 (prior-work.md, Precedents).'
+  novelty: First run of this backbone at an anchor strength set from its weight scale.
+  coverage: Every study and every label; the largest gaps to the ResNet-50 are Lateral OA, Fracture, PF OA, ACL
+    and Lateral Meniscus (prior-work.md).
+  exploitation: 'Read x4 and x1 against the incumbent, the training loss per epoch against the reference''s (0.934
+    falling to 0.593), and the labels from largest gain to largest loss. Activation: the logged anchor penalty and
+    the drift of every stage against the incumbent''s. Shown wrong by: drift unchanged, or both multipliers below
+    the incumbent. The anchors exist for unseen sites: the device stays on at the strength it has on the ResNet-50
+    in relative terms.'
+  budget: The reference's training time (2,594 s) within 1.05; no change to memory (12.7 GB peak).
+  implementation: 'Follow the environment paragraph of the developer instructions. Configuration only: configs/training.yaml.
+    Apply to the incumbent as assigned.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The second measured cause, independent of the rate; keeps the site-generalisation device instead
+    of removing it.
+exhausted_directions: ''

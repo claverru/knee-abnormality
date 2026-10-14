@@ -1,0 +1,76 @@
+ideas:
+- id: twelve-epochs
+  mechanism_id: schedule-length
+  parent_idea_id: null
+  title: Train for twelve epochs on the same schedule shape
+  opportunity: 'Evidence: the reference underfits and its validation AUC still rose in the last epochs (0.9141,
+    0.9142, 0.9150) while the cosine rate was near its floor. Guess: +0.001 to +0.003 macro on the reference''s
+    rates, less once the rates are corrected. Twelve epochs by the user''s decision of 2026-10-13.'
+  mechanism: trainer.max_epochs 12; trainer.patience 12 so early stopping stays out of play as in the reference.
+    One warm-up epoch, cosine to the same minimum ratio over the twelve epochs.
+  precedents:
+  - None on this model.
+  novelty: First longer training of MambaVision-T.
+  coverage: Every study and every label; the largest gaps to the ResNet-50 are Lateral OA, Fracture, PF OA, ACL
+    and Lateral Meniscus (prior-work.md).
+  exploitation: 'Read x4 and x1 against the incumbent, the training loss per epoch against the reference''s (0.934
+    falling to 0.593), and the labels from largest gain to largest loss. Compare epochs 1 to 10 with the incumbent''s
+    and read epochs 11 and 12 for what the extra steps add. Activation: twelve epoch records. Shown wrong by: no
+    gain after epoch 10 at x1 and x4 at or below the incumbent.'
+  budget: 1.2 times the incumbent's training time (about 3,110 s on the reference), inside the 1.3 bound; memory
+    unchanged.
+  implementation: 'Follow the environment paragraph of the developer instructions. Configuration only: configs/training.yaml.
+    Apply to the incumbent as assigned.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Whether the underfit is also a matter of steps; the one seed that uses the budget's upper
+    range.
+- id: feature-statistics-augmentation-off
+  mechanism_id: feature-augmentation
+  parent_idea_id: null
+  title: Turn the feature-statistics augmentation off
+  opportunity: 'Evidence: the augmentation''s logged mean absolute change of the stride-8 features is 0.035 to 0.040
+    on this backbone against 0.014 on the ResNet-50, 2.5 to 2.9 times stronger, on a model that underfits. It was
+    tuned on ResNet features (512 channels); here it acts on 160. Guess: off raises the fit and the fold score by
+    +0.001 to +0.004.'
+  mechanism: model.feature_statistics_augmentation.probability 0.
+  precedents:
+  - On the ResNet line the augmentation was adopted for robustness to scanner differences.
+  novelty: First run of this backbone without it.
+  coverage: Every study and every label; the largest gaps to the ResNet-50 are Lateral OA, Fracture, PF OA, ACL
+    and Lateral Meniscus (prior-work.md).
+  exploitation: 'Read x4 and x1 against the incumbent, the training loss per epoch against the reference''s (0.934
+    falling to 0.593), and the labels from largest gain to largest loss. Activation: the logged feature-statistics
+    activity is zero. Shown wrong by: both multipliers below the incumbent. A gain is a fold-score gain only: the
+    augmentation exists for unseen scanners, which this fold does not measure, so the run tells what the device
+    costs here and whether a weaker setting is worth a seed.'
+  budget: The reference's training time (2,594 s) within 1.05; no change to memory (12.7 GB peak).
+  implementation: 'Follow the environment paragraph of the developer instructions. Configuration only: configs/training.yaml.
+    Apply to the incumbent as assigned.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: A ResNet-tuned regulariser that measures almost three times stronger on this model.
+- id: gradient-clipping-at-10
+  mechanism_id: gradient-clipping
+  parent_idea_id: null
+  title: Clip the gradient norm at 10 instead of 1
+  opportunity: 'Evidence: the reference''s gradient norm is 9.5 falling to 4.3 per epoch against 1.0 to 1.5 for
+    the ResNet-50, so the clip at 1.0 rescales every step instead of catching rare ones, and the stem''s gradients
+    (RMS 15 to 30 times the ResNet-50''s) set the factor for the whole model. Adam removes a constant factor, so
+    the effect is on how steps are weighted against each other. Guess, low: +0 to +0.002 macro.'
+  mechanism: trainer.gradient_clip_val 10.0.
+  precedents:
+  - None.
+  novelty: First run of this backbone with the clip above its usual gradient norm.
+  coverage: Every study and every label; the largest gaps to the ResNet-50 are Lateral OA, Fracture, PF OA, ACL
+    and Lateral Meniscus (prior-work.md).
+  exploitation: 'Read x4 and x1 against the incumbent, the training loss per epoch against the reference''s (0.934
+    falling to 0.593), and the labels from largest gain to largest loss. Activation: the logged gradient norm against
+    the incumbent''s and the share of steps above 10. Shown wrong by: both multipliers below the incumbent.'
+  budget: The reference's training time (2,594 s) within 1.05; no change to memory (12.7 GB peak).
+  implementation: 'Follow the environment paragraph of the developer instructions. Configuration only: configs/training.yaml.
+    Apply to the incumbent as assigned.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: A measured mismatch of a ResNet-set threshold; cheap, low expected gain.
+exhausted_directions: ''

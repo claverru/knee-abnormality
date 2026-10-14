@@ -1,0 +1,98 @@
+id: mambavision-settings
+recipe: configs/training.yaml
+reference_run: outputs/training/mambavision-t-rn50-recipe
+reference_equivalences: {}
+additional_evidence_runs: []
+backlog:
+  refill_below: 3
+  refill_to: 5
+  seed_order: forced
+  rotate_after: 1000000
+budget:
+  mode: range
+  min_fraction: 0.75
+  max_fraction: 1.3
+policy:
+  editable_files:
+  - configs/training.yaml
+  - src/knee_abnormality/config.py
+  - src/knee_abnormality/training/lightning.py
+  - src/knee_abnormality/modeling/model.py
+  - src/knee_abnormality/modeling/staged_backbones.py
+  editable_directories: []
+  config_keys:
+  - model.stochastic_depth
+  - model.backbone_eval
+  - data.mean
+  - data.std
+  - trainer.max_epochs
+  - trainer.patience
+  - trainer.gradient_clip_val
+  config_prefixes:
+  - optimizer
+  - model.feature_statistics_augmentation
+  list_item_fields: {}
+  input_identity_keys:
+  - preprocessing_identity
+  require_source_change: false
+  configuration_only_ideas: true
+  developer_instructions: 'Environment, read this first. (1) This worktree''s Python environment carries packages
+    that are not in pyproject.toml or uv.lock: the Mamba scan kernels, einops, fvcore, transformers 4.50.0, and
+    the outside model code under .venv/third_party. Never run uv sync, uv run, uv add or pip install: any of them
+    removes or replaces those packages and breaks every later training. Run Python only as the worktree''s .venv/bin/python.
+    Never edit anything under .venv. (2) You have no GPU and must not use one. The Mamba scan runs only on a GPU,
+    so the backbone cannot run a forward pass on the CPU: allowed checks are static checks, loading configs/training.yaml
+    through the config model, building the optimizer on the constructed model without pretrained weights, and tiny
+    no-gradient checks of changed functions on synthetic tensors. Never return blocked for lack of a GPU. (3) Make
+    every change inside the candidate workspace you were assigned and nowhere else. Do not stage the candidate under
+    /tmp, and do not write source/ or changes.diff in the experiment directory: the supervisor freezes the source
+    and the diff from your workspace after you return. (4) When the change is complete and the checks pass, return
+    status prepared with the integration and activation declarations in the report. The incumbent starts as mambavision-t-rn50-recipe
+    (prior-work.md, The reference): mamba_vision_T with ImageNet-1k weights on the ResNet-50 recipe. Read contract.md
+    before writing code. Each seed is one setting and says exactly what changes; apply it to the incumbent you are
+    assigned and leave everything outside it byte-identical. A configuration-only seed changes configs/training.yaml
+    and nothing else. Do not change the backbone, its weights, the labels, the views, the slices, the image size,
+    the batch size, the heads, the losses or the prediction settings. A new option exists only for a value the campaign
+    intends to vary; with its default the optimizer and the model must be identical to the incumbent''s. New parameters
+    or buffers initialise under torch.random.fork_rng so the incumbent''s random stream is unchanged. Keep the speed
+    rules of the recipe: model.channels_last stays true, epoch metrics go through _log_epoch_metric, and code that
+    runs every training step gets no .item(), .cpu(), bool() or int() of a tensor and no Python loop over studies.
+    At most six new metrics per seed, logged per epoch or on validation. Never fewer than ten epochs. Training time
+    must stay within 0.75 to 1.3 of the reference''s 2,594 s; only a seed that states more epochs may exceed 1.05.
+    No weight averaging. No tests.'
+  researcher_instructions: 'The campaign has no end: it runs until the user stops it. Never return an empty report
+    and never declare the directions exhausted. Research starts after the forced seeds. Your first product after
+    every completed run is its analysis: both multipliers against the incumbent (the x1 change is the selected epoch''s
+    validation macro, the x4 change the saved predictions''), the training loss per epoch against the incumbent''s
+    and the reference''s, the per-label AUC changes from the two runs'' fold_2/validation_predictions.csv sorted
+    from largest gain to largest loss, the training and prediction seconds and the peak GPU memory. Then the same
+    run against the ResNet-50 on this fold (x4 0.939634, x1 0.930902; its predictions are named in prior-work.md)
+    and the equal logit blend of the two against the ResNet-50 alone: the campaign''s purpose is a third architecture
+    for the blend. Adoption is by the runtime under the shared rule; say which side of it the run falls on. One
+    run is a starting point, never a verdict on a setting: for a run that was not adopted list what it shares with
+    the other runs that moved the same labels and name candidate causes; do not write that a reference was lucky
+    or that a difference is noise. Only then propose. The scope is the training settings of mamba_vision_T that
+    its differences from the ResNet-50 make suspect (contract.md, prior-work.md): rates and their distribution over
+    stages, warm-up and schedule length, the weight anchors, the model''s own regularisers, input statistics, normalisation
+    layers in training, precision of the scan, gradient clipping. Each idea is one training run that changes one
+    setting, or combines settings of named earlier runs; it marks every claim as evidence-backed or a guess, cites
+    its numbers from prior-work.md or a run, takes its value from a cited source or from the bracket earlier runs
+    of this campaign opened, and states its expected training time and GPU memory. Every refill carries at least
+    one idea that changes source. Start every implementation text with the sentence ''Follow the environment paragraph
+    of the developer instructions.'' and name the metrics that prove the idea active. Out of bounds: everything
+    in the contract''s out-of-bounds list, among it another backbone, model size or pretrained weights, image sizes
+    other than 224 px, more slices or images per study, fewer epochs, the labels, new routing, attention or readout
+    structure, ensembling, weight averaging, test-time augmentation, reflection probabilities, gold-study weighting,
+    trained models in the loader, per-run controls and confirmation or multi-seed runs. Two trainings of the ResNet-50
+    recipe on this fold were 0.0010 apart at x4 and 0.0013 at x1; this model''s own spread is not known. Past experiments,
+    by the user''s order of 2026-10-13: before proposing, read every decided run of the campaign and the reference,
+    not only the last run. From each run''s fold_2 logs, epochs and validation_predictions.csv put in the report
+    one table per run of the validation macro AUC and the training loss per epoch, the logged diagnostics per epoch
+    (anchor penalty, drift per backbone stage, gradient norm, rates per stage), x1 and x4, and the per-label x4
+    AUC change against the reference and against the ResNet-50; the keeper''s run-notes.md and the ''Why it underfits''
+    section of prior-work.md hold the same records for the reference and the first runs. Then read across runs:
+    which curves share a shape (a slower start, a later catch-up, a plateau), which labels moved together, and which
+    settings the runs that moved them share. Every idea names the runs, the curve features and the labels it rests
+    on, says what in those records it expects to change and by how much, and takes its value from the bracket the
+    past runs opened. Do not propose an idea that the records of past runs already answer, and do not repeat a setting
+    a past run tried without naming what differs this time.'

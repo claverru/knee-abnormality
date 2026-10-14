@@ -80,15 +80,17 @@ In `KneeAbnormalityModel.__init__`:
   EfficientNets: `efficientnet_b3.ra2_in1k`, `efficientnet_b0.ra_in1k` and
   `efficientnet_b0.ra4_e3600_r224_in1k`, all at origin 0 and stride 32, the same anchors as
   ReXNet-200 ([result](../validation/results/2026-09-18-efficientnet-backbone-results.md)).
-- **Features:** `forward_features` must return NCHW with `num_features` channels. Construction
-  probes the backbone once at `data.image_size`.
+- **Stages:** the model reads the backbone through a stage adapter registered for its class in
+  `BACKBONE_STAGES` (`modeling/backbone_stages.py`): ResNet, timm ConvNeXt and the MambaVision
+  wrapper have one ([stem-staged backbones](mambavision-backbone.md#code)). Each must give NCHW
+  stride-8, 16 and 32 maps, the three stage widths and the decoder mapping, and the name needs
+  `.layer2` or `.layer3` mapping entries for the mask decoder and meniscus map.
 - **Input size:** the backbone must accept `data.image_size`.
   [CoAtNet](coatnet-224-spatial-backbone.md) receives it explicitly and requires a multiple
   of 32.
 - **Anchors:** token anchors come from the mapping, so any verified origin works.
 - **Activation checkpointing:** `model.checkpoint_backbone` requires `model.backbone_eval: true`.
-- **DSU:** `model.feature_statistics_augmentation` splits the backbone at stride 8, which is
-  implemented for ReXNet (after block 5) and ResNet (after `layer2`) only.
+- **DSU:** `model.feature_statistics_augmentation` resamples the adapter's stride-8 output.
 
 ## Checkpoint weight scale
 
@@ -98,7 +100,10 @@ same `backbone_lr`. Measured 2026-09-25: `rexnetr_200.sw_in12k_ft_in1k` has conv
 0.0204 against 0.0508 for `rexnet_200.nav_in1k`; at the same rate its gradient norms ran 3–4× higher
 and it fitted more slowly
 ([result](../validation/results/2026-09-25-backbone-swap-runs.md#rexnet-r)). Compare the pretrained convolution-weight
-RMS before a swap and scale `backbone_lr` by the ratio.
+RMS before a swap and scale `backbone_lr` by the ratio. The L2-SP anchors scale too: the penalty
+grows with the squared weight drift, so MambaVision-T, whose weights are 1.5 to 12.7 times the
+ResNet-50's, needed anchors ten to a hundred times weaker beside a fourfold rate
+([MambaVision-T recipe](mambavision-backbone.md#recipe)).
 
 ## Mapping pitfalls
 
@@ -107,7 +112,8 @@ convolution in module order is exact only for single-path networks with static p
 2026-09-16 sweep of timm models found these categories:
 
 - **Native:** a single path with symmetric padding gives origin 0 at strides 16 and 32 for
-  MobileNetV3/V4, EfficientNet, ReXNet and EfficientViT-B. Only a mapping entry is needed.
+  MobileNetV3/V4, EfficientNet, ReXNet and EfficientViT-B. A mapping entry and a stage adapter
+  are needed.
 - **Offset origin:** these need a mapping entry with the true origin.
   - *ConvNeXt:* at stride 16, the patchify stem gives a 7.5 px origin (6 px for `_ols`
     variants), and grids floor (18×18 at 300 px).

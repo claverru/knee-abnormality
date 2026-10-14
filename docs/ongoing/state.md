@@ -22,6 +22,14 @@ measured outcomes are in the [validation results](../validation/results/INDEX.md
   0.937000, ×1 0.928460, 0.959 public (S151). Checkpoints trained before 2026-10-13 do not load
   into the current model (new parameters, renamed shortcut keys, a changed token identity);
   export them from their `source_snapshot.zip`.
+- **Other backbones, since 2026-10-14:** `configs/mambavision-t.yaml` (MambaVision-T with its own
+  rate, anchors, twelve epochs and linear decay; ×4 0.937801 on fold 2, blend with the ResNet-50
+  0.941419) and `configs/convnext-tiny.yaml` (the S155 ConvNeXt-Tiny settings on Kaggle data only,
+  per-stage rate decay 0.7, stochastic depth 0.1) train beside `configs/training.yaml`
+  ([MambaVision-T](../modeling/mambavision-backbone.md),
+  [result](../validation/results/2026-10-14-mambavision-t.md)). The merge changed hashed model
+  sources, so every checkpoint trained before it exports from its own `source_snapshot.zip`; the
+  ResNet-50 forward and initialisation match the previous code within run-to-run noise.
 - **Labels and split, since 2026-09-28 (user decision):** training and evaluation use
   [`rebuild_state_v2`](../public-labels/label-rebuild.md#a2-common-state-scale-and-the-zhen-lineage-fix-2026-09-28)
   (A2 of the label rebuild) and the label-stratified split
