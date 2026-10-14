@@ -83,8 +83,8 @@ In `KneeAbnormalityModel.__init__`:
 - **Stages:** the model reads the backbone through a stage adapter registered for its class in
   `BACKBONE_STAGES` (`modeling/backbone_stages.py`): ResNet, timm ConvNeXt and the MambaVision
   wrapper have one ([stem-staged backbones](mambavision-backbone.md#code)). Each must give NCHW
-  stride-8, 16 and 32 maps, the three stage widths and the decoder mapping, and the name needs
-  `.layer2` or `.layer3` mapping entries for the mask decoder and meniscus map.
+  stride-8, 16 and 32 maps and the stride-16 width, and the name needs a `.layer3` mapping entry
+  for the meniscus map.
 - **Input size:** the backbone must accept `data.image_size`.
   [CoAtNet](coatnet-224-spatial-backbone.md) receives it explicitly and requires a multiple
   of 32.

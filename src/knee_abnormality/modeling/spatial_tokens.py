@@ -36,15 +36,6 @@ BACKBONE_MAPPINGS = {
         for name in CONVNEXT_BACKBONES
     },
     **{
-        f"{name}.layer2": {
-            "layout": "NCHW",
-            "origin": [3.5, 3.5],
-            "stride": [8.0, 8.0],
-            "anchors": "patch_stem_and_downsample_centers",
-        }
-        for name in CONVNEXT_BACKBONES
-    },
-    **{
         f"{name}{suffix}": {
             "layout": "NCHW",
             "origin": [0.0, 0.0],
@@ -52,7 +43,7 @@ BACKBONE_MAPPINGS = {
             "anchors": "convolution_centers",
         }
         for name in STAGED_BACKBONES
-        for suffix, stride in (("", 32.0), (".layer3", 16.0), (".layer2", 8.0))
+        for suffix, stride in (("", 32.0), (".layer3", 16.0))
     },
     "resnet50.a1_in1k": {
         "layout": "NCHW",
@@ -215,15 +206,11 @@ _BACKBONE_MAPPING_FUNCTIONS = {
             backbone.geometry_layers(stages)
         )
         for name in STAGED_BACKBONES
-        for suffix, stages in (("", 4), (".layer3", 3), (".layer2", 2))
+        for suffix, stages in (("", 4), (".layer3", 3))
     },
     **{name: _convnext_mapping for name in CONVNEXT_BACKBONES},
     **{
         f"{name}.layer3": lambda backbone: _convnext_mapping(backbone, 3)
-        for name in CONVNEXT_BACKBONES
-    },
-    **{
-        f"{name}.layer2": lambda backbone: _convnext_mapping(backbone, 2)
         for name in CONVNEXT_BACKBONES
     },
 }

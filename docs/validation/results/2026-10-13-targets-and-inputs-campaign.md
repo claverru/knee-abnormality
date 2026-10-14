@@ -6,7 +6,8 @@ studies), seed 1110484336, ten epochs, labels `rebuild_state_v2`, teacher share 
 fold 2 of `outputs/training/rn50-aligned-mixing-folds-0-2`, ×4 0.937000, ×1 0.928460, 2,691 s.
 **Adopted on main: a mask decoder trained beside the labels, the three-compartment OA detector
 beside the routed shared OA head, and average-pool shortcuts in the ResNet-50: ×4 0.939634, ×1
-0.930902 (run 27).** Per run, per label, logged diagnostics and incidents:
+0.930902 (run 27).** The user removed the mask decoder again on 2026-10-14, without a run
+([current model](../../modeling/current-model.md#adoption-history)). Per run, per label, logged diagnostics and incidents:
 [run notes](../../../autoresearch/campaigns/targets-and-inputs/run-notes.md).
 
 ## Runs
@@ -97,7 +98,8 @@ fraction; positive weights fall (Synovitis 2.16 to 1.29, MCL 3.66 to 2.52).
   lose 0.0009 at ×4 with the interval below zero. Contusion, MCL and the tibiofemoral OA labels,
   which gained in run 1, turn negative; they are labels the two additions already raised.
   Synovitis, whose weight is cut most, falls in both runs (−0.0036, −0.0055).
-- **Where it still applies:** models on the recipe without the decoder and the detector.
+- **Where it still applies:** models on the recipe without the decoder and the detector. The
+  current recipe, with the detector and without the decoder, is unmeasured.
 
 ## Targets
 

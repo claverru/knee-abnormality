@@ -1,7 +1,7 @@
 # Model submodules
 
 `KneeAbnormalityModel` in `modeling/model.py` is one `nn.Module` of about 2,000 lines whose methods
-share state through attributes. The backbone stages, view windows and mask decoder already live in
+share state through attributes. The backbone stages and view windows already live in
 their own files (2026-10-14). The rest falls into four groups (line counts of 2026-10-14):
 
 | Group | Methods | Lines |
