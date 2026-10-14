@@ -24,7 +24,7 @@ the end of the competition. **Since 2026-09-25 the screening fold rotates** with
 (user decision, [below](#controlled-comparisons)); since 2026-09-28 it is fold 0 of
 `all_5fold_scanner_v2`. Every fold-0 decision on `all_5fold_scanner_v1` had been made on the same
 905 studies, and the public board disagreed with it: S59 (a fold-0 adoption) scored 0.939, while
-S58 (a fold-0 reject) scored 0.944. The fold lives only in `configs/training.yaml`
+S58 (a fold-0 reject) scored 0.944. The fold lives only in `configs/resnet50.yaml`
 (`validation.folds`): the `just` recipes, `predict`, `compare_fold_runs` and `repredict_run` read
 it from there unless a fold is passed explicitly, and the autoresearch runner takes it from the
 sealed recipe. Results on earlier folds stay valid as a record but cannot be compared across folds.
@@ -50,7 +50,7 @@ checkpoint rule; never search seeds for an apparent improvement.
    score) on the next fold, cycling 0 → 1 → 2 → 3 → 4 → 0. Later candidates use that fold and
    seed. Autoresearch `provisional_accept` decisions are working choices within a campaign, not
    adoptions.
-3. **One source of truth:** the fold and seed live only in `configs/training.yaml`
+3. **One source of truth:** the fold and seed live only in `configs/resnet50.yaml`
    (`validation.folds`, `seed`), and commands take them from there.
 4. **Campaigns:** a campaign runs on its reference's fold from start to end. Since 2026-09-26 a
    provisional acceptance makes the adopted run the campaign's reference, with no control

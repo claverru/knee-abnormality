@@ -307,8 +307,8 @@ Audit mode is the regression check that all three arms prepare identical batches
 study at a time and raises on any differing field.
 
 ```bash
-rtk proxy env OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 uv run --locked python -m scripts.adhoc.compare_header_implementations configs/training.yaml --mode loader --implementation pydicom --samples 256 --workers 16 --passes 2 --no-prewarm --output-dir outputs/profiling/header-cold-pydicom-new
-rtk proxy uv run --locked python -m scripts.adhoc.compare_header_implementations configs/training.yaml --mode audit --samples 8 --no-prewarm --output-dir outputs/profiling/header-audit-new
+rtk proxy env OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 uv run --locked python -m scripts.adhoc.compare_header_implementations configs/resnet50.yaml --mode loader --implementation pydicom --samples 256 --workers 16 --passes 2 --no-prewarm --output-dir outputs/profiling/header-cold-pydicom-new
+rtk proxy uv run --locked python -m scripts.adhoc.compare_header_implementations configs/resnet50.yaml --mode audit --samples 8 --no-prewarm --output-dir outputs/profiling/header-audit-new
 ```
 
 The choice is not separable anyway: one `KneeStudyDataset` path serves training, validation and

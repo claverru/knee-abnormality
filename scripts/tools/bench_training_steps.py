@@ -92,9 +92,7 @@ PROFILED = {
         "_log_augmentation_activity",
         "_log_views",
         "_side_step",
-        "_report_attribute_step",
         "_anatomy_step",
-        "_scanner_confusion_step",
         "on_before_optimizer_step",
     ),
     "model": (

@@ -76,7 +76,7 @@ adoption, or the loop needs its first topic. The next topic is a new campaign se
 incumbent in the topic packet: its effective configuration, frozen source, seed and fold. It
 runs until it stops paying; nothing waits for the user.
 
-- **Scope.** Any Python file under `src/knee_abnormality/` and `configs/training.yaml`, except
+- **Scope.** Any Python file under `src/knee_abnormality/` and `configs/campaign.yaml`, except
   {sources} and the config paths {config}; {range_config} are editable only when the assignment's
   `budget` is a wall-clock range. Training-label code is in scope: training-target
   construction in `src/knee_abnormality/data/labels.py`, target processing and losses on

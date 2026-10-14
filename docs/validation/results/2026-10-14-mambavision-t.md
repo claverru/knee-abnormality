@@ -8,7 +8,7 @@ detail and per-label tables: the campaign's
 
 ## Result
 
-The full recipe (`configs/mambavision-t.yaml`, run `outputs/training/mambavision-t-combined-12-epochs`,
+The full recipe (`configs/mambavision.yaml`, run `outputs/training/mambavision-t-combined-12-epochs`,
 best epoch 11) scores ×4 0.937801 and ×1 0.929880: −0.0018 at ×4 against the ResNet-50 alone. The
 equal logit blend of the two scores 0.941419, +0.0018 over the ResNet-50 alone. It has no public
 score.

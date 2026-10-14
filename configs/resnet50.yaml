@@ -1,11 +1,10 @@
-name: mambavision-t
+name: resnet50
 seed: 1110484336
 
 paths:
   data_root: ../data
   output_root: ../outputs/training
   label_manifest: labels/rebuild-state-v2-label-sources.json
-  report_attribute_manifest: labels/jevk5-report-attribute-targets-v4.0.json
   anatomy_targets: ../data/labels/prepared/anatomy-mrannotator-sample550-joints
   meniscus_targets: ../data/labels/prepared/soft-tissue-nnunet-knee-dess265
 
@@ -108,56 +107,42 @@ data:
   image_size: 224
   lower_quantile: 0.005
   upper_quantile: 0.995
-  mean: [0.485, 0.456, 0.406]
-  std: [0.229, 0.224, 0.225]
+  mean: [0.3162, 0.3162, 0.3162]
+  std: [0.3213, 0.3213, 0.3213]
 
 model:
-  backbone: mamba_vision_T
+  backbone: resnet50.a1_in1k
   pretrained: true
-  pretrained_weights: timm
+  pretrained_weights: radimagenet
   slice_channels: repeated_middle
   channels_last: true
-  checkpoint_backbone: false
-  backbone_eval: false
-  dropout: 0.0
-  series_dropout: 0.0
-  plane_readout: true
-  view_label_bias: true
-  anatomical_frame: true
-  meniscus_map: true
-  soft_tissue_routing: true
   feature_statistics_augmentation:
     probability: 0.5
 
 optimizer:
-  backbone_lr: 0.0002
+  backbone_lr: 0.00005
   head_lr: 0.0006
   weight_decay: 0.01
-  anchor_alpha_early: 0.001
-  anchor_alpha_late: 0.00001
-  late_anchor_follows_lr: true
+  anchor_alpha_early: 0.01
+  anchor_alpha_late: 0.001
   beta1: 0.9
   beta2: 0.999
   epsilon: 0.00000001
   warmup_epochs: 1
   warmup_start_ratio: 0.1
   minimum_lr_ratio: 0.01
-  lr_decay: linear
-  weight_averaging: null
 
 trainer:
-  max_epochs: 12
+  max_epochs: 10
   batch_size: 8
   accumulate_grad_batches: 1
   gradient_clip_val: 1.0
   num_workers: 16
   persistent_workers: true
   prefetch_factor: 2
-  patience: 12
+  patience: 10
   min_delta: 0.0001
   deterministic: false
   class_balance_exponent: 0.5
-  report_attribute_loss_weight: 0
   anatomy_loss_weight: 0.1
   meniscus_loss_weight: 0.1
-  scanner_confusion_weight: 0.0

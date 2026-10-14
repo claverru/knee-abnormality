@@ -9,8 +9,8 @@ measured outcomes are in the [validation results](../validation/results/INDEX.md
 
 ## Recipe in force
 
-- **The recipe is the ResNet-50 on fold 2, since 2026-10-13 (user decision):** `configs/training.yaml`
-  is the Refined-RadImageNet `resnet50.a1_in1k` on fold 2 of `all_5fold_scanner_v2`, seed
+- **The recipe is the ResNet-50 on fold 2, since 2026-10-13 (user decision):** `configs/resnet50.yaml`
+  (named `configs/training.yaml` until 2026-10-14) is the Refined-RadImageNet `resnet50.a1_in1k` on fold 2 of `all_5fold_scanner_v2`, seed
   1110484336; `configs/refined-resnet50.yaml` and the ResNet-18 recipe are removed, and every
   mention of them below describes earlier states. On top of the aligned-contrast-mixing recipe it
   carries the three adoptions of the
@@ -22,14 +22,24 @@ measured outcomes are in the [validation results](../validation/results/INDEX.md
   0.937000, ×1 0.928460, 0.959 public (S151). Checkpoints trained before 2026-10-13 do not load
   into the current model (new parameters, renamed shortcut keys, a changed token identity);
   export them from their `source_snapshot.zip`.
-- **Other backbones, since 2026-10-14:** `configs/mambavision-t.yaml` (MambaVision-T with its own
-  rate, anchors, twelve epochs and linear decay; ×4 0.937801 on fold 2, blend with the ResNet-50
-  0.941419) and `configs/convnext-tiny.yaml` (the S155 ConvNeXt-Tiny settings on Kaggle data only,
-  per-stage rate decay 0.7, stochastic depth 0.1) train beside `configs/training.yaml`
-  ([MambaVision-T](../modeling/mambavision-backbone.md),
-  [result](../validation/results/2026-10-14-mambavision-t.md)). The merge changed hashed model
-  sources, so every checkpoint trained before it exports from its own `source_snapshot.zip`; the
-  ResNet-50 forward and initialisation match the previous code within run-to-run noise.
+- **One config per model, since 2026-10-14 (user decision):** `configs/resnet50.yaml`,
+  `configs/mambavision.yaml` (MambaVision-T with its own rate, anchors, twelve epochs and linear
+  decay; ×4 0.937801 on fold 2, blend with the ResNet-50 0.941419) and `configs/convnext.yaml` (the
+  S155 ConvNeXt-Tiny settings on Kaggle data only, per-stage rate decay 0.7, stochastic depth 0.1);
+  there is no default config, every command names one, and campaigns write their recipe to
+  `configs/campaign.yaml` inside their own sources ([MambaVision-T](../modeling/mambavision-backbone.md),
+  [result](../validation/results/2026-10-14-mambavision-t.md)).
+- **Dead paths removed, 2026-10-14 (user decision):** weight averaging, the report-attribute heads,
+  the scanner confusion head, dropout and series dropout, activation checkpointing and frozen
+  backbone, unused folds, the ReXNet, EfficientNet and CoAtNet mappings, the ResNet-18, ResNet-10t
+  and original RadImageNet ResNet-50 weights, and the switches every recipe had on (plane readout,
+  view label bias, anatomical frame, meniscus map, soft-tissue routing), which are now fixed
+  behaviour ([list](../architecture/configs-and-experiment-artifacts.md#experiment-artifacts-and-reproducibility)).
+  Adjacent-slice inputs stay. Checked against the previous code for all three configs: identical
+  initial weights, optimizer groups and random-number state after a seeded training step, and
+  forward outputs within each model's rerun spread. These changes touch hashed model sources and
+  drop two renumbered layer keys (`attention.2`, `soft_attention.2`), so every checkpoint trained
+  before them exports from its own `source_snapshot.zip`.
 - **Labels and split, since 2026-09-28 (user decision):** training and evaluation use
   [`rebuild_state_v2`](../public-labels/label-rebuild.md#a2-common-state-scale-and-the-zhen-lineage-fix-2026-09-28)
   (A2 of the label rebuild) and the label-stratified split

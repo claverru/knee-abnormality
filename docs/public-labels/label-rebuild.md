@@ -287,8 +287,8 @@ them (`fold4_training_positives.json`).
   fold 4, seed 703791404; compare publicly with S73 at ×4, τ 0.75):
 
   ```bash
-  rtk proxy nohup uv run --locked python -u -m scripts.pipeline.train configs/training.yaml --name rebuild-mean-labels --paths.label-manifest configs/labels/rebuild-mean-v1-label-sources.json --labels.source rebuild_mean_v1 --run-id rebuild-mean-candidate > outputs/training/rebuild-mean-candidate.log 2>&1 < /dev/null &
-  rtk proxy nohup uv run --locked python -u -m scripts.pipeline.train configs/training.yaml --name rebuild-state-labels --paths.label-manifest configs/labels/rebuild-state-v1-label-sources.json --labels.source rebuild_state_v1 --run-id rebuild-state-candidate > outputs/training/rebuild-state-candidate.log 2>&1 < /dev/null &
+  rtk proxy nohup uv run --locked python -u -m scripts.pipeline.train configs/resnet50.yaml --name rebuild-mean-labels --paths.label-manifest configs/labels/rebuild-mean-v1-label-sources.json --labels.source rebuild_mean_v1 --run-id rebuild-mean-candidate > outputs/training/rebuild-mean-candidate.log 2>&1 < /dev/null &
+  rtk proxy nohup uv run --locked python -u -m scripts.pipeline.train configs/resnet50.yaml --name rebuild-state-labels --paths.label-manifest configs/labels/rebuild-state-v1-label-sources.json --labels.source rebuild_state_v1 --run-id rebuild-state-candidate > outputs/training/rebuild-state-candidate.log 2>&1 < /dev/null &
   ```
 
   Local validation scores against the frozen `combined_v1` targets, which both tables move away
@@ -449,7 +449,7 @@ Medial OA 760 (A 689), Lateral OA 370 (A 345). Table
 `outputs/analysis/l/label-rebuild-20260928/v2/`. Launch (user):
 
 ```bash
-rtk proxy nohup uv run --locked python -u -m scripts.pipeline.train configs/training.yaml --name rebuild-state-v2-labels --paths.label-manifest configs/labels/rebuild-state-v2-label-sources.json --labels.source rebuild_state_v2 --run-id rebuild-state-v2-candidate > outputs/training/rebuild-state-v2-candidate.log 2>&1 < /dev/null &
+rtk proxy nohup uv run --locked python -u -m scripts.pipeline.train configs/resnet50.yaml --name rebuild-state-v2-labels --paths.label-manifest configs/labels/rebuild-state-v2-label-sources.json --labels.source rebuild_state_v2 --run-id rebuild-state-v2-candidate > outputs/training/rebuild-state-v2-candidate.log 2>&1 < /dev/null &
 ```
 
 ### Reproducing A2
@@ -457,11 +457,11 @@ rtk proxy nohup uv run --locked python -u -m scripts.pipeline.train configs/trai
 Rerun on 2026-09-28 into scratch directories, the tool and the split builder reproduce the
 adopted files byte for byte: `rebuild-state-v2/labels.csv` (`5877acaf…`) and
 `rebuild-mean-v2/labels.csv` (`a550cd46…`) in 42 s, and all four files of
-`all_5fold_scanner_v2` from `scripts.tools.validation prepare --config configs/training.yaml`.
+`all_5fold_scanner_v2` from `scripts.tools.validation prepare --config configs/resnet50.yaml`.
 
 ```bash
 rtk proxy uv run --locked python -m scripts.tools.prepare_rebuilt_labels --output-dir <scratch>/prepared --manifest-dir <scratch>/manifests --analysis-dir <scratch>/analysis
-rtk proxy uv run --locked python -m scripts.tools.validation prepare --config configs/training.yaml --split-dir <scratch>/split
+rtk proxy uv run --locked python -m scripts.tools.validation prepare --config configs/resnet50.yaml --split-dir <scratch>/split
 ```
 
 - **Public inputs:** the label manifest pins every input by SHA-256 but records Kaggle versions

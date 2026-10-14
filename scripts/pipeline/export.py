@@ -141,7 +141,8 @@ def _portable_config(config: ExperimentConfig, fold: int) -> dict:
         "data_root": "data",
         "output_root": "output",
         "label_manifest": "label-manifest-not-required-for-test.json",
-        "report_attribute_manifest": "report-attribute-manifest-not-required-for-test.json",
+        "anatomy_targets": "anatomy-targets-not-required-for-test",
+        "meniscus_targets": "meniscus-targets-not-required-for-test",
     }
     values["validation"]["folds"] = [fold]
     ExperimentConfig.model_validate(values, context={"config_dir": Path.cwd()})

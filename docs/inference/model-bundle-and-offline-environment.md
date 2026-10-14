@@ -39,7 +39,7 @@ The generated bundle contains:
   state is unnecessary for inference.
 - The config recorded with that checkpoint and its ordered target list. Build
   this from saved run/checkpoint metadata, not a later edit of
-  `configs/training.yaml`. Freeze model/data settings; permit explicit path and
+  `configs/resnet50.yaml`. Freeze model/data settings; permit explicit path and
   runtime overrides with their values recorded. The bundle `config.json` must
   carry an `inference` section with the frozen image multiplier; configs without it
   are rejected. Bundle-mode prediction applies this frozen multiplier to both

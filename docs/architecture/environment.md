@@ -27,7 +27,7 @@ editable mode from `src/knee_abnormality/`, using the pinned setuptools build
 backend. Scripts and notebooks can import the shared modules, and source
 edits take effect without reinstalling. The [architecture](INDEX.md)
 defines module, config and cache conventions. Inspect the starting settings
-with `rtk proxy uv run --locked python -m knee_abnormality.config configs/training.yaml`.
+with `rtk proxy uv run --locked python -m knee_abnormality.config configs/resnet50.yaml`.
 
 The `dev` group (Ruff and just), `notebooks` group (IPython kernel and plotting),
 and `tools` group (Kaggle CLI and fold generation) install by default.

@@ -48,10 +48,10 @@ validation and decoding serially (the 2026-09-18 cold comparison is in
 Use a fresh output directory:
 
 ```bash
-rtk proxy env OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 uv run --locked python -m scripts.adhoc.profile_threaded_loading configs/training.yaml --mode loader --workers 8 --decode-threads 1 --samples 512 --warmup-batches 16 --output-dir outputs/profiling/threading-loader-new
-rtk proxy env OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 uv run --locked python -m scripts.adhoc.profile_threaded_loading configs/training.yaml --mode loader --workers 16 --decode-threads 1 --read-threads 4 --samples 256 --warmup-batches 1 --passes 2 --output-dir outputs/profiling/frames-cold-readthreads-new
-rtk proxy uv run --locked python -m scripts.adhoc.profile_threaded_loading configs/training.yaml --mode audit --samples 8 --output-dir outputs/profiling/threading-audit-new
-rtk proxy uv run --locked python -m scripts.adhoc.profile_threaded_loading configs/training.yaml --mode gpu --workers 8 --decode-threads 1 --samples 256 --output-dir outputs/profiling/threading-gpu-new
+rtk proxy env OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 uv run --locked python -m scripts.adhoc.profile_threaded_loading configs/resnet50.yaml --mode loader --workers 8 --decode-threads 1 --samples 512 --warmup-batches 16 --output-dir outputs/profiling/threading-loader-new
+rtk proxy env OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 uv run --locked python -m scripts.adhoc.profile_threaded_loading configs/resnet50.yaml --mode loader --workers 16 --decode-threads 1 --read-threads 4 --samples 256 --warmup-batches 1 --passes 2 --output-dir outputs/profiling/frames-cold-readthreads-new
+rtk proxy uv run --locked python -m scripts.adhoc.profile_threaded_loading configs/resnet50.yaml --mode audit --samples 8 --output-dir outputs/profiling/threading-audit-new
+rtk proxy uv run --locked python -m scripts.adhoc.profile_threaded_loading configs/resnet50.yaml --mode gpu --workers 8 --decode-threads 1 --samples 256 --output-dir outputs/profiling/threading-gpu-new
 ```
 
 Warmup batches are excluded from `studies_per_second`. For a cold run, drop the page cache first,

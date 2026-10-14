@@ -77,16 +77,14 @@ class PathsConfig(ConfigModel):
     data_root: Path
     output_root: Path
     label_manifest: Path
-    report_attribute_manifest: Path
-    anatomy_targets: Path | None = None
-    meniscus_targets: Path | None = None
+    anatomy_targets: Path
+    meniscus_targets: Path
     teacher_table: Path | None = None
 
     @field_validator(
         "data_root",
         "output_root",
         "label_manifest",
-        "report_attribute_manifest",
         "anatomy_targets",
         "meniscus_targets",
         "teacher_table",
@@ -297,46 +295,10 @@ class ModelConfig(ConfigModel):
     pretrained_weights: Literal["timm", "radimagenet"] = "timm"
     slice_channels: Literal["adjacent", "repeated_middle"] = "adjacent"
     channels_last: bool = False
-    checkpoint_backbone: bool = False
-    backbone_eval: bool = False
-    dropout: Annotated[float, Field(ge=0, lt=1)]
     stochastic_depth: Annotated[float, Field(ge=0, lt=1)] = 0.0
-    series_dropout: Annotated[float, Field(ge=0, lt=1)]
-    plane_readout: bool = False
-    view_label_bias: bool = False
-    anatomical_frame: bool = False
-    meniscus_map: bool = False
-    soft_tissue_routing: bool = False
     feature_statistics_augmentation: FeatureStatisticsAugmentationConfig = Field(
         default_factory=FeatureStatisticsAugmentationConfig
     )
-
-    @model_validator(mode="after")
-    def validate_model_options(self) -> "ModelConfig":
-        if self.checkpoint_backbone and not self.backbone_eval:
-            raise ValueError(
-                "checkpoint_backbone requires backbone_eval=true to preserve training-mode BatchNorm"
-            )
-        if self.soft_tissue_routing and not (
-            self.meniscus_map and self.anatomical_frame
-        ):
-            raise ValueError(
-                "soft_tissue_routing requires meniscus_map and anatomical_frame"
-            )
-        return self
-
-
-class EMAConfig(ConfigModel):
-    method: Literal["ema"]
-    decay: Annotated[float, Field(gt=0, lt=1)]
-
-
-class SWAConfig(ConfigModel):
-    method: Literal["swa"]
-    epochs: Annotated[StrictInt, Field(gt=0)]
-
-
-WeightAveragingConfig = Annotated[EMAConfig | SWAConfig, Field(discriminator="method")]
 
 
 class OptimizerConfig(ConfigModel):
@@ -351,7 +313,6 @@ class OptimizerConfig(ConfigModel):
     warmup_start_ratio: Annotated[float, Field(gt=0, le=1)]
     minimum_lr_ratio: Annotated[float, Field(gt=0, le=1)]
     lr_decay: Literal["cosine", "linear"] = "cosine"
-    weight_averaging: WeightAveragingConfig | None
     anchor_alpha_early: Annotated[float, Field(ge=0, allow_inf_nan=False)] = 0.0
     anchor_alpha_late: Annotated[float, Field(ge=0, allow_inf_nan=False)] = 0.0
     late_anchor_follows_lr: bool = False
@@ -369,30 +330,21 @@ class TrainerConfig(ConfigModel):
     min_delta: Annotated[float, Field(ge=0)]
     deterministic: bool
     class_balance_exponent: Annotated[float, Field(ge=0, le=1)]
-    report_attribute_loss_weight: Annotated[float, Field(ge=0, allow_inf_nan=False)]
-    anatomy_loss_weight: Annotated[float, Field(ge=0, allow_inf_nan=False)] = 0.0
-    meniscus_loss_weight: Annotated[float, Field(ge=0, allow_inf_nan=False)] = 0.0
-    scanner_confusion_weight: Annotated[float, Field(ge=0, allow_inf_nan=False)]
+    anatomy_loss_weight: Annotated[float, Field(gt=0, allow_inf_nan=False)]
+    meniscus_loss_weight: Annotated[float, Field(gt=0, allow_inf_nan=False)]
 
 
 class ValidationConfig(ConfigModel):
     split: Identifier
     folds: Annotated[tuple[Fold, ...], Field(min_length=1)]
     prediction_image_multiplier: Annotated[StrictInt, Field(gt=0)] = 1
-    unused_folds: tuple[Fold, ...] = ()
 
-    @field_validator("folds", "unused_folds")
+    @field_validator("folds")
     @classmethod
     def distinct_folds(cls, value: tuple[int, ...]) -> tuple[int, ...]:
         if len(set(value)) != len(value):
             raise ValueError("folds must be distinct")
         return value
-
-    @model_validator(mode="after")
-    def unused_folds_are_not_validated(self) -> "ValidationConfig":
-        if set(self.folds) & set(self.unused_folds):
-            raise ValueError("unused_folds must not hold a validation fold")
-        return self
 
 
 class ExperimentConfig(ConfigModel):
@@ -406,18 +358,6 @@ class ExperimentConfig(ConfigModel):
     model: ModelConfig
     optimizer: OptimizerConfig
     trainer: TrainerConfig
-
-    @model_validator(mode="after")
-    def swa_window_fits_schedule(self) -> "ExperimentConfig":
-        averaging = self.optimizer.weight_averaging
-        if isinstance(averaging, SWAConfig) and averaging.epochs > (
-            self.trainer.max_epochs - self.optimizer.warmup_epochs
-        ):
-            raise ValueError(
-                "optimizer.weight_averaging.epochs must not exceed "
-                "trainer.max_epochs minus optimizer.warmup_epochs"
-            )
-        return self
 
     @property
     def split_dir(self) -> Path:

@@ -352,7 +352,6 @@ def run_fold(
                 "training_studies": training_studies,
                 "validation_studies": labels.validation.height,
                 "optimizer_steps": trainer.global_step,
-                "batch_norm_refresh_seconds": module.batch_norm_refresh_seconds,
                 "peak_cuda_allocated_bytes": torch.cuda.max_memory_allocated()
                 if torch.cuda.is_available()
                 else None,

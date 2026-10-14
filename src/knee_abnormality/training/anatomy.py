@@ -23,7 +23,6 @@ SOFT_TISSUE_CLASSES = (
     "femoral_cartilage",
     "patellar_cartilage",
 )
-MENISCUS_CLASSES = SOFT_TISSUE_CLASSES[:3]
 OUTSIDE = 255
 ANATOMY_POINTS = 4
 MENISCUS_POINTS = 4
@@ -158,15 +157,6 @@ class AnatomyTargets(nn.Module):
         plane = self.planes[row.clamp_min(0)]
         known = (row >= 0) & (plane[:, 3:6].abs().sum(-1) > 0)
         return plane[:, :3], known
-
-
-class AnatomyHead(nn.Module):
-    def __init__(self, width: int) -> None:
-        super().__init__()
-        self.classifier = nn.Linear(width, len(ANATOMY_CLASSES))
-
-    def forward(self, tokens: torch.Tensor) -> torch.Tensor:
-        return self.classifier(tokens)
 
 
 def anatomy_loss(

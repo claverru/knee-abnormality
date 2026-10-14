@@ -1,7 +1,7 @@
 # MambaVision-T and stem-staged backbones
 
-MambaVision-T (`mamba_vision_T`, ImageNet-1k weights) trains from `configs/mambavision-t.yaml` and
-ConvNeXt-Tiny from `configs/convnext-tiny.yaml`, beside the ResNet-50 of `configs/training.yaml`.
+MambaVision-T (`mamba_vision_T`, ImageNet-1k weights) trains from `configs/mambavision.yaml` and
+ConvNeXt-Tiny from `configs/convnext.yaml`, beside the ResNet-50 of `configs/resnet50.yaml`.
 Results: [2026-10-14 MambaVision-T](../validation/results/2026-10-14-mambavision-t.md).
 
 ## Code
@@ -78,7 +78,7 @@ timed only, never trained, and their code was removed on 2026-10-14; it was comp
 
 ## Recipe
 
-`configs/mambavision-t.yaml` is the ResNet-50 recipe with five changes, each from the
+`configs/mambavision.yaml` is the ResNet-50 recipe with five changes, each from the
 [MambaVision settings campaign](../../autoresearch/campaigns/mambavision-settings/INDEX.md):
 
 - **Weight scale:** MambaVision's pretrained weights are 1.5 to 12.7 times larger (RMS) than the

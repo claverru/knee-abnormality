@@ -129,8 +129,8 @@ updates to audit recomputation under activation checkpointing. Lightning mode us
 precision and configured batch size, and refuses to exhaust its subset.
 
 ```bash
-rtk proxy uv run --locked python -m scripts.adhoc.profile_training configs/training.yaml --mode preprocessing --output-dir outputs/profiling/preprocessing-new
-rtk proxy uv run --locked python -m scripts.adhoc.profile_training configs/training.yaml --mode gpu --batch-sizes 8 --samples 8 --warmup 1 --steps 2 --output-dir outputs/profiling/gpu-new
-rtk proxy uv run --locked python -m scripts.adhoc.profile_training configs/training.yaml --mode loader --batch-sizes 4 --workers 2,4,8 --samples 48 --warmup 2 --steps 6 --threads 16 --output-dir outputs/profiling/loader-new
-rtk proxy uv run --locked python -m scripts.adhoc.profile_training configs/training.yaml --mode lightning --samples 64 --warmup 1 --steps 2 --threads 16 --output-dir outputs/profiling/lightning-new
+rtk proxy uv run --locked python -m scripts.adhoc.profile_training configs/resnet50.yaml --mode preprocessing --output-dir outputs/profiling/preprocessing-new
+rtk proxy uv run --locked python -m scripts.adhoc.profile_training configs/resnet50.yaml --mode gpu --batch-sizes 8 --samples 8 --warmup 1 --steps 2 --output-dir outputs/profiling/gpu-new
+rtk proxy uv run --locked python -m scripts.adhoc.profile_training configs/resnet50.yaml --mode loader --batch-sizes 4 --workers 2,4,8 --samples 48 --warmup 2 --steps 6 --threads 16 --output-dir outputs/profiling/loader-new
+rtk proxy uv run --locked python -m scripts.adhoc.profile_training configs/resnet50.yaml --mode lightning --samples 64 --warmup 1 --steps 2 --threads 16 --output-dir outputs/profiling/lightning-new
 ```

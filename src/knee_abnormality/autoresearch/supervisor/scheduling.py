@@ -3,6 +3,7 @@ from pathlib import Path
 
 from knee_abnormality.autoresearch.campaign.binding import parent_changed
 from knee_abnormality.autoresearch.campaign.completion import completion_blockers
+from knee_abnormality.autoresearch.campaign.definition import RECIPE
 from knee_abnormality.autoresearch.runtime.gpu import gpu_available
 from knee_abnormality.autoresearch.runtime.isolation import sandbox
 from knee_abnormality.autoresearch.supervisor.prompts import (
@@ -61,7 +62,7 @@ class SchedulingMixin:
                     "knee_abnormality.autoresearch.cli",
                     "calibrate",
                     "--config",
-                    str(base / "configs/training.yaml"),
+                    str(base / RECIPE),
                     "--destination",
                     str(destination),
                 ],

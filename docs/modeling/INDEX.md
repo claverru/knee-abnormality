@@ -4,13 +4,13 @@
 |---|---|
 | Understanding and reproducing the current model recipe, and when each part was adopted | [Current model](current-model.md) |
 | Tracing model tensor shapes | [Model shape diagram](model-shapes.md) |
-| Using the CoAtNet backbone and its spatial anchors | [CoAtNet 224 spatial backbone](coatnet-224-spatial-backbone.md) |
+| Recovering the removed CoAtNet backbone and its spatial anchors (code removed 2026-10-14) | [CoAtNet 224 spatial backbone](coatnet-224-spatial-backbone.md) |
 | Understanding triplet channels, normalization and sampling | [Triplet inputs and sampling](triplet-inputs-and-sampling.md) |
 | Checking reference labels, class-balanced BCE, masking and Tonylin supervision | [Supervision](supervision.md) |
-| Enabling or interpreting the training-only report-attribute auxiliary heads (JevK5 question targets, parent gating, soft cross-entropy, KL diagnostics) | [Report-attribute heads](report-attribute-heads.md) |
-| Understanding the training-only scanner confusion head of the ReXNet recipe (detached scanner-group head, bounded KL confusion loss, site debiasing, why gradient reversal was rejected, why it was removed from ResNet-18) | [Scanner confusion head](scanner-confusion-head.md) |
+| Recovering the removed training-only report-attribute auxiliary heads (code removed 2026-10-14; JevK5 question targets, parent gating, soft cross-entropy, KL diagnostics) | [Report-attribute heads](report-attribute-heads.md) |
+| Recovering the removed training-only scanner confusion head (code removed 2026-10-14; detached scanner-group head, bounded KL confusion loss, site debiasing, why gradient reversal was rejected) | [Scanner confusion head](scanner-confusion-head.md) |
 | Diagnosing GPU batches, host RAM, prefetch and validation loader waves | [Training runtime and memory](training-runtime-and-memory.md) |
-| Checking training schedules, augmentation and weight averaging | [Training schedule and augmentation](schedule-and-augmentation.md) |
+| Checking training schedules and augmentation, and recovering the removed weight averaging | [Training schedule and augmentation](schedule-and-augmentation.md) |
 | Recovering retired side embeddings and classifier-sharing variants | [Retired side and compartment variants](retired-side-and-compartment-variants.md) |
 | Reviewing the historical regional fusion model | [Historical regional fusion](historical-regional-fusion.md) |
 | Changing backbones and checking spatial mapping | [Swapping a backbone](backbone-swaps.md) |

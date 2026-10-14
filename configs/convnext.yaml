@@ -1,11 +1,10 @@
-name: convnext-tiny
+name: convnext
 seed: 1110484336
 
 paths:
   data_root: ../data
   output_root: ../outputs/training
   label_manifest: labels/rebuild-state-v2-label-sources.json
-  report_attribute_manifest: labels/jevk5-report-attribute-targets-v4.0.json
   anatomy_targets: ../data/labels/prepared/anatomy-mrannotator-sample550-joints
   meniscus_targets: ../data/labels/prepared/soft-tissue-nnunet-knee-dess265
 
@@ -117,16 +116,7 @@ model:
   pretrained_weights: timm
   slice_channels: repeated_middle
   channels_last: true
-  checkpoint_backbone: false
-  backbone_eval: false
-  dropout: 0.0
   stochastic_depth: 0.1
-  series_dropout: 0.0
-  plane_readout: true
-  view_label_bias: true
-  anatomical_frame: true
-  meniscus_map: true
-  soft_tissue_routing: true
   feature_statistics_augmentation:
     probability: 0.5
 
@@ -143,7 +133,6 @@ optimizer:
   warmup_epochs: 1
   warmup_start_ratio: 0.1
   minimum_lr_ratio: 0.01
-  weight_averaging: null
 
 trainer:
   max_epochs: 10
@@ -157,7 +146,5 @@ trainer:
   min_delta: 0.0001
   deterministic: false
   class_balance_exponent: 0.5
-  report_attribute_loss_weight: 0
   anatomy_loss_weight: 0.1
   meniscus_loss_weight: 0.1
-  scanner_confusion_weight: 0.0

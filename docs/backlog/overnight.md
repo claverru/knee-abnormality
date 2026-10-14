@@ -61,7 +61,7 @@ as untried settings:
 - User decisions of 2026-09-16, on the ordinary-BCE recipe: `min_lr 0.1` dropped after three
   unestablished measurements ([result](../validation/results/2026-09-16-restored-code-hyperparameter-runs.md));
   series dropout 0.1 dropped, since 0.2 and 0.3 are flat; reflection 0.25, intensity-off and batch
-  size 4 dropped; `model.backbone_eval` moved to [bigger images](endgame.md#bigger-images). The
+  size 4 dropped; `model.backbone_eval` moved to [bigger images](endgame.md#bigger-images) (removed 2026-10-14). The
   result history does not reopen them.
 
 | Recipe | Completed comparisons |

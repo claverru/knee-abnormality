@@ -12,7 +12,7 @@ from pydantic import (
 )
 
 PACKAGE = PurePosixPath("src/knee_abnormality")
-RECIPE = "configs/training.yaml"
+RECIPE = "configs/campaign.yaml"
 PROTECTED_SOURCES = tuple(
     PACKAGE / name
     for name in (

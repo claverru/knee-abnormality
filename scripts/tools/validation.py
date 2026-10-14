@@ -321,7 +321,6 @@ def prepare(
 
 class ValidationCommand(BaseModel):
     config: Path = Field(
-        default=Path("configs/training.yaml"),
         description="Experiment YAML supplying the data, split, seed and label defaults",
     )
     data_dir: Path | None = Field(
