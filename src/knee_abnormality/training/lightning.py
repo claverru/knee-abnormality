@@ -879,7 +879,6 @@ class KneeModule(L.LightningModule):
         loss = loss + SIDE_LOSS_WEIGHT * self._side_step(self.model, batch, encoded, "")
         loss = loss + self._anatomy_step(self.model, encoded, batch, "")
         loss = loss + self._meniscus_step(encoded, batch, "")
-        loss = loss + self._mask_decoder_step(encoded)
         if self.anchor_parameters:
             backbone_group = self.trainer.optimizers[0].param_groups[
                 self.backbone_optimizer_group_index
@@ -1007,8 +1006,6 @@ class KneeModule(L.LightningModule):
             batch["study_uid"],
             encoded["study"],
         )
-        if not prefix:
-            encoded["soft_tissue_target_rows"] = rows
         shares, covered = self.meniscus_targets.token_shares(
             rows,
             encoded["meniscus_patient_position"],
@@ -1026,39 +1023,6 @@ class KneeModule(L.LightningModule):
         self._log_epoch_metric(f"{prefix}meniscus_tokens", float(tokens), 1, "sum")
         self._log_soft_tissue_routing(encoded, prefix)
         return self.config.trainer.meniscus_loss_weight * loss
-
-    def _mask_decoder_step(self, encoded: dict) -> torch.Tensor:
-        bone_scores, soft_tissue_scores = self.model.mask_decoder(
-            *encoded["decoder_maps"]
-        )
-        position = encoded["decoder_patient_position"]
-        steps = encoded["decoder_token_steps"]
-        valid = encoded["decoder_visual_valid"] & encoded["routable"][:, None]
-        bone_shares, bone_covered = self.anatomy_targets.token_shares(
-            encoded["anatomy_target_rows"], position, steps
-        )
-        bone_mask = bone_covered & valid
-        bone_loss, _ = anatomy_loss(
-            bone_scores, bone_shares, bone_mask, ANATOMY_CLASSES, diagnostics=False
-        )
-        soft_tissue_shares, soft_tissue_covered = self.meniscus_targets.token_shares(
-            encoded["soft_tissue_target_rows"], position, steps
-        )
-        soft_tissue_mask = soft_tissue_covered & valid
-        soft_tissue_loss, _ = anatomy_loss(
-            soft_tissue_scores,
-            soft_tissue_shares,
-            soft_tissue_mask,
-            SOFT_TISSUE_CLASSES,
-            diagnostics=False,
-        )
-        self._log_epoch_metric(
-            "mask_decoder_bone_loss", bone_loss, encoded["batch_size"]
-        )
-        self._log_epoch_metric(
-            "mask_decoder_soft_tissue_loss", soft_tissue_loss, encoded["batch_size"]
-        )
-        return 0.1 * bone_loss + 0.1 * soft_tissue_loss
 
     def _log_soft_tissue_routing(self, encoded: dict, prefix: str) -> None:
         stats = self.model.soft_tissue_routing_stats
@@ -1085,8 +1049,6 @@ class KneeModule(L.LightningModule):
             batch["study_uid"],
             encoded["study"],
         )
-        if not prefix:
-            encoded["anatomy_target_rows"] = rows
         shares, covered = self.anatomy_targets.token_shares(
             rows,
             encoded["patient_position"],

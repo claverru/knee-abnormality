@@ -296,14 +296,9 @@ and the posed crops. All are guesses about the score; the segmenter never runs a
   already reaches 0.90 overlap on femur and tibia with them, so what the rest would add is
   unknown.
 - **Segmentation before the labels.** A stage that teaches the backbone to segment knees before
-  the label training. The decoder beside the labels is in the recipe since 2026-10-13
-  ([result](../validation/results/2026-10-13-targets-and-inputs-campaign.md#what-was-adopted)); more decoder weight and a finer level added nothing.
-- **The label path reads the mask decoder's features** (untested; kept out of the
-  targets-and-inputs campaign by its contract). The decoder's 64-channel 28 by 28 map pooled to
-  the token grid and added to the tokens through a zero-started projection, or the soft-tissue
-  routing reading the decoder's class shares pooled to 14 by 14 in place of the cell head's. It
-  is the direct test of whether the decoder's gain is a feature effect; the decoder then runs at
-  prediction, on the model's own features.
+  the label training. A decoder beside the labels was in the recipe from 2026-10-13 to 2026-10-14
+  ([result](../validation/results/2026-10-13-targets-and-inputs-campaign.md#what-was-adopted)); more decoder weight and a finer level added nothing,
+  and the user removed it.
 
 ## Parked until a specific need
 

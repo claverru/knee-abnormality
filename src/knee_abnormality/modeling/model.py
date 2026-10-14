@@ -6,6 +6,22 @@ from torch import nn
 
 from knee_abnormality.config import SLICES_PER_INPUT, DataConfig, ModelConfig
 from knee_abnormality.evaluation.metrics import COMPARTMENT_PAIRS
+from knee_abnormality.modeling.anatomy_classes import (
+    ANATOMY_CLASS_COUNT,
+    FEMORAL_CARTILAGE_CLASS,
+    FEMUR_CLASS,
+    FIBULA_CLASS,
+    JOINT_CLASS,
+    KNEECAP_CLASS,
+    KNEECAP_JOINT_CLASS,
+    LATERAL_MENISCUS_CLASS,
+    LATERAL_TIBIAL_CARTILAGE_CLASS,
+    MEDIAL_MENISCUS_CLASS,
+    MEDIAL_TIBIAL_CARTILAGE_CLASS,
+    PATELLAR_CARTILAGE_CLASS,
+    SOFT_TISSUE_CLASS_COUNT,
+    TIBIA_CLASS,
+)
 from knee_abnormality.modeling.augmentation import (
     ImageAugmentation,
     affine_matrices,
@@ -21,23 +37,6 @@ from knee_abnormality.modeling.augmentation import (
     sample_reflection_parameters,
 )
 from knee_abnormality.modeling.backbone_stages import backbone_stages
-from knee_abnormality.modeling.mask_decoder import (
-    ANATOMY_CLASS_COUNT,
-    FEMORAL_CARTILAGE_CLASS,
-    FEMUR_CLASS,
-    FIBULA_CLASS,
-    JOINT_CLASS,
-    KNEECAP_CLASS,
-    KNEECAP_JOINT_CLASS,
-    LATERAL_MENISCUS_CLASS,
-    LATERAL_TIBIAL_CARTILAGE_CLASS,
-    MEDIAL_MENISCUS_CLASS,
-    MEDIAL_TIBIAL_CARTILAGE_CLASS,
-    PATELLAR_CARTILAGE_CLASS,
-    SOFT_TISSUE_CLASS_COUNT,
-    TIBIA_CLASS,
-    MaskDecoder,
-)
 from knee_abnormality.modeling.plane_readout import PlaneContrastReadout
 from knee_abnormality.modeling.radimagenet import (
     RADIMAGENET_WEIGHTS,
@@ -230,7 +229,7 @@ class KneeAbnormalityModel(nn.Module):
                 state = resnet_avg_down_state_dict(state)
             self.backbone.load_state_dict(state, strict=True)
         self.feature_mapping = backbone_mapping(model.backbone, self.backbone)
-        self.backbone_stages = backbone_stages(model.backbone, self.backbone)
+        self.backbone_stages = backbone_stages(self.backbone)
         self.projection = nn.Linear(self.backbone.num_features, PROJECTION_WIDTH)
         if self.channels_last:
             self.backbone.to(memory_format=torch.channels_last)
@@ -366,7 +365,7 @@ class KneeAbnormalityModel(nn.Module):
         )
         with torch.random.fork_rng(devices=[]):
             self.meniscus_projection = nn.Linear(
-                self.backbone_stages.widths[1], PROJECTION_WIDTH
+                self.backbone_stages.middle_width, PROJECTION_WIDTH
             )
             self.meniscus_head = nn.Linear(PROJECTION_WIDTH, SOFT_TISSUE_CLASS_COUNT)
         nn.init.zeros_(self.meniscus_head.weight)
@@ -494,8 +493,6 @@ class KneeAbnormalityModel(nn.Module):
         )
         with torch.random.fork_rng(devices=[]):
             self.view_windows = ViewWindows(data)
-            self.mask_decoder = MaskDecoder(self.backbone_stages.widths)
-        self.decoder_mapping = self.backbone_stages.decoder_mapping
 
     def _encode_images(
         self,
@@ -504,10 +501,9 @@ class KneeAbnormalityModel(nn.Module):
         acquisition_type: torch.Tensor,
         primary_image: torch.Tensor,
         primary_count: int,
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor | None]:
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         if not self.training:
-            maps, meniscus_maps = self._backbone_features(images)
-            return maps, meniscus_maps, None
+            return self._backbone_features(images)
         features = self.backbone_stages.to_stride_8(images)
         if self.feature_statistics_settings.probability > 0:
             features, self.feature_statistics_activity = (
@@ -520,8 +516,7 @@ class KneeAbnormalityModel(nn.Module):
                     primary_count,
                 )
             )
-        maps, meniscus_maps = self.backbone_stages.deep(features)
-        return maps, meniscus_maps, features
+        return self.backbone_stages.deep(features)
 
     def _backbone_features(
         self, images: torch.Tensor
@@ -1397,7 +1392,7 @@ class KneeAbnormalityModel(nn.Module):
         valid_images = valid_images.sub(self.mean).div_(self.std)
         if self.channels_last:
             valid_images = valid_images.contiguous(memory_format=torch.channels_last)
-        maps, meniscus_maps, decoder_maps = self._encode_images(
+        maps, meniscus_maps = self._encode_images(
             valid_images,
             acquisition_index,
             token_type,
@@ -1422,8 +1417,6 @@ class KneeAbnormalityModel(nn.Module):
             **self.spatial_tokens(token_type, features.dtype),
             "detail_view": detail_view,
         }
-        if self.training:
-            encoded["decoder_maps"] = (decoder_maps, meniscus_maps, maps)
         tokens = self.mil_norm(self._base_tokens(encoded))
         with torch.autocast(device_type=features.device.type, enabled=False):
             homogeneous = torch.cat(
@@ -1597,30 +1590,6 @@ class KneeAbnormalityModel(nn.Module):
                     .flatten(1, 2)
                 ),
             }
-            if self.training:
-                decoder_valid, decoder_xy = feature_geometry(
-                    source_valid_rects,
-                    inverse_affine,
-                    decoder_maps.shape[-2:],
-                    self.decoder_mapping,
-                    channels,
-                    batch["canvas_valid_rects"].flatten(0, 1)[flat_indices],
-                    batch["crop_affine"].flatten(0, 1)[flat_indices],
-                )
-                decoder_homogeneous = torch.cat(
-                    (decoder_xy, torch.ones_like(decoder_xy[..., :1])), -1
-                )
-                decoder_position = torch.einsum(
-                    "nij,nkj->nki", middle, decoder_homogeneous
-                )
-                meniscus_encoded |= {
-                    "decoder_visual_valid": decoder_valid
-                    & (valid_position & torch.isfinite(decoder_position).all((-1, -2)))[
-                        :, None
-                    ],
-                    "decoder_patient_position": decoder_position.detach(),
-                    "decoder_token_steps": (steps[:, :2] * 0.25).detach(),
-                }
             meniscus_encoded |= {
                 "soft_tissue_features": meniscus_features,
                 "soft_tissue_shares": meniscus_scores.detach().softmax(-1),

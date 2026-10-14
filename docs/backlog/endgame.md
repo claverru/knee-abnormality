@@ -11,7 +11,8 @@ hypothesis.
 
 - **Soft-prevalence class weights for members on the recipe before the mask decoder and the OA
   detector** (measured on one pair): +0.0005 at ×4 locally and 0.960 against 0.959 public on fold
-  2 (S150 against S151); on the recipe with those two additions they lose 0.0009
+  2 (S150 against S151); on the recipe with those two additions they lose 0.0009 (the decoder was removed on
+  2026-10-14; the recipe with the detector alone is unmeasured)
   ([result](../validation/results/2026-10-13-targets-and-inputs-campaign.md#soft-prevalence-class-weights-read-publicly)). Relevant only if an ensemble
   trains further members on the older recipe.
 

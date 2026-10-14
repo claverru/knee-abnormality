@@ -6,7 +6,7 @@ from torch import nn
 
 from knee_abnormality.config import DataConfig
 from knee_abnormality.inference.reflection import reflect_crops
-from knee_abnormality.modeling.mask_decoder import FEMUR_CLASS, KNEECAP_CLASS
+from knee_abnormality.modeling.anatomy_classes import FEMUR_CLASS, KNEECAP_CLASS
 
 
 def sample_windows(

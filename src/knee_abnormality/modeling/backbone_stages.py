@@ -3,21 +3,15 @@ from timm.models.convnext import ConvNeXt
 from timm.models.resnet import ResNet
 from torch import nn
 
-from knee_abnormality.modeling.spatial_tokens import backbone_mapping
 from knee_abnormality.modeling.staged_backbones import StagedBackbone
 
 CONVNEXT_IMAGE_COUNT_STEP = 16
 
 
 class ResNetStages:
-    def __init__(self, name: str, backbone: ResNet) -> None:
+    def __init__(self, backbone: ResNet) -> None:
         self.backbone = backbone
-        self.widths = tuple(
-            getattr(stage[-1], "conv3", stage[-1].conv2).out_channels
-            for stage in (backbone.layer2, backbone.layer3, backbone.layer4)
-        )
-        mapping = backbone_mapping(f"{name}.layer3", backbone)
-        self.decoder_mapping = (*mapping[:2], *(step * 0.5 for step in mapping[2:]))
+        self.middle_width = backbone.layer3[-1].conv3.out_channels
 
     def to_stride_8(self, images: torch.Tensor) -> torch.Tensor:
         backbone = self.backbone
@@ -32,17 +26,15 @@ class ResNetStages:
 class StemStages:
     def __init__(
         self,
-        name: str,
         backbone: nn.Module,
         final_norm: nn.Module,
-        widths: tuple[int, int, int],
+        middle_width: int,
         count_step: int,
     ) -> None:
         self.backbone = backbone
         self.final_norm = final_norm
-        self.widths = widths
+        self.middle_width = middle_width
         self.count_step = count_step
-        self.decoder_mapping = backbone_mapping(f"{name}.layer2", backbone)
 
     def _padded(self, tensor: torch.Tensor) -> torch.Tensor:
         missing = -tensor.shape[0] % self.count_step
@@ -70,18 +62,17 @@ class StemStages:
 
 BACKBONE_STAGES = {
     ResNet: ResNetStages,
-    ConvNeXt: lambda name, backbone: StemStages(
-        name,
+    ConvNeXt: lambda backbone: StemStages(
         backbone,
         backbone.norm_pre,
-        tuple(stage["num_chs"] for stage in backbone.feature_info[-3:]),
+        backbone.feature_info[-2]["num_chs"],
         CONVNEXT_IMAGE_COUNT_STEP,
     ),
-    StagedBackbone: lambda name, backbone: StemStages(
-        name, backbone, backbone.norm, backbone.stage_widths, 1
+    StagedBackbone: lambda backbone: StemStages(
+        backbone, backbone.norm, backbone.stage_widths[1], 1
     ),
 }
 
 
-def backbone_stages(name: str, backbone: nn.Module) -> ResNetStages | StemStages:
-    return BACKBONE_STAGES[type(backbone)](name, backbone)
+def backbone_stages(backbone: nn.Module) -> ResNetStages | StemStages:
+    return BACKBONE_STAGES[type(backbone)](backbone)

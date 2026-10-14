@@ -210,7 +210,8 @@ Feedback-driven allocation ran in the
 
 **Damping exponent implemented, 2026-09-21, and set to 0.5 in the recipe. Soft prevalence was
 run on 2026-10-12 and 13: +0.0005 at ×4 and 0.960 against 0.959 public on the recipe before the mask
-decoder and the OA detector, −0.0009 on the recipe with them; not in the recipe
+decoder and the OA detector, −0.0009 on the recipe with them; not in the recipe (the decoder was
+removed on 2026-10-14; the recipe with the detector alone is unmeasured)
 ([result](../validation/results/2026-10-13-targets-and-inputs-campaign.md#soft-prevalence-class-weights-read-publicly)).** The implemented weights set `w_pos/w_neg = ((1 - r_c) / r_c) ** k` with
 `k = trainer.class_balance_exponent`, on the thresholded positive fraction; see
 [supervision](../modeling/supervision.md#fixed-class-balanced-bce) for the exact formula. Full

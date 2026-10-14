@@ -13,15 +13,16 @@ measured outcomes are in the [validation results](../validation/results/INDEX.md
   (named `configs/training.yaml` until 2026-10-14) is the Refined-RadImageNet `resnet50.a1_in1k` on fold 2 of `all_5fold_scanner_v2`, seed
   1110484336; `configs/refined-resnet50.yaml` and the ResNet-18 recipe are removed, and every
   mention of them below describes earlier states. On top of the aligned-contrast-mixing recipe it
-  carries the three adoptions of the
-  [targets-and-inputs campaign](../validation/results/2026-10-13-targets-and-inputs-campaign.md): a mask decoder trained beside the
-  labels (bone and soft-tissue classes on the 28 by 28 grid, weight 0.1 each, training only), the
+  carries two adoptions of the
+  [targets-and-inputs campaign](../validation/results/2026-10-13-targets-and-inputs-campaign.md): the
   three-compartment OA detector beside the routed shared OA head, and average-pool shortcuts in
-  the ResNet-50 on the same weights. The campaign's incumbent, run 27: ×4 0.939634, ×1 0.930902,
+  the ResNet-50 on the same weights. Its third adoption, a mask decoder trained beside the labels,
+  was removed on 2026-10-14 (user decision, no run). The campaign's incumbent, run 27, still has
+  the decoder: ×4 0.939634, ×1 0.930902,
   training 2,696 s, 16.9 GB; it has no public score. The starting recipe on the same fold: ×4
   0.937000, ×1 0.928460, 0.959 public (S151). Checkpoints trained before 2026-10-13 do not load
-  into the current model (new parameters, renamed shortcut keys, a changed token identity);
-  export them from their `source_snapshot.zip`.
+  into the current model (new parameters, renamed shortcut keys, a changed token identity), nor
+  do those with mask decoder weights; export them from their `source_snapshot.zip`.
 - **One config per model, since 2026-10-14 (user decision):** `configs/resnet50.yaml`,
   `configs/mambavision.yaml` (MambaVision-T with its own rate, anchors, twelve epochs and linear
   decay; ×4 0.937801 on fold 2, blend with the ResNet-50 0.941419) and `configs/convnext.yaml` (the

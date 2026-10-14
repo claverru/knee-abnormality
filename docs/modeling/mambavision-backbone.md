@@ -8,8 +8,8 @@ Results: [2026-10-14 MambaVision-T](../validation/results/2026-10-14-mambavision
 
 - **Stage adapters** (`modeling/backbone_stages.py`): the model reads every backbone through one
   adapter per family, chosen by the backbone's class in `BACKBONE_STAGES`. Each gives
-  `to_stride_8`, `deep` (the stride-32 maps and the stride-16 maps), the three stage widths and the
-  mask decoder's token mapping. `ResNetStages` runs `conv1` to `layer4`; `StemStages` runs `stem`,
+  `to_stride_8`, `deep` (the stride-32 maps and the stride-16 maps), the width of the stride-16
+  maps (`middle_width`, for the meniscus map). `ResNetStages` runs `conv1` to `layer4`; `StemStages` runs `stem`,
   `stages[0]` to `stages[3]` and a final norm, for timm's ConvNeXt and for the MambaVision wrapper.
   A new family needs an adapter and its `BACKBONE_MAPPINGS` entries
   ([swapping a backbone](backbone-swaps.md#code-requirements)).
