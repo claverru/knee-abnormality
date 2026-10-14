@@ -11,7 +11,7 @@ nohup rtk proxy uv run --locked python -m scripts.tools.train_overnight > output
 ```
 
 Use `--prepare-only` to write the configurations without starting training, or
-`--config PATH` to select another training YAML (default `configs/training.yaml`). Every
+`--config PATH` to select another training YAML (default `configs/resnet50.yaml`). Every
 invocation creates a new queue; preparation does not reserve a queue for a later command.
 
 The script trains and plots results without invoking Codex or submitting to Kaggle. Before
@@ -91,9 +91,8 @@ start, log path and completion status.
 | `delta_best_vs_control`, `delta_last_vs_control` | Difference against the control run's best/last |
 | `prediction_macro_auc`, `delta_prediction_vs_control` | `selected_checkpoint.json`'s ×4 `prediction_macro_auc`, the adoption metric, and its difference against the control run |
 | `soft_macro_auc_at_selected` | `soft_macro_auc` from the selected epoch's metrics file |
-| `live_best_val_macro_auc`, `live_last_val_macro_auc` | Best/last `macro_auc` from `epochs/live_metrics_epoch_*.json`; blank unless `optimizer.weight_averaging` is set |
 | `soft_target_bce_at_selected`, `gold_macro_auc_at_selected` | `soft_target_bce` and `gold.macro_auc` from the selected epoch's metrics file |
-| `training_seconds`, `batch_norm_refresh_seconds`, `optimizer_steps` | `timing.json` |
+| `training_seconds`, `optimizer_steps` | `timing.json` |
 | `peak_cuda_memory_gib` | `timing.json`'s `peak_cuda_allocated_bytes` / 2^30 |
 
 A failed experiment is recorded and the queue continues; its final exit code is nonzero if any

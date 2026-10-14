@@ -58,7 +58,6 @@ from knee_abnormality.autoresearch.topics.history import (
     seeded_ideas,
 )
 from knee_abnormality.autoresearch.topics.packet import build_packet
-from knee_abnormality.config import load_config
 
 LOOP = OUTPUTS / ".loop"
 SEALED = {"mode": "sealed"}
@@ -127,7 +126,9 @@ class TopicLoop(JobMixin):
         if reference_run is not None:
             initial_limits(
                 (self.root / reference_run).resolve(),
-                load_config(self.root / RECIPE).model_dump(mode="json"),
+                read_json(
+                    (self.root / reference_run).resolve() / "effective_config.json"
+                ),
                 {},
                 [],
                 [],

@@ -11,9 +11,9 @@ From the repository root:
 
 ```bash
 rtk proxy uv sync --locked
-rtk proxy uv run --locked python -m knee_abnormality.config configs/training.yaml
+rtk proxy uv run --locked python -m knee_abnormality.config configs/resnet50.yaml
 rtk proxy uv run --locked python -m scripts.tools.validation prepare
-rtk proxy uv run --locked python -m scripts.pipeline.train configs/training.yaml
+rtk proxy uv run --locked python -m scripts.pipeline.train configs/resnet50.yaml
 ```
 
 Shared Python code lives in `src/knee_abnormality/` (`data/`, `modeling/`,
@@ -33,14 +33,14 @@ The root `justfile` exposes the maintained four-command workflow. All artifact
 and remote identities are explicit:
 
 ```bash
-rtk proxy uv run --locked just train configs/training.yaml --run-id RUN_ID
+rtk proxy uv run --locked just train configs/resnet50.yaml --run-id RUN_ID
 rtk proxy uv run --locked just export --checkpoint CHECKPOINT --output OUTPUT
 rtk proxy uv run --locked just infer BUNDLE DATA_ROOT OUTPUT --batch-size 8 --num-workers 2
 rtk proxy uv run --locked just submission-job start --bundle BUNDLE --dataset OWNER/DATASET --notebook OWNER/NOTEBOOK --record RECORD --label "Fold 0"
 ```
 
 Each recipe passes its arguments to the module it names, so `just RECIPE --help`
-documents it. `train` runs the YAML's folds (fold 0 in `configs/training.yaml`) into a
+documents it. `train` runs the YAML's folds (fold 2 in each model config) into a
 fresh named run. `export` never selects or resumes a checkpoint implicitly. `infer`
 imports prediction code from the bundle and accepts direct competition data mounts.
 `submission-job start` versions a private Kaggle Dataset, runs the attached notebook

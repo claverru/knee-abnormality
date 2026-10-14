@@ -70,9 +70,6 @@ def training_input_identity(
     )
     return {
         "version": 1,
-        "report_attribute_manifest_sha256": sha256_file(
-            config.paths.report_attribute_manifest
-        ),
         "preprocessing_identity": preprocessing_identity(config.model.backbone),
         "label_manifest_sha256": labels.provenance["manifest_sha256"],
         "split_protocol_sha256": labels.provenance["split_protocol_sha256"],
@@ -98,7 +95,6 @@ def training_input_identity(
 def _resume_settings(config: ExperimentConfig) -> dict:
     result = config.model_dump(mode="json", exclude={"paths", "name"})
     result["validation"].pop("folds")
-    result["model"].pop("checkpoint_backbone")
     for name in ("num_workers", "persistent_workers", "prefetch_factor"):
         result["trainer"].pop(name)
     return result

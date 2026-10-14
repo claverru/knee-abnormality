@@ -127,7 +127,7 @@ original CSV, metadata, column mapping and preparation script. The prepared
 CSV SHA-256 is
 `aa852eebb32e6ef95bbf1736e4f73b40699bb3dd247049606e8f1696bca4e216`.
 
-In a copy of `configs/training.yaml` saved as `configs/tonylin-soft-v3.yaml`, change these
+In a copy of `configs/resnet50.yaml` saved as `configs/tonylin-soft-v3.yaml`, change these
 two values, retaining the other path settings:
 
 ```yaml

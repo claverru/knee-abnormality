@@ -58,7 +58,7 @@ class FamilyVerdict(Report):
 
 class ResearchIdea(Idea):
     source_change: bool = Field(
-        description="True when the idea needs a Python source change; false when it only sets values in configs/training.yaml."
+        description="True when the idea needs a Python source change; false when it only sets values in configs/campaign.yaml."
     )
     targeted_curve: str = Field(
         min_length=1,

@@ -1,5 +1,7 @@
 # CoAtNet 224 spatial backbone
 
+**Removed from the code on 2026-10-14:** CoAtNet has no stage adapter and its mapping was deleted with the ReXNet and EfficientNet ones; the code is at `7770ce9:src/knee_abnormality/modeling/spatial_tokens.py`. The rest of this page describes it as it was.
+
 These notes describe the [full-slice model](current-model.md), which supports
 CoAtNet again since the restoration of 2026-09-16. The
 dropped crop-selection and learned-zoom models could not use it: the crop models rejected its
@@ -9,7 +11,7 @@ context glimpses did not fit its fixed input size.
 The supported alternative is `coatnet_rmlp_2_rw_224.sw_in12k_ft_in1k` with
 224-pixel inputs and per-channel mean/std `[0.5, 0.5, 0.5]`, matching its
 pretrained normalization. [`configs/coatnet.yaml`](../../configs/coatnet.yaml) follows the ReXNet
-[training config](../../configs/training.yaml) with `model.backbone`, `data.mean` and `data.std`
+[training config](../../configs/resnet50.yaml) with `model.backbone`, `data.mean` and `data.std`
 changed, and `trainer.batch_size: 2` with `accumulate_grad_batches: 4` to keep the effective batch
 of eight. Since 2026-09-21 its optimizer uses transformer fine-tuning values:
 

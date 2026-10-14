@@ -109,9 +109,7 @@ def load_fold_labels(config: ExperimentConfig, fold: int) -> FoldLabels:
             for target in targets
         )
     )
-    training = base.filter(
-        ~pl.col("fold").is_in([fold, *config.validation.unused_folds])
-    ).sort(STUDY)
+    training = base.filter(pl.col("fold") != fold).sort(STUDY)
     validation = (
         base.filter(pl.col("fold") == fold)
         .drop([f"target_{target}" for target in targets])

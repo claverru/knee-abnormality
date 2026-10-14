@@ -45,7 +45,6 @@ from knee_abnormality.modeling.radimagenet import (
     resnet_avg_down_state_dict,
 )
 from knee_abnormality.modeling.spatial_tokens import (
-    COATNET_BACKBONE,
     SpatialTokens,
     backbone_mapping,
     backbone_mapping_identity,
@@ -135,7 +134,6 @@ PLANE_START_SLOPE = 0.05
 PLANE_REFITS = 3
 PLANE_REFIT_WIDTH_MM = 12.0
 ANATOMY_CENTRE_WIDTH_MM = 10.0
-MENISCUS_CLASS_COUNT = 3
 MENISCUS_CORE_SHARE = 1 / (2 * MENISCUS_POINTS**2)
 SECTION_LOGIT = 2.0
 SECTION_RATE = 5.0
@@ -184,8 +182,6 @@ class KneeAbnormalityModel(nn.Module):
     ) -> None:
         super().__init__()
         target_count = len(targets)
-        self.series_dropout = model.series_dropout
-        self.plane_readout = model.plane_readout
         self.augmentation_settings = data
         self.feature_statistics_settings = model.feature_statistics_augmentation
         self.image_augmentation = ImageAugmentation(data)
@@ -198,8 +194,6 @@ class KneeAbnormalityModel(nn.Module):
         self.channels_last = model.channels_last
         self._pooling_cache = None
         self.repeated_middle_slice = model.slice_channels == "repeated_middle"
-        self.checkpoint_backbone = model.checkpoint_backbone
-        self.backbone_eval = model.backbone_eval
         pretrained = model.pretrained if load_pretrained is None else load_pretrained
         self.feature_mapping_identity = backbone_mapping_identity(model.backbone)
         if (
@@ -212,12 +206,6 @@ class KneeAbnormalityModel(nn.Module):
         backbone_kwargs = {}
         if model.backbone == "resnet50.a1_in1k":
             backbone_kwargs["avg_down"] = True
-        if model.backbone == COATNET_BACKBONE:
-            if data.image_size % 32:
-                raise ValueError(
-                    "CoAtNet spatial tokens require image_size divisible by 32"
-                )
-            backbone_kwargs["img_size"] = data.image_size
         if model.stochastic_depth > 0:
             backbone_kwargs["drop_path_rate"] = model.stochastic_depth
         self.backbone = (
@@ -243,8 +231,6 @@ class KneeAbnormalityModel(nn.Module):
             self.backbone.load_state_dict(state, strict=True)
         self.feature_mapping = backbone_mapping(model.backbone, self.backbone)
         self.backbone_stages = backbone_stages(model.backbone, self.backbone)
-        if self.checkpoint_backbone:
-            self.backbone.set_grad_checkpointing(True)
         self.projection = nn.Linear(self.backbone.num_features, PROJECTION_WIDTH)
         if self.channels_last:
             self.backbone.to(memory_format=torch.channels_last)
@@ -334,16 +320,14 @@ class KneeAbnormalityModel(nn.Module):
         self.attention = nn.Sequential(
             nn.Linear(PROJECTION_WIDTH, MIL_ATTENTION_WIDTH),
             nn.Tanh(),
-            nn.Dropout(model.dropout),
             nn.Linear(MIL_ATTENTION_WIDTH, target_count),
         )
         self.head = nn.Linear(PROJECTION_WIDTH, target_count)
         self.target_bias = nn.Parameter(self.head.bias.detach().clone())
         self.attention[-1] = channel_linear(self.attention[-1], channel_source, True)
         self.head = channel_linear(self.head, channel_source, False)
-        if self.plane_readout:
-            with torch.random.fork_rng(devices=[]):
-                self.head = PlaneContrastReadout(self.head, len(data.series_types))
+        with torch.random.fork_rng(devices=[]):
+            self.head = PlaneContrastReadout(self.head, len(data.series_types))
         self.spatial_tokens = SpatialTokens(PROJECTION_WIDTH, data.series_types)
         if data.contrast_mixing_augmentation.probability > 0:
             plane_lookup = self.spatial_tokens.plane_lookup.tolist()
@@ -377,71 +361,53 @@ class KneeAbnormalityModel(nn.Module):
             torch.tensor(FRAME_SIZE_START_PITCHES),
             persistent=False,
         )
-        self.meniscus_map = model.meniscus_map
-        if self.meniscus_map:
-            self.meniscus_mapping = backbone_mapping(
-                f"{model.backbone}.layer3", self.backbone
+        self.meniscus_mapping = backbone_mapping(
+            f"{model.backbone}.layer3", self.backbone
+        )
+        with torch.random.fork_rng(devices=[]):
+            self.meniscus_projection = nn.Linear(
+                self.backbone_stages.widths[1], PROJECTION_WIDTH
             )
-            with torch.random.fork_rng(devices=[]):
-                self.meniscus_projection = nn.Linear(
-                    self.backbone_stages.widths[1], PROJECTION_WIDTH
-                )
-                self.meniscus_head = nn.Linear(
-                    PROJECTION_WIDTH,
-                    SOFT_TISSUE_CLASS_COUNT
-                    if model.soft_tissue_routing
-                    else MENISCUS_CLASS_COUNT,
-                )
-            nn.init.zeros_(self.meniscus_head.weight)
-            nn.init.zeros_(self.meniscus_head.bias)
-        self.soft_tissue_routing = model.soft_tissue_routing
-        if self.soft_tissue_routing:
-            soft_target = [targets.index(target) for target in TARGET_ROUTES]
-            self.register_buffer(
-                "soft_target", torch.tensor(soft_target), persistent=False
+            self.meniscus_head = nn.Linear(PROJECTION_WIDTH, SOFT_TISSUE_CLASS_COUNT)
+        nn.init.zeros_(self.meniscus_head.weight)
+        nn.init.zeros_(self.meniscus_head.bias)
+        soft_target = [targets.index(target) for target in TARGET_ROUTES]
+        self.register_buffer("soft_target", torch.tensor(soft_target), persistent=False)
+        self.register_buffer(
+            "soft_target_channel",
+            torch.tensor(
+                [SHARED_CHANNELS.index(route[0]) for route in TARGET_ROUTES.values()]
+            ),
+            persistent=False,
+        )
+        with torch.random.fork_rng(devices=[]):
+            self.soft_norm = nn.LayerNorm(PROJECTION_WIDTH)
+            self.soft_attention = nn.Sequential(
+                nn.Linear(PROJECTION_WIDTH, MIL_ATTENTION_WIDTH),
+                nn.Tanh(),
+                nn.Linear(MIL_ATTENTION_WIDTH, len(SHARED_CHANNELS)),
             )
-            self.register_buffer(
-                "soft_target_channel",
-                torch.tensor(
-                    [
-                        SHARED_CHANNELS.index(route[0])
-                        for route in TARGET_ROUTES.values()
-                    ]
-                ),
-                persistent=False,
+            self.soft_head = nn.Linear(
+                PROJECTION_WIDTH, len(SHARED_CHANNELS), bias=False
             )
-            with torch.random.fork_rng(devices=[]):
-                self.soft_norm = nn.LayerNorm(PROJECTION_WIDTH)
-                self.soft_attention = nn.Sequential(
-                    nn.Linear(PROJECTION_WIDTH, MIL_ATTENTION_WIDTH),
-                    nn.Tanh(),
-                    nn.Dropout(model.dropout),
-                    nn.Linear(MIL_ATTENTION_WIDTH, len(SHARED_CHANNELS)),
-                )
-                self.soft_head = nn.Linear(
-                    PROJECTION_WIDTH, len(SHARED_CHANNELS), bias=False
-                )
-                nn.init.zeros_(self.soft_head.weight)
-                if self.plane_readout:
-                    self.soft_head = PlaneContrastReadout(
-                        self.soft_head, len(data.series_types)
-                    )
-        self.anatomical_frame = model.anatomical_frame
-        if self.anatomical_frame:
-            with torch.random.fork_rng(devices=[]):
-                self.anatomy_head = nn.Linear(PROJECTION_WIDTH, ANATOMY_CLASS_COUNT)
-                self.route_section_shift = nn.Parameter(torch.zeros((len(ROUTES), 3)))
-            self.register_buffer(
-                "route_section_start",
-                SECTION_LOGIT
-                * (2 * torch.tensor([ROUTE_SECTIONS[route] for route in ROUTES]) - 1.0),
-                persistent=False,
+            nn.init.zeros_(self.soft_head.weight)
+            self.soft_head = PlaneContrastReadout(
+                self.soft_head, len(data.series_types)
             )
-            self.register_buffer(
-                "anatomical_band_start",
-                torch.tensor(ANATOMICAL_BAND_PITCHES),
-                persistent=False,
-            )
+        with torch.random.fork_rng(devices=[]):
+            self.anatomy_head = nn.Linear(PROJECTION_WIDTH, ANATOMY_CLASS_COUNT)
+            self.route_section_shift = nn.Parameter(torch.zeros((len(ROUTES), 3)))
+        self.register_buffer(
+            "route_section_start",
+            SECTION_LOGIT
+            * (2 * torch.tensor([ROUTE_SECTIONS[route] for route in ROUTES]) - 1.0),
+            persistent=False,
+        )
+        self.register_buffer(
+            "anatomical_band_start",
+            torch.tensor(ANATOMICAL_BAND_PITCHES),
+            persistent=False,
+        )
         with torch.random.fork_rng(devices=[]):
             self.frame_head = nn.Sequential(
                 nn.Linear(PROJECTION_WIDTH, MIL_ATTENTION_WIDTH), nn.Tanh()
@@ -523,22 +489,13 @@ class KneeAbnormalityModel(nn.Module):
         self.primary_view_count = sum(
             index == source for index, source in enumerate(data.view_sources)
         )
-        self.view_label_bias = (
-            nn.Parameter(torch.zeros(len(data.views), len(self.channels)))
-            if model.view_label_bias
-            else None
+        self.view_label_bias = nn.Parameter(
+            torch.zeros(len(data.views), len(self.channels))
         )
         with torch.random.fork_rng(devices=[]):
             self.view_windows = ViewWindows(data)
             self.mask_decoder = MaskDecoder(self.backbone_stages.widths)
         self.decoder_mapping = self.backbone_stages.decoder_mapping
-        self.train(self.training)
-
-    def train(self, mode: bool = True) -> "KneeAbnormalityModel":
-        super().train(mode)
-        if self.backbone_eval:
-            self.backbone.eval()
-        return self
 
     def _encode_images(
         self,
@@ -547,11 +504,7 @@ class KneeAbnormalityModel(nn.Module):
         acquisition_type: torch.Tensor,
         primary_image: torch.Tensor,
         primary_count: int,
-    ) -> tuple[torch.Tensor, torch.Tensor | None, torch.Tensor | None]:
-        if self.checkpoint_backbone:
-            self.backbone.set_grad_checkpointing(
-                self.training and torch.is_grad_enabled()
-            )
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor | None]:
         if not self.training:
             maps, meniscus_maps = self._backbone_features(images)
             return maps, meniscus_maps, None
@@ -578,20 +531,7 @@ class KneeAbnormalityModel(nn.Module):
     def _effective_presence(self, presence: torch.Tensor) -> torch.Tensor:
         if not presence.any(dim=1).all():
             raise ValueError("Every study must contain at least one present series")
-        if not self.training or self.series_dropout == 0:
-            return presence
-        keep = presence & (
-            torch.rand(presence.shape, device=presence.device) >= self.series_dropout
-        )
-        empty = ~keep.any(dim=1)
-        if empty.any():
-            scores = torch.rand(presence.shape, device=presence.device).masked_fill(
-                ~presence, -1
-            )
-            selected = scores.argmax(dim=1)
-            rows = empty.nonzero(as_tuple=False).flatten()
-            keep[rows, selected[rows]] = True
-        return keep
+        return presence
 
     def _mix_contrast(
         self,
@@ -1194,21 +1134,18 @@ class KneeAbnormalityModel(nn.Module):
                 self.attention(shared_tokens).transpose(0, 1),
                 self.attention(tokens).transpose(0, 1),
             )
-            evidence = None
-            if self.plane_readout:
-                with torch.autocast(device_type=tokens.device.type, enabled=False):
-                    evidence = torch.where(
-                        self.shared_channel,
-                        self.head(shared_tokens, image_type),
-                        self.head(tokens, image_type),
-                    )
+            with torch.autocast(device_type=tokens.device.type, enabled=False):
+                evidence = torch.where(
+                    self.shared_channel,
+                    self.head(shared_tokens, image_type),
+                    self.head(tokens, image_type),
+                )
             self._pooling_cache = (
                 None if self.training else (tokens, shared_tokens, scores, evidence)
             )
-        if self.view_label_bias is not None:
-            scores = scores.float() + self.view_label_bias.float()[
-                token_view
-            ].transpose(0, 1)
+        scores = scores.float() + self.view_label_bias.float()[token_view].transpose(
+            0, 1
+        )
         membership = (
             torch.arange(batch_size, device=tokens.device)[:, None] == token_study[None]
         ) & token_valid[None]
@@ -1259,26 +1196,9 @@ class KneeAbnormalityModel(nn.Module):
                 self.routing_mean = (
                     (routing * token_valid).sum(-1) / token_valid.sum().clamp_min(1)
                 ).detach()
-            if self.plane_readout:
-                logits = torch.einsum(
-                    "btn,nt->bt", attention, evidence[:, self.target_channel]
-                )
-            else:
-                pooled = torch.where(
-                    self.shared_channel[self.target_channel][None, :, None],
-                    torch.einsum("btn,nf->btf", attention, shared_tokens.float()),
-                    torch.einsum("btn,nf->btf", attention, tokens.float()),
-                )
-                logits = (
-                    pooled * self.head.weight.float()[self.target_channel][None]
-                ).sum(-1)
-                evidence = torch.where(
-                    self.shared_channel,
-                    nn.functional.linear(
-                        shared_tokens.float(), self.head.weight.float()
-                    ),
-                    nn.functional.linear(tokens.float(), self.head.weight.float()),
-                )
+            logits = torch.einsum(
+                "btn,nt->bt", attention, evidence[:, self.target_channel]
+            )
             knee_allowed = allowed[:, None] & (
                 ~self.shared_slice_view[token_view][None, None]
                 | self.detail_channel_allowed[None, :, None]
@@ -1630,94 +1550,87 @@ class KneeAbnormalityModel(nn.Module):
             fitted_position = torch.stack(
                 (sign * knee_x, anterior_axis, superior_axis), -1
             )
-            meniscus_scores = None
-            meniscus_encoded = {}
-            if self.meniscus_map:
-                height, width = maps.shape[-2:]
-                fine_height, fine_width = meniscus_maps.shape[-2:]
-                meniscus_features = self.meniscus_projection(
-                    meniscus_maps.flatten(2).transpose(1, 2).float()
-                )
-                deep = (
-                    tokens.float()
-                    .unflatten(1, (height, width))
-                    .repeat_interleave(2, 1)
-                    .repeat_interleave(2, 2)
+            height, width = maps.shape[-2:]
+            fine_height, fine_width = meniscus_maps.shape[-2:]
+            meniscus_features = self.meniscus_projection(
+                meniscus_maps.flatten(2).transpose(1, 2).float()
+            )
+            deep = (
+                tokens.float()
+                .unflatten(1, (height, width))
+                .repeat_interleave(2, 1)
+                .repeat_interleave(2, 2)
+                .flatten(1, 2)
+            )
+            meniscus_scores = self.meniscus_head(meniscus_features + deep)
+            meniscus_valid, meniscus_xy = feature_geometry(
+                source_valid_rects,
+                inverse_affine,
+                (fine_height, fine_width),
+                self.meniscus_mapping,
+                channels,
+                batch["canvas_valid_rects"].flatten(0, 1)[flat_indices],
+                batch["crop_affine"].flatten(0, 1)[flat_indices],
+            )
+            fine_homogeneous = torch.cat(
+                (meniscus_xy, torch.ones_like(meniscus_xy[..., :1])), -1
+            )
+            meniscus_position = torch.einsum("nij,nkj->nki", middle, fine_homogeneous)
+            soft_tissue_valid = meniscus_valid
+            meniscus_valid = (
+                meniscus_valid
+                & (valid_position & torch.isfinite(meniscus_position).all((-1, -2)))[
+                    :, None
+                ]
+            )
+            meniscus_encoded = {
+                "meniscus_visual_valid": meniscus_valid,
+                "meniscus_patient_position": meniscus_position.detach(),
+                "meniscus_token_steps": torch.cat(
+                    (steps[:, :2] * 0.5, steps[:, 2:]), 1
+                ).detach(),
+                "meniscus_shares": (
+                    meniscus_scores.detach()
+                    .softmax(-1)
+                    .reshape(-1, height, 2, width, 2, meniscus_scores.shape[-1])
+                    .mean((2, 4))
                     .flatten(1, 2)
-                )
-                meniscus_scores = self.meniscus_head(meniscus_features + deep)
-                meniscus_valid, meniscus_xy = feature_geometry(
+                ),
+            }
+            if self.training:
+                decoder_valid, decoder_xy = feature_geometry(
                     source_valid_rects,
                     inverse_affine,
-                    (fine_height, fine_width),
-                    self.meniscus_mapping,
+                    decoder_maps.shape[-2:],
+                    self.decoder_mapping,
                     channels,
                     batch["canvas_valid_rects"].flatten(0, 1)[flat_indices],
                     batch["crop_affine"].flatten(0, 1)[flat_indices],
                 )
-                fine_homogeneous = torch.cat(
-                    (meniscus_xy, torch.ones_like(meniscus_xy[..., :1])), -1
+                decoder_homogeneous = torch.cat(
+                    (decoder_xy, torch.ones_like(decoder_xy[..., :1])), -1
                 )
-                meniscus_position = torch.einsum(
-                    "nij,nkj->nki", middle, fine_homogeneous
+                decoder_position = torch.einsum(
+                    "nij,nkj->nki", middle, decoder_homogeneous
                 )
-                soft_tissue_valid = meniscus_valid
-                meniscus_valid = (
-                    meniscus_valid
-                    & (
-                        valid_position & torch.isfinite(meniscus_position).all((-1, -2))
-                    )[:, None]
-                )
-                meniscus_encoded = {
-                    "meniscus_visual_valid": meniscus_valid,
-                    "meniscus_patient_position": meniscus_position.detach(),
-                    "meniscus_token_steps": torch.cat(
-                        (steps[:, :2] * 0.5, steps[:, 2:]), 1
-                    ).detach(),
-                    "meniscus_shares": (
-                        meniscus_scores.detach()
-                        .softmax(-1)
-                        .reshape(-1, height, 2, width, 2, meniscus_scores.shape[-1])
-                        .mean((2, 4))
-                        .flatten(1, 2)
-                    ),
+                meniscus_encoded |= {
+                    "decoder_visual_valid": decoder_valid
+                    & (valid_position & torch.isfinite(decoder_position).all((-1, -2)))[
+                        :, None
+                    ],
+                    "decoder_patient_position": decoder_position.detach(),
+                    "decoder_token_steps": (steps[:, :2] * 0.25).detach(),
                 }
-                if self.training:
-                    decoder_valid, decoder_xy = feature_geometry(
-                        source_valid_rects,
-                        inverse_affine,
-                        decoder_maps.shape[-2:],
-                        self.decoder_mapping,
-                        channels,
-                        batch["canvas_valid_rects"].flatten(0, 1)[flat_indices],
-                        batch["crop_affine"].flatten(0, 1)[flat_indices],
-                    )
-                    decoder_homogeneous = torch.cat(
-                        (decoder_xy, torch.ones_like(decoder_xy[..., :1])), -1
-                    )
-                    decoder_position = torch.einsum(
-                        "nij,nkj->nki", middle, decoder_homogeneous
-                    )
-                    meniscus_encoded |= {
-                        "decoder_visual_valid": decoder_valid
-                        & (
-                            valid_position
-                            & torch.isfinite(decoder_position).all((-1, -2))
-                        )[:, None],
-                        "decoder_patient_position": decoder_position.detach(),
-                        "decoder_token_steps": (steps[:, :2] * 0.25).detach(),
-                    }
-                if self.soft_tissue_routing:
-                    meniscus_encoded |= {
-                        "soft_tissue_features": meniscus_features,
-                        "soft_tissue_shares": meniscus_scores.detach().softmax(-1),
-                        "soft_tissue_valid": soft_tissue_valid,
-                        "soft_tissue_offset": torch.where(
-                            meniscus_valid[..., None],
-                            meniscus_position - center[:, None],
-                            0.0,
-                        ).detach(),
-                    }
+            meniscus_encoded |= {
+                "soft_tissue_features": meniscus_features,
+                "soft_tissue_shares": meniscus_scores.detach().softmax(-1),
+                "soft_tissue_valid": soft_tissue_valid,
+                "soft_tissue_offset": torch.where(
+                    meniscus_valid[..., None],
+                    meniscus_position - center[:, None],
+                    0.0,
+                ).detach(),
+            }
             study_shift, study_rotation, landmarks, study_sizes = self.study_frames(
                 tokens,
                 fitted_position,
@@ -1726,24 +1639,21 @@ class KneeAbnormalityModel(nn.Module):
                 token_pitch,
                 batch_size,
             )
-            anatomy_scores = None
-            anatomy_shares = None
             anatomy_diagnostics = {}
-            if self.anatomical_frame:
-                anatomy_scores = self.anatomy_head(tokens.float())
-                anatomy_shares = anatomy_scores.detach().float().softmax(-1)
-                study_shift, study_rotation, study_sizes = self.anatomical_frames(
-                    anatomy_scores,
-                    fitted_position.detach(),
-                    visual_valid & valid_position[:, None],
-                    token_study,
-                    token_pitch,
-                    batch_size,
-                    study_shift,
-                    study_rotation,
-                    study_sizes,
-                    anatomy_diagnostics if view_pose is not None else None,
-                )
+            anatomy_scores = self.anatomy_head(tokens.float())
+            anatomy_shares = anatomy_scores.detach().float().softmax(-1)
+            study_shift, study_rotation, study_sizes = self.anatomical_frames(
+                anatomy_scores,
+                fitted_position.detach(),
+                visual_valid & valid_position[:, None],
+                token_study,
+                token_pitch,
+                batch_size,
+                study_shift,
+                study_rotation,
+                study_sizes,
+                anatomy_diagnostics if view_pose is not None else None,
+            )
             geometry = {
                 "knee_x": knee_x,
                 "anterior_axis": anterior_axis,
@@ -1974,10 +1884,9 @@ class KneeAbnormalityModel(nn.Module):
             scores = self.soft_attention(tokens).transpose(0, 1)[
                 self.soft_target_channel
             ]
-            if self.view_label_bias is not None:
-                scores = scores + self.view_label_bias.float()[cell_view][
-                    :, self.target_channel[self.soft_target]
-                ].transpose(0, 1)
+            scores = scores + self.view_label_bias.float()[cell_view][
+                :, self.target_channel[self.soft_target]
+            ].transpose(0, 1)
             membership = (
                 torch.arange(batch_size, device=valid.device)[:, None] == study[None]
             ) & valid[None]
@@ -2013,11 +1922,9 @@ class KneeAbnormalityModel(nn.Module):
                     "routed": routed.float(),
                     "compartment_found": found.float(),
                 }
-            evidence = (
-                self.soft_head(tokens, encoded["image_type"])
-                if self.plane_readout
-                else nn.functional.linear(tokens, self.soft_head.weight.float())
-            )[:, self.soft_target_channel]
+            evidence = self.soft_head(tokens, encoded["image_type"])[
+                :, self.soft_target_channel
+            ]
             logits = torch.einsum("btn,nt->bt", attention, evidence)
             if view is None:
                 self.soft_tissue_routing_stats["logit_abs"] = logits.detach().abs()
@@ -2025,8 +1932,6 @@ class KneeAbnormalityModel(nn.Module):
 
     def pool_encoded(self, encoded: dict, view: int | None = None) -> torch.Tensor:
         logits = self._pool_tokens(encoded, view)
-        if not self.soft_tissue_routing:
-            return logits
         soft = self._soft_tissue_pool(encoded, view)
         if not torch.isfinite(soft).all():
             raise RuntimeError("Soft-tissue pooling produced non-finite logits")

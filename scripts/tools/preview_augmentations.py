@@ -162,9 +162,7 @@ class PreviewCLI(CLISettings):
         "for browsing, with optional CUDA profiling of the reflection"
     )
 
-    config: CliPositionalArg[Path] = Field(
-        default=Path("configs/training.yaml"), description="Experiment YAML file"
-    )
+    config: CliPositionalArg[Path] = Field(description="Experiment YAML file")
     output_dir: Path = Field(
         default=Path("outputs/previews/augmentations"), description="Preview directory"
     )

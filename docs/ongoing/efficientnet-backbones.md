@@ -46,6 +46,6 @@ Backbone mapping is already implemented; see [swapping a backbone](../modeling/b
   the older joint-LR gain transfers to fifteen-epoch B0 or to balanced BCE.
 - B0 EMA at decay 0.999 remains untested. Its 0.9999 attempt was void because it retained too
   much initialization. ReXNet's EMA/SWA comparisons are already measured; recipe-wide adoption
-  and follow-ups stay in [endgame](../backlog/endgame.md#weight-averaging).
+  and follow-ups stay in [the 2026-09-17 results](../validation/results/2026-09-17-overnight-results.md#weight-averaging).
 - A second fold/seed ensemble using balanced-BCE members remains in
   [endgame](../backlog/endgame.md#ensembling). The ordinary-BCE ensemble round is complete.

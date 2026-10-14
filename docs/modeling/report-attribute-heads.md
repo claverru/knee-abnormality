@@ -1,5 +1,7 @@
 # Report-attribute auxiliary heads
 
+**Removed from the code on 2026-10-14** (no recipe used them since the anatomy-recipe campaign turned the report-attribute loss off): the heads, their loss and the target loader are at `7770ce9:src/knee_abnormality/training/report_attributes.py`, `7770ce9:src/knee_abnormality/data/report_attributes.py` and `7770ce9:scripts/tools/prepare_report_attribute_targets.py`. The rest of this page describes them as they were.
+
 **Part of the recipe since 2026-09-25** (user decision): on target set 3.1 the heads scored
 +0.00105 ×4 macro and 0.940 public against 0.938
 ([result](../validation/results/2026-09-25-report-attribute-heads.md)). Training only: one
@@ -25,7 +27,7 @@ A weight of 0 switches the loss and its validation fit off; the heads stay in th
 
 ## Targets
 
-[`prepare_report_attribute_targets`](../../scripts/tools/prepare_report_attribute_targets.py)
+`prepare_report_attribute_targets` (`7770ce9:scripts/tools/prepare_report_attribute_targets.py`)
 turns a finished extraction run into
 `data/labels/prepared/<name>/targets.parquet`, one row per training study, one column per
 question option and one weight per question, and a manifest in `configs/labels/` pinning the

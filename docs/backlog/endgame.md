@@ -125,15 +125,10 @@ At 224 px a 160 mm field added nothing in five designs, but there it cost resolu
   triplet (1.61×), and its token grid grows from 7×7 to 9×9, which gives 81 tokens instead of 49
   ([budget](../modeling/backbone-swaps.md#current-budget)).
 - *Memory:* scaling `00-baseline`'s 20.02 GB peak gives an estimated 31 GB at batch 8, so the
-  24 GB GPU needs gradient accumulation (for example batch 4 × 2) or activation checkpointing. The
-  model allows `model.checkpoint_backbone` only with `model.backbone_eval: true`, which also
-  changes BatchNorm behaviour.
-- *`model.backbone_eval` alone:* moved here from the [overnight queue](overnight.md) on
-  2026-09-16 (the user's decision) because it only matters as the gate for
-  `model.checkpoint_backbone` above; an isolated on/off comparison at the current image size is
-  not worth a queue slot. `baseline0` (`resnet50d.ra4_e3600_r224_in1k`) and `baseline1`
-  (`resnet50d.ra2_in1k`) both trained with `backbone_eval: true` and `checkpoint_backbone: true`,
-  but neither has a recorded comparison against `backbone_eval: false` on the same recipe.
+  24 GB GPU needs gradient accumulation (for example batch 4 × 2) or activation checkpointing.
+  `model.checkpoint_backbone` and `model.backbone_eval` were removed on 2026-10-14 as unused; their
+  code is at `7770ce9:src/knee_abnormality/modeling/model.py`. Neither had a recorded comparison
+  against ordinary training mode on the same recipe.
 - *Host memory:* loader memory grows with pixels
   ([host memory](../modeling/training-runtime-and-memory.md#host-memory-with-larger-inputs)).
 - *Inference:* the backbone forward is about a quarter of Kaggle prediction time at 16 loader
@@ -174,30 +169,9 @@ moved between labels: OA rose (lateral +0.0094, medial +0.0026, PF +0.0036) and 
 campaigns about 10% headroom under their 1,627 s ceiling. A 40-triplet, 9-epoch follow-up scored
 −0.0015 against 36, confounded by the lost epoch. The 36-triplet model scored 0.944 public (S79);
 no 26-triplet version was submitted, and a 0.002 gap is below one submission's resolution. The
-committed recipe (`configs/training.yaml`) therefore keeps 26. Denser per-type budgets (`slices` above 6/6/5/5/5/5) belong to the same
+committed recipe (`configs/resnet50.yaml`) therefore keeps 26. Denser per-type budgets (`slices` above 6/6/5/5/5/5) belong to the same
 deferral; on ReXNet the cheaper side lost monotonically (−0.0041, −0.0051). Revisit training at 36
 with the final recipe.
-
-## Weight averaging
-
-**EMA or SWA as the final recipe's default** (measured on fold 0; moved here on 2026-09-17, the
-user's decision). Both are implemented behind `optimizer.weight_averaging` (`null`, feature off, in
-`configs/training.yaml`) and were measured by `03-ema-0.999` and `04-swa-3` of the 2026-09-17
-queue ([result](../validation/results/2026-09-17-overnight-results.md#weight-averaging)): averaged
-weights beat the live ones by about +0.00015 at the best epoch and +0.0005 at the last, and lower
-BCE; EMA costs +153 s per run and SWA +369 s. The EMA checkpoint scored 0.929 public, +0.001 over
-its own live weights (0.928). The gain is small against seed noise, so fold-0 experiments train
-without it until the final phase. A public CoAtNet pipeline reports the same null for SWA over six
-pairs: 0.9167 against 0.9150 on the 58 gold studies and 0.938 against 0.937 on the board
-([public research](../research/public-research.md#slice-density-and-the-board-2026-09-18-re-sweep)).
-
-- *Before adopting it:* validate the live weights only at the last epoch. The second validation
-  pass is all of EMA's +153 s (about 17 s per epoch; training steps are unchanged), so this cuts
-  the overhead to about 17 s.
-- *Follow-ups:* EMA decays 0.998 and 0.9995, EMA with `minimum_lr_ratio: 0.1`, and SWA paired with
-  a non-vanishing tail learning rate (`minimum_lr_ratio: 0.1`), which `04-swa-3` does not test.
-Implementation, original design choices and measured costs live in
-[the modeling guide](../modeling/schedule-and-augmentation.md#weight-averaging).
 
 ## Training-label exclusions
 

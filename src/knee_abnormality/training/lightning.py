@@ -1,7 +1,5 @@
-import copy
 import json
 import math
-import time
 from collections import Counter
 from pathlib import Path
 
@@ -10,24 +8,15 @@ import polars as pl
 import pytorch_lightning as L
 import torch
 from timm.models import group_parameters
-from torch.func import functional_call
 from torch.nn import functional as F
-from torch.nn.modules.batchnorm import _BatchNorm
 from torch.optim import AdamW
 from torch.optim.lr_scheduler import LambdaLR
 from torch.utils.data import DataLoader
 
-from knee_abnormality.config import (
-    STUDY_HEADERS,
-    EMAConfig,
-    ExperimentConfig,
-    OptimizerConfig,
-    SWAConfig,
-)
+from knee_abnormality.config import ExperimentConfig, OptimizerConfig
 from knee_abnormality.data.dataset import KneeStudyDataset, build_data_loader
 from knee_abnormality.data.labels import FoldLabels, distilled, load_fold_labels
 from knee_abnormality.data.preprocessing.device import with_images
-from knee_abnormality.data.report_attributes import load_report_attribute_targets
 from knee_abnormality.data.sources import build_series_index
 from knee_abnormality.evaluation.metrics import validation_metrics
 from knee_abnormality.evaluation.predictions import make_prediction_frame
@@ -46,28 +35,12 @@ from knee_abnormality.modeling.model import (
 from knee_abnormality.training.anatomy import (
     ANATOMY_CLASSES,
     ANATOMY_POINTS,
-    MENISCUS_CLASSES,
     MENISCUS_POINTS,
     SOFT_TISSUE_CLASSES,
-    AnatomyHead,
     AnatomyTargets,
     anatomy_loss,
 )
-from knee_abnormality.training.auxiliary.scanner_confusion import (
-    SCANNER_GROUPS,
-    SCANNER_TABLE_SHA256,
-    ScannerConfusionHead,
-    confusion_ramp,
-    load_scanner_groups,
-    scanner_group_labels,
-    scanner_group_prior,
-)
 from knee_abnormality.training.checkpoints import checkpoint_sampling_epoch
-from knee_abnormality.training.report_attributes import (
-    REGION_IDS,
-    ReportAttributeHeads,
-    report_attribute_loss,
-)
 
 PRECISION = "bf16-mixed"
 GRADIENT_DIAGNOSTIC_INTERVAL = 10
@@ -84,18 +57,9 @@ LR_DECAYS = {
 def build_optimizer(
     model: KneeAbnormalityModel,
     settings: OptimizerConfig,
-    heads: tuple[torch.nn.Module, ...],
     anchored_backbone_names: frozenset[str],
 ) -> AdamW:
     groups: dict[tuple[float, float], list[torch.nn.Parameter]] = {}
-    named = [
-        *model.named_parameters(),
-        *(
-            (f"heads.{name}", parameter)
-            for head in heads
-            for name, parameter in head.named_parameters()
-        ),
-    ]
     stages = group_parameters(model.backbone, model.backbone.group_matcher(coarse=True))
     deepest = max(
         index
@@ -107,7 +71,7 @@ def build_optimizer(
         for index, names in stages.items()
         for parameter_name in names
     }
-    for name, parameter in named:
+    for name, parameter in model.named_parameters():
         if not parameter.requires_grad:
             continue
         learning_rate = (
@@ -278,15 +242,6 @@ class KneeDataModule(L.LightningDataModule):
             middle_only=self.middle_only,
         )
 
-    def batch_norm_loader(self) -> DataLoader:
-        return build_data_loader(
-            self.train_dataset,
-            self.config.trainer,
-            self.config.trainer.batch_size,
-            shuffle=False,
-            persistent_workers=False,
-        )
-
     def on_after_batch_transfer(self, batch: dict, dataloader_idx: int) -> dict:
         return with_images(batch)
 
@@ -322,59 +277,12 @@ class KneeModule(L.LightningModule):
         self.model = KneeAbnormalityModel(
             config.model, config.data, targets, load_pretrained=load_pretrained
         )
-        attributes = load_report_attribute_targets(
-            config.paths.report_attribute_manifest, config.paths.data_root
+        self.anatomy_targets = AnatomyTargets(
+            config.paths.anatomy_targets, len(ANATOMY_CLASSES), ANATOMY_POINTS
         )
-        with torch.random.fork_rng(devices=[]):
-            self.report_attribute_heads = ReportAttributeHeads(attributes)
-        self.anatomy_head = None
-        if config.model.anatomical_frame and config.trainer.anatomy_loss_weight <= 0:
-            raise ValueError(
-                "model.anatomical_frame needs trainer.anatomy_loss_weight above zero"
-            )
-        if config.trainer.anatomy_loss_weight > 0:
-            self.anatomy_targets = AnatomyTargets(
-                config.paths.anatomy_targets, len(ANATOMY_CLASSES), ANATOMY_POINTS
-            )
-            if not config.model.anatomical_frame:
-                with torch.random.fork_rng(devices=[]):
-                    self.anatomy_head = AnatomyHead(
-                        self.model.mil_norm.normalized_shape[0]
-                    )
-        if config.model.meniscus_map != (config.trainer.meniscus_loss_weight > 0):
-            raise ValueError(
-                "model.meniscus_map and trainer.meniscus_loss_weight above zero "
-                "go together"
-            )
-        if config.model.meniscus_map:
-            self.meniscus_classes = (
-                SOFT_TISSUE_CLASSES
-                if config.model.soft_tissue_routing
-                else MENISCUS_CLASSES
-            )
-            self.meniscus_targets = AnatomyTargets(
-                config.paths.meniscus_targets,
-                len(self.meniscus_classes),
-                MENISCUS_POINTS,
-            )
-        self.scanner_confusion_head = None
-        self.scanner_group_counts = None
-        if config.trainer.scanner_confusion_weight > 0:
-            self.scanner_targets = load_scanner_groups(
-                config.paths.data_root.parent / STUDY_HEADERS
-            )
-            prior, counts = scanner_group_prior(
-                config.split_dir, fold, self.scanner_targets
-            )
-            self.register_buffer("scanner_prior", prior, persistent=False)
-            self.scanner_group_counts = counts
-            with torch.random.fork_rng(devices=[]):
-                self.scanner_confusion_head = ScannerConfusionHead()
-        self.weight_averaging = config.optimizer.weight_averaging
-        self._last_averaged_step = -1
-        self.batch_norm_refresh_seconds = 0.0
-        if self.weight_averaging is not None:
-            self.averaged = copy.deepcopy(self.model).requires_grad_(False)
+        self.meniscus_targets = AnatomyTargets(
+            config.paths.meniscus_targets, len(SOFT_TISSUE_CLASSES), MENISCUS_POINTS
+        )
         self.validation_rows: list[
             tuple[list[str], np.ndarray, np.ndarray, np.ndarray]
         ] = []
@@ -384,9 +292,6 @@ class KneeModule(L.LightningModule):
             True: {},
         }
         self.validating = False
-        self.live_validation_rows: list[
-            tuple[list[str], np.ndarray, np.ndarray, np.ndarray]
-        ] = []
         self.view_names = tuple(
             name
             for index, name in enumerate(config.data.view_names)
@@ -416,20 +321,6 @@ class KneeModule(L.LightningModule):
                 "class_balance": class_balance,
                 "input_identity": input_identity,
                 "preprocessing_identity": preprocessing_identity(config.model.backbone),
-                "report_attributes": {
-                    **attributes.provenance,
-                    "questions": [
-                        question.model_dump(mode="json")
-                        for question in attributes.questions
-                    ],
-                },
-                "scanner_groups": {
-                    "table_sha256": SCANNER_TABLE_SHA256,
-                    "groups": list(SCANNER_GROUPS),
-                    "training_group_counts": self.scanner_group_counts,
-                }
-                if self.scanner_confusion_head is not None
-                else None,
             }
         )
         backbone = self.model.backbone
@@ -469,41 +360,6 @@ class KneeModule(L.LightningModule):
 
     def on_load_checkpoint(self, checkpoint: dict) -> None:
         self.sampling_epoch = checkpoint_sampling_epoch(checkpoint)
-        if self.weight_averaging is not None:
-            state = checkpoint["state_dict"]
-            live = checkpoint.pop("live_state_dict")
-            checkpoint["state_dict"] = {
-                **{
-                    f"averaged.{key.removeprefix('model.')}": value
-                    for key, value in state.items()
-                    if key.startswith("model.")
-                },
-                **{f"model.{key}": value for key, value in live.items()},
-            }
-
-    def on_save_checkpoint(self, checkpoint: dict) -> None:
-        if self.weight_averaging is None:
-            return
-        state = checkpoint["state_dict"]
-        live = {
-            key.removeprefix("model."): value
-            for key, value in state.items()
-            if key.startswith("model.")
-        }
-        averaged = {
-            key.removeprefix("averaged."): value
-            for key, value in state.items()
-            if key.startswith("averaged.")
-        }
-        checkpoint["state_dict"] = {
-            key: value
-            for key, value in state.items()
-            if not key.startswith("model.") and not key.startswith("averaged.")
-        }
-        checkpoint["state_dict"].update(
-            {f"model.{key}": value for key, value in averaged.items()}
-        )
-        checkpoint["live_state_dict"] = live
 
     def on_train_epoch_start(self) -> None:
         self.train_window_rows.clear()
@@ -538,22 +394,20 @@ class KneeModule(L.LightningModule):
             1,
         )
         self._log_window_stats("", self.train_window_rows)
-        if self.model.view_label_bias is not None:
-            for name, bias in zip(
-                self.view_names,
-                self.model.view_label_bias[: len(self.view_names)].detach().float(),
-                strict=True,
-            ):
-                for channel, value in zip(self.model.channels, bias, strict=True):
-                    self._log_epoch_metric(
-                        f"view_label_bias_{name}_{channel.lower().replace(' ', '_')}",
-                        value,
-                        1,
-                    )
-        if self.config.model.plane_readout:
-            self._log_epoch_metric(
-                "plane_readout_drift", self.model.head.divergence().mean(), 1
-            )
+        for name, bias in zip(
+            self.view_names,
+            self.model.view_label_bias[: len(self.view_names)].detach().float(),
+            strict=True,
+        ):
+            for channel, value in zip(self.model.channels, bias, strict=True):
+                self._log_epoch_metric(
+                    f"view_label_bias_{name}_{channel.lower().replace(' ', '_')}",
+                    value,
+                    1,
+                )
+        self._log_epoch_metric(
+            "plane_readout_drift", self.model.head.divergence().mean(), 1
+        )
         for name, width in zip(
             ROUTING_WIDTHS, self.model.routing_widths().detach(), strict=True
         ):
@@ -1023,15 +877,9 @@ class KneeModule(L.LightningModule):
             self.class_balance_weights,
         )
         loss = loss + SIDE_LOSS_WEIGHT * self._side_step(self.model, batch, encoded, "")
-        if self.config.trainer.report_attribute_loss_weight > 0:
-            loss = loss + self._report_attribute_step(self.model, encoded, batch, "")
-        if self.config.trainer.anatomy_loss_weight > 0:
-            loss = loss + self._anatomy_step(self.model, encoded, batch, "")
-        if self.config.model.meniscus_map:
-            loss = loss + self._meniscus_step(encoded, batch, "")
+        loss = loss + self._anatomy_step(self.model, encoded, batch, "")
+        loss = loss + self._meniscus_step(encoded, batch, "")
         loss = loss + self._mask_decoder_step(encoded)
-        if self.scanner_confusion_head is not None:
-            loss = loss + self._scanner_confusion_step(encoded, batch)
         if self.anchor_parameters:
             backbone_group = self.trainer.optimizers[0].param_groups[
                 self.backbone_optimizer_group_index
@@ -1154,48 +1002,6 @@ class KneeModule(L.LightningModule):
         self._log_epoch_metric(f"{prefix}side_head_loss", loss, int(certain.sum()))
         return loss
 
-    def _report_attribute_step(
-        self, model, encoded: dict, batch: dict, prefix: str
-    ) -> torch.Tensor:
-        heads = self.report_attribute_heads
-        batch_size = len(batch["study_uid"])
-        logits, region_logits = heads(
-            model.study_tokens(encoded),
-            encoded["study"][:, None].expand_as(encoded["visual_valid"]).flatten(),
-            encoded["visual_valid"].flatten(),
-            model.study_tokens(encoded, shared=True),
-            model.routing_weights(encoded).flatten(1),
-            encoded["batch_size"],
-        )
-        targets, weights, region_targets, region_weights, observed = heads.targets(
-            batch["study_uid"]
-        )
-        loss, divergence, region_loss = report_attribute_loss(
-            logits,
-            targets,
-            weights,
-            region_logits,
-            region_targets,
-            region_weights,
-            observed,
-            heads.option_counts,
-        )
-        self._log_epoch_metric(
-            f"{prefix}report_attribute_{'fit' if prefix else 'loss'}", loss, batch_size
-        )
-        for region, value in zip(REGION_IDS, region_loss, strict=True):
-            self._log_epoch_metric(
-                f"{prefix}report_attribute_bce_{region}", value, batch_size
-            )
-        if prefix:
-            return loss
-        self._log_epoch_metric(
-            "report_attribute_studies", observed.sum().float(), 1, "sum"
-        )
-        for question, value in zip(heads.question_ids, divergence, strict=True):
-            self._log_epoch_metric(f"report_attribute_kl_{question}", value, batch_size)
-        return self.config.trainer.report_attribute_loss_weight * loss
-
     def _meniscus_step(self, encoded: dict, batch: dict, prefix: str) -> torch.Tensor:
         rows = self.meniscus_targets.token_rows(
             batch["study_uid"],
@@ -1210,7 +1016,7 @@ class KneeModule(L.LightningModule):
         )
         mask = covered & encoded["meniscus_visual_valid"] & encoded["routable"][:, None]
         loss, metrics = anatomy_loss(
-            encoded["meniscus_scores"], shares, mask, self.meniscus_classes
+            encoded["meniscus_scores"], shares, mask, SOFT_TISSUE_CLASSES
         )
         tokens = int(mask.sum())
         if tokens:
@@ -1218,8 +1024,7 @@ class KneeModule(L.LightningModule):
             for name, value in metrics.items():
                 self._log_epoch_metric(f"{prefix}meniscus_{name}", value, tokens)
         self._log_epoch_metric(f"{prefix}meniscus_tokens", float(tokens), 1, "sum")
-        if self.config.model.soft_tissue_routing:
-            self._log_soft_tissue_routing(encoded, prefix)
+        self._log_soft_tissue_routing(encoded, prefix)
         return self.config.trainer.meniscus_loss_weight * loss
 
     def _mask_decoder_step(self, encoded: dict) -> torch.Tensor:
@@ -1256,12 +1061,7 @@ class KneeModule(L.LightningModule):
         return 0.1 * bone_loss + 0.1 * soft_tissue_loss
 
     def _log_soft_tissue_routing(self, encoded: dict, prefix: str) -> None:
-        model = (
-            self.averaged
-            if prefix and self.weight_averaging is not None
-            else self.model
-        )
-        stats = model.soft_tissue_routing_stats
+        stats = self.model.soft_tissue_routing_stats
         studies = encoded["batch_size"]
         for number, target in enumerate(TARGET_ROUTES):
             label = target.lower().replace(" ", "_")
@@ -1293,13 +1093,11 @@ class KneeModule(L.LightningModule):
             encoded["token_steps"],
         )
         mask = covered & encoded["visual_valid"] & encoded["routable"][:, None]
-        scores = (
-            encoded["anatomy_scores"]
-            if encoded["anatomy_scores"] is not None
-            else self.anatomy_head(model.study_tokens(encoded, shared=True))
-        )
         loss, metrics = anatomy_loss(
-            scores.view(*mask.shape, -1), shares, mask, ANATOMY_CLASSES
+            encoded["anatomy_scores"].view(*mask.shape, -1),
+            shares,
+            mask,
+            ANATOMY_CLASSES,
         )
         tokens = int(mask.sum())
         if tokens:
@@ -1307,115 +1105,73 @@ class KneeModule(L.LightningModule):
             for name, value in metrics.items():
                 self._log_epoch_metric(f"{prefix}anatomy_{name}", value, tokens)
         self._log_epoch_metric(f"{prefix}anatomy_tokens", float(tokens), 1, "sum")
-        if encoded["anatomy_scores"] is not None:
-            self._log_epoch_metric(
-                f"{prefix}anatomy_centre_displacement_mm",
-                encoded["anatomy_centre_delta_mm"].norm(dim=-1).mean(),
-                encoded["batch_size"],
-            )
-            self._log_epoch_metric(
-                f"{prefix}anatomy_centre_applied_fraction",
-                encoded["anatomy_centre_applied"].float().mean(),
-                encoded["batch_size"],
-            )
-            centre, known_centre = self.anatomy_targets.study_centres(
-                batch["study_uid"]
-            )
-            member = encoded["study"]
-            offset = centre[member] - encoded["patient_position"][:, 0]
-            cosine, sine = encoded["study_axis"][member].unbind(-1)
-            sign = 1 - 2 * encoded["left_probability"].detach().float()
-            truth_centre = encoded["fitted_position"][:, 0, :2] + torch.stack(
-                (
-                    sign * (offset[:, 0] * cosine + offset[:, 1] * sine),
-                    offset[:, 0] * sine - offset[:, 1] * cosine,
-                ),
-                -1,
-            )
-            valid = encoded["routable"] & encoded["visual_valid"].any(-1)
-            counts = torch.zeros(encoded["batch_size"], device=self.device).index_add(
-                0, member, valid.float()
-            )
-            errors = (
-                torch.zeros_like(centre[:, :2]).index_add(
-                    0,
-                    member,
-                    torch.where(
-                        valid[:, None],
-                        encoded["frame_shift"][:, :2].detach() - truth_centre,
-                        0.0,
-                    ),
-                )
-                / counts.clamp_min(1)[:, None]
-            )
-            seen_centre = known_centre & (counts > 0)
-            if seen_centre.any():
-                for axis, name in enumerate(("across", "front")):
-                    values = errors[seen_centre, axis]
-                    metric = f"{prefix}anatomy_centre_error_{name}_mm"
-                    self._log_epoch_spread(metric, values, suffix="")
-                    self._log_epoch_metric(f"{metric}_mean", values.mean(), len(values))
-            truth, known = self.anatomy_targets.token_heights(
-                batch["study_uid"], encoded["study"], encoded["patient_position"]
-            )
-            seen = (
-                known[:, None]
-                & encoded["visual_valid"]
-                & encoded["routable"][:, None]
-                & (truth.abs() < HEIGHT_TARGET_LIMIT_MM)
-            )
-            if seen.any():
-                self._log_epoch_metric(
-                    f"{prefix}anatomy_plane_error_mm",
-                    (
-                        encoded["position"][..., 2].float()
-                        - truth
-                        + JOINT_PLANE_ABOVE_PLATEAU_MM
-                    )[seen]
-                    .abs()
-                    .mean(),
-                    int(seen.sum()),
-                )
-        return self.config.trainer.anatomy_loss_weight * loss
-
-    def _scanner_confusion_step(self, encoded: dict, batch: dict) -> torch.Tensor:
-        head = self.scanner_confusion_head
-        tokens = self.model.study_tokens(encoded)
-        args = (
-            encoded["study"][:, None].expand_as(encoded["visual_valid"]).flatten(),
-            encoded["visual_valid"].flatten(),
+        self._log_epoch_metric(
+            f"{prefix}anatomy_centre_displacement_mm",
+            encoded["anatomy_centre_delta_mm"].norm(dim=-1).mean(),
             encoded["batch_size"],
         )
-        groups = scanner_group_labels(
-            batch["study_uid"], self.scanner_targets, tokens.device
-        )
-        head_logits = head(tokens.detach(), *args)
-        head_loss = F.cross_entropy(head_logits, groups)
-        accuracy = (head_logits.argmax(-1) == groups).float().mean()
-        detached_parameters = {
-            name: parameter.detach() for name, parameter in head.named_parameters()
-        }
-        confusion_logits = functional_call(head, detached_parameters, (tokens, *args))
-        confusion_kl = F.kl_div(
-            F.log_softmax(confusion_logits, dim=-1),
-            self.scanner_prior.expand_as(confusion_logits),
-            reduction="batchmean",
-        )
-        ramp = confusion_ramp(self.trainer.global_step, self.total_steps)
-        weight = self.config.trainer.scanner_confusion_weight
-        batch_size = len(batch["study_uid"])
-        self._log_epoch_metric("scanner_head_loss", head_loss, batch_size)
-        self._log_epoch_metric("scanner_head_accuracy", accuracy, batch_size)
-        self._log_epoch_metric("scanner_confusion_kl", confusion_kl, batch_size)
         self._log_epoch_metric(
-            "scanner_confusion_loss", weight * ramp * confusion_kl, batch_size
+            f"{prefix}anatomy_centre_applied_fraction",
+            encoded["anatomy_centre_applied"].float().mean(),
+            encoded["batch_size"],
         )
-        self._log_epoch_metric("scanner_confusion_ramp", ramp, batch_size)
-        self._log_epoch_metric(
-            "scanner_confusion_effective_weight", weight * ramp, batch_size
+        centre, known_centre = self.anatomy_targets.study_centres(batch["study_uid"])
+        member = encoded["study"]
+        offset = centre[member] - encoded["patient_position"][:, 0]
+        cosine, sine = encoded["study_axis"][member].unbind(-1)
+        sign = 1 - 2 * encoded["left_probability"].detach().float()
+        truth_centre = encoded["fitted_position"][:, 0, :2] + torch.stack(
+            (
+                sign * (offset[:, 0] * cosine + offset[:, 1] * sine),
+                offset[:, 0] * sine - offset[:, 1] * cosine,
+            ),
+            -1,
         )
-        self._log_epoch_metric("scanner_head_studies", batch_size, 1, "sum")
-        return head_loss + weight * ramp * confusion_kl
+        valid = encoded["routable"] & encoded["visual_valid"].any(-1)
+        counts = torch.zeros(encoded["batch_size"], device=self.device).index_add(
+            0, member, valid.float()
+        )
+        errors = (
+            torch.zeros_like(centre[:, :2]).index_add(
+                0,
+                member,
+                torch.where(
+                    valid[:, None],
+                    encoded["frame_shift"][:, :2].detach() - truth_centre,
+                    0.0,
+                ),
+            )
+            / counts.clamp_min(1)[:, None]
+        )
+        seen_centre = known_centre & (counts > 0)
+        if seen_centre.any():
+            for axis, name in enumerate(("across", "front")):
+                values = errors[seen_centre, axis]
+                metric = f"{prefix}anatomy_centre_error_{name}_mm"
+                self._log_epoch_spread(metric, values, suffix="")
+                self._log_epoch_metric(f"{metric}_mean", values.mean(), len(values))
+        truth, known = self.anatomy_targets.token_heights(
+            batch["study_uid"], encoded["study"], encoded["patient_position"]
+        )
+        seen = (
+            known[:, None]
+            & encoded["visual_valid"]
+            & encoded["routable"][:, None]
+            & (truth.abs() < HEIGHT_TARGET_LIMIT_MM)
+        )
+        if seen.any():
+            self._log_epoch_metric(
+                f"{prefix}anatomy_plane_error_mm",
+                (
+                    encoded["position"][..., 2].float()
+                    - truth
+                    + JOINT_PLANE_ABOVE_PLATEAU_MM
+                )[seen]
+                .abs()
+                .mean(),
+                int(seen.sum()),
+            )
+        return self.config.trainer.anatomy_loss_weight * loss
 
     def on_before_optimizer_step(self, optimizer) -> None:
         if self.trainer.global_step % GRADIENT_DIAGNOSTIC_INTERVAL:
@@ -1450,73 +1206,6 @@ class KneeModule(L.LightningModule):
         if head_gradients:
             self._log_epoch_metric("head_grad_rms", _gradient_rms(head_gradients), 1)
 
-    def _averaging_weight(self, step: int) -> float:
-        averaging = self.weight_averaging
-        if isinstance(averaging, EMAConfig):
-            return 1.0 if step <= self.warmup_steps else 1.0 - averaging.decay
-        return (
-            1.0 if step <= self.swa_start_step else 1.0 / (step - self.swa_start_step)
-        )
-
-    def _refresh_batch_norm(self) -> None:
-        self.averaged.train()
-        modules = [
-            module
-            for module in self.averaged.modules()
-            if isinstance(module, _BatchNorm) and module.training
-        ]
-        if not modules:
-            return
-        momentums = [module.momentum for module in modules]
-        for module in modules:
-            module.reset_running_stats()
-            module.momentum = None
-        device = self.device
-        devices = [device] if device.type == "cuda" else []
-        started = time.perf_counter()
-        with (
-            torch.random.fork_rng(devices=devices),
-            torch.no_grad(),
-            self.trainer.precision_plugin.forward_context(),
-        ):
-            for batch in self.trainer.datamodule.batch_norm_loader():
-                batch = with_images(self.transfer_batch_to_device(batch, device, 0))
-                self.averaged(batch)
-        self.batch_norm_refresh_seconds += time.perf_counter() - started
-        for module, momentum in zip(modules, momentums):
-            module.momentum = momentum
-
-    def on_train_batch_end(self, outputs, batch, batch_index: int) -> None:
-        if self.weight_averaging is None:
-            return
-        step = self.trainer.global_step
-        if step == self._last_averaged_step:
-            return
-        self._last_averaged_step = step
-        weight = self._averaging_weight(step)
-        with torch.no_grad():
-            live_state = self.model.state_dict()
-            averaged_state = self.averaged.state_dict()
-            live_floats, averaged_floats = [], []
-            for name, live_tensor in live_state.items():
-                averaged_tensor = averaged_state[name]
-                if torch.is_floating_point(live_tensor):
-                    if weight >= 1.0:
-                        averaged_tensor.copy_(live_tensor)
-                    else:
-                        live_floats.append(live_tensor)
-                        averaged_floats.append(averaged_tensor)
-                else:
-                    averaged_tensor.copy_(live_tensor)
-            if averaged_floats:
-                torch._foreach_lerp_(averaged_floats, live_floats, weight)
-        if (
-            isinstance(self.weight_averaging, SWAConfig)
-            and step > self.swa_start_step
-            and step % self.steps_per_epoch == 0
-        ):
-            self._refresh_batch_norm()
-
     def on_validation_epoch_start(self) -> None:
         self.validating = True
         self.epoch_totals[True].clear()
@@ -1527,27 +1216,20 @@ class KneeModule(L.LightningModule):
         self.validation_window_rows.clear()
         self.validation_window_studies.clear()
         self.validation_rows.clear()
-        self.live_validation_rows.clear()
 
     def validation_step(self, batch: dict, batch_index: int) -> None:
-        saved_model = self.averaged if self.weight_averaging is not None else self.model
-        encoded = saved_model.encode_batch(batch)
+        model = self.model
+        encoded = model.encode_batch(batch)
         self._log_canvas_pixel_size(batch)
         self._log_crop_frames(encoded, "val_")
-        self._log_smart_crop_pose(saved_model, encoded)
-        prediction = torch.sigmoid(saved_model.pool_encoded(encoded).to(torch.float32))
+        self._log_smart_crop_pose(model, encoded)
+        prediction = torch.sigmoid(model.pool_encoded(encoded).to(torch.float32))
         self._log_views(batch, encoded, "val_")
-        self._side_step(saved_model, batch, encoded, "val_")
-        if self.config.trainer.report_attribute_loss_weight > 0:
-            self._report_attribute_step(saved_model, encoded, batch, "val_")
-        if self.config.trainer.anatomy_loss_weight > 0:
-            self._anatomy_step(saved_model, encoded, batch, "val_")
-        if self.config.model.meniscus_map:
-            self._meniscus_step(encoded, batch, "val_")
+        self._side_step(model, batch, encoded, "val_")
+        self._anatomy_step(model, encoded, batch, "val_")
+        self._meniscus_step(encoded, batch, "val_")
         for view, (view_name, rows) in enumerate(self.view_validation_rows.items()):
-            view_prediction = torch.sigmoid(
-                saved_model.pool_encoded(encoded, view).float()
-            )
+            view_prediction = torch.sigmoid(model.pool_encoded(encoded, view).float())
             present = encoded["visual_valid"].any(-1) & (encoded["view_index"] == view)
             self.view_missing_studies[view_name] += encoded["batch_size"] - len(
                 encoded["study"][present].unique()
@@ -1568,16 +1250,6 @@ class KneeModule(L.LightningModule):
                 batch["is_gold"].cpu().numpy(),
             )
         )
-        if self.weight_averaging is not None:
-            live_prediction = torch.sigmoid(self.model(batch).to(torch.float32))
-            self.live_validation_rows.append(
-                (
-                    batch["study_uid"],
-                    batch["target"].cpu().numpy(),
-                    live_prediction.cpu().numpy(),
-                    batch["is_gold"].cpu().numpy(),
-                )
-            )
 
     def _log_and_write_validation(
         self,
@@ -1652,10 +1324,6 @@ class KneeModule(L.LightningModule):
                     1,
                 )
         self._log_and_write_validation(self.validation_rows, "val_", "")
-        if self.weight_averaging is not None:
-            self._log_and_write_validation(
-                self.live_validation_rows, "val_live_", "live_"
-            )
         self._flush_epoch_metrics()
         self.validating = False
 
@@ -1664,15 +1332,6 @@ class KneeModule(L.LightningModule):
         optimizer = build_optimizer(
             self.model,
             settings,
-            tuple(
-                head
-                for head in (
-                    self.report_attribute_heads,
-                    self.scanner_confusion_head,
-                    self.anatomy_head,
-                )
-                if head is not None
-            ),
             frozenset(f"backbone.{name}" for name, _, _, _ in self.anchor_parameters),
         )
         backbone_parameter_ids = {
@@ -1693,11 +1352,6 @@ class KneeModule(L.LightningModule):
         self.total_steps = total_steps
         self.steps_per_epoch = steps_per_epoch
         self.warmup_steps = warmup_steps
-        self.swa_start_step = (
-            total_steps - settings.weight_averaging.epochs * steps_per_epoch
-            if isinstance(settings.weight_averaging, SWAConfig)
-            else None
-        )
 
         def schedule(step: int) -> float:
             if warmup_steps and step < warmup_steps:

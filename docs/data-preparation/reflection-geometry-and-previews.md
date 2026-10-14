@@ -67,8 +67,8 @@ hardware, shapes, seeds, incremental peak allocated/reserved memory, source/conf
 identity and input hashes in `manifest.json`. It does not run a backbone or optimizer.
 
 ```bash
-rtk proxy uv run --locked python -m scripts.tools.preview_augmentations configs/training.yaml --variants 1 --profile-cuda --output-dir outputs/previews/reflection-new
-rtk proxy uv run --locked python -m scripts.tools.preview_augmentations configs/training.yaml --split validation --offset 604 --max-studies 8 --variants 1 --output-dir outputs/previews/reflection-validation-new
+rtk proxy uv run --locked python -m scripts.tools.preview_augmentations configs/resnet50.yaml --variants 1 --profile-cuda --output-dir outputs/previews/reflection-new
+rtk proxy uv run --locked python -m scripts.tools.preview_augmentations configs/resnet50.yaml --split validation --offset 604 --max-studies 8 --variants 1 --output-dir outputs/previews/reflection-validation-new
 ```
 
 The [example-test preview](../../outputs/previews/reflection-test-20260913/preview.html)

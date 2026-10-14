@@ -33,12 +33,9 @@ SUMMARY_HEADER = [
     "prediction_macro_auc",
     "delta_prediction_vs_control",
     "soft_macro_auc_at_selected",
-    "live_best_val_macro_auc",
-    "live_last_val_macro_auc",
     "soft_target_bce_at_selected",
     "gold_macro_auc_at_selected",
     "training_seconds",
-    "batch_norm_refresh_seconds",
     "optimizer_steps",
     "peak_cuda_memory_gib",
 ]
@@ -62,9 +59,7 @@ class OvernightCLI(CLISettings):
         "control config's fold and seed within a five-hour budget"
     )
 
-    config: Path = Field(
-        default=ROOT / "configs/training.yaml", description="Control experiment YAML"
-    )
+    config: Path = Field(description="Control experiment YAML")
     prepare_only: bool = Field(
         default=False, description="Write validated experiment configs without training"
     )
@@ -121,7 +116,7 @@ def comparable(values: dict) -> dict:
     values = deepcopy(values)
     values.pop("name")
     values["paths"].pop("output_root")
-    for key in ("label_manifest", "report_attribute_manifest"):
+    for key in ("label_manifest",):
         parts = Path(values["paths"][key]).parts
         values["paths"][key] = "/".join(
             parts[len(parts) - 1 - parts[::-1].index("configs") :]
@@ -230,11 +225,6 @@ def run_summary(run_dir: Path) -> dict | None:
     selected_index = int(match.group(1)) if match is not None else records[-1][0]
     selected_record = by_epoch.get(selected_index, records[-1][1])
     _, last_record = records[-1]
-    live_records = read_epoch_metrics(fold_dir, "live_")
-    live_best = (
-        max(record["macro_auc"] for _, record in live_records) if live_records else None
-    )
-    live_last = live_records[-1][1]["macro_auc"] if live_records else None
     peak_bytes = timing.get("peak_cuda_allocated_bytes")
     return {
         "selected_epoch": selected_index + 1,
@@ -242,12 +232,9 @@ def run_summary(run_dir: Path) -> dict | None:
         "last_val_macro_auc": last_record["macro_auc"],
         "prediction_macro_auc": selected["prediction_macro_auc"],
         "soft_macro_auc_at_selected": selected_record["soft_macro_auc"],
-        "live_best_val_macro_auc": live_best,
-        "live_last_val_macro_auc": live_last,
         "soft_target_bce_at_selected": selected_record["soft_target_bce"],
         "gold_macro_auc_at_selected": selected_record["gold"]["macro_auc"],
         "training_seconds": timing["training_seconds"],
-        "batch_norm_refresh_seconds": timing.get("batch_norm_refresh_seconds", 0.0),
         "optimizer_steps": timing["optimizer_steps"],
         "peak_cuda_memory_gib": peak_bytes / 2**30 if peak_bytes is not None else None,
     }
@@ -292,12 +279,9 @@ def write_summary(queue: Path, configs: list[Path]) -> None:
                     summary["prediction_macro_auc"],
                     delta_prediction,
                     summary["soft_macro_auc_at_selected"],
-                    summary["live_best_val_macro_auc"],
-                    summary["live_last_val_macro_auc"],
                     summary["soft_target_bce_at_selected"],
                     summary["gold_macro_auc_at_selected"],
                     summary["training_seconds"],
-                    summary["batch_norm_refresh_seconds"],
                     summary["optimizer_steps"],
                     summary["peak_cuda_memory_gib"],
                 ]

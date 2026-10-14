@@ -2,7 +2,7 @@
 
 ## Configs and development commands
 
-Use one explicit YAML file per experiment. Copy `configs/training.yaml` for a new idea,
+Use one explicit YAML file per experiment. Copy `configs/resnet50.yaml` for a new idea,
 change the relevant settings, and retain the effective config with its outputs.
 Keep numerical choices that experiments vary in configs, not scattered constants or
 notebook cells. Accepted fixed choices are code constants instead of single-value fields:
@@ -19,10 +19,8 @@ validation settings.
 Unknown or missing keys fail clearly, so configs and checkpoints that still carry removed
 fields must be used with their archived source; seeds must be integers in `[0, 2**32)`
 and fold selections must be nonempty, distinct nonnegative integers.
-`model.checkpoint_backbone` requires `model.backbone_eval: true`, because activation
-checkpointing would otherwise rerun training-mode BatchNorm during recomputation.
 `model.pretrained_weights: radimagenet` requires a backbone listed in `RADIMAGENET_WEIGHTS`
-(`resnet50.tv_in1k`, `resnet18.a1_in1k`, `resnet10t.c3_in1k`), and
+(`resnet50.a1_in1k`), and
 `model.slice_channels: repeated_middle` feeds each triplet's middle slice on all three channels
 ([RadImageNet backbone](../ongoing/radimagenet-backbone.md)). The models
 are frozen after validation. Their nesting matches the YAML, for example
@@ -49,8 +47,8 @@ against the YAML's directory. Training records the overrides in `provenance.json
 Current commands, from the repository root:
 
 ```bash
-rtk proxy uv run --locked python -m knee_abnormality.config configs/training.yaml
-rtk proxy uv run --locked python -m knee_abnormality.config configs/training.yaml --validation.folds '[0,1,2,3,4]'
+rtk proxy uv run --locked python -m knee_abnormality.config configs/resnet50.yaml
+rtk proxy uv run --locked python -m knee_abnormality.config configs/resnet50.yaml --validation.folds '[0,1,2,3,4]'
 ```
 
 These print resolved settings as JSON, retaining the YAML's nested sections
@@ -64,7 +62,7 @@ The current config selects [`combined_v1`](../public-labels/combined-labels.md),
 **fold 0 for quick development**. Selecting one fold does not change the
 saved five-fold assignments.
 
-`configs/training.yaml` pins **2263738815**, matching the adopted learned-strength
+`configs/resnet50.yaml` pins **2263738815**, matching the adopted learned-strength
 reference. Autoresearch candidates inherit their current incumbent's saved training
 seed; preparation, review and launch cannot select a different seed. A null or
 missing seed in an explicitly supplied manual config still draws a fresh 32-bit
@@ -113,7 +111,7 @@ for supporting tools and investigations, for example
 
 | Directory | Contents |
 |---|---|
-| `training/` | Runs and overnight queues; `paths.output_root` in `configs/training.yaml` points here |
+| `training/` | Runs and overnight queues; `paths.output_root` in `configs/resnet50.yaml` points here |
 | `analysis/`, `previews/`, `profiling/` | Investigation artifacts; the plotting tool's default PNG goes to `analysis/` |
 | `submission/` | Inference bundles (`exports/`), their `runtimes/`, workflow `records/`, `verification/`, `prep/` scratch and offline codec wheels (`dependencies/`) |
 | `research/` | External review material and scouting sweeps |
@@ -172,7 +170,7 @@ See [implemented corrections](../history/baseline1-review.md#implemented-correct
 for allowed runtime/storage changes and baseline1 compatibility.
 
 **Count-normalised attention** (`model.count_normalized_attention`, required, `false` in
-`configs/training.yaml`) subtracts `log(that acquisition's valid tokens in the study)` from every
+`configs/resnet50.yaml`) subtracts `log(that acquisition's valid tokens in the study)` from every
 token's attention score before the masked softmax in `_attention_pool`, so a series' attention
 mass no longer grows with the number of triplets it contributed. It applies in training,
 validation and inference alike, and `false` is bit-identical to the earlier code. Because it lives
@@ -180,7 +178,7 @@ in `modeling/model.py`, which is in `identity.PREPROCESSING_SOURCES`, it changes
 source digest and is a fresh-runs-only change; earlier checkpoints keep validating against their
 archived sources.
 
-**Study slice total** (`data.study_slice_total`, required, **26 in `configs/training.yaml`
+**Study slice total** (`data.study_slice_total`, required, **26 in `configs/resnet50.yaml`
 since 2026-09-18**) raises a study whose per-type budgets sum below that many training slices to
 it, scaling the slots it has in proportion to their configured budgets, largest-remainder rounded
 and capped by each slot's capacity; a study already at or above the floor is untouched. On fold 0
@@ -194,25 +192,15 @@ on 2026-09-25 ([overnight](../validation/results/2026-09-18-overnight-results.md
 exists. Configs and checkpoints that carry it fail validation and need their archived sources, as
 do the four runs that used it.
 
-**Weight averaging** (`optimizer.weight_averaging`, required, `null` by default) is a
-discriminated union: `null`, `{method: ema, decay}` or `{method: swa, epochs}`, one method per
-run; a config validator rejects SWA `epochs` greater than `trainer.max_epochs` minus
-`optimizer.warmup_epochs`. See the
-[schedule doc](../modeling/schedule-and-augmentation.md#weight-averaging) for the averaging
-semantics. When set, `KneeModule` keeps a deep-copied averaged model alongside the live one and
-rewrites checkpoints on save: the saved `state_dict`'s `model.*` keys hold the averaged weights
-(what selection, prediction, export and `compare_fold_runs` use, unchanged), and a new top-level
-`live_state_dict` key holds the live, unaveraged weights, restored to `model.*` on resume and
-dropped by export's checkpoint allowlist. Validation scores both models on the same batches every
-epoch: `val_macro_auc`, `val_soft_macro_auc`, `val_soft_target_bce` and `val_gold_macro_auc`
-always score the saved (averaged) weights, while `val_live_macro_auc`, `val_live_soft_macro_auc`,
-`val_live_soft_target_bce` and `val_live_gold_macro_auc` score the live ones. The per-epoch files gain `epochs/live_metrics_epoch_*.json`
-and `epochs/live_validation_epoch_*.csv` alongside the existing (unprefixed) ones. With
-`weight_averaging: null`, none of this exists: no `live_state_dict`, no `val_live_*` metrics, no
-`live_*` files. Independent of weight averaging, `KneeModule` always logs the pre-clip total
-gradient norm as the `grad_norm` step metric, and `timing.json` always records
-`batch_norm_refresh_seconds` (0 unless a SWA run actually refreshed BatchNorm statistics that
-epoch).
+**Removed 2026-10-14** (no recipe used them; code at `7770ce9`): weight averaging
+(`optimizer.weight_averaging`, its `live_state_dict`, `val_live_*` metrics and
+`batch_norm_refresh_seconds`), the report-attribute heads (`trainer.report_attribute_loss_weight`,
+`paths.report_attribute_manifest`), the scanner confusion head (`trainer.scanner_confusion_weight`),
+`model.dropout`, `model.series_dropout`, `model.checkpoint_backbone`, `model.backbone_eval`,
+`validation.unused_folds`, and the switches that every recipe had on (`model.plane_readout`,
+`view_label_bias`, `anatomical_frame`, `meniscus_map`, `soft_tissue_routing`), whose behaviour is now
+fixed. `paths.anatomy_targets`, `paths.meniscus_targets` and both loss weights are required. The
+pre-clip total gradient norm is still logged as `grad_norm`.
 
 Keep reusable metadata and label tables under `data/`, outside run directories.
 Preserve original gold/silver

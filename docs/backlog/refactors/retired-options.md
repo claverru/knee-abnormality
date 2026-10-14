@@ -7,4 +7,4 @@ with its branch and every config that sets it. `data.repeated_series_share`,
 
 | Option | Why it goes | Code |
 |---|---|---|
-| `trainer.min_delta` | Its only consumer is EarlyStopping, whose patience covers the whole fixed training budget | `config.py`, `scripts/pipeline/train.py`; set in `configs/training.yaml`, `coatnet.yaml` |
+| `trainer.min_delta` | Its only consumer is EarlyStopping, whose patience covers the whole fixed training budget | `config.py`, `scripts/pipeline/train.py`; set in `configs/resnet50.yaml`, `coatnet.yaml` |

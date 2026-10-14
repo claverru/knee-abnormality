@@ -1,5 +1,7 @@
 # Scanner confusion head
 
+**Removed from the code on 2026-10-14** (no recipe used it): the head and its loss are at `7770ce9:src/knee_abnormality/training/auxiliary/scanner_confusion.py`. The rest of this page describes it as it was.
+
 **Part of the ReXNet recipe (`configs/rexnet-200.yaml`) since 2026-09-27; removed from the
 ResNet-18 recipe on 2026-09-30** (user decisions): a training-only head learns the study's
 scanner group from detached tokens, and a bounded confusion loss pushes the backbone's tokens

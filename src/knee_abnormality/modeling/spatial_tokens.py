@@ -1,45 +1,13 @@
 import torch
 from timm.layers import to_2tuple
-from timm.models._efficientnet_blocks import (
-    ConvBnAct,
-    DepthwiseSeparableConv,
-    EdgeResidual,
-    InvertedResidual,
-)
-from timm.models.maxxvit import Downsample2d, MbConvBlock, TransformerBlock2d
-from timm.models.resnet import BasicBlock, Bottleneck
+from timm.models.resnet import Bottleneck
 from torch import nn
 
 from knee_abnormality.modeling.staged_backbones import STAGED_BACKBONES
 
-COATNET_BACKBONE = "coatnet_rmlp_2_rw_224.sw_in12k_ft_in1k"
 CONVNEXT_BACKBONES = ("convnext_tiny.in12k_ft_in1k",)
 
 BACKBONE_MAPPINGS = {
-    "rexnet_200.nav_in1k": {
-        "layout": "NCHW",
-        "origin": [0.0, 0.0],
-        "stride": [32.0, 32.0],
-        "anchors": "convolution_centers",
-    },
-    "efficientnet_b3.ra2_in1k": {
-        "layout": "NCHW",
-        "origin": [0.0, 0.0],
-        "stride": [32.0, 32.0],
-        "anchors": "convolution_centers",
-    },
-    "efficientnet_b0.ra4_e3600_r224_in1k": {
-        "layout": "NCHW",
-        "origin": [0.0, 0.0],
-        "stride": [32.0, 32.0],
-        "anchors": "convolution_centers",
-    },
-    "efficientnet_b0.ra_in1k": {
-        "layout": "NCHW",
-        "origin": [0.0, 0.0],
-        "stride": [32.0, 32.0],
-        "anchors": "convolution_centers",
-    },
     **{
         f"{name}.layer3": {
             "layout": "NCHW",
@@ -47,7 +15,7 @@ BACKBONE_MAPPINGS = {
             "stride": [16.0, 16.0],
             "anchors": "convolution_centers",
         }
-        for name in ("resnet18.a1_in1k", "resnet50.a1_in1k")
+        for name in ("resnet50.a1_in1k",)
     },
     **{
         name: {
@@ -76,12 +44,6 @@ BACKBONE_MAPPINGS = {
         }
         for name in CONVNEXT_BACKBONES
     },
-    COATNET_BACKBONE: {
-        "layout": "NCHW",
-        "origin": [12.0, 12.0],
-        "stride": [32.0, 32.0],
-        "anchors": "mbconv_main_branch_and_attention_pool_centers",
-    },
     **{
         f"{name}{suffix}": {
             "layout": "NCHW",
@@ -92,19 +54,11 @@ BACKBONE_MAPPINGS = {
         for name in STAGED_BACKBONES
         for suffix, stride in (("", 32.0), (".layer3", 16.0), (".layer2", 8.0))
     },
-    **{
-        name: {
-            "layout": "NCHW",
-            "origin": [0.0, 0.0],
-            "stride": [32.0, 32.0],
-            "anchors": "convolution_centers",
-        }
-        for name in (
-            "resnet50.tv_in1k",
-            "resnet50.a1_in1k",
-            "resnet18.a1_in1k",
-            "resnet10t.c3_in1k",
-        )
+    "resnet50.a1_in1k": {
+        "layout": "NCHW",
+        "origin": [0.0, 0.0],
+        "stride": [32.0, 32.0],
+        "anchors": "convolution_centers",
     },
 }
 
@@ -119,7 +73,7 @@ SPATIAL_TOKEN_IDENTITY = {
     "initialization_rng": "side_head_position_prior_up_width_and_knee_level_scale_parameters_forked_removed_position_draw_count_and_target_sized_scorer_and_readout_draws_preserve_training_stream_meniscus_stride16_projection_and_head_forked",
     "view_policy": "sagittal_fluid_second_64mm_view_reuses_first_view_exact_slice_selection_and_budget_excluded_from_first_look_shared_patient_shift_jitter_and_turn_configured_fixed_fields_and_slice_counts_all_six_views_shift_turn_scale_detached_single_eval_central224_first_look_multiplier_one_scale_sqrt_medial_bone_sd_times_front_femur_sd_over17.087_clamp0.87_to1.13_zero_mass_one_sagittal_coronal_incumbent_centres_and12deg_turn_axial_center_midpoint_femur_share5th_front_minus30mm_kneecap_share95th_front_frame_medial_zero_projected_medial_axis20deg_turn_shift18mm_sagittal_coronal8mm_axial_rounded_pixels_training_jitter3deg3mm_all_views_side_per_series_in_split_studies",
     "view_embedding": "zero_initialized_additive_detail_only",
-    "view_label_bias": "optional_zero_initialized_additive_attention_score_per_view_and_channel",
+    "view_label_bias": "zero_initialized_additive_attention_score_per_view_and_channel",
     "geometry_dtype": "float32_outside_autocast",
     "plane_order": ["Axial", "Coronal", "Sagittal"],
     "contrast_order": [[0, 0], [1, 1]],
@@ -178,84 +132,6 @@ def _spatial_mapping(
     return origin[0], origin[1], stride[0], stride[1]
 
 
-def _rexnet_mapping(backbone: nn.Module) -> tuple[float, float, float, float]:
-    convolutions = [backbone.stem.conv]
-    for block in backbone.features:
-        if hasattr(block, "conv_dw"):
-            if block.conv_exp is not None:
-                convolutions.append(block.conv_exp.conv)
-            convolutions.extend((block.conv_dw.conv, block.conv_pwl.conv))
-        elif hasattr(block, "conv"):
-            convolutions.append(block.conv)
-        else:
-            raise ValueError("Unsupported ReXNet spatial feature block")
-    return _spatial_mapping(convolutions)
-
-
-def _efficientnet_mapping(backbone: nn.Module) -> tuple[float, float, float, float]:
-    convolutions = [backbone.conv_stem]
-    for stage in backbone.blocks:
-        for block in stage:
-            if isinstance(block, DepthwiseSeparableConv):
-                convolutions.extend((block.conv_dw, block.conv_pw))
-            elif isinstance(block, InvertedResidual):
-                convolutions.extend((block.conv_pw, block.conv_dw, block.conv_pwl))
-            elif isinstance(block, ConvBnAct):
-                convolutions.append(block.conv)
-            elif isinstance(block, EdgeResidual):
-                convolutions.extend((block.conv_exp, block.conv_pwl))
-            else:
-                raise TypeError(
-                    f"Unsupported EfficientNet spatial block: {type(block).__name__}"
-                )
-    convolutions.append(backbone.conv_head)
-    return _spatial_mapping(convolutions)
-
-
-def _coatnet_mapping(backbone: nn.Module) -> tuple[float, float, float, float]:
-    mapping = _spatial_mapping([backbone.stem.conv1, backbone.stem.conv2])
-    for stage in backbone.stages:
-        for block in stage.blocks:
-            previous = mapping
-            if isinstance(block, MbConvBlock):
-                if not isinstance(block.down, nn.Identity):
-                    raise TypeError(
-                        "CoAtNet spatial anchors require depthwise downsampling"
-                    )
-                layers = [block.conv1_1x1, block.conv2_kxk, block.conv3_1x1]
-            elif isinstance(block, TransformerBlock2d):
-                layers = (
-                    [block.norm1.down.pool, block.norm1.down.expand]
-                    if isinstance(block.norm1, nn.Sequential)
-                    else []
-                )
-            else:
-                raise TypeError(
-                    f"Unsupported CoAtNet spatial block: {type(block).__name__}"
-                )
-            mapping = _spatial_mapping(layers, previous)
-            shortcut = block.shortcut
-            shortcut_layers = (
-                [shortcut.pool, shortcut.expand]
-                if isinstance(shortcut, Downsample2d)
-                else [shortcut]
-            )
-            shortcut_mapping = _spatial_mapping(shortcut_layers, previous)
-            expected_shortcut = mapping
-            if isinstance(block, MbConvBlock) and isinstance(shortcut, Downsample2d):
-                expected_shortcut = (
-                    mapping[0] + previous[2] / 2,
-                    mapping[1] + previous[3] / 2,
-                    mapping[2],
-                    mapping[3],
-                )
-            if shortcut_mapping != expected_shortcut:
-                raise ValueError(
-                    "CoAtNet residual geometry differs from verified anchors"
-                )
-    return mapping
-
-
 def _convnext_mapping(
     backbone: nn.Module, stages: int = 4
 ) -> tuple[float, float, float, float]:
@@ -283,26 +159,16 @@ def _convnext_mapping(
 def _resnet_mapping(
     backbone: nn.Module, stages: int = 4
 ) -> tuple[float, float, float, float]:
-    stem = (
-        backbone.conv1
-        if isinstance(backbone.conv1, nn.Sequential)
-        else [backbone.conv1]
-    )
-    mapping = _spatial_mapping(
-        [layer for layer in stem if isinstance(layer, nn.Conv2d)] + [backbone.maxpool]
-    )
+    mapping = _spatial_mapping([backbone.conv1, backbone.maxpool])
     for stage in (backbone.layer1, backbone.layer2, backbone.layer3, backbone.layer4)[
         :stages
     ]:
         for block in stage:
-            if isinstance(block, Bottleneck):
-                layers = [block.conv1, block.aa, block.conv2, block.conv3]
-            elif isinstance(block, BasicBlock):
-                layers = [block.conv1, block.aa, block.conv2]
-            else:
+            if not isinstance(block, Bottleneck):
                 raise TypeError(
                     f"Unsupported ResNet spatial block: {type(block).__name__}"
                 )
+            layers = [block.conv1, block.aa, block.conv2, block.conv3]
             previous = mapping
             mapping = _spatial_mapping(layers, previous)
             if block.downsample is None:
@@ -342,17 +208,8 @@ def _resnet_mapping(
 
 
 _BACKBONE_MAPPING_FUNCTIONS = {
-    "rexnet_200.nav_in1k": _rexnet_mapping,
-    "efficientnet_b3.ra2_in1k": _efficientnet_mapping,
-    "efficientnet_b0.ra4_e3600_r224_in1k": _efficientnet_mapping,
-    "efficientnet_b0.ra_in1k": _efficientnet_mapping,
-    COATNET_BACKBONE: _coatnet_mapping,
-    "resnet50.tv_in1k": _resnet_mapping,
     "resnet50.a1_in1k": _resnet_mapping,
-    "resnet18.a1_in1k": _resnet_mapping,
-    "resnet18.a1_in1k.layer3": lambda backbone: _resnet_mapping(backbone, 3),
     "resnet50.a1_in1k.layer3": lambda backbone: _resnet_mapping(backbone, 3),
-    "resnet10t.c3_in1k": _resnet_mapping,
     **{
         f"{name}{suffix}": lambda backbone, stages=stages: _spatial_mapping(
             backbone.geometry_layers(stages)

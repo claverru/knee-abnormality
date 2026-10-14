@@ -12,6 +12,7 @@ from knee_abnormality.autoresearch.campaign.binding import (
     reference_seed,
 )
 from knee_abnormality.autoresearch.campaign.definition import (
+    RECIPE,
     CampaignPolicy,
     load_campaign,
 )
@@ -236,9 +237,7 @@ class Supervisor(JobMixin, ExperimentMixin, ResultMixin, SchedulingMixin, Monito
                 self.docs, base / "autoresearch/campaigns" / self.campaign["id"]
             )
         config["seed"] = reference_seed({"run": str(reference)})
-        atomic_write(
-            base / "configs/training.yaml", yaml.safe_dump(config, sort_keys=False)
-        )
+        atomic_write(base / RECIPE, yaml.safe_dump(config, sort_keys=False))
         write_json(self.output / "baseline/manifest.json", manifest(base))
         write_json(self.output / "baseline/config.json", config)
         write_json(self.output / "limits.json", limits)

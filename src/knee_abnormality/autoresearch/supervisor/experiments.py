@@ -16,6 +16,7 @@ from knee_abnormality.autoresearch.campaign.binding import (
     reference_seed,
     reference_snapshot,
 )
+from knee_abnormality.autoresearch.campaign.definition import RECIPE
 from knee_abnormality.autoresearch.campaign.gates import (
     chained_counts,
     config_differences,
@@ -146,7 +147,7 @@ class ExperimentMixin:
                     sys.executable,
                     "-m",
                     "knee_abnormality.config",
-                    str(source / "configs/training.yaml"),
+                    str(source / RECIPE),
                 ],
                 source,
                 [],

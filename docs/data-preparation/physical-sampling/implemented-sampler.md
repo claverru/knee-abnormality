@@ -1,6 +1,6 @@
 # Implemented sampler
 
-The current recipe in `configs/training.yaml` uses positive finite
+The current recipe in `configs/resnet50.yaml` uses positive finite
 `data.sampling_sigma_fraction: 0.867` and independent epoch-specific random
 targets within each probability band. It preserves the spatial-token model, accepted
 study-center estimator, reliability thresholds, 140-mm crop and acquisition-
