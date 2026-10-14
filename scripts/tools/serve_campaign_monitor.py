@@ -31,6 +31,8 @@ WATCHDOG = "watchdog"
 MAXIMUM_MESSAGE_BYTES = 20000
 TAILNET = (ip_network("100.64.0.0/10"), ip_network("fd7a:115c:a1e0::/48"))
 GAINS: dict[tuple, list[float]] = {}
+REGISTRY = Path("outputs/autoresearch/monitor/campaigns")
+SUMMARIES: dict[str, dict] = {}
 PLOTLY_JS = f"plotly-{plotly.__version__}.min.js"
 BANNER = {
     "RUNNING": "var(--good)",
@@ -133,6 +135,15 @@ form.send { display: flex; gap: 8px; margin-top: 8px; align-items: flex-end; }
 form.send textarea { flex: 1; min-height: 56px; font: inherit; color: var(--ink); background: var(--bg);
   border: 1px solid var(--grid); border-radius: 6px; padding: 6px; }
 form.send button { font: inherit; padding: 6px 14px; }
+a { color: var(--s1); }
+nav { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px; }
+nav a { padding: 8px 14px; border-radius: 8px; background: var(--card); color: var(--ink); text-decoration: none;
+  font-size: 14px; }
+nav a.back { background: var(--s1); color: #fff; font-weight: 600; }
+a.campaign { display: block; margin-top: 12px; color: var(--ink); text-decoration: none; }
+a.campaign .name { font-size: 16px; font-weight: 600; }
+.pill { display: inline-block; color: #fff; border-radius: 10px; padding: 1px 8px; margin-left: 6px;
+  font-size: 12px; font-weight: 600; }
 """
 SCRIPT = """
 const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -177,9 +188,10 @@ PAGE = """<!doctype html>
 <html><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{campaign} monitor</title>
-<script src="{plotly_js}"></script>
+<script src="/{plotly_js}"></script>
 <style>{style}</style></head>
 <body>
+<nav><a class="back" href="/">← All campaigns</a>{others}</nav>
 <h1>{campaign}</h1>
 <div class="banner" style="background:{color}">{state} · supervisor {supervisor}<small>{detail}</small></div>
 <div id="age" data-updated="{updated_ms}" data-interval="{refresh}"></div>
@@ -188,16 +200,37 @@ PAGE = """<!doctype html>
 <script>{script}</script>
 </body></html>
 """
+FRONT = """<!doctype html>
+<html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Campaigns</title>
+<style>{style}</style></head>
+<body>
+<h1>Campaigns</h1>
+<div id="age" data-updated="{updated_ms}" data-interval="{refresh}"></div>
+{body}
+<script>
+const age = document.getElementById("age");
+const interval = Number(age.dataset.interval) * 1000;
+function describeAge() {{
+  const minutes = (Date.now() - Number(age.dataset.updated)) / 60000;
+  age.textContent = "updated " + Math.round(minutes) + " min ago · reloads every " + Math.round(interval / 1000) + " s";
+}}
+describeAge();
+setInterval(() => location.reload(), interval);
+</script>
+</body></html>
+"""
 
 
 class MonitorCLI(CLISettings):
     model_config = describe(
-        "Serve an auto-refreshing page for one autoresearch campaign: its state, the decided runs "
-        "against the control, per-epoch validation AUC and loss curves of the control, the "
-        "incumbent and the current run, and per-label deltas, regenerated on each page request"
+        "Serve one auto-refreshing site for every registered autoresearch campaign: a front page "
+        "listing the live ones whatever their status, and per campaign its state, the decided runs against the control, per-epoch "
+        "validation AUC and loss curves of the control, the incumbent and the current run, "
+        "per-label deltas and its own message box, regenerated on each page request"
     )
 
-    campaign: str = Field(description="Campaign ID")
     hosts: list[str] = Field(
         description="Addresses to bind, e.g. the Tailscale IPv4 and IPv6 and 127.0.0.1"
     )
@@ -214,6 +247,24 @@ class MonitorCLI(CLISettings):
 class Message(BaseModel):
     time: datetime
     text: str
+
+
+class Registration(BaseModel):
+    campaign: str = Field(pattern=r"^[a-z0-9][a-z0-9-]*$")
+    root: Path
+
+
+def registrations() -> dict[str, Registration]:
+    entries = (
+        Registration.model_validate_json(path.read_text())
+        for path in sorted(REGISTRY.glob("*.json"))
+    )
+    return {
+        entry.campaign: entry
+        for entry in entries
+        if Path(f"outputs/autoresearch/{entry.campaign}/state.json").is_file()
+        and (entry.root / "autoresearch/campaigns" / entry.campaign).is_dir()
+    }
 
 
 def messages_path(campaign: str) -> Path:
@@ -410,6 +461,12 @@ def per_label(run: dict) -> dict[str, dict]:
     return {entry["target"]: entry for entry in entries}
 
 
+def local_input(path: str) -> str:
+    if Path(path).is_file() or "/data/" not in path:
+        return path
+    return str(Path("data") / path.rsplit("/data/", 1)[1])
+
+
 def control_gain(control: dict, run: Path, fold: int, runs: list[dict]) -> list | None:
     report = next((r["comparison"] for r in runs if r["comparison"]), None)
     files = [fold_dir(path, fold) / PREDICTIONS for path in (control["run"], run)]
@@ -424,7 +481,10 @@ def control_gain(control: dict, run: Path, fold: int, runs: list[dict]) -> list 
         from knee_abnormality.evaluation import metrics
 
         report = read_json(Path(report))
-        inputs = {Path(item["path"]).name: item["path"] for item in report["inputs"]}
+        inputs = {
+            Path(item["path"]).name: local_input(item["path"])
+            for item in report["inputs"]
+        }
         if "studies.csv" not in inputs:
             return None
         frame = (
@@ -813,8 +873,8 @@ def minutes(seconds: float) -> str:
     return f"{seconds / 60:.0f} min" if seconds >= 60 else f"{seconds:.0f} s"
 
 
-def agents(state: dict) -> str:
-    configured = yaml.safe_load(Path("autoresearch/agents.yaml").read_text()).get(
+def agents(state: dict, root: Path) -> str:
+    configured = yaml.safe_load((root / "autoresearch/agents.yaml").read_text()).get(
         state["provider"], {}
     )
     root = Path(f"outputs/autoresearch/{state['campaign']}/jobs")
@@ -877,7 +937,7 @@ def agents(state: dict) -> str:
     )
 
 
-def activity(status: str, state: dict) -> str:
+def activity(status: str, state: dict, root: Path) -> str:
     rows = "".join(job(line) for line in status_lines(status, "Now"))
     jobs = (
         "<div class='jobs-scroll'><table class='jobs'><tr><th>run</th><th>stage</th><th>time</th><th>epoch</th><th>×1</th>"
@@ -892,7 +952,7 @@ def activity(status: str, state: dict) -> str:
     return (
         "<div class='activity'>"
         f"<div class='card'><div class='sub'>Now</div>{jobs}</div>"
-        f"<div class='card'><div class='sub'>Agents · {html.escape(state['provider'])}</div>{agents(state)}</div>"
+        f"<div class='card'><div class='sub'>Agents · {html.escape(state['provider'])}</div>{agents(state, root)}</div>"
         f"<div class='card'><div class='sub'>Up next</div><ol>{queue or '<li>empty</li>'}</ol></div>"
         "</div>"
     )
@@ -916,42 +976,40 @@ def messages(campaign: str) -> str:
     return (
         "<h2>Messages to the keeper</h2><div class='card'>"
         f"<div class='thread' id='thread'>{rows or "<div class='sub'>none yet</div>"}</div>"
-        "<form class='send' method='post' action='/messages'>"
+        "<form class='send' method='post' action='messages'>"
         f"<textarea id='draft' name='text' maxlength='{MAXIMUM_MESSAGE_BYTES // 4}' required></textarea>"
         "<button>Send</button></form></div>"
     )
 
 
-def regenerate(settings: MonitorCLI) -> None:
-    settings.directory.mkdir(parents=True, exist_ok=True)
+def regenerate(settings: MonitorCLI, entry: Registration) -> None:
+    campaign = entry.campaign
+    directory = settings.directory / campaign
+    directory.mkdir(parents=True, exist_ok=True)
     if not (settings.directory / PLOTLY_JS).exists():
         (settings.directory / PLOTLY_JS).write_text(get_plotlyjs())
+    python = entry.root / ".venv/bin/python"
     status = subprocess.run(
         [
-            sys.executable,
+            str(python if python.exists() else sys.executable),
             "-m",
             "scripts.tools.autoresearch",
             "status",
-            settings.campaign,
+            campaign,
         ],
+        cwd=entry.root,
         capture_output=True,
         text=True,
         check=False,
     ).stdout
     header = next(
-        (
-            line
-            for line in status.splitlines()
-            if line.startswith(f"{settings.campaign} · ")
-        ),
+        (line for line in status.splitlines() if line.startswith(f"{campaign} · ")),
         "",
     )
     parts = [part.strip() for part in header.split("·")]
     state_name = parts[2] if len(parts) > 2 else "UNKNOWN"
     supervisor = parts[3].removeprefix("supervisor ") if len(parts) > 3 else "unknown"
-    state = json.loads(
-        Path(f"outputs/autoresearch/{settings.campaign}/state.json").read_text()
-    )
+    state = json.loads(Path(f"outputs/autoresearch/{campaign}/state.json").read_text())
     control, runs = collect(state)
     fold = campaign_fold(state)
     detail = state.get("reason") or {
@@ -968,16 +1026,22 @@ def regenerate(settings: MonitorCLI) -> None:
     )
     body = (
         tiles(control, runs, fold)
-        + activity(status, state)
-        + messages(settings.campaign)
+        + activity(status, state, entry.root)
+        + messages(campaign)
         + "<h2>Results</h2>"
         + results(control, runs)
         + comparison(control, runs, fold)
         + "<h2>Curves</h2>"
         + curves(control, runs)
     )
+    others = "".join(
+        f"<a href='/{html.escape(name)}/'>{html.escape(name)}</a>"
+        for name in registrations()
+        if name != campaign
+    )
     page = PAGE.format(
-        campaign=html.escape(settings.campaign),
+        campaign=html.escape(campaign),
+        others=others,
         plotly_js=PLOTLY_JS,
         style=STYLE,
         state=html.escape(state_name),
@@ -990,28 +1054,83 @@ def regenerate(settings: MonitorCLI) -> None:
         status=html.escape(status),
         script=SCRIPT,
     )
-    (settings.directory / "index.tmp").write_text(page)
-    (settings.directory / "index.tmp").replace(settings.directory / "index.html")
+    (directory / "index.tmp").write_text(page)
+    (directory / "index.tmp").replace(directory / "index.html")
+    waiting = len(read_messages(campaign))
+    seen = messages_path(campaign).with_suffix(".seen")
+    waiting -= int(seen.read_text()) if seen.is_file() else 0
+    SUMMARIES[campaign] = {
+        "state": state_name,
+        "supervisor": supervisor,
+        "color": color,
+        "detail": detail,
+        "now": status_lines(status, "Now"),
+        "queued": len(state["queue"]),
+        "decided": len(runs),
+        "waiting": waiting,
+    }
     print(
-        f"{datetime.now().astimezone():%H:%M} {state_name} supervisor {supervisor}",
+        f"{datetime.now().astimezone():%H:%M} {campaign} {state_name} supervisor {supervisor}",
         flush=True,
     )
 
 
+def front_page(settings: MonitorCLI) -> None:
+    order = {"RUNNING": 0, "CALIBRATING": 0, "PAUSED": 1, "STOPPING": 2}
+    cards = []
+    for name, summary in sorted(
+        SUMMARIES.items(), key=lambda item: (order.get(item[1]["state"], 3), item[0])
+    ):
+        if name not in registrations():
+            continue
+        now = "".join(f"<li>{html.escape(line)}</li>" for line in summary["now"])
+        waiting = (
+            f" · <span class='waiting'>{summary['waiting']} messages waiting for the keeper</span>"
+            if summary["waiting"]
+            else ""
+        )
+        cards.append(
+            f"<a class='campaign card' href='/{html.escape(name)}/'>"
+            f"<span class='name'>{html.escape(name)}</span>"
+            f"<span class='pill' style='background:{summary['color']}'>{html.escape(summary['state'])} · "
+            f"supervisor {html.escape(summary['supervisor'])}</span>"
+            f"<div class='sub'>{html.escape(summary['detail'])}</div>"
+            f"<ul>{now or '<li>idle</li>'}</ul>"
+            f"<div class='sub'>{summary['decided']} runs decided · {summary['queued']} ideas queued{waiting}</div>"
+            "</a>"
+        )
+    page = FRONT.format(
+        style=STYLE,
+        updated_ms=int(time.time() * 1000),
+        refresh=settings.interval,
+        body="".join(cards) or "<div class='sub'>No live campaign.</div>",
+    )
+    (settings.directory / "index.tmp").write_text(page)
+    (settings.directory / "index.tmp").replace(settings.directory / "index.html")
+
+
 MINIMUM_AGE_SECONDS = 5
 REGENERATION = threading.Lock()
-last_regeneration = [float("-inf")]
+last_regeneration: dict[str, float] = {}
 
 
-def fresh(settings: MonitorCLI) -> None:
+def fresh(settings: MonitorCLI, entry: Registration) -> None:
     with REGENERATION:
-        if time.monotonic() - last_regeneration[0] < MINIMUM_AGE_SECONDS:
+        age = time.monotonic() - last_regeneration.get(entry.campaign, float("-inf"))
+        if age < MINIMUM_AGE_SECONDS:
             return
         try:
-            regenerate(settings)
+            regenerate(settings, entry)
         except (OSError, ValueError, KeyError) as error:
-            print(f"regeneration failed: {error}", flush=True)
-        last_regeneration[0] = time.monotonic()
+            print(f"regeneration of {entry.campaign} failed: {error}", flush=True)
+        last_regeneration[entry.campaign] = time.monotonic()
+
+
+def fresh_front(settings: MonitorCLI) -> None:
+    for entry in registrations().values():
+        fresh(settings, entry)
+    with REGENERATION:
+        front_page(settings)
 
 
 class Handler(SimpleHTTPRequestHandler):
@@ -1020,8 +1139,13 @@ class Handler(SimpleHTTPRequestHandler):
         super().__init__(*args, directory=str(settings.directory), **kwargs)
 
     def do_GET(self) -> None:
-        if self.path.split("?")[0] in {"/", "/index.html"}:
-            fresh(self.settings)
+        parts = self.path.split("?")[0].strip("/").split("/")
+        if parts in ([""], ["index.html"]):
+            fresh_front(self.settings)
+        elif len(parts) <= 2 and parts[1:] in ([], ["index.html"]):
+            entry = registrations().get(parts[0])
+            if entry is not None:
+                fresh(self.settings, entry)
         super().do_GET()
 
     def do_POST(self) -> None:
@@ -1030,17 +1154,19 @@ class Handler(SimpleHTTPRequestHandler):
             self.send_error(403)
             return
         length = int(self.headers.get("Content-Length", 0))
-        if self.path != "/messages" or not 0 < length <= MAXIMUM_MESSAGE_BYTES:
+        parts = self.path.strip("/").split("/")
+        campaign = parts[0] if len(parts) == 2 and parts[1] == "messages" else None
+        if campaign not in registrations() or not 0 < length <= MAXIMUM_MESSAGE_BYTES:
             self.send_error(400)
             return
         form = parse_qs(self.rfile.read(length).decode())
         text = form.get("text", [""])[0].replace("\r\n", "\n").strip()
         if text:
             with REGENERATION:
-                append_message(self.settings.campaign, text)
-                last_regeneration[0] = float("-inf")
+                append_message(campaign, text)
+                last_regeneration.pop(campaign, None)
         self.send_response(303)
-        self.send_header("Location", "/")
+        self.send_header("Location", f"/{campaign}/")
         self.end_headers()
 
     def end_headers(self) -> None:
@@ -1057,7 +1183,8 @@ class IPv6Server(ThreadingHTTPServer):
 
 
 def run(settings: MonitorCLI) -> None:
-    fresh(settings)
+    settings.directory.mkdir(parents=True, exist_ok=True)
+    fresh_front(settings)
     handler = partial(Handler, settings=settings)
     servers = []
     for host in settings.hosts:

@@ -11,7 +11,7 @@ while true; do
   status=$(rtk proxy uv run --locked python -m scripts.tools.autoresearch status "$campaign" 2>&1)
   header=$(echo "$status" | grep -m1 "^$campaign · ")
   warnings=$(echo "$status" | grep -iE "pause|error|provider wait|dead|stopped|blocked|invalid" | grep -v "research waits" | head -5)
-  now=$(echo "$status" | sed -n '/^Now/,/^$/p' | sed -n '2,4p' | sed -E 's/[0-9]+m [0-9]+s//g; s/[0-9]+h [0-9]+m//g')
+  now=$(echo "$status" | sed -n '/^Now/,/^$/p' | sed -n '2,4p' | sed -E 's/[0-9]+m [0-9]+s//g; s/[0-9]+h [0-9]+m//g' | tr -s ' ')
   if [ -n "$family" ]; then
     now=$(echo "$now" | awk -v curve="$family" '
       BEGIN { split(curve, offset, " ") }
@@ -41,6 +41,11 @@ while true; do
   fi
   if ! echo "$header" | grep -q "supervisor alive"; then
     echo "$(date +%H:%M) ALERT supervisor not alive: $header"
+  fi
+  curl -s -m 60 -o /dev/null "http://127.0.0.1:8765/$campaign/"
+  page="outputs/analysis/campaign-monitor/$campaign/index.html"
+  if [ ! -f "$page" ] || [ $(( $(date +%s) - $(stat -c %Y "$page") )) -gt 900 ]; then
+    echo "$(date +%H:%M) ALERT monitor page of $campaign is missing or older than 15 minutes"
   fi
   for _ in $(seq 12); do
     total=0
