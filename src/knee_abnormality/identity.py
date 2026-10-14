@@ -28,6 +28,7 @@ PREPROCESSING_SOURCES = (
     "modeling/augmentation.py",
     "modeling/model.py",
     "modeling/spatial_tokens.py",
+    "modeling/view_windows.py",
     "inference/reflection.py",
 )
 

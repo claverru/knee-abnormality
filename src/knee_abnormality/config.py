@@ -300,6 +300,7 @@ class ModelConfig(ConfigModel):
     checkpoint_backbone: bool = False
     backbone_eval: bool = False
     dropout: Annotated[float, Field(ge=0, lt=1)]
+    stochastic_depth: Annotated[float, Field(ge=0, lt=1)] = 0.0
     series_dropout: Annotated[float, Field(ge=0, lt=1)]
     plane_readout: bool = False
     view_label_bias: bool = False
@@ -340,6 +341,7 @@ WeightAveragingConfig = Annotated[EMAConfig | SWAConfig, Field(discriminator="me
 
 class OptimizerConfig(ConfigModel):
     backbone_lr: Annotated[float, Field(gt=0)]
+    backbone_lr_stage_decay: Annotated[float, Field(gt=0, le=1)] = 1.0
     head_lr: Annotated[float, Field(gt=0)]
     weight_decay: Annotated[float, Field(ge=0)]
     beta1: Annotated[float, Field(gt=0, lt=1)]
@@ -348,9 +350,11 @@ class OptimizerConfig(ConfigModel):
     warmup_epochs: Annotated[StrictInt, Field(ge=0)]
     warmup_start_ratio: Annotated[float, Field(gt=0, le=1)]
     minimum_lr_ratio: Annotated[float, Field(gt=0, le=1)]
+    lr_decay: Literal["cosine", "linear"] = "cosine"
     weight_averaging: WeightAveragingConfig | None
     anchor_alpha_early: Annotated[float, Field(ge=0, allow_inf_nan=False)] = 0.0
     anchor_alpha_late: Annotated[float, Field(ge=0, allow_inf_nan=False)] = 0.0
+    late_anchor_follows_lr: bool = False
 
 
 class TrainerConfig(ConfigModel):
