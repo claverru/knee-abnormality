@@ -36,6 +36,7 @@ from knee_abnormality.inference.checkpoint import (
     validate_checkpoint,
 )
 from knee_abnormality.kaggle import (
+    BACKBONE_WHEELS,
     KAGGLE_PLATFORM,
     KAGGLE_PYTHON,
     KAGGLE_WHEELS,
@@ -278,16 +279,19 @@ def _license_record(info) -> dict:
 
 
 def _wheel_requirements(
-    wheel_dir: Path, destination: Path
+    wheel_dirs: list[Path], destination: Path
 ) -> tuple[list[str], list[str], list[dict]]:
     requirements = []
     copied = []
     dependencies = []
     versions = {}
-    wheel_dir = wheel_dir.expanduser().resolve()
-    if not wheel_dir.is_dir():
-        raise FileNotFoundError(f"Wheel directory does not exist: {wheel_dir}")
-    for source in sorted(wheel_dir.glob("*.whl")):
+    wheel_dirs = [wheel_dir.expanduser().resolve() for wheel_dir in wheel_dirs]
+    for wheel_dir in wheel_dirs:
+        if not wheel_dir.is_dir():
+            raise FileNotFoundError(f"Wheel directory does not exist: {wheel_dir}")
+    for source in sorted(
+        source for wheel_dir in wheel_dirs for source in wheel_dir.glob("*.whl")
+    ):
         name, wheel_version, _, _ = parse_wheel_filename(source.name)
         normalized_name = str(name)
         normalized_version = str(wheel_version)
@@ -407,7 +411,17 @@ def export_bundle(args: ExportCLI) -> dict:
         _copy_code(temporary / "code")
         source_hash = _source_hash(temporary / "code")
         requirements, wheels, wheel_dependencies = _wheel_requirements(
-            args.wheel_dir, temporary / "wheels"
+            [
+                args.wheel_dir,
+                *sorted(
+                    {
+                        BACKBONE_WHEELS[member.config.model.backbone]
+                        for member in members
+                        if member.config.model.backbone in BACKBONE_WHEELS
+                    }
+                ),
+            ],
+            temporary / "wheels",
         )
         (temporary / "requirements.txt").write_text(
             "".join(f"{requirement}\n" for requirement in requirements),

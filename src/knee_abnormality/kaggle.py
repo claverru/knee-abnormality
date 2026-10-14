@@ -7,6 +7,9 @@ COMPETITION = "rsna-knee-abnormality-detection"
 KAGGLE_PYTHON = "3.13"
 KAGGLE_PLATFORM = "manylinux_x86_64"
 KAGGLE_WHEELS = Path("outputs/submission/dependencies/kaggle-py313")
+BACKBONE_WHEELS = {
+    "mamba_vision_T": Path("outputs/submission/dependencies/kaggle-py313-mambavision")
+}
 OFFLINE_WHEELS = (
     "pylibjpeg==2.1.0",
     "pylibjpeg-libjpeg==2.4.0",
