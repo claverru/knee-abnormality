@@ -19,11 +19,17 @@ Anything else is fine as long as the campaign keeps working.
   project memory with the campaign, root and provider.
 - **Monitor page:** on every start or resume, run
   `bash .agents/skills/campaign-keeper/monitor.sh CAMPAIGN ROOT` and check that port 8765
-  answers. It serves the campaign's page as the systemd user unit `campaign-plots`, replacing
-  the previous campaign's, and is reachable only inside the tailnet. Leave it running when the
-  campaign stops.
-- **Messages:** the user writes to you in the page's message box, and the watch prints each
-  new text once as `MESSAGE from the user`. These are light indications while the user is away,
+  answers. It registers the campaign with the one monitor site, the systemd user unit
+  `campaign-plots` served from the main checkout and reachable only inside the tailnet, and
+  starts the site if it is down. The front page lists every live campaign whatever its status,
+  stopped ones too, and each has its page under `/CAMPAIGN/`; a campaign registered later
+  appears without a restart. A campaign leaves the list when its root is removed. Leave the
+  site running when the campaign stops. `monitor_guard.sh`, run as the user unit
+  `campaign-plots-guard`, restarts the site from the main checkout when it is down, serves from
+  another checkout or stops answering.
+- **Messages:** the user writes to you in the message box of your campaign's page, and the watch
+  prints each new text once as `MESSAGE from the user`. Each campaign has its own box and file,
+  so you receive only your campaign's messages. These are light indications while the user is away,
   such as dropping, adding or reordering a seed: follow them with your own judgment.
 - **Watch:** Monitor `bash .agents/skills/campaign-keeper/watch.sh CAMPAIGN ROOT` at the maximum
   timeout, and re-arm it on every expiry.
