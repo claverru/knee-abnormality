@@ -1,0 +1,161 @@
+diff --git a/src/knee_abnormality/modeling/spatial_tokens.py b/src/knee_abnormality/modeling/spatial_tokens.py
+index 58c8d21..d6cc75c 100644
+--- a/src/knee_abnormality/modeling/spatial_tokens.py
++++ b/src/knee_abnormality/modeling/spatial_tokens.py
+@@ -38,12 +38,12 @@ BACKBONE_MAPPINGS = {
+     **{
+         f"{name}{suffix}": {
+             "layout": "NCHW",
+-            "origin": [0.0, 0.0],
++            "origin": [origin, origin],
+             "stride": [stride, stride],
+-            "anchors": "convolution_centers",
++            "anchors": settings["anchors"],
+         }
+-        for name in STAGED_BACKBONES
+-        for suffix, stride in (("", 32.0), (".layer3", 16.0))
++        for name, settings in STAGED_BACKBONES.items()
++        for suffix, (origin, stride) in settings["geometry"].items()
+     },
+     "resnet50.a1_in1k": {
+         "layout": "NCHW",
+diff --git a/src/knee_abnormality/modeling/staged_backbones.py b/src/knee_abnormality/modeling/staged_backbones.py
+index 96ddaaa..4e90f8b 100644
+--- a/src/knee_abnormality/modeling/staged_backbones.py
++++ b/src/knee_abnormality/modeling/staged_backbones.py
+@@ -1,8 +1,11 @@
+ import importlib
+ import importlib.util
++import itertools
++import math
+ import sys
+ import types
+ 
++import timm
+ import torch
+ from torch import nn
+ 
+@@ -11,9 +14,20 @@ IMAGENET_STD = (0.229, 0.224, 0.225)
+ 
+ STAGED_BACKBONES = {
+     "mamba_vision_T": {
++        "family": "mamba_vision",
+         "module": "mambavision.models.mamba_vision",
+         "url": "https://huggingface.co/nvidia/MambaVision-T-1K/resolve/main/mambavision_tiny_1k.pth.tar",
+         "widths": (160, 320, 640),
++        "geometry": {"": (0.0, 32.0), ".layer3": (0.0, 16.0)},
++        "anchors": "convolution_centers",
++    },
++    "radiodino_s16": {
++        "family": "vision_transformer",
++        "architecture": "vit_small_patch16_224.dino",
++        "hf_hub_id": "Snarcy/RadioDino-s16",
++        "stage_blocks": (1, 2, 5, 4),
++        "geometry": {"": (15.5, 32.0), ".layer3": (7.5, 16.0)},
++        "anchors": "patch_stem_and_downsample_centers",
+     },
+ }
+ 
+@@ -46,14 +60,45 @@ class StagedBackbone(nn.Module):
+ 
+     def geometry_layers(self, stages: int) -> list[nn.Module]:
+         modules = [self.stem, *(stage.downsample for stage in self.stages[:stages])]
++        if stages == len(self.stages):
++            modules.append(self.norm)
+         return [
+             layer
+             for module in modules
+             for layer in module.modules()
+-            if isinstance(layer, nn.Conv2d)
++            if isinstance(layer, (nn.Conv2d, nn.AvgPool2d))
+         ]
+ 
+ 
++class _PatchStem(nn.Module):
++    def __init__(self, projection: nn.Conv2d, position: torch.Tensor) -> None:
++        super().__init__()
++        side = math.isqrt(position.shape[1])
++        self.proj = projection
++        self.pos_embed = nn.Parameter(
++            position.transpose(1, 2).reshape(1, -1, side, side).clone()
++        )
++
++    def forward(self, images: torch.Tensor) -> torch.Tensor:
++        return self.proj(images) + self.pos_embed
++
++
++class _TokenBlocks(nn.Sequential):
++    def forward(self, features: torch.Tensor) -> torch.Tensor:
++        count, width, height, columns = features.shape
++        tokens = super().forward(features.flatten(2).transpose(1, 2))
++        return tokens.transpose(1, 2).reshape(count, width, height, columns)
++
++
++class _TokenNorm(nn.Module):
++    def __init__(self, norm: nn.Module) -> None:
++        super().__init__()
++        self.norm = norm
++
++    def forward(self, features: torch.Tensor) -> torch.Tensor:
++        return self.norm(features.permute(0, 2, 3, 1)).permute(0, 3, 1, 2)
++
++
+ def _stage(downsample: nn.Module | None, blocks: nn.Module) -> nn.Sequential:
+     stage = nn.Sequential()
+     stage.add_module("downsample", downsample or nn.Identity())
+@@ -73,6 +118,45 @@ def create_staged_backbone(
+     name: str, pretrained: bool, stochastic_depth: float
+ ) -> StagedBackbone:
+     settings = STAGED_BACKBONES[name]
++    return _BUILDERS[settings["family"]](name, settings, pretrained, stochastic_depth)
++
++
++def _vision_transformer(
++    name: str, settings: dict, pretrained: bool, stochastic_depth: float
++) -> StagedBackbone:
++    original = timm.create_model(
++        settings["architecture"],
++        pretrained=pretrained,
++        pretrained_cfg_overlay={"hf_hub_id": settings["hf_hub_id"]},
++        num_classes=0,
++        drop_path_rate=stochastic_depth,
++    )
++    blocks = list(original.blocks)
++    ends = list(itertools.accumulate(settings["stage_blocks"]))
++    if ends[-1] != len(blocks):
++        raise ValueError(f"{name} stage blocks do not cover its {len(blocks)} blocks")
++    return StagedBackbone(
++        _PatchStem(
++            original.patch_embed.proj,
++            original.pos_embed[:, original.num_prefix_tokens :].detach(),
++        ),
++        [
++            _stage(None, _TokenBlocks(*blocks[start:end]))
++            for start, end in zip([0, *ends[:-1]], ends)
++        ],
++        nn.Sequential(_TokenNorm(original.norm), nn.AvgPool2d(2)),
++        (original.embed_dim,) * 3,
++        {
++            "hf_hub_id": settings["hf_hub_id"],
++            "mean": IMAGENET_MEAN,
++            "std": IMAGENET_STD,
++        },
++    )
++
++
++def _mamba_vision(
++    name: str, settings: dict, pretrained: bool, stochastic_depth: float
++) -> StagedBackbone:
+     if "mamba_ssm" not in sys.modules:
+         package = types.ModuleType("mamba_ssm")
+         package.__path__ = list(
+@@ -110,3 +194,9 @@ def _drop_paths(backbone: nn.Module) -> list[nn.Module]:
+     return [
+         module for module in backbone.modules() if type(module).__name__ == "DropPath"
+     ]
++
++
++_BUILDERS = {
++    "mamba_vision": _mamba_vision,
++    "vision_transformer": _vision_transformer,
++}

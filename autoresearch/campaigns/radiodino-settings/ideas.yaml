@@ -1,0 +1,1679 @@
+revision: 418
+ideas:
+- id: radiodino-on-mamba-recipe
+  mechanism_id: backbone
+  parent_idea_id: null
+  title: RadioDINO-S/16 in place of MambaVision-T on the MambaVision recipe, adopted
+    by the user's decision
+  opportunity: 'The campaign''s starting point. RadioDINO-S/16 is the only medical-pretrained
+    encoder found at our size and speed (prior-work.md, The model): DINO ViT-S/16
+    on RadImageNet CT, MRI and ultrasound, 21.7M parameters, 224 px. It enters on
+    the MambaVision-T incumbent''s settings unchanged so that every later seed is
+    read against one RadioDINO run. The keeper adopts it whatever its verdict (contract.md,
+    Duration and adoption).'
+  mechanism: model.backbone radiodino_s16. Nothing else changes. The adapter is in
+    the baseline source.
+  precedents:
+  - 'Swin-T on the MambaVision recipe, fold 2, 2026-10-14: x4 0.937176 against 0.937801
+    (another ImageNet model, not adopted).'
+  novelty: First run of a ViT and of a medical self-supervised encoder on this recipe.
+  coverage: Every study and every label.
+  exploitation: 'Read x4 and x1 against the MambaVision-T reference, the training
+    loss per epoch against its, the labels from largest gain to largest loss, the
+    equal logit blend with the reference and with the ResNet-50, the training seconds
+    and the peak memory. Activation: the recorded effective config names radiodino_s16
+    and the preprocessing identity''s feature mapping is origin 15.5, stride 32.'
+  budget: Unmeasured; ViT-S/16 at 224 px is about 4.6 GFLOPs per image against about
+    4.4 for MambaVision-T (guess from published counts), so near the reference's 3,106
+    s. Memory below the reference's 12.7 GB (guess).
+  implementation: 'Configuration only: model.backbone radiodino_s16 in configs/campaign.yaml.
+    Do not touch the source.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user's first seed; every later seed builds on it.
+  status: completed
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality-radiodino/autoresearch/campaigns/radiodino-settings/seed-ideas.yaml
+  experiments:
+  - radiodino-on-mamba-recipe-20261014T233834Z-2f015b73
+  decision: provisional_accept
+- id: layer-rate-decay-from-radimagenet-profile
+  mechanism_id: backbone-rate
+  parent_idea_id: null
+  title: 'Rates falling with depth, 4e-4 on the last block and 0.85 per block towards
+    the patch stem: the RadImageNet ResNet-50''s relative-step profile on a model
+    whose weights do not shrink with depth'
+  opportunity: 'Evidence (prior-work.md, Weight scale): Adam moves each weight by
+    about the rate per step, so the relative step is the rate over the weight RMS.
+    The RadImageNet ResNet-50 at its one rate of 5e-5 has relative steps rising 8.5
+    times from stem to last stage (8e-4 to 6.8e-3) because its weights shrink with
+    depth (0.062 to 0.0073). MambaVision-T at 2e-4 is flat (2.2e-3 to 2.6e-3). RadioDINO''s
+    weights are also flat over depth (0.049 to 0.063, stem 0.075), so one rate gives
+    every block about the same relative step (2.7e-3 to 4.1e-3 at 2e-4): its first
+    blocks move more than the ResNet-50''s first stages, its last blocks half as much
+    as the ResNet-50''s last stage. Twelve equal blocks of global attention make a
+    flat rate a choice, not a consequence of the architecture. Evidence: ViT fine-tuning
+    recipes decay the rate per block (BEiT and MAE: 0.65 for ViT-B, 0.75 for ViT-L);
+    their values serve masked-image pretraining, whose top blocks need more change.
+    Guess on size: +0.002 to +0.006 macro.'
+  mechanism: 'A new optimizer.backbone_lr_layer_decay (0.85). Each backbone parameter''s
+    rate is backbone_lr times the decay to the power of the number of transformer
+    blocks above it: block 12 and the final norm at backbone_lr, block 11 at 0.85,
+    block 1 at 0.85^11, the patch stem and position embedding at 0.85^12. optimizer.backbone_lr
+    4e-4. So the last block''s relative step is the ResNet-50 last stage''s (4e-4
+    / 0.063 = 6.3e-3 against 6.8e-3), block 9 keeps the incumbent''s 2.5e-4 and the
+    stem gets 5.7e-5, the ResNet-50 stem''s relative step (7.6e-4 against 8e-4). Warm-up
+    and decay scale every group alike; head rate unchanged.'
+  precedents:
+  - 'MambaVision settings, stage-rates-by-weight-scale: 6e-4 on the last stage, 0.6
+    per stage, rejected (x4 -0.0028). That model''s weights were 1.5 to 12.7 times
+    the ResNet-50''s and it underfit; the decay there undid a flat weight-scale profile
+    in the opposite direction from this one.'
+  - 'MambaVision settings, backbone-rate-4e-4: level with 2e-4 (x4 +0.0004).'
+  novelty: First rate profile over depth on a ViT here; the existing backbone_lr_stage_decay
+    acts per stage group, four groups for twelve blocks.
+  coverage: Every study and every label.
+  exploitation: 'Read x4 and x1 against the incumbent, the training loss per epoch,
+    the drift per stage against the incumbent''s (expected: last stage up, stem and
+    first stage down), and the labels from largest gain to largest loss. Activation:
+    the logged rate of the stem group and of the last stage at their configured ratio
+    0.85^12 : 1 (0.142). Shown wrong by: both multipliers below the incumbent with
+    the last stage''s drift up.'
+  budget: The incumbent's training time within 1.02; no change to memory.
+  implementation: 'Files: src/knee_abnormality/config.py (the field, default 1.0,
+    gt 0, le 1), src/knee_abnormality/modeling/staged_backbones.py (each staged backbone
+    reports a parameter''s block depth: the patch stem 0, block k of the transformer
+    k, the final norm the deepest; the MambaVision path needs no depth because its
+    decay stays 1.0), src/knee_abnormality/training/lightning.py (build_optimizer
+    multiplies each backbone rate by decay to the power of the blocks above the parameter,
+    on top of the existing stage decay), configs/campaign.yaml (backbone_lr 0.0004,
+    backbone_lr_layer_decay 0.85). With 1.0 the optimizer must be identical to the
+    incumbent''s. The anchors and their schedule are unchanged.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The largest difference in how the two models respond to one
+    rate, set from the RadImageNet model whose recipe is the reference for this domain.
+  status: completed
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality-radiodino/autoresearch/campaigns/radiodino-settings/seed-ideas.yaml
+  experiments:
+  - layer-rate-decay-from-radimagenet-profile-20261015T003123Z-b68674fa
+  - layer-rate-decay-from-radimagenet-profile-20261015T003716Z-7c264aed
+  decision: reject
+- id: anchors-by-weight-scale
+  mechanism_id: anchors
+  parent_idea_id: null
+  title: Both anchors twice as strong, 0.002 early and 0.00002 late, for weights 0.6
+    to 0.8 times MambaVision-T's RMS
+  opportunity: 'Evidence (prior-work.md, Weight scale; MambaVision settings, anchors-by-weight-scale,
+    x4 +0.0101): the anchor penalises the squared absolute distance from the pretrained
+    weights, so the cost of one relative movement scales with the weight RMS squared.
+    MambaVision''s anchors (0.001, 0.00001) were cut tenfold and a hundredfold from
+    the ResNet-50''s for weights 1.5 to 12.7 times larger. RadioDINO''s weights are
+    0.82 (stem) and 0.59 to 0.75 (blocks) of MambaVision-T''s, so the same relative
+    movement costs 0.35 to 0.67 as much under the inherited strengths. Twice the strengths
+    restore MambaVision''s cost per relative movement. The pretraining argues the
+    same way: RadImageNet features start in the target''s domain and the anchors are
+    the site-generalisation device. Guess on size: +0.001 to +0.003 macro.'
+  mechanism: optimizer.anchor_alpha_early 0.002, optimizer.anchor_alpha_late 0.00002.
+    The late anchor keeps following the rate. Nothing else changes.
+  precedents:
+  - 'MambaVision settings, anchors-by-weight-scale: 0.001 and 0.00001 against 0.01
+    and 0.0001, x4 +0.0101, the campaign''s largest gain.'
+  - 'MambaVision settings, anchors-per-stage-by-weight-scale: rejected (x4 -0.0007,
+    x1 +0.0022).'
+  novelty: First anchor strength set for this model's weight scale.
+  coverage: Every study and every label.
+  exploitation: 'Read x4 and x1 against the incumbent, the training loss per epoch
+    (expected slightly higher), the logged anchor penalty and drift per stage (expected:
+    drift down by up to a factor of two), and the labels from largest gain to largest
+    loss. Activation: the recorded effective config and an anchor penalty per epoch
+    above the incumbent''s. Shown wrong by: both multipliers below the incumbent with
+    the training loss up.'
+  budget: The incumbent's training time within 1.02; no change to memory.
+  implementation: 'Configuration only: configs/campaign.yaml.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The setting that moved MambaVision-T most, rescaled by the measured
+    weight ratio.
+  status: completed
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality-radiodino/autoresearch/campaigns/radiodino-settings/seed-ideas.yaml
+  experiments:
+  - anchors-by-weight-scale-20261015T004015Z-0d3dd5c4
+  decision: reject
+- id: feature-statistics-before-position-embedding
+  mechanism_id: feature-statistics
+  parent_idea_id: null
+  title: Feature-statistics augmentation on the patch projection before the position
+    embedding, not on the residual stream after block 3
+  opportunity: 'Evidence (prior-work.md, The adapter): on the CNNs and MambaVision-T
+    the augmentation mixes per-channel mean and spread of convolution features after
+    BatchNorm, which carry image style. In RadioDINO it acts on the pre-norm residual
+    stream after block 3, which also holds the learned absolute position embedding
+    (RMS 0.14, the largest tensor in the model): every image carries the same position
+    code, so rescaling a channel''s spread across tokens rescales the position code
+    with it. The patch projection before the position embedding is the model''s only
+    local, low-level layer, the ViT''s counterpart of the CNN stem''s style features.
+    Evidence for keeping the augmentation: MambaVision settings, feature-statistics-augmentation-off,
+    x4 -0.0011. Guess on size: +0.001 to +0.003 macro.'
+  mechanism: The adapter's stride-8 point becomes the patch projection's output before
+    the position embedding is added; the position embedding is added at the start
+    of the blocks, and all twelve blocks run after the augmentation. The augmentation's
+    settings are unchanged (probability 0.5).
+  precedents:
+  - 'MambaVision settings, feature-statistics-augmentation-off: x4 -0.0011, x1 -0.0013.'
+  - 'MambaVision settings, feature-statistics-after-first-epoch: x4 -0.0003, x1 -0.0023.'
+  novelty: First placement of the augmentation chosen for a model with a position
+    code in its features.
+  coverage: Every study and every label; style shift between sites is the target.
+  exploitation: 'Read x4 and x1 against the incumbent and the labels from largest
+    gain to largest loss. Activation: the logged mean absolute change of the augmented
+    features is nonzero and differs from the incumbent''s, and a synthetic check shows
+    the position embedding unchanged by the augmentation. Shown wrong by: both multipliers
+    below the incumbent.'
+  budget: The incumbent's training time within 1.02; no change to memory.
+  implementation: 'File: src/knee_abnormality/modeling/staged_backbones.py. For the
+    vision transformer only: the stem returns the patch projection, the position embedding
+    is added at the start of the first block stage, and the stages are arranged so
+    that to_stride_8 returns the projection and deep runs all twelve blocks, the middle
+    read still after block 8 and the final read unchanged. Every parameter keeps its
+    name prefix, rate group and anchor group: the position embedding stays in the
+    early anchor. MambaVision-T unchanged. Verify on CPU that with the augmentation
+    off the backbone''s outputs equal the incumbent''s exactly.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: A concrete fault of the inherited placement on this architecture,
+    cheap to fix.
+  status: completed
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality-radiodino/autoresearch/campaigns/radiodino-settings/seed-ideas.yaml
+  experiments:
+  - feature-statistics-before-position-embedding-20261015T012724Z-14506018
+  decision: reject
+- id: middle-read-at-block-10
+  mechanism_id: adapter-depth
+  parent_idea_id: null
+  title: The stride-16 middle read after block 10 instead of block 8, at the depth
+    the other backbones read it
+  opportunity: 'Evidence (prior-work.md, The adapter): the soft-tissue and meniscus
+    reads come from the stride-16 map, which the hierarchical backbones take at the
+    end of their third stage: ResNet-50 after 13 of 16 blocks (0.81), ConvNeXt-T after
+    15 of 18 (0.83), MambaVision-T after 12 of 16 (0.75). RadioDINO has no hierarchy,
+    every block is at stride 16, and the adapter took block 8 of 12 (0.67), shallower
+    than all three. Block 10 (0.83) matches them. Guess on size: +0.001 to +0.003
+    macro, on the menisci and the OA labels.'
+  mechanism: The adapter's stages become 1, 2, 7 and 2 blocks; the stride-8 point
+    stays after block 3, the final read after block 12.
+  precedents:
+  - 'The stride-16 read on ConvNeXt-T and ResNet-50 (soft-tissue line, on main): the
+    read was built and tuned at those depths.'
+  novelty: First choice of the read depth on a backbone without a hierarchy.
+  coverage: The meniscus and OA targets read by the stride-16 cells; others through
+    the shared backbone.
+  exploitation: 'Read x4 and x1 against the incumbent and the labels from largest
+    gain to largest loss, expecting Medial and Lateral Meniscus and the three OA labels
+    first. Activation: the model''s middle width and stage sizes in the recorded run,
+    and the stage groups'' parameter counts (7 and 2 blocks).'
+  budget: The incumbent's training time within 1.02; no change to memory.
+  implementation: 'File: src/knee_abnormality/modeling/staged_backbones.py, radiodino_s16''s
+    stage_blocks (1, 2, 7, 2). The early anchor and every rate group keep their parameters
+    apart from blocks 9 and 10 moving into the third stage group.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: An adapter choice made without evidence, corrected to the depth
+    the routed reads were built on.
+  status: completed
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality-radiodino/autoresearch/campaigns/radiodino-settings/seed-ideas.yaml
+  experiments:
+  - middle-read-at-block-10-20261015T061249Z-a0fa07a5
+  decision: reject
+- id: stochastic-depth-0-1
+  mechanism_id: regulariser
+  parent_idea_id: null
+  title: Stochastic depth 0.1 over the twelve blocks, the ViT pretraining and fine-tuning
+    default
+  opportunity: 'Evidence: DINO''s ViT-S is pretrained with drop path 0.1 (the DINO
+    repository''s default), and ViT fine-tuning recipes keep it (DeiT-S 0.1, MAE ViT-B
+    0.1), because a ViT has no convolutional locality to constrain it and overfits
+    small datasets; the fold trains on 3,532 studies. Whether RadioDINO kept DINO''s
+    default is not stated on its card (guess). The difference from MambaVision-T''s
+    rejected run: there the drop applied to a hierarchy whose first two stages are
+    convolutions with BatchNorm and to a model that had underfit; here it applies
+    equally to twelve identical residual attention blocks, which is the setting it
+    was designed for. Guess on size: -0.001 to +0.003 macro.'
+  mechanism: model.stochastic_depth 0.1, passed to timm as drop_path_rate (linear
+    from 0 at block 1 to 0.1 at block 12). Nothing else changes.
+  precedents:
+  - 'MambaVision settings, stochastic-depth-0-1-on-a-fitted-model: x4 -0.0009, x1
+    +0.0011.'
+  novelty: First stochastic depth on a ViT here.
+  coverage: Every study and every label.
+  exploitation: 'Read x4 and x1 against the incumbent, the training loss per epoch
+    (expected higher) against the validation curve, and the labels from largest gain
+    to largest loss. Activation: the recorded effective config and drop-path modules
+    with rates rising to 0.1 in the built backbone. Shown wrong by: both multipliers
+    below the incumbent.'
+  budget: The incumbent's training time within 1.0 (dropped blocks skip no compute
+    in timm); no change to memory.
+  implementation: 'Configuration only: configs/campaign.yaml.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The ViT default regulariser, last because the MambaVision run
+    of the same setting rose at x1 and fell at x4.
+  status: completed
+  created_revision: 1
+  seeded: /home/claudio/src/knee-abnormality-radiodino/autoresearch/campaigns/radiodino-settings/seed-ideas-2.yaml
+  ranking_rationale: "Block and park the candidate: replacing fixed pooling with a\
+    \ trainable 384\u2192768 spatial merge and widening the final projection introduces\
+    \ new readout structure, explicitly excluded by the campaign contract. Editable-file\
+    \ permissions and prior reservation supply no exception. A bounded repair cannot\
+    \ retain this mechanism within scope. The full remaining queue order removes the\
+    \ blocked head and preserves the other entries\u2019 relative order, correcting\
+    \ the previous report\u2019s rejected ranking."
+  experiments:
+  - stochastic-depth-0-1-20261015T074811Z-8ccb8f20
+  - stochastic-depth-0-1-20261015T075028Z-86896704
+  decision: invalid
+- id: stage-rates-4e-4-top-to-2e-4-stem
+  mechanism_id: backbone-rate
+  parent_idea_id: layer-rate-decay-from-radimagenet-profile
+  title: 'Rates falling over the stage groups from 4e-4 at the top to the incumbent''s
+    2e-4 at the patch stem: seed 2''s top rate without its low stem'
+  opportunity: 'Evidence (run-notes.md, seed 2): 4e-4 on block 12 and 0.85 per block
+    was ahead of seed 1 at every epoch (+0.011 epoch 1, +0.006 to epoch 6), x1 +0.0015,
+    x4 level, with Fracture -0.0035 and Contusion -0.0034. Seed 2 put the stem at
+    5.7e-5 and blocks 1 to 8 at 1.1e-4 to 2.1e-4, below the incumbent. Evidence (MambaVision
+    run notes, runs 1, 2, 4, 6): every run that raised the late rate lost Fracture
+    and Contusion, least where the stem kept its rate (run 4, flat 4e-4: Fracture
+    -0.0019) and most where the stem rate fell (run 6, 0.6 per stage: Fracture -0.0068).
+    Guess: the bone labels need the stem and first blocks at the incumbent''s rate,
+    and the top-rate gain needs only the top. Guess on size: +0.001 to +0.003 macro.'
+  mechanism: 'optimizer.backbone_lr 0.0004 and optimizer.backbone_lr_stage_decay 0.87
+    (0.87^5 = 0.50). The existing stage decay acts on the adapter''s groups (checked
+    on CPU): final norm 4e-4, blocks 9 to 12 3.5e-4, blocks 4 to 8 3.0e-4, blocks
+    2 and 3 2.6e-4, block 1 2.3e-4, patch stem and position embedding 2.0e-4. Blocks
+    9 to 12 get about seed 2''s mean over them (3.2e-4), the stem keeps seed 1''s
+    rate, no group is below the incumbent. Warm-up, decay, anchors and head rate unchanged.'
+  precedents:
+  - 'radiodino-settings seed 2, layer-rate-decay-from-radimagenet-profile: x4 -0.00001,
+    x1 +0.0015, ahead every epoch, Fracture and Contusion lost.'
+  - 'MambaVision settings, backbone-rate-4e-4 (flat, stem raised too): x4 +0.0004;
+    stage-rates-on-freed-anchors (stem lowered): x4 -0.0003, Fracture -0.0068.'
+  novelty: First profile on RadioDINO that raises the top without lowering any group
+    below the incumbent.
+  coverage: Every study and every label; Fracture and Contusion are the labels it
+    targets to keep.
+  exploitation: Read x4 and x1 against the incumbent and seed 2, train_loss_epoch
+    per epoch, and labels from largest gain to largest loss, Fracture and Contusion
+    first. metrics.csv logs no rate column; activation is the recorded effective config
+    plus backbone_drift_stage3 and backbone_drift_stage4 above the incumbent's (0.051
+    and 0.048 at epoch 0) and backbone_drift_stage0 near the incumbent's (0.014),
+    against seed 2's 0.006.
+  budget: The incumbent's 2,701 s within 1.02; peak memory 11.8 GB unchanged.
+  implementation: 'Configuration only: configs/campaign.yaml, optimizer.backbone_lr
+    0.0004 and optimizer.backbone_lr_stage_decay 0.87. Adds to the incumbent; nothing
+    removed.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Closest to the only rate change measured on this model, keeps
+    its early-epoch gain and removes the stem cut both campaigns tie to the bone-label
+    losses; configuration only.
+  status: completed
+  created_revision: 69
+  seeded: /home/claudio/src/knee-abnormality-radiodino/autoresearch/campaigns/radiodino-settings/keeper-ideas-rates.yaml
+  experiments:
+  - stage-rates-4e-4-top-to-2e-4-stem-20261015T021432Z-2cab93f1
+  - stage-rates-4e-4-top-to-2e-4-stem-20261015T021717Z-b4df245b
+  decision: reject
+- id: backbone-held-for-the-head-epoch
+  mechanism_id: backbone-rate-schedule
+  parent_idea_id: null
+  title: 'Backbone rate zero in the first epoch while the new heads fit, then its
+    warm-up and linear decay: linear probing then fine-tuning'
+  opportunity: 'Evidence (seed 1 metrics.csv): 38% of the final drift of blocks 4
+    to 12 happens in epoch 1 (0.050 of 0.130 for blocks 4 to 8, 0.048 of 0.127 for
+    blocks 9 to 12), while the heads are freshly initialised (train loss 0.724 against
+    0.507 at the end). Evidence (Kumar et al., ICLR 2022, LP-FT): gradients through
+    a random head distort pretrained features; fitting the head first and then fine-tuning
+    everything keeps them and gains most out of distribution, the site-generalisation
+    purpose here. RadImageNet DINO features start in the target domain, so they have
+    more to lose than ImageNet features (guess). Guess on size: +0.001 to +0.003 macro.'
+  mechanism: 'A new optimizer.backbone_frozen_epochs (1). Backbone groups get rate
+    multiplier 0 for the first epoch, then the incumbent''s warm-up (one epoch from
+    0.1) and linear decay to 0.01 at the last step; head groups keep the incumbent''s
+    schedule. The late anchor follows the backbone ratio as now, so it is 0 in epoch
+    1. Adam''s moments keep accumulating at rate 0, so the first backbone steps are
+    not bias-correction inflated. Value: one epoch, the incumbent''s head warm-up
+    length.'
+  precedents:
+  - 'MambaVision settings, two-warm-up-epochs (backbone and heads together): x4 -0.0004,
+    x1 +0.0013.'
+  - 'Kumar et al. 2022, LP-FT: linear probe then full fine-tuning.'
+  novelty: First schedule here that separates the backbone's start from the heads'.
+  coverage: Every study and every label.
+  exploitation: 'Read x4 and x1, train_loss_epoch per epoch (expected higher in epochs
+    1 and 2) and labels from largest gain to largest loss. Activation: backbone_drift_stage0
+    to backbone_drift_stage4 and anchor_penalty exactly 0 at epoch 0 and positive
+    from epoch 1; one new per-epoch metric backbone_lr_ratio (mean backbone multiplier)
+    at 0 in epoch 0.'
+  budget: The incumbent's 2,701 s within 1.02 (backward still runs through the backbone);
+    memory unchanged.
+  implementation: 'Files: src/knee_abnormality/config.py (backbone_frozen_epochs,
+    StrictInt, ge 0, default 0), src/knee_abnormality/training/lightning.py (configure_optimizers
+    passes LambdaLR one function per param group: backbone groups use the schedule
+    shifted by frozen_epochs x steps_per_epoch and 0 before it, heads the existing
+    one; log backbone_lr_ratio through _log_epoch_metric), configs/campaign.yaml (1).
+    With 0 every group uses the existing function and the optimizer is identical to
+    the incumbent''s. Adds to the incumbent.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Acts on the measured epoch-1 drift, has the strongest out-of-distribution
+    evidence in the fine-tuning literature and leaves the rest of the schedule as
+    the incumbent's.
+  status: completed
+  created_revision: 69
+  seeded: /home/claudio/src/knee-abnormality-radiodino/autoresearch/campaigns/radiodino-settings/keeper-ideas-rates.yaml
+  experiments:
+  - backbone-held-for-the-head-epoch-20261015T030117Z-0b0bd581
+  decision: reject
+- id: top-down-backbone-warm-up
+  mechanism_id: backbone-rate-schedule
+  parent_idea_id: null
+  title: 'Each backbone stage group warms up one epoch later than the group above
+    it: seed 2''s slow lower blocks early, the incumbent''s rates after'
+  opportunity: 'Evidence (seed 2): with the lower blocks slow, the lead over seed
+    1 was largest early (+0.011 epoch 1) and narrowed after epoch 6, and the bone
+    labels lost; seed 2 kept the lower blocks slow all twelve epochs. Evidence (Howard
+    and Ruder 2018, ULMFiT): gradual unfreezing from the top, one layer group per
+    epoch, beats fine-tuning all layers at once. A linear warm-up from 0.1 averages
+    0.55 of peak and the linear decay 0.505, so a later peak keeps each group''s total
+    rate within 3% of the incumbent''s (stem 6.29 against 6.11 epoch-equivalents):
+    only the timing moves. Guess: the early lead comes from slow lower blocks, the
+    bone loss from their low total. Guess on size: +0.001 to +0.002 macro.'
+  mechanism: 'A new optimizer.backbone_warmup_epochs_per_stage (1). A backbone group
+    at stage depth d (final norm 0, blocks 9 to 12 1, blocks 4 to 8 2, blocks 2 and
+    3 3, block 1 4, stem 5) warms up from warmup_start_ratio over warmup_epochs +
+    max(d - 1, 0) x this value epochs, then decays linearly to minimum_lr_ratio at
+    the last step: norm and blocks 9 to 12 peak at epoch 1 as now, blocks 4 to 8 at
+    2, blocks 2 and 3 at 3, block 1 at 4, stem at 5. Peak rates 2e-4 everywhere; heads
+    unchanged. Each late-anchored weight follows its own group''s multiplier.'
+  precedents:
+  - 'radiodino-settings seed 2: x1 +0.0015, x4 level, ahead every epoch.'
+  - 'MambaVision settings, two-warm-up-epochs: x4 -0.0004, x1 +0.0013 (every group
+    delayed alike).'
+  novelty: First schedule here whose timing differs between backbone groups.
+  coverage: Every study and every label; Fracture and Contusion are the labels to
+    watch.
+  exploitation: 'Read x4 and x1 against the incumbent and seed 2, val_macro_auc and
+    train_loss_epoch per epoch (expected seed 2''s early lead) and labels from largest
+    gain to largest loss. Activation: new per-epoch metrics backbone_lr_ratio_stage0
+    and backbone_lr_ratio_stage4 (0.19 and 0.55 means in epoch 0); backbone_drift_stage0
+    to stage2 below the incumbent''s in epochs 0 to 3.'
+  budget: The incumbent's 2,701 s within 1.02; memory unchanged.
+  implementation: 'Files: src/knee_abnormality/config.py (StrictInt ge 0, default
+    0), src/knee_abnormality/training/lightning.py (build_optimizer keeps each group''s
+    stage depth; configure_optimizers passes one LambdaLR function per group; the
+    anchor penalty multiplies each late-anchored weight by its group''s lr / initial_lr;
+    two metrics via _log_epoch_metric), configs/campaign.yaml (1). With 0 all groups
+    share the existing function and the optimizer and anchors are identical to the
+    incumbent''s. Adds to the incumbent.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Separates the two effects seed 2 mixed (early speed, late bone
+    loss) at the incumbent's rates; a small source change.
+  status: completed
+  created_revision: 69
+  seeded: /home/claudio/src/knee-abnormality-radiodino/autoresearch/campaigns/radiodino-settings/keeper-ideas-rates.yaml
+  experiments:
+  - top-down-backbone-warm-up-20261015T034829Z-c8b4e10b
+  decision: provisional_accept
+- id: backbone-rate-1-4e-4-by-relative-step
+  mechanism_id: backbone-rate
+  parent_idea_id: null
+  title: One backbone rate of 1.4e-4, MambaVision-T's best relative step carried to
+    RadioDINO's smaller weights
+  opportunity: 'Evidence (MambaVision run notes): the rate moved MambaVision-T most
+    (5e-5 to 2e-4 x4 +0.0024; 4e-4 level), an optimum at a relative step of 2.2e-3
+    per Adam step. Evidence (prior-work.md, Weight scale): RadioDINO''s weights are
+    0.59 to 0.75 of MambaVision-T''s, so 2e-4 gives it 2.7e-3 to 3.2e-3, the 4e-4
+    side of that optimum. Evidence (seed 1 metrics.csv): blocks 4 to 12 ended 12 to
+    13% from their start against 3.6 to 4.5% for MambaVision-T''s last stage. 2.2e-3
+    x 0.0626 (last-stage RMS) = 1.4e-4. Guess: Fracture (-0.021 against MambaVision-T)
+    gains, as it fell in every MambaVision run that pushed rates up. Guess on size:
+    -0.001 to +0.003 macro.'
+  mechanism: optimizer.backbone_lr 0.00014, one rate for every backbone group. Warm-up,
+    decay, anchors and head rate unchanged; the late anchor still follows the rate's
+    ratio.
+  precedents:
+  - 'MambaVision settings, backbone-rate-2e-4: x4 +0.0024; backbone-rate-4e-4: x4
+    +0.0004, behind at every epoch.'
+  - 'radiodino-settings seed 2: blocks 1 to 8 and the stem below 2e-4, x1 +0.0015,
+    x4 level.'
+  novelty: First rate below the inherited one on this model; opens the bracket below
+    2e-4 as seed 2 opened it above.
+  coverage: Every study and every label.
+  exploitation: 'Read x4 and x1 against the incumbent, train_loss_epoch per epoch
+    (expected higher) and labels from largest gain to largest loss, Fracture first.
+    Activation: the recorded effective config, and backbone_drift_stage3 and backbone_drift_stage4
+    at epoch 0 about 0.7 of the incumbent''s (0.051, 0.048); final drift below 0.12.'
+  budget: The incumbent's 2,701 s within 1.02; memory unchanged.
+  implementation: 'Configuration only: configs/campaign.yaml, optimizer.backbone_lr
+    0.00014. Replaces the 2e-4 value.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The rate level is the setting that moved MambaVision-T most
+    and this is its weight-scale transfer; after the three above because seed 2 shows
+    the top blocks gaining from more rate.
+  status: completed
+  created_revision: 69
+  seeded: /home/claudio/src/knee-abnormality-radiodino/autoresearch/campaigns/radiodino-settings/keeper-ideas-rates.yaml
+  experiments:
+  - backbone-rate-1-4e-4-by-relative-step-20261015T043541Z-c0ecec92
+  - backbone-rate-1-4e-4-by-relative-step-20261015T043718Z-aedabb69
+  - backbone-rate-1-4e-4-by-relative-step-20261015T052333Z-fa591893
+  decision: reject
+- id: position-embedding-rate-by-weight-scale
+  mechanism_id: backbone-rate
+  parent_idea_id: null
+  title: The learned position embedding at 3.7e-4, the same relative step as the patch
+    projection it is added to
+  opportunity: 'Evidence (prior-work.md, Weight scale): the position embedding has
+    RMS 0.140, the largest tensor in the model, the patch projection 0.075, the blocks
+    0.049 to 0.063. At one rate its relative step is 1.4e-3, half the projection''s
+    and a third of block 1''s. Evidence (seed 1 metrics.csv): the stem group (projection
+    and position embedding) drifted at most 1.6%, against 12 to 13% for blocks 4 to
+    12. The embedding was learned on RadImageNet whole-field CT, MRI and ultrasound
+    slices; our views are knee crops of 84 to 120 mm with the anatomy placed by the
+    frame, a different spatial layout (guess). Guess on size: +0.000 to +0.002 macro,
+    on the located labels.'
+  mechanism: 'A new optimizer.position_embedding_lr_ratio (1.86 = 0.140 / 0.0752):
+    the position embedding''s rate is backbone_lr x stage decay x this ratio, 3.7e-4
+    on the incumbent; every other rate unchanged. It stays in the early anchor and
+    follows the shared schedule.'
+  precedents:
+  - 'MambaVision settings, anchors-by-weight-scale: strengths set from the weight
+    RMS, x4 +0.0101.'
+  - 'prior-work.md, Weight scale: relative step = rate / RMS.'
+  novelty: First rate on the one component MambaVision-T does not have.
+  coverage: Every study and every label; the menisci, OA compartments and Fracture
+    through located tokens.
+  exploitation: 'Read x4 and x1 against the incumbent and labels from largest gain
+    to largest loss. Activation: new per-epoch metric position_embedding_drift (relative
+    distance from its start, expected above the incumbent''s stem drift of 0.014 to
+    0.016) and backbone_drift_stage0 above the incumbent''s.'
+  budget: The incumbent's 2,701 s within 1.01; memory unchanged.
+  implementation: 'Files: src/knee_abnormality/config.py (float gt 0, default 1.0),
+    src/knee_abnormality/training/lightning.py (build_optimizer multiplies the rate
+    of backbone.stem.pos_embed; log position_embedding_drift through the existing
+    epoch-end drift code), configs/campaign.yaml (1.86). MambaVision-T has no such
+    parameter. With 1.0 the optimizer is identical to the incumbent''s. Adds to the
+    incumbent.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Targets a component specific to the ViT, with its value fixed
+    by the measured weight scale; last because its share of the model is small (75k
+    of 21.7M parameters).
+  status: completed
+  created_revision: 69
+  seeded: /home/claudio/src/knee-abnormality-radiodino/autoresearch/campaigns/radiodino-settings/keeper-ideas-rates.yaml
+  experiments:
+  - position-embedding-rate-by-weight-scale-20261015T052532Z-c316406e
+  decision: reject
+- id: final-read-by-learned-two-by-two-merge
+  mechanism_id: adapter-final-read
+  parent_idea_id: null
+  title: 'The stride-32 read through a learned 2x2 stride-2 merge from 384 to 768
+    channels, started as the incumbent''s average pool: the downsample MambaVision-T
+    and Swin-T have and the adapter replaced by a fixed average'
+  opportunity: 'Evidence (validation_predictions.csv, x4): against the decoder-free
+    MambaVision-T on this fold and config (outputs/training/mamba-silver-fold-2, x4
+    0.935160, x1 0.9301) the incumbent loses Lateral Meniscus -0.0154, PF OA -0.0154,
+    Medial OA -0.0102, Lateral OA -0.0077, Medial Meniscus -0.0076: 85% of its summed
+    per-label deficit on the five soft-tissue-routed labels; the other seven average
+    -0.0015. Evidence (metrics.csv, epoch 12): the token maps behind that routing
+    are worse, val_anatomy_share_error 0.0789 against 0.0760 (Swin-T 0.0706), val_meniscus_loss
+    0.5955 against 0.5876 (Swin-T 0.5755). Evidence (CPU, 12 real middle slices, pretrained
+    weights): 41% of the spatial variance of the final normed 14x14 tokens lies inside
+    the 2x2 cells the average pool collapses. MambaVision-T reaches 7x7 through a
+    learned 3x3 stride-2 convolution (320 to 640) and Swin-T through patch merging
+    (4C to 2C); both reached x4 0.9372 to 0.9378. Guess on size: +0.002 to +0.005
+    macro, on the five routed labels.'
+  mechanism: 'In radiodino_s16 the final read becomes the ViT norm, then nn.Conv2d(384,
+    768, kernel 2, stride 2, bias False), in place of nn.AvgPool2d(2). Initialisation
+    without random draws: output channel c < 384 takes 0.25 on input channel c at
+    all four taps and 0 elsewhere (exactly the average pool), output channels 384
+    to 767 are 0. So the first forward equals the incumbent''s and the merge learns
+    the within-cell layout. stage_widths becomes (384, 384, 768) and num_features
+    768; the middle read stays 384. The merge sits in the final-norm group: backbone
+    rate, top-down warm-up, late anchor to its start, no weight decay. Geometry is
+    unchanged: kernel 2, stride 2, no padding after origin 7.5 and stride 16 gives
+    origin 15.5, stride 32, which geometry_layers derives from the Conv2d.'
+  precedents:
+  - 'Swin-T on the MambaVision recipe, fold 2: x4 0.937176 with a learned 2x2 merge
+    before its 7x7 stage.'
+  - 'MambaVision-T reference: x4 0.937801 with a learned stride-2 convolution to 7x7,
+    320 to 640 channels.'
+  - 'radiodino-settings runs 1 to 8: rates, anchors and schedule moved x4 by -0.0024
+    to +0.0004; none touched the final read.'
+  novelty: First change to the adapter's final read; every earlier run kept the average
+    pool.
+  coverage: Every study and every label through the 7x7 tokens; the menisci and OA
+    labels also through the meniscus map, whose deep term repeats these tokens.
+  exploitation: 'Read x4 and x1 against the incumbent and against mamba-silver-fold-2,
+    labels from largest gain to largest loss (the five routed labels first), val_anatomy_share_error
+    and val_meniscus_loss per epoch. Activation: backbone_drift_stage5 now logged
+    for the merge weight and rising from 0; one new per-epoch metric final_merge_new_channel_share,
+    the share of merge output energy in channels 384 to 767 (0 at the start, rising).'
+  budget: About 58M multiply-adds per image against 4.6G for the ViT, so within 1.02
+    of the incumbent's 2,737 s; peak memory within 0.1 GB of 11.8 GB.
+  implementation: 'Files: src/knee_abnormality/modeling/staged_backbones.py (the merge
+    in _vision_transformer''s final Sequential, its deterministic initialisation,
+    widths (384, 384, 768)); src/knee_abnormality/modeling/model.py (projection Linear(768,
+    256): create the incumbent''s Linear(384, 256) as now, then under torch.random.fork_rng
+    the 384 extra input columns with the same default init, so the random stream is
+    unchanged); src/knee_abnormality/training/lightning.py (the metric through _log_epoch_metric).
+    Replaces the average pool in the RadioDINO adapter, no option; the MambaVision
+    path is untouched. Adds to the incumbent.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The one structural difference of the adapter from both models
+    that reached 0.937, aimed at the five labels holding 85% of the deficit, with
+    an identical start; cost 1%.
+  status: completed
+  created_revision: 183
+  seeded: /home/claudio/src/knee-abnormality-radiodino/autoresearch/campaigns/radiodino-settings/keeper-ideas-fixes.yaml
+  experiments:
+  - final-read-by-learned-two-by-two-merge-20261015T070028Z-b9442810
+  blocked_reason: "Block and park the candidate: replacing fixed pooling with a trainable\
+    \ 384\u2192768 spatial merge and widening the final projection introduces new\
+    \ readout structure, explicitly excluded by the campaign contract. Editable-file\
+    \ permissions and prior reservation supply no exception. A bounded repair cannot\
+    \ retain this mechanism within scope. The full remaining queue order removes the\
+    \ blocked head and preserves the other entries\u2019 relative order, correcting\
+    \ the previous report\u2019s rejected ranking."
+  decision: reject
+- id: early-anchor-by-gradient-scale
+  mechanism_id: anchors
+  parent_idea_id: anchors-by-weight-scale
+  title: Early anchor 0.00013, one seventh of 0.001, for task gradients 7 to 17 times
+    smaller than MambaVision-T's at the stem and block 1
+  opportunity: 'Evidence (metrics.csv, mean over epochs): task gradient RMS on the
+    stem 2.9e-4 against 5.0e-3 for MambaVision-T, on block 1 7.5e-5 against 5.3e-4;
+    weight RMS 0.075 and 0.049 against 0.092 and 0.084. The anchor gradient is 2 x
+    alpha x (w - w0), so at equal relative drift the anchor-to-task ratio is 13.6
+    times MambaVision-T''s at the stem and 4.1 times at block 1 (geometric mean 7.5).
+    Evidence (drift curves): the incumbent''s stem and block 1 lose 40% and 54% of
+    their peak drift by epoch 12, against 19% and 35% for the decoder-free MambaVision-T:
+    the anchor pulls them back while the rate decays. Evidence (seed 3): doubling
+    the anchors lost x4 -0.0024; rate idea 1, the one run that kept the early layers
+    fastest, gained Fracture +0.0052. Guess on size: +0.000 to +0.002 macro.'
+  mechanism: optimizer.anchor_alpha_early 0.00013 (0.001 / 7.5). The early anchor
+    still covers the patch projection, the position embedding and block 1; the late
+    anchor, rates and warm-up unchanged.
+  precedents:
+  - 'radiodino-settings anchors-by-weight-scale (0.002, 0.00002): x4 -0.002436, Contusion
+    -0.0075, Fracture -0.0061.'
+  - 'MambaVision settings anchors-by-weight-scale (0.001 and 0.00001 from 0.01 and
+    0.0001): x4 +0.0101.'
+  novelty: First anchor value set from the measured gradient scale rather than the
+    weight scale, and the first weaker than inherited on this model.
+  coverage: Every study and every label; Fracture, Contusion and the located labels
+    through the early layers.
+  exploitation: 'Read x4 and x1 against the incumbent and labels from largest gain
+    to largest loss. Activation: the recorded effective config; backbone_drift_stage0
+    and backbone_drift_stage1 at epoch 12 above the incumbent''s 0.0112 and 0.0107,
+    falling less than 40% and 54% from their peaks; anchor_penalty lower.'
+  budget: The incumbent's 2,737 s within 1.01; memory unchanged.
+  implementation: 'Configuration only: configs/campaign.yaml, optimizer.anchor_alpha_early
+    0.00013. Replaces the 0.001 value.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: A measured 7.5-fold mismatch in a setting inherited unchanged
+    from MambaVision-T, configuration only; second because the deficit sits mostly
+    on the routed soft-tissue labels the merge targets.
+  status: completed
+  created_revision: 183
+  seeded: /home/claudio/src/knee-abnormality-radiodino/autoresearch/campaigns/radiodino-settings/keeper-ideas-fixes.yaml
+  ranking_rationale: "Block and park the candidate: replacing fixed pooling with a\
+    \ trainable 384\u2192768 spatial merge and widening the final projection introduces\
+    \ new readout structure, explicitly excluded by the campaign contract. Editable-file\
+    \ permissions and prior reservation supply no exception. A bounded repair cannot\
+    \ retain this mechanism within scope. The full remaining queue order removes the\
+    \ blocked head and preserves the other entries\u2019 relative order, correcting\
+    \ the previous report\u2019s rejected ranking."
+  experiments:
+  - early-anchor-by-gradient-scale-20261015T070624Z-4d02b304
+  - early-anchor-by-gradient-scale-20261015T070841Z-00121fcd
+  decision: reject
+- id: blockwise-top-down-warm-up
+  mechanism_id: backbone-rate-schedule
+  parent_idea_id: top-down-backbone-warm-up
+  title: Distribute the successful top-down warm-up over physical transformer blocks
+  opportunity: 'Measured: the incumbent protects the stem early, while its final blocks
+    adapt immediately. Its stem drift rises through epoch 5 and then retreats; validation
+    continues improving through epoch 11. RadioDINO has twelve equal transformer blocks,
+    but the current timing assigns them to uneven groups of 1, 2, 5 and 4 blocks.
+    Hypothesis: smoothing those timing boundaries can preserve early protection while
+    improving intermediate-block adaptation. A working expectation is approximately
+    +0.0005 macro AUC at both multipliers; this is a hypothesis, not an additional
+    acceptance condition.'
+  mechanism: "Replace coarse stage warm-up durations with a linear distribution over\
+    \ physical depth. For depth d=0 at the patch stem and d=1\u202612 at transformer\
+    \ blocks, use warm-up duration 1+4(12-d)/12 epochs. Thus the stem retains five\
+    \ epochs, block 6 uses three, and block 12 retains one. Retain the incumbent peak\
+    \ rates, warm-up start ratio, linear decay to the same final step, and each parameter's\
+    \ own late-anchor rate multiplier. The endpoint durations come directly from the\
+    \ adopted run; intermediate durations interpolate those endpoints without consulting\
+    \ validation labels."
+  precedents:
+  - 'top-down-backbone-warm-up: adopted at both multipliers; its recorded rate curves
+    establish differential timing. The family verdict below contains the complete
+    epoch table and diagnostics.'
+  - 'backbone-held-for-the-head-epoch: holding every backbone group produced a large
+    initial validation deficit. This proposal retains immediate adaptation in upper
+    blocks.'
+  - 'layer-rate-decay-from-radimagenet-profile and stage-rates-4e-4-top-to-2e-4-stem:
+    sustained changes to peak-rate distribution failed the adoption rule. This proposal
+    changes timing while retaining current peak rates.'
+  - 'prior-work.md: RadioDINO has twelve equal pre-norm attention blocks, unlike MambaVision-T''s
+    heterogeneous hierarchy. Physical block depth is therefore a plausible timing
+    coordinate.'
+  novelty: Extends the adopted timing mechanism by replacing artificial stage boundaries
+    with physical block depth. It does not retry a rejected rate value or increase
+    the duration of training.
+  coverage: Addresses optimization across all twelve blocks while retaining the fixed
+    adapter reads, augmentation, anchor coefficients, heads, losses and prediction
+    settings.
+  exploitation: Uses the campaign's only adopted settings result. Expected evidence
+    is smoother intermediate-block rate and drift trajectories, followed by improved
+    late-epoch macro AUC. Label changes remain diagnostic.
+  budget: "Twelve epochs, 5,304 optimizer steps, batch 8, seed 1110484336. Estimated\
+    \ training 2,700\u20132,850 s and peak allocation about 11.8 GB, based on the\
+    \ incumbent's 2,736.7 s and 11.777 GB. Extra optimizer groups and scalar logging\
+    \ should add little computation; actual runtime remains subject to the existing\
+    \ budget check."
+  implementation: Replace stage-depth schedule grouping in training/lightning.py with
+    physical transformer-depth metadata supplied by modeling/staged_backbones.py.
+    Replace backbone_warmup_epochs_per_stage with a numeric backbone_warmup_depth_span_epochs=4;
+    remove the superseded stage-timing branch. Retain parameter ownership, anchor
+    membership and per-weight late-anchor scaling. Log actual stem, block-6 and block-12
+    rate ratios plus block-6 warm-up duration, at most four mechanism scalars. A recorded
+    block-6 duration of three epochs distinguishes the candidate from the incumbent's
+    two. This intentionally supersedes top-down-backbone-warm-up's coarse timing.
+    On a newly accepted incumbent, retain unrelated improvements, including any changed
+    read depth or stochastic depth; derive timing from physical blocks rather than
+    their readout grouping.
+  open_choices: The interpolation is specified; no duration sweep is proposed. A risk
+    is that slowing intermediate blocks reduces useful adaptation within twelve epochs.
+    Actual optimizer-group rates must establish the intended mapping, including norm
+    and bias parameters.
+  dependencies: []
+  priority_rationale: 'First: directly extends the only adopted setting, preserves
+    its endpoint protection, has low compute cost, and tests an architecture-specific
+    weakness in the current implementation.'
+  source_change: true
+  targeted_curve: "Incumbent epochs 0\u20136: preserve reduced early stem drift while\
+    \ smoothing intermediate-block timing. Epochs 8\u201311: improve the still-rising\
+    \ \xD71 macro curve without increasing peak rates or epochs."
+  status: completed
+  created_revision: 247
+  ranking_rationale: "Admit all five: proposal_admission reports satisfied dependencies,\
+    \ and the read-depth prerequisite is provisionally accepted and active. Ledger,\
+    \ prior-work table and targeted documentation searches reveal no identical measured\
+    \ attempts. Rank blockwise timing first for its concrete architecture-specific\
+    \ extension, while treating the opening win as weak against unknown seed variation.\
+    \ Rank the block-10 retry second because inspected source confirms its material\
+    \ difference: the rejected run also changed optimizer timing for blocks 9\u2013\
+    10. Token-moment restoration is a distinct augmentation transform, but its causal\
+    \ motivation is less established. Beta2 and clipping follow as inexpensive, less\
+    \ directly supported directions. Historical 06-beta2-0.99 and 12-grad-clip-0.5\
+    \ lost on an older recipe and fold; different values, architecture and the adopted\
+    \ staggered schedule provide material differences here. Neither negative precedent\
+    \ establishes a RadioDINO verdict."
+  experiments:
+  - blockwise-top-down-warm-up-20261015T085652Z-df8bb1db
+  - blockwise-top-down-warm-up-20261015T092235Z-da4cc355
+  - blockwise-top-down-warm-up-20261015T101549Z-af3f34e2
+  decision: reject
+- id: block-ten-read-with-fixed-optimizer-ownership
+  mechanism_id: adapter-depth
+  parent_idea_id: middle-read-at-block-10
+  title: Read after block 10 while preserving each block's incumbent optimizer ownership
+  opportunity: "Measured: the first block-10 run improved selected-epoch \xD71 but\
+    \ declined at \xD74. Source comparison identifies a concrete confound: changing\
+    \ stage_blocks from (1,2,5,4) to (1,2,7,2) also moved blocks 9\u201310 into a\
+    \ different warm-up group. The result therefore mixes read depth with optimization\
+    \ timing. Hypothesis: retaining their original optimizer and anchor-rate ownership\
+    \ can recover the later read's useful representation without that timing change.\
+    \ Working expectation: about +0.0003\u20130.0007 macro at both multipliers."
+  mechanism: Keep all twelve blocks registered under their incumbent names and groups.
+    During the deep forward pass, capture the middle feature after blocks 9 and 10
+    have executed, then execute blocks 11 and 12 once and apply the existing final
+    norm and pooling. Change only the middle capture point. Preserve the first read
+    and feature-statistics boundary after block 3. Do not add a learned merge, projection,
+    attention mechanism or additional read.
+  precedents:
+  - "middle-read-at-block-10: \xD71 +0.000292 and \xD74 \u22120.000515 against the\
+    \ warm-up incumbent; the complete result is in the adapter-depth verdict."
+  - "Original source diff: stage_blocks changed from (1,2,5,4) to (1,2,7,2). build_optimizer\
+    \ derives warm-up depth from stage ownership, so blocks 9\u201310 changed from\
+    \ one-epoch to two-epoch warm-up."
+  - 'top-down-backbone-warm-up: optimization timing is an adopted behavior and must
+    remain independent of the candidate''s feature capture point.'
+  - 'prior-work.md: adapter read depth is an allowed subject; a learned final merge
+    was blocked as a new readout structure.'
+  novelty: A diagnosed retry of the existing block-10 idea. It removes its optimization
+    confound instead of renaming the same experiment or adjusting a strength.
+  coverage: Changes the allowed middle-read depth only. Retains block count, widths,
+    pretrained weights, CLS exclusion, early read, augmentation boundary, final pooling,
+    routing and heads.
+  exploitation: "Tests whether the earlier \xD71 improvement survives when the incumbent's\
+    \ successful timing is preserved. ACL, Baker's and medial-meniscus declines shared\
+    \ with other rejected settings motivate scrutiny, not label-specific objectives."
+  budget: "Same twelve epochs and 5,304 steps at seed 1110484336. Estimated 2,700\u2013\
+    2,850 s and about 11.8 GB peak allocation. The previous block-10 run took 2,742.5\
+    \ s; capturing an existing intermediate tensor should have similar cost."
+  implementation: "Add a RadioDINO stage wrapper in modeling/staged_backbones.py and\
+    \ select it in modeling/model.py. Reuse the existing registered modules; preserve\
+    \ stage_blocks=(1,2,5,4), parameter names, optimizer groups and anchor assignments.\
+    \ Split execution inside the last stage to capture block 10, with no duplicate\
+    \ execution or parameter registration. Remove the superseded block-8 capture for\
+    \ RadioDINO. Log middle_read_block_index=10, final_read_block_index=12 and the\
+    \ actual warm-up durations assigned to blocks 9\u201310. On a new incumbent, preserve\
+    \ that incumbent's physical-parameter timing; never restore the rejected stage\
+    \ regrouping. If another timing mechanism supersedes the current prerequisite,\
+    \ reconcile the prerequisite explicitly."
+  open_choices: Implementation must preserve checkpoint-backbone execution and avoid
+    duplicate random draws when stochastic depth is retained from a new incumbent.
+    Capture depth and optimizer ownership require separate recorded evidence.
+  dependencies:
+  - top-down-backbone-warm-up
+  priority_rationale: 'Second: the failed result has a specific source-level confound,
+    and this retry can isolate an allowed mechanism at almost unchanged cost.'
+  source_change: true
+  targeted_curve: "middle-read-at-block-10 epochs 8\u201311: retain its late \xD7\
+    1 improvement while preventing the blocks-9\u201310 warm-up change. Target the\
+    \ \xD74 decline and accompanying ACL, Baker's and medial-meniscus losses without\
+    \ selecting labels."
+  status: retired
+  created_revision: 247
+  ranking_rationale: Block and park after the single bounded repair. Recursive comparison
+    confirms the repair workspace is byte-identical to the budget-failed candidate,
+    excluding __pycache__. No runtime reduction was implemented; preparation failed
+    and prepared source, diff, integration declaration and activation binding are
+    absent. Fewer epochs or less input would violate the fixed comparison requirements.
+    The full remaining queue is listed in its existing relative order, excluding the
+    blocked idea, to resolve the previous ranking rejection.
+  experiments:
+  - block-ten-read-with-fixed-optimizer-ownership-20261015T103103Z-02c56a32
+  - block-ten-read-with-fixed-optimizer-ownership-20261015T112230Z-facdca8d
+  retired_reason: 'User decision 2026-10-15: locality line only'
+- id: feature-statistics-preserving-token-moments
+  mechanism_id: feature-statistics
+  parent_idea_id: feature-statistics-before-position-embedding
+  title: Preserve each token's mean and variance during feature-statistics perturbation
+  opportunity: "Measured: moving feature-statistics augmentation before position addition\
+    \ changed both its depth and its input representation, with mixed label effects\
+    \ and a \xD74 decline. Source inspection shows the incumbent perturbs a position-bearing\
+    \ residual stream before further pre-norm blocks. Hypothesis: changing token magnitude\
+    \ and offset unnecessarily disturbs the residual path, while channel-direction\
+    \ perturbations could retain useful style variation. This remains an unverified\
+    \ causal explanation. Working expectation: approximately +0.0005 macro at both\
+    \ multipliers."
+  mechanism: 'Keep augmentation after block 3, its probability 0.5, acquisition grouping
+    and existing random draws. Let x be the unperturbed token and z the existing DSU
+    output. Across channels, restore x''s token mean and standard deviation: y=mean(x)+std(x)*(z-mean(z))/max(std(z),epsilon).
+    Apply restoration only to affected tokens/acquisitions; preserve untouched inputs
+    exactly. The perturbation can still alter channel direction, while token offset
+    and magnitude follow the original residual stream. This is a training-only augmentation
+    replacement, with no learned normalization or inference change.'
+  precedents:
+  - "feature-statistics-before-position-embedding: activation passed, \xD71 improved\
+    \ and \xD74 declined. Its full curves and per-label changes are in the family\
+    \ verdict."
+  - 'Incumbent source: DSU acts after block 3, and subsequent transformer blocks normalize
+    branch inputs while retaining the residual stream.'
+  - '[Layer Normalization](https://arxiv.org/abs/1607.06450) defines normalization
+    using within-example feature moments; [DINO''s block implementation](https://github.com/facebookresearch/dino/blob/main/vision_transformer.py)
+    shows normalization before residual branches. The proposed augmentation projection
+    is an inference from these mechanics, not a published RadioDINO result.'
+  - '[Modeling Uncertain Feature Representation for Domain Generalization](https://arxiv.org/abs/2301.06442)
+    motivates perturbing feature statistics. It does not establish that restoring
+    token moments improves this model.'
+  - The external augmentation campaign already tried correlated-style and study-coherent
+    DSU variants. This proposal changes neither correlation modeling nor grouping.
+  novelty: Changes the geometry of the existing perturbation while retaining its depth
+    and sampling. The failed placement experiment did not preserve token moments or
+    isolate this residual-path effect.
+  coverage: Addresses the LayerNorm-only, pre-norm transformer architecture. Retains
+    current augmentation probability, acquisition/type eligibility, adapter reads
+    and all inference behavior.
+  exploitation: Preserves the adopted recipe's augmentation rather than disabling
+    it. The relevant pattern is mixed MCL/lateral-meniscus gains alongside fracture/PF-OA
+    losses; no label receives a separate objective.
+  budget: "Twelve epochs, 5,304 steps and seed 1110484336. Estimated 2,750\u20132,950\
+    \ s, about 11.8\u201312.0 GB peak allocation. Channel reductions operate on the\
+    \ existing 384\xD714\xD714 feature maps. These are estimates; avoid storing additional\
+    \ full-resolution features beyond the augmentation boundary."
+  implementation: 'Replace RadioDINO''s training augmentation output in modeling/model.py
+    with the moment-restored output; keep modeling/augmentation.py unchanged because
+    it is outside policy. Retain the original tensor only through restoration, use
+    FP32 reductions and the existing numerical epsilon, and preserve differentiability.
+    Remove the superseded unprojected RadioDINO augmentation path rather than adding
+    a mode switch. In training/lightning.py, report post-restoration feature_statistics_mean_absolute_change,
+    effective probability, normalized-direction change, token-mean error and token-standard-deviation
+    error: five mechanism scalars. Positive normalized-direction change proves the
+    replacement remains active. On a newly accepted incumbent retain unrelated optimizer,
+    read-depth and regularizer improvements; replace only its feature-statistics transform.'
+  open_choices: Token moments do not isolate the nonlinear positional contribution,
+    and the method must not claim to preserve that contribution exactly. Restoration
+    may remove useful augmentation components. The diagnosis is architectural and
+    provisional; existing artifacts contain no saved intermediate features that establish
+    it.
+  dependencies: []
+  priority_rationale: 'Third: a structural follow-up to the mixed placement result,
+    with explicit activation evidence and modest cost. Its uncertainty is greater
+    than the read-depth retry.'
+  source_change: true
+  targeted_curve: "Pre-position run versus RadioDINO baseline, epochs 0\u201311: retain\
+    \ useful perturbation while reducing residual-moment disturbance. Seek improved\
+    \ late macro AUC and \xD74 performance; inspect fracture/PF OA alongside all other\
+    \ labels."
+  status: retired
+  created_revision: 247
+  ranking_rationale: Block and park after the single bounded repair. Recursive comparison
+    confirms the repair workspace is byte-identical to the budget-failed candidate,
+    excluding __pycache__. No runtime reduction was implemented; preparation failed
+    and prepared source, diff, integration declaration and activation binding are
+    absent. Fewer epochs or less input would violate the fixed comparison requirements.
+    The full remaining queue is listed in its existing relative order, excluding the
+    blocked idea, to resolve the previous ranking rejection.
+  retired_reason: 'User decision 2026-10-15: locality line only'
+- id: adam-second-moment-memory-0-95
+  mechanism_id: adam-second-moment
+  parent_idea_id: null
+  title: Shorten Adam's second-moment memory for the changing warm-up regime
+  opportunity: "Measured: the incumbent's groups peak at different times, anchor penalty\
+    \ peaks near epoch 5, and gradient diagnostics vary throughout training. Its beta2=0.999\
+    \ retains a nominal second-moment timescale of about 1,000 steps, or 2.26 epochs\
+    \ at 442 steps per epoch. Hypothesis: that memory is slow relative to the changing\
+    \ optimization regime of a twelve-epoch fine-tune. Beta2=0.95 gives about 20 steps.\
+    \ A working expectation is around +0.0003\u20130.0007 macro at both multipliers,\
+    \ with substantial uncertainty."
+  mechanism: Set optimizer.beta2 from 0.999 to 0.95. Retain beta1=0.9, epsilon, all
+    peak rates, depth-dependent warm-up, linear decay, anchor coefficients and clipping.
+    The value comes from the authors' MAE ViT pretraining implementation, not a validation-driven
+    sweep. Applying it to RadioDINO fine-tuning is an extrapolation; MAE fine-tuning
+    itself uses the AdamW defaults.
+  precedents:
+  - '[MAE''s official pretraining implementation](https://github.com/facebookresearch/mae/blob/main/main_pretrain.py)
+    explicitly uses AdamW betas=(0.9,0.95). This supplies the proposed value, not
+    evidence of a fine-tuning advantage.'
+  - 'top-down-backbone-warm-up: actual stem and upper-block rate trajectories differ
+    over the twelve epochs; the complete diagnostics are reported below.'
+  - Lowering the backbone rate reduced drift but failed both multipliers. Changing
+    beta2 alters the temporal preconditioner rather than repeating that rate change.
+  - 'prior-work.md: RadioDINO''s smaller weights, global attention and LayerNorm-only
+    blocks differ from the MambaVision recipe from which beta2 was inherited.'
+  novelty: Tests optimizer memory, which none of the recorded rate, anchor or schedule
+    attempts changed. It is a distinct mechanism from another peak-rate value.
+  coverage: Applies to the existing AdamW optimizer without changing model structure,
+    data, losses, parameter ownership or the schedule.
+  exploitation: Uses the measured nonstationary schedule as motivation. Look for faster
+    recovery as group rates and anchor gradients change, rather than lower training
+    loss alone.
+  budget: "Configuration-only; expected training 2,700\u20132,800 s and peak allocation\
+    \ about 11.8 GB, with the same optimizer state sizes, twelve epochs, 5,304 steps\
+    \ and seed 1110484336."
+  implementation: Change only optimizer.beta2 in configs/campaign.yaml. Recorded effective
+    configuration proves this numeric optimizer setting; retain existing loss, gradient,
+    anchor and drift diagnostics. On a newly accepted incumbent retain every unrelated
+    improvement and change only beta2. If it already uses 0.95, the proposal is a
+    no-op and must not launch as a duplicate.
+  open_choices: A short second-moment memory may make batch-8 updates less stable
+    or overreact to rare gradients. Logged scalar norms do not establish second-moment
+    lag; it is a hypothesis. No additional rate adjustment or confirmation run is
+    proposed.
+  dependencies: []
+  priority_rationale: 'Fourth: inexpensive, genuinely distinct from the rejected rate
+    and anchor attempts, and tied to the adopted schedule''s changing timescales.'
+  source_change: false
+  targeted_curve: "Incumbent epochs 3\u20137: improve adaptation around staggered\
+    \ rate peaks and the anchor-penalty maximum. Preserve late validation gains through\
+    \ epochs 8\u201311 while improving both selected \xD71 and saved \xD74 macro AUC."
+  status: retired
+  created_revision: 247
+  ranking_rationale: Block and park after the single bounded repair. Recursive comparison
+    confirms the repair workspace is byte-identical to the budget-failed candidate,
+    excluding __pycache__. No runtime reduction was implemented; preparation failed
+    and prepared source, diff, integration declaration and activation binding are
+    absent. Fewer epochs or less input would violate the fixed comparison requirements.
+    The full remaining queue is listed in its existing relative order, excluding the
+    blocked idea, to resolve the previous ranking rejection.
+  retired_reason: 'User decision 2026-10-15: locality line only'
+- id: global-gradient-clip-0-3
+  mechanism_id: gradient-clipping
+  parent_idea_id: null
+  title: Make clipping active at RadioDINO's measured gradient scale
+  opportunity: "Measured from the incumbent's original CSV: none of 104 logged pre-clipping\
+    \ gradient norms exceeded the inherited threshold 1.0; 93 exceeded 0.3. MambaVision\
+    \ exceeded 1.0 in 46 of 104 logged samples. Thus the same threshold operates in\
+    \ materially different gradient regimes. Hypothesis: active clipping can limit\
+    \ large-batch-to-batch gradient influence under global attention. Working expectation\
+    \ is approximately +0.0003\u20130.0007 macro at both multipliers; excessive clipping\
+    \ is a material risk."
+  mechanism: "Set trainer.gradient_clip_val=0.3, retaining Lightning's existing global-norm\
+    \ clipping algorithm. DINO's authors cite 0.3\u20131.0 as potentially useful clipping\
+    \ values for larger ViTs. Their implementation clips individual parameter tensors,\
+    \ so using 0.3 as a global threshold here is an explicit extrapolation. Keep all\
+    \ optimizer rates, moments, anchors and timing unchanged."
+  precedents:
+  - 'Original grad_norm records: RadioDINO incumbent maximum 0.982803, with 93/104
+    logged samples above 0.3; MambaVision maximum 22.461454 and 46/104 above 1.0.
+    These are sampled observations, not all-step clipping frequencies.'
+  - "[DINO's official training arguments](https://github.com/facebookresearch/dino/blob/main/main_dino.py)\
+    \ name clipping norms 0.3\u20131.0 as useful possibilities for larger ViTs. The\
+    \ proposed global clipping scope differs from DINO's parameter-wise implementation."
+  - "prior-work.md: MambaVision clipping 10 versus 1 declined by about 0.0003 at \xD7\
+    4. That is a different direction and architecture; it supplies no RadioDINO verdict."
+  - 'The rejected lower-rate run does not duplicate clipping: variable gradient rescaling
+    changes Adam''s moment history, while a lower learning rate scales the resulting
+    update.'
+  novelty: First RadioDINO clipping experiment. It uses a threshold expected to activate
+    under observed gradients rather than loosening an apparently inactive threshold.
+  coverage: Changes only an allowed training setting. Architecture, losses, optimizer
+    moments, peak rates and prediction settings remain the incumbent's.
+  exploitation: Explores a measured mismatch between the inherited recipe and RadioDINO.
+    Compare learning progress and full macro performance, not a desired clipping frequency
+    or a label subset.
+  budget: "Configuration-only. Expected 2,700\u20132,800 s training and about 11.8\
+    \ GB peak allocation, twelve epochs, 5,304 steps and seed 1110484336. Existing\
+    \ clipping performs the norm computation already."
+  implementation: Change only trainer.gradient_clip_val in configs/campaign.yaml.
+    The effective config establishes threshold 0.3; existing pre-clipping grad_norm
+    observations above 0.3 establish occasions on which the configured clipping should
+    act. Do not reinterpret the sampled values as an epoch average or full clipping
+    fraction. Retain current timing and anchors. On a newly accepted incumbent retain
+    unrelated changes; if its clipping algorithm has been replaced, reconcile this
+    proposal rather than silently overwriting that mechanism.
+  open_choices: The threshold may clip too often. Adam's approximate scale invariance
+    can also blunt benefits from global rescaling. The sampled incumbent counterfactual
+    predicts activation, not the candidate's realized clipping frequency or accuracy.
+  dependencies: []
+  priority_rationale: 'Fifth: cheap and supported by a clear measured scale mismatch,
+    but the transfer from DINO''s clipping scope and larger models is uncertain.'
+  source_change: false
+  targeted_curve: "Incumbent epochs 0\u201311: constrain the many sampled norms between\
+    \ 0.3 and 1.0 while preserving its declining training loss and rising validation\
+    \ macro AUC. Improve both multipliers without extending training."
+  status: retired
+  created_revision: 247
+  ranking_rationale: Block and park after the single bounded repair. Recursive comparison
+    confirms the repair workspace is byte-identical to the budget-failed candidate,
+    excluding __pycache__. No runtime reduction was implemented; preparation failed
+    and prepared source, diff, integration declaration and activation binding are
+    absent. Fewer epochs or less input would violate the fixed comparison requirements.
+    The full remaining queue is listed in its existing relative order, excluding the
+    blocked idea, to resolve the previous ranking rejection.
+  retired_reason: 'User decision 2026-10-15: locality line only'
+- id: convolutional-spatial-prior-injection
+  mechanism_id: adapter-spatial-prior
+  parent_idea_id: null
+  title: "A convolutional spatial prior: the RadImageNet ResNet-50 stem to layer2,\
+    \ brought to the 14\xD714 grid and added to the ViT tokens before each of the\
+    \ four stages through zero-initialised gates"
+  opportunity: 'Evidence (run-notes.md, Diagnosis of the gap): 85% of the gap to MambaVision-T
+    sits on the menisci and the three OA labels, read from the stride-16 and stride-32
+    maps, and RadioDINO''s anatomy and meniscus maps are worse. The convolutional
+    backbones also read at stride 16 and 32, but build those maps from stride-4 and
+    stride-8 features; RadioDINO''s tokens never see detail finer than a 16-pixel
+    patch. Rates, anchors, the read depth and a learned final merge left those labels
+    within 0.002. Evidence: ViT-Adapter (Chen et al. 2022) adds exactly this convolutional
+    spatial prior to plain ViTs for dense tasks. Guess on size: +0.002 to +0.006 macro,
+    on the five labels.'
+  mechanism: "A spatial-prior branch inside the radiodino_s16 staged backbone: the\
+    \ stem, layer1 and layer2 of the Refined RadImageNet ResNet-50 (the main recipe's\
+    \ weights, avg_down layout, loaded strictly through radimagenet_state_dict), fed\
+    \ the same images converted from the recipe's ImageNet normalisation to the ResNet-50\
+    \ recipe's mean 0.3162 and std 0.3213 inside the branch. Its stride-8 output (512\
+    \ channels, origin 0) is padded by one cell right and below and goes through a\
+    \ 3\xD73 stride-2 convolution to 384 channels on the 14\xD714 token grid (origin\
+    \ 8 against the tokens' 7.5), then a LayerNorm. Before each of the four block\
+    \ stages, tokens += gamma_s \u2299 Linear_s(prior), with a per-stage linear 384\u2192\
+    384 and a per-channel gamma_s initialised at zero, so the model starts as the\
+    \ incumbent. The branch joins the stem's rate group; its pretrained ResNet layers\
+    \ train at 0.25 of it (5e-5, the ResNet-50 recipe's rate)."
+  precedents:
+  - 'ViT-Adapter (Chen et al., 2022): spatial prior module plus injectors with zero-initialised
+    gamma.'
+  - "This campaign: middle-read-at-block-10 (\xD74 \u22120.0005), final-read-by-learned-two-by-two-merge\
+    \ (in progress, level through epoch 9): changing the reads alone leaves the five\
+    \ labels in place."
+  novelty: First run giving RadioDINO's tokens sub-patch detail; the only change that
+    adds information the 16-pixel patches cannot see. An adapter fix, in scope (contract.md,
+    Settled, "The adapter is a subject").
+  coverage: Every study; aimed at Medial and Lateral Meniscus, Medial, Lateral and
+    PF OA.
+  exploitation: "Read x4 and x1 against the incumbent and the five labels first, then\
+    \ against the decoder-free MambaVision-T (mamba-silver-fold-2, x4 0.935160). Activation:\
+    \ spatial_prior_gate_stage0 to stage3, the absolute mean of each stage's gamma\
+    \ per epoch, above 0 after epoch 1. Shown wrong by: gammas staying near zero,\
+    \ or the five labels within \xB10.002."
+  budget: 'About +1.3 GFLOPs per image on 4.6 (ResNet-50 stem to layer2 plus the stride-2
+    convolution, guess from published counts): training expected near 3,100 s, inside
+    the 3,417 s ceiling; memory about +1.5 GB on 11.8 GB.'
+  implementation: 'Written and verified by the keeper: apply /home/claudio/src/knee-abnormality-radiodino/autoresearch/campaigns/radiodino-settings/spatial-prior.patch
+    exactly (git apply in the workspace; base is the top-down-backbone-warm-up incumbent''s
+    source; files src/knee_abnormality/modeling/staged_backbones.py and src/knee_abnormality/training/lightning.py)
+    and change nothing else. Keeper''s CPU checks on that base: feature mapping 15.5/32
+    verified; branch weights equal the RadImageNet file; rates 2e-4 stem, 5e-5 ResNet
+    layers; random stream after construction unchanged; with the gammas at zero both
+    backbone maps equal the incumbent''s exactly (max difference 0.0); backbone 25.5M
+    parameters. If the incumbent changed, port the same change onto it.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user's choice after the diagnosis (2026-10-15 12:00); the
+    one remaining lever that adds what the architecture lacks rather than re-reading
+    what it has.
+  status: blocked
+  created_revision: 275
+  seeded: /home/claudio/src/knee-abnormality-radiodino/autoresearch/campaigns/radiodino-settings/keeper-ideas-spatial-prior.yaml
+  user_ordered: true
+  experiments:
+  - convolutional-spatial-prior-injection-20261015T101054Z-85df0060
+  - convolutional-spatial-prior-injection-20261015T102730Z-4f5de736
+  blocked_reason: Block and park after the single bounded repair. Recursive comparison
+    confirms the repair workspace is byte-identical to the budget-failed candidate,
+    excluding __pycache__. No runtime reduction was implemented; preparation failed
+    and prepared source, diff, integration declaration and activation binding are
+    absent. Fewer epochs or less input would violate the fixed comparison requirements.
+    The full remaining queue is listed in its existing relative order, excluding the
+    blocked idea, to resolve the previous ranking rejection.
+- id: convolutional-spatial-prior-frozen-branch
+  mechanism_id: adapter-spatial-prior
+  parent_idea_id: null
+  title: 'The convolutional spatial prior with its pretrained RadImageNet ResNet-50
+    layers frozen (no gradients, BatchNorm in eval): stem and layer1 added to the
+    ViT tokens before each stage through zero-initialised gates'
+  opportunity: 'Evidence (run-notes.md, Diagnosis of the gap): 85% of the gap to MambaVision-T
+    sits on the menisci and the three OA labels, read from the stride-16 and stride-32
+    maps, and RadioDINO''s anatomy and meniscus maps are worse. The convolutional
+    backbones also read at stride 16 and 32, but build those maps from stride-4 and
+    stride-8 features; RadioDINO''s tokens never see detail finer than a 16-pixel
+    patch. Rates, anchors, the read depth and a learned final merge left those labels
+    within 0.002. Evidence: ViT-Adapter (Chen et al. 2022) adds exactly this convolutional
+    spatial prior to plain ViTs for dense tasks. Guess on size: +0.002 to +0.006 macro,
+    on the five labels.'
+  mechanism: "A spatial-prior branch inside the radiodino_s16 staged backbone: the\
+    \ stem, layer1 and layer2 of the Refined RadImageNet ResNet-50 (the main recipe's\
+    \ weights, avg_down layout, loaded strictly through radimagenet_state_dict), fed\
+    \ the same images converted from the recipe's ImageNet normalisation to the ResNet-50\
+    \ recipe's mean 0.3162 and std 0.3213 inside the branch. Its stride-8 output (512\
+    \ channels, origin 0) is padded by one cell right and below and goes through a\
+    \ 3\xD73 stride-2 convolution to 384 channels on the 14\xD714 token grid (origin\
+    \ 8 against the tokens' 7.5), then a LayerNorm. Before each of the four block\
+    \ stages, tokens += gamma_s \u2299 Linear_s(prior), with a per-stage linear 384\u2192\
+    384 and a per-channel gamma_s initialised at zero, so the model starts as the\
+    \ incumbent. The pretrained ResNet layers are frozen: they run under no_grad with\
+    \ BatchNorm in eval mode, so their activations are not kept; the downsampling\
+    \ convolution, the LayerNorm, the projections and the gates train at the stem\
+    \ group's rate."
+  precedents:
+  - 'ViT-Adapter (Chen et al., 2022): spatial prior module plus injectors with zero-initialised
+    gamma.'
+  - "This campaign: middle-read-at-block-10 (\xD74 \u22120.0005), final-read-by-learned-two-by-two-merge\
+    \ (in progress, level through epoch 9): changing the reads alone leaves the five\
+    \ labels in place."
+  novelty: 'Replaces convolutional-spatial-prior-injection, invalid at its second
+    epoch on the budget (4,072 s projected against 3,417 s; GPU memory 22 GB, epoch
+    2 at about 340 s against 264 s): freezing the pretrained branch removes its stored
+    activations. An adapter fix, in scope (contract.md, Settled, ''The adapter is
+    a subject'').'
+  coverage: Every study; aimed at Medial and Lateral Meniscus, Medial, Lateral and
+    PF OA.
+  exploitation: "Read x4 and x1 against the incumbent and the five labels first, then\
+    \ against the decoder-free MambaVision-T (mamba-silver-fold-2, x4 0.935160). Activation:\
+    \ spatial_prior_gate_stage0 to stage3, the absolute mean of each stage's gamma\
+    \ per epoch, above 0 after epoch 1. Shown wrong by: gammas staying near zero,\
+    \ or the five labels within \xB10.002."
+  budget: 'Forward of the ResNet-50 stem to layer2 without backward: training expected
+    about 2,900 to 3,100 s, inside the 3,417 s ceiling; memory near the incumbent''s
+    11.8 GB plus the prior''s 14x14 maps.'
+  implementation: 'Repair of the budget failure (projected 3,513 s against 3,417 s
+    with the frozen stem to layer2): written and verified by the keeper, apply /home/claudio/src/knee-abnormality-radiodino/autoresearch/campaigns/radiodino-settings/spatial-prior-stride-four.patch
+    exactly on the top-down-backbone-warm-up incumbent''s source (files src/knee_abnormality/modeling/staged_backbones.py
+    and src/knee_abnormality/training/lightning.py) and change nothing else. It keeps
+    the frozen RadImageNet ResNet-50 stem and layer1 only (stride 4, 256 channels),
+    padded by three cells right and below and brought to the 14x14 token grid by a
+    5x5 stride-4 convolution (origin 8 against the tokens'' 7.5); the downsampling
+    convolution, LayerNorm, injector projections and gates are in the stem''s rate
+    and warm-up group; anchor registration skips frozen weights. Keeper''s CPU checks:
+    mapping 15.5/32 verified; branch weights equal the RadImageNet file; ResNet layers
+    frozen, outside the optimizer, BatchNorm in eval after model.train(); all 55 anchored
+    matrices in the optimizer; random stream unchanged; with the gammas at zero both
+    backbone maps equal the incumbent''s exactly.'
+  open_choices: Only a cost reduction inside the branch if the budget check still
+    fails.
+  dependencies: []
+  priority_rationale: The user's choice after the diagnosis (2026-10-15 12:00); the
+    one remaining lever that adds what the architecture lacks rather than re-reading
+    what it has.
+  status: completed
+  created_revision: 309
+  seeded: /home/claudio/src/knee-abnormality-radiodino/autoresearch/campaigns/radiodino-settings/keeper-ideas-spatial-prior-frozen.yaml
+  user_ordered: true
+  experiments:
+  - convolutional-spatial-prior-frozen-branch-20261015T111543Z-2bfbf703
+  - convolutional-spatial-prior-frozen-branch-20261015T111825Z-a6ebe7c0
+  - convolutional-spatial-prior-frozen-branch-20261015T113449Z-210001be
+  decision: reject
+- id: overlapping-patch-embedding
+  mechanism_id: adapter-patch-embedding
+  parent_idea_id: null
+  title: "Overlapping patch embedding: the 16\xD716 stride-16 projection becomes a\
+    \ 32\xD732 kernel at stride 16 with padding 8, started from the pretrained kernel\
+    \ in its centre and zeros around it"
+  opportunity: "Evidence (run-notes.md, Diagnosis of the gap): the gap to MambaVision-T\
+    \ sits on the menisci and OA labels, small structures whose edges cross the 16-pixel\
+    \ patch boundaries. RadioDINO's patch projection sees each 16\xD716 patch alone,\
+    \ without overlap, so an edge split between two patches is never seen whole by\
+    \ either token. Evidence: overlapping patch embeddings (PVTv2, CvT) and convolutional\
+    \ stems (Xiao et al. 2021) improve ViTs on dense tasks. Guess on size: +0.001\
+    \ to +0.004 macro, on the five labels."
+  mechanism: "The adapter's stem projection is replaced by a Conv2d(3, 384, kernel\
+    \ 32, stride 16, padding 8). Its weight starts as zeros with the pretrained 16\xD7\
+    16 kernel copied into the centre (rows and columns 8 to 23) and the pretrained\
+    \ bias, so at the start each token equals the incumbent's; the border weights\
+    \ learn to use the 8-pixel neighbourhood around each patch. Geometry unchanged:\
+    \ origin (32\u22121)/2 \u2212 8 = 7.5, stride 16, 196 tokens."
+  precedents:
+  - PVTv2 (Wang et al. 2022) OverlapPatchEmbed; CvT (Wu et al. 2021) convolutional
+    token embedding; Xiao et al. 2021, early convolutions help transformers see better.
+  novelty: "An adapter fix, in scope (contract.md, Settled, \"The adapter is a subject\"\
+    ); the user's choice of 2026-10-15 after discussing that RadioDINO sees in 16\xD7\
+    16 patches."
+  coverage: Every study; aimed at Medial and Lateral Meniscus, Medial, Lateral and
+    PF OA.
+  exploitation: "Read x4 and x1 against the incumbent and the five labels first. Activation:\
+    \ one metric, the RMS of the projection weight outside the central 16\xD716 window\
+    \ per epoch, above 0 after epoch 1. Shown wrong by: the border weights staying\
+    \ near zero, or the five labels within \xB10.002."
+  budget: 'The projection''s cost grows fourfold, about 0.06 GFLOPs per image on 4.6:
+    training within 1.02 of the incumbent''s; no change to memory beyond the projection.'
+  implementation: 'File: src/knee_abnormality/modeling/staged_backbones.py, radiodino_s16
+    only: build the larger Conv2d and fill it from original.patch_embed.proj before
+    passing it to the stem; keep it as stem.proj so its name, rate group and early
+    anchor stay; the new weight''s init uses no random draws (zeros plus copies),
+    so the random stream is unchanged. training/lightning.py only for the one metric
+    through _log_epoch_metric. Verify on CPU that the feature mapping still verifies
+    at 7.5/15.5 and that the backbone''s outputs equal the incumbent''s exactly.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user's choice; fixes the split-edge problem of non-overlapping
+    patches at almost no cost.
+  status: completed
+  created_revision: 336
+  seeded: /home/claudio/src/knee-abnormality-radiodino/autoresearch/campaigns/radiodino-settings/keeper-ideas-overlap.yaml
+  experiments:
+  - overlapping-patch-embedding-20261015T113924Z-3107b16f
+  decision: reject
+- id: depthwise-convolution-in-block-mlps
+  mechanism_id: adapter-locality
+  parent_idea_id: null
+  title: "A 3\xD73 depthwise convolution inside every transformer block's MLP, added\
+    \ through a zero-initialised per-channel gate so the model starts as the incumbent\
+    \ (PVTv2 MlpWithDepthwiseConv, LocalViT)"
+  opportunity: 'Evidence (run-notes.md, Diagnosis of the gap): the gap to MambaVision-T
+    sits on small located structures (menisci, OA compartments); RadioDINO mixes neighbouring
+    patches only through global attention, with no local operator after the patch
+    projection, while every model that reached 0.937 (MambaVision-T, Swin-T, the CNNs)
+    has local mixing at every stage. Evidence: a depthwise convolution in the feed-forward
+    network gives ViTs locality and improves them on dense and small-data tasks (PVTv2,
+    Wang et al. 2022; LocalViT, Li et al. 2021). Guess on size: +0.002 to +0.005 macro,
+    on the five labels.'
+  mechanism: "In each of the twelve blocks the MLP becomes: h = fc1(x); h = h + gamma\
+    \ \u2299 DWConv3\xD73(h) on the 14\xD714 token grid (1536 hidden channels, groups\
+    \ 1536, padding 1); then the block's own activation, norm and fc2 as before. gamma\
+    \ is a per-channel vector initialised at zero, so each block starts identical\
+    \ to the incumbent's; the depthwise weights use the default Conv2d initialisation\
+    \ drawn under torch.random.fork_rng. Geometry unchanged."
+  precedents:
+  - 'PVTv2 (Wang et al. 2022): MlpWithDepthwiseConv, in timm.models.pvt_v2.'
+  - 'LocalViT (Li et al. 2021): depthwise convolution in the feed-forward network
+    of every block.'
+  novelty: An adapter fix in the campaign's locality line (contract.md, Current line),
+    after the spatial prior and the overlapping patch embedding; the only one acting
+    inside every block.
+  coverage: Every study; aimed at Medial and Lateral Meniscus, Medial, Lateral and
+    PF OA.
+  exploitation: "Read x4 and x1 against the incumbent and the five labels first. Activation:\
+    \ one metric, the mean absolute gamma over the twelve blocks per epoch, above\
+    \ 0 after epoch 1. Shown wrong by: gammas staying near zero, or the five labels\
+    \ within \xB10.002."
+  budget: "A depthwise 3\xD73 over 1536\xD7196 per block, about 0.03 GFLOPs per image\
+    \ per block on 4.6 in total: training within 1.05 of the incumbent's; memory up\
+    \ by the depthwise activations, about +1 GB."
+  implementation: "File: src/knee_abnormality/modeling/staged_backbones.py, radiodino_s16\
+    \ only: wrap each block's mlp in a module that reshapes the hidden tokens to the\
+    \ 14\xD714 grid for the depthwise convolution and back, keeping fc1, act, norm,\
+    \ fc2 and their names (blocks.N.mlp.fc1 and so on) so rates, anchors and checkpoints\
+    \ of the pretrained weights are unchanged; new parameters under torch.random.fork_rng.\
+    \ training/lightning.py only for the one metric through _log_epoch_metric. Verify\
+    \ on CPU that the feature mapping still verifies and that, with the gammas at\
+    \ zero, the backbone's outputs equal the incumbent's exactly."
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The highest-potential reusable timm idea for the locality ViTs
+    lack; acts in every block.
+  status: completed
+  created_revision: 343
+  seeded: /home/claudio/src/knee-abnormality-radiodino/autoresearch/campaigns/radiodino-settings/keeper-ideas-local-mlp.yaml
+  experiments:
+  - depthwise-convolution-in-block-mlps-20261015T123604Z-569d6a40
+  decision: reject
+- id: spatial-prior-direct-zero-projection
+  mechanism_id: adapter-spatial-prior
+  parent_idea_id: convolutional-spatial-prior-frozen-branch
+  title: Inject the frozen spatial prior through zero-initialized projections without
+    multiplicative gates
+  opportunity: "Measured: the completed frozen layer1 prior narrowly missed adoption:\
+    \ \u0394\xD71 \u22120.000318, \u0394\xD74 \u22120.000144. All four gates moved,\
+    \ but their small magnitudes do not establish useful residual energy. Source inspection\
+    \ identifies a potentially restrictive parameterization: a random projection multiplied\
+    \ by a zero-start gate, with the projection also anchored to its initialization.\
+    \ Hypothesis: a directly trained zero projection can expose the same local information\
+    \ more effectively within twelve epochs. The working expectation is a macro gain\
+    \ around 0.0005 at both multipliers, with substantial uncertainty."
+  mechanism: Reuse the budget-compliant frozen ResNet stem-through-layer1 feature
+    extractor, its trainable downsampling convolution and LayerNorm, and its four
+    injection positions. Replace each random Linear plus channelwise gamma with one
+    bias-free Linear(384,384), initialized entirely to zero, and add its output directly
+    to the token stream. This preserves the initial RadioDINO function while changing
+    how the residual learns, rather than changing gate strength. Retain existing rates,
+    warm-up and anchor rules. Log four injection-to-input RMS ratios and one aggregate
+    projection-weight RMS; the ratios start at zero and directly measure the mechanism's
+    realized contribution.
+  precedents:
+  - "convolutional-spatial-prior-frozen-branch-20261015T113449Z-210001be: 3262.6 s,\
+    \ 12.930 GB, all four gates nonzero, \u0394\xD71/\xD74 \u22120.000318/\u22120.000144.\
+    \ The layer2 predecessors exceeded projected runtime limits."
+  - '[ControlNet](https://arxiv.org/abs/2302.05543) uses zero-initialized convolutional
+    connections to introduce a trainable conditioning path progressively. This supports
+    the initialization principle; its task and training regime differ.'
+  - '[Current campaign line](/home/claudio/src/knee-abnormality-radiodino/autoresearch/campaigns/radiodino-settings/contract.md):
+    convolutional side branches and local token detail are explicitly in scope.'
+  novelty: 'A structural retry of the same spatial information source: direct zero
+    projections replace the product of random projections and learned gates. It changes
+    neither the frozen CNN depth nor optimizer strengths.'
+  coverage: Supplies local image features at all four existing stage entries. The
+    RadioDINO weights, twelve blocks, token count, adapter reads and downstream maps
+    retain their current roles.
+  exploitation: Uses the closest completed locality result while addressing a specific
+    activation ambiguity. Lateral OA and fracture gains motivate retaining the information
+    source, but neither label becomes an objective. Success remains strict macro improvement
+    at both multipliers.
+  budget: "Twelve epochs, batch 8, 5304 steps, seed 1110484336. Estimated training\
+    \ 3200\u20133350 s and peak allocation about 13 GB, based on the completed layer1\
+    \ branch. Its measured 3262.6 s leaves only 154.2 s below the ceiling, so this\
+    \ is the tightest proposal. Removing gates should add negligible compute; actual\
+    \ cost remains unknown."
+  implementation: In src/knee_abnormality/modeling/staged_backbones.py, add the frozen
+    layer1 branch from the completed attempt and replace its four injector implementations
+    with direct zero projections. Remove their gamma parameters entirely. In training/lightning.py,
+    retain the frozen-parameter exclusion needed for anchor registration and add the
+    five diagnostics through _log_epoch_metric; use modeling/model.py only if aggregation
+    requires it. Preserve incumbent parameter names and optimizer ownership, isolate
+    new initialization with fork_rng, and preserve sampling and RNG behavior. Apply
+    to the incumbent accepted at development time, retaining unrelated improvements.
+    If it already contains a spatial-prior injector, replace that injector and record
+    any superseded active idea explicitly.
+  open_choices: Fix the branch to stem plus layer1; do not restore the over-budget
+    layer2 design. Four residual RMS ratios, rather than gate magnitude alone, are
+    the activation evidence. Whether direct projections improve useful feature transfer
+    is the unresolved hypothesis.
+  dependencies: []
+  priority_rationale: 'First: an open family requires its follow-up, the valid result
+    was close, and the proposed change has a concrete source-level diagnosis. Runtime
+    headroom is narrow.'
+  source_change: true
+  targeted_curve: "Frozen-layer1 prior, epochs 3\u201311: loss nearly matches I while\
+    \ macro AUC remains close and gates stay small. Seek nonzero measured residual\
+    \ contribution and about +0.0005 late macro AUC without the earlier runtime failures."
+  status: launched
+  created_revision: 392
+  ranking_rationale: 'Admit all five: proposal_admission reports their dependencies
+    satisfied, and the original contract''s current-line decision explicitly permits
+    these locality mechanisms. Each differs materially from measured attempts. The
+    frozen-prior retry replaces projection-times-gate optimization with direct zero
+    projections; the patch retry preserves the pretrained kernel while adding a nonlinear
+    residual. Keep these two diagnosed retries first. Adaptive sub-patch pooling follows
+    because it supplies new image information at low estimated cost. The single positional
+    convolution is cheaper but only mixes existing patch information. Wavelet summarization
+    ranks fifth because its transfer rationale is more indirect and its diagnostic
+    adds computation. The family ledger, prior-work precedent table and searches of
+    results/history in both source trees revealed no equivalent measured run. Historical
+    token-graph and adjacent-slice stem failures involve different information sources
+    and insertion points, so they do not prohibit these proposals. No proposal depends
+    on acceptance of the running MLP experiment.'
+  experiments:
+  - spatial-prior-direct-zero-projection-20261015T134421Z-349e2cff
+- id: patch-stem-residual-convolution-cascade
+  mechanism_id: adapter-patch-embedding
+  parent_idea_id: overlapping-patch-embedding
+  title: Add a nonlinear convolutional stem beside the retained pretrained patch projection
+  opportunity: "Measured: the 32\xD732 overlapping projection learned nonzero border\
+    \ weights, but training loss exceeded I throughout training and \xD71/\xD74 fell\
+    \ by 0.001168/0.001604. Stem drift and anchor penalty also increased. Hypothesis:\
+    \ expanding one linear projection couples neighborhood learning to the pretrained\
+    \ patch representation too strongly. A separate nonlinear residual stem can retain\
+    \ the pretrained route while learning local combinations. A working expectation\
+    \ is recovery of roughly 0.0005\u20130.001 macro AUC at both multipliers; this\
+    \ is unmeasured."
+  mechanism: "Retain the original trainable 16\xD716 stride-16 projection. In parallel,\
+    \ apply four bias-free 4\xD74 stride-2 padding-1 convolutions with widths 24,48,96,192,\
+    \ each followed by BatchNorm and ReLU, then a zero-initialized bias-free 1\xD7\
+    1 projection to 384 channels. Add this residual before the existing position embedding.\
+    \ The branch produces a 14\xD714 grid with stride 16 and center origin 7.5 pixels,\
+    \ matching the original projection. Widths follow the small convolutional-stem\
+    \ precedent; 4\xD74 kernels are a geometry-derived adaptation. Log residual/input\
+    \ RMS and output-projection RMS, both initially zero."
+  precedents:
+  - "overlapping-patch-embedding-20261015T113924Z-3107b16f: active border weights,\
+    \ elevated stem drift and loss, \u0394\xD71/\xD74 \u22120.001168/\u22120.001604;\
+    \ 2937.2 s."
+  - "[Early Convolutions Help Transformers See Better](https://papers.nips.cc/paper/2021/file/ff1418e8cc993fe8abcfe3ce2003e5c5-Paper.pdf)\
+    \ studies convolutional stems and gives the 24,48,96,192 width sequence with normalization\
+    \ and activation. Its 3\xD73 replacement stem differs from this aligned residual\
+    \ branch."
+  - The pretrained-preserving zero-output connection is an initialization hypothesis
+    supported by [ControlNet](https://arxiv.org/abs/2302.05543), not evidence of predictive
+    benefit here.
+  novelty: Replaces the failed single linear overlap expansion with a separately parameterized
+    nonlinear hierarchy. The pretrained patch kernel retains its shape and parameter
+    identity.
+  coverage: Adds image-level local processing before every transformer block while
+    retaining 196 transformer tokens, all twelve blocks, the existing position embedding
+    and fixed adapter outputs.
+  exploitation: Targets the observed optimization cost of expanded linear overlap.
+    Shared ACL/PF-OA declines with the learned merge suggest representation disruption
+    as one candidate cause, without establishing it or defining label-specific objectives.
+  budget: "Twelve epochs, batch 8, 5304 steps, seed 1110484336. The branch adds approximately\
+    \ 463k parameters and 202M convolution MACs per image. Estimated training 2900\u2013\
+    3200 s and peak allocation 12.3\u201313.5 GB, versus I's 2736.7 s and 11.777 GB.\
+    \ These are estimates, not budget measurements."
+  implementation: 'Add the fixed residual stem in modeling/staged_backbones.py, retaining
+    stem.proj and adding the position embedding exactly once. Explicitly make geometry_layers
+    expose the primary projection geometry: traversing both parallel branches as successive
+    convolutions would corrupt map geometry. Keep existing backbone parameter names
+    and stage ownership; isolate new initialization with fork_rng. Add two epoch diagnostics
+    through training/lightning.py, with modeling/model.py only if needed for aggregation.
+    Do not change optimizer, anchors or augmentation. Against a newly accepted incumbent,
+    retain unrelated locality improvements; replace any competing patch-stem correction
+    and identify its removed active idea rather than silently stacking two stem experiments.'
+  open_choices: Fix four stages and the cited widths. Kernel size 4 is chosen to align
+    sampling centers, not from validation performance. Keep all twelve transformer
+    blocks, unlike compute-matched stem replacements in the paper.
+  dependencies: []
+  priority_rationale: 'Second: supplies the required follow-up for the patch family
+    with a structural correction rather than another overlap size. Moderate implementation
+    and runtime cost.'
+  source_change: true
+  targeted_curve: "Overlapping-patch run, epochs 1\u201311: training loss stays above\
+    \ I, with an epoch-3 macro deficit of about 0.0075 and elevated stem drift. Seek\
+    \ loss closer to I and improved late macro AUC while the new residual becomes\
+    \ active."
+  status: prepared
+  created_revision: 392
+  ranking_rationale: 'Admit all five: proposal_admission reports their dependencies
+    satisfied, and the original contract''s current-line decision explicitly permits
+    these locality mechanisms. Each differs materially from measured attempts. The
+    frozen-prior retry replaces projection-times-gate optimization with direct zero
+    projections; the patch retry preserves the pretrained kernel while adding a nonlinear
+    residual. Keep these two diagnosed retries first. Adaptive sub-patch pooling follows
+    because it supplies new image information at low estimated cost. The single positional
+    convolution is cheaper but only mixes existing patch information. Wavelet summarization
+    ranks fifth because its transfer rationale is more indirect and its diagnostic
+    adds computation. The family ledger, prior-work precedent table and searches of
+    results/history in both source trees revealed no equivalent measured run. Historical
+    token-graph and adjacent-slice stem failures involve different information sources
+    and insertion points, so they do not prohibit these proposals. No proposal depends
+    on acceptance of the running MLP experiment.'
+  experiments:
+  - patch-stem-residual-convolution-cascade-20261015T142255Z-094b7a95
+- id: patchwise-content-resampling-residual
+  mechanism_id: adapter-subpatch-resampling
+  parent_idea_id: null
+  title: Learn a content-dependent summary of four sub-patches beside each pretrained
+    patch token
+  opportunity: "Measured: learned final merging and linear input overlap both activated\
+    \ without improving macro AUC. Neither explicitly selects informative content\
+    \ inside an original 16\xD716 patch. Hypothesis: a local adaptive summary can\
+    \ preserve small structures that uniform linear patchification represents poorly.\
+    \ This targets the persistent fracture, PF-OA and lateral-meniscus gaps as diagnostic\
+    \ weaknesses, while optimizing only macro AUC. A tentative expectation is approximately\
+    \ +0.0005 macro AUC at both multipliers."
+  mechanism: "Keep the pretrained stem. A parallel 8\xD78 stride-8 convolution maps\
+    \ the same image to 96-channel features on a 28\xD728 grid, followed by GELU.\
+    \ Within each non-overlapping 2\xD72 group, a shared bias-free linear scorer produces\
+    \ four logits and a softmax-weighted feature summary. Project the summary through\
+    \ a zero-initialized bias-free Linear(96,384), add it to the original 14\xD714\
+    \ patch projection, then add the existing position embedding once. Initialize\
+    \ the scorer to zero for uniform initial weights. The 8-pixel subdivision and\
+    \ 96-channel width derive from halving the fixed patch width and quartering its\
+    \ 384 channels."
+  precedents:
+  - '[TokenLearner](https://arxiv.org/abs/2106.11297) learns input-dependent visual
+    tokens. This proposal borrows adaptive spatial summarization but confines it to
+    four sub-patches per fixed output token.'
+  - 'overlapping-patch-embedding: active extra neighborhood weights did not improve
+    either multiplier. This proposal changes content selection and nonlinear representation,
+    rather than enlarging another linear kernel.'
+  - 'final-read-by-learned-two-by-two-merge: added final channels became active, but
+    the source information had already passed through the original patchification.'
+  novelty: Introduces content-dependent sub-patch pooling before the transformer.
+    It differs from fixed overlap, a convolutional cascade and the running MLP locality
+    mechanism.
+  coverage: All original patch tokens receive one local residual. Only the side branch
+    has 784 intermediate features; transformer sequence length remains 196, with existing
+    read depths and downstream outputs.
+  exploitation: Tests whether local content selection matters beyond additional linear
+    capacity. Log residual/input RMS, deviation of pooling weights from 0.25, and
+    pooling entropy. Nonuniform weights are needed to establish that adaptive resampling
+    itself activated.
+  budget: "Twelve epochs, batch 8, 5304 steps, seed 1110484336. Approximately 56k\
+    \ added weights and 18M projection MACs per image, plus small scoring operations.\
+    \ Estimated training 2800\u20133000 s and peak allocation about 12\u201312.5 GB.\
+    \ Actual runtime remains unknown."
+  implementation: Add the fixed side branch to modeling/staged_backbones.py; preserve
+    the pretrained stem.proj path, positional embedding and original parameter ownership.
+    Correct geometry_layers to report the primary stem geometry rather than composing
+    parallel branch convolutions. Preserve new-parameter RNG isolation and add three
+    epoch diagnostics through training/lightning.py and, if required, modeling/model.py.
+    No configuration sweep or new runtime flag is needed. Rebase on the accepted incumbent,
+    retaining unrelated block-local improvements. Replace a competing stem residual
+    rather than combining two unmeasured stem mechanisms; name any removed active
+    idea.
+  open_choices: Fix four-way pooling, 96 channels and one shared content scorer. Output-zero
+    initialization delays upstream branch learning until the projection moves; the
+    first-epoch nonuniform-weight diagnostic checks that this delay did not prevent
+    adaptation.
+  dependencies: []
+  priority_rationale: 'Third: directly addresses sub-patch selection at low estimated
+    cost and is distinct from every decided or running mechanism. Its causal premise
+    remains uncertain.'
+  source_change: true
+  targeted_curve: "I, epochs 6\u201311: macro AUC continues rising, while the saved-prediction\
+    \ fracture/PF-OA/lateral-meniscus gaps to M persist. Seek improved late macro\
+    \ AUC with active content-dependent sub-patch pooling, without transformer token\
+    \ growth."
+  status: queued
+  created_revision: 392
+  ranking_rationale: 'Admit all five: proposal_admission reports their dependencies
+    satisfied, and the original contract''s current-line decision explicitly permits
+    these locality mechanisms. Each differs materially from measured attempts. The
+    frozen-prior retry replaces projection-times-gate optimization with direct zero
+    projections; the patch retry preserves the pretrained kernel while adding a nonlinear
+    residual. Keep these two diagnosed retries first. Adaptive sub-patch pooling follows
+    because it supplies new image information at low estimated cost. The single positional
+    convolution is cheaper but only mixes existing patch information. Wavelet summarization
+    ranks fifth because its transfer rationale is more indirect and its diagnostic
+    adds computation. The family ledger, prior-work precedent table and searches of
+    results/history in both source trees revealed no equivalent measured run. Historical
+    token-graph and adjacent-slice stem failures involve different information sources
+    and insertion points, so they do not prohibit these proposals. No proposal depends
+    on acceptance of the running MLP experiment.'
+- id: conditional-local-position-after-first-block
+  mechanism_id: adapter-local-position
+  parent_idea_id: null
+  title: Add one zero-initialized local positional residual after the first transformer
+    block
+  opportunity: 'Measured: changing the learned position embedding''s learning rate
+    failed adoption, and the current backbone has no explicit convolutional neighborhood
+    operation between its patch tokens. Hypothesis: a local spatial relation after
+    the first global block can help subsequent attention use neighboring patch evidence.
+    This supplies a different locality mechanism from processing 1536-channel MLP
+    activations in every block. It cannot recover discarded pixel information, but
+    can improve how retained neighboring evidence combines.'
+  mechanism: "Replace the identity stage entry immediately after physical block 1\
+    \ with x + DWConv3\xD73(x), operating on the 384-channel 14\xD714 token map with\
+    \ stride 1, padding 1, no bias and zero-initialized weights. Retain the pretrained\
+    \ absolute position embedding and all twelve blocks. Kernel and placement follow\
+    \ the conditional-position-encoding precedent; zero initialization preserves the\
+    \ incumbent function. Log off-center kernel RMS and residual/input RMS. Positive\
+    \ off-center RMS establishes actual neighborhood mixing rather than a center-only\
+    \ channel adjustment."
+  precedents:
+  - "[Conditional Positional Encodings for Vision Transformers](https://arxiv.org/pdf/2102.10882),\
+    \ sections 3.2 and 5.2: a 3\xD73 depthwise positional generator and placement\
+    \ after the first encoder provide the architectural precedent."
+  - "position-embedding-rate-by-weight-scale: \u0394\xD71 +0.000188, \u0394\xD74 \u2212\
+    0.000549 against I. This proposal adds local content-conditioned relations while\
+    \ retaining the existing embedding and rate."
+  - depthwise-convolution-in-block-mlps is running and undecided. It operates inside
+    all twelve expanded MLPs; this proposal uses one residual on the persistent token
+    stream before later QKV projections.
+  novelty: A single early positional neighborhood operation, rather than an input-stem
+    replacement, final merge or repeated MLP convolution. The running experiment provides
+    no prerequisite evidence.
+  coverage: "Affects blocks 2\u201312 through their input token stream. Map centers,\
+    \ sequence length, read depths, heads, routing and prediction behavior stay fixed."
+  exploitation: A cheap test of local spatial relationships with a precise activation
+    signature. A speculative macro gain around 0.0005 at both multipliers would be
+    useful; the measured adoption rule alone decides.
+  budget: "Twelve epochs, batch 8, 5304 steps, seed 1110484336. Adds 3456 weights\
+    \ and approximately 0.68M MACs per image. Estimated training 2740\u20132850 s\
+    \ and peak allocation 11.8\u201312.1 GB on the assigned incumbent. Cost must be\
+    \ reassessed if another locality mechanism is accepted first."
+  implementation: In modeling/staged_backbones.py, replace only the relevant identity
+    downsample module; do not repartition transformer blocks or move their parameters.
+    Keep all existing parameter paths and optimizer ownership. Initialize the added
+    convolution under fork_rng, and log two diagnostics through training/lightning.py
+    with modeling/model.py aggregation if necessary. Apply to the newly accepted incumbent
+    while retaining unrelated stem or MLP improvements. If that incumbent already
+    includes a local positional residual at this position, reconcile it as an explicit
+    replacement rather than adding a duplicate.
+  open_choices: "Fix one insertion after physical block 1 and a 3\xD73 depthwise kernel.\
+    \ Retaining the learned absolute embedding differs from CPVT's replacement setting\
+    \ and is an explicit transfer hypothesis."
+  dependencies: []
+  priority_rationale: 'Fourth: very low estimated compute and a clean distinction
+    from the running MLP experiment. It targets token relationships rather than providing
+    new sub-patch measurements.'
+  source_change: true
+  targeted_curve: "I, epochs 3\u201311: macro AUC improves slowly despite falling\
+    \ loss. Seek earlier useful spatial interaction and roughly +0.0005 late macro\
+    \ AUC; off-center kernel and residual RMS must demonstrate the local operation."
+  status: queued
+  created_revision: 392
+  ranking_rationale: 'Admit all five: proposal_admission reports their dependencies
+    satisfied, and the original contract''s current-line decision explicitly permits
+    these locality mechanisms. Each differs materially from measured attempts. The
+    frozen-prior retry replaces projection-times-gate optimization with direct zero
+    projections; the patch retry preserves the pretrained kernel while adding a nonlinear
+    residual. Keep these two diagnosed retries first. Adaptive sub-patch pooling follows
+    because it supplies new image information at low estimated cost. The single positional
+    convolution is cheaper but only mixes existing patch information. Wavelet summarization
+    ranks fifth because its transfer rationale is more indirect and its diagnostic
+    adds computation. The family ledger, prior-work precedent table and searches of
+    results/history in both source trees revealed no equivalent measured run. Historical
+    token-graph and adjacent-slice stem failures involve different information sources
+    and insertion points, so they do not prohibit these proposals. No proposal depends
+    on acceptance of the running MLP experiment.'
+- id: wavelet-packet-detail-stem-residual
+  mechanism_id: adapter-frequency-locality
+  parent_idea_id: null
+  title: Feed a nonlinear summary of preserved local frequency bands into the pretrained
+    patch tokens
+  opportunity: 'Measured: adding linear overlap harmed ACL and PF-OA, while widening
+    the final merge did not close the broad gap to M. Hypothesis: an explicit representation
+    of local differences can preserve useful fine detail with fewer learned early
+    filters than a convolutional cascade. This is an alternative stem mechanism with
+    an unmeasured working expectation of about +0.0005 macro AUC at both multipliers.'
+  mechanism: "Keep the original patch projection. Apply two levels of fixed orthonormal\
+    \ 2\xD72 Haar decomposition to every band of the three-channel image, producing\
+    \ 48 channels at 56\xD756. Apply a trainable bias-free 3\xD73 convolution 48\u2192\
+    48 with padding 1, channel LayerNorm and GELU, then 4\xD74 stride-4 average pooling\
+    \ and a zero-initialized bias-free 1\xD71 projection 48\u2192384. Add this branch\
+    \ before the existing position embedding. The Haar filters use (1,1)/sqrt(2) and\
+    \ (1,\u22121)/sqrt(2); two levels and 48 channels follow the fixed input geometry.\
+    \ Only the Haar packing is lossless; the learned summary and pooling are compressive."
+  precedents:
+  - '[Wave-ViT](https://www.ecva.net/papers/eccv_2022/papers_ECCV/papers/136850324.pdf),
+    section 3.2, gives the Haar filters and combines preserved subbands with local
+    convolution. This proposal uses that representation principle in an input residual,
+    without replacing attention.'
+  - 'overlapping-patch-embedding: a larger linear raw-pixel projection activated but
+    failed both multipliers.'
+  - The current locality contract permits convolutional stems and side branches; the
+    fixed base RadioDINO weights and all downstream structures remain retained.
+  novelty: Uses explicit local frequency bands followed by nonlinear summarization.
+    It differs from learning a raw-image convolutional hierarchy or selecting among
+    four sub-patches.
+  coverage: "Introduces fine-detail measurements before patch-token processing while\
+    \ preserving the 14\xD714 token grid. The side branch's pooled centers align with\
+    \ the original stem at origin 7.5 and stride 16."
+  exploitation: Log residual/input RMS and the branch-output RMS difference when all
+    bands except the three twice-low-pass bands are zeroed. This cheap branch-only
+    diagnostic demonstrates use of detail bands without a second backbone evaluation
+    or a new predictive objective.
+  budget: "Twelve epochs, batch 8, 5304 steps, seed 1110484336. Approximately 39k\
+    \ trainable parameters and 69M convolution MACs per image, plus fixed Haar operations.\
+    \ Estimated training 2800\u20133050 s and peak allocation 12\u201312.5 GB. Neither\
+    \ estimate is measured."
+  implementation: Implement fixed Haar filters as buffers and the trainable residual
+    in modeling/staged_backbones.py; add the position embedding once and preserve
+    stem.proj. Make geometry_layers expose only the primary projection geometry for
+    the parallel stem. Isolate initialization and keep existing rates, anchors, augmentation
+    and original parameter ownership. Add two epoch diagnostics through training/lightning.py
+    and modeling/model.py if aggregation requires it. Develop against the accepted
+    incumbent, retaining unrelated block-local improvements; explicitly replace any
+    competing stem residual and identify superseded active ideas.
+  open_choices: Fix two full wavelet-packet levels and the 48-channel convolution.
+    The branch-only detail diagnostic must isolate high-band dependence; a nonzero
+    generic residual alone would not establish the intended frequency mechanism.
+  dependencies: []
+  priority_rationale: 'Fifth: a distinct, relatively cheap representation of local
+    detail. Evidence is architectural analogy rather than an observed campaign win,
+    so uncertainty is highest.'
+  source_change: true
+  targeted_curve: "Overlap and learned-merge runs, epochs 3\u201311: both retain late\
+    \ macro deficits despite active added capacity. Seek improved late macro AUC with\
+    \ measured dependence on preserved detail bands and loss near I."
+  status: queued
+  created_revision: 392
+  ranking_rationale: 'Admit all five: proposal_admission reports their dependencies
+    satisfied, and the original contract''s current-line decision explicitly permits
+    these locality mechanisms. Each differs materially from measured attempts. The
+    frozen-prior retry replaces projection-times-gate optimization with direct zero
+    projections; the patch retry preserves the pretrained kernel while adding a nonlinear
+    residual. Keep these two diagnosed retries first. Adaptive sub-patch pooling follows
+    because it supplies new image information at low estimated cost. The single positional
+    convolution is cheaper but only mixes existing patch information. Wavelet summarization
+    ranks fifth because its transfer rationale is more indirect and its diagnostic
+    adds computation. The family ledger, prior-work precedent table and searches of
+    results/history in both source trees revealed no equivalent measured run. Historical
+    token-graph and adjacent-slice stem failures involve different information sources
+    and insertion points, so they do not prohibit these proposals. No proposal depends
+    on acceptance of the running MLP experiment.'

@@ -1,0 +1,164 @@
+ideas:
+- id: stage-rates-4e-4-top-to-2e-4-stem
+  mechanism_id: backbone-rate
+  parent_idea_id: layer-rate-decay-from-radimagenet-profile
+  title: 'Rates falling over the stage groups from 4e-4 at the top to the incumbent''s 2e-4 at the patch stem: seed
+    2''s top rate without its low stem'
+  opportunity: 'Evidence (run-notes.md, seed 2): 4e-4 on block 12 and 0.85 per block was ahead of seed 1 at every
+    epoch (+0.011 epoch 1, +0.006 to epoch 6), x1 +0.0015, x4 level, with Fracture -0.0035 and Contusion -0.0034.
+    Seed 2 put the stem at 5.7e-5 and blocks 1 to 8 at 1.1e-4 to 2.1e-4, below the incumbent. Evidence (MambaVision
+    run notes, runs 1, 2, 4, 6): every run that raised the late rate lost Fracture and Contusion, least where the
+    stem kept its rate (run 4, flat 4e-4: Fracture -0.0019) and most where the stem rate fell (run 6, 0.6 per stage:
+    Fracture -0.0068). Guess: the bone labels need the stem and first blocks at the incumbent''s rate, and the top-rate
+    gain needs only the top. Guess on size: +0.001 to +0.003 macro.'
+  mechanism: 'optimizer.backbone_lr 0.0004 and optimizer.backbone_lr_stage_decay 0.87 (0.87^5 = 0.50). The existing
+    stage decay acts on the adapter''s groups (checked on CPU): final norm 4e-4, blocks 9 to 12 3.5e-4, blocks 4
+    to 8 3.0e-4, blocks 2 and 3 2.6e-4, block 1 2.3e-4, patch stem and position embedding 2.0e-4. Blocks 9 to 12
+    get about seed 2''s mean over them (3.2e-4), the stem keeps seed 1''s rate, no group is below the incumbent.
+    Warm-up, decay, anchors and head rate unchanged.'
+  precedents:
+  - 'radiodino-settings seed 2, layer-rate-decay-from-radimagenet-profile: x4 -0.00001, x1 +0.0015, ahead every epoch,
+    Fracture and Contusion lost.'
+  - 'MambaVision settings, backbone-rate-4e-4 (flat, stem raised too): x4 +0.0004; stage-rates-on-freed-anchors (stem
+    lowered): x4 -0.0003, Fracture -0.0068.'
+  novelty: First profile on RadioDINO that raises the top without lowering any group below the incumbent.
+  coverage: Every study and every label; Fracture and Contusion are the labels it targets to keep.
+  exploitation: 'Read x4 and x1 against the incumbent and seed 2, train_loss_epoch per epoch, and labels from largest
+    gain to largest loss, Fracture and Contusion first. metrics.csv logs no rate column; activation is the recorded
+    effective config plus backbone_drift_stage3 and backbone_drift_stage4 above the incumbent''s (0.051 and 0.048
+    at epoch 0) and backbone_drift_stage0 near the incumbent''s (0.014), against seed 2''s 0.006.'
+  budget: The incumbent's 2,701 s within 1.02; peak memory 11.8 GB unchanged.
+  implementation: 'Configuration only: configs/campaign.yaml, optimizer.backbone_lr 0.0004 and optimizer.backbone_lr_stage_decay
+    0.87. Adds to the incumbent; nothing removed.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Closest to the only rate change measured on this model, keeps its early-epoch gain and removes
+    the stem cut both campaigns tie to the bone-label losses; configuration only.
+- id: backbone-held-for-the-head-epoch
+  mechanism_id: backbone-rate-schedule
+  parent_idea_id: null
+  title: 'Backbone rate zero in the first epoch while the new heads fit, then its warm-up and linear decay: linear
+    probing then fine-tuning'
+  opportunity: 'Evidence (seed 1 metrics.csv): 38% of the final drift of blocks 4 to 12 happens in epoch 1 (0.050
+    of 0.130 for blocks 4 to 8, 0.048 of 0.127 for blocks 9 to 12), while the heads are freshly initialised (train
+    loss 0.724 against 0.507 at the end). Evidence (Kumar et al., ICLR 2022, LP-FT): gradients through a random head
+    distort pretrained features; fitting the head first and then fine-tuning everything keeps them and gains most
+    out of distribution, the site-generalisation purpose here. RadImageNet DINO features start in the target domain,
+    so they have more to lose than ImageNet features (guess). Guess on size: +0.001 to +0.003 macro.'
+  mechanism: 'A new optimizer.backbone_frozen_epochs (1). Backbone groups get rate multiplier 0 for the first epoch,
+    then the incumbent''s warm-up (one epoch from 0.1) and linear decay to 0.01 at the last step; head groups keep
+    the incumbent''s schedule. The late anchor follows the backbone ratio as now, so it is 0 in epoch 1. Adam''s moments
+    keep accumulating at rate 0, so the first backbone steps are not bias-correction inflated. Value: one epoch, the
+    incumbent''s head warm-up length.'
+  precedents:
+  - 'MambaVision settings, two-warm-up-epochs (backbone and heads together): x4 -0.0004, x1 +0.0013.'
+  - 'Kumar et al. 2022, LP-FT: linear probe then full fine-tuning.'
+  novelty: First schedule here that separates the backbone's start from the heads'.
+  coverage: Every study and every label.
+  exploitation: 'Read x4 and x1, train_loss_epoch per epoch (expected higher in epochs 1 and 2) and labels from largest
+    gain to largest loss. Activation: backbone_drift_stage0 to backbone_drift_stage4 and anchor_penalty exactly 0
+    at epoch 0 and positive from epoch 1; one new per-epoch metric backbone_lr_ratio (mean backbone multiplier) at
+    0 in epoch 0.'
+  budget: The incumbent's 2,701 s within 1.02 (backward still runs through the backbone); memory unchanged.
+  implementation: 'Files: src/knee_abnormality/config.py (backbone_frozen_epochs, StrictInt, ge 0, default 0), src/knee_abnormality/training/lightning.py
+    (configure_optimizers passes LambdaLR one function per param group: backbone groups use the schedule shifted
+    by frozen_epochs x steps_per_epoch and 0 before it, heads the existing one; log backbone_lr_ratio through _log_epoch_metric),
+    configs/campaign.yaml (1). With 0 every group uses the existing function and the optimizer is identical to the
+    incumbent''s. Adds to the incumbent.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Acts on the measured epoch-1 drift, has the strongest out-of-distribution evidence in the fine-tuning
+    literature and leaves the rest of the schedule as the incumbent's.
+- id: top-down-backbone-warm-up
+  mechanism_id: backbone-rate-schedule
+  parent_idea_id: null
+  title: 'Each backbone stage group warms up one epoch later than the group above it: seed 2''s slow lower blocks
+    early, the incumbent''s rates after'
+  opportunity: 'Evidence (seed 2): with the lower blocks slow, the lead over seed 1 was largest early (+0.011 epoch
+    1) and narrowed after epoch 6, and the bone labels lost; seed 2 kept the lower blocks slow all twelve epochs.
+    Evidence (Howard and Ruder 2018, ULMFiT): gradual unfreezing from the top, one layer group per epoch, beats fine-tuning
+    all layers at once. A linear warm-up from 0.1 averages 0.55 of peak and the linear decay 0.505, so a later peak
+    keeps each group''s total rate within 3% of the incumbent''s (stem 6.29 against 6.11 epoch-equivalents): only
+    the timing moves. Guess: the early lead comes from slow lower blocks, the bone loss from their low total. Guess
+    on size: +0.001 to +0.002 macro.'
+  mechanism: 'A new optimizer.backbone_warmup_epochs_per_stage (1). A backbone group at stage depth d (final norm
+    0, blocks 9 to 12 1, blocks 4 to 8 2, blocks 2 and 3 3, block 1 4, stem 5) warms up from warmup_start_ratio over
+    warmup_epochs + max(d - 1, 0) x this value epochs, then decays linearly to minimum_lr_ratio at the last step:
+    norm and blocks 9 to 12 peak at epoch 1 as now, blocks 4 to 8 at 2, blocks 2 and 3 at 3, block 1 at 4, stem
+    at 5. Peak rates 2e-4 everywhere; heads unchanged. Each late-anchored weight follows its own group''s multiplier.'
+  precedents:
+  - 'radiodino-settings seed 2: x1 +0.0015, x4 level, ahead every epoch.'
+  - 'MambaVision settings, two-warm-up-epochs: x4 -0.0004, x1 +0.0013 (every group delayed alike).'
+  novelty: First schedule here whose timing differs between backbone groups.
+  coverage: Every study and every label; Fracture and Contusion are the labels to watch.
+  exploitation: 'Read x4 and x1 against the incumbent and seed 2, val_macro_auc and train_loss_epoch per epoch (expected
+    seed 2''s early lead) and labels from largest gain to largest loss. Activation: new per-epoch metrics backbone_lr_ratio_stage0
+    and backbone_lr_ratio_stage4 (0.19 and 0.55 means in epoch 0); backbone_drift_stage0 to stage2 below the incumbent''s
+    in epochs 0 to 3.'
+  budget: The incumbent's 2,701 s within 1.02; memory unchanged.
+  implementation: 'Files: src/knee_abnormality/config.py (StrictInt ge 0, default 0), src/knee_abnormality/training/lightning.py
+    (build_optimizer keeps each group''s stage depth; configure_optimizers passes one LambdaLR function per group;
+    the anchor penalty multiplies each late-anchored weight by its group''s lr / initial_lr; two metrics via _log_epoch_metric),
+    configs/campaign.yaml (1). With 0 all groups share the existing function and the optimizer and anchors are identical
+    to the incumbent''s. Adds to the incumbent.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Separates the two effects seed 2 mixed (early speed, late bone loss) at the incumbent's rates;
+    a small source change.
+- id: backbone-rate-1-4e-4-by-relative-step
+  mechanism_id: backbone-rate
+  parent_idea_id: null
+  title: One backbone rate of 1.4e-4, MambaVision-T's best relative step carried to RadioDINO's smaller weights
+  opportunity: 'Evidence (MambaVision run notes): the rate moved MambaVision-T most (5e-5 to 2e-4 x4 +0.0024; 4e-4
+    level), an optimum at a relative step of 2.2e-3 per Adam step. Evidence (prior-work.md, Weight scale): RadioDINO''s
+    weights are 0.59 to 0.75 of MambaVision-T''s, so 2e-4 gives it 2.7e-3 to 3.2e-3, the 4e-4 side of that optimum.
+    Evidence (seed 1 metrics.csv): blocks 4 to 12 ended 12 to 13% from their start against 3.6 to 4.5% for MambaVision-T''s
+    last stage. 2.2e-3 x 0.0626 (last-stage RMS) = 1.4e-4. Guess: Fracture (-0.021 against MambaVision-T) gains,
+    as it fell in every MambaVision run that pushed rates up. Guess on size: -0.001 to +0.003 macro.'
+  mechanism: optimizer.backbone_lr 0.00014, one rate for every backbone group. Warm-up, decay, anchors and head rate
+    unchanged; the late anchor still follows the rate's ratio.
+  precedents:
+  - 'MambaVision settings, backbone-rate-2e-4: x4 +0.0024; backbone-rate-4e-4: x4 +0.0004, behind at every epoch.'
+  - 'radiodino-settings seed 2: blocks 1 to 8 and the stem below 2e-4, x1 +0.0015, x4 level.'
+  novelty: First rate below the inherited one on this model; opens the bracket below 2e-4 as seed 2 opened it above.
+  coverage: Every study and every label.
+  exploitation: 'Read x4 and x1 against the incumbent, train_loss_epoch per epoch (expected higher) and labels from
+    largest gain to largest loss, Fracture first. Activation: the recorded effective config, and backbone_drift_stage3
+    and backbone_drift_stage4 at epoch 0 about 0.7 of the incumbent''s (0.051, 0.048); final drift below 0.12.'
+  budget: The incumbent's 2,701 s within 1.02; memory unchanged.
+  implementation: 'Configuration only: configs/campaign.yaml, optimizer.backbone_lr 0.00014. Replaces the 2e-4 value.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The rate level is the setting that moved MambaVision-T most and this is its weight-scale transfer;
+    after the three above because seed 2 shows the top blocks gaining from more rate.
+- id: position-embedding-rate-by-weight-scale
+  mechanism_id: backbone-rate
+  parent_idea_id: null
+  title: The learned position embedding at 3.7e-4, the same relative step as the patch projection it is added to
+  opportunity: 'Evidence (prior-work.md, Weight scale): the position embedding has RMS 0.140, the largest tensor in
+    the model, the patch projection 0.075, the blocks 0.049 to 0.063. At one rate its relative step is 1.4e-3, half
+    the projection''s and a third of block 1''s. Evidence (seed 1 metrics.csv): the stem group (projection and position
+    embedding) drifted at most 1.6%, against 12 to 13% for blocks 4 to 12. The embedding was learned on RadImageNet
+    whole-field CT, MRI and ultrasound slices; our views are knee crops of 84 to 120 mm with the anatomy placed by
+    the frame, a different spatial layout (guess). Guess on size: +0.000 to +0.002 macro, on the located labels.'
+  mechanism: 'A new optimizer.position_embedding_lr_ratio (1.86 = 0.140 / 0.0752): the position embedding''s rate
+    is backbone_lr x stage decay x this ratio, 3.7e-4 on the incumbent; every other rate unchanged. It stays in the
+    early anchor and follows the shared schedule.'
+  precedents:
+  - 'MambaVision settings, anchors-by-weight-scale: strengths set from the weight RMS, x4 +0.0101.'
+  - 'prior-work.md, Weight scale: relative step = rate / RMS.'
+  novelty: First rate on the one component MambaVision-T does not have.
+  coverage: Every study and every label; the menisci, OA compartments and Fracture through located tokens.
+  exploitation: 'Read x4 and x1 against the incumbent and labels from largest gain to largest loss. Activation: new
+    per-epoch metric position_embedding_drift (relative distance from its start, expected above the incumbent''s stem
+    drift of 0.014 to 0.016) and backbone_drift_stage0 above the incumbent''s.'
+  budget: The incumbent's 2,701 s within 1.01; memory unchanged.
+  implementation: 'Files: src/knee_abnormality/config.py (float gt 0, default 1.0), src/knee_abnormality/training/lightning.py
+    (build_optimizer multiplies the rate of backbone.stem.pos_embed; log position_embedding_drift through the existing
+    epoch-end drift code), configs/campaign.yaml (1.86). MambaVision-T has no such parameter. With 1.0 the optimizer
+    is identical to the incumbent''s. Adds to the incumbent.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Targets a component specific to the ViT, with its value fixed by the measured weight scale;
+    last because its share of the model is small (75k of 21.7M parameters).
+exhausted_directions: ''

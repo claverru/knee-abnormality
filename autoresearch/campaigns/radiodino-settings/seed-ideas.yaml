@@ -1,0 +1,161 @@
+ideas:
+- id: radiodino-on-mamba-recipe
+  mechanism_id: backbone
+  parent_idea_id: null
+  title: RadioDINO-S/16 in place of MambaVision-T on the MambaVision recipe, adopted by the user's decision
+  opportunity: 'The campaign''s starting point. RadioDINO-S/16 is the only medical-pretrained encoder found at our
+    size and speed (prior-work.md, The model): DINO ViT-S/16 on RadImageNet CT, MRI and ultrasound, 21.7M parameters,
+    224 px. It enters on the MambaVision-T incumbent''s settings unchanged so that every later seed is read against
+    one RadioDINO run. The keeper adopts it whatever its verdict (contract.md, Duration and adoption).'
+  mechanism: model.backbone radiodino_s16. Nothing else changes. The adapter is in the baseline source.
+  precedents:
+  - 'Swin-T on the MambaVision recipe, fold 2, 2026-10-14: x4 0.937176 against 0.937801 (another ImageNet model, not
+    adopted).'
+  novelty: First run of a ViT and of a medical self-supervised encoder on this recipe.
+  coverage: Every study and every label.
+  exploitation: 'Read x4 and x1 against the MambaVision-T reference, the training loss per epoch against its, the
+    labels from largest gain to largest loss, the equal logit blend with the reference and with the ResNet-50, the
+    training seconds and the peak memory. Activation: the recorded effective config names radiodino_s16 and the
+    preprocessing identity''s feature mapping is origin 15.5, stride 32.'
+  budget: Unmeasured; ViT-S/16 at 224 px is about 4.6 GFLOPs per image against about 4.4 for MambaVision-T (guess
+    from published counts), so near the reference's 3,106 s. Memory below the reference's 12.7 GB (guess).
+  implementation: 'Configuration only: model.backbone radiodino_s16 in configs/campaign.yaml. Do not touch the source.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user's first seed; every later seed builds on it.
+- id: layer-rate-decay-from-radimagenet-profile
+  mechanism_id: backbone-rate
+  parent_idea_id: null
+  title: 'Rates falling with depth, 4e-4 on the last block and 0.85 per block towards the patch stem: the RadImageNet
+    ResNet-50''s relative-step profile on a model whose weights do not shrink with depth'
+  opportunity: 'Evidence (prior-work.md, Weight scale): Adam moves each weight by about the rate per step, so the relative
+    step is the rate over the weight RMS. The RadImageNet ResNet-50 at its one rate of 5e-5 has relative steps rising
+    8.5 times from stem to last stage (8e-4 to 6.8e-3) because its weights shrink with depth (0.062 to 0.0073).
+    MambaVision-T at 2e-4 is flat (2.2e-3 to 2.6e-3). RadioDINO''s weights are also flat over depth (0.049 to 0.063,
+    stem 0.075), so one rate gives every block about the same relative step (2.7e-3 to 4.1e-3 at 2e-4): its first
+    blocks move more than the ResNet-50''s first stages, its last blocks half as much as the ResNet-50''s last stage.
+    Twelve equal blocks of global attention make a flat rate a choice, not a consequence of the architecture. Evidence:
+    ViT fine-tuning recipes decay the rate per block (BEiT and MAE: 0.65 for ViT-B, 0.75 for ViT-L); their values
+    serve masked-image pretraining, whose top blocks need more change. Guess on size: +0.002 to +0.006 macro.'
+  mechanism: 'A new optimizer.backbone_lr_layer_decay (0.85). Each backbone parameter''s rate is backbone_lr times the
+    decay to the power of the number of transformer blocks above it: block 12 and the final norm at backbone_lr,
+    block 11 at 0.85, block 1 at 0.85^11, the patch stem and position embedding at 0.85^12. optimizer.backbone_lr
+    4e-4. So the last block''s relative step is the ResNet-50 last stage''s (4e-4 / 0.063 = 6.3e-3 against 6.8e-3),
+    block 9 keeps the incumbent''s 2.5e-4 and the stem gets 5.7e-5, the ResNet-50 stem''s relative step (7.6e-4
+    against 8e-4). Warm-up and decay scale every group alike; head rate unchanged.'
+  precedents:
+  - 'MambaVision settings, stage-rates-by-weight-scale: 6e-4 on the last stage, 0.6 per stage, rejected (x4 -0.0028).
+    That model''s weights were 1.5 to 12.7 times the ResNet-50''s and it underfit; the decay there undid a flat
+    weight-scale profile in the opposite direction from this one.'
+  - 'MambaVision settings, backbone-rate-4e-4: level with 2e-4 (x4 +0.0004).'
+  novelty: First rate profile over depth on a ViT here; the existing backbone_lr_stage_decay acts per stage group,
+    four groups for twelve blocks.
+  coverage: Every study and every label.
+  exploitation: 'Read x4 and x1 against the incumbent, the training loss per epoch, the drift per stage against the
+    incumbent''s (expected: last stage up, stem and first stage down), and the labels from largest gain to largest
+    loss. Activation: the logged rate of the stem group and of the last stage at their configured ratio 0.85^12 :
+    1 (0.142). Shown wrong by: both multipliers below the incumbent with the last stage''s drift up.'
+  budget: The incumbent's training time within 1.02; no change to memory.
+  implementation: 'Files: src/knee_abnormality/config.py (the field, default 1.0, gt 0, le 1), src/knee_abnormality/modeling/staged_backbones.py
+    (each staged backbone reports a parameter''s block depth: the patch stem 0, block k of the transformer k, the
+    final norm the deepest; the MambaVision path needs no depth because its decay stays 1.0), src/knee_abnormality/training/lightning.py
+    (build_optimizer multiplies each backbone rate by decay to the power of the blocks above the parameter, on top
+    of the existing stage decay), configs/campaign.yaml (backbone_lr 0.0004, backbone_lr_layer_decay 0.85). With
+    1.0 the optimizer must be identical to the incumbent''s. The anchors and their schedule are unchanged.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The largest difference in how the two models respond to one rate, set from the RadImageNet
+    model whose recipe is the reference for this domain.
+- id: anchors-by-weight-scale
+  mechanism_id: anchors
+  parent_idea_id: null
+  title: Both anchors twice as strong, 0.002 early and 0.00002 late, for weights 0.6 to 0.8 times MambaVision-T's
+    RMS
+  opportunity: 'Evidence (prior-work.md, Weight scale; MambaVision settings, anchors-by-weight-scale, x4 +0.0101):
+    the anchor penalises the squared absolute distance from the pretrained weights, so the cost of one relative movement
+    scales with the weight RMS squared. MambaVision''s anchors (0.001, 0.00001) were cut tenfold and a hundredfold
+    from the ResNet-50''s for weights 1.5 to 12.7 times larger. RadioDINO''s weights are 0.82 (stem) and 0.59 to
+    0.75 (blocks) of MambaVision-T''s, so the same relative movement costs 0.35 to 0.67 as much under the inherited
+    strengths. Twice the strengths restore MambaVision''s cost per relative movement. The pretraining argues the same
+    way: RadImageNet features start in the target''s domain and the anchors are the site-generalisation device. Guess
+    on size: +0.001 to +0.003 macro.'
+  mechanism: optimizer.anchor_alpha_early 0.002, optimizer.anchor_alpha_late 0.00002. The late anchor keeps following
+    the rate. Nothing else changes.
+  precedents:
+  - 'MambaVision settings, anchors-by-weight-scale: 0.001 and 0.00001 against 0.01 and 0.0001, x4 +0.0101, the campaign''s
+    largest gain.'
+  - 'MambaVision settings, anchors-per-stage-by-weight-scale: rejected (x4 -0.0007, x1 +0.0022).'
+  novelty: First anchor strength set for this model's weight scale.
+  coverage: Every study and every label.
+  exploitation: 'Read x4 and x1 against the incumbent, the training loss per epoch (expected slightly higher), the
+    logged anchor penalty and drift per stage (expected: drift down by up to a factor of two), and the labels from
+    largest gain to largest loss. Activation: the recorded effective config and an anchor penalty per epoch above
+    the incumbent''s. Shown wrong by: both multipliers below the incumbent with the training loss up.'
+  budget: The incumbent's training time within 1.02; no change to memory.
+  implementation: 'Configuration only: configs/campaign.yaml.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The setting that moved MambaVision-T most, rescaled by the measured weight ratio.
+- id: feature-statistics-before-position-embedding
+  mechanism_id: feature-statistics
+  parent_idea_id: null
+  title: Feature-statistics augmentation on the patch projection before the position embedding, not on the residual
+    stream after block 3
+  opportunity: 'Evidence (prior-work.md, The adapter): on the CNNs and MambaVision-T the augmentation mixes per-channel
+    mean and spread of convolution features after BatchNorm, which carry image style. In RadioDINO it acts on the
+    pre-norm residual stream after block 3, which also holds the learned absolute position embedding (RMS 0.14, the
+    largest tensor in the model): every image carries the same position code, so rescaling a channel''s spread across
+    tokens rescales the position code with it. The patch projection before the position embedding is the model''s
+    only local, low-level layer, the ViT''s counterpart of the CNN stem''s style features. Evidence for keeping the
+    augmentation: MambaVision settings, feature-statistics-augmentation-off, x4 -0.0011. Guess on size: +0.001 to
+    +0.003 macro.'
+  mechanism: 'The adapter''s stride-8 point becomes the patch projection''s output before the position embedding is
+    added; the position embedding is added at the start of the blocks, and all twelve blocks run after the augmentation.
+    The augmentation''s settings are unchanged (probability 0.5).'
+  precedents:
+  - 'MambaVision settings, feature-statistics-augmentation-off: x4 -0.0011, x1 -0.0013.'
+  - 'MambaVision settings, feature-statistics-after-first-epoch: x4 -0.0003, x1 -0.0023.'
+  novelty: First placement of the augmentation chosen for a model with a position code in its features.
+  coverage: Every study and every label; style shift between sites is the target.
+  exploitation: 'Read x4 and x1 against the incumbent and the labels from largest gain to largest loss. Activation:
+    the logged mean absolute change of the augmented features is nonzero and differs from the incumbent''s, and a
+    synthetic check shows the position embedding unchanged by the augmentation. Shown wrong by: both multipliers below
+    the incumbent.'
+  budget: The incumbent's training time within 1.02; no change to memory.
+  implementation: 'File: src/knee_abnormality/modeling/staged_backbones.py. For the vision transformer only: the
+    stem returns the patch projection, the position embedding is added at the start of the first block stage, and
+    the stages are arranged so that to_stride_8 returns the projection and deep runs all twelve blocks, the middle
+    read still after block 8 and the final read unchanged. Every parameter keeps its name prefix, rate group and anchor
+    group: the position embedding stays in the early anchor. MambaVision-T unchanged. Verify on CPU that with the augmentation
+    off the backbone''s outputs equal the incumbent''s exactly.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: A concrete fault of the inherited placement on this architecture, cheap to fix.
+- id: middle-read-at-block-10
+  mechanism_id: adapter-depth
+  parent_idea_id: null
+  title: The stride-16 middle read after block 10 instead of block 8, at the depth the other backbones read it
+  opportunity: 'Evidence (prior-work.md, The adapter): the soft-tissue and meniscus reads come from the stride-16 map,
+    which the hierarchical backbones take at the end of their third stage: ResNet-50 after 13 of 16 blocks (0.81),
+    ConvNeXt-T after 15 of 18 (0.83), MambaVision-T after 12 of 16 (0.75). RadioDINO has no hierarchy, every block
+    is at stride 16, and the adapter took block 8 of 12 (0.67), shallower than all three. Block 10 (0.83) matches
+    them. Guess on size: +0.001 to +0.003 macro, on the menisci and the OA labels.'
+  mechanism: The adapter's stages become 1, 2, 7 and 2 blocks; the stride-8 point stays after block 3, the final read
+    after block 12.
+  precedents:
+  - 'The stride-16 read on ConvNeXt-T and ResNet-50 (soft-tissue line, on main): the read was built and tuned at those
+    depths.'
+  novelty: First choice of the read depth on a backbone without a hierarchy.
+  coverage: The meniscus and OA targets read by the stride-16 cells; others through the shared backbone.
+  exploitation: 'Read x4 and x1 against the incumbent and the labels from largest gain to largest loss, expecting
+    Medial and Lateral Meniscus and the three OA labels first. Activation: the model''s middle width and stage sizes
+    in the recorded run, and the stage groups'' parameter counts (7 and 2 blocks).'
+  budget: The incumbent's training time within 1.02; no change to memory.
+  implementation: 'File: src/knee_abnormality/modeling/staged_backbones.py, radiodino_s16''s stage_blocks (1, 2, 7,
+    2). The early anchor and every rate group keep their parameters apart from blocks 9 and 10 moving into the third
+    stage group.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: An adapter choice made without evidence, corrected to the depth the routed reads were built
+    on.
+exhausted_directions: ''

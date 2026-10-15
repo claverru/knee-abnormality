@@ -1,0 +1,203 @@
+--- a/src/knee_abnormality/modeling/staged_backbones.py
++++ b/src/knee_abnormality/modeling/staged_backbones.py
+@@ -9,8 +9,15 @@
+ import torch
+ from torch import nn
+ 
++from knee_abnormality.modeling.radimagenet import (
++    radimagenet_state_dict,
++    resnet_avg_down_state_dict,
++)
++
+ IMAGENET_MEAN = (0.485, 0.456, 0.406)
+ IMAGENET_STD = (0.229, 0.224, 0.225)
++SPATIAL_PRIOR_MEAN = 0.3162
++SPATIAL_PRIOR_STD = 0.3213
+ 
+ STAGED_BACKBONES = {
+     "mamba_vision_T": {
+@@ -26,6 +33,7 @@
+         "architecture": "vit_small_patch16_224.dino",
+         "hf_hub_id": "Snarcy/RadioDino-s16",
+         "stage_blocks": (1, 2, 5, 4),
++        "spatial_prior": "resnet50.a1_in1k",
+         "geometry": {"": (15.5, 32.0), ".layer3": (7.5, 16.0)},
+         "anchors": "patch_stem_and_downsample_centers",
+     },
+@@ -40,11 +48,14 @@
+         norm: nn.Module,
+         widths: tuple[int, int, int],
+         pretrained_cfg: dict,
++        spatial_prior: nn.Module | None = None,
+     ) -> None:
+         super().__init__()
+         self.stem = stem
+         self.stages = nn.ModuleList(stages)
+         self.norm = norm
++        if spatial_prior is not None:
++            self.spatial_prior = spatial_prior
+         self.stage_widths = widths
+         self.num_features = widths[-1]
+         self.pretrained_cfg = pretrained_cfg
+@@ -56,7 +67,10 @@
+         return self.norm(features)
+ 
+     def group_matcher(self, coarse: bool = False) -> dict:
+-        return {"stem": r"^stem", "blocks": r"^stages\.(\d+)"}
++        return {
++            "stem": r"^stem|^spatial_prior|^stages\.\d+\.downsample",
++            "blocks": r"^stages\.(\d+)",
++        }
+ 
+     def geometry_layers(self, stages: int) -> list[nn.Module]:
+         modules = [self.stem, *(stage.downsample for stage in self.stages[:stages])]
+@@ -70,16 +84,77 @@
+         ]
+ 
+ 
++class _SpatialPrior(nn.Module):
++    def __init__(self, resnet: nn.Module, width: int) -> None:
++        super().__init__()
++        self.resnet = nn.Sequential(
++            resnet.conv1,
++            resnet.bn1,
++            resnet.act1,
++            resnet.maxpool,
++            resnet.layer1,
++        )
++        self.resnet.requires_grad_(False)
++        self.down = nn.Conv2d(
++            resnet.layer1[-1].conv3.out_channels, width, kernel_size=5, stride=4
++        )
++        self.norm = _TokenNorm(nn.LayerNorm(width, eps=1e-6))
++        self.register_buffer(
++            "scale",
++            (torch.tensor(IMAGENET_STD) / SPATIAL_PRIOR_STD).view(1, -1, 1, 1),
++            persistent=False,
++        )
++        self.register_buffer(
++            "shift",
++            ((torch.tensor(IMAGENET_MEAN) - SPATIAL_PRIOR_MEAN) / SPATIAL_PRIOR_STD).view(
++                1, -1, 1, 1
++            ),
++            persistent=False,
++        )
++        self.features = None
++
++    def train(self, mode: bool = True) -> "_SpatialPrior":
++        super().train(mode)
++        self.resnet.eval()
++        return self
++
++    def update(self, images: torch.Tensor) -> None:
++        with torch.no_grad():
++            features = self.resnet(images * self.scale + self.shift)
++        features = nn.functional.pad(features, (0, 3, 0, 3))
++        self.features = self.norm(self.down(features))
++
++
++class _PriorInjector(nn.Module):
++    def __init__(self, prior: _SpatialPrior, width: int) -> None:
++        super().__init__()
++        self.source = [prior]
++        self.proj = nn.Linear(width, width)
++        self.gamma = nn.Parameter(torch.zeros(width))
++
++    def forward(self, tokens: torch.Tensor) -> torch.Tensor:
++        prior = self.source[0].features.permute(0, 2, 3, 1)
++        return tokens + (self.proj(prior) * self.gamma).permute(0, 3, 1, 2)
++
++
+ class _PatchStem(nn.Module):
+-    def __init__(self, projection: nn.Conv2d, position: torch.Tensor) -> None:
++    def __init__(
++        self,
++        projection: nn.Conv2d,
++        position: torch.Tensor,
++        prior: _SpatialPrior | None = None,
++    ) -> None:
+         super().__init__()
+         side = math.isqrt(position.shape[1])
+         self.proj = projection
+         self.pos_embed = nn.Parameter(
+             position.transpose(1, 2).reshape(1, -1, side, side).clone()
+         )
++        self.prior = [prior] if prior is not None else []
+ 
+     def forward(self, images: torch.Tensor) -> torch.Tensor:
++        for prior in self.prior:
++            prior.update(images)
+         return self.proj(images) + self.pos_embed
+ 
+ 
+@@ -135,22 +210,42 @@
+     ends = list(itertools.accumulate(settings["stage_blocks"]))
+     if ends[-1] != len(blocks):
+         raise ValueError(f"{name} stage blocks do not cover its {len(blocks)} blocks")
++    width = original.embed_dim
++    with torch.random.fork_rng(devices=[]):
++        resnet = timm.create_model(
++            settings["spatial_prior"],
++            pretrained=False,
++            num_classes=0,
++            global_pool="",
++            avg_down=True,
++        )
++        if pretrained:
++            resnet.load_state_dict(
++                resnet_avg_down_state_dict(
++                    radimagenet_state_dict(settings["spatial_prior"])
++                ),
++                strict=True,
++            )
++        prior = _SpatialPrior(resnet, width)
++        injectors = [_PriorInjector(prior, width) for _ in settings["stage_blocks"]]
+     return StagedBackbone(
+         _PatchStem(
+             original.patch_embed.proj,
+             original.pos_embed[:, original.num_prefix_tokens :].detach(),
++            prior,
+         ),
+         [
+-            _stage(None, _TokenBlocks(*blocks[start:end]))
+-            for start, end in zip([0, *ends[:-1]], ends)
++            _stage(injector, _TokenBlocks(*blocks[start:end]))
++            for injector, start, end in zip(injectors, [0, *ends[:-1]], ends)
+         ],
+         nn.Sequential(_TokenNorm(original.norm), nn.AvgPool2d(2)),
+-        (original.embed_dim,) * 3,
++        (width,) * 3,
+         {
+             "hf_hub_id": settings["hf_hub_id"],
+             "mean": IMAGENET_MEAN,
+             "std": IMAGENET_STD,
+         },
++        prior,
+     )
+ 
+ 
+--- a/src/knee_abnormality/training/lightning.py
++++ b/src/knee_abnormality/training/lightning.py
+@@ -351,7 +351,7 @@
+         self.backbone_origin = {}
+         early_anchors = 0
+         for index, (name, parameter) in enumerate(backbone.named_parameters()):
+-            if parameter.ndim < 2:
++            if parameter.ndim < 2 or not parameter.requires_grad:
+                 continue
+             early = name.startswith(EARLY_ANCHOR_PREFIXES)
+             early_anchors += early
+@@ -387,6 +387,13 @@
+             dataset.set_epoch(self.current_epoch)
+ 
+     def on_train_epoch_end(self) -> None:
++        if hasattr(self.model.backbone, "spatial_prior"):
++            for index, stage in enumerate(self.model.backbone.stages):
++                self._log_epoch_metric(
++                    f"spatial_prior_gate_stage{index}",
++                    stage.downsample.gamma.detach().abs().mean(),
++                    1,
++                )
+         for region, scale in zip(
+             ("medial", "lateral", "pf"),
+             self.model.oa_detector_scale.detach().float(),

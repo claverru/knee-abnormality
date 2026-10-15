@@ -1,0 +1,50 @@
+ideas:
+- id: convolutional-spatial-prior-frozen-branch
+  mechanism_id: adapter-spatial-prior
+  parent_idea_id: null
+  title: 'The convolutional spatial prior with its pretrained RadImageNet ResNet-50 layers frozen (no gradients,
+    BatchNorm in eval): stem to layer2 added to the ViT tokens before each stage through zero-initialised gates'
+  opportunity: 'Evidence (run-notes.md, Diagnosis of the gap): 85% of the gap to MambaVision-T sits on the menisci
+    and the three OA labels, read from the stride-16 and stride-32 maps, and RadioDINO''s anatomy and meniscus maps
+    are worse. The convolutional backbones also read at stride 16 and 32, but build those maps from stride-4 and
+    stride-8 features; RadioDINO''s tokens never see detail finer than a 16-pixel patch. Rates, anchors, the read
+    depth and a learned final merge left those labels within 0.002. Evidence: ViT-Adapter (Chen et al. 2022) adds
+    exactly this convolutional spatial prior to plain ViTs for dense tasks. Guess on size: +0.002 to +0.006 macro,
+    on the five labels.'
+  mechanism: 'A spatial-prior branch inside the radiodino_s16 staged backbone: the stem, layer1 and layer2 of the
+    Refined RadImageNet ResNet-50 (the main recipe''s weights, avg_down layout, loaded strictly through radimagenet_state_dict),
+    fed the same images converted from the recipe''s ImageNet normalisation to the ResNet-50 recipe''s mean 0.3162
+    and std 0.3213 inside the branch. Its stride-8 output (512 channels, origin 0) is padded by one cell right and
+    below and goes through a 3×3 stride-2 convolution to 384 channels on the 14×14 token grid (origin 8 against
+    the tokens'' 7.5), then a LayerNorm. Before each of the four block stages, tokens += gamma_s ⊙ Linear_s(prior),
+    with a per-stage linear 384→384 and a per-channel gamma_s initialised at zero, so the model starts as the incumbent.
+    The pretrained ResNet layers are frozen: they run under no_grad with BatchNorm in eval mode, so their activations
+    are not kept; the downsampling convolution, the LayerNorm, the projections and the gates train at the stem group''s
+    rate.'
+  precedents:
+  - 'ViT-Adapter (Chen et al., 2022): spatial prior module plus injectors with zero-initialised gamma.'
+  - 'This campaign: middle-read-at-block-10 (×4 −0.0005), final-read-by-learned-two-by-two-merge (in progress, level
+    through epoch 9): changing the reads alone leaves the five labels in place.'
+  novelty: 'Replaces convolutional-spatial-prior-injection, invalid at its second epoch on the budget (4,072 s projected
+    against 3,417 s; GPU memory 22 GB, epoch 2 at about 340 s against 264 s): freezing the pretrained branch removes
+    its stored activations. An adapter fix, in scope (contract.md, Settled, ''The adapter is a subject'').'
+  coverage: Every study; aimed at Medial and Lateral Meniscus, Medial, Lateral and PF OA.
+  exploitation: 'Read x4 and x1 against the incumbent and the five labels first, then against the decoder-free MambaVision-T
+    (mamba-silver-fold-2, x4 0.935160). Activation: spatial_prior_gate_stage0 to stage3, the absolute mean of each
+    stage''s gamma per epoch, above 0 after epoch 1. Shown wrong by: gammas staying near zero, or the five labels
+    within ±0.002.'
+  budget: 'Forward of the ResNet-50 stem to layer2 without backward: training expected about 2,900 to 3,100 s, inside
+    the 3,417 s ceiling; memory near the incumbent''s 11.8 GB plus the prior''s 14x14 maps.'
+  implementation: 'Written and verified by the keeper: apply /home/claudio/src/knee-abnormality-radiodino/autoresearch/campaigns/radiodino-settings/spatial-prior-frozen.patch
+    exactly (git apply in the workspace; base is the top-down-backbone-warm-up incumbent''s source; files src/knee_abnormality/modeling/staged_backbones.py
+    and src/knee_abnormality/training/lightning.py) and change nothing else. Keeper''s CPU checks on that base:
+    mapping 15.5/32 verified; branch weights equal the RadImageNet file; ResNet layers not trainable and outside
+    the optimizer, BatchNorm in eval after model.train(); prior features carry gradients to the downsampling convolution
+    and gates; random stream unchanged; with the gammas at zero both backbone maps equal the incumbent''s exactly.
+    If the budget still fails, the developer may reduce cost only inside the branch (for example the LayerNorm or
+    the downsampling convolution''s width), never the backbone, epochs or inputs.'
+  open_choices: Only a cost reduction inside the branch if the budget check still fails.
+  dependencies: []
+  priority_rationale: The user's choice after the diagnosis (2026-10-15 12:00); the one remaining lever that adds
+    what the architecture lacks rather than re-reading what it has.
+exhausted_directions: ''

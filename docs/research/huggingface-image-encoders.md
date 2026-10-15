@@ -44,6 +44,9 @@ can construct the architecture. [Backbone swap requirements](../modeling/backbon
 
 ### RadioDINO and OmniRad
 
+RadioDINO-S/16 was trained and tuned on 2026-10-15 and not adopted (×4 0.929641, below the
+ResNet-50 and MambaVision-T and lowering their blends): [result](../validation/results/2026-10-15-radiodino-s16.md).
+
 Every RadImageNet-pretrained release found, including the S/8 and B/16 variants and the
 supervised CNNs, is catalogued in [RadImageNet weights](radimagenet-weights.md).
 
