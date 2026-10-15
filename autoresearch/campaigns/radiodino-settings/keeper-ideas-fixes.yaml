@@ -1,0 +1,77 @@
+ideas:
+- id: final-read-by-learned-two-by-two-merge
+  mechanism_id: adapter-final-read
+  parent_idea_id: null
+  title: 'The stride-32 read through a learned 2x2 stride-2 merge from 384 to 768 channels, started as the incumbent''s
+    average pool: the downsample MambaVision-T and Swin-T have and the adapter replaced by a fixed average'
+  opportunity: 'Evidence (validation_predictions.csv, x4): against the decoder-free MambaVision-T on this fold and config
+    (outputs/training/mamba-silver-fold-2, x4 0.935160, x1 0.9301) the incumbent loses Lateral Meniscus -0.0154, PF
+    OA -0.0154, Medial OA -0.0102, Lateral OA -0.0077, Medial Meniscus -0.0076: 85% of its summed per-label deficit
+    on the five soft-tissue-routed labels; the other seven average -0.0015. Evidence (metrics.csv, epoch 12): the token
+    maps behind that routing are worse, val_anatomy_share_error 0.0789 against 0.0760 (Swin-T 0.0706), val_meniscus_loss
+    0.5955 against 0.5876 (Swin-T 0.5755). Evidence (CPU, 12 real middle slices, pretrained weights): 41% of the spatial
+    variance of the final normed 14x14 tokens lies inside the 2x2 cells the average pool collapses. MambaVision-T reaches
+    7x7 through a learned 3x3 stride-2 convolution (320 to 640) and Swin-T through patch merging (4C to 2C); both
+    reached x4 0.9372 to 0.9378. Guess on size: +0.002 to +0.005 macro, on the five routed labels.'
+  mechanism: 'In radiodino_s16 the final read becomes the ViT norm, then nn.Conv2d(384, 768, kernel 2, stride 2, bias
+    False), in place of nn.AvgPool2d(2). Initialisation without random draws: output channel c < 384 takes 0.25 on
+    input channel c at all four taps and 0 elsewhere (exactly the average pool), output channels 384 to 767 are 0. So
+    the first forward equals the incumbent''s and the merge learns the within-cell layout. stage_widths becomes (384,
+    384, 768) and num_features 768; the middle read stays 384. The merge sits in the final-norm group: backbone rate,
+    top-down warm-up, late anchor to its start, no weight decay. Geometry is unchanged: kernel 2, stride 2, no padding
+    after origin 7.5 and stride 16 gives origin 15.5, stride 32, which geometry_layers derives from the Conv2d.'
+  precedents:
+  - 'Swin-T on the MambaVision recipe, fold 2: x4 0.937176 with a learned 2x2 merge before its 7x7 stage.'
+  - 'MambaVision-T reference: x4 0.937801 with a learned stride-2 convolution to 7x7, 320 to 640 channels.'
+  - 'radiodino-settings runs 1 to 8: rates, anchors and schedule moved x4 by -0.0024 to +0.0004; none touched the
+    final read.'
+  novelty: First change to the adapter's final read; every earlier run kept the average pool.
+  coverage: Every study and every label through the 7x7 tokens; the menisci and OA labels also through the meniscus
+    map, whose deep term repeats these tokens.
+  exploitation: 'Read x4 and x1 against the incumbent and against mamba-silver-fold-2, labels from largest gain to
+    largest loss (the five routed labels first), val_anatomy_share_error and val_meniscus_loss per epoch. Activation:
+    backbone_drift_stage5 now logged for the merge weight and rising from 0; one new per-epoch metric final_merge_new_channel_share,
+    the share of merge output energy in channels 384 to 767 (0 at the start, rising).'
+  budget: About 58M multiply-adds per image against 4.6G for the ViT, so within 1.02 of the incumbent's 2,737 s; peak
+    memory within 0.1 GB of 11.8 GB.
+  implementation: 'Files: src/knee_abnormality/modeling/staged_backbones.py (the merge in _vision_transformer''s final
+    Sequential, its deterministic initialisation, widths (384, 384, 768)); src/knee_abnormality/modeling/model.py (projection
+    Linear(768, 256): create the incumbent''s Linear(384, 256) as now, then under torch.random.fork_rng the 384 extra
+    input columns with the same default init, so the random stream is unchanged); src/knee_abnormality/training/lightning.py
+    (the metric through _log_epoch_metric). Replaces the average pool in the RadioDINO adapter, no option; the MambaVision
+    path is untouched. Adds to the incumbent.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The one structural difference of the adapter from both models that reached 0.937, aimed at the
+    five labels holding 85% of the deficit, with an identical start; cost 1%.
+- id: early-anchor-by-gradient-scale
+  mechanism_id: anchors
+  parent_idea_id: anchors-by-weight-scale
+  title: Early anchor 0.00013, one seventh of 0.001, for task gradients 7 to 17 times smaller than MambaVision-T's at
+    the stem and block 1
+  opportunity: 'Evidence (metrics.csv, mean over epochs): task gradient RMS on the stem 2.9e-4 against 5.0e-3 for MambaVision-T,
+    on block 1 7.5e-5 against 5.3e-4; weight RMS 0.075 and 0.049 against 0.092 and 0.084. The anchor gradient is 2 x
+    alpha x (w - w0), so at equal relative drift the anchor-to-task ratio is 13.6 times MambaVision-T''s at the stem
+    and 4.1 times at block 1 (geometric mean 7.5). Evidence (drift curves): the incumbent''s stem and block 1 lose 40%
+    and 54% of their peak drift by epoch 12, against 19% and 35% for the decoder-free MambaVision-T: the anchor pulls
+    them back while the rate decays. Evidence (seed 3): doubling the anchors lost x4 -0.0024; rate idea 1, the one run
+    that kept the early layers fastest, gained Fracture +0.0052. Guess on size: +0.000 to +0.002 macro.'
+  mechanism: optimizer.anchor_alpha_early 0.00013 (0.001 / 7.5). The early anchor still covers the patch projection,
+    the position embedding and block 1; the late anchor, rates and warm-up unchanged.
+  precedents:
+  - 'radiodino-settings anchors-by-weight-scale (0.002, 0.00002): x4 -0.002436, Contusion -0.0075, Fracture -0.0061.'
+  - 'MambaVision settings anchors-by-weight-scale (0.001 and 0.00001 from 0.01 and 0.0001): x4 +0.0101.'
+  novelty: First anchor value set from the measured gradient scale rather than the weight scale, and the first weaker
+    than inherited on this model.
+  coverage: Every study and every label; Fracture, Contusion and the located labels through the early layers.
+  exploitation: 'Read x4 and x1 against the incumbent and labels from largest gain to largest loss. Activation: the
+    recorded effective config; backbone_drift_stage0 and backbone_drift_stage1 at epoch 12 above the incumbent''s 0.0112
+    and 0.0107, falling less than 40% and 54% from their peaks; anchor_penalty lower.'
+  budget: The incumbent's 2,737 s within 1.01; memory unchanged.
+  implementation: 'Configuration only: configs/campaign.yaml, optimizer.anchor_alpha_early 0.00013. Replaces the 0.001
+    value.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: A measured 7.5-fold mismatch in a setting inherited unchanged from MambaVision-T, configuration
+    only; second because the deficit sits mostly on the routed soft-tissue labels the merge targets.
+exhausted_directions: ''

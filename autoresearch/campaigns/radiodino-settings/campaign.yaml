@@ -1,0 +1,111 @@
+id: radiodino-settings
+recipe: configs/mambavision.yaml
+reference_run: outputs/training/mambavision-t-combined-12-epochs
+reference_equivalences:
+  optimizer.backbone_lr_stage_decay: 1.0
+  optimizer.late_anchor_follows_lr: true
+  optimizer.lr_decay: linear
+reference_config_exceptions:
+- model.anatomical_frame
+- model.backbone_eval
+- model.checkpoint_backbone
+- model.dropout
+- model.meniscus_map
+- model.plane_readout
+- model.series_dropout
+- model.soft_tissue_routing
+- model.view_label_bias
+- paths.label_manifest
+- paths.report_attribute_manifest
+- trainer.report_attribute_loss_weight
+- trainer.scanner_confusion_weight
+- validation.unused_folds
+reference_identity_exceptions:
+- report_attribute_manifest_sha256
+- preprocessing_identity.sources_sha256
+- preprocessing_identity.spatial_tokens.view_label_bias
+additional_evidence_runs: []
+backlog:
+  refill_below: 3
+  refill_to: 5
+  seed_order: forced
+  rotate_after: 1000000
+budget:
+  mode: range
+  min_fraction: 0.5
+  max_fraction: 1.1
+policy:
+  editable_files:
+  - configs/campaign.yaml
+  - src/knee_abnormality/config.py
+  - src/knee_abnormality/training/lightning.py
+  - src/knee_abnormality/modeling/model.py
+  - src/knee_abnormality/modeling/staged_backbones.py
+  editable_directories: []
+  config_keys:
+  - model.backbone
+  - model.stochastic_depth
+  - trainer.gradient_clip_val
+  config_prefixes:
+  - optimizer
+  - model.feature_statistics_augmentation
+  list_item_fields: {}
+  input_identity_keys:
+  - preprocessing_identity
+  require_source_change: false
+  configuration_only_ideas: true
+  developer_instructions: 'You have no GPU and must not use one. Allowed checks are static checks, loading configs/campaign.yaml
+    through the config model, building the model and the optimizer on the CPU, and tiny no-gradient forward passes
+    of the backbone on two synthetic 224 px images; never return blocked for lack of a GPU. Make every change inside
+    the candidate workspace you were assigned and nowhere else; do not stage the candidate under /tmp, and do not
+    write source/ or changes.diff in the experiment directory. Read contract.md before writing code. The baseline
+    source already holds the RadioDINO-S/16 adapter (radiodino_s16 in src/knee_abnormality/modeling/staged_backbones.py:
+    patch stem without the CLS token, stages of 1, 2, 5 and 4 blocks, final norm and 2x2 average pool). The recipe
+    starts as the MambaVision-T incumbent; the first seed switches model.backbone to radiodino_s16 and is adopted
+    by the user''s decision, so every later seed applies to a radiodino_s16 incumbent. model.backbone changes only
+    in that first seed. Each seed is one setting and says exactly what changes; apply it to the incumbent you are
+    assigned and leave everything outside it byte-identical. A configuration-only seed changes configs/campaign.yaml
+    and nothing else. Do not change the backbone''s pretrained weights, the labels, the views, the slices, the image
+    size, the batch size, the epochs, the heads, the losses or the prediction settings. A new option exists only
+    for a value the campaign intends to vary; with its default the optimizer and the model must be identical to the
+    incumbent''s, and the MambaVision path must stay identical. New parameters or buffers initialise under torch.random.fork_rng
+    so the incumbent''s random stream is unchanged. Keep the speed rules of the recipe: model.channels_last stays
+    true, epoch metrics go through _log_epoch_metric, and code that runs every training step gets no .item(), .cpu(),
+    bool() or int() of a tensor and no Python loop over studies. At most six new metrics per seed, logged per epoch
+    or on validation. Twelve epochs. Training time must stay within 0.5 to 1.1 of the reference''s 3,106 s. No weight
+    averaging. No tests.'
+  researcher_instructions: 'The campaign has no end: it runs until the user stops it. Never return an empty report
+    and never declare the directions exhausted. Research starts after the forced seeds. Your first product after
+    every completed run is its analysis: both multipliers against the incumbent (the x1 change is the selected epoch''s
+    validation macro, the x4 change the saved predictions''), the training loss per epoch against the incumbent''s
+    and against the MambaVision-T reference''s, the per-label AUC changes from the two runs'' fold_2/validation_predictions.csv
+    sorted from largest gain to largest loss, the training and prediction seconds and the peak GPU memory. Then
+    the same run against the MambaVision-T reference on this fold (x4 0.937801, x1 0.929880) and the ResNet-50 (x4
+    0.939634, x1 0.930902), and the equal logit blend with each against that model alone: the purpose is an architecture
+    that adds to the blend. Adoption is by the runtime under the shared rule; say which side of it the run falls
+    on. One run is a starting point, never a verdict on a setting: for a run that was not adopted list what it shares
+    with the other runs that moved the same labels and name candidate causes; do not write that a reference was
+    lucky or that a difference is noise. Only then propose. The scope is the training settings of radiodino_s16
+    that its differences from MambaVision-T make suspect (contract.md, prior-work.md): RadImageNet DINO pretraining
+    against supervised ImageNet-1k, weights 0.05 to 0.063 RMS against 0.08 to 0.09, 21.7M parameters against 31.8M,
+    twelve equal pre-norm attention blocks over all 196 tokens against a convolution, Mamba and attention hierarchy,
+    LayerNorm only against BatchNorm in the early stages, a learned absolute position embedding. Subjects: rates
+    and their distribution over depth, warm-up and schedule shape, the weight anchors, the model''s own regularisers,
+    gradient clipping, the feature-statistics augmentation, and the depth of the adapter''s stride-8 and middle
+    reads. Each idea is one training run that changes one setting, or combines settings of named earlier runs; it
+    marks every claim as evidence-backed or a guess, cites its numbers from prior-work.md or a run, takes its value
+    from a cited source or from the bracket earlier runs of this campaign opened, and states its expected training
+    time and GPU memory. Name the metrics that prove the idea active. Out of bounds: everything in the contract''s
+    out-of-bounds list, among it another backbone, model size or pretrained weights, keeping the CLS token, image
+    sizes other than 224 px, more slices or images per study, more or fewer epochs, the labels, new routing, attention
+    or readout structure, ensembling, weight averaging, test-time augmentation, reflection probabilities, gold-study
+    weighting, trained models in the loader, per-run controls and confirmation or multi-seed runs. Two trainings
+    of the ResNet-50 recipe on this fold were 0.0010 apart at x4 and 0.0013 at x1; this model''s own spread is not
+    known. Before proposing, read every decided run of the campaign, not only the last one: from each run''s fold_2
+    logs, epochs and validation_predictions.csv put in the report one table per run of the validation macro AUC
+    and the training loss per epoch, the logged diagnostics per epoch (anchor penalty, drift per backbone stage,
+    gradient norm, rates per stage, feature-statistics change), x1 and x4, and the per-label x4 AUC change against
+    the incumbent and the MambaVision-T reference. Then read across runs: which curves share a shape, which labels
+    moved together, and which settings the runs that moved them share. Every idea names the runs, the curve features
+    and the labels it rests on, says what it expects to change and by how much, and does not repeat a setting a
+    past run tried without naming what differs this time.'

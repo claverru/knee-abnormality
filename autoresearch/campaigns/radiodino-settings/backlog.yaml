@@ -1,0 +1,6 @@
+revision: 418
+queue:
+- patch-stem-residual-convolution-cascade
+- patchwise-content-resampling-residual
+- conditional-local-position-after-first-block
+- wavelet-packet-detail-stem-residual

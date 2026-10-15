@@ -1,0 +1,35 @@
+ideas:
+- id: overlapping-patch-embedding
+  mechanism_id: adapter-patch-embedding
+  parent_idea_id: null
+  title: 'Overlapping patch embedding: the 16×16 stride-16 projection becomes a 32×32 kernel at stride 16 with padding
+    8, started from the pretrained kernel in its centre and zeros around it'
+  opportunity: 'Evidence (run-notes.md, Diagnosis of the gap): the gap to MambaVision-T sits on the menisci and OA
+    labels, small structures whose edges cross the 16-pixel patch boundaries. RadioDINO''s patch projection sees each
+    16×16 patch alone, without overlap, so an edge split between two patches is never seen whole by either token.
+    Evidence: overlapping patch embeddings (PVTv2, CvT) and convolutional stems (Xiao et al. 2021) improve ViTs on
+    dense tasks. Guess on size: +0.001 to +0.004 macro, on the five labels.'
+  mechanism: 'The adapter''s stem projection is replaced by a Conv2d(3, 384, kernel 32, stride 16, padding 8). Its
+    weight starts as zeros with the pretrained 16×16 kernel copied into the centre (rows and columns 8 to 23) and the
+    pretrained bias, so at the start each token equals the incumbent''s; the border weights learn to use the 8-pixel
+    neighbourhood around each patch. Geometry unchanged: origin (32−1)/2 − 8 = 7.5, stride 16, 196 tokens.'
+  precedents:
+  - 'PVTv2 (Wang et al. 2022) OverlapPatchEmbed; CvT (Wu et al. 2021) convolutional token embedding; Xiao et al. 2021,
+    early convolutions help transformers see better.'
+  novelty: An adapter fix, in scope (contract.md, Settled, "The adapter is a subject"); the user's choice of
+    2026-10-15 after discussing that RadioDINO sees in 16×16 patches.
+  coverage: Every study; aimed at Medial and Lateral Meniscus, Medial, Lateral and PF OA.
+  exploitation: 'Read x4 and x1 against the incumbent and the five labels first. Activation: one metric, the RMS of the
+    projection weight outside the central 16×16 window per epoch, above 0 after epoch 1. Shown wrong by: the border
+    weights staying near zero, or the five labels within ±0.002.'
+  budget: 'The projection''s cost grows fourfold, about 0.06 GFLOPs per image on 4.6: training within 1.02 of the
+    incumbent''s; no change to memory beyond the projection.'
+  implementation: 'File: src/knee_abnormality/modeling/staged_backbones.py, radiodino_s16 only: build the larger
+    Conv2d and fill it from original.patch_embed.proj before passing it to the stem; keep it as stem.proj so its name,
+    rate group and early anchor stay; the new weight''s init uses no random draws (zeros plus copies), so the random
+    stream is unchanged. training/lightning.py only for the one metric through _log_epoch_metric. Verify on CPU that the
+    feature mapping still verifies at 7.5/15.5 and that the backbone''s outputs equal the incumbent''s exactly.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user's choice; fixes the split-edge problem of non-overlapping patches at almost no cost.
+exhausted_directions: ''

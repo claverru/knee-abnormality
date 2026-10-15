@@ -1,0 +1,37 @@
+ideas:
+- id: depthwise-convolution-in-block-mlps
+  mechanism_id: adapter-locality
+  parent_idea_id: null
+  title: 'A 3×3 depthwise convolution inside every transformer block''s MLP, added through a zero-initialised per-channel
+    gate so the model starts as the incumbent (PVTv2 MlpWithDepthwiseConv, LocalViT)'
+  opportunity: 'Evidence (run-notes.md, Diagnosis of the gap): the gap to MambaVision-T sits on small located structures
+    (menisci, OA compartments); RadioDINO mixes neighbouring patches only through global attention, with no local
+    operator after the patch projection, while every model that reached 0.937 (MambaVision-T, Swin-T, the CNNs) has
+    local mixing at every stage. Evidence: a depthwise convolution in the feed-forward network gives ViTs locality and
+    improves them on dense and small-data tasks (PVTv2, Wang et al. 2022; LocalViT, Li et al. 2021). Guess on size:
+    +0.002 to +0.005 macro, on the five labels.'
+  mechanism: 'In each of the twelve blocks the MLP becomes: h = fc1(x); h = h + gamma ⊙ DWConv3×3(h) on the 14×14 token
+    grid (1536 hidden channels, groups 1536, padding 1); then the block''s own activation, norm and fc2 as before. gamma
+    is a per-channel vector initialised at zero, so each block starts identical to the incumbent''s; the depthwise
+    weights use the default Conv2d initialisation drawn under torch.random.fork_rng. Geometry unchanged.'
+  precedents:
+  - 'PVTv2 (Wang et al. 2022): MlpWithDepthwiseConv, in timm.models.pvt_v2.'
+  - 'LocalViT (Li et al. 2021): depthwise convolution in the feed-forward network of every block.'
+  novelty: An adapter fix in the campaign's locality line (contract.md, Current line), after the spatial prior and the
+    overlapping patch embedding; the only one acting inside every block.
+  coverage: Every study; aimed at Medial and Lateral Meniscus, Medial, Lateral and PF OA.
+  exploitation: 'Read x4 and x1 against the incumbent and the five labels first. Activation: one metric, the mean
+    absolute gamma over the twelve blocks per epoch, above 0 after epoch 1. Shown wrong by: gammas staying near zero, or
+    the five labels within ±0.002.'
+  budget: 'A depthwise 3×3 over 1536×196 per block, about 0.03 GFLOPs per image per block on 4.6 in total: training
+    within 1.05 of the incumbent''s; memory up by the depthwise activations, about +1 GB.'
+  implementation: 'File: src/knee_abnormality/modeling/staged_backbones.py, radiodino_s16 only: wrap each block''s mlp
+    in a module that reshapes the hidden tokens to the 14×14 grid for the depthwise convolution and back, keeping
+    fc1, act, norm, fc2 and their names (blocks.N.mlp.fc1 and so on) so rates, anchors and checkpoints of the pretrained
+    weights are unchanged; new parameters under torch.random.fork_rng. training/lightning.py only for the one metric
+    through _log_epoch_metric. Verify on CPU that the feature mapping still verifies and that, with the gammas at zero,
+    the backbone''s outputs equal the incumbent''s exactly.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The highest-potential reusable timm idea for the locality ViTs lack; acts in every block.
+exhausted_directions: ''

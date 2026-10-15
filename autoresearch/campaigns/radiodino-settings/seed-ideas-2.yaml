@@ -1,0 +1,28 @@
+ideas:
+- id: stochastic-depth-0-1
+  mechanism_id: regulariser
+  parent_idea_id: null
+  title: Stochastic depth 0.1 over the twelve blocks, the ViT pretraining and fine-tuning default
+  opportunity: 'Evidence: DINO''s ViT-S is pretrained with drop path 0.1 (the DINO repository''s default), and ViT
+    fine-tuning recipes keep it (DeiT-S 0.1, MAE ViT-B 0.1), because a ViT has no convolutional locality to constrain
+    it and overfits small datasets; the fold trains on 3,532 studies. Whether RadioDINO kept DINO''s default is not
+    stated on its card (guess). The difference from MambaVision-T''s rejected run: there the drop applied to a hierarchy
+    whose first two stages are convolutions with BatchNorm and to a model that had underfit; here it applies equally
+    to twelve identical residual attention blocks, which is the setting it was designed for. Guess on size: -0.001
+    to +0.003 macro.'
+  mechanism: model.stochastic_depth 0.1, passed to timm as drop_path_rate (linear from 0 at block 1 to 0.1 at block
+    12). Nothing else changes.
+  precedents:
+  - 'MambaVision settings, stochastic-depth-0-1-on-a-fitted-model: x4 -0.0009, x1 +0.0011.'
+  novelty: First stochastic depth on a ViT here.
+  coverage: Every study and every label.
+  exploitation: 'Read x4 and x1 against the incumbent, the training loss per epoch (expected higher) against the validation
+    curve, and the labels from largest gain to largest loss. Activation: the recorded effective config and drop-path
+    modules with rates rising to 0.1 in the built backbone. Shown wrong by: both multipliers below the incumbent.'
+  budget: The incumbent's training time within 1.0 (dropped blocks skip no compute in timm); no change to memory.
+  implementation: 'Configuration only: configs/campaign.yaml.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The ViT default regulariser, last because the MambaVision run of the same setting rose at x1
+    and fell at x4.
+exhausted_directions: ''
