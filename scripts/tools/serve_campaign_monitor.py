@@ -11,35 +11,57 @@ from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from ipaddress import ip_address, ip_network
 from pathlib import Path
-from urllib.parse import parse_qs
+from urllib.parse import parse_qs, quote
 
 import plotly
 import plotly.graph_objects as go
 import yaml
 from plotly.offline import get_plotlyjs
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 
+from knee_abnormality.autoresearch.campaign.rules import (
+    CALIBRATION_EPOCHS,
+    SEED_TERMINAL,
+)
 from knee_abnormality.autoresearch.runtime.layout import (
     PREDICTIONS,
     campaign_fold,
     fold_dir,
+    job_experiment,
 )
+from knee_abnormality.autoresearch.runtime.storage import alive
 from knee_abnormality.cli import CLISettings, describe
 
 CONTROL = "control"
 WATCHDOG = "watchdog"
 MAXIMUM_MESSAGE_BYTES = 20000
+MINIMUM_AGE_SECONDS = 5
+STATUS_TIMEOUT_SECONDS = 60
+PAGE_ERRORS = (OSError, ValueError, KeyError, TypeError, IndexError, AttributeError)
 TAILNET = (ip_network("100.64.0.0/10"), ip_network("fd7a:115c:a1e0::/48"))
-GAINS: dict[tuple, list[float]] = {}
-REGISTRY = Path("outputs/autoresearch/monitor/campaigns")
-SUMMARIES: dict[str, dict] = {}
+OUTPUTS = Path("outputs/autoresearch")
+REGISTRY = OUTPUTS / "monitor/campaigns"
 PLOTLY_JS = f"plotly-{plotly.__version__}.min.js"
-BANNER = {
-    "RUNNING": "var(--good)",
-    "CALIBRATING": "var(--s1)",
-    "STOPPING": "var(--warn)",
-    "STOPPED": "var(--warn)",
+GAINS: dict[tuple, list[float]] = {}
+STATES: dict[Path, tuple[int, dict]] = {}
+REGENERATION = threading.Lock()
+STATUS = threading.Lock()
+last_regeneration: dict[str, float] = {}
+SUPERVISED = {"RUNNING", "CALIBRATING", "STOPPING"}
+STATE_COLOR = {
+    "RUNNING": "--good",
+    "CALIBRATING": "--s1",
+    "STOPPING": "--warn",
+    "PAUSED": "--bad",
 }
+STATE_DETAIL = {
+    "RUNNING": "working normally",
+    "CALIBRATING": "measuring the budget on CPU",
+    "STOPPED": "stopped; nothing runs until resumed",
+    "STOPPING": "finishing the current run before stopping",
+    "PAUSED": "paused; needs a repair",
+}
+STATE_ORDER = {"PAUSED": 0, "RUNNING": 1, "CALIBRATING": 1, "STOPPING": 2}
 ROLES = {
     "training": "training",
     "developer": "being implemented",
@@ -50,6 +72,25 @@ ROLES = {
     "researcher": "proposing ideas",
     "config": "checking its configuration",
 }
+VERDICTS = {
+    "provisional_accept": "accepted",
+    "reject": "rejected",
+    "invalid": "invalid",
+    "failed": "failed",
+    "blocked": "blocked",
+}
+IDEA_FIELDS = (
+    "opportunity",
+    "mechanism",
+    "precedents",
+    "novelty",
+    "coverage",
+    "exploitation",
+    "budget",
+    "implementation",
+    "open_choices",
+    "priority_rationale",
+)
 LINE = {
     "control": {"width": 2},
     "incumbent": {"width": 1.5},
@@ -65,10 +106,14 @@ COLOR = {
 LIGHT = {
     "--ink": "#0b0b0b",
     "--ink2": "#52514e",
+    "--card": "#f0efec",
+    "--grid": "#e4e3df",
     "--other": "#a8a79f",
     "--s1": "#2a78d6",
     "--s2": "#eb6834",
     "--good": "#0ca30c",
+    "--warn": "#eda100",
+    "--bad": "#e34948",
 }
 PLOT_CONFIG = {
     "displaylogo": False,
@@ -77,156 +122,268 @@ PLOT_CONFIG = {
 }
 STYLE = """
 :root { color-scheme: light; --bg: #fcfcfb; --card: #f0efec; --ink: #0b0b0b; --ink2: #52514e; --grid: #e4e3df;
-  --other: #a8a79f; --s1: #2a78d6; --s2: #eb6834; --good: #0ca30c; --warn: #eda100; --bad: #e34948; }
+  --other: #a8a79f; --s1: #2a78d6; --s2: #eb6834; --good: #0ca30c; --warn: #eda100; --bad: #e34948;
+  --up: #087a08; --down: #c4302f; --amber: #8a5d00; --tint: #e1ebf7; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { color-scheme: dark; --bg: #1a1a19;
   --card: #262624; --ink: #ffffff; --ink2: #c3c2b7; --grid: #383835; --other: #75746e; --s1: #3987e5;
-  --s2: #d95926; --good: #1baf7a; --warn: #c98500; --bad: #e66767; } }
+  --s2: #d95926; --good: #1baf7a; --warn: #c98500; --bad: #e66767; --up: #3cc68f; --down: #f07a7a;
+  --amber: #e5ad3a; --tint: #23324a; } }
 :root[data-theme="dark"] { color-scheme: dark; --bg: #1a1a19; --card: #262624; --ink: #ffffff; --ink2: #c3c2b7;
-  --grid: #383835; --other: #75746e; --s1: #3987e5; --s2: #d95926; --good: #1baf7a; --warn: #c98500; --bad: #e66767; }
-body { margin: 0 auto; max-width: 1440px; padding: 12px 16px; background: var(--bg); color: var(--ink);
-  font: 14px system-ui, sans-serif; }
-h1 { font-size: 18px; margin: 4px 0 8px; }
-h2 { font-size: 13px; color: var(--ink2); text-transform: uppercase; letter-spacing: .04em; margin: 22px 0 6px; }
-.banner { color: #fff; border-radius: 8px; padding: 10px 12px; font-weight: 600; }
-.banner small { display: block; font-weight: 400; margin-top: 4px; }
-.card { background: var(--card); border-radius: 8px; padding: 8px 10px; min-width: 0; overflow: hidden; }
-.plotly-graph-div { width: 100% !important; }
-.sub { color: var(--ink2); font-size: 13px; }
-.grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 8px; }
-@media (max-width: 900px) { .grid { grid-template-columns: minmax(0, 1fr); } }
-.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-top: 8px; }
-.tile .value { font-size: 22px; font-weight: 600; margin-top: 2px; }
-.scroll { overflow-x: auto; margin-top: 8px; }
-table { border-collapse: collapse; width: 100%; font-size: 12px; }
-th, td { text-align: right; padding: 5px 6px; border-bottom: 1px solid var(--grid); white-space: nowrap;
-  font-variant-numeric: tabular-nums; }
-th:first-child, td:first-child, th:nth-child(2), td:nth-child(2) { text-align: left; }
-th { color: var(--ink2); font-weight: 600; }
-tr.incumbent td:first-child::before { content: "★ "; color: var(--s1); }
-.accept { color: var(--good); font-weight: 600; } .reject { color: var(--bad); font-weight: 600; }
-ul, ol { margin: 6px 0 2px 18px; padding: 0; } li { margin: 2px 0; }
-#age { font-size: 12px; margin-top: 8px; color: var(--ink2); }
-.stale { color: var(--bad) !important; font-weight: 600; }
-pre { font-size: 11px; line-height: 1.35; white-space: pre-wrap; background: var(--card); padding: 8px; border-radius: 6px; }
-details { margin-top: 18px; }
-.activity { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.3fr) minmax(0, 0.8fr); gap: 12px;
-  margin-top: 8px; align-items: stretch; }
-table.agents th:nth-child(3), table.agents td:nth-child(3) { text-align: left; }
-.card.wide { overflow-x: auto; }
-.card.wide .plotly-graph-div { min-width: 720px; }
-.pair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 12px; margin-top: 12px; }
-@media (max-width: 900px) { .pair { grid-template-columns: minmax(0, 1fr); } }
-@media (max-width: 1100px) { .activity { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
-@media (max-width: 720px) { .activity { grid-template-columns: minmax(0, 1fr); } }
-table.jobs { margin-top: 6px; font-size: 13px; }
-table.jobs th, table.jobs td { border-bottom: none; padding: 4px 5px; white-space: normal; }
-table.jobs td:nth-child(2), table.jobs td:nth-child(3) { color: var(--ink2); }
-table.jobs:not(.agents) td:first-child { overflow-wrap: anywhere; }
-table.jobs:not(.agents) th:nth-child(n+3), table.jobs:not(.agents) td:nth-child(n+3) { white-space: nowrap; }
-.jobs-scroll { overflow-x: auto; }
-@media (max-width: 720px) { table.jobs:not(.agents) { font-size: 12px; }
-  table.jobs:not(.agents) th, table.jobs:not(.agents) td { padding: 4px 3px; } }
-table.jobs th:nth-child(2), table.jobs td:nth-child(2) { text-align: left; }
-.up { color: var(--good); font-weight: 600; } .down { color: var(--bad); font-weight: 600; }
-.thread { max-height: 320px; overflow-y: auto; }
-.message { margin: 6px 0; padding-left: 8px; border-left: 3px solid var(--s1); white-space: pre-wrap; }
-.waiting { color: var(--warn); font-weight: 600; }
-form.send { display: flex; gap: 8px; margin-top: 8px; align-items: flex-end; }
-form.send textarea { flex: 1; min-height: 56px; font: inherit; color: var(--ink); background: var(--bg);
-  border: 1px solid var(--grid); border-radius: 6px; padding: 6px; }
-form.send button { font: inherit; padding: 6px 14px; }
+  --grid: #383835; --other: #75746e; --s1: #3987e5; --s2: #d95926; --good: #1baf7a; --warn: #c98500; --bad: #e66767;
+  --up: #3cc68f; --down: #f07a7a; --amber: #e5ad3a; --tint: #23324a; }
+* { box-sizing: border-box; }
+body { margin: 0 auto; max-width: 1440px; padding: 12px 16px 40px; background: var(--bg); color: var(--ink);
+  font: 14px/1.4 system-ui, sans-serif; -webkit-text-size-adjust: 100%; }
+main > * + * { margin-top: 12px; }
 a { color: var(--s1); }
-nav { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px; }
-nav a { padding: 8px 14px; border-radius: 8px; background: var(--card); color: var(--ink); text-decoration: none;
-  font-size: 14px; }
-nav a.back { background: var(--s1); color: #fff; font-weight: 600; }
-a.campaign { display: block; margin-top: 12px; color: var(--ink); text-decoration: none; }
-a.campaign .name { font-size: 16px; font-weight: 600; }
-.pill { display: inline-block; color: #fff; border-radius: 10px; padding: 1px 8px; margin-left: 6px;
-  font-size: 12px; font-weight: 600; }
+:focus-visible { outline: 2px solid var(--s1); outline-offset: 2px; }
+button { font: inherit; color: var(--ink); background: var(--card); border: 1px solid var(--grid); border-radius: 8px;
+  padding: 8px 14px; min-height: 40px; cursor: pointer; }
+button.primary { background: var(--s1); border-color: var(--s1); color: #fff; font-weight: 600; }
+button:disabled { opacity: .6; cursor: default; }
+nav { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
+nav .strip { display: flex; gap: 6px; flex: 1; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+nav .strip::-webkit-scrollbar { display: none; }
+nav a { flex: none; display: inline-flex; align-items: center; gap: 6px; min-height: 40px;
+  padding: 6px 12px; border-radius: 8px; border: 0; background: var(--card); color: var(--ink);
+  text-decoration: none; white-space: nowrap; }
+nav a.home { font-weight: 600; }
+nav a[aria-current] { box-shadow: inset 0 0 0 2px var(--s1); font-weight: 600; }
+.dot { display: inline-block; flex: none; width: 9px; height: 9px; border-radius: 50%; background: var(--c); }
+h1 { font-size: 20px; margin: 0 0 8px; overflow-wrap: anywhere; }
+h2 { font-size: 13px; color: var(--ink2); text-transform: uppercase; letter-spacing: .04em; margin: 26px 0 8px; }
+h2 .sub { text-transform: none; letter-spacing: 0; font-weight: 400; }
+.sub { color: var(--ink2); font-size: 13px; }
+.card { background: var(--card); border-radius: 8px; padding: 10px 12px; min-width: 0; }
+.banner { background: var(--card); border-left: 6px solid var(--c); border-radius: 8px; padding: 10px 12px; }
+.banner .state { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-size: 15px; }
+.banner .detail { margin-top: 2px; color: var(--ink2); }
+.banner.alert .detail { color: var(--down); font-weight: 600; }
+#age { font-size: 12px; margin-top: 6px; color: var(--ink2); }
+#age.stale { color: var(--down); font-weight: 600; }
+.up { color: var(--up); font-weight: 600; } .down { color: var(--down); font-weight: 600; }
+.waiting { color: var(--amber); font-weight: 600; }
+.split { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 12px; }
+.tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.tile .name { font-size: 15px; font-weight: 600; overflow-wrap: anywhere; }
+.fact { margin-top: 3px; font-size: 13px; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.fact .key { color: var(--ink2); }
+.label { color: var(--ink2); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 4px; }
+.job { padding: 8px 0; } .job + .job { border-top: 1px solid var(--grid); }
+.job .head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 2px 12px; }
+.job progress { display: block; width: 100%; height: 8px; margin: 6px 0 4px; accent-color: var(--s2); }
+.job .numbers { font-variant-numeric: tabular-nums; }
+ol, ul { margin: 4px 0 2px 20px; padding: 0; } li { margin: 4px 0; }
+.table { overflow-x: auto; padding: 2px 0; }
+table { border-collapse: separate; border-spacing: 0; width: 100%; font-size: 13px; }
+th, td { text-align: right; padding: 6px 8px; border-bottom: 1px solid var(--grid); white-space: nowrap;
+  font-variant-numeric: tabular-nums; }
+th { color: var(--ink2); font-weight: 600; vertical-align: bottom; }
+th.text, td.text { text-align: left; }
+th:first-child, td:first-child { padding-left: 12px; } th:last-child, td:last-child { padding-right: 12px; }
+th.name, td.name { text-align: left; position: sticky; left: 0; z-index: 1; background: var(--card); }
+tr:last-child td { border-bottom: 0; }
+tr.incumbent td { background: var(--tint); }
+tr.incumbent td.name::before { content: "★ "; color: var(--s1); }
+button.idea { font: inherit; color: var(--s1); background: none; border: 0; border-radius: 0; padding: 2px 0;
+  min-height: 0; cursor: pointer; text-align: left; text-decoration: underline dotted; text-underline-offset: 3px; }
+.thread { max-height: 320px; overflow-y: auto; }
+.message { margin: 6px 0; padding-left: 8px; border-left: 3px solid var(--s1); white-space: pre-wrap;
+  overflow-wrap: anywhere; }
+form.send { display: flex; gap: 8px; margin-top: 8px; align-items: flex-end; }
+form.send textarea { flex: 1; min-width: 0; min-height: 64px; font: inherit; font-size: 16px; color: var(--ink);
+  background: var(--bg); border: 1px solid var(--grid); border-radius: 8px; padding: 8px; resize: vertical; }
+.charts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.pair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
+.chart { overflow: hidden; }
+.pair .chart { display: flex; flex-direction: column; }
+.pair .chart > div:last-child { margin-top: auto; }
+.chart .caption { font-weight: 600; font-size: 13px; }
+.plotly-graph-div { width: 100% !important; }
+a.campaign { display: block; color: var(--ink); text-decoration: none; }
+a.campaign .head { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; }
+a.campaign .name { font-size: 16px; font-weight: 600; overflow-wrap: anywhere; }
+.badge { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; }
+details.status { margin-top: 26px; }
+footer { margin-top: 26px; }
+details.status summary { cursor: pointer; padding: 8px 0; color: var(--ink2); }
+pre { font-size: 11px; line-height: 1.35; white-space: pre-wrap; overflow-wrap: anywhere; background: var(--card);
+  padding: 8px; border-radius: 8px; margin: 0; }
+dialog.idea { width: min(760px, calc(100vw - 32px)); max-height: calc(100dvh - 48px); background: var(--bg);
+  color: var(--ink); border: 1px solid var(--grid); border-radius: 8px; padding: 0 16px 14px; overflow-x: hidden;
+  overflow-y: auto; overflow-wrap: anywhere; }
+dialog.idea::backdrop { background: rgba(0, 0, 0, .45); }
+dialog.idea .head { position: sticky; top: 0; display: flex; gap: 12px; align-items: center;
+  justify-content: space-between; background: var(--bg); padding: 12px 0 8px; border-bottom: 1px solid var(--grid); }
+dialog.idea h3 { font-size: 15px; margin: 0; }
+dialog.idea dl { margin: 0; }
+dialog.idea dt { color: var(--ink2); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; margin-top: 12px; }
+dialog.idea dd { margin: 2px 0 0; white-space: pre-wrap; line-height: 1.45; }
+dialog.idea form { flex: none; margin: 0; }
+@media (max-width: 1100px) { .charts, .tiles { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
+@media (max-width: 900px) { .split, .pair { grid-template-columns: minmax(0, 1fr); }
+  .chart.wide { overflow-x: auto; } .chart.wide .plotly-graph-div { min-width: 720px; } }
+@media (max-width: 720px) { .charts { grid-template-columns: minmax(0, 1fr); }
+  table.cards, table.cards tbody { display: block; }
+  table.cards thead { display: none; }
+  table.cards tr { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); grid-auto-flow: row dense;
+    gap: 4px 8px; padding: 8px 12px; border-bottom: 1px solid var(--grid); font-size: 12px; }
+  table.cards tr:last-child { border-bottom: 0; }
+  table.cards td { display: block; min-width: 0; padding: 0; border: 0; text-align: left; white-space: normal;
+    position: static; background: none; }
+  table.cards td.none { display: none; }
+  table.cards td.name { grid-column: span 4; font-size: 13px; font-weight: 600; overflow-wrap: anywhere; }
+  table.cards td.wide { grid-column: span 2; }
+  table.cards td.verdict { text-align: right; }
+  table.cards td:not(.name):not(.verdict)::before { content: attr(data-label); display: block; font-size: 10.5px;
+    color: var(--ink2); white-space: nowrap; }
+  table.cards tr.incumbent { background: var(--tint); } }
+@media (max-width: 560px) { .tiles { grid-template-columns: minmax(0, 1fr); } }
+"""
+THEME_BOOT = """
+try { const theme = localStorage.getItem("theme"); if (theme) document.documentElement.dataset.theme = theme; } catch {}
 """
 SCRIPT = """
-const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-function theme() {
-  document.querySelectorAll(".js-plotly-plot").forEach(gd => {
-    const indices = gd.data.map((trace, index) => trace.meta ? index : -1).filter(index => index >= 0);
-    const colors = indices.map(index => css(gd.data[index].meta));
-    if (indices.length) Plotly.restyle(gd, {"line.color": colors, "marker.color": colors, "error_x.color": colors}, indices);
-    Plotly.relayout(gd, {
-      "font.color": css("--ink2"), "xaxis.gridcolor": css("--grid"), "yaxis.gridcolor": css("--grid"),
-      "xaxis.zerolinecolor": css("--ink2"), "yaxis.zerolinecolor": css("--ink2"),
-      "legend.font.color": css("--ink2"), "hoverlabel.bgcolor": css("--card"), "hoverlabel.font.color": css("--ink"),
-      "shapes": (gd.layout.shapes || []).map(shape => ({...shape, line: {...shape.line, color: css(shape.name || "--ink2")}})),
+const root = document.documentElement;
+const css = name => getComputedStyle(root).getPropertyValue(name).trim();
+const age = document.getElementById("age");
+const interval = Number(age.dataset.interval) * 1000;
+const updated = Date.now();
+const draft = document.getElementById("draft");
+const themeButton = document.getElementById("theme");
+const themes = ["auto", "light", "dark"];
+let lastTouch = 0;
+let unreachable = false;
+const touched = () => { lastTouch = Date.now(); };
+function busy() {
+  return Date.now() - lastTouch < interval
+    || Boolean(document.querySelector("dialog[open], details[open]"))
+    || Boolean(draft && draft.value.trim())
+    || Boolean(document.activeElement && document.activeElement.matches("textarea, input, select"))
+    || Boolean(window.visualViewport && visualViewport.scale > 1.05)
+    || String(getSelection()).length > 0;
+}
+function describeAge() {
+  const elapsed = Date.now() - updated;
+  const minutes = Math.floor(elapsed / 60000);
+  const when = minutes < 1 ? "updated just now" : "updated " + minutes + " min ago";
+  const every = " · refreshes every " + Math.round(interval / 60000) + " min";
+  const note = unreachable ? " · monitor unreachable, retrying"
+    : elapsed > interval && busy() ? " · refresh paused while you zoom, type, select or read" : every;
+  age.textContent = when + note;
+  age.className = unreachable ? "stale" : "";
+}
+async function refresh() {
+  describeAge();
+  if (document.hidden || Date.now() - updated < interval || busy()) return;
+  try {
+    const response = await fetch(location.href, {method: "HEAD", cache: "no-store"});
+    if (response.ok) return location.reload();
+  } catch {}
+  unreachable = true;
+  describeAge();
+}
+function showTheme() { themeButton.textContent = "Theme: " + (root.dataset.theme || "auto"); }
+themeButton.addEventListener("click", () => {
+  const next = themes[(themes.indexOf(root.dataset.theme || "auto") + 1) % themes.length];
+  if (next === "auto") delete root.dataset.theme; else root.dataset.theme = next;
+  try { if (next === "auto") localStorage.removeItem("theme"); else localStorage.setItem("theme", next); } catch {}
+  showTheme();
+  window.dispatchEvent(new Event("themechange"));
+});
+["pointerdown", "keydown", "wheel"].forEach(name => document.addEventListener(name, touched, {passive: true}));
+document.addEventListener("visibilitychange", refresh);
+setInterval(refresh, 10000);
+showTheme();
+describeAge();
+"""
+PLOT_SCRIPT = """
+const plots = () => [...document.querySelectorAll(".js-plotly-plot")];
+const narrow = matchMedia("(max-width: 640px)");
+const stacked = matchMedia("(max-width: 900px)");
+const coarse = matchMedia("(pointer: coarse)");
+function paint() {
+  return Promise.all(plots().map(gd => {
+    const lines = [], colors = [], heat = [];
+    gd.data.forEach((trace, index) => {
+      if (trace.type === "heatmap") heat.push(index);
+      else if (trace.meta) { lines.push(index); colors.push(css(trace.meta)); }
     });
+    const jobs = [];
+    if (lines.length) jobs.push(Plotly.restyle(gd, {"line.color": colors, "marker.color": colors, "error_x.color": colors}, lines));
+    if (heat.length) jobs.push(Plotly.restyle(gd, {
+      colorscale: [[[0, css("--bad")], [0.5, css("--card")], [1, css("--s1")]]], "textfont.color": css("--ink"),
+    }, heat));
+    jobs.push(Plotly.relayout(gd, {
+      "font.color": css("--ink2"), "xaxis.gridcolor": css("--grid"), "yaxis.gridcolor": css("--grid"),
+      "legend.font.color": css("--ink2"), "hoverlabel.bgcolor": css("--card"), "hoverlabel.font.color": css("--ink"),
+    }));
+    return Promise.all(jobs);
+  }));
+}
+function fit() {
+  return Promise.all(plots().map(gd => {
+    const update = {dragmode: coarse.matches ? false : "zoom"};
+    const names = gd.layout.meta;
+    if (names) {
+      update["yaxis.ticktext"] = narrow.matches ? names.map(name => name.length > 24 ? name.slice(0, 23) + "…" : name) : names;
+      if (gd.data[0].type === "heatmap") update["yaxis.showticklabels"] = stacked.matches;
+    }
+    return Plotly.relayout(gd, update);
+  }));
+}
+function listen() {
+  plots().forEach(gd => {
     gd.on("plotly_relayout", touched);
     gd.on("plotly_legendclick", touched);
+    gd.on("plotly_click", touched);
   });
 }
-const age = document.getElementById("age");
-const interval = Number(age.dataset.interval) * 1000;
-const draft = document.getElementById("draft");
-const thread = document.getElementById("thread");
-let lastTouch = 0;
-function touched() { lastTouch = Date.now(); }
-function describeAge() {
-  const minutes = (Date.now() - Number(age.dataset.updated)) / 60000;
-  const stale = minutes * 60000 > 2.5 * interval;
-  age.textContent = "updated " + Math.round(minutes) + " min ago" + (stale ? " · updater may be down" : "")
-    + " · reloads every " + Math.round(interval / 1000) + " s unless you are zooming or writing";
-  age.className = stale ? "stale" : "";
-}
 window.addEventListener("load", () => {
-  document.querySelectorAll(".js-plotly-plot").forEach(gd => Plotly.Plots.resize(gd));
-  theme();
-  describeAge();
+  plots().forEach(gd => Plotly.Plots.resize(gd));
+  Promise.all([paint(), fit()]).then(listen);
+  const strip = document.querySelector("nav .strip");
+  const current = strip.querySelector("[aria-current]").getBoundingClientRect();
+  const frame = strip.getBoundingClientRect();
+  strip.scrollLeft += current.left - frame.left - (frame.width - current.width) / 2;
+  const thread = document.getElementById("thread");
   thread.scrollTop = thread.scrollHeight;
 });
-matchMedia("(prefers-color-scheme: dark)").addEventListener("change", theme);
-setInterval(() => { describeAge(); if (Date.now() - lastTouch > interval && !draft.value) location.reload(); }, interval);
-"""
-PAGE = """<!doctype html>
-<html><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{campaign} monitor</title>
-<script src="/{plotly_js}"></script>
-<style>{style}</style></head>
-<body>
-<nav><a class="back" href="/">← All campaigns</a>{others}</nav>
-<h1>{campaign}</h1>
-<div class="banner" style="background:{color}">{state} · supervisor {supervisor}<small>{detail}</small></div>
-<div id="age" data-updated="{updated_ms}" data-interval="{refresh}"></div>
-{body}
-<details><summary>Full status</summary><pre>{status}</pre></details>
-<script>{script}</script>
-</body></html>
-"""
-FRONT = """<!doctype html>
-<html><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Campaigns</title>
-<style>{style}</style></head>
-<body>
-<h1>Campaigns</h1>
-<div id="age" data-updated="{updated_ms}" data-interval="{refresh}"></div>
-{body}
-<script>
-const age = document.getElementById("age");
-const interval = Number(age.dataset.interval) * 1000;
-function describeAge() {{
-  const minutes = (Date.now() - Number(age.dataset.updated)) / 60000;
-  age.textContent = "updated " + Math.round(minutes) + " min ago · reloads every " + Math.round(interval / 1000) + " s";
-}}
-describeAge();
-setInterval(() => location.reload(), interval);
-</script>
-</body></html>
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", paint);
+window.addEventListener("themechange", paint);
+[narrow, stacked, coarse].forEach(query => query.addEventListener("change", fit));
+document.addEventListener("click", event => {
+  const link = event.target.closest("button.idea");
+  if (link) return document.getElementById("idea-" + link.dataset.idea).showModal();
+  if (event.target.matches("dialog")) {
+    const box = event.target.getBoundingClientRect();
+    const inside = event.clientX >= box.left && event.clientX <= box.right && event.clientY >= box.top && event.clientY <= box.bottom;
+    if (!inside) event.target.close();
+  }
+});
+const form = document.querySelector("form.send");
+form.addEventListener("submit", () => { form.querySelector("button").disabled = true; });
+draft.addEventListener("keydown", event => {
+  if (event.key === "Enter" && (event.ctrlKey || event.metaKey) && draft.value.trim()) form.requestSubmit();
+});
+const statusBox = document.querySelector("details.status");
+statusBox.addEventListener("toggle", async () => {
+  if (!statusBox.open) return;
+  const pre = statusBox.querySelector("pre");
+  pre.textContent = "loading…";
+  try {
+    const response = await fetch("status", {cache: "no-store"});
+    pre.textContent = await response.text();
+  } catch { pre.textContent = "could not load the status"; }
+});
 """
 
 
 class MonitorCLI(CLISettings):
     model_config = describe(
         "Serve one auto-refreshing site for every registered autoresearch campaign: a front page "
-        "listing the live ones whatever their status, and per campaign its state, the decided runs against the control, per-epoch "
+        "listing the live ones whatever their status, and per campaign its state, the active jobs with the "
+        "training's progress against the incumbent, the decided runs against the control, per-epoch "
         "validation AUC and loss curves of the control, the incumbent and the current run, "
         "per-label deltas and its own message box, regenerated on each page request"
     )
@@ -254,32 +411,86 @@ class Registration(BaseModel):
     root: Path
 
 
+class Overview(BaseModel):
+    status: str
+    supervisor: bool
+    provider: str
+    detail: str
+    color: str
+    alert: bool
+
+
+class Job(BaseModel):
+    kind: str
+    idea: str | None
+    name: str
+    started: float | None
+    note: str | None = None
+    epoch: int | None = None
+    epochs: int | None = None
+    auc: float | None = None
+    delta: float | None = None
+
+
+def campaign_dir(campaign: str) -> Path:
+    return OUTPUTS / campaign
+
+
 def registrations() -> dict[str, Registration]:
-    entries = (
-        Registration.model_validate_json(path.read_text())
-        for path in sorted(REGISTRY.glob("*.json"))
-    )
-    return {
-        entry.campaign: entry
-        for entry in entries
-        if Path(f"outputs/autoresearch/{entry.campaign}/state.json").is_file()
-        and (entry.root / "autoresearch/campaigns" / entry.campaign).is_dir()
-    }
+    entries = {}
+    for path in sorted(REGISTRY.glob("*.json")):
+        try:
+            entry = Registration.model_validate_json(path.read_text())
+        except (OSError, ValidationError):
+            continue
+        if (campaign_dir(entry.campaign) / "state.json").is_file() and (
+            entry.root / "autoresearch/campaigns" / entry.campaign
+        ).is_dir():
+            entries[entry.campaign] = entry
+    return entries
+
+
+def read_json(path: Path) -> dict:
+    try:
+        value = json.loads(path.read_text())
+    except (OSError, ValueError):
+        return {}
+    return value if isinstance(value, dict) else {}
+
+
+def load_state(campaign: str) -> dict:
+    path = campaign_dir(campaign) / "state.json"
+    stamp = path.stat().st_mtime_ns
+    cached = STATES.get(path)
+    if cached is None or cached[0] != stamp:
+        cached = stamp, json.loads(path.read_text())
+        STATES[path] = cached
+    return cached[1]
 
 
 def messages_path(campaign: str) -> Path:
-    return Path(f"outputs/autoresearch/{campaign}/messages.jsonl")
+    return campaign_dir(campaign) / "messages.jsonl"
 
 
 def read_messages(campaign: str) -> list[Message]:
     path = messages_path(campaign)
     if not path.is_file():
         return []
-    return [
-        Message.model_validate_json(line)
-        for line in path.read_text().splitlines()
-        if line.strip()
-    ]
+    entries = []
+    for line in path.read_text().splitlines():
+        try:
+            entries.append(Message.model_validate_json(line))
+        except ValidationError:
+            continue
+    return entries
+
+
+def delivered(campaign: str) -> int:
+    seen = messages_path(campaign).with_suffix(".seen")
+    try:
+        return int(seen.read_text())
+    except (OSError, ValueError):
+        return 0
 
 
 def append_message(campaign: str, text: str) -> None:
@@ -289,26 +500,60 @@ def append_message(campaign: str, text: str) -> None:
 
 
 def label(name: str) -> str:
-    return re.sub(r"-2026\d{4}T\d{6}Z-[0-9a-f]{8}$", "", name)
+    return re.sub(r"-\d{8}T\d{6}Z-[0-9a-f]{8}$", "", name)
+
+
+def overview(campaign: str, state: dict) -> Overview:
+    status = str(state.get("status", "unknown")).upper()
+    supervisor = alive(read_json(campaign_dir(campaign) / "supervisor.json"))
+    stranded = status in SUPERVISED and not supervisor
+    notes = [state.get("reason") or STATE_DETAIL.get(status, "")]
+    if stranded:
+        notes.insert(0, "supervisor is not running, so nothing progresses")
+    if (campaign_dir(campaign) / "stop.json").exists() and status != "STOPPED":
+        notes.append("stop requested")
+    retry = state.get("retry_after") or 0
+    if status == "RUNNING" and retry > time.time():
+        notes.append(
+            f"agents wait for the provider until {datetime.fromtimestamp(retry).astimezone():%H:%M}"
+        )
+    alert = stranded or status == "PAUSED"
+    return Overview(
+        status=status,
+        supervisor=supervisor,
+        provider=state.get("provider") or "no provider",
+        detail=" · ".join(note for note in notes if note),
+        color="--bad" if alert else STATE_COLOR.get(status, "--other"),
+        alert=alert,
+    )
+
+
+def badge(view: Overview) -> str:
+    return (
+        f"<span class='badge' style='--c: var({view.color})'><span class='dot'></span>"
+        f"{html.escape(view.status)} · supervisor {'alive' if view.supervisor else 'not running'}</span>"
+    )
 
 
 def epoch_metrics(fold: Path) -> dict[int, dict]:
     metrics = {}
     for path in sorted((fold / "epochs").glob("metrics_epoch_*.json")):
-        text = path.read_text()
-        if text.strip():
-            metrics[int(path.stem.rsplit("_", 1)[1])] = json.loads(text)
+        values = read_json(path)
+        if "macro_auc" in values:
+            metrics[int(path.stem.rsplit("_", 1)[1])] = values
     return metrics
 
 
-def read_json(path: Path) -> dict:
-    return json.loads(path.read_text()) if path.exists() else {}
+def x4(run: Path, fold: int) -> float | None:
+    return read_json(fold_dir(run, fold) / "selected_checkpoint.json").get(
+        "prediction_macro_auc"
+    )
 
 
 def run_record(name: str, run: Path, fold: int) -> dict:
     directory = fold_dir(run, fold)
     selected = read_json(directory / "selected_checkpoint.json")
-    epoch = re.search(r"best-epoch=(\d+)", selected.get("path", ""))
+    epoch = re.search(r"best-epoch=(\d+)", selected.get("path") or "")
     return {
         "name": name,
         "epochs": epoch_metrics(directory),
@@ -316,6 +561,24 @@ def run_record(name: str, run: Path, fold: int) -> dict:
         "best_epoch": int(epoch[1]) if epoch else None,
         "seconds": read_json(directory / "timing.json").get("training_seconds"),
     }
+
+
+def verdict_of(key: str, exp: dict, running: str | None, retained: set) -> tuple:
+    verdict = exp.get("decision") or exp.get("eligible_decision")
+    if not verdict and exp.get("stage") == "repair_requested":
+        verdict = "failed"
+    withdrawn = (
+        bool(exp.get("decision"))
+        and "provisional_accept" in (verdict, exp.get("eligible_decision"))
+        and key not in retained
+    )
+    if withdrawn:
+        verdict += (
+            " (not retained)"
+            if verdict == "provisional_accept"
+            else " (acceptance withdrawn)"
+        )
+    return verdict or ("training" if key == running else "pending"), withdrawn
 
 
 def collect(state: dict) -> tuple[dict, list[dict]]:
@@ -339,31 +602,19 @@ def collect(state: dict) -> tuple[dict, list[dict]]:
         record = run_record(
             name if seen[name] == 1 else f"{name} #{seen[name]}", training, fold
         )
-        verdict = exp.get("decision") or exp.get("eligible_decision")
-        if not verdict and exp.get("stage") == "repair_requested":
-            verdict = "failed"
-        withdrawn = (
-            bool(exp.get("decision"))
-            and "provisional_accept" in (verdict, exp.get("eligible_decision"))
-            and key not in retained
-        )
-        if withdrawn:
-            verdict += (
-                " (not retained)"
-                if verdict == "provisional_accept"
-                else " (acceptance withdrawn)"
-            )
+        verdict, withdrawn = verdict_of(key, exp, running, retained)
         evidence = exp.get("evidence") or {}
         scores = evidence.get("macro_auc")
         reference = exp.get("reference")
         record.update(
+            idea=exp["idea"],
             run=training.resolve(),
             withdrawn=withdrawn,
             comparison=evidence.get("comparison"),
             level=scores["reference"] - control["x4"]
             if scores and control["x4"] is not None
             else None,
-            verdict=verdict or ("training" if key == running else "pending"),
+            verdict=verdict,
             role="incumbent"
             if key == incumbent
             else "running"
@@ -387,6 +638,111 @@ def collect(state: dict) -> tuple[dict, list[dict]]:
     return control, runs
 
 
+def active_jobs(campaign: str, state: dict) -> list[Job]:
+    fold = campaign_fold(state)
+    jobs = []
+    if state.get("status") == "calibrating":
+        ledger = read_json(campaign_dir(campaign) / "baseline/triplet_accounting.json")
+        jobs.append(
+            Job(
+                kind="calibration",
+                idea=None,
+                name="control",
+                started=None,
+                epoch=len(ledger.get("train") or []),
+                epochs=min(CALIBRATION_EPOCHS, state["limits"]["epochs"]),
+            )
+        )
+    incumbent = epoch_metrics(fold_dir(Path(state["incumbent"]["run"]), fold))
+    for job in state["jobs"].values():
+        if job.get("processed"):
+            continue
+        directory = Path(job["path"])
+        exp = state["experiments"].get(job_experiment(job)) or {}
+        note = (
+            "finishing"
+            if (directory / "receipt.json").exists()
+            else None
+            if alive(read_json(directory / "owner.json"))
+            else "starting or awaiting recovery"
+        )
+        entry = Job(
+            kind=job["kind"],
+            idea=exp.get("idea"),
+            name=label(exp.get("idea") or job["kind"]),
+            started=job.get("created_at"),
+            note=note,
+        )
+        if exp and job["kind"] == "training":
+            run = fold_dir(Path(exp["directory"]) / "training", fold)
+            ledger = read_json(run / "triplet_accounting.json")
+            metrics = epoch_metrics(run)
+            entry.epoch = len(ledger.get("train") or []) if ledger else None
+            entry.epochs = (
+                (exp.get("config") or {}).get("trainer", {}).get("max_epochs")
+            )
+            if metrics:
+                last = max(metrics)
+                entry.auc = metrics[last]["macro_auc"]
+                if last in incumbent:
+                    entry.delta = entry.auc - incumbent[last]["macro_auc"]
+        jobs.append(entry)
+    return jobs
+
+
+def tally(state: dict) -> tuple[int, int]:
+    decisions = [exp.get("decision") for exp in state["experiments"].values()]
+    return sum(map(bool, decisions)), decisions.count("provisional_accept")
+
+
+def outcome(exp: dict) -> str | None:
+    if exp.get("decision"):
+        return exp["decision"]
+    if exp.get("stage") == "repair_requested":
+        return "failed"
+    return "blocked" if exp.get("stage") == "blocked" else None
+
+
+def clock(timestamp: float) -> str:
+    moment = datetime.fromtimestamp(timestamp).astimezone()
+    today = datetime.now().astimezone().date()
+    return f"{moment:%H:%M}" if moment.date() == today else f"{moment:%d %b %H:%M}"
+
+
+def budget_text(state: dict) -> str:
+    limits = state["limits"]
+    if state["budget"]["mode"] == "sealed":
+        return (
+            f"≤ {minutes(limits['max_run_seconds'])} per run, {limits['epochs']} epochs"
+        )
+    return (
+        f"{minutes(limits['min_training_seconds'])} – "
+        f"{minutes(limits['max_training_seconds'])} training"
+    )
+
+
+def research_text(state: dict) -> str:
+    seeds = state.get("seed_ideas") or []
+    done = sum(
+        (state["ideas"].get(idea) or {}).get("status") in SEED_TERMINAL
+        for idea in seeds
+    )
+    refill = f"research refills below {state['refill_below']} queued"
+    if not seeds:
+        return refill
+    if done < len(seeds):
+        return f"forced seeds {done}/{len(seeds)} done · research waits for them"
+    return f"forced seeds {done}/{len(seeds)} done · {refill}"
+
+
+def best_x1(record: dict) -> float | None:
+    return (
+        max(m["macro_auc"] for m in record["epochs"].values())
+        if record["epochs"]
+        else None
+    )
+
+
 def signed(value) -> str:
     return "–" if value is None else f"{value:+.4f}"
 
@@ -395,10 +751,35 @@ def number(value, digits: int = 4) -> str:
     return "–" if value is None else f"{value:.{digits}f}"
 
 
-def layout(title: str, **extra) -> dict:
+def tone(value, text: str | None = None) -> str:
+    text = signed(value) if text is None else text
+    if not value:
+        return text
+    return f"<span class='{'up' if value > 0 else 'down'}'>{text}</span>"
+
+
+def minutes(seconds: float) -> str:
+    if seconds >= 86400:
+        return f"{seconds // 86400:.0f} d {seconds % 86400 // 3600:.0f} h"
+    if seconds < 60:
+        return f"{seconds:.0f} s"
+    if seconds < 3600:
+        return f"{seconds / 60:.0f} min"
+    return f"{seconds // 3600:.0f} h {seconds % 3600 / 60:02.0f} min"
+
+
+def kilo(value: int) -> str:
+    return f"{value / 1e6:.1f}M" if value >= 1e6 else f"{value / 1e3:.0f}k"
+
+
+def interval_text(interval) -> str:
+    return "–" if not interval else f"[{interval[0]:+.4f}, {interval[1]:+.4f}]"
+
+
+def layout(**extra) -> dict:
     axis = {
         "showgrid": True,
-        "gridcolor": "#e4e3df",
+        "gridcolor": LIGHT["--grid"],
         "gridwidth": 1,
         "zeroline": False,
         "showline": False,
@@ -406,24 +787,28 @@ def layout(title: str, **extra) -> dict:
         "automargin": True,
     }
     return {
-        "title": {"text": title, "x": 0, "xanchor": "left", "font": {"size": 13}},
         "paper_bgcolor": "rgba(0,0,0,0)",
         "plot_bgcolor": "rgba(0,0,0,0)",
-        "font": {"family": "system-ui, sans-serif", "size": 11, "color": "#52514e"},
-        "margin": {"l": 8, "r": 8, "t": 36, "b": 8},
-        "height": 330,
+        "font": {
+            "family": "system-ui, sans-serif",
+            "size": 11,
+            "color": LIGHT["--ink2"],
+        },
+        "margin": {"l": 8, "r": 8, "t": 8, "b": 8},
+        "height": 300,
         "hovermode": "closest",
         "hoverlabel": {"font": {"size": 12}},
-        "legend": {"orientation": "h", "y": -0.18, "font": {"size": 11}},
+        "legend": {"orientation": "h", "y": -0.22, "font": {"size": 11}},
         "xaxis": axis,
         "yaxis": {**axis, "tickformat": ".4f"},
         **extra,
     }
 
 
-def figure_html(figure: go.Figure, css: str = "card") -> str:
+def figure_html(figure: go.Figure, caption: str, note: str = "", css: str = "") -> str:
     return (
-        f"<div class='{css}'>"
+        f"<div class='card chart {css}'><div class='caption'>{caption}</div>"
+        + (f"<div class='sub'>{note}</div>" if note else "")
         + figure.to_html(full_html=False, include_plotlyjs=False, config=PLOT_CONFIG)
         + "</div>"
     )
@@ -435,7 +820,6 @@ def curve(title: str, series: list[tuple[dict, dict[int, float]]]) -> str:
         if not values:
             continue
         epochs = sorted(values)
-        role = record["role"]
         figure.add_trace(
             go.Scatter(
                 x=epochs,
@@ -443,22 +827,21 @@ def curve(title: str, series: list[tuple[dict, dict[int, float]]]) -> str:
                 name=record["name"],
                 meta=record["color"],
                 mode="lines+markers",
-                line={**LINE[role], "shape": "linear", "color": LIGHT[record["color"]]},
+                line={**LINE[record["role"]], "color": LIGHT[record["color"]]},
                 marker={"size": 5, "color": LIGHT[record["color"]]},
                 hovertemplate=f"<b>{html.escape(record['name'])}</b><br>epoch %{{x}}<br>%{{y:.4f}}<extra></extra>",
             )
         )
-    extra = {"xaxis": {**layout("")["xaxis"], "title": {"text": "epoch"}, "dtick": 1}}
-    figure.update_layout(layout(title, **extra))
-    return figure_html(figure)
+    base = layout()
+    figure.update_layout(
+        base, xaxis={**base["xaxis"], "title": {"text": "epoch"}, "dtick": 1}
+    )
+    return figure_html(figure, title)
 
 
 def per_label(run: dict) -> dict[str, dict]:
-    path = Path(run["per_label"]) if run["per_label"] else None
-    entries = (
-        json.loads(path.read_text())["per_target"] if path and path.exists() else []
-    )
-    return {entry["target"]: entry for entry in entries}
+    entries = read_json(Path(run["per_label"])) if run["per_label"] else {}
+    return {entry["target"]: entry for entry in entries.get("per_target") or []}
 
 
 def local_input(path: str) -> str:
@@ -474,56 +857,65 @@ def control_gain(control: dict, run: Path, fold: int, runs: list[dict]) -> list 
     if run == control["run"] or not report or not all(f.is_file() for f in files):
         return None
     if key not in GAINS:
-        import numpy as np
         import polars as pl
 
-        from knee_abnormality.data import splits
-        from knee_abnormality.evaluation import metrics
-
-        report = read_json(Path(report))
-        inputs = {
-            Path(item["path"]).name: local_input(item["path"])
-            for item in report["inputs"]
-        }
-        if "studies.csv" not in inputs:
+        try:
+            gain = bootstrap_gain(Path(report), files, fold)
+        except (*PAGE_ERRORS, pl.exceptions.PolarsError) as error:
+            print(f"control gain for {run} failed: {error!r}", flush=True)
             return None
-        frame = (
-            pl.read_csv(inputs["studies.csv"])
-            .filter(pl.col("fold") == fold)
-            .join(pl.read_csv(inputs["targets.csv"]), on=splits.STUDY, how="inner")
-            .sort(splits.STUDY)
-        )
-        targets = report["targets"]
-        hard = (frame.select(targets).to_numpy() >= splits.TARGET_THRESHOLD).astype(int)
-        scores = [pl.read_csv(file).sort(splits.STUDY) for file in files]
-        if frame.height != report["studies"] or any(
-            score[splits.STUDY].to_list() != frame[splits.STUDY].to_list()
-            for score in scores
-        ):
+        if gain is None:
             return None
-        bootstrap = report["paired_report_group_bootstrap"]
-        groups, inverse = np.unique(
-            frame["report_group"].to_numpy(), return_inverse=True
-        )
-        counts = np.random.default_rng(bootstrap["seed"]).multinomial(
-            len(groups), np.full(len(groups), 1 / len(groups)), size=bootstrap["draws"]
-        )[:, inverse]
-        positive = counts @ hard
-        weights = counts[
-            ((positive > 0) & (positive < counts.sum(axis=1, keepdims=True))).all(
-                axis=1
-            )
-        ]
-        if not len(weights):
-            return None
-        reference, candidate = (
-            metrics.bootstrap_auc(
-                hard, score.select(targets).to_numpy().astype(float), weights
-            )
-            for score in scores
-        )
-        GAINS[key] = np.percentile(candidate - reference, [10, 90]).tolist()
+        GAINS[key] = gain
     return GAINS[key]
+
+
+def bootstrap_gain(report: Path, files: list[Path], fold: int) -> list | None:
+    import numpy as np
+    import polars as pl
+
+    from knee_abnormality.data import splits
+    from knee_abnormality.evaluation import metrics
+
+    report = read_json(report)
+    inputs = {
+        Path(item["path"]).name: local_input(item["path"])
+        for item in report.get("inputs") or []
+    }
+    if "studies.csv" not in inputs:
+        return None
+    frame = (
+        pl.read_csv(inputs["studies.csv"])
+        .filter(pl.col("fold") == fold)
+        .join(pl.read_csv(inputs["targets.csv"]), on=splits.STUDY, how="inner")
+        .sort(splits.STUDY)
+    )
+    targets = report["targets"]
+    hard = (frame.select(targets).to_numpy() >= splits.TARGET_THRESHOLD).astype(int)
+    scores = [pl.read_csv(file).sort(splits.STUDY) for file in files]
+    if frame.height != report["studies"] or any(
+        score[splits.STUDY].to_list() != frame[splits.STUDY].to_list()
+        for score in scores
+    ):
+        return None
+    bootstrap = report["paired_report_group_bootstrap"]
+    groups, inverse = np.unique(frame["report_group"].to_numpy(), return_inverse=True)
+    counts = np.random.default_rng(bootstrap["seed"]).multinomial(
+        len(groups), np.full(len(groups), 1 / len(groups)), size=bootstrap["draws"]
+    )[:, inverse]
+    positive = counts @ hard
+    weights = counts[
+        ((positive > 0) & (positive < counts.sum(axis=1, keepdims=True))).all(axis=1)
+    ]
+    if not len(weights):
+        return None
+    reference, candidate = (
+        metrics.bootstrap_auc(
+            hard, score.select(targets).to_numpy().astype(float), weights
+        )
+        for score in scores
+    )
+    return np.percentile(candidate - reference, [10, 90]).tolist()
 
 
 def segments(
@@ -540,6 +932,25 @@ def segments(
     return {"x": xs, "y": ys}
 
 
+def rows_layout(names: list[str], **extra) -> dict:
+    base = layout()
+    return layout(
+        height=max(240, 120 + 26 * len(names)),
+        margin={"l": 8, "r": 8, "t": 96, "b": 16},
+        meta=names,
+        yaxis={
+            **base["yaxis"],
+            "tickformat": None,
+            "showgrid": False,
+            "tickmode": "array",
+            "tickvals": list(range(len(names))),
+            "ticktext": names,
+            "range": [len(names) - 0.5, -0.5],
+        },
+        **extra,
+    )
+
+
 def comparison(control: dict, runs: list[dict], fold: int) -> str:
     scored = [
         run
@@ -547,11 +958,9 @@ def comparison(control: dict, runs: list[dict], fold: int) -> str:
         if run["delta"] is not None and run["interval"] and run["level"] is not None
     ]
     if not scored:
-        return "<div class='card'><div class='sub'>No scored run yet.</div></div>"
+        return "<div class='card sub'>No scored run yet.</div>"
     names = [
-        ("<span style='color:#2a78d6'>★</span> " if run["role"] == "incumbent" else "")
-        + run["name"]
-        for run in scored
+        ("★ " if run["role"] == "incumbent" else "") + run["name"] for run in scored
     ]
     cells = [per_label(run) for run in scored]
     baseline = next(
@@ -563,17 +972,7 @@ def comparison(control: dict, runs: list[dict], fold: int) -> str:
         {},
     )
     targets = list(baseline)
-    base = layout("")
-    rows = {
-        "height": max(220, 150 + 26 * len(scored)),
-        "margin": {"l": 8, "r": 8, "t": 56, "b": 94},
-        "yaxis": {
-            **base["yaxis"],
-            "tickformat": None,
-            "showgrid": False,
-            "autorange": "reversed",
-        },
-    }
+    base = layout()
     campaign = {control["run"], *(run["run"] for run in runs)}
     levels = [run["level"] for run in scored]
     manual = {row for row, run in enumerate(scored) if run["reference"] not in campaign}
@@ -583,25 +982,21 @@ def comparison(control: dict, runs: list[dict], fold: int) -> str:
         for reference in {run["reference"] for run in scored}
     }
     intervals = go.Figure()
-    for spans, style, color in (
-        (segments(levels, everything - manual), {"width": 1}, "--ink2"),
-        (
-            segments(levels, manual, joined=False),
-            {"width": 1, "dash": "dash"},
-            "--ink2",
-        ),
+    for spans, style in (
+        (segments(levels, everything - manual), {"width": 1}),
+        (segments(levels, manual, joined=False), {"width": 1, "dash": "dash"}),
     ):
         intervals.add_trace(
             go.Scatter(
                 **spans,
-                meta=color,
+                meta="--ink2",
                 mode="lines",
-                line={**style, "color": LIGHT[color]},
+                line={**style, "color": LIGHT["--ink2"]},
                 showlegend=False,
                 hoverinfo="skip",
             )
         )
-    for row, (name, run) in enumerate(zip(names, scored)):
+    for row, run in enumerate(scored):
         low, high = run["interval"]
         position = run["level"] + run["delta"]
         gain = gains[run["reference"]]
@@ -640,32 +1035,21 @@ def comparison(control: dict, runs: list[dict], fold: int) -> str:
                 ),
             )
         )
+    top = {"side": "top", "automargin": False, "showgrid": True}
     intervals.update_layout(
-        layout(
-            "×4 macro Δ vs control, 80% interval vs each run's reference"
-            "<br><sup>line: incumbent each run was judged against, dashed if set by hand"
-            " · adopted when the interval lies above it</sup>",
-            **{
-                **rows,
-                "yaxis": {
-                    **base["yaxis"],
-                    "tickformat": None,
-                    "showgrid": False,
-                    "tickmode": "array",
-                    "tickvals": list(range(len(scored))),
-                    "ticktext": names,
-                    "range": [len(scored) - 0.5, -0.5],
-                },
-            },
-            xaxis={**base["xaxis"], "tickformat": "+.3f", "automargin": False},
-        )
+        rows_layout(names, xaxis={**base["xaxis"], **top, "tickformat": "+.3f"})
     )
-    boxes = figure_html(intervals)
+    boxes = figure_html(
+        intervals,
+        "×4 macro Δ vs control, 80% interval vs each run's reference",
+        "Line: the incumbent each run was judged against, dashed if set by hand. "
+        "A run is adopted when its interval lies above the line.",
+    )
     if targets:
         heatmap = go.Figure(
             go.Heatmap(
                 x=targets,
-                y=names,
+                y=list(range(len(scored))),
                 z=[
                     [
                         (row[t]["candidate"] - baseline[t]) * 1000 if t in row else None
@@ -675,134 +1059,254 @@ def comparison(control: dict, runs: list[dict], fold: int) -> str:
                 ],
                 customdata=[
                     [
-                        f"{baseline[t]:.4f} → {row[t]['candidate']:.4f}"
+                        f"{html.escape(run['name'])}<br>{t}: {baseline[t]:.4f} → {row[t]['candidate']:.4f}"
                         if t in row
                         else ""
                         for t in targets
                     ]
-                    for row in cells
+                    for run, row in zip(scored, cells)
                 ],
                 texttemplate="%{z:+.1f}",
-                textfont={"size": 10, "color": "#0b0b0b"},
-                colorscale=[[0, "#e34948"], [0.5, "#f0efec"], [1, "#2a78d6"]],
+                textfont={"size": 10, "color": LIGHT["--ink"]},
+                colorscale=[
+                    [0, LIGHT["--bad"]],
+                    [0.5, LIGHT["--card"]],
+                    [1, LIGHT["--s1"]],
+                ],
                 zmin=-10,
                 zmax=10,
                 showscale=False,
                 xgap=2,
                 ygap=2,
-                hovertemplate="<b>%{y}</b><br>%{x}: %{customdata}<br>Δ ×1000 %{z:+.1f}<extra></extra>",
+                hovertemplate="<b>%{customdata}</b><br>Δ ×1000 %{z:+.1f}<extra></extra>",
             )
         )
         heatmap.update_layout(
-            layout(
-                "Per-label ×4 Δ vs control ×1000<br><sup>blue up, red down, full colour at ±10</sup>",
-                **rows,
-                xaxis={
-                    **base["xaxis"],
-                    "showgrid": False,
-                    "tickangle": -40,
-                    "automargin": False,
-                },
+            rows_layout(
+                names,
+                xaxis={**base["xaxis"], **top, "showgrid": False, "tickangle": -40},
             )
         )
-        boxes += figure_html(heatmap, "card wide")
+        boxes += figure_html(
+            heatmap,
+            "Per-label ×4 Δ vs control ×1000",
+            "Blue up, red down, full colour at ±10. Rows follow the interval chart.",
+            "wide",
+        )
     return f"<div class='pair'>{boxes}</div>"
 
 
+def metric(runs: list[dict], key: str) -> list[tuple[dict, dict[int, float]]]:
+    return [
+        (run, {e: m[key] for e, m in run["epochs"].items() if key in m}) for run in runs
+    ]
+
+
 def curves(control: dict, runs: list[dict]) -> str:
-    everything = [control, *(run for run in runs if run["role"] != "other")]
-    validation = [
-        (run, {e: m["macro_auc"] for e, m in run["epochs"].items()})
-        for run in everything
-    ]
-    soft = [
-        (
-            run,
-            {
-                e: m["soft_macro_auc"]
-                for e, m in run["epochs"].items()
-                if "soft_macro_auc" in m
-            },
-        )
-        for run in everything
-    ]
-    bce = [
-        (
-            run,
-            {
-                e: m["soft_target_bce"]
-                for e, m in run["epochs"].items()
-                if "soft_target_bce" in m
-            },
-        )
-        for run in everything
-    ]
+    shown = [control, *(run for run in runs if run["role"] != "other")]
     return (
-        "<div class='sub'>Black: control. Blue: the incumbent. Orange: the run training now (dashed) or, "
+        "<div class='sub'>Thick line in the text colour: control. Blue: the incumbent. Orange: the run training now (dashed) or, "
         "until the next one logs an epoch, the last run that finished. "
-        "Click a legend entry to hide a run, double-click to isolate it.</div>"
-        "<div class='grid'>"
-        + curve("×1 validation macro AUC", validation)
-        + curve("×1 validation disease loss (soft-target BCE, lower is better)", bce)
-        + curve("×1 soft macro AUC", soft)
+        "Tap a legend entry to hide a run, double-tap to isolate it.</div>"
+        "<div class='charts'>"
+        + curve("×1 validation macro AUC", metric(shown, "macro_auc"))
+        + curve(
+            "×1 validation disease loss (soft-target BCE, lower is better)",
+            metric(shown, "soft_target_bce"),
+        )
+        + curve("×1 soft macro AUC", metric(shown, "soft_macro_auc"))
         + "</div>"
     )
 
 
-def tiles(control: dict, runs: list[dict], fold: int) -> str:
-    incumbent = next((run for run in runs if run["role"] == "incumbent"), control)
-    bounds = control_gain(control, incumbent["run"], fold, runs)
-    decided = [
-        run for run in runs if run["verdict"] not in {"training", "pending", "failed"}
-    ]
-    gain = (
-        incumbent["x4"] - control["x4"]
-        if incumbent["x4"] is not None and control["x4"] is not None
-        else None
+def fact(key: str, value: str) -> str:
+    return f"<div class='fact'><span class='key'>{key}</span> {value}</div>"
+
+
+def leader(state: dict, record: dict | None, value: float | None, base) -> str:
+    if record is None or value is None:
+        return "none yet"
+    gain = f" ({tone(value - base)})" if base is not None else ""
+    return f"{idea_link(state, record.get('idea'), record['name'])} {value:.4f}{gain}"
+
+
+def tiles(control: dict, runs: list[dict], fold: int, state: dict) -> str:
+    incumbent = next((run for run in runs if run["role"] == "incumbent"), None)
+    if incumbent is None:
+        adopted = fact("×4", f"{number(control['x4'])} · no run adopted yet")
+    else:
+        bounds = control_gain(control, incumbent["run"], fold, runs)
+        gain = (
+            incumbent["x4"] - control["x4"]
+            if None not in (incumbent["x4"], control["x4"])
+            else None
+        )
+        adopted = fact("×4", f"{number(incumbent['x4'])} · {tone(gain)} vs control") + (
+            fact("80%", interval_text(bounds)) if bounds else ""
+        )
+    scored = [run for run in runs if run["x4"] is not None]
+    trained = [run for run in runs if run["epochs"]]
+    top4 = max(scored, key=lambda run: run["x4"], default=None)
+    top1 = max(trained, key=best_x1, default=None)
+    counts: dict[str, int] = {}
+    last = None
+    for exp in state["experiments"].values():
+        if verdict := outcome(exp):
+            counts[verdict] = counts.get(verdict, 0) + 1
+            last = exp, verdict
+    tally_text = " · ".join(
+        f"{counts.get(key, 0)} {name}"
+        for key, name in VERDICTS.items()
+        if counts.get(key) or key == "provisional_accept"
     )
+    timed = [run for run in runs if run["seconds"] is not None]
+    starts = [
+        job["created_at"] for job in state["jobs"].values() if job.get("created_at")
+    ]
     items = [
-        ("Control ×4", number(control["x4"])),
-        ("Incumbent", html.escape(incumbent["name"])),
         (
-            "Gain over control",
-            signed(gain)
+            "Incumbent",
+            "<div class='name'>"
             + (
-                f"<div class='sub'>80% [{bounds[0]:+.4f}, {bounds[1]:+.4f}]</div>"
-                if bounds
+                idea_link(state, incumbent.get("idea"), incumbent["name"])
+                if incumbent
+                else CONTROL
+            )
+            + "</div>"
+            + adopted,
+        ),
+        (
+            "Best so far",
+            fact("×4", leader(state, top4, top4 and top4["x4"], control["x4"]))
+            + fact(
+                "×1",
+                leader(state, top1, top1 and best_x1(top1), best_x1(control)),
+            ),
+        ),
+        (
+            "Verdicts",
+            fact("", tally_text)
+            + (
+                fact(
+                    "last",
+                    f"{idea_link(state, last[0]['idea'], label(last[0]['idea']))} "
+                    f"<span class='{'up' if last[1] == 'provisional_accept' else 'down'}'>"
+                    f"{html.escape(VERDICTS.get(last[1], last[1]))}</span>",
+                )
+                if last
                 else ""
             ),
         ),
         (
-            "Decided · accepted",
-            f"{len(decided)} · {sum(run['verdict'] == 'provisional_accept' for run in decided)}",
+            "Campaign",
+            (
+                fact(
+                    "started",
+                    f"{clock(min(starts))} · {minutes(time.time() - min(starts))} ago",
+                )
+                if starts
+                else ""
+            )
+            + fact("budget", f"{html.escape(budget_text(state))} · fold {fold}")
+            + (
+                fact(
+                    "last run",
+                    f"{html.escape(timed[-1]['name'])} trained {minutes(timed[-1]['seconds'])}",
+                )
+                if timed
+                else ""
+            ),
         ),
     ]
     return (
         "<div class='tiles'>"
         + "".join(
-            f"<div class='card tile'><div class='sub'>{name}</div><div class='value'>{value}</div></div>"
+            f"<div class='card tile'><div class='label'>{name}</div>{value}</div>"
             for name, value in items
         )
         + "</div>"
     )
 
 
-def results(control: dict, runs: list[dict]) -> str:
-    header = (
-        "<tr><th>run</th><th>verdict</th><th>×4 macro</th><th>Δ vs its reference</th><th>80% interval</th>"
-        "<th>soft Δ</th><th>Δ ×4 vs control</th><th>best ×1</th><th>best epoch</th><th>train s</th></tr>"
+def idea_link(state: dict, idea: str | None, text: str) -> str:
+    if idea not in state["ideas"]:
+        return html.escape(text)
+    return f"<button class='idea' data-idea='{html.escape(idea)}'>{html.escape(text)}</button>"
+
+
+def idea_field(value) -> str:
+    if isinstance(value, list):
+        return "<br>".join(f"• {html.escape(str(item))}" for item in value)
+    return html.escape(str(value))
+
+
+def idea_dialogs(state: dict, ideas: list[str]) -> str:
+    dialogs = []
+    for idea in dict.fromkeys(ideas):
+        record = state["ideas"].get(idea)
+        if not record:
+            continue
+        fields = "".join(
+            f"<dt>{field.replace('_', ' ')}</dt><dd>{idea_field(record[field])}</dd>"
+            for field in IDEA_FIELDS
+            if record.get(field) not in (None, "", [])
+        )
+        dialogs.append(
+            f"<dialog class='idea' id='idea-{html.escape(idea)}' aria-labelledby='title-{html.escape(idea)}'>"
+            f"<div class='head'><div><h3 id='title-{html.escape(idea)}'>{html.escape(idea)}</h3>"
+            f"<div class='sub'>{html.escape(record.get('status') or '')}"
+            f"{' · forced seed' if record.get('seeded') else ''}</div></div>"
+            "<form method='dialog'><button>Close</button></form></div>"
+            f"<dl><dt>title</dt><dd>{html.escape(record.get('title') or '')}</dd>{fields}</dl>"
+            "</dialog>"
+        )
+    return "".join(dialogs)
+
+
+def table(
+    columns: list[tuple[str, str, str]], rows: list[tuple[str, list[str]]]
+) -> str:
+    head = "".join(f"<th class='{css}'>{name}</th>" for name, _, css in columns)
+    body = "".join(
+        f"<tr class='{row}'>"
+        + "".join(
+            f"<td class='{css}{' none' if cell == '–' else ''}' data-label='{short}'>{cell}</td>"
+            for (_, short, css), cell in zip(columns, cells)
+        )
+        + "</tr>"
+        for row, cells in rows
     )
+    return (
+        f"<div class='card table'><table class='cards'><thead><tr>{head}</tr></thead>"
+        f"<tbody>{body}</tbody></table></div>"
+    )
+
+
+RESULT_COLUMNS = [
+    ("run", "", "name"),
+    ("verdict", "", "text verdict"),
+    ("×4 macro", "×4", ""),
+    ("Δ vs its reference", "Δ ref", ""),
+    ("80% interval", "80% interval", "wide"),
+    ("soft Δ", "soft Δ", ""),
+    ("Δ ×4 vs control", "Δ control", ""),
+    ("best ×1", "best ×1", ""),
+    ("best epoch", "epoch", ""),
+    ("train min", "train min", ""),
+]
+
+
+def results(control: dict, runs: list[dict], state: dict) -> str:
     rows = []
     for run in [control, *runs]:
         verdict = run["verdict"]
         css = (
-            "reject"
+            "down"
             if verdict.split()[0] in {"reject", "invalid", "failed"}
-            else "accept"
-            if verdict.endswith("accept")
+            else "up"
+            if verdict.startswith("provisional_accept") and not run.get("withdrawn")
             else ""
         )
-        interval = run.get("interval")
         versus = (
             run["x4"] - control["x4"]
             if run is not control
@@ -814,92 +1318,102 @@ def results(control: dict, runs: list[dict]) -> str:
             run is control and not any(r["role"] == "incumbent" for r in runs)
         )
         rows.append(
-            f"<tr class='{'incumbent' if starred else ''}'><td>{html.escape(run['name'])}</td>"
-            f"<td class='{css}'>{html.escape(verdict)}</td><td>{number(run['x4'])}</td><td>{signed(run.get('delta'))}</td>"
-            f"<td>{'–' if not interval else f'[{interval[0]:+.4f}, {interval[1]:+.4f}]'}</td><td>{signed(run.get('soft'))}</td>"
-            f"<td>{signed(versus)}</td>"
-            f"<td>{number(max(m['macro_auc'] for m in run['epochs'].values())) if run['epochs'] else '–'}</td>"
-            f"<td>{'–' if run['best_epoch'] is None else run['best_epoch']}</td>"
-            f"<td>{number(run['seconds'], 0)}</td></tr>"
+            (
+                "incumbent" if starred else "",
+                [
+                    idea_link(state, run.get("idea"), run["name"]),
+                    f"<span class='{css}'>{html.escape(verdict.replace('_', ' '))}</span>"
+                    if run is not control
+                    else "–",
+                    number(run["x4"]),
+                    tone(run.get("delta")),
+                    interval_text(run.get("interval")),
+                    tone(run.get("soft")),
+                    tone(versus),
+                    number(best_x1(run)),
+                    "–" if run["best_epoch"] is None else str(run["best_epoch"]),
+                    "–" if run["seconds"] is None else f"{run['seconds'] / 60:.1f}",
+                ],
+            )
         )
-    return f"<div class='scroll card'><table>{header}{''.join(rows)}</table></div>"
+    return table(RESULT_COLUMNS, rows)
 
 
-def status_lines(status: str, heading: str) -> list[str]:
-    lines = status.splitlines()
-    if heading not in lines:
-        return []
-    block = []
-    for line in lines[lines.index(heading) + 1 :]:
-        if not line.strip():
-            break
-        block.append(" ".join(line.split()))
-    return block
+def job_progress(job: Job) -> str:
+    parts = []
+    if job.epoch is not None and job.epochs:
+        parts.append(f"epoch {job.epoch}/{job.epochs}")
+        if 0 < job.epoch < job.epochs and job.started and job.kind == "training":
+            left = (time.time() - job.started) / job.epoch * (job.epochs - job.epoch)
+            parts.append(f"ETA {clock(time.time() + left)} (≈{minutes(left)})")
+    if job.auc is not None:
+        parts.append(f"×1 {job.auc:.4f}")
+    if job.delta is not None:
+        parts.append(f"{tone(job.delta)} vs incumbent at this epoch")
+    return " · ".join(parts)
 
 
-def job(line: str) -> str:
-    role, _, rest = line.partition(" ")
-    elapsed = re.match(r"((?:\d+h )?\d+m \d+s)\s+", rest)
-    target = rest[elapsed.end() :] if elapsed else rest
-    name, _, details = target.partition(",")
-    stage = ROLES.get(role, role)
-    epoch = re.search(r"epoch (\d+)/(\d+)", details)
-    score = re.search(
-        r"val AUC ([\d.]+) \(incumbent ([\d.]+) at this epoch, ([+-][\d.]+)\)", details
-    )
-    cells = ["", "", ""]
-    if role == "training" and epoch and score:
-        delta = float(score[3])
-        cells = [
-            f"{epoch[1]}/{epoch[2]}",
-            f"{float(score[1]):.4f}",
-            f"<span class='{'up' if delta >= 0 else 'down'}'>{delta:+.4f}</span>",
-        ]
-    elif role == "training":
+def job_stage(job: Job) -> str:
+    stage = ROLES.get(job.kind, job.kind.replace("_", " "))
+    if job.kind == "training" and job.epoch is None and job.auc is None:
         stage += " (starting)"
     return (
-        f"<tr><td><b>{html.escape(label(name.strip()))}</b></td><td>{html.escape(stage)}</td>"
-        f"<td>{elapsed[1] if elapsed else ''}</td>"
-        + "".join(f"<td>{cell}</td>" for cell in cells)
-        + "</tr>"
+        html.escape(stage)
+        + (
+            f" · {minutes(time.time() - job.started)} since {clock(job.started)}"
+            if job.started
+            else ""
+        )
+        + (
+            f" · <span class='waiting'>{html.escape(job.note)}</span>"
+            if job.note
+            else ""
+        )
     )
 
 
-def kilo(value: int) -> str:
-    return f"{value / 1e6:.1f}M" if value >= 1e6 else f"{value / 1e3:.0f}k"
-
-
-def minutes(seconds: float) -> str:
-    return f"{seconds / 60:.0f} min" if seconds >= 60 else f"{seconds:.0f} s"
+def job_block(job: Job, state: dict) -> str:
+    bar = (
+        f"<progress max='{job.epochs}' value='{min(job.epoch, job.epochs)}' "
+        f"aria-label='epoch {job.epoch} of {job.epochs}'></progress>"
+        if job.epoch is not None and job.epochs
+        else ""
+    )
+    progress = job_progress(job)
+    return (
+        "<div class='job'><div class='head'>"
+        f"<b>{idea_link(state, job.idea, job.name)}</b>"
+        f"<span class='sub'>{job_stage(job)}</span>"
+        f"</div>{bar}"
+        + (f"<div class='sub numbers'>{progress}</div>" if progress else "")
+        + "</div>"
+    )
 
 
 def agents(state: dict, root: Path) -> str:
-    configured = yaml.safe_load((root / "autoresearch/agents.yaml").read_text()).get(
-        state["provider"], {}
-    )
-    root = Path(f"outputs/autoresearch/{state['campaign']}/jobs")
-    used = {path.parent.name.rsplit("-", 3)[0] for path in root.glob("*/usage.json")}
+    configured = (
+        yaml.safe_load((root / "autoresearch/agents.yaml").read_text()) or {}
+    ).get(state["provider"], {})
+    jobs = campaign_dir(state["campaign"]) / "jobs"
+    used = {path.parent.name.rsplit("-", 3)[0] for path in jobs.glob("*/usage.json")}
     rows = []
-    for role in [
-        role
-        for role in [*configured, *sorted(used - set(configured))]
-        if role != WATCHDOG
-    ]:
+    for role in [*configured, *sorted(used - set(configured))]:
+        if role == WATCHDOG:
+            continue
         done = failed = tokens_in = tokens_out = 0
-        model, effort = (
-            configured.get(role, {}).get("model"),
-            configured.get(role, {}).get("effort"),
-        )
+        model = (configured.get(role) or {}).get("model")
+        effort = (configured.get(role) or {}).get("effort")
         working, last_end = None, None
-        for path in sorted(root.glob(f"{role}-*")):
+        for path in sorted(jobs.glob(f"{role}-*")):
             usage, started, receipt = (
                 read_json(path / name)
                 for name in ("usage.json", "started.json", "receipt.json")
             )
-            model, effort = usage.get("model", model), usage.get("effort", effort)
-            tokens = usage.get("tokens", {})
-            tokens_in += tokens.get("input", 0) + tokens.get("cache_read", 0)
-            tokens_out += tokens.get("output", 0)
+            model, effort = usage.get("model") or model, usage.get("effort") or effort
+            tokens = usage.get("tokens") or {}
+            tokens_in += (tokens.get("input") or 0) + (tokens.get("cache_read") or 0)
+            tokens_out += tokens.get("output") or 0
+            begun = started.get("time")
             if receipt:
                 done += 1
                 failed += bool(
@@ -907,211 +1421,215 @@ def agents(state: dict, root: Path) -> str:
                     or receipt.get("error")
                     or usage.get("provider_error")
                 )
-                if started:
-                    last_end = started["time"] + receipt.get("seconds", 0)
-            elif started:
+                if begun:
+                    last_end = begun + (receipt.get("seconds") or 0)
+            elif begun and alive(read_json(path / "owner.json")):
                 target = label(
                     read_json(path / "assignment.json").get("experiment")
                     or usage.get("experiment")
                     or ""
                 )
-                working = f"working {minutes(time.time() - started['time'])}" + (
-                    f" · {html.escape(target)}" if target else ""
+                working = f"working {minutes(time.time() - begun)}" + (
+                    f" · {target}" if target else ""
                 )
         state_text = working or (
-            f"idle · last {datetime.fromtimestamp(last_end).astimezone():%H:%M}"
+            f"idle · last {datetime.fromtimestamp(last_end).astimezone():%d %b %H:%M}"
             if last_end
             else "idle"
         )
         rows.append(
-            f"<tr><td><b>{html.escape(role.replace('_', ' '))}</b></td>"
-            f"<td>{html.escape(str(model or '–'))}{' · ' + html.escape(str(effort)) if effort else ''}</td>"
-            f"<td>{f'<span class=up>{state_text}</span>' if working else state_text}</td>"
-            f"<td>{done}{f' <span class=down>({failed} failed)</span>' if failed else ''}</td>"
-            f"<td>{kilo(tokens_in)} / {kilo(tokens_out)}</td></tr>"
+            (
+                "",
+                [
+                    f"<b>{html.escape(role.replace('_', ' '))}</b>",
+                    html.escape(str(model or "–"))
+                    + (f" · {html.escape(str(effort))}" if effort else ""),
+                    f"<span class=up>{html.escape(state_text)}</span>"
+                    if working
+                    else html.escape(state_text),
+                    f"{done}"
+                    + (f" <span class=down>({failed} failed)</span>" if failed else ""),
+                    f"{kilo(tokens_in)} / {kilo(tokens_out)}",
+                ],
+            )
         )
+    columns = [
+        ("agent", "", "name"),
+        ("model", "model", "text wide"),
+        ("state", "state", "text wide"),
+        ("jobs", "jobs", ""),
+        ("tokens in / out", "tokens in / out", "wide"),
+    ]
     return (
-        "<table class='jobs agents'><tr><th>agent</th><th>model</th><th>state</th><th>jobs</th><th>tokens in / out</th></tr>"
-        + "".join(rows)
-        + "</table>"
+        f"<h2>Agents <span class='sub'>· {html.escape(state['provider'])}</span></h2>"
+        + table(columns, rows)
     )
 
 
-def activity(status: str, state: dict, root: Path) -> str:
-    rows = "".join(job(line) for line in status_lines(status, "Now"))
-    jobs = (
-        "<div class='jobs-scroll'><table class='jobs'><tr><th>run</th><th>stage</th><th>time</th><th>epoch</th><th>×1</th>"
-        f"<th title='×1 macro AUC minus the incumbent at the same epoch'>Δ inc.</th></tr>{rows}</table></div>"
-        if rows
-        else "<div class='sub'>idle</div>"
-    )
+def activity(campaign: str, state: dict) -> str:
+    jobs = "".join(job_block(job, state) for job in active_jobs(campaign, state))
     queue = "".join(
-        f"<li>{html.escape(idea)} <span class='sub'>{html.escape(state['ideas'][idea].get('status', ''))}</span></li>"
+        f"<li>{idea_link(state, idea, idea)} <span class='sub'>{html.escape(state['ideas'][idea].get('status') or '')}</span></li>"
         for idea in state["queue"]
     )
     return (
-        "<div class='activity'>"
-        f"<div class='card'><div class='sub'>Now</div>{jobs}</div>"
-        f"<div class='card'><div class='sub'>Agents · {html.escape(state['provider'])}</div>{agents(state, root)}</div>"
-        f"<div class='card'><div class='sub'>Up next</div><ol>{queue or '<li>empty</li>'}</ol></div>"
+        "<div class='split'>"
+        f"<div class='card'><div class='label'>Now</div>{jobs or '<div class=sub>no active jobs</div>'}</div>"
+        f"<div class='card'><div class='label'>Up next</div>"
+        f"<div class='sub'>{html.escape(research_text(state))}</div>"
+        f"{f'<ol>{queue}</ol>' if queue else '<div class=sub>queue empty</div>'}</div>"
         "</div>"
     )
 
 
 def messages(campaign: str) -> str:
     entries = read_messages(campaign)
-    seen = messages_path(campaign).with_suffix(".seen")
-    delivered = int(seen.read_text()) if seen.is_file() else 0
+    count = delivered(campaign)
+    waiting = len(entries) - count
     rows = "".join(
         "<div class='message'><div class='sub'>"
         f"{entry.time.astimezone():%d %b %H:%M} · "
         + (
             "delivered to the keeper"
-            if index < delivered
+            if index < count
             else "<span class='waiting'>waiting for the keeper</span>"
         )
         + f"</div>{html.escape(entry.text)}</div>"
         for index, entry in enumerate(entries)
     )
     return (
-        "<h2>Messages to the keeper</h2><div class='card'>"
+        "<h2>Messages to the keeper"
+        + (
+            f" <span class='sub waiting'>· {waiting} waiting</span>"
+            if waiting > 0
+            else ""
+        )
+        + "</h2><div class='card'>"
         f"<div class='thread' id='thread'>{rows or "<div class='sub'>none yet</div>"}</div>"
         "<form class='send' method='post' action='messages'>"
-        f"<textarea id='draft' name='text' maxlength='{MAXIMUM_MESSAGE_BYTES // 4}' required></textarea>"
-        "<button>Send</button></form></div>"
+        f"<textarea id='draft' name='text' maxlength='{MAXIMUM_MESSAGE_BYTES // 4}' required "
+        "aria-label='Message to the keeper' placeholder='Message to the keeper'></textarea>"
+        "<button class='primary'>Send</button></form></div>"
     )
+
+
+def icon(color: str) -> str:
+    svg = f"<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><circle cx='8' cy='8' r='7' fill='{LIGHT[color]}'/></svg>"
+    return "data:image/svg+xml," + quote(svg)
+
+
+def page(
+    title: str,
+    color: str,
+    navigation: str,
+    body: str,
+    plots: bool = False,
+) -> str:
+    return (
+        "<!doctype html><html lang='en'><head><meta charset='utf-8'>"
+        "<meta name='viewport' content='width=device-width, initial-scale=1'>"
+        f"<title>{title}</title><link rel='icon' href='{icon(color)}'>"
+        f"<script>{THEME_BOOT}</script>"
+        + (f"<script src='/{PLOTLY_JS}'></script>" if plots else "")
+        + f"<style>{STYLE}</style></head><body>"
+        + (f"<nav>{navigation}</nav>" if navigation else "")
+        + f"<main>{body}</main>"
+        "<footer><button id='theme' type='button'>Theme</button></footer>"
+        f"<script>{SCRIPT}{PLOT_SCRIPT if plots else ''}</script>"
+        "</body></html>"
+    )
+
+
+def age_line(settings: MonitorCLI) -> str:
+    return f"<div id='age' data-interval='{settings.interval}'></div>"
+
+
+def navigation(campaign: str) -> str:
+    links = []
+    for name in registrations():
+        try:
+            color = overview(name, load_state(name)).color
+        except PAGE_ERRORS:
+            color = "--bad"
+        current = " aria-current='page'" if name == campaign else ""
+        links.append(
+            f"<a href='/{html.escape(name)}/'{current}>"
+            f"<span class='dot' style='--c: var({color})'></span>{html.escape(name)}</a>"
+        )
+    return f"<a class='home' href='/'>← Campaigns</a><div class='strip'>{''.join(links)}</div>"
+
+
+def banner(view: Overview) -> str:
+    return (
+        f"<div class='banner{' alert' if view.alert else ''}' style='--c: var({view.color})'>"
+        f"<div class='state'><span class='dot'></span><b>{html.escape(view.status)}</b>"
+        f"<span>supervisor {'alive' if view.supervisor else 'not running'}</span>"
+        f"<span class='sub'>agents on {html.escape(view.provider)}</span></div>"
+        f"<div class='detail'>{html.escape(view.detail)}</div></div>"
+    )
+
+
+def write(path: Path, text: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_suffix(".tmp")
+    temporary.write_text(text)
+    temporary.replace(path)
 
 
 def regenerate(settings: MonitorCLI, entry: Registration) -> None:
     campaign = entry.campaign
-    directory = settings.directory / campaign
-    directory.mkdir(parents=True, exist_ok=True)
     if not (settings.directory / PLOTLY_JS).exists():
-        (settings.directory / PLOTLY_JS).write_text(get_plotlyjs())
-    python = entry.root / ".venv/bin/python"
-    status = subprocess.run(
-        [
-            str(python if python.exists() else sys.executable),
-            "-m",
-            "scripts.tools.autoresearch",
-            "status",
-            campaign,
-        ],
-        cwd=entry.root,
-        capture_output=True,
-        text=True,
-        check=False,
-    ).stdout
-    header = next(
-        (line for line in status.splitlines() if line.startswith(f"{campaign} · ")),
-        "",
-    )
-    parts = [part.strip() for part in header.split("·")]
-    state_name = parts[2] if len(parts) > 2 else "UNKNOWN"
-    supervisor = parts[3].removeprefix("supervisor ") if len(parts) > 3 else "unknown"
-    state = json.loads(Path(f"outputs/autoresearch/{campaign}/state.json").read_text())
+        write(settings.directory / PLOTLY_JS, get_plotlyjs())
+    state = load_state(campaign)
+    view = overview(campaign, state)
     control, runs = collect(state)
     fold = campaign_fold(state)
-    detail = state.get("reason") or {
-        "RUNNING": f"working normally · agents on {state['provider']}",
-        "CALIBRATING": "measuring the budget on CPU",
-        "STOPPED": "stopped; nothing runs until resumed",
-        "STOPPING": "finishing the current run before stopping",
-        "PAUSED": "paused; needs a repair",
-    }.get(state_name, "")
-    color = (
-        "var(--bad)"
-        if supervisor != "alive" or state_name == "PAUSED"
-        else BANNER.get(state_name, "var(--ink2)")
-    )
     body = (
-        tiles(control, runs, fold)
-        + activity(status, state, entry.root)
+        f"<h1>{html.escape(campaign)}</h1>"
+        + banner(view)
+        + age_line(settings)
+        + activity(campaign, state)
+        + tiles(control, runs, fold, state)
         + messages(campaign)
         + "<h2>Results</h2>"
-        + results(control, runs)
+        + results(control, runs, state)
         + comparison(control, runs, fold)
         + "<h2>Curves</h2>"
         + curves(control, runs)
+        + agents(state, entry.root)
+        + "<details class='status'><summary>Full status (runs the status command)</summary><pre></pre></details>"
+        + idea_dialogs(state, [*state["queue"], *(run["idea"] for run in runs)])
     )
-    others = "".join(
-        f"<a href='/{html.escape(name)}/'>{html.escape(name)}</a>"
-        for name in registrations()
-        if name != campaign
+    write(
+        settings.directory / campaign / "index.html",
+        page(
+            f"{html.escape(view.status)} · {html.escape(campaign)}",
+            view.color,
+            navigation(campaign),
+            body,
+            plots=True,
+        ),
     )
-    page = PAGE.format(
-        campaign=html.escape(campaign),
-        others=others,
-        plotly_js=PLOTLY_JS,
-        style=STYLE,
-        state=html.escape(state_name),
-        supervisor=html.escape(supervisor),
-        color=color,
-        detail=html.escape(detail),
-        updated_ms=int(time.time() * 1000),
-        refresh=settings.interval,
-        body=body,
-        status=html.escape(status),
-        script=SCRIPT,
-    )
-    (directory / "index.tmp").write_text(page)
-    (directory / "index.tmp").replace(directory / "index.html")
-    waiting = len(read_messages(campaign))
-    seen = messages_path(campaign).with_suffix(".seen")
-    waiting -= int(seen.read_text()) if seen.is_file() else 0
-    SUMMARIES[campaign] = {
-        "state": state_name,
-        "supervisor": supervisor,
-        "color": color,
-        "detail": detail,
-        "now": status_lines(status, "Now"),
-        "queued": len(state["queue"]),
-        "decided": len(runs),
-        "waiting": waiting,
-    }
     print(
-        f"{datetime.now().astimezone():%H:%M} {campaign} {state_name} supervisor {supervisor}",
+        f"{datetime.now().astimezone():%H:%M} {campaign} {view.status} "
+        f"supervisor {'alive' if view.supervisor else 'not running'}",
         flush=True,
     )
 
 
-def front_page(settings: MonitorCLI) -> None:
-    order = {"RUNNING": 0, "CALIBRATING": 0, "PAUSED": 1, "STOPPING": 2}
-    cards = []
-    for name, summary in sorted(
-        SUMMARIES.items(), key=lambda item: (order.get(item[1]["state"], 3), item[0])
-    ):
-        if name not in registrations():
-            continue
-        now = "".join(f"<li>{html.escape(line)}</li>" for line in summary["now"])
-        waiting = (
-            f" · <span class='waiting'>{summary['waiting']} messages waiting for the keeper</span>"
-            if summary["waiting"]
-            else ""
-        )
-        cards.append(
-            f"<a class='campaign card' href='/{html.escape(name)}/'>"
-            f"<span class='name'>{html.escape(name)}</span>"
-            f"<span class='pill' style='background:{summary['color']}'>{html.escape(summary['state'])} · "
-            f"supervisor {html.escape(summary['supervisor'])}</span>"
-            f"<div class='sub'>{html.escape(summary['detail'])}</div>"
-            f"<ul>{now or '<li>idle</li>'}</ul>"
-            f"<div class='sub'>{summary['decided']} runs decided · {summary['queued']} ideas queued{waiting}</div>"
-            "</a>"
-        )
-    page = FRONT.format(
-        style=STYLE,
-        updated_ms=int(time.time() * 1000),
-        refresh=settings.interval,
-        body="".join(cards) or "<div class='sub'>No live campaign.</div>",
+def failure(settings: MonitorCLI, campaign: str, error: Exception) -> None:
+    body = (
+        f"<h1>{html.escape(campaign)}</h1>"
+        "<div class='banner alert' style='--c: var(--bad)'><div class='state'><span class='dot'></span>"
+        "<b>PAGE FAILED</b></div><div class='detail'>The monitor could not read this campaign; "
+        "it retries on the next refresh.</div></div>"
+        + age_line(settings)
+        + f"<pre style='margin-top: 12px'>{html.escape(f'{type(error).__name__}: {error}')}</pre>"
     )
-    (settings.directory / "index.tmp").write_text(page)
-    (settings.directory / "index.tmp").replace(settings.directory / "index.html")
-
-
-MINIMUM_AGE_SECONDS = 5
-REGENERATION = threading.Lock()
-last_regeneration: dict[str, float] = {}
+    write(
+        settings.directory / campaign / "index.html",
+        page(f"FAILED · {html.escape(campaign)}", "--bad", navigation(campaign), body),
+    )
 
 
 def fresh(settings: MonitorCLI, entry: Registration) -> None:
@@ -1121,16 +1639,121 @@ def fresh(settings: MonitorCLI, entry: Registration) -> None:
             return
         try:
             regenerate(settings, entry)
-        except (OSError, ValueError, KeyError) as error:
-            print(f"regeneration of {entry.campaign} failed: {error}", flush=True)
+        except PAGE_ERRORS as error:
+            print(f"regeneration of {entry.campaign} failed: {error!r}", flush=True)
+            failure(settings, entry.campaign, error)
         last_regeneration[entry.campaign] = time.monotonic()
 
 
+def job_line(job: Job) -> str:
+    progress = job_progress(job)
+    return (
+        f"<li><b>{html.escape(job.name)}</b> <span class='sub'>{job_stage(job)}</span>"
+        + (f"<div class='sub'>{progress}</div>" if progress else "")
+        + "</li>"
+    )
+
+
+def summary_card(name: str) -> tuple[tuple, str]:
+    state = load_state(name)
+    view = overview(name, state)
+    fold = campaign_fold(state)
+    decided, accepted = tally(state)
+    control = x4(Path(state["reference"]), fold)
+    incumbent = x4(Path(state["incumbent"]["run"]), fold)
+    leader = (
+        CONTROL
+        if Path(state["incumbent"]["run"]).resolve()
+        == Path(state["reference"]).resolve()
+        else label(state["incumbent"]["id"])
+    )
+    gain = (
+        incumbent - control
+        if leader != CONTROL and None not in (incumbent, control)
+        else None
+    )
+    waiting = len(read_messages(name)) - delivered(name)
+    jobs = "".join(job_line(job) for job in active_jobs(name, state))
+    card = (
+        f"<a class='campaign card' href='/{html.escape(name)}/'>"
+        f"<div class='head'><span class='name'>{html.escape(name)}</span>{badge(view)}</div>"
+        f"<div class='sub'>{html.escape(view.detail)}</div>"
+        + (f"<ul>{jobs}</ul>" if jobs else "")
+        + f"<div class='sub'>incumbent <b>{html.escape(leader)}</b>"
+        + (f" · ×4 {tone(gain)} vs control" if gain is not None else "")
+        + f" · {decided} decided · {accepted} accepted · {len(state['queue'])} queued</div>"
+        + (
+            f"<div class='waiting'>{waiting} message{'s' if waiting > 1 else ''} waiting for the keeper</div>"
+            if waiting > 0
+            else ""
+        )
+        + "</a>"
+    )
+    return (not view.alert, STATE_ORDER.get(view.status, 3), name), card
+
+
+def front_page(settings: MonitorCLI) -> None:
+    cards = []
+    for name in registrations():
+        try:
+            cards.append(summary_card(name))
+        except PAGE_ERRORS as error:
+            cards.append(
+                (
+                    (False, 0, name),
+                    (
+                        f"<a class='campaign card' href='/{html.escape(name)}/'>"
+                        f"<div class='head'><span class='name'>{html.escape(name)}</span>"
+                        "<span class='badge down'>unreadable</span></div>"
+                        f"<div class='sub'>{html.escape(f'{type(error).__name__}: {error}')}</div></a>"
+                    ),
+                )
+            )
+    alert = any(not key[0] for key, _ in cards)
+    body = (
+        "<h1>Campaigns</h1>"
+        + age_line(settings)
+        + (
+            "".join(card for _, card in sorted(cards))
+            or "<div class='sub'>No live campaign.</div>"
+        )
+    )
+    write(
+        settings.directory / "index.html",
+        page("Campaigns", "--bad" if alert else "--s1", "", body),
+    )
+
+
 def fresh_front(settings: MonitorCLI) -> None:
-    for entry in registrations().values():
-        fresh(settings, entry)
     with REGENERATION:
         front_page(settings)
+
+
+def full_status(entry: Registration) -> str:
+    python = entry.root / ".venv/bin/python"
+    with STATUS:
+        try:
+            result = subprocess.run(
+                [
+                    str(python if python.exists() else sys.executable),
+                    "-m",
+                    "scripts.tools.autoresearch",
+                    "status",
+                    entry.campaign,
+                ],
+                cwd=entry.root,
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=STATUS_TIMEOUT_SECONDS,
+            )
+        except subprocess.TimeoutExpired:
+            return f"status timed out after {STATUS_TIMEOUT_SECONDS} s"
+    if result.returncode:
+        return f"status failed with exit code {result.returncode}\n\n" + "\n".join(
+            result.stderr.strip().splitlines()[-12:]
+        )
+    return result.stdout
 
 
 class Handler(SimpleHTTPRequestHandler):
@@ -1142,24 +1765,42 @@ class Handler(SimpleHTTPRequestHandler):
         parts = self.path.split("?")[0].strip("/").split("/")
         if parts in ([""], ["index.html"]):
             fresh_front(self.settings)
+        elif len(parts) == 2 and parts[1] == "status":
+            entry = registrations().get(parts[0])
+            if entry is None:
+                self.send_error(404)
+                return
+            self.send_text(full_status(entry))
+            return
         elif len(parts) <= 2 and parts[1:] in ([], ["index.html"]):
             entry = registrations().get(parts[0])
             if entry is not None:
                 fresh(self.settings, entry)
         super().do_GET()
 
+    def send_text(self, text: str) -> None:
+        data = text.encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "text/plain; charset=utf-8")
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
+
     def do_POST(self) -> None:
         sender = ip_address(self.client_address[0])
         if not any(sender in network for network in TAILNET):
             self.send_error(403)
             return
-        length = int(self.headers.get("Content-Length", 0))
+        try:
+            length = int(self.headers.get("Content-Length", 0))
+        except ValueError:
+            length = 0
         parts = self.path.strip("/").split("/")
         campaign = parts[0] if len(parts) == 2 and parts[1] == "messages" else None
         if campaign not in registrations() or not 0 < length <= MAXIMUM_MESSAGE_BYTES:
             self.send_error(400)
             return
-        form = parse_qs(self.rfile.read(length).decode())
+        form = parse_qs(self.rfile.read(length).decode(errors="replace"))
         text = form.get("text", [""])[0].replace("\r\n", "\n").strip()
         if text:
             with REGENERATION:
