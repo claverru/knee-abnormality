@@ -93,6 +93,10 @@ finished.
   out-of-fold files, mostly on MCL, Synovitis and ACL. That disagrees with our loss-ensemble
   simulation above; per-label choices are allowed again, fixed before the run
   ([re-sweep](../research/2026-09-28-public-resweep.md#measurements-embedded-in-the-s75-private-model)).
+- *Weights or stackers fitted on gold (measured, 2026-10-16):* every combiner fitted on the 58 gold
+  studies lost to S163's equal average held out on gold (logistic −0.0005 to −0.0399, TabPFN
+  −0.0041 to −0.0149), and S164's gold-tuned per-label weights scored 0.963 against 0.964. Do not
+  fit member weights on gold ([result](../validation/results/2026-10-16-gold-fitted-stacking.md)).
 
 ## Bigger images
 
