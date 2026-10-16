@@ -1,0 +1,54 @@
+ideas:
+- id: efficientvit-b2-checkpointed
+  mechanism_id: family-efficientvit
+  parent_idea_id: null
+  title: EfficientViT-B2 (efficientvit_b2.r224_in1k), multi-scale ReLU linear attention at strides 16 and 32, image counts
+    padded to 16 with BatchNorm statistics from the real images only, rate 2e-4, anchors 0.001 and 0.00003, ten epochs, with
+    activation checkpointing of stages 0 and 1 in training
+  opportunity: 'Evidence (prior-work.md, Four families added on 2026-10-15): MobileNet inverted-residual blocks at strides
+    4 and 8, then global ReLU linear attention with multi-scale token aggregation at strides 16 and 32: global context at
+    linear cost, strong segmentation per compute (Cityscapes 82.1, ADE20K 45.9 mIoU). Apache-2.0. BatchNorm throughout (47
+    layers) and 30 depthwise plus 10 grouped convolutions: unpadded, every new image count would trigger cuDNN planning (ConvNeXt
+    paid 4.3 s per count). Weights fall mildly with depth (stem 0.076, stages 0.057, 0.053, 0.049, 0.044). Added at the user''s
+    request. Guess on size: −0.004 to +0.002 against the reference; blend value from a linear-attention family.'
+  mechanism: 'timm''s efficientvit_b2.r224_in1k with pretrained weights: stem at stride 2, stages 0 to 3 at strides 4, 8,
+    16 and 32 (48, 96, 192 and 384 channels). to_stride_8 runs the stem and stages 0 and 1; the middle map is stage 2''s output,
+    the final map stage 3''s (no final norm in the model; the final read takes stage 3 as it is). Image counts padded to a
+    multiple of 16, and every BatchNorm in the backbone takes its batch statistics, and its running-statistics update, from
+    the real rows only: a wrapper replaces each BatchNorm2d, computes mean and variance over the first count rows in training
+    mode, normalises all rows with them and updates the running statistics as BatchNorm2d would; in eval mode it is BatchNorm2d.
+    The real row count reaches the wrappers through the stage adapter without a host synchronisation. With that, padding leaves
+    the real rows'' outputs and the statistics exactly as unpadded. Mapping: origin 0 at every stride as derived from the
+    stem and the stride-2 convolutions, checked against the built model. Settings: model.backbone the new name; rate 2e-4
+    (relative step 2.6e-3 to 4.5e-3); early anchor 0.001; late anchor 0.00003, whose cost per relative movement on the last
+    stage (0.00003 × 0.044² = 5.8e-8) matches the ResNet-50''s (5.3e-8) and MambaVision-T''s (8.5e-8), where the recipe''s
+    0.00001 would give a third of it. trainer.max_epochs 10. In training mode the adapter runs stages 0 and 1 (strides 4 and
+    8) under torch.utils.checkpoint.checkpoint(use_reentrant=False), so their activations are recomputed in the backward pass
+    instead of stored. The recomputed forward must not update the BatchNorm running statistics or num_batches_tracked a second
+    time: pass a context_fn to checkpoint whose recompute context sets a flag the real-row BatchNorm wrappers read, and under
+    that flag they normalise with the batch statistics of the real rows (the same values as the first pass) without touching
+    the running buffers. Outputs, gradients and running statistics then equal the uncheckpointed model''s. In eval mode the
+    stages run directly. The feature-statistics augmentation stays outside the checkpointed stages.'
+  precedents:
+  - 'MaViT-S: BatchNorm with depthwise convolutions cost 8 s per new image count unpadded (docs/modeling/mambavision-backbone.md).'
+  - 'PVTv2-b2 (weights 0.045 to 0.056) and RadioDINO-S/16: the recipe''s rate held.'
+  - 'efficientvit-b2 (2026-10-16): the preflight ran out of memory at its 52nd training batch under the 22.5 GiB cap (22.29
+    GiB allocated), so it never trained; blocked after its one repair.'
+  - 'Keeper measurement 2026-10-16, timm efficientvit_b2 backbone alone, 256 images, bf16, channels_last, forward and backward
+    on the 3090: 18.5 GB and 0.306 s unpatched; stages 0 and 1 checkpointed 8.6 GB and 0.353 s (FocalNet-T 17.2 GB and 0.389
+    s there). PVTv2-b2 and RDNet-T trained with the same kind of checkpointing.'
+  novelty: First linear-attention backbone and first padded BatchNorm family here.
+  coverage: Every study and every label.
+  exploitation: 'Read ×4 and ×1 against the incumbent and the reference, the per-label changes, the token-map metrics and
+    the blends. Activation: the effective config names the backbone; backbone_drift_stage4 above zero after epoch 1.'
+  budget: 'Backbone step below FocalNet-T''s (0.353 against 0.389 s per 256 images): ten epochs well inside the 4,090 s bound;
+    peak memory far below the 22.5 GiB cap. The preflight checks both before training.'
+  implementation: 'Files: modeling/backbone_stages.py (the stage adapter with the multiple-of-16 padding and the real-row
+    BatchNorm wrapper), modeling/spatial_tokens.py (mapping), configs/campaign.yaml. Check on CPU at two image counts that
+    the real rows'' outputs, the batch statistics and the running statistics after one training-mode forward are equal with
+    and without padding, and the mapping. Check on CPU at two image counts that one training-mode forward and backward with
+    checkpointing gives the same outputs, gradients, running means and variances and num_batches_tracked as without it.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user's pick; the one global-attention family that is cheap at stride 16 and 32.
+exhausted_directions: ''

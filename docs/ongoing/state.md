@@ -30,6 +30,12 @@ measured outcomes are in the [validation results](../validation/results/INDEX.md
   there is no default config, every command names one, and campaigns write their recipe to
   `configs/campaign.yaml` inside their own sources ([MambaVision-T](../modeling/mambavision-backbone.md),
   [result](../validation/results/2026-10-14-mambavision-t.md)).
+- **FocalNet-T and EfficientViT-B2 configs, since 2026-10-16:** `configs/focalnet.yaml` (FocalNet-T
+  SRF, ×4 0.938816 on fold 2 at twelve epochs, now ten) and `configs/efficientvit.yaml`
+  (EfficientViT-B2 with stochastic depth 0.2, ×4 0.938773, float32 attention) from the
+  [backbone-families campaign](../validation/results/2026-10-16-backbone-families.md)
+  ([code](../modeling/focalnet-and-efficientvit-backbones.md)). The new adapters leave the ResNet-50,
+  MambaVision-T and ConvNeXt-Tiny paths unchanged.
 - **Dead paths removed, 2026-10-14 (user decision):** weight averaging, the report-attribute heads,
   the scanner confusion head, dropout and series dropout, activation checkpointing and frozen
   backbone, unused folds, the ReXNet, EfficientNet and CoAtNet mappings, the ResNet-18, ResNet-10t

@@ -1,0 +1,43 @@
+ideas:
+- id: efficientvit-stochastic-depth-02
+  mechanism_id: efficientvit-stochastic-depth
+  parent_idea_id: efficientvit-stochastic-depth-stage0
+  title: EfficientViT-B2 with stochastic depth 0.2 instead of 0.1, and only stage 0's first block under activation
+    checkpointing, the efficientvit-stochastic-depth-stage0 run otherwise unchanged
+  opportunity: 'Evidence (run-notes.md, run 30): stochastic depth 0.1 lifted EfficientViT-B2 from ×4 0.937280 to 0.938641
+    (+0.0014), level with the FocalNet-T incumbent (0.938816), while ×1 fell 0.0011 (0.929984 against 0.931092). Guess:
+    a higher rate lifts ×4 further or starts to cost; this run finds which side 0.2 is on. Requested by the user on
+    2026-10-16. The checkpointing change is results-neutral and only saves time: keeper measurement 2026-10-16 (saved
+    activations per image, bf16, timm efficientvit_b2): stage 0 block 0 9.5 MiB, blocks 1 and 2 7.5 MiB each; with only
+    block 0 checkpointed the predicted peak is about 20.2 GiB against the 22.5 GiB cap (the parent predicted 15.9 GiB
+    with all of stage 0 checkpointed).'
+  mechanism: 'Start from the files of the efficientvit-stochastic-depth-stage0 candidate,
+    /home/claudio/src/knee-abnormality/outputs/autoresearch/backbone-families/experiments/efficientvit-stochastic-depth-stage0-20261016T110912Z-bcd14c63/workspace
+    (stochastic depth on the identity residual blocks with rates rising linearly, bfloat16 attention products with the
+    division in float32, real-row BatchNorm padding), rebased on the current incumbent. Two changes: (1)
+    model.stochastic_depth 0.2, so the drop rates rise linearly from 0 to 0.2 over the same blocks; (2) in training only
+    stage 0''s first block (stages.0.blocks.0, the stride-4 downsample) runs under torch.utils.checkpoint.checkpoint
+    (use_reentrant=False, preserve_rng_state=True, the same recompute context that leaves the BatchNorm running
+    statistics alone); stage 0''s other blocks and stage 1 run directly. Nothing else changes (rate 2e-4, anchors 0.001
+    and 0.00003, ten epochs).'
+  precedents:
+  - 'efficientvit-stochastic-depth (0.1, stages 0 and 1 checkpointed, float32 attention): ×4 0.938641, ×1 0.929984,
+    3,633 s, 11.4 GiB.'
+  - 'efficientvit-stochastic-depth-stage0 preflight: 0.638 s per step, 3,573 s projected, 14.8 GiB measured, 15.9 GiB
+    predicted.'
+  novelty: First stochastic depth above 0.1 here.
+  coverage: Every study and every label.
+  exploitation: 'Read ×4 and ×1 against the incumbent, efficientvit-stochastic-depth and
+    efficientvit-stochastic-depth-stage0, the ×1 curve, the per-label changes and the blends; the preflight and the
+    training seconds against the parent. Activation: the stochastic-depth metrics report a largest drop rate of 0.2,
+    and the checkpointed-image count covers stage 0''s first block only.'
+  budget: 'At most the parent''s time (about 3,570 s); peak memory about 20 GiB; the preflight decides.'
+  implementation: 'Files: modeling/backbone_stages.py (the checkpoint around stages.0.blocks.0 only), configs/campaign.yaml
+    (model.stochastic_depth 0.2), training/lightning.py only for the activation metric. Check on CPU that the drop
+    rates rise to 0.2, that with checkpointing of block 0 only the outputs, gradients and BatchNorm running statistics
+    equal running without checkpointing at the same random state, and that block 0''s drop masks repeat in the
+    recompute.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user's choice; the next step of the one setting that helped EfficientViT-B2.
+exhausted_directions: ''

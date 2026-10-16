@@ -1,0 +1,66 @@
+ideas:
+- id: efficientvit-read-layernorm
+  mechanism_id: efficientvit-read-normalisation
+  parent_idea_id: efficientvit-b2-checkpointed
+  title: EfficientViT-B2 with a LayerNorm on its stride-16 and stride-32 reads, the efficientvit-b2-checkpointed run otherwise
+    unchanged
+  opportunity: 'Evidence (run-notes.md, run 19; prior-work.md, Four families): EfficientViT-B2 has no final norm, so its stride-16
+    and stride-32 maps reach the reads unnormalised, while FocalNet-T, DaViT-T, EdgeNeXt-B and ConvNeXt-T end in a LayerNorm.
+    Its ×1 led FocalNet-T by up to +0.0125 through epoch 7 and fell behind in the last epochs (0.931092 at epoch 10 against
+    0.933241); ×4 0.937280, −0.0015 against the incumbent. Guess: normalised reads stabilise the heads late in training, level
+    to +0.002 at ×4. Chosen by the user on 2026-10-16.'
+  mechanism: 'The efficientvit-b2-checkpointed candidate (stages 0 and 1 checkpointed, real-row BatchNorm padding with the
+    recompute pass leaving the running statistics alone, rate 2e-4, anchors 0.001 and 0.00003, ten epochs) with two new LayerNorm2d
+    modules over the channels: one on the stride-32 final map (384 channels, as the final_norm of the stage adapter) and one
+    on the stride-16 middle map (192 channels). Weights 1 and biases 0 at the start, created under torch.random.fork_rng;
+    they are new parameters, so they train with the head parameters at the head rate and carry no anchor. Nothing else changes.
+    Start from the files of that run''s candidate, /home/claudio/src/knee-abnormality/outputs/autoresearch/backbone-families/experiments/efficientvit-b2-checkpointed-20261016T011621Z-3b868528/workspace
+    (its changed files: configs/campaign.yaml, modeling/backbone_stages.py, modeling/spatial_tokens.py and the others its
+    changes.diff lists), rebased on the current incumbent.'
+  precedents:
+  - 'efficientvit-b2-checkpointed: ×4 0.937280, ×1 0.931092, 3,406 s, 11.4 GiB.'
+  - FocalNet-T and ConvNeXt-T in this code read their final map through the backbone's own LayerNorm (StemStages final_norm).
+  novelty: First read normalisation on EfficientViT-B2.
+  coverage: Every study and every label.
+  exploitation: 'Read ×4 and ×1 against the incumbent and against efficientvit-b2-checkpointed, the per-epoch ×1 curve of
+    epochs 7 to 10 against that run, the per-label changes and the blends. Activation: the two new LayerNorm weights move
+    from 1 (their drift is logged at epoch end).'
+  budget: 'Two LayerNorms on maps of 14×14 and 7×7: training time and memory as efficientvit-b2-checkpointed (3,406 s, 11.4
+    GiB).'
+  implementation: 'Files: modeling/backbone_stages.py (the norms in the EfficientViT stage adapter), training/lightning.py
+    only if the new parameters need placing in the head group, configs/campaign.yaml unchanged except as the parent. Check
+    on CPU the shapes, the parameter groups and that eval mode applies the norms.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user's choice; the missing final norm is the one structural difference from every other family here.
+- id: efficientvit-bf16-attention
+  mechanism_id: efficientvit-attention-precision
+  parent_idea_id: efficientvit-b2-checkpointed
+  title: EfficientViT-B2 with its linear-attention products in bfloat16 and only the normalising division in float32, the
+    efficientvit-b2-checkpointed run otherwise unchanged
+  opportunity: 'Evidence (prior-work.md, Four families): timm''s LiteMLA turns autocast off and casts q, k and v to float32
+    for both attention matrix products, the only float32 compute in the backbone; the rest runs in bfloat16. Running the products
+    in bfloat16 (accumulated in float32 by cuBLAS) cuts the attention time and memory at strides 16 and 32. Guess on accuracy:
+    level (±0.001 at ×4), at lower cost; it isolates whether the float32 attention matters. Chosen by the user on 2026-10-16.'
+  mechanism: 'The efficientvit-b2-checkpointed candidate with LiteMLA''s attention replaced, in the stage adapter, by: k transposed
+    times v and q times that product in the autocast dtype (bfloat16), then the last column (the normaliser from the padded
+    ones) and the division out[..., :-1] / (out[..., -1:] + eps) in float32, cast back to the input dtype. Same eps as timm.
+    Outside training under autocast the computation is identical in float32. Nothing else changes (stages 0 and 1 stay checkpointed,
+    ten epochs). Start from the files of that run''s candidate, /home/claudio/src/knee-abnormality/outputs/autoresearch/backbone-families/experiments/efficientvit-b2-checkpointed-20261016T011621Z-3b868528/workspace
+    (its changed files: configs/campaign.yaml, modeling/backbone_stages.py, modeling/spatial_tokens.py and the others its
+    changes.diff lists), rebased on the current incumbent.'
+  precedents:
+  - 'efficientvit-b2-checkpointed: ×4 0.937280, 3,406 s, 11.4 GiB, 0.73 s per step.'
+  novelty: First reduced-precision attention here.
+  coverage: Every study and every label.
+  exploitation: 'Read ×4 and ×1 against the incumbent and efficientvit-b2-checkpointed, the training seconds and peak memory
+    against that run, the per-label changes and the blends. Activation: the preflight and timing show a faster step than 0.73
+    s, and a CPU check shows the attention products in bfloat16 under autocast.'
+  budget: At most efficientvit-b2-checkpointed's 3,406 s and 11.4 GiB.
+  implementation: 'Files: modeling/backbone_stages.py (the replaced attention for the EfficientViT blocks), configs/campaign.yaml
+    unchanged except as the parent. Check on CPU in float32 that the replaced attention equals timm''s to 1e-6 relative, and
+    that under bfloat16 autocast the products run in bfloat16 and the division in float32.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user's choice; the cheapest change and a speed headroom for later EfficientViT runs.
+exhausted_directions: ''

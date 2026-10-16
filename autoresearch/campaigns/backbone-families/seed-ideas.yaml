@@ -1,0 +1,151 @@
+ideas:
+- id: sam2-hiera-tiny
+  mechanism_id: family-hiera
+  parent_idea_id: null
+  title: SAM2.1 Hiera-T (sam2_hiera_tiny.fb_r896_2pt1) on the MambaVision recipe, rate 1e-4 and anchors 0.01 early,
+    0.0001 late for its ResNet-like weight scale
+  opportunity: 'Evidence (prior-work.md, The families): the most different family available at our size, attention
+    only with no convolutions, local mask-unit attention early and global attention in the last stages, pretrained
+    by MAE then promptable segmentation on SA-1B and SA-V, so its features are trained to delineate objects; Apache-2.0.
+    Its weights shrink with depth like the ResNet-50''s (RMS 0.049 in block 0 to 0.021 in block 11, stem 0.018), not
+    flat like MambaVision-T''s (0.08 to 0.09), so the MambaVision rate and anchors do not transfer. Guess on size:
+    level to +0.004 against the reference, and blend value from a different family.'
+  mechanism: 'A hiera backbone built from timm''s sam2_hiera_tiny.fb_r896_2pt1 with pretrained weights; at 224 px its
+    stage outputs are 96, 192, 384 and 768 channels at strides 4, 8, 16 and 32 (stage ends at blocks 0, 2, 9 and 11).
+    to_stride_8 runs the patch embedding with its position embeddings and the first two stages; the middle map is the
+    third stage''s output, the final map the fourth''s. No image-count padding (no depthwise convolution, no BatchNorm).
+    Settings: model.backbone the new name, optimizer.backbone_lr 0.0001, optimizer.anchor_alpha_early 0.01,
+    optimizer.anchor_alpha_late 0.0001; everything else the recipe''s.'
+  precedents:
+  - 'Swin-T on the MambaVision recipe, fold 2, 2026-10-14: ×4 0.937176, blend with the ResNet-50 +0.0016 (docs/validation/results/2026-10-14-swin-t.md).'
+  - 'ResNet-50 recipe (weights 0.062 stem to 0.0073 last stage): rate 5e-5, anchors 0.01 and 0.001.'
+  novelty: First attention-only backbone with dense segmentation pretraining here.
+  coverage: Every study and every label.
+  exploitation: 'Read ×4 and ×1 against the reference, the per-label changes, and the blends with the ResNet-50 and
+    the reference. Activation: the recorded effective config names the backbone, and the logged drift of the first
+    and last stage groups after epoch 1 is above zero.'
+  budget: '4.9 GMAC per image against MambaVision-T''s 4.4 (measured): training expected near a local MambaVision-T
+    run (about 3,100 s locally, 0.65 of the reference''s 4,812 s); memory near 12 GB.'
+  implementation: 'Files: src/knee_abnormality/modeling/staged_backbones.py or backbone_stages.py (the family''s stage
+    adapter, following the existing StagedBackbone or stage classes; parameter names with a stem and stages.N so the
+    early anchor covers the patch embedding, position embeddings and the first stage), modeling/spatial_tokens.py (the
+    mapping entries for the final and layer3 reads, derived from the patch embedding and the pooling between stages and
+    checked against the built model), configs/campaign.yaml. Check on CPU that the four stage outputs have the shapes
+    above at 224 px and that the mapping verifies.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The most different family in operator and pretraining, and the one the user chose first.
+- id: hrnet-w18
+  mechanism_id: family-hrnet
+  parent_idea_id: null
+  title: HRNet-W18 (hrnet_w18.ms_aug_in1k), parallel high-resolution streams, on the recipe with the ResNet-50's rate
+    5e-5 and anchors 0.005 early, 0.0003 late for its BatchNorm convolution weights
+  opportunity: 'Evidence (prior-work.md, The families): the only design that keeps a high-resolution stream through the
+    whole network, aimed at the located labels (menisci, OA compartments) where the other families lose most. A BatchNorm
+    convolution network with weights like the ResNet-50''s (RMS 0.04 early to 0.013 in stage 4, stem conv 0.15), so
+    the ResNet-50 recipe''s relative step and anchor cost apply, not MambaVision''s. MIT. Guess on size: level to +0.004
+    on the located labels.'
+  mechanism: 'An hrnet backbone from timm''s hrnet_w18.ms_aug_in1k with pretrained weights, read through its incre
+    features: 128, 256, 512 and 1024 channels at strides 4, 8, 16 and 32 at 224 px. to_stride_8 runs the stem, layer1
+    and the second stage, and the feature-statistics augmentation acts on the stride-8 branch; the middle map is the
+    stride-16 incre output, the final map the stride-32 one. No image-count padding (BatchNorm). Settings: model.backbone
+    the new name, optimizer.backbone_lr 0.00005, optimizer.anchor_alpha_early 0.005, optimizer.anchor_alpha_late 0.0003.'
+  precedents:
+  - 'ResNet-50 recipe: rate 5e-5, anchors 0.01 early on a 0.062 stem and 0.001 late on a 0.0073 last stage; here 0.001
+    × (0.0073/0.0135)² ≈ 0.0003 late.'
+  novelty: First multi-resolution backbone here.
+  coverage: Every study; aimed at Medial and Lateral Meniscus and the three OA labels.
+  exploitation: 'Read ×4 and ×1 against the reference, the five located labels first, and the blends. Activation: the
+    effective config and the logged drift of the stem and stage-4 groups after epoch 1 above zero.'
+  budget: '4.3 GMAC per image (measured by the search); many small parallel convolutions run slower than their GMAC:
+    expected 1.0 to 1.3 of a local MambaVision-T run (0.65 to 0.85 of the reference''s time); memory 12 to 16 GB.'
+  implementation: 'Files: modeling/backbone_stages.py (a stage class that runs HRNet''s stem, layer1 and stage 2 in
+    to_stride_8, applies the augmentation to the stride-8 branch tensor while carrying the other branches, then the
+    rest in deep), modeling/spatial_tokens.py (mappings derived from the stem and incre downsampling convolutions),
+    training/lightning.py only if the early-anchor prefixes need conv2 and bn2 of the stem, configs/campaign.yaml.
+    Check on CPU the incre output shapes at 224 px and the mapping.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The family whose design targets the labels where every family so far loses.
+- id: pvt-v2-b2
+  mechanism_id: family-pvtv2
+  parent_idea_id: null
+  title: PVTv2-b2 (pvt_v2_b2.in1k), global spatial-reduction attention from stride 4 with overlapping patch embeddings,
+    on the MambaVision recipe unchanged
+  opportunity: 'Evidence (prior-work.md, The families): global attention at every stage (with spatially reduced keys and
+    values), not windowed like Swin-T, plus overlapping patch embeddings and a depthwise convolution in each MLP, the
+    encoder of many medical segmentation models (Polyp-PVT). Apache-2.0. Its weights are flat over depth (RMS 0.045 to
+    0.056), between RadioDINO''s 0.05 to 0.06, where the MambaVision rate and anchors held, and MambaVision''s 0.08.
+    Guess on size: level to +0.003, blend value from global attention.'
+  mechanism: 'A pvt_v2 backbone from timm''s pvt_v2_b2.in1k: 64, 128, 320 and 512 channels at strides 4, 8, 16 and 32.
+    to_stride_8 runs the patch embedding and the first two stages; the middle map is the third stage''s output, the
+    final map the fourth''s. Image counts padded to a multiple of 16 (depthwise convolutions, no BatchNorm). Settings:
+    model.backbone the new name; rate and anchors the recipe''s (2e-4, 0.001, 0.00001).'
+  precedents:
+  - 'RadioDINO-S/16 (weights 0.05 to 0.06): rates 1.4e-4 to 4e-4 and the MambaVision anchors all within ±0.0006 at ×4;
+    doubled anchors −0.0024 (autoresearch/campaigns/radiodino-settings).'
+  novelty: First global-attention pyramid here.
+  coverage: Every study and every label.
+  exploitation: 'Read ×4 and ×1 against the reference, the per-label changes and the blends. Activation: the effective
+    config and the padded image count logged or checked once.'
+  budget: '4.0 GMAC per image (measured): expected near a local MambaVision-T run; memory near 12 GB.'
+  implementation: 'Files: modeling/backbone_stages.py (the stage adapter with the multiple-of-16 padding ConvNeXt uses),
+    modeling/staged_backbones.py if a wrapper is needed, modeling/spatial_tokens.py (mappings derived from the overlapping
+    patch embeddings: kernel 7 stride 4 padding 3, then kernel 3 stride 2 padding 1), configs/campaign.yaml. Check on CPU
+    the stage shapes and that padded and unpadded image counts give the same outputs for the real images.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The easiest drop-in of the attention families, with global attention from the start.
+- id: focalnet-tiny-srf
+  mechanism_id: family-focalnet
+  parent_idea_id: null
+  title: FocalNet-T SRF (focalnet_tiny_srf.ms_in1k), focal modulation instead of attention, on the MambaVision recipe
+    unchanged
+  opportunity: 'Evidence (prior-work.md, The families): focal modulation aggregates context in a gated hierarchy of
+    depthwise convolutions and modulates each token with it, neither attention nor a plain convolution stack; BiomedParse
+    built its encoder on Focal. MIT. Weights flat over depth (RMS 0.043 to 0.051), in the range where the MambaVision
+    rate and anchors held for RadioDINO. Guess on size: level to +0.003.'
+  mechanism: 'A focalnet backbone from timm''s focalnet_tiny_srf.ms_in1k: 96, 192, 384 and 768 channels at strides 4,
+    8, 16 and 32. to_stride_8 runs the stem and the first two layers; the middle map is the third layer''s output, the
+    final map the fourth''s through the final norm. Image counts padded to a multiple of 16 (depthwise convolutions, no
+    BatchNorm). Settings: model.backbone the new name; rate and anchors the recipe''s.'
+  precedents:
+  - 'ConvNeXt-T padding of image counts to multiples of 16 (docs/modeling/mambavision-backbone.md, New batch sizes): 4.3
+    s per unseen count without it.'
+  novelty: First modulation-based backbone here.
+  coverage: Every study and every label.
+  exploitation: 'Read ×4 and ×1 against the reference, the per-label changes and the blends. Activation: the effective
+    config.'
+  budget: '4.4 GMAC per image (measured): expected near a local MambaVision-T run; memory near 12 GB.'
+  implementation: 'Files: modeling/backbone_stages.py (the stage adapter with the multiple-of-16 padding),
+    modeling/spatial_tokens.py (mappings derived from the patch-embedding and downsampling convolutions),
+    configs/campaign.yaml. Check on CPU the stage shapes and padding equivalence.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: A different operator at our size; the user's choice.
+- id: rdnet-tiny
+  mechanism_id: family-rdnet
+  parent_idea_id: null
+  title: RDNet-T (rdnet_tiny.nv_in1k), DenseNet-style feature concatenation, on the MambaVision recipe unchanged
+  opportunity: 'Evidence (prior-work.md, The families): dense connections that concatenate earlier features instead of
+    summing them, so fine early features reach the deep reads directly; Apache-2.0. LayerNorm, no BatchNorm; weights
+    flat over depth (RMS 0.039 to 0.043). Guess on size: level to +0.003.'
+  mechanism: 'An rdnet backbone from timm''s rdnet_tiny.nv_in1k: 256, 440, 744 and 1040 channels at strides 4, 8, 16
+    and 32 (outputs of dense stages 0, 1, 5 and 6). to_stride_8 runs the stem and dense stages 0 and 1; the middle map
+    is dense stage 5''s output, the final map dense stage 6''s through the final norm. Image counts padded to a multiple
+    of 16 (depthwise convolutions, no BatchNorm). Settings: model.backbone the new name; rate and anchors the recipe''s.'
+  precedents:
+  - 'RadioDINO-S/16 (weights 0.05 to 0.06): the MambaVision rate and anchors held within ±0.0006.'
+  novelty: First densely connected backbone here.
+  coverage: Every study and every label.
+  exploitation: 'Read ×4 and ×1 against the reference, the per-label changes and the blends. Activation: the effective
+    config.'
+  budget: '5.0 GMAC per image (measured): expected 1.0 to 1.2 of a local MambaVision-T run; memory 12 to 15 GB with
+    the concatenated channels.'
+  implementation: 'Files: modeling/backbone_stages.py (the stage adapter with the multiple-of-16 padding, stage groups
+    stem, dense stage 0, 1, 2 to 5, 6), modeling/spatial_tokens.py (mappings derived from the stem and transition
+    downsampling), configs/campaign.yaml. Check on CPU the stage shapes and padding equivalence.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Feature reuse instead of residual sums; the user's choice.
+exhausted_directions: ''

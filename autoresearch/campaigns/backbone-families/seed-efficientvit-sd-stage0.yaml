@@ -1,0 +1,41 @@
+ideas:
+- id: efficientvit-stochastic-depth-stage0
+  mechanism_id: efficientvit-stochastic-depth
+  parent_idea_id: efficientvit-stochastic-depth
+  title: EfficientViT-B2 with stochastic depth 0.1, only stage 0 under activation checkpointing and bfloat16 attention products,
+    combining the runs efficientvit-stochastic-depth, efficientvit-checkpoint-stage0 and efficientvit-bf16-attention
+  opportunity: 'Evidence (run-notes.md, run 30): stochastic depth 0.1 lifted EfficientViT-B2 to ×4 0.938641, level with the
+    FocalNet-T incumbent (0.938816, 80% interval −0.0019 to +0.0016) and +0.0014 above plain EfficientViT-B2, at 3,633 s and
+    11.4 GiB with stages 0 and 1 checkpointed. The stage-0-only candidate''s preflight measured 0.662 s per step and 17.0
+    GiB predicted, against 0.704 s with both stages checkpointed: checkpointing stage 0 only changes neither outputs nor gradients,
+    so the combination is the stochastic-depth run, faster. Requested by the user on 2026-10-16; the stage-0-only run without
+    stochastic depth was aborted in favour of this one. efficientvit-bf16-attention was level with plain EfficientViT-B2 at
+    ×4 (0.937130 against 0.937280) at 3,319 s and 10.4 GiB against 3,406 s and 11.4 GiB; the user asked to combine it on 2026-10-16.'
+  mechanism: 'Start from the files of the efficientvit-stochastic-depth candidate, /home/claudio/src/knee-abnormality/outputs/autoresearch/backbone-families/experiments/efficientvit-stochastic-depth-20261016T094329Z-1300506e/workspace
+    (its changed files as its changes.diff lists: model.stochastic_depth 0.1, DropPath on the identity residual blocks with
+    rates rising from 0 to 0.1, no drop_path_rate passed to timm), rebased on the current incumbent, and apply the checkpointing
+    change of the efficientvit-checkpoint-stage0 candidate, /home/claudio/src/knee-abnormality/outputs/autoresearch/backbone-families/experiments/efficientvit-checkpoint-stage0-20261016T095631Z-cd917f65/workspace:
+    only stage 0 runs under torch.utils.checkpoint.checkpoint(use_reentrant=False) in training, with the recompute context
+    that keeps the real-row BatchNorm from updating its running statistics twice and preserve_rng_state=True so stage 0''s
+    drop masks repeat in the recompute; stage 1 runs directly. Nothing else changes (rate 2e-4, anchors 0.001 and 0.00003,
+    ten epochs). Also apply the attention change of the efficientvit-bf16-attention candidate, /home/claudio/src/knee-abnormality/outputs/autoresearch/backbone-families/experiments/efficientvit-bf16-attention-20261016T074147Z-ac2934c1/workspace:
+    the EfficientVitLiteMLA subclass that reuses timm''s LiteMLA weights, runs k transposed times v and q times that product
+    in the autocast dtype and only the normalising division in float32, swapped in for every LiteMLA in the stage adapter,
+    with its activity check.'
+  precedents:
+  - 'efficientvit-stochastic-depth: ×4 0.938641, ×1 0.929984, 3,633 s, 11.4 GiB.'
+  - 'efficientvit-checkpoint-stage0 preflight: 0.662 s per step, 3,690 s projected, 17.0 GiB predicted.'
+  novelty: Combines the two named runs.
+  coverage: Every study and every label.
+  exploitation: 'Read ×4 and ×1 against the incumbent and efficientvit-stochastic-depth, the training seconds and peak memory
+    against it, the per-label changes and the blends. Activation: the stochastic-depth metrics of the parent and the checkpointed-image
+    count covering stage 0 only.'
+  budget: Faster than efficientvit-stochastic-depth's 3,633 s; peak memory near 17 GiB; the preflight decides.
+  implementation: 'Files: as the two named candidates (modeling/backbone_stages.py, modeling/model.py, training/lightning.py,
+    configs/campaign.yaml). Check on CPU that with the drop rate at 0 outputs, gradients and the BatchNorm running statistics
+    equal the efficientvit-checkpoint-stage0 candidate''s, and that stage 0''s drop masks match between the forward and the
+    recompute.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user's request; the best EfficientViT-B2 run at a lower cost.
+exhausted_directions: ''

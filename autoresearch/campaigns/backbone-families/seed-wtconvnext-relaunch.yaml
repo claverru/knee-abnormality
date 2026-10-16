@@ -1,0 +1,53 @@
+ideas:
+- id: wtconvnext-tiny-relaunch
+  mechanism_id: family-wtconvnext
+  parent_idea_id: null
+  title: WTConvNeXt-T (official checkpoint), ConvNeXt-T with wavelet convolutions in place of the 7×7 depthwise convolutions,
+    through the official fused Triton kernels, on the MambaVision recipe unchanged, ten epochs (relaunch of the reviewed candidate
+    after a harness failure)
+  opportunity: 'Evidence (prior-work.md, Four families added on 2026-10-15): each block''s depthwise convolution becomes a
+    wavelet convolution, a 5×5 depthwise base plus 5, 4, 3 and 2 Haar levels in stages 0 to 3, each level a 5×5 depthwise
+    convolution on the four Haar subbands: a large low-frequency receptive field while the edge subbands keep thin detail.
+    Against ConvNeXt-T in its paper: ADE20K 46.6 against 46.0 mIoU, COCO 51.0/44.4 against 50.4/43.7 AP, shape bias 29.2%
+    against 21.7%, ImageNet-C mCE 52.0 against 53.2. MIT. Weights flat at RMS about 0.10. Added at the user''s request. Guess
+    on size: level to +0.004 against the reference.'
+  mechanism: 'Reuse unchanged the reviewed candidate of wtconvnext-tiny (experiment wtconvnext-tiny-20261016T011029Z-444af988):
+    copy its changed files from /home/claudio/src/knee-abnormality/outputs/autoresearch/backbone-families/experiments/wtconvnext-tiny-20261016T011029Z-444af988/workspace
+    (src/knee_abnormality/modeling/wtconv.py, modeling/backbone_stages.py, modeling/spatial_tokens.py, training/lightning.py,
+    modeling/model.py and configs/campaign.yaml as they differ from the parent) into the new workspace, rebased on the current
+    incumbent, with trainer.max_epochs 10. That candidate never trained: its job died in 17 s because Triton''s kernel cache
+    defaulted to ~/.triton, read-only in the training sandbox; the keeper set TRITON_CACHE_DIR to ~/.cache/triton for training
+    jobs. A backbone in a new file modeling/wtconv.py: the wavelet convolution layer vendored from the official MIT repository
+    (local clone /home/claudio/.cache/wtconv-src/WTConv): the pure Triton implementation in fast_wtconv/wtconv_triton.py and
+    fast_wtconv/triton_haar/ (fused Haar, conv and scale forward, fused inverse Haar, scaled depthwise base convolution),
+    with the Haar filters written out (no PyWavelets) and the MIT copyright notice kept as the licence requires. The network
+    is timm''s ConvNeXt-T layout (convnext_tiny, conv stem 4×4 stride 4, 2×2 downsamples, 96, 192, 384 and 768 channels) built
+    without pretrained weights, each block''s conv_dw replaced by the wavelet layer with kernel 5 and the stage''s levels,
+    then loaded strictly from the official checkpoint /home/claudio/.cache/torch/hub/checkpoints/wtconvnext_tiny_official.pth
+    (sha256 1df1052d1bd288d481adbf227833f33e1bf5c0644da453c427a90d3a406d091f), mapping its key names (wtconvnext/wtconvnext.py
+    and wtconv/wtconv2d.py in the clone) onto the vendored layer''s; every checkpoint tensor used and no new parameter left
+    random. The Triton layer takes contiguous NCHW: convert from channels_last inside the layer only, and back. Image counts
+    padded to a multiple of 16; stem, downsamples and mapping as ConvNeXt''s (origins 1.5, 3.5, 7.5 and 15.5 px; the wavelet
+    convolutions keep the cell centres, check it against the layers). model.backbone a new name (wtconvnext_tiny), pretrained_weights
+    as the existing families use it. Settings: rate 2e-4 and anchors 0.001 and 0.00001, the recipe''s (relative step 2.0e-3).'
+  precedents:
+  - 'Fast WTConv (arXiv 2608.10805): the Triton backend runs the layer about 3.0× faster than the original on an RTX A6000;
+    the original WTConvNeXt-T trains at 0.67× ConvNeXt-T''s throughput on a 3090.'
+  - 'ConvNeXt-T in12k: the stem and downsample geometry and the padding.'
+  - 'Keeper GPU parity 2026-10-16 (prior-work.md, WTConvNeXt-T GPU parity; evidence/wtconv_gpu_parity.py): that candidate''s
+    wtconv.py against the official wtconv2d.py, float32 with TF32 off, at the four stage shapes including five levels and
+    the odd 7 px map: output 1.2e-7 to 1.4e-7, input gradient 8.0e-8 to 9.1e-8, every parameter gradient at most 6.4e-7 relative;
+    this is the backward parity the review asked for.'
+  novelty: First frequency-domain operator here.
+  coverage: Every study and every label.
+  exploitation: 'Read ×4 and ×1 against the incumbent and the reference, the per-label changes (menisci, cartilage-borne OA
+    labels and ACL first), the token-map metrics and the blends. Activation: the effective config names the backbone; backbone_drift_stage4
+    above zero after epoch 1.'
+  budget: 4.5 GMAC per image; with the Triton layer expected about 4.6 to 5.3 min per epoch, memory near FocalNet-T's. The
+    original PyTorch layer would take 6.5 to 7.5 min per epoch, over the bound, so the Triton path is the implementation.
+  implementation: Copy the files of the reviewed candidate named in the mechanism; no new code. Check on CPU the strict checkpoint
+    load, the config, and that the files equal the reviewed candidate's except for rebasing.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user's pick with the most adapter work, so last.
+exhausted_directions: ''
