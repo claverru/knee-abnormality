@@ -47,7 +47,7 @@ GRADIENT_DIAGNOSTIC_INTERVAL = 10
 HEIGHT_TARGET_LIMIT_MM = 80.0
 JOINT_PLANE_ABOVE_PLATEAU_MM = 6.4
 SIDE_LOSS_WEIGHT = 0.1
-EARLY_ANCHOR_PREFIXES = ("conv1.", "bn1.", "layer1.", "stem.", "stages.0.")
+EARLY_ANCHOR_PREFIXES = ("conv1.", "bn1.", "layer1.", "stem.", "stages.0.", "layers.0.")
 LR_DECAYS = {
     "cosine": lambda progress: 0.5 * (1 + math.cos(math.pi * progress)),
     "linear": lambda progress: 1 - progress,

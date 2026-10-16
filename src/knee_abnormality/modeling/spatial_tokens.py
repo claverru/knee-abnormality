@@ -6,6 +6,7 @@ from torch import nn
 from knee_abnormality.modeling.staged_backbones import STAGED_BACKBONES
 
 CONVNEXT_BACKBONES = ("convnext_tiny.in12k_ft_in1k",)
+FOCALNET_BACKBONES = ("focalnet_tiny_srf.ms_in1k",)
 
 BACKBONE_MAPPINGS = {
     **{
@@ -24,7 +25,7 @@ BACKBONE_MAPPINGS = {
             "stride": [32.0, 32.0],
             "anchors": "patch_stem_and_downsample_centers",
         }
-        for name in CONVNEXT_BACKBONES
+        for name in (*CONVNEXT_BACKBONES, *FOCALNET_BACKBONES)
     },
     **{
         f"{name}.layer3": {
@@ -33,7 +34,7 @@ BACKBONE_MAPPINGS = {
             "stride": [16.0, 16.0],
             "anchors": "patch_stem_and_downsample_centers",
         }
-        for name in CONVNEXT_BACKBONES
+        for name in (*CONVNEXT_BACKBONES, *FOCALNET_BACKBONES)
     },
     **{
         f"{name}{suffix}": {
@@ -147,6 +148,25 @@ def _convnext_mapping(
     return mapping
 
 
+def _focalnet_mapping(
+    backbone: nn.Module, stages: int = 4
+) -> tuple[float, float, float, float]:
+    mapping = _spatial_mapping([backbone.stem.proj])
+    for stage in backbone.layers[:stages]:
+        if not isinstance(stage.downsample, nn.Identity):
+            mapping = _spatial_mapping([stage.downsample.proj], mapping)
+        for block in stage.blocks:
+            for layer in block.modules():
+                if (
+                    isinstance(layer, nn.Conv2d)
+                    and _spatial_mapping([layer], mapping) != mapping
+                ):
+                    raise ValueError(
+                        "FocalNet residual geometry differs from verified anchors"
+                    )
+    return mapping
+
+
 def _resnet_mapping(
     backbone: nn.Module, stages: int = 4
 ) -> tuple[float, float, float, float]:
@@ -212,6 +232,11 @@ _BACKBONE_MAPPING_FUNCTIONS = {
     **{
         f"{name}.layer3": lambda backbone: _convnext_mapping(backbone, 3)
         for name in CONVNEXT_BACKBONES
+    },
+    **{name: _focalnet_mapping for name in FOCALNET_BACKBONES},
+    **{
+        f"{name}.layer3": lambda backbone: _focalnet_mapping(backbone, 3)
+        for name in FOCALNET_BACKBONES
     },
 }
 
