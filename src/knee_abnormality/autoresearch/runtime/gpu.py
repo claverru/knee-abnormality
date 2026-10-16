@@ -1,6 +1,7 @@
 import subprocess
 
 GPU_BUSY = 75
+GPU_IDLE_MEMORY_MIB = 2048
 
 
 def nvidia_smi(gpu: str, query: str, check: bool):
@@ -17,7 +18,10 @@ def gpu_available(gpu: str):
     result = nvidia_smi(gpu, "--query-compute-apps=pid", False)
     if result.returncode:
         raise ValueError(f"Cannot inspect selected GPU: {result.stderr.strip()}")
-    return not result.stdout.strip()
+    if result.stdout.strip():
+        return False
+    used = nvidia_smi(gpu, "--query-gpu=memory.used", True).stdout.strip()
+    return int(used) < GPU_IDLE_MEMORY_MIB
 
 
 def gpu_uuid(gpu: str):

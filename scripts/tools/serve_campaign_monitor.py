@@ -430,6 +430,7 @@ class Job(BaseModel):
     epochs: int | None = None
     auc: float | None = None
     delta: float | None = None
+    preflight: bool = False
 
 
 def campaign_dir(campaign: str) -> Path:
@@ -674,6 +675,12 @@ def active_jobs(campaign: str, state: dict) -> list[Job]:
             note=note,
         )
         if exp and job["kind"] == "training":
+            preflight = Path(exp["directory"]) / "preflight"
+            report = preflight / "preflight.json"
+            if report.exists():
+                entry.started = max(entry.started or 0.0, report.stat().st_mtime)
+            elif preflight.is_dir():
+                entry.preflight = True
             run = fold_dir(Path(exp["directory"]) / "training", fold)
             ledger = read_json(run / "triplet_accounting.json")
             metrics = epoch_metrics(run)
@@ -1355,7 +1362,9 @@ def job_progress(job: Job) -> str:
 
 def job_stage(job: Job) -> str:
     stage = ROLES.get(job.kind, job.kind.replace("_", " "))
-    if job.kind == "training" and job.epoch is None and job.auc is None:
+    if job.preflight:
+        stage = "preflight (memory and time check before training)"
+    elif job.kind == "training" and job.epoch is None and job.auc is None:
         stage += " (starting)"
     return (
         html.escape(stage)

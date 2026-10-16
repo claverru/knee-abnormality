@@ -28,6 +28,24 @@ def select(value, keys):
     return {key: value[key] for key in keys if key in value}
 
 
+RANGE_FREE_LIMITS = {
+    "epochs",
+    "optimizer_steps",
+    "training_visits",
+    "training_triplets",
+}
+
+
+def agent_limits(state):
+    if state["budget"]["mode"] != "range":
+        return state["limits"]
+    return {
+        key: value
+        for key, value in state["limits"].items()
+        if key not in RANGE_FREE_LIMITS
+    }
+
+
 def artifact(path):
     path = Path(path)
     value = {"path": str(path), "available": path.is_file()}
@@ -122,7 +140,7 @@ def experiment_evidence(state, exp):
     fold = campaign_fold(state)
     packet = {
         "experiment": experiment_card(exp),
-        "limits": state["limits"],
+        "limits": agent_limits(state),
         "artifacts": {
             name: artifact(directory / name)
             for name in (
@@ -340,7 +358,7 @@ def build_context(state, role, assignment, directory, docs, state_path):
     context = {
         "role": role,
         "budget": state["budget"],
-        "limits": state["limits"],
+        "limits": agent_limits(state),
         "incumbent": state["incumbent"],
         "active_incumbent_ideas": active_incumbent_ideas(state),
         "history_index": str(index_path),
