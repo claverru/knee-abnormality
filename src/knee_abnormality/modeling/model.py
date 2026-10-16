@@ -1,4 +1,5 @@
 import math
+from contextlib import nullcontext
 
 import timm
 import torch
@@ -205,24 +206,26 @@ class KneeAbnormalityModel(nn.Module):
         backbone_kwargs = {}
         if model.backbone == "resnet50.a1_in1k":
             backbone_kwargs["avg_down"] = True
-        if model.stochastic_depth > 0:
+        focalnet = model.backbone == "focalnet_tiny_srf.ms_in1k"
+        if model.stochastic_depth > 0 or focalnet:
             backbone_kwargs["drop_path_rate"] = model.stochastic_depth
-        self.backbone = (
-            create_staged_backbone(
-                model.backbone,
-                pretrained and model.pretrained_weights == "timm",
-                model.stochastic_depth,
+        with torch.random.fork_rng(devices=[]) if focalnet else nullcontext():
+            self.backbone = (
+                create_staged_backbone(
+                    model.backbone,
+                    pretrained and model.pretrained_weights == "timm",
+                    model.stochastic_depth,
+                )
+                if model.backbone in STAGED_BACKBONES
+                else timm.create_model(
+                    model.backbone,
+                    pretrained=pretrained and model.pretrained_weights == "timm",
+                    in_chans=SLICES_PER_INPUT,
+                    num_classes=0,
+                    global_pool="",
+                    **backbone_kwargs,
+                )
             )
-            if model.backbone in STAGED_BACKBONES
-            else timm.create_model(
-                model.backbone,
-                pretrained=pretrained and model.pretrained_weights == "timm",
-                in_chans=SLICES_PER_INPUT,
-                num_classes=0,
-                global_pool="",
-                **backbone_kwargs,
-            )
-        )
         if pretrained and model.pretrained_weights == "radimagenet":
             state = radimagenet_state_dict(model.backbone)
             if model.backbone == "resnet50.a1_in1k":
